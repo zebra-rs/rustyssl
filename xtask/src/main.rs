@@ -7,9 +7,11 @@
 // This is a command-line tool: printing to the terminal is its interface.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+mod abi_check;
 mod codegen;
 mod coverage;
 mod dist;
+mod elf;
 mod reference;
 mod targets;
 mod test_c;
@@ -47,6 +49,7 @@ fn main() -> ExitCode {
             print_help();
             ExitCode::SUCCESS
         }
+        Some("abi-check") => report("abi-check", abi_check::run(&rest)),
         Some("codegen") => report("codegen", codegen::run(&rest)),
         Some("coverage") => report("coverage", coverage::run(&rest)),
         Some("dist") => report("dist", dist::run(&rest)),

@@ -354,8 +354,85 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
 
     Supporting Fedora binaries means a per-distribution export profile. That's decided in
     12.3.
+- [x] **0.11 ABI check.** `cargo xtask abi-check` automates TEST_PLAN L3. It turns the
+  one-off checks from 0.3 and 0.6 into a gate that runs in CI on every PR: Linux x86_64 on
+  each push, and the weekly run adds Linux aarch64 and macOS arm64. It checks the built
+  `target/dist` libraries against `abi/` and fails on any difference:
+  1. **Symbol set and versions.**
+     - Each library's dynamic exports equal its export list from the vendored mkdef `.ld`
+       files, and each symbol carries its version node.
+     - libcrypto also exports `rustssl_private_*`, exactly one per libssl function, under
+       `RUSTSSL_PRIVATE`. Nothing else is exported, including no Rust runtime symbols.
+     - Linux symbols are read from the ELF version tables, extending `usage_scan/elf.rs`'s
+       reader to defined symbols and `.gnu.version_d`. macOS uses `nm` and the export list.
+  2. **Library metadata:**
+     - the soname or install name;
+     - `NEEDED` entries: libssl needs libcrypto, and neither needs anything beyond libc,
+       libm, libpthread, libdl and the unwinder;
+     - the version definitions and their parent chain;
+     - macOS compatibility and current versions 3.0.0.
+  3. **Signatures.** Every hand-written `extern "C"` export in `rustssl-capi` (outside
+     `generated/`), including the `rustssl_private_*` definitions of libssl functions, must
+     match the bindgen prototype exactly: parameter and return types, pointer constness,
+     and variadics. The generated stubs and forwarders match by construction.
+  4. **Layouts.** A generated C program, compiled with the official headers, prints
+     `sizeof`, `alignof`, and `offsetof` for every public struct and union. The values must
+     equal `rustssl-abi`'s layout for the host target.
+  5. **Constants.** The C compiler evaluates every integer and string macro constant with
+     the real libc headers, and each value must equal `rustssl-abi`'s.
+  6. **Binary compatibility.** A program that references every exported function is linked
+     against the reference OpenSSL with immediate binding (`-z now`; `-bind_at_load` on
+     macOS). It's then loaded against our libraries, so every versioned symbol must resolve.
+  7. **Static linking:** that program also links against `libssl.a` and `libcrypto.a` and
+     runs.
+  8. **Headers and pkg-config.** Each installed header compiles on its own, and
+     `pkg-config --cflags --libs openssl` (and the `libssl`/`libcrypto` files) builds the
+     program.
+
+  Items 4 and 5 already ran by hand in 0.3 (all three targets, real compilers). Items 1, 2,
+  6, and 7 ran in the 0.6 spike against Homebrew and Debian binaries. Each item reports
+  every mismatch, not just the first.
+
+  *Done.* All eight checks pass on macOS arm64 and on Linux aarch64 (Debian trixie in
+  Docker). A run takes about 6 s once the libraries are built. `cargo xtask abi-check
+  <check>...` runs only the named checks. CI runs it in the `test` job.
+  - **Symbols:**
+    - libcrypto exports 5,876 functions plus 603 `rustssl_private_*`; libssl exports 603.
+    - On Linux every symbol is at its node and none is a non-default version. The ELF
+      reader from 0.10 now also reads `.gnu.version_d` and `.dynamic`. It skips the absolute
+      symbols the linker defines for version nodes.
+    - The reference is checked against the same lists. On Linux it exports exactly them,
+      which validates the vendored mkdef output against a real build. On macOS it also
+      exports 4,498 internal symbols: OpenSSL doesn't restrict exports there.
+  - **Metadata:** the sonames, the version definitions, and their parents match the
+    reference's. The macOS install-name leaf and compatibility and current versions 3.0.0
+    match too, and only system libraries are needed.
+    - **Fixed:** our macOS libcrypto also loaded `/usr/lib/libiconv.2.dylib`, which the
+      reference doesn't. Rust's std names it but nothing calls it, so `dist` now links with
+      `-dead_strip_dylibs`.
+  - **Signatures:** instead of parsing `ffi_export!` bodies with `syn`, codegen writes
+    `rustssl-capi/src/generated/signatures.rs`. It assigns each hand-written export to a
+    function pointer of the header prototype's type, so the compiler checks the signature
+    exactly, on every target codegen checks. That covers `*const`/`*mut`, widths,
+    variadics, and `VaList` through a higher-ranked lifetime. abi-check confirms every
+    hand-written export has an assertion. A deliberate constness mismatch fails the build.
+  - **Layouts:** 910 sizes, alignments, and field offsets (macOS) match `gcc`/Apple clang
+    with the real libc. Records bindgen can't give C names to (anonymous ones and bitfield
+    storage) are skipped. bindgen's `parent_child` names for nested records map back to
+    their C tags (the `lh_*_dummy` unions).
+  - **Constants:** 8,401 integer (8,400 on Linux) and 3,454 string constants match. Integers
+    are checked for value, size, and signedness.
+  - **Binary and static:** a program referencing all 6,479 public functions is linked
+    against the reference with `-z now`/`-bind_at_load`. It loads on rustssl's libraries,
+    and `dladdr` shows ours were used. It also links statically against `libssl.a` and
+    `libcrypto.a` and runs.
+  - **Headers:** the 142 installed headers are byte-identical to the reference's, and
+    each compiles on its own. The pkg-config versions match, and a program built with
+    `pkg-config --cflags --libs openssl` runs.
 
 **Exit:** M0. The ABI checks are green (symbol set and versions, signatures, layouts).
+*Reached on 2026-10-07: every Phase 0 step is done, and `cargo xtask abi-check` is green on
+macOS arm64 and Linux aarch64.*
 
 ## Phase 1: libcrypto runtime core
 

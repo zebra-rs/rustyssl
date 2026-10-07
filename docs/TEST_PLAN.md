@@ -91,9 +91,11 @@ rustssl itself**. You can only regenerate golden files with
    exported except `RUSTSSL_PRIVATE`.
 2. **Library metadata:** soname and install_name, `NEEDED` entries, version definitions,
    macOS compatibility versions.
-3. **Signatures.** Every Rust `extern "C"` export (parsed with `syn`) matches the bindgen
-   prototype of the vendored headers exactly: integer widths, pointer constness, variadics,
-   and return types.
+3. **Signatures.** Every Rust `extern "C"` export matches the bindgen prototype of the
+   vendored headers exactly: integer widths, pointer constness, variadics, and return types.
+   Codegen asserts it at compile time: `generated/signatures.rs` assigns each hand-written
+   export to a function pointer of the prototype's type, which compiles only if they match,
+   on every target. abi-check confirms every export has its assertion.
 4. **Layouts.** A generated C program, compiled with the official headers, prints
    `sizeof`, `alignof`, and `offsetof` for every public struct and union. These must equal
    the Rust `offset_of!` assertions.
@@ -357,7 +359,8 @@ Linux x86_64:
 - L4 dual runs (`test-c`) and L5 with 1,000 random sessions;
 - Miri, `cargo deny`, and `cargo vet`;
 - a codegen job that fails if regenerating from `abi/` or `cargo xtask coverage` changes any
-  committed file, or if an export is defined without a `tests/c` program that calls it.
+  committed file, or if an export is defined without a `tests/c` program that calls it;
+- L3, `cargo xtask abi-check`.
 
 The weekly cron and manual runs add Linux aarch64, macOS arm64, and 5 minutes of fuzzing
 per target. Those wait for a weekly run because the repository is private, so macOS
