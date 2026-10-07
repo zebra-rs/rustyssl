@@ -1,12 +1,22 @@
-//! The C ABI layer of rustssl: every `extern "C"` export of libcrypto and libssl, the opaque
-//! handle model, BIOs, C callbacks, `OSSL_PARAM`, ex_data, the error queue, `CRYPTO_malloc`,
-//! and the ASN1_ITEM template engine.
+//! The C ABI layer of rustssl: every `extern "C"` export of libcrypto, and the private
+//! definitions behind libssl's exports (docs/adr/0001-library-layout.md).
 //!
 //! This is the only library crate allowed to contain `unsafe` code. Every `unsafe` block needs
-//! a `// SAFETY:` comment, and every export goes through `ffi_export!` so that no panic
-//! crosses into C.
+//! a `// SAFETY:` comment, and every export goes through [`ffi::guard`], usually via
+//! `ffi_export!`, so that no panic crosses into C.
+//!
+//! The building blocks:
+//! - [`ffi`]: the panic guard, `ffi_export!`, and checked conversions at the boundary;
+//! - [`handle`]: opaque C handles as tagged, reference-counted Rust objects;
+//! - [`mem`]: memory C may free with `OPENSSL_free`;
+//! - [`err`]: the per-thread error queue.
 //!
 //! Exports that aren't implemented yet are generated stubs that abort (see [`stub`]).
 
+mod buffer;
+mod err;
+mod ffi;
 mod generated;
+mod handle;
+mod mem;
 mod stub;
