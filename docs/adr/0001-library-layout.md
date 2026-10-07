@@ -48,7 +48,7 @@ and Linux musl aarch64 (Alpine, `rust:1.99.0-alpine`):
 
 | Check | Result |
 |---|---|
-| Exports | libcrypto: the 5,873 OpenSSL functions plus 603 private ones. libssl: exactly its 603. On Linux every symbol carries its OpenSSL version node, with no differences from the map. |
+| Exports | libcrypto: the 5,873 OpenSSL functions (5,876 since `enable-ec_nistp_64_gcc_128`; see Consequences) plus 603 private ones. libssl: exactly its 603. On Linux every symbol carries its OpenSSL version node, with no differences from the map. |
 | Dependency | libssl needs libcrypto (`NEEDED libcrypto.so.3`, or an `LC_LOAD_DYLIB` entry), and on glibc records the `RUSTSSL_PRIVATE` version it uses |
 | Forwarder code | A single tail-call branch: `b …@plt` on aarch64, `jmp *GOT` on x86_64, `b` to the stub on macOS |
 | Binaries linked against **real OpenSSL**, run on ours with every symbol bound at load (`DYLD_BIND_AT_LAUNCH`, `LD_BIND_NOW`) | Homebrew 3.6.5: all 6,476 functions resolve (two-level namespace included). Debian 3.5.7: 6,459. Alpine 3.5: 6,402. Each is every function the distro build and ours have in common. |
@@ -77,12 +77,16 @@ and Linux musl aarch64 (Alpine, `rust:1.99.0-alpine`):
 - **Extra dependencies from Rust's runtime:** compared with OpenSSL's libraries, libcrypto
   also depends on `ld-linux` and `libgcc_s` (glibc) or `libiconv` (macOS). On musl, gcc's
   startup files add `NEEDED libgcc_s.so.1` to libssl. All are harmless system libraries.
-- **Export set vs distribution builds:** we export OpenSSL's default-build set, while
-  distributions configure OpenSSL differently:
+- **Export set vs distribution builds:** distributions configure OpenSSL differently from
+  its default build:
   - **Supersets:** Debian builds without IDEA and MDC2. Alpine also leaves out the GF2m
     curves, compression, and SEED. Exporting more than they do is harmless.
-  - **The one gap:** Debian and Homebrew build with `enable-ec_nistp_64_gcc_128` and so
-    export `EC_GFp_nistp224_method`, `EC_GFp_nistp256_method`, and `EC_GFp_nistp521_method`,
-    which the default build doesn't. A binary built on those systems that calls one of them
-    won't load against rustssl until the export set includes them; that's an open
-    decision, tracked in the implementation plan.
+  - **Closed gap:** Debian and Homebrew build with `enable-ec_nistp_64_gcc_128` and so
+    export `EC_GFp_nistp224_method`, `EC_GFp_nistp256_method`, and `EC_GFp_nistp521_method`.
+    rustssl now vendors with that option too (`CONFIGURE_OPTIONS` in
+    `xtask/src/vendor.rs`), and binaries linked against Homebrew and Debian resolve all
+    6,479 and 6,462 functions, including these three.
+  - **Left out on purpose:** Debian also builds with `enable-unit-test`, which exports
+    `SSL_test_functions`, a hook that hands OpenSSL's own unit tests pointers to its
+    internal functions. Homebrew doesn't export it and no application needs it, so it's
+    left out.

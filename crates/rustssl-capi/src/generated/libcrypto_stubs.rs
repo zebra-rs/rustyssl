@@ -9837,6 +9837,21 @@ pub extern "C" fn EC_GFp_nist_method() -> *const EC_METHOD {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn EC_GFp_nistp224_method() -> *const EC_METHOD {
+    crate::stub::unimplemented("EC_GFp_nistp224_method")
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn EC_GFp_nistp256_method() -> *const EC_METHOD {
+    crate::stub::unimplemented("EC_GFp_nistp256_method")
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn EC_GFp_nistp521_method() -> *const EC_METHOD {
+    crate::stub::unimplemented("EC_GFp_nistp521_method")
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn EC_GFp_simple_method() -> *const EC_METHOD {
     crate::stub::unimplemented("EC_GFp_simple_method")
 }

@@ -1243,6 +1243,9 @@ _ECParameters_print_fp
 _EC_GF2m_simple_method
 _EC_GFp_mont_method
 _EC_GFp_nist_method
+_EC_GFp_nistp224_method
+_EC_GFp_nistp256_method
+_EC_GFp_nistp521_method
 _EC_GFp_simple_method
 _EC_GROUP_check
 _EC_GROUP_check_discriminant

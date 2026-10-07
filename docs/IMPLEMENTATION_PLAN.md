@@ -112,7 +112,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - **Export lists.** `vendor` now saves what OpenSSL's `util/mkdef.pl` resolves for each
     target (`abi/.../config/<target>/lib{crypto,ssl}.ld`), so EXIST/NOEXIST and feature
     conditions are resolved by OpenSSL itself. The 3.5 set is **5,873 libcrypto and 603
-    libssl** functions, identical on all three targets. There are 9 version nodes, including
+    libssl** functions (5,876 in libcrypto once 0.6 adds `enable-ec_nistp_64_gcc_128`), identical on all three targets. There are 9 version nodes, including
     patch-level ones (`OPENSSL_3.0.3`, `3.0.8`, `3.0.9`) and up to `OPENSSL_3.5.0`; no data
     symbols are exported. The generated scripts match mkdef's output exactly. The
     `RUSTSSL_PRIVATE` node exports the glob `rustssl_private_*`, a placeholder until 0.6
@@ -194,12 +194,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     - **Static linking:** `libssl.a` + `libcrypto.a` link a program that references all
       6,476 functions (item 4).
     - **Overhead:** forwarding costs about 0.2 ns per call (item 5).
-  - **Open decision (before Phase 1).** Debian and Homebrew build with
-    `enable-ec_nistp_64_gcc_128` and export `EC_GFp_nistp{224,256,521}_method`, which
-    OpenSSL's default build, and so ours, doesn't. Distribution binaries calling them won't
-    load on rustssl. The proposal is to vendor with that option on 64-bit targets.
+  - **Decided: vendor with `enable-ec_nistp_64_gcc_128`.** Debian and Homebrew build with
+    that option and export `EC_GFp_nistp{224,256,521}_method`, which OpenSSL's default
+    build doesn't. With the option, libcrypto exports 5,876 functions, and binaries linked
+    against Homebrew and Debian resolve all 6,479 and 6,462 functions they share with us.
     Everything else distributions differ in, we export as a superset (Debian drops
-    IDEA/MDC2; Alpine also drops GF2m, compression, and SEED).
+    IDEA/MDC2; Alpine also drops GF2m, compression, and SEED). The exception is Debian's
+    `SSL_test_functions` (`enable-unit-test`), an internal test hook left out on purpose.
 - [ ] **0.7 FFI primitives** in `rustssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
     value);

@@ -10,7 +10,7 @@ Each `openssl-<major>.<minor>/` directory contains:
 | Path | Contents |
 |---|---|
 | `VERSION.toml` | Release version, download URL, SHA-256, signing key, and the `Configure` targets used |
-| `include/openssl/*.h` | The public headers, generated with default `Configure` options, except `configuration.h` |
+| `include/openssl/*.h` | The public headers, generated with OpenSSL's default `Configure` options plus those in `VERSION.toml`, except `configuration.h` |
 | `config/<target>/openssl/configuration.h` | The one header that differs per target (for example, `RC4_INT` changes the size of `RC4_KEY`) |
 | `config/<target>/lib{crypto,ssl}.ld` | The export lists OpenSSL's `util/mkdef.pl` resolves from the `.num` files for that target |
 | `include/internal/*.h` | The few internal headers that declare functions libcrypto exports anyway (`DSO_*`, `conf_ssl_*`, ...) |
