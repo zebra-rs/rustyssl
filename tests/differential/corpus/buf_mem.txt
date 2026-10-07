@@ -1,0 +1,38 @@
+# Growing from empty, within max, and past max.
+new 0
+grow 1
+grow 3
+grow 4
+fill 0x41
+grow 5
+dump
+grow 100
+dump
+# Shrinking keeps the bytes; grow_clean zeroes them.
+grow 7
+fill 0x42
+grow 2
+grow 7
+dump
+grow_clean 2
+grow 7
+dump
+# Past the size limit (growing to exactly the limit would allocate 2 GB).
+grow 1610612733
+free
+# Secure buffers.
+new 1
+grow 10
+fill 0x43
+grow_clean 30
+dump
+grow_clean 0
+free
+# Operations without a buffer.
+grow 5
+dump
+# BUF_reverse.
+reverse 00
+reverse 0102
+reverse 010203
+reverse 00112233445566778899aabbccddeeff
