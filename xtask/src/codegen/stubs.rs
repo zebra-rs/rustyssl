@@ -141,16 +141,26 @@ fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
                     dirs.push(path);
                 }
             } else if path.extension().is_some_and(|e| e == "rs") {
-                let text = fs::read_to_string(&path)?;
-                for piece in text.split("extern \"C\" fn ").skip(1) {
-                    if let Some(name) = identifiers(piece).next() {
-                        names.insert(name.to_owned());
-                    }
-                }
+                names.extend(defined_functions(&fs::read_to_string(&path)?));
             }
         }
     }
     Ok(names)
+}
+
+/// Names of the `extern "C" fn`s defined in Rust `source`, ignoring comment lines (whose
+/// examples must not count as implementations).
+fn defined_functions(source: &str) -> Vec<String> {
+    let code: String = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    code.split("extern \"C\" fn ")
+        .skip(1)
+        .filter_map(|piece| identifiers(piece).next())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Every prototype in bindgen's output, keyed by function name.
@@ -331,6 +341,18 @@ mod tests {
     fn prototype_of(declaration: &str) -> Prototype {
         let file = format!("unsafe extern \"C\" {{ {declaration} }}");
         prototypes(&file).unwrap().into_values().next().unwrap()
+    }
+
+    #[test]
+    fn only_code_counts_as_an_implementation() {
+        let source = "//! pub unsafe extern \"C\" fn BIO_printf(b: *mut BIO)\n\
+                      /// pub unsafe extern \"C\" fn BIO_vprintf(b: *mut BIO)\n\
+                      ffi_export! {\n    pub unsafe extern \"C\" fn BUF_MEM_new() -> *mut BUF_MEM\n}\n\
+                      pub extern \"C\" fn rustssl_private_SSL_free(s: *mut SSL) {}\n";
+        assert_eq!(
+            defined_functions(source),
+            ["BUF_MEM_new", "rustssl_private_SSL_free"]
+        );
     }
 
     #[test]
