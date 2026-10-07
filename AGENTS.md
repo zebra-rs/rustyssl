@@ -31,9 +31,11 @@ Size of the surface (OpenSSL 3.6): about 6,200 public libcrypto functions and ab
 libssl functions, plus 20–40 exported data symbols. The exact list is `util/libcrypto.num`
 and `util/libssl.num`.
 
-**Sources of truth** are vendored under `abi/openssl-<ver>/`: the public headers, the
-`.num` files, `objects.txt`, the error tables, and the man pages (OpenSSL 3+ is
-Apache-2.0; keep its copyright and NOTICE). The man pages (`doc/man3/*.pod`) are the
+**Sources of truth** are vendored under `abi/openssl-<ver>/` by `cargo xtask vendor` (see
+`abi/README.md`): the public headers, the `.num` files, `objects.txt`, the error tables, and
+the man pages (OpenSSL 3+ is Apache-2.0; keep its copyright). `configuration.h` differs per
+target and lives under `config/<target>/`; for example, `RC4_INT` changes the `RC4_KEY` layout
+between x86_64 and aarch64 Linux, so layouts and bindings are per target. The man pages (`doc/man3/*.pod`) are the
 behavioral spec. When the docs are silent or ambiguous, **the reference OpenSSL build's
 actual behavior is the spec**. Test it, don't guess.
 
@@ -74,7 +76,7 @@ test.
 Planned workspace layout (built in Phase 0):
 
 ```
-abi/openssl-3.x/      vendored headers, *.num, objects.txt, err tables, man3 (Apache-2.0)
+abi/openssl-3.5/      vendored headers (+ config/<target>/), *.num, objects, err tables, man pages
 crates/
   rustssl-abi/        bindgen output from abi/ headers: types, constants, public-struct layouts. No logic.
   rustssl-asn1/       DER/BER reader and writer, ASN.1 universal types, OID/NID registry, base64, PEM framing
@@ -173,9 +175,9 @@ generator. Don't paste the number.
 
 ## Commands
 
-`cargo build`, `test`, `clippy`, and `fmt` work now. `cargo xtask` lists every command,
-but the subcommands arrive during Phase 0 and fail with a message until then. Update this
-section when they change.
+`cargo build`, `test`, `clippy`, `fmt`, and `cargo xtask vendor` work now. The other
+`cargo xtask` commands arrive during Phase 0 and fail with a message until then. Update this
+section when they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`, `perl`, and `make`.
 
 ```sh
 cargo build --workspace                      # build everything
@@ -183,6 +185,7 @@ cargo test --workspace                       # Rust unit, property, and KAT test
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 cargo deny check && cargo vet                # supply-chain gates
+cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
 cargo xtask codegen                          # regenerate ABI bindings, NID/err tables, version scripts
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
 cargo xtask ref-openssl 3.5                  # build the pinned reference OpenSSL into target/ref/
