@@ -99,7 +99,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     expected. That one-off check should become L3 items 4 and 5 in `cargo xtask abi-check`.
   - `rust-toolchain.toml` lists the three Rust targets, so codegen can `cargo check` each
     one, which evaluates the layout assertions. Regenerating gives byte-identical output.
-- [ ] **0.4 Code generators** (`cargo xtask codegen`):
+- [x] **0.4 Code generators** (`cargo xtask codegen`):
   - Linux version scripts (`OPENSSL_3.0.0` … `OPENSSL_3.6.0` plus `RUSTSSL_PRIVATE`) and
     macOS exported-symbol lists, from the `.num` files. Honor the `EXIST`/`NOEXIST` and
     feature columns exactly as the default build resolves them.
@@ -107,6 +107,36 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - `ERR_LIB_*` codes, reason codes, and reason strings from `openssl.txt`.
   - A **fail-closed stub** for every export, built from the header prototype, to be replaced
     family by family.
+
+  *Done.* Each output was checked against OpenSSL's own generated artifacts. Notes:
+  - **Export lists.** `vendor` now saves what OpenSSL's `util/mkdef.pl` resolves for each
+    target (`abi/.../config/<target>/lib{crypto,ssl}.ld`), so EXIST/NOEXIST and feature
+    conditions are resolved by OpenSSL itself. The 3.5 set is **5,873 libcrypto and 603
+    libssl** functions, identical on all three targets. There are 9 version nodes, including
+    patch-level ones (`OPENSSL_3.0.3`, `3.0.8`, `3.0.9`) and up to `OPENSSL_3.5.0`; no data
+    symbols are exported. The generated scripts match mkdef's output exactly. The
+    `RUSTSSL_PRIVATE` node exports the glob `rustssl_private_*`, a placeholder until 0.6
+    settles the names.
+  - **Stubs abort** instead of returning an error (see rule 10 in AGENTS.md). There's one
+    per export: 6,476, generated from bindgen prototypes parsed with `syn`. `va_list`
+    parameters become `VaList`. All three targets must produce identical stubs, and they
+    compile on each. A C program linked to the built `libcrypto.dylib` gets the message and
+    SIGABRT. 26 exports are declared only in internal headers (`DSO_*`, `conf_ssl_*`,
+    `OPENSSL_DIR_*`, …), so six of those are now vendored, and `rustssl-abi` includes their
+    types. The wrapper also puts headers first when another header declares extra
+    functions only after them (`cms.h` declares the `PEM_*_CMS` functions only if `pem.h`
+    came first).
+  - **Error strings.** Three sources are cross-checked: `openssl.txt` (names and codes), the
+    headers (codes, as `rustssl-abi` constants), and the C string tables `*_err.c`, which
+    are now vendored. Upstream, 3 BIO texts in `bio_err.c` differ from `openssl.txt`, and
+    the C text wins because it's what OpenSSL prints. Separately,
+    `BIO_R_PEER_ADDR_NOT_AVAILABLE` is 114 in `openssl.txt` but 151 in the header, and the
+    header wins. The result is 1,821 reasons, matching the compiled tables exactly; 25
+    (SM2, PROP) take their codes from `openssl.txt` alone.
+  - **Object table:** 1,478 NIDs (up to 1,486) and 68 signature-algorithm rows. It matches
+    OpenSSL's `obj_dat.h` exactly for all 1,487 slots, including `obj_dat.pl`'s quirks: the
+    single-arc roots get no encoding, a bare alias (`ac_auditEntity`) is named `"NULL"`
+    with no OID, and `NID_x` aliases are ignored.
 - [ ] **0.5 Library facades.** `libs/libcrypto` (`crate-type = ["cdylib", "staticlib"]`,
   lib name `crypto`) and `libs/libssl`. Their `build.rs` passes the soname or install_name,
   the version script, and on macOS the current and compatibility versions.
@@ -118,10 +148,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   2. A binary **linked against real OpenSSL** resolves every versioned symbol against our libs.
   3. macOS two-level-namespace binding resolves correctly.
   4. `-lssl -lcrypto` static linking works and doesn't duplicate Rust `std` symbols.
-  5. The exported data symbols work.
-  6. Forwarding overhead is negligible.
+  5. Forwarding overhead is negligible.
 
-  Write the outcome up as an ADR in `docs/adr/0001-library-layout.md`.
+  OpenSSL 3.5 exports no data symbols (the `.num` files list only functions), so there's
+  nothing to test there. Inputs from 0.4: `rustssl-capi` currently holds the stubs of both
+  libraries, so libcrypto exports all 6,476 functions until the export lists are linked in.
+  The private node's symbol names (`rustssl_private_*`) are a placeholder for this step to
+  settle. Write the outcome up as an ADR in `docs/adr/0001-library-layout.md`.
 - [ ] **0.7 FFI primitives** in `rustssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
     value);
@@ -178,6 +211,10 @@ Everything else depends on this phase.
   - `ERR_print_errors_fp` / `ERR_print_errors_cb`
   - application-defined libraries (`ERR_get_next_error_library`, `ERR_load_strings`)
   - `ERR_add_error_data` / `ERR_add_error_vdata`
+
+  The reason strings already exist (`err_reasons.rs`, from 0.4). Extend codegen to also
+  emit the library names (`ERR_str_libraries`) and the common `ERR_R_*` reasons
+  (`ERR_str_reasons`) from the vendored `crypto/err/err.c`.
 - [ ] **1.5 Containers and utilities:**
   - `OPENSSL_sk_*`, including the comparator and sort quirks (for example, `find` sorts an
     unsorted stack)
@@ -211,7 +248,8 @@ base64 fuzzers run clean.
 ## Phase 2: ASN.1, objects, encodings
 
 - [ ] **2.1 OBJ:**
-  - the generated NID table, plus `OBJ_create`/`OBJ_add_object` for runtime OIDs
+  - the generated NID table (`rustssl_asn1::objects`, from 0.4), plus
+    `OBJ_create`/`OBJ_add_object` for runtime OIDs
   - `OBJ_txt2obj`/`OBJ_obj2txt` (byte-exact, including large arcs)
   - `OBJ_find_sigid_algs`, `OBJ_add_sigid`
   - the `OBJ_NAME_*` alias registry

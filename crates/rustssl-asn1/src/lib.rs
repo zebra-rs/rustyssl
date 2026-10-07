@@ -6,3 +6,6 @@
 
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
+
+mod generated;
+pub mod objects;
