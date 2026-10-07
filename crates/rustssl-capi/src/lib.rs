@@ -5,3 +5,8 @@
 //! This is the only library crate allowed to contain `unsafe` code. Every `unsafe` block needs
 //! a `// SAFETY:` comment, and every export goes through `ffi_export!` so that no panic
 //! crosses into C.
+//!
+//! Exports that aren't implemented yet are generated stubs that abort (see [`stub`]).
+
+mod generated;
+mod stub;

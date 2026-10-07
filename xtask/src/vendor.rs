@@ -12,7 +12,8 @@ use std::process::Command;
 
 use crate::targets::TARGETS;
 use crate::util::{
-    Result, copy_file, fresh_dir, private_dir, run_logged, sha256_file, with_suffix, workspace_root,
+    Result, copy_file, fresh_dir, private_dir, run_logged, run_output, sha256_file, with_suffix,
+    workspace_root,
 };
 
 const RELEASES: &str = "https://github.com/openssl/openssl/releases/download";
@@ -24,10 +25,15 @@ const TRUST_ANCHOR: &str = "B146647E45A7B33947AB226B2A2C87D161692D40";
 /// OpenSSL's signing certificates, copied from <https://openssl-library.org/source/pubkeys.asc>.
 const PUBKEYS: &str = "xtask/keys/openssl-pubkeys.asc";
 
-/// The one generated file that legitimately differs between the `Configure` targets in
-/// [`TARGETS`] (for example, `RC4_INT` changes the size of `RC4_KEY`). It is installed as
-/// `config/<target>/openssl/configuration.h`; the first target supplies every other file.
-const PER_TARGET: &str = "include/openssl/configuration.h";
+/// Generated files that legitimately differ between the `Configure` targets in [`TARGETS`],
+/// with their install path under `config/<target>/`. `configuration.h` differs (for example,
+/// `RC4_INT` changes the size of `RC4_KEY`), and so may the export lists that `util/mkdef.pl`
+/// resolves from each target's configuration. The first target supplies every other file.
+const PER_TARGET: &[(&str, &str)] = &[
+    ("include/openssl/configuration.h", "openssl/configuration.h"),
+    ("libcrypto.ld", "libcrypto.ld"),
+    ("libssl.ld", "libssl.ld"),
+];
 
 /// Single files to vendor, relative to the source root.
 const FILES: &[&str] = &[
@@ -38,6 +44,14 @@ const FILES: &[&str] = &[
     "crypto/objects/obj_mac.num",
     "crypto/objects/obj_xref.txt",
     "crypto/err/openssl.txt",
+    // Internal headers that declare functions libcrypto exports all the same (DSO_*,
+    // conf_ssl_*, OPENSSL_DIR_*, ...). Codegen fails if an export has no prototype.
+    "include/internal/asn1.h",
+    "include/internal/dso.h",
+    "include/internal/dsoerr.h",
+    "include/internal/err.h",
+    "include/internal/o_dir.h",
+    "include/internal/sslconf.h",
 ];
 
 /// Directories whose files with the given extension are vendored.
@@ -227,12 +241,27 @@ fn configure(work: &Path, tarball: &Path, version: &str, target: &str) -> Result
         .env_clear()
         .env("PATH", &path);
     run_logged(&mut make, &log)?;
+
+    // The export lists, from OpenSSL's own resolver, invoked as the Linux Makefile does. Its
+    // `linux` writer handles every UNIX target, macOS included (whose build has no list).
+    for lib in ["libcrypto", "libssl"] {
+        let mut mkdef = Command::new("perl");
+        mkdef
+            .arg("util/mkdef.pl")
+            .args(["--version", version, "--type", "lib", "--ordinals"])
+            .arg(format!("util/{lib}.num"))
+            .args(["--name", lib, "--OS", "linux"])
+            .current_dir(&src)
+            .env_clear()
+            .env("PATH", &path);
+        fs::write(src.join(format!("{lib}.ld")), run_output(&mut mkdef)?)?;
+    }
     Ok(src)
 }
 
 /// Replaces `dest` with the vendored files and returns how many were written. Every file
-/// except [`PER_TARGET`] must be byte-identical across targets; if that ever stops being
-/// true, this fails instead of silently vendoring one target's copy.
+/// except the [`PER_TARGET`] ones must be byte-identical across targets; if that ever stops
+/// being true, this fails instead of silently vendoring one target's copy.
 fn install(trees: &[PathBuf], dest: &Path) -> Result<usize> {
     let [primary, others @ ..] = trees else {
         return Err("no targets were configured".into());
@@ -247,13 +276,14 @@ fn install(trees: &[PathBuf], dest: &Path) -> Result<usize> {
         }
         files.extend(names.into_iter().map(|name| format!("{dir}/{name}")));
     }
-    files.retain(|f| f != PER_TARGET);
+    files.extend(error_tables(primary)?);
+    files.retain(|f| !PER_TARGET.iter().any(|(from, _)| f == from));
     for file in &files {
         let content = fs::read(primary.join(file))?;
         for other in others {
             if fs::read(other.join(file))? != content {
                 return Err(format!(
-                    "{file} differs between Configure targets; only {PER_TARGET} may"
+                    "{file} differs between Configure targets; only the files in PER_TARGET may"
                 )
                 .into());
             }
@@ -267,13 +297,41 @@ fn install(trees: &[PathBuf], dest: &Path) -> Result<usize> {
         copy_file(&primary.join(file), &dest.join(file))?;
     }
     for (target, tree) in TARGETS.iter().zip(trees) {
-        let to = dest
-            .join("config")
-            .join(target.configure)
-            .join("openssl/configuration.h");
-        copy_file(&tree.join(PER_TARGET), &to)?;
+        for (from, to) in PER_TARGET {
+            let config = dest.join("config").join(target.configure);
+            copy_file(&tree.join(from), &config.join(to))?;
+        }
     }
-    Ok(files.len() + trees.len())
+    Ok(files.len() + trees.len() * PER_TARGET.len())
+}
+
+/// The C sources that define error-string tables (`static const ERR_STRING_DATA x[] = {`),
+/// relative to `src`. Their strings are what OpenSSL prints at run time, and a few differ from
+/// `crypto/err/openssl.txt`; `err.c` also holds the library names and common reasons.
+fn error_tables(src: &Path) -> Result<Vec<String>> {
+    let mut found = Vec::new();
+    let mut dirs: Vec<PathBuf> = ["crypto", "ssl", "providers"]
+        .iter()
+        .map(|d| src.join(d))
+        .collect();
+    while let Some(dir) = dirs.pop() {
+        for entry in fs::read_dir(&dir)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "c") {
+                let text = fs::read_to_string(&path)?;
+                let defines_table = text
+                    .lines()
+                    .any(|l| l.contains("ERR_STRING_DATA ") && l.contains("[] = {"));
+                if defines_table && let Ok(relative) = path.strip_prefix(src) {
+                    found.push(relative.display().to_string());
+                }
+            }
+        }
+    }
+    found.sort();
+    Ok(found)
 }
 
 /// Sorted names of the files in `dir` with extension `ext`.
@@ -307,7 +365,8 @@ sha256 = "{sha256}"
 signing-key = "{signer}"
 trust-anchor = "{TRUST_ANCHOR}"
 # Each target ran `perl Configure <target>` with no options in a cleared environment.
-# Only include/openssl/configuration.h differs; it lives under config/<target>/.
+# config/<target>/ holds the files that differ: configuration.h, and the export lists
+# libcrypto.ld and libssl.ld written by util/mkdef.pl.
 configure-targets = [{targets}]
 "#
     );

@@ -12,20 +12,6 @@
 
 use libc::{pthread_key_t, pthread_once_t, pthread_t};
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct aes_key_st {
-    pub rd_key: [core::ffi::c_uint; 60usize],
-    pub rounds: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of aes_key_st"][::core::mem::size_of::<aes_key_st>() - 244usize];
-    ["Alignment of aes_key_st"][::core::mem::align_of::<aes_key_st>() - 4usize];
-    ["Offset of field: aes_key_st::rd_key"][::core::mem::offset_of!(aes_key_st, rd_key) - 0usize];
-    ["Offset of field: aes_key_st::rounds"][::core::mem::offset_of!(aes_key_st, rounds) - 240usize];
-};
-pub type AES_KEY = aes_key_st;
 pub type intmax_t = core::ffi::c_long;
 pub type uintmax_t = core::ffi::c_ulong;
 pub type ossl_intmax_t = intmax_t;
@@ -1092,782 +1078,312 @@ pub const BIO_SOCK_INFO_ADDRESS: BIO_sock_info_type = 0;
 pub type BIO_sock_info_type = core::ffi::c_uint;
 #[repr(C)]
 #[derive(Debug)]
-pub struct stack_st_X509_ALGOR {
+pub struct lhash_node_st {
     _unused: [u8; 0],
 }
-pub type sk_X509_ALGOR_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const X509_ALGOR,
-        b: *const *const X509_ALGOR,
-    ) -> core::ffi::c_int,
->;
-pub type sk_X509_ALGOR_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut X509_ALGOR)>;
-pub type sk_X509_ALGOR_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const X509_ALGOR) -> *mut X509_ALGOR>;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct asn1_string_st {
-    pub length: core::ffi::c_int,
-    pub type_: core::ffi::c_int,
-    pub data: *mut core::ffi::c_uchar,
-    pub flags: core::ffi::c_long,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of asn1_string_st"][::core::mem::size_of::<asn1_string_st>() - 24usize];
-    ["Alignment of asn1_string_st"][::core::mem::align_of::<asn1_string_st>() - 8usize];
-    ["Offset of field: asn1_string_st::length"]
-        [::core::mem::offset_of!(asn1_string_st, length) - 0usize];
-    ["Offset of field: asn1_string_st::type_"]
-        [::core::mem::offset_of!(asn1_string_st, type_) - 4usize];
-    ["Offset of field: asn1_string_st::data"]
-        [::core::mem::offset_of!(asn1_string_st, data) - 8usize];
-    ["Offset of field: asn1_string_st::flags"]
-        [::core::mem::offset_of!(asn1_string_st, flags) - 16usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_ENCODING_st {
-    pub enc: *mut core::ffi::c_uchar,
-    pub len: core::ffi::c_long,
-    pub modified: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_ENCODING_st"][::core::mem::size_of::<ASN1_ENCODING_st>() - 24usize];
-    ["Alignment of ASN1_ENCODING_st"][::core::mem::align_of::<ASN1_ENCODING_st>() - 8usize];
-    ["Offset of field: ASN1_ENCODING_st::enc"]
-        [::core::mem::offset_of!(ASN1_ENCODING_st, enc) - 0usize];
-    ["Offset of field: ASN1_ENCODING_st::len"]
-        [::core::mem::offset_of!(ASN1_ENCODING_st, len) - 8usize];
-    ["Offset of field: ASN1_ENCODING_st::modified"]
-        [::core::mem::offset_of!(ASN1_ENCODING_st, modified) - 16usize];
-};
-pub type ASN1_ENCODING = ASN1_ENCODING_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct asn1_string_table_st {
-    pub nid: core::ffi::c_int,
-    pub minsize: core::ffi::c_long,
-    pub maxsize: core::ffi::c_long,
-    pub mask: core::ffi::c_ulong,
-    pub flags: core::ffi::c_ulong,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of asn1_string_table_st"][::core::mem::size_of::<asn1_string_table_st>() - 40usize];
-    ["Alignment of asn1_string_table_st"][::core::mem::align_of::<asn1_string_table_st>() - 8usize];
-    ["Offset of field: asn1_string_table_st::nid"]
-        [::core::mem::offset_of!(asn1_string_table_st, nid) - 0usize];
-    ["Offset of field: asn1_string_table_st::minsize"]
-        [::core::mem::offset_of!(asn1_string_table_st, minsize) - 8usize];
-    ["Offset of field: asn1_string_table_st::maxsize"]
-        [::core::mem::offset_of!(asn1_string_table_st, maxsize) - 16usize];
-    ["Offset of field: asn1_string_table_st::mask"]
-        [::core::mem::offset_of!(asn1_string_table_st, mask) - 24usize];
-    ["Offset of field: asn1_string_table_st::flags"]
-        [::core::mem::offset_of!(asn1_string_table_st, flags) - 32usize];
-};
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_ASN1_STRING_TABLE {
-    _unused: [u8; 0],
-}
-pub type sk_ASN1_STRING_TABLE_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_STRING_TABLE,
-        b: *const *const ASN1_STRING_TABLE,
-    ) -> core::ffi::c_int,
->;
-pub type sk_ASN1_STRING_TABLE_freefunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_STRING_TABLE)>;
-pub type sk_ASN1_STRING_TABLE_copyfunc = ::core::option::Option<
-    unsafe extern "C" fn(a: *const ASN1_STRING_TABLE) -> *mut ASN1_STRING_TABLE,
->;
-pub type ASN1_TEMPLATE = ASN1_TEMPLATE_st;
-pub type ASN1_TLC = ASN1_TLC_st;
-#[repr(C)]
-#[derive(Debug)]
-pub struct ASN1_VALUE_st {
-    _unused: [u8; 0],
-}
-pub type ASN1_VALUE = ASN1_VALUE_st;
-pub type d2i_of_void = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut *mut core::ffi::c_void,
-        arg2: *mut *const core::ffi::c_uchar,
-        arg3: core::ffi::c_long,
-    ) -> *mut core::ffi::c_void,
->;
-pub type i2d_of_void = ::core::option::Option<
+pub type OPENSSL_LH_NODE = lhash_node_st;
+pub type OPENSSL_LH_COMPFUNC = ::core::option::Option<
     unsafe extern "C" fn(
         arg1: *const core::ffi::c_void,
-        arg2: *mut *mut core::ffi::c_uchar,
+        arg2: *const core::ffi::c_void,
     ) -> core::ffi::c_int,
 >;
-pub type OSSL_i2d_of_void_ctx = ::core::option::Option<
+pub type OPENSSL_LH_COMPFUNCTHUNK = ::core::option::Option<
     unsafe extern "C" fn(
         arg1: *const core::ffi::c_void,
-        arg2: *mut *mut core::ffi::c_uchar,
-        vctx: *mut core::ffi::c_void,
+        arg2: *const core::ffi::c_void,
+        cfn: OPENSSL_LH_COMPFUNC,
     ) -> core::ffi::c_int,
 >;
-pub type ASN1_ITEM_EXP = ::core::option::Option<unsafe extern "C" fn() -> *const ASN1_ITEM>;
+pub type OPENSSL_LH_HASHFUNC = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *const core::ffi::c_void) -> core::ffi::c_ulong,
+>;
+pub type OPENSSL_LH_HASHFUNCTHUNK = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const core::ffi::c_void,
+        hfn: OPENSSL_LH_HASHFUNC,
+    ) -> core::ffi::c_ulong,
+>;
+pub type OPENSSL_LH_DOALL_FUNC =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>;
+pub type OPENSSL_LH_DOALL_FUNC_THUNK = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *mut core::ffi::c_void, doall: OPENSSL_LH_DOALL_FUNC),
+>;
+pub type OPENSSL_LH_DOALL_FUNCARG = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *mut core::ffi::c_void, arg2: *mut core::ffi::c_void),
+>;
+pub type OPENSSL_LH_DOALL_FUNCARG_THUNK = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut core::ffi::c_void,
+        arg2: *mut core::ffi::c_void,
+        doall: OPENSSL_LH_DOALL_FUNCARG,
+    ),
+>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct lhash_st {
+    _unused: [u8; 0],
+}
+pub type OPENSSL_LHASH = lhash_st;
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct asn1_type_st {
-    pub type_: core::ffi::c_int,
-    pub value: asn1_type_st__bindgen_ty_1,
+pub struct lhash_st_OPENSSL_STRING {
+    pub dummy: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union asn1_type_st__bindgen_ty_1 {
-    pub ptr: *mut core::ffi::c_char,
-    pub boolean: ASN1_BOOLEAN,
-    pub asn1_string: *mut ASN1_STRING,
-    pub object: *mut ASN1_OBJECT,
-    pub integer: *mut ASN1_INTEGER,
-    pub enumerated: *mut ASN1_ENUMERATED,
-    pub bit_string: *mut ASN1_BIT_STRING,
-    pub octet_string: *mut ASN1_OCTET_STRING,
-    pub printablestring: *mut ASN1_PRINTABLESTRING,
-    pub t61string: *mut ASN1_T61STRING,
-    pub ia5string: *mut ASN1_IA5STRING,
-    pub generalstring: *mut ASN1_GENERALSTRING,
-    pub bmpstring: *mut ASN1_BMPSTRING,
-    pub universalstring: *mut ASN1_UNIVERSALSTRING,
-    pub utctime: *mut ASN1_UTCTIME,
-    pub generalizedtime: *mut ASN1_GENERALIZEDTIME,
-    pub visiblestring: *mut ASN1_VISIBLESTRING,
-    pub utf8string: *mut ASN1_UTF8STRING,
-    pub set: *mut ASN1_STRING,
-    pub sequence: *mut ASN1_STRING,
-    pub asn1_value: *mut ASN1_VALUE,
+pub union lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy {
+    pub d1: *mut core::ffi::c_void,
+    pub d2: core::ffi::c_ulong,
+    pub d3: core::ffi::c_int,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of asn1_type_st__bindgen_ty_1"]
-        [::core::mem::size_of::<asn1_type_st__bindgen_ty_1>() - 8usize];
-    ["Alignment of asn1_type_st__bindgen_ty_1"]
-        [::core::mem::align_of::<asn1_type_st__bindgen_ty_1>() - 8usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::ptr"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, ptr) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::boolean"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, boolean) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::asn1_string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, asn1_string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::object"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, object) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::integer"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, integer) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::enumerated"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, enumerated) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::bit_string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, bit_string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::octet_string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, octet_string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::printablestring"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, printablestring) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::t61string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, t61string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::ia5string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, ia5string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::generalstring"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, generalstring) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::bmpstring"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, bmpstring) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::universalstring"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, universalstring) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::utctime"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, utctime) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::generalizedtime"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, generalizedtime) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::visiblestring"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, visiblestring) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::utf8string"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, utf8string) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::set"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, set) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::sequence"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, sequence) - 0usize];
-    ["Offset of field: asn1_type_st__bindgen_ty_1::asn1_value"]
-        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, asn1_value) - 0usize];
+    ["Size of lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy"]
+        [::core::mem::size_of::<lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy>() - 8usize];
+    ["Alignment of lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy"]
+        [::core::mem::align_of::<lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy>() - 8usize];
+    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d1"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d1) - 0usize];
+    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d2"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d2) - 0usize];
+    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d3"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d3) - 0usize];
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of asn1_type_st"][::core::mem::size_of::<asn1_type_st>() - 16usize];
-    ["Alignment of asn1_type_st"][::core::mem::align_of::<asn1_type_st>() - 8usize];
-    ["Offset of field: asn1_type_st::type_"][::core::mem::offset_of!(asn1_type_st, type_) - 0usize];
-    ["Offset of field: asn1_type_st::value"][::core::mem::offset_of!(asn1_type_st, value) - 8usize];
+    ["Size of lhash_st_OPENSSL_STRING"][::core::mem::size_of::<lhash_st_OPENSSL_STRING>() - 8usize];
+    ["Alignment of lhash_st_OPENSSL_STRING"]
+        [::core::mem::align_of::<lhash_st_OPENSSL_STRING>() - 8usize];
+    ["Offset of field: lhash_st_OPENSSL_STRING::dummy"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING, dummy) - 0usize];
 };
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_ASN1_TYPE {
-    _unused: [u8; 0],
-}
-pub type sk_ASN1_TYPE_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_TYPE,
-        b: *const *const ASN1_TYPE,
-    ) -> core::ffi::c_int,
+pub type lh_OPENSSL_STRING_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(a: *const OPENSSL_STRING, b: *const OPENSSL_STRING) -> core::ffi::c_int,
 >;
-pub type sk_ASN1_TYPE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_TYPE)>;
-pub type sk_ASN1_TYPE_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_TYPE) -> *mut ASN1_TYPE>;
-pub type ASN1_SEQUENCE_ANY = stack_st_ASN1_TYPE;
+pub type lh_OPENSSL_STRING_hashfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const OPENSSL_STRING) -> core::ffi::c_ulong>;
+pub type lh_OPENSSL_STRING_doallfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut OPENSSL_STRING)>;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct lhash_st_OPENSSL_CSTRING {
+    pub dummy: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy {
+    pub d1: *mut core::ffi::c_void,
+    pub d2: core::ffi::c_ulong,
+    pub d3: core::ffi::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy"]
+        [::core::mem::size_of::<lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy>() - 8usize];
+    ["Alignment of lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy"]
+        [::core::mem::align_of::<lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy>() - 8usize];
+    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d1"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d1) - 0usize];
+    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d2"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d2) - 0usize];
+    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d3"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d3) - 0usize];
+};
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of lhash_st_OPENSSL_CSTRING"]
+        [::core::mem::size_of::<lhash_st_OPENSSL_CSTRING>() - 8usize];
+    ["Alignment of lhash_st_OPENSSL_CSTRING"]
+        [::core::mem::align_of::<lhash_st_OPENSSL_CSTRING>() - 8usize];
+    ["Offset of field: lhash_st_OPENSSL_CSTRING::dummy"]
+        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING, dummy) - 0usize];
+};
+pub type lh_OPENSSL_CSTRING_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(a: *const OPENSSL_CSTRING, b: *const OPENSSL_CSTRING) -> core::ffi::c_int,
+>;
+pub type lh_OPENSSL_CSTRING_hashfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const OPENSSL_CSTRING) -> core::ffi::c_ulong>;
+pub type lh_OPENSSL_CSTRING_doallfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut OPENSSL_CSTRING)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct BIT_STRING_BITNAME_st {
-    pub bitnum: core::ffi::c_int,
-    pub lname: *const core::ffi::c_char,
-    pub sname: *const core::ffi::c_char,
+pub struct CONF_VALUE {
+    pub section: *mut core::ffi::c_char,
+    pub name: *mut core::ffi::c_char,
+    pub value: *mut core::ffi::c_char,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BIT_STRING_BITNAME_st"][::core::mem::size_of::<BIT_STRING_BITNAME_st>() - 24usize];
-    ["Alignment of BIT_STRING_BITNAME_st"]
-        [::core::mem::align_of::<BIT_STRING_BITNAME_st>() - 8usize];
-    ["Offset of field: BIT_STRING_BITNAME_st::bitnum"]
-        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, bitnum) - 0usize];
-    ["Offset of field: BIT_STRING_BITNAME_st::lname"]
-        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, lname) - 8usize];
-    ["Offset of field: BIT_STRING_BITNAME_st::sname"]
-        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, sname) - 16usize];
+    ["Size of CONF_VALUE"][::core::mem::size_of::<CONF_VALUE>() - 24usize];
+    ["Alignment of CONF_VALUE"][::core::mem::align_of::<CONF_VALUE>() - 8usize];
+    ["Offset of field: CONF_VALUE::section"][::core::mem::offset_of!(CONF_VALUE, section) - 0usize];
+    ["Offset of field: CONF_VALUE::name"][::core::mem::offset_of!(CONF_VALUE, name) - 8usize];
+    ["Offset of field: CONF_VALUE::value"][::core::mem::offset_of!(CONF_VALUE, value) - 16usize];
 };
-pub type BIT_STRING_BITNAME = BIT_STRING_BITNAME_st;
 #[repr(C)]
 #[derive(Debug)]
-pub struct stack_st_ASN1_OBJECT {
+pub struct stack_st_CONF_VALUE {
     _unused: [u8; 0],
 }
-pub type sk_ASN1_OBJECT_compfunc = ::core::option::Option<
+pub type sk_CONF_VALUE_compfunc = ::core::option::Option<
     unsafe extern "C" fn(
-        a: *const *const ASN1_OBJECT,
-        b: *const *const ASN1_OBJECT,
+        a: *const *const CONF_VALUE,
+        b: *const *const CONF_VALUE,
     ) -> core::ffi::c_int,
 >;
-pub type sk_ASN1_OBJECT_freefunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_OBJECT)>;
-pub type sk_ASN1_OBJECT_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_OBJECT) -> *mut ASN1_OBJECT>;
+pub type sk_CONF_VALUE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut CONF_VALUE)>;
+pub type sk_CONF_VALUE_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const CONF_VALUE) -> *mut CONF_VALUE>;
 #[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_ASN1_INTEGER {
-    _unused: [u8; 0],
+#[derive(Copy, Clone)]
+pub struct lhash_st_CONF_VALUE {
+    pub dummy: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy,
 }
-pub type sk_ASN1_INTEGER_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_INTEGER,
-        b: *const *const ASN1_INTEGER,
-    ) -> core::ffi::c_int,
->;
-pub type sk_ASN1_INTEGER_freefunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_INTEGER)>;
-pub type sk_ASN1_INTEGER_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_INTEGER) -> *mut ASN1_INTEGER>;
 #[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_ASN1_UTF8STRING {
-    _unused: [u8; 0],
-}
-pub type sk_ASN1_UTF8STRING_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_UTF8STRING,
-        b: *const *const ASN1_UTF8STRING,
-    ) -> core::ffi::c_int,
->;
-pub type sk_ASN1_UTF8STRING_freefunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_UTF8STRING)>;
-pub type sk_ASN1_UTF8STRING_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_UTF8STRING) -> *mut ASN1_UTF8STRING>;
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_ASN1_GENERALSTRING {
-    _unused: [u8; 0],
-}
-pub type sk_ASN1_GENERALSTRING_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_GENERALSTRING,
-        b: *const *const ASN1_GENERALSTRING,
-    ) -> core::ffi::c_int,
->;
-pub type sk_ASN1_GENERALSTRING_freefunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_GENERALSTRING)>;
-pub type sk_ASN1_GENERALSTRING_copyfunc = ::core::option::Option<
-    unsafe extern "C" fn(a: *const ASN1_GENERALSTRING) -> *mut ASN1_GENERALSTRING,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_TEMPLATE_st {
-    pub flags: core::ffi::c_ulong,
-    pub tag: core::ffi::c_long,
-    pub offset: core::ffi::c_ulong,
-    pub field_name: *const core::ffi::c_char,
-    pub item: ASN1_ITEM_EXP,
+#[derive(Copy, Clone)]
+pub union lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy {
+    pub d1: *mut core::ffi::c_void,
+    pub d2: core::ffi::c_ulong,
+    pub d3: core::ffi::c_int,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ASN1_TEMPLATE_st"][::core::mem::size_of::<ASN1_TEMPLATE_st>() - 40usize];
-    ["Alignment of ASN1_TEMPLATE_st"][::core::mem::align_of::<ASN1_TEMPLATE_st>() - 8usize];
-    ["Offset of field: ASN1_TEMPLATE_st::flags"]
-        [::core::mem::offset_of!(ASN1_TEMPLATE_st, flags) - 0usize];
-    ["Offset of field: ASN1_TEMPLATE_st::tag"]
-        [::core::mem::offset_of!(ASN1_TEMPLATE_st, tag) - 8usize];
-    ["Offset of field: ASN1_TEMPLATE_st::offset"]
-        [::core::mem::offset_of!(ASN1_TEMPLATE_st, offset) - 16usize];
-    ["Offset of field: ASN1_TEMPLATE_st::field_name"]
-        [::core::mem::offset_of!(ASN1_TEMPLATE_st, field_name) - 24usize];
-    ["Offset of field: ASN1_TEMPLATE_st::item"]
-        [::core::mem::offset_of!(ASN1_TEMPLATE_st, item) - 32usize];
+    ["Size of lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy"]
+        [::core::mem::size_of::<lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy>() - 8usize];
+    ["Alignment of lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy"]
+        [::core::mem::align_of::<lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy>() - 8usize];
+    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d1"]
+        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d1) - 0usize];
+    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d2"]
+        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d2) - 0usize];
+    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d3"]
+        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d3) - 0usize];
 };
-pub type ASN1_ADB_TABLE = ASN1_ADB_TABLE_st;
-pub type ASN1_ADB = ASN1_ADB_st;
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of lhash_st_CONF_VALUE"][::core::mem::size_of::<lhash_st_CONF_VALUE>() - 8usize];
+    ["Alignment of lhash_st_CONF_VALUE"][::core::mem::align_of::<lhash_st_CONF_VALUE>() - 8usize];
+    ["Offset of field: lhash_st_CONF_VALUE::dummy"]
+        [::core::mem::offset_of!(lhash_st_CONF_VALUE, dummy) - 0usize];
+};
+pub type lh_CONF_VALUE_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(a: *const CONF_VALUE, b: *const CONF_VALUE) -> core::ffi::c_int,
+>;
+pub type lh_CONF_VALUE_hashfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const CONF_VALUE) -> core::ffi::c_ulong>;
+pub type lh_CONF_VALUE_doallfunc = ::core::option::Option<unsafe extern "C" fn(a: *mut CONF_VALUE)>;
+pub type CONF_METHOD = conf_method_st;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ASN1_ADB_st {
-    pub flags: core::ffi::c_ulong,
-    pub offset: core::ffi::c_ulong,
-    pub adb_cb: ::core::option::Option<
-        unsafe extern "C" fn(psel: *mut core::ffi::c_long) -> core::ffi::c_int,
+pub struct conf_method_st {
+    pub name: *const core::ffi::c_char,
+    pub create: ::core::option::Option<unsafe extern "C" fn(meth: *mut CONF_METHOD) -> *mut CONF>,
+    pub init: ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
+    pub destroy: ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
+    pub destroy_data:
+        ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
+    pub load_bio: ::core::option::Option<
+        unsafe extern "C" fn(
+            conf: *mut CONF,
+            bp: *mut BIO,
+            eline: *mut core::ffi::c_long,
+        ) -> core::ffi::c_int,
     >,
-    pub tbl: *const ASN1_ADB_TABLE,
-    pub tblcount: core::ffi::c_long,
-    pub default_tt: *const ASN1_TEMPLATE,
-    pub null_tt: *const ASN1_TEMPLATE,
+    pub dump: ::core::option::Option<
+        unsafe extern "C" fn(conf: *const CONF, bp: *mut BIO) -> core::ffi::c_int,
+    >,
+    pub is_number: ::core::option::Option<
+        unsafe extern "C" fn(conf: *const CONF, c: core::ffi::c_char) -> core::ffi::c_int,
+    >,
+    pub to_int: ::core::option::Option<
+        unsafe extern "C" fn(conf: *const CONF, c: core::ffi::c_char) -> core::ffi::c_int,
+    >,
+    pub load: ::core::option::Option<
+        unsafe extern "C" fn(
+            conf: *mut CONF,
+            name: *const core::ffi::c_char,
+            eline: *mut core::ffi::c_long,
+        ) -> core::ffi::c_int,
+    >,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ASN1_ADB_st"][::core::mem::size_of::<ASN1_ADB_st>() - 56usize];
-    ["Alignment of ASN1_ADB_st"][::core::mem::align_of::<ASN1_ADB_st>() - 8usize];
-    ["Offset of field: ASN1_ADB_st::flags"][::core::mem::offset_of!(ASN1_ADB_st, flags) - 0usize];
-    ["Offset of field: ASN1_ADB_st::offset"][::core::mem::offset_of!(ASN1_ADB_st, offset) - 8usize];
-    ["Offset of field: ASN1_ADB_st::adb_cb"]
-        [::core::mem::offset_of!(ASN1_ADB_st, adb_cb) - 16usize];
-    ["Offset of field: ASN1_ADB_st::tbl"][::core::mem::offset_of!(ASN1_ADB_st, tbl) - 24usize];
-    ["Offset of field: ASN1_ADB_st::tblcount"]
-        [::core::mem::offset_of!(ASN1_ADB_st, tblcount) - 32usize];
-    ["Offset of field: ASN1_ADB_st::default_tt"]
-        [::core::mem::offset_of!(ASN1_ADB_st, default_tt) - 40usize];
-    ["Offset of field: ASN1_ADB_st::null_tt"]
-        [::core::mem::offset_of!(ASN1_ADB_st, null_tt) - 48usize];
+    ["Size of conf_method_st"][::core::mem::size_of::<conf_method_st>() - 80usize];
+    ["Alignment of conf_method_st"][::core::mem::align_of::<conf_method_st>() - 8usize];
+    ["Offset of field: conf_method_st::name"]
+        [::core::mem::offset_of!(conf_method_st, name) - 0usize];
+    ["Offset of field: conf_method_st::create"]
+        [::core::mem::offset_of!(conf_method_st, create) - 8usize];
+    ["Offset of field: conf_method_st::init"]
+        [::core::mem::offset_of!(conf_method_st, init) - 16usize];
+    ["Offset of field: conf_method_st::destroy"]
+        [::core::mem::offset_of!(conf_method_st, destroy) - 24usize];
+    ["Offset of field: conf_method_st::destroy_data"]
+        [::core::mem::offset_of!(conf_method_st, destroy_data) - 32usize];
+    ["Offset of field: conf_method_st::load_bio"]
+        [::core::mem::offset_of!(conf_method_st, load_bio) - 40usize];
+    ["Offset of field: conf_method_st::dump"]
+        [::core::mem::offset_of!(conf_method_st, dump) - 48usize];
+    ["Offset of field: conf_method_st::is_number"]
+        [::core::mem::offset_of!(conf_method_st, is_number) - 56usize];
+    ["Offset of field: conf_method_st::to_int"]
+        [::core::mem::offset_of!(conf_method_st, to_int) - 64usize];
+    ["Offset of field: conf_method_st::load"]
+        [::core::mem::offset_of!(conf_method_st, load) - 72usize];
 };
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ASN1_ADB_TABLE_st {
-    pub value: core::ffi::c_long,
-    pub tt: ASN1_TEMPLATE,
+pub struct conf_st {
+    pub meth: *mut CONF_METHOD,
+    pub meth_data: *mut core::ffi::c_void,
+    pub data: *mut lhash_st_CONF_VALUE,
+    pub flag_dollarid: core::ffi::c_int,
+    pub flag_abspath: core::ffi::c_int,
+    pub includedir: *mut core::ffi::c_char,
+    pub libctx: *mut OSSL_LIB_CTX,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ASN1_ADB_TABLE_st"][::core::mem::size_of::<ASN1_ADB_TABLE_st>() - 48usize];
-    ["Alignment of ASN1_ADB_TABLE_st"][::core::mem::align_of::<ASN1_ADB_TABLE_st>() - 8usize];
-    ["Offset of field: ASN1_ADB_TABLE_st::value"]
-        [::core::mem::offset_of!(ASN1_ADB_TABLE_st, value) - 0usize];
-    ["Offset of field: ASN1_ADB_TABLE_st::tt"]
-        [::core::mem::offset_of!(ASN1_ADB_TABLE_st, tt) - 8usize];
+    ["Size of conf_st"][::core::mem::size_of::<conf_st>() - 48usize];
+    ["Alignment of conf_st"][::core::mem::align_of::<conf_st>() - 8usize];
+    ["Offset of field: conf_st::meth"][::core::mem::offset_of!(conf_st, meth) - 0usize];
+    ["Offset of field: conf_st::meth_data"][::core::mem::offset_of!(conf_st, meth_data) - 8usize];
+    ["Offset of field: conf_st::data"][::core::mem::offset_of!(conf_st, data) - 16usize];
+    ["Offset of field: conf_st::flag_dollarid"]
+        [::core::mem::offset_of!(conf_st, flag_dollarid) - 24usize];
+    ["Offset of field: conf_st::flag_abspath"]
+        [::core::mem::offset_of!(conf_st, flag_abspath) - 28usize];
+    ["Offset of field: conf_st::includedir"]
+        [::core::mem::offset_of!(conf_st, includedir) - 32usize];
+    ["Offset of field: conf_st::libctx"][::core::mem::offset_of!(conf_st, libctx) - 40usize];
 };
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_ITEM_st {
-    pub itype: core::ffi::c_char,
-    pub utype: core::ffi::c_long,
-    pub templates: *const ASN1_TEMPLATE,
-    pub tcount: core::ffi::c_long,
-    pub funcs: *const core::ffi::c_void,
-    pub size: core::ffi::c_long,
-    pub sname: *const core::ffi::c_char,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_ITEM_st"][::core::mem::size_of::<ASN1_ITEM_st>() - 56usize];
-    ["Alignment of ASN1_ITEM_st"][::core::mem::align_of::<ASN1_ITEM_st>() - 8usize];
-    ["Offset of field: ASN1_ITEM_st::itype"][::core::mem::offset_of!(ASN1_ITEM_st, itype) - 0usize];
-    ["Offset of field: ASN1_ITEM_st::utype"][::core::mem::offset_of!(ASN1_ITEM_st, utype) - 8usize];
-    ["Offset of field: ASN1_ITEM_st::templates"]
-        [::core::mem::offset_of!(ASN1_ITEM_st, templates) - 16usize];
-    ["Offset of field: ASN1_ITEM_st::tcount"]
-        [::core::mem::offset_of!(ASN1_ITEM_st, tcount) - 24usize];
-    ["Offset of field: ASN1_ITEM_st::funcs"]
-        [::core::mem::offset_of!(ASN1_ITEM_st, funcs) - 32usize];
-    ["Offset of field: ASN1_ITEM_st::size"][::core::mem::offset_of!(ASN1_ITEM_st, size) - 40usize];
-    ["Offset of field: ASN1_ITEM_st::sname"]
-        [::core::mem::offset_of!(ASN1_ITEM_st, sname) - 48usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_TLC_st {
-    pub valid: core::ffi::c_char,
-    pub ret: core::ffi::c_int,
-    pub plen: core::ffi::c_long,
-    pub ptag: core::ffi::c_int,
-    pub pclass: core::ffi::c_int,
-    pub hdrlen: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_TLC_st"][::core::mem::size_of::<ASN1_TLC_st>() - 32usize];
-    ["Alignment of ASN1_TLC_st"][::core::mem::align_of::<ASN1_TLC_st>() - 8usize];
-    ["Offset of field: ASN1_TLC_st::valid"][::core::mem::offset_of!(ASN1_TLC_st, valid) - 0usize];
-    ["Offset of field: ASN1_TLC_st::ret"][::core::mem::offset_of!(ASN1_TLC_st, ret) - 4usize];
-    ["Offset of field: ASN1_TLC_st::plen"][::core::mem::offset_of!(ASN1_TLC_st, plen) - 8usize];
-    ["Offset of field: ASN1_TLC_st::ptag"][::core::mem::offset_of!(ASN1_TLC_st, ptag) - 16usize];
-    ["Offset of field: ASN1_TLC_st::pclass"]
-        [::core::mem::offset_of!(ASN1_TLC_st, pclass) - 20usize];
-    ["Offset of field: ASN1_TLC_st::hdrlen"]
-        [::core::mem::offset_of!(ASN1_TLC_st, hdrlen) - 24usize];
-};
-pub type ASN1_ex_d2i = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        in_: *mut *const core::ffi::c_uchar,
-        len: core::ffi::c_long,
-        it: *const ASN1_ITEM,
-        tag: core::ffi::c_int,
-        aclass: core::ffi::c_int,
-        opt: core::ffi::c_char,
-        ctx: *mut ASN1_TLC,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_ex_d2i_ex = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        in_: *mut *const core::ffi::c_uchar,
-        len: core::ffi::c_long,
-        it: *const ASN1_ITEM,
-        tag: core::ffi::c_int,
-        aclass: core::ffi::c_int,
-        opt: core::ffi::c_char,
-        ctx: *mut ASN1_TLC,
-        libctx: *mut OSSL_LIB_CTX,
-        propq: *const core::ffi::c_char,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_ex_i2d = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *const ASN1_VALUE,
-        out: *mut *mut core::ffi::c_uchar,
-        it: *const ASN1_ITEM,
-        tag: core::ffi::c_int,
-        aclass: core::ffi::c_int,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_ex_new_func = ::core::option::Option<
-    unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM) -> core::ffi::c_int,
->;
-pub type ASN1_ex_new_ex_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        it: *const ASN1_ITEM,
-        libctx: *mut OSSL_LIB_CTX,
-        propq: *const core::ffi::c_char,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_ex_free_func =
-    ::core::option::Option<unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM)>;
-pub type ASN1_ex_print_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        out: *mut BIO,
-        pval: *mut *const ASN1_VALUE,
-        indent: core::ffi::c_int,
-        fname: *const core::ffi::c_char,
-        pctx: *const ASN1_PCTX,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_primitive_i2c = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *const ASN1_VALUE,
-        cont: *mut core::ffi::c_uchar,
-        putype: *mut core::ffi::c_int,
-        it: *const ASN1_ITEM,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_primitive_c2i = ::core::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        cont: *const core::ffi::c_uchar,
-        len: core::ffi::c_int,
-        utype: core::ffi::c_int,
-        free_cont: *mut core::ffi::c_char,
-        it: *const ASN1_ITEM,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_primitive_print = ::core::option::Option<
-    unsafe extern "C" fn(
-        out: *mut BIO,
-        pval: *mut *const ASN1_VALUE,
-        it: *const ASN1_ITEM,
-        indent: core::ffi::c_int,
-        pctx: *const ASN1_PCTX,
-    ) -> core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_EXTERN_FUNCS_st {
-    pub app_data: *mut core::ffi::c_void,
-    pub asn1_ex_new: ASN1_ex_new_func,
-    pub asn1_ex_free: ASN1_ex_free_func,
-    pub asn1_ex_clear: ASN1_ex_free_func,
-    pub asn1_ex_d2i: ASN1_ex_d2i,
-    pub asn1_ex_i2d: ASN1_ex_i2d,
-    pub asn1_ex_print: ASN1_ex_print_func,
-    pub asn1_ex_new_ex: ASN1_ex_new_ex_func,
-    pub asn1_ex_d2i_ex: ASN1_ex_d2i_ex,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_EXTERN_FUNCS_st"][::core::mem::size_of::<ASN1_EXTERN_FUNCS_st>() - 72usize];
-    ["Alignment of ASN1_EXTERN_FUNCS_st"][::core::mem::align_of::<ASN1_EXTERN_FUNCS_st>() - 8usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::app_data"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, app_data) - 0usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_new"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_new) - 8usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_free"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_free) - 16usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_clear"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_clear) - 24usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_d2i"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_d2i) - 32usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_i2d"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_i2d) - 40usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_print"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_print) - 48usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_new_ex"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_new_ex) - 56usize];
-    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_d2i_ex"]
-        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_d2i_ex) - 64usize];
-};
-pub type ASN1_EXTERN_FUNCS = ASN1_EXTERN_FUNCS_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_PRIMITIVE_FUNCS_st {
-    pub app_data: *mut core::ffi::c_void,
-    pub flags: core::ffi::c_ulong,
-    pub prim_new: ASN1_ex_new_func,
-    pub prim_free: ASN1_ex_free_func,
-    pub prim_clear: ASN1_ex_free_func,
-    pub prim_c2i: ASN1_primitive_c2i,
-    pub prim_i2c: ASN1_primitive_i2c,
-    pub prim_print: ASN1_primitive_print,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_PRIMITIVE_FUNCS_st"]
-        [::core::mem::size_of::<ASN1_PRIMITIVE_FUNCS_st>() - 64usize];
-    ["Alignment of ASN1_PRIMITIVE_FUNCS_st"]
-        [::core::mem::align_of::<ASN1_PRIMITIVE_FUNCS_st>() - 8usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::app_data"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, app_data) - 0usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::flags"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, flags) - 8usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_new"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_new) - 16usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_free"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_free) - 24usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_clear"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_clear) - 32usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_c2i"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_c2i) - 40usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_i2c"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_i2c) - 48usize];
-    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_print"]
-        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_print) - 56usize];
-};
-pub type ASN1_PRIMITIVE_FUNCS = ASN1_PRIMITIVE_FUNCS_st;
-pub type ASN1_aux_cb = ::core::option::Option<
-    unsafe extern "C" fn(
-        operation: core::ffi::c_int,
-        in_: *mut *mut ASN1_VALUE,
-        it: *const ASN1_ITEM,
-        exarg: *mut core::ffi::c_void,
-    ) -> core::ffi::c_int,
->;
-pub type ASN1_aux_const_cb = ::core::option::Option<
-    unsafe extern "C" fn(
-        operation: core::ffi::c_int,
-        in_: *mut *const ASN1_VALUE,
-        it: *const ASN1_ITEM,
-        exarg: *mut core::ffi::c_void,
-    ) -> core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_AUX_st {
-    pub app_data: *mut core::ffi::c_void,
-    pub flags: core::ffi::c_int,
-    pub ref_offset: core::ffi::c_int,
-    pub ref_lock: core::ffi::c_int,
-    pub asn1_cb: ASN1_aux_cb,
-    pub enc_offset: core::ffi::c_int,
-    pub asn1_const_cb: ASN1_aux_const_cb,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_AUX_st"][::core::mem::size_of::<ASN1_AUX_st>() - 48usize];
-    ["Alignment of ASN1_AUX_st"][::core::mem::align_of::<ASN1_AUX_st>() - 8usize];
-    ["Offset of field: ASN1_AUX_st::app_data"]
-        [::core::mem::offset_of!(ASN1_AUX_st, app_data) - 0usize];
-    ["Offset of field: ASN1_AUX_st::flags"][::core::mem::offset_of!(ASN1_AUX_st, flags) - 8usize];
-    ["Offset of field: ASN1_AUX_st::ref_offset"]
-        [::core::mem::offset_of!(ASN1_AUX_st, ref_offset) - 12usize];
-    ["Offset of field: ASN1_AUX_st::ref_lock"]
-        [::core::mem::offset_of!(ASN1_AUX_st, ref_lock) - 16usize];
-    ["Offset of field: ASN1_AUX_st::asn1_cb"]
-        [::core::mem::offset_of!(ASN1_AUX_st, asn1_cb) - 24usize];
-    ["Offset of field: ASN1_AUX_st::enc_offset"]
-        [::core::mem::offset_of!(ASN1_AUX_st, enc_offset) - 32usize];
-    ["Offset of field: ASN1_AUX_st::asn1_const_cb"]
-        [::core::mem::offset_of!(ASN1_AUX_st, asn1_const_cb) - 40usize];
-};
-pub type ASN1_AUX = ASN1_AUX_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_PRINT_ARG_st {
-    pub out: *mut BIO,
-    pub indent: core::ffi::c_int,
-    pub pctx: *const ASN1_PCTX,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_PRINT_ARG_st"][::core::mem::size_of::<ASN1_PRINT_ARG_st>() - 24usize];
-    ["Alignment of ASN1_PRINT_ARG_st"][::core::mem::align_of::<ASN1_PRINT_ARG_st>() - 8usize];
-    ["Offset of field: ASN1_PRINT_ARG_st::out"]
-        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, out) - 0usize];
-    ["Offset of field: ASN1_PRINT_ARG_st::indent"]
-        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, indent) - 8usize];
-    ["Offset of field: ASN1_PRINT_ARG_st::pctx"]
-        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, pctx) - 16usize];
-};
-pub type ASN1_PRINT_ARG = ASN1_PRINT_ARG_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_STREAM_ARG_st {
-    pub out: *mut BIO,
-    pub ndef_bio: *mut BIO,
-    pub boundary: *mut *mut core::ffi::c_uchar,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of ASN1_STREAM_ARG_st"][::core::mem::size_of::<ASN1_STREAM_ARG_st>() - 24usize];
-    ["Alignment of ASN1_STREAM_ARG_st"][::core::mem::align_of::<ASN1_STREAM_ARG_st>() - 8usize];
-    ["Offset of field: ASN1_STREAM_ARG_st::out"]
-        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, out) - 0usize];
-    ["Offset of field: ASN1_STREAM_ARG_st::ndef_bio"]
-        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, ndef_bio) - 8usize];
-    ["Offset of field: ASN1_STREAM_ARG_st::boundary"]
-        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, boundary) - 16usize];
-};
-pub type ASN1_STREAM_ARG = ASN1_STREAM_ARG_st;
 #[repr(C)]
 #[derive(Debug)]
-pub struct stack_st_ASN1_VALUE {
+pub struct conf_imodule_st {
     _unused: [u8; 0],
 }
-pub type sk_ASN1_VALUE_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const ASN1_VALUE,
-        b: *const *const ASN1_VALUE,
-    ) -> core::ffi::c_int,
+pub type CONF_IMODULE = conf_imodule_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct conf_module_st {
+    _unused: [u8; 0],
+}
+pub type CONF_MODULE = conf_module_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_CONF_MODULE {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_CONF_IMODULE {
+    _unused: [u8; 0],
+}
+pub type conf_init_func = ::core::option::Option<
+    unsafe extern "C" fn(md: *mut CONF_IMODULE, cnf: *const CONF) -> core::ffi::c_int,
 >;
-pub type sk_ASN1_VALUE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_VALUE)>;
-pub type sk_ASN1_VALUE_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_VALUE) -> *mut ASN1_VALUE>;
-#[repr(C)]
-#[derive(Debug)]
-pub struct async_job_st {
-    _unused: [u8; 0],
-}
-pub type ASYNC_JOB = async_job_st;
-#[repr(C)]
-#[derive(Debug)]
-pub struct async_wait_ctx_st {
-    _unused: [u8; 0],
-}
-pub type ASYNC_WAIT_CTX = async_wait_ctx_st;
-pub type ASYNC_callback_fn =
-    ::core::option::Option<unsafe extern "C" fn(arg: *mut core::ffi::c_void) -> core::ffi::c_int>;
-pub type ASYNC_stack_alloc_fn =
-    ::core::option::Option<unsafe extern "C" fn(num: *mut usize) -> *mut core::ffi::c_void>;
-pub type ASYNC_stack_free_fn =
-    ::core::option::Option<unsafe extern "C" fn(addr: *mut core::ffi::c_void)>;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct bf_key_st {
-    pub P: [core::ffi::c_uint; 18usize],
-    pub S: [core::ffi::c_uint; 1024usize],
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of bf_key_st"][::core::mem::size_of::<bf_key_st>() - 4168usize];
-    ["Alignment of bf_key_st"][::core::mem::align_of::<bf_key_st>() - 4usize];
-    ["Offset of field: bf_key_st::P"][::core::mem::offset_of!(bf_key_st, P) - 0usize];
-    ["Offset of field: bf_key_st::S"][::core::mem::offset_of!(bf_key_st, S) - 72usize];
-};
-pub type BF_KEY = bf_key_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct buf_mem_st {
-    pub length: usize,
-    pub data: *mut core::ffi::c_char,
-    pub max: usize,
-    pub flags: core::ffi::c_ulong,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of buf_mem_st"][::core::mem::size_of::<buf_mem_st>() - 32usize];
-    ["Alignment of buf_mem_st"][::core::mem::align_of::<buf_mem_st>() - 8usize];
-    ["Offset of field: buf_mem_st::length"][::core::mem::offset_of!(buf_mem_st, length) - 0usize];
-    ["Offset of field: buf_mem_st::data"][::core::mem::offset_of!(buf_mem_st, data) - 8usize];
-    ["Offset of field: buf_mem_st::max"][::core::mem::offset_of!(buf_mem_st, max) - 16usize];
-    ["Offset of field: buf_mem_st::flags"][::core::mem::offset_of!(buf_mem_st, flags) - 24usize];
-};
-pub type KEY_TABLE_TYPE = [core::ffi::c_uint; 68usize];
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct camellia_key_st {
-    pub u: camellia_key_st__bindgen_ty_1,
-    pub grand_rounds: core::ffi::c_int,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union camellia_key_st__bindgen_ty_1 {
-    pub d: f64,
-    pub rd_key: KEY_TABLE_TYPE,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of camellia_key_st__bindgen_ty_1"]
-        [::core::mem::size_of::<camellia_key_st__bindgen_ty_1>() - 272usize];
-    ["Alignment of camellia_key_st__bindgen_ty_1"]
-        [::core::mem::align_of::<camellia_key_st__bindgen_ty_1>() - 8usize];
-    ["Offset of field: camellia_key_st__bindgen_ty_1::d"]
-        [::core::mem::offset_of!(camellia_key_st__bindgen_ty_1, d) - 0usize];
-    ["Offset of field: camellia_key_st__bindgen_ty_1::rd_key"]
-        [::core::mem::offset_of!(camellia_key_st__bindgen_ty_1, rd_key) - 0usize];
-};
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of camellia_key_st"][::core::mem::size_of::<camellia_key_st>() - 280usize];
-    ["Alignment of camellia_key_st"][::core::mem::align_of::<camellia_key_st>() - 8usize];
-    ["Offset of field: camellia_key_st::u"][::core::mem::offset_of!(camellia_key_st, u) - 0usize];
-    ["Offset of field: camellia_key_st::grand_rounds"]
-        [::core::mem::offset_of!(camellia_key_st, grand_rounds) - 272usize];
-};
-pub type CAMELLIA_KEY = camellia_key_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct cast_key_st {
-    pub data: [core::ffi::c_uint; 32usize],
-    pub short_key: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of cast_key_st"][::core::mem::size_of::<cast_key_st>() - 132usize];
-    ["Alignment of cast_key_st"][::core::mem::align_of::<cast_key_st>() - 4usize];
-    ["Offset of field: cast_key_st::data"][::core::mem::offset_of!(cast_key_st, data) - 0usize];
-    ["Offset of field: cast_key_st::short_key"]
-        [::core::mem::offset_of!(cast_key_st, short_key) - 128usize];
-};
-pub type CAST_KEY = cast_key_st;
+pub type conf_finish_func = ::core::option::Option<unsafe extern "C" fn(md: *mut CONF_IMODULE)>;
 pub type OSSL_INDICATOR_CALLBACK = ::core::option::Option<
     unsafe extern "C" fn(
         type_: *const core::ffi::c_char,
@@ -3438,6 +2954,312 @@ pub type OSSL_FUNC_store_open_ex_fn = ::core::option::Option<
     ) -> *mut core::ffi::c_void,
 >;
 #[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_X509_ALGOR {
+    _unused: [u8; 0],
+}
+pub type sk_X509_ALGOR_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const X509_ALGOR,
+        b: *const *const X509_ALGOR,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_X509_ALGOR_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut X509_ALGOR)>;
+pub type sk_X509_ALGOR_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const X509_ALGOR) -> *mut X509_ALGOR>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct asn1_string_st {
+    pub length: core::ffi::c_int,
+    pub type_: core::ffi::c_int,
+    pub data: *mut core::ffi::c_uchar,
+    pub flags: core::ffi::c_long,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of asn1_string_st"][::core::mem::size_of::<asn1_string_st>() - 24usize];
+    ["Alignment of asn1_string_st"][::core::mem::align_of::<asn1_string_st>() - 8usize];
+    ["Offset of field: asn1_string_st::length"]
+        [::core::mem::offset_of!(asn1_string_st, length) - 0usize];
+    ["Offset of field: asn1_string_st::type_"]
+        [::core::mem::offset_of!(asn1_string_st, type_) - 4usize];
+    ["Offset of field: asn1_string_st::data"]
+        [::core::mem::offset_of!(asn1_string_st, data) - 8usize];
+    ["Offset of field: asn1_string_st::flags"]
+        [::core::mem::offset_of!(asn1_string_st, flags) - 16usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_ENCODING_st {
+    pub enc: *mut core::ffi::c_uchar,
+    pub len: core::ffi::c_long,
+    pub modified: core::ffi::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_ENCODING_st"][::core::mem::size_of::<ASN1_ENCODING_st>() - 24usize];
+    ["Alignment of ASN1_ENCODING_st"][::core::mem::align_of::<ASN1_ENCODING_st>() - 8usize];
+    ["Offset of field: ASN1_ENCODING_st::enc"]
+        [::core::mem::offset_of!(ASN1_ENCODING_st, enc) - 0usize];
+    ["Offset of field: ASN1_ENCODING_st::len"]
+        [::core::mem::offset_of!(ASN1_ENCODING_st, len) - 8usize];
+    ["Offset of field: ASN1_ENCODING_st::modified"]
+        [::core::mem::offset_of!(ASN1_ENCODING_st, modified) - 16usize];
+};
+pub type ASN1_ENCODING = ASN1_ENCODING_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct asn1_string_table_st {
+    pub nid: core::ffi::c_int,
+    pub minsize: core::ffi::c_long,
+    pub maxsize: core::ffi::c_long,
+    pub mask: core::ffi::c_ulong,
+    pub flags: core::ffi::c_ulong,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of asn1_string_table_st"][::core::mem::size_of::<asn1_string_table_st>() - 40usize];
+    ["Alignment of asn1_string_table_st"][::core::mem::align_of::<asn1_string_table_st>() - 8usize];
+    ["Offset of field: asn1_string_table_st::nid"]
+        [::core::mem::offset_of!(asn1_string_table_st, nid) - 0usize];
+    ["Offset of field: asn1_string_table_st::minsize"]
+        [::core::mem::offset_of!(asn1_string_table_st, minsize) - 8usize];
+    ["Offset of field: asn1_string_table_st::maxsize"]
+        [::core::mem::offset_of!(asn1_string_table_st, maxsize) - 16usize];
+    ["Offset of field: asn1_string_table_st::mask"]
+        [::core::mem::offset_of!(asn1_string_table_st, mask) - 24usize];
+    ["Offset of field: asn1_string_table_st::flags"]
+        [::core::mem::offset_of!(asn1_string_table_st, flags) - 32usize];
+};
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_STRING_TABLE {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_STRING_TABLE_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_STRING_TABLE,
+        b: *const *const ASN1_STRING_TABLE,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_STRING_TABLE_freefunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_STRING_TABLE)>;
+pub type sk_ASN1_STRING_TABLE_copyfunc = ::core::option::Option<
+    unsafe extern "C" fn(a: *const ASN1_STRING_TABLE) -> *mut ASN1_STRING_TABLE,
+>;
+pub type ASN1_TEMPLATE = ASN1_TEMPLATE_st;
+pub type ASN1_TLC = ASN1_TLC_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct ASN1_VALUE_st {
+    _unused: [u8; 0],
+}
+pub type ASN1_VALUE = ASN1_VALUE_st;
+pub type d2i_of_void = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut *mut core::ffi::c_void,
+        arg2: *mut *const core::ffi::c_uchar,
+        arg3: core::ffi::c_long,
+    ) -> *mut core::ffi::c_void,
+>;
+pub type i2d_of_void = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const core::ffi::c_void,
+        arg2: *mut *mut core::ffi::c_uchar,
+    ) -> core::ffi::c_int,
+>;
+pub type OSSL_i2d_of_void_ctx = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const core::ffi::c_void,
+        arg2: *mut *mut core::ffi::c_uchar,
+        vctx: *mut core::ffi::c_void,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_ITEM_EXP = ::core::option::Option<unsafe extern "C" fn() -> *const ASN1_ITEM>;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct asn1_type_st {
+    pub type_: core::ffi::c_int,
+    pub value: asn1_type_st__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union asn1_type_st__bindgen_ty_1 {
+    pub ptr: *mut core::ffi::c_char,
+    pub boolean: ASN1_BOOLEAN,
+    pub asn1_string: *mut ASN1_STRING,
+    pub object: *mut ASN1_OBJECT,
+    pub integer: *mut ASN1_INTEGER,
+    pub enumerated: *mut ASN1_ENUMERATED,
+    pub bit_string: *mut ASN1_BIT_STRING,
+    pub octet_string: *mut ASN1_OCTET_STRING,
+    pub printablestring: *mut ASN1_PRINTABLESTRING,
+    pub t61string: *mut ASN1_T61STRING,
+    pub ia5string: *mut ASN1_IA5STRING,
+    pub generalstring: *mut ASN1_GENERALSTRING,
+    pub bmpstring: *mut ASN1_BMPSTRING,
+    pub universalstring: *mut ASN1_UNIVERSALSTRING,
+    pub utctime: *mut ASN1_UTCTIME,
+    pub generalizedtime: *mut ASN1_GENERALIZEDTIME,
+    pub visiblestring: *mut ASN1_VISIBLESTRING,
+    pub utf8string: *mut ASN1_UTF8STRING,
+    pub set: *mut ASN1_STRING,
+    pub sequence: *mut ASN1_STRING,
+    pub asn1_value: *mut ASN1_VALUE,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of asn1_type_st__bindgen_ty_1"]
+        [::core::mem::size_of::<asn1_type_st__bindgen_ty_1>() - 8usize];
+    ["Alignment of asn1_type_st__bindgen_ty_1"]
+        [::core::mem::align_of::<asn1_type_st__bindgen_ty_1>() - 8usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::ptr"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, ptr) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::boolean"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, boolean) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::asn1_string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, asn1_string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::object"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, object) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::integer"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, integer) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::enumerated"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, enumerated) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::bit_string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, bit_string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::octet_string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, octet_string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::printablestring"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, printablestring) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::t61string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, t61string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::ia5string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, ia5string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::generalstring"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, generalstring) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::bmpstring"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, bmpstring) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::universalstring"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, universalstring) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::utctime"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, utctime) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::generalizedtime"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, generalizedtime) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::visiblestring"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, visiblestring) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::utf8string"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, utf8string) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::set"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, set) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::sequence"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, sequence) - 0usize];
+    ["Offset of field: asn1_type_st__bindgen_ty_1::asn1_value"]
+        [::core::mem::offset_of!(asn1_type_st__bindgen_ty_1, asn1_value) - 0usize];
+};
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of asn1_type_st"][::core::mem::size_of::<asn1_type_st>() - 16usize];
+    ["Alignment of asn1_type_st"][::core::mem::align_of::<asn1_type_st>() - 8usize];
+    ["Offset of field: asn1_type_st::type_"][::core::mem::offset_of!(asn1_type_st, type_) - 0usize];
+    ["Offset of field: asn1_type_st::value"][::core::mem::offset_of!(asn1_type_st, value) - 8usize];
+};
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_TYPE {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_TYPE_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_TYPE,
+        b: *const *const ASN1_TYPE,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_TYPE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_TYPE)>;
+pub type sk_ASN1_TYPE_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_TYPE) -> *mut ASN1_TYPE>;
+pub type ASN1_SEQUENCE_ANY = stack_st_ASN1_TYPE;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct BIT_STRING_BITNAME_st {
+    pub bitnum: core::ffi::c_int,
+    pub lname: *const core::ffi::c_char,
+    pub sname: *const core::ffi::c_char,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of BIT_STRING_BITNAME_st"][::core::mem::size_of::<BIT_STRING_BITNAME_st>() - 24usize];
+    ["Alignment of BIT_STRING_BITNAME_st"]
+        [::core::mem::align_of::<BIT_STRING_BITNAME_st>() - 8usize];
+    ["Offset of field: BIT_STRING_BITNAME_st::bitnum"]
+        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, bitnum) - 0usize];
+    ["Offset of field: BIT_STRING_BITNAME_st::lname"]
+        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, lname) - 8usize];
+    ["Offset of field: BIT_STRING_BITNAME_st::sname"]
+        [::core::mem::offset_of!(BIT_STRING_BITNAME_st, sname) - 16usize];
+};
+pub type BIT_STRING_BITNAME = BIT_STRING_BITNAME_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_OBJECT {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_OBJECT_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_OBJECT,
+        b: *const *const ASN1_OBJECT,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_OBJECT_freefunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_OBJECT)>;
+pub type sk_ASN1_OBJECT_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_OBJECT) -> *mut ASN1_OBJECT>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_INTEGER {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_INTEGER_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_INTEGER,
+        b: *const *const ASN1_INTEGER,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_INTEGER_freefunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_INTEGER)>;
+pub type sk_ASN1_INTEGER_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_INTEGER) -> *mut ASN1_INTEGER>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_UTF8STRING {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_UTF8STRING_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_UTF8STRING,
+        b: *const *const ASN1_UTF8STRING,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_UTF8STRING_freefunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_UTF8STRING)>;
+pub type sk_ASN1_UTF8STRING_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_UTF8STRING) -> *mut ASN1_UTF8STRING>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_GENERALSTRING {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_GENERALSTRING_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_GENERALSTRING,
+        b: *const *const ASN1_GENERALSTRING,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_GENERALSTRING_freefunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_GENERALSTRING)>;
+pub type sk_ASN1_GENERALSTRING_copyfunc = ::core::option::Option<
+    unsafe extern "C" fn(a: *const ASN1_GENERALSTRING) -> *mut ASN1_GENERALSTRING,
+>;
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct obj_name_st {
     pub type_: core::ffi::c_int,
@@ -3521,11 +3343,22 @@ pub type EVP_PBE_KEYGEN_EX = ::core::option::Option<
 pub type EVP_PKEY_gen_cb =
     ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>;
 #[repr(C)]
-#[derive(Debug)]
-pub struct CMAC_CTX_st {
-    _unused: [u8; 0],
+#[derive(Debug, Copy, Clone)]
+pub struct buf_mem_st {
+    pub length: usize,
+    pub data: *mut core::ffi::c_char,
+    pub max: usize,
+    pub flags: core::ffi::c_ulong,
 }
-pub type CMAC_CTX = CMAC_CTX_st;
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of buf_mem_st"][::core::mem::size_of::<buf_mem_st>() - 32usize];
+    ["Alignment of buf_mem_st"][::core::mem::align_of::<buf_mem_st>() - 8usize];
+    ["Offset of field: buf_mem_st::length"][::core::mem::offset_of!(buf_mem_st, length) - 0usize];
+    ["Offset of field: buf_mem_st::data"][::core::mem::offset_of!(buf_mem_st, data) - 8usize];
+    ["Offset of field: buf_mem_st::max"][::core::mem::offset_of!(buf_mem_st, max) - 16usize];
+    ["Offset of field: buf_mem_st::flags"][::core::mem::offset_of!(buf_mem_st, flags) - 24usize];
+};
 pub const POINT_CONVERSION_COMPRESSED: point_conversion_form_t = 2;
 pub const POINT_CONVERSION_UNCOMPRESSED: point_conversion_form_t = 4;
 pub const POINT_CONVERSION_HYBRID: point_conversion_form_t = 6;
@@ -4128,136 +3961,6 @@ const _: () = {
         [::core::mem::offset_of!(SCRYPT_PARAMS_st, keyLength) - 32usize];
 };
 pub type SCRYPT_PARAMS = SCRYPT_PARAMS_st;
-#[repr(C)]
-#[derive(Debug)]
-pub struct lhash_node_st {
-    _unused: [u8; 0],
-}
-pub type OPENSSL_LH_NODE = lhash_node_st;
-pub type OPENSSL_LH_COMPFUNC = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const core::ffi::c_void,
-        arg2: *const core::ffi::c_void,
-    ) -> core::ffi::c_int,
->;
-pub type OPENSSL_LH_COMPFUNCTHUNK = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const core::ffi::c_void,
-        arg2: *const core::ffi::c_void,
-        cfn: OPENSSL_LH_COMPFUNC,
-    ) -> core::ffi::c_int,
->;
-pub type OPENSSL_LH_HASHFUNC = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const core::ffi::c_void) -> core::ffi::c_ulong,
->;
-pub type OPENSSL_LH_HASHFUNCTHUNK = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const core::ffi::c_void,
-        hfn: OPENSSL_LH_HASHFUNC,
-    ) -> core::ffi::c_ulong,
->;
-pub type OPENSSL_LH_DOALL_FUNC =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>;
-pub type OPENSSL_LH_DOALL_FUNC_THUNK = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *mut core::ffi::c_void, doall: OPENSSL_LH_DOALL_FUNC),
->;
-pub type OPENSSL_LH_DOALL_FUNCARG = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *mut core::ffi::c_void, arg2: *mut core::ffi::c_void),
->;
-pub type OPENSSL_LH_DOALL_FUNCARG_THUNK = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut core::ffi::c_void,
-        arg2: *mut core::ffi::c_void,
-        doall: OPENSSL_LH_DOALL_FUNCARG,
-    ),
->;
-#[repr(C)]
-#[derive(Debug)]
-pub struct lhash_st {
-    _unused: [u8; 0],
-}
-pub type OPENSSL_LHASH = lhash_st;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct lhash_st_OPENSSL_STRING {
-    pub dummy: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy {
-    pub d1: *mut core::ffi::c_void,
-    pub d2: core::ffi::c_ulong,
-    pub d3: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy"]
-        [::core::mem::size_of::<lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy>() - 8usize];
-    ["Alignment of lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy"]
-        [::core::mem::align_of::<lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy>() - 8usize];
-    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d1"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d1) - 0usize];
-    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d2"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d2) - 0usize];
-    ["Offset of field: lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy::d3"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING_lh_OPENSSL_STRING_dummy, d3) - 0usize];
-};
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_OPENSSL_STRING"][::core::mem::size_of::<lhash_st_OPENSSL_STRING>() - 8usize];
-    ["Alignment of lhash_st_OPENSSL_STRING"]
-        [::core::mem::align_of::<lhash_st_OPENSSL_STRING>() - 8usize];
-    ["Offset of field: lhash_st_OPENSSL_STRING::dummy"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_STRING, dummy) - 0usize];
-};
-pub type lh_OPENSSL_STRING_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(a: *const OPENSSL_STRING, b: *const OPENSSL_STRING) -> core::ffi::c_int,
->;
-pub type lh_OPENSSL_STRING_hashfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const OPENSSL_STRING) -> core::ffi::c_ulong>;
-pub type lh_OPENSSL_STRING_doallfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut OPENSSL_STRING)>;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct lhash_st_OPENSSL_CSTRING {
-    pub dummy: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy {
-    pub d1: *mut core::ffi::c_void,
-    pub d2: core::ffi::c_ulong,
-    pub d3: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy"]
-        [::core::mem::size_of::<lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy>() - 8usize];
-    ["Alignment of lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy"]
-        [::core::mem::align_of::<lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy>() - 8usize];
-    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d1"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d1) - 0usize];
-    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d2"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d2) - 0usize];
-    ["Offset of field: lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy::d3"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING_lh_OPENSSL_CSTRING_dummy, d3) - 0usize];
-};
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_OPENSSL_CSTRING"]
-        [::core::mem::size_of::<lhash_st_OPENSSL_CSTRING>() - 8usize];
-    ["Alignment of lhash_st_OPENSSL_CSTRING"]
-        [::core::mem::align_of::<lhash_st_OPENSSL_CSTRING>() - 8usize];
-    ["Offset of field: lhash_st_OPENSSL_CSTRING::dummy"]
-        [::core::mem::offset_of!(lhash_st_OPENSSL_CSTRING, dummy) - 0usize];
-};
-pub type lh_OPENSSL_CSTRING_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(a: *const OPENSSL_CSTRING, b: *const OPENSSL_CSTRING) -> core::ffi::c_int,
->;
-pub type lh_OPENSSL_CSTRING_hashfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const OPENSSL_CSTRING) -> core::ffi::c_ulong>;
-pub type lh_OPENSSL_CSTRING_doallfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *mut OPENSSL_CSTRING)>;
 pub const X509_LU_NONE: X509_LOOKUP_TYPE = 0;
 pub const X509_LU_X509: X509_LOOKUP_TYPE = 1;
 pub const X509_LU_CRL: X509_LOOKUP_TYPE = 2;
@@ -4823,184 +4526,6 @@ pub type sk_PKCS7_compfunc = ::core::option::Option<
 pub type sk_PKCS7_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut PKCS7)>;
 pub type sk_PKCS7_copyfunc =
     ::core::option::Option<unsafe extern "C" fn(a: *const PKCS7) -> *mut PKCS7>;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct CONF_VALUE {
-    pub section: *mut core::ffi::c_char,
-    pub name: *mut core::ffi::c_char,
-    pub value: *mut core::ffi::c_char,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of CONF_VALUE"][::core::mem::size_of::<CONF_VALUE>() - 24usize];
-    ["Alignment of CONF_VALUE"][::core::mem::align_of::<CONF_VALUE>() - 8usize];
-    ["Offset of field: CONF_VALUE::section"][::core::mem::offset_of!(CONF_VALUE, section) - 0usize];
-    ["Offset of field: CONF_VALUE::name"][::core::mem::offset_of!(CONF_VALUE, name) - 8usize];
-    ["Offset of field: CONF_VALUE::value"][::core::mem::offset_of!(CONF_VALUE, value) - 16usize];
-};
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_CONF_VALUE {
-    _unused: [u8; 0],
-}
-pub type sk_CONF_VALUE_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(
-        a: *const *const CONF_VALUE,
-        b: *const *const CONF_VALUE,
-    ) -> core::ffi::c_int,
->;
-pub type sk_CONF_VALUE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut CONF_VALUE)>;
-pub type sk_CONF_VALUE_copyfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const CONF_VALUE) -> *mut CONF_VALUE>;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct lhash_st_CONF_VALUE {
-    pub dummy: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy {
-    pub d1: *mut core::ffi::c_void,
-    pub d2: core::ffi::c_ulong,
-    pub d3: core::ffi::c_int,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy"]
-        [::core::mem::size_of::<lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy>() - 8usize];
-    ["Alignment of lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy"]
-        [::core::mem::align_of::<lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy>() - 8usize];
-    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d1"]
-        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d1) - 0usize];
-    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d2"]
-        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d2) - 0usize];
-    ["Offset of field: lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy::d3"]
-        [::core::mem::offset_of!(lhash_st_CONF_VALUE_lh_CONF_VALUE_dummy, d3) - 0usize];
-};
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of lhash_st_CONF_VALUE"][::core::mem::size_of::<lhash_st_CONF_VALUE>() - 8usize];
-    ["Alignment of lhash_st_CONF_VALUE"][::core::mem::align_of::<lhash_st_CONF_VALUE>() - 8usize];
-    ["Offset of field: lhash_st_CONF_VALUE::dummy"]
-        [::core::mem::offset_of!(lhash_st_CONF_VALUE, dummy) - 0usize];
-};
-pub type lh_CONF_VALUE_compfunc = ::core::option::Option<
-    unsafe extern "C" fn(a: *const CONF_VALUE, b: *const CONF_VALUE) -> core::ffi::c_int,
->;
-pub type lh_CONF_VALUE_hashfunc =
-    ::core::option::Option<unsafe extern "C" fn(a: *const CONF_VALUE) -> core::ffi::c_ulong>;
-pub type lh_CONF_VALUE_doallfunc = ::core::option::Option<unsafe extern "C" fn(a: *mut CONF_VALUE)>;
-pub type CONF_METHOD = conf_method_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct conf_method_st {
-    pub name: *const core::ffi::c_char,
-    pub create: ::core::option::Option<unsafe extern "C" fn(meth: *mut CONF_METHOD) -> *mut CONF>,
-    pub init: ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
-    pub destroy: ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
-    pub destroy_data:
-        ::core::option::Option<unsafe extern "C" fn(conf: *mut CONF) -> core::ffi::c_int>,
-    pub load_bio: ::core::option::Option<
-        unsafe extern "C" fn(
-            conf: *mut CONF,
-            bp: *mut BIO,
-            eline: *mut core::ffi::c_long,
-        ) -> core::ffi::c_int,
-    >,
-    pub dump: ::core::option::Option<
-        unsafe extern "C" fn(conf: *const CONF, bp: *mut BIO) -> core::ffi::c_int,
-    >,
-    pub is_number: ::core::option::Option<
-        unsafe extern "C" fn(conf: *const CONF, c: core::ffi::c_char) -> core::ffi::c_int,
-    >,
-    pub to_int: ::core::option::Option<
-        unsafe extern "C" fn(conf: *const CONF, c: core::ffi::c_char) -> core::ffi::c_int,
-    >,
-    pub load: ::core::option::Option<
-        unsafe extern "C" fn(
-            conf: *mut CONF,
-            name: *const core::ffi::c_char,
-            eline: *mut core::ffi::c_long,
-        ) -> core::ffi::c_int,
-    >,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of conf_method_st"][::core::mem::size_of::<conf_method_st>() - 80usize];
-    ["Alignment of conf_method_st"][::core::mem::align_of::<conf_method_st>() - 8usize];
-    ["Offset of field: conf_method_st::name"]
-        [::core::mem::offset_of!(conf_method_st, name) - 0usize];
-    ["Offset of field: conf_method_st::create"]
-        [::core::mem::offset_of!(conf_method_st, create) - 8usize];
-    ["Offset of field: conf_method_st::init"]
-        [::core::mem::offset_of!(conf_method_st, init) - 16usize];
-    ["Offset of field: conf_method_st::destroy"]
-        [::core::mem::offset_of!(conf_method_st, destroy) - 24usize];
-    ["Offset of field: conf_method_st::destroy_data"]
-        [::core::mem::offset_of!(conf_method_st, destroy_data) - 32usize];
-    ["Offset of field: conf_method_st::load_bio"]
-        [::core::mem::offset_of!(conf_method_st, load_bio) - 40usize];
-    ["Offset of field: conf_method_st::dump"]
-        [::core::mem::offset_of!(conf_method_st, dump) - 48usize];
-    ["Offset of field: conf_method_st::is_number"]
-        [::core::mem::offset_of!(conf_method_st, is_number) - 56usize];
-    ["Offset of field: conf_method_st::to_int"]
-        [::core::mem::offset_of!(conf_method_st, to_int) - 64usize];
-    ["Offset of field: conf_method_st::load"]
-        [::core::mem::offset_of!(conf_method_st, load) - 72usize];
-};
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct conf_st {
-    pub meth: *mut CONF_METHOD,
-    pub meth_data: *mut core::ffi::c_void,
-    pub data: *mut lhash_st_CONF_VALUE,
-    pub flag_dollarid: core::ffi::c_int,
-    pub flag_abspath: core::ffi::c_int,
-    pub includedir: *mut core::ffi::c_char,
-    pub libctx: *mut OSSL_LIB_CTX,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of conf_st"][::core::mem::size_of::<conf_st>() - 48usize];
-    ["Alignment of conf_st"][::core::mem::align_of::<conf_st>() - 8usize];
-    ["Offset of field: conf_st::meth"][::core::mem::offset_of!(conf_st, meth) - 0usize];
-    ["Offset of field: conf_st::meth_data"][::core::mem::offset_of!(conf_st, meth_data) - 8usize];
-    ["Offset of field: conf_st::data"][::core::mem::offset_of!(conf_st, data) - 16usize];
-    ["Offset of field: conf_st::flag_dollarid"]
-        [::core::mem::offset_of!(conf_st, flag_dollarid) - 24usize];
-    ["Offset of field: conf_st::flag_abspath"]
-        [::core::mem::offset_of!(conf_st, flag_abspath) - 28usize];
-    ["Offset of field: conf_st::includedir"]
-        [::core::mem::offset_of!(conf_st, includedir) - 32usize];
-    ["Offset of field: conf_st::libctx"][::core::mem::offset_of!(conf_st, libctx) - 40usize];
-};
-#[repr(C)]
-#[derive(Debug)]
-pub struct conf_imodule_st {
-    _unused: [u8; 0],
-}
-pub type CONF_IMODULE = conf_imodule_st;
-#[repr(C)]
-#[derive(Debug)]
-pub struct conf_module_st {
-    _unused: [u8; 0],
-}
-pub type CONF_MODULE = conf_module_st;
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_CONF_MODULE {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug)]
-pub struct stack_st_CONF_IMODULE {
-    _unused: [u8; 0],
-}
-pub type conf_init_func = ::core::option::Option<
-    unsafe extern "C" fn(md: *mut CONF_IMODULE, cnf: *const CONF) -> core::ffi::c_int,
->;
-pub type conf_finish_func = ::core::option::Option<unsafe extern "C" fn(md: *mut CONF_IMODULE)>;
 pub type OSSL_HTTP_bio_cb_t = ::core::option::Option<
     unsafe extern "C" fn(
         bio: *mut BIO,
@@ -5009,6 +4534,481 @@ pub type OSSL_HTTP_bio_cb_t = ::core::option::Option<
         detail: core::ffi::c_int,
     ) -> *mut BIO,
 >;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct aes_key_st {
+    pub rd_key: [core::ffi::c_uint; 60usize],
+    pub rounds: core::ffi::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of aes_key_st"][::core::mem::size_of::<aes_key_st>() - 244usize];
+    ["Alignment of aes_key_st"][::core::mem::align_of::<aes_key_st>() - 4usize];
+    ["Offset of field: aes_key_st::rd_key"][::core::mem::offset_of!(aes_key_st, rd_key) - 0usize];
+    ["Offset of field: aes_key_st::rounds"][::core::mem::offset_of!(aes_key_st, rounds) - 240usize];
+};
+pub type AES_KEY = aes_key_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_TEMPLATE_st {
+    pub flags: core::ffi::c_ulong,
+    pub tag: core::ffi::c_long,
+    pub offset: core::ffi::c_ulong,
+    pub field_name: *const core::ffi::c_char,
+    pub item: ASN1_ITEM_EXP,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_TEMPLATE_st"][::core::mem::size_of::<ASN1_TEMPLATE_st>() - 40usize];
+    ["Alignment of ASN1_TEMPLATE_st"][::core::mem::align_of::<ASN1_TEMPLATE_st>() - 8usize];
+    ["Offset of field: ASN1_TEMPLATE_st::flags"]
+        [::core::mem::offset_of!(ASN1_TEMPLATE_st, flags) - 0usize];
+    ["Offset of field: ASN1_TEMPLATE_st::tag"]
+        [::core::mem::offset_of!(ASN1_TEMPLATE_st, tag) - 8usize];
+    ["Offset of field: ASN1_TEMPLATE_st::offset"]
+        [::core::mem::offset_of!(ASN1_TEMPLATE_st, offset) - 16usize];
+    ["Offset of field: ASN1_TEMPLATE_st::field_name"]
+        [::core::mem::offset_of!(ASN1_TEMPLATE_st, field_name) - 24usize];
+    ["Offset of field: ASN1_TEMPLATE_st::item"]
+        [::core::mem::offset_of!(ASN1_TEMPLATE_st, item) - 32usize];
+};
+pub type ASN1_ADB_TABLE = ASN1_ADB_TABLE_st;
+pub type ASN1_ADB = ASN1_ADB_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_ADB_st {
+    pub flags: core::ffi::c_ulong,
+    pub offset: core::ffi::c_ulong,
+    pub adb_cb: ::core::option::Option<
+        unsafe extern "C" fn(psel: *mut core::ffi::c_long) -> core::ffi::c_int,
+    >,
+    pub tbl: *const ASN1_ADB_TABLE,
+    pub tblcount: core::ffi::c_long,
+    pub default_tt: *const ASN1_TEMPLATE,
+    pub null_tt: *const ASN1_TEMPLATE,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_ADB_st"][::core::mem::size_of::<ASN1_ADB_st>() - 56usize];
+    ["Alignment of ASN1_ADB_st"][::core::mem::align_of::<ASN1_ADB_st>() - 8usize];
+    ["Offset of field: ASN1_ADB_st::flags"][::core::mem::offset_of!(ASN1_ADB_st, flags) - 0usize];
+    ["Offset of field: ASN1_ADB_st::offset"][::core::mem::offset_of!(ASN1_ADB_st, offset) - 8usize];
+    ["Offset of field: ASN1_ADB_st::adb_cb"]
+        [::core::mem::offset_of!(ASN1_ADB_st, adb_cb) - 16usize];
+    ["Offset of field: ASN1_ADB_st::tbl"][::core::mem::offset_of!(ASN1_ADB_st, tbl) - 24usize];
+    ["Offset of field: ASN1_ADB_st::tblcount"]
+        [::core::mem::offset_of!(ASN1_ADB_st, tblcount) - 32usize];
+    ["Offset of field: ASN1_ADB_st::default_tt"]
+        [::core::mem::offset_of!(ASN1_ADB_st, default_tt) - 40usize];
+    ["Offset of field: ASN1_ADB_st::null_tt"]
+        [::core::mem::offset_of!(ASN1_ADB_st, null_tt) - 48usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_ADB_TABLE_st {
+    pub value: core::ffi::c_long,
+    pub tt: ASN1_TEMPLATE,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_ADB_TABLE_st"][::core::mem::size_of::<ASN1_ADB_TABLE_st>() - 48usize];
+    ["Alignment of ASN1_ADB_TABLE_st"][::core::mem::align_of::<ASN1_ADB_TABLE_st>() - 8usize];
+    ["Offset of field: ASN1_ADB_TABLE_st::value"]
+        [::core::mem::offset_of!(ASN1_ADB_TABLE_st, value) - 0usize];
+    ["Offset of field: ASN1_ADB_TABLE_st::tt"]
+        [::core::mem::offset_of!(ASN1_ADB_TABLE_st, tt) - 8usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_ITEM_st {
+    pub itype: core::ffi::c_char,
+    pub utype: core::ffi::c_long,
+    pub templates: *const ASN1_TEMPLATE,
+    pub tcount: core::ffi::c_long,
+    pub funcs: *const core::ffi::c_void,
+    pub size: core::ffi::c_long,
+    pub sname: *const core::ffi::c_char,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_ITEM_st"][::core::mem::size_of::<ASN1_ITEM_st>() - 56usize];
+    ["Alignment of ASN1_ITEM_st"][::core::mem::align_of::<ASN1_ITEM_st>() - 8usize];
+    ["Offset of field: ASN1_ITEM_st::itype"][::core::mem::offset_of!(ASN1_ITEM_st, itype) - 0usize];
+    ["Offset of field: ASN1_ITEM_st::utype"][::core::mem::offset_of!(ASN1_ITEM_st, utype) - 8usize];
+    ["Offset of field: ASN1_ITEM_st::templates"]
+        [::core::mem::offset_of!(ASN1_ITEM_st, templates) - 16usize];
+    ["Offset of field: ASN1_ITEM_st::tcount"]
+        [::core::mem::offset_of!(ASN1_ITEM_st, tcount) - 24usize];
+    ["Offset of field: ASN1_ITEM_st::funcs"]
+        [::core::mem::offset_of!(ASN1_ITEM_st, funcs) - 32usize];
+    ["Offset of field: ASN1_ITEM_st::size"][::core::mem::offset_of!(ASN1_ITEM_st, size) - 40usize];
+    ["Offset of field: ASN1_ITEM_st::sname"]
+        [::core::mem::offset_of!(ASN1_ITEM_st, sname) - 48usize];
+};
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_TLC_st {
+    pub valid: core::ffi::c_char,
+    pub ret: core::ffi::c_int,
+    pub plen: core::ffi::c_long,
+    pub ptag: core::ffi::c_int,
+    pub pclass: core::ffi::c_int,
+    pub hdrlen: core::ffi::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_TLC_st"][::core::mem::size_of::<ASN1_TLC_st>() - 32usize];
+    ["Alignment of ASN1_TLC_st"][::core::mem::align_of::<ASN1_TLC_st>() - 8usize];
+    ["Offset of field: ASN1_TLC_st::valid"][::core::mem::offset_of!(ASN1_TLC_st, valid) - 0usize];
+    ["Offset of field: ASN1_TLC_st::ret"][::core::mem::offset_of!(ASN1_TLC_st, ret) - 4usize];
+    ["Offset of field: ASN1_TLC_st::plen"][::core::mem::offset_of!(ASN1_TLC_st, plen) - 8usize];
+    ["Offset of field: ASN1_TLC_st::ptag"][::core::mem::offset_of!(ASN1_TLC_st, ptag) - 16usize];
+    ["Offset of field: ASN1_TLC_st::pclass"]
+        [::core::mem::offset_of!(ASN1_TLC_st, pclass) - 20usize];
+    ["Offset of field: ASN1_TLC_st::hdrlen"]
+        [::core::mem::offset_of!(ASN1_TLC_st, hdrlen) - 24usize];
+};
+pub type ASN1_ex_d2i = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *mut ASN1_VALUE,
+        in_: *mut *const core::ffi::c_uchar,
+        len: core::ffi::c_long,
+        it: *const ASN1_ITEM,
+        tag: core::ffi::c_int,
+        aclass: core::ffi::c_int,
+        opt: core::ffi::c_char,
+        ctx: *mut ASN1_TLC,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_ex_d2i_ex = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *mut ASN1_VALUE,
+        in_: *mut *const core::ffi::c_uchar,
+        len: core::ffi::c_long,
+        it: *const ASN1_ITEM,
+        tag: core::ffi::c_int,
+        aclass: core::ffi::c_int,
+        opt: core::ffi::c_char,
+        ctx: *mut ASN1_TLC,
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const core::ffi::c_char,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_ex_i2d = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *const ASN1_VALUE,
+        out: *mut *mut core::ffi::c_uchar,
+        it: *const ASN1_ITEM,
+        tag: core::ffi::c_int,
+        aclass: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_ex_new_func = ::core::option::Option<
+    unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM) -> core::ffi::c_int,
+>;
+pub type ASN1_ex_new_ex_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *mut ASN1_VALUE,
+        it: *const ASN1_ITEM,
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const core::ffi::c_char,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_ex_free_func =
+    ::core::option::Option<unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM)>;
+pub type ASN1_ex_print_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        out: *mut BIO,
+        pval: *mut *const ASN1_VALUE,
+        indent: core::ffi::c_int,
+        fname: *const core::ffi::c_char,
+        pctx: *const ASN1_PCTX,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_primitive_i2c = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *const ASN1_VALUE,
+        cont: *mut core::ffi::c_uchar,
+        putype: *mut core::ffi::c_int,
+        it: *const ASN1_ITEM,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_primitive_c2i = ::core::option::Option<
+    unsafe extern "C" fn(
+        pval: *mut *mut ASN1_VALUE,
+        cont: *const core::ffi::c_uchar,
+        len: core::ffi::c_int,
+        utype: core::ffi::c_int,
+        free_cont: *mut core::ffi::c_char,
+        it: *const ASN1_ITEM,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_primitive_print = ::core::option::Option<
+    unsafe extern "C" fn(
+        out: *mut BIO,
+        pval: *mut *const ASN1_VALUE,
+        it: *const ASN1_ITEM,
+        indent: core::ffi::c_int,
+        pctx: *const ASN1_PCTX,
+    ) -> core::ffi::c_int,
+>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_EXTERN_FUNCS_st {
+    pub app_data: *mut core::ffi::c_void,
+    pub asn1_ex_new: ASN1_ex_new_func,
+    pub asn1_ex_free: ASN1_ex_free_func,
+    pub asn1_ex_clear: ASN1_ex_free_func,
+    pub asn1_ex_d2i: ASN1_ex_d2i,
+    pub asn1_ex_i2d: ASN1_ex_i2d,
+    pub asn1_ex_print: ASN1_ex_print_func,
+    pub asn1_ex_new_ex: ASN1_ex_new_ex_func,
+    pub asn1_ex_d2i_ex: ASN1_ex_d2i_ex,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_EXTERN_FUNCS_st"][::core::mem::size_of::<ASN1_EXTERN_FUNCS_st>() - 72usize];
+    ["Alignment of ASN1_EXTERN_FUNCS_st"][::core::mem::align_of::<ASN1_EXTERN_FUNCS_st>() - 8usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::app_data"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, app_data) - 0usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_new"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_new) - 8usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_free"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_free) - 16usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_clear"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_clear) - 24usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_d2i"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_d2i) - 32usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_i2d"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_i2d) - 40usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_print"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_print) - 48usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_new_ex"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_new_ex) - 56usize];
+    ["Offset of field: ASN1_EXTERN_FUNCS_st::asn1_ex_d2i_ex"]
+        [::core::mem::offset_of!(ASN1_EXTERN_FUNCS_st, asn1_ex_d2i_ex) - 64usize];
+};
+pub type ASN1_EXTERN_FUNCS = ASN1_EXTERN_FUNCS_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_PRIMITIVE_FUNCS_st {
+    pub app_data: *mut core::ffi::c_void,
+    pub flags: core::ffi::c_ulong,
+    pub prim_new: ASN1_ex_new_func,
+    pub prim_free: ASN1_ex_free_func,
+    pub prim_clear: ASN1_ex_free_func,
+    pub prim_c2i: ASN1_primitive_c2i,
+    pub prim_i2c: ASN1_primitive_i2c,
+    pub prim_print: ASN1_primitive_print,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_PRIMITIVE_FUNCS_st"]
+        [::core::mem::size_of::<ASN1_PRIMITIVE_FUNCS_st>() - 64usize];
+    ["Alignment of ASN1_PRIMITIVE_FUNCS_st"]
+        [::core::mem::align_of::<ASN1_PRIMITIVE_FUNCS_st>() - 8usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::app_data"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, app_data) - 0usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::flags"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, flags) - 8usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_new"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_new) - 16usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_free"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_free) - 24usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_clear"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_clear) - 32usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_c2i"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_c2i) - 40usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_i2c"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_i2c) - 48usize];
+    ["Offset of field: ASN1_PRIMITIVE_FUNCS_st::prim_print"]
+        [::core::mem::offset_of!(ASN1_PRIMITIVE_FUNCS_st, prim_print) - 56usize];
+};
+pub type ASN1_PRIMITIVE_FUNCS = ASN1_PRIMITIVE_FUNCS_st;
+pub type ASN1_aux_cb = ::core::option::Option<
+    unsafe extern "C" fn(
+        operation: core::ffi::c_int,
+        in_: *mut *mut ASN1_VALUE,
+        it: *const ASN1_ITEM,
+        exarg: *mut core::ffi::c_void,
+    ) -> core::ffi::c_int,
+>;
+pub type ASN1_aux_const_cb = ::core::option::Option<
+    unsafe extern "C" fn(
+        operation: core::ffi::c_int,
+        in_: *mut *const ASN1_VALUE,
+        it: *const ASN1_ITEM,
+        exarg: *mut core::ffi::c_void,
+    ) -> core::ffi::c_int,
+>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_AUX_st {
+    pub app_data: *mut core::ffi::c_void,
+    pub flags: core::ffi::c_int,
+    pub ref_offset: core::ffi::c_int,
+    pub ref_lock: core::ffi::c_int,
+    pub asn1_cb: ASN1_aux_cb,
+    pub enc_offset: core::ffi::c_int,
+    pub asn1_const_cb: ASN1_aux_const_cb,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_AUX_st"][::core::mem::size_of::<ASN1_AUX_st>() - 48usize];
+    ["Alignment of ASN1_AUX_st"][::core::mem::align_of::<ASN1_AUX_st>() - 8usize];
+    ["Offset of field: ASN1_AUX_st::app_data"]
+        [::core::mem::offset_of!(ASN1_AUX_st, app_data) - 0usize];
+    ["Offset of field: ASN1_AUX_st::flags"][::core::mem::offset_of!(ASN1_AUX_st, flags) - 8usize];
+    ["Offset of field: ASN1_AUX_st::ref_offset"]
+        [::core::mem::offset_of!(ASN1_AUX_st, ref_offset) - 12usize];
+    ["Offset of field: ASN1_AUX_st::ref_lock"]
+        [::core::mem::offset_of!(ASN1_AUX_st, ref_lock) - 16usize];
+    ["Offset of field: ASN1_AUX_st::asn1_cb"]
+        [::core::mem::offset_of!(ASN1_AUX_st, asn1_cb) - 24usize];
+    ["Offset of field: ASN1_AUX_st::enc_offset"]
+        [::core::mem::offset_of!(ASN1_AUX_st, enc_offset) - 32usize];
+    ["Offset of field: ASN1_AUX_st::asn1_const_cb"]
+        [::core::mem::offset_of!(ASN1_AUX_st, asn1_const_cb) - 40usize];
+};
+pub type ASN1_AUX = ASN1_AUX_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_PRINT_ARG_st {
+    pub out: *mut BIO,
+    pub indent: core::ffi::c_int,
+    pub pctx: *const ASN1_PCTX,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_PRINT_ARG_st"][::core::mem::size_of::<ASN1_PRINT_ARG_st>() - 24usize];
+    ["Alignment of ASN1_PRINT_ARG_st"][::core::mem::align_of::<ASN1_PRINT_ARG_st>() - 8usize];
+    ["Offset of field: ASN1_PRINT_ARG_st::out"]
+        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, out) - 0usize];
+    ["Offset of field: ASN1_PRINT_ARG_st::indent"]
+        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, indent) - 8usize];
+    ["Offset of field: ASN1_PRINT_ARG_st::pctx"]
+        [::core::mem::offset_of!(ASN1_PRINT_ARG_st, pctx) - 16usize];
+};
+pub type ASN1_PRINT_ARG = ASN1_PRINT_ARG_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ASN1_STREAM_ARG_st {
+    pub out: *mut BIO,
+    pub ndef_bio: *mut BIO,
+    pub boundary: *mut *mut core::ffi::c_uchar,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ASN1_STREAM_ARG_st"][::core::mem::size_of::<ASN1_STREAM_ARG_st>() - 24usize];
+    ["Alignment of ASN1_STREAM_ARG_st"][::core::mem::align_of::<ASN1_STREAM_ARG_st>() - 8usize];
+    ["Offset of field: ASN1_STREAM_ARG_st::out"]
+        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, out) - 0usize];
+    ["Offset of field: ASN1_STREAM_ARG_st::ndef_bio"]
+        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, ndef_bio) - 8usize];
+    ["Offset of field: ASN1_STREAM_ARG_st::boundary"]
+        [::core::mem::offset_of!(ASN1_STREAM_ARG_st, boundary) - 16usize];
+};
+pub type ASN1_STREAM_ARG = ASN1_STREAM_ARG_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct stack_st_ASN1_VALUE {
+    _unused: [u8; 0],
+}
+pub type sk_ASN1_VALUE_compfunc = ::core::option::Option<
+    unsafe extern "C" fn(
+        a: *const *const ASN1_VALUE,
+        b: *const *const ASN1_VALUE,
+    ) -> core::ffi::c_int,
+>;
+pub type sk_ASN1_VALUE_freefunc = ::core::option::Option<unsafe extern "C" fn(a: *mut ASN1_VALUE)>;
+pub type sk_ASN1_VALUE_copyfunc =
+    ::core::option::Option<unsafe extern "C" fn(a: *const ASN1_VALUE) -> *mut ASN1_VALUE>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct async_job_st {
+    _unused: [u8; 0],
+}
+pub type ASYNC_JOB = async_job_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct async_wait_ctx_st {
+    _unused: [u8; 0],
+}
+pub type ASYNC_WAIT_CTX = async_wait_ctx_st;
+pub type ASYNC_callback_fn =
+    ::core::option::Option<unsafe extern "C" fn(arg: *mut core::ffi::c_void) -> core::ffi::c_int>;
+pub type ASYNC_stack_alloc_fn =
+    ::core::option::Option<unsafe extern "C" fn(num: *mut usize) -> *mut core::ffi::c_void>;
+pub type ASYNC_stack_free_fn =
+    ::core::option::Option<unsafe extern "C" fn(addr: *mut core::ffi::c_void)>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct bf_key_st {
+    pub P: [core::ffi::c_uint; 18usize],
+    pub S: [core::ffi::c_uint; 1024usize],
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of bf_key_st"][::core::mem::size_of::<bf_key_st>() - 4168usize];
+    ["Alignment of bf_key_st"][::core::mem::align_of::<bf_key_st>() - 4usize];
+    ["Offset of field: bf_key_st::P"][::core::mem::offset_of!(bf_key_st, P) - 0usize];
+    ["Offset of field: bf_key_st::S"][::core::mem::offset_of!(bf_key_st, S) - 72usize];
+};
+pub type BF_KEY = bf_key_st;
+pub type KEY_TABLE_TYPE = [core::ffi::c_uint; 68usize];
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct camellia_key_st {
+    pub u: camellia_key_st__bindgen_ty_1,
+    pub grand_rounds: core::ffi::c_int,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union camellia_key_st__bindgen_ty_1 {
+    pub d: f64,
+    pub rd_key: KEY_TABLE_TYPE,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of camellia_key_st__bindgen_ty_1"]
+        [::core::mem::size_of::<camellia_key_st__bindgen_ty_1>() - 272usize];
+    ["Alignment of camellia_key_st__bindgen_ty_1"]
+        [::core::mem::align_of::<camellia_key_st__bindgen_ty_1>() - 8usize];
+    ["Offset of field: camellia_key_st__bindgen_ty_1::d"]
+        [::core::mem::offset_of!(camellia_key_st__bindgen_ty_1, d) - 0usize];
+    ["Offset of field: camellia_key_st__bindgen_ty_1::rd_key"]
+        [::core::mem::offset_of!(camellia_key_st__bindgen_ty_1, rd_key) - 0usize];
+};
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of camellia_key_st"][::core::mem::size_of::<camellia_key_st>() - 280usize];
+    ["Alignment of camellia_key_st"][::core::mem::align_of::<camellia_key_st>() - 8usize];
+    ["Offset of field: camellia_key_st::u"][::core::mem::offset_of!(camellia_key_st, u) - 0usize];
+    ["Offset of field: camellia_key_st::grand_rounds"]
+        [::core::mem::offset_of!(camellia_key_st, grand_rounds) - 272usize];
+};
+pub type CAMELLIA_KEY = camellia_key_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct cast_key_st {
+    pub data: [core::ffi::c_uint; 32usize],
+    pub short_key: core::ffi::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of cast_key_st"][::core::mem::size_of::<cast_key_st>() - 132usize];
+    ["Alignment of cast_key_st"][::core::mem::align_of::<cast_key_st>() - 4usize];
+    ["Offset of field: cast_key_st::data"][::core::mem::offset_of!(cast_key_st, data) - 0usize];
+    ["Offset of field: cast_key_st::short_key"]
+        [::core::mem::offset_of!(cast_key_st, short_key) - 128usize];
+};
+pub type CAST_KEY = cast_key_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct CMAC_CTX_st {
+    _unused: [u8; 0],
+}
+pub type CMAC_CTX = CMAC_CTX_st;
 pub type X509V3_EXT_NEW = ::core::option::Option<unsafe extern "C" fn() -> *mut core::ffi::c_void>;
 pub type X509V3_EXT_FREE =
     ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>;
@@ -9392,6 +9392,41 @@ pub type sk_OSSL_ISSUER_SERIAL_freefunc =
 pub type sk_OSSL_ISSUER_SERIAL_copyfunc = ::core::option::Option<
     unsafe extern "C" fn(a: *const OSSL_ISSUER_SERIAL) -> *mut OSSL_ISSUER_SERIAL,
 >;
+pub type DSO_FUNC_TYPE = ::core::option::Option<unsafe extern "C" fn()>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct dso_st {
+    _unused: [u8; 0],
+}
+pub type DSO = dso_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct dso_meth_st {
+    _unused: [u8; 0],
+}
+pub type DSO_METHOD = dso_meth_st;
+pub type DSO_NAME_CONVERTER_FUNC = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *mut DSO, arg2: *const core::ffi::c_char) -> *mut core::ffi::c_char,
+>;
+pub type DSO_MERGER_FUNC = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut DSO,
+        arg2: *const core::ffi::c_char,
+        arg3: *const core::ffi::c_char,
+    ) -> *mut core::ffi::c_char,
+>;
+#[repr(C)]
+#[derive(Debug)]
+pub struct OPENSSL_dir_context_st {
+    _unused: [u8; 0],
+}
+pub type OPENSSL_DIR_CTX = OPENSSL_dir_context_st;
+#[repr(C)]
+#[derive(Debug)]
+pub struct ssl_conf_cmd_st {
+    _unused: [u8; 0],
+}
+pub type SSL_CONF_CMD = ssl_conf_cmd_st;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -10914,6 +10949,29 @@ pub const DSA_R_P_NOT_PRIME: core::ffi::c_int = 115;
 pub const DSA_R_Q_NOT_PRIME: core::ffi::c_int = 113;
 pub const DSA_R_SEED_LEN_SMALL: core::ffi::c_int = 110;
 pub const DSA_R_TOO_MANY_RETRIES: core::ffi::c_int = 116;
+pub const DSO_CTRL_GET_FLAGS: core::ffi::c_int = 1;
+pub const DSO_CTRL_OR_FLAGS: core::ffi::c_int = 3;
+pub const DSO_CTRL_SET_FLAGS: core::ffi::c_int = 2;
+pub const DSO_FLAG_GLOBAL_SYMBOLS: core::ffi::c_int = 32;
+pub const DSO_FLAG_NAME_TRANSLATION_EXT_ONLY: core::ffi::c_int = 2;
+pub const DSO_FLAG_NO_NAME_TRANSLATION: core::ffi::c_int = 1;
+pub const DSO_FLAG_NO_UNLOAD_ON_FREE: core::ffi::c_int = 4;
+pub const DSO_R_CTRL_FAILED: core::ffi::c_int = 100;
+pub const DSO_R_DSO_ALREADY_LOADED: core::ffi::c_int = 110;
+pub const DSO_R_EMPTY_FILE_STRUCTURE: core::ffi::c_int = 113;
+pub const DSO_R_FAILURE: core::ffi::c_int = 114;
+pub const DSO_R_FILENAME_TOO_BIG: core::ffi::c_int = 101;
+pub const DSO_R_FINISH_FAILED: core::ffi::c_int = 102;
+pub const DSO_R_INCORRECT_FILE_SYNTAX: core::ffi::c_int = 115;
+pub const DSO_R_LOAD_FAILED: core::ffi::c_int = 103;
+pub const DSO_R_NAME_TRANSLATION_FAILED: core::ffi::c_int = 109;
+pub const DSO_R_NO_FILENAME: core::ffi::c_int = 111;
+pub const DSO_R_NULL_HANDLE: core::ffi::c_int = 104;
+pub const DSO_R_SET_FILENAME_FAILED: core::ffi::c_int = 112;
+pub const DSO_R_STACK_ERROR: core::ffi::c_int = 105;
+pub const DSO_R_SYM_FAILURE: core::ffi::c_int = 106;
+pub const DSO_R_UNLOAD_FAILED: core::ffi::c_int = 107;
+pub const DSO_R_UNSUPPORTED: core::ffi::c_int = 108;
 pub const DSS_prime_checks: core::ffi::c_int = 64;
 pub const DTLS1_2_VERSION: core::ffi::c_int = 65277;
 pub const DTLS1_AL_HEADER_LENGTH: core::ffi::c_int = 2;

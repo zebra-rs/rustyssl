@@ -160,9 +160,13 @@ Key design decisions:
 9. **Port behavior, not code.** OpenSSL's C source and man pages are the spec; don't
    transliterate the C. Reproduce an OpenSSL quirk only when compatibility requires it,
    and document it.
-10. **Fail closed.** An export that isn't implemented yet must push an `ERR_R_UNSUPPORTED`
-    error and return the failure value. It never returns success. Functions that are
-    documented no-ops in OpenSSL 3 (`ERR_load_crypto_strings`, for example) stay no-ops.
+10. **Fail closed.** An export that isn't implemented yet is a generated stub that names the
+    function on stderr and **aborts** the process. Returning an error isn't safe without
+    knowing each function's conventions: a stub `CRYPTO_memcmp` returning 0 would say two
+    buffers are equal, `SSL_get_verify_result` returning 0 means `X509_V_OK`, and
+    `AES_set_encrypt_key` returns 0 on success. An implemented function never reports
+    success for work it didn't do. Functions OpenSSL 3 documents as no-ops are implemented
+    as no-ops, not left as stubs.
 11. **Every relevant historical OpenSSL CVE gets a regression test** in `tests/cve/`.
 
 ## Code generation (never hand-type ABI facts)
@@ -175,11 +179,21 @@ generator. Don't paste the number.
 
 ## Commands
 
-`cargo build`, `test`, `clippy`, `fmt`, `cargo xtask vendor`, and `cargo xtask codegen`
-(so far it only generates the `rustssl-abi` bindings) work now. The other `cargo xtask`
-commands arrive during Phase 0 and fail with a message until then. Update this section when
-they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`, `perl`, and `make`. `codegen` needs
-`clang` and bindgen 0.73.2 exactly (`cargo install bindgen-cli --version 0.73.2 --locked`).
+`cargo build`, `test`, `clippy`, `fmt`, `cargo xtask vendor`, and `cargo xtask codegen` work
+now. The other `cargo xtask` commands arrive during Phase 0 and fail with a message until
+then. Update this section when they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`,
+`perl`, and `make`. `codegen` needs `clang` and bindgen 0.73.2 exactly
+(`cargo install bindgen-cli --version 0.73.2 --locked`).
+
+`cargo xtask codegen` writes:
+
+| Output | Contents |
+|---|---|
+| `crates/rustssl-abi/src/generated/` | types, layouts, enums, and every macro constant, per target |
+| `libs/<lib>/exports/` | ELF version scripts (Linux) and exported-symbol lists (macOS), per target |
+| `crates/rustssl-capi/src/generated/<lib>_stubs.rs` | an aborting stub for every export that isn't implemented yet |
+| `crates/rustssl-capi/src/generated/err_reasons.rs` | the reason-string table |
+| `crates/rustssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
 
 ```sh
 cargo build --workspace                      # build everything
@@ -188,7 +202,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 cargo deny check && cargo vet                # supply-chain gates
 cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
-cargo xtask codegen                          # regenerate ABI bindings, NID/err tables, version scripts
+cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
 cargo xtask ref-openssl 3.5                  # build the pinned reference OpenSSL into target/ref/
 cargo xtask abi-check                        # symbols+versions vs *.num, signatures vs headers, struct layouts
@@ -210,8 +224,9 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   first (KAT, differential against the reference OpenSSL, and a C conformance test
   compiled against the official headers). Then implement the safe core, then the `capi`
   exports, then update the coverage status.
-- An export counts as **implemented** only once it has a conformance test. Until then it's
-  a fail-closed stub.
+- **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
+  `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. It counts
+  as **implemented** only once it has a conformance test.
 - Commit one API family or step at a time, and keep the diffs reviewable.
 - When OpenSSL's behavior is unclear, run it against the reference build
   (`target/ref/`). Behavior matters more than intent.

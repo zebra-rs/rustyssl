@@ -1,57 +1,22 @@
 //! Generates the `rustssl-abi` bindings, `crates/rustssl-abi/src/generated/<module>.rs`, for
 //! every target in [`TARGETS`] (step 0.3 of the implementation plan).
 //!
-//! - **Types and enums** come from bindgen (pinned to [`BINDGEN_VERSION`]), run on the vendored
-//!   headers with clang's freestanding headers plus stand-ins for the few libc headers OpenSSL
-//!   includes (see [`LIBC_TYPEDEFS`]). bindgen's compile-time layout assertions are kept.
+//! - **Types and enums** come from bindgen, run on the vendored headers with clang's
+//!   freestanding headers plus stand-ins for the libc headers OpenSSL includes (see
+//!   `headers.rs`). bindgen's compile-time layout assertions are kept.
 //! - **Constants** are every object-like macro the headers define, evaluated by clang itself:
 //!   values and C types are exact even for casts, `sizeof`, and function-like macros such as
 //!   `SSL_OP_BIT(n)`, which bindgen can't evaluate. String macros become `&CStr`.
-//!
-//! Needs `bindgen` (`cargo install bindgen-cli --version 0.73.2 --locked`), `clang`, `rustfmt`,
-//! and the Rust targets in `rust-toolchain.toml`, which are used to check the output.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
+use super::headers::{BINDGEN_VERSION, Context, identifiers, libc_types, write_rust};
 use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
-use crate::util::{Result, fresh_dir, run_output};
-
-const BINDGEN_VERSION: &str = "0.73.2";
-
-/// libc typedefs the OpenSSL headers use. The stand-in headers declare each one as an
-/// incomplete struct: clang then rejects any public struct that embeds one by value, so a
-/// wrong layout can't slip through, and the generated Rust takes the real per-target
-/// definition from the `libc` crate.
-const LIBC_TYPEDEFS: &[&str] = &[
-    "FILE",
-    "off_t",
-    "pthread_key_t",
-    "pthread_once_t",
-    "pthread_t",
-    "ssize_t",
-    "time_t",
-];
-
-/// libc struct tags the headers use, only ever through pointers.
-const LIBC_STRUCTS: &[&str] = &["timeval", "tm"];
-
-/// System headers the OpenSSL headers include. Each stand-in just includes the shared
-/// declarations; clang's own freestanding headers supply `stddef.h`, `stdint.h`, and the like.
-const STUB_HEADERS: &[&str] = &[
-    "errno.h",
-    "inttypes.h",
-    "pthread.h",
-    "stdio.h",
-    "stdlib.h",
-    "string.h",
-    "sys/time.h",
-    "sys/types.h",
-    "time.h",
-];
+use crate::util::Result;
 
 /// Builtin macros whose value depends on where they're expanded. Macros that use them, even
 /// indirectly like `OPENSSL_LINE`, aren't constants.
@@ -74,41 +39,31 @@ const LOCATION_MACROS: &[&str] = &[
 const GENERATED_ALLOWS: &str =
     "non_camel_case_types, non_snake_case, non_upper_case_globals, clippy::indexing_slicing";
 
-pub fn generate(root: &Path) -> Result {
-    check_bindgen()?;
-    let abi = root
-        .join("abi")
-        .join(format!("openssl-{OPENSSL_SERIES}"))
-        .canonicalize()
-        .map_err(|e| {
-            format!("abi/openssl-{OPENSSL_SERIES} is missing ({e}); run `cargo xtask vendor` first")
-        })?;
-    let work = root.join("target/xtask/codegen/abi");
-    fresh_dir(&work)?;
-    let stubs = write_stubs(&work)?;
-    let wrapper = write_wrapper(&abi, &work)?;
-    let out_dir = root.join("crates/rustssl-abi/src/generated");
-    fs::create_dir_all(&out_dir)?;
-
+/// Generates every target's bindings and returns the constants of the first target. Names
+/// and values of the constants are the same on every target; only some C types differ.
+pub fn generate(ctx: &Context) -> Result<Constants> {
+    let out_dir = ctx.root.join("crates/rustssl-abi/src/generated");
+    let mut first = None;
     for target in TARGETS {
         println!(
             "Generating rustssl-abi bindings for {}...",
             target.configure
         );
-        let flags = clang_flags(target, &abi, &stubs);
-        let types = bindgen(&wrapper, &work, target, &abi, &flags)?;
-        let macros = object_like_macros(&wrapper, &abi, &flags)?;
-        let constants = evaluate(
-            &work,
-            target,
-            &wrapper,
-            &flags,
-            &constant_candidates(&macros),
-        )?;
-        let path = out_dir.join(format!("{}.rs", target.module));
+        let libc = libc_types().join("|");
+        let options = [
+            "--ignore-functions".to_owned(),
+            "--blocklist-type".to_owned(),
+            format!("{libc}|rustssl_libc_.*"),
+        ];
+        let types = ctx.bindgen(target, &ctx.wrapper, "types", &options)?;
+        let macros = ctx.object_like_macros(target)?;
+        let constants = evaluate(ctx, target, &constant_candidates(&macros))?;
         let (source, skipped) = render(target, &types, &constants)?;
-        fs::write(&path, source)?;
-        rustfmt(root, &path)?;
+        write_rust(
+            &ctx.root,
+            &out_dir.join(format!("{}.rs", target.module)),
+            &source,
+        )?;
         println!(
             "  {} integer and {} string constants",
             constants.ints.len(),
@@ -117,195 +72,10 @@ pub fn generate(root: &Path) -> Result {
         for (name, why) in skipped {
             println!("  skipped constant {name}: {why}");
         }
+        first.get_or_insert(constants);
     }
-    let mod_rs = out_dir.join("mod.rs");
-    fs::write(&mod_rs, render_mod()?)?;
-    rustfmt(root, &mod_rs)?;
-
-    for target in TARGETS {
-        println!("Checking rustssl-abi for {}...", target.rust);
-        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-        run_output(
-            Command::new(cargo)
-                .args([
-                    "check",
-                    "--quiet",
-                    "-p",
-                    "rustssl-abi",
-                    "--target",
-                    target.rust,
-                ])
-                .current_dir(root),
-        )?;
-    }
-    Ok(())
-}
-
-fn check_bindgen() -> Result {
-    let version = run_output(Command::new("bindgen").arg("--version")).map_err(|e| {
-        format!(
-            "{e}\ninstall it with: cargo install bindgen-cli --version {BINDGEN_VERSION} --locked"
-        )
-    })?;
-    if version.trim() == format!("bindgen {BINDGEN_VERSION}") {
-        Ok(())
-    } else {
-        Err(format!(
-            "found `{}`, but the bindings are pinned to bindgen {BINDGEN_VERSION}\n\
-             install it with: cargo install bindgen-cli --version {BINDGEN_VERSION} --locked",
-            version.trim()
-        )
-        .into())
-    }
-}
-
-/// Writes the stand-in system headers and returns their include directory.
-fn write_stubs(work: &Path) -> Result<PathBuf> {
-    let dir = work.join("libc-stubs");
-    let mut shared = String::from(
-        "/* Stand-ins for libc, generated by `cargo xtask codegen`. */\n\
-         #ifndef RUSTSSL_LIBC_H\n#define RUSTSSL_LIBC_H\n#include <stddef.h>\n#include <stdint.h>\n",
-    );
-    for name in LIBC_TYPEDEFS {
-        writeln!(shared, "typedef struct rustssl_libc_{name} {name};")?;
-    }
-    for tag in LIBC_STRUCTS {
-        writeln!(shared, "struct {tag};")?;
-    }
-    // Only needed to parse the bodies of byteorder.h's inline helpers, which bindgen skips.
-    shared.push_str("void *memcpy(void *, const void *, size_t);\n#endif\n");
-    fs::create_dir_all(dir.join("sys"))?;
-    fs::create_dir_all(dir.join("libkern"))?;
-    fs::write(dir.join("rustssl_libc.h"), shared)?;
-    for header in STUB_HEADERS {
-        fs::write(dir.join(header), "#include <rustssl_libc.h>\n")?;
-    }
-    // byteorder.h uses these on Apple targets, again only inside inline helper bodies.
-    let mut osbyteorder = String::from("#include <rustssl_libc.h>\n");
-    for swap in ["HostToBig", "BigToHost", "HostToLittle", "LittleToHost"] {
-        for bits in [16, 32, 64] {
-            writeln!(osbyteorder, "#define OSSwap{swap}Int{bits}(x) (x)")?;
-        }
-    }
-    fs::write(dir.join("libkern/OSByteOrder.h"), osbyteorder)?;
-    Ok(dir)
-}
-
-/// Writes a header that includes every vendored public header, in sorted order.
-fn write_wrapper(abi: &Path, work: &Path) -> Result<PathBuf> {
-    let mut headers: Vec<String> = Vec::new();
-    for entry in fs::read_dir(abi.join("include/openssl"))? {
-        let path = entry?.path();
-        if path.extension().is_some_and(|e| e == "h")
-            && let Some(name) = path.file_name().and_then(|n| n.to_str())
-        {
-            headers.push(name.to_owned());
-        }
-    }
-    headers.push("configuration.h".to_owned());
-    headers.sort();
-    let mut text = String::new();
-    for header in headers {
-        writeln!(text, "#include <openssl/{header}>")?;
-    }
-    let path = work.join("openssl-all.h");
-    fs::write(&path, text)?;
-    Ok(path)
-}
-
-fn clang_flags(target: &Target, abi: &Path, stubs: &Path) -> Vec<String> {
-    let config = abi.join("config").join(target.configure);
-    vec![
-        "-target".into(),
-        target.clang.into(),
-        "-ffreestanding".into(),
-        "-nostdlibinc".into(),
-        "-I".into(),
-        stubs.display().to_string(),
-        "-I".into(),
-        config.display().to_string(),
-        "-I".into(),
-        abi.join("include").display().to_string(),
-    ]
-}
-
-/// Runs bindgen for types and enums only, and returns its output.
-fn bindgen(
-    wrapper: &Path,
-    work: &Path,
-    target: &Target,
-    abi: &Path,
-    flags: &[String],
-) -> Result<String> {
-    let out = work.join(format!("bindgen-{}.rs", target.module));
-    let libc_types = [LIBC_TYPEDEFS, LIBC_STRUCTS].concat().join("|");
-    let mut cmd = Command::new("bindgen");
-    cmd.arg(wrapper)
-        .arg("--output")
-        .arg(&out)
-        .args(["--ignore-functions", "--no-doc-comments", "--use-core"])
-        .args(["--ctypes-prefix", "core::ffi"])
-        // C enums become integer constants: a Rust enum holding an unknown value is UB.
-        .args(["--default-enum-style", "consts", "--no-prepend-enum-name"])
-        // Macro constants come from `evaluate`; extern data belongs with the prototypes.
-        .args(["--blocklist-var", ".*"])
-        .arg("--blocklist-type")
-        .arg(format!("{libc_types}|rustssl_libc_.*"))
-        .arg("--allowlist-file")
-        .arg(format!("{}/.*", regex_escape(&abi.display().to_string())))
-        .arg("--")
-        .args(flags);
-    run_output(&mut cmd)?;
-    Ok(fs::read_to_string(out)?)
-}
-
-fn regex_escape(text: &str) -> String {
-    let mut escaped = String::new();
-    for c in text.chars() {
-        if "\\.+*?()|[]{}^$".contains(c) {
-            escaped.push('\\');
-        }
-        escaped.push(c);
-    }
-    escaped
-}
-
-/// Object-like macros defined by the vendored headers, mapped to their bodies.
-fn object_like_macros(
-    wrapper: &Path,
-    abi: &Path,
-    flags: &[String],
-) -> Result<BTreeMap<String, String>> {
-    let text = run_output(
-        Command::new("clang")
-            .args(flags)
-            .args(["-E", "-dD", "-x", "c"])
-            .arg(wrapper),
-    )?;
-    let ours = format!("{}/", abi.display());
-    let mut in_ours = false;
-    let mut macros = BTreeMap::new();
-    for line in text.lines() {
-        // Line markers look like `# 12 "/path/to/file.h" 2`.
-        if let Some(marker) = line.strip_prefix("# ") {
-            if let Some(file) = marker.split('"').nth(1) {
-                in_ours = file.starts_with(&ours);
-            }
-        } else if !in_ours {
-            continue;
-        } else if let Some(definition) = line.strip_prefix("#define ") {
-            let end = definition
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-                .unwrap_or(definition.len());
-            let (name, body) = definition.split_at(end);
-            if !body.starts_with('(') {
-                macros.insert(name.to_owned(), body.trim().to_owned());
-            }
-        } else if let Some(name) = line.strip_prefix("#undef ") {
-            macros.remove(name.trim());
-        }
-    }
-    Ok(macros)
+    write_rust(&ctx.root, &out_dir.join("mod.rs"), &render_mod()?)?;
+    first.ok_or_else(|| "no targets".into())
 }
 
 /// Macros worth evaluating: non-empty, and not location-dependent.
@@ -329,11 +99,6 @@ fn constant_candidates(macros: &BTreeMap<String, String>) -> Vec<String> {
         .collect()
 }
 
-fn identifiers(text: &str) -> impl Iterator<Item = &str> {
-    text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-        .filter(|t| !t.is_empty())
-}
-
 /// C integer types a macro can evaluate to, in `_Generic` order (codes 1..).
 const C_TYPES: &[(&str, &str)] = &[
     ("_Bool", "bool"),
@@ -350,17 +115,17 @@ const C_TYPES: &[(&str, &str)] = &[
     ("unsigned long long", "core::ffi::c_ulonglong"),
 ];
 
-struct IntConst {
-    name: String,
+pub struct IntConst {
+    pub name: String,
     /// Index into [`C_TYPES`].
-    ctype: usize,
+    pub ctype: usize,
     /// The value converted to `unsigned long long`, as LLVM prints it (signed).
-    value: i64,
+    pub value: i64,
 }
 
-struct Constants {
-    ints: Vec<IntConst>,
-    strings: Vec<(String, Vec<u8>)>,
+pub struct Constants {
+    pub ints: Vec<IntConst>,
+    pub strings: Vec<(String, Vec<u8>)>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -372,15 +137,11 @@ enum Kind {
 /// Evaluates the candidates with clang. Each macro is probed both as an integer constant
 /// expression and as a string literal; probes that don't compile are dropped and the rest are
 /// compiled to LLVM IR, which holds the values.
-fn evaluate(
-    work: &Path,
-    target: &Target,
-    wrapper: &Path,
-    flags: &[String],
-    candidates: &[String],
-) -> Result<Constants> {
-    let source = work.join(format!("probe-{}.c", target.module));
-    let ir = work.join(format!("probe-{}.ll", target.module));
+fn evaluate(ctx: &Context, target: &Target, candidates: &[String]) -> Result<Constants> {
+    let source = ctx.work.join(format!("probe-{}.c", target.module));
+    let ir = ctx.work.join(format!("probe-{}.ll", target.module));
+    let wrapper = &ctx.wrapper;
+    let flags = ctx.clang_flags(target);
     let mut probes: Vec<(&str, Kind)> = candidates
         .iter()
         .flat_map(|name| [(name.as_str(), Kind::Int), (name.as_str(), Kind::Str)])
@@ -388,7 +149,7 @@ fn evaluate(
     for _ in 0..4 {
         fs::write(&source, probe_source(wrapper, &probes)?)?;
         let output = Command::new("clang")
-            .args(flags)
+            .args(&flags)
             .args(["-S", "-emit-llvm", "-ferror-limit=0", "-Wno-everything"])
             // Reject expressions clang only folds as an extension (like string addresses).
             .arg("-Werror=gnu-folding-constant")
@@ -568,8 +329,7 @@ fn render(
     )?;
     writeln!(out, "#![allow({GENERATED_ALLOWS})]\n")?;
 
-    let used: Vec<&str> = [LIBC_TYPEDEFS, LIBC_STRUCTS]
-        .concat()
+    let used: Vec<&str> = libc_types()
         .into_iter()
         .filter(|t| identifiers(types).any(|id| id == *t))
         .collect();
@@ -665,7 +425,7 @@ const RUST_KEYWORDS: &[&str] = &[
 ];
 
 /// Escapes bytes for a Rust `c"..."` literal.
-fn c_literal(bytes: &[u8]) -> String {
+pub(super) fn c_literal(bytes: &[u8]) -> String {
     let mut text = String::new();
     for &b in bytes {
         match b {
@@ -700,16 +460,6 @@ fn render_mod() -> Result<String> {
         all.join(", ")
     )?;
     Ok(out)
-}
-
-fn rustfmt(root: &Path, path: &Path) -> Result {
-    run_output(
-        Command::new("rustfmt")
-            .args(["--edition", "2024"])
-            .arg(path)
-            .current_dir(root),
-    )?;
-    Ok(())
 }
 
 #[cfg(test)]
