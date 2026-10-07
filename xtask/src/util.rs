@@ -59,6 +59,20 @@ pub fn run_logged(cmd: &mut Command, log: &Path) -> Result {
     }
 }
 
+/// Runs `cmd` and returns its stdout. On failure, the error includes its stderr.
+pub fn run_output(cmd: &mut Command) -> Result<String> {
+    let program = cmd.get_program().to_string_lossy().into_owned();
+    let output = cmd
+        .output()
+        .map_err(|e| format!("cannot run `{program}`: {e}"))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("`{program}` failed ({}):\n{stderr}", output.status).into())
+    }
+}
+
 /// Lowercase hex SHA-256 of a file's contents.
 pub fn sha256_file(path: &Path) -> Result<String> {
     let mut file = File::open(path)?;

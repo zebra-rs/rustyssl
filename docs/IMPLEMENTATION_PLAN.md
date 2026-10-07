@@ -75,11 +75,30 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - Also vendored: `obj_xref.txt` (needed by `OBJ_find_sigid_algs` in 2.1) and OpenSSL's
     `LICENSE.txt`. The generated `.pod` files come from `make build_generated_pods`.
   - The same command handles 3.6 and 4.0 (`abi/openssl-3.6/`, `abi/openssl-4.0/`).
-- [ ] **0.3 `rustssl-abi`.** Generate it with bindgen from the vendored headers, **once per
+- [x] **0.3 `rustssl-abi`.** Generate it with bindgen from the vendored headers, **once per
   target** (see the `configuration.h` note in 0.2), selected with
   `cfg(target_arch, target_os)`. The output is committed so users don't need libclang. It
   holds opaque type declarations, every public struct and union with `#[repr(C)]`, and all
   constants. Generate layout assertions too.
+  *Done* (`cargo xtask codegen`, output in `crates/rustssl-abi/src/generated/`). Notes:
+  - **Headers are parsed without a target sysroot**, using clang's freestanding headers plus
+    generated stand-ins for the few libc headers OpenSSL includes. Each libc type is an
+    *incomplete* struct there, so a public struct embedding one by value fails the parse.
+    In Rust these types come from the `libc` crate, so glibc vs. musl is handled for free.
+  - **Constants come from clang, not bindgen.** bindgen guesses Rust types and misses casts,
+    `sizeof`, and function-like macros (`SSL_OP_BIT(n)`). xtask instead probes every
+    object-like macro as an integer constant expression and as a string literal, then reads
+    the values and C types from LLVM IR. Per target that's about 8,290 integer and 3,454
+    string constants. Location-dependent macros (`OPENSSL_LINE`, …) are excluded.
+  - Enums become constants (`--default-enum-style consts`). Extern data symbols and function
+    prototypes are left out here; abi-check (L3) gets the prototypes.
+  - **Verified** against real C compilers with real libc headers (Apple clang with the macOS
+    SDK; gcc 14.2 with glibc 2.41 in Debian containers for x86_64 and aarch64). Every integer
+    and string constant and every nameable struct size and alignment matches on all three
+    targets. `RC4_KEY` is 1032 bytes on x86_64 and macOS but 258 on aarch64 Linux, as
+    expected. That one-off check should become L3 items 4 and 5 in `cargo xtask abi-check`.
+  - `rust-toolchain.toml` lists the three Rust targets, so codegen can `cargo check` each
+    one, which evaluates the layout assertions. Regenerating gives byte-identical output.
 - [ ] **0.4 Code generators** (`cargo xtask codegen`):
   - Linux version scripts (`OPENSSL_3.0.0` … `OPENSSL_3.6.0` plus `RUSTSSL_PRIVATE`) and
     macOS exported-symbol lists, from the `.num` files. Honor the `EXIST`/`NOEXIST` and

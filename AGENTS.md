@@ -78,7 +78,7 @@ Planned workspace layout (built in Phase 0):
 ```
 abi/openssl-3.5/      vendored headers (+ config/<target>/), *.num, objects, err tables, man pages
 crates/
-  rustssl-abi/        bindgen output from abi/ headers: types, constants, public-struct layouts. No logic.
+  rustssl-abi/        generated per target from abi/: types, layouts, enums, every macro constant. No logic.
   rustssl-asn1/       DER/BER reader and writer, ASN.1 universal types, OID/NID registry, base64, PEM framing
   rustssl-crypto/     algorithm facade + backend traits, DRBG/RNG, BIGNUM, built-in provider algorithms
   rustssl-pki/        X.509/CRL/CSR, path validation, PKCS#7/#8/#12, CMS, OCSP, TS, CT
@@ -175,9 +175,11 @@ generator. Don't paste the number.
 
 ## Commands
 
-`cargo build`, `test`, `clippy`, `fmt`, and `cargo xtask vendor` work now. The other
-`cargo xtask` commands arrive during Phase 0 and fail with a message until then. Update this
-section when they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`, `perl`, and `make`.
+`cargo build`, `test`, `clippy`, `fmt`, `cargo xtask vendor`, and `cargo xtask codegen`
+(so far it only generates the `rustssl-abi` bindings) work now. The other `cargo xtask`
+commands arrive during Phase 0 and fail with a message until then. Update this section when
+they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`, `perl`, and `make`. `codegen` needs
+`clang` and bindgen 0.73.2 exactly (`cargo install bindgen-cli --version 0.73.2 --locked`).
 
 ```sh
 cargo build --workspace                      # build everything

@@ -7,6 +7,8 @@
 // This is a command-line tool: printing to the terminal is its interface.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+mod codegen;
+mod targets;
 mod util;
 mod vendor;
 
@@ -39,6 +41,7 @@ fn main() -> ExitCode {
             print_help();
             ExitCode::SUCCESS
         }
+        Some("codegen") => report("codegen", codegen::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {
             eprintln!(

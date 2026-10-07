@@ -7,3 +7,4 @@ crates. `cargo deny` and `cargo vet` gates arrive in Phase 0.8.
 | Crate | Version | Used by | Ships in libcrypto/libssl? | Purpose | Notes |
 |---|---|---|---|---|---|
 | `sha2` | 0.11 (`default-features = false`) | `xtask` | No | SHA-256 of downloaded OpenSSL release tarballs in `cargo xtask vendor` | RustCrypto, MIT OR Apache-2.0. Hashes only public data, so constant-time behavior doesn't matter here. Pulls in `digest`, `block-buffer`, `crypto-common`, `hybrid-array`, `typenum`, `cfg-if`, `cpufeatures`, and `libc` (FFI declarations only; its build script compiles no C). |
+| `libc` | 0.2 (`default-features = false`) | `rustssl-abi` | Yes | Per-target definitions of the libc types in the OpenSSL API (`pthread_once_t` behind `CRYPTO_ONCE`, `pthread_t`, `pthread_key_t`, ...) | Maintained by the Rust project, MIT OR Apache-2.0. Type declarations only; its build script compiles no C. Already in the lock file through `cpufeatures`. |
