@@ -24,7 +24,7 @@ use super::headers::{Context, identifiers, libc_types, write_rust};
 use crate::targets::{OPENSSL_SERIES, TARGETS};
 use crate::util::Result;
 
-const CAPI_SRC: &str = "crates/rustssl-capi/src";
+pub const CAPI_SRC: &str = "crates/rustssl-capi/src";
 const LIBSSL_SRC: &str = "libs/libssl/src";
 
 /// A C prototype as Rust types.
@@ -130,7 +130,7 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
 }
 
 /// Names of the `extern "C"` functions implemented by hand under `src`.
-fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
+pub fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     let mut dirs = vec![src.to_path_buf()];
     while let Some(dir) = dirs.pop() {

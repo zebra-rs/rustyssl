@@ -8,6 +8,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod codegen;
+mod coverage;
 mod dist;
 mod reference;
 mod targets;
@@ -26,7 +27,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("dist", "build lib{crypto,ssl} with soname and symbol versions into target/dist/"),
     ("ref-openssl", "build the pinned reference OpenSSL into target/ref/"),
     ("abi-check", "check symbols, versions, signatures, and struct layouts against abi/"),
-    ("coverage", "report implemented / stubbed exports per API family"),
+    ("coverage", "report implemented exports per library and header into docs/coverage.md"),
     ("usage-scan", "rank exported functions by how many distro packages import them"),
     ("test-c", "run the C conformance tests against the reference and target/dist"),
     ("test-differential", "compare results against the reference OpenSSL"),
@@ -46,6 +47,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("codegen") => report("codegen", codegen::run(&rest)),
+        Some("coverage") => report("coverage", coverage::run(&rest)),
         Some("dist") => report("dist", dist::run(&rest)),
         Some("ref-openssl") => report("ref-openssl", reference::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),

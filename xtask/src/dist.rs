@@ -322,7 +322,7 @@ fn export_names(path: &Path, target: &Target) -> Result<HashSet<String>> {
 }
 
 /// The global symbols of an object file as (defined, name), from `nm -g`.
-fn symbols(object: &Path, target: &Target) -> Result<Vec<(bool, String)>> {
+pub fn symbols(object: &Path, target: &Target) -> Result<Vec<(bool, String)>> {
     let listing = run_output(Command::new("nm").arg("-g").arg(object))?;
     let mut symbols = Vec::new();
     for line in listing.lines() {

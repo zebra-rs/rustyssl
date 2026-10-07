@@ -63,7 +63,7 @@ jobs:
       - run: cargo +nightly miri test -p rustssl-capi
 
   codegen:
-    name: generated code is up to date
+    name: generated files are up to date
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -79,7 +79,9 @@ jobs:
         run: cargo install --locked bindgen-cli --version 0.73.2
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask codegen
-      - name: Fail if the committed generated code differs
+      # Also fails if an export is defined without a C conformance test that calls it.
+      - run: cargo xtask coverage
+      - name: Fail if the committed generated code or docs/coverage.md differs
         run: git diff --exit-code
 
   # The tool versions are pinned: a different cargo-vet formats supply-chain/ differently and

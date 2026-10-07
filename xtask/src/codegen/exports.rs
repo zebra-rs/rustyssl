@@ -71,7 +71,7 @@ pub fn generate(ctx: &Context) -> Result<Vec<Exports>> {
 }
 
 /// Parses the version script `mkdef.pl --OS linux` writes.
-fn parse_version_script(text: &str) -> Result<Vec<(String, Vec<String>)>> {
+pub fn parse_version_script(text: &str) -> Result<Vec<(String, Vec<String>)>> {
     let mut nodes: Vec<(String, Vec<String>)> = Vec::new();
     let mut open = false;
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
