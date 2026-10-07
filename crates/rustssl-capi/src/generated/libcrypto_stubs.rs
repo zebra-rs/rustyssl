@@ -5269,36 +5269,6 @@ pub extern "C" fn BN_zero_ex(_: *mut BIGNUM) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BUF_MEM_free(_: *mut BUF_MEM) {
-    crate::stub::unimplemented("BUF_MEM_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BUF_MEM_grow(_: *mut BUF_MEM, _: usize) -> usize {
-    crate::stub::unimplemented("BUF_MEM_grow")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BUF_MEM_grow_clean(_: *mut BUF_MEM, _: usize) -> usize {
-    crate::stub::unimplemented("BUF_MEM_grow_clean")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BUF_MEM_new() -> *mut BUF_MEM {
-    crate::stub::unimplemented("BUF_MEM_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BUF_MEM_new_ex(_: core::ffi::c_ulong) -> *mut BUF_MEM {
-    crate::stub::unimplemented("BUF_MEM_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BUF_reverse(_: *mut core::ffi::c_uchar, _: *const core::ffi::c_uchar, _: usize) {
-    crate::stub::unimplemented("BUF_reverse")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CAST_cbc_encrypt(
     _: *const core::ffi::c_uchar,
     _: *mut core::ffi::c_uchar,
