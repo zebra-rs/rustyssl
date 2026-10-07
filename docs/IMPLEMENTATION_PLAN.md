@@ -201,7 +201,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     Everything else distributions differ in, we export as a superset (Debian drops
     IDEA/MDC2; Alpine also drops GF2m, compression, and SEED). The exception is Debian's
     `SSL_test_functions` (`enable-unit-test`), an internal test hook left out on purpose.
-- [ ] **0.7 FFI primitives** in `rustssl-capi`:
+- [x] **0.7 FFI primitives** in `rustssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
     value);
   - the opaque handle model (Arc-backed, with `*_up_ref`/`*_free` and stable interior
@@ -211,9 +211,36 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - the C-variadic export pattern.
 
   Prove them out on `BUF_MEM`.
+
+  *Done.* Modules in `crates/rustssl-capi/src/`:
+  - **`ffi.rs`:** `guard` and `ffi_export!`. A panic becomes `ERR_R_INTERNAL_ERROR` for the
+    export's library, plus its failure value. Also the checked conversions (`length`,
+    `to_c_int`, `bytes`, `bytes_or_c_str` for the "-1 means NUL-terminated" convention), and
+    the documented C-variadic pattern: the exported `...` function moves its argument list
+    into a guarded helper shared with the `v` variant.
+  - **`handle.rs`:** each handle is an `Arc` with a per-type tag in front.
+    - `get`/`up_ref`/`free` follow OpenSSL's rules, and the object stays put, so `get0`
+      pointers to its fields stay valid.
+    - A valid handle of the **wrong type** is rejected instead of being reinterpreted.
+    - It's used by tests only until the first opaque type arrives in Phase 1.
+  - **`mem.rs`:** `alloc`/`zalloc`/`realloc`/`clear_realloc`/`free`/`clear_free`/`cleanse`
+    with `CRYPTO_*` semantics. Zero bytes gives null with no error; a failure raises
+    `ERR_R_MALLOC_FAILURE`. The exports and `CRYPTO_set_mem_functions` come in 1.1.
+  - **`err.rs`:** the per-thread queue `raise` writes to, holding `ERR_NUM_ERRORS - 1`
+    entries (to be confirmed in 1.4).
+  - **`buffer.rs`:** all six `buffer.h` exports are implemented. The C test
+    `tests/c/buf_mem.c` (26 checks) passes against the reference and rustssl, with
+    identical output: Homebrew 3.6.5 on macOS and Debian 3.5.7 on Linux, the same binary
+    run against both. Where OpenSSL crashes (null buffer), rustssl fails cleanly.
+  - **Checks:** the `rustssl-capi` tests pass under Miri
+    (`cargo +nightly miri test -p rustssl-capi`). Codegen's implemented-function scan now
+    skips comments; doc examples had been hiding the `BIO_printf` stubs.
 - [ ] **0.8 Test infrastructure** (details in TEST_PLAN.md):
   - `cargo xtask ref-openssl 3.5`, which builds the reference into `target/ref/`;
-  - the C conformance harness in `tests/c`, with dual runs (reference and ours);
+  - the C conformance harness in `tests/c`, with dual runs (reference and ours). The first
+    test, `tests/c/buf_mem.c` (TAP output), is already there and has been dual-run by hand
+    (0.7);
+  - Miri on the `rustssl-capi` tests;
   - the differential probe skeleton;
   - fuzz scaffolding;
   - CI on Linux x86_64 and aarch64 and macOS arm64;
@@ -233,6 +260,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
 Everything else depends on this phase.
 
 - [ ] **1.1 Memory:**
+  (The internal allocator exists in `rustssl-capi/src/mem.rs` since 0.7; this step exports
+  it, adds the `CRYPTO_set_mem_functions` hooks, and confirms its edge cases against the
+  reference.)
   - `CRYPTO_malloc`, `zalloc`, `realloc`, `clear_realloc`, `free`, `clear_free`
   - `CRYPTO_set_mem_functions` / `CRYPTO_get_mem_functions`
   - `OPENSSL_cleanse`, `CRYPTO_memcmp`

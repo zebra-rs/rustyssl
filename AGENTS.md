@@ -220,6 +220,7 @@ cargo xtask test-c                           # C conformance tests against targe
 cargo xtask test-differential                # same calls vs reference OpenSSL, compare results
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
+cargo +nightly miri test -p rustssl-capi     # the unsafe FFI layer under Miri
 cargo +nightly fuzz run <target>             # fuzzing
 ```
 
@@ -236,8 +237,11 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
 - **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
   `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. A libssl
   function is written as `rustssl_private_<name>`; never implement anything in
-  `libs/libssl`, whose forwarders are generated. It counts as **implemented** only once it
-  has a conformance test.
+  `libs/libssl`, whose forwarders are generated. Use `ffi_export!` (`rustssl-capi/src/ffi.rs`)
+  and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
+  `mem`, and errors go through `err::raise`. It counts as **implemented** only once it has a
+  conformance test: a TAP program in `tests/c/` that passes, unchanged, against the reference
+  and rustssl (`tests/c/buf_mem.c` is the model).
 - Commit one API family or step at a time, and keep the diffs reviewable.
 - When OpenSSL's behavior is unclear, run it against the reference build
   (`target/ref/`). Behavior matters more than intent.
