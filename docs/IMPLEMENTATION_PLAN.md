@@ -308,11 +308,52 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - The report is the same on every host: the export lists and headers are read for a
     fixed target, and the macOS and Linux outputs are byte-identical. CI's codegen job runs
     `coverage` after `codegen` and fails on any diff.
-- [ ] **0.10 Usage-driven prioritization.** `cargo xtask usage-scan` downloads the
+- [x] **0.10 Usage-driven prioritization.** `cargo xtask usage-scan` downloads the
   Debian/Ubuntu/Fedora packages that depend on `libssl3`/`libcrypto3` (treat them as untrusted
   data: parse the ELF only, never execute it), collects their imported versioned symbols,
   and writes `docs/symbol-usage.md`, a ranking of how many packages import each function.
   Breadth phases use it to choose order.
+
+  *Done.* Scanned: Debian 13 (OpenSSL 3.5.7), Ubuntu 26.04 LTS (3.5.5), and Fedora 44
+  (3.5.5), amd64, which are the current releases on the 3.5 series. Ubuntu 24.04's OpenSSL
+  3.0 would add nothing newer.
+  - **How it works:**
+    - The packages to scan come from each distribution's index: Debian `Depends` on
+      `libssl3t64`, Fedora requiring `libssl.so.3`/`libcrypto.so.3`.
+    - Each package is downloaded over HTTPS only and checked against the index's SHA-256.
+    - Safe-Rust parsers read it in memory: `ar`, tar, cpio, the RPM header, and ELF
+      (`.dynsym`, `.gnu.version`, `.gnu.version_r`). `xz`/`zstd` only decompress. Nothing
+      from a package touches the disk or runs.
+    - An import counts when its version needs `libssl.so.3` or `libcrypto.so.3`.
+    - Results are cached per SHA-256 and the package is deleted.
+  - **Cost:** the full scan downloads about 5 GB and took 11 minutes with 8 jobs. A rerun
+    from the 17 MB cache takes 16 s and writes an identical report.
+  - **Validation:**
+    - Debian's `/usr/bin/openssl` gives the same 1,623 imports as `objdump -T`, name and
+      version node. Each lands in the right library (225 libssl, 1,398 libcrypto, all in
+      the matching export list).
+    - The ELF reader survives every truncation and every single-byte corruption of a test
+      file.
+  - **Results:**
+    - 2,920 packages; all scanned, and 2,814 import OpenSSL directly.
+    - 3,957 of our 6,479 exports are imported somewhere, and 2,522 never are.
+    - The head is the TLS client/server and digest basics: `SSL_CTX_new`, `ERR_get_error`,
+      `SSL_new`, `X509_free`, ….
+    - The tail is long. Implementing the top 100 functions fully serves 108 packages
+      (4%), the top 1,000 serves 41%, and the top 2,000 serves 68%. Usage orders the work,
+      but nearly every imported function is needed by someone.
+  - **Open decision: Fedora's ABI extras.** 7 Fedora packages import functions the
+    upstream 3.5 ABI doesn't have, so they wouldn't load on rustssl. Fedora's libcrypto
+    (checked) has three extras:
+    - MD2 (`EVP_md2`, `MD2_*`; ipmitool, perl-Net-SSLeay, qca), which upstream disables by
+      default and AGENTS.md keeps disabled;
+    - SCTP (`BIO_new_dgram_sctp`; Fedora's own `openssl` CLI);
+    - an extra `OPENSSL_3.1.0` version node for `EVP_MD_CTX_dup` and `EVP_CIPHER_CTX_dup`
+      (dpdk). This is the default version Fedora binaries bind to; upstream exports them
+      only at `OPENSSL_3.2.0`.
+
+    Supporting Fedora binaries means a per-distribution export profile. That's decided in
+    12.3.
 
 **Exit:** M0. The ABI checks are green (symbol set and versions, signatures, layouts).
 
@@ -838,7 +879,9 @@ CLI, both for users and for the upstream test recipes.
   - a constant-time verification report
 - [ ] **12.3 Packaging:** Debian/Fedora/Alpine (musl)/Homebrew layouts, pkg-config files, a
   default `openssl.cnf`, MODULESDIR, side-by-side installation and an alternatives mechanism,
-  and migration docs.
+  and migration docs. Decide the Fedora ABI extras found in 0.10 (MD2, SCTP, and the
+  `OPENSSL_3.1.0` versions of `EVP_{MD,CIPHER}_CTX_dup`). Rerun `cargo xtask usage-scan`
+  against the distributions current at release.
 - [ ] **12.4 Distro validation:** the system tests in TEST_PLAN L11.
 - [ ] **12.5 Release 1.0.** The ABI stability promise is OpenSSL's 3.x ABI. The Rust crates
   follow SemVer.
