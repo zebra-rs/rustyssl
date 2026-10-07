@@ -1,6 +1,55 @@
-[package]
-name = "rustssl"
+[workspace]
+resolver = "3"
+members = ["crates/*", "libs/*", "xtask"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/zebra-rs/rustssl"
+publish = false
 
-[dependencies]
+[workspace.dependencies]
+rustssl-abi = { path = "crates/rustssl-abi" }
+rustssl-asn1 = { path = "crates/rustssl-asn1" }
+rustssl-crypto = { path = "crates/rustssl-crypto" }
+rustssl-pki = { path = "crates/rustssl-pki" }
+rustssl-tls = { path = "crates/rustssl-tls" }
+rustssl-capi = { path = "crates/rustssl-capi" }
+
+# Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`
+# outside rustssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
+# crates. Rule numbers refer to "Security rules" in AGENTS.md.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+# Rule 1: every unsafe operation is justified on its own.
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+# Rule 2: no silent truncation or sign change between int, size_t, and long.
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_sign_loss = "deny"
+# Rule 3: no panics on attacker-controlled input (tests are exempt, see clippy.toml).
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+# A library must not print or exit on its host application's behalf.
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+exit = "deny"
+
+[profile.dev]
+# ffi_export! catches unwinds at the C boundary, so panics must unwind.
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"
+# Security over speed: integer overflow becomes a caught panic, not silent wrapping.
+overflow-checks = true
