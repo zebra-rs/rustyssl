@@ -272,7 +272,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     against a `Vec` model: 958k runs in 31 s under ASan, no findings.
   - **Supply chain:** `deny.toml` covers advisories, licenses, sources, and a build-script
     allowlist (libc, proc-macro2, quote). `cargo vet` imports four organizations' audits;
-    `quote` is audited, and 12 crates are exemptions to burn down before 1.0.
+    `quote` is audited, and 12 crates are exemptions to burn down before 1.0. CI pins
+    cargo-deny 0.20.2 and cargo-vet 0.10.2. The first run on `main` installed the newest
+    *prebuilt* cargo-vet, 0.10.0, which formats `imports.lock` differently and failed.
   - **CI** (`.github/workflows/ci.yml`; actionlint clean). On every push and PR, Linux
     x86_64 runs fmt, clippy, the tests, `test-c`, and `test-differential --random 1000`,
     plus separate Miri, supply-chain, and codegen jobs. The codegen job regenerates
@@ -281,8 +283,31 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     aarch64, macOS arm64, and 5 minutes of fuzzing per target. Those are deferred because
     the repository is private: macOS minutes count 10x, and arm64 Linux runners may not be
     available on the current plan. The reference build is cached per OS and arch.
-- [ ] **0.9 Coverage report.** `cargo xtask coverage` prints implemented/stubbed counts per
+- [x] **0.9 Coverage report.** `cargo xtask coverage` prints implemented/stubbed counts per
   API family (by prefix and header). CI keeps `docs/coverage.md` up to date.
+
+  *Done.* `cargo xtask coverage` writes `docs/coverage.md`: totals per library, a table per
+  header, and the implemented exports with the tests that call them. `--list PREFIX...`
+  prints the status of every export with that prefix: implemented, untested, or stub.
+  Starting point: 6 of 6,479 exports (all of `buffer.h`).
+  - **Implemented** means `rustssl-capi` defines the export and a `tests/c` program calls
+    it, which is AGENTS.md's rule made mechanical. Calls come from the undefined symbols of
+    each test compiled to an object, not from its source text. So a call through a macro
+    (`BIO_get_mem_data` → `BIO_ctrl`) or an inline wrapper (`sk_X509_num` →
+    `OPENSSL_sk_num`) credits the function that's actually linked; this was checked by
+    hand.
+  - **An export that's defined but that no test calls fails the command,** and so fails CI.
+    It would otherwise ship untested.
+  - **Headers:** each export is listed under the first header that declares it, found from
+    the line markers in clang's preprocessed headers. That puts macro-generated
+    declarations where the macro is invoked (`d2i_X509` in `x509.h`) and gives `internal/`
+    headers for the internal APIs libcrypto exports. The counts agree with the generated
+    stubs (5,870 + 603).
+  - **The prefix view** is `--list`, not a table in the report. Families by leading
+    token cut across headers (`d2i_`, `EVP_`), so headers group better.
+  - The report is the same on every host: the export lists and headers are read for a
+    fixed target, and the macOS and Linux outputs are byte-identical. CI's codegen job runs
+    `coverage` after `codegen` and fails on any diff.
 - [ ] **0.10 Usage-driven prioritization.** `cargo xtask usage-scan` downloads the
   Debian/Ubuntu/Fedora packages that depend on `libssl3`/`libcrypto3` (treat them as untrusted
   data: parse the ELF only, never execute it), collects their imported versioned symbols,

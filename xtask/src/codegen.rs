@@ -3,21 +3,23 @@
 
 mod abi;
 mod errors;
-pub(crate) mod exports;
-mod headers;
+pub mod exports;
+pub mod headers;
 mod objects;
-mod stubs;
+pub mod stubs;
 
 use std::process::Command;
 
 use crate::targets::TARGETS;
-use crate::util::{Result, run_output, workspace_root};
+use crate::util::{Result, run_output, target_dir, workspace_root};
 
 pub fn run(args: &[String]) -> Result {
     if !args.is_empty() {
         return Err("usage: cargo xtask codegen".into());
     }
-    let ctx = headers::Context::new(&workspace_root())?;
+    headers::check_bindgen()?;
+    let root = workspace_root();
+    let ctx = headers::Context::new(&root, &target_dir(&root).join("xtask/codegen"))?;
     let constants = abi::generate(&ctx)?;
     let exports = exports::generate(&ctx)?;
     stubs::generate(&ctx, &exports)?;

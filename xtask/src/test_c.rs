@@ -14,6 +14,9 @@ use std::time::{Duration, Instant};
 use crate::reference;
 use crate::util::{Result, fresh_dir, run_output, target_dir, workspace_root};
 
+/// How every C test is compiled. `-Werror` turns a call to an undeclared function into an error.
+pub const CFLAGS: &[&str] = &["-std=c99", "-Wall", "-Wextra", "-Werror", "-g"];
+
 /// How long one run of one test may take.
 const TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -61,7 +64,7 @@ pub fn prepare(root: &Path) -> Result<(PathBuf, PathBuf)> {
 }
 
 /// The `.c` files in `dir` as (name, path), all of them or only those named in `only`.
-fn select(dir: &Path, only: &[String]) -> Result<Vec<(String, PathBuf)>> {
+pub fn select(dir: &Path, only: &[String]) -> Result<Vec<(String, PathBuf)>> {
     let mut tests = Vec::new();
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
@@ -79,12 +82,16 @@ fn select(dir: &Path, only: &[String]) -> Result<Vec<(String, PathBuf)>> {
     Ok(tests)
 }
 
+/// The C compiler: `$CC`, or `cc`.
+pub fn cc() -> Command {
+    Command::new(std::env::var_os("CC").unwrap_or_else(|| "cc".into()))
+}
+
 /// Compiles a C program against the vendored headers and links it against the reference.
 pub fn compile(source: &Path, exe: &Path, dist: &Path, reference: &Path) -> Result {
-    let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
     run_output(
-        Command::new(cc)
-            .args(["-std=c99", "-Wall", "-Wextra", "-Werror", "-g", "-I"])
+        cc().args(CFLAGS)
+            .arg("-I")
             .arg(dist.join("include"))
             .arg(source)
             .arg("-L")

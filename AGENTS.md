@@ -189,7 +189,8 @@ generator. Don't paste the number.
 ## Commands
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
-xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, and `test-differential`.
+xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, `test-differential`, and
+`coverage`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -198,10 +199,12 @@ Tools each command needs:
   (Debian's `perl`, not just `perl-base`).
 - **`codegen`:** `clang` and bindgen 0.73.2 exactly
   (`cargo install bindgen-cli --version 0.73.2 --locked`).
+- **`coverage`:** `clang`, a C compiler (`$CC`), and `nm`.
 - **`dist`, `test-c`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
-- **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny cargo-vet
-  cargo-fuzz`.
+- **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
+  cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
+  cargo-vet formats `supply-chain/` differently, and CI then fails.
 
 `cargo xtask codegen` writes:
 
@@ -224,7 +227,7 @@ cargo xtask codegen                          # regenerate bindings, export lists
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
 cargo xtask abi-check                        # symbols+versions vs *.num, signatures vs headers, struct layouts
-cargo xtask coverage                         # implemented / stubbed / missing exports, per API family
+cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
@@ -250,7 +253,9 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
   `mem`, and errors go through `err::raise`. It counts as **implemented** only once it has a
   conformance test: a TAP program in `tests/c/` that passes, unchanged, against the reference
-  and rustssl (`tests/c/buf_mem.c` is the model).
+  and rustssl (`tests/c/buf_mem.c` is the model). Then run `cargo xtask coverage` and commit
+  `docs/coverage.md`. CI fails if that file is stale, or if an export is defined but no test
+  in `tests/c/` calls it.
 - **Where the reference is the oracle,** add commands to the differential probe
   (`tests/differential/probe.c`), a corpus file, and random generation in
   `xtask/src/test_differential.rs`. **Parsers of untrusted input** get a fuzz target in

@@ -62,8 +62,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(root: &Path) -> Result<Self> {
-        check_bindgen()?;
+    /// Points clang at the vendored headers, using `work` (emptied first) for scratch files.
+    pub fn new(root: &Path, work: &Path) -> Result<Self> {
         let abi = root
             .join("abi")
             .join(format!("openssl-{OPENSSL_SERIES}"))
@@ -73,14 +73,13 @@ impl Context {
                     "abi/openssl-{OPENSSL_SERIES} is missing ({e}); run `cargo xtask vendor` first"
                 )
             })?;
-        let work = root.join("target/xtask/codegen");
-        fresh_dir(&work)?;
-        let libc_stubs = write_libc_stubs(&work)?;
-        let wrapper = write_wrapper(&abi, &work)?;
+        fresh_dir(work)?;
+        let libc_stubs = write_libc_stubs(work)?;
+        let wrapper = write_wrapper(&abi, work)?;
         Ok(Self {
             root: root.to_path_buf(),
             abi,
-            work,
+            work: work.to_path_buf(),
             libc_stubs,
             wrapper,
         })
@@ -174,7 +173,7 @@ impl Context {
     }
 }
 
-fn check_bindgen() -> Result {
+pub fn check_bindgen() -> Result {
     let version = run_output(Command::new("bindgen").arg("--version")).map_err(|e| {
         format!(
             "{e}\ninstall it with: cargo install bindgen-cli --version {BINDGEN_VERSION} --locked"
