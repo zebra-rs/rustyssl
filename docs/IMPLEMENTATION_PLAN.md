@@ -272,7 +272,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     against a `Vec` model: 958k runs in 31 s under ASan, no findings.
   - **Supply chain:** `deny.toml` covers advisories, licenses, sources, and a build-script
     allowlist (libc, proc-macro2, quote). `cargo vet` imports four organizations' audits;
-    `quote` is audited, and 12 crates are exemptions to burn down before 1.0.
+    `quote` is audited, and 12 crates are exemptions to burn down before 1.0. CI pins
+    cargo-deny 0.20.2 and cargo-vet 0.10.2. The first run on `main` installed the newest
+    *prebuilt* cargo-vet, 0.10.0, which formats `imports.lock` differently and failed.
   - **CI** (`.github/workflows/ci.yml`; actionlint clean). On every push and PR, Linux
     x86_64 runs fmt, clippy, the tests, `test-c`, and `test-differential --random 1000`,
     plus separate Miri, supply-chain, and codegen jobs. The codegen job regenerates

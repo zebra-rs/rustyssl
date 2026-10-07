@@ -200,8 +200,9 @@ Tools each command needs:
   (`cargo install bindgen-cli --version 0.73.2 --locked`).
 - **`dist`, `test-c`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
-- **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny cargo-vet
-  cargo-fuzz`.
+- **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
+  cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
+  cargo-vet formats `supply-chain/` differently, and CI then fails.
 
 `cargo xtask codegen` writes:
 

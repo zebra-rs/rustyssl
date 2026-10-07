@@ -33,7 +33,7 @@ jobs:
         os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install the toolchain from rust-toolchain.toml
         run: rustup show
       - name: Install GnuPG (verifies the reference OpenSSL download)
@@ -42,7 +42,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # Declared after rust-cache, so it saves target/ref before rust-cache cleans target/.
       - name: Cache the reference OpenSSL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: target/ref
           key: ref-openssl-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('abi/openssl-*/VERSION.toml', 'xtask/src/reference.rs', 'xtask/src/vendor.rs') }}
@@ -57,7 +57,7 @@ jobs:
   miri:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal --component miri,rust-src
       - uses: Swatinem/rust-cache@v2
       - run: cargo +nightly miri test -p rustssl-capi
@@ -66,12 +66,12 @@ jobs:
     name: generated code is up to date
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup show
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
       - name: Cache bindgen
         id: bindgen
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/bindgen
           key: bindgen-cli-0.73.2-${{ runner.os }}-${{ runner.arch }}
@@ -82,13 +82,23 @@ jobs:
       - name: Fail if the committed generated code differs
         run: git diff --exit-code
 
+  # The tool versions are pinned: a different cargo-vet formats supply-chain/ differently and
+  # fails. cargo-vet 0.10.2 has no prebuilt release, so it's built once and cached.
   supply-chain:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny,cargo-vet
+          tool: cargo-deny@0.20.2
+      - name: Cache cargo-vet
+        id: cargo-vet
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/cargo-vet
+          key: cargo-vet-0.10.2-${{ runner.os }}-${{ runner.arch }}
+      - if: steps.cargo-vet.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-vet --version 0.10.2
       - run: cargo deny check
       - run: cargo vet --locked
 
@@ -96,7 +106,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal
       - uses: taiki-e/install-action@v2
         with:

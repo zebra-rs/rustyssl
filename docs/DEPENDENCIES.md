@@ -15,6 +15,9 @@ crates. CI enforces it with two gates:
   crates in the graph are recorded as exemptions (a reviewed snapshot, not an audit) and
   must be audited before the 1.0 release. A crate that isn't audited or exempted fails CI.
 
+CI pins the tools (cargo-deny 0.20.2, cargo-vet 0.10.2); use the same versions locally.
+Another cargo-vet version reformats `supply-chain/`, which fails the check.
+
 | Crate | Version | Used by | Ships in libcrypto/libssl? | Purpose | Notes |
 |---|---|---|---|---|---|
 | `sha2` | 0.11 (`default-features = false`) | `xtask` | No | SHA-256 of downloaded OpenSSL release tarballs in `cargo xtask vendor` | RustCrypto, MIT OR Apache-2.0. Hashes only public data, so constant-time behavior doesn't matter here. Pulls in `digest`, `block-buffer`, `crypto-common`, `hybrid-array`, `typenum`, `cfg-if`, `cpufeatures`, and `libc` (FFI declarations only; its build script compiles no C). |
