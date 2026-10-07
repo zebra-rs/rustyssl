@@ -188,11 +188,20 @@ generator. Don't paste the number.
 
 ## Commands
 
-`cargo build`, `test`, `clippy`, `fmt`, and `cargo xtask vendor`, `codegen`, and `dist` work
-now. The other `cargo xtask` commands arrive during Phase 0 and fail with a message until
-then. Update this section when they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`,
-`perl`, and `make`. `codegen` needs `clang` and bindgen 0.73.2 exactly
-(`cargo install bindgen-cli --version 0.73.2 --locked`). `dist` needs a C compiler (`$CC`).
+Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
+xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, and `test-differential`.
+The other `cargo xtask` commands arrive later and fail with a message until then. Update this
+section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
+
+Tools each command needs:
+- **`vendor` and `ref-openssl`:** `curl`, `gpg`/`gpgv`, `tar`, `make`, and a full `perl`
+  (Debian's `perl`, not just `perl-base`).
+- **`codegen`:** `clang` and bindgen 0.73.2 exactly
+  (`cargo install bindgen-cli --version 0.73.2 --locked`).
+- **`dist`, `test-c`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
+  Alpine also `llvm-libunwind-dev`.
+- **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny cargo-vet
+  cargo-fuzz`.
 
 `cargo xtask codegen` writes:
 
@@ -213,15 +222,15 @@ cargo deny check && cargo vet                # supply-chain gates
 cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), and vendor a release into abi/
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
-cargo xtask ref-openssl 3.5                  # build the pinned reference OpenSSL into target/ref/
+cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
 cargo xtask abi-check                        # symbols+versions vs *.num, signatures vs headers, struct layouts
 cargo xtask coverage                         # implemented / stubbed / missing exports, per API family
-cargo xtask test-c                           # C conformance tests against target/dist
-cargo xtask test-differential                # same calls vs reference OpenSSL, compare results
+cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
+cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
 cargo +nightly miri test -p rustssl-capi     # the unsafe FFI layer under Miri
-cargo +nightly fuzz run <target>             # fuzzing
+cargo +nightly fuzz run <target>             # fuzzing (fuzz/ is its own workspace; `cargo +nightly fuzz list`)
 ```
 
 The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). Rust
@@ -242,6 +251,10 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   `mem`, and errors go through `err::raise`. It counts as **implemented** only once it has a
   conformance test: a TAP program in `tests/c/` that passes, unchanged, against the reference
   and rustssl (`tests/c/buf_mem.c` is the model).
+- **Where the reference is the oracle,** add commands to the differential probe
+  (`tests/differential/probe.c`), a corpus file, and random generation in
+  `xtask/src/test_differential.rs`. **Parsers of untrusted input** get a fuzz target in
+  `fuzz/fuzz_targets/` (`buf_mem.rs` is the model-based example).
 - Commit one API family or step at a time, and keep the diffs reviewable.
 - When OpenSSL's behavior is unclear, run it against the reference build
   (`target/ref/`). Behavior matters more than intent.

@@ -351,6 +351,17 @@ each release.
 Platforms: Linux x86_64 and aarch64 on glibc (Tier 1), Linux x86_64 on musl, and macOS
 arm64 (Tier 2). Windows comes later.
 
+**Today** (`.github/workflows/ci.yml`, since Phase 0.8), every push and PR runs these on
+Linux x86_64:
+- fmt, clippy, and the Rust tests;
+- L4 dual runs (`test-c`) and L5 with 1,000 random sessions;
+- Miri, `cargo deny`, and `cargo vet`;
+- a codegen job that fails if regenerating from `abi/` changes any committed file.
+
+The weekly cron and manual runs add Linux aarch64, macOS arm64, and 5 minutes of fuzzing
+per target. Those wait for a weekly run because the repository is private, so macOS
+minutes cost 10x. The tiers above are filled in as their test layers come into being.
+
 ## Definition of Done for one exported function
 
 A function counts as **implemented** in the coverage report only when all of these hold:

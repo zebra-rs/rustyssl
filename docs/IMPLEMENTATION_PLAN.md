@@ -235,7 +235,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - **Checks:** the `rustssl-capi` tests pass under Miri
     (`cargo +nightly miri test -p rustssl-capi`). Codegen's implemented-function scan now
     skips comments; doc examples had been hiding the `BIO_printf` stubs.
-- [ ] **0.8 Test infrastructure** (details in TEST_PLAN.md):
+- [x] **0.8 Test infrastructure** (details in TEST_PLAN.md):
   - `cargo xtask ref-openssl 3.5`, which builds the reference into `target/ref/`;
   - the C conformance harness in `tests/c`, with dual runs (reference and ours). The first
     test, `tests/c/buf_mem.c` (TAP output), is already there and has been dual-run by hand
@@ -245,6 +245,42 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - fuzz scaffolding;
   - CI on Linux x86_64 and aarch64 and macOS arm64;
   - `deny.toml` and the `supply-chain/` config for `cargo vet`.
+
+  *Done.*
+  - **`cargo xtask ref-openssl [version]`** builds the vendored release (3.5.9 by
+    default) into `target/ref/openssl-<version>/`. It uses the same verified download as
+    `vendor` (signature, then the pinned SHA-256), the same Configure options as our build
+    (`enable-ec_nistp_64_gcc_128`), and `-g`, with a cleared environment. A stamp file
+    makes a rebuild with the same version, target, and options a no-op. A first build
+    takes about 40 s on an M-series Mac. Linux needs the full `perl` package: Debian's
+    slim images ship only `perl-base`, which lacks `FindBin`.
+  - **`cargo xtask test-c`** builds the reference and `dist`, then compiles each
+    `tests/c/*.c` once with `-Wall -Wextra -Werror` against our headers and the reference
+    libraries. It runs each binary twice by switching the loader path, with a 120 s
+    timeout. A test passes only if both runs pass every TAP check and their output is
+    identical. `buf_mem`: 26 checks, identical on macOS arm64 and on Linux aarch64 (Debian
+    trixie in Docker).
+  - **`cargo xtask test-differential`** feeds the same command script to
+    `tests/differential/probe.c` on the reference and on rustssl and compares output line
+    by line: the reference is the oracle. The inputs are the hand-written corpus in
+    `tests/differential/corpus/` plus `--random N` generated sessions (default 200). The
+    seed is printed, and `--seed` replays it. Results: 500 sessions on macOS (about 13,000
+    lines) and 1,000 on Linux (25,367 lines), all identical. The corpus never grows a
+    buffer to exactly the size limit, because that allocates 2 GB.
+  - **Fuzzing:** `fuzz/` is its own workspace, because libFuzzer is C++ (see
+    DEPENDENCIES.md). The first target, `buf_mem`, checks `BUF_MEM_grow`/`_grow_clean`
+    against a `Vec` model: 958k runs in 31 s under ASan, no findings.
+  - **Supply chain:** `deny.toml` covers advisories, licenses, sources, and a build-script
+    allowlist (libc, proc-macro2, quote). `cargo vet` imports four organizations' audits;
+    `quote` is audited, and 12 crates are exemptions to burn down before 1.0.
+  - **CI** (`.github/workflows/ci.yml`; actionlint clean). On every push and PR, Linux
+    x86_64 runs fmt, clippy, the tests, `test-c`, and `test-differential --random 1000`,
+    plus separate Miri, supply-chain, and codegen jobs. The codegen job regenerates
+    everything with Ubuntu's clang and fails on any diff; codegen is byte-identical
+    between Apple clang 21 and Debian clang 19. The weekly cron and manual runs add Linux
+    aarch64, macOS arm64, and 5 minutes of fuzzing per target. Those are deferred because
+    the repository is private: macOS minutes count 10x, and arm64 Linux runners may not be
+    available on the current plan. The reference build is cached per OS and arch.
 - [ ] **0.9 Coverage report.** `cargo xtask coverage` prints implemented/stubbed counts per
   API family (by prefix and header). CI keeps `docs/coverage.md` up to date.
 - [ ] **0.10 Usage-driven prioritization.** `cargo xtask usage-scan` downloads the
