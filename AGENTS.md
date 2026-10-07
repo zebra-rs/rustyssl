@@ -62,10 +62,13 @@ actual behavior is the spec**. Test it, don't guess.
 - The same thread-safety guarantees as OpenSSL 3 (a shared `SSL_CTX` is safe across
   threads, and so on).
 
-**Default feature set = OpenSSL's default `./Configure` build.** Whatever upstream
-disables by default (SSLv3, weak SSL ciphers, MD2, RC5, …) stays disabled. Legacy
-algorithms (MD4, RC4, DES, Blowfish, …) are available only through the `legacy` provider.
-There is no FIPS provider.
+**Default feature set = OpenSSL's default `./Configure` build, plus
+`enable-ec_nistp_64_gcc_128`.** Debian and Homebrew turn that option on, and it only adds
+API (`EC_GFp_nistp{224,256,521}_method`), so binaries built there must load on rustssl. The
+options live in `CONFIGURE_OPTIONS` in `xtask/src/vendor.rs`. Whatever upstream disables by
+default (SSLv3, weak SSL ciphers, MD2, RC5, …) stays disabled. Legacy algorithms (MD4, RC4,
+DES, Blowfish, …) are available only through the `legacy` provider. There is no FIPS
+provider.
 
 **Deviations** are allowed only for security reasons (for example, when no compatible
 behavior is safe). Each one is recorded in `docs/DEVIATIONS.md` with its rationale and a
