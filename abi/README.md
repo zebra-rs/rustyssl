@@ -12,9 +12,12 @@ Each `openssl-<major>.<minor>/` directory contains:
 | `VERSION.toml` | Release version, download URL, SHA-256, signing key, and the `Configure` targets used |
 | `include/openssl/*.h` | The public headers, generated with default `Configure` options, except `configuration.h` |
 | `config/<target>/openssl/configuration.h` | The one header that differs per target (for example, `RC4_INT` changes the size of `RC4_KEY`) |
+| `config/<target>/lib{crypto,ssl}.ld` | The export lists OpenSSL's `util/mkdef.pl` resolves from the `.num` files for that target |
+| `include/internal/*.h` | The few internal headers that declare functions libcrypto exports anyway (`DSO_*`, `conf_ssl_*`, ...) |
 | `util/libcrypto.num`, `util/libssl.num` | Every exported symbol with its version and build conditions |
 | `crypto/objects/` | `objects.txt`, `obj_mac.num` (NIDs), and `obj_xref.txt` (signature-algorithm mapping) |
 | `crypto/err/openssl.txt` | Error reason codes and strings |
+| `crypto/**/*_err.c`, `crypto/err/err.c`, ... | The C error-string tables: the text OpenSSL actually prints (a few strings differ from `openssl.txt`), the library names, and the common reasons |
 | `doc/man3/`, `doc/man7/` | The API man pages (POD), our behavioral spec |
 | `LICENSE.txt` | OpenSSL's license (Apache-2.0) |
 
