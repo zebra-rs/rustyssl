@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "libs/*", "xtask"]
+# fuzz/ is its own workspace: libfuzzer-sys builds C++, which the libraries must not use.
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.1.0"
