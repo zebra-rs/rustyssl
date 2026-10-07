@@ -173,7 +173,9 @@ generator. Don't paste the number.
 
 ## Commands
 
-These are planned; Phase 0 creates them. Update this section when they change.
+`cargo build`, `test`, `clippy`, and `fmt` work now. `cargo xtask` lists every command,
+but the subcommands arrive during Phase 0 and fail with a message until then. Update this
+section when they change.
 
 ```sh
 cargo build --workspace                      # build everything

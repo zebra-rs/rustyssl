@@ -1,0 +1,11 @@
+rustssl
+Copyright 2026 The rustssl Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE.txt).
+
+rustssl implements the OpenSSL C API and ABI. Files under abi/openssl-*/ are copied
+unmodified from OpenSSL (https://www.openssl.org/) and keep their original copyright
+headers:
+
+  Copyright The OpenSSL Project Authors. All Rights Reserved.
+  Licensed under the Apache License, Version 2.0.

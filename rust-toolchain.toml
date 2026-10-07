@@ -1,0 +1,6 @@
+[toolchain]
+# Pinned for reproducible builds. 1.99 is the minimum: it can define C-variadic
+# functions (BIO_printf, ERR_add_error_data) on stable.
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

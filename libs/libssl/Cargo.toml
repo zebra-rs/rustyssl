@@ -1,0 +1,16 @@
+[package]
+name = "rustssl-libssl"
+description = "libssl.so.3 drop-in: exports the SSL_* symbols and forwards them into libcrypto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "ssl"
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
