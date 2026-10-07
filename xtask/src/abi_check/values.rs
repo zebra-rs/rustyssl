@@ -188,7 +188,8 @@ enum Fact<'a> {
 
 impl<'a> Fact<'a> {
     /// Parses a label, skipping records and fields C can't name: bindgen's names for anonymous
-    /// records (`__bindgen_ty_1`), bitfield storage, and placeholders.
+    /// records (`__bindgen_ty_1`), bitfield storage, placeholders, and the implementation's
+    /// own records, whose names start with `__` (x86_64's `__va_list_tag`, behind `va_list`).
     fn parse(label: &'a str) -> Option<Self> {
         let fact = if let Some(record) = label.strip_prefix("Size of ") {
             Fact::Size(record)
@@ -204,7 +205,8 @@ impl<'a> Fact<'a> {
             }
             Fact::Offset(record, field)
         };
-        (!fact.record().contains("__bindgen")).then_some(fact)
+        let record = fact.record();
+        (!record.contains("__bindgen") && !record.starts_with("__")).then_some(fact)
     }
 
     fn record(&self) -> &'a str {
@@ -521,6 +523,8 @@ mod tests {
             Some(Fact::Offset("asn1_string_st", "type_"))
         ));
         assert!(Fact::parse("Size of x__bindgen_ty_1").is_none());
+        assert!(Fact::parse("Size of __va_list_tag").is_none());
+        assert!(Fact::parse("Offset of field: __va_list_tag::gp_offset").is_none());
         assert!(Fact::parse("Offset of field: x::_bitfield_1").is_none());
         assert_eq!(c_field("type_"), "type");
         assert_eq!(c_field("length"), "length");
