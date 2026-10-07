@@ -19,17 +19,21 @@
 //! The libraries match OpenSSL's: on Linux the soname is `lib<name>.so.<major>` and every
 //! export keeps its OpenSSL version node; on macOS the compatibility and current versions are
 //! `<major>.0.0`, as in OpenSSL's own dylibs. libssl depends on libcrypto either way.
+//!
+//! libcrypto is linked from its whole archive. libssl, both shared and as `libssl.a`, is
+//! built from the crate's forwarder objects alone, so it carries no second Rust runtime
+//! (docs/adr/0001-library-layout.md). Needs `ar` and `nm`; on Alpine, `llvm-libunwind-dev`.
 
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::codegen::exports::PRIVATE_PREFIX;
 use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
 use crate::util::{Result, copy_file, fresh_dir, run_output, toml_value, workspace_root};
-
-const LIBRARIES: &[&str] = &["libcrypto", "libssl"];
 
 pub fn run(args: &[String]) -> Result {
     if !args.is_empty() {
@@ -39,7 +43,7 @@ pub fn run(args: &[String]) -> Result {
     let host = host_triple()?;
     let target = TARGETS
         .iter()
-        .find(|t| t.rust == host)
+        .find(|t| same_platform(t.rust, &host))
         .ok_or_else(|| format!("no rustssl target for host {host}; see xtask/src/targets.rs"))?;
     let abi = root.join("abi").join(format!("openssl-{OPENSSL_SERIES}"));
     let version_file = fs::read_to_string(abi.join("VERSION.toml"))?;
@@ -56,29 +60,79 @@ pub fn run(args: &[String]) -> Result {
     let lib_dir = dist.join("lib");
     fs::create_dir_all(lib_dir.join("pkgconfig"))?;
 
-    let mut private_libs = Vec::new();
-    for library in LIBRARIES {
-        println!("Building {library}...");
-        let native = build_archive(&root, library)?;
-        let archive = target_dir.join("release").join(format!("{library}.a"));
-        let shared = Shared::new(target, library, major);
-        println!("Linking {}...", shared.file);
-        link(&root, target, &shared, &archive, &native, &lib_dir, major)?;
-        symlink(&shared.file, &lib_dir.join(&shared.link))?;
-        copy_file(&archive, &lib_dir.join(format!("{library}.a")))?;
-        if *library == "libcrypto" {
-            // What static users of libcrypto must link besides it (pkg-config --static).
-            private_libs = native;
-        }
-    }
+    let release = target_dir.join("release");
+    let work = target_dir.join("xtask/dist");
+    fresh_dir(&work)?;
+
+    // libcrypto: the whole implementation, Rust runtime included.
+    println!("Building libcrypto...");
+    let native = build_archive(&root, "libcrypto")?;
+    let archive = release.join("libcrypto.a");
+    let crypto = Shared::new(target, "libcrypto", major);
+    println!("Linking {}...", crypto.file);
+    let inputs = Inputs::Archive {
+        archive: archive.clone(),
+        native: native.clone(),
+    };
+    link(&root, target, &crypto, &inputs, &lib_dir, major)?;
+    symlink(&crypto.file, &lib_dir.join(&crypto.link))?;
+    copy_file(&archive, &lib_dir.join("libcrypto.a"))?;
+
+    // libssl: only the forwarders, so it carries no second copy of the Rust runtime, as a
+    // shared library or as libssl.a next to libcrypto.a.
+    println!("Building libssl...");
+    build_archive(&root, "libssl")?;
+    let ssl = Shared::new(target, "libssl", major);
+    let objects = forwarder_objects(
+        &release.join("libssl.a"),
+        &root.join(&ssl.exports),
+        target,
+        &work,
+    )?;
+    println!("Linking {} from its forwarders...", ssl.file);
+    link(
+        &root,
+        target,
+        &ssl,
+        &Inputs::Objects(objects.clone()),
+        &lib_dir,
+        major,
+    )?;
+    symlink(&ssl.file, &lib_dir.join(&ssl.link))?;
+    run_output(
+        Command::new("ar")
+            .arg("rcs")
+            .arg(lib_dir.join("libssl.a"))
+            .args(&objects),
+    )?;
 
     install_headers(&abi, target, &dist)?;
-    write_pkgconfig(&lib_dir.join("pkgconfig"), version, &private_libs)?;
+    // What static users of libcrypto must link besides it (pkg-config --static).
+    write_pkgconfig(&lib_dir.join("pkgconfig"), version, &native)?;
     println!(
         "Installed OpenSSL {version}-compatible libraries for {host} into {}",
         dist.display()
     );
     Ok(())
+}
+
+/// Whether `host` uses `target`'s ABI definitions: the same architecture and OS, whatever the
+/// C library (`x86_64-unknown-linux-musl` uses the `linux-x86_64` ones, as OpenSSL's
+/// `Configure` does).
+fn same_platform(target: &str, host: &str) -> bool {
+    let platform = |triple: &str| {
+        let arch = triple.split('-').next().unwrap_or_default().to_owned();
+        let os = if triple.contains("-linux") {
+            "linux"
+        } else if triple.contains("-apple-darwin") {
+            "darwin"
+        } else {
+            ""
+        };
+        (arch, os)
+    };
+    let (arch, os) = platform(host);
+    !os.is_empty() && platform(target) == (arch, os)
 }
 
 fn host_triple() -> Result<String> {
@@ -144,38 +198,52 @@ fn is_apple(target: &Target) -> bool {
     target.clang.contains("apple")
 }
 
-/// Links `shared` from `archive`, exporting exactly the generated export list. libssl links
-/// against the libcrypto already in `lib_dir`, so it records the dependency as OpenSSL's does.
+/// What a shared library is linked from.
+enum Inputs {
+    /// libcrypto: its whole static archive, plus the system libraries the archive needs.
+    Archive {
+        archive: PathBuf,
+        native: Vec<String>,
+    },
+    /// libssl: the forwarder objects only, which need nothing but libcrypto.
+    Objects(Vec<PathBuf>),
+}
+
+/// Links `shared`, exporting exactly the generated export list. libssl links against the
+/// libcrypto already in `lib_dir`, so it records the dependency as OpenSSL's does.
 fn link(
     root: &Path,
     target: &Target,
     shared: &Shared,
-    archive: &Path,
-    native: &[String],
+    inputs: &Inputs,
     lib_dir: &Path,
     major: &str,
 ) -> Result {
     let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
     let output = lib_dir.join(&shared.file);
     let exports = root.join(&shared.exports);
-    let is_libssl = shared.file.starts_with("libssl");
     let mut cmd = Command::new(cc);
     if is_apple(target) {
         let version = format!("{major}.0.0");
         cmd.arg("-dynamiclib")
             .arg("-o")
             .arg(&output)
-            .arg(link_arg("-force_load,", archive))
             .arg(link_arg("-exported_symbols_list,", &exports))
             .arg(link_arg("-install_name,", &output))
             .arg(format!("-Wl,-compatibility_version,{version}"))
             .arg(format!("-Wl,-current_version,{version}"))
             .args(["-Wl,-dead_strip", "-Wl,-S"]);
-        if is_libssl {
-            cmd.arg(lib_dir.join(format!("libcrypto.{major}.dylib")));
+        match inputs {
+            Inputs::Archive { archive, native } => {
+                cmd.arg(link_arg("-force_load,", archive));
+                // cc links libSystem itself; listing it again only draws a warning.
+                cmd.args(native.iter().filter(|l| *l != "-lSystem"));
+            }
+            Inputs::Objects(objects) => {
+                cmd.args(objects)
+                    .arg(lib_dir.join(format!("libcrypto.{major}.dylib")));
+            }
         }
-        // cc links libSystem itself; listing it again only draws a warning.
-        cmd.args(native.iter().filter(|l| *l != "-lSystem"));
     } else {
         cmd.arg("-shared")
             .arg("-o")
@@ -183,22 +251,124 @@ fn link(
             .arg(format!("-Wl,-soname,{}", shared.file))
             .arg(link_arg("--version-script=", &exports))
             // Every name in the script must be defined, and so must everything referenced.
-            .args(["-Wl,--no-undefined-version", "-Wl,--no-undefined"])
-            .arg("-Wl,--whole-archive")
-            .arg(archive)
-            .arg("-Wl,--no-whole-archive");
-        if is_libssl {
-            cmd.arg("-Wl,--no-as-needed")
-                .arg("-L")
-                .arg(lib_dir)
-                .arg("-lcrypto");
+            .args(["-Wl,--no-undefined-version", "-Wl,--no-undefined"]);
+        match inputs {
+            Inputs::Archive { archive, .. } => {
+                cmd.arg("-Wl,--whole-archive")
+                    .arg(archive)
+                    .arg("-Wl,--no-whole-archive");
+            }
+            Inputs::Objects(objects) => {
+                cmd.args(objects)
+                    .arg("-Wl,--no-as-needed")
+                    .arg("-L")
+                    .arg(lib_dir)
+                    .arg("-lcrypto");
+            }
         }
         cmd.args(["-Wl,--as-needed", "-Wl,--gc-sections", "-Wl,--strip-debug"])
-            .args(["-Wl,-z,relro,-z,now", "-Wl,-z,noexecstack"])
-            .args(native);
+            .args(["-Wl,-z,relro,-z,now", "-Wl,-z,noexecstack"]);
+        if let Inputs::Archive { native, .. } = inputs {
+            cmd.args(native);
+        }
     }
     run_output(&mut cmd)?;
     Ok(())
+}
+
+/// Extracts the objects of the libssl crate that define its exports, and checks that they
+/// reference nothing but libcrypto's private functions. The crate's static archive also holds
+/// rustc's allocator shim and a copy of the standard library; leaving those out keeps a
+/// second Rust runtime out of libssl, and out of programs that link libssl.a and libcrypto.a.
+fn forwarder_objects(
+    archive: &Path,
+    exports: &Path,
+    target: &Target,
+    work: &Path,
+) -> Result<Vec<PathBuf>> {
+    let exported = export_names(exports, target)?;
+    let dir = work.join("libssl-objects");
+    fresh_dir(&dir)?;
+    let members = run_output(Command::new("ar").arg("t").arg(archive))?;
+    let own: Vec<&str> = members.lines().filter(|m| m.starts_with("ssl-")).collect();
+    run_output(
+        Command::new("ar")
+            .arg("x")
+            .arg(archive)
+            .args(&own)
+            .current_dir(&dir),
+    )?;
+    let mut kept = Vec::new();
+    let mut defined = HashSet::new();
+    for member in own {
+        let path = dir.join(member);
+        let symbols = symbols(&path, target)?;
+        if !symbols
+            .iter()
+            .any(|(d, name)| *d && exported.contains(name))
+        {
+            continue; // the allocator shim
+        }
+        let foreign: Vec<&String> = symbols
+            .iter()
+            .filter(|(d, name)| !*d && !name.starts_with(PRIVATE_PREFIX))
+            .map(|(_, name)| name)
+            .collect();
+        if !foreign.is_empty() {
+            return Err(format!(
+                "libssl's forwarders must only call libcrypto's {PRIVATE_PREFIX}* functions, \
+                 but {member} also references {foreign:?}"
+            )
+            .into());
+        }
+        defined.extend(symbols.into_iter().filter(|(d, _)| *d).map(|(_, n)| n));
+        kept.push(path);
+    }
+    let missing: Vec<&String> = exported.iter().filter(|n| !defined.contains(*n)).collect();
+    if !missing.is_empty() {
+        return Err(format!("no forwarder defines {missing:?}").into());
+    }
+    Ok(kept)
+}
+
+/// The names in a generated export list (without Mach-O's leading underscore).
+fn export_names(path: &Path, target: &Target) -> Result<HashSet<String>> {
+    let text = fs::read_to_string(path)?;
+    let mut names = HashSet::new();
+    for line in text.lines().map(str::trim) {
+        let name = if is_apple(target) {
+            line.strip_prefix('_')
+        } else {
+            line.strip_suffix(';')
+        };
+        if let Some(name) = name
+            && !name.is_empty()
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        {
+            names.insert(name.to_owned());
+        }
+    }
+    Ok(names)
+}
+
+/// The global symbols of an object file as (defined, name), from `nm -g`.
+fn symbols(object: &Path, target: &Target) -> Result<Vec<(bool, String)>> {
+    let listing = run_output(Command::new("nm").arg("-g").arg(object))?;
+    let mut symbols = Vec::new();
+    for line in listing.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        let (kind, name) = match fields.as_slice() {
+            [kind, name] | [_, kind, name] => (*kind, *name),
+            _ => continue,
+        };
+        let name = if is_apple(target) {
+            name.strip_prefix('_').unwrap_or(name)
+        } else {
+            name
+        };
+        symbols.push((kind != "U", name.to_owned()));
+    }
+    Ok(symbols)
 }
 
 /// `-Wl,<option><path>`.
@@ -266,4 +436,26 @@ fn write_pkgconfig(dir: &Path, version: &str, private_libs: &[String]) -> Result
     fs::write(dir.join("libssl.pc"), libssl)?;
     fs::write(dir.join("openssl.pc"), openssl)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hosts_map_to_targets_by_arch_and_os() {
+        let linux = "x86_64-unknown-linux-gnu";
+        assert!(same_platform(linux, "x86_64-unknown-linux-gnu"));
+        assert!(same_platform(linux, "x86_64-unknown-linux-musl"));
+        assert!(!same_platform(linux, "aarch64-unknown-linux-gnu"));
+        assert!(!same_platform(linux, "x86_64-pc-windows-msvc"));
+        assert!(same_platform(
+            "aarch64-apple-darwin",
+            "aarch64-apple-darwin"
+        ));
+        assert!(!same_platform(
+            "aarch64-apple-darwin",
+            "aarch64-unknown-linux-gnu"
+        ));
+    }
 }
