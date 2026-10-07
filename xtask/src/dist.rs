@@ -202,7 +202,9 @@ fn link(
             .arg(link_arg("-install_name,", &output))
             .arg(format!("-Wl,-compatibility_version,{version}"))
             .arg(format!("-Wl,-current_version,{version}"))
-            .args(["-Wl,-dead_strip", "-Wl,-S"]);
+            // Rust's std names libiconv, which nothing calls: drop dylibs no symbol comes
+            // from, so the dependencies are OpenSSL's (abi-check, metadata).
+            .args(["-Wl,-dead_strip", "-Wl,-dead_strip_dylibs", "-Wl,-S"]);
         match inputs {
             Inputs::Archive { archive, native } => {
                 cmd.arg(link_arg("-force_load,", archive));
