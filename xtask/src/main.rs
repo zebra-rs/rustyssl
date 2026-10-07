@@ -7,6 +7,9 @@
 // This is a command-line tool: printing to the terminal is its interface.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+mod util;
+mod vendor;
+
 use std::process::ExitCode;
 
 /// Every command named in AGENTS.md and the plans, with a one-line summary.
@@ -28,12 +31,15 @@ const COMMANDS: &[(&str, &str)] = &[
 ];
 
 fn main() -> ExitCode {
-    let command = std::env::args().nth(1);
+    let mut args = std::env::args().skip(1);
+    let command = args.next();
+    let rest: Vec<String> = args.collect();
     match command.as_deref() {
         None | Some("help" | "-h" | "--help") => {
             print_help();
             ExitCode::SUCCESS
         }
+        Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {
             eprintln!(
                 "xtask: `{name}` is not implemented yet; see Phase 0 in docs/IMPLEMENTATION_PLAN.md"
@@ -44,6 +50,16 @@ fn main() -> ExitCode {
             eprintln!("xtask: unknown command `{name}`\n");
             print_help();
             ExitCode::from(2)
+        }
+    }
+}
+
+fn report(command: &str, result: util::Result) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("xtask {command}: {e}");
+            ExitCode::FAILURE
         }
     }
 }

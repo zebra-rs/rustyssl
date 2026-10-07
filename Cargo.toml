@@ -18,6 +18,9 @@ rustssl-pki = { path = "crates/rustssl-pki" }
 rustssl-tls = { path = "crates/rustssl-tls" }
 rustssl-capi = { path = "crates/rustssl-capi" }
 
+# Third-party crates. Each one is recorded in docs/DEPENDENCIES.md.
+sha2 = { version = "0.11", default-features = false }
+
 # Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`
 # outside rustssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
 # crates. Rule numbers refer to "Security rules" in AGENTS.md.

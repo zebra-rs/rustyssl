@@ -1,0 +1,2 @@
+# Vendored from OpenSSL by `cargo xtask vendor`; collapsed in diffs and excluded from stats.
+abi/openssl-*/** linguist-vendored linguist-generated

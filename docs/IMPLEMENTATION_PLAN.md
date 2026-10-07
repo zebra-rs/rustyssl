@@ -54,7 +54,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   to Phase 10), plus `libs/libcrypto` (cdylib + staticlib), `libs/libssl` (cdylib), and
   `xtask`. The lints live in `[workspace.lints]` plus crate-level attributes, with test
   exemptions in `clippy.toml`. The release profile keeps `overflow-checks = true`.
-- [ ] **0.2 Vendor the ABI.** Add `cargo xtask vendor 3.5.<patch>`: download the pinned
+- [x] **0.2 Vendor the ABI.** Add `cargo xtask vendor 3.5.<patch>`: download the pinned
   release tarball and verify its SHA-256 and PGP signature. Run `./Configure` with default
   options so that the **generated** headers exist (in 3.x many public headers come from
   `*.h.in`: `ssl.h`, `x509.h`, `asn1.h`, `crypto.h`, `opensslv.h`, `configuration.h`, …).
@@ -62,9 +62,24 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   `include/openssl/*.h`, `util/libcrypto.num`, `util/libssl.num`,
   `crypto/objects/objects.txt` + `obj_mac.num`, `crypto/err/openssl.txt`, `doc/man3`,
   `doc/man7`. Record the version and checksums in `abi/openssl-3.5/VERSION`.
-- [ ] **0.3 `rustssl-abi`.** Generate it with bindgen from the vendored headers. The output is
-  committed so users don't need libclang. It holds opaque type declarations, every public
-  struct and union with `#[repr(C)]`, and all constants. Generate layout assertions too.
+  *Done* with OpenSSL **3.5.9** (`cargo xtask vendor 3.5.9`). Notes:
+  - Trust: the signature must verify against `xtask/keys/openssl-pubkeys.asc` (from
+    openssl-library.org) and chain to the published anchor `B146…2D40`. The SHA-256 must match
+    the published checksum and any pin in `VERSION.toml` (which replaces the planned
+    `VERSION`).
+  - `configuration.h` is **per target**: `RC4_INT` is `unsigned int` on x86_64 and macOS but
+    `unsigned char` on aarch64 Linux, which changes `RC4_KEY`'s size, and macOS adds
+    `OPENSSL_SYS_MACOSX` and `OPENSSL_NO_AFALGENG`. It's vendored as
+    `config/{linux-x86_64,linux-aarch64,darwin64-arm64}/openssl/configuration.h`. The tool
+    fails if any other file differs between targets.
+  - Also vendored: `obj_xref.txt` (needed by `OBJ_find_sigid_algs` in 2.1) and OpenSSL's
+    `LICENSE.txt`. The generated `.pod` files come from `make build_generated_pods`.
+  - The same command handles 3.6 and 4.0 (`abi/openssl-3.6/`, `abi/openssl-4.0/`).
+- [ ] **0.3 `rustssl-abi`.** Generate it with bindgen from the vendored headers, **once per
+  target** (see the `configuration.h` note in 0.2), selected with
+  `cfg(target_arch, target_os)`. The output is committed so users don't need libclang. It
+  holds opaque type declarations, every public struct and union with `#[repr(C)]`, and all
+  constants. Generate layout assertions too.
 - [ ] **0.4 Code generators** (`cargo xtask codegen`):
   - Linux version scripts (`OPENSSL_3.0.0` … `OPENSSL_3.6.0` plus `RUSTSSL_PRIVATE`) and
     macOS exported-symbol lists, from the `.num` files. Honor the `EXIST`/`NOEXIST` and
