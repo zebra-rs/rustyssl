@@ -12,8 +12,8 @@ use std::process::Command;
 
 use crate::targets::TARGETS;
 use crate::util::{
-    Result, copy_file, fresh_dir, private_dir, run_logged, run_output, sha256_file, with_suffix,
-    workspace_root,
+    Result, copy_file, fresh_dir, private_dir, run_logged, run_output, sha256_file, toml_value,
+    with_suffix, workspace_root,
 };
 
 const RELEASES: &str = "https://github.com/openssl/openssl/releases/download";
@@ -372,18 +372,6 @@ configure-targets = [{targets}]
     );
     fs::write(dest.join("VERSION.toml"), text)?;
     Ok(())
-}
-
-/// The string value of `key` in a flat TOML file written by [`write_version_file`].
-fn toml_value<'a>(toml: &'a str, key: &str) -> Option<&'a str> {
-    toml.lines().find_map(|line| {
-        line.strip_prefix(key)?
-            .trim_start()
-            .strip_prefix('=')?
-            .trim()
-            .strip_prefix('"')?
-            .strip_suffix('"')
-    })
 }
 
 #[cfg(test)]

@@ -103,3 +103,15 @@ pub fn copy_file(from: &Path, to: &Path) -> Result {
     fs::copy(from, to).map_err(|e| format!("cannot copy {}: {e}", from.display()))?;
     Ok(())
 }
+
+/// The string value of `key` in a flat TOML file such as `abi/openssl-*/VERSION.toml`.
+pub fn toml_value<'a>(toml: &'a str, key: &str) -> Option<&'a str> {
+    toml.lines().find_map(|line| {
+        line.strip_prefix(key)?
+            .trim_start()
+            .strip_prefix('=')?
+            .trim()
+            .strip_prefix('"')?
+            .strip_suffix('"')
+    })
+}
