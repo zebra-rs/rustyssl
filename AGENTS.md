@@ -189,8 +189,8 @@ generator. Don't paste the number.
 ## Commands
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
-xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, `test-differential`,
-`coverage`, and `usage-scan`.
+xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
+`test-differential`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -204,6 +204,8 @@ Tools each command needs:
   (only the per-package results are kept, under `target/`).
 - **`dist`, `test-c`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
+- **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
+  (from the Xcode command-line tools).
 - **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
   cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
   cargo-vet formats `supply-chain/` differently, and CI then fails.
@@ -228,7 +230,7 @@ cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), an
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
-cargo xtask abi-check                        # symbols+versions vs *.num, signatures vs headers, struct layouts
+cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
@@ -253,8 +255,9 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
 - **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
   `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. A libssl
   function is written as `rustssl_private_<name>`; never implement anything in
-  `libs/libssl`, whose forwarders are generated. Use `ffi_export!` (`rustssl-capi/src/ffi.rs`)
-  and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
+  `libs/libssl`, whose forwarders are generated. Codegen also asserts the function's
+  signature against the header's prototype at compile time (`generated/signatures.rs`). Use
+  `ffi_export!` (`rustssl-capi/src/ffi.rs`) and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
   `mem`, and errors go through `err::raise`. It counts as **implemented** only once it has a
   conformance test: a TAP program in `tests/c/` that passes, unchanged, against the reference
   and rustssl (`tests/c/buf_mem.c` is the model). Then run `cargo xtask coverage` and commit
