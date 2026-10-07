@@ -2,6 +2,7 @@
 
 mod libcrypto_stubs;
 mod libssl_stubs;
+mod signatures;
 
 // Read by the error queue from Phase 1.4 on.
 #[allow(dead_code)]

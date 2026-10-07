@@ -11,6 +11,11 @@
 //! as `rustssl_private_<name>` for libssl) and regenerate, which drops its stub. A stub calls
 //! `crate::stub::unimplemented`, which aborts. Every target must produce identical code;
 //! codegen fails otherwise.
+//!
+//! For each function written by hand, `rustssl-capi/src/generated/signatures.rs` asserts that
+//! it has exactly the header's prototype: it assigns the function to a function-pointer
+//! constant of that type, so the compiler rejects any difference in a parameter or return
+//! type, pointer constness, or variadics, on every target (TEST_PLAN.md, L3 item 3).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
@@ -89,7 +94,8 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
     let crypto = libraries.get("libcrypto").ok_or("no libcrypto exports")?;
     let ssl = libraries.get("libssl").ok_or("no libssl exports")?;
 
-    let implemented = implemented_functions(&ctx.root.join(CAPI_SRC))?;
+    let paths = implemented_paths(&ctx.root.join(CAPI_SRC))?;
+    let implemented: BTreeSet<String> = paths.keys().cloned().collect();
     let crypto_stubs: Vec<String> = crypto
         .iter()
         .filter(|(name, _)| !implemented.contains(*name))
@@ -111,6 +117,11 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
         &capi.join("libssl_stubs.rs"),
         &render_stubs_file("libssl", PRIVATE_PREFIX, &ssl_stubs)?,
     )?;
+    write_rust(
+        &ctx.root,
+        &capi.join("signatures.rs"),
+        &render_signatures_file(crypto, ssl, &paths)?,
+    )?;
     let forwarders = ctx
         .root
         .join(LIBSSL_SRC)
@@ -131,7 +142,13 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
 
 /// Names of the `extern "C"` functions implemented by hand under `src`.
 pub fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
-    let mut names = BTreeSet::new();
+    Ok(implemented_paths(src)?.into_keys().collect())
+}
+
+/// The `extern "C"` functions implemented by hand under `src`, each with the path of the module
+/// that defines it (`crate::buffer`).
+pub fn implemented_paths(src: &Path) -> Result<BTreeMap<String, String>> {
+    let mut paths = BTreeMap::new();
     let mut dirs = vec![src.to_path_buf()];
     while let Some(dir) = dirs.pop() {
         for entry in fs::read_dir(&dir)? {
@@ -141,11 +158,30 @@ pub fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
                     dirs.push(path);
                 }
             } else if path.extension().is_some_and(|e| e == "rs") {
-                names.extend(defined_functions(&fs::read_to_string(&path)?));
+                let module = module_path(path.strip_prefix(src)?)?;
+                for name in defined_functions(&fs::read_to_string(&path)?) {
+                    paths.insert(name, module.clone());
+                }
             }
         }
     }
-    Ok(names)
+    Ok(paths)
+}
+
+/// The module path of a source file, from its path relative to `src/`: `lib.rs` is `crate`,
+/// `buffer.rs` is `crate::buffer`, and `a/mod.rs` and `a/b.rs` are `crate::a` and `crate::a::b`.
+fn module_path(file: &Path) -> Result<String> {
+    let mut parts = vec!["crate".to_owned()];
+    for component in file.with_extension("").components() {
+        let part = component
+            .as_os_str()
+            .to_str()
+            .ok_or("non-UTF-8 source path")?;
+        if part != "lib" && part != "mod" {
+            parts.push(part.to_owned());
+        }
+    }
+    Ok(parts.join("::"))
 }
 
 /// Names of the `extern "C" fn`s defined in Rust `source`, ignoring comment lines (whose
@@ -277,6 +313,58 @@ fn render_stubs_file(library: &str, prefix: &str, stubs: &[String]) -> Result<St
     Ok(out)
 }
 
+/// A function pointer type for `prototype`. A `VaList` parameter's elided lifetime becomes a
+/// higher-ranked one, which the function's own late-bound lifetime coerces to.
+fn function_type(prototype: &Prototype) -> String {
+    let mut params = prototype.params.clone();
+    if prototype.variadic {
+        params.push("...".to_owned());
+    }
+    let signature = format!(
+        "unsafe extern \"C\" fn({}){}",
+        params.join(", "),
+        output(prototype)
+    );
+    if signature.contains("'_") {
+        format!("for<'a> {}", signature.replace("'_", "'a"))
+    } else {
+        signature
+    }
+}
+
+/// One signature assertion for each function implemented by hand, under its exported name
+/// (libcrypto) or private name (libssl).
+fn render_signatures_file(
+    crypto: &BTreeMap<String, Prototype>,
+    ssl: &BTreeMap<String, Prototype>,
+    paths: &BTreeMap<String, String>,
+) -> Result<String> {
+    let mut assertions = String::new();
+    let functions = crypto.iter().map(|(name, p)| (name.clone(), p)).chain(
+        ssl.iter()
+            .map(|(name, p)| (format!("{PRIVATE_PREFIX}{name}"), p)),
+    );
+    for (symbol, prototype) in functions {
+        if let Some(module) = paths.get(&symbol) {
+            writeln!(
+                assertions,
+                "const _: {} = {module}::{symbol};",
+                function_type(prototype)
+            )?;
+        }
+    }
+    let mut out = format!(
+        "// Generated by `cargo xtask codegen` from the prototypes in abi/openssl-{OPENSSL_SERIES}'s \
+         headers. Do not edit.\n//\n\
+         // Each function rustssl-capi implements by hand is assigned to a function pointer of its \
+         C\n// prototype's type, so it doesn't compile unless the signatures match exactly \
+         (TEST_PLAN.md, L3 item 3).\n\n"
+    );
+    out.push_str(&imports(&assertions)?);
+    out.push_str(&assertions);
+    Ok(out)
+}
+
 /// libssl's exports, each forwarding to libcrypto's `rustssl_private_<name>`.
 fn render_forwarders_file(ssl: &BTreeMap<String, Prototype>) -> Result<String> {
     let mut declarations = String::from("unsafe extern \"C\" {\n");
@@ -377,6 +465,60 @@ mod tests {
         let p = prototype_of("pub fn BIO_vprintf(b: *mut BIO, a: *mut __va_list_tag) -> c_int;");
         assert_eq!(p.params[1], "core::ffi::VaList<'_>");
         assert!(!render_stub("BIO_vprintf", "BIO_vprintf", &p).contains("unsafe extern"));
+    }
+
+    #[test]
+    fn signatures_assert_the_prototype() {
+        let crypto = BTreeMap::from([
+            (
+                "BUF_MEM_grow".to_owned(),
+                prototype_of("pub fn BUF_MEM_grow(b: *mut BUF_MEM, n: usize) -> usize;"),
+            ),
+            (
+                "BIO_vprintf".to_owned(),
+                prototype_of(
+                    "pub fn BIO_vprintf(b: *mut BIO, f: *const c_char, a: va_list) -> c_int;",
+                ),
+            ),
+            (
+                "BIO_printf".to_owned(),
+                prototype_of("pub fn BIO_printf(b: *mut BIO, f: *const c_char, ...) -> c_int;"),
+            ),
+            (
+                "BN_new".to_owned(),
+                prototype_of("pub fn BN_new() -> *mut BIGNUM;"),
+            ),
+        ]);
+        let ssl = BTreeMap::from([(
+            "SSL_free".to_owned(),
+            prototype_of("pub fn SSL_free(s: *mut SSL);"),
+        )]);
+        let paths = BTreeMap::from([
+            ("BUF_MEM_grow".to_owned(), "crate::buffer".to_owned()),
+            ("BIO_vprintf".to_owned(), "crate::bio".to_owned()),
+            ("BIO_printf".to_owned(), "crate::bio".to_owned()),
+            (
+                "rustssl_private_SSL_free".to_owned(),
+                "crate::ssl".to_owned(),
+            ),
+        ]);
+        let file = render_signatures_file(&crypto, &ssl, &paths).unwrap();
+        assert!(file.contains("const _: unsafe extern \"C\" fn(* mut BUF_MEM, usize) -> usize = crate::buffer::BUF_MEM_grow;\n"));
+        assert!(file.contains("const _: for<'a> unsafe extern \"C\" fn(* mut BIO, * const c_char, core::ffi::VaList<'a>) -> c_int = crate::bio::BIO_vprintf;\n"));
+        assert!(file.contains("const _: unsafe extern \"C\" fn(* mut BIO, * const c_char, ...) -> c_int = crate::bio::BIO_printf;\n"));
+        assert!(file.contains(
+            "const _: unsafe extern \"C\" fn(* mut SSL) = crate::ssl::rustssl_private_SSL_free;\n"
+        ));
+        assert!(!file.contains("BN_new"));
+    }
+
+    #[test]
+    fn module_paths() {
+        let path = |p: &str| module_path(Path::new(p)).unwrap();
+        assert_eq!(path("lib.rs"), "crate");
+        assert_eq!(path("buffer.rs"), "crate::buffer");
+        assert_eq!(path("bio/mod.rs"), "crate::bio");
+        assert_eq!(path("bio/mem.rs"), "crate::bio::mem");
     }
 
     #[test]
