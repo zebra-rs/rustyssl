@@ -1,0 +1,38 @@
+# `cargo deny check`: the supply-chain gate from AGENTS.md security rule 8. Every dependency
+# is also recorded in docs/DEPENDENCIES.md and audited with `cargo vet` (supply-chain/).
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+# Permissive licenses compatible with Apache-2.0 only. Unicode-3.0 covers unicode-ident's
+# data tables.
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace crates refer to each other by path; they are never published.
+allow-wildcard-paths = true
+
+[bans.build]
+# Build scripts are where C sneaks in (`cc`, `*-sys`). These only probe the compiler and set
+# cfgs; anything new must be reviewed and added here.
+allow-build-scripts = [
+    { crate = "libc" },
+    { crate = "proc-macro2" },
+    { crate = "quote" },
+]
+executables = "deny"
+interpreted = "deny"
+script-extensions = ["sh", "bash", "py", "pl", "rb", "ps1", "bat", "cmd"]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

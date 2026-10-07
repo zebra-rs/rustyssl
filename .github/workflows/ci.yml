@@ -1,0 +1,108 @@
+# CI for rustssl (docs/TEST_PLAN.md, "CI organization").
+#
+# Every push and pull request runs the full gate on Linux x86_64. The weekly and manual runs
+# add macOS arm64 and Linux arm64, and fuzzing: those runners cost several times more Actions
+# minutes on a private repository, so they don't run on every push.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15"]' || '["ubuntu-24.04"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the toolchain from rust-toolchain.toml
+        run: rustup show
+      - name: Install GnuPG (verifies the reference OpenSSL download)
+        if: runner.os == 'macOS'
+        run: command -v gpgv || brew install gnupg
+      - uses: Swatinem/rust-cache@v2
+      # Declared after rust-cache, so it saves target/ref before rust-cache cleans target/.
+      - name: Cache the reference OpenSSL build
+        uses: actions/cache@v4
+        with:
+          path: target/ref
+          key: ref-openssl-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('abi/openssl-*/VERSION.toml', 'xtask/src/reference.rs', 'xtask/src/vendor.rs') }}
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: C conformance tests (reference vs rustssl)
+        run: cargo xtask test-c
+      - name: Differential tests (reference vs rustssl)
+        run: cargo xtask test-differential --random 1000
+
+  miri:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal --component miri,rust-src
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +nightly miri test -p rustssl-capi
+
+  codegen:
+    name: generated code is up to date
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
+      - name: Cache bindgen
+        id: bindgen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/bindgen
+          key: bindgen-cli-0.73.2-${{ runner.os }}-${{ runner.arch }}
+      - if: steps.bindgen.outputs.cache-hit != 'true'
+        run: cargo install --locked bindgen-cli --version 0.73.2
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask codegen
+      - name: Fail if the committed generated code differs
+        run: git diff --exit-code
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-vet
+      - run: cargo deny check
+      - run: cargo vet --locked
+
+  fuzz:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Fuzz every target for 5 minutes
+        run: |
+          for target in $(cargo +nightly fuzz list); do
+            cargo +nightly fuzz run "$target" -- -max_total_time=300
+          done

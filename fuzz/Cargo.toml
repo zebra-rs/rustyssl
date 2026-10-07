@@ -1,0 +1,27 @@
+# Fuzz targets (TEST_PLAN.md, layer L9), run with `cargo +nightly fuzz run <target>`.
+#
+# This is its own workspace on purpose: libfuzzer-sys compiles libFuzzer (C++), and nothing
+# that ships in libcrypto or libssl may depend on C code (AGENTS.md, security rule 8).
+
+[package]
+name = "rustssl-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rustssl-abi = { path = "../crates/rustssl-abi" }
+rustssl-capi = { path = "../crates/rustssl-capi" }
+
+[workspace]
+
+[[bin]]
+name = "buf_mem"
+path = "fuzz_targets/buf_mem.rs"
+test = false
+doc = false
+bench = false

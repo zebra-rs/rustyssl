@@ -16,6 +16,11 @@ pub fn workspace_root() -> PathBuf {
     xtask.parent().unwrap_or(xtask).to_path_buf()
 }
 
+/// Cargo's target directory: `$CARGO_TARGET_DIR` if set, else `target/` in the workspace.
+pub fn target_dir(root: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), |dir| root.join(dir))
+}
+
 /// Deletes `dir` if it exists and creates it again, empty.
 pub fn fresh_dir(dir: &Path) -> Result {
     if dir.exists() {
