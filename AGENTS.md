@@ -212,5 +212,5 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   `docs/DEVIATIONS.md`.
 - Edition 2024. Errors in core crates are typed (`thiserror`-style enums), and capi maps
   them to ERR codes in one place per crate.
-- License: Apache-2.0 (proposed), matching OpenSSL 3. Vendored files keep their upstream
-  headers.
+- License: Apache-2.0 (`LICENSE.txt`), matching OpenSSL 3. Every crate sets
+  `license = "Apache-2.0"`. Vendored files keep their upstream headers.

@@ -48,7 +48,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   placeholder `src/lib.rs`. Create the crate skeletons from AGENTS.md, `rust-toolchain.toml`
   (stable, at least 1.99), and workspace lints: `forbid(unsafe_code)` everywhere except
   `rustssl-capi` and `libs/*`, plus the clippy set from the security rules. Add `rustfmt.toml`,
-  `LICENSE`, and `NOTICE`.
+  `license = "Apache-2.0"` in the workspace package metadata, and a `NOTICE` that carries
+  OpenSSL's attribution for the vendored files. (`LICENSE.txt` already exists.)
 - [ ] **0.2 Vendor the ABI.** Add `cargo xtask vendor 3.5.<patch>`: download the pinned
   release tarball and verify its SHA-256 and PGP signature. Run `./Configure` with default
   options so that the **generated** headers exist (in 3.x many public headers come from
