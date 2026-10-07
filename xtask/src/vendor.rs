@@ -12,8 +12,8 @@ use std::process::Command;
 
 use crate::targets::TARGETS;
 use crate::util::{
-    Result, copy_file, fresh_dir, private_dir, run_logged, run_output, sha256_file, toml_value,
-    with_suffix, workspace_root,
+    Result, copy_file, fresh_dir, private_dir, run_logged, run_output, sha256_file, target_dir,
+    toml_value, with_suffix, workspace_root,
 };
 
 const RELEASES: &str = "https://github.com/openssl/openssl/releases/download";
@@ -40,7 +40,7 @@ const PER_TARGET: &[(&str, &str)] = &[
 /// and P-521 code and its exports `EC_GFp_nistp{224,256,521}_method`. Debian and Homebrew
 /// enable it, so binaries built there may call those functions. It needs a 64-bit target
 /// with `__uint128_t`, which every target in [`TARGETS`] is.
-const CONFIGURE_OPTIONS: &[&str] = &["enable-ec_nistp_64_gcc_128"];
+pub const CONFIGURE_OPTIONS: &[&str] = &["enable-ec_nistp_64_gcc_128"];
 
 /// Single files to vendor, relative to the source root.
 const FILES: &[&str] = &[
@@ -75,18 +75,15 @@ pub fn run(args: &[String]) -> Result {
     let series = release_series(version)?;
     let root = workspace_root();
     let dest = root.join("abi").join(format!("openssl-{series}"));
-    let work = root
-        .join("target/xtask/vendor")
+    let work = target_dir(&root)
+        .join("xtask/vendor")
         .join(format!("openssl-{version}"));
     fresh_dir(&work)?;
-
-    println!("Downloading OpenSSL {version}...");
-    let tarball = download(version, &work)?;
-    let sha256 = verify_checksum(&tarball)?;
-    check_pin(&dest, version, &sha256)?;
-    let signer = verify_signature(&root, &work, &tarball)?;
-    println!("Verified SHA-256 {sha256}");
-    println!("Verified signature by {signer} (trust anchor {TRUST_ANCHOR})");
+    let Release {
+        tarball,
+        sha256,
+        signer,
+    } = fetch_verified(&root, version, &work)?;
 
     let mut trees = Vec::new();
     for target in TARGETS {
@@ -99,6 +96,33 @@ pub fn run(args: &[String]) -> Result {
     let shown = dest.strip_prefix(&root).unwrap_or(&dest);
     println!("Vendored {count} files into {}", shown.display());
     Ok(())
+}
+
+/// A downloaded OpenSSL release tarball that passed every check in the module docs.
+pub struct Release {
+    pub tarball: PathBuf,
+    pub sha256: String,
+    pub signer: String,
+}
+
+/// Downloads OpenSSL `version` into `work` and verifies it: the published SHA-256, any pin
+/// recorded in `abi/openssl-<series>/VERSION.toml`, and a signature chaining to
+/// [`TRUST_ANCHOR`]. Nothing from the tarball should be used before this returns.
+pub fn fetch_verified(root: &Path, version: &str, work: &Path) -> Result<Release> {
+    let series = release_series(version)?;
+    let pinned = root.join("abi").join(format!("openssl-{series}"));
+    println!("Downloading OpenSSL {version}...");
+    let tarball = download(version, work)?;
+    let sha256 = verify_checksum(&tarball)?;
+    check_pin(&pinned, version, &sha256)?;
+    let signer = verify_signature(root, work, &tarball)?;
+    println!("Verified SHA-256 {sha256}");
+    println!("Verified signature by {signer} (trust anchor {TRUST_ANCHOR})");
+    Ok(Release {
+        tarball,
+        sha256,
+        signer,
+    })
 }
 
 /// `3.5.9` -> `3.5`. Rejects anything that isn't three numeric components.

@@ -32,19 +32,17 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::codegen::exports::PRIVATE_PREFIX;
-use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
-use crate::util::{Result, copy_file, fresh_dir, run_output, toml_value, workspace_root};
+use crate::targets::{OPENSSL_SERIES, Target, host};
+use crate::util::{
+    Result, copy_file, fresh_dir, run_output, target_dir, toml_value, workspace_root,
+};
 
 pub fn run(args: &[String]) -> Result {
     if !args.is_empty() {
         return Err("usage: cargo xtask dist".into());
     }
     let root = workspace_root();
-    let host = host_triple()?;
-    let target = TARGETS
-        .iter()
-        .find(|t| same_platform(t.rust, &host))
-        .ok_or_else(|| format!("no rustssl target for host {host}; see xtask/src/targets.rs"))?;
+    let (host, target) = host()?;
     let abi = root.join("abi").join(format!("openssl-{OPENSSL_SERIES}"));
     let version_file = fs::read_to_string(abi.join("VERSION.toml"))?;
     let version = toml_value(&version_file, "version").ok_or("VERSION.toml has no version")?;
@@ -53,8 +51,7 @@ pub fn run(args: &[String]) -> Result {
         .next()
         .ok_or("bad OPENSSL_SERIES")?;
 
-    let target_dir =
-        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
+    let target_dir = target_dir(&root);
     let dist = target_dir.join("dist");
     fresh_dir(&dist)?;
     let lib_dir = dist.join("lib");
@@ -114,33 +111,6 @@ pub fn run(args: &[String]) -> Result {
         dist.display()
     );
     Ok(())
-}
-
-/// Whether `host` uses `target`'s ABI definitions: the same architecture and OS, whatever the
-/// C library (`x86_64-unknown-linux-musl` uses the `linux-x86_64` ones, as OpenSSL's
-/// `Configure` does).
-fn same_platform(target: &str, host: &str) -> bool {
-    let platform = |triple: &str| {
-        let arch = triple.split('-').next().unwrap_or_default().to_owned();
-        let os = if triple.contains("-linux") {
-            "linux"
-        } else if triple.contains("-apple-darwin") {
-            "darwin"
-        } else {
-            ""
-        };
-        (arch, os)
-    };
-    let (arch, os) = platform(host);
-    !os.is_empty() && platform(target) == (arch, os)
-}
-
-fn host_triple() -> Result<String> {
-    let info = run_output(Command::new("rustc").arg("-vV"))?;
-    info.lines()
-        .find_map(|line| line.strip_prefix("host: "))
-        .map(str::to_owned)
-        .ok_or_else(|| "rustc -vV printed no host".into())
 }
 
 /// Builds `rustssl-<library>` as a release static archive and returns the system libraries
@@ -436,26 +406,4 @@ fn write_pkgconfig(dir: &Path, version: &str, private_libs: &[String]) -> Result
     fs::write(dir.join("libssl.pc"), libssl)?;
     fs::write(dir.join("openssl.pc"), openssl)?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hosts_map_to_targets_by_arch_and_os() {
-        let linux = "x86_64-unknown-linux-gnu";
-        assert!(same_platform(linux, "x86_64-unknown-linux-gnu"));
-        assert!(same_platform(linux, "x86_64-unknown-linux-musl"));
-        assert!(!same_platform(linux, "aarch64-unknown-linux-gnu"));
-        assert!(!same_platform(linux, "x86_64-pc-windows-msvc"));
-        assert!(same_platform(
-            "aarch64-apple-darwin",
-            "aarch64-apple-darwin"
-        ));
-        assert!(!same_platform(
-            "aarch64-apple-darwin",
-            "aarch64-unknown-linux-gnu"
-        ));
-    }
 }

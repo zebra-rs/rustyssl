@@ -9,6 +9,7 @@
 
 mod codegen;
 mod dist;
+mod reference;
 mod targets;
 mod util;
 mod vendor;
@@ -44,6 +45,7 @@ fn main() -> ExitCode {
         }
         Some("codegen") => report("codegen", codegen::run(&rest)),
         Some("dist") => report("dist", dist::run(&rest)),
+        Some("ref-openssl") => report("ref-openssl", reference::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {
             eprintln!(
