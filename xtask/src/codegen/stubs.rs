@@ -1,10 +1,10 @@
-//! Generates a stub for every function libcrypto and libssl export, in
-//! `crates/rustssl-capi/src/generated/<lib>_stubs.rs`, with the signature from the vendored
-//! headers. A stub calls `crate::stub::unimplemented`, which aborts the process.
+//! Generates a stub for every function libcrypto and libssl export, with the signature from
+//! the vendored headers, in the crate that defines that library's exports (see [`SOURCES`]).
+//! A stub calls `crate::stub::unimplemented`, which aborts the process.
 //!
-//! Functions that `rustssl-capi` already implements (any `extern "C" fn` outside
-//! `src/generated/`) get no stub, so implementing a function and regenerating replaces its
-//! stub. Every target must produce identical stubs; codegen fails otherwise.
+//! Functions that crate already implements (any `extern "C" fn` outside `src/generated/`) get
+//! no stub, so implementing a function and regenerating replaces its stub. Every target must
+//! produce identical stubs; codegen fails otherwise.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
@@ -13,14 +13,24 @@ use std::path::Path;
 
 use quote::ToTokens;
 
-use super::exports::{Exports, LIBRARIES};
+use super::exports::Exports;
 use super::headers::{Context, identifiers, libc_types, write_rust};
 use crate::targets::{OPENSSL_SERIES, TARGETS};
 use crate::util::Result;
 
+/// The source directory of the crate that defines each library's exports. libcrypto holds the
+/// whole implementation (`rustssl-capi`); libssl's facade defines its own symbols, which
+/// become forwarders into libcrypto (step 0.6 of the plan).
+pub const SOURCES: &[(&str, &str)] = &[
+    ("libcrypto", "crates/rustssl-capi/src"),
+    ("libssl", "libs/libssl/src"),
+];
+
 pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
-    let capi = ctx.root.join("crates/rustssl-capi/src");
-    let implemented = implemented_functions(&capi)?;
+    let mut implemented: HashMap<&str, BTreeSet<String>> = HashMap::new();
+    for (library, src) in SOURCES {
+        implemented.insert(library, implemented_functions(&ctx.root.join(src))?);
+    }
     // library -> rendered stubs, which must agree across targets.
     let mut rendered: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::new();
     for target in TARGETS {
@@ -28,10 +38,13 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
         let text = ctx.bindgen(target, &ctx.wrapper, "functions", &options)?;
         let prototypes = prototypes(&text)?;
         for library_exports in exports.iter().filter(|e| e.target.module == target.module) {
+            let done = implemented
+                .get(library_exports.library)
+                .ok_or_else(|| format!("no source crate for {}", library_exports.library))?;
             let mut stubs = BTreeMap::new();
             let mut missing = Vec::new();
             for name in library_exports.names() {
-                if implemented.contains(name) {
+                if done.contains(name) {
                     continue;
                 }
                 match prototypes.get(name) {
@@ -73,10 +86,12 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
         }
     }
 
-    let out_dir = capi.join("generated");
-    for library in LIBRARIES {
+    for (library, src) in SOURCES {
         let stubs = rendered.get(library).ok_or("no stubs rendered")?;
-        let path = out_dir.join(format!("{library}_stubs.rs"));
+        let path = ctx
+            .root
+            .join(src)
+            .join(format!("generated/{library}_stubs.rs"));
         write_rust(&ctx.root, &path, &render_file(library, stubs)?)?;
         let exported = exports
             .iter()
@@ -91,7 +106,7 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
     Ok(())
 }
 
-/// Names of the `extern "C"` functions implemented by hand in `rustssl-capi`.
+/// Names of the `extern "C"` functions implemented by hand under `src`.
 fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     let mut dirs = vec![src.to_path_buf()];
