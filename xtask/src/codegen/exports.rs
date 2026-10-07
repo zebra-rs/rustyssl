@@ -12,7 +12,9 @@ use crate::util::Result;
 
 pub const LIBRARIES: &[&str] = &["libcrypto", "libssl"];
 
-/// libcrypto exports these to libssl only (see the plan's step 0.6). The name is a glob.
+/// libcrypto exports `rustssl_private_<function>` for each libssl function, for libssl's
+/// forwarders only, under its own version node (docs/adr/0001-library-layout.md).
+pub const PRIVATE_PREFIX: &str = "rustssl_private_";
 const PRIVATE_NODE: &str = "RUSTSSL_PRIVATE";
 const PRIVATE_GLOB: &str = "rustssl_private_*";
 
@@ -162,6 +164,11 @@ mod tests {
 
     const MKDEF: &str = "OPENSSL_3.0.0 {\n    global:\n        A_new;\n        A_free;\n};\n\
                          OPENSSL_3.1.0 {\n    global:\n        B_new;\n    local: *;\n} OPENSSL_3.0.0;\n";
+
+    #[test]
+    fn private_glob_matches_the_prefix() {
+        assert_eq!(PRIVATE_GLOB, format!("{PRIVATE_PREFIX}*"));
+    }
 
     #[test]
     fn parses_mkdef_output() {

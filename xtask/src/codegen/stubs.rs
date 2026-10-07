@@ -1,10 +1,16 @@
-//! Generates a stub for every function libcrypto and libssl export, with the signature from
-//! the vendored headers, in the crate that defines that library's exports (see [`SOURCES`]).
-//! A stub calls `crate::stub::unimplemented`, which aborts the process.
+//! Generates what each export compiles to, from the prototypes in the vendored headers:
 //!
-//! Functions that crate already implements (any `extern "C" fn` outside `src/generated/`) get
-//! no stub, so implementing a function and regenerating replaces its stub. Every target must
-//! produce identical stubs; codegen fails otherwise.
+//! - in `rustssl-capi`, which is linked into libcrypto: an aborting stub for every libcrypto
+//!   export it doesn't implement yet, and one for every libssl export under its private name
+//!   `rustssl_private_<name>`;
+//! - in `libs/libssl`: a forwarder for every libssl export, which calls libcrypto's private
+//!   definition. libssl holds no implementation and no state of its own
+//!   (`docs/adr/0001-library-layout.md`).
+//!
+//! To implement a function, write it in `rustssl-capi` (under its own name for libcrypto, or
+//! as `rustssl_private_<name>` for libssl) and regenerate, which drops its stub. A stub calls
+//! `crate::stub::unimplemented`, which aborts. Every target must produce identical code;
+//! codegen fails otherwise.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
@@ -13,43 +19,37 @@ use std::path::Path;
 
 use quote::ToTokens;
 
-use super::exports::Exports;
+use super::exports::{Exports, PRIVATE_PREFIX};
 use super::headers::{Context, identifiers, libc_types, write_rust};
 use crate::targets::{OPENSSL_SERIES, TARGETS};
 use crate::util::Result;
 
-/// The source directory of the crate that defines each library's exports. libcrypto holds the
-/// whole implementation (`rustssl-capi`); libssl's facade defines its own symbols, which
-/// become forwarders into libcrypto (step 0.6 of the plan).
-pub const SOURCES: &[(&str, &str)] = &[
-    ("libcrypto", "crates/rustssl-capi/src"),
-    ("libssl", "libs/libssl/src"),
-];
+const CAPI_SRC: &str = "crates/rustssl-capi/src";
+const LIBSSL_SRC: &str = "libs/libssl/src";
+
+/// A C prototype as Rust types.
+#[derive(Clone, PartialEq, Debug)]
+struct Prototype {
+    params: Vec<String>,
+    variadic: bool,
+    output: Option<String>,
+}
 
 pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
-    let mut implemented: HashMap<&str, BTreeSet<String>> = HashMap::new();
-    for (library, src) in SOURCES {
-        implemented.insert(library, implemented_functions(&ctx.root.join(src))?);
-    }
-    // library -> rendered stubs, which must agree across targets.
-    let mut rendered: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::new();
+    // library -> name -> prototype, which must agree across targets.
+    let mut agreed: Option<BTreeMap<&str, BTreeMap<String, Prototype>>> = None;
     for target in TARGETS {
         let options = ["--blocklist-type".to_owned(), ".*".to_owned()];
         let text = ctx.bindgen(target, &ctx.wrapper, "functions", &options)?;
         let prototypes = prototypes(&text)?;
+        let mut libraries = BTreeMap::new();
         for library_exports in exports.iter().filter(|e| e.target.module == target.module) {
-            let done = implemented
-                .get(library_exports.library)
-                .ok_or_else(|| format!("no source crate for {}", library_exports.library))?;
-            let mut stubs = BTreeMap::new();
+            let mut functions = BTreeMap::new();
             let mut missing = Vec::new();
             for name in library_exports.names() {
-                if done.contains(name) {
-                    continue;
-                }
                 match prototypes.get(name) {
-                    Some(stub) => {
-                        stubs.insert(name.to_owned(), stub.clone());
+                    Some(prototype) => {
+                        functions.insert(name.to_owned(), prototype.clone());
                     }
                     None => missing.push(name),
                 }
@@ -63,44 +63,67 @@ pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
                 )
                 .into());
             }
-            match rendered.get(library_exports.library) {
-                None => {
-                    rendered.insert(library_exports.library, stubs);
-                }
-                Some(first) if *first == stubs => {}
-                Some(first) => {
-                    let differs: Vec<&String> = first
-                        .iter()
-                        .filter(|(name, stub)| stubs.get(*name) != Some(stub))
-                        .map(|(name, _)| name)
-                        .chain(stubs.keys().filter(|name| !first.contains_key(*name)))
-                        .take(10)
-                        .collect();
-                    return Err(format!(
-                        "{} stubs differ on {}: {differs:?}",
-                        library_exports.library, target.configure
-                    )
-                    .into());
-                }
+            libraries.insert(library_exports.library, functions);
+        }
+        match &agreed {
+            None => agreed = Some(libraries),
+            Some(first) if *first == libraries => {}
+            Some(first) => {
+                let differs: Vec<&String> = first
+                    .values()
+                    .zip(libraries.values())
+                    .flat_map(|(a, b)| {
+                        a.iter()
+                            .filter(|(name, p)| b.get(*name) != Some(p))
+                            .map(|(name, _)| name)
+                    })
+                    .take(10)
+                    .collect();
+                return Err(
+                    format!("prototypes differ on {}: {differs:?}", target.configure).into(),
+                );
             }
         }
     }
+    let libraries = agreed.ok_or("no targets")?;
+    let crypto = libraries.get("libcrypto").ok_or("no libcrypto exports")?;
+    let ssl = libraries.get("libssl").ok_or("no libssl exports")?;
 
-    for (library, src) in SOURCES {
-        let stubs = rendered.get(library).ok_or("no stubs rendered")?;
-        let path = ctx
-            .root
-            .join(src)
-            .join(format!("generated/{library}_stubs.rs"));
-        write_rust(&ctx.root, &path, &render_file(library, stubs)?)?;
-        let exported = exports
-            .iter()
-            .find(|e| e.library == *library)
-            .map_or(0, |e| e.names().count());
+    let implemented = implemented_functions(&ctx.root.join(CAPI_SRC))?;
+    let crypto_stubs: Vec<String> = crypto
+        .iter()
+        .filter(|(name, _)| !implemented.contains(*name))
+        .map(|(name, prototype)| render_stub(name, name, prototype))
+        .collect();
+    let ssl_stubs: Vec<String> = ssl
+        .iter()
+        .filter(|(name, _)| !implemented.contains(&format!("{PRIVATE_PREFIX}{name}")))
+        .map(|(name, prototype)| render_stub(&format!("{PRIVATE_PREFIX}{name}"), name, prototype))
+        .collect();
+    let capi = ctx.root.join(CAPI_SRC).join("generated");
+    write_rust(
+        &ctx.root,
+        &capi.join("libcrypto_stubs.rs"),
+        &render_stubs_file("libcrypto", "", &crypto_stubs)?,
+    )?;
+    write_rust(
+        &ctx.root,
+        &capi.join("libssl_stubs.rs"),
+        &render_stubs_file("libssl", PRIVATE_PREFIX, &ssl_stubs)?,
+    )?;
+    let forwarders = ctx
+        .root
+        .join(LIBSSL_SRC)
+        .join("generated/libssl_forwarders.rs");
+    write_rust(&ctx.root, &forwarders, &render_forwarders_file(ssl)?)?;
+
+    for (library, functions, stubs) in [
+        ("libcrypto", crypto, crypto_stubs.len()),
+        ("libssl", ssl, ssl_stubs.len()),
+    ] {
         println!(
-            "{library}: {} implemented, {} stubs",
-            exported - stubs.len(),
-            stubs.len()
+            "{library}: {} implemented, {stubs} stubs",
+            functions.len() - stubs
         );
     }
     Ok(())
@@ -130,49 +153,38 @@ fn implemented_functions(src: &Path) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
-/// Renders a stub for every prototype in bindgen's output, keyed by function name.
-fn prototypes(bindgen: &str) -> Result<HashMap<String, String>> {
+/// Every prototype in bindgen's output, keyed by function name.
+fn prototypes(bindgen: &str) -> Result<HashMap<String, Prototype>> {
     let file = syn::parse_file(bindgen)?;
-    let mut stubs = HashMap::new();
+    let mut prototypes = HashMap::new();
     for item in file.items {
         let syn::Item::ForeignMod(block) = item else {
             continue;
         };
         for foreign in block.items {
             if let syn::ForeignItem::Fn(function) = foreign {
-                let name = function.sig.ident.to_string();
-                stubs.insert(name, render_stub(&function.sig)?);
+                let sig = &function.sig;
+                let mut params = Vec::new();
+                for input in &sig.inputs {
+                    let syn::FnArg::Typed(param) = input else {
+                        return Err(format!("{}: unexpected receiver", sig.ident).into());
+                    };
+                    params.push(rust_type(&param.ty));
+                }
+                let output = match &sig.output {
+                    syn::ReturnType::Default => None,
+                    syn::ReturnType::Type(_, ty) => Some(rust_type(ty)),
+                };
+                let prototype = Prototype {
+                    params,
+                    variadic: sig.variadic.is_some(),
+                    output,
+                };
+                prototypes.insert(sig.ident.to_string(), prototype);
             }
         }
     }
-    Ok(stubs)
-}
-
-fn render_stub(sig: &syn::Signature) -> Result<String> {
-    let name = sig.ident.to_string();
-    let mut params = Vec::new();
-    for input in &sig.inputs {
-        let syn::FnArg::Typed(param) = input else {
-            return Err(format!("{name}: unexpected receiver").into());
-        };
-        params.push(format!("_: {}", rust_type(&param.ty)));
-    }
-    // C-variadic functions must be `unsafe` to define.
-    let unsafety = if sig.variadic.is_some() {
-        params.push("_: ...".to_owned());
-        "unsafe "
-    } else {
-        ""
-    };
-    let output = match &sig.output {
-        syn::ReturnType::Default => String::new(),
-        syn::ReturnType::Type(_, ty) => format!(" -> {}", rust_type(ty)),
-    };
-    Ok(format!(
-        "#[unsafe(no_mangle)]\npub {unsafety}extern \"C\" fn {name}({}){output} {{\n    \
-         crate::stub::unimplemented(\"{name}\")\n}}\n",
-        params.join(", ")
-    ))
+    Ok(prototypes)
 }
 
 /// A type as Rust source. `va_list` is spelled differently on every target (x86_64 passes a
@@ -187,27 +199,128 @@ fn rust_type(ty: &syn::Type) -> String {
     }
 }
 
-fn render_file(library: &str, stubs: &BTreeMap<String, String>) -> Result<String> {
-    let mut out = format!(
-        "// Generated by `cargo xtask codegen` from the {library} export list in \
-         abi/openssl-{OPENSSL_SERIES}\n// and the prototypes in its headers. Do not edit: \
-         implementing a function in rustssl-capi\n// and regenerating removes its stub.\n\n\
-         // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.\n\
-         #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]\n\n"
-    );
-    let all: String = stubs.values().map(String::as_str).collect();
+fn output(prototype: &Prototype) -> String {
+    prototype
+        .output
+        .as_ref()
+        .map_or_else(String::new, |ty| format!(" -> {ty}"))
+}
+
+/// An exported stub named `symbol` that aborts, reporting the OpenSSL function `name`.
+fn render_stub(symbol: &str, name: &str, prototype: &Prototype) -> String {
+    let mut params: Vec<String> = prototype
+        .params
+        .iter()
+        .map(|ty| format!("_: {ty}"))
+        .collect();
+    // C-variadic functions must be `unsafe` to define.
+    let unsafety = if prototype.variadic {
+        params.push("_: ...".to_owned());
+        "unsafe "
+    } else {
+        ""
+    };
+    format!(
+        "#[unsafe(no_mangle)]\npub {unsafety}extern \"C\" fn {symbol}({}){} {{\n    \
+         crate::stub::unimplemented(\"{name}\")\n}}\n",
+        params.join(", "),
+        output(prototype)
+    )
+}
+
+/// The `use` lines for the libc and ABI types the generated code mentions.
+fn imports(code: &str) -> Result<String> {
+    let mut out = String::new();
     let used: Vec<&str> = libc_types()
         .into_iter()
-        .filter(|t| identifiers(&all).any(|id| id == *t))
+        .filter(|t| identifiers(code).any(|id| id == *t))
         .collect();
     if !used.is_empty() {
         writeln!(out, "use libc::{{{}}};", used.join(", "))?;
     }
     out.push_str("use rustssl_abi::*;\n\n");
-    for stub in stubs.values() {
+    Ok(out)
+}
+
+fn render_stubs_file(library: &str, prefix: &str, stubs: &[String]) -> Result<String> {
+    let naming = if prefix.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n//\n// Each stub carries the private name `{prefix}<function>`; libssl's export of the \
+             same\n// function forwards to it (docs/adr/0001-library-layout.md)."
+        )
+    };
+    let mut out = format!(
+        "// Generated by `cargo xtask codegen` from the {library} export list in \
+         abi/openssl-{OPENSSL_SERIES}\n// and the prototypes in its headers. Do not edit: \
+         implementing a function in rustssl-capi\n// and regenerating removes its stub.{naming}\n\n\
+         // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.\n\
+         #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]\n\n"
+    );
+    let body: String = stubs.concat();
+    out.push_str(&imports(&body)?);
+    for stub in stubs {
         out.push_str(stub);
         out.push('\n');
     }
+    Ok(out)
+}
+
+/// libssl's exports, each forwarding to libcrypto's `rustssl_private_<name>`.
+fn render_forwarders_file(ssl: &BTreeMap<String, Prototype>) -> Result<String> {
+    let mut declarations = String::from("unsafe extern \"C\" {\n");
+    let mut forwarders = String::new();
+    for (name, prototype) in ssl {
+        if prototype.variadic {
+            return Err(format!(
+                "{name} is variadic and can't be forwarded; give its private definition a VaList"
+            )
+            .into());
+        }
+        let ret = output(prototype);
+        let types: Vec<String> = prototype
+            .params
+            .iter()
+            .map(|ty| format!("_: {ty}"))
+            .collect();
+        writeln!(
+            declarations,
+            "    fn {PRIVATE_PREFIX}{name}({}){ret};",
+            types.join(", ")
+        )?;
+        let params: Vec<String> = prototype
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| format!("a{i}: {ty}"))
+            .collect();
+        let args: Vec<String> = (0..prototype.params.len())
+            .map(|i| format!("a{i}"))
+            .collect();
+        writeln!(
+            forwarders,
+            "#[unsafe(no_mangle)]\npub unsafe extern \"C\" fn {name}({}){ret} {{\n    \
+             // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same\n    \
+             // signature and the same contract as this function.\n    \
+             unsafe {{ {PRIVATE_PREFIX}{name}({}) }}\n}}\n",
+            params.join(", "),
+            args.join(", ")
+        )?;
+    }
+    declarations.push_str("}\n\n");
+
+    let mut out = format!(
+        "// Generated by `cargo xtask codegen` from the libssl export list in \
+         abi/openssl-{OPENSSL_SERIES}\n// and the prototypes in its headers. Do not edit.\n//\n\
+         // Every libssl export forwards to libcrypto's private definition, so libssl holds no \
+         state\n// or code of its own (docs/adr/0001-library-layout.md).\n\n\
+         // Forwarders have their callers' contract; some take many parameters.\n\
+         #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]\n\n"
+    );
+    out.push_str(&imports(&forwarders)?);
+    out.push_str(&declarations);
+    out.push_str(&forwarders);
     Ok(out)
 }
 
@@ -215,32 +328,55 @@ fn render_file(library: &str, stubs: &BTreeMap<String, String>) -> Result<String
 mod tests {
     use super::*;
 
-    fn stub_for(prototype: &str) -> String {
-        let file = format!("unsafe extern \"C\" {{ {prototype} }}");
+    fn prototype_of(declaration: &str) -> Prototype {
+        let file = format!("unsafe extern \"C\" {{ {declaration} }}");
         prototypes(&file).unwrap().into_values().next().unwrap()
     }
 
     #[test]
     fn stubs_keep_the_signature_and_abort() {
-        let stub = stub_for("pub fn SSL_CTX_new(meth: *const SSL_METHOD) -> *mut SSL_CTX;");
-        assert!(stub.starts_with("#[unsafe(no_mangle)]\npub extern \"C\" fn SSL_CTX_new("));
+        let p = prototype_of("pub fn SSL_CTX_new(meth: *const SSL_METHOD) -> *mut SSL_CTX;");
+        let stub = render_stub("rustssl_private_SSL_CTX_new", "SSL_CTX_new", &p);
+        assert!(
+            stub.starts_with(
+                "#[unsafe(no_mangle)]\npub extern \"C\" fn rustssl_private_SSL_CTX_new("
+            )
+        );
         assert!(stub.contains("(_: * const SSL_METHOD) -> * mut SSL_CTX"));
         assert!(stub.contains("crate::stub::unimplemented(\"SSL_CTX_new\")"));
     }
 
     #[test]
     fn variadic_and_va_list_stubs() {
-        let printf = stub_for("pub fn BIO_printf(b: *mut BIO, f: *const c_char, ...) -> c_int;");
+        let p = prototype_of("pub fn BIO_printf(b: *mut BIO, f: *const c_char, ...) -> c_int;");
+        let printf = render_stub("BIO_printf", "BIO_printf", &p);
         assert!(printf.contains("pub unsafe extern \"C\" fn BIO_printf("));
         assert!(printf.contains(", _: ...)"));
-        let vprintf = stub_for("pub fn BIO_vprintf(b: *mut BIO, a: *mut __va_list_tag) -> c_int;");
-        assert!(vprintf.contains("_: core::ffi::VaList<'_>"));
-        assert!(vprintf.contains("pub extern \"C\" fn BIO_vprintf("));
+        let p = prototype_of("pub fn BIO_vprintf(b: *mut BIO, a: *mut __va_list_tag) -> c_int;");
+        assert_eq!(p.params[1], "core::ffi::VaList<'_>");
+        assert!(!render_stub("BIO_vprintf", "BIO_vprintf", &p).contains("unsafe extern"));
     }
 
     #[test]
-    fn void_functions_have_no_return_type() {
-        let stub = stub_for("pub fn X509_free(a: *mut X509);");
-        assert!(stub.contains("fn X509_free(_: * mut X509) {"));
+    fn forwarders_call_the_private_definition() {
+        let ssl = BTreeMap::from([
+            (
+                "SSL_free".to_owned(),
+                prototype_of("pub fn SSL_free(s: *mut SSL);"),
+            ),
+            (
+                "SSL_read".to_owned(),
+                prototype_of("pub fn SSL_read(s: *mut SSL, b: *mut c_void, n: c_int) -> c_int;"),
+            ),
+        ]);
+        let file = render_forwarders_file(&ssl).unwrap();
+        assert!(file.contains("    fn rustssl_private_SSL_free(_: * mut SSL);\n"));
+        assert!(file.contains("pub unsafe extern \"C\" fn SSL_read(a0: * mut SSL, a1: * mut c_void, a2: c_int) -> c_int {"));
+        assert!(file.contains("unsafe { rustssl_private_SSL_read(a0, a1, a2) }"));
+        let variadic = BTreeMap::from([(
+            "X".to_owned(),
+            prototype_of("pub fn X(f: *const c_char, ...);"),
+        )]);
+        assert!(render_forwarders_file(&variadic).is_err());
     }
 }

@@ -88,7 +88,7 @@ crates/
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
 libs/
   libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
-  libssl/             static archive, linked into libssl.so.3; defines the SSL_* exports, which forward into libcrypto
+  libssl/             static archive of generated forwarders, linked into libssl.so.3; no implementation of its own
 xtask/                codegen, version scripts, symbol coverage, ABI checks, reference-OpenSSL builds, test drivers
 tests/                c/ (C conformance), differential/, interop/, consumers/, cve/
 fuzz/                 cargo-fuzz targets
@@ -96,12 +96,14 @@ docs/                 plans, DEVIATIONS.md, DEPENDENCIES.md
 ```
 
 Key design decisions:
-- **One implementation, two ABI facades.** All state lives in libcrypto: objects, the
-  allocator, the global state, and the TLS code. libssl only exports the `SSL_*` symbols,
-  with the right symbol versions and two-level-namespace binding, and forwards to private
-  `RUSTSSL_PRIVATE`-versioned entry points in libcrypto. This keeps objects such as an
-  `X509*` shared safely between the libraries. For static linking, `libcrypto.a` carries
-  everything and `libssl.a` is minimal. Phase 0 must validate this on Linux and macOS.
+- **One implementation, two ABI facades** ([ADR 0001](docs/adr/0001-library-layout.md)).
+  All code and state live in libcrypto: objects, the allocator, the global state, and the
+  TLS code, which libcrypto exports to libssl only, as `rustssl_private_<function>` in its
+  `RUSTSSL_PRIVATE` version node. libssl exports exactly OpenSSL's libssl functions, each a
+  generated one-branch forwarder to its private twin, and contains no Rust runtime. This
+  keeps objects such as an `X509*` shared safely between the libraries. For static linking,
+  `libcrypto.a` carries everything and `libssl.a` holds only the forwarders. Validated on
+  macOS, glibc, and musl.
 - **Cargo builds each facade as a static archive; `cargo xtask dist` links the shared
   libraries** from them with the C compiler. rustc gives every cdylib its own anonymous
   version script, which GNU ld refuses to combine with OpenSSL's named version nodes, so
@@ -229,8 +231,10 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   compiled against the official headers). Then implement the safe core, then the `capi`
   exports, then update the coverage status.
 - **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
-  `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. It counts
-  as **implemented** only once it has a conformance test.
+  `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. A libssl
+  function is written as `rustssl_private_<name>`; never implement anything in
+  `libs/libssl`, whose forwarders are generated. It counts as **implemented** only once it
+  has a conformance test.
 - Commit one API family or step at a time, and keep the diffs reviewable.
 - When OpenSSL's behavior is unclear, run it against the reference build
   (`target/ref/`). Behavior matters more than intent.

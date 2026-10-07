@@ -170,7 +170,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - **Differences from OpenSSL's libraries:** Rust's std adds `libiconv` (macOS) and
     `ld-linux` (Linux) dependencies. `libssl.a` carries its own copy of std, so static
     linking of both archives is item 4 of 0.6.
-- [ ] **0.6 Architecture spike: "one implementation, two facades".** Prove on Linux
+- [x] **0.6 Architecture spike: "one implementation, two facades".** Prove on Linux
   (glibc and musl) and macOS that:
   1. libssl's `SSL_*` exports forward into libcrypto's `RUSTSSL_PRIVATE` entry points.
   2. A binary **linked against real OpenSSL** resolves every versioned symbol against our libs.
@@ -179,10 +179,27 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   5. Forwarding overhead is negligible.
 
   OpenSSL 3.5 exports no data symbols (the `.num` files list only functions), so there's
-  nothing to test there. Items 2 and 3 already hold for the stub libraries (0.5). Inputs
-  from 0.4 and 0.5: libssl's stubs live in `libs/libssl` and must become forwarders, and the
-  private node's symbol names (`rustssl_private_*`) are a placeholder for this step to
-  settle. Write the outcome up as an ADR in `docs/adr/0001-library-layout.md`.
+  nothing to test there.
+
+  *Done:* see [ADR 0001](adr/0001-library-layout.md) for the decision and evidence.
+  - **Design.** libssl's exports are generated one-branch forwarders to libcrypto's
+    `rustssl_private_<name>`, which hold the stubs (and later the implementations).
+    `dist` builds libssl from the crate's forwarder objects alone and verifies they
+    reference nothing else, so libssl carries no Rust runtime: `libssl.a` shrank from
+    19 MB to 95 KB.
+  - **Proof, on macOS arm64, glibc aarch64/x86_64, and musl aarch64:**
+    - **Real-OpenSSL binaries:** programs linked against Homebrew 3.6.5, Debian 3.5.7, and
+      Alpine's OpenSSL, referencing every function they share with us (6,476 / 6,459 /
+      6,402), load on our libraries with all symbols bound at launch (items 2 and 3).
+    - **Static linking:** `libssl.a` + `libcrypto.a` link a program that references all
+      6,476 functions (item 4).
+    - **Overhead:** forwarding costs about 0.2 ns per call (item 5).
+  - **Open decision (before Phase 1).** Debian and Homebrew build with
+    `enable-ec_nistp_64_gcc_128` and export `EC_GFp_nistp{224,256,521}_method`, which
+    OpenSSL's default build, and so ours, doesn't. Distribution binaries calling them won't
+    load on rustssl. The proposal is to vendor with that option on 64-bit targets.
+    Everything else distributions differ in, we export as a superset (Debian drops
+    IDEA/MDC2; Alpine also drops GF2m, compression, and SEED).
 - [ ] **0.7 FFI primitives** in `rustssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
     value);
