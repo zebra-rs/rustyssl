@@ -356,7 +356,8 @@ Linux x86_64:
 - fmt, clippy, and the Rust tests;
 - L4 dual runs (`test-c`) and L5 with 1,000 random sessions;
 - Miri, `cargo deny`, and `cargo vet`;
-- a codegen job that fails if regenerating from `abi/` changes any committed file.
+- a codegen job that fails if regenerating from `abi/` or `cargo xtask coverage` changes any
+  committed file, or if an export is defined without a `tests/c` program that calls it.
 
 The weekly cron and manual runs add Linux aarch64, macOS arm64, and 5 minutes of fuzzing
 per target. Those wait for a weekly run because the repository is private, so macOS
