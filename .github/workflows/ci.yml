@@ -36,9 +36,11 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install the toolchain from rust-toolchain.toml
         run: rustup show
-      - name: Install GnuPG (verifies the reference OpenSSL download)
+      - name: Install GnuPG (verifies the reference OpenSSL download) and pkg-config
         if: runner.os == 'macOS'
-        run: command -v gpgv || brew install gnupg
+        run: |
+          command -v gpgv || brew install gnupg
+          command -v pkg-config || brew install pkgconf
       - uses: Swatinem/rust-cache@v2
       # Declared after rust-cache, so it saves target/ref before rust-cache cleans target/.
       - name: Cache the reference OpenSSL build
@@ -53,6 +55,8 @@ jobs:
         run: cargo xtask test-c
       - name: Differential tests (reference vs rustssl)
         run: cargo xtask test-differential --random 1000
+      - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking)
+        run: cargo xtask abi-check
 
   miri:
     runs-on: ubuntu-24.04

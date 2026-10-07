@@ -5,7 +5,7 @@
 //! For each distribution in `SOURCES`, it reads the package index, picks the amd64 packages
 //! that depend on OpenSSL's libraries, downloads each one over HTTPS, and checks it against the
 //! index's SHA-256. Then it reads which functions every ELF file in the package imports from
-//! `libssl.so.3` and `libcrypto.so.3` (`elf.rs`). Packages are untrusted: they're parsed in
+//! `libssl.so.3` and `libcrypto.so.3` (`crate::elf`). Packages are untrusted: they're parsed in
 //! memory and never unpacked to disk or run (`archive.rs`). The index itself is trusted only
 //! as far as HTTPS goes; its signature isn't checked, since the output is statistics.
 //!
@@ -17,7 +17,6 @@
 //! Needs `curl`, `xz`, and `zstd`.
 
 mod archive;
-mod elf;
 mod index;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -30,9 +29,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::codegen::exports::{LIBRARIES, parse_version_script};
+use crate::elf::{self, Import};
 use crate::targets::{OPENSSL_SERIES, TARGETS};
 use crate::util::{Result, fresh_dir, run_output, sha256_file, target_dir, workspace_root};
-use elf::Import;
 use index::Package;
 
 const REPORT: &str = "docs/symbol-usage.md";
