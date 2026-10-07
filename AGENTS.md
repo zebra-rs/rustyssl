@@ -189,8 +189,8 @@ generator. Don't paste the number.
 ## Commands
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
-xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, `test-differential`, and
-`coverage`.
+xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `test-c`, `test-differential`,
+`coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -200,6 +200,8 @@ Tools each command needs:
 - **`codegen`:** `clang` and bindgen 0.73.2 exactly
   (`cargo install bindgen-cli --version 0.73.2 --locked`).
 - **`coverage`:** `clang`, a C compiler (`$CC`), and `nm`.
+- **`usage-scan`:** `curl`, `xz`, and `zstd`, plus about 5 GB of downloads for a full scan
+  (only the per-package results are kept, under `target/`).
 - **`dist`, `test-c`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
 - **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
@@ -228,6 +230,7 @@ cargo xtask dist                             # build lib{crypto,ssl}.so.3 with s
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
 cargo xtask abi-check                        # symbols+versions vs *.num, signatures vs headers, struct layouts
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
+cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
@@ -245,7 +248,8 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
 - **For each API family:** read the man pages and headers in `abi/`, then write the tests
   first (KAT, differential against the reference OpenSSL, and a C conformance test
   compiled against the official headers). Then implement the safe core, then the `capi`
-  exports, then update the coverage status.
+  exports, then update the coverage status. Within a phase, go in `docs/symbol-usage.md`
+  order: the functions the most distribution packages import come first.
 - **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
   `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. A libssl
   function is written as `rustssl_private_<name>`; never implement anything in
