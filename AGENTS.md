@@ -87,8 +87,8 @@ crates/
   rustssl-capi/       THE FFI LAYER: every extern "C" export, handle tables, BIO, callbacks,
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
 libs/
-  libcrypto/          cdylib + staticlib → libcrypto.so.3 / libcrypto.a; contains the WHOLE implementation
-  libssl/             thin cdylib → libssl.so.3; exports SSL_* symbols that forward into libcrypto
+  libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
+  libssl/             static archive, linked into libssl.so.3; defines the SSL_* exports, which forward into libcrypto
 xtask/                codegen, version scripts, symbol coverage, ABI checks, reference-OpenSSL builds, test drivers
 tests/                c/ (C conformance), differential/, interop/, consumers/, cve/
 fuzz/                 cargo-fuzz targets
@@ -102,6 +102,10 @@ Key design decisions:
   `RUSTSSL_PRIVATE`-versioned entry points in libcrypto. This keeps objects such as an
   `X509*` shared safely between the libraries. For static linking, `libcrypto.a` carries
   everything and `libssl.a` is minimal. Phase 0 must validate this on Linux and macOS.
+- **Cargo builds each facade as a static archive; `cargo xtask dist` links the shared
+  libraries** from them with the C compiler. rustc gives every cdylib its own anonymous
+  version script, which GNU ld refuses to combine with OpenSSL's named version nodes, so
+  `cargo build` alone never produces the shipped `.so`/`.dylib`.
 - **The core crates are safe, idiomatic Rust and sans-IO.** They know nothing about C
   pointers, BIOs, or callbacks. `rustssl-capi` adapts them to the C model.
 - **There are two kinds of C-visible objects.**
@@ -179,11 +183,11 @@ generator. Don't paste the number.
 
 ## Commands
 
-`cargo build`, `test`, `clippy`, `fmt`, `cargo xtask vendor`, and `cargo xtask codegen` work
+`cargo build`, `test`, `clippy`, `fmt`, and `cargo xtask vendor`, `codegen`, and `dist` work
 now. The other `cargo xtask` commands arrive during Phase 0 and fail with a message until
 then. Update this section when they change. `vendor` needs `curl`, `gpg`/`gpgv`, `tar`,
 `perl`, and `make`. `codegen` needs `clang` and bindgen 0.73.2 exactly
-(`cargo install bindgen-cli --version 0.73.2 --locked`).
+(`cargo install bindgen-cli --version 0.73.2 --locked`). `dist` needs a C compiler (`$CC`).
 
 `cargo xtask codegen` writes:
 

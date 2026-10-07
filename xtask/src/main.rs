@@ -8,6 +8,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod codegen;
+mod dist;
 mod targets;
 mod util;
 mod vendor;
@@ -42,6 +43,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("codegen") => report("codegen", codegen::run(&rest)),
+        Some("dist") => report("dist", dist::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {
             eprintln!(

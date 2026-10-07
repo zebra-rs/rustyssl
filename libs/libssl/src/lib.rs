@@ -1,5 +1,8 @@
-//! Builds `libssl.so.3`: a thin facade that exports the `SSL_*` symbols with OpenSSL's symbol
-//! versions and forwards each call to libcrypto's private `RUSTSSL_PRIVATE` entry points.
-//!
-//! It keeps no state of its own. The Phase 0.6 spike validates this layout, including whether
-//! a `libssl.a` is needed, before any forwarding code is written.
+//! The libssl facade, linked into `libssl.so.3` / `libssl.3.dylib` by `cargo xtask dist`. It
+//! defines every `SSL_*` export, with OpenSSL's symbol versions applied at link time, and keeps
+//! no state of its own: each export will forward to libcrypto's private `RUSTSSL_PRIVATE`
+//! entry points (step 0.6 of the plan). Until a function is implemented, its export is a
+//! generated stub that aborts.
+
+mod generated;
+mod stub;

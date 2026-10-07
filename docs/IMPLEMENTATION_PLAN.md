@@ -137,11 +137,39 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     OpenSSL's `obj_dat.h` exactly for all 1,487 slots, including `obj_dat.pl`'s quirks: the
     single-arc roots get no encoding, a bare alias (`ac_auditEntity`) is named `"NULL"`
     with no OID, and `NID_x` aliases are ignored.
-- [ ] **0.5 Library facades.** `libs/libcrypto` (`crate-type = ["cdylib", "staticlib"]`,
+- [x] **0.5 Library facades.** `libs/libcrypto` (`crate-type = ["cdylib", "staticlib"]`,
   lib name `crypto`) and `libs/libssl`. Their `build.rs` passes the soname or install_name,
   the version script, and on macOS the current and compatibility versions.
   `cargo xtask dist` lays out `target/dist/{lib,include,lib/pkgconfig}`, including
   `libcrypto.pc`, `libssl.pc`, and `openssl.pc`.
+
+  *Done, with a different mechanism from the one planned:*
+  - **No `build.rs`; dist links the shared libraries.** A cdylib can't carry OpenSSL's
+    version nodes. rustc gives every cdylib an anonymous version script, and GNU ld rejects
+    a second, named one: "anonymous version tag cannot be combined with other version
+    tags" (reproduced on Linux). So both facades are `staticlib` only, and
+    `cargo xtask dist` links `libcrypto.so.3`/`libssl.so.3` (macOS: `lib*.3.dylib`) from
+    the archives with `cc`, adding the system libraries rustc reports.
+    - **Linux:** whole archive, `--version-script`, soname, `--no-undefined-version`,
+      `--no-undefined`, GC, strip.
+    - **macOS:** `-force_load`, `-exported_symbols_list`, an absolute install name,
+      compatibility and current version 3.0.0 (as in OpenSSL's dylibs), dead-strip.
+  - **libssl defines its own exports.** Its 603 stubs moved from `rustssl-capi` into
+    `libs/libssl` (they become forwarders in 0.6), and libssl links against libcrypto
+    (`NEEDED libcrypto.so.3`), as OpenSSL's does.
+  - **dist also installs** the headers (with the host's `configuration.h`), the `.a`
+    archives, the dev symlinks, and pkg-config files modeled on OpenSSL's. These use
+    `${pcfiledir}` so the tree is relocatable, and report version 3.5.9.
+  - **Verified on macOS arm64 and on Linux aarch64 and x86_64 (Docker):**
+    - **Exports:** each library exports exactly its list (5,873 / 603). On Linux every
+      symbol carries exactly its version node from the map.
+    - **Builds:** a C program built through pkg-config runs and hits a stub.
+    - **Drop-in:** binaries built against **real OpenSSL** (Homebrew 3.6.5; Debian 3.5.7)
+      run on our libraries and reach our stubs, so versioned symbols and dyld
+      compatibility versions resolve.
+  - **Differences from OpenSSL's libraries:** Rust's std adds `libiconv` (macOS) and
+    `ld-linux` (Linux) dependencies. `libssl.a` carries its own copy of std, so static
+    linking of both archives is item 4 of 0.6.
 - [ ] **0.6 Architecture spike: "one implementation, two facades".** Prove on Linux
   (glibc and musl) and macOS that:
   1. libssl's `SSL_*` exports forward into libcrypto's `RUSTSSL_PRIVATE` entry points.
@@ -151,9 +179,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   5. Forwarding overhead is negligible.
 
   OpenSSL 3.5 exports no data symbols (the `.num` files list only functions), so there's
-  nothing to test there. Inputs from 0.4: `rustssl-capi` currently holds the stubs of both
-  libraries, so libcrypto exports all 6,476 functions until the export lists are linked in.
-  The private node's symbol names (`rustssl_private_*`) are a placeholder for this step to
+  nothing to test there. Items 2 and 3 already hold for the stub libraries (0.5). Inputs
+  from 0.4 and 0.5: libssl's stubs live in `libs/libssl` and must become forwarders, and the
+  private node's symbol names (`rustssl_private_*`) are a placeholder for this step to
   settle. Write the outcome up as an ADR in `docs/adr/0001-library-layout.md`.
 - [ ] **0.7 FFI primitives** in `rustssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
