@@ -556,8 +556,39 @@ Everything else depends on this phase.
     - `crypto_init_config_strict.c` (5, including another thread).
     - All are identical to the reference on macOS. Rust unit tests cover the
       rustssl-specific strings and the new deviations.
-- [ ] **1.3 Threads:** `CRYPTO_THREAD_*` locks, run-once, and thread-local storage;
+- [x] **1.3 Threads:** `CRYPTO_THREAD_*` locks, run-once, and thread-local storage;
   `CRYPTO_atomic_*`; `OSSL_set_max_threads` and the thread pool.
+
+  *Done:* 24 exports, now 74 of libcrypto's 5,876 (`threads.rs`).
+  - **pthread wrappers:** `crypto.h` defines `CRYPTO_ONCE`, `CRYPTO_THREAD_LOCAL`, and
+    `CRYPTO_THREAD_ID` as `pthread_once_t`, `pthread_key_t`, and `pthread_t`, which live in
+    the application's storage (`CRYPTO_ONCE_STATIC_INIT` is `PTHREAD_ONCE_INIT`). So
+    run-once, thread-local storage (cleanup at thread exit included), and thread IDs are
+    exact wrappers around the pthread calls OpenSSL makes.
+  - **Locks:** a `CRYPTO_RWLOCK` is a `pthread_rwlock_t` from the C allocator, as
+    OpenSSL's is, so readers share it and an installed allocator sees the allocation. The
+    hooks test now counts it.
+  - **Atomics:** they're lock-free on every supported target, so they ignore the lock
+    (it may be null), with OpenSSL's memory orders (acquire-release, acquire for loads,
+    release for stores) and wrapping arithmetic. Only a misaligned value falls back to
+    the lock, as OpenSSL's does when `__atomic_is_lock_free` says no.
+  - **Thread pool:**
+    - `OSSL_get_thread_support_flags` reports both flags, as the default build does.
+    - `OSSL_set_max_threads`/`OSSL_get_max_threads` keep the default context's limit
+      until library contexts exist (3.1 moves it into them). They return 0 for any other
+      context, none of which can exist yet.
+    - Argon2 uses the limit (3.6).
+  - **Thread stop:** `OPENSSL_thread_stop` frees the thread's error queue, and
+    `OPENSSL_cleanup` calls it, as OpenSSL's does. `OPENSSL_thread_stop_ex(ctx)` has no
+    per-context state to free until the random generators (3.7).
+  - **Deviation:** null pointers fail instead of crashing (`DEVIATIONS.md`).
+  - **Tests:** `tests/c/crypto_threads.c` (27 checks) gives the same output as the
+    reference on macOS. It covers:
+    - 8 threads × 20,000 increments under a write lock, and with `CRYPTO_atomic_add`/`_add64`
+      and no lock;
+    - run-once across threads;
+    - per-thread values and their exit cleanup;
+    - thread IDs, and the pool setting.
 - [ ] **1.4 Error queue (all of `ERR_*`):**
   - a thread-local queue with marks
   - `ERR_raise`, `ERR_raise_data`, `ERR_set_debug`, `ERR_set_error` (variadic)
@@ -657,7 +688,8 @@ have run for at least 24 CPU-hours with no findings.
 ## Phase 3: Provider core, EVP symmetric, RAND → M1
 
 - [ ] **3.1 Library contexts, params, and providers:**
-  - `OSSL_LIB_CTX` (default and child contexts)
+  - `OSSL_LIB_CTX` (default and child contexts); move `OSSL_set_max_threads`'s limit, kept
+    for the default context since 1.3, into each context
   - `OSSL_PARAM`: all types, the `*_ptr` semantics, the modified flags, and `OSSL_PARAM_BLD`
   - `OSSL_PROVIDER`: load, try_load, unload, available, do_all, get_params, self_test
   - the property-query parser and matcher
@@ -691,7 +723,8 @@ have run for at least 24 CPU-hours with no findings.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
   KBKDF, TLS1-PRF, SSHKDF, PKCS12KDF, KRB5KDF, Argon2i/d/id, HMAC-DRBG-KDF;
   `PKCS5_PBKDF2_HMAC*`, `EVP_PBE_scrypt`, `EVP_BytesToKey`.
-- [ ] **3.7 RAND and DRBG:**
+- [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
+  generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.)
   - `EVP_RAND`: CTR-, HASH-, and HMAC-DRBG, SEED-SRC, TEST-RAND
   - the primary/public/private DRBG hierarchy, per thread, with reseed policy and fork safety
   - `RAND_bytes(_ex)`, `RAND_priv_bytes(_ex)`, `RAND_seed`, `RAND_add`, `RAND_status`,
