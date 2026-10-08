@@ -21570,3 +21570,18 @@ pub const TLS_MD_KEY_EXPANSION_CONST: &core::ffi::CStr = c"key expansion";
 pub const TLS_MD_MASTER_SECRET_CONST: &core::ffi::CStr = c"master secret";
 pub const TLS_MD_SERVER_FINISH_CONST: &core::ffi::CStr = c"server finished";
 pub const TLS_MD_SERVER_WRITE_KEY_CONST: &core::ffi::CStr = c"server write key";
+
+/// What OpenSSL's build compiles in for this target (`-DOPENSSLDIR=...` and the like),
+/// from `config/<target>/build.toml`.
+pub mod build {
+    /// The `Configure` target (`PLATFORM`).
+    pub const PLATFORM: &core::ffi::CStr = c"darwin64-arm64";
+    /// The default configuration and certificate directory (`OPENSSLDIR`).
+    pub const OPENSSLDIR: &core::ffi::CStr = c"/usr/local/ssl";
+    /// The default engines directory (`ENGINESDIR`).
+    pub const ENGINESDIR: &core::ffi::CStr = c"/usr/local/lib/engines-3";
+    /// The default provider modules directory (`MODULESDIR`).
+    pub const MODULESDIR: &core::ffi::CStr = c"/usr/local/lib/ossl-modules";
+    /// The file extension of loadable modules (`DSO_EXTENSION`).
+    pub const DSO_EXTENSION: &core::ffi::CStr = c".dylib";
+}

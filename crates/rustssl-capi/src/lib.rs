@@ -18,6 +18,8 @@ mod err;
 mod ffi;
 mod generated;
 mod handle;
+mod init;
 mod mem;
 mod secure;
 mod stub;
+mod version;

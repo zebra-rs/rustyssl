@@ -206,6 +206,11 @@ Tools each command needs:
   Alpine also `llvm-libunwind-dev`.
 - **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
   (from the Xcode command-line tools).
+
+Building for a distribution: the directories rustssl reports and reads from default to
+OpenSSL's default build for the target (`OPENSSLDIR` `/usr/local/ssl` and so on, from
+`abi/openssl-3.5/config/<target>/build.toml`). Override them at build time with the
+environment variables `RUSTSSL_OPENSSLDIR`, `RUSTSSL_ENGINESDIR`, and `RUSTSSL_MODULESDIR`.
 - **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
   cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
   cargo-vet formats `supply-chain/` differently, and CI then fails.

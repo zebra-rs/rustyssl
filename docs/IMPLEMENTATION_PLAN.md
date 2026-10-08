@@ -490,7 +490,7 @@ Everything else depends on this phase.
   - **Deviations:** five, all where OpenSSL corrupts memory, crashes, or recurses forever.
     They're the first entries in the new `docs/DEVIATIONS.md`, each with a test (two as
     single-process integration tests).
-- [ ] **1.2 Init, version, info:**
+- [x] **1.2 Init, version, info:**
   - `OPENSSL_init_crypto`, with every `OPENSSL_INIT_*` flag
   - `OPENSSL_cleanup`, `OPENSSL_atexit`
   - `OpenSSL_version*`, `OPENSSL_version_{major,minor,patch,pre_release,build_metadata}`,
@@ -499,6 +499,63 @@ Everything else depends on this phase.
 
   Decide the version-string policy: the numbers report the targeted 3.5.x and the text names
   rustssl. Record it in `DEVIATIONS.md` if it differs from upstream.
+
+  *Done:* 23 exports, now 50 of libcrypto's 5,876.
+  - **Version policy** (`version.rs`; `DEVIATIONS.md` explains why):
+    - The numbers (`OpenSSL_version_num`, `OPENSSL_version_major`/`_minor`/`_patch`,
+      `OPENSSL_VERSION_STRING`) and the release date are the vendored 3.5.9's.
+    - rustssl names itself in the build metadata, which OpenSSL's man page reserves "for
+      other parties, such as `+fips`": `OpenSSL 3.5.9+rustssl.0.1.0 29 Sep 2026`.
+  - **Build information:**
+    - `cargo xtask vendor` now records each target's `PLATFORM`, `OPENSSLDIR`,
+      `ENGINESDIR`, `MODULESDIR`, and `DSO_EXTENSION` from OpenSSL's Makefile in
+      `config/<target>/build.toml`, and codegen turns them into `rustssl_abi::build`.
+      x86_64 Linux gets `lib64`, as upstream's default build does.
+    - Packagers override the directories with `RUSTSSL_OPENSSLDIR`/`_ENGINESDIR`/
+      `_MODULESDIR` at build time; that's for 12.3.
+    - `CPUINFO` is `N/A`, since rustssl has no `OPENSSL_ia32cap`-steered assembly. The
+      compiler and build date say rustc and "reproducible build".
+  - **Initialization** (`init.rs`), following `crypto/init.c`:
+    - `OPENSSL_init_crypto(0, NULL)` does nothing.
+    - Each subsystem is set up once, and between a flag and its `NO_` twin, the first one
+      asked for wins.
+    - `atexit(OPENSSL_cleanup)` is registered unless `OPENSSL_INIT_NO_ATEXIT` comes first.
+      The library pins itself, and each handler's library, with
+      `dlopen(RTLD_NOLOAD | RTLD_NODELETE)`, so exit never jumps into unmapped code.
+    - `OPENSSL_cleanup` runs the `OPENSSL_atexit` handlers newest first, without holding a
+      lock. After it, init fails with `ERR_R_INIT_FAIL`.
+    - The settings object is the first real handle type.
+    - `OPENSSL_fork_*`, `OPENSSL_init`, and `OPENSSL_isservice` are no-ops, as in
+      OpenSSL 3.
+    - `OPENSSL_issetugid` follows OpenSSL per platform: `getauxval(AT_SECURE)` on glibc,
+      ID comparison elsewhere.
+    - `OPENSSL_die` prints OpenSSL's exact line and aborts.
+  - **Configuration:** `OPENSSL_INIT_LOAD_CONFIG` finds the file as OpenSSL does (the
+    settings' file, else `$OPENSSL_CONF` unless set-user-ID, else
+    `<OPENSSLDIR>/openssl.cnf`).
+    - A missing file gives OpenSSL's result for the flags.
+    - An existing file aborts until 6.1.
+    - The dual-run test found an OpenSSL quirk, now reproduced. A thread's first load
+      leaves a never-cleared "loading" mark (`in_init_config_local`). So later loads on that
+      thread succeed even after a failed one, while other threads and
+      `OPENSSL_INIT_NO_LOAD_CONFIG` get the failure.
+  - **Still to come, aborting until then (rule 10):**
+    - `OPENSSL_INIT_ADD_ALL_CIPHERS`/`_DIGESTS` (the name tables, 3.3 and 3.4);
+    - `OPENSSL_INIT_ASYNC` (6.11);
+    - `OPENSSL_INIT_ENGINE_*` (9.3);
+    - loading a configuration file (3.12 and 6.1).
+
+    `OPENSSL_INIT_BASE_ONLY` lives in an internal header, so applications can't name it,
+    and it isn't supported. `OPENSSL_thread_stop` waits for 1.3, and ERR's per-thread state
+    at cleanup for 1.4.
+  - **Tests:**
+    - `tests/c/crypto_version.c` (25 checks): version and info relationships that hold for
+      every build, and `OPENSSL_die` in a forked child.
+    - `crypto_init.c` (16): flag precedence, handler order, and init after cleanup.
+    - `crypto_init_config.c` (3, with the exit handler run by `atexit`).
+    - `crypto_init_config_strict.c` (5, including another thread).
+    - All are identical to the reference on macOS. Rust unit tests cover the
+      rustssl-specific strings and the new deviations.
 - [ ] **1.3 Threads:** `CRYPTO_THREAD_*` locks, run-once, and thread-local storage;
   `CRYPTO_atomic_*`; `OSSL_set_max_threads` and the thread pool.
 - [ ] **1.4 Error queue (all of `ERR_*`):**
@@ -619,12 +676,16 @@ have run for at least 24 CPU-hours with no findings.
     RIPEMD-160, NULL
   - legacy provider: MD4, MDC2, Whirlpool
   - the full `EVP_MD_CTX` API, `EVP_Digest`, `EVP_Q_digest`
+  - the digest name table behind `EVP_get_digestbyname`, which `OPENSSL_INIT_ADD_ALL_DIGESTS`
+    fills (it aborts until then; see 1.2)
 - [ ] **3.4 EVP_CIPHER:**
   - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
     and the CBC-HMAC composites
   - ARIA, Camellia, ChaCha20, ChaCha20-Poly1305, SM4, 3DES (all modes and wrap), NULL
   - legacy provider: DES, BF, CAST5, IDEA, RC2, RC4 (including RC4-HMAC-MD5), SEED
   - the full `EVP_CIPHER_CTX` API, including padding, AEAD ctrls, and the TLS AAD and IV ctrls
+  - the cipher name table behind `EVP_get_cipherbyname`, which `OPENSSL_INIT_ADD_ALL_CIPHERS`
+    fills (it aborts until then; see 1.2)
 - [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
   the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,

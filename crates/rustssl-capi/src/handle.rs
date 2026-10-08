@@ -23,10 +23,6 @@ struct Tagged<T> {
 }
 
 /// A tag derived from the C type's name (FNV-1a), unique per type in practice.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "first used by the step 1 exports")
-)]
 pub(crate) const fn tag(name: &str) -> u64 {
     let mut rest = name.as_bytes();
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -43,10 +39,6 @@ pub(crate) const fn tag(name: &str) -> u64 {
 ///
 /// # Safety
 /// `TAG` must differ from every other implementation's.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "first used by the step 1 exports")
-)]
 pub(crate) unsafe trait Handle: Sized {
     type Object: Send + Sync + 'static;
     const TAG: u64;
@@ -85,6 +77,10 @@ pub(crate) unsafe trait Handle: Sized {
     ///
     /// # Safety
     /// As for [`Handle::get`].
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "first used by a `*_up_ref` export")
+    )]
     unsafe fn up_ref(handle: *const Self) -> bool {
         // SAFETY: the caller's guarantee is the one `get` needs.
         if unsafe { Self::get(handle) }.is_none() {
@@ -112,10 +108,6 @@ pub(crate) unsafe trait Handle: Sized {
 }
 
 /// Implements [`Handle`] for an opaque C type: `handle_type!(rustssl_abi::X509 => X509Object);`
-#[cfg_attr(
-    not(test),
-    expect(unused_macros, reason = "first used by the step 1 exports")
-)]
 macro_rules! handle_type {
     ($c:ty => $object:ty) => {
         // SAFETY: the tag comes from the C type's name, and each C type has one implementation.
@@ -125,10 +117,6 @@ macro_rules! handle_type {
         }
     };
 }
-#[cfg_attr(
-    not(test),
-    expect(unused_imports, reason = "first used by the step 1 exports")
-)]
 pub(crate) use handle_type;
 
 #[cfg(test)]
