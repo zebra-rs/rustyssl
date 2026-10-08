@@ -644,10 +644,9 @@ Everything else depends on this phase.
       OpenSSL does.
   - **Saving:** `OSSL_ERR_STATE_new/save/save_to_mark/restore/free` follow OpenSSL's moves
     and copies.
-  - **Not yet (step 1.6):** `ERR_set_error`/`ERR_vset_error` with a format (`ERR_raise_data`
-    with text) need the printf engine and abort until then. A null format works, which is
-    what `ERR_raise` uses. `ERR_print_errors` and `ERR_add_error_mem_bio` take a BIO and stay
-    stubs.
+  - **Later (step 1.6):** `ERR_set_error`/`ERR_vset_error` with a format (`ERR_raise_data`
+    with text) needed the printf engine and aborted until step 1.6b; `ERR_print_errors` and
+    `ERR_add_error_mem_bio` needed BIOs (step 1.6a).
   - **Deviations (`DEVIATIONS.md`):**
     - `ERR_add_error_txt` with a piece too long for one error: OpenSSL loops forever.
     - Restoring the thread's own state into itself: OpenSSL loops forever.
@@ -779,12 +778,49 @@ Everything else depends on this phase.
         identical on macOS and 3,000 on Linux;
       - a model-based `bio_mem` fuzz target (4 million runs clean). It caught a mistake in
         its own model: `BIO_write` of 0 bytes doesn't reach the BIO.
-  - [ ] **1.6b printf and formatting:**
-    - `BIO_printf`, `BIO_snprintf`, `BIO_vprintf`, `BIO_vsnprintf`: C-printf-compatible,
-      byte-exact with the reference
-    - `ERR_set_error`/`ERR_vset_error` with a format, through `err::raise_with_bytes` (they
-      abort until then)
+  - [x] **1.6b printf and formatting:**
+    - `BIO_printf`, `BIO_snprintf`, `BIO_vprintf`, `BIO_vsnprintf`: byte-exact with the
+      reference
+    - `ERR_set_error`/`ERR_vset_error` with a format (they aborted until now)
     - `BIO_dump*`, `BIO_hex_string`, `BIO_debug_callback(_ex)`
+
+    *Done:* 13 exports, now 332 of libcrypto's 5,876 (`bio/print.rs`, `bio/dump.rs`,
+    `bio/debug.rs`).
+    - **OpenSSL's printf is its own,** not the C library's, so `bio/print.rs` ports its
+      behavior rather than calling `vsnprintf`. The differences from C that applications can
+      see are kept:
+      - negative `*` widths and precisions are ignored;
+      - `0` pads even with `-` or a precision;
+      - `%f`/`%e`/`%g` print at most 9 decimals, round half up on the scaled fraction, fail at
+        2^64, print `?` for the sign of infinities and NaNs, leave 10.0 as the mantissa of
+        `%e`, and drop the leading digit of a 20-digit integer part;
+      - `%hhd` prints `d`; `%w` skips a character; `%L` reads a `double`, as OpenSSL is built
+        without `long double`;
+      - `BIO_snprintf` returns -1 on truncation and stops reading arguments once the buffer is
+        full; `BIO_printf` fails past about 2 GiB of output.
+      The arithmetic wraps where C's does, and `f64` is the `double` OpenSSL computes in, so
+      the digits match bit for bit.
+    - **One formatter, two kinds of arguments:** a C `va_list` (`VaList`, through the
+      C-variadic definitions of Rust 1.99, with no C shim), or a slice of `Arg`s from Rust.
+      The dump and debug functions use the latter, so their output, truncation, and sequence
+      of `BIO_write` calls are OpenSSL's by construction.
+    - **The error queue** formats `ERR_set_error`'s data into the reused, grown, and shrunk
+      buffer as `ERR_vset_error` does; output that doesn't fit leaves the data empty.
+    - **Deviations (`DEVIATIONS.md`):** null formats and `%n` targets, a final `%w`, and null
+      arguments to the dump, hex, and debug functions.
+    - **Tests:** identical output to the reference on macOS and Linux aarch64:
+      - `tests/c/bio_print.c` (45 checks, the expected strings taken from the reference) and
+        `bio_dump.c` (25, including the debug callback's traces for memory and fd BIOs and its
+        255-byte cut);
+      - differential: `printf` and `bioprintf` probe commands with typed arguments (dispatched
+        by type signature, so every call is a real, well-typed C call on each ABI), a
+        `printf.txt` corpus, and random formats in which the generator follows OpenSSL's
+        parsing to know which arguments each conversion takes. 90,000 sessions identical on
+        macOS and 40,000 on Linux;
+      - Miri over the formatter's unit tests, including C-variadic calls, for macOS and Linux
+        x86_64;
+      - a `bio_printf` fuzz target (6 million runs clean) checking that `BIO_snprintf` stays
+        in its buffer and agrees with `BIO_printf`.
   - [ ] **1.6c Filters and pairs:**
     - buffer, linebuffer, readbuffer, prefix, base64, nbio_test
     - the BIO pair (`BIO_s_bio`, `BIO_new_bio_pair`, `BIO_nread`/`nwrite`), dgram_pair, and
