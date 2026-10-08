@@ -5,6 +5,9 @@
 //! built from. The build uses the same verified release tarball and the same `Configure`
 //! options as the vendored ABI, plus debug info (`-g`). A finished build records its inputs
 //! and is reused until they change.
+//!
+//! The verified source is kept, unbuilt, in `target/ref/openssl-<version>/src/`: OpenSSL's C is
+//! the behavioral spec where the man pages are silent (AGENTS.md).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -55,13 +58,19 @@ pub fn ensure(root: &Path, version: &str) -> Result<PathBuf> {
         target.configure,
         options.join(" ")
     );
-    if fs::read_to_string(prefix.join(STAMP)).is_ok_and(|built| built == inputs) {
-        return Ok(prefix);
-    }
-
     let work = target_dir(root)
         .join("xtask/ref")
         .join(format!("openssl-{version}"));
+    if fs::read_to_string(prefix.join(STAMP)).is_ok_and(|built| built == inputs) {
+        if !prefix.join("src").exists() {
+            fresh_dir(&work)?;
+            let release = fetch_verified(root, version, &work)?;
+            keep_source(&release.tarball, version, &prefix, &work)?;
+            fs::remove_dir_all(&work)?;
+        }
+        return Ok(prefix);
+    }
+
     fresh_dir(&work)?;
     let release = fetch_verified(root, version, &work)?;
     let log = work.join("build.log");
@@ -101,7 +110,23 @@ pub fn ensure(root: &Path, version: &str) -> Result<PathBuf> {
             .env("PATH", &path);
         run_logged(&mut make, &log)?;
     }
+    keep_source(&release.tarball, version, &prefix, &work)?;
     fs::write(prefix.join(STAMP), inputs)?;
     fs::remove_dir_all(&work)?;
     Ok(prefix)
+}
+
+/// Unpacks the verified release tarball, unbuilt, into `<prefix>/src/`.
+fn keep_source(tarball: &Path, version: &str, prefix: &Path, work: &Path) -> Result {
+    let unpacked = work.join("pristine");
+    fresh_dir(&unpacked)?;
+    let mut tar = Command::new("tar");
+    tar.arg("-xzf").arg(tarball).arg("-C").arg(&unpacked);
+    run_logged(&mut tar, &work.join("source.log"))?;
+    let src = prefix.join("src");
+    if src.exists() {
+        fs::remove_dir_all(&src)?;
+    }
+    fs::rename(unpacked.join(format!("openssl-{version}")), &src)?;
+    Ok(())
 }

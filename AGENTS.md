@@ -269,7 +269,8 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   `fuzz/fuzz_targets/` (`buf_mem.rs` is the model-based example).
 - Commit one API family or step at a time, and keep the diffs reviewable.
 - When OpenSSL's behavior is unclear, run it against the reference build
-  (`target/ref/`). Behavior matters more than intent.
+  (`target/ref/`), whose verified source is in `target/ref/openssl-<version>/src/`. Behavior
+  matters more than intent, and it can differ by platform (measure macOS and Linux).
 - Mark progress in `docs/IMPLEMENTATION_PLAN.md`, and record each new deviation in
   `docs/DEVIATIONS.md`.
 - Edition 2024. Errors in core crates are typed (`thiserror`-style enums), and capi maps
