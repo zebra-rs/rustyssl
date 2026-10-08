@@ -25,3 +25,24 @@ path = "fuzz_targets/buf_mem.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "stack"
+path = "fuzz_targets/stack.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lhash"
+path = "fuzz_targets/lhash.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hex"
+path = "fuzz_targets/hex.rs"
+test = false
+doc = false
+bench = false
