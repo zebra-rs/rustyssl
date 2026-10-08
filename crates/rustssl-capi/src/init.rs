@@ -312,6 +312,8 @@ ffi_export! {
         if !BASE.load(Ordering::Acquire) || STOPPED.swap(true, Ordering::AcqRel) {
             return;
         }
+        // As OpenSSL's does: the last thread may never get its thread-exit cleanup.
+        crate::threads::stop_thread();
         // The handlers run without the lock held: they may call back into the library.
         let handlers = HANDLERS.lock().map(|mut h| core::mem::take(&mut *h)).unwrap_or_default();
         for handler in handlers.into_iter().rev() {

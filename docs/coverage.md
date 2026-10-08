@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 50 | 5826 | 0.9% |
+| libcrypto | 5876 | 74 | 5802 | 1.3% |
 | libssl | 603 | 0 | 603 | 0.0% |
-| **Total** | **6479** | **50** | **6429** | **0.8%** |
+| **Total** | **6479** | **74** | **6405** | **1.1%** |
 
 ## By header
 
@@ -41,7 +41,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/comp.h` | libcrypto | 17 | 0 | 0.0% |
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
-| `openssl/crypto.h` | libcrypto | 101 | 44 | 43.6% |
+| `openssl/crypto.h` | libcrypto | 101 | 65 | 64.4% |
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 0 | 0.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
@@ -88,7 +88,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/sslerr_legacy.h` | libssl | 1 | 0 | 0.0% |
 | `openssl/stack.h` | libcrypto | 25 | 0 | 0.0% |
 | `openssl/store.h` | libcrypto | 75 | 0 | 0.0% |
-| `openssl/thread.h` | libcrypto | 3 | 0 | 0.0% |
+| `openssl/thread.h` | libcrypto | 3 | 3 | 100.0% |
 | `openssl/tls1.h` | libssl | 13 | 0 | 0.0% |
 | `openssl/trace.h` | libcrypto | 10 | 0 | 0.0% |
 | `openssl/ts.h` | libcrypto | 184 | 0 | 0.0% |
@@ -110,7 +110,26 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BUF_MEM_new` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
 | `BUF_MEM_new_ex` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_secure_heap` |
 | `BUF_reverse` | libcrypto | `openssl/buffer.h` | `buf_mem` |
+| `CRYPTO_THREAD_cleanup_local` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_compare_id` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_get_current_id` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_get_local` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_init_local` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_lock_free` | libcrypto | `openssl/crypto.h` | `crypto_mem_hooks`, `crypto_threads` |
+| `CRYPTO_THREAD_lock_new` | libcrypto | `openssl/crypto.h` | `crypto_mem_hooks`, `crypto_threads` |
+| `CRYPTO_THREAD_read_lock` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_run_once` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_set_local` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_unlock` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_THREAD_write_lock` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_aligned_alloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_atomic_add` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_add64` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_and` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_load` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_load_int` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_or` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_atomic_store` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
@@ -147,10 +166,15 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
 | `OPENSSL_isservice` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_issetugid` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_thread_stop` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `OPENSSL_thread_stop_ex` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `OPENSSL_version_build_metadata` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_major` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_minor` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_patch` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_pre_release` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
+| `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
+| `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OpenSSL_version` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OpenSSL_version_num` | libcrypto | `openssl/crypto.h` | `crypto_version` |

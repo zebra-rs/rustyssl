@@ -22,4 +22,5 @@ mod init;
 mod mem;
 mod secure;
 mod stub;
+mod threads;
 mod version;

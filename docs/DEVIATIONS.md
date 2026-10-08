@@ -17,6 +17,7 @@ OpenSSL never depends on them.
 | An allocator from `CRYPTO_set_mem_functions` that calls `CRYPTO_malloc` | recurses until the stack overflows | the nested call takes the default allocator | `tests/reentrant_allocator.rs` |
 | `OPENSSL_atexit(NULL)` | registers it, then crashes calling it at `OPENSSL_cleanup` | returns 0 and registers nothing | `init::tests::a_null_exit_handler_is_refused` |
 | `OPENSSL_INIT_set_config_filename`/`_appname` on null settings | dereference null and crash | return 0 | `init::tests::null_settings_are_refused` |
+| `CRYPTO_THREAD_*` and `CRYPTO_atomic_*` with a null lock, key, once, or value pointer | pass it to pthreads or dereference it, and crash | return 0 (null for `CRYPTO_THREAD_get_local`) | `threads::tests::null_pointers_fail` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustssl.<version>`: `OpenSSL 3.5.9+rustssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustssl_in_the_build_metadata` |
 
 ## Notes

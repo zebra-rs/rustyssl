@@ -71,6 +71,7 @@ int main(void)
     unsigned char *p, *z;
     void *freeptr;
     BUF_MEM *b;
+    CRYPTO_RWLOCK *lock;
 
     check(CRYPTO_set_mem_functions(counting_malloc, counting_realloc, counting_free) == 1,
           "CRYPTO_set_mem_functions: installs the application's allocator");
@@ -112,6 +113,11 @@ int main(void)
     BUF_MEM_free(b);
     counts(5, 3, 7, "BUF_MEM_free frees the data and the buffer through the application");
 
+    lock = CRYPTO_THREAD_lock_new();
+    counts(6, 3, 7, "CRYPTO_THREAD_lock_new allocates through the application");
+    CRYPTO_THREAD_lock_free(lock);
+    counts(6, 3, 8, "CRYPTO_THREAD_lock_free frees through the application");
+
     check(CRYPTO_set_mem_functions(NULL, NULL, NULL) == 1,
           "CRYPTO_set_mem_functions: still allowed while the default allocator is unused");
     CRYPTO_get_mem_functions(&m, NULL, NULL);
@@ -123,7 +129,7 @@ int main(void)
           "CRYPTO_get_mem_functions: reports the defaults again");
     p = OPENSSL_malloc(8);
     OPENSSL_free(p);
-    counts(5, 3, 7, "the default allocator doesn't call the application's");
+    counts(6, 3, 8, "the default allocator doesn't call the application's");
     check(CRYPTO_set_mem_functions(counting_malloc, NULL, NULL) == 0,
           "CRYPTO_set_mem_functions: refused once the default allocator has allocated");
     printf("1..%d\n", number);
