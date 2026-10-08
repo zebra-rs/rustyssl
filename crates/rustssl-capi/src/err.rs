@@ -29,7 +29,8 @@ use std::panic::Location;
 
 use rustssl_abi::{
     ERR_FLAG_CLEAR, ERR_LIB_CRYPTO, ERR_LIB_MASK, ERR_LIB_NONE, ERR_LIB_OFFSET, ERR_LIB_SYS,
-    ERR_NUM_ERRORS, ERR_REASON_MASK, ERR_STATE, ERR_SYSTEM_FLAG, ERR_TXT_MALLOCED, ERR_TXT_STRING,
+    ERR_MAX_DATA_SIZE, ERR_NUM_ERRORS, ERR_REASON_MASK, ERR_STATE, ERR_SYSTEM_FLAG,
+    ERR_TXT_MALLOCED, ERR_TXT_STRING,
 };
 
 use crate::ffi::{ffi_export, guard};
@@ -879,6 +880,79 @@ ffi_export! {
             unsafe { set_debug(state, top, file, line, func) };
         }
     }
+}
+
+/// `ERR_vset_error` with the format already applied: sets the newest error's code, and its
+/// data to `text`, as OpenSSL does. The slot's old buffer is reused, grown to
+/// `ERR_MAX_DATA_SIZE`, written, and shrunk to fit. Text that doesn't fit leaves the data
+/// empty, as `BIO_vsnprintf` reports truncation as a failure.
+fn set_error_with_text(library: c_int, reason: c_int, text: &[u8]) {
+    let Some(state) = state() else {
+        return;
+    };
+    // SAFETY: this thread's state, for each access below; the slot's buffer is taken out, so
+    // nothing called meanwhile can free or change it.
+    let (top, _) = unsafe { ends(state) };
+    // SAFETY: as above.
+    let mut entry = unsafe { load(state, top) };
+    // Only allocated data can be reused; anything else isn't the queue's to resize.
+    let (mut buffer, mut size) = if entry.data_flags & ERR_TXT_MALLOCED != 0 {
+        (entry.data.cast::<u8>(), entry.data_size)
+    } else {
+        (ptr::null_mut(), 0)
+    };
+    entry.data = ptr::null_mut();
+    entry.data_flags = 0;
+    // SAFETY: as above.
+    unsafe { store(state, top, entry) };
+    let max = usize::try_from(ERR_MAX_DATA_SIZE).unwrap_or(1024);
+    if size < max {
+        // SAFETY: the buffer is null or the slot's allocated data, which this function owns.
+        let grown = unsafe { mem::resize(buffer.cast(), max) }.cast::<u8>();
+        if !grown.is_null() {
+            buffer = grown;
+            size = max;
+        }
+    }
+    let mut flags = 0;
+    if !buffer.is_null() {
+        let printed = if text.len() < size { text.len() } else { 0 };
+        // SAFETY: `printed < size`, inside the buffer, which `text` isn't part of.
+        unsafe { ptr::copy_nonoverlapping(text.as_ptr(), buffer, printed) };
+        // SAFETY: as above.
+        unsafe { buffer.wrapping_add(printed).write(0) };
+        // SAFETY: the buffer is from CRYPTO_malloc; a failed resize leaves it as it was.
+        let shrunk = unsafe { mem::resize(buffer.cast(), printed + 1) }.cast::<u8>();
+        if !shrunk.is_null() {
+            buffer = shrunk;
+            size = printed + 1;
+        }
+        flags = MALLOCED_STRING;
+    }
+    // SAFETY: this thread's state, as above.
+    unsafe { clear_data(state, top, false) };
+    // SAFETY: as above.
+    unsafe { set_code(state, top, library, reason) };
+    // SAFETY: as above; the queue takes over the buffer.
+    unsafe { set_data(state, top, buffer.cast(), size, flags) };
+}
+
+/// Raises an error with text as its data, as `ERR_raise_data(library, reason, format, ...)`
+/// does in OpenSSL once the format is applied, from the caller's Rust file and line on behalf
+/// of the exported C function `function`.
+#[track_caller]
+pub(crate) fn raise_with_text(library: c_int, reason: c_int, function: &str, text: &str) {
+    let caller = Location::caller();
+    let line = c_int::try_from(caller.line()).unwrap_or(c_int::MAX);
+    new();
+    if let Some(state) = state() {
+        // SAFETY: this thread's state.
+        let (top, _) = unsafe { ends(state) };
+        let (file, function) = (Some(caller.file().as_bytes()), Some(function.as_bytes()));
+        // SAFETY: as above.
+        unsafe { set_debug(state, top, file, line, function) };
+    }
+    set_error_with_text(library, reason, text.as_bytes());
 }
 
 /// `ERR_vset_error`, which `ERR_set_error` shares.

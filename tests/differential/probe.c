@@ -26,6 +26,23 @@
  *   save, savemark, restore    OSSL_ERR_STATE_save, _save_to_mark, _restore with one saved state
  *   state                      the thread's ERR_STATE, slot by slot (data as length and hash)
  *
+ * Commands for a stack of pointers into a pool of 64 ints (pool[i] = i * 7 % 10, so values
+ * repeat; elements print as pool indexes, so the order of equal values shows):
+ *   sknew <cmp>                OPENSSL_sk_new: 0 no comparator, 1 by value, 2 reversed
+ *   skcmp <cmp>                OPENSSL_sk_set_cmp_func
+ *   skpush <i>, skunshift <i>, skinsert <i> <loc>, skset <loc> <i>, skdelptr <i>
+ *   skdelete <loc>, skshift, skpop, skzero, sksort, skdup, skreserve <n>
+ *   skfind <value>, skfindex <value>, skfindall <value>   (with the comparisons made)
+ *   skdump                     the elements and the sorted flag
+ *
+ * Commands for a hash table of items keyed by number (pool indexes again):
+ *   lhnew <hash>               lh_ITEM_new: 0 the key itself, 1 a multiplicative hash
+ *   lhinsert <i>, lhdelete <i>, lhget <i>, lhdown <n>, lhdump (the doall order)
+ *
+ * Other helpers:
+ *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
+ *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
+ *
  *   # ...              comment, echoed
  */
 /* ERR_get_state is deprecated. */
@@ -34,8 +51,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <errno.h>
+
 #include <openssl/buffer.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/lhash.h>
+#include <openssl/stack.h>
 
 static BUF_MEM *buffer = NULL;
 
@@ -135,6 +157,243 @@ static char *make_text(const char *separator, size_t len, size_t every)
     return text;
 }
 
+/* The pool stacks and hash tables point into. */
+static int pool[64];
+static int comparisons;
+
+static int pool_index(const void *p)
+{
+    return p == NULL ? -1 : (int)((const int *)p - pool);
+}
+
+static int by_value(const void *a, const void *b)
+{
+    const int *x = *(const int *const *)a, *y = *(const int *const *)b;
+
+    comparisons++;
+    return *x < *y ? -1 : *x > *y;
+}
+
+static int by_value_reversed(const void *a, const void *b)
+{
+    return -by_value(a, b);
+}
+
+static OPENSSL_sk_compfunc comparator(int which)
+{
+    return which == 1 ? by_value : which == 2 ? by_value_reversed : NULL;
+}
+
+static void print_stack(const char *label, const OPENSSL_STACK *st)
+{
+    printf("%s num=%d sorted=%d:", label, OPENSSL_sk_num(st), OPENSSL_sk_is_sorted(st));
+    for (int i = 0; i < OPENSSL_sk_num(st); i++)
+        printf(" %d", pool_index(OPENSSL_sk_value(st, i)));
+    printf("\n");
+}
+
+/* Runs a stack command; returns 0 if `command` isn't one. */
+static int stack_command(const char *command, const char *line)
+{
+    static OPENSSL_STACK *st = NULL;
+    int a = 0, b = 0, n;
+
+    n = sscanf(line, "%*s %d %d", &a, &b);
+    if (a < 0 || a >= 64)
+        a = 0;
+    if (strcmp(command, "sknew") == 0) {
+        OPENSSL_sk_free(st);
+        st = OPENSSL_sk_new(comparator(a));
+        printf("sknew\n");
+        return 1;
+    }
+    if (strncmp(command, "sk", 2) != 0)
+        return 0;
+    if (st == NULL) {
+        printf("error no stack\n");
+    } else if (strcmp(command, "skcmp") == 0) {
+        OPENSSL_sk_compfunc old = OPENSSL_sk_set_cmp_func(st, comparator(a));
+        printf("skcmp old=%d sorted=%d\n", old == by_value ? 1 : old == by_value_reversed ? 2 : 0,
+               OPENSSL_sk_is_sorted(st));
+    } else if (strcmp(command, "skpush") == 0) {
+        printf("skpush %d\n", OPENSSL_sk_push(st, &pool[a]));
+    } else if (strcmp(command, "skunshift") == 0) {
+        printf("skunshift %d\n", OPENSSL_sk_unshift(st, &pool[a]));
+    } else if (strcmp(command, "skinsert") == 0) {
+        printf("skinsert %d\n", OPENSSL_sk_insert(st, &pool[a], b));
+    } else if (strcmp(command, "skset") == 0) {
+        sscanf(line, "%*s %d %d", &a, &b);
+        if (b < 0 || b >= 64)
+            b = 0;
+        printf("skset %d\n", pool_index(OPENSSL_sk_set(st, a, &pool[b])));
+        ERR_clear_error();
+    } else if (strcmp(command, "skdelptr") == 0) {
+        printf("skdelptr %d\n", pool_index(OPENSSL_sk_delete_ptr(st, &pool[a])));
+    } else if (strcmp(command, "skdelete") == 0) {
+        sscanf(line, "%*s %d", &a);
+        printf("skdelete %d\n", pool_index(OPENSSL_sk_delete(st, a)));
+    } else if (strcmp(command, "skshift") == 0) {
+        printf("skshift %d\n", pool_index(OPENSSL_sk_shift(st)));
+    } else if (strcmp(command, "skpop") == 0) {
+        printf("skpop %d\n", pool_index(OPENSSL_sk_pop(st)));
+    } else if (strcmp(command, "skzero") == 0) {
+        OPENSSL_sk_zero(st);
+        printf("skzero\n");
+    } else if (strcmp(command, "sksort") == 0) {
+        comparisons = 0;
+        OPENSSL_sk_sort(st);
+        print_stack("sksort", st);
+    } else if (strcmp(command, "skdup") == 0) {
+        OPENSSL_STACK *copy = OPENSSL_sk_dup(st);
+
+        print_stack("skdup", copy);
+        OPENSSL_sk_free(st);
+        st = copy;
+    } else if (strcmp(command, "skreserve") == 0) {
+        sscanf(line, "%*s %d", &a);
+        printf("skreserve %d\n", OPENSSL_sk_reserve(st, a));
+        ERR_clear_error();
+    } else if (strcmp(command, "skfind") == 0 || strcmp(command, "skfindex") == 0
+               || strcmp(command, "skfindall") == 0) {
+        int key, *k = &key, count = 5, at;
+
+        sscanf(line, "%*s %d", &key);
+        comparisons = 0;
+        if (strcmp(command, "skfind") == 0)
+            at = OPENSSL_sk_find(st, k);
+        else if (strcmp(command, "skfindex") == 0)
+            at = OPENSSL_sk_find_ex(st, k);
+        else
+            at = OPENSSL_sk_find_all(st, k, &count);
+        printf("%s %d count=%d comparisons=%d\n", command, at, count, comparisons);
+    } else if (strcmp(command, "skdump") == 0) {
+        print_stack("skdump", st);
+    } else {
+        printf("error unknown command %s\n", command);
+    }
+    (void)n;
+    return 1;
+}
+
+/* Hash table items: pool entries, keyed by their index. */
+typedef struct {
+    int key;
+} ITEM;
+
+DEFINE_LHASH_OF_EX(ITEM);
+
+static ITEM items[64];
+
+static unsigned long hash_key(const ITEM *item)
+{
+    return (unsigned long)item->key;
+}
+
+static unsigned long hash_mixed(const ITEM *item)
+{
+    return ((unsigned long)item->key * 2654435761UL) & 0xffffffffUL;
+}
+
+static int same_key(const ITEM *a, const ITEM *b)
+{
+    return a->key != b->key;
+}
+
+static void print_item(ITEM *item)
+{
+    printf(" %d", (int)(item - items));
+}
+
+/* Runs a hash table command; returns 0 if `command` isn't one. */
+static int lhash_command(const char *command, const char *line)
+{
+    static LHASH_OF(ITEM) *lh = NULL;
+    static ITEM copies[64];
+    int a = 0;
+
+    sscanf(line, "%*s %d", &a);
+    if (strcmp(command, "lhnew") == 0) {
+        lh_ITEM_free(lh);
+        for (int i = 0; i < 64; i++)
+            items[i].key = copies[i].key = i;
+        lh = lh_ITEM_new(a == 1 ? hash_mixed : hash_key, same_key);
+        printf("lhnew\n");
+        return 1;
+    }
+    if (strncmp(command, "lh", 2) != 0)
+        return 0;
+    if (a < 0 || a >= 64)
+        a = 0;
+    if (lh == NULL) {
+        printf("error no table\n");
+    } else if (strcmp(command, "lhinsert") == 0) {
+        ITEM *old = lh_ITEM_insert(lh, &items[a]);
+
+        printf("lhinsert %d items=%lu\n", old == NULL ? -1 : (int)(old - items),
+               lh_ITEM_num_items(lh));
+    } else if (strcmp(command, "lhdelete") == 0) {
+        ITEM *old = lh_ITEM_delete(lh, &copies[a]);
+
+        printf("lhdelete %d items=%lu\n", old == NULL ? -1 : (int)(old - items),
+               lh_ITEM_num_items(lh));
+    } else if (strcmp(command, "lhget") == 0) {
+        ITEM *found = lh_ITEM_retrieve(lh, &copies[a]);
+
+        printf("lhget %d\n", found == NULL ? -1 : (int)(found - items));
+    } else if (strcmp(command, "lhdown") == 0) {
+        sscanf(line, "%*s %d", &a);
+        lh_ITEM_set_down_load(lh, (unsigned long)a);
+        printf("lhdown %lu\n", lh_ITEM_get_down_load(lh));
+    } else if (strcmp(command, "lhdump") == 0) {
+        printf("lhdump");
+        lh_ITEM_doall(lh, print_item);
+        printf("\n");
+    } else {
+        printf("error unknown command %s\n", command);
+    }
+    return 1;
+}
+
+/* Runs a string helper command; returns 0 if `command` isn't one. */
+static int string_command(const char *command, const char *line)
+{
+    char text[200] = "";
+    int other = 0;
+
+    sscanf(line, "%*s %199s %d", text, &other);
+    if (strcmp(text, "-") == 0)
+        text[0] = '\0';
+    if (strcmp(command, "hexdecode") == 0) {
+        unsigned char buf[100];
+        size_t len = 0;
+        int ok = OPENSSL_hexstr2buf_ex(buf, sizeof(buf), &len, text, (char)other);
+
+        printf("hexdecode %d", ok);
+        if (ok) {
+            printf(" len=%zu ", len);
+            for (size_t i = 0; i < len; i++)
+                printf("%02x", buf[i]);
+        } else {
+            printf(" reason=%d", ERR_GET_REASON(ERR_get_error()));
+        }
+        printf("\n");
+        ERR_clear_error();
+    } else if (strcmp(command, "strtoul") == 0) {
+        unsigned long value = 0;
+        char *end = NULL;
+        int with, without, saved;
+
+        with = OPENSSL_strtoul(text, &end, other, &value);
+        saved = errno;
+        printf("strtoul %d %lu end=%d errno=%d", with, value, (int)(end - text), saved);
+        without = OPENSSL_strtoul(text, NULL, other, &value);
+        printf(" without=%d\n", without);
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 /* Runs an error-queue command; returns 0 if `command` isn't one. */
 static int err_command(const char *command, const char *line)
 {
@@ -230,6 +489,8 @@ static int err_command(const char *command, const char *line)
 
 int main(void)
 {
+    for (int i = 0; i < 64; i++)
+        pool[i] = i * 7 % 10;
     char line[1024], command[32], argument[1000];
 
     while (fgets(line, sizeof(line), stdin) != NULL) {
@@ -241,7 +502,8 @@ int main(void)
         argument[0] = '\0';
         if (sscanf(line, "%31s %999s", command, argument) < 1)
             continue;
-        if (err_command(command, line)) {
+        if (err_command(command, line) || stack_command(command, line)
+            || lhash_command(command, line) || string_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
