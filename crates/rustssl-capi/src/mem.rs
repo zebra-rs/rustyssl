@@ -689,6 +689,11 @@ mod tests {
             // SAFETY: `freeptr` is the block to free.
             unsafe { release(freeptr) };
         }
+        // On Linux the size goes to posix_memalign, which Miri can't fail gracefully: it stops
+        // with "resource exhaustion" instead of returning ENOMEM.
+        if cfg!(miri) && cfg!(target_os = "linux") {
+            return;
+        }
         let mut freeptr = ptr::null_mut();
         // SAFETY: as above; the size overflows when the alignment is added.
         let block = unsafe { aligned_alloc(usize::MAX - 8, 64, &mut freeptr, FILE.as_ptr(), 1) };
