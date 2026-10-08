@@ -1,0 +1,128 @@
+# Stacks: finding on unsorted and sorted stacks, equal values in qsort's order, and the
+# index find_ex returns when nothing matches.
+sknew 1
+skpush 0
+skpush 7
+skpush 3
+skpush 10
+skpush 17
+skpush 13
+skpush 20
+skpush 5
+skfind 1
+skfindall 1
+skfindex 1
+sksort
+skfind 1
+skfindall 1
+skfindex 4
+skfindex 2
+skfindex -1
+skfindex 11
+skinsert 9 2
+skdump
+skset 99 1
+skdelete -1
+sksort
+skcmp 2
+sksort
+skcmp 2
+skdup
+skreserve -1
+skreserve 1000
+sknew 0
+skpush 3
+skpush 3
+skfind 0
+skfindall 0
+skpop
+skshift
+skshift
+skdump
+# Hash tables: growth past the first split, replacement, and shrinking.
+lhnew 0
+lhinsert 1
+lhinsert 9
+lhinsert 17
+lhinsert 25
+lhdump
+lhinsert 9
+lhget 25
+lhget 26
+lhdelete 17
+lhdump
+lhnew 1
+lhinsert 0
+lhinsert 1
+lhinsert 2
+lhinsert 3
+lhinsert 4
+lhinsert 5
+lhinsert 6
+lhinsert 7
+lhinsert 8
+lhinsert 9
+lhinsert 10
+lhinsert 11
+lhinsert 12
+lhinsert 13
+lhinsert 14
+lhinsert 15
+lhinsert 16
+lhinsert 17
+lhinsert 18
+lhinsert 19
+lhinsert 20
+lhinsert 21
+lhinsert 22
+lhinsert 23
+lhinsert 24
+lhinsert 25
+lhinsert 26
+lhinsert 27
+lhinsert 28
+lhinsert 29
+lhinsert 30
+lhinsert 31
+lhinsert 32
+lhinsert 33
+lhinsert 34
+lhinsert 35
+lhinsert 36
+lhinsert 37
+lhinsert 38
+lhinsert 39
+lhdump
+lhdelete 0
+lhdelete 2
+lhdelete 4
+lhdelete 6
+lhdelete 8
+lhdelete 10
+lhdelete 12
+lhdelete 14
+lhdelete 16
+lhdelete 18
+lhdelete 20
+lhdelete 22
+lhdelete 24
+lhdelete 26
+lhdelete 28
+lhdelete 30
+lhdump
+# Hex and strtoul edge cases.
+hexdecode 0a:0B 58
+hexdecode 0a:0B 0
+hexdecode 0a0 0
+hexdecode zz 0
+hexdecode - 0
+hexdecode ::::ab:: 58
+strtoul 42 10
+strtoul 0x1f 0
+strtoul 99999999999999999999 10
+strtoul 12ab 10
+strtoul - 10
+strtoul -1 10
+strtoul +7 10
+strtoul z 36
+strtoul 5 1

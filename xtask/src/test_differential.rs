@@ -129,6 +129,11 @@ impl Random {
         self.next() % bound.max(1)
     }
 
+    /// A number in `low..low + span`.
+    fn offset(&mut self, low: i64, span: u64) -> i64 {
+        low.saturating_add(i64::try_from(self.below(span)).unwrap_or(0))
+    }
+
     /// One of `items`.
     fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
         let i = self.below(u64::try_from(items.len()).unwrap_or(1));
@@ -143,10 +148,12 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        if random.below(2) == 0 {
-            err_session(&mut random, &mut out)?;
-        } else {
-            buf_mem_session(&mut random, &mut out)?;
+        match random.below(5) {
+            0 => err_session(&mut random, &mut out)?,
+            1 => buf_mem_session(&mut random, &mut out)?,
+            2 => stack_session(&mut random, &mut out)?,
+            3 => lhash_session(&mut random, &mut out)?,
+            _ => string_session(&mut random, &mut out)?,
         }
     }
     Ok(out)
@@ -220,6 +227,93 @@ fn err_session(random: &mut Random, out: &mut String) -> Result {
     }
     writeln!(out, "state")?;
     Ok(())
+}
+
+/// A random stack session: elements pushed, inserted, removed, replaced, sorted, and found,
+/// with comparators changing along the way.
+fn stack_session(random: &mut Random, out: &mut String) -> Result {
+    writeln!(out, "sknew {}", random.below(3))?;
+    for _ in 0..1 + random.below(60) {
+        let element = random.below(64);
+        match random.below(24) {
+            0..=5 => writeln!(out, "skpush {element}")?,
+            6 => writeln!(out, "skunshift {element}")?,
+            7 | 8 => writeln!(out, "skinsert {element} {}", random.offset(-3, 20))?,
+            9 => writeln!(out, "skset {} {element}", random.offset(-2, 20))?,
+            10 => writeln!(out, "skdelptr {element}")?,
+            11 => writeln!(out, "skdelete {}", random.offset(-2, 20))?,
+            12 => writeln!(out, "{}", random.pick(&["skshift", "skpop"]))?,
+            13 => writeln!(out, "skcmp {}", random.below(3))?,
+            14 | 15 => writeln!(out, "sksort")?,
+            16..=19 => writeln!(
+                out,
+                "{} {}",
+                random.pick(&["skfind", "skfindex", "skfindall"]),
+                random.offset(-1, 12)
+            )?,
+            20 => writeln!(out, "skdup")?,
+            21 => writeln!(out, "skreserve {}", random.offset(-2, 10))?,
+            22 => writeln!(out, "skzero")?,
+            _ => writeln!(out, "skdump")?,
+        }
+    }
+    writeln!(out, "skdump")?;
+    Ok(())
+}
+
+/// A random hash table session: items inserted, replaced, deleted, and looked up while the
+/// table grows and shrinks, with its doall order printed along the way.
+fn lhash_session(random: &mut Random, out: &mut String) -> Result {
+    writeln!(out, "lhnew {}", random.below(2))?;
+    let keys = 1 + random.below(64);
+    for _ in 0..1 + random.below(150) {
+        let key = random.below(keys);
+        match random.below(20) {
+            0..=8 => writeln!(out, "lhinsert {key}")?,
+            9..=13 => writeln!(out, "lhdelete {key}")?,
+            14..=16 => writeln!(out, "lhget {key}")?,
+            17 => writeln!(out, "lhdown {}", random.pick(&["0", "128", "256", "512"]))?,
+            _ => writeln!(out, "lhdump")?,
+        }
+    }
+    writeln!(out, "lhdump")?;
+    Ok(())
+}
+
+/// A random session of hex decoding and `OPENSSL_strtoul`, on text mixing digits, letters,
+/// separators, signs, and spaces.
+fn string_session(random: &mut Random, out: &mut String) -> Result {
+    const HEX: &[u8] = b"0123456789abcdefABCDEF::--xg";
+    const NUMBER: &[u8] = b"0123456789abcdefxX+-";
+    for _ in 0..1 + random.below(20) {
+        if random.below(2) == 0 {
+            let text = random_text(random, HEX, 16);
+            let separator = random.pick(&["0", "58", "45", "120"]);
+            writeln!(out, "hexdecode {text} {separator}")?;
+        } else {
+            let text = random_text(random, NUMBER, 24);
+            let base = random.pick(&["0", "8", "10", "16", "36", "1", "99"]);
+            writeln!(out, "strtoul {text} {base}")?;
+        }
+    }
+    Ok(())
+}
+
+/// Up to `max` characters from `alphabet`, or `-` for none.
+fn random_text(random: &mut Random, alphabet: &[u8], max: u64) -> String {
+    let len = random.below(max + 1);
+    let text: String = (0..len)
+        .map(|_| {
+            let i = usize::try_from(random.below(u64::try_from(alphabet.len()).unwrap_or(1)))
+                .unwrap_or(0);
+            char::from(alphabet.get(i).copied().unwrap_or(b'0'))
+        })
+        .collect();
+    if text.is_empty() {
+        "-".to_owned()
+    } else {
+        text
+    }
 }
 
 /// A reason for `raise`: small codes, with the common and fatal flags, or anything.
