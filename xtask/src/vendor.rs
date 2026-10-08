@@ -52,6 +52,8 @@ const FILES: &[&str] = &[
     "crypto/objects/obj_mac.num",
     "crypto/objects/obj_xref.txt",
     "crypto/err/openssl.txt",
+    // The order in which OpenSSL loads libcrypto's error strings (`ossl_err_load_crypto_strings`).
+    "crypto/err/err_all.c",
     // Internal headers that declare functions libcrypto exports all the same (DSO_*,
     // conf_ssl_*, OPENSSL_DIR_*, ...). Codegen fails if an export has no prototype.
     "include/internal/asn1.h",
