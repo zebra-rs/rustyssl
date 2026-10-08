@@ -1,0 +1,41 @@
+# Memory BIOs: writes, reads, gets, seeks within the buffer, syncing before a write, the EOF
+# return, and resets of writable and read-only BIOs.
+bionew 0
+biowrite hello_world_
+bioputs more
+bioread 3
+bioctrl tell 0
+bioctrl seek 1
+bioctrl pending 0
+biogets 40
+biomem
+biowrite tail
+bioctrl tell 0
+bioread 100
+bioread 5
+biostate
+bioctrl eofret 0
+bioread 5
+biostate
+bioctrl reset 0
+biomem
+bionew 2
+bioline 6
+biogets 40
+bioctrl info 0
+bioctrl reset 0
+bioread 100
+bioread 4
+biostate
+biowrite x
+bionew 3
+biowrite through_
+bioread 3
+biogets 10
+bioread 4
+biostate
+bionew 1
+biowrite secret
+bioctrl seek 7
+bioctrl seek 6
+bioread 1

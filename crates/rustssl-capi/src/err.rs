@@ -925,6 +925,12 @@ fn set_error_with_text(library: c_int, reason: c_int, text: &[u8]) {
 /// of the exported C function `function`.
 #[track_caller]
 pub(crate) fn raise_with_text(library: c_int, reason: c_int, function: &str, text: &str) {
+    raise_with_bytes(library, reason, function, text.as_bytes());
+}
+
+/// [`raise_with_text`] for text that needn't be UTF-8, such as a file name.
+#[track_caller]
+pub(crate) fn raise_with_bytes(library: c_int, reason: c_int, function: &str, text: &[u8]) {
     let caller = Location::caller();
     let line = c_int::try_from(caller.line()).unwrap_or(c_int::MAX);
     new();
@@ -935,7 +941,7 @@ pub(crate) fn raise_with_text(library: c_int, reason: c_int, function: &str, tex
         // SAFETY: as above.
         unsafe { set_debug(state, top, file, line, function) };
     }
-    set_error_with_text(library, reason, text.as_bytes());
+    set_error_with_text(library, reason, text);
 }
 
 /// `ERR_vset_error`, which `ERR_set_error` shares.

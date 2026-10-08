@@ -14,6 +14,7 @@
 //!
 //! Exports that aren't implemented yet are generated stubs that abort (see [`stub`]).
 
+mod bio;
 mod buffer;
 mod dir;
 mod err;
