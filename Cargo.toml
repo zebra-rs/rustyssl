@@ -24,6 +24,7 @@ rustssl-capi = { path = "crates/rustssl-capi" }
 libc = { version = "0.2", default-features = false }
 sha2 = { version = "0.11", default-features = false }
 quote = { version = "1", default-features = false }
+subtle = { version = "2.6", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing"] }
 
 # Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`

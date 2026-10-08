@@ -11,8 +11,8 @@ yanked = "deny"
 [licenses]
 version = 2
 # Permissive licenses compatible with Apache-2.0 only. Unicode-3.0 covers unicode-ident's
-# data tables.
-allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+# data tables; BSD-3-Clause covers subtle.
+allow = ["Apache-2.0", "BSD-3-Clause", "MIT", "Unicode-3.0"]
 confidence-threshold = 0.9
 
 [bans]

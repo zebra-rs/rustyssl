@@ -5,15 +5,15 @@ rule 8). Only pure-Rust crates are allowed: no C or assembly build scripts, `cc`
 crates. CI enforces it with two gates:
 
 - **`cargo deny check`** (`deny.toml`) denies yanked crates and RustSec advisories, licenses
-  other than Apache-2.0, MIT, and Unicode-3.0, crates from unknown registries or git, and
-  wildcard versions. It also allows **build scripts** only for the crates named in
-  `[bans.build]`, and rejects executables or scripts shipped inside a crate. A new
+  other than Apache-2.0, BSD-3-Clause, MIT, and Unicode-3.0, crates from unknown registries
+  or git, and wildcard versions. It also allows **build scripts** only for the crates named
+  in `[bans.build]`, and rejects executables or scripts shipped inside a crate. A new
   dependency with a build script fails CI until its script has been read and the crate is
   added there.
 - **`cargo vet --locked`** (`supply-chain/`) imports the audits published by Bytecode
-  Alliance, Google, ISRG, and Mozilla. With them, `quote` is fully audited; the other 12
-  crates in the graph are recorded as exemptions (a reviewed snapshot, not an audit) and
-  must be audited before the 1.0 release. A crate that isn't audited or exempted fails CI.
+  Alliance, Google, ISRG, and Mozilla. With them, `quote` and `subtle` are fully audited; the
+  other 12 crates in the graph are recorded as exemptions (a reviewed snapshot, not an audit)
+  and must be audited before the 1.0 release. A crate that isn't audited or exempted fails CI.
 
 CI pins the tools (cargo-deny 0.20.2, cargo-vet 0.10.2); use the same versions locally.
 Another cargo-vet version reformats `supply-chain/`, which fails the check.
@@ -24,6 +24,7 @@ Another cargo-vet version reformats `supply-chain/`, which fails the check.
 | `libc` | 0.2 (`default-features = false`) | `rustssl-abi`, `rustssl-capi` | Yes | Per-target definitions of the libc types in the OpenSSL API (`pthread_once_t` behind `CRYPTO_ONCE`, `pthread_t`, `pthread_key_t`, ...) | Maintained by the Rust project, MIT OR Apache-2.0. Type declarations only; its build script compiles no C. Already in the lock file through `cpufeatures`. |
 | `syn` | 3 (`default-features = false`; `full`, `parsing`, `printing`) | `xtask` | No | Parses bindgen's function prototypes to generate the stubs in `cargo xtask codegen` | MIT OR Apache-2.0. Pulls in `proc-macro2` and `unicode-ident`. |
 | `quote` | 1 (`default-features = false`) | `xtask` | No | Prints the parsed parameter and return types back as Rust source | MIT OR Apache-2.0. |
+| `subtle` | 2.6 (`default-features = false`) | `rustssl-capi` | Yes | Constant-time comparison: `CRYPTO_memcmp` now, MAC and tag checks later (security rule 4) | dalek-cryptography, BSD-3-Clause, no dependencies. Fully audited through the imported audits (`cargo vet`). **Constant time:** `ct_eq` combines byte comparisons with `Choice` values kept behind an optimization barrier, so no branch depends on the data; it's constant-time in the contents, not the length. |
 
 ## Outside the shipped workspace
 

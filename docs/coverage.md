@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 6 | 5870 | 0.1% |
+| libcrypto | 5876 | 27 | 5849 | 0.5% |
 | libssl | 603 | 0 | 603 | 0.0% |
-| **Total** | **6479** | **6** | **6473** | **0.1%** |
+| **Total** | **6479** | **27** | **6452** | **0.4%** |
 
 ## By header
 
@@ -41,7 +41,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/comp.h` | libcrypto | 17 | 0 | 0.0% |
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
-| `openssl/crypto.h` | libcrypto | 101 | 0 | 0.0% |
+| `openssl/crypto.h` | libcrypto | 101 | 21 | 20.8% |
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 0 | 0.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
@@ -104,9 +104,30 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 
 | Export | Library | Header | Called by |
 |---|---|---|---|
-| `BUF_MEM_free` | libcrypto | `openssl/buffer.h` | `buf_mem` |
-| `BUF_MEM_grow` | libcrypto | `openssl/buffer.h` | `buf_mem` |
+| `BUF_MEM_free` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
+| `BUF_MEM_grow` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
 | `BUF_MEM_grow_clean` | libcrypto | `openssl/buffer.h` | `buf_mem` |
-| `BUF_MEM_new` | libcrypto | `openssl/buffer.h` | `buf_mem` |
-| `BUF_MEM_new_ex` | libcrypto | `openssl/buffer.h` | `buf_mem` |
+| `BUF_MEM_new` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
+| `BUF_MEM_new_ex` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_secure_heap` |
 | `BUF_reverse` | libcrypto | `openssl/buffer.h` | `buf_mem` |
+| `CRYPTO_aligned_alloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
+| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_get_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
+| `CRYPTO_memcmp` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
+| `CRYPTO_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_secure_actual_size` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_allocated` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_free` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_malloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_malloc_done` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_malloc_init` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_malloc_initialized` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_used` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_set_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `OPENSSL_cleanse` | libcrypto | `openssl/crypto.h` | `crypto_mem` |

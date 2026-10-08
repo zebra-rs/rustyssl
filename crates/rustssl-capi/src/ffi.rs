@@ -76,6 +76,20 @@ macro_rules! ffi_export {
 }
 pub(crate) use ffi_export;
 
+/// Aborts the process on a misuse that OpenSSL catches with `OPENSSL_assert`, which prints the
+/// failed assertion and aborts too: freeing a pointer the secure heap never handed out, for
+/// example. Carrying on would corrupt memory.
+#[cold]
+pub(crate) fn die(assertion: &str) -> ! {
+    use std::io::Write as _;
+    // Nothing useful can be done if stderr is closed; the process aborts either way.
+    let _ = writeln!(
+        std::io::stderr(),
+        "rustssl: OpenSSL internal error: assertion failed: {assertion}"
+    );
+    std::process::abort()
+}
+
 /// A C length that must not be negative, as `usize`.
 #[cfg_attr(
     not(test),

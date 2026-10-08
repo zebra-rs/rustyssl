@@ -6926,17 +6926,6 @@ pub extern "C" fn CRYPTO_THREAD_write_lock(_: *mut CRYPTO_RWLOCK) -> core::ffi::
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_aligned_alloc(
-    _: usize,
-    _: usize,
-    _: *mut *mut core::ffi::c_void,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_aligned_alloc")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_alloc_ex_data(
     _: core::ffi::c_int,
     _: *mut core::ffi::c_void,
@@ -7161,27 +7150,6 @@ pub extern "C" fn CRYPTO_cfb128_encrypt(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_clear_free(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("CRYPTO_clear_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_clear_realloc(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_clear_realloc")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_ctr128_encrypt(
     _: *const core::ffi::c_uchar,
     _: *mut core::ffi::c_uchar,
@@ -7264,15 +7232,6 @@ pub extern "C" fn CRYPTO_dup_ex_data(
     _: *const CRYPTO_EX_DATA,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CRYPTO_dup_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_free(
-    _: *mut core::ffi::c_void,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("CRYPTO_free")
 }
 
 #[unsafe(no_mangle)]
@@ -7406,33 +7365,6 @@ pub extern "C" fn CRYPTO_get_ex_new_index(
     _: CRYPTO_EX_free,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CRYPTO_get_ex_new_index")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_get_mem_functions(
-    _: *mut CRYPTO_malloc_fn,
-    _: *mut CRYPTO_realloc_fn,
-    _: *mut CRYPTO_free_fn,
-) {
-    crate::stub::unimplemented("CRYPTO_get_mem_functions")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_malloc(
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_malloc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_memcmp(
-    _: *const core::ffi::c_void,
-    _: *const core::ffi::c_void,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_memcmp")
 }
 
 #[unsafe(no_mangle)]
@@ -7611,98 +7543,12 @@ pub extern "C" fn CRYPTO_ofb128_encrypt(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_realloc(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_realloc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_actual_size(_: *mut core::ffi::c_void) -> usize {
-    crate::stub::unimplemented("CRYPTO_secure_actual_size")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_allocated(_: *const core::ffi::c_void) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_secure_allocated")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_clear_free(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("CRYPTO_secure_clear_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_free(
-    _: *mut core::ffi::c_void,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("CRYPTO_secure_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_malloc(
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_secure_malloc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_malloc_done() -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_secure_malloc_done")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_malloc_init(_: usize, _: usize) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_secure_malloc_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_malloc_initialized() -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_secure_malloc_initialized")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_used() -> usize {
-    crate::stub::unimplemented("CRYPTO_secure_used")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_zalloc(
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_secure_zalloc")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_set_ex_data(
     _: *mut CRYPTO_EX_DATA,
     _: core::ffi::c_int,
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CRYPTO_set_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_set_mem_functions(
-    _: CRYPTO_malloc_fn,
-    _: CRYPTO_realloc_fn,
-    _: CRYPTO_free_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_set_mem_functions")
 }
 
 #[unsafe(no_mangle)]
@@ -7734,15 +7580,6 @@ pub extern "C" fn CRYPTO_xts128_encrypt(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CRYPTO_xts128_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_zalloc(
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_zalloc")
 }
 
 #[unsafe(no_mangle)]
@@ -21354,11 +21191,6 @@ pub extern "C" fn OPENSSL_buf2hexstr_ex(
     _: core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OPENSSL_buf2hexstr_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_cleanse(_: *mut core::ffi::c_void, _: usize) {
-    crate::stub::unimplemented("OPENSSL_cleanse")
 }
 
 #[unsafe(no_mangle)]

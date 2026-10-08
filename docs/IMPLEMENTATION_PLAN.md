@@ -438,7 +438,7 @@ macOS arm64 and Linux aarch64.*
 
 Everything else depends on this phase.
 
-- [ ] **1.1 Memory:**
+- [x] **1.1 Memory:**
   (The internal allocator exists in `rustssl-capi/src/mem.rs` since 0.7; this step exports
   it, adds the `CRYPTO_set_mem_functions` hooks, and confirms its edge cases against the
   reference.)
@@ -447,6 +447,49 @@ Everything else depends on this phase.
   - `OPENSSL_cleanse`, `CRYPTO_memcmp`
   - the secure heap (`CRYPTO_secure_*`: mmap, mlock, guard pages, `MADV_DONTDUMP`)
   - `CRYPTO_mem_debug_*`, as no-ops (matching the default build)
+
+  *Done:* 21 exports. With `BUF_MEM`, that's 27 of libcrypto's 5,876.
+  - **Debug functions:** the `CRYPTO_mem_debug_*` and `CRYPTO_mem_leaks*` functions exist
+    only with `crypto-mdebug`, which the default build doesn't enable. They aren't in the
+    ABI, so there's nothing to implement.
+  - **The source is now kept:** `cargo xtask ref-openssl` saves the verified, unbuilt
+    source in `target/ref/openssl-<version>/src/`, the C spec for each family. Behavior
+    that varies by platform was measured on the reference, macOS and Linux.
+  - **Allocator (`mem.rs`):**
+    - Every allocation, rustssl's own included, goes through the functions installed with
+      `CRYPTO_set_mem_functions`. Our own pass the file `"rustssl"` and the Rust line.
+    - Customization closes at the first allocation by the default allocator, as in OpenSSL.
+      `CRYPTO_get_mem_functions` reports the defaults as `CRYPTO_malloc`/`_realloc`/`_free`,
+      and passing those back restores them.
+    - A failing `CRYPTO_realloc` raises no error, unlike `CRYPTO_malloc` (as in OpenSSL).
+    - `CRYPTO_aligned_alloc` follows each platform's build: `posix_memalign` on Linux;
+      over-allocate and round on macOS, alignment-0 and odd-alignment quirks included.
+    - `CRYPTO_memcmp` returns exactly 0 or 1, like OpenSSL's x86_64 and arm64 assembly
+      (the C fallback returns the OR of the differences), and uses `subtle` (new
+      dependency, BSD-3-Clause, now allowed by `deny.toml`).
+    - `OPENSSL_cleanse` uses volatile byte and word stores.
+  - **Secure heap (`secure.rs`, `secure/buddy.rs`):**
+    - The buddy allocator is safe Rust over arena offsets. It reproduces OpenSSL's
+      placement exactly: LIFO lists, splitting toward the upper half, and buddy merging.
+    - Its free lists live beside the arena, never in it, so blocks are zero because frees
+      clear them.
+    - The arena code does what OpenSSL's `sh_init` does: `mmap`, guard pages, `mlock` (or
+      `mlock2` with `MLOCK_ONFAULT`), and `MADV_DONTDUMP`. So it returns 1 or 2 in the
+      same cases.
+    - Misuse aborts, as `OPENSSL_assert` does: a pointer that isn't a block start, a
+      double free, or a size that isn't a power of two.
+    - Secure `BUF_MEM` data now lives in the secure heap, as in OpenSSL.
+  - **Tests:**
+    - `tests/c/crypto_mem.c` (80 checks), `crypto_mem_hooks.c` (24, counting every call to
+      an installed allocator, `BUF_MEM`'s included), and `crypto_secure_heap.c` (30).
+    - The secure-heap test traces 300 random operations, with block offsets from the arena
+      start. Placements, sizes, usage, and failures are identical to the reference's on
+      macOS arm64 and Linux aarch64.
+    - Rust tests cover cleanse ranges, `memcmp`, the overflow case, and a randomized buddy
+      run (disjoint, aligned blocks that merge back). Miri passes.
+  - **Deviations:** five, all where OpenSSL corrupts memory, crashes, or recurses forever.
+    They're the first entries in the new `docs/DEVIATIONS.md`, each with a test (two as
+    single-process integration tests).
 - [ ] **1.2 Init, version, info:**
   - `OPENSSL_init_crypto`, with every `OPENSSL_INIT_*` flag
   - `OPENSSL_cleanup`, `OPENSSL_atexit`
@@ -470,6 +513,12 @@ Everything else depends on this phase.
   The reason strings already exist (`err_reasons.rs`, from 0.4). Extend codegen to also
   emit the library names (`ERR_str_libraries`) and the common `ERR_R_*` reasons
   (`ERR_str_reasons`) from the vendored `crypto/err/err.c`.
+
+  From 1.1:
+  - Errors raised by `CRYPTO_malloc` and `CRYPTO_secure_malloc` carry the caller's file and
+    line and no function (`ERR_set_debug(file, line, NULL)`).
+  - Allocating a thread's error state closes `CRYPTO_set_mem_functions`, as OpenSSL's
+    `CRYPTO_zalloc` of `ERR_STATE` does (`mem::close_customization`).
 - [ ] **1.5 Containers and utilities:**
   - `OPENSSL_sk_*`, including the comparator and sort quirks (for example, `find` sorts an
     unsorted stack)
