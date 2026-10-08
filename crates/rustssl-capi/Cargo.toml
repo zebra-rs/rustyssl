@@ -15,6 +15,7 @@ rustssl-asn1.workspace = true
 rustssl-crypto.workspace = true
 rustssl-pki.workspace = true
 rustssl-tls.workspace = true
+subtle.workspace = true
 
 [lints]
 workspace = true
