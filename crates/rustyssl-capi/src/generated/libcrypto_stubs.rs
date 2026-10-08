@@ -2388,32 +2388,6 @@ pub extern "C" fn BIO_ctrl_reset_read_request(_: *mut BIO) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_debug_callback(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-    _: core::ffi::c_long,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("BIO_debug_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_debug_callback_ex(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-    _: core::ffi::c_int,
-    _: *mut usize,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("BIO_debug_callback_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_dgram_non_fatal_error(_: core::ffi::c_int) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_dgram_non_fatal_error")
 }
@@ -2425,77 +2399,6 @@ pub extern "C" fn BIO_do_connect_retry(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_do_connect_retry")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump(
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump_cb(
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            data: *const core::ffi::c_void,
-            len: usize,
-            u: *mut core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-    _: *mut core::ffi::c_void,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump_fp(
-    _: *mut FILE,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump_indent(
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump_indent")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump_indent_cb(
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            data: *const core::ffi::c_void,
-            len: usize,
-            u: *mut core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-    _: *mut core::ffi::c_void,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump_indent_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_dump_indent_fp(
-    _: *mut FILE,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dump_indent_fp")
 }
 
 #[unsafe(no_mangle)]
@@ -2595,17 +2498,6 @@ pub extern "C" fn BIO_get_port(
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_gethostbyname(_: *const core::ffi::c_char) -> *mut hostent {
     crate::stub::unimplemented("BIO_gethostbyname")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_hex_string(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_hex_string")
 }
 
 #[unsafe(no_mangle)]
@@ -2741,15 +2633,6 @@ pub extern "C" fn BIO_parse_hostserv(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn BIO_printf(
-    _: *mut BIO,
-    _: *const core::ffi::c_char,
-    _: ...
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_printf")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_accept() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_accept")
 }
@@ -2808,16 +2691,6 @@ pub extern "C" fn BIO_set_cipher(
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_set_tcp_ndelay(_: core::ffi::c_int, _: core::ffi::c_int) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_set_tcp_ndelay")
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn BIO_snprintf(
-    _: *mut core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: ...
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_snprintf")
 }
 
 #[unsafe(no_mangle)]
@@ -2880,25 +2753,6 @@ pub extern "C" fn BIO_socket_wait(
     _: time_t,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_socket_wait")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_vprintf(
-    _: *mut BIO,
-    _: *const core::ffi::c_char,
-    _: core::ffi::VaList<'_>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_vprintf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_vsnprintf(
-    _: *mut core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::VaList<'_>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_vsnprintf")
 }
 
 #[unsafe(no_mangle)]

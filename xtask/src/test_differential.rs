@@ -148,16 +148,184 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(6) {
+        match random.below(7) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
             3 => lhash_session(&mut random, &mut out)?,
             4 => bio_session(&mut random, &mut out)?,
+            5 => printf_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
     Ok(out)
+}
+
+/// A random session of `printf` and `bioprintf` commands.
+fn printf_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..1 + random.below(20) {
+        let (format, args) = printf_format(random);
+        let args: String = args.iter().map(|a| format!(" {a}")).collect();
+        if random.below(4) == 0 {
+            writeln!(out, "bioprintf {format}{args}")?;
+        } else {
+            let n = random.pick(&["0", "1", "2", "3", "8", "16", "40", "100"]);
+            writeln!(out, "printf {n} {format}{args}")?;
+        }
+    }
+    Ok(())
+}
+
+/// A random format of up to four conversions, with typed arguments for what they consume (at
+/// most the probe's three). `_` is a space. The arguments follow OpenSSL's parsing exactly, or
+/// a conversion would read an argument of the wrong type.
+fn printf_format(random: &mut Random) -> (String, Vec<String>) {
+    let mut format = String::new();
+    let mut args = Vec::new();
+    for _ in 0..1 + random.below(4) {
+        if random.below(2) == 0 {
+            let text = random_text(random, b"ab_-.:", 4);
+            format.push_str(if text == "-" { "" } else { &text });
+        }
+        let mut spec = String::from("%");
+        let mut needed = Vec::new();
+        for flag in ['-', '+', '_', '#', '0'] {
+            if random.below(5) == 0 {
+                spec.push(flag);
+            }
+        }
+        match random.below(5) {
+            0 | 1 => {}
+            2 => spec.push_str(&random.below(25).to_string()),
+            3 => spec.push_str(&random.below(120).to_string()),
+            _ => {
+                spec.push('*');
+                needed.push(format!("i:{}", random.offset(-10, 40)));
+            }
+        }
+        match random.below(5) {
+            0 | 1 => {}
+            2 => spec.push('.'),
+            3 => spec.push_str(&format!(".{}", random.below(15))),
+            _ => {
+                spec.push_str(".*");
+                needed.push(format!("i:{}", random.offset(-5, 20)));
+            }
+        }
+        let modifier = random.pick(&["", "", "", "", "h", "l", "ll", "z", "j", "q", "L", "hh"]);
+        spec.push_str(modifier);
+        let mut conversion = random.pick(&[
+            "d", "i", "u", "x", "X", "o", "c", "s", "s", "p", "f", "f", "e", "E", "g", "G", "%",
+            "k", "w",
+        ]);
+        if modifier == "hh" && conversion == "%" {
+            // After `%hh` the conversion character is text; a `%` would start a conversion.
+            conversion = "d";
+        }
+        spec.push_str(conversion);
+        let wide = ["l", "ll", "z", "j", "q"].contains(&modifier);
+        // `%hh` is `%h` and the unknown conversion `h`: the conversion character is just text.
+        let argument = if modifier == "hh" {
+            None
+        } else {
+            match conversion {
+                "d" | "i" | "u" | "x" | "X" | "o" if wide => Some(printf_long(random)),
+                "d" | "i" | "u" | "x" | "X" | "o" => Some(printf_int(random)),
+                "c" => Some(format!("i:{}", random.below(128))),
+                "s" => Some(format!(
+                    "s:{}",
+                    random.pick(&["-", "x", "hello", "abcdefghijklmnopqrstuvwxyz0123456789"])
+                )),
+                "p" => Some(printf_long(random)),
+                "f" | "e" | "E" | "g" | "G" => Some(printf_double(random)),
+                _ => None,
+            }
+        };
+        needed.extend(argument);
+        if args.len() + needed.len() > 3 {
+            break;
+        }
+        format.push_str(&spec);
+        if conversion == "w" {
+            // `%w` skips the next character; make it text, not the next conversion's `%`.
+            format.push('x');
+        }
+        args.extend(needed);
+    }
+    if format.is_empty() {
+        format.push('-');
+    }
+    (format, args)
+}
+
+fn printf_int(random: &mut Random) -> String {
+    let value = match random.below(4) {
+        0 => random
+            .pick(&[
+                "0",
+                "1",
+                "-1",
+                "255",
+                "65535",
+                "70000",
+                "-2147483648",
+                "2147483647",
+            ])
+            .to_owned(),
+        _ => random.offset(-100_000, 200_000).to_string(),
+    };
+    format!("i:{value}")
+}
+
+fn printf_long(random: &mut Random) -> String {
+    let value = match random.below(3) {
+        0 => random
+            .pick(&[
+                "0",
+                "-1",
+                "-9223372036854775808",
+                "9223372036854775807",
+                "4294967296",
+            ])
+            .to_owned(),
+        1 => random.next().cast_signed().to_string(),
+        _ => random.offset(-1_000_000, 2_000_000).to_string(),
+    };
+    format!("j:{value}")
+}
+
+fn printf_double(random: &mut Random) -> String {
+    let value = match random.below(4) {
+        0 => random
+            .pick(&[
+                "0",
+                "-0",
+                "1.5",
+                "2.675",
+                "10",
+                "1e-5",
+                "0.0001",
+                "100000",
+                "1e19",
+                "1e20",
+                "inf",
+                "-inf",
+                "nan",
+                "5e-324",
+                "1e-300",
+                "9.9999999995",
+                "0.5",
+            ])
+            .to_owned(),
+        1 => format!("{:e}", f64::from_bits(random.next())),
+        _ => {
+            let scaled = random.offset(-1_000_000_000, 2_000_000_000);
+            #[expect(clippy::cast_precision_loss, reason = "any double will do")]
+            let value = scaled as f64 / 10f64.powi(i32::try_from(random.below(12)).unwrap_or(0));
+            format!("{value:e}")
+        }
+    };
+    format!("d:{value}")
 }
 
 /// A random `BUF_MEM` session.
@@ -391,6 +559,7 @@ mod tests {
             "\nlhnew ",
             "\nbionew ",
             "\nhexdecode ",
+            "printf ",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }

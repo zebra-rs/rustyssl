@@ -35,6 +35,9 @@ OpenSSL never depends on them.
 | `BIO_indent` with a negative limit | loops about 2^31 times, writing a space each time | writes nothing and returns 1 | `bio::tests::a_negative_indent_limit_writes_nothing` |
 | `BIO_set_mem_buf(b, NULL, ...)` | frees the old buffer, then dereferences null | returns 0, keeping the old buffer | `bio::tests::a_negative_indent_limit_writes_nothing` |
 | A `FILE` BIO with no `FILE` yet: `BIO_eof`, `BIO_tell`, `BIO_seek`, `BIO_gets` | pass null to stdio and crash | return 0 (`BIO_eof`, `BIO_gets`) or -1 | `bio::tests::a_file_bio_without_a_file_fails` |
+| `BIO_printf`, `BIO_snprintf`, and their `v` forms with a null format; `%n` with a null pointer; a format ending in `%w` | dereference null and crash; write to null; read past the format's NUL | return -1; skip the store; stop at the NUL | `bio::print::tests::null_formats_and_targets_fail_or_are_skipped` |
+| `BIO_dump*` with null data, a null callback, or a null `FILE`, when there's a line to output; `BIO_hex_string` with null data | dereference null and crash | return -1; `BIO_hex_string` returns 0 | `bio::dump::tests::null_data_callbacks_and_files_fail` |
+| `BIO_debug_callback` and `BIO_debug_callback_ex` with a null BIO | dereference null and crash | write nothing and return `ret` | `bio::debug::tests::a_null_bio_writes_nothing` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes

@@ -1,0 +1,48 @@
+# OpenSSL's printf (at most three arguments a line): integers, strings, chars, and its quirks.
+printf 64 %d|%i|%u i:-42 i:7 i:-1
+printf 64 [%5d|%-5d|%05d] i:42 i:-7 i:-7
+printf 64 [%+d|%_d|%.3d] i:5 i:5 i:5
+printf 64 %x|%X|%#x i:255 i:255 i:255
+printf 64 %#o|%#X|%o i:8 i:0 i:8
+printf 64 %ld|%lu|%lld j:-1 j:-1 j:-9223372036854775808
+printf 64 %zu|%zd|%jd j:7 j:-7 j:9
+printf 64 %qd|%Ld j:9 i:4
+printf 64 %hd|%hu|%hx i:70000 i:70000 i:-1
+printf 64 [%*d] i:4 i:1
+printf 64 [%-*d] i:-4 i:2
+printf 64 [%.*d] i:-2 i:7
+printf 64 [%.*s] i:-1 s:hello
+printf 64 [%08.3d|%-08d|%+05d] i:5 i:5 i:-5
+printf 64 %p|%p|%#p j:0 j:4660 j:-1
+printf 64 %hhd| i:5
+printf 64 a%wbc%k%5%d i:1
+printf 64 trailing_%
+printf 64 %c%c%c i:65 i:0 i:200
+printf 64 [%8s][%-8s][%6.2s] s:hello s:hello s:hello
+printf 64 [%s|%3s|%.3s] s:- s:- s:-
+# Doubles.
+printf 64 %f|%.2f|%.0f d:1.5 d:2.675 d:2.5
+printf 64 %#.0f|%#g d:3 d:3
+printf 64 [%10.3f|%-10.3f|%010.3f] d:-1.5 d:-1.5 d:-1.5
+printf 64 %.12f|%e|%E d:0.5 d:12345.678 d:0.000123
+printf 64 %e|%g|%g d:10 d:0.0001 d:100000
+printf 64 %g|%g|%G d:1e-5 d:1234567 d:1e-10
+printf 64 %f|%f|%.1f d:inf d:-inf d:nan
+printf 64 %f d:1e20
+printf 64 %.0f d:12345678901234567890
+printf 64 %Lf|%qf d:2 d:3
+printf 64 %+g|%_g|%#g d:5 d:5 d:5
+# Truncation.
+printf 4 abcdef
+printf 4 abc
+printf 0 abc
+printf 1 abc
+printf 6 %10d i:1
+printf 5 %s s:abcdef
+printf 3 %d%s i:12345 s:x
+printf 64 -
+# BIO_printf.
+bioprintf %s=%d_ s:x i:5
+bioprintf %200s s:wide
+bioprintf %f d:1e300
+bioprintf -

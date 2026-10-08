@@ -48,12 +48,20 @@
  *   biomem                     BIO_get_mem_ptr: the buffer's length and a hash of its data
  *   biostate                   retry flags, bytes read and written
  *
+ * Commands for OpenSSL's printf (`_` in a format stands for a space). Each argument is typed:
+ * i:<int>, j:<64-bit int>, d:<double>, or s:<word> (s:- is a null string); at most three:
+ *   printf <n> <format> <arg>...   BIO_snprintf into a buffer of <n> bytes (at most 100),
+ *                                  printing the return and the first <n> + 1 bytes
+ *   bioprintf <format> <arg>...    BIO_printf to a memory BIO, printing the return and what
+ *                                  it wrote
+ *
  * Other helpers:
  *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
  *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
  *
  *   # ...              comment, echoed
  */
+#define _POSIX_C_SOURCE 200809L
 /* ERR_get_state is deprecated. */
 #define OPENSSL_SUPPRESS_DEPRECATED
 #include <stdio.h>
@@ -618,6 +626,139 @@ static int err_command(const char *command, const char *line)
     return 1;
 }
 
+/* A typed argument of a printf command. */
+typedef struct {
+    int i;
+    long long j;
+    double d;
+    const char *s;
+} ARG;
+
+/*
+ * Calls CALL(arguments...) with the arguments typed as `sig` says (one letter each), so each
+ * argument is passed as its own C type, as a real call would.
+ */
+#define V_i(a) (a).i
+#define V_j(a) (a).j
+#define V_d(a) (a).d
+#define V_s(a) (a).s
+#define C1(x) \
+    if (strcmp(sig, #x) == 0) \
+        return CALL(V_##x(a[0]));
+#define C2(x, y) \
+    if (strcmp(sig, #x #y) == 0) \
+        return CALL(V_##x(a[0]), V_##y(a[1]));
+#define C3(x, y, z) \
+    if (strcmp(sig, #x #y #z) == 0) \
+        return CALL(V_##x(a[0]), V_##y(a[1]), V_##z(a[2]));
+#define L3(x, y) C3(x, y, i) C3(x, y, j) C3(x, y, d) C3(x, y, s)
+#define L2(x) C2(x, i) C2(x, j) C2(x, d) C2(x, s) L3(x, i) L3(x, j) L3(x, d) L3(x, s)
+#define EVERY_SIGNATURE C1(i) C1(j) C1(d) C1(s) L2(i) L2(j) L2(d) L2(s)
+
+static int call_snprintf(char *buf, size_t n, const char *f, const char *sig, const ARG *a)
+{
+#define CALL(...) BIO_snprintf(buf, n, f, __VA_ARGS__)
+    if (sig[0] == '\0')
+        return CALL(0);
+    EVERY_SIGNATURE
+#undef CALL
+    return -99;
+}
+
+static int call_printf(BIO *bio, const char *f, const char *sig, const ARG *a)
+{
+#define CALL(...) BIO_printf(bio, f, __VA_ARGS__)
+    if (sig[0] == '\0')
+        return CALL(0);
+    EVERY_SIGNATURE
+#undef CALL
+    return -99;
+}
+
+static void print_escaped(const char *label, int ret, const char *data, size_t len)
+{
+    printf("%s %d \"", label, ret);
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)data[i];
+
+        if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+            putchar(c);
+        else
+            printf("\\x%02x", c);
+    }
+    printf("\"\n");
+}
+
+static int printf_command(const char *command, const char *line)
+{
+    static BIO *mem = NULL;
+    static char words[1024];
+    char format[300], sig[4] = "", buf[128];
+    ARG a[3];
+    char *word, *save = NULL;
+    size_t n = 0;
+    int count = 0, ret;
+
+    if (strcmp(command, "printf") != 0 && strcmp(command, "bioprintf") != 0)
+        return 0;
+    snprintf(words, sizeof(words), "%s", line);
+    strtok_r(words, " ", &save);
+    if (strcmp(command, "printf") == 0) {
+        word = strtok_r(NULL, " ", &save);
+        n = word == NULL ? 0 : strtoul(word, NULL, 10);
+        if (n > 100)
+            n = 100;
+    }
+    word = strtok_r(NULL, " ", &save);
+    snprintf(format, sizeof(format), "%s", word == NULL ? "" : word);
+    for (char *p = format; *p != '\0'; p++)
+        if (*p == '_')
+            *p = ' ';
+    while ((word = strtok_r(NULL, " ", &save)) != NULL && count < 3) {
+        memset(&a[count], 0, sizeof(a[count]));
+        if (word[0] == '\0' || word[1] != ':') {
+            printf("error bad argument %s\n", word);
+            return 1;
+        }
+        switch (word[0]) {
+        case 'i':
+            a[count].i = (int)strtol(word + 2, NULL, 10);
+            break;
+        case 'j':
+            a[count].j = strtoll(word + 2, NULL, 10);
+            break;
+        case 'd':
+            a[count].d = strtod(word + 2, NULL);
+            break;
+        case 's':
+            a[count].s = strcmp(word + 2, "-") == 0 ? NULL : word + 2;
+            break;
+        default:
+            printf("error bad argument %s\n", word);
+            return 1;
+        }
+        sig[count++] = word[0];
+        sig[count] = '\0';
+    }
+    if (strcmp(command, "printf") == 0) {
+        memset(buf, '#', sizeof(buf));
+        ret = call_snprintf(buf, n, format, sig, a);
+        print_escaped("printf", ret, buf, n + 1);
+    } else {
+        char *data = NULL;
+        long len;
+
+        if (mem == NULL)
+            mem = BIO_new(BIO_s_mem());
+        ret = call_printf(mem, format, sig, a);
+        len = BIO_get_mem_data(mem, &data);
+        print_escaped("bioprintf", ret, data, len > 0 ? (size_t)len : 0);
+        (void)BIO_reset(mem);
+    }
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -635,7 +776,7 @@ int main(void)
             continue;
         if (err_command(command, line) || stack_command(command, line)
             || lhash_command(command, line) || string_command(command, line)
-            || bio_command(command, line)) {
+            || bio_command(command, line) || printf_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
