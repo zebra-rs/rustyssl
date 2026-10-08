@@ -59,7 +59,7 @@ static void numbers(void)
 
 static void strings(void)
 {
-    char full[256], text[256];
+    char full[256], text[512];
     const char *meta = OPENSSL_version_build_metadata();
 
     check(meta[0] == '\0' || meta[0] == '+',
