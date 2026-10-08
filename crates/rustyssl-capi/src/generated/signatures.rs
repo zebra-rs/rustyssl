@@ -18,6 +18,71 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_long = crate::bio::BIO_ctrl;
 const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::BIO_ctrl_pending;
 const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::BIO_ctrl_wpending;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    core::ffi::c_long,
+) -> core::ffi::c_long = crate::bio::debug::BIO_debug_callback;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    usize,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    core::ffi::c_int,
+    *mut usize,
+) -> core::ffi::c_long = crate::bio::debug::BIO_debug_callback_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            data: *const core::ffi::c_void,
+            len: usize,
+            u: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut core::ffi::c_void,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump_cb;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump_fp;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump_indent;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            data: *const core::ffi::c_void,
+            len: usize,
+            u: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut core::ffi::c_void,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump_indent_cb;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_dump_indent_fp;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_dup_chain;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_null;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
@@ -54,6 +119,13 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::bio::BIO_gets;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::dump::BIO_hex_string;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::BIO_indent;
 const _: unsafe extern "C" fn(
@@ -300,6 +372,8 @@ const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_next;
 const _: unsafe extern "C" fn(*mut BIO) -> u64 = crate::bio::BIO_number_read;
 const _: unsafe extern "C" fn(*mut BIO) -> u64 = crate::bio::BIO_number_written;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_pop;
+const _: unsafe extern "C" fn(*mut BIO, *const core::ffi::c_char, ...) -> core::ffi::c_int =
+    crate::bio::print::BIO_printf;
 const _: unsafe extern "C" fn(
     *mut BIO,
     core::ffi::c_int,
@@ -354,10 +428,27 @@ const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_
 const _: unsafe extern "C" fn(*mut BIO, *mut BIO) = crate::bio::BIO_set_next;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_retry_reason;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_shutdown;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    usize,
+    *const core::ffi::c_char,
+    ...
+) -> core::ffi::c_int = crate::bio::print::BIO_snprintf;
 const _: unsafe extern "C" fn(*const BIO, core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::BIO_test_flags;
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_up_ref;
 const _: unsafe extern "C" fn(*mut BIO) = crate::bio::BIO_vfree;
+const _: for<'a> unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    core::ffi::VaList<'a>,
+) -> core::ffi::c_int = crate::bio::print::BIO_vprintf;
+const _: for<'a> unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::VaList<'a>,
+) -> core::ffi::c_int = crate::bio::print::BIO_vsnprintf;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_void,

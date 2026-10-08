@@ -34,7 +34,7 @@ use rustyssl_abi::{
 };
 
 use crate::ffi::{ffi_export, guard};
-use crate::{init, mem, stub};
+use crate::{init, mem};
 
 /// A C string table as (packed error, text), in the order of OpenSSL's table.
 pub(crate) type Table = &'static [(c_ulong, &'static CStr)];
@@ -865,11 +865,24 @@ ffi_export! {
     }
 }
 
-/// `ERR_vset_error` with the format already applied: sets the newest error's code, and its
-/// data to `text`, as OpenSSL does. The slot's old buffer is reused, grown to
-/// `ERR_MAX_DATA_SIZE`, written, and shrunk to fit. Text that doesn't fit leaves the data
+/// [`set_error_printed`] with text already formatted. Text that doesn't fit leaves the data
 /// empty, as `BIO_vsnprintf` reports truncation as a failure.
 fn set_error_with_text(library: c_int, reason: c_int, text: &[u8]) {
+    set_error_printed(library, reason, |buffer, size| {
+        if text.len() >= size {
+            return 0;
+        }
+        // SAFETY: `text.len() < size`, inside the buffer, which `text` isn't part of.
+        unsafe { ptr::copy_nonoverlapping(text.as_ptr(), buffer, text.len()) };
+        text.len()
+    });
+}
+
+/// `ERR_vset_error` with a format: sets the newest error's code, and its data to what `print`
+/// writes into the buffer it gets (of the given size), returning the length, which is below
+/// the size. The slot's old buffer is reused, grown to `ERR_MAX_DATA_SIZE`, written, and shrunk
+/// to fit, as OpenSSL does.
+fn set_error_printed(library: c_int, reason: c_int, print: impl FnOnce(*mut u8, usize) -> usize) {
     let Some(state) = state() else {
         return;
     };
@@ -899,10 +912,8 @@ fn set_error_with_text(library: c_int, reason: c_int, text: &[u8]) {
     }
     let mut flags = 0;
     if !buffer.is_null() {
-        let printed = if text.len() < size { text.len() } else { 0 };
-        // SAFETY: `printed < size`, inside the buffer, which `text` isn't part of.
-        unsafe { ptr::copy_nonoverlapping(text.as_ptr(), buffer, printed) };
-        // SAFETY: as above.
+        let printed = print(buffer, size).min(size - 1);
+        // SAFETY: `printed < size`, inside the buffer.
         unsafe { buffer.wrapping_add(printed).write(0) };
         // SAFETY: the buffer is from CRYPTO_malloc; a failed resize leaves it as it was.
         let shrunk = unsafe { mem::resize(buffer.cast(), printed + 1) }.cast::<u8>();
@@ -945,15 +956,22 @@ pub(crate) fn raise_with_bytes(library: c_int, reason: c_int, function: &str, te
 }
 
 /// `ERR_vset_error`, which `ERR_set_error` shares.
-fn set_error(library: c_int, reason: c_int, format: *const c_char) {
+///
+/// # Safety
+/// `format` is null or a NUL-terminated string whose conversions `args` match.
+unsafe fn set_error(library: c_int, reason: c_int, format: *const c_char, args: &mut VaList<'_>) {
+    if !format.is_null() {
+        set_error_printed(library, reason, |buffer, size| {
+            // SAFETY: the buffer has `size` bytes; the caller's guarantee about the format.
+            let printed =
+                unsafe { crate::bio::print::vsnprintf(buffer.cast(), size, format, args) };
+            usize::try_from(printed).unwrap_or(0)
+        });
+        return;
+    }
     let Some(state) = state() else {
         return;
     };
-    if !format.is_null() {
-        stub::unimplemented(
-            "ERR_set_error and ERR_vset_error with a format (BIO_printf, step 1.6)",
-        );
-    }
     // SAFETY: this thread's state, for each access.
     let (top, _) = unsafe { ends(state) };
     // SAFETY: as above.
@@ -962,19 +980,25 @@ fn set_error(library: c_int, reason: c_int, format: *const c_char) {
     unsafe { set_code(state, top, library, reason) };
 }
 
-/// Sets the newest error's code and drops its data. `ERR_LIB_SYS` makes a system error, whose
-/// reason is an `errno` value. With a format, the error's data would be the formatted text;
-/// that needs the printf engine of step 1.6 and aborts until then.
+/// Sets the newest error's code. `ERR_LIB_SYS` makes a system error, whose reason is an
+/// `errno` value. With a format, the error's data becomes the text it formats as
+/// `BIO_snprintf` would (empty if it's longer than `ERR_MAX_DATA_SIZE` - 1); without one, the
+/// error has no data.
 ///
 /// # Safety
-/// `fmt` is null (or a format whose arguments follow).
+/// `fmt` is null or a NUL-terminated string whose conversions the arguments match, as for C's
+/// `printf`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ERR_set_error(lib: c_int, reason: c_int, fmt: *const c_char, _: ...) {
+pub unsafe extern "C" fn ERR_set_error(lib: c_int, reason: c_int, fmt: *const c_char, args: ...) {
     guard(
         ERR_LIB_CRYPTO,
         "ERR_set_error",
         || (),
-        move || set_error(lib, reason, fmt),
+        move || {
+            let mut args = args;
+            // SAFETY: the caller's guarantee.
+            unsafe { set_error(lib, reason, fmt, &mut args) };
+        },
     );
 }
 
@@ -986,8 +1010,9 @@ ffi_export! {
     pub unsafe extern "C" fn ERR_vset_error(lib: c_int, reason: c_int, fmt: *const c_char, args: VaList<'_>)
     where failure = (), library = ERR_LIB_CRYPTO
     {
-        let _ = args;
-        set_error(lib, reason, fmt);
+        let mut args = args;
+        // SAFETY: the caller's guarantee.
+        unsafe { set_error(lib, reason, fmt, &mut args) };
     }
 }
 
