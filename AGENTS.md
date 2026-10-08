@@ -222,7 +222,7 @@ environment variables `RUSTSSL_OPENSSLDIR`, `RUSTSSL_ENGINESDIR`, and `RUSTSSL_M
 | `crates/rustssl-abi/src/generated/` | types, layouts, enums, and every macro constant, per target |
 | `libs/<lib>/exports/` | ELF version scripts (Linux) and exported-symbol lists (macOS), per target |
 | `crates/rustssl-capi/src/generated/<lib>_stubs.rs` | an aborting stub for every export that isn't implemented yet |
-| `crates/rustssl-capi/src/generated/err_reasons.rs` | the reason-string table |
+| `crates/rustssl-capi/src/generated/err_strings.rs` | the error-string tables, in OpenSSL's order and load order |
 | `crates/rustssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
 
 ```sh

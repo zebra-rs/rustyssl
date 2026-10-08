@@ -105,11 +105,6 @@ pub extern "C" fn rustssl_private_DTLSv1_server_method() -> *const SSL_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustssl_private_ERR_load_SSL_strings() -> core::ffi::c_int {
-    crate::stub::unimplemented("ERR_load_SSL_strings")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustssl_private_OPENSSL_cipher_name(
     _: *const core::ffi::c_char,
 ) -> *const core::ffi::c_char {

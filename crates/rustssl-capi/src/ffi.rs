@@ -30,17 +30,28 @@ use rustssl_abi::ERR_R_INTERNAL_ERROR;
 
 use crate::err;
 
-/// Runs an export's `body`. If it panics, raises `ERR_R_INTERNAL_ERROR` for `library` and
-/// returns `failure()` instead of unwinding into C. Objects the body was changing may be left
-/// partly updated, as after any internal error; a panic is always a bug.
+/// Runs an export's `body`. If it panics, raises `ERR_R_INTERNAL_ERROR` for `library` from the
+/// caller's file and line, and returns `failure()` instead of unwinding into C. Objects the body
+/// was changing may be left partly updated, as after any internal error; a panic is always a
+/// bug.
+#[track_caller]
 pub(crate) fn guard<R>(
     library: c_int,
     function: &'static str,
     failure: impl FnOnce() -> R,
     body: impl FnOnce() -> R,
 ) -> R {
+    let caller = std::panic::Location::caller();
     catch_unwind(AssertUnwindSafe(body)).unwrap_or_else(|_| {
-        err::raise(library, ERR_R_INTERNAL_ERROR, function);
+        let line = c_int::try_from(caller.line()).unwrap_or(c_int::MAX);
+        let file = Some(caller.file().as_bytes());
+        err::raise_from(
+            library,
+            ERR_R_INTERNAL_ERROR,
+            file,
+            line,
+            Some(function.as_bytes()),
+        );
         failure()
     })
 }

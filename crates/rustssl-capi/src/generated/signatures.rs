@@ -3,6 +3,7 @@
 // Each function rustssl-capi implements by hand is assigned to a function pointer of its C
 // prototype's type, so it doesn't compile unless the signatures match exactly (TEST_PLAN.md, L3 item 3).
 
+use libc::FILE;
 use rustssl_abi::*;
 
 const _: unsafe extern "C" fn(*mut BUF_MEM) = crate::buffer::BUF_MEM_free;
@@ -138,6 +139,163 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
+const _: unsafe extern "C" fn(core::ffi::c_int, ...) = crate::err::ERR_add_error_data;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *const core::ffi::c_char) =
+    crate::err::ERR_add_error_txt;
+const _: for<'a> unsafe extern "C" fn(core::ffi::c_int, core::ffi::VaList<'a>) =
+    crate::err::ERR_add_error_vdata;
+const _: unsafe extern "C" fn() = crate::err::ERR_clear_error;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::ERR_clear_last_mark;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::ERR_count_to_mark;
+const _: unsafe extern "C" fn(
+    core::ffi::c_ulong,
+    *mut core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::err::strings::ERR_error_string;
+const _: unsafe extern "C" fn(core::ffi::c_ulong, *mut core::ffi::c_char, usize) =
+    crate::err::strings::ERR_error_string_n;
+const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *const core::ffi::c_char =
+    crate::err::strings::ERR_func_error_string;
+const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::err::ERR_get_error;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_get_error_all;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_get_error_line;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_get_error_line_data;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::err::strings::ERR_get_next_error_library;
+const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::ERR_get_state;
+const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *const core::ffi::c_char =
+    crate::err::strings::ERR_lib_error_string;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_ASN1_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_ASYNC_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_BIO_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_BN_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_BUF_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_CMS_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_COMP_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_CONF_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_CRYPTO_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_CT_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_DH_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_DSA_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_EC_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_ENGINE_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_ERR_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_EVP_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_KDF_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_OBJ_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_OCSP_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::err::strings::ERR_load_OSSL_STORE_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_PEM_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_PKCS12_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_PKCS7_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_RAND_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_RSA_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_TS_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_UI_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_X509V3_strings;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::strings::ERR_load_X509_strings;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut ERR_STRING_DATA) -> core::ffi::c_int =
+    crate::err::strings::ERR_load_strings;
+const _: unsafe extern "C" fn(*const ERR_STRING_DATA) -> core::ffi::c_int =
+    crate::err::strings::ERR_load_strings_const;
+const _: unsafe extern "C" fn() = crate::err::ERR_new;
+const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::err::ERR_peek_error;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_error_all;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_error_data;
+const _: unsafe extern "C" fn(*mut *const core::ffi::c_char) -> core::ffi::c_ulong =
+    crate::err::ERR_peek_error_func;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_error_line;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_error_line_data;
+const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::err::ERR_peek_last_error;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_last_error_all;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_last_error_data;
+const _: unsafe extern "C" fn(*mut *const core::ffi::c_char) -> core::ffi::c_ulong =
+    crate::err::ERR_peek_last_error_func;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_last_error_line;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_ulong = crate::err::ERR_peek_last_error_line_data;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::ERR_pop;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::ERR_pop_to_mark;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            str_: *const core::ffi::c_char,
+            len: usize,
+            u: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut core::ffi::c_void,
+) = crate::err::strings::ERR_print_errors_cb;
+const _: unsafe extern "C" fn(*mut FILE) = crate::err::strings::ERR_print_errors_fp;
+const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *const core::ffi::c_char =
+    crate::err::strings::ERR_reason_error_string;
+const _: unsafe extern "C" fn(core::ffi::c_ulong) = crate::err::ERR_remove_state;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void) = crate::err::ERR_remove_thread_state;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) = crate::err::ERR_set_debug;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int, *const core::ffi::c_char, ...) =
+    crate::err::ERR_set_error;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, core::ffi::c_int) =
+    crate::err::ERR_set_error_data;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::err::ERR_set_mark;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut ERR_STRING_DATA) -> core::ffi::c_int =
+    crate::err::strings::ERR_unload_strings;
+const _: for<'a> unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::VaList<'a>,
+) = crate::err::ERR_vset_error;
 const _: unsafe extern "C" fn(*mut OPENSSL_INIT_SETTINGS) = crate::init::OPENSSL_INIT_free;
 const _: unsafe extern "C" fn() -> *mut OPENSSL_INIT_SETTINGS = crate::init::OPENSSL_INIT_new;
 const _: unsafe extern "C" fn(
@@ -178,6 +336,11 @@ const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_v
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_free;
+const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_new;
+const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
+const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
+const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::threads::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
@@ -185,3 +348,6 @@ const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
+const _: unsafe extern "C" fn() = crate::err::strings::err_free_strings_int;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::err::strings::rustssl_private_ERR_load_SSL_strings;
