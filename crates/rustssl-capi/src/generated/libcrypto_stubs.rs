@@ -20991,40 +20991,6 @@ pub extern "C" fn OPENSSL_DIR_read(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_INIT_free(_: *mut OPENSSL_INIT_SETTINGS) {
-    crate::stub::unimplemented("OPENSSL_INIT_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_INIT_new() -> *mut OPENSSL_INIT_SETTINGS {
-    crate::stub::unimplemented("OPENSSL_INIT_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_INIT_set_config_appname(
-    _: *mut OPENSSL_INIT_SETTINGS,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_INIT_set_config_appname")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_INIT_set_config_file_flags(
-    _: *mut OPENSSL_INIT_SETTINGS,
-    _: core::ffi::c_ulong,
-) {
-    crate::stub::unimplemented("OPENSSL_INIT_set_config_file_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_INIT_set_config_filename(
-    _: *mut OPENSSL_INIT_SETTINGS,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_INIT_set_config_filename")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_LH_delete(
     _: *mut OPENSSL_LHASH,
     _: *const core::ffi::c_void,
@@ -21167,13 +21133,6 @@ pub extern "C" fn OPENSSL_asc2uni(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_atexit(
-    _: ::core::option::Option<unsafe extern "C" fn()>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_atexit")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_buf2hexstr(
     _: *const core::ffi::c_uchar,
     _: core::ffi::c_long,
@@ -21194,37 +21153,8 @@ pub extern "C" fn OPENSSL_buf2hexstr_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_cleanup() {
-    crate::stub::unimplemented("OPENSSL_cleanup")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_config(_: *const core::ffi::c_char) {
     crate::stub::unimplemented("OPENSSL_config")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_die(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("OPENSSL_die")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_fork_child() {
-    crate::stub::unimplemented("OPENSSL_fork_child")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_fork_parent() {
-    crate::stub::unimplemented("OPENSSL_fork_parent")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_fork_prepare() {
-    crate::stub::unimplemented("OPENSSL_fork_prepare")
 }
 
 #[unsafe(no_mangle)]
@@ -21273,31 +21203,6 @@ pub extern "C" fn OPENSSL_hexstr2buf_ex(
     _: core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OPENSSL_hexstr2buf_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_info(_: core::ffi::c_int) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_info")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_init() {
-    crate::stub::unimplemented("OPENSSL_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_init_crypto(_: u64, _: *const OPENSSL_INIT_SETTINGS) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_init_crypto")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_isservice() -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_isservice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_issetugid() -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_issetugid")
 }
 
 #[unsafe(no_mangle)]
@@ -21563,31 +21468,6 @@ pub extern "C" fn OPENSSL_utf82uni(
     _: *mut core::ffi::c_int,
 ) -> *mut core::ffi::c_uchar {
     crate::stub::unimplemented("OPENSSL_utf82uni")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_version_build_metadata() -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_version_build_metadata")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_version_major() -> core::ffi::c_uint {
-    crate::stub::unimplemented("OPENSSL_version_major")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_version_minor() -> core::ffi::c_uint {
-    crate::stub::unimplemented("OPENSSL_version_minor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_version_patch() -> core::ffi::c_uint {
-    crate::stub::unimplemented("OPENSSL_version_patch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_version_pre_release() -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_version_pre_release")
 }
 
 #[unsafe(no_mangle)]
@@ -26470,16 +26350,6 @@ pub extern "C" fn OTHERNAME_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn OTHERNAME_new() -> *mut OTHERNAME {
     crate::stub::unimplemented("OTHERNAME_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OpenSSL_version(_: core::ffi::c_int) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OpenSSL_version")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OpenSSL_version_num() -> core::ffi::c_ulong {
-    crate::stub::unimplemented("OpenSSL_version_num")
 }
 
 #[unsafe(no_mangle)]

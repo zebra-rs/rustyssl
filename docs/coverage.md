@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 27 | 5849 | 0.5% |
+| libcrypto | 5876 | 50 | 5826 | 0.9% |
 | libssl | 603 | 0 | 603 | 0.0% |
-| **Total** | **6479** | **27** | **6452** | **0.4%** |
+| **Total** | **6479** | **50** | **6429** | **0.8%** |
 
 ## By header
 
@@ -41,7 +41,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/comp.h` | libcrypto | 17 | 0 | 0.0% |
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
-| `openssl/crypto.h` | libcrypto | 101 | 21 | 20.8% |
+| `openssl/crypto.h` | libcrypto | 101 | 44 | 43.6% |
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 0 | 0.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
@@ -130,4 +130,27 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_secure_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_set_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `OPENSSL_INIT_free` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_INIT_new` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_INIT_set_config_appname` | libcrypto | `openssl/crypto.h` | `crypto_init` |
+| `OPENSSL_INIT_set_config_file_flags` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_INIT_set_config_filename` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_atexit` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config` |
 | `OPENSSL_cleanse` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
+| `OPENSSL_cleanup` | libcrypto | `openssl/crypto.h` | `crypto_init` |
+| `OPENSSL_die` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_fork_child` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_fork_parent` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_fork_prepare` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_info` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_init` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_isservice` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_issetugid` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_version_build_metadata` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_version_major` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_version_minor` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_version_patch` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OPENSSL_version_pre_release` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OpenSSL_version` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OpenSSL_version_num` | libcrypto | `openssl/crypto.h` | `crypto_version` |

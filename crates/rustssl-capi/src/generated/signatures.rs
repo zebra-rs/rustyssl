@@ -90,4 +90,44 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
+const _: unsafe extern "C" fn(*mut OPENSSL_INIT_SETTINGS) = crate::init::OPENSSL_INIT_free;
+const _: unsafe extern "C" fn() -> *mut OPENSSL_INIT_SETTINGS = crate::init::OPENSSL_INIT_new;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_INIT_SETTINGS,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::init::OPENSSL_INIT_set_config_appname;
+const _: unsafe extern "C" fn(*mut OPENSSL_INIT_SETTINGS, core::ffi::c_ulong) =
+    crate::init::OPENSSL_INIT_set_config_file_flags;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_INIT_SETTINGS,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::init::OPENSSL_INIT_set_config_filename;
+const _: unsafe extern "C" fn(::core::option::Option<unsafe extern "C" fn()>) -> core::ffi::c_int =
+    crate::init::OPENSSL_atexit;
 const _: unsafe extern "C" fn(*mut core::ffi::c_void, usize) = crate::mem::OPENSSL_cleanse;
+const _: unsafe extern "C" fn() = crate::init::OPENSSL_cleanup;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) = crate::init::OPENSSL_die;
+const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_child;
+const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_parent;
+const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_prepare;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::version::OPENSSL_info;
+const _: unsafe extern "C" fn() = crate::init::OPENSSL_init;
+const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c_int =
+    crate::init::OPENSSL_init_crypto;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_isservice;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_issetugid;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
+    crate::version::OPENSSL_version_build_metadata;
+const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_major;
+const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_minor;
+const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
+    crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::version::OpenSSL_version;
+const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
