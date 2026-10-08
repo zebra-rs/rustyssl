@@ -253,20 +253,6 @@ ffi_export! {
     }
 }
 
-/// This thread's `errno`.
-#[cfg(target_os = "macos")]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__error() }
-}
-
-/// This thread's `errno`.
-#[cfg(not(target_os = "macos"))]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__errno_location() }
-}
-
 ffi_export! {
     /// Converts `str` with `strtoul` into `*num`. Returns 1, or 0 if `strtoul` failed (see
     /// `errno`, which is cleared first), nothing was converted, `str` starts with `-`, or
@@ -280,8 +266,7 @@ ffi_export! {
     {
         let mut local = ptr::null_mut();
         let end = if endptr.is_null() { &raw mut local } else { endptr };
-        // SAFETY: errno_location returns this thread's errno.
-        unsafe { errno_location().write(0) };
+        crate::errno::set(0);
         // SAFETY: `end` is the caller's endptr or the local.
         unsafe { end.write(str.cast_mut()) };
         if num.is_null() || str.is_null() {
@@ -297,8 +282,7 @@ ffi_export! {
         unsafe { num.write(value) };
         // SAFETY: as above.
         let end_at = unsafe { end.read() };
-        // SAFETY: errno_location returns this thread's errno.
-        let errno = unsafe { errno_location().read() };
+        let errno = crate::errno::get();
         // SAFETY: strtoul's end position is inside the string.
         let left_over = endptr.is_null() && unsafe { end_at.read() } != 0;
         c_int::from(errno == 0 && !left_over && end_at.cast_const() != str)
