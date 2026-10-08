@@ -2,7 +2,7 @@
  * Conformance test for application data on objects (CRYPTO_get_ex_new_index(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The callbacks
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The callbacks
  * record the order they run in; free callbacks of equal priority run in the order the C
  * library's qsort leaves them, which both implementations share.
  */

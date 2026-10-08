@@ -12,11 +12,11 @@ use crate::util::Result;
 
 pub const LIBRARIES: &[&str] = &["libcrypto", "libssl"];
 
-/// libcrypto exports `rustssl_private_<function>` for each libssl function, for libssl's
+/// libcrypto exports `rustyssl_private_<function>` for each libssl function, for libssl's
 /// forwarders only, under its own version node (docs/adr/0001-library-layout.md).
-pub const PRIVATE_PREFIX: &str = "rustssl_private_";
-const PRIVATE_NODE: &str = "RUSTSSL_PRIVATE";
-const PRIVATE_GLOB: &str = "rustssl_private_*";
+pub const PRIVATE_PREFIX: &str = "rustyssl_private_";
+const PRIVATE_NODE: &str = "RUSTYSSL_PRIVATE";
+const PRIVATE_GLOB: &str = "rustyssl_private_*";
 
 /// The functions one library exports on one target, grouped by symbol version in order.
 pub struct Exports {

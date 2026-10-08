@@ -10,7 +10,7 @@
 //! Files can come from downloaded packages, so they're untrusted input. Every read is
 //! bounds-checked, and loop counts taken from the file are capped. A malformed file is `None`
 //! (or has no imports), never a panic. Only 64-bit little-endian files with section headers are
-//! read, which covers every platform rustssl builds ELF libraries for.
+//! read, which covers every platform rustyssl builds ELF libraries for.
 
 use std::collections::HashMap;
 

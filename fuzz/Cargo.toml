@@ -4,7 +4,7 @@
 # that ships in libcrypto or libssl may depend on C code (AGENTS.md, security rule 8).
 
 [package]
-name = "rustssl-fuzz"
+name = "rustyssl-fuzz"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -14,8 +14,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-rustssl-abi = { path = "../crates/rustssl-abi" }
-rustssl-capi = { path = "../crates/rustssl-capi" }
+rustyssl-abi = { path = "../crates/rustyssl-abi" }
+rustyssl-capi = { path = "../crates/rustyssl-capi" }
 
 [workspace]
 

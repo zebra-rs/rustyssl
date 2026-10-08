@@ -1,10 +1,16 @@
-# rustssl Implementation Plan
+# rustyssl Implementation Plan
 
 Baseline: **OpenSSL 3.5 LTS ABI → 3.6 additions → OpenSSL 4.0 ABI.**
 See [AGENTS.md](../AGENTS.md) for the rules and architecture, and [TEST_PLAN.md](TEST_PLAN.md)
 for how each step is verified.
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this file as you work.
+
+The project was called rustssl until 2026-10-07; it was renamed because that name is taken on
+crates.io. Everything changed with it: the crates (`rustyssl-*`), libssl's private symbols
+(`rustyssl_private_*` in the `RUSTYSSL_PRIVATE` version node), the build variables
+(`RUSTYSSL_OPENSSLDIR`, `RUSTYSSL_ENGINESDIR`, `RUSTYSSL_MODULESDIR`), and the build metadata
+in the version text (`+rustyssl.<version>`).
 
 ---
 
@@ -47,10 +53,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
 - [x] **0.1 Workspace.** Convert the root `Cargo.toml` into a workspace and remove the
   placeholder `src/lib.rs`. Create the crate skeletons from AGENTS.md, `rust-toolchain.toml`
   (stable, at least 1.99), and workspace lints: `forbid(unsafe_code)` everywhere except
-  `rustssl-capi` and `libs/*`, plus the clippy set from the security rules. Add `rustfmt.toml`,
+  `rustyssl-capi` and `libs/*`, plus the clippy set from the security rules. Add `rustfmt.toml`,
   `license = "Apache-2.0"` in the workspace package metadata, and a `NOTICE` that carries
   OpenSSL's attribution for the vendored files. (`LICENSE.txt` already exists.)
-  *Done.* The workspace has every `crates/*` from AGENTS.md except `rustssl-quic` (deferred
+  *Done.* The workspace has every `crates/*` from AGENTS.md except `rustyssl-quic` (deferred
   to Phase 10), plus `libs/libcrypto` (cdylib + staticlib), `libs/libssl` (cdylib), and
   `xtask`. The lints live in `[workspace.lints]` plus crate-level attributes, with test
   exemptions in `clippy.toml`. The release profile keeps `overflow-checks = true`.
@@ -75,12 +81,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - Also vendored: `obj_xref.txt` (needed by `OBJ_find_sigid_algs` in 2.1) and OpenSSL's
     `LICENSE.txt`. The generated `.pod` files come from `make build_generated_pods`.
   - The same command handles 3.6 and 4.0 (`abi/openssl-3.6/`, `abi/openssl-4.0/`).
-- [x] **0.3 `rustssl-abi`.** Generate it with bindgen from the vendored headers, **once per
+- [x] **0.3 `rustyssl-abi`.** Generate it with bindgen from the vendored headers, **once per
   target** (see the `configuration.h` note in 0.2), selected with
   `cfg(target_arch, target_os)`. The output is committed so users don't need libclang. It
   holds opaque type declarations, every public struct and union with `#[repr(C)]`, and all
   constants. Generate layout assertions too.
-  *Done* (`cargo xtask codegen`, output in `crates/rustssl-abi/src/generated/`). Notes:
+  *Done* (`cargo xtask codegen`, output in `crates/rustyssl-abi/src/generated/`). Notes:
   - **Headers are parsed without a target sysroot**, using clang's freestanding headers plus
     generated stand-ins for the few libc headers OpenSSL includes. Each libc type is an
     *incomplete* struct there, so a public struct embedding one by value fails the parse.
@@ -100,7 +106,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - `rust-toolchain.toml` lists the three Rust targets, so codegen can `cargo check` each
     one, which evaluates the layout assertions. Regenerating gives byte-identical output.
 - [x] **0.4 Code generators** (`cargo xtask codegen`):
-  - Linux version scripts (`OPENSSL_3.0.0` … `OPENSSL_3.6.0` plus `RUSTSSL_PRIVATE`) and
+  - Linux version scripts (`OPENSSL_3.0.0` … `OPENSSL_3.6.0` plus `RUSTYSSL_PRIVATE`) and
     macOS exported-symbol lists, from the `.num` files. Honor the `EXIST`/`NOEXIST` and
     feature columns exactly as the default build resolves them.
   - NID, short-name, long-name, and OID tables from `objects.txt`.
@@ -115,19 +121,19 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     libssl** functions (5,876 in libcrypto once 0.6 adds `enable-ec_nistp_64_gcc_128`), identical on all three targets. There are 9 version nodes, including
     patch-level ones (`OPENSSL_3.0.3`, `3.0.8`, `3.0.9`) and up to `OPENSSL_3.5.0`; no data
     symbols are exported. The generated scripts match mkdef's output exactly. The
-    `RUSTSSL_PRIVATE` node exports the glob `rustssl_private_*`, a placeholder until 0.6
+    `RUSTYSSL_PRIVATE` node exports the glob `rustyssl_private_*`, a placeholder until 0.6
     settles the names.
   - **Stubs abort** instead of returning an error (see rule 10 in AGENTS.md). There's one
     per export: 6,476, generated from bindgen prototypes parsed with `syn`. `va_list`
     parameters become `VaList`. All three targets must produce identical stubs, and they
     compile on each. A C program linked to the built `libcrypto.dylib` gets the message and
     SIGABRT. 26 exports are declared only in internal headers (`DSO_*`, `conf_ssl_*`,
-    `OPENSSL_DIR_*`, …), so six of those are now vendored, and `rustssl-abi` includes their
+    `OPENSSL_DIR_*`, …), so six of those are now vendored, and `rustyssl-abi` includes their
     types. The wrapper also puts headers first when another header declares extra
     functions only after them (`cms.h` declares the `PEM_*_CMS` functions only if `pem.h`
     came first).
   - **Error strings.** Three sources are cross-checked: `openssl.txt` (names and codes), the
-    headers (codes, as `rustssl-abi` constants), and the C string tables `*_err.c`, which
+    headers (codes, as `rustyssl-abi` constants), and the C string tables `*_err.c`, which
     are now vendored. Upstream, 3 BIO texts in `bio_err.c` differ from `openssl.txt`, and
     the C text wins because it's what OpenSSL prints. Separately,
     `BIO_R_PEER_ADDR_NOT_AVAILABLE` is 114 in `openssl.txt` but 151 in the header, and the
@@ -154,7 +160,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
       `--no-undefined`, GC, strip.
     - **macOS:** `-force_load`, `-exported_symbols_list`, an absolute install name,
       compatibility and current version 3.0.0 (as in OpenSSL's dylibs), dead-strip.
-  - **libssl defines its own exports.** Its 603 stubs moved from `rustssl-capi` into
+  - **libssl defines its own exports.** Its 603 stubs moved from `rustyssl-capi` into
     `libs/libssl` (they become forwarders in 0.6), and libssl links against libcrypto
     (`NEEDED libcrypto.so.3`), as OpenSSL's does.
   - **dist also installs** the headers (with the host's `configuration.h`), the `.a`
@@ -172,7 +178,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     linking of both archives is item 4 of 0.6.
 - [x] **0.6 Architecture spike: "one implementation, two facades".** Prove on Linux
   (glibc and musl) and macOS that:
-  1. libssl's `SSL_*` exports forward into libcrypto's `RUSTSSL_PRIVATE` entry points.
+  1. libssl's `SSL_*` exports forward into libcrypto's `RUSTYSSL_PRIVATE` entry points.
   2. A binary **linked against real OpenSSL** resolves every versioned symbol against our libs.
   3. macOS two-level-namespace binding resolves correctly.
   4. `-lssl -lcrypto` static linking works and doesn't duplicate Rust `std` symbols.
@@ -183,7 +189,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
 
   *Done:* see [ADR 0001](adr/0001-library-layout.md) for the decision and evidence.
   - **Design.** libssl's exports are generated one-branch forwarders to libcrypto's
-    `rustssl_private_<name>`, which hold the stubs (and later the implementations).
+    `rustyssl_private_<name>`, which hold the stubs (and later the implementations).
     `dist` builds libssl from the crate's forwarder objects alone and verifies they
     reference nothing else, so libssl carries no Rust runtime: `libssl.a` shrank from
     19 MB to 95 KB.
@@ -201,7 +207,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     Everything else distributions differ in, we export as a superset (Debian drops
     IDEA/MDC2; Alpine also drops GF2m, compression, and SEED). The exception is Debian's
     `SSL_test_functions` (`enable-unit-test`), an internal test hook left out on purpose.
-- [x] **0.7 FFI primitives** in `rustssl-capi`:
+- [x] **0.7 FFI primitives** in `rustyssl-capi`:
   - the `ffi_export!` wrapper (catches unwinds, pushes an ERR entry, returns the failure
     value);
   - the opaque handle model (Arc-backed, with `*_up_ref`/`*_free` and stable interior
@@ -212,7 +218,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
 
   Prove them out on `BUF_MEM`.
 
-  *Done.* Modules in `crates/rustssl-capi/src/`:
+  *Done.* Modules in `crates/rustyssl-capi/src/`:
   - **`ffi.rs`:** `guard` and `ffi_export!`. A panic becomes `ERR_R_INTERNAL_ERROR` for the
     export's library, plus its failure value. Also the checked conversions (`length`,
     `to_c_int`, `bytes`, `bytes_or_c_str` for the "-1 means NUL-terminated" convention), and
@@ -229,18 +235,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - **`err.rs`:** the per-thread queue `raise` writes to, holding `ERR_NUM_ERRORS - 1`
     entries (to be confirmed in 1.4).
   - **`buffer.rs`:** all six `buffer.h` exports are implemented. The C test
-    `tests/c/buf_mem.c` (26 checks) passes against the reference and rustssl, with
+    `tests/c/buf_mem.c` (26 checks) passes against the reference and rustyssl, with
     identical output: Homebrew 3.6.5 on macOS and Debian 3.5.7 on Linux, the same binary
-    run against both. Where OpenSSL crashes (null buffer), rustssl fails cleanly.
-  - **Checks:** the `rustssl-capi` tests pass under Miri
-    (`cargo +nightly miri test -p rustssl-capi`). Codegen's implemented-function scan now
+    run against both. Where OpenSSL crashes (null buffer), rustyssl fails cleanly.
+  - **Checks:** the `rustyssl-capi` tests pass under Miri
+    (`cargo +nightly miri test -p rustyssl-capi`). Codegen's implemented-function scan now
     skips comments; doc examples had been hiding the `BIO_printf` stubs.
 - [x] **0.8 Test infrastructure** (details in TEST_PLAN.md):
   - `cargo xtask ref-openssl 3.5`, which builds the reference into `target/ref/`;
   - the C conformance harness in `tests/c`, with dual runs (reference and ours). The first
     test, `tests/c/buf_mem.c` (TAP output), is already there and has been dual-run by hand
     (0.7);
-  - Miri on the `rustssl-capi` tests;
+  - Miri on the `rustyssl-capi` tests;
   - the differential probe skeleton;
   - fuzz scaffolding;
   - CI on Linux x86_64 and aarch64 and macOS arm64;
@@ -261,7 +267,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
     identical. `buf_mem`: 26 checks, identical on macOS arm64 and on Linux aarch64 (Debian
     trixie in Docker).
   - **`cargo xtask test-differential`** feeds the same command script to
-    `tests/differential/probe.c` on the reference and on rustssl and compares output line
+    `tests/differential/probe.c` on the reference and on rustyssl and compares output line
     by line: the reference is the oracle. The inputs are the hand-written corpus in
     `tests/differential/corpus/` plus `--random N` generated sessions (default 200). The
     seed is printed, and `--seed` replays it. Results: 500 sessions on macOS (about 13,000
@@ -290,7 +296,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   header, and the implemented exports with the tests that call them. `--list PREFIX...`
   prints the status of every export with that prefix: implemented, untested, or stub.
   Starting point: 6 of 6,479 exports (all of `buffer.h`).
-  - **Implemented** means `rustssl-capi` defines the export and a `tests/c` program calls
+  - **Implemented** means `rustyssl-capi` defines the export and a `tests/c` program calls
     it, which is AGENTS.md's rule made mechanical. Calls come from the undefined symbols of
     each test compiled to an object, not from its source text. So a call through a macro
     (`BIO_get_mem_data` → `BIO_ctrl`) or an inline wrapper (`sk_X509_num` →
@@ -343,7 +349,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
       (4%), the top 1,000 serves 41%, and the top 2,000 serves 68%. Usage orders the work,
       but nearly every imported function is needed by someone.
   - **Open decision: Fedora's ABI extras.** 7 Fedora packages import functions the
-    upstream 3.5 ABI doesn't have, so they wouldn't load on rustssl. Fedora's libcrypto
+    upstream 3.5 ABI doesn't have, so they wouldn't load on rustyssl. Fedora's libcrypto
     (checked) has three extras:
     - MD2 (`EVP_md2`, `MD2_*`; ipmitool, perl-Net-SSLeay, qca), which upstream disables by
       default and AGENTS.md keeps disabled;
@@ -361,8 +367,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   1. **Symbol set and versions.**
      - Each library's dynamic exports equal its export list from the vendored mkdef `.ld`
        files, and each symbol carries its version node.
-     - libcrypto also exports `rustssl_private_*`, exactly one per libssl function, under
-       `RUSTSSL_PRIVATE`. Nothing else is exported, including no Rust runtime symbols.
+     - libcrypto also exports `rustyssl_private_*`, exactly one per libssl function, under
+       `RUSTYSSL_PRIVATE`. Nothing else is exported, including no Rust runtime symbols.
      - Linux symbols are read from the ELF version tables, extending `usage_scan/elf.rs`'s
        reader to defined symbols and `.gnu.version_d`. macOS uses `nm` and the export list.
   2. **Library metadata:**
@@ -371,15 +377,15 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
        libm, libpthread, libdl and the unwinder;
      - the version definitions and their parent chain;
      - macOS compatibility and current versions 3.0.0.
-  3. **Signatures.** Every hand-written `extern "C"` export in `rustssl-capi` (outside
-     `generated/`), including the `rustssl_private_*` definitions of libssl functions, must
+  3. **Signatures.** Every hand-written `extern "C"` export in `rustyssl-capi` (outside
+     `generated/`), including the `rustyssl_private_*` definitions of libssl functions, must
      match the bindgen prototype exactly: parameter and return types, pointer constness,
      and variadics. The generated stubs and forwarders match by construction.
   4. **Layouts.** A generated C program, compiled with the official headers, prints
      `sizeof`, `alignof`, and `offsetof` for every public struct and union. The values must
-     equal `rustssl-abi`'s layout for the host target.
+     equal `rustyssl-abi`'s layout for the host target.
   5. **Constants.** The C compiler evaluates every integer and string macro constant with
-     the real libc headers, and each value must equal `rustssl-abi`'s.
+     the real libc headers, and each value must equal `rustyssl-abi`'s.
   6. **Binary compatibility.** A program that references every exported function is linked
      against the reference OpenSSL with immediate binding (`-z now`; `-bind_at_load` on
      macOS). It's then loaded against our libraries, so every versioned symbol must resolve.
@@ -397,7 +403,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   Docker). A run takes about 6 s once the libraries are built. `cargo xtask abi-check
   <check>...` runs only the named checks. CI runs it in the `test` job.
   - **Symbols:**
-    - libcrypto exports 5,876 functions plus 603 `rustssl_private_*`; libssl exports 603.
+    - libcrypto exports 5,876 functions plus 603 `rustyssl_private_*`; libssl exports 603.
     - On Linux every symbol is at its node and none is a non-default version. The ELF
       reader from 0.10 now also reads `.gnu.version_d` and `.dynamic`. It skips the absolute
       symbols the linker defines for version nodes.
@@ -411,7 +417,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
       reference doesn't. Rust's std names it but nothing calls it, so `dist` now links with
       `-dead_strip_dylibs`.
   - **Signatures:** instead of parsing `ffi_export!` bodies with `syn`, codegen writes
-    `rustssl-capi/src/generated/signatures.rs`. It assigns each hand-written export to a
+    `rustyssl-capi/src/generated/signatures.rs`. It assigns each hand-written export to a
     function pointer of the header prototype's type, so the compiler checks the signature
     exactly, on every target codegen checks. That covers `*const`/`*mut`, widths,
     variadics, and `VaList` through a higher-ranked lifetime. abi-check confirms every
@@ -423,7 +429,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this
   - **Constants:** 8,401 integer (8,400 on Linux) and 3,454 string constants match. Integers
     are checked for value, size, and signedness.
   - **Binary and static:** a program referencing all 6,479 public functions is linked
-    against the reference with `-z now`/`-bind_at_load`. It loads on rustssl's libraries,
+    against the reference with `-z now`/`-bind_at_load`. It loads on rustyssl's libraries,
     and `dladdr` shows ours were used. It also links statically against `libssl.a` and
     `libcrypto.a` and runs.
   - **Headers:** the 142 installed headers are byte-identical to the reference's, and
@@ -439,7 +445,7 @@ macOS arm64 and Linux aarch64.*
 Everything else depends on this phase.
 
 - [x] **1.1 Memory:**
-  (The internal allocator exists in `rustssl-capi/src/mem.rs` since 0.7; this step exports
+  (The internal allocator exists in `rustyssl-capi/src/mem.rs` since 0.7; this step exports
   it, adds the `CRYPTO_set_mem_functions` hooks, and confirms its edge cases against the
   reference.)
   - `CRYPTO_malloc`, `zalloc`, `realloc`, `clear_realloc`, `free`, `clear_free`
@@ -456,8 +462,8 @@ Everything else depends on this phase.
     source in `target/ref/openssl-<version>/src/`, the C spec for each family. Behavior
     that varies by platform was measured on the reference, macOS and Linux.
   - **Allocator (`mem.rs`):**
-    - Every allocation, rustssl's own included, goes through the functions installed with
-      `CRYPTO_set_mem_functions`. Our own pass the file `"rustssl"` and the Rust line.
+    - Every allocation, rustyssl's own included, goes through the functions installed with
+      `CRYPTO_set_mem_functions`. Our own pass the file `"rustyssl"` and the Rust line.
     - Customization closes at the first allocation by the default allocator, as in OpenSSL.
       `CRYPTO_get_mem_functions` reports the defaults as `CRYPTO_malloc`/`_realloc`/`_free`,
       and passing those back restores them.
@@ -498,22 +504,22 @@ Everything else depends on this phase.
   - fork handling
 
   Decide the version-string policy: the numbers report the targeted 3.5.x and the text names
-  rustssl. Record it in `DEVIATIONS.md` if it differs from upstream.
+  rustyssl. Record it in `DEVIATIONS.md` if it differs from upstream.
 
   *Done:* 23 exports, now 50 of libcrypto's 5,876.
   - **Version policy** (`version.rs`; `DEVIATIONS.md` explains why):
     - The numbers (`OpenSSL_version_num`, `OPENSSL_version_major`/`_minor`/`_patch`,
       `OPENSSL_VERSION_STRING`) and the release date are the vendored 3.5.9's.
-    - rustssl names itself in the build metadata, which OpenSSL's man page reserves "for
-      other parties, such as `+fips`": `OpenSSL 3.5.9+rustssl.0.1.0 29 Sep 2026`.
+    - rustyssl names itself in the build metadata, which OpenSSL's man page reserves "for
+      other parties, such as `+fips`": `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026`.
   - **Build information:**
     - `cargo xtask vendor` now records each target's `PLATFORM`, `OPENSSLDIR`,
       `ENGINESDIR`, `MODULESDIR`, and `DSO_EXTENSION` from OpenSSL's Makefile in
-      `config/<target>/build.toml`, and codegen turns them into `rustssl_abi::build`.
+      `config/<target>/build.toml`, and codegen turns them into `rustyssl_abi::build`.
       x86_64 Linux gets `lib64`, as upstream's default build does.
-    - Packagers override the directories with `RUSTSSL_OPENSSLDIR`/`_ENGINESDIR`/
+    - Packagers override the directories with `RUSTYSSL_OPENSSLDIR`/`_ENGINESDIR`/
       `_MODULESDIR` at build time; that's for 12.3.
-    - `CPUINFO` is `N/A`, since rustssl has no `OPENSSL_ia32cap`-steered assembly. The
+    - `CPUINFO` is `N/A`, since rustyssl has no `OPENSSL_ia32cap`-steered assembly. The
       compiler and build date say rustc and "reproducible build".
   - **Initialization** (`init.rs`), following `crypto/init.c`:
     - `OPENSSL_init_crypto(0, NULL)` does nothing.
@@ -555,7 +561,7 @@ Everything else depends on this phase.
     - `crypto_init_config.c` (3, with the exit handler run by `atexit`).
     - `crypto_init_config_strict.c` (5, including another thread).
     - All are identical to the reference on macOS. Rust unit tests cover the
-      rustssl-specific strings and the new deviations.
+      rustyssl-specific strings and the new deviations.
 - [x] **1.3 Threads:** `CRYPTO_THREAD_*` locks, run-once, and thread-local storage;
   `CRYPTO_atomic_*`; `OSSL_set_max_threads` and the thread pool.
 
@@ -801,12 +807,12 @@ base64 fuzzers run clean.
 ## Phase 2: ASN.1, objects, encodings
 
 - [ ] **2.1 OBJ:**
-  - the generated NID table (`rustssl_asn1::objects`, from 0.4), plus
+  - the generated NID table (`rustyssl_asn1::objects`, from 0.4), plus
     `OBJ_create`/`OBJ_add_object` for runtime OIDs
   - `OBJ_txt2obj`/`OBJ_obj2txt` (byte-exact, including large arcs)
   - `OBJ_find_sigid_algs`, `OBJ_add_sigid`
   - the `OBJ_NAME_*` alias registry
-- [ ] **2.2 DER/BER engine** (`rustssl-asn1`):
+- [ ] **2.2 DER/BER engine** (`rustyssl-asn1`):
   - safe and zero-copy, with bounded depth and size
   - indefinite-length BER (needed for PKCS#7, CMS, and PKCS#12)
   - strict DER, plus a documented list of the leniencies OpenSSL accepts
@@ -859,7 +865,7 @@ have run for at least 24 CPU-hours with no findings.
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
-- [ ] **3.2 Backend layer** (`rustssl-crypto`): Digest, Cipher (block, stream, AEAD), Mac,
+- [ ] **3.2 Backend layer** (`rustyssl-crypto`): Digest, Cipher (block, stream, AEAD), Mac,
   Kdf, and Rng traits; adapters for the vetted RustCrypto crates; entries in
   `docs/DEPENDENCIES.md`; CPU-feature dispatch (AES-NI, ARMv8 crypto, SHA extensions) through
   crate features.
@@ -1011,7 +1017,7 @@ files pass.
   - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store
   - `load_locations`, default paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`, OPENSSLDIR)
   - every store callback setter
-- [ ] **5.4 Path validation** (core in `rustssl-pki`):
+- [ ] **5.4 Path validation** (core in `rustyssl-pki`):
   - chain building over multiple candidate issuers (alternate chains, the CVE-2015-1793
     lesson), trusted-first, partial chains
   - RFC 5280 checks: signatures under security levels, validity time, basic constraints and
@@ -1087,7 +1093,7 @@ The upstream cms, pkcs12, ocsp, ts, and cmp recipes pass.
 
 Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 → 7.5 → 7.6 (**M4**).
 
-- [ ] **7.1 Sans-IO TLS core** (`rustssl-tls`):
+- [ ] **7.1 Sans-IO TLS core** (`rustyssl-tls`):
   - the record layer: version-specific protection, fragmentation, the
     `max_fragment_length` and `record_size_limit` extensions, padding
   - a typed codec for every handshake message and extension (unknown extensions are kept for
@@ -1095,7 +1101,7 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - client and server state machines (typestate internally, mapped to OpenSSL's observable
     `SSL_ST_*` and `SSL_state_string(_long)` values)
   - the key schedule and transcript hash
-  - crypto calls into `rustssl-crypto`
+  - crypto calls into `rustyssl-crypto`
 - [ ] **7.2 SSL objects in capi:**
   - the `SSL_METHOD` set
   - `SSL_CTX` and `SSL` lifecycle and refcounts, CTX → SSL inheritance, `SSL_set_SSL_CTX`,
@@ -1214,7 +1220,7 @@ DTLS interop with the reference and GnuTLS works under loss and reordering.
 
 ## Phase 10: QUIC
 
-- [ ] **10.1 Sans-IO QUIC transport** (`rustssl-quic`):
+- [ ] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
   - packet protection and header protection
   - frames, streams, flow control
   - congestion control (NewReno, as upstream) and loss detection

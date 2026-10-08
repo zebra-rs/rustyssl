@@ -1,6 +1,6 @@
 # abi/: vendored OpenSSL ABI definitions
 
-These files are the source of truth for the C API and ABI that rustssl reproduces. They are
+These files are the source of truth for the C API and ABI that rustyssl reproduces. They are
 copied unmodified from a signed OpenSSL release by `cargo xtask vendor <version>`. Don't edit
 them by hand: re-run the command, which replaces the whole `openssl-<major>.<minor>/`
 directory.

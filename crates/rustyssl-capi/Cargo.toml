@@ -1,0 +1,21 @@
+[package]
+name = "rustyssl-capi"
+description = "The C ABI layer: every C export of libcrypto and libssl, handles, BIO, callbacks, ERR, and CRYPTO_malloc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+libc.workspace = true
+rustyssl-abi.workspace = true
+rustyssl-asn1.workspace = true
+rustyssl-crypto.workspace = true
+rustyssl-pki.workspace = true
+rustyssl-tls.workspace = true
+subtle.workspace = true
+
+[lints]
+workspace = true

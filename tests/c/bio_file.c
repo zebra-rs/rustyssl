@@ -3,7 +3,7 @@
  * BIO_new_file, BIO_new_fp, BIO_new_fd, BIO_fd_should_retry), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
@@ -88,9 +88,9 @@ static void missing(void)
     unsigned long e;
 
     ERR_clear_error();
-    check(BIO_new_file("/nonexistent/rustssl", "r") == NULL, "BIO_new_file: a missing file");
+    check(BIO_new_file("/nonexistent/rustyssl", "r") == NULL, "BIO_new_file: a missing file");
     e = ERR_get_error_all(&file, NULL, NULL, &data, &flags);
-    check(e == (ERR_SYSTEM_FLAG | ENOENT) && same(data, "calling fopen(/nonexistent/rustssl, r)")
+    check(e == (ERR_SYSTEM_FLAG | ENOENT) && same(data, "calling fopen(/nonexistent/rustyssl, r)")
           && flags == (ERR_TXT_MALLOCED | ERR_TXT_STRING),
           "the system error, with the call in its data");
     check(ERR_get_error() == ERR_PACK(ERR_LIB_BIO, 0, BIO_R_NO_SUCH_FILE) && ERR_get_error() == 0,
@@ -143,7 +143,7 @@ static void descriptors(void)
 
 int main(void)
 {
-    snprintf(path, sizeof(path), "/tmp/rustssl-bio-%ld.txt", (long)getpid());
+    snprintf(path, sizeof(path), "/tmp/rustyssl-bio-%ld.txt", (long)getpid());
     files();
     missing();
     descriptors();

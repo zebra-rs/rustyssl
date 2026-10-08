@@ -10,7 +10,7 @@ use std::ffi::CString;
 
 use libfuzzer_sys::fuzz_target;
 // Linked for its exports, which the declarations below resolve to.
-use rustssl_capi as _;
+use rustyssl_capi as _;
 
 unsafe extern "C" {
     fn OPENSSL_hexstr2buf_ex(

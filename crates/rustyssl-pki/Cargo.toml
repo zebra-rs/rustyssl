@@ -1,0 +1,16 @@
+[package]
+name = "rustyssl-pki"
+description = "X.509, CRLs, CSRs, path validation, PKCS#7/#8/#12, CMS, OCSP, TS, and CT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustyssl-asn1.workspace = true
+rustyssl-crypto.workspace = true
+
+[lints]
+workspace = true

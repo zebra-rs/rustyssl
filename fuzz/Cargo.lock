@@ -76,60 +76,60 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "rustssl-abi"
+name = "rustyssl-abi"
 version = "0.1.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
-name = "rustssl-asn1"
+name = "rustyssl-asn1"
 version = "0.1.0"
 
 [[package]]
-name = "rustssl-capi"
+name = "rustyssl-capi"
 version = "0.1.0"
 dependencies = [
  "libc",
- "rustssl-abi",
- "rustssl-asn1",
- "rustssl-crypto",
- "rustssl-pki",
- "rustssl-tls",
+ "rustyssl-abi",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
+ "rustyssl-pki",
+ "rustyssl-tls",
  "subtle",
 ]
 
 [[package]]
-name = "rustssl-crypto"
+name = "rustyssl-crypto"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
+ "rustyssl-asn1",
 ]
 
 [[package]]
-name = "rustssl-fuzz"
+name = "rustyssl-fuzz"
 version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
- "rustssl-abi",
- "rustssl-capi",
+ "rustyssl-abi",
+ "rustyssl-capi",
 ]
 
 [[package]]
-name = "rustssl-pki"
+name = "rustyssl-pki"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
- "rustssl-crypto",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
 ]
 
 [[package]]
-name = "rustssl-tls"
+name = "rustyssl-tls"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
- "rustssl-crypto",
- "rustssl-pki",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
+ "rustyssl-pki",
 ]
 
 [[package]]

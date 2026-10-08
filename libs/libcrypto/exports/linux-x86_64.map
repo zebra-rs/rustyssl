@@ -5903,8 +5903,8 @@ OPENSSL_3.5.0 {
         i2d_OSSL_TIME_SPEC_WEEKS;
         i2d_OSSL_TIME_SPEC_X_DAY_OF;
 } OPENSSL_3.4.0;
-RUSTSSL_PRIVATE {
+RUSTYSSL_PRIVATE {
     global:
-        rustssl_private_*;
+        rustyssl_private_*;
     local: *;
 } OPENSSL_3.5.0;

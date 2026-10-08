@@ -1,5 +1,5 @@
 //! `cargo xtask abi-check [check...]`: ABI conformance (TEST_PLAN.md, layer L3). It builds
-//! rustssl's libraries (`cargo xtask dist`) and the reference OpenSSL (`cargo xtask
+//! rustyssl's libraries (`cargo xtask dist`) and the reference OpenSSL (`cargo xtask
 //! ref-openssl`), then checks ours against `abi/` and the reference. It fails if any check
 //! finds a difference, and reports every difference, not just the first.
 //!
@@ -85,7 +85,7 @@ impl Context {
         prefix.join("lib").join(name)
     }
 
-    /// What rustssl's library must export: the vendored list, plus, in libcrypto, the private
+    /// What rustyssl's library must export: the vendored list, plus, in libcrypto, the private
     /// twin of every libssl function (docs/adr/0001-library-layout.md).
     fn expected_exports(&self, library: &str) -> BTreeMap<String, String> {
         let mut expected = self.exports.get(library).cloned().unwrap_or_default();
@@ -98,7 +98,7 @@ impl Context {
             {
                 expected.insert(
                     format!("{PRIVATE_PREFIX}{name}"),
-                    "RUSTSSL_PRIVATE".to_owned(),
+                    "RUSTYSSL_PRIVATE".to_owned(),
                 );
             }
         }
@@ -184,7 +184,7 @@ pub fn run(args: &[String]) -> Result {
     }
 }
 
-/// Every hand-written export has a signature assertion in `rustssl-capi`'s generated
+/// Every hand-written export has a signature assertion in `rustyssl-capi`'s generated
 /// `signatures.rs`, which the compiler checks against the header's prototype on every target.
 /// A missing one means codegen wasn't rerun after implementing it.
 fn signatures(cx: &Context) -> Result<Outcome> {

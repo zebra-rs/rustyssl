@@ -3,7 +3,7 @@
  * format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The order in which
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The order in which
  * OPENSSL_LH_doall visits items follows from OpenSSL's linear hashing (when buckets split and
  * merge), so the test prints visiting orders, call counts, and statistics as comments, which the
  * harness compares between the two runs.

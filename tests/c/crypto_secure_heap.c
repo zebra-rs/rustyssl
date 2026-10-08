@@ -2,7 +2,7 @@
  * Conformance test for the secure heap (CRYPTO_secure_malloc(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Lines starting
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Lines starting
  * with "#" trace where blocks land, as offsets from the start of the arena: the two allocators
  * must place them identically.
  *

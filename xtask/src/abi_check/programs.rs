@@ -17,7 +17,7 @@ use super::{Context, Outcome};
 use crate::test_c::{LOADER_PATH, cc};
 use crate::util::{Result, run_output};
 
-/// Check 6: a program linked against the reference OpenSSL runs on rustssl's libraries.
+/// Check 6: a program linked against the reference OpenSSL runs on rustyssl's libraries.
 pub fn binary(cx: &Context) -> Result<Outcome> {
     let source = all_functions_program(cx)?;
     let exe = output(cx, "binary")?;
@@ -38,7 +38,7 @@ pub fn binary(cx: &Context) -> Result<Outcome> {
 
     let mut problems = Vec::new();
     let mut functions = 0;
-    for (whose, prefix) in [("the reference", &cx.reference), ("rustssl", &cx.dist)] {
+    for (whose, prefix) in [("the reference", &cx.reference), ("rustyssl", &cx.dist)] {
         let output = run_with_libraries(&exe, &prefix.join("lib"))
             .map_err(|e| format!("on {whose}'s libraries: {e}"))?;
         let report = Report::parse(&output)?;
@@ -56,7 +56,7 @@ pub fn binary(cx: &Context) -> Result<Outcome> {
     Ok(Outcome {
         summary: format!(
             "a program linked against the reference resolves all {functions} functions on \
-             rustssl's libraries"
+             rustyssl's libraries"
         ),
         problems,
     })
@@ -105,7 +105,7 @@ pub fn headers(cx: &Context) -> Result<Outcome> {
     let their_names = header_names(&theirs)?;
     for name in names.symmetric_difference(&their_names) {
         let whose = if names.contains(name) {
-            "rustssl"
+            "rustyssl"
         } else {
             "the reference"
         };
@@ -243,7 +243,7 @@ fn run_with_libraries(exe: &Path, lib: &Path) -> Result<String> {
     run_output(Command::new(exe).env(LOADER_PATH, lib))
 }
 
-/// Runs pkg-config on rustssl's `.pc` files only.
+/// Runs pkg-config on rustyssl's `.pc` files only.
 fn pkg_config(cx: &Context, args: &[&str]) -> Result<String> {
     pkg_config_at(&cx.dist, args)
 }

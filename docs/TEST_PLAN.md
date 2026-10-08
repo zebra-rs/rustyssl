@@ -1,4 +1,4 @@
-# rustssl Test Plan
+# rustyssl Test Plan
 
 Companion to [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Rules are in
 [AGENTS.md](../AGENTS.md).
@@ -8,7 +8,7 @@ Companion to [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Rules are in
 The tests must prove three things:
 
 1. **Correctness.** The crypto and the protocols are right (vectors, RFCs, interop).
-2. **Compatibility.** To an application, rustssl can't be told apart from OpenSSL: same
+2. **Compatibility.** To an application, rustyssl can't be told apart from OpenSSL: same
    ABI, same results, same error codes, same output bytes.
 3. **Security.** No memory unsafety, no panics on hostile input, constant-time handling of
    secrets, bounded resource use, and no regressions of any historical OpenSSL CVE class.
@@ -27,7 +27,7 @@ explosion). Layers L5, L7, and L9 exist for those.
 | Consumer test suites (curl, nginx, OpenSSH, CPython, …) | Ground truth for "drop-in" |
 
 **The golden rule:** expected outputs come from the reference or from the spec, **never from
-rustssl itself**. You can only regenerate golden files with
+rustyssl itself**. You can only regenerate golden files with
 `cargo xtask regen-golden --from-ref`.
 
 ## Test layers
@@ -88,7 +88,7 @@ rustssl itself**. You can only regenerate golden files with
 1. **The symbol set.** The dynamic exports of `target/dist` libraries equal the set derived
    from `*.num` under the default-build conditions. Each symbol carries the correct version
    node (`readelf --dyn-syms -V`; `nm` plus the export list on macOS). Nothing extra is
-   exported except `RUSTSSL_PRIVATE`.
+   exported except `RUSTYSSL_PRIVATE`.
 2. **Library metadata:** soname and install_name, `NEEDED` entries, version definitions,
    macOS compatibility versions.
 3. **Signatures.** Every Rust `extern "C"` export matches the bindgen prototype of the
@@ -100,7 +100,7 @@ rustssl itself**. You can only regenerate golden files with
    `sizeof`, `alignof`, and `offsetof` for every public struct and union. These must equal
    the Rust `offset_of!` assertions.
 5. **Constants.** The C compiler evaluates every header `#define` constant, and the results
-   must equal `rustssl-abi`.
+   must equal `rustyssl-abi`.
 6. **Binary compatibility.** Binaries **prebuilt against the reference OpenSSL** run against
    our libraries (`LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`). That exercises versioned-symbol
    resolution and two-level-namespace binding.
@@ -178,7 +178,7 @@ rustssl itself**. You can only regenerate golden files with
 
 ### L7: Protocol conformance and interoperability
 
-- **BoGo** (the BoringSSL TLS test runner) with a rustssl shim written in C against the
+- **BoGo** (the BoringSSL TLS test runner) with a rustyssl shim written in C against the
   OpenSSL API, which also exercises capi. A config file lists the BoringSSL-only features
   we skip.
 - **tlsfuzzer**, against `s_server` (upstream app relinked, later our CLI): the script set
@@ -252,7 +252,7 @@ M2. **Any crash, panic, hang, or OOM is a P0 bug** and gets a minimized regressi
 - **Miri** on core-crate unit tests, and on the capi handle model and template engine with
   synthetic tables.
 - An **unsafe budget**: `cargo geiger` reports per release, every `unsafe` block is reviewed,
-  and a CODEOWNERS entry covers `rustssl-capi`.
+  and a CODEOWNERS entry covers `rustyssl-capi`.
 
 **Constant-time verification:**
 1. **dudect-style statistical tests** in CI for AES (backend), GHASH, Poly1305, X25519,
@@ -326,7 +326,7 @@ each release.
 ### L11: Distro system tests (release gate)
 
 - Container images: Debian 13, Ubuntu LTS, Fedora (current), an EL10-compatible distro, and
-  Alpine (musl). Each has the system libssl and libcrypto replaced by rustssl packages.
+  Alpine (musl). Each has the system libssl and libcrypto replaced by rustyssl packages.
 - Scenarios:
   - package-manager operations over HTTPS
   - `sshd` and ssh logins

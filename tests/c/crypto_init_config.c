@@ -5,7 +5,7 @@
  * registered here.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
@@ -34,11 +34,11 @@ int main(void)
 {
     OPENSSL_INIT_SETTINGS *s = OPENSSL_INIT_new();
 
-    setenv("OPENSSL_CONF", "/nonexistent/rustssl-test/openssl.cnf", 1);
+    setenv("OPENSSL_CONF", "/nonexistent/rustyssl-test/openssl.cnf", 1);
     check(OPENSSL_atexit(at_exit) == 1, "OPENSSL_atexit");
     check(OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, NULL) == 1,
           "OPENSSL_INIT_LOAD_CONFIG: a missing $OPENSSL_CONF loads nothing");
-    OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustssl-test/other.cnf");
+    OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustyssl-test/other.cnf");
     OPENSSL_INIT_set_config_file_flags(s, CONF_MFLAGS_DEFAULT_SECTION);
     check(OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, s) == 1,
           "OPENSSL_INIT_LOAD_CONFIG: the configuration is only decided once");

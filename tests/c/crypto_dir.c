@@ -3,7 +3,7 @@
  * which libcrypto exports), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Entries come in
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Entries come in
  * the order readdir returns them, so the test checks the set of names.
  */
 #define _POSIX_C_SOURCE 200809L
@@ -43,7 +43,7 @@ int main(void)
     const char *entry;
     int seen[4] = { 0 }, others = 0, count = 0, ok = 1;
 
-    snprintf(dir, sizeof(dir), "/tmp/rustssl-dir-%ld", (long)getpid());
+    snprintf(dir, sizeof(dir), "/tmp/rustyssl-dir-%ld", (long)getpid());
     if (mkdir(dir, 0700) != 0) {
         printf("Bail out! mkdir\n");
         return 1;

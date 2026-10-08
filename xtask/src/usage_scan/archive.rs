@@ -469,7 +469,8 @@ mod tests {
 
     #[test]
     fn decompresses_with_the_named_tool() {
-        let dir = std::env::temp_dir().join(format!("rustssl-archive-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("rustyssl-archive-test-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         let mut tar = Vec::new();
         tar_entry(&mut tar, "bin", b'0', b"\x7fELF!");

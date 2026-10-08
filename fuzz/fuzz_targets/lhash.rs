@@ -11,9 +11,9 @@ use core::ptr;
 use std::collections::HashMap;
 
 use libfuzzer_sys::fuzz_target;
-use rustssl_abi::{OPENSSL_LH_COMPFUNC, OPENSSL_LH_DOALL_FUNCARG, OPENSSL_LH_HASHFUNC, OPENSSL_LHASH};
+use rustyssl_abi::{OPENSSL_LH_COMPFUNC, OPENSSL_LH_DOALL_FUNCARG, OPENSSL_LH_HASHFUNC, OPENSSL_LHASH};
 // Linked for its exports, which the declarations below resolve to.
-use rustssl_capi as _;
+use rustyssl_capi as _;
 
 unsafe extern "C" {
     fn OPENSSL_LH_new(h: OPENSSL_LH_HASHFUNC, c: OPENSSL_LH_COMPFUNC) -> *mut OPENSSL_LHASH;
@@ -25,7 +25,7 @@ unsafe extern "C" {
     fn OPENSSL_LH_set_down_load(lh: *mut OPENSSL_LHASH, dl: c_ulong);
     fn OPENSSL_LH_doall_arg_thunk(
         lh: *mut OPENSSL_LHASH,
-        daaw: rustssl_abi::OPENSSL_LH_DOALL_FUNCARG_THUNK,
+        daaw: rustyssl_abi::OPENSSL_LH_DOALL_FUNCARG_THUNK,
         f: OPENSSL_LH_DOALL_FUNCARG,
         arg: *mut c_void,
     );

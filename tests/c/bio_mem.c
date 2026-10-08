@@ -4,7 +4,7 @@
  * TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #include <limits.h>
 #include <stdio.h>

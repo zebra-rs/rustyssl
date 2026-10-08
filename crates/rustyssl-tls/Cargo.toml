@@ -1,0 +1,17 @@
+[package]
+name = "rustyssl-tls"
+description = "Sans-IO TLS 1.0-1.3 and DTLS: record layer, handshake state machines, cipher-string parser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustyssl-asn1.workspace = true
+rustyssl-crypto.workspace = true
+rustyssl-pki.workspace = true
+
+[lints]
+workspace = true

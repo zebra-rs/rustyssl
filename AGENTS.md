@@ -1,14 +1,14 @@
-# AGENTS.md — rustssl
+# AGENTS.md — rustyssl
 
 ## Mission
 
-rustssl is a **memory-safe Rust reimplementation of OpenSSL** (libcrypto + libssl) that
+rustyssl is a **memory-safe Rust reimplementation of OpenSSL** (libcrypto + libssl) that
 works as a **drop-in binary replacement**. An application built against OpenSSL must run
-unchanged with rustssl's libraries in its place, with no recompile and no source changes.
+unchanged with rustyssl's libraries in its place, with no recompile and no source changes.
 
 Why it exists: **security**. OpenSSL's history of memory-safety and parsing CVEs
 (Heartbleed, ASN.1 and X.509 parser bugs, the punycode overflow, and others) comes mostly
-from C. rustssl removes that class of bug and keeps the exact C API/ABI, so adopting it
+from C. rustyssl removes that class of bug and keeps the exact C API/ABI, so adopting it
 costs users nothing.
 
 Priority order when goals conflict:
@@ -64,7 +64,7 @@ actual behavior is the spec**. Test it, don't guess.
 
 **Default feature set = OpenSSL's default `./Configure` build, plus
 `enable-ec_nistp_64_gcc_128`.** Debian and Homebrew turn that option on, and it only adds
-API (`EC_GFp_nistp{224,256,521}_method`), so binaries built there must load on rustssl. The
+API (`EC_GFp_nistp{224,256,521}_method`), so binaries built there must load on rustyssl. The
 options live in `CONFIGURE_OPTIONS` in `xtask/src/vendor.rs`. Whatever upstream disables by
 default (SSLv3, weak SSL ciphers, MD2, RC5, …) stays disabled. Legacy algorithms (MD4, RC4,
 DES, Blowfish, …) are available only through the `legacy` provider. There is no FIPS
@@ -81,13 +81,13 @@ Planned workspace layout (built in Phase 0):
 ```
 abi/openssl-3.5/      vendored headers (+ config/<target>/), *.num, objects, err tables, man pages
 crates/
-  rustssl-abi/        generated per target from abi/: types, layouts, enums, every macro constant. No logic.
-  rustssl-asn1/       DER/BER reader and writer, ASN.1 universal types, OID/NID registry, base64, PEM framing
-  rustssl-crypto/     algorithm facade + backend traits, DRBG/RNG, BIGNUM, built-in provider algorithms
-  rustssl-pki/        X.509/CRL/CSR, path validation, PKCS#7/#8/#12, CMS, OCSP, TS, CT
-  rustssl-tls/        sans-IO TLS 1.0–1.3 + DTLS: record layer, handshake state machines, cipher-string parser
-  rustssl-quic/       (later phase) QUIC transport for the SSL QUIC API
-  rustssl-capi/       THE FFI LAYER: every extern "C" export, handle tables, BIO, callbacks,
+  rustyssl-abi/       generated per target from abi/: types, layouts, enums, every macro constant. No logic.
+  rustyssl-asn1/      DER/BER reader and writer, ASN.1 universal types, OID/NID registry, base64, PEM framing
+  rustyssl-crypto/    algorithm facade + backend traits, DRBG/RNG, BIGNUM, built-in provider algorithms
+  rustyssl-pki/       X.509/CRL/CSR, path validation, PKCS#7/#8/#12, CMS, OCSP, TS, CT
+  rustyssl-tls/       sans-IO TLS 1.0–1.3 + DTLS: record layer, handshake state machines, cipher-string parser
+  rustyssl-quic/      (later phase) QUIC transport for the SSL QUIC API
+  rustyssl-capi/      THE FFI LAYER: every extern "C" export, handle tables, BIO, callbacks,
                       OSSL_PARAM, ex_data, ERR queue, CRYPTO_malloc, the ASN1_ITEM template engine
 libs/
   libcrypto/          static archive, linked into libcrypto.so.3 by `cargo xtask dist`; contains the WHOLE implementation
@@ -101,8 +101,8 @@ docs/                 plans, DEVIATIONS.md, DEPENDENCIES.md
 Key design decisions:
 - **One implementation, two ABI facades** ([ADR 0001](docs/adr/0001-library-layout.md)).
   All code and state live in libcrypto: objects, the allocator, the global state, and the
-  TLS code, which libcrypto exports to libssl only, as `rustssl_private_<function>` in its
-  `RUSTSSL_PRIVATE` version node. libssl exports exactly OpenSSL's libssl functions, each a
+  TLS code, which libcrypto exports to libssl only, as `rustyssl_private_<function>` in its
+  `RUSTYSSL_PRIVATE` version node. libssl exports exactly OpenSSL's libssl functions, each a
   generated one-branch forwarder to its private twin, and contains no Rust runtime. This
   keeps objects such as an `X509*` shared safely between the libraries. For static linking,
   `libcrypto.a` carries everything and `libssl.a` holds only the forwarders. Validated on
@@ -112,13 +112,13 @@ Key design decisions:
   version script, which GNU ld refuses to combine with OpenSSL's named version nodes, so
   `cargo build` alone never produces the shipped `.so`/`.dylib`.
 - **The core crates are safe, idiomatic Rust and sans-IO.** They know nothing about C
-  pointers, BIOs, or callbacks. `rustssl-capi` adapts them to the C model.
+  pointers, BIOs, or callbacks. `rustyssl-capi` adapts them to the C model.
 - **There are two kinds of C-visible objects.**
   1. **Opaque handles** (`SSL_CTX`, `SSL`, `X509`, `EVP_PKEY`, `EVP_MD_CTX`, …) point to
      Rust-owned objects. Their refcounts map onto `*_up_ref` and `*_free`, and interior
      mutability matches OpenSSL's mutate-after-share patterns.
   2. **Public-layout structs** (`ASN1_STRING`, `GENERAL_NAME`, …) are `#[repr(C)]`
-     mirrors from `rustssl-abi`. They're allocated with `CRYPTO_malloc` and populated by
+     mirrors from `rustyssl-abi`. They're allocated with `CRYPTO_malloc` and populated by
      the ASN1_ITEM template engine. That engine also interprets **application-defined**
      `ASN1_SEQUENCE(...)` templates; built-in opaque types are exposed to it as
      `ASN1_ITYPE_EXTERN` items.
@@ -126,7 +126,7 @@ Key design decisions:
   borrowed (`X509_get_subject_name`, for example) live at stable heap addresses and are
   never moved or reallocated while the parent is alive.
 - **Crypto primitives** come from vetted pure-Rust crates (RustCrypto and similar) behind
-  backend traits in `rustssl-crypto`, so each one can be replaced. **Protocol and parsing
+  backend traits in `rustyssl-crypto`, so each one can be replaced. **Protocol and parsing
   code is our own**: ASN.1, X.509, PEM, PKCS#*, CMS, TLS, DTLS, and QUIC. That's where
   OpenSSL's CVEs concentrated.
 - **The provider architecture is real.** `OSSL_LIB_CTX`, `EVP_*_fetch`, `OSSL_PARAM`,
@@ -136,7 +136,7 @@ Key design decisions:
 
 ## Security rules (non-negotiable)
 
-1. **`unsafe` only in `rustssl-capi`** and the `libs/*` shims. Every other crate has
+1. **`unsafe` only in `rustyssl-capi`** and the `libs/*` shims. Every other crate has
    `#![forbid(unsafe_code)]`. Each `unsafe` block needs a `// SAFETY:` comment, enforced
    by `clippy::undocumented_unsafe_blocks = "deny"`.
 2. **Treat the FFI boundary as hostile input.** Turn raw pointer and length pairs into
@@ -180,7 +180,7 @@ Key design decisions:
 
 ## Code generation (never hand-type ABI facts)
 
-Generate these from `abi/`, through `rustssl-abi` (bindgen) or `cargo xtask codegen`:
+Generate these from `abi/`, through `rustyssl-abi` (bindgen) or `cargo xtask codegen`:
 NIDs and OIDs (`objects.txt`), `ERR_LIB_*` and reason codes plus their strings, `*_ctrl`
 command numbers, every `#define` constant, public struct layouts, the export list, and
 the linker version scripts (from `*.num`). If a value you need isn't generated, extend the
@@ -207,10 +207,10 @@ Tools each command needs:
 - **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
   (from the Xcode command-line tools).
 
-Building for a distribution: the directories rustssl reports and reads from default to
+Building for a distribution: the directories rustyssl reports and reads from default to
 OpenSSL's default build for the target (`OPENSSLDIR` `/usr/local/ssl` and so on, from
 `abi/openssl-3.5/config/<target>/build.toml`). Override them at build time with the
-environment variables `RUSTSSL_OPENSSLDIR`, `RUSTSSL_ENGINESDIR`, and `RUSTSSL_MODULESDIR`.
+environment variables `RUSTYSSL_OPENSSLDIR`, `RUSTYSSL_ENGINESDIR`, and `RUSTYSSL_MODULESDIR`.
 - **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
   cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
   cargo-vet formats `supply-chain/` differently, and CI then fails.
@@ -219,11 +219,11 @@ environment variables `RUSTSSL_OPENSSLDIR`, `RUSTSSL_ENGINESDIR`, and `RUSTSSL_M
 
 | Output | Contents |
 |---|---|
-| `crates/rustssl-abi/src/generated/` | types, layouts, enums, and every macro constant, per target |
+| `crates/rustyssl-abi/src/generated/` | types, layouts, enums, and every macro constant, per target |
 | `libs/<lib>/exports/` | ELF version scripts (Linux) and exported-symbol lists (macOS), per target |
-| `crates/rustssl-capi/src/generated/<lib>_stubs.rs` | an aborting stub for every export that isn't implemented yet |
-| `crates/rustssl-capi/src/generated/err_strings.rs` | the error-string tables, in OpenSSL's order and load order |
-| `crates/rustssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
+| `crates/rustyssl-capi/src/generated/<lib>_stubs.rs` | an aborting stub for every export that isn't implemented yet |
+| `crates/rustyssl-capi/src/generated/err_strings.rs` | the error-string tables, in OpenSSL's order and load order |
+| `crates/rustyssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
 
 ```sh
 cargo build --workspace                      # build everything
@@ -242,7 +242,7 @@ cargo xtask test-c                           # tests/c/*.c, each run on the refe
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
-cargo +nightly miri test -p rustssl-capi     # the unsafe FFI layer under Miri
+cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri
 cargo +nightly fuzz run <target>             # fuzzing (fuzz/ is its own workspace; `cargo +nightly fuzz list`)
 ```
 
@@ -257,15 +257,15 @@ The toolchain is stable Rust, pinned in `rust-toolchain.toml` (at least 1.99). R
   compiled against the official headers). Then implement the safe core, then the `capi`
   exports, then update the coverage status. Within a phase, go in `docs/symbol-usage.md`
   order: the functions the most distribution packages import come first.
-- **To implement an export,** write it in `rustssl-capi` (any `extern "C" fn` outside
+- **To implement an export,** write it in `rustyssl-capi` (any `extern "C" fn` outside
   `src/generated/`) and re-run `cargo xtask codegen`, which then drops its stub. A libssl
-  function is written as `rustssl_private_<name>`; never implement anything in
+  function is written as `rustyssl_private_<name>`; never implement anything in
   `libs/libssl`, whose forwarders are generated. Codegen also asserts the function's
   signature against the header's prototype at compile time (`generated/signatures.rs`). Use
-  `ffi_export!` (`rustssl-capi/src/ffi.rs`) and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
+  `ffi_export!` (`rustyssl-capi/src/ffi.rs`) and give each export a `# Safety` section. Handles use `handle_type!`, C memory comes from
   `mem`, and errors go through `err::raise`. It counts as **implemented** only once it has a
   conformance test: a TAP program in `tests/c/` that passes, unchanged, against the reference
-  and rustssl (`tests/c/buf_mem.c` is the model). Then run `cargo xtask coverage` and commit
+  and rustyssl (`tests/c/buf_mem.c` is the model). Then run `cargo xtask coverage` and commit
   `docs/coverage.md`. CI fails if that file is stale, or if an export is defined but no test
   in `tests/c/` calls it.
 - **Where the reference is the oracle,** add commands to the differential probe

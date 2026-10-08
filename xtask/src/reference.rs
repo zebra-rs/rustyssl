@@ -1,7 +1,7 @@
-//! `cargo xtask ref-openssl [version]`: builds the reference OpenSSL that rustssl is compared
+//! `cargo xtask ref-openssl [version]`: builds the reference OpenSSL that rustyssl is compared
 //! against (TEST_PLAN.md, "Oracles") into `target/ref/openssl-<version>/`.
 //!
-//! The version defaults to the vendored one, so the reference matches the headers rustssl is
+//! The version defaults to the vendored one, so the reference matches the headers rustyssl is
 //! built from. The build uses the same verified release tarball and the same `Configure`
 //! options as the vendored ABI, plus debug info (`-g`). A finished build records its inputs
 //! and is reused until they change.
@@ -18,7 +18,7 @@ use crate::util::{Result, fresh_dir, run_logged, target_dir, toml_value, workspa
 use crate::vendor::{CONFIGURE_OPTIONS, fetch_verified};
 
 /// Marks a finished build; holds the inputs it was built from.
-const STAMP: &str = ".rustssl-build";
+const STAMP: &str = ".rustyssl-build";
 
 pub fn run(args: &[String]) -> Result {
     let root = workspace_root();

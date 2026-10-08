@@ -3,7 +3,7 @@
  * OPENSSL_init_crypto(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The strings are
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The strings are
  * global, so this runs in a process of its own, starting with none loaded. Each library's table
  * is loaded only if its first entry is unknown, so an application's string for that entry keeps
  * the whole table out.

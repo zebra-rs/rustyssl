@@ -1,4 +1,4 @@
-//! The platforms rustssl generates ABI definitions for, and how each one is named by OpenSSL's
+//! The platforms rustyssl generates ABI definitions for, and how each one is named by OpenSSL's
 //! `Configure`, by clang, and by Rust.
 
 use std::process::Command;
@@ -15,7 +15,7 @@ pub struct Target {
     pub clang: &'static str,
     /// Rust target triple used to check the generated bindings.
     pub rust: &'static str,
-    /// Module name of the generated bindings in `rustssl-abi`.
+    /// Module name of the generated bindings in `rustyssl-abi`.
     pub module: &'static str,
     /// Rust `cfg` predicate that selects this target's bindings.
     pub cfg: &'static str,
@@ -56,7 +56,7 @@ pub fn host() -> Result<(String, &'static Target)> {
     let target = TARGETS
         .iter()
         .find(|t| same_platform(t.rust, &host))
-        .ok_or_else(|| format!("no rustssl target for host {host}; see xtask/src/targets.rs"))?;
+        .ok_or_else(|| format!("no rustyssl target for host {host}; see xtask/src/targets.rs"))?;
     Ok((host, target))
 }
 
