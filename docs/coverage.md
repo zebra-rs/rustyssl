@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 345 | 5531 | 5.9% |
+| libcrypto | 5876 | 393 | 5483 | 6.7% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **346** | **6133** | **5.3%** |
+| **Total** | **6479** | **394** | **6085** | **6.1%** |
 
 ## By header
 
@@ -28,7 +28,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/asn1.h` | libcrypto | 291 | 0 | 0.0% |
 | `openssl/asn1t.h` | libcrypto | 20 | 0 | 0.0% |
 | `openssl/async.h` | libcrypto | 22 | 0 | 0.0% |
-| `openssl/bio.h` | libcrypto | 184 | 120 | 65.2% |
+| `openssl/bio.h` | libcrypto | 184 | 167 | 90.8% |
 | `openssl/blowfish.h` | libcrypto | 8 | 0 | 0.0% |
 | `openssl/bn.h` | libcrypto | 201 | 0 | 0.0% |
 | `openssl/buffer.h` | libcrypto | 6 | 6 | 100.0% |
@@ -41,7 +41,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/comp.h` | libcrypto | 17 | 0 | 0.0% |
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
-| `openssl/crypto.h` | libcrypto | 101 | 87 | 86.1% |
+| `openssl/crypto.h` | libcrypto | 101 | 88 | 87.1% |
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 29 | 100.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
@@ -104,10 +104,33 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 
 | Export | Library | Header | Called by |
 |---|---|---|---|
+| `BIO_ADDRINFO_address` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDRINFO_family` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDRINFO_free` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDRINFO_next` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDRINFO_protocol` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDRINFO_socktype` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_clear` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_copy` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_dup` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_family` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_free` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_hostname_string` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_new` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_path_string` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_rawaddress` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_ADDR_rawmake` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_rawport` | libcrypto | `openssl/bio.h` | `bio_addr`, `bio_sock` |
+| `BIO_ADDR_service_string` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_accept` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_accept_ex` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_bind` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_callback_ctrl` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_meth` |
 | `BIO_clear_flags` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
+| `BIO_closesocket` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_connect` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_copy_next_retry` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `err_bio`, `lhash` |
+| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash` |
 | `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_mem` |
@@ -115,6 +138,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_ctrl_wpending` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_debug_callback` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_debug_callback_ex` | libcrypto | `openssl/bio.h` | `bio_dump` |
+| `BIO_do_connect_retry` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_dump` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_dump_cb` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_dump_fp` | libcrypto | `openssl/bio.h` | `bio_dump` |
@@ -122,7 +146,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_dump_indent_cb` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_dump_indent_fp` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_dup_chain` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem`, `bio_pair` |
-| `BIO_f_buffer` | libcrypto | `openssl/bio.h` | `bio_filter` |
+| `BIO_f_buffer` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_sock` |
 | `BIO_f_linebuffer` | libcrypto | `openssl/bio.h` | `bio_filter` |
 | `BIO_f_null` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_f_prefix` | libcrypto | `openssl/bio.h` | `bio_filter` |
@@ -130,25 +154,32 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_fd_non_fatal_error` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_fd_should_retry` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_find_type` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_free` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `err_bio`, `lhash` |
-| `BIO_free_all` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
+| `BIO_free` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash` |
+| `BIO_free_all` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem`, `bio_sock` |
+| `BIO_get_accept_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_get_callback` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_get_callback_arg` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_get_callback_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_get_data` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_get_ex_data` | libcrypto | `openssl/bio.h` | `bio_meth` |
+| `BIO_get_host_ip` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_get_init` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_mem`, `bio_meth`, `bio_pair` |
 | `BIO_get_line` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_get_new_index` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_meth` |
+| `BIO_get_port` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_get_retry_BIO` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_get_retry_reason` | libcrypto | `openssl/bio.h` | `bio_mem` |
+| `BIO_get_retry_reason` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_sock` |
 | `BIO_get_rpoll_descriptor` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_get_shutdown` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_meth` |
 | `BIO_get_wpoll_descriptor` | libcrypto | `openssl/bio.h` | `bio_meth` |
-| `BIO_gets` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth` |
+| `BIO_gethostbyname` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_gets` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_sock` |
 | `BIO_hex_string` | libcrypto | `openssl/bio.h` | `bio_dump` |
 | `BIO_indent` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_int_ctrl` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
+| `BIO_listen` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_lookup` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_lookup_ex` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_meth_free` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_meth` |
 | `BIO_meth_get_callback_ctrl` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_get_create` | libcrypto | `openssl/bio.h` | `bio_meth` |
@@ -176,35 +207,40 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_meth_set_write` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_meth` |
 | `BIO_meth_set_write_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_method_name` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_mem`, `bio_meth` |
-| `BIO_method_type` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_mem`, `bio_meth` |
-| `BIO_new` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `err_bio`, `lhash` |
+| `BIO_method_type` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_mem`, `bio_meth`, `bio_sock` |
+| `BIO_new` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash` |
+| `BIO_new_accept` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_new_bio_pair` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_new_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_new_fd` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file` |
 | `BIO_new_file` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_new_fp` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
-| `BIO_next` | libcrypto | `openssl/bio.h` | `bio_mem` |
+| `BIO_new_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_next` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_sock` |
 | `BIO_nread` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_nread0` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_number_read` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_pair` |
 | `BIO_number_written` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_pair` |
 | `BIO_nwrite` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_nwrite0` | libcrypto | `openssl/bio.h` | `bio_pair` |
-| `BIO_pop` | libcrypto | `openssl/bio.h` | `bio_mem` |
+| `BIO_parse_hostserv` | libcrypto | `openssl/bio.h` | `bio_addr` |
+| `BIO_pop` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_sock` |
 | `BIO_printf` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_print` |
-| `BIO_ptr_ctrl` | libcrypto | `openssl/bio.h` | `bio_mem` |
+| `BIO_ptr_ctrl` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_sock` |
 | `BIO_push` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
-| `BIO_puts` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `err_bio` |
-| `BIO_read` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair` |
+| `BIO_puts` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `err_bio` |
+| `BIO_read` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock` |
 | `BIO_read_ex` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_meth` |
 | `BIO_recvmmsg` | libcrypto | `openssl/bio.h` | `bio_meth` |
+| `BIO_s_accept` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_s_bio` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_s_fd` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_s_file` | libcrypto | `openssl/bio.h` | `bio_file` |
-| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `err_bio`, `lhash` |
+| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `bio_sock`, `err_bio`, `lhash` |
 | `BIO_s_null` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_s_secmem` | libcrypto | `openssl/bio.h` | `bio_mem` |
+| `BIO_s_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_sendmmsg` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_set_callback` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_meth` |
 | `BIO_set_callback_arg` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_meth` |
@@ -216,13 +252,24 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_set_next` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_set_retry_reason` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_set_shutdown` | libcrypto | `openssl/bio.h` | `bio_meth` |
+| `BIO_set_tcp_ndelay` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_snprintf` | libcrypto | `openssl/bio.h` | `bio_print` |
-| `BIO_test_flags` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair` |
+| `BIO_sock_error` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_sock_info` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_sock_init` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_sock_non_fatal_error` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_sock_should_retry` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_socket_ioctl` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_socket_nbio` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_socket_wait` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_test_flags` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock` |
 | `BIO_up_ref` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_vfree` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_vprintf` | libcrypto | `openssl/bio.h` | `bio_print` |
 | `BIO_vsnprintf` | libcrypto | `openssl/bio.h` | `bio_print` |
-| `BIO_write` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair` |
+| `BIO_wait` | libcrypto | `openssl/bio.h` | `bio_sock` |
+| `BIO_write` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock` |
 | `BIO_write_ex` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BUF_MEM_free` | libcrypto | `openssl/buffer.h` | `bio_mem`, `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
 | `BUF_MEM_grow` | libcrypto | `openssl/buffer.h` | `bio_mem`, `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
@@ -254,7 +301,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `crypto_str` |
+| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `bio_addr`, `bio_sock`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str` |
 | `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_get_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
@@ -284,7 +331,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `stack` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `bio_addr`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `stack` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -335,7 +382,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_peek_error_func` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_peek_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_peek_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_peek_last_error` | libcrypto | `openssl/err.h` | `bio_pair`, `err_queue` |
+| `ERR_peek_last_error` | libcrypto | `openssl/err.h` | `bio_addr`, `bio_pair`, `bio_sock`, `err_queue` |
 | `ERR_peek_last_error_all` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_peek_last_error_data` | libcrypto | `openssl/err.h` | `err_bio`, `err_queue` |
 | `ERR_peek_last_error_func` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -446,6 +493,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
+| `OSSL_sleep` | libcrypto | `openssl/crypto.h` | `bio_sock` |
 | `OpenSSL_version` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OpenSSL_version_num` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `err_free_strings_int` | libcrypto | `internal/err.h` | `err_queue` |

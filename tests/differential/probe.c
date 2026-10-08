@@ -61,6 +61,13 @@
  *   bioprintf <format> <arg>...    BIO_printf to a memory BIO, printing the return and what
  *                                  it wrote
  *
+ * Commands for addresses (`_` in a spec stands for nothing, so `_` alone is the empty spec):
+ *   hostserv <spec> <prio>     BIO_parse_hostserv with priority 0 (host) or 1 (service):
+ *                              the result, host, and service, or the error's reason
+ *   addr <family> <hex> <port> BIO_ADDR_rawmake (4 for AF_INET, 6 for AF_INET6, u for
+ *                              AF_UNIX with the hex as the path), then the family, raw port,
+ *                              raw address, and numeric host and service strings
+ *
  * Other helpers:
  *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
  *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
@@ -75,6 +82,9 @@
 #include <string.h>
 
 #include <errno.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
@@ -683,6 +693,79 @@ static int err_command(const char *command, const char *line)
     return 1;
 }
 
+static void print_c_string(const char *label, char *text)
+{
+    printf(" %s=%s", label, text == NULL ? "(null)" : text);
+    OPENSSL_free(text);
+}
+
+static int addr_command(const char *command, const char *line)
+{
+    char spec[256] = "", family[8] = "", hex[256] = "";
+    int prio = 0, port = 0;
+
+    if (strcmp(command, "hostserv") == 0) {
+        char *host = (char *)"-", *service = (char *)"-";
+        int ret;
+
+        sscanf(line, "%*s %255s %d", spec, &prio);
+        for (char *p = spec; *p != '\0'; p++)
+            if (*p == '_')
+                memmove(p, p + 1, strlen(p)), p--;
+        ret = BIO_parse_hostserv(spec, &host, &service, prio);
+        printf("hostserv %d", ret);
+        if (ret) {
+            if (strcmp(host != NULL ? host : "", "-") != 0 || host == NULL)
+                print_c_string("host", host);
+            else
+                printf(" host=untouched");
+            if (strcmp(service != NULL ? service : "", "-") != 0 || service == NULL)
+                print_c_string("service", service);
+            else
+                printf(" service=untouched");
+        } else {
+            printf(" reason=%d", ERR_GET_REASON(ERR_peek_last_error()));
+        }
+        printf("\n");
+        ERR_clear_error();
+        return 1;
+    }
+    if (strcmp(command, "addr") == 0) {
+        unsigned char raw[128];
+        size_t len = 0, rawlen = 0;
+        BIO_ADDR *a = BIO_ADDR_new();
+        int fam, ret;
+
+        sscanf(line, "%*s %7s %255s %d", family, hex, &port);
+        if (!parse_hex(hex, raw, &len) || len > sizeof(raw) - 1) {
+            printf("error bad hex\n");
+            BIO_ADDR_free(a);
+            return 1;
+        }
+        raw[len] = '\0';
+        fam = family[0] == '4' ? AF_INET : family[0] == '6' ? AF_INET6 : AF_UNIX;
+        ret = BIO_ADDR_rawmake(a, fam, raw, len, htons((unsigned short)port));
+        printf("addr %d family=%d port=%u", ret, BIO_ADDR_family(a), ntohs(BIO_ADDR_rawport(a)));
+        if (BIO_ADDR_rawaddress(a, NULL, &rawlen) && rawlen <= sizeof(raw)) {
+            BIO_ADDR_rawaddress(a, raw, &rawlen);
+            printf(" raw=");
+            for (size_t i = 0; i < rawlen; i++)
+                printf("%02x", raw[i]);
+        }
+        if (fam == AF_UNIX) {
+            print_c_string("path", BIO_ADDR_path_string(a));
+        } else if (ret) {
+            print_c_string("host", BIO_ADDR_hostname_string(a, 1));
+            print_c_string("service", BIO_ADDR_service_string(a, 1));
+        }
+        printf("\n");
+        BIO_ADDR_free(a);
+        ERR_clear_error();
+        return 1;
+    }
+    return 0;
+}
+
 /* A typed argument of a printf command. */
 typedef struct {
     int i;
@@ -833,7 +916,8 @@ int main(void)
             continue;
         if (err_command(command, line) || stack_command(command, line)
             || lhash_command(command, line) || string_command(command, line)
-            || bio_command(command, line) || printf_command(command, line)) {
+            || bio_command(command, line) || printf_command(command, line)
+            || addr_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
