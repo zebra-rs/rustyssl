@@ -19,4 +19,5 @@ mod ffi;
 mod generated;
 mod handle;
 mod mem;
+mod secure;
 mod stub;

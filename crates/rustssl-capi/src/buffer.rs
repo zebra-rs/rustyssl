@@ -8,8 +8,8 @@
 //! - lengths above [`LIMIT_BEFORE_EXPANSION`] fail with `ERR_R_PASSED_INVALID_ARGUMENT`;
 //! - freeing zeroes the data first.
 //!
-//! The secure-heap flag behaves as it does in OpenSSL while no secure heap is set up (step 1.1
-//! adds one): the memory comes from the normal allocator.
+//! With `BUF_MEM_FLAG_SECURE`, the data lives in the secure heap ([`crate::secure`]) when one
+//! is set up, and in ordinary memory otherwise, as in OpenSSL.
 
 use core::ffi::{c_ulong, c_void};
 use core::ptr;
@@ -22,6 +22,7 @@ use rustssl_abi::{
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::mem;
+use crate::secure;
 
 /// The largest length a buffer may grow to. OpenSSL's `buffer.c` picks it so that
 /// `(len + 3) / 3 * 4` stays below 2^31.
@@ -36,7 +37,7 @@ ffi_export! {
     pub unsafe extern "C" fn BUF_MEM_new() -> *mut BUF_MEM
     where failure = ptr::null_mut(), library = ERR_LIB_BUF
     {
-        mem::zalloc(size_of::<BUF_MEM>()).cast()
+        mem::alloc_zeroed(size_of::<BUF_MEM>()).cast()
     }
 }
 
@@ -48,7 +49,7 @@ ffi_export! {
     pub unsafe extern "C" fn BUF_MEM_new_ex(flags: c_ulong) -> *mut BUF_MEM
     where failure = ptr::null_mut(), library = ERR_LIB_BUF
     {
-        let buffer: *mut BUF_MEM = mem::zalloc(size_of::<BUF_MEM>()).cast();
+        let buffer: *mut BUF_MEM = mem::alloc_zeroed(size_of::<BUF_MEM>()).cast();
         // SAFETY: a non-null result is a zeroed `BUF_MEM` this function just allocated.
         if let Some(fresh) = unsafe { buffer.as_mut() } {
             fresh.flags = flags;
@@ -70,10 +71,17 @@ ffi_export! {
         let Some(contents) = (unsafe { buffer.as_ref() }) else {
             return;
         };
-        // SAFETY: `data` is null or holds `max` bytes from the OpenSSL allocator.
-        unsafe { mem::clear_free(contents.data.cast(), contents.max) };
+        let data = contents.data.cast();
+        if contents.flags & BUF_MEM_FLAG_SECURE.cast_unsigned() as c_ulong != 0 {
+            // SAFETY: `data` is null or holds `max` bytes from the secure heap or, without
+            // one, the OpenSSL allocator.
+            unsafe { secure::release_clean(data, contents.max) };
+        } else {
+            // SAFETY: `data` is null or holds `max` bytes from the OpenSSL allocator.
+            unsafe { mem::release_clean(data, contents.max) };
+        }
         // SAFETY: the buffer itself came from the OpenSSL allocator.
-        unsafe { mem::free(buffer.cast()) };
+        unsafe { mem::release(buffer.cast()) };
     }
 }
 
@@ -142,20 +150,21 @@ unsafe fn grow(buffer: *mut BUF_MEM, len: usize, clean: bool, function: &'static
     let secure = buffer.flags & BUF_MEM_FLAG_SECURE.cast_unsigned() as c_ulong != 0;
     let fresh: *mut c_void = if secure {
         // OpenSSL moves secure data to a new block, copying only `length` bytes.
-        let fresh = mem::alloc(size);
+        let fresh = secure::alloc(size);
         if !fresh.is_null() && !data.is_null() {
             // SAFETY: the old block holds `length` bytes, the new one `size > length`.
             unsafe { ptr::copy_nonoverlapping(data, fresh.cast::<u8>(), buffer.length) };
-            // SAFETY: the old block came from the OpenSSL allocator and holds `length` bytes.
-            unsafe { mem::clear_free(data.cast(), buffer.length) };
+            // SAFETY: the old block came from the secure heap or the OpenSSL allocator and
+            // holds `length` bytes.
+            unsafe { secure::release_clean(data.cast(), buffer.length) };
         }
         fresh
     } else if clean {
         // SAFETY: `data` is null or holds `max` bytes from the OpenSSL allocator.
-        unsafe { mem::clear_realloc(data.cast(), buffer.max, size) }
+        unsafe { mem::resize_clean(data.cast(), buffer.max, size) }
     } else {
         // SAFETY: `data` is null or a live block from the OpenSSL allocator.
-        unsafe { mem::realloc(data.cast(), size) }
+        unsafe { mem::resize(data.cast(), size) }
     };
     if fresh.is_null() {
         return 0;

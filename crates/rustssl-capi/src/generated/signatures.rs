@@ -12,3 +12,82 @@ const _: unsafe extern "C" fn() -> *mut BUF_MEM = crate::buffer::BUF_MEM_new;
 const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *mut BUF_MEM = crate::buffer::BUF_MEM_new_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const core::ffi::c_uchar, usize) =
     crate::buffer::BUF_reverse;
+const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    *mut *mut core::ffi::c_void,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_aligned_alloc;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) = crate::mem::CRYPTO_clear_free;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_clear_realloc;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, *const core::ffi::c_char, core::ffi::c_int) =
+    crate::mem::CRYPTO_free;
+const _: unsafe extern "C" fn(*mut CRYPTO_malloc_fn, *mut CRYPTO_realloc_fn, *mut CRYPTO_free_fn) =
+    crate::mem::CRYPTO_get_mem_functions;
+const _: unsafe extern "C" fn(
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_malloc;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::mem::CRYPTO_memcmp;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_realloc;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void) -> usize =
+    crate::secure::CRYPTO_secure_actual_size;
+const _: unsafe extern "C" fn(*const core::ffi::c_void) -> core::ffi::c_int =
+    crate::secure::CRYPTO_secure_allocated;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) = crate::secure::CRYPTO_secure_clear_free;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, *const core::ffi::c_char, core::ffi::c_int) =
+    crate::secure::CRYPTO_secure_free;
+const _: unsafe extern "C" fn(
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::secure::CRYPTO_secure_malloc;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::secure::CRYPTO_secure_malloc_done;
+const _: unsafe extern "C" fn(usize, usize) -> core::ffi::c_int =
+    crate::secure::CRYPTO_secure_malloc_init;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::secure::CRYPTO_secure_malloc_initialized;
+const _: unsafe extern "C" fn() -> usize = crate::secure::CRYPTO_secure_used;
+const _: unsafe extern "C" fn(
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::secure::CRYPTO_secure_zalloc;
+const _: unsafe extern "C" fn(
+    CRYPTO_malloc_fn,
+    CRYPTO_realloc_fn,
+    CRYPTO_free_fn,
+) -> core::ffi::c_int = crate::mem::CRYPTO_set_mem_functions;
+const _: unsafe extern "C" fn(
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, usize) = crate::mem::OPENSSL_cleanse;
