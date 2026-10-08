@@ -14,6 +14,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+libc = "0.2"
 rustyssl-abi = { path = "../crates/rustyssl-abi" }
 rustyssl-capi = { path = "../crates/rustyssl-capi" }
 
@@ -64,6 +65,13 @@ bench = false
 [[bin]]
 name = "bio_pair"
 path = "fuzz_targets/bio_pair.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bio_addr"
+path = "fuzz_targets/bio_addr.rs"
 test = false
 doc = false
 bench = false

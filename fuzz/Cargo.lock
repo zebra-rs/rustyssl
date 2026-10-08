@@ -110,6 +110,7 @@ dependencies = [
 name = "rustyssl-fuzz"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "libfuzzer-sys",
  "rustyssl-abi",
  "rustyssl-capi",
