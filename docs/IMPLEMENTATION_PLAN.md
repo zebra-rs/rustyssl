@@ -827,7 +827,7 @@ Everything else depends on this phase.
     - *Moved out:*
       - base64 to step 2.5, where the plan already had it beside its `EVP_Encode*` codec;
       - `BIO_f_nbio_test` to step 3.7, as it needs `RAND_priv_bytes`;
-      - `BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`, and `BIO_s_dgram_mem` to 1.6d, as they
+      - `BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`, and `BIO_s_dgram_mem` to 1.6e, as they
         carry peer addresses (`BIO_ADDR`).
 
     *Done:* 13 exports, now 345 of libcrypto's 5,876 (`bio/buffer.rs`, `bio/prefix.rs`,
@@ -877,11 +877,64 @@ Everything else depends on this phase.
         sessions;
       - a model-based `bio_pair` fuzz target (pair traffic against queues, and filter output
         against what was written).
-  - [ ] **1.6d Networking:**
+  - [x] **1.6d Addresses, sockets, and the socket and accept BIOs:**
     - `BIO_ADDR`, `BIO_ADDRINFO`, `BIO_lookup(_ex)`, `BIO_parse_hostserv`
-    - the socket helpers (`BIO_socket`, `BIO_connect`, `BIO_listen`, `BIO_accept_ex`,
-      `BIO_sock_*`, `BIO_socket_wait`, `BIO_wait`, `BIO_do_connect_retry`, ...)
-    - the socket, connect, accept, and datagram BIOs, and `sendmmsg`/`recvmmsg`
+    - the socket helpers (`BIO_socket`, `BIO_connect`, `BIO_bind`, `BIO_listen`,
+      `BIO_accept_ex`, `BIO_sock_*`, `BIO_socket_wait`, `BIO_socket_nbio`,
+      `BIO_socket_ioctl`, ...), the deprecated ones (`BIO_get_host_ip`, `BIO_get_port`,
+      `BIO_accept`, `BIO_get_accept_socket`, `BIO_gethostbyname`), `BIO_wait`,
+      `BIO_do_connect_retry`, and `OSSL_sleep`
+    - the socket and accept BIOs
+
+    *Done:* 48 exports, now 393 of libcrypto's 5,876 (`bio/addr.rs`, `bio/sock.rs`,
+    `bio/accept.rs`, `sleep.rs`).
+    - **Split from 1.6e,** which holds the datagram BIOs and the connect BIO (whose
+      `SOCK_DGRAM` mode wraps a datagram BIO). This step is everything below them.
+    - **`BIO_ADDR`** is OpenSSL's union of the IPv4, IPv6, and Unix-domain socket addresses,
+      from `OPENSSL_zalloc`. **`BIO_ADDRINFO` is the C library's `struct addrinfo`,** freed
+      with `freeaddrinfo`, except for Unix-domain lookups, which build one entry as OpenSSL
+      does. `BIO_ADDRINFO_address` hands out the entry's `sockaddr`, so a `BIO_ADDR` pointer
+      may point at no more than its family's address. Nothing reads more of one than that
+      family's size, and field pointers come from `offset_of!`, with one access per unsafe
+      block.
+    - **Lookups follow OpenSSL's `getaddrinfo` use:**
+      - `AI_ADDRCONFIG` for `AF_UNSPEC` with a host, and a retry as `AI_NUMERICHOST`;
+      - `AI_PASSIVE` for servers;
+      - errors with `gai_strerror`'s text, or the system error for `EAI_SYSTEM`.
+    - **The socket helpers** raise OpenSSL's errors, the system error with `calling
+      socket()` and the like, then the BIO reason. TCP Fast Open follows OpenSSL's paths:
+      `TCP_FASTOPEN_CONNECT` and `TCP_FASTOPEN` on Linux; on macOS the
+      `net.inet.tcp.fastopen` sysctl, `connectx`, and `TCP_FASTOPEN`. The socket BIO keeps
+      the Fast Open peer (`BIO_C_SET_CONNECT`) that OpenSSL keeps, though on these
+      platforms it never sends to it.
+    - **The accept BIO's** state machine calls `BIO_push` on itself, which runs its own
+      control function, so its state's lock is never held across a call out. The cached
+      names (`BIO_get_accept_name`, `BIO_get_peer_name`, ...) are `OPENSSL_malloc` strings
+      the state owns, at stable addresses until replaced.
+    - **Deviations (`DEVIATIONS.md`):**
+      - null addresses, specs, results, and descriptors;
+      - a Unix path that fills its field without a NUL;
+      - an accept BIO freed with `BIO_NOCLOSE`, whose state is freed rather than leaked.
+    - **Tests:** identical output to the reference:
+      - `tests/c/bio_addr.c` (31 checks; numeric hosts and the local services database, so
+        nothing depends on the network);
+      - `tests/c/bio_sock.c` (49), over loopback: the helpers, socket BIOs, the accept BIO
+        with and without a chain, non-blocking accepts, `BIO_wait`, and the deprecated
+        functions. Ports are ephemeral, so only their relations are checked. The TCP Fast
+        Open result is printed, as it depends on the machine, and compared too;
+      - differential: `hostserv` and `addr` probe commands, an `addr.txt` corpus, and random
+        specs and raw addresses. 60,000 sessions identical on macOS and 40,000 on Linux
+        aarch64, where the C tests also passed (built with GCC);
+      - Miri for macOS and Linux x86_64 (the socket test is skipped there);
+      - a `bio_addr` fuzz target: `BIO_parse_hostserv` against a model of its rules, and raw
+        addresses round-tripped through `BIO_ADDR`, about 12 million runs. It found that
+        macOS's `getnameinfo` refuses some multicast-scoped IPv6 addresses, which OpenSSL
+        reports identically; the target's model was too strict.
+  - [ ] **1.6e Datagrams and the connect BIO:**
+    - the datagram BIO (`BIO_s_datagram`, `BIO_new_dgram`, `BIO_dgram_non_fatal_error`,
+      `BIO_err_is_non_fatal`): peers, MTU queries, timeouts, local addresses, and
+      `sendmmsg`/`recvmmsg`
+    - the connect BIO (`BIO_s_connect`, `BIO_new_connect`), stream and datagram
     - the datagram pair and memory BIOs (`BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`,
       `BIO_s_dgram_mem`), moved from 1.6c
 
