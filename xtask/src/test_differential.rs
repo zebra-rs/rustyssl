@@ -452,22 +452,50 @@ fn lhash_session(random: &mut Random, out: &mut String) -> Result {
 /// A random memory BIO session: writes and reads of every kind, seeks, resets, and the EOF
 /// return, on a writable, secure, read-only, or filtered memory BIO.
 fn bio_session(random: &mut Random, out: &mut String) -> Result {
-    writeln!(out, "bionew {}", random.below(4))?;
+    let kind = random.below(9);
+    writeln!(out, "bionew {kind}")?;
     for _ in 0..1 + random.below(50) {
-        match random.below(16) {
+        match random.below(19) {
             0..=3 => writeln!(out, "biowrite {}", random_text(random, b"abcxyz__", 30))?,
             4 => writeln!(out, "bioputs {}", random_text(random, b"abc__", 12))?,
             5..=7 => writeln!(out, "bioread {}", random.below(40))?,
+            // A size of 0 makes OpenSSL's buffer filter loop forever once it holds data.
+            8 if kind == 4 => writeln!(out, "biogets {}", 1 + random.below(40))?,
             8 => writeln!(out, "biogets {}", random.below(40))?,
             9 => writeln!(out, "bioline {}", random.below(20))?,
             10 | 11 => {
                 let name = random.pick(&[
-                    "reset", "eof", "pending", "wpending", "seek", "tell", "eofret", "getclose",
-                    "flush", "info",
+                    "reset",
+                    "eof",
+                    "pending",
+                    "wpending",
+                    "seek",
+                    "tell",
+                    "eofret",
+                    "getclose",
+                    "flush",
+                    "info",
+                    "shutdown",
+                    "guarantee",
+                    "request",
+                    "lines",
+                    "bufsize",
                 ]);
-                writeln!(out, "bioctrl {name} {}", random.offset(-2, 40))?;
+                let arg = if name == "bufsize" {
+                    random.offset(-2, 9000)
+                } else if name == "eofret" && (4..=7).contains(&kind) {
+                    // A positive EOF return reads bytes nobody wrote; behind a filter, those
+                    // are the filter's uninitialized buffer in OpenSSL.
+                    random.offset(-2, 3)
+                } else {
+                    random.offset(-2, 40)
+                };
+                writeln!(out, "bioctrl {name} {arg}")?;
             }
             12 => writeln!(out, "biomem")?,
+            13 | 14 if kind == 8 => writeln!(out, "biopeer")?,
+            15 if kind == 8 => writeln!(out, "bionread {}", random.below(20))?,
+            16 if kind == 8 => writeln!(out, "bionwrite {}", random_text(random, b"pqr", 20))?,
             _ => writeln!(out, "biostate")?,
         }
     }

@@ -1,0 +1,60 @@
+# Filters in front of a memory BIO, a read buffer over a fixed text, and a BIO pair.
+bionew 4
+biowrite hello_
+bioctrl wpending 0
+biomem
+bioctrl flush 0
+biomem
+bioread 3
+bioctrl lines 0
+bioctrl bufsize 9000
+biowrite more
+bioctrl reset 0
+biostate
+bionew 5
+biowrite abc
+biomem
+biowrite def_ghi
+biomem
+bioctrl wpending 0
+bioctrl flush 0
+biomem
+bionew 6
+bioread 4
+bioctrl tell 0
+bioctrl seek 1
+biogets 40
+bioctrl reset 0
+bioline 40
+bioctrl eof 0
+biowrite x
+bionew 7
+biowrite a_bc__d
+bioputs e_
+biomem
+bioctrl reset 0
+biowrite x
+biomem
+bionew 8
+bioread 5
+biostate
+bioctrl request 0
+biopeer
+bioctrl request 0
+bioctrl guarantee 0
+biowrite 0123456789abcdefghij
+biostate
+bionwrite xyz
+biopeer
+bioctrl pending 0
+bionread 4
+bioread 100
+bionread 3
+biostate
+biopeer
+bioctrl shutdown 0
+biowrite x
+biopeer
+bioread 5
+bioctrl eof 0
+bioctrl wpending 0

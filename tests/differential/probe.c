@@ -39,12 +39,18 @@
  *   lhnew <hash>               lh_ITEM_new: 0 the key itself, 1 a multiplicative hash
  *   lhinsert <i>, lhdelete <i>, lhget <i>, lhdown <n>, lhdump (the doall order)
  *
- * Commands for a memory BIO (`_` in a word stands for a newline):
+ * Commands for a BIO (`_` in a word stands for a newline):
  *   bionew <kind>              0 memory, 1 secure memory, 2 read-only over a fixed text,
- *                              3 memory behind a null filter
+ *                              3 memory behind a null filter, 4 behind a buffer, 5 behind a
+ *                              line buffer, 6 a read buffer over the fixed text, 7 memory
+ *                              behind a prefix filter ("> ", indented 2), 8 one end of a BIO
+ *                              pair (buffers of 16 and 32 bytes)
+ *   biopeer                    switch to the pair's other end
  *   biowrite <word>, bioputs <word>, bioread <n>, biogets <n>, bioline <n>
+ *   bionread <n>, bionwrite <word>   BIO_nread and BIO_nwrite (what was read, or copied in)
  *   bioctrl <name> <n>         reset, eof, pending, wpending, seek, tell, eofret, setclose,
- *                              getclose, flush, info
+ *                              getclose, flush, info, shutdown, guarantee, request, lines,
+ *                              bufsize
  *   biomem                     BIO_get_mem_ptr: the buffer's length and a hash of its data
  *   biostate                   retry flags, bytes read and written
  *
@@ -384,7 +390,7 @@ static void print_bytes(const char *label, int ret, const char *data, int len)
 static int bio_command(const char *command, const char *line)
 {
     static const char fixed[] = "line one\nline two\nthird line, no newline";
-    static BIO *bio = NULL;
+    static BIO *bio = NULL, *peer = NULL;
     char word[200] = "", name[32] = "";
     char buf[300];
     int n = 0;
@@ -402,6 +408,8 @@ static int bio_command(const char *command, const char *line)
         n = (int)sizeof(buf) - 1;
     if (strcmp(command, "bionew") == 0) {
         BIO_free_all(bio);
+        BIO_free(peer);
+        peer = NULL;
         switch (n) {
         case 1:
             bio = BIO_new(BIO_s_secmem());
@@ -412,12 +420,51 @@ static int bio_command(const char *command, const char *line)
         case 3:
             bio = BIO_push(BIO_new(BIO_f_null()), BIO_new(BIO_s_mem()));
             break;
+        case 4:
+            bio = BIO_push(BIO_new(BIO_f_buffer()), BIO_new(BIO_s_mem()));
+            break;
+        case 5:
+            bio = BIO_push(BIO_new(BIO_f_linebuffer()), BIO_new(BIO_s_mem()));
+            break;
+        case 6:
+            bio = BIO_push(BIO_new(BIO_f_readbuffer()), BIO_new_mem_buf(fixed, -1));
+            break;
+        case 7:
+            bio = BIO_push(BIO_new(BIO_f_prefix()), BIO_new(BIO_s_mem()));
+            (void)BIO_set_prefix(bio, "> ");
+            (void)BIO_set_indent(bio, 2);
+            break;
+        case 8:
+            if (!BIO_new_bio_pair(&bio, 16, &peer, 32))
+                bio = peer = NULL;
+            break;
         default:
             bio = BIO_new(BIO_s_mem());
         }
         printf("bionew %d\n", bio != NULL);
     } else if (bio == NULL) {
         printf("error no bio\n");
+    } else if (strcmp(command, "biopeer") == 0) {
+        if (peer != NULL) {
+            BIO *other = bio;
+
+            bio = peer;
+            peer = other;
+        }
+        printf("biopeer %d\n", peer != NULL);
+    } else if (strcmp(command, "bionread") == 0) {
+        char *p = NULL;
+        int ret = BIO_nread(bio, &p, n);
+
+        print_bytes("bionread", ret, p, ret > 0 && p != NULL ? ret : 0);
+    } else if (strcmp(command, "bionwrite") == 0) {
+        char *p = NULL;
+        int room = BIO_nwrite0(bio, &p), len = (int)strlen(word), ret;
+
+        if (room > 0 && p != NULL)
+            memcpy(p, word, (size_t)(len < room ? len : room));
+        ret = BIO_nwrite(bio, &p, len);
+        printf("bionwrite %d %d\n", room, ret);
     } else if (strcmp(command, "biowrite") == 0) {
         printf("biowrite %d\n", BIO_write(bio, word, (int)strlen(word)));
     } else if (strcmp(command, "bioputs") == 0) {
@@ -461,6 +508,16 @@ static int bio_command(const char *command, const char *line)
             ret = BIO_get_close(bio);
         else if (strcmp(name, "flush") == 0)
             ret = BIO_flush(bio);
+        else if (strcmp(name, "shutdown") == 0)
+            ret = BIO_shutdown_wr(bio);
+        else if (strcmp(name, "guarantee") == 0)
+            ret = (long)BIO_ctrl_get_write_guarantee(bio);
+        else if (strcmp(name, "request") == 0)
+            ret = (long)BIO_ctrl_get_read_request(bio);
+        else if (strcmp(name, "lines") == 0)
+            ret = BIO_get_buffer_num_lines(bio);
+        else if (strcmp(name, "bufsize") == 0)
+            ret = BIO_set_buffer_size(bio, arg);
         else if (strcmp(name, "info") == 0) {
             ret = BIO_get_mem_data(bio, &data);
             if (ret > 0 && data != NULL) {

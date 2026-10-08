@@ -16,7 +16,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_long = crate::bio::BIO_ctrl;
+const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::pair::BIO_ctrl_get_read_request;
+const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::pair::BIO_ctrl_get_write_guarantee;
 const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::BIO_ctrl_pending;
+const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int =
+    crate::bio::pair::BIO_ctrl_reset_read_request;
 const _: unsafe extern "C" fn(*mut BIO) -> usize = crate::bio::BIO_ctrl_wpending;
 const _: unsafe extern "C" fn(
     *mut BIO,
@@ -84,7 +88,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::bio::dump::BIO_dump_indent_fp;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_dup_chain;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_linebuffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_null;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::prefix::BIO_f_prefix;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_readbuffer;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::fd::BIO_fd_non_fatal_error;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
@@ -358,6 +366,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const BIO) -> *const core::ffi::c_char = crate::bio::BIO_method_name;
 const _: unsafe extern "C" fn(*const BIO) -> core::ffi::c_int = crate::bio::BIO_method_type;
 const _: unsafe extern "C" fn(*const BIO_METHOD) -> *mut BIO = crate::bio::BIO_new;
+const _: unsafe extern "C" fn(*mut *mut BIO, usize, *mut *mut BIO, usize) -> core::ffi::c_int =
+    crate::bio::pair::BIO_new_bio_pair;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const BIO_METHOD) -> *mut BIO =
     crate::bio::BIO_new_ex;
 const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> *mut BIO =
@@ -369,8 +379,22 @@ const _: unsafe extern "C" fn(*mut FILE, core::ffi::c_int) -> *mut BIO =
 const _: unsafe extern "C" fn(*const core::ffi::c_void, core::ffi::c_int) -> *mut BIO =
     crate::bio::mem::BIO_new_mem_buf;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_next;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::pair::BIO_nread;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut core::ffi::c_char) -> core::ffi::c_int =
+    crate::bio::pair::BIO_nread0;
 const _: unsafe extern "C" fn(*mut BIO) -> u64 = crate::bio::BIO_number_read;
 const _: unsafe extern "C" fn(*mut BIO) -> u64 = crate::bio::BIO_number_written;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::pair::BIO_nwrite;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut core::ffi::c_char) -> core::ffi::c_int =
+    crate::bio::pair::BIO_nwrite0;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_pop;
 const _: unsafe extern "C" fn(*mut BIO, *const core::ffi::c_char, ...) -> core::ffi::c_int =
     crate::bio::print::BIO_printf;
@@ -401,6 +425,7 @@ const _: unsafe extern "C" fn(
     u64,
     *mut usize,
 ) -> core::ffi::c_int = crate::bio::BIO_recvmmsg;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::pair::BIO_s_bio;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::fd::BIO_s_fd;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::file::BIO_s_file;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_mem;

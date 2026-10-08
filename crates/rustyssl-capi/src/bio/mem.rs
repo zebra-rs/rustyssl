@@ -487,7 +487,8 @@ fn mem_funcs(create: super::method::Create) -> Funcs {
     }
 }
 
-static MEM: Builtin = Builtin::new(BIO_TYPE_MEM, c"memory buffer", || mem_funcs(mem_new));
+pub(crate) static MEM: Builtin =
+    Builtin::new(BIO_TYPE_MEM, c"memory buffer", || mem_funcs(mem_new));
 static SECMEM: Builtin = Builtin::new(BIO_TYPE_MEM, c"secure memory buffer", || {
     mem_funcs(secmem_new)
 });
