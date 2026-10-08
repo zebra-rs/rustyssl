@@ -39,6 +39,15 @@
  *   lhnew <hash>               lh_ITEM_new: 0 the key itself, 1 a multiplicative hash
  *   lhinsert <i>, lhdelete <i>, lhget <i>, lhdown <n>, lhdump (the doall order)
  *
+ * Commands for a memory BIO (`_` in a word stands for a newline):
+ *   bionew <kind>              0 memory, 1 secure memory, 2 read-only over a fixed text,
+ *                              3 memory behind a null filter
+ *   biowrite <word>, bioputs <word>, bioread <n>, biogets <n>, bioline <n>
+ *   bioctrl <name> <n>         reset, eof, pending, wpending, seek, tell, eofret, setclose,
+ *                              getclose, flush, info
+ *   biomem                     BIO_get_mem_ptr: the buffer's length and a hash of its data
+ *   biostate                   retry flags, bytes read and written
+ *
  * Other helpers:
  *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
  *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
@@ -53,6 +62,7 @@
 
 #include <errno.h>
 
+#include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -354,6 +364,127 @@ static int lhash_command(const char *command, const char *line)
     return 1;
 }
 
+static void print_bytes(const char *label, int ret, const char *data, int len)
+{
+    printf("%s %d \"", label, ret);
+    for (int i = 0; i < len; i++)
+        printf(data[i] == '\n' ? "\\n" : "%c", data[i]);
+    printf("\"\n");
+}
+
+/* Runs a memory BIO command; returns 0 if `command` isn't one. */
+static int bio_command(const char *command, const char *line)
+{
+    static const char fixed[] = "line one\nline two\nthird line, no newline";
+    static BIO *bio = NULL;
+    char word[200] = "", name[32] = "";
+    char buf[300];
+    int n = 0;
+
+    if (strncmp(command, "bio", 3) != 0)
+        return 0;
+    sscanf(line, "%*s %199s", word);
+    for (char *p = word; *p != '\0'; p++)
+        if (*p == '_')
+            *p = '\n';
+    if (strcmp(word, "-") == 0)
+        word[0] = '\0';
+    n = atoi(word);
+    if (n < 0 || n > (int)sizeof(buf) - 1)
+        n = (int)sizeof(buf) - 1;
+    if (strcmp(command, "bionew") == 0) {
+        BIO_free_all(bio);
+        switch (n) {
+        case 1:
+            bio = BIO_new(BIO_s_secmem());
+            break;
+        case 2:
+            bio = BIO_new_mem_buf(fixed, -1);
+            break;
+        case 3:
+            bio = BIO_push(BIO_new(BIO_f_null()), BIO_new(BIO_s_mem()));
+            break;
+        default:
+            bio = BIO_new(BIO_s_mem());
+        }
+        printf("bionew %d\n", bio != NULL);
+    } else if (bio == NULL) {
+        printf("error no bio\n");
+    } else if (strcmp(command, "biowrite") == 0) {
+        printf("biowrite %d\n", BIO_write(bio, word, (int)strlen(word)));
+    } else if (strcmp(command, "bioputs") == 0) {
+        printf("bioputs %d\n", BIO_puts(bio, word));
+    } else if (strcmp(command, "bioread") == 0) {
+        int ret;
+
+        /* A positive EOF return reads "bytes" that were never written: show the fill. */
+        memset(buf, '#', sizeof(buf));
+        ret = BIO_read(bio, buf, n);
+
+        print_bytes("bioread", ret, buf, ret > 0 ? ret : 0);
+    } else if (strcmp(command, "biogets") == 0 || strcmp(command, "bioline") == 0) {
+        int ret;
+
+        memset(buf, '#', sizeof(buf));
+        ret = strcmp(command, "biogets") == 0 ? BIO_gets(bio, buf, n) : BIO_get_line(bio, buf, n);
+        print_bytes(command, ret, buf, ret > 0 ? ret : 0);
+    } else if (strcmp(command, "bioctrl") == 0) {
+        long arg = 0, ret = -99;
+        char *data = NULL;
+
+        sscanf(line, "%*s %31s %ld", name, &arg);
+        if (strcmp(name, "reset") == 0)
+            ret = BIO_reset(bio);
+        else if (strcmp(name, "eof") == 0)
+            ret = BIO_eof(bio);
+        else if (strcmp(name, "pending") == 0)
+            ret = BIO_pending(bio);
+        else if (strcmp(name, "wpending") == 0)
+            ret = BIO_wpending(bio);
+        else if (strcmp(name, "seek") == 0)
+            ret = BIO_seek(bio, arg);
+        else if (strcmp(name, "tell") == 0)
+            ret = BIO_tell(bio);
+        else if (strcmp(name, "eofret") == 0)
+            ret = BIO_set_mem_eof_return(bio, arg);
+        else if (strcmp(name, "setclose") == 0)
+            ret = BIO_set_close(bio, arg);
+        else if (strcmp(name, "getclose") == 0)
+            ret = BIO_get_close(bio);
+        else if (strcmp(name, "flush") == 0)
+            ret = BIO_flush(bio);
+        else if (strcmp(name, "info") == 0) {
+            ret = BIO_get_mem_data(bio, &data);
+            if (ret > 0 && data != NULL) {
+                print_bytes("bioctrl info", (int)ret, data, (int)ret);
+                ERR_clear_error();
+                return 1;
+            }
+        }
+        printf("bioctrl %s %ld\n", name, ret);
+    } else if (strcmp(command, "biomem") == 0) {
+        BUF_MEM *bm = NULL;
+        BIO *mem = BIO_find_type(bio, BIO_TYPE_MEM);
+
+        if (mem != NULL && BIO_get_mem_ptr(mem, &bm) > 0 && bm != NULL) {
+            char *copy = OPENSSL_strndup(bm->data == NULL ? "" : bm->data, bm->length);
+
+            printf("biomem %zu %lx\n", bm->length, copy == NULL ? 0UL : hash(copy));
+            OPENSSL_free(copy);
+        } else {
+            printf("biomem none\n");
+        }
+    } else if (strcmp(command, "biostate") == 0) {
+        printf("biostate retry=%d read=%d write=%d in=%llu out=%llu\n", BIO_should_retry(bio) != 0,
+               BIO_should_read(bio) != 0, BIO_should_write(bio) != 0,
+               (unsigned long long)BIO_number_read(bio), (unsigned long long)BIO_number_written(bio));
+    } else {
+        printf("error unknown command %s\n", command);
+    }
+    ERR_clear_error();
+    return 1;
+}
+
 /* Runs a string helper command; returns 0 if `command` isn't one. */
 static int string_command(const char *command, const char *line)
 {
@@ -503,7 +634,8 @@ int main(void)
         if (sscanf(line, "%31s %999s", command, argument) < 1)
             continue;
         if (err_command(command, line) || stack_command(command, line)
-            || lhash_command(command, line) || string_command(command, line)) {
+            || lhash_command(command, line) || string_command(command, line)
+            || bio_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

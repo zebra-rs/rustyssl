@@ -148,11 +148,12 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(5) {
+        match random.below(6) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
             3 => lhash_session(&mut random, &mut out)?,
+            4 => bio_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -280,6 +281,32 @@ fn lhash_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
+/// A random memory BIO session: writes and reads of every kind, seeks, resets, and the EOF
+/// return, on a writable, secure, read-only, or filtered memory BIO.
+fn bio_session(random: &mut Random, out: &mut String) -> Result {
+    writeln!(out, "bionew {}", random.below(4))?;
+    for _ in 0..1 + random.below(50) {
+        match random.below(16) {
+            0..=3 => writeln!(out, "biowrite {}", random_text(random, b"abcxyz__", 30))?,
+            4 => writeln!(out, "bioputs {}", random_text(random, b"abc__", 12))?,
+            5..=7 => writeln!(out, "bioread {}", random.below(40))?,
+            8 => writeln!(out, "biogets {}", random.below(40))?,
+            9 => writeln!(out, "bioline {}", random.below(20))?,
+            10 | 11 => {
+                let name = random.pick(&[
+                    "reset", "eof", "pending", "wpending", "seek", "tell", "eofret", "getclose",
+                    "flush", "info",
+                ]);
+                writeln!(out, "bioctrl {name} {}", random.offset(-2, 40))?;
+            }
+            12 => writeln!(out, "biomem")?,
+            _ => writeln!(out, "biostate")?,
+        }
+    }
+    writeln!(out, "biostate")?;
+    Ok(())
+}
+
 /// A random session of hex decoding and `OPENSSL_strtoul`, on text mixing digits, letters,
 /// separators, signs, and spaces.
 fn string_session(random: &mut Random, out: &mut String) -> Result {
@@ -353,11 +380,20 @@ mod tests {
 
     #[test]
     fn a_seed_replays_the_same_sessions() {
-        let first = random_sessions(42, 20).unwrap();
-        assert_eq!(first, random_sessions(42, 20).unwrap());
-        assert_ne!(first, random_sessions(43, 20).unwrap());
-        // Both kinds of session.
-        assert!(first.contains("\nnew ") && first.contains("\nclear\n"));
+        let first = random_sessions(42, 100).unwrap();
+        assert_eq!(first, random_sessions(42, 100).unwrap());
+        assert_ne!(first, random_sessions(43, 100).unwrap());
+        // Every kind of session.
+        for start in [
+            "\nnew ",
+            "\nclear\n",
+            "\nsknew ",
+            "\nlhnew ",
+            "\nbionew ",
+            "\nhexdecode ",
+        ] {
+            assert!(first.contains(start), "no session starting {start:?}");
+        }
     }
 
     #[test]

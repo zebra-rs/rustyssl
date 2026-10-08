@@ -91,6 +91,22 @@ pub(crate) unsafe trait Handle: Sized {
         true
     }
 
+    /// Keeps the object alive for as long as the returned guard lives, without changing the
+    /// count `*_free` and `*_up_ref` work with: a call that runs C callbacks holds its object
+    /// this way, so a callback that frees it can't free it under the call. `None` for null or
+    /// a handle of another type.
+    ///
+    /// # Safety
+    /// As for [`Handle::get`].
+    unsafe fn hold(handle: *const Self) -> Option<Held<Self>> {
+        // SAFETY: the caller's guarantee is the one `get` needs.
+        unsafe { Self::get(handle) }?;
+        let tagged = handle.cast::<Tagged<Self::Object>>();
+        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`.
+        unsafe { Arc::increment_strong_count(tagged) };
+        Some(Held { tagged })
+    }
+
     /// Drops a reference, as `*_free` does; the object is dropped with the last one. Null and
     /// handles of another type are left alone.
     ///
@@ -104,6 +120,27 @@ pub(crate) unsafe trait Handle: Sized {
         // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`, and the
         // caller owns one of its references.
         unsafe { Arc::decrement_strong_count(handle.cast::<Tagged<Self::Object>>()) };
+    }
+}
+
+/// A reference from [`Handle::hold`], released when dropped.
+pub(crate) struct Held<H: Handle> {
+    tagged: *const Tagged<H::Object>,
+}
+
+impl<H: Handle> core::ops::Deref for Held<H> {
+    type Target = H::Object;
+
+    fn deref(&self) -> &H::Object {
+        // SAFETY: the guard owns a strong reference, so the allocation is live.
+        unsafe { &(*self.tagged).object }
+    }
+}
+
+impl<H: Handle> Drop for Held<H> {
+    fn drop(&mut self) {
+        // SAFETY: the guard owns one strong reference, taken in `hold`.
+        unsafe { Arc::decrement_strong_count(self.tagged) };
     }
 }
 
@@ -207,6 +244,19 @@ mod tests {
         assert!(!dropped.load(Ordering::SeqCst));
         // SAFETY: `handle` is live and this drops its only reference.
         unsafe { Widget::free(handle) };
+        assert!(dropped.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn a_hold_outlives_the_last_free() {
+        let (handle, dropped) = widget();
+        // SAFETY: `handle` is live.
+        let held = unsafe { Widget::hold(handle) }.unwrap();
+        // SAFETY: drops the only reference `*_free` knows about.
+        unsafe { Widget::free(handle) };
+        assert!(!dropped.load(Ordering::SeqCst));
+        held.uses.fetch_add(1, Ordering::SeqCst);
+        drop(held);
         assert!(dropped.load(Ordering::SeqCst));
     }
 

@@ -46,3 +46,10 @@ path = "fuzz_targets/hex.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "bio_mem"
+path = "fuzz_targets/bio_mem.rs"
+test = false
+doc = false
+bench = false

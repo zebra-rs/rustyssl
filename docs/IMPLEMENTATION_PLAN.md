@@ -719,28 +719,79 @@ Everything else depends on this phase.
       `strtoul` sessions, 10,000 of them identical on macOS;
     - fuzz targets `stack` and `lhash`, model-based, and `hex`, against a model decoder
       with a round trip.
-- [ ] **1.6 BIO core:**
-  - the BIO object, chains, and the full `BIO_ctrl` protocol (every `BIO_CTRL_*`)
-  - `read`/`write`/`gets`/`puts` and their `_ex` variants
-  - `BIO_printf`, `BIO_snprintf`, `BIO_vprintf`: C-printf-compatible, byte-exact with the
-    reference
-  - `BIO_meth_*`, for application-defined BIOs
-  - callbacks (`BIO_set_callback_ex`)
-  - `BIO_ADDR`, `BIO_ADDRINFO`, and the socket helpers
-  - source/sink BIOs: mem (including read-only), secmem, file, fd, socket, connect, accept,
-    null, dgram, dgram_pair, BIO pair
-  - filters: buffer, null, base64, readbuffer, prefix, indent, nbio_test
-  - `BIO_dump*`
+- [ ] **1.6 BIO core**, in four sub-steps, each its own PR (about 200 exports in all; those that
+  need later phases are listed at the end):
+  - [x] **1.6a The BIO object and the simple types:**
+    - the BIO object and chains
+    - `read`/`write`/`gets`/`puts` and their `_ex` variants
+    - the `BIO_ctrl` protocol
+    - callbacks (`BIO_set_callback_ex` and the old-style one)
+    - `BIO_meth_*`, for application-defined BIOs
+    - ex_data
+    - the mem (including read-only), secmem, null, file, and fd BIOs, and the null filter
+    - `ERR_print_errors`, `ERR_add_error_mem_bio`, and the `OPENSSL_LH_*_bio` statistics
 
-  The md and cipher filters come in Phase 3.
+    *Done:* 99 exports, now 319 of libcrypto's 5,876 (`bio.rs`, `bio/`).
+    - **Methods are tables of C functions,** built-in ones included. Applications build their
+      own methods out of `BIO_meth_get_*(BIO_s_mem())`, so every built-in function is a real C
+      function taking a `BIO *`, and the plain `read`/`write` go through OpenSSL's converters.
+      The internal ones are written with `ffi_callback!`, the unexported twin of
+      `ffi_export!`.
+    - **The BIO object:**
+      - The fields are atomics, so misuse from two threads isn't a data race on the Rust
+        side.
+      - No lock is held while a method or callback runs.
+      - Each call holds a reference through `Handle::hold`, new in this step, so a callback
+        that frees the BIO can't free it under the call. `BIO_free`'s count is separate from
+        that.
+      - The core is OpenSSL's `bio_lib.c`: errors and return values, the callbacks before
+        and after (the old-style one with its length and count conversions), and the byte
+        counts.
+    - **The memory BIO** keeps OpenSSL's state in C memory: the public `BUF_MEM` that
+      `BIO_get_mem_ptr` hands out, plus a read position. So applications that edit the buffer
+      see what OpenSSL gives them, including the move of unread data on a write, seeks within
+      the buffer, and the EOF return. A positive EOF return reads "bytes" that were never
+      written, as in OpenSSL.
+    - **The file and fd BIOs** are OpenSSL's Unix paths over stdio and descriptors. Failures
+      raise the system error with the call in the data (`calling fopen(name, mode)`, through
+      the new `err::raise_with_bytes`), then the BIO error.
+    - **Quirks kept:**
+      - The null filter refuses `BIO_CTRL_DUP`, so `BIO_dup_chain` fails on a chain with
+        one.
+      - `BIO_free_all` stops after a BIO with another reference.
+      - `BIO_set_next` doesn't link back.
+    - **Deviations (`DEVIATIONS.md`):**
+      - null BIOs and methods;
+      - built-in methods, which OpenSSL keeps read-only;
+      - `BIO_indent` with a negative limit;
+      - a file BIO without a `FILE`;
+      - `BIO_set_mem_buf(NULL)`.
+    - **Tests:** identical output to the reference on macOS and Linux aarch64:
+      - `tests/c/bio_mem.c` (62 checks), `bio_meth.c` (37, with the callback traces
+        compared), `bio_file.c` (31), `err_bio.c` (6), and an addition to `lhash.c`;
+      - differential: a `bio.txt` corpus, plus random memory BIO sessions, 9,000 sessions
+        identical on macOS and 3,000 on Linux;
+      - a model-based `bio_mem` fuzz target (4 million runs clean). It caught a mistake in
+        its own model: `BIO_write` of 0 bytes doesn't reach the BIO.
+  - [ ] **1.6b printf and formatting:**
+    - `BIO_printf`, `BIO_snprintf`, `BIO_vprintf`, `BIO_vsnprintf`: C-printf-compatible,
+      byte-exact with the reference
+    - `ERR_set_error`/`ERR_vset_error` with a format, through `err::raise_with_bytes` (they
+      abort until then)
+    - `BIO_dump*`, `BIO_hex_string`, `BIO_debug_callback(_ex)`
+  - [ ] **1.6c Filters and pairs:**
+    - buffer, linebuffer, readbuffer, prefix, base64, nbio_test
+    - the BIO pair (`BIO_s_bio`, `BIO_new_bio_pair`, `BIO_nread`/`nwrite`), dgram_pair, and
+      `BIO_s_dgram_mem`
+  - [ ] **1.6d Networking:**
+    - `BIO_ADDR`, `BIO_ADDRINFO`, `BIO_lookup(_ex)`, `BIO_parse_hostserv`
+    - the socket helpers (`BIO_socket`, `BIO_connect`, `BIO_listen`, `BIO_accept_ex`,
+      `BIO_sock_*`, `BIO_socket_wait`, `BIO_wait`, `BIO_do_connect_retry`, ...)
+    - the socket, connect, accept, and datagram BIOs, and `sendmmsg`/`recvmmsg`
 
-  From 1.4:
-  - `ERR_set_error`/`ERR_vset_error` with a format, through the printf engine (they abort
-    until then; `err::raise_with_text` takes the formatted text);
-  - `ERR_print_errors` and `ERR_add_error_mem_bio`.
-
-  From 1.5: the BIO statistics functions `OPENSSL_LH_stats_bio`, `_node_stats_bio`, and
-  `_node_usage_stats_bio`, which print what the `FILE` versions do.
+  Later phases: the md and cipher filters (`BIO_f_md`, `BIO_f_cipher`, `BIO_f_reliable`,
+  Phase 3); the ASN.1, CMS, PKCS#7, and NDEF BIOs; and the provider core BIO
+  (`BIO_s_core`, `BIO_new_from_core_bio`).
 - [ ] **1.7 Tracing:** `OSSL_trace_*` with the default build's behavior (tracing disabled).
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both

@@ -87,6 +87,24 @@ macro_rules! ffi_export {
 }
 pub(crate) use ffi_export;
 
+/// Defines a C-callable function that isn't exported: one rustssl hands to C as a function
+/// pointer, such as a built-in BIO method's `read`. Its body runs inside [`guard`], as an
+/// export's does.
+macro_rules! ffi_callback {
+    (
+        $(#[$attr:meta])*
+        pub(crate) unsafe extern "C" fn $name:ident ( $($arg:ident : $ty:ty),* $(,)? ) $(-> $ret:ty)?
+        where failure = $failure:expr, library = $library:path
+        $body:block
+    ) => {
+        $(#[$attr])*
+        pub(crate) unsafe extern "C" fn $name($($arg: $ty),*) $(-> $ret)? {
+            $crate::ffi::guard($library, stringify!($name), || $failure, move || $body)
+        }
+    };
+}
+pub(crate) use ffi_callback;
+
 /// Aborts the process on a misuse that OpenSSL catches with `OPENSSL_assert`, which prints the
 /// failed assertion and aborts too: freeing a pointer the secure heap never handed out, for
 /// example. Carrying on would corrupt memory.

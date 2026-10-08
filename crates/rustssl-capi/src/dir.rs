@@ -36,25 +36,6 @@ unsafe impl Sync for DirContext {}
 
 handle_type!(OPENSSL_DIR_CTX => DirContext);
 
-/// This thread's `errno`.
-#[cfg(target_os = "macos")]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__error() }
-}
-
-/// This thread's `errno`.
-#[cfg(not(target_os = "macos"))]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__errno_location() }
-}
-
-fn set_errno(value: c_int) {
-    // SAFETY: errno_location returns this thread's errno.
-    unsafe { errno_location().write(value) };
-}
-
 ffi_export! {
     /// Returns the next name in `directory`, opening it into `*ctx` on the first call (with
     /// `*ctx` null). Returns null at the end, with `errno` 0, or on failure with `errno` set
@@ -68,10 +49,10 @@ ffi_export! {
     where failure = ptr::null(), library = ERR_LIB_CRYPTO
     {
         if ctx.is_null() || directory.is_null() {
-            set_errno(libc::EINVAL);
+            crate::errno::set(libc::EINVAL);
             return ptr::null();
         }
-        set_errno(0);
+        crate::errno::set(0);
         // SAFETY: the caller's guarantee.
         let mut handle = unsafe { ctx.read() };
         if handle.is_null() {
@@ -89,7 +70,7 @@ ffi_export! {
         }
         // SAFETY: as above.
         let Some(context) = (unsafe { OPENSSL_DIR_CTX::get(handle) }) else {
-            set_errno(libc::EINVAL);
+            crate::errno::set(libc::EINVAL);
             return ptr::null();
         };
         let mut state = context.0.lock().unwrap_or_else(PoisonError::into_inner);
@@ -126,7 +107,7 @@ ffi_export! {
         let handle = if ctx.is_null() { ptr::null_mut() } else { unsafe { ctx.read() } };
         // SAFETY: as above.
         let Some(context) = (unsafe { OPENSSL_DIR_CTX::get(handle) }) else {
-            set_errno(libc::EINVAL);
+            crate::errno::set(libc::EINVAL);
             return 0;
         };
         let closed = {

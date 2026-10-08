@@ -30,6 +30,11 @@ OpenSSL never depends on them.
 | `CRYPTO_*_ex_data` with a null `CRYPTO_EX_DATA`; `CRYPTO_alloc_ex_data` for an index that doesn't exist | dereference null and crash | return 0 or null, or do nothing | `ex_data::tests::null_data_and_missing_indexes_fail` |
 | The string and hex helpers (`OPENSSL_strnlen`, `OPENSSL_strlcpy`, `OPENSSL_strlcat`, `OPENSSL_hexstr2buf(_ex)`, `OPENSSL_buf2hexstr(_ex)`) with a null string or buffer | dereference null and crash | count it as empty, or fail | `string::tests::nulls_are_refused` |
 | `OPENSSL_DIR_end` | frees the context and leaves `*ctx` pointing at it, so a second call frees it again | sets `*ctx` to null; a second call returns 0 with `EINVAL` | `dir::tests::ending_clears_the_context` |
+| The BIO accessors (`BIO_set_data`, `BIO_get_init`, `BIO_set_flags`, `BIO_method_name`, `BIO_set_ex_data`, ...) with a null BIO; `BIO_new` with a null method; `BIO_new_file` with a null name or mode | dereference null and crash | read as 0 or null, or do nothing | `bio::tests::null_bios_are_ignored` |
+| `BIO_meth_free` and `BIO_meth_set_*` on a built-in method (`BIO_s_mem()`, ...) | write to read-only data and crash | `BIO_meth_free` ignores it; the setters return 0 | `bio::tests::builtin_methods_cant_be_changed_or_freed` |
+| `BIO_indent` with a negative limit | loops about 2^31 times, writing a space each time | writes nothing and returns 1 | `bio::tests::a_negative_indent_limit_writes_nothing` |
+| `BIO_set_mem_buf(b, NULL, ...)` | frees the old buffer, then dereferences null | returns 0, keeping the old buffer | `bio::tests::a_negative_indent_limit_writes_nothing` |
+| A `FILE` BIO with no `FILE` yet: `BIO_eof`, `BIO_tell`, `BIO_seek`, `BIO_gets` | pass null to stdio and crash | return 0 (`BIO_eof`, `BIO_gets`) or -1 | `bio::tests::a_file_bio_without_a_file_fails` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustssl.<version>`: `OpenSSL 3.5.9+rustssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustssl_in_the_build_metadata` |
 
 ## Notes

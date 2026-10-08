@@ -2359,20 +2359,6 @@ pub extern "C" fn BIO_bind(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_callback_ctrl(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: BIO_info_cb,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("BIO_callback_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_clear_flags(_: *mut BIO, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BIO_clear_flags")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_closesocket(_: core::ffi::c_int) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_closesocket")
 }
@@ -2387,21 +2373,6 @@ pub extern "C" fn BIO_connect(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_copy_next_retry(_: *mut BIO) {
-    crate::stub::unimplemented("BIO_copy_next_retry")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("BIO_ctrl")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_ctrl_get_read_request(_: *mut BIO) -> usize {
     crate::stub::unimplemented("BIO_ctrl_get_read_request")
 }
@@ -2412,18 +2383,8 @@ pub extern "C" fn BIO_ctrl_get_write_guarantee(_: *mut BIO) -> usize {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl_pending(_: *mut BIO) -> usize {
-    crate::stub::unimplemented("BIO_ctrl_pending")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_ctrl_reset_read_request(_: *mut BIO) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_ctrl_reset_read_request")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl_wpending(_: *mut BIO) -> usize {
-    crate::stub::unimplemented("BIO_ctrl_wpending")
 }
 
 #[unsafe(no_mangle)]
@@ -2538,11 +2499,6 @@ pub extern "C" fn BIO_dump_indent_fp(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_dup_chain(_: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_dup_chain")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_err_is_non_fatal(_: core::ffi::c_uint) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_err_is_non_fatal")
 }
@@ -2588,11 +2544,6 @@ pub extern "C" fn BIO_f_nbio_test() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_null() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_null")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_prefix() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_prefix")
 }
@@ -2618,61 +2569,11 @@ pub extern "C" fn BIO_f_zstd() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_fd_non_fatal_error(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_fd_non_fatal_error")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_fd_should_retry(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_fd_should_retry")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_find_type(_: *mut BIO, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_find_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_free(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_free_all(_: *mut BIO) {
-    crate::stub::unimplemented("BIO_free_all")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_get_accept_socket(
     _: *mut core::ffi::c_char,
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_get_accept_socket")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_callback(_: *const BIO) -> BIO_callback_fn {
-    crate::stub::unimplemented("BIO_get_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_callback_arg(_: *const BIO) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("BIO_get_callback_arg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_callback_ex(_: *const BIO) -> BIO_callback_fn_ex {
-    crate::stub::unimplemented("BIO_get_callback_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_data(_: *mut BIO) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("BIO_get_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_ex_data(_: *const BIO, _: core::ffi::c_int) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("BIO_get_ex_data")
 }
 
 #[unsafe(no_mangle)]
@@ -2684,25 +2585,6 @@ pub extern "C" fn BIO_get_host_ip(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_init(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_line(
-    _: *mut BIO,
-    _: *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_line")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_new_index() -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_new_index")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_get_port(
     _: *const core::ffi::c_char,
     _: *mut core::ffi::c_ushort,
@@ -2711,48 +2593,8 @@ pub extern "C" fn BIO_get_port(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_retry_BIO(_: *mut BIO, _: *mut core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_get_retry_BIO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_retry_reason(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_retry_reason")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_rpoll_descriptor(
-    _: *mut BIO,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_rpoll_descriptor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_shutdown(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_shutdown")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_get_wpoll_descriptor(
-    _: *mut BIO,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_get_wpoll_descriptor")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_gethostbyname(_: *const core::ffi::c_char) -> *mut hostent {
     crate::stub::unimplemented("BIO_gethostbyname")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_gets(
-    _: *mut BIO,
-    _: *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_gets")
 }
 
 #[unsafe(no_mangle)]
@@ -2764,25 +2606,6 @@ pub extern "C" fn BIO_hex_string(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_hex_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_indent(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_indent")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_int_ctrl(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-    _: core::ffi::c_int,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("BIO_int_ctrl")
 }
 
 #[unsafe(no_mangle)]
@@ -2817,344 +2640,6 @@ pub extern "C" fn BIO_lookup_ex(
     _: *mut *mut BIO_ADDRINFO,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_lookup_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_free(_: *mut BIO_METHOD) {
-    crate::stub::unimplemented("BIO_meth_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_callback_ctrl(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: core::ffi::c_int,
-        arg2: BIO_info_cb,
-    ) -> core::ffi::c_long,
-> {
-    crate::stub::unimplemented("BIO_meth_get_callback_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_create(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(bion: *mut BIO) -> core::ffi::c_int> {
-    crate::stub::unimplemented("BIO_meth_get_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_ctrl(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: core::ffi::c_int,
-        arg2: core::ffi::c_long,
-        arg3: *mut core::ffi::c_void,
-    ) -> core::ffi::c_long,
-> {
-    crate::stub::unimplemented("BIO_meth_get_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_destroy(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(biom: *mut BIO) -> core::ffi::c_int> {
-    crate::stub::unimplemented("BIO_meth_get_destroy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_gets(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *mut core::ffi::c_char,
-        arg2: core::ffi::c_int,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_gets")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_puts(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(biom: *mut BIO, arg1: *const core::ffi::c_char) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_puts")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_read(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *mut core::ffi::c_char,
-        arg2: core::ffi::c_int,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_read_ex(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *mut core::ffi::c_char,
-        arg2: usize,
-        arg3: *mut usize,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_read_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_recvmmsg(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *mut BIO_MSG,
-        arg2: usize,
-        arg3: usize,
-        arg4: u64,
-        arg5: *mut usize,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_recvmmsg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_sendmmsg(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *mut BIO_MSG,
-        arg2: usize,
-        arg3: usize,
-        arg4: u64,
-        arg5: *mut usize,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_sendmmsg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_write(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *const core::ffi::c_char,
-        arg2: core::ffi::c_int,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_write")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_get_write_ex(
-    _: *const BIO_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        biom: *mut BIO,
-        arg1: *const core::ffi::c_char,
-        arg2: usize,
-        arg3: *mut usize,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("BIO_meth_get_write_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_new(
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-) -> *mut BIO_METHOD {
-    crate::stub::unimplemented("BIO_meth_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_callback_ctrl(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: core::ffi::c_int,
-            arg3: BIO_info_cb,
-        ) -> core::ffi::c_long,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_callback_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_create(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<unsafe extern "C" fn(arg1: *mut BIO) -> core::ffi::c_int>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_ctrl(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: core::ffi::c_int,
-            arg3: core::ffi::c_long,
-            arg4: *mut core::ffi::c_void,
-        ) -> core::ffi::c_long,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_destroy(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<unsafe extern "C" fn(arg1: *mut BIO) -> core::ffi::c_int>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_destroy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_gets(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *mut core::ffi::c_char,
-            arg3: core::ffi::c_int,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_gets")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_puts(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(arg1: *mut BIO, arg2: *const core::ffi::c_char) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_puts")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_read(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *mut core::ffi::c_char,
-            arg3: core::ffi::c_int,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_read_ex(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *mut core::ffi::c_char,
-            arg3: usize,
-            arg4: *mut usize,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_read_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_recvmmsg(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *mut BIO_MSG,
-            arg3: usize,
-            arg4: usize,
-            arg5: u64,
-            arg6: *mut usize,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_recvmmsg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_sendmmsg(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *mut BIO_MSG,
-            arg3: usize,
-            arg4: usize,
-            arg5: u64,
-            arg6: *mut usize,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_sendmmsg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_write(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *const core::ffi::c_char,
-            arg3: core::ffi::c_int,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_write")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_meth_set_write_ex(
-    _: *mut BIO_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *mut BIO,
-            arg2: *const core::ffi::c_char,
-            arg3: usize,
-            arg4: *mut usize,
-        ) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_meth_set_write_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_method_name(_: *const BIO) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("BIO_method_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_method_type(_: *const BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_method_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new(_: *const BIO_METHOD) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new")
 }
 
 #[unsafe(no_mangle)]
@@ -3208,46 +2693,13 @@ pub extern "C" fn BIO_new_dgram(_: core::ffi::c_int, _: core::ffi::c_int) -> *mu
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_ex(_: *mut OSSL_LIB_CTX, _: *const BIO_METHOD) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_fd(_: core::ffi::c_int, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_fd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_file(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_file")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_fp(_: *mut FILE, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_from_core_bio")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_mem_buf(_: *const core::ffi::c_void, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_mem_buf")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_socket(_: core::ffi::c_int, _: core::ffi::c_int) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_socket")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_next(_: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_next")
 }
 
 #[unsafe(no_mangle)]
@@ -3262,16 +2714,6 @@ pub extern "C" fn BIO_nread(
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_nread0(_: *mut BIO, _: *mut *mut core::ffi::c_char) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_nread0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_number_read(_: *mut BIO) -> u64 {
-    crate::stub::unimplemented("BIO_number_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_number_written(_: *mut BIO) -> u64 {
-    crate::stub::unimplemented("BIO_number_written")
 }
 
 #[unsafe(no_mangle)]
@@ -3299,67 +2741,12 @@ pub extern "C" fn BIO_parse_hostserv(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_pop(_: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_pop")
-}
-
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_printf(
     _: *mut BIO,
     _: *const core::ffi::c_char,
     _: ...
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_printf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_ptr_ctrl(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("BIO_ptr_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_push(_: *mut BIO, _: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_push")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_puts(_: *mut BIO, _: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_puts")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_read(
-    _: *mut BIO,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_read_ex(
-    _: *mut BIO,
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_read_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_recvmmsg(
-    _: *mut BIO,
-    _: *mut BIO_MSG,
-    _: usize,
-    _: usize,
-    _: u64,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_recvmmsg")
 }
 
 #[unsafe(no_mangle)]
@@ -3398,65 +2785,13 @@ pub extern "C" fn BIO_s_dgram_pair() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_fd() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_fd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_file() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_file")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_log")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_mem() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_mem")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_null() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_null")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_secmem() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_secmem")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_socket() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_socket")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_sendmmsg(
-    _: *mut BIO,
-    _: *mut BIO_MSG,
-    _: usize,
-    _: usize,
-    _: u64,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_sendmmsg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_callback(_: *mut BIO, _: BIO_callback_fn) {
-    crate::stub::unimplemented("BIO_set_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_callback_arg(_: *mut BIO, _: *mut core::ffi::c_char) {
-    crate::stub::unimplemented("BIO_set_callback_arg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_callback_ex(_: *mut BIO, _: BIO_callback_fn_ex) {
-    crate::stub::unimplemented("BIO_set_callback_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -3468,45 +2803,6 @@ pub extern "C" fn BIO_set_cipher(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_set_cipher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_data(_: *mut BIO, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("BIO_set_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_ex_data(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_set_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_flags(_: *mut BIO, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BIO_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_init(_: *mut BIO, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BIO_set_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_next(_: *mut BIO, _: *mut BIO) {
-    crate::stub::unimplemented("BIO_set_next")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_retry_reason(_: *mut BIO, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BIO_set_retry_reason")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_shutdown(_: *mut BIO, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BIO_set_shutdown")
 }
 
 #[unsafe(no_mangle)]
@@ -3587,21 +2883,6 @@ pub extern "C" fn BIO_socket_wait(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_test_flags(_: *const BIO, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_test_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_up_ref(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_up_ref")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_vfree(_: *mut BIO) {
-    crate::stub::unimplemented("BIO_vfree")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_vprintf(
     _: *mut BIO,
     _: *const core::ffi::c_char,
@@ -3623,25 +2904,6 @@ pub extern "C" fn BIO_vsnprintf(
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_wait(_: *mut BIO, _: time_t, _: core::ffi::c_uint) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_wait")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_write(
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_write")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_write_ex(
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_write_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -11327,16 +10589,6 @@ pub extern "C" fn ENGINE_unregister_pkey_meths(_: *mut ENGINE) {
 #[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_up_ref(_: *mut ENGINE) -> core::ffi::c_int {
     crate::stub::unimplemented("ENGINE_up_ref")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ERR_add_error_mem_bio(_: *const core::ffi::c_char, _: *mut BIO) {
-    crate::stub::unimplemented("ERR_add_error_mem_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ERR_print_errors(_: *mut BIO) {
-    crate::stub::unimplemented("ERR_print_errors")
 }
 
 #[unsafe(no_mangle)]
@@ -20288,21 +19540,6 @@ pub extern "C" fn OCSP_url_svcloc_new(
     _: *mut *const core::ffi::c_char,
 ) -> *mut X509_EXTENSION {
     crate::stub::unimplemented("OCSP_url_svcloc_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_node_stats_bio(_: *const OPENSSL_LHASH, _: *mut BIO) {
-    crate::stub::unimplemented("OPENSSL_LH_node_stats_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_node_usage_stats_bio(_: *const OPENSSL_LHASH, _: *mut BIO) {
-    crate::stub::unimplemented("OPENSSL_LH_node_usage_stats_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_stats_bio(_: *const OPENSSL_LHASH, _: *mut BIO) {
-    crate::stub::unimplemented("OPENSSL_LH_stats_bio")
 }
 
 #[unsafe(no_mangle)]

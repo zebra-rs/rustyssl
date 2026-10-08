@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/lhash.h>
 
@@ -226,6 +227,20 @@ static void strings(void)
         fclose(f);
     }
     check(f != NULL, "OPENSSL_LH_stats, _node_stats, _node_usage_stats");
+    {
+        BIO *out = BIO_new(BIO_s_mem());
+        char *text = NULL;
+        long len;
+
+        OPENSSL_LH_stats_bio(lh, out);
+        OPENSSL_LH_node_stats_bio(lh, out);
+        OPENSSL_LH_node_usage_stats_bio(lh, out);
+        len = BIO_get_mem_data(out, &text);
+        printf("# the BIO statistics: %ld bytes\n", len);
+        check(len > 0 && memcmp(text, "num_items             = 1\n", 26) == 0,
+              "OPENSSL_LH_stats_bio, _node_stats_bio, _node_usage_stats_bio");
+        BIO_free(out);
+    }
     OPENSSL_LH_flush(lh);
     OPENSSL_LH_flush(NULL);
     OPENSSL_LH_free(lh);

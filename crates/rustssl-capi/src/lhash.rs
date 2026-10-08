@@ -18,7 +18,7 @@ use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use libc::FILE;
 use rustssl_abi::{
-    ERR_LIB_CRYPTO, LH_LOAD_MULT, OPENSSL_LH_COMPFUNC, OPENSSL_LH_COMPFUNCTHUNK,
+    BIO, ERR_LIB_CRYPTO, LH_LOAD_MULT, OPENSSL_LH_COMPFUNC, OPENSSL_LH_COMPFUNCTHUNK,
     OPENSSL_LH_DOALL_FUNC, OPENSSL_LH_DOALL_FUNC_THUNK, OPENSSL_LH_DOALL_FUNCARG,
     OPENSSL_LH_DOALL_FUNCARG_THUNK, OPENSSL_LH_HASHFUNC, OPENSSL_LH_HASHFUNCTHUNK, OPENSSL_LHASH,
 };
@@ -802,6 +802,63 @@ unsafe fn print_stats(lh: *const OPENSSL_LHASH, fp: *mut FILE, kind: Stats) {
         if unsafe { libc::fwrite(line.as_ptr().cast(), line.len(), 1, fp) } != 1 {
             return;
         }
+    }
+}
+
+/// Writes a statistics report to `out`, a line per `BIO_write` as OpenSSL's `BIO_printf`s.
+/// A null table prints nothing (docs/DEVIATIONS.md).
+///
+/// # Safety
+/// `lh` is null or a live table; `out` is null or a live BIO.
+unsafe fn print_stats_bio(lh: *const OPENSSL_LHASH, out: *mut BIO, kind: Stats) {
+    // SAFETY: the caller's guarantee.
+    let Some(table) = (unsafe { table(lh) }) else {
+        return;
+    };
+    let lines = stats(&table.read(), kind);
+    for line in lines {
+        let len = c_int::try_from(line.len()).unwrap_or(c_int::MAX);
+        // SAFETY: the caller's guarantee about `out`; `line` holds `len` bytes.
+        unsafe { crate::bio::BIO_write(out, line.as_ptr().cast(), len) };
+    }
+}
+
+ffi_export! {
+    /// Prints the item and bucket counts to `out` (deprecated).
+    ///
+    /// # Safety
+    /// `lh` is null or a live table; `out` is null or a live BIO.
+    pub unsafe extern "C" fn OPENSSL_LH_stats_bio(lh: *const OPENSSL_LHASH, out: *mut BIO)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { print_stats_bio(lh, out, Stats::Summary) };
+    }
+}
+
+ffi_export! {
+    /// Prints each bucket's chain length to `out` (deprecated).
+    ///
+    /// # Safety
+    /// `lh` is null or a live table; `out` is null or a live BIO.
+    pub unsafe extern "C" fn OPENSSL_LH_node_stats_bio(lh: *const OPENSSL_LHASH, out: *mut BIO)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { print_stats_bio(lh, out, Stats::Nodes) };
+    }
+}
+
+ffi_export! {
+    /// Prints how many buckets are used and the load to `out` (deprecated).
+    ///
+    /// # Safety
+    /// `lh` is null or a live table; `out` is null or a live BIO.
+    pub unsafe extern "C" fn OPENSSL_LH_node_usage_stats_bio(lh: *const OPENSSL_LHASH, out: *mut BIO)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { print_stats_bio(lh, out, Stats::Usage) };
     }
 }
 

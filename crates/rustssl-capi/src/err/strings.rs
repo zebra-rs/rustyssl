@@ -25,8 +25,9 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, RwLock};
 
 use rustssl_abi::{
-    ERR_LIB_CRYPTO, ERR_LIB_SSL, ERR_LIB_USER, ERR_REASON_MASK, ERR_RFLAGS_MASK, ERR_RFLAGS_OFFSET,
-    ERR_STRING_DATA, ERR_SYSTEM_MASK, ERR_TXT_STRING, OPENSSL_INIT_LOAD_SSL_STRINGS,
+    BIO, BIO_CTRL_INFO, ERR_LIB_CRYPTO, ERR_LIB_SSL, ERR_LIB_USER, ERR_REASON_MASK,
+    ERR_RFLAGS_MASK, ERR_RFLAGS_OFFSET, ERR_STRING_DATA, ERR_SYSTEM_MASK, ERR_TXT_STRING,
+    OPENSSL_INIT_LOAD_SSL_STRINGS,
 };
 
 use super::{Get, Table, c_bytes, get, is_system, library_of, pack};
@@ -533,6 +534,58 @@ ffi_export! {
             // SAFETY: the caller's guarantee about `fp`; `text` holds `len` bytes.
             unsafe { libc::fwrite(text.as_ptr().cast(), len, 1, fp) == 1 }
         });
+    }
+}
+
+ffi_export! {
+    /// `ERR_print_errors_cb` writing each line to `bp` with `BIO_write`, stopping when a write
+    /// fails (so a null BIO consumes one error, as in OpenSSL).
+    ///
+    /// # Safety
+    /// `bp` is null or a live BIO.
+    pub unsafe extern "C" fn ERR_print_errors(bp: *mut BIO)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        print_errors(|text| {
+            let len = c_int::try_from(text.len().saturating_sub(1)).unwrap_or(c_int::MAX);
+            // SAFETY: the caller's guarantee about `bp`; `text` holds `len` bytes.
+            unsafe { crate::bio::BIO_write(bp, text.as_ptr().cast(), len) > 0 }
+        });
+    }
+}
+
+ffi_export! {
+    /// Adds the text in memory BIO `bio` to the newest error's data with `ERR_add_error_txt`,
+    /// NUL-terminating the BIO's data first. Null and empty BIOs add nothing.
+    ///
+    /// # Safety
+    /// `separator` is null or a NUL-terminated string; `bio` is null or a live memory BIO.
+    pub unsafe extern "C" fn ERR_add_error_mem_bio(separator: *const c_char, bio: *mut BIO)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        if bio.is_null() {
+            return;
+        }
+        let mut data: *mut c_char = core::ptr::null_mut();
+        // SAFETY: the caller's guarantee; BIO_CTRL_INFO stores a `char *`.
+        let mut len = unsafe { crate::bio::ctrl(bio, BIO_CTRL_INFO, 0, (&raw mut data).cast()) };
+        if len <= 0 || data.is_null() {
+            return;
+        }
+        let last = usize::try_from(len - 1).unwrap_or(0);
+        // SAFETY: the memory BIO's data holds `len` bytes.
+        if unsafe { data.wrapping_add(last).read() } != 0 {
+            // SAFETY: as above.
+            if unsafe { crate::bio::BIO_write(bio, c"".as_ptr().cast(), 1) } <= 0 {
+                return;
+            }
+            // SAFETY: as above.
+            len = unsafe { crate::bio::ctrl(bio, BIO_CTRL_INFO, 0, (&raw mut data).cast()) };
+        }
+        if len > 1 && !data.is_null() {
+            // SAFETY: the data is NUL-terminated now; `separator` is the caller's.
+            unsafe { super::ERR_add_error_txt(separator, data) };
+        }
     }
 }
 

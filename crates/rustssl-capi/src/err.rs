@@ -384,30 +384,13 @@ thread_local! {
     static STATE: ThreadState = const { ThreadState(Cell::new(Slot::Empty)) };
 }
 
-/// This thread's `errno`.
-#[cfg(target_os = "macos")]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__error() }
-}
-
-/// This thread's `errno`.
-#[cfg(not(target_os = "macos"))]
-fn errno_location() -> *mut c_int {
-    // SAFETY: no preconditions.
-    unsafe { libc::__errno_location() }
-}
-
 /// This thread's error state, created on first use (OpenSSL's `ossl_err_get_state_int`). None
 /// after `OPENSSL_cleanup`, while the thread exits, while the state is being created, or if it
 /// can't be allocated. `errno` is left as it was.
 fn state() -> Option<NonNull<ERR_STATE>> {
-    let errno = errno_location();
-    // SAFETY: errno_location returns this thread's errno.
-    let saved = unsafe { errno.read() };
+    let saved = crate::errno::get();
     let state = current_or_new();
-    // SAFETY: as above.
-    unsafe { errno.write(saved) };
+    crate::errno::set(saved);
     state
 }
 
@@ -942,6 +925,12 @@ fn set_error_with_text(library: c_int, reason: c_int, text: &[u8]) {
 /// of the exported C function `function`.
 #[track_caller]
 pub(crate) fn raise_with_text(library: c_int, reason: c_int, function: &str, text: &str) {
+    raise_with_bytes(library, reason, function, text.as_bytes());
+}
+
+/// [`raise_with_text`] for text that needn't be UTF-8, such as a file name.
+#[track_caller]
+pub(crate) fn raise_with_bytes(library: c_int, reason: c_int, function: &str, text: &[u8]) {
     let caller = Location::caller();
     let line = c_int::try_from(caller.line()).unwrap_or(c_int::MAX);
     new();
@@ -952,7 +941,7 @@ pub(crate) fn raise_with_text(library: c_int, reason: c_int, function: &str, tex
         // SAFETY: as above.
         unsafe { set_debug(state, top, file, line, function) };
     }
-    set_error_with_text(library, reason, text.as_bytes());
+    set_error_with_text(library, reason, text);
 }
 
 /// `ERR_vset_error`, which `ERR_set_error` shares.
