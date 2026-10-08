@@ -322,7 +322,10 @@ mod tests {
         // SAFETY: null is allowed.
         assert_eq!(unsafe { BUF_MEM_grow_clean(ptr::null_mut(), 4) }, 0);
         let errors = err::take_all();
-        let codes: Vec<_> = errors.iter().map(|e| (e.code, e.function)).collect();
+        let codes: Vec<_> = errors
+            .iter()
+            .map(|e| (e.code, e.function.as_str()))
+            .collect();
         assert_eq!(
             codes,
             [

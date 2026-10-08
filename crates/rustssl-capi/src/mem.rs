@@ -102,7 +102,10 @@ pub(crate) fn malloc(num: usize, file: *const c_char, line: c_int) -> *mut c_voi
         }
     };
     if !file.is_null() || line != 0 {
-        err::raise(ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE, "CRYPTO_malloc");
+        // As OpenSSL's: the caller's file and line, and no function.
+        // SAFETY: CRYPTO_malloc's callers pass null or a NUL-terminated file name.
+        let file = (!file.is_null()).then(|| unsafe { CStr::from_ptr(file) }.to_bytes());
+        err::raise_from(ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE, file, line, None);
     }
     block
 }
@@ -285,10 +288,6 @@ pub(crate) fn caller_line() -> c_int {
 
 /// Allocates `size` bytes for rustssl itself, like `OPENSSL_malloc`.
 #[track_caller]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "first used by the step 1.5 string helpers")
-)]
 pub(crate) fn alloc(size: usize) -> *mut c_void {
     malloc(size, FILE.as_ptr(), caller_line())
 }

@@ -496,7 +496,7 @@ ffi_export! {
 /// Frees the calling thread's library state, as `OPENSSL_thread_stop` does: so far, its error
 /// queue.
 pub(crate) fn stop_thread() {
-    err::clear_thread();
+    err::stop_thread();
 }
 
 ffi_export! {

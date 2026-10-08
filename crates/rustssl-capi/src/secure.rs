@@ -13,7 +13,7 @@
 
 mod buddy;
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr::{self, NonNull};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -177,7 +177,10 @@ fn secure_malloc(num: usize, file: *const c_char, line: c_int) -> *mut c_void {
         Err(_) => ERR_R_CRYPTO_LIB,
     };
     if !file.is_null() || line != 0 {
-        err::raise(ERR_LIB_CRYPTO, reason, "CRYPTO_secure_malloc");
+        // As OpenSSL's: the caller's file and line, and no function.
+        // SAFETY: CRYPTO_secure_malloc's callers pass null or a NUL-terminated file name.
+        let file = (!file.is_null()).then(|| unsafe { CStr::from_ptr(file) }.to_bytes());
+        err::raise_from(ERR_LIB_CRYPTO, reason, file, line, None);
     }
     ptr::null_mut()
 }

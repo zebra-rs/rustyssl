@@ -37,8 +37,7 @@ use rustssl_abi::{
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
-use crate::stub;
-use crate::version;
+use crate::{mem, stub, version};
 
 /// The flags `OPENSSL_init_crypto` takes, as `u64`.
 fn flag(value: c_long) -> u64 {
@@ -88,8 +87,11 @@ fn unavailable(flag: &str) -> ! {
 
 /// Keeps the library that contains `address` loaded for good, as OpenSSL does before
 /// registering exit handlers: if it were unloaded, the process would jump into unmapped
-/// memory at exit.
+/// memory at exit. Miri can't run `dladdr`, and its tests unload nothing.
 fn pin(address: *const c_void) {
+    if cfg!(miri) {
+        return;
+    }
     let mut info = core::mem::MaybeUninit::<libc::Dl_info>::zeroed();
     // SAFETY: dladdr only reads `address` as a number and fills `info`.
     if unsafe { libc::dladdr(address, info.as_mut_ptr()) } == 0 {
@@ -124,15 +126,38 @@ thread_local! {
     static LOADED_CONFIG: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
+/// What `OPENSSL_init_crypto(OPENSSL_INIT_BASE_ONLY, NULL)` does inside OpenSSL, which the
+/// error queue and string functions start with: sets up the base, so that `OPENSSL_cleanup`
+/// has work to do. False after `OPENSSL_cleanup`. OpenSSL allocates its locks here, so this
+/// also ends `CRYPTO_set_mem_functions`.
+pub(crate) fn base() -> bool {
+    if STOPPED.load(Ordering::Acquire) {
+        return false;
+    }
+    if !BASE.load(Ordering::Acquire) {
+        mem::close_customization();
+        BASE.store(true, Ordering::Release);
+    }
+    true
+}
+
+/// Loads libcrypto's error strings when a thread first records an error, as OpenSSL does,
+/// unless `OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS` came first. A failure is ignored.
+pub(crate) fn load_crypto_strings_at_first_error() {
+    // SAFETY: no settings.
+    unsafe { OPENSSL_init_crypto(flag(OPENSSL_INIT_LOAD_CRYPTO_STRINGS), core::ptr::null()) };
+}
+
 /// `OPENSSL_init_crypto`'s work for the flags in `opts`. Returns the flags to record as done,
 /// or `None` if a subsystem failed.
 fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
     let mut done = opts;
-    BASE.store(true, Ordering::Release);
+    base();
 
     let no_atexit = opts & flag(OPENSSL_INIT_NO_ATEXIT) != 0;
     ATEXIT.get_or_init(|| {
-        if no_atexit {
+        // Miri can't run atexit; its tests need no cleanup at exit.
+        if no_atexit || cfg!(miri) {
             return false;
         }
         pin(cleanup_at_exit as *const c_void);
@@ -169,14 +194,17 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
         }
         if opts & flag(with) != 0 {
             cell.get_or_init(|| {
-                // The error strings are tables compiled in, so there's nothing to load.
+                if with == OPENSSL_INIT_LOAD_CRYPTO_STRINGS {
+                    return err::load_crypto_strings();
+                }
+                if with == OPENSSL_INIT_LOAD_SSL_STRINGS {
+                    err::load_ssl_strings();
+                    return true;
+                }
                 if with == OPENSSL_INIT_ADD_ALL_CIPHERS {
                     unavailable("OPENSSL_INIT_ADD_ALL_CIPHERS");
                 }
-                if with == OPENSSL_INIT_ADD_ALL_DIGESTS {
-                    unavailable("OPENSSL_INIT_ADD_ALL_DIGESTS");
-                }
-                true
+                unavailable("OPENSSL_INIT_ADD_ALL_DIGESTS");
             });
         }
     }
