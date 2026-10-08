@@ -33,6 +33,7 @@ const PER_TARGET: &[(&str, &str)] = &[
     ("include/openssl/configuration.h", "openssl/configuration.h"),
     ("libcrypto.ld", "libcrypto.ld"),
     ("libssl.ld", "libssl.ld"),
+    ("build.toml", "build.toml"),
 ];
 
 /// Options given to `Configure` on top of OpenSSL's defaults, so the ABI matches what the
@@ -288,7 +289,64 @@ fn configure(work: &Path, tarball: &Path, version: &str, target: &str) -> Result
             .env("PATH", &path);
         fs::write(src.join(format!("{lib}.ld")), run_output(&mut mkdef)?)?;
     }
+    fs::write(src.join("build.toml"), build_settings(&src)?)?;
     Ok(src)
+}
+
+/// The settings OpenSSL compiles into the library for a target (`-DOPENSSLDIR=...` and the
+/// like), resolved from its Makefile and `dso_conf.h`, as TOML. `OpenSSL_version` and
+/// `OPENSSL_info` report them.
+fn build_settings(src: &Path) -> Result<String> {
+    let makefile = fs::read_to_string(src.join("Makefile"))?;
+    let mut variables = std::collections::HashMap::new();
+    for line in makefile.lines() {
+        if let Some((name, value)) = line.split_once('=')
+            && !name.is_empty()
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        {
+            variables.entry(name).or_insert(value);
+        }
+    }
+    let resolve = |name: &str| -> Result<String> {
+        let mut value = (*variables
+            .get(name)
+            .ok_or(format!("the Makefile has no {name}"))?)
+        .to_owned();
+        // Expand `$(NAME)` references, which only ever nest a few deep.
+        for _ in 0..8 {
+            let Some((before, rest)) = value.split_once("$(") else {
+                return Ok(value);
+            };
+            let (inner, after) = rest
+                .split_once(')')
+                .ok_or("unterminated $( in the Makefile")?;
+            let inner = variables
+                .get(inner)
+                .ok_or(format!("the Makefile has no {inner}"))?;
+            value = format!("{before}{inner}{after}");
+        }
+        Err(format!("{name} doesn't resolve").into())
+    };
+    let dso_conf = fs::read_to_string(src.join("include/crypto/dso_conf.h"))?;
+    let extension = dso_conf
+        .lines()
+        .find_map(|line| {
+            line.split_once("define DSO_EXTENSION ")?
+                .1
+                .trim()
+                .strip_prefix('"')?
+                .strip_suffix('"')
+        })
+        .ok_or("dso_conf.h defines no DSO_EXTENSION")?;
+    Ok(format!(
+        "# What OpenSSL's build compiles in for this target, resolved from its Makefile.\n\
+         platform = \"{}\"\nopenssldir = \"{}\"\nenginesdir = \"{}\"\nmodulesdir = \"{}\"\n\
+         dso_extension = \"{extension}\"\n",
+        resolve("PLATFORM")?,
+        resolve("OPENSSLDIR")?,
+        resolve("ENGINESDIR")?,
+        resolve("MODULESDIR")?,
+    ))
 }
 
 /// Replaces `dest` with the vendored files and returns how many were written. Every file

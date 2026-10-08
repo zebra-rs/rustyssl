@@ -13,6 +13,7 @@ Each `openssl-<major>.<minor>/` directory contains:
 | `include/openssl/*.h` | The public headers, generated with OpenSSL's default `Configure` options plus those in `VERSION.toml`, except `configuration.h` |
 | `config/<target>/openssl/configuration.h` | The one header that differs per target (for example, `RC4_INT` changes the size of `RC4_KEY`) |
 | `config/<target>/lib{crypto,ssl}.ld` | The export lists OpenSSL's `util/mkdef.pl` resolves from the `.num` files for that target |
+| `config/<target>/build.toml` | What OpenSSL's build compiles in for that target: the `Configure` platform name, the default `OPENSSLDIR`, `ENGINESDIR`, and `MODULESDIR`, and the module file extension (`OpenSSL_version` and `OPENSSL_info` report them) |
 | `include/internal/*.h` | The few internal headers that declare functions libcrypto exports anyway (`DSO_*`, `conf_ssl_*`, ...) |
 | `util/libcrypto.num`, `util/libssl.num` | Every exported symbol with its version and build conditions |
 | `crypto/objects/` | `objects.txt`, `obj_mac.num` (NIDs), and `obj_xref.txt` (signature-algorithm mapping) |

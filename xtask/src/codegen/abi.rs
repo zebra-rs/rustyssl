@@ -16,7 +16,7 @@ use std::process::Command;
 
 use super::headers::{BINDGEN_VERSION, Context, identifiers, libc_types, write_rust};
 use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
-use crate::util::Result;
+use crate::util::{Result, toml_value};
 
 /// Builtin macros whose value depends on where they're expanded. Macros that use them, even
 /// indirectly like `OPENSSL_LINE`, aren't constants.
@@ -58,7 +58,14 @@ pub fn generate(ctx: &Context) -> Result<Constants> {
         let types = ctx.bindgen(target, &ctx.wrapper, "types", &options)?;
         let macros = ctx.object_like_macros(target)?;
         let constants = evaluate(ctx, target, &constant_candidates(&macros))?;
-        let (source, skipped) = render(target, &types, &constants)?;
+        let build = fs::read_to_string(
+            ctx.abi
+                .join("config")
+                .join(target.configure)
+                .join("build.toml"),
+        )?;
+        let (mut source, skipped) = render(target, &types, &constants)?;
+        source.push_str(&render_build(&build)?);
         write_rust(
             &ctx.root,
             &out_dir.join(format!("{}.rs", target.module)),
@@ -392,6 +399,44 @@ fn render(
         }
     }
     Ok((out, skipped))
+}
+
+/// What OpenSSL's build compiles in for the target (`config/<target>/build.toml`), as the
+/// module `build`, which `OpenSSL_version` and `OPENSSL_info` report.
+fn render_build(toml: &str) -> Result<String> {
+    let mut out = String::from(
+        "\n/// What OpenSSL's build compiles in for this target (`-DOPENSSLDIR=...` and the like),\n\
+         /// from `config/<target>/build.toml`.\npub mod build {\n",
+    );
+    for (key, doc) in [
+        ("platform", "The `Configure` target (`PLATFORM`)."),
+        (
+            "openssldir",
+            "The default configuration and certificate directory (`OPENSSLDIR`).",
+        ),
+        (
+            "enginesdir",
+            "The default engines directory (`ENGINESDIR`).",
+        ),
+        (
+            "modulesdir",
+            "The default provider modules directory (`MODULESDIR`).",
+        ),
+        (
+            "dso_extension",
+            "The file extension of loadable modules (`DSO_EXTENSION`).",
+        ),
+    ] {
+        let value = toml_value(toml, key).ok_or_else(|| format!("build.toml has no {key}"))?;
+        writeln!(
+            out,
+            "    /// {doc}\n    pub const {}: &core::ffi::CStr = c\"{}\";",
+            key.to_ascii_uppercase(),
+            c_literal(value.as_bytes())
+        )?;
+    }
+    out.push_str("}\n");
+    Ok(out)
 }
 
 /// Names that bindgen defined, so constants can't collide with them.
