@@ -589,7 +589,7 @@ Everything else depends on this phase.
     - run-once across threads;
     - per-thread values and their exit cleanup;
     - thread IDs, and the pool setting.
-- [ ] **1.4 Error queue (all of `ERR_*`):**
+- [x] **1.4 Error queue (all of `ERR_*`):**
   - a thread-local queue with marks
   - `ERR_raise`, `ERR_raise_data`, `ERR_set_debug`, `ERR_set_error` (variadic)
   - the get/peek variants (`_all`, `_data`, `_last`)
@@ -598,15 +598,62 @@ Everything else depends on this phase.
   - application-defined libraries (`ERR_get_next_error_library`, `ERR_load_strings`)
   - `ERR_add_error_data` / `ERR_add_error_vdata`
 
-  The reason strings already exist (`err_reasons.rs`, from 0.4). Extend codegen to also
-  emit the library names (`ERR_str_libraries`) and the common `ERR_R_*` reasons
-  (`ERR_str_reasons`) from the vendored `crypto/err/err.c`.
-
-  From 1.1:
-  - Errors raised by `CRYPTO_malloc` and `CRYPTO_secure_malloc` carry the caller's file and
-    line and no function (`ERR_set_debug(file, line, NULL)`).
-  - Allocating a thread's error state closes `CRYPTO_set_mem_functions`, as OpenSSL's
-    `CRYPTO_zalloc` of `ERR_STATE` does (`mem::close_customization`).
+  *Done:* 79 exports, now 153 of libcrypto's 5,876, and libssl's `ERR_load_SSL_strings`
+  (`err.rs`, `err/strings.rs`).
+  - **The queue is OpenSSL's `ERR_STATE`:** the public `struct err_state_st`, a 16-slot ring
+    that holds 15 errors and drops the oldest when full. The deprecated `ERR_get_state` hands
+    it to applications, so its contents are OpenSSL's slot for slot: C memory for the state,
+    for copies of each error's file and function names, and for its data. The differential
+    probe compares the whole ring after random sessions. Ring positions an application wrote
+    out of range are wrapped, never trusted. The application's allocator may call back in,
+    so no reference to the state is held across an allocation.
+  - **Lifetime:** a thread's state is created on first use, which also loads libcrypto's
+    strings (unless `OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS` came first). It's freed at thread
+    exit (a thread-local destructor) or `OPENSSL_thread_stop`. After `OPENSSL_cleanup` there
+    is none, and the functions do nothing. Getting the state leaves `errno` alone.
+    `init::base()` stands for OpenSSL's `OPENSSL_INIT_BASE_ONLY`: it makes `OPENSSL_cleanup`
+    active and closes `CRYPTO_set_mem_functions`, as OpenSSL's lock allocations do.
+  - **Raising from Rust:** `err::raise` records the Rust file and line (`#[track_caller]`)
+    and the export's name; a panic caught by `ffi_export!` records the export's own location.
+    `CRYPTO_malloc` and `CRYPTO_secure_malloc` failures name the caller's file and line and
+    no function, and the error state's own allocation names none, so a failure there can't
+    recurse.
+  - **Strings:**
+    - Codegen now parses every C table in order (`ERR_str_libraries` and `ERR_str_reasons`
+      from `err.c`, `<LIB>_str_reasons` from `*_err.c`). It reads the load order from the
+      vendored `crypto/err/err_all.c`, with its `#ifndef OPENSSL_NO_*` guards evaluated
+      against each target's `configuration.h` (`generated/err_strings.rs`).
+    - Order matters because a table whose first entry is already known isn't loaded.
+    - Loading any table first reloads the library names and common reasons, as OpenSSL does.
+    - SSL's table loads on `OPENSSL_INIT_LOAD_SSL_STRINGS`. The encoder and decoder tables
+      are never loaded, as in 3.5. Applications' strings are kept by pointer.
+  - **Formatting:**
+    - `ERR_error_string_n` is OpenSSL's, including the switch to the short form `err:...`
+      when the long one fills the buffer exactly.
+    - System errors use `strerror` text the way each platform's OpenSSL build gets it. glibc
+      defines `_POSIX_C_SOURCE`, so OpenSSL calls the XSI `strerror_r`, and an unknown number
+      prints `reason(N)`. On macOS it falls back to `strerror`, which prints
+      `Unknown error: N`. The differential probe found this; both are reproduced.
+    - `ERR_print_errors_cb` prefixes each line with the thread ID's bytes in hex, as
+      OpenSSL does.
+  - **Saving:** `OSSL_ERR_STATE_new/save/save_to_mark/restore/free` follow OpenSSL's moves
+    and copies.
+  - **Not yet (step 1.6):** `ERR_set_error`/`ERR_vset_error` with a format (`ERR_raise_data`
+    with text) need the printf engine and abort until then. A null format works, which is
+    what `ERR_raise` uses. `ERR_print_errors` and `ERR_add_error_mem_bio` take a BIO and stay
+    stubs.
+  - **Deviations (`DEVIATIONS.md`):**
+    - `ERR_add_error_txt` with a piece too long for one error: OpenSSL loops forever.
+    - Restoring the thread's own state into itself: OpenSSL loops forever.
+    - Null arguments that crash OpenSSL.
+  - **Tests:** identical output to the reference on macOS and Linux aarch64:
+    - `tests/c/err_queue.c` (96 checks): reading, data, text splitting, the ring, marks,
+      strings, application libraries, printing, saving, threads, allocation failures;
+    - `tests/c/err_strings.c` (12 checks, its own process): when tables load and when they
+      don't;
+    - the differential probe: an `err.txt` corpus, plus random sessions (raise, mark, pop,
+      data, text, save and restore, `ERR_error_string_n` on random codes and lengths) that
+      end with the whole `ERR_STATE`. 6,000 random sessions were identical on macOS.
 - [ ] **1.5 Containers and utilities:**
   - `OPENSSL_sk_*`, including the comparator and sort quirks (for example, `find` sorts an
     unsorted stack)
@@ -631,6 +678,11 @@ Everything else depends on this phase.
   - `BIO_dump*`
 
   The md and cipher filters come in Phase 3.
+
+  From 1.4:
+  - `ERR_set_error`/`ERR_vset_error` with a format, through the printf engine (they abort
+    until then);
+  - `ERR_print_errors` and `ERR_add_error_mem_bio`.
 - [ ] **1.7 Tracing:** `OSSL_trace_*` with the default build's behavior (tracing disabled).
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both

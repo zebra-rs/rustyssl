@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 74 | 5802 | 1.3% |
-| libssl | 603 | 0 | 603 | 0.0% |
-| **Total** | **6479** | **74** | **6405** | **1.1%** |
+| libcrypto | 5876 | 153 | 5723 | 2.6% |
+| libssl | 603 | 1 | 602 | 0.2% |
+| **Total** | **6479** | **154** | **6325** | **2.4%** |
 
 ## By header
 
@@ -21,7 +21,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 |---|---|--:|--:|--:|
 | `internal/asn1.h` | libcrypto | 1 | 0 | 0.0% |
 | `internal/dso.h` | libcrypto | 15 | 0 | 0.0% |
-| `internal/err.h` | libcrypto | 1 | 0 | 0.0% |
+| `internal/err.h` | libcrypto | 1 | 1 | 100.0% |
 | `internal/o_dir.h` | libcrypto | 2 | 0 | 0.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
 | `openssl/aes.h` | libcrypto | 15 | 0 | 0.0% |
@@ -42,7 +42,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
 | `openssl/crypto.h` | libcrypto | 101 | 65 | 64.4% |
-| `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 0 | 0.0% |
+| `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 29 | 100.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
 | `openssl/des.h` | libcrypto | 33 | 0 | 0.0% |
@@ -51,7 +51,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/ec.h` | libcrypto | 202 | 0 | 0.0% |
 | `openssl/encoder.h` | libcrypto | 38 | 0 | 0.0% |
 | `openssl/engine.h` | libcrypto | 121 | 0 | 0.0% |
-| `openssl/err.h` | libcrypto | 51 | 0 | 0.0% |
+| `openssl/err.h` | libcrypto | 51 | 49 | 96.1% |
 | `openssl/ess.h` | libcrypto | 30 | 0 | 0.0% |
 | `openssl/evp.h` | libcrypto | 828 | 0 | 0.0% |
 | `openssl/hmac.h` | libcrypto | 12 | 0 | 0.0% |
@@ -85,7 +85,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/srp.h` | libcrypto | 29 | 0 | 0.0% |
 | `openssl/srtp.h` | libssl | 4 | 0 | 0.0% |
 | `openssl/ssl.h` | libssl | 582 | 0 | 0.0% |
-| `openssl/sslerr_legacy.h` | libssl | 1 | 0 | 0.0% |
+| `openssl/sslerr_legacy.h` | libssl | 1 | 1 | 100.0% |
 | `openssl/stack.h` | libcrypto | 25 | 0 | 0.0% |
 | `openssl/store.h` | libcrypto | 75 | 0 | 0.0% |
 | `openssl/thread.h` | libcrypto | 3 | 3 | 100.0% |
@@ -134,21 +134,94 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_get_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
-| `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
+| `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap`, `err_queue` |
 | `CRYPTO_memcmp` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_secure_actual_size` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_allocated` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_free` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
-| `CRYPTO_secure_malloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
+| `CRYPTO_secure_malloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap`, `err_queue` |
 | `CRYPTO_secure_malloc_done` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_malloc_init` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_malloc_initialized` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_used` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_set_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
-| `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
+| `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `err_queue` |
+| `ERR_add_error_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `crypto_secure_heap`, `err_queue` |
+| `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `crypto_secure_heap`, `err_queue` |
+| `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_get_state` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_lib_error_string` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_load_ASN1_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_ASYNC_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_BIO_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_BN_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue`, `err_strings` |
+| `ERR_load_BUF_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_CMS_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_COMP_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_CONF_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_CRYPTO_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_CT_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_DH_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_DSA_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_EC_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_ENGINE_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_ERR_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_EVP_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_KDF_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_OBJ_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_OCSP_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_OSSL_STORE_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_PEM_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_PKCS12_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_PKCS7_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_RAND_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_RSA_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue`, `err_strings` |
+| `ERR_load_TS_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_UI_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_X509V3_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_X509_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
+| `ERR_load_strings` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_load_strings_const` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_new` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_peek_error` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_error_all` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_error_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_error_func` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error_all` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error_func` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_peek_last_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_pop` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_pop_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_print_errors_cb` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_print_errors_fp` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_reason_error_string` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_remove_state` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_remove_thread_state` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_set_debug` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_set_error` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_set_error_data` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_set_mark` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_unload_strings` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
+| `ERR_vset_error` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OPENSSL_INIT_free` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
 | `OPENSSL_INIT_new` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
 | `OPENSSL_INIT_set_config_appname` | libcrypto | `openssl/crypto.h` | `crypto_init` |
@@ -163,18 +236,25 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OPENSSL_fork_prepare` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_info` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_init` | libcrypto | `openssl/crypto.h` | `crypto_version` |
-| `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict` |
+| `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict`, `err_queue`, `err_strings` |
 | `OPENSSL_isservice` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_issetugid` | libcrypto | `openssl/crypto.h` | `crypto_version` |
-| `OPENSSL_thread_stop` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `OPENSSL_thread_stop` | libcrypto | `openssl/crypto.h` | `crypto_threads`, `err_queue` |
 | `OPENSSL_thread_stop_ex` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `OPENSSL_version_build_metadata` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_major` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_minor` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_patch` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_version_pre_release` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `OSSL_ERR_STATE_free` | libcrypto | `openssl/err.h` | `err_queue` |
+| `OSSL_ERR_STATE_new` | libcrypto | `openssl/err.h` | `err_queue` |
+| `OSSL_ERR_STATE_restore` | libcrypto | `openssl/err.h` | `err_queue` |
+| `OSSL_ERR_STATE_save` | libcrypto | `openssl/err.h` | `err_queue` |
+| `OSSL_ERR_STATE_save_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OpenSSL_version` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OpenSSL_version_num` | libcrypto | `openssl/crypto.h` | `crypto_version` |
+| `err_free_strings_int` | libcrypto | `internal/err.h` | `err_queue` |
+| `ERR_load_SSL_strings` | libssl | `openssl/sslerr_legacy.h` | `err_strings` |
