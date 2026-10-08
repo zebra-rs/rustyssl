@@ -53,3 +53,10 @@ path = "fuzz_targets/bio_mem.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "bio_printf"
+path = "fuzz_targets/bio_printf.rs"
+test = false
+doc = false
+bench = false
