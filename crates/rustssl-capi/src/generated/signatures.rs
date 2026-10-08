@@ -12,6 +12,33 @@ const _: unsafe extern "C" fn() -> *mut BUF_MEM = crate::buffer::BUF_MEM_new;
 const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *mut BUF_MEM = crate::buffer::BUF_MEM_new_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const core::ffi::c_uchar, usize) =
     crate::buffer::BUF_reverse;
+const _: unsafe extern "C" fn(*mut CRYPTO_THREAD_LOCAL) -> core::ffi::c_int =
+    crate::threads::CRYPTO_THREAD_cleanup_local;
+const _: unsafe extern "C" fn(CRYPTO_THREAD_ID, CRYPTO_THREAD_ID) -> core::ffi::c_int =
+    crate::threads::CRYPTO_THREAD_compare_id;
+const _: unsafe extern "C" fn() -> CRYPTO_THREAD_ID = crate::threads::CRYPTO_THREAD_get_current_id;
+const _: unsafe extern "C" fn(*mut CRYPTO_THREAD_LOCAL) -> *mut core::ffi::c_void =
+    crate::threads::CRYPTO_THREAD_get_local;
+const _: unsafe extern "C" fn(
+    *mut CRYPTO_THREAD_LOCAL,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>,
+) -> core::ffi::c_int = crate::threads::CRYPTO_THREAD_init_local;
+const _: unsafe extern "C" fn(*mut CRYPTO_RWLOCK) = crate::threads::CRYPTO_THREAD_lock_free;
+const _: unsafe extern "C" fn() -> *mut CRYPTO_RWLOCK = crate::threads::CRYPTO_THREAD_lock_new;
+const _: unsafe extern "C" fn(*mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_THREAD_read_lock;
+const _: unsafe extern "C" fn(
+    *mut CRYPTO_ONCE,
+    ::core::option::Option<unsafe extern "C" fn()>,
+) -> core::ffi::c_int = crate::threads::CRYPTO_THREAD_run_once;
+const _: unsafe extern "C" fn(
+    *mut CRYPTO_THREAD_LOCAL,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::threads::CRYPTO_THREAD_set_local;
+const _: unsafe extern "C" fn(*mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_THREAD_unlock;
+const _: unsafe extern "C" fn(*mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_THREAD_write_lock;
 const _: unsafe extern "C" fn(
     usize,
     usize,
@@ -19,6 +46,27 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_aligned_alloc;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut CRYPTO_RWLOCK,
+) -> core::ffi::c_int = crate::threads::CRYPTO_atomic_add;
+const _: unsafe extern "C" fn(*mut u64, u64, *mut u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_atomic_add64;
+const _: unsafe extern "C" fn(*mut u64, u64, *mut u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_atomic_and;
+const _: unsafe extern "C" fn(*mut u64, *mut u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_atomic_load;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut CRYPTO_RWLOCK,
+) -> core::ffi::c_int = crate::threads::CRYPTO_atomic_load_int;
+const _: unsafe extern "C" fn(*mut u64, u64, *mut u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_atomic_or;
+const _: unsafe extern "C" fn(*mut u64, u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
+    crate::threads::CRYPTO_atomic_store;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
     usize,
@@ -121,6 +169,8 @@ const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c
     crate::init::OPENSSL_init_crypto;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_isservice;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_issetugid;
+const _: unsafe extern "C" fn() = crate::threads::OPENSSL_thread_stop;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) = crate::threads::OPENSSL_thread_stop_ex;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_build_metadata;
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_major;
@@ -128,6 +178,10 @@ const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_v
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::threads::OSSL_get_max_threads;
+const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
+    crate::threads::OSSL_set_max_threads;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;

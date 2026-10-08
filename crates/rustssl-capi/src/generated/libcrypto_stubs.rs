@@ -6854,78 +6854,6 @@ pub extern "C" fn CRYPTO_128_wrap_pad(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_cleanup_local(_: *mut CRYPTO_THREAD_LOCAL) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_cleanup_local")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_compare_id(
-    _: CRYPTO_THREAD_ID,
-    _: CRYPTO_THREAD_ID,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_compare_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_get_current_id() -> CRYPTO_THREAD_ID {
-    crate::stub::unimplemented("CRYPTO_THREAD_get_current_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_get_local(_: *mut CRYPTO_THREAD_LOCAL) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_THREAD_get_local")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_init_local(
-    _: *mut CRYPTO_THREAD_LOCAL,
-    _: ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_init_local")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_lock_free(_: *mut CRYPTO_RWLOCK) {
-    crate::stub::unimplemented("CRYPTO_THREAD_lock_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_lock_new() -> *mut CRYPTO_RWLOCK {
-    crate::stub::unimplemented("CRYPTO_THREAD_lock_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_read_lock(_: *mut CRYPTO_RWLOCK) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_read_lock")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_run_once(
-    _: *mut CRYPTO_ONCE,
-    _: ::core::option::Option<unsafe extern "C" fn()>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_run_once")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_set_local(
-    _: *mut CRYPTO_THREAD_LOCAL,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_set_local")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_unlock(_: *mut CRYPTO_RWLOCK) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_unlock")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_THREAD_write_lock(_: *mut CRYPTO_RWLOCK) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_THREAD_write_lock")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_alloc_ex_data(
     _: core::ffi::c_int,
     _: *mut core::ffi::c_void,
@@ -6933,73 +6861,6 @@ pub extern "C" fn CRYPTO_alloc_ex_data(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CRYPTO_alloc_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_add(
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_add64(
-    _: *mut u64,
-    _: u64,
-    _: *mut u64,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_add64")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_and(
-    _: *mut u64,
-    _: u64,
-    _: *mut u64,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_and")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_load(
-    _: *mut u64,
-    _: *mut u64,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_load_int(
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_load_int")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_or(
-    _: *mut u64,
-    _: u64,
-    _: *mut u64,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_or")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_atomic_store(
-    _: *mut u64,
-    _: u64,
-    _: *mut CRYPTO_RWLOCK,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_atomic_store")
 }
 
 #[unsafe(no_mangle)]
@@ -21435,16 +21296,6 @@ pub extern "C" fn OPENSSL_strtoul(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_thread_stop() {
-    crate::stub::unimplemented("OPENSSL_thread_stop")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_thread_stop_ex(_: *mut OSSL_LIB_CTX) {
-    crate::stub::unimplemented("OPENSSL_thread_stop_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_uni2asc(
     _: *const core::ffi::c_uchar,
     _: core::ffi::c_int,
@@ -26232,16 +26083,6 @@ pub extern "C" fn OSSL_USER_NOTICE_SYNTAX_new() -> *mut OSSL_USER_NOTICE_SYNTAX 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_get_max_threads(_: *mut OSSL_LIB_CTX) -> u64 {
-    crate::stub::unimplemented("OSSL_get_max_threads")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_get_thread_support_flags() -> u32 {
-    crate::stub::unimplemented("OSSL_get_thread_support_flags")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_parse_url(
     _: *const core::ffi::c_char,
     _: *mut *mut core::ffi::c_char,
@@ -26254,11 +26095,6 @@ pub extern "C" fn OSSL_parse_url(
     _: *mut *mut core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_parse_url")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_set_max_threads(_: *mut OSSL_LIB_CTX, _: u64) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_set_max_threads")
 }
 
 #[unsafe(no_mangle)]

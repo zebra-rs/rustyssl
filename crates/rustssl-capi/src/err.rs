@@ -57,6 +57,16 @@ pub(crate) fn raise(library: c_int, reason: c_int, function: &'static str) {
     });
 }
 
+/// Drops this thread's errors, as OpenSSL does when `OPENSSL_thread_stop` frees the thread's
+/// error state.
+pub(crate) fn clear_thread() {
+    let _ = QUEUE.try_with(|queue| {
+        if let Ok(mut queue) = queue.try_borrow_mut() {
+            queue.clear();
+        }
+    });
+}
+
 /// Removes and returns this thread's errors, oldest first.
 #[cfg(test)]
 pub(crate) fn take_all() -> Vec<Error> {
