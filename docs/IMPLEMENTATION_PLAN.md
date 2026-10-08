@@ -821,15 +821,69 @@ Everything else depends on this phase.
         x86_64;
       - a `bio_printf` fuzz target (6 million runs clean) checking that `BIO_snprintf` stays
         in its buffer and agrees with `BIO_printf`.
-  - [ ] **1.6c Filters and pairs:**
-    - buffer, linebuffer, readbuffer, prefix, base64, nbio_test
-    - the BIO pair (`BIO_s_bio`, `BIO_new_bio_pair`, `BIO_nread`/`nwrite`), dgram_pair, and
-      `BIO_s_dgram_mem`
+  - [x] **1.6c Filters and pairs:**
+    - buffer, linebuffer, readbuffer, prefix
+    - the BIO pair (`BIO_s_bio`, `BIO_new_bio_pair`, `BIO_nread`/`nwrite`)
+    - *Moved out:*
+      - base64 to step 2.5, where the plan already had it beside its `EVP_Encode*` codec;
+      - `BIO_f_nbio_test` to step 3.7, as it needs `RAND_priv_bytes`;
+      - `BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`, and `BIO_s_dgram_mem` to 1.6d, as they
+        carry peer addresses (`BIO_ADDR`).
+
+    *Done:* 13 exports, now 345 of libcrypto's 5,876 (`bio/buffer.rs`, `bio/prefix.rs`,
+    `bio/pair.rs`, `bio/state.rs`).
+    - **Ports of OpenSSL's `bf_buff.c`, `bf_lbuf.c`, `bf_readbuff.c`, `bf_prefix.c`, and
+      `bss_bio.c`.** What applications see is kept, quirks included:
+      - how each write is split and when it reaches the next BIO;
+      - partial writes and retries, and what is counted when the next BIO fails (a line
+        buffer counts bytes it then drops);
+      - a buffer's size only grows past 4 KiB, and `BIO_set_buffer_read_data` keeps it;
+      - a read buffer refuses writes with 0 and passes no controls on;
+      - `BIO_dup_chain` copies a pair end unpaired but with `init` set.
+    - **State (`bio/state.rs`):** these types' private state is Rust, an `Arc<Mutex<T>>` in a
+      typed slot of the BIO object, downcast to the type that asks for it. The BIO's `ptr`
+      is set to its address, as OpenSSL sets it to its context, but nothing reads through
+      it, so `BIO_set_data` can't make the state be misread.
+      - A call clones the `Arc` before calling the next BIO, so a callback that frees the
+        filter can't free the state under it.
+      - Buffers are taken out of the state across such calls, and no lock is held across
+        them.
+      - An application method built from `BIO_meth_get_*(BIO_f_buffer())` with another
+        create function has no state of that type, so its functions do nothing.
+      - A first version told state apart by comparing create functions' addresses, which
+        Rust doesn't guarantee to be unique: Miri gives a function different addresses, and
+        caught it.
+    - **The pair's ring buffers are C memory** (`OPENSSL_malloc`, as in OpenSSL), because
+      `BIO_nread`/`BIO_nwrite` hand out pointers into them. Each end holds a counted
+      reference to its peer, BIO and state, dropped on unpairing. So freeing an end, or
+      misusing a pair from two threads, never reaches freed memory. Only one end's lock is
+      held at a time.
+    - **`Held` handles are now `Send`/`Sync`** (when the object is), so the pair can store
+      one.
+    - **Deviations (`DEVIATIONS.md`):**
+      - a buffer filter's `BIO_gets` of size 0;
+      - negative or null preloads and peeks;
+      - read buffer reads past `INT_MAX`;
+      - pairing with a non-pair BIO;
+      - unpaired ends with `init` set;
+      - null arguments to the pair functions and the prefix filter;
+      - methods mixing these functions with another create function.
+    - **Tests:** identical output to the reference:
+      - `tests/c/bio_filter.c` (40 checks, through a scripted BIO that logs every write the
+        filters pass on) and `bio_pair.c` (27);
+      - differential: new `bionew` kinds (each filter in front of memory, a read buffer over
+        a fixed text, and a pair with small buffers, with `biopeer`, `bionread`,
+        `bionwrite`, and pair and buffer controls), a `bio_filters.txt` corpus, and random
+        sessions;
+      - a model-based `bio_pair` fuzz target (pair traffic against queues, and filter output
+        against what was written).
   - [ ] **1.6d Networking:**
     - `BIO_ADDR`, `BIO_ADDRINFO`, `BIO_lookup(_ex)`, `BIO_parse_hostserv`
     - the socket helpers (`BIO_socket`, `BIO_connect`, `BIO_listen`, `BIO_accept_ex`,
       `BIO_sock_*`, `BIO_socket_wait`, `BIO_wait`, `BIO_do_connect_retry`, ...)
     - the socket, connect, accept, and datagram BIOs, and `sendmmsg`/`recvmmsg`
+    - the datagram pair and memory BIOs (`BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`,
+      `BIO_s_dgram_mem`), moved from 1.6c
 
   Later phases: the md and cipher filters (`BIO_f_md`, `BIO_f_cipher`, `BIO_f_reliable`,
   Phase 3); the ASN.1, CMS, PKCS#7, and NDEF BIOs; and the provider core BIO
@@ -838,7 +892,7 @@ Everything else depends on this phase.
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both
 the reference and ours. The printf corpus is byte-identical to the reference. The printf and
-base64 fuzzers run clean.
+BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
 
 ## Phase 2: ASN.1, objects, encodings
 
@@ -932,6 +986,8 @@ have run for at least 24 CPU-hours with no findings.
   - the primary/public/private DRBG hierarchy, per thread, with reseed policy and fork safety
   - `RAND_bytes(_ex)`, `RAND_priv_bytes(_ex)`, `RAND_seed`, `RAND_add`, `RAND_status`,
     `RAND_poll`, `RAND_load_file`, `RAND_write_file`, `RAND_set_DRBG_type`
+  - `BIO_f_nbio_test` (moved from 1.6c: it picks its short reads and writes with
+    `RAND_priv_bytes`)
   - legacy `RAND_METHOD`
   - seeding from the OS (getrandom/getentropy)
 - [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x):
