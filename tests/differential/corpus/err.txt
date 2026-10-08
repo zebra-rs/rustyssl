@@ -1,0 +1,92 @@
+# Error strings: known and unknown libraries and reasons, system errors, and every length
+# around the switch to the short form (the long form exactly filling the buffer switches too).
+errstr 3880106 256
+errstr 3880106 64
+errstr 3880106 63
+errstr 3880106 62
+errstr 3880106 21
+errstr 3880106 20
+errstr 3880106 2
+errstr 3880106 1
+errstr 3880106 0
+errstr 1800067 100
+errstr 32000005 100
+errstr a080014 100
+errstr 80000002 100
+errstr 800000c8 100
+errstr ffffffff 100
+errstr 0 100
+errstr c0100 100
+# The ring: 20 errors into 15 places, then marks.
+clear
+raise 3 1
+raise 3 2
+raise 3 3
+raise 3 4
+raise 3 5
+raise 3 6
+raise 3 7
+raise 3 8
+raise 3 9
+raise 3 10
+raise 3 11
+raise 3 12
+raise 3 13
+raise 3 14
+raise 3 15
+raise 3 16
+raise 3 17
+raise 3 18
+raise 3 19
+raise 3 20
+state
+peek
+last
+get
+mark
+raise 2 2
+data hello
+data world
+mark
+mark
+raise 7 262
+count
+clearmark
+count
+poptomark
+poptomark
+count
+state
+# Data, and text split over errors.
+clear
+raise 3 103
+txt , 30 7
+last
+txt - 5000 0
+last
+get
+get
+get
+raise 3 104
+txt ; 9000 2500
+state
+clear
+txt : 10 3
+state
+# Saving and restoring.
+clear
+raise 3 1
+data saved
+raise 3 2
+mark
+raise 3 3
+raise 3 4
+savemark
+state
+restore
+restore
+state
+save
+state
+restore
+state

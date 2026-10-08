@@ -15,6 +15,7 @@
 
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
+#include <openssl/err.h>
 
 #define ARENA 4096
 
@@ -131,7 +132,8 @@ static void tracing(unsigned char *base)
 static void filling(unsigned char *base)
 {
     unsigned char *blocks[ARENA / 16];
-    int all = 1;
+    const char *file = NULL, *func = NULL;
+    int all = 1, line = 0;
 
     for (size_t i = 0; i < ARENA / 16; i++) {
         blocks[i] = OPENSSL_secure_malloc(16);
@@ -139,6 +141,12 @@ static void filling(unsigned char *base)
     }
     check(all && CRYPTO_secure_used() == ARENA, "the arena holds 256 16-byte blocks");
     check(OPENSSL_secure_malloc(1) == NULL, "CRYPTO_secure_malloc: null when the arena is full");
+    ERR_clear_error();
+    check(CRYPTO_secure_malloc(1, "full.c", 9) == NULL
+          && ERR_get_error_all(&file, &line, &func, NULL, NULL)
+                 == ERR_PACK(ERR_LIB_CRYPTO, 0, CRYPTO_R_SECURE_MALLOC_FAILURE)
+          && strcmp(file, "full.c") == 0 && line == 9 && strcmp(func, "") == 0,
+          "CRYPTO_secure_malloc: the error names the caller's file and line, no function");
     check(CRYPTO_secure_malloc_done() == 0, "CRYPTO_secure_malloc_done: 0 while blocks are used");
     for (size_t i = 0; i < ARENA / 16; i++)
         OPENSSL_secure_free(blocks[i]);

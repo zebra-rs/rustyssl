@@ -128,34 +128,118 @@ impl Random {
     fn below(&mut self, bound: u64) -> u64 {
         self.next() % bound.max(1)
     }
+
+    /// One of `items`.
+    fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
+        let i = self.below(u64::try_from(items.len()).unwrap_or(1));
+        let i = usize::try_from(i).unwrap_or(0);
+        items.get(i).copied().unwrap_or_default()
+    }
 }
 
-/// Random `BUF_MEM` command sessions in the probe's language.
+/// Random command sessions in the probe's language, for `BUF_MEM` and the error queue.
 fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut random = Random::new(seed);
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        writeln!(out, "new {}", random.below(2))?;
-        for _ in 0..1 + random.below(40) {
-            match random.below(10) {
-                0..=3 => writeln!(out, "grow {}", length(&mut random))?,
-                4..=6 => writeln!(out, "grow_clean {}", length(&mut random))?,
-                7 => writeln!(out, "fill {}", random.below(256))?,
-                8 => writeln!(out, "dump")?,
-                _ => {
-                    let bytes: Vec<String> = (0..1 + random.below(32))
-                        .map(|_| format!("{:02x}", random.below(256)))
-                        .collect();
-                    writeln!(out, "reverse {}", bytes.concat())?;
-                }
-            }
-        }
-        if random.below(4) != 0 {
-            writeln!(out, "free")?;
+        if random.below(2) == 0 {
+            err_session(&mut random, &mut out)?;
+        } else {
+            buf_mem_session(&mut random, &mut out)?;
         }
     }
     Ok(out)
+}
+
+/// A random `BUF_MEM` session.
+fn buf_mem_session(random: &mut Random, out: &mut String) -> Result {
+    writeln!(out, "new {}", random.below(2))?;
+    for _ in 0..1 + random.below(40) {
+        match random.below(10) {
+            0..=3 => writeln!(out, "grow {}", length(random))?,
+            4..=6 => writeln!(out, "grow_clean {}", length(random))?,
+            7 => writeln!(out, "fill {}", random.below(256))?,
+            8 => writeln!(out, "dump")?,
+            _ => {
+                let bytes: Vec<String> = (0..1 + random.below(32))
+                    .map(|_| format!("{:02x}", random.below(256)))
+                    .collect();
+                writeln!(out, "reverse {}", bytes.concat())?;
+            }
+        }
+    }
+    if random.below(4) != 0 {
+        writeln!(out, "free")?;
+    }
+    Ok(())
+}
+
+/// A random error-queue session: errors raised, marked, read, saved, and restored, ending
+/// with the whole ring.
+fn err_session(random: &mut Random, out: &mut String) -> Result {
+    writeln!(out, "clear")?;
+    for _ in 0..1 + random.below(40) {
+        match random.below(20) {
+            0..=6 => {
+                let library = match random.below(4) {
+                    0 => 2, // ERR_LIB_SYS: the reason is an errno value
+                    1 => 128 + random.below(4),
+                    _ => 1 + random.below(64),
+                };
+                writeln!(out, "raise {library} {}", reason(random))?;
+            }
+            7 => {
+                let word: String = (0..1 + random.below(20))
+                    .map(|_| char::from(b'a' + u8::try_from(random.below(26)).unwrap_or(0)))
+                    .collect();
+                writeln!(out, "data {word}")?;
+            }
+            8 => {
+                // Pieces between separators stay shorter than an error holds: OpenSSL loops
+                // forever on longer ones (docs/DEVIATIONS.md).
+                let separator = random.pick(&["-", ";", ",", ":", "::"]);
+                let every = if separator == "-" {
+                    0
+                } else {
+                    1 + random.below(3000)
+                };
+                writeln!(out, "txt {separator} {} {every}", random.below(9000))?;
+            }
+            9 => writeln!(out, "mark")?,
+            10 => writeln!(out, "pop")?,
+            11 => writeln!(out, "poptomark")?,
+            12 => writeln!(out, "clearmark")?,
+            13 => writeln!(out, "count")?,
+            14 => writeln!(out, "{}", random.pick(&["get", "peek", "last"]))?,
+            15 => writeln!(out, "{}", random.pick(&["save", "savemark", "restore"]))?,
+            16 => writeln!(out, "errstr {:x} {}", error_code(random), random.below(300))?,
+            17 => writeln!(out, "state")?,
+            _ => writeln!(out, "get")?,
+        }
+    }
+    writeln!(out, "state")?;
+    Ok(())
+}
+
+/// A reason for `raise`: small codes, with the common and fatal flags, or anything.
+fn reason(random: &mut Random) -> u64 {
+    match random.below(4) {
+        0 => random.below(300),
+        1 => 0x8_0000 | random.below(300),
+        2 => 0xc_0000 | random.below(300),
+        _ => random.below(0x80_0000),
+    }
+}
+
+/// An error code for `errstr`: packed from a library and reason, a system error, or any bits.
+fn error_code(random: &mut Random) -> u64 {
+    match random.below(5) {
+        0 | 1 => (random.below(70) << 23) | reason(random),
+        2 => 0x8000_0000 | random.below(200),
+        3 => random.below(1 << 32),
+        _ => random.next(),
+    }
 }
 
 /// Mostly small lengths, where growth, shrinking, and reuse of `max` interact, plus a few
@@ -178,7 +262,8 @@ mod tests {
         let first = random_sessions(42, 20).unwrap();
         assert_eq!(first, random_sessions(42, 20).unwrap());
         assert_ne!(first, random_sessions(43, 20).unwrap());
-        assert!(first.starts_with("# session 0\nnew "));
+        // Both kinds of session.
+        assert!(first.contains("\nnew ") && first.contains("\nclear\n"));
     }
 
     #[test]
