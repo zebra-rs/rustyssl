@@ -48,6 +48,12 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_aligned_alloc;
 const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    *mut CRYPTO_EX_DATA,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ex_data::CRYPTO_alloc_ex_data;
+const _: unsafe extern "C" fn(
     *mut core::ffi::c_int,
     core::ffi::c_int,
     *mut core::ffi::c_int,
@@ -81,8 +87,27 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_clear_realloc;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut CRYPTO_EX_DATA,
+    *const CRYPTO_EX_DATA,
+) -> core::ffi::c_int = crate::ex_data::CRYPTO_dup_ex_data;
 const _: unsafe extern "C" fn(*mut core::ffi::c_void, *const core::ffi::c_char, core::ffi::c_int) =
     crate::mem::CRYPTO_free;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut core::ffi::c_void, *mut CRYPTO_EX_DATA) =
+    crate::ex_data::CRYPTO_free_ex_data;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ex_data::CRYPTO_free_ex_index;
+const _: unsafe extern "C" fn(*const CRYPTO_EX_DATA, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::ex_data::CRYPTO_get_ex_data;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+    CRYPTO_EX_new,
+    CRYPTO_EX_dup,
+    CRYPTO_EX_free,
+) -> core::ffi::c_int = crate::ex_data::CRYPTO_get_ex_new_index;
 const _: unsafe extern "C" fn(*mut CRYPTO_malloc_fn, *mut CRYPTO_realloc_fn, *mut CRYPTO_free_fn) =
     crate::mem::CRYPTO_get_mem_functions;
 const _: unsafe extern "C" fn(
@@ -95,6 +120,17 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::mem::CRYPTO_memcmp;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::string::CRYPTO_memdup;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    *mut CRYPTO_EX_DATA,
+) -> core::ffi::c_int = crate::ex_data::CRYPTO_new_ex_data;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
     usize,
@@ -130,10 +166,26 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::secure::CRYPTO_secure_zalloc;
 const _: unsafe extern "C" fn(
+    *mut CRYPTO_EX_DATA,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ex_data::CRYPTO_set_ex_data;
+const _: unsafe extern "C" fn(
     CRYPTO_malloc_fn,
     CRYPTO_realloc_fn,
     CRYPTO_free_fn,
 ) -> core::ffi::c_int = crate::mem::CRYPTO_set_mem_functions;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_char = crate::string::CRYPTO_strdup;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_char = crate::string::CRYPTO_strndup;
 const _: unsafe extern "C" fn(
     usize,
     *const core::ffi::c_char,
@@ -296,6 +348,12 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(*mut *mut OPENSSL_DIR_CTX) -> core::ffi::c_int =
+    crate::dir::OPENSSL_DIR_end;
+const _: unsafe extern "C" fn(
+    *mut *mut OPENSSL_DIR_CTX,
+    *const core::ffi::c_char,
+) -> *const core::ffi::c_char = crate::dir::OPENSSL_DIR_read;
 const _: unsafe extern "C" fn(*mut OPENSSL_INIT_SETTINGS) = crate::init::OPENSSL_INIT_free;
 const _: unsafe extern "C" fn() -> *mut OPENSSL_INIT_SETTINGS = crate::init::OPENSSL_INIT_new;
 const _: unsafe extern "C" fn(
@@ -308,8 +366,71 @@ const _: unsafe extern "C" fn(
     *mut OPENSSL_INIT_SETTINGS,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::init::OPENSSL_INIT_set_config_filename;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::lhash::OPENSSL_LH_delete;
+const _: unsafe extern "C" fn(*mut OPENSSL_LHASH, OPENSSL_LH_DOALL_FUNC) =
+    crate::lhash::OPENSSL_LH_doall;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    OPENSSL_LH_DOALL_FUNCARG,
+    *mut core::ffi::c_void,
+) = crate::lhash::OPENSSL_LH_doall_arg;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    OPENSSL_LH_DOALL_FUNCARG_THUNK,
+    OPENSSL_LH_DOALL_FUNCARG,
+    *mut core::ffi::c_void,
+) = crate::lhash::OPENSSL_LH_doall_arg_thunk;
+const _: unsafe extern "C" fn(*mut OPENSSL_LHASH) -> core::ffi::c_int =
+    crate::lhash::OPENSSL_LH_error;
+const _: unsafe extern "C" fn(*mut OPENSSL_LHASH) = crate::lhash::OPENSSL_LH_flush;
+const _: unsafe extern "C" fn(*mut OPENSSL_LHASH) = crate::lhash::OPENSSL_LH_free;
+const _: unsafe extern "C" fn(*const OPENSSL_LHASH) -> core::ffi::c_ulong =
+    crate::lhash::OPENSSL_LH_get_down_load;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::lhash::OPENSSL_LH_insert;
+const _: unsafe extern "C" fn(OPENSSL_LH_HASHFUNC, OPENSSL_LH_COMPFUNC) -> *mut OPENSSL_LHASH =
+    crate::lhash::OPENSSL_LH_new;
+const _: unsafe extern "C" fn(*const OPENSSL_LHASH, *mut FILE) =
+    crate::lhash::OPENSSL_LH_node_stats;
+const _: unsafe extern "C" fn(*const OPENSSL_LHASH, *mut FILE) =
+    crate::lhash::OPENSSL_LH_node_usage_stats;
+const _: unsafe extern "C" fn(*const OPENSSL_LHASH) -> core::ffi::c_ulong =
+    crate::lhash::OPENSSL_LH_num_items;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::lhash::OPENSSL_LH_retrieve;
+const _: unsafe extern "C" fn(*mut OPENSSL_LHASH, core::ffi::c_ulong) =
+    crate::lhash::OPENSSL_LH_set_down_load;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_LHASH,
+    OPENSSL_LH_HASHFUNCTHUNK,
+    OPENSSL_LH_COMPFUNCTHUNK,
+    OPENSSL_LH_DOALL_FUNC_THUNK,
+    OPENSSL_LH_DOALL_FUNCARG_THUNK,
+) -> *mut OPENSSL_LHASH = crate::lhash::OPENSSL_LH_set_thunks;
+const _: unsafe extern "C" fn(*const OPENSSL_LHASH, *mut FILE) = crate::lhash::OPENSSL_LH_stats;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_ulong =
+    crate::lhash::OPENSSL_LH_strhash;
 const _: unsafe extern "C" fn(::core::option::Option<unsafe extern "C" fn()>) -> core::ffi::c_int =
     crate::init::OPENSSL_atexit;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut core::ffi::c_char = crate::string::OPENSSL_buf2hexstr;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    usize,
+    *mut usize,
+    *const core::ffi::c_uchar,
+    usize,
+    core::ffi::c_char,
+) -> core::ffi::c_int = crate::string::OPENSSL_buf2hexstr_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_void, usize) = crate::mem::OPENSSL_cleanse;
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_cleanup;
 const _: unsafe extern "C" fn(
@@ -320,6 +441,19 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_child;
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_parent;
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_fork_prepare;
+const _: unsafe extern "C" fn(core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::string::OPENSSL_hexchar2int;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_long,
+) -> *mut core::ffi::c_uchar = crate::string::OPENSSL_hexstr2buf;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut usize,
+    *const core::ffi::c_char,
+    core::ffi::c_char,
+) -> core::ffi::c_int = crate::string::OPENSSL_hexstr2buf_ex;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OPENSSL_info;
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_init;
@@ -327,6 +461,89 @@ const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c
     crate::init::OPENSSL_init_crypto;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_isservice;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_issetugid;
+const _: unsafe extern "C" fn(
+    *const OPENSSL_STACK,
+    OPENSSL_sk_copyfunc,
+    OPENSSL_sk_freefunc,
+) -> *mut OPENSSL_STACK = crate::stack::OPENSSL_sk_deep_copy;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::stack::OPENSSL_sk_delete;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_STACK,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::stack::OPENSSL_sk_delete_ptr;
+const _: unsafe extern "C" fn(*const OPENSSL_STACK) -> *mut OPENSSL_STACK =
+    crate::stack::OPENSSL_sk_dup;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_find;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_STACK,
+    *const core::ffi::c_void,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::stack::OPENSSL_sk_find_all;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_find_ex;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK) = crate::stack::OPENSSL_sk_free;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_STACK,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::stack::OPENSSL_sk_insert;
+const _: unsafe extern "C" fn(*const OPENSSL_STACK) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_is_sorted;
+const _: unsafe extern "C" fn(OPENSSL_sk_compfunc) -> *mut OPENSSL_STACK =
+    crate::stack::OPENSSL_sk_new;
+const _: unsafe extern "C" fn() -> *mut OPENSSL_STACK = crate::stack::OPENSSL_sk_new_null;
+const _: unsafe extern "C" fn(OPENSSL_sk_compfunc, core::ffi::c_int) -> *mut OPENSSL_STACK =
+    crate::stack::OPENSSL_sk_new_reserve;
+const _: unsafe extern "C" fn(*const OPENSSL_STACK) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_num;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK) -> *mut core::ffi::c_void =
+    crate::stack::OPENSSL_sk_pop;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_STACK,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>,
+) = crate::stack::OPENSSL_sk_pop_free;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_push;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, core::ffi::c_int) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_reserve;
+const _: unsafe extern "C" fn(
+    *mut OPENSSL_STACK,
+    core::ffi::c_int,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::stack::OPENSSL_sk_set;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, OPENSSL_sk_compfunc) -> OPENSSL_sk_compfunc =
+    crate::stack::OPENSSL_sk_set_cmp_func;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK) -> *mut core::ffi::c_void =
+    crate::stack::OPENSSL_sk_shift;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK) = crate::stack::OPENSSL_sk_sort;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::stack::OPENSSL_sk_unshift;
+const _: unsafe extern "C" fn(*const OPENSSL_STACK, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::stack::OPENSSL_sk_value;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK) = crate::stack::OPENSSL_sk_zero;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::string::OPENSSL_strcasecmp;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, *const core::ffi::c_char, usize) -> usize =
+    crate::string::OPENSSL_strlcat;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, *const core::ffi::c_char, usize) -> usize =
+    crate::string::OPENSSL_strlcpy;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::string::OPENSSL_strncasecmp;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, usize) -> usize =
+    crate::string::OPENSSL_strnlen;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::string::OPENSSL_strtoul;
 const _: unsafe extern "C" fn() = crate::threads::OPENSSL_thread_stop;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) = crate::threads::OPENSSL_thread_stop_ex;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =

@@ -6854,16 +6854,6 @@ pub extern "C" fn CRYPTO_128_wrap_pad(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_alloc_ex_data(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: *mut CRYPTO_EX_DATA,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_alloc_ex_data")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_cbc128_decrypt(
     _: *const core::ffi::c_uchar,
     _: *mut core::ffi::c_uchar,
@@ -7087,32 +7077,6 @@ pub extern "C" fn CRYPTO_cts128_encrypt_block(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_dup_ex_data(
-    _: core::ffi::c_int,
-    _: *mut CRYPTO_EX_DATA,
-    _: *const CRYPTO_EX_DATA,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_dup_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_free_ex_data(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: *mut CRYPTO_EX_DATA,
-) {
-    crate::stub::unimplemented("CRYPTO_free_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_free_ex_index(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_free_ex_index")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_gcm128_aad(
     _: *mut GCM128_CONTEXT,
     _: *const core::ffi::c_uchar,
@@ -7206,45 +7170,6 @@ pub extern "C" fn CRYPTO_gcm128_setiv(
 #[unsafe(no_mangle)]
 pub extern "C" fn CRYPTO_gcm128_tag(_: *mut GCM128_CONTEXT, _: *mut core::ffi::c_uchar, _: usize) {
     crate::stub::unimplemented("CRYPTO_gcm128_tag")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_get_ex_data(
-    _: *const CRYPTO_EX_DATA,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_get_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_get_ex_new_index(
-    _: core::ffi::c_int,
-    _: core::ffi::c_long,
-    _: *mut core::ffi::c_void,
-    _: CRYPTO_EX_new,
-    _: CRYPTO_EX_dup,
-    _: CRYPTO_EX_free,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_get_ex_new_index")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_memdup(
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_memdup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_new_ex_data(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: *mut CRYPTO_EX_DATA,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_new_ex_data")
 }
 
 #[unsafe(no_mangle)]
@@ -7401,34 +7326,6 @@ pub extern "C" fn CRYPTO_ofb128_encrypt(
     _: block128_f,
 ) {
     crate::stub::unimplemented("CRYPTO_ofb128_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_set_ex_data(
-    _: *mut CRYPTO_EX_DATA,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CRYPTO_set_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_strdup(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("CRYPTO_strdup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_strndup(
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("CRYPTO_strndup")
 }
 
 #[unsafe(no_mangle)]
@@ -20394,99 +20291,8 @@ pub extern "C" fn OCSP_url_svcloc_new(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_DIR_end(_: *mut *mut OPENSSL_DIR_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_DIR_end")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_DIR_read(
-    _: *mut *mut OPENSSL_DIR_CTX,
-    _: *const core::ffi::c_char,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_DIR_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_delete(
-    _: *mut OPENSSL_LHASH,
-    _: *const core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_LH_delete")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_doall(_: *mut OPENSSL_LHASH, _: OPENSSL_LH_DOALL_FUNC) {
-    crate::stub::unimplemented("OPENSSL_LH_doall")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_doall_arg(
-    _: *mut OPENSSL_LHASH,
-    _: OPENSSL_LH_DOALL_FUNCARG,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("OPENSSL_LH_doall_arg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_doall_arg_thunk(
-    _: *mut OPENSSL_LHASH,
-    _: OPENSSL_LH_DOALL_FUNCARG_THUNK,
-    _: OPENSSL_LH_DOALL_FUNCARG,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("OPENSSL_LH_doall_arg_thunk")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_error(_: *mut OPENSSL_LHASH) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_LH_error")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_flush(_: *mut OPENSSL_LHASH) {
-    crate::stub::unimplemented("OPENSSL_LH_flush")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_free(_: *mut OPENSSL_LHASH) {
-    crate::stub::unimplemented("OPENSSL_LH_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_get_down_load(_: *const OPENSSL_LHASH) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("OPENSSL_LH_get_down_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_insert(
-    _: *mut OPENSSL_LHASH,
-    _: *mut core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_LH_insert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_new(
-    _: OPENSSL_LH_HASHFUNC,
-    _: OPENSSL_LH_COMPFUNC,
-) -> *mut OPENSSL_LHASH {
-    crate::stub::unimplemented("OPENSSL_LH_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_node_stats(_: *const OPENSSL_LHASH, _: *mut FILE) {
-    crate::stub::unimplemented("OPENSSL_LH_node_stats")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_LH_node_stats_bio(_: *const OPENSSL_LHASH, _: *mut BIO) {
     crate::stub::unimplemented("OPENSSL_LH_node_stats_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_node_usage_stats(_: *const OPENSSL_LHASH, _: *mut FILE) {
-    crate::stub::unimplemented("OPENSSL_LH_node_usage_stats")
 }
 
 #[unsafe(no_mangle)]
@@ -20495,47 +20301,8 @@ pub extern "C" fn OPENSSL_LH_node_usage_stats_bio(_: *const OPENSSL_LHASH, _: *m
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_num_items(_: *const OPENSSL_LHASH) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("OPENSSL_LH_num_items")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_retrieve(
-    _: *mut OPENSSL_LHASH,
-    _: *const core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_LH_retrieve")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_set_down_load(_: *mut OPENSSL_LHASH, _: core::ffi::c_ulong) {
-    crate::stub::unimplemented("OPENSSL_LH_set_down_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_set_thunks(
-    _: *mut OPENSSL_LHASH,
-    _: OPENSSL_LH_HASHFUNCTHUNK,
-    _: OPENSSL_LH_COMPFUNCTHUNK,
-    _: OPENSSL_LH_DOALL_FUNC_THUNK,
-    _: OPENSSL_LH_DOALL_FUNCARG_THUNK,
-) -> *mut OPENSSL_LHASH {
-    crate::stub::unimplemented("OPENSSL_LH_set_thunks")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_stats(_: *const OPENSSL_LHASH, _: *mut FILE) {
-    crate::stub::unimplemented("OPENSSL_LH_stats")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_LH_stats_bio(_: *const OPENSSL_LHASH, _: *mut BIO) {
     crate::stub::unimplemented("OPENSSL_LH_stats_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_LH_strhash(_: *const core::ffi::c_char) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("OPENSSL_LH_strhash")
 }
 
 #[unsafe(no_mangle)]
@@ -20546,26 +20313,6 @@ pub extern "C" fn OPENSSL_asc2uni(
     _: *mut core::ffi::c_int,
 ) -> *mut core::ffi::c_uchar {
     crate::stub::unimplemented("OPENSSL_asc2uni")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_buf2hexstr(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_buf2hexstr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_buf2hexstr_ex(
-    _: *mut core::ffi::c_char,
-    _: usize,
-    _: *mut usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_buf2hexstr_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -20598,256 +20345,8 @@ pub extern "C" fn OPENSSL_gmtime_diff(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_hexchar2int(_: core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_hexchar2int")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_hexstr2buf(
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_long,
-) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("OPENSSL_hexstr2buf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_hexstr2buf_ex(
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *mut usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_hexstr2buf_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OPENSSL_load_builtin_modules() {
     crate::stub::unimplemented("OPENSSL_load_builtin_modules")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_deep_copy(
-    _: *const OPENSSL_STACK,
-    _: OPENSSL_sk_copyfunc,
-    _: OPENSSL_sk_freefunc,
-) -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_deep_copy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_delete(
-    _: *mut OPENSSL_STACK,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_delete")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_delete_ptr(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_delete_ptr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_dup(_: *const OPENSSL_STACK) -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_find(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_find")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_find_all(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_find_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_find_ex(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_find_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_free(_: *mut OPENSSL_STACK) {
-    crate::stub::unimplemented("OPENSSL_sk_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_insert(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_insert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_is_sorted(_: *const OPENSSL_STACK) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_is_sorted")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_new(_: OPENSSL_sk_compfunc) -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_new_null() -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_new_null")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_new_reserve(
-    _: OPENSSL_sk_compfunc,
-    _: core::ffi::c_int,
-) -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_new_reserve")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_num(_: *const OPENSSL_STACK) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_num")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_pop(_: *mut OPENSSL_STACK) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_pop")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_pop_free(
-    _: *mut OPENSSL_STACK,
-    _: ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void)>,
-) {
-    crate::stub::unimplemented("OPENSSL_sk_pop_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_push(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_push")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_reserve(
-    _: *mut OPENSSL_STACK,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_reserve")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_set(
-    _: *mut OPENSSL_STACK,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_set_cmp_func(
-    _: *mut OPENSSL_STACK,
-    _: OPENSSL_sk_compfunc,
-) -> OPENSSL_sk_compfunc {
-    crate::stub::unimplemented("OPENSSL_sk_set_cmp_func")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_shift(_: *mut OPENSSL_STACK) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_shift")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_sort(_: *mut OPENSSL_STACK) {
-    crate::stub::unimplemented("OPENSSL_sk_sort")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_unshift(
-    _: *mut OPENSSL_STACK,
-    _: *const core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_sk_unshift")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_value(
-    _: *const OPENSSL_STACK,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OPENSSL_sk_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_zero(_: *mut OPENSSL_STACK) {
-    crate::stub::unimplemented("OPENSSL_sk_zero")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strcasecmp(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_strcasecmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strlcat(
-    _: *mut core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: usize,
-) -> usize {
-    crate::stub::unimplemented("OPENSSL_strlcat")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strlcpy(
-    _: *mut core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: usize,
-) -> usize {
-    crate::stub::unimplemented("OPENSSL_strlcpy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strncasecmp(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_strncasecmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strnlen(_: *const core::ffi::c_char, _: usize) -> usize {
-    crate::stub::unimplemented("OPENSSL_strnlen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_strtoul(
-    _: *const core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_strtoul")
 }
 
 #[unsafe(no_mangle)]

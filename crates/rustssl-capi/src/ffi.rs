@@ -124,10 +124,6 @@ pub(crate) fn to_c_int(len: usize) -> Option<c_int> {
 ///
 /// # Safety
 /// If `data` isn't null, it is valid for `len` bytes of reads that nothing writes to for `'a`.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "first used by the step 1 exports")
-)]
 pub(crate) unsafe fn bytes<'a>(data: *const u8, len: usize) -> Option<&'a [u8]> {
     if data.is_null() {
         return (len == 0).then_some(&[]);
