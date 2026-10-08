@@ -148,13 +148,14 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(7) {
+        match random.below(8) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
             3 => lhash_session(&mut random, &mut out)?,
             4 => bio_session(&mut random, &mut out)?,
             5 => printf_session(&mut random, &mut out)?,
+            6 => addr_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -326,6 +327,40 @@ fn printf_double(random: &mut Random) -> String {
         }
     };
     format!("d:{value}")
+}
+
+/// A random session of `hostserv` and `addr` commands.
+fn addr_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..1 + random.below(20) {
+        if random.below(2) == 0 {
+            let spec = random_text(random, b"[]:*ab1_", 10);
+            writeln!(out, "hostserv {spec} {}", random.below(2))?;
+            continue;
+        }
+        let (family, len) = match random.below(5) {
+            0 | 1 => ("4", 4),
+            2 | 3 => ("6", 16),
+            _ => ("u", 1 + random.below(20)),
+        };
+        // Sometimes a wrong length.
+        let len = if random.below(8) == 0 {
+            random.below(20)
+        } else {
+            len
+        };
+        let hex: String = (0..len.max(1))
+            .map(|_| {
+                let byte = if family == "u" {
+                    0x61 + random.below(26)
+                } else {
+                    random.below(256)
+                };
+                format!("{byte:02x}")
+            })
+            .collect();
+        writeln!(out, "addr {family} {hex} {}", random.below(65536))?;
+    }
+    Ok(())
 }
 
 /// A random `BUF_MEM` session.
@@ -588,6 +623,7 @@ mod tests {
             "\nbionew ",
             "\nhexdecode ",
             "printf ",
+            "\nhostserv ",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }

@@ -27,6 +27,7 @@ mod init;
 mod lhash;
 mod mem;
 mod secure;
+mod sleep;
 mod stack;
 mod string;
 mod stub;

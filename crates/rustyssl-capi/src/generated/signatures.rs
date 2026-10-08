@@ -3,12 +3,70 @@
 // Each function rustyssl-capi implements by hand is assigned to a function pointer of its C
 // prototype's type, so it doesn't compile unless the signatures match exactly (TEST_PLAN.md, L3 item 3).
 
-use libc::FILE;
+use libc::{FILE, time_t};
 use rustyssl_abi::*;
 
+const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDR =
+    crate::bio::addr::BIO_ADDRINFO_address;
+const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
+    crate::bio::addr::BIO_ADDRINFO_family;
+const _: unsafe extern "C" fn(*mut BIO_ADDRINFO) = crate::bio::addr::BIO_ADDRINFO_free;
+const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDRINFO =
+    crate::bio::addr::BIO_ADDRINFO_next;
+const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
+    crate::bio::addr::BIO_ADDRINFO_protocol;
+const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
+    crate::bio::addr::BIO_ADDRINFO_socktype;
+const _: unsafe extern "C" fn(*mut BIO_ADDR) = crate::bio::addr::BIO_ADDR_clear;
+const _: unsafe extern "C" fn(*mut BIO_ADDR, *const BIO_ADDR) -> core::ffi::c_int =
+    crate::bio::addr::BIO_ADDR_copy;
+const _: unsafe extern "C" fn(*const BIO_ADDR) -> *mut BIO_ADDR = crate::bio::addr::BIO_ADDR_dup;
+const _: unsafe extern "C" fn(*const BIO_ADDR) -> core::ffi::c_int =
+    crate::bio::addr::BIO_ADDR_family;
+const _: unsafe extern "C" fn(*mut BIO_ADDR) = crate::bio::addr::BIO_ADDR_free;
+const _: unsafe extern "C" fn(*const BIO_ADDR, core::ffi::c_int) -> *mut core::ffi::c_char =
+    crate::bio::addr::BIO_ADDR_hostname_string;
+const _: unsafe extern "C" fn() -> *mut BIO_ADDR = crate::bio::addr::BIO_ADDR_new;
+const _: unsafe extern "C" fn(*const BIO_ADDR) -> *mut core::ffi::c_char =
+    crate::bio::addr::BIO_ADDR_path_string;
+const _: unsafe extern "C" fn(
+    *const BIO_ADDR,
+    *mut core::ffi::c_void,
+    *mut usize,
+) -> core::ffi::c_int = crate::bio::addr::BIO_ADDR_rawaddress;
+const _: unsafe extern "C" fn(
+    *mut BIO_ADDR,
+    core::ffi::c_int,
+    *const core::ffi::c_void,
+    usize,
+    core::ffi::c_ushort,
+) -> core::ffi::c_int = crate::bio::addr::BIO_ADDR_rawmake;
+const _: unsafe extern "C" fn(*const BIO_ADDR) -> core::ffi::c_ushort =
+    crate::bio::addr::BIO_ADDR_rawport;
+const _: unsafe extern "C" fn(*const BIO_ADDR, core::ffi::c_int) -> *mut core::ffi::c_char =
+    crate::bio::addr::BIO_ADDR_service_string;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut *mut core::ffi::c_char) -> core::ffi::c_int =
+    crate::bio::sock::BIO_accept;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut BIO_ADDR,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::sock::BIO_accept_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const BIO_ADDR,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::sock::BIO_bind;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int, BIO_info_cb) -> core::ffi::c_long =
     crate::bio::BIO_callback_ctrl;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_clear_flags;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_closesocket;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const BIO_ADDR,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::sock::BIO_connect;
 const _: unsafe extern "C" fn(*mut BIO) = crate::bio::BIO_copy_next_retry;
 const _: unsafe extern "C" fn(
     *mut BIO,
@@ -40,6 +98,8 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut usize,
 ) -> core::ffi::c_long = crate::bio::debug::BIO_debug_callback_ex;
+const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_do_connect_retry;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_void,
@@ -100,6 +160,8 @@ const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) -> *mut BIO = crate::bio::BIO_find_type;
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_free;
 const _: unsafe extern "C" fn(*mut BIO) = crate::bio::BIO_free_all;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_get_accept_socket;
 const _: unsafe extern "C" fn(*const BIO) -> BIO_callback_fn = crate::bio::BIO_get_callback;
 const _: unsafe extern "C" fn(*const BIO) -> *mut core::ffi::c_char =
     crate::bio::BIO_get_callback_arg;
@@ -107,6 +169,10 @@ const _: unsafe extern "C" fn(*const BIO) -> BIO_callback_fn_ex = crate::bio::BI
 const _: unsafe extern "C" fn(*mut BIO) -> *mut core::ffi::c_void = crate::bio::BIO_get_data;
 const _: unsafe extern "C" fn(*const BIO, core::ffi::c_int) -> *mut core::ffi::c_void =
     crate::bio::BIO_get_ex_data;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::bio::sock::BIO_get_host_ip;
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_get_init;
 const _: unsafe extern "C" fn(
     *mut BIO,
@@ -114,6 +180,10 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::bio::BIO_get_line;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::bio::method::BIO_get_new_index;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_ushort,
+) -> core::ffi::c_int = crate::bio::sock::BIO_get_port;
 const _: unsafe extern "C" fn(*mut BIO, *mut core::ffi::c_int) -> *mut BIO =
     crate::bio::BIO_get_retry_BIO;
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_get_retry_reason;
@@ -122,6 +192,8 @@ const _: unsafe extern "C" fn(*mut BIO, *mut BIO_POLL_DESCRIPTOR) -> core::ffi::
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_get_shutdown;
 const _: unsafe extern "C" fn(*mut BIO, *mut BIO_POLL_DESCRIPTOR) -> core::ffi::c_int =
     crate::bio::BIO_get_wpoll_descriptor;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut hostent =
+    crate::bio::sock::BIO_gethostbyname;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut core::ffi::c_char,
@@ -142,6 +214,28 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
     core::ffi::c_int,
 ) -> core::ffi::c_long = crate::bio::BIO_int_ctrl;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const BIO_ADDR,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::sock::BIO_listen;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    BIO_lookup_type,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut *mut BIO_ADDRINFO,
+) -> core::ffi::c_int = crate::bio::addr::BIO_lookup;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut *mut BIO_ADDRINFO,
+) -> core::ffi::c_int = crate::bio::addr::BIO_lookup_ex;
 const _: unsafe extern "C" fn(*mut BIO_METHOD) = crate::bio::method::BIO_meth_free;
 const _: unsafe extern "C" fn(
     *const BIO_METHOD,
@@ -366,6 +460,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const BIO) -> *const core::ffi::c_char = crate::bio::BIO_method_name;
 const _: unsafe extern "C" fn(*const BIO) -> core::ffi::c_int = crate::bio::BIO_method_type;
 const _: unsafe extern "C" fn(*const BIO_METHOD) -> *mut BIO = crate::bio::BIO_new;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut BIO =
+    crate::bio::accept::BIO_new_accept;
 const _: unsafe extern "C" fn(*mut *mut BIO, usize, *mut *mut BIO, usize) -> core::ffi::c_int =
     crate::bio::pair::BIO_new_bio_pair;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const BIO_METHOD) -> *mut BIO =
@@ -378,6 +474,8 @@ const _: unsafe extern "C" fn(*mut FILE, core::ffi::c_int) -> *mut BIO =
     crate::bio::file::BIO_new_fp;
 const _: unsafe extern "C" fn(*const core::ffi::c_void, core::ffi::c_int) -> *mut BIO =
     crate::bio::mem::BIO_new_mem_buf;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> *mut BIO =
+    crate::bio::sock::BIO_new_socket;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_next;
 const _: unsafe extern "C" fn(
     *mut BIO,
@@ -395,6 +493,12 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::bio::pair::BIO_nwrite;
 const _: unsafe extern "C" fn(*mut BIO, *mut *mut core::ffi::c_char) -> core::ffi::c_int =
     crate::bio::pair::BIO_nwrite0;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    BIO_hostserv_priorities,
+) -> core::ffi::c_int = crate::bio::addr::BIO_parse_hostserv;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_pop;
 const _: unsafe extern "C" fn(*mut BIO, *const core::ffi::c_char, ...) -> core::ffi::c_int =
     crate::bio::print::BIO_printf;
@@ -425,12 +529,14 @@ const _: unsafe extern "C" fn(
     u64,
     *mut usize,
 ) -> core::ffi::c_int = crate::bio::BIO_recvmmsg;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::accept::BIO_s_accept;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::pair::BIO_s_bio;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::fd::BIO_s_fd;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::file::BIO_s_file;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_mem;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_s_null;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_secmem;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::sock::BIO_s_socket;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut BIO_MSG,
@@ -453,12 +559,41 @@ const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_
 const _: unsafe extern "C" fn(*mut BIO, *mut BIO) = crate::bio::BIO_set_next;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_retry_reason;
 const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) = crate::bio::BIO_set_shutdown;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_set_tcp_ndelay;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     usize,
     *const core::ffi::c_char,
     ...
 ) -> core::ffi::c_int = crate::bio::print::BIO_snprintf;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_sock_error;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    BIO_sock_info_type,
+    *mut BIO_sock_info_u,
+) -> core::ffi::c_int = crate::bio::sock::BIO_sock_info;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::bio::sock::BIO_sock_init;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_sock_non_fatal_error;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_sock_should_retry;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::sock::BIO_socket;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::bio::sock::BIO_socket_ioctl;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bio::sock::BIO_socket_nbio;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int, time_t) -> core::ffi::c_int =
+    crate::bio::sock::BIO_socket_wait;
 const _: unsafe extern "C" fn(*const BIO, core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::BIO_test_flags;
 const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::bio::BIO_up_ref;
@@ -474,6 +609,8 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) -> core::ffi::c_int = crate::bio::print::BIO_vsnprintf;
+const _: unsafe extern "C" fn(*mut BIO, time_t, core::ffi::c_uint) -> core::ffi::c_int =
+    crate::bio::sock::BIO_wait;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_void,
@@ -1049,6 +1186,7 @@ const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::threads::OSSL_g
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
     crate::threads::OSSL_set_max_threads;
+const _: unsafe extern "C" fn(u64) = crate::sleep::OSSL_sleep;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;

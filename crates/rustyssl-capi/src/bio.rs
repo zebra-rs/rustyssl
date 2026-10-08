@@ -12,10 +12,13 @@
 //! the Rust side. No lock is held while a method or callback runs, and each call holds a
 //! reference to its BIO, so a callback that frees the BIO doesn't free it under the call.
 //!
-//! The built-in types are in [`mem`], [`null`], [`file`], [`fd`], [`buffer`], [`prefix`], and
-//! [`pair`] (the last three keep their private state as [`state`] describes). OpenSSL's
-//! printf is in [`print`], with the hex dumps in [`dump`] and the debug callback in [`debug`].
+//! The built-in types are in [`mem`], [`null`], [`file`], [`fd`], [`buffer`], [`prefix`],
+//! [`pair`], [`sock`], and [`accept`] (those from [`buffer`] on keep their private state as
+//! [`state`] describes); addresses and lookups are in [`addr`]. OpenSSL's printf is in
+//! [`print`], with the hex dumps in [`dump`] and the debug callback in [`debug`].
 
+pub(crate) mod accept;
+pub(crate) mod addr;
 pub(crate) mod buffer;
 pub(crate) mod debug;
 pub(crate) mod dump;
@@ -27,6 +30,7 @@ pub(crate) mod null;
 pub(crate) mod pair;
 pub(crate) mod prefix;
 pub(crate) mod print;
+pub(crate) mod sock;
 pub(crate) mod state;
 
 use core::cell::UnsafeCell;

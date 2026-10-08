@@ -67,7 +67,7 @@ fn entries(table: Table) -> impl Iterator<Item = (c_ulong, *const c_char)> {
 }
 
 /// `ERR_GET_REASON(code)` from `err.h`.
-fn reason_of(code: c_ulong) -> c_ulong {
+pub(crate) fn reason_of(code: c_ulong) -> c_ulong {
     let mask = if is_system(code) {
         ERR_SYSTEM_MASK
     } else {

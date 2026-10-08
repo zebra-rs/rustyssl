@@ -47,7 +47,7 @@ pub(crate) const fn pack(library: c_int, reason: c_int) -> c_ulong {
 }
 
 /// `ERR_GET_LIB(code)` from `err.h`.
-fn library_of(code: c_ulong) -> c_int {
+pub(crate) fn library_of(code: c_ulong) -> c_int {
     if is_system(code) {
         return ERR_LIB_SYS;
     }
@@ -658,7 +658,7 @@ unsafe fn set_error_data(data: *mut c_char, size: usize, flags: c_int, deallocat
 /// Appends `pieces` to the newest error's data, null pieces as `<NULL>` (OpenSSL's
 /// `ERR_add_error_vdata`). Allocated string data is extended in place; any other data is
 /// replaced.
-fn add_error_data<'a>(pieces: impl IntoIterator<Item = Option<&'a [u8]>>) {
+pub(crate) fn add_error_data<'a>(pieces: impl IntoIterator<Item = Option<&'a [u8]>>) {
     let Some(state) = state() else {
         return;
     };
