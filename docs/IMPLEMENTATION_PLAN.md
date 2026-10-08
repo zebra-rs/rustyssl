@@ -654,16 +654,71 @@ Everything else depends on this phase.
     - the differential probe: an `err.txt` corpus, plus random sessions (raise, mark, pop,
       data, text, save and restore, `ERR_error_string_n` on random codes and lengths) that
       end with the whole `ERR_STATE`. 6,000 random sessions were identical on macOS.
-- [ ] **1.5 Containers and utilities:**
-  - `OPENSSL_sk_*`, including the comparator and sort quirks (for example, `find` sorts an
-    unsorted stack)
+- [x] **1.5 Containers and utilities:**
+  - `OPENSSL_sk_*`, including the comparator and sort quirks
   - `OPENSSL_LH_*`
-  - `BUF_MEM`
+  - `BUF_MEM` (done in Phase 0)
   - the string helpers (`OPENSSL_strdup`, `strlcpy`, `hexstr2buf`, `buf2hexstr`,
     `strcasecmp`, …)
   - `OPENSSL_DIR_read`
   - `ex_data` (`CRYPTO_get_ex_new_index`, `new_ex_data`, `dup`, `free`, `set`, `get`, with
     per-class index spaces)
+
+  *Done:* 67 exports, now 220 of libcrypto's 5,876 (`stack.rs`, `lhash.rs`, `ex_data.rs`,
+  `string.rs`, `dir.rs`).
+  - **Stacks:**
+    - A stack is a Rust object behind a handle, and no lock is held while the application's
+      comparator, copy, or free function runs (they work on a copy of the elements).
+    - In 3.5, finding on an unsorted stack is a linear search with the comparator. It no
+      longer sorts the stack as 1.1.1 did, so the plan's old example was out of date.
+    - On a sorted stack, finding is OpenSSL's binary search, with the same probes, so
+      `OPENSSL_sk_find_ex` lands where OpenSSL's does.
+    - Sorting calls the C library's `qsort`, so equal elements end up in the same order as
+      with OpenSSL on the same system.
+    - Quirks kept: `OPENSSL_sk_find_all` on an unsorted stack adds to the caller's count;
+      `OPENSSL_sk_dup(NULL)` returns an empty stack; `OPENSSL_sk_set` out of range raises
+      with the data `i=<n>`.
+  - **Hash tables:**
+    - OpenSSL's linear hashing is ported step for step (bucket choice, splits, merges, chain
+      order), since `doall`'s order is visible.
+    - Nodes live in a slab under generation-checked references, and no lock is held during
+      callbacks. A `doall` callback may delete the item it visits, as OpenSSL's session cache
+      does; one that deletes the next item stops that chain where OpenSSL would read freed
+      memory.
+    - `OPENSSL_LH_strhash` reproduces the per-platform effect of `char`'s signedness.
+    - The `FILE` statistics functions print OpenSSL 3.1+'s text. The `_bio` variants wait
+      for 1.6.
+  - **`ex_data`:**
+    - Index 0 is reserved in each class, and the values are an ordinary `STACK_OF(void)` in
+      the public `CRYPTO_EX_DATA`.
+    - Free callbacks run in the order libc `qsort` leaves equal priorities. That isn't index
+      order on macOS with 13 entries, and the test checks it.
+    - Freed indexes keep do-nothing callbacks, as OpenSSL's dummies.
+    - The quirks of `CRYPTO_set_ex_data(-1, NULL)` (succeeds, leaving an error) and of
+      `CRYPTO_dup_ex_data` for a class without indexes are kept.
+  - **Strings:**
+    - Copies come from `CRYPTO_malloc` with the caller's file and line.
+    - `OPENSSL_strcasecmp`/`strncasecmp` fold only ASCII and return differences of C
+      `char`s, which are signed or not depending on the platform.
+    - `OPENSSL_strtoul` is libc's `strtoul` with OpenSSL's checks.
+    - The hex codec matches OpenSSL, including that a separator above 0x7f never matches
+      where `char` is signed.
+    - `err::raise_with_text` attaches preformatted error data exactly as `ERR_vset_error`
+      does, buffer sizes included; 1.6's printf engine will reuse it.
+  - **Directories:** `OPENSSL_DIR_read` wraps `opendir`/`readdir` with OpenSSL's `errno`
+    conventions.
+  - **Deviations (`DEVIATIONS.md`):**
+    - `doall` on a table without thunks (OpenSSL calls a null thunk);
+    - a `doall` callback deleting the next item;
+    - `OPENSSL_DIR_end` leaving the context dangling;
+    - null arguments that crash OpenSSL.
+  - **Tests:** identical output to the reference on macOS and Linux aarch64:
+    - `tests/c/stack.c` (48 checks), `lhash.c` (23, with `doall` orders and statistics
+      compared), `ex_data.c` (27), `crypto_str.c` (41), `crypto_dir.c` (9);
+    - differential: a `containers.txt` corpus, plus random stack, hash-table, hex, and
+      `strtoul` sessions, 10,000 of them identical on macOS;
+    - fuzz targets `stack` and `lhash`, model-based, and `hex`, against a model decoder
+      with a round trip.
 - [ ] **1.6 BIO core:**
   - the BIO object, chains, and the full `BIO_ctrl` protocol (every `BIO_CTRL_*`)
   - `read`/`write`/`gets`/`puts` and their `_ex` variants
@@ -681,8 +736,11 @@ Everything else depends on this phase.
 
   From 1.4:
   - `ERR_set_error`/`ERR_vset_error` with a format, through the printf engine (they abort
-    until then);
+    until then; `err::raise_with_text` takes the formatted text);
   - `ERR_print_errors` and `ERR_add_error_mem_bio`.
+
+  From 1.5: the BIO statistics functions `OPENSSL_LH_stats_bio`, `_node_stats_bio`, and
+  `_node_usage_stats_bio`, which print what the `FILE` versions do.
 - [ ] **1.7 Tracing:** `OSSL_trace_*` with the default build's behavior (tracing disabled).
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both
