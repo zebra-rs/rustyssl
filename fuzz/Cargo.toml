@@ -60,3 +60,10 @@ path = "fuzz_targets/bio_printf.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "bio_pair"
+path = "fuzz_targets/bio_pair.rs"
+test = false
+doc = false
+bench = false

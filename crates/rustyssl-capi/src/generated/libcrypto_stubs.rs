@@ -2373,21 +2373,6 @@ pub extern "C" fn BIO_connect(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl_get_read_request(_: *mut BIO) -> usize {
-    crate::stub::unimplemented("BIO_ctrl_get_read_request")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl_get_write_guarantee(_: *mut BIO) -> usize {
-    crate::stub::unimplemented("BIO_ctrl_get_write_guarantee")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_ctrl_reset_read_request(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_ctrl_reset_read_request")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_dgram_non_fatal_error(_: core::ffi::c_int) -> core::ffi::c_int {
     crate::stub::unimplemented("BIO_dgram_non_fatal_error")
 }
@@ -2422,18 +2407,8 @@ pub extern "C" fn BIO_f_brotli() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_buffer() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_buffer")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_cipher() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_cipher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_linebuffer() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_linebuffer")
 }
 
 #[unsafe(no_mangle)]
@@ -2444,16 +2419,6 @@ pub extern "C" fn BIO_f_md() -> *const BIO_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_nbio_test() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_nbio_test")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_prefix() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_prefix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_readbuffer() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_readbuffer")
 }
 
 #[unsafe(no_mangle)]
@@ -2565,16 +2530,6 @@ pub extern "C" fn BIO_new_bio_dgram_pair(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_bio_pair(
-    _: *mut *mut BIO,
-    _: usize,
-    _: *mut *mut BIO,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_new_bio_pair")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_connect(_: *const core::ffi::c_char) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_connect")
 }
@@ -2595,34 +2550,6 @@ pub extern "C" fn BIO_new_socket(_: core::ffi::c_int, _: core::ffi::c_int) -> *m
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_nread(
-    _: *mut BIO,
-    _: *mut *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_nread")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_nread0(_: *mut BIO, _: *mut *mut core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_nread0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_nwrite(
-    _: *mut BIO,
-    _: *mut *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_nwrite")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_nwrite0(_: *mut BIO, _: *mut *mut core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_nwrite0")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_parse_hostserv(
     _: *const core::ffi::c_char,
     _: *mut *mut core::ffi::c_char,
@@ -2635,11 +2562,6 @@ pub extern "C" fn BIO_parse_hostserv(
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_accept() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_accept")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_bio() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_bio")
 }
 
 #[unsafe(no_mangle)]

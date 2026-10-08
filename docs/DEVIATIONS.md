@@ -38,6 +38,14 @@ OpenSSL never depends on them.
 | `BIO_printf`, `BIO_snprintf`, and their `v` forms with a null format; `%n` with a null pointer; a format ending in `%w` | dereference null and crash; write to null; read past the format's NUL | return -1; skip the store; stop at the NUL | `bio::print::tests::null_formats_and_targets_fail_or_are_skipped` |
 | `BIO_dump*` with null data, a null callback, or a null `FILE`, when there's a line to output; `BIO_hex_string` with null data | dereference null and crash | return -1; `BIO_hex_string` returns 0 | `bio::dump::tests::null_data_callbacks_and_files_fail` |
 | `BIO_debug_callback` and `BIO_debug_callback_ex` with a null BIO | dereference null and crash | write nothing and return `ret` | `bio::debug::tests::a_null_bio_writes_nothing` |
+| `BIO_gets` of size 0 on a `BIO_f_buffer` | with data buffered, loops forever; otherwise refills, writes a NUL past the caller's zero bytes, and returns the read's result | returns 0, or the failed read's result without writing | `bio::buffer::tests::gets_of_size_zero_doesnt_loop_or_write` |
+| `BIO_set_buffer_read_data` and `BIO_buffer_peek` with a negative count or null data | copy a negative (huge) count, or from or to null, and crash | return 0 and copy nothing | `bio::buffer::tests::bad_read_data_and_peeks_are_refused` |
+| A `BIO_f_readbuffer` read or line whose size plus the read position passes `INT_MAX` | the buffer size overflows, so it reads into too small a buffer | returns 0 | `bio::buffer::tests::reads_past_int_max_are_refused` |
+| A method mixing the buffering, prefix, or pair functions with another create function | the functions take the other type's `ptr` for their state | the functions do nothing and return 0 (or -1 for the prefix filter's controls, as without state) | `bio::buffer::tests::functions_in_a_method_with_another_create_do_nothing` |
+| `BIO_make_bio_pair` with a BIO that isn't a pair end, or null | takes its `ptr` for a pair's state and crashes | returns 0 | `bio::pair::tests::misused_pairs_fail` |
+| `BIO_nread0`, `BIO_nread`, `BIO_nwrite0`, `BIO_nwrite` with a null BIO; `BIO_new_bio_pair` with null out-pointers | dereference null and crash | return -2 with `BIO_R_UNINITIALIZED`; return 0 | `bio::pair::tests::misused_pairs_fail` |
+| Reading or writing an unpaired pair end with `init` set (a `BIO_dup_chain` copy, or `BIO_set_init`) | dereferences the missing peer and crashes | returns 0 | `bio::pair::tests::an_unpaired_copy_reads_and_writes_nothing` |
+| A `BIO_f_prefix` write of null data with a length | reads the last byte of null and crashes | returns 0 | `bio::prefix::tests::null_data_is_refused` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes

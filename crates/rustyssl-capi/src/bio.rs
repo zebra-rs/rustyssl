@@ -12,9 +12,11 @@
 //! the Rust side. No lock is held while a method or callback runs, and each call holds a
 //! reference to its BIO, so a callback that frees the BIO doesn't free it under the call.
 //!
-//! The built-in types are in [`mem`], [`null`], [`file`], and [`fd`]; OpenSSL's printf is in
-//! [`print`], with the hex dumps in [`dump`] and the debug callback in [`debug`].
+//! The built-in types are in [`mem`], [`null`], [`file`], [`fd`], [`buffer`], [`prefix`], and
+//! [`pair`] (the last three keep their private state as [`state`] describes). OpenSSL's
+//! printf is in [`print`], with the hex dumps in [`dump`] and the debug callback in [`debug`].
 
+pub(crate) mod buffer;
 pub(crate) mod debug;
 pub(crate) mod dump;
 pub(crate) mod fd;
@@ -22,7 +24,10 @@ pub(crate) mod file;
 pub(crate) mod mem;
 pub(crate) mod method;
 pub(crate) mod null;
+pub(crate) mod pair;
+pub(crate) mod prefix;
 pub(crate) mod print;
+pub(crate) mod state;
 
 use core::cell::UnsafeCell;
 use core::ffi::{c_char, c_int, c_long, c_void};
@@ -94,6 +99,8 @@ pub(crate) struct Bio {
     num_read: AtomicU64,
     num_write: AtomicU64,
     ex_data: ExData,
+    /// The private state of a built-in type that keeps it in Rust ([`state`]).
+    state: state::Slot,
 }
 
 handle_type!(BIO => Bio);
@@ -607,6 +614,7 @@ pub(crate) unsafe fn new(libctx: *mut OSSL_LIB_CTX, method: *const BIO_METHOD) -
         references: AtomicI32::new(1),
         num_read: AtomicU64::new(0),
         num_write: AtomicU64::new(0),
+        state: state::Slot::default(),
         ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
             ctx: ptr::null_mut(),
             sk: ptr::null_mut(),

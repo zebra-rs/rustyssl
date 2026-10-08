@@ -128,6 +128,12 @@ pub(crate) struct Held<H: Handle> {
     tagged: *const Tagged<H::Object>,
 }
 
+// SAFETY: a `Held` is a strong reference to an `Arc`, which may move to and be shared with
+// other threads when the object can.
+unsafe impl<H: Handle> Send for Held<H> where H::Object: Send + Sync {}
+// SAFETY: as above.
+unsafe impl<H: Handle> Sync for Held<H> where H::Object: Send + Sync {}
+
 impl<H: Handle> core::ops::Deref for Held<H> {
     type Target = H::Object;
 
