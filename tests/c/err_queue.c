@@ -4,7 +4,7 @@
  * OSSL_ERR_STATE_save(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Error strings are
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Error strings are
  * compared byte for byte; the file names and lines are this file's, from the macros.
  */
 #define _POSIX_C_SOURCE 200809L

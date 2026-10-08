@@ -9,9 +9,9 @@
 use core::ffi::{c_char, c_int, c_long, c_void};
 
 use libfuzzer_sys::fuzz_target;
-use rustssl_abi::{BIO, BIO_C_FILE_SEEK, BIO_C_FILE_TELL, BIO_CTRL_PENDING, BIO_CTRL_RESET, BIO_METHOD};
+use rustyssl_abi::{BIO, BIO_C_FILE_SEEK, BIO_C_FILE_TELL, BIO_CTRL_PENDING, BIO_CTRL_RESET, BIO_METHOD};
 // Linked for its exports, which the declarations below resolve to.
-use rustssl_capi as _;
+use rustyssl_capi as _;
 
 unsafe extern "C" {
     fn BIO_s_mem() -> *const BIO_METHOD;

@@ -1,4 +1,4 @@
-//! Generates the `rustssl-abi` bindings, `crates/rustssl-abi/src/generated/<module>.rs`, for
+//! Generates the `rustyssl-abi` bindings, `crates/rustyssl-abi/src/generated/<module>.rs`, for
 //! every target in [`TARGETS`] (step 0.3 of the implementation plan).
 //!
 //! - **Types and enums** come from bindgen, run on the vendored headers with clang's
@@ -42,18 +42,18 @@ const GENERATED_ALLOWS: &str =
 /// Generates every target's bindings and returns the constants of the first target. Names
 /// and values of the constants are the same on every target; only some C types differ.
 pub fn generate(ctx: &Context) -> Result<Constants> {
-    let out_dir = ctx.root.join("crates/rustssl-abi/src/generated");
+    let out_dir = ctx.root.join("crates/rustyssl-abi/src/generated");
     let mut first = None;
     for target in TARGETS {
         println!(
-            "Generating rustssl-abi bindings for {}...",
+            "Generating rustyssl-abi bindings for {}...",
             target.configure
         );
         let libc = libc_types().join("|");
         let options = [
             "--ignore-functions".to_owned(),
             "--blocklist-type".to_owned(),
-            format!("{libc}|rustssl_libc_.*"),
+            format!("{libc}|rustyssl_libc_.*"),
         ];
         let types = ctx.bindgen(target, &ctx.wrapper, "types", &options)?;
         let macros = ctx.object_like_macros(target)?;
@@ -190,7 +190,7 @@ const PROBE_FIRST_LINE: usize = 3;
 
 fn probe_source(wrapper: &Path, probes: &[(&str, Kind)]) -> Result<String> {
     let mut text = format!(
-        "#include \"{}\"\n#define RUSTSSL_TYPE(x) _Generic((x)",
+        "#include \"{}\"\n#define RUSTYSSL_TYPE(x) _Generic((x)",
         wrapper.display()
     );
     for (code, (ctype, _)) in (1..).zip(C_TYPES) {
@@ -202,13 +202,13 @@ fn probe_source(wrapper: &Path, probes: &[(&str, Kind)]) -> Result<String> {
             // The array bound forces an integer constant expression.
             Kind::Int => writeln!(
                 text,
-                "typedef char rustssl_ice_{name}[({name}) ? 1 : 1]; \
-                 const unsigned long long rustssl_v_{name} = (unsigned long long)({name}); \
-                 const int rustssl_t_{name} = RUSTSSL_TYPE({name});"
+                "typedef char rustyssl_ice_{name}[({name}) ? 1 : 1]; \
+                 const unsigned long long rustyssl_v_{name} = (unsigned long long)({name}); \
+                 const int rustyssl_t_{name} = RUSTYSSL_TYPE({name});"
             )?,
             // Pasting `""` in front only compiles if the macro is a string literal (a brace
             // initializer such as `EXT_END` would otherwise fill a char array too).
-            Kind::Str => writeln!(text, "const char rustssl_s_{name}[] = \"\" {name};")?,
+            Kind::Str => writeln!(text, "const char rustyssl_s_{name}[] = \"\" {name};")?,
         }
     }
     Ok(text)
@@ -234,7 +234,7 @@ fn parse_ir(ir: &str, probes: &[(&str, Kind)]) -> Result<Constants> {
     let mut strings: HashMap<&str, Vec<u8>> = HashMap::new();
     for line in ir.lines() {
         let Some((symbol, definition)) = line
-            .strip_prefix("@rustssl_")
+            .strip_prefix("@rustyssl_")
             .and_then(|rest| rest.split_once(" = "))
         else {
             continue;
@@ -500,7 +500,7 @@ fn render_mod() -> Result<String> {
     let all: Vec<&str> = TARGETS.iter().map(|t| t.cfg).collect();
     writeln!(
         out,
-        "#[cfg(not(any({})))]\ncompile_error!(\"rustssl-abi has no bindings for this target; add \
+        "#[cfg(not(any({})))]\ncompile_error!(\"rustyssl-abi has no bindings for this target; add \
          it to TARGETS in xtask/src/targets.rs and run `cargo xtask codegen`\");",
         all.join(", ")
     )?;

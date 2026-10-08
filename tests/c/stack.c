@@ -2,7 +2,7 @@
  * Conformance test for the generic stack (OPENSSL_sk_new(3), DEFINE_STACK_OF(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Sorting uses the
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Sorting uses the
  * C library's qsort in both, so the test compares a sorted stack with qsort's own result rather
  * than with a fixed order.
  */

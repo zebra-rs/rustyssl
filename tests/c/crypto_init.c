@@ -3,8 +3,8 @@
  * (OPENSSL_init_crypto(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). It only asks for
- * subsystems rustssl has; configuration loading is switched off first, so no file is read.
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). It only asks for
+ * subsystems rustyssl has; configuration loading is switched off first, so no file is read.
  */
 #include <stdio.h>
 #include <string.h>
@@ -43,10 +43,10 @@ static void settings(void)
     OPENSSL_INIT_SETTINGS *s = OPENSSL_INIT_new();
 
     check(s != NULL, "OPENSSL_INIT_new");
-    check(OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustssl.cnf") == 1
+    check(OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustyssl.cnf") == 1
           && OPENSSL_INIT_set_config_filename(s, NULL) == 1,
           "OPENSSL_INIT_set_config_filename: sets and clears");
-    check(OPENSSL_INIT_set_config_appname(s, "rustssl_test") == 1
+    check(OPENSSL_INIT_set_config_appname(s, "rustyssl_test") == 1
           && OPENSSL_INIT_set_config_appname(s, NULL) == 1,
           "OPENSSL_INIT_set_config_appname: sets and clears");
     OPENSSL_INIT_set_config_file_flags(s, CONF_MFLAGS_IGNORE_MISSING_FILE);

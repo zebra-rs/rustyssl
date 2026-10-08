@@ -113,11 +113,11 @@ pub fn run(args: &[String]) -> Result {
     Ok(())
 }
 
-/// Builds `rustssl-<library>` as a release static archive and returns the system libraries
+/// Builds `rustyssl-<library>` as a release static archive and returns the system libraries
 /// the archive needs, as rustc reports them.
 fn build_archive(root: &Path, library: &str) -> Result<Vec<String>> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let package = format!("rustssl-{library}");
+    let package = format!("rustyssl-{library}");
     let output = Command::new(cargo)
         .args(["rustc", "--release", "--color", "never", "-p", &package])
         .args(["--", "--print", "native-static-libs"])
@@ -386,7 +386,7 @@ fn write_pkgconfig(dir: &Path, version: &str, private_libs: &[String]) -> Result
     writeln!(
         libcrypto,
         "enginesdir=${{libdir}}/engines-3\nmodulesdir=${{libdir}}/ossl-modules\n\n\
-         Name: OpenSSL-libcrypto\nDescription: OpenSSL cryptography library (rustssl)\n\
+         Name: OpenSSL-libcrypto\nDescription: OpenSSL cryptography library (rustyssl)\n\
          Version: {version}\nLibs: -L${{libdir}} -lcrypto\nLibs.private: {}\n\
          Cflags: -I${{includedir}}",
         private_libs.join(" ")
@@ -395,14 +395,14 @@ fn write_pkgconfig(dir: &Path, version: &str, private_libs: &[String]) -> Result
     writeln!(
         libssl,
         "\nName: OpenSSL-libssl\nDescription: Secure Sockets Layer and cryptography libraries \
-         (rustssl)\nVersion: {version}\nRequires.private: libcrypto\n\
+         (rustyssl)\nVersion: {version}\nRequires.private: libcrypto\n\
          Libs: -L${{libdir}} -lssl\nCflags: -I${{includedir}}"
     )?;
     let mut openssl = String::from(header);
     writeln!(
         openssl,
         "\nName: OpenSSL\nDescription: Secure Sockets Layer and cryptography libraries and \
-         tools (rustssl)\nVersion: {version}\nRequires: libssl libcrypto"
+         tools (rustyssl)\nVersion: {version}\nRequires: libssl libcrypto"
     )?;
     fs::write(dir.join("libcrypto.pc"), libcrypto)?;
     fs::write(dir.join("libssl.pc"), libssl)?;

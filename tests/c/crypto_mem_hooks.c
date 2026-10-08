@@ -3,7 +3,7 @@
  * application's allocator receives every allocation, OpenSSL's own included.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). It installs its
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). It installs its
  * allocator first, before anything allocates.
  */
 #include <stdint.h>

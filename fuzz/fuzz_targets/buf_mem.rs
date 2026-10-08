@@ -9,9 +9,9 @@ use core::ffi::c_ulong;
 use core::slice;
 
 use libfuzzer_sys::fuzz_target;
-use rustssl_abi::BUF_MEM;
+use rustyssl_abi::BUF_MEM;
 // Linked for its exports, which the declarations below resolve to.
-use rustssl_capi as _;
+use rustyssl_capi as _;
 
 unsafe extern "C" {
     fn BUF_MEM_new_ex(flags: c_ulong) -> *mut BUF_MEM;

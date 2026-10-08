@@ -1,6 +1,6 @@
 # Deviations from OpenSSL
 
-rustssl matches OpenSSL's behavior, including its quirks (AGENTS.md, "Compatibility target"),
+rustyssl matches OpenSSL's behavior, including its quirks (AGENTS.md, "Compatibility target"),
 with one exception: where matching it would be unsafe. Every such case is listed here, with
 the reason and the test that pins the behavior down. Each entry names the OpenSSL release it was
 checked against.
@@ -8,7 +8,7 @@ checked against.
 Most entries cover inputs where OpenSSL corrupts memory or crashes. A program that works with
 OpenSSL never depends on them.
 
-| Function | OpenSSL 3.5 | rustssl | Test |
+| Function | OpenSSL 3.5 | rustyssl | Test |
 |---|---|---|---|
 | `CRYPTO_aligned_alloc` on macOS | adds `num + alignment` without checking, so a huge `num` wraps and gets a block smaller than requested | fails with null and `*freeptr` null | `mem::tests::aligned_allocations` |
 | `CRYPTO_secure_used`, `CRYPTO_secure_actual_size` | without a secure heap, lock a null lock and crash | return 0 | `tests/no_secure_heap.rs` |
@@ -35,18 +35,18 @@ OpenSSL never depends on them.
 | `BIO_indent` with a negative limit | loops about 2^31 times, writing a space each time | writes nothing and returns 1 | `bio::tests::a_negative_indent_limit_writes_nothing` |
 | `BIO_set_mem_buf(b, NULL, ...)` | frees the old buffer, then dereferences null | returns 0, keeping the old buffer | `bio::tests::a_negative_indent_limit_writes_nothing` |
 | A `FILE` BIO with no `FILE` yet: `BIO_eof`, `BIO_tell`, `BIO_seek`, `BIO_gets` | pass null to stdio and crash | return 0 (`BIO_eof`, `BIO_gets`) or -1 | `bio::tests::a_file_bio_without_a_file_fails` |
-| `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustssl.<version>`: `OpenSSL 3.5.9+rustssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustssl_in_the_build_metadata` |
+| `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes
 
 - **The version text.** This is the one entry not about memory safety: it's about knowing what
   runs. A vulnerability scanner or an administrator reading `OpenSSL 3.5.9` would apply
-  OpenSSL's advisories to rustssl and miss rustssl's own. The version numbers
+  OpenSSL's advisories to rustyssl and miss rustyssl's own. The version numbers
   (`OpenSSL_version_num`, `OPENSSL_version_major`/`_minor`/`_patch`,
   `OPENSSL_VERSION_STRING`) are untouched, so version checks pass. The name goes where
   OpenSSL's man page reserves room "for other parties, such as `+fips`, or `+vendor.1`".
   Parsers that read `OpenSSL x.y.z` from the text still do. The other build information
-  (directories, compiler, build date, CPU capabilities) describes rustssl's build, as a
+  (directories, compiler, build date, CPU capabilities) describes rustyssl's build, as a
   differently configured OpenSSL's would describe its own; it isn't a deviation.
 
 - **`CRYPTO_aligned_alloc`.** On Linux both libraries use `posix_memalign`, which checks the
@@ -58,6 +58,6 @@ OpenSSL never depends on them.
   itself reached through a different address (a non-PIE executable's PLT entry, say).
 - **`ERR_add_error_txt`.** Its text often comes from outside, such as a peer's or a
   configuration file's, so OpenSSL's endless loop can be a denial of service. Where OpenSSL
-  returns, rustssl splits the text exactly as it does, separator quirks included (the
+  returns, rustyssl splits the text exactly as it does, separator quirks included (the
   differential probe compares them). The probe's random text never contains a piece that
   long, because the reference would hang.

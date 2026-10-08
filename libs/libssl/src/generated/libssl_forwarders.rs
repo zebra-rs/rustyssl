@@ -8,132 +8,135 @@
 #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
 
 use libc::{FILE, off_t, time_t, timeval};
-use rustssl_abi::*;
+use rustyssl_abi::*;
 
 unsafe extern "C" {
-    fn rustssl_private_BIO_f_ssl() -> *const BIO_METHOD;
-    fn rustssl_private_BIO_new_buffer_ssl_connect(_: *mut SSL_CTX) -> *mut BIO;
-    fn rustssl_private_BIO_new_ssl(_: *mut SSL_CTX, _: core::ffi::c_int) -> *mut BIO;
-    fn rustssl_private_BIO_new_ssl_connect(_: *mut SSL_CTX) -> *mut BIO;
-    fn rustssl_private_BIO_ssl_copy_session_id(_: *mut BIO, _: *mut BIO) -> core::ffi::c_int;
-    fn rustssl_private_BIO_ssl_shutdown(_: *mut BIO);
-    fn rustssl_private_DTLS_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLS_get_data_mtu(_: *const SSL) -> usize;
-    fn rustssl_private_DTLS_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLS_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLS_set_timer_cb(_: *mut SSL, _: DTLS_timer_cb);
-    fn rustssl_private_DTLSv1_2_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLSv1_2_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLSv1_2_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLSv1_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLSv1_listen(_: *mut SSL, _: *mut BIO_ADDR) -> core::ffi::c_int;
-    fn rustssl_private_DTLSv1_method() -> *const SSL_METHOD;
-    fn rustssl_private_DTLSv1_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_ERR_load_SSL_strings() -> core::ffi::c_int;
-    fn rustssl_private_OPENSSL_cipher_name(_: *const core::ffi::c_char)
-    -> *const core::ffi::c_char;
-    fn rustssl_private_OPENSSL_init_ssl(
+    fn rustyssl_private_BIO_f_ssl() -> *const BIO_METHOD;
+    fn rustyssl_private_BIO_new_buffer_ssl_connect(_: *mut SSL_CTX) -> *mut BIO;
+    fn rustyssl_private_BIO_new_ssl(_: *mut SSL_CTX, _: core::ffi::c_int) -> *mut BIO;
+    fn rustyssl_private_BIO_new_ssl_connect(_: *mut SSL_CTX) -> *mut BIO;
+    fn rustyssl_private_BIO_ssl_copy_session_id(_: *mut BIO, _: *mut BIO) -> core::ffi::c_int;
+    fn rustyssl_private_BIO_ssl_shutdown(_: *mut BIO);
+    fn rustyssl_private_DTLS_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLS_get_data_mtu(_: *const SSL) -> usize;
+    fn rustyssl_private_DTLS_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLS_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLS_set_timer_cb(_: *mut SSL, _: DTLS_timer_cb);
+    fn rustyssl_private_DTLSv1_2_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLSv1_2_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLSv1_2_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLSv1_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLSv1_listen(_: *mut SSL, _: *mut BIO_ADDR) -> core::ffi::c_int;
+    fn rustyssl_private_DTLSv1_method() -> *const SSL_METHOD;
+    fn rustyssl_private_DTLSv1_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_ERR_load_SSL_strings() -> core::ffi::c_int;
+    fn rustyssl_private_OPENSSL_cipher_name(
+        _: *const core::ffi::c_char,
+    ) -> *const core::ffi::c_char;
+    fn rustyssl_private_OPENSSL_init_ssl(
         _: u64,
         _: *const OPENSSL_INIT_SETTINGS,
     ) -> core::ffi::c_int;
-    fn rustssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_OSSL_QUIC_client_thread_method() -> *const SSL_METHOD;
-    fn rustssl_private_OSSL_QUIC_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_OSSL_default_cipher_list() -> *const core::ffi::c_char;
-    fn rustssl_private_OSSL_default_ciphersuites() -> *const core::ffi::c_char;
-    fn rustssl_private_PEM_read_SSL_SESSION(
+    fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_OSSL_QUIC_client_thread_method() -> *const SSL_METHOD;
+    fn rustyssl_private_OSSL_QUIC_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_OSSL_default_cipher_list() -> *const core::ffi::c_char;
+    fn rustyssl_private_OSSL_default_ciphersuites() -> *const core::ffi::c_char;
+    fn rustyssl_private_PEM_read_SSL_SESSION(
         _: *mut FILE,
         _: *mut *mut SSL_SESSION,
         _: pem_password_cb,
         _: *mut core::ffi::c_void,
     ) -> *mut SSL_SESSION;
-    fn rustssl_private_PEM_read_bio_SSL_SESSION(
+    fn rustyssl_private_PEM_read_bio_SSL_SESSION(
         _: *mut BIO,
         _: *mut *mut SSL_SESSION,
         _: pem_password_cb,
         _: *mut core::ffi::c_void,
     ) -> *mut SSL_SESSION;
-    fn rustssl_private_PEM_write_SSL_SESSION(
+    fn rustyssl_private_PEM_write_SSL_SESSION(
         _: *mut FILE,
         _: *const SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_PEM_write_bio_SSL_SESSION(
+    fn rustyssl_private_PEM_write_bio_SSL_SESSION(
         _: *mut BIO,
         _: *const SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SRP_Calc_A_param(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_description(
+    fn rustyssl_private_SRP_Calc_A_param(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_description(
         _: *const SSL_CIPHER,
         _: *mut core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> *mut core::ffi::c_char;
-    fn rustssl_private_SSL_CIPHER_find(
+    fn rustyssl_private_SSL_CIPHER_find(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
     ) -> *const SSL_CIPHER;
-    fn rustssl_private_SSL_CIPHER_get_auth_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_get_bits(
+    fn rustyssl_private_SSL_CIPHER_get_auth_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_get_bits(
         _: *const SSL_CIPHER,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_get_cipher_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_get_digest_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_get_handshake_digest(_: *const SSL_CIPHER) -> *const EVP_MD;
-    fn rustssl_private_SSL_CIPHER_get_id(_: *const SSL_CIPHER) -> u32;
-    fn rustssl_private_SSL_CIPHER_get_kx_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_get_name(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_CIPHER_get_protocol_id(_: *const SSL_CIPHER) -> u16;
-    fn rustssl_private_SSL_CIPHER_get_version(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_CIPHER_is_aead(_: *const SSL_CIPHER) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CIPHER_standard_name(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_COMP_add_compression_method(
+    fn rustyssl_private_SSL_CIPHER_get_cipher_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_get_digest_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_get_handshake_digest(_: *const SSL_CIPHER) -> *const EVP_MD;
+    fn rustyssl_private_SSL_CIPHER_get_id(_: *const SSL_CIPHER) -> u32;
+    fn rustyssl_private_SSL_CIPHER_get_kx_nid(_: *const SSL_CIPHER) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_get_name(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_CIPHER_get_protocol_id(_: *const SSL_CIPHER) -> u16;
+    fn rustyssl_private_SSL_CIPHER_get_version(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_CIPHER_is_aead(_: *const SSL_CIPHER) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CIPHER_standard_name(_: *const SSL_CIPHER) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_COMP_add_compression_method(
         _: core::ffi::c_int,
         _: *mut COMP_METHOD,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_COMP_get0_name(_: *const SSL_COMP) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_COMP_get_compression_methods() -> *mut stack_st_SSL_COMP;
-    fn rustssl_private_SSL_COMP_get_id(_: *const SSL_COMP) -> core::ffi::c_int;
-    fn rustssl_private_SSL_COMP_get_name(_: *const COMP_METHOD) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_COMP_set0_compression_methods(
+    fn rustyssl_private_SSL_COMP_get0_name(_: *const SSL_COMP) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_COMP_get_compression_methods() -> *mut stack_st_SSL_COMP;
+    fn rustyssl_private_SSL_COMP_get_id(_: *const SSL_COMP) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_COMP_get_name(_: *const COMP_METHOD) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_COMP_set0_compression_methods(
         _: *mut stack_st_SSL_COMP,
     ) -> *mut stack_st_SSL_COMP;
-    fn rustssl_private_SSL_CONF_CTX_clear_flags(
+    fn rustyssl_private_SSL_CONF_CTX_clear_flags(
         _: *mut SSL_CONF_CTX,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_uint;
-    fn rustssl_private_SSL_CONF_CTX_finish(_: *mut SSL_CONF_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CONF_CTX_free(_: *mut SSL_CONF_CTX);
-    fn rustssl_private_SSL_CONF_CTX_new() -> *mut SSL_CONF_CTX;
-    fn rustssl_private_SSL_CONF_CTX_set1_prefix(
+    fn rustyssl_private_SSL_CONF_CTX_finish(_: *mut SSL_CONF_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CONF_CTX_free(_: *mut SSL_CONF_CTX);
+    fn rustyssl_private_SSL_CONF_CTX_new() -> *mut SSL_CONF_CTX;
+    fn rustyssl_private_SSL_CONF_CTX_set1_prefix(
         _: *mut SSL_CONF_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CONF_CTX_set_flags(
+    fn rustyssl_private_SSL_CONF_CTX_set_flags(
         _: *mut SSL_CONF_CTX,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_uint;
-    fn rustssl_private_SSL_CONF_CTX_set_ssl(_: *mut SSL_CONF_CTX, _: *mut SSL);
-    fn rustssl_private_SSL_CONF_CTX_set_ssl_ctx(_: *mut SSL_CONF_CTX, _: *mut SSL_CTX);
-    fn rustssl_private_SSL_CONF_cmd(
+    fn rustyssl_private_SSL_CONF_CTX_set_ssl(_: *mut SSL_CONF_CTX, _: *mut SSL);
+    fn rustyssl_private_SSL_CONF_CTX_set_ssl_ctx(_: *mut SSL_CONF_CTX, _: *mut SSL_CTX);
+    fn rustyssl_private_SSL_CONF_cmd(
         _: *mut SSL_CONF_CTX,
         _: *const core::ffi::c_char,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CONF_cmd_argv(
+    fn rustyssl_private_SSL_CONF_cmd_argv(
         _: *mut SSL_CONF_CTX,
         _: *mut core::ffi::c_int,
         _: *mut *mut *mut core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CONF_cmd_value_type(
+    fn rustyssl_private_SSL_CONF_cmd_value_type(
         _: *mut SSL_CONF_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_SRP_CTX_free(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_SRP_CTX_init(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add1_to_CA_list(_: *mut SSL_CTX, _: *const X509)
-    -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add_client_CA(_: *mut SSL_CTX, _: *mut X509) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add_client_custom_ext(
+    fn rustyssl_private_SSL_CTX_SRP_CTX_free(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_SRP_CTX_init(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_add1_to_CA_list(
+        _: *mut SSL_CTX,
+        _: *const X509,
+    ) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_add_client_CA(_: *mut SSL_CTX, _: *mut X509) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_add_client_custom_ext(
         _: *mut SSL_CTX,
         _: core::ffi::c_uint,
         _: custom_ext_add_cb,
@@ -142,7 +145,7 @@ unsafe extern "C" {
         _: custom_ext_parse_cb,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add_custom_ext(
+    fn rustyssl_private_SSL_CTX_add_custom_ext(
         _: *mut SSL_CTX,
         _: core::ffi::c_uint,
         _: core::ffi::c_uint,
@@ -152,7 +155,7 @@ unsafe extern "C" {
         _: SSL_custom_ext_parse_cb_ex,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add_server_custom_ext(
+    fn rustyssl_private_SSL_CTX_add_server_custom_ext(
         _: *mut SSL_CTX,
         _: core::ffi::c_uint,
         _: custom_ext_add_cb,
@@ -161,77 +164,78 @@ unsafe extern "C" {
         _: custom_ext_parse_cb,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_add_session(
+    fn rustyssl_private_SSL_CTX_add_session(
         _: *mut SSL_CTX,
         _: *mut SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_callback_ctrl(
+    fn rustyssl_private_SSL_CTX_callback_ctrl(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: ::core::option::Option<unsafe extern "C" fn()>,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_CTX_check_private_key(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_clear_options(_: *mut SSL_CTX, _: u64) -> u64;
-    fn rustssl_private_SSL_CTX_compress_certs(
+    fn rustyssl_private_SSL_CTX_check_private_key(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_clear_options(_: *mut SSL_CTX, _: u64) -> u64;
+    fn rustyssl_private_SSL_CTX_compress_certs(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_config(
+    fn rustyssl_private_SSL_CTX_config(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_ct_is_enabled(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_ctrl(
+    fn rustyssl_private_SSL_CTX_ct_is_enabled(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_ctrl(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: core::ffi::c_long,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_CTX_dane_clear_flags(
+    fn rustyssl_private_SSL_CTX_dane_clear_flags(
         _: *mut SSL_CTX,
         _: core::ffi::c_ulong,
     ) -> core::ffi::c_ulong;
-    fn rustssl_private_SSL_CTX_dane_enable(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_dane_mtype_set(
+    fn rustyssl_private_SSL_CTX_dane_enable(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_dane_mtype_set(
         _: *mut SSL_CTX,
         _: *const EVP_MD,
         _: u8,
         _: u8,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_dane_set_flags(
+    fn rustyssl_private_SSL_CTX_dane_set_flags(
         _: *mut SSL_CTX,
         _: core::ffi::c_ulong,
     ) -> core::ffi::c_ulong;
-    fn rustssl_private_SSL_CTX_enable_ct(_: *mut SSL_CTX, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_flush_sessions(_: *mut SSL_CTX, _: core::ffi::c_long);
-    fn rustssl_private_SSL_CTX_flush_sessions_ex(_: *mut SSL_CTX, _: time_t);
-    fn rustssl_private_SSL_CTX_free(_: *mut SSL_CTX);
-    fn rustssl_private_SSL_CTX_get0_CA_list(_: *const SSL_CTX) -> *const stack_st_X509_NAME;
-    fn rustssl_private_SSL_CTX_get0_certificate(_: *const SSL_CTX) -> *mut X509;
-    fn rustssl_private_SSL_CTX_get0_client_cert_type(
+    fn rustyssl_private_SSL_CTX_enable_ct(_: *mut SSL_CTX, _: core::ffi::c_int)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_flush_sessions(_: *mut SSL_CTX, _: core::ffi::c_long);
+    fn rustyssl_private_SSL_CTX_flush_sessions_ex(_: *mut SSL_CTX, _: time_t);
+    fn rustyssl_private_SSL_CTX_free(_: *mut SSL_CTX);
+    fn rustyssl_private_SSL_CTX_get0_CA_list(_: *const SSL_CTX) -> *const stack_st_X509_NAME;
+    fn rustyssl_private_SSL_CTX_get0_certificate(_: *const SSL_CTX) -> *mut X509;
+    fn rustyssl_private_SSL_CTX_get0_client_cert_type(
         _: *const SSL_CTX,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get0_ctlog_store(_: *const SSL_CTX) -> *const CTLOG_STORE;
-    fn rustssl_private_SSL_CTX_get0_param(_: *mut SSL_CTX) -> *mut X509_VERIFY_PARAM;
-    fn rustssl_private_SSL_CTX_get0_privatekey(_: *const SSL_CTX) -> *mut EVP_PKEY;
-    fn rustssl_private_SSL_CTX_get0_security_ex_data(_: *const SSL_CTX) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_CTX_get0_server_cert_type(
+    fn rustyssl_private_SSL_CTX_get0_ctlog_store(_: *const SSL_CTX) -> *const CTLOG_STORE;
+    fn rustyssl_private_SSL_CTX_get0_param(_: *mut SSL_CTX) -> *mut X509_VERIFY_PARAM;
+    fn rustyssl_private_SSL_CTX_get0_privatekey(_: *const SSL_CTX) -> *mut EVP_PKEY;
+    fn rustyssl_private_SSL_CTX_get0_security_ex_data(_: *const SSL_CTX) -> *mut core::ffi::c_void;
+    fn rustyssl_private_SSL_CTX_get0_server_cert_type(
         _: *const SSL_CTX,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get1_compressed_cert(
+    fn rustyssl_private_SSL_CTX_get1_compressed_cert(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> usize;
-    fn rustssl_private_SSL_CTX_get_cert_store(_: *const SSL_CTX) -> *mut X509_STORE;
-    fn rustssl_private_SSL_CTX_get_ciphers(_: *const SSL_CTX) -> *mut stack_st_SSL_CIPHER;
-    fn rustssl_private_SSL_CTX_get_client_CA_list(_: *const SSL_CTX) -> *mut stack_st_X509_NAME;
-    fn rustssl_private_SSL_CTX_get_client_cert_cb(
+    fn rustyssl_private_SSL_CTX_get_cert_store(_: *const SSL_CTX) -> *mut X509_STORE;
+    fn rustyssl_private_SSL_CTX_get_ciphers(_: *const SSL_CTX) -> *mut stack_st_SSL_CIPHER;
+    fn rustyssl_private_SSL_CTX_get_client_CA_list(_: *const SSL_CTX) -> *mut stack_st_X509_NAME;
+    fn rustyssl_private_SSL_CTX_get_client_cert_cb(
         _: *mut SSL_CTX,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(
@@ -240,31 +244,33 @@ unsafe extern "C" {
             arg2: *mut *mut EVP_PKEY,
         ) -> core::ffi::c_int,
     >;
-    fn rustssl_private_SSL_CTX_get_default_passwd_cb(_: *mut SSL_CTX) -> pem_password_cb;
-    fn rustssl_private_SSL_CTX_get_default_passwd_cb_userdata(
+    fn rustyssl_private_SSL_CTX_get_default_passwd_cb(_: *mut SSL_CTX) -> pem_password_cb;
+    fn rustyssl_private_SSL_CTX_get_default_passwd_cb_userdata(
         _: *mut SSL_CTX,
     ) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_CTX_get_domain_flags(_: *const SSL_CTX, _: *mut u64)
-    -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get_ex_data(
+    fn rustyssl_private_SSL_CTX_get_domain_flags(
+        _: *const SSL_CTX,
+        _: *mut u64,
+    ) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_get_ex_data(
         _: *const SSL_CTX,
         _: core::ffi::c_int,
     ) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_CTX_get_info_callback(
+    fn rustyssl_private_SSL_CTX_get_info_callback(
         _: *mut SSL_CTX,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(ctx: *const SSL, arg1: core::ffi::c_int, arg2: core::ffi::c_int),
     >;
-    fn rustssl_private_SSL_CTX_get_keylog_callback(_: *const SSL_CTX) -> SSL_CTX_keylog_cb_func;
-    fn rustssl_private_SSL_CTX_get_max_early_data(_: *const SSL_CTX) -> u32;
-    fn rustssl_private_SSL_CTX_get_num_tickets(_: *const SSL_CTX) -> usize;
-    fn rustssl_private_SSL_CTX_get_options(_: *const SSL_CTX) -> u64;
-    fn rustssl_private_SSL_CTX_get_quiet_shutdown(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get_record_padding_callback_arg(
+    fn rustyssl_private_SSL_CTX_get_keylog_callback(_: *const SSL_CTX) -> SSL_CTX_keylog_cb_func;
+    fn rustyssl_private_SSL_CTX_get_max_early_data(_: *const SSL_CTX) -> u32;
+    fn rustyssl_private_SSL_CTX_get_num_tickets(_: *const SSL_CTX) -> usize;
+    fn rustyssl_private_SSL_CTX_get_options(_: *const SSL_CTX) -> u64;
+    fn rustyssl_private_SSL_CTX_get_quiet_shutdown(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_get_record_padding_callback_arg(
         _: *const SSL_CTX,
     ) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_CTX_get_recv_max_early_data(_: *const SSL_CTX) -> u32;
-    fn rustssl_private_SSL_CTX_get_security_callback(
+    fn rustyssl_private_SSL_CTX_get_recv_max_early_data(_: *const SSL_CTX) -> u32;
+    fn rustyssl_private_SSL_CTX_get_security_callback(
         _: *const SSL_CTX,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(
@@ -277,44 +283,44 @@ unsafe extern "C" {
             arg6: *mut core::ffi::c_void,
         ) -> core::ffi::c_int,
     >;
-    fn rustssl_private_SSL_CTX_get_security_level(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get_ssl_method(_: *const SSL_CTX) -> *const SSL_METHOD;
-    fn rustssl_private_SSL_CTX_get_timeout(_: *const SSL_CTX) -> core::ffi::c_long;
-    fn rustssl_private_SSL_CTX_get_verify_callback(_: *const SSL_CTX) -> SSL_verify_cb;
-    fn rustssl_private_SSL_CTX_get_verify_depth(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_get_verify_mode(_: *const SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_has_client_custom_ext(
+    fn rustyssl_private_SSL_CTX_get_security_level(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_get_ssl_method(_: *const SSL_CTX) -> *const SSL_METHOD;
+    fn rustyssl_private_SSL_CTX_get_timeout(_: *const SSL_CTX) -> core::ffi::c_long;
+    fn rustyssl_private_SSL_CTX_get_verify_callback(_: *const SSL_CTX) -> SSL_verify_cb;
+    fn rustyssl_private_SSL_CTX_get_verify_depth(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_get_verify_mode(_: *const SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_has_client_custom_ext(
         _: *const SSL_CTX,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_load_verify_dir(
+    fn rustyssl_private_SSL_CTX_load_verify_dir(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_load_verify_file(
+    fn rustyssl_private_SSL_CTX_load_verify_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_load_verify_locations(
+    fn rustyssl_private_SSL_CTX_load_verify_locations(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_load_verify_store(
+    fn rustyssl_private_SSL_CTX_load_verify_store(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_new(_: *const SSL_METHOD) -> *mut SSL_CTX;
-    fn rustssl_private_SSL_CTX_new_ex(
+    fn rustyssl_private_SSL_CTX_new(_: *const SSL_METHOD) -> *mut SSL_CTX;
+    fn rustyssl_private_SSL_CTX_new_ex(
         _: *mut OSSL_LIB_CTX,
         _: *const core::ffi::c_char,
         _: *const SSL_METHOD,
     ) -> *mut SSL_CTX;
-    fn rustssl_private_SSL_CTX_remove_session(
+    fn rustyssl_private_SSL_CTX_remove_session(
         _: *mut SSL_CTX,
         _: *mut SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_sess_get_get_cb(
+    fn rustyssl_private_SSL_CTX_sess_get_get_cb(
         _: *mut SSL_CTX,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(
@@ -324,15 +330,15 @@ unsafe extern "C" {
             arg3: *mut core::ffi::c_int,
         ) -> *mut SSL_SESSION,
     >;
-    fn rustssl_private_SSL_CTX_sess_get_new_cb(
+    fn rustyssl_private_SSL_CTX_sess_get_new_cb(
         _: *mut SSL_CTX,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(ctx: *mut ssl_st, arg1: *mut SSL_SESSION) -> core::ffi::c_int,
     >;
-    fn rustssl_private_SSL_CTX_sess_get_remove_cb(
+    fn rustyssl_private_SSL_CTX_sess_get_remove_cb(
         _: *mut SSL_CTX,
     ) -> ::core::option::Option<unsafe extern "C" fn(ctx: *mut ssl_ctx_st, arg1: *mut SSL_SESSION)>;
-    fn rustssl_private_SSL_CTX_sess_set_get_cb(
+    fn rustyssl_private_SSL_CTX_sess_set_get_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -343,91 +349,91 @@ unsafe extern "C" {
             ) -> *mut SSL_SESSION,
         >,
     );
-    fn rustssl_private_SSL_CTX_sess_set_new_cb(
+    fn rustyssl_private_SSL_CTX_sess_set_new_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(ssl: *mut ssl_st, sess: *mut SSL_SESSION) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_sess_set_remove_cb(
+    fn rustyssl_private_SSL_CTX_sess_set_remove_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(ctx: *mut ssl_ctx_st, sess: *mut SSL_SESSION),
         >,
     );
-    fn rustssl_private_SSL_CTX_sessions(_: *mut SSL_CTX) -> *mut lhash_st_SSL_SESSION;
-    fn rustssl_private_SSL_CTX_set0_CA_list(_: *mut SSL_CTX, _: *mut stack_st_X509_NAME);
-    fn rustssl_private_SSL_CTX_set0_ctlog_store(_: *mut SSL_CTX, _: *mut CTLOG_STORE);
-    fn rustssl_private_SSL_CTX_set0_security_ex_data(_: *mut SSL_CTX, _: *mut core::ffi::c_void);
-    fn rustssl_private_SSL_CTX_set0_tmp_dh_pkey(
+    fn rustyssl_private_SSL_CTX_sessions(_: *mut SSL_CTX) -> *mut lhash_st_SSL_SESSION;
+    fn rustyssl_private_SSL_CTX_set0_CA_list(_: *mut SSL_CTX, _: *mut stack_st_X509_NAME);
+    fn rustyssl_private_SSL_CTX_set0_ctlog_store(_: *mut SSL_CTX, _: *mut CTLOG_STORE);
+    fn rustyssl_private_SSL_CTX_set0_security_ex_data(_: *mut SSL_CTX, _: *mut core::ffi::c_void);
+    fn rustyssl_private_SSL_CTX_set0_tmp_dh_pkey(
         _: *mut SSL_CTX,
         _: *mut EVP_PKEY,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set1_cert_comp_preference(
+    fn rustyssl_private_SSL_CTX_set1_cert_comp_preference(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_int,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set1_cert_store(_: *mut SSL_CTX, _: *mut X509_STORE);
-    fn rustssl_private_SSL_CTX_set1_client_cert_type(
+    fn rustyssl_private_SSL_CTX_set1_cert_store(_: *mut SSL_CTX, _: *mut X509_STORE);
+    fn rustyssl_private_SSL_CTX_set1_client_cert_type(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set1_compressed_cert(
+    fn rustyssl_private_SSL_CTX_set1_compressed_cert(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_uchar,
         _: usize,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set1_param(
+    fn rustyssl_private_SSL_CTX_set1_param(
         _: *mut SSL_CTX,
         _: *mut X509_VERIFY_PARAM,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set1_server_cert_type(
+    fn rustyssl_private_SSL_CTX_set1_server_cert_type(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_allow_early_data_cb(
+    fn rustyssl_private_SSL_CTX_set_allow_early_data_cb(
         _: *mut SSL_CTX,
         _: SSL_allow_early_data_cb_fn,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_alpn_protos(
+    fn rustyssl_private_SSL_CTX_set_alpn_protos(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_alpn_select_cb(
+    fn rustyssl_private_SSL_CTX_set_alpn_select_cb(
         _: *mut SSL_CTX,
         _: SSL_CTX_alpn_select_cb_func,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_async_callback(
+    fn rustyssl_private_SSL_CTX_set_async_callback(
         _: *mut SSL_CTX,
         _: SSL_async_callback_fn,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_async_callback_arg(
+    fn rustyssl_private_SSL_CTX_set_async_callback_arg(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_block_padding(_: *mut SSL_CTX, _: usize) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_block_padding_ex(
+    fn rustyssl_private_SSL_CTX_set_block_padding(_: *mut SSL_CTX, _: usize) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_block_padding_ex(
         _: *mut SSL_CTX,
         _: usize,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_cert_cb(
+    fn rustyssl_private_SSL_CTX_set_cert_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(ssl: *mut SSL, arg: *mut core::ffi::c_void) -> core::ffi::c_int,
         >,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_cert_store(_: *mut SSL_CTX, _: *mut X509_STORE);
-    fn rustssl_private_SSL_CTX_set_cert_verify_callback(
+    fn rustyssl_private_SSL_CTX_set_cert_store(_: *mut SSL_CTX, _: *mut X509_STORE);
+    fn rustyssl_private_SSL_CTX_set_cert_verify_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -437,16 +443,16 @@ unsafe extern "C" {
         >,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_cipher_list(
+    fn rustyssl_private_SSL_CTX_set_cipher_list(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_ciphersuites(
+    fn rustyssl_private_SSL_CTX_set_ciphersuites(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_client_CA_list(_: *mut SSL_CTX, _: *mut stack_st_X509_NAME);
-    fn rustssl_private_SSL_CTX_set_client_cert_cb(
+    fn rustyssl_private_SSL_CTX_set_client_CA_list(_: *mut SSL_CTX, _: *mut stack_st_X509_NAME);
+    fn rustyssl_private_SSL_CTX_set_client_cert_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -456,16 +462,16 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_client_cert_engine(
+    fn rustyssl_private_SSL_CTX_set_client_cert_engine(
         _: *mut SSL_CTX,
         _: *mut ENGINE,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_client_hello_cb(
+    fn rustyssl_private_SSL_CTX_set_client_hello_cb(
         _: *mut SSL_CTX,
         _: SSL_client_hello_cb_fn,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_cookie_generate_cb(
+    fn rustyssl_private_SSL_CTX_set_cookie_generate_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -475,7 +481,7 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_cookie_verify_cb(
+    fn rustyssl_private_SSL_CTX_set_cookie_verify_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -485,45 +491,45 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_ct_validation_callback(
+    fn rustyssl_private_SSL_CTX_set_ct_validation_callback(
         _: *mut SSL_CTX,
         _: ssl_ct_validation_cb,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_ctlog_list_file(
+    fn rustyssl_private_SSL_CTX_set_ctlog_list_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_default_ctlog_list_file(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_default_passwd_cb(_: *mut SSL_CTX, _: pem_password_cb);
-    fn rustssl_private_SSL_CTX_set_default_passwd_cb_userdata(
+    fn rustyssl_private_SSL_CTX_set_default_ctlog_list_file(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_default_passwd_cb(_: *mut SSL_CTX, _: pem_password_cb);
+    fn rustyssl_private_SSL_CTX_set_default_passwd_cb_userdata(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_default_read_buffer_len(_: *mut SSL_CTX, _: usize);
-    fn rustssl_private_SSL_CTX_set_default_verify_dir(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_default_verify_file(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_default_verify_paths(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_default_verify_store(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_domain_flags(_: *mut SSL_CTX, _: u64) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_ex_data(
+    fn rustyssl_private_SSL_CTX_set_default_read_buffer_len(_: *mut SSL_CTX, _: usize);
+    fn rustyssl_private_SSL_CTX_set_default_verify_dir(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_default_verify_file(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_default_verify_paths(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_default_verify_store(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_domain_flags(_: *mut SSL_CTX, _: u64) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_ex_data(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_generate_session_id(
+    fn rustyssl_private_SSL_CTX_set_generate_session_id(
         _: *mut SSL_CTX,
         _: GEN_SESSION_CB,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_info_callback(
+    fn rustyssl_private_SSL_CTX_set_info_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(ssl: *const SSL, type_: core::ffi::c_int, val: core::ffi::c_int),
         >,
     );
-    fn rustssl_private_SSL_CTX_set_keylog_callback(_: *mut SSL_CTX, _: SSL_CTX_keylog_cb_func);
-    fn rustssl_private_SSL_CTX_set_max_early_data(_: *mut SSL_CTX, _: u32) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_msg_callback(
+    fn rustyssl_private_SSL_CTX_set_keylog_callback(_: *mut SSL_CTX, _: SSL_CTX_keylog_cb_func);
+    fn rustyssl_private_SSL_CTX_set_max_early_data(_: *mut SSL_CTX, _: u32) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_msg_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -537,22 +543,22 @@ unsafe extern "C" {
             ),
         >,
     );
-    fn rustssl_private_SSL_CTX_set_new_pending_conn_cb(
+    fn rustyssl_private_SSL_CTX_set_new_pending_conn_cb(
         _: *mut SSL_CTX,
         _: SSL_new_pending_conn_cb_fn,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_next_proto_select_cb(
+    fn rustyssl_private_SSL_CTX_set_next_proto_select_cb(
         _: *mut SSL_CTX,
         _: SSL_CTX_npn_select_cb_func,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_next_protos_advertised_cb(
+    fn rustyssl_private_SSL_CTX_set_next_protos_advertised_cb(
         _: *mut SSL_CTX,
         _: SSL_CTX_npn_advertised_cb_func,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_not_resumable_session_callback(
+    fn rustyssl_private_SSL_CTX_set_not_resumable_session_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -561,25 +567,25 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_num_tickets(_: *mut SSL_CTX, _: usize) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_options(_: *mut SSL_CTX, _: u64) -> u64;
-    fn rustssl_private_SSL_CTX_set_post_handshake_auth(_: *mut SSL_CTX, _: core::ffi::c_int);
-    fn rustssl_private_SSL_CTX_set_psk_client_callback(_: *mut SSL_CTX, _: SSL_psk_client_cb_func);
-    fn rustssl_private_SSL_CTX_set_psk_find_session_callback(
+    fn rustyssl_private_SSL_CTX_set_num_tickets(_: *mut SSL_CTX, _: usize) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_options(_: *mut SSL_CTX, _: u64) -> u64;
+    fn rustyssl_private_SSL_CTX_set_post_handshake_auth(_: *mut SSL_CTX, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_CTX_set_psk_client_callback(_: *mut SSL_CTX, _: SSL_psk_client_cb_func);
+    fn rustyssl_private_SSL_CTX_set_psk_find_session_callback(
         _: *mut SSL_CTX,
         _: SSL_psk_find_session_cb_func,
     );
-    fn rustssl_private_SSL_CTX_set_psk_server_callback(_: *mut SSL_CTX, _: SSL_psk_server_cb_func);
-    fn rustssl_private_SSL_CTX_set_psk_use_session_callback(
+    fn rustyssl_private_SSL_CTX_set_psk_server_callback(_: *mut SSL_CTX, _: SSL_psk_server_cb_func);
+    fn rustyssl_private_SSL_CTX_set_psk_use_session_callback(
         _: *mut SSL_CTX,
         _: SSL_psk_use_session_cb_func,
     );
-    fn rustssl_private_SSL_CTX_set_purpose(
+    fn rustyssl_private_SSL_CTX_set_purpose(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_quiet_shutdown(_: *mut SSL_CTX, _: core::ffi::c_int);
-    fn rustssl_private_SSL_CTX_set_record_padding_callback(
+    fn rustyssl_private_SSL_CTX_set_quiet_shutdown(_: *mut SSL_CTX, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_CTX_set_record_padding_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -590,13 +596,15 @@ unsafe extern "C" {
             ) -> usize,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_record_padding_callback_arg(
+    fn rustyssl_private_SSL_CTX_set_record_padding_callback_arg(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_CTX_set_recv_max_early_data(_: *mut SSL_CTX, _: u32)
-    -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_security_callback(
+    fn rustyssl_private_SSL_CTX_set_recv_max_early_data(
+        _: *mut SSL_CTX,
+        _: u32,
+    ) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_security_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -610,23 +618,23 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_security_level(_: *mut SSL_CTX, _: core::ffi::c_int);
-    fn rustssl_private_SSL_CTX_set_session_id_context(
+    fn rustyssl_private_SSL_CTX_set_security_level(_: *mut SSL_CTX, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_CTX_set_session_id_context(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_session_ticket_cb(
+    fn rustyssl_private_SSL_CTX_set_session_ticket_cb(
         _: *mut SSL_CTX,
         _: SSL_CTX_generate_session_ticket_fn,
         _: SSL_CTX_decrypt_session_ticket_fn,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_cb_arg(
+    fn rustyssl_private_SSL_CTX_set_srp_cb_arg(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_client_pwd_callback(
+    fn rustyssl_private_SSL_CTX_set_srp_client_pwd_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -635,19 +643,19 @@ unsafe extern "C" {
             ) -> *mut core::ffi::c_char,
         >,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_password(
+    fn rustyssl_private_SSL_CTX_set_srp_password(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_strength(
+    fn rustyssl_private_SSL_CTX_set_srp_strength(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_username(
+    fn rustyssl_private_SSL_CTX_set_srp_username(
         _: *mut SSL_CTX,
         _: *mut core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_username_callback(
+    fn rustyssl_private_SSL_CTX_set_srp_username_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -657,17 +665,17 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_srp_verify_param_callback(
+    fn rustyssl_private_SSL_CTX_set_srp_verify_param_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(arg1: *mut SSL, arg2: *mut core::ffi::c_void) -> core::ffi::c_int,
         >,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_ssl_version(
+    fn rustyssl_private_SSL_CTX_set_ssl_version(
         _: *mut SSL_CTX,
         _: *const SSL_METHOD,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_stateless_cookie_generate_cb(
+    fn rustyssl_private_SSL_CTX_set_stateless_cookie_generate_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -677,7 +685,7 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_stateless_cookie_verify_cb(
+    fn rustyssl_private_SSL_CTX_set_stateless_cookie_verify_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -687,15 +695,15 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_timeout(
+    fn rustyssl_private_SSL_CTX_set_timeout(
         _: *mut SSL_CTX,
         _: core::ffi::c_long,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_CTX_set_tlsext_max_fragment_length(
+    fn rustyssl_private_SSL_CTX_set_tlsext_max_fragment_length(
         _: *mut SSL_CTX,
         _: u8,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_tlsext_ticket_key_evp_cb(
+    fn rustyssl_private_SSL_CTX_set_tlsext_ticket_key_evp_cb(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -708,11 +716,11 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_tlsext_use_srtp(
+    fn rustyssl_private_SSL_CTX_set_tlsext_use_srtp(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_tmp_dh_callback(
+    fn rustyssl_private_SSL_CTX_set_tmp_dh_callback(
         _: *mut SSL_CTX,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -722,222 +730,229 @@ unsafe extern "C" {
             ) -> *mut DH,
         >,
     );
-    fn rustssl_private_SSL_CTX_set_trust(_: *mut SSL_CTX, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_set_verify(_: *mut SSL_CTX, _: core::ffi::c_int, _: SSL_verify_cb);
-    fn rustssl_private_SSL_CTX_set_verify_depth(_: *mut SSL_CTX, _: core::ffi::c_int);
-    fn rustssl_private_SSL_CTX_up_ref(_: *mut SSL_CTX) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_PrivateKey(
+    fn rustyssl_private_SSL_CTX_set_trust(_: *mut SSL_CTX, _: core::ffi::c_int)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_set_verify(_: *mut SSL_CTX, _: core::ffi::c_int, _: SSL_verify_cb);
+    fn rustyssl_private_SSL_CTX_set_verify_depth(_: *mut SSL_CTX, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_CTX_up_ref(_: *mut SSL_CTX) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_use_PrivateKey(
         _: *mut SSL_CTX,
         _: *mut EVP_PKEY,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_PrivateKey_ASN1(
+    fn rustyssl_private_SSL_CTX_use_PrivateKey_ASN1(
         _: core::ffi::c_int,
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_long,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_PrivateKey_file(
+    fn rustyssl_private_SSL_CTX_use_PrivateKey_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_RSAPrivateKey(_: *mut SSL_CTX, _: *mut RSA) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_RSAPrivateKey_ASN1(
+    fn rustyssl_private_SSL_CTX_use_RSAPrivateKey(_: *mut SSL_CTX, _: *mut RSA)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_use_RSAPrivateKey_ASN1(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_long,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_RSAPrivateKey_file(
+    fn rustyssl_private_SSL_CTX_use_RSAPrivateKey_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_cert_and_key(
+    fn rustyssl_private_SSL_CTX_use_cert_and_key(
         _: *mut SSL_CTX,
         _: *mut X509,
         _: *mut EVP_PKEY,
         _: *mut stack_st_X509,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_certificate(_: *mut SSL_CTX, _: *mut X509) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_certificate_ASN1(
+    fn rustyssl_private_SSL_CTX_use_certificate(_: *mut SSL_CTX, _: *mut X509) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_CTX_use_certificate_ASN1(
         _: *mut SSL_CTX,
         _: core::ffi::c_int,
         _: *const core::ffi::c_uchar,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_certificate_chain_file(
+    fn rustyssl_private_SSL_CTX_use_certificate_chain_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_certificate_file(
+    fn rustyssl_private_SSL_CTX_use_certificate_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_psk_identity_hint(
+    fn rustyssl_private_SSL_CTX_use_psk_identity_hint(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_serverinfo(
+    fn rustyssl_private_SSL_CTX_use_serverinfo(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_serverinfo_ex(
+    fn rustyssl_private_SSL_CTX_use_serverinfo_ex(
         _: *mut SSL_CTX,
         _: core::ffi::c_uint,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_CTX_use_serverinfo_file(
+    fn rustyssl_private_SSL_CTX_use_serverinfo_file(
         _: *mut SSL_CTX,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_dup(_: *const SSL_SESSION) -> *mut SSL_SESSION;
-    fn rustssl_private_SSL_SESSION_free(_: *mut SSL_SESSION);
-    fn rustssl_private_SSL_SESSION_get0_alpn_selected(
+    fn rustyssl_private_SSL_SESSION_dup(_: *const SSL_SESSION) -> *mut SSL_SESSION;
+    fn rustyssl_private_SSL_SESSION_free(_: *mut SSL_SESSION);
+    fn rustyssl_private_SSL_SESSION_get0_alpn_selected(
         _: *const SSL_SESSION,
         _: *mut *const core::ffi::c_uchar,
         _: *mut usize,
     );
-    fn rustssl_private_SSL_SESSION_get0_cipher(_: *const SSL_SESSION) -> *const SSL_CIPHER;
-    fn rustssl_private_SSL_SESSION_get0_hostname(_: *const SSL_SESSION)
-    -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_SESSION_get0_id_context(
+    fn rustyssl_private_SSL_SESSION_get0_cipher(_: *const SSL_SESSION) -> *const SSL_CIPHER;
+    fn rustyssl_private_SSL_SESSION_get0_hostname(
+        _: *const SSL_SESSION,
+    ) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_SESSION_get0_id_context(
         _: *const SSL_SESSION,
         _: *mut core::ffi::c_uint,
     ) -> *const core::ffi::c_uchar;
-    fn rustssl_private_SSL_SESSION_get0_peer(_: *mut SSL_SESSION) -> *mut X509;
-    fn rustssl_private_SSL_SESSION_get0_peer_rpk(_: *mut SSL_SESSION) -> *mut EVP_PKEY;
-    fn rustssl_private_SSL_SESSION_get0_ticket(
+    fn rustyssl_private_SSL_SESSION_get0_peer(_: *mut SSL_SESSION) -> *mut X509;
+    fn rustyssl_private_SSL_SESSION_get0_peer_rpk(_: *mut SSL_SESSION) -> *mut EVP_PKEY;
+    fn rustyssl_private_SSL_SESSION_get0_ticket(
         _: *const SSL_SESSION,
         _: *mut *const core::ffi::c_uchar,
         _: *mut usize,
     );
-    fn rustssl_private_SSL_SESSION_get0_ticket_appdata(
+    fn rustyssl_private_SSL_SESSION_get0_ticket_appdata(
         _: *mut SSL_SESSION,
         _: *mut *mut core::ffi::c_void,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_get_compress_id(_: *const SSL_SESSION) -> core::ffi::c_uint;
-    fn rustssl_private_SSL_SESSION_get_ex_data(
+    fn rustyssl_private_SSL_SESSION_get_compress_id(_: *const SSL_SESSION) -> core::ffi::c_uint;
+    fn rustyssl_private_SSL_SESSION_get_ex_data(
         _: *const SSL_SESSION,
         _: core::ffi::c_int,
     ) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_SESSION_get_id(
+    fn rustyssl_private_SSL_SESSION_get_id(
         _: *const SSL_SESSION,
         _: *mut core::ffi::c_uint,
     ) -> *const core::ffi::c_uchar;
-    fn rustssl_private_SSL_SESSION_get_master_key(
+    fn rustyssl_private_SSL_SESSION_get_master_key(
         _: *const SSL_SESSION,
         _: *mut core::ffi::c_uchar,
         _: usize,
     ) -> usize;
-    fn rustssl_private_SSL_SESSION_get_max_early_data(_: *const SSL_SESSION) -> u32;
-    fn rustssl_private_SSL_SESSION_get_max_fragment_length(_: *const SSL_SESSION) -> u8;
-    fn rustssl_private_SSL_SESSION_get_protocol_version(_: *const SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_get_ticket_lifetime_hint(
+    fn rustyssl_private_SSL_SESSION_get_max_early_data(_: *const SSL_SESSION) -> u32;
+    fn rustyssl_private_SSL_SESSION_get_max_fragment_length(_: *const SSL_SESSION) -> u8;
+    fn rustyssl_private_SSL_SESSION_get_protocol_version(_: *const SSL_SESSION)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SESSION_get_ticket_lifetime_hint(
         _: *const SSL_SESSION,
     ) -> core::ffi::c_ulong;
-    fn rustssl_private_SSL_SESSION_get_time(_: *const SSL_SESSION) -> core::ffi::c_long;
-    fn rustssl_private_SSL_SESSION_get_time_ex(_: *const SSL_SESSION) -> time_t;
-    fn rustssl_private_SSL_SESSION_get_timeout(_: *const SSL_SESSION) -> core::ffi::c_long;
-    fn rustssl_private_SSL_SESSION_has_ticket(_: *const SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_is_resumable(_: *const SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_new() -> *mut SSL_SESSION;
-    fn rustssl_private_SSL_SESSION_print(_: *mut BIO, _: *const SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_print_fp(
+    fn rustyssl_private_SSL_SESSION_get_time(_: *const SSL_SESSION) -> core::ffi::c_long;
+    fn rustyssl_private_SSL_SESSION_get_time_ex(_: *const SSL_SESSION) -> time_t;
+    fn rustyssl_private_SSL_SESSION_get_timeout(_: *const SSL_SESSION) -> core::ffi::c_long;
+    fn rustyssl_private_SSL_SESSION_has_ticket(_: *const SSL_SESSION) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SESSION_is_resumable(_: *const SSL_SESSION) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SESSION_new() -> *mut SSL_SESSION;
+    fn rustyssl_private_SSL_SESSION_print(_: *mut BIO, _: *const SSL_SESSION) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SESSION_print_fp(
         _: *mut FILE,
         _: *const SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_print_keylog(
+    fn rustyssl_private_SSL_SESSION_print_keylog(
         _: *mut BIO,
         _: *const SSL_SESSION,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_alpn_selected(
+    fn rustyssl_private_SSL_SESSION_set1_alpn_selected(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_hostname(
+    fn rustyssl_private_SSL_SESSION_set1_hostname(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_id(
+    fn rustyssl_private_SSL_SESSION_set1_id(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_id_context(
+    fn rustyssl_private_SSL_SESSION_set1_id_context(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_master_key(
+    fn rustyssl_private_SSL_SESSION_set1_master_key(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set1_ticket_appdata(
+    fn rustyssl_private_SSL_SESSION_set1_ticket_appdata(
         _: *mut SSL_SESSION,
         _: *const core::ffi::c_void,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set_cipher(
+    fn rustyssl_private_SSL_SESSION_set_cipher(
         _: *mut SSL_SESSION,
         _: *const SSL_CIPHER,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set_ex_data(
+    fn rustyssl_private_SSL_SESSION_set_ex_data(
         _: *mut SSL_SESSION,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set_max_early_data(
+    fn rustyssl_private_SSL_SESSION_set_max_early_data(
         _: *mut SSL_SESSION,
         _: u32,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set_protocol_version(
+    fn rustyssl_private_SSL_SESSION_set_protocol_version(
         _: *mut SSL_SESSION,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SESSION_set_time(
+    fn rustyssl_private_SSL_SESSION_set_time(
         _: *mut SSL_SESSION,
         _: core::ffi::c_long,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_SESSION_set_time_ex(_: *mut SSL_SESSION, _: time_t) -> time_t;
-    fn rustssl_private_SSL_SESSION_set_timeout(
+    fn rustyssl_private_SSL_SESSION_set_time_ex(_: *mut SSL_SESSION, _: time_t) -> time_t;
+    fn rustyssl_private_SSL_SESSION_set_timeout(
         _: *mut SSL_SESSION,
         _: core::ffi::c_long,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_SESSION_up_ref(_: *mut SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SRP_CTX_free(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_SRP_CTX_init(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_accept(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_accept_connection(_: *mut SSL, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_accept_stream(_: *mut SSL, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_add1_host(_: *mut SSL, _: *const core::ffi::c_char) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add1_to_CA_list(_: *mut SSL, _: *const X509) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add_client_CA(_: *mut SSL, _: *mut X509) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add_dir_cert_subjects_to_stack(
+    fn rustyssl_private_SSL_SESSION_up_ref(_: *mut SSL_SESSION) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SRP_CTX_free(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_SRP_CTX_init(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_accept(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_accept_connection(_: *mut SSL, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_accept_stream(_: *mut SSL, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_add1_host(_: *mut SSL, _: *const core::ffi::c_char)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_add1_to_CA_list(_: *mut SSL, _: *const X509) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_add_client_CA(_: *mut SSL, _: *mut X509) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_add_dir_cert_subjects_to_stack(
         _: *mut stack_st_X509_NAME,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add_expected_rpk(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add_file_cert_subjects_to_stack(
+    fn rustyssl_private_SSL_add_expected_rpk(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_add_file_cert_subjects_to_stack(
         _: *mut stack_st_X509_NAME,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_add_ssl_module();
-    fn rustssl_private_SSL_add_store_cert_subjects_to_stack(
+    fn rustyssl_private_SSL_add_ssl_module();
+    fn rustyssl_private_SSL_add_store_cert_subjects_to_stack(
         _: *mut stack_st_X509_NAME,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_alert_desc_string(_: core::ffi::c_int) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_alert_desc_string_long(_: core::ffi::c_int) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_alert_type_string(_: core::ffi::c_int) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_alert_type_string_long(_: core::ffi::c_int) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_alloc_buffers(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_bytes_to_cipher_list(
+    fn rustyssl_private_SSL_alert_desc_string(_: core::ffi::c_int) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_alert_desc_string_long(_: core::ffi::c_int)
+    -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_alert_type_string(_: core::ffi::c_int) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_alert_type_string_long(_: core::ffi::c_int)
+    -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_alloc_buffers(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_bytes_to_cipher_list(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: usize,
@@ -945,78 +960,80 @@ unsafe extern "C" {
         _: *mut *mut stack_st_SSL_CIPHER,
         _: *mut *mut stack_st_SSL_CIPHER,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_callback_ctrl(
+    fn rustyssl_private_SSL_callback_ctrl(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: ::core::option::Option<unsafe extern "C" fn()>,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_certs_clear(_: *mut SSL);
-    fn rustssl_private_SSL_check_chain(
+    fn rustyssl_private_SSL_certs_clear(_: *mut SSL);
+    fn rustyssl_private_SSL_check_chain(
         _: *mut SSL,
         _: *mut X509,
         _: *mut EVP_PKEY,
         _: *mut stack_st_X509,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_check_private_key(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_clear(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_clear_options(_: *mut SSL, _: u64) -> u64;
-    fn rustssl_private_SSL_client_hello_get0_ciphers(
+    fn rustyssl_private_SSL_check_private_key(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_clear(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_clear_options(_: *mut SSL, _: u64) -> u64;
+    fn rustyssl_private_SSL_client_hello_get0_ciphers(
         _: *mut SSL,
         _: *mut *const core::ffi::c_uchar,
     ) -> usize;
-    fn rustssl_private_SSL_client_hello_get0_compression_methods(
+    fn rustyssl_private_SSL_client_hello_get0_compression_methods(
         _: *mut SSL,
         _: *mut *const core::ffi::c_uchar,
     ) -> usize;
-    fn rustssl_private_SSL_client_hello_get0_ext(
+    fn rustyssl_private_SSL_client_hello_get0_ext(
         _: *mut SSL,
         _: core::ffi::c_uint,
         _: *mut *const core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_client_hello_get0_legacy_version(_: *mut SSL) -> core::ffi::c_uint;
-    fn rustssl_private_SSL_client_hello_get0_random(
+    fn rustyssl_private_SSL_client_hello_get0_legacy_version(_: *mut SSL) -> core::ffi::c_uint;
+    fn rustyssl_private_SSL_client_hello_get0_random(
         _: *mut SSL,
         _: *mut *const core::ffi::c_uchar,
     ) -> usize;
-    fn rustssl_private_SSL_client_hello_get0_session_id(
+    fn rustyssl_private_SSL_client_hello_get0_session_id(
         _: *mut SSL,
         _: *mut *const core::ffi::c_uchar,
     ) -> usize;
-    fn rustssl_private_SSL_client_hello_get1_extensions_present(
+    fn rustyssl_private_SSL_client_hello_get1_extensions_present(
         _: *mut SSL,
         _: *mut *mut core::ffi::c_int,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_client_hello_get_extension_order(
+    fn rustyssl_private_SSL_client_hello_get_extension_order(
         _: *mut SSL,
         _: *mut u16,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_client_hello_isv2(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_client_version(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_compress_certs(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_config(_: *mut SSL, _: *const core::ffi::c_char) -> core::ffi::c_int;
-    fn rustssl_private_SSL_connect(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_copy_session_id(_: *mut SSL, _: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_ct_is_enabled(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_ctrl(
+    fn rustyssl_private_SSL_client_hello_isv2(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_client_version(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_compress_certs(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_config(_: *mut SSL, _: *const core::ffi::c_char) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_connect(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_copy_session_id(_: *mut SSL, _: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_ct_is_enabled(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_ctrl(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: core::ffi::c_long,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_long;
-    fn rustssl_private_SSL_dane_clear_flags(
+    fn rustyssl_private_SSL_dane_clear_flags(
         _: *mut SSL,
         _: core::ffi::c_ulong,
     ) -> core::ffi::c_ulong;
-    fn rustssl_private_SSL_dane_enable(
+    fn rustyssl_private_SSL_dane_enable(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_dane_set_flags(_: *mut SSL, _: core::ffi::c_ulong)
-    -> core::ffi::c_ulong;
-    fn rustssl_private_SSL_dane_tlsa_add(
+    fn rustyssl_private_SSL_dane_set_flags(
+        _: *mut SSL,
+        _: core::ffi::c_ulong,
+    ) -> core::ffi::c_ulong;
+    fn rustyssl_private_SSL_dane_tlsa_add(
         _: *mut SSL,
         _: u8,
         _: u8,
@@ -1024,11 +1041,11 @@ unsafe extern "C" {
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_do_handshake(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_dup(_: *mut SSL) -> *mut SSL;
-    fn rustssl_private_SSL_dup_CA_list(_: *const stack_st_X509_NAME) -> *mut stack_st_X509_NAME;
-    fn rustssl_private_SSL_enable_ct(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_export_keying_material(
+    fn rustyssl_private_SSL_do_handshake(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_dup(_: *mut SSL) -> *mut SSL;
+    fn rustyssl_private_SSL_dup_CA_list(_: *const stack_st_X509_NAME) -> *mut stack_st_X509_NAME;
+    fn rustyssl_private_SSL_enable_ct(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_export_keying_material(
         _: *mut SSL,
         _: *mut core::ffi::c_uchar,
         _: usize,
@@ -1038,7 +1055,7 @@ unsafe extern "C" {
         _: usize,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_export_keying_material_early(
+    fn rustyssl_private_SSL_export_keying_material_early(
         _: *mut SSL,
         _: *mut core::ffi::c_uchar,
         _: usize,
@@ -1047,28 +1064,28 @@ unsafe extern "C" {
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_extension_supported(_: core::ffi::c_uint) -> core::ffi::c_int;
-    fn rustssl_private_SSL_free(_: *mut SSL);
-    fn rustssl_private_SSL_free_buffers(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get0_CA_list(_: *const SSL) -> *const stack_st_X509_NAME;
-    fn rustssl_private_SSL_get0_alpn_selected(
+    fn rustyssl_private_SSL_extension_supported(_: core::ffi::c_uint) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_free(_: *mut SSL);
+    fn rustyssl_private_SSL_free_buffers(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get0_CA_list(_: *const SSL) -> *const stack_st_X509_NAME;
+    fn rustyssl_private_SSL_get0_alpn_selected(
         _: *const SSL,
         _: *mut *const core::ffi::c_uchar,
         _: *mut core::ffi::c_uint,
     );
-    fn rustssl_private_SSL_get0_client_cert_type(
+    fn rustyssl_private_SSL_get0_client_cert_type(
         _: *const SSL,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get0_connection(_: *mut SSL) -> *mut SSL;
-    fn rustssl_private_SSL_get0_dane(_: *mut SSL) -> *mut SSL_DANE;
-    fn rustssl_private_SSL_get0_dane_authority(
+    fn rustyssl_private_SSL_get0_connection(_: *mut SSL) -> *mut SSL;
+    fn rustyssl_private_SSL_get0_dane(_: *mut SSL) -> *mut SSL_DANE;
+    fn rustyssl_private_SSL_get0_dane_authority(
         _: *mut SSL,
         _: *mut *mut X509,
         _: *mut *mut EVP_PKEY,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get0_dane_tlsa(
+    fn rustyssl_private_SSL_get0_dane_tlsa(
         _: *mut SSL,
         _: *mut u8,
         _: *mut u8,
@@ -1076,138 +1093,139 @@ unsafe extern "C" {
         _: *mut *const core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get0_domain(_: *mut SSL) -> *mut SSL;
-    fn rustssl_private_SSL_get0_group_name(_: *mut SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get0_listener(_: *mut SSL) -> *mut SSL;
-    fn rustssl_private_SSL_get0_next_proto_negotiated(
+    fn rustyssl_private_SSL_get0_domain(_: *mut SSL) -> *mut SSL;
+    fn rustyssl_private_SSL_get0_group_name(_: *mut SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_get0_listener(_: *mut SSL) -> *mut SSL;
+    fn rustyssl_private_SSL_get0_next_proto_negotiated(
         _: *const SSL,
         _: *mut *const core::ffi::c_uchar,
         _: *mut core::ffi::c_uint,
     );
-    fn rustssl_private_SSL_get0_param(_: *mut SSL) -> *mut X509_VERIFY_PARAM;
-    fn rustssl_private_SSL_get0_peer_CA_list(_: *const SSL) -> *const stack_st_X509_NAME;
-    fn rustssl_private_SSL_get0_peer_certificate(_: *const SSL) -> *mut X509;
-    fn rustssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY;
-    fn rustssl_private_SSL_get0_peer_scts(_: *mut SSL) -> *const stack_st_SCT;
-    fn rustssl_private_SSL_get0_peername(_: *mut SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get0_security_ex_data(_: *const SSL) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_get0_server_cert_type(
+    fn rustyssl_private_SSL_get0_param(_: *mut SSL) -> *mut X509_VERIFY_PARAM;
+    fn rustyssl_private_SSL_get0_peer_CA_list(_: *const SSL) -> *const stack_st_X509_NAME;
+    fn rustyssl_private_SSL_get0_peer_certificate(_: *const SSL) -> *mut X509;
+    fn rustyssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY;
+    fn rustyssl_private_SSL_get0_peer_scts(_: *mut SSL) -> *const stack_st_SCT;
+    fn rustyssl_private_SSL_get0_peername(_: *mut SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_get0_security_ex_data(_: *const SSL) -> *mut core::ffi::c_void;
+    fn rustyssl_private_SSL_get0_server_cert_type(
         _: *const SSL,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get0_verified_chain(_: *const SSL) -> *mut stack_st_X509;
-    fn rustssl_private_SSL_get1_builtin_sigalgs(_: *mut OSSL_LIB_CTX) -> *mut core::ffi::c_char;
-    fn rustssl_private_SSL_get1_compressed_cert(
+    fn rustyssl_private_SSL_get0_verified_chain(_: *const SSL) -> *mut stack_st_X509;
+    fn rustyssl_private_SSL_get1_builtin_sigalgs(_: *mut OSSL_LIB_CTX) -> *mut core::ffi::c_char;
+    fn rustyssl_private_SSL_get1_compressed_cert(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: *mut *mut core::ffi::c_uchar,
         _: *mut usize,
     ) -> usize;
-    fn rustssl_private_SSL_get1_peer_certificate(_: *const SSL) -> *mut X509;
-    fn rustssl_private_SSL_get1_session(_: *mut SSL) -> *mut SSL_SESSION;
-    fn rustssl_private_SSL_get1_supported_ciphers(_: *mut SSL) -> *mut stack_st_SSL_CIPHER;
-    fn rustssl_private_SSL_get_SSL_CTX(_: *const SSL) -> *mut SSL_CTX;
-    fn rustssl_private_SSL_get_accept_connection_queue_len(_: *mut SSL) -> usize;
-    fn rustssl_private_SSL_get_accept_stream_queue_len(_: *mut SSL) -> usize;
-    fn rustssl_private_SSL_get_all_async_fds(
+    fn rustyssl_private_SSL_get1_peer_certificate(_: *const SSL) -> *mut X509;
+    fn rustyssl_private_SSL_get1_session(_: *mut SSL) -> *mut SSL_SESSION;
+    fn rustyssl_private_SSL_get1_supported_ciphers(_: *mut SSL) -> *mut stack_st_SSL_CIPHER;
+    fn rustyssl_private_SSL_get_SSL_CTX(_: *const SSL) -> *mut SSL_CTX;
+    fn rustyssl_private_SSL_get_accept_connection_queue_len(_: *mut SSL) -> usize;
+    fn rustyssl_private_SSL_get_accept_stream_queue_len(_: *mut SSL) -> usize;
+    fn rustyssl_private_SSL_get_all_async_fds(
         _: *mut SSL,
         _: *mut core::ffi::c_int,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_async_status(
+    fn rustyssl_private_SSL_get_async_status(
         _: *mut SSL,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_blocking_mode(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_certificate(_: *const SSL) -> *mut X509;
-    fn rustssl_private_SSL_get_changed_async_fds(
+    fn rustyssl_private_SSL_get_blocking_mode(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_certificate(_: *const SSL) -> *mut X509;
+    fn rustyssl_private_SSL_get_changed_async_fds(
         _: *mut SSL,
         _: *mut core::ffi::c_int,
         _: *mut usize,
         _: *mut core::ffi::c_int,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_cipher_list(
+    fn rustyssl_private_SSL_get_cipher_list(
         _: *const SSL,
         _: core::ffi::c_int,
     ) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get_ciphers(_: *const SSL) -> *mut stack_st_SSL_CIPHER;
-    fn rustssl_private_SSL_get_client_CA_list(_: *const SSL) -> *mut stack_st_X509_NAME;
-    fn rustssl_private_SSL_get_client_ciphers(_: *const SSL) -> *mut stack_st_SSL_CIPHER;
-    fn rustssl_private_SSL_get_client_random(
+    fn rustyssl_private_SSL_get_ciphers(_: *const SSL) -> *mut stack_st_SSL_CIPHER;
+    fn rustyssl_private_SSL_get_client_CA_list(_: *const SSL) -> *mut stack_st_X509_NAME;
+    fn rustyssl_private_SSL_get_client_ciphers(_: *const SSL) -> *mut stack_st_SSL_CIPHER;
+    fn rustyssl_private_SSL_get_client_random(
         _: *const SSL,
         _: *mut core::ffi::c_uchar,
         _: usize,
     ) -> usize;
-    fn rustssl_private_SSL_get_conn_close_info(
+    fn rustyssl_private_SSL_get_conn_close_info(
         _: *mut SSL,
         _: *mut SSL_CONN_CLOSE_INFO,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_current_cipher(_: *const SSL) -> *const SSL_CIPHER;
-    fn rustssl_private_SSL_get_current_compression(_: *const SSL) -> *const COMP_METHOD;
-    fn rustssl_private_SSL_get_current_expansion(_: *const SSL) -> *const COMP_METHOD;
-    fn rustssl_private_SSL_get_default_passwd_cb(_: *mut SSL) -> pem_password_cb;
-    fn rustssl_private_SSL_get_default_passwd_cb_userdata(_: *mut SSL) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_get_default_timeout(_: *const SSL) -> core::ffi::c_long;
-    fn rustssl_private_SSL_get_domain_flags(_: *const SSL, _: *mut u64) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_early_data_status(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_error(_: *const SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_event_timeout(
+    fn rustyssl_private_SSL_get_current_cipher(_: *const SSL) -> *const SSL_CIPHER;
+    fn rustyssl_private_SSL_get_current_compression(_: *const SSL) -> *const COMP_METHOD;
+    fn rustyssl_private_SSL_get_current_expansion(_: *const SSL) -> *const COMP_METHOD;
+    fn rustyssl_private_SSL_get_default_passwd_cb(_: *mut SSL) -> pem_password_cb;
+    fn rustyssl_private_SSL_get_default_passwd_cb_userdata(_: *mut SSL) -> *mut core::ffi::c_void;
+    fn rustyssl_private_SSL_get_default_timeout(_: *const SSL) -> core::ffi::c_long;
+    fn rustyssl_private_SSL_get_domain_flags(_: *const SSL, _: *mut u64) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_early_data_status(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_error(_: *const SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_event_timeout(
         _: *mut SSL,
         _: *mut timeval,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_ex_data(
+    fn rustyssl_private_SSL_get_ex_data(
         _: *const SSL,
         _: core::ffi::c_int,
     ) -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_get_ex_data_X509_STORE_CTX_idx() -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_fd(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_finished(
+    fn rustyssl_private_SSL_get_ex_data_X509_STORE_CTX_idx() -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_fd(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_finished(
         _: *const SSL,
         _: *mut core::ffi::c_void,
         _: usize,
     ) -> usize;
-    fn rustssl_private_SSL_get_handshake_rtt(_: *const SSL, _: *mut u64) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_info_callback(
+    fn rustyssl_private_SSL_get_handshake_rtt(_: *const SSL, _: *mut u64) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_info_callback(
         _: *const SSL,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(ssl: *const SSL, arg1: core::ffi::c_int, arg2: core::ffi::c_int),
     >;
-    fn rustssl_private_SSL_get_key_update_type(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_max_early_data(_: *const SSL) -> u32;
-    fn rustssl_private_SSL_get_negotiated_client_cert_type(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_negotiated_server_cert_type(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_num_tickets(_: *const SSL) -> usize;
-    fn rustssl_private_SSL_get_options(_: *const SSL) -> u64;
-    fn rustssl_private_SSL_get_peer_cert_chain(_: *const SSL) -> *mut stack_st_X509;
-    fn rustssl_private_SSL_get_peer_finished(
+    fn rustyssl_private_SSL_get_key_update_type(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_max_early_data(_: *const SSL) -> u32;
+    fn rustyssl_private_SSL_get_negotiated_client_cert_type(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_negotiated_server_cert_type(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_num_tickets(_: *const SSL) -> usize;
+    fn rustyssl_private_SSL_get_options(_: *const SSL) -> u64;
+    fn rustyssl_private_SSL_get_peer_cert_chain(_: *const SSL) -> *mut stack_st_X509;
+    fn rustyssl_private_SSL_get_peer_finished(
         _: *const SSL,
         _: *mut core::ffi::c_void,
         _: usize,
     ) -> usize;
-    fn rustssl_private_SSL_get_peer_signature_type_nid(
+    fn rustyssl_private_SSL_get_peer_signature_type_nid(
         _: *const SSL,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_pending_cipher(_: *const SSL) -> *const SSL_CIPHER;
-    fn rustssl_private_SSL_get_privatekey(_: *const SSL) -> *mut evp_pkey_st;
-    fn rustssl_private_SSL_get_psk_identity(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get_psk_identity_hint(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get_quiet_shutdown(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_rbio(_: *const SSL) -> *mut BIO;
-    fn rustssl_private_SSL_get_read_ahead(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_record_padding_callback_arg(_: *const SSL)
-    -> *mut core::ffi::c_void;
-    fn rustssl_private_SSL_get_recv_max_early_data(_: *const SSL) -> u32;
-    fn rustssl_private_SSL_get_rfd(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_rpoll_descriptor(
+    fn rustyssl_private_SSL_get_pending_cipher(_: *const SSL) -> *const SSL_CIPHER;
+    fn rustyssl_private_SSL_get_privatekey(_: *const SSL) -> *mut evp_pkey_st;
+    fn rustyssl_private_SSL_get_psk_identity(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_get_psk_identity_hint(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_get_quiet_shutdown(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_rbio(_: *const SSL) -> *mut BIO;
+    fn rustyssl_private_SSL_get_read_ahead(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_record_padding_callback_arg(
+        _: *const SSL,
+    ) -> *mut core::ffi::c_void;
+    fn rustyssl_private_SSL_get_recv_max_early_data(_: *const SSL) -> u32;
+    fn rustyssl_private_SSL_get_rfd(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_rpoll_descriptor(
         _: *mut SSL,
         _: *mut BIO_POLL_DESCRIPTOR,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_security_callback(
+    fn rustyssl_private_SSL_get_security_callback(
         _: *const SSL,
     ) -> ::core::option::Option<
         unsafe extern "C" fn(
@@ -1220,25 +1238,25 @@ unsafe extern "C" {
             arg6: *mut core::ffi::c_void,
         ) -> core::ffi::c_int,
     >;
-    fn rustssl_private_SSL_get_security_level(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_selected_srtp_profile(_: *mut SSL) -> *mut SRTP_PROTECTION_PROFILE;
-    fn rustssl_private_SSL_get_server_random(
+    fn rustyssl_private_SSL_get_security_level(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_selected_srtp_profile(_: *mut SSL) -> *mut SRTP_PROTECTION_PROFILE;
+    fn rustyssl_private_SSL_get_server_random(
         _: *const SSL,
         _: *mut core::ffi::c_uchar,
         _: usize,
     ) -> usize;
-    fn rustssl_private_SSL_get_servername(
+    fn rustyssl_private_SSL_get_servername(
         _: *const SSL,
         _: core::ffi::c_int,
     ) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get_servername_type(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_session(_: *const SSL) -> *mut SSL_SESSION;
-    fn rustssl_private_SSL_get_shared_ciphers(
+    fn rustyssl_private_SSL_get_servername_type(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_session(_: *const SSL) -> *mut SSL_SESSION;
+    fn rustyssl_private_SSL_get_shared_ciphers(
         _: *const SSL,
         _: *mut core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> *mut core::ffi::c_char;
-    fn rustssl_private_SSL_get_shared_sigalgs(
+    fn rustyssl_private_SSL_get_shared_sigalgs(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_int,
@@ -1247,8 +1265,8 @@ unsafe extern "C" {
         _: *mut core::ffi::c_uchar,
         _: *mut core::ffi::c_uchar,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_shutdown(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_sigalgs(
+    fn rustyssl_private_SSL_get_shutdown(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_sigalgs(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_int,
@@ -1257,105 +1275,108 @@ unsafe extern "C" {
         _: *mut core::ffi::c_uchar,
         _: *mut core::ffi::c_uchar,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_signature_type_nid(
+    fn rustyssl_private_SSL_get_signature_type_nid(
         _: *const SSL,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_srp_N(_: *mut SSL) -> *mut BIGNUM;
-    fn rustssl_private_SSL_get_srp_g(_: *mut SSL) -> *mut BIGNUM;
-    fn rustssl_private_SSL_get_srp_userinfo(_: *mut SSL) -> *mut core::ffi::c_char;
-    fn rustssl_private_SSL_get_srp_username(_: *mut SSL) -> *mut core::ffi::c_char;
-    fn rustssl_private_SSL_get_srtp_profiles(_: *mut SSL) -> *mut stack_st_SRTP_PROTECTION_PROFILE;
-    fn rustssl_private_SSL_get_ssl_method(_: *const SSL) -> *const SSL_METHOD;
-    fn rustssl_private_SSL_get_state(_: *const SSL) -> OSSL_HANDSHAKE_STATE;
-    fn rustssl_private_SSL_get_stream_id(_: *mut SSL) -> u64;
-    fn rustssl_private_SSL_get_stream_read_error_code(_: *mut SSL, _: *mut u64)
-    -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_stream_read_state(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_stream_type(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_stream_write_error_code(
+    fn rustyssl_private_SSL_get_srp_N(_: *mut SSL) -> *mut BIGNUM;
+    fn rustyssl_private_SSL_get_srp_g(_: *mut SSL) -> *mut BIGNUM;
+    fn rustyssl_private_SSL_get_srp_userinfo(_: *mut SSL) -> *mut core::ffi::c_char;
+    fn rustyssl_private_SSL_get_srp_username(_: *mut SSL) -> *mut core::ffi::c_char;
+    fn rustyssl_private_SSL_get_srtp_profiles(_: *mut SSL)
+    -> *mut stack_st_SRTP_PROTECTION_PROFILE;
+    fn rustyssl_private_SSL_get_ssl_method(_: *const SSL) -> *const SSL_METHOD;
+    fn rustyssl_private_SSL_get_state(_: *const SSL) -> OSSL_HANDSHAKE_STATE;
+    fn rustyssl_private_SSL_get_stream_id(_: *mut SSL) -> u64;
+    fn rustyssl_private_SSL_get_stream_read_error_code(
         _: *mut SSL,
         _: *mut u64,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_stream_write_state(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_value_uint(
+    fn rustyssl_private_SSL_get_stream_read_state(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_stream_type(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_stream_write_error_code(
+        _: *mut SSL,
+        _: *mut u64,
+    ) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_stream_write_state(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_value_uint(
         _: *mut SSL,
         _: u32,
         _: u32,
         _: *mut u64,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_verify_callback(_: *const SSL) -> SSL_verify_cb;
-    fn rustssl_private_SSL_get_verify_depth(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_verify_mode(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_verify_result(_: *const SSL) -> core::ffi::c_long;
-    fn rustssl_private_SSL_get_version(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_get_wbio(_: *const SSL) -> *mut BIO;
-    fn rustssl_private_SSL_get_wfd(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_get_wpoll_descriptor(
+    fn rustyssl_private_SSL_get_verify_callback(_: *const SSL) -> SSL_verify_cb;
+    fn rustyssl_private_SSL_get_verify_depth(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_verify_mode(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_verify_result(_: *const SSL) -> core::ffi::c_long;
+    fn rustyssl_private_SSL_get_version(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_get_wbio(_: *const SSL) -> *mut BIO;
+    fn rustyssl_private_SSL_get_wfd(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_get_wpoll_descriptor(
         _: *mut SSL,
         _: *mut BIO_POLL_DESCRIPTOR,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_group_to_name(
+    fn rustyssl_private_SSL_group_to_name(
         _: *mut SSL,
         _: core::ffi::c_int,
     ) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_handle_events(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_has_matching_session_id(
+    fn rustyssl_private_SSL_handle_events(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_has_matching_session_id(
         _: *const SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_has_pending(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_in_before(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_in_init(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_inject_net_dgram(
+    fn rustyssl_private_SSL_has_pending(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_in_before(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_in_init(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_inject_net_dgram(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: usize,
         _: *const BIO_ADDR,
         _: *const BIO_ADDR,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_connection(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_domain(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_dtls(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_init_finished(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_listener(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_quic(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_server(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_stream_local(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_is_tls(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_key_update(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_listen(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_load_client_CA_file(
+    fn rustyssl_private_SSL_is_connection(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_domain(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_dtls(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_init_finished(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_listener(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_quic(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_server(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_stream_local(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_is_tls(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_key_update(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_listen(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_load_client_CA_file(
         _: *const core::ffi::c_char,
     ) -> *mut stack_st_X509_NAME;
-    fn rustssl_private_SSL_load_client_CA_file_ex(
+    fn rustyssl_private_SSL_load_client_CA_file_ex(
         _: *const core::ffi::c_char,
         _: *mut OSSL_LIB_CTX,
         _: *const core::ffi::c_char,
     ) -> *mut stack_st_X509_NAME;
-    fn rustssl_private_SSL_net_read_desired(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_net_write_desired(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_new(_: *mut SSL_CTX) -> *mut SSL;
-    fn rustssl_private_SSL_new_domain(_: *mut SSL_CTX, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_new_from_listener(_: *mut SSL, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_new_listener(_: *mut SSL_CTX, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_new_listener_from(_: *mut SSL, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_new_session_ticket(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_new_stream(_: *mut SSL, _: u64) -> *mut SSL;
-    fn rustssl_private_SSL_peek(
+    fn rustyssl_private_SSL_net_read_desired(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_net_write_desired(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_new(_: *mut SSL_CTX) -> *mut SSL;
+    fn rustyssl_private_SSL_new_domain(_: *mut SSL_CTX, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_new_from_listener(_: *mut SSL, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_new_listener(_: *mut SSL_CTX, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_new_listener_from(_: *mut SSL, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_new_session_ticket(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_new_stream(_: *mut SSL, _: u64) -> *mut SSL;
+    fn rustyssl_private_SSL_peek(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_peek_ex(
+    fn rustyssl_private_SSL_peek_ex(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: usize,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_pending(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_poll(
+    fn rustyssl_private_SSL_pending(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_poll(
         _: *mut SSL_POLL_ITEM,
         _: usize,
         _: usize,
@@ -1363,29 +1384,29 @@ unsafe extern "C" {
         _: u64,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_read(
+    fn rustyssl_private_SSL_read(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_read_early_data(
+    fn rustyssl_private_SSL_read_early_data(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: usize,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_read_ex(
+    fn rustyssl_private_SSL_read_ex(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: usize,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_renegotiate(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_renegotiate_abbreviated(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_renegotiate_pending(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_rstate_string(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_rstate_string_long(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_select_next_proto(
+    fn rustyssl_private_SSL_renegotiate(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_renegotiate_abbreviated(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_renegotiate_pending(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_rstate_string(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_rstate_string_long(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_select_next_proto(
         _: *mut *mut core::ffi::c_uchar,
         _: *mut core::ffi::c_uchar,
         _: *const core::ffi::c_uchar,
@@ -1393,126 +1414,128 @@ unsafe extern "C" {
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_sendfile(
+    fn rustyssl_private_SSL_sendfile(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: off_t,
         _: usize,
         _: core::ffi::c_int,
     ) -> isize;
-    fn rustssl_private_SSL_session_reused(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set0_CA_list(_: *mut SSL, _: *mut stack_st_X509_NAME);
-    fn rustssl_private_SSL_set0_rbio(_: *mut SSL, _: *mut BIO);
-    fn rustssl_private_SSL_set0_security_ex_data(_: *mut SSL, _: *mut core::ffi::c_void);
-    fn rustssl_private_SSL_set0_tmp_dh_pkey(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set0_wbio(_: *mut SSL, _: *mut BIO);
-    fn rustssl_private_SSL_set1_cert_comp_preference(
+    fn rustyssl_private_SSL_session_reused(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set0_CA_list(_: *mut SSL, _: *mut stack_st_X509_NAME);
+    fn rustyssl_private_SSL_set0_rbio(_: *mut SSL, _: *mut BIO);
+    fn rustyssl_private_SSL_set0_security_ex_data(_: *mut SSL, _: *mut core::ffi::c_void);
+    fn rustyssl_private_SSL_set0_tmp_dh_pkey(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set0_wbio(_: *mut SSL, _: *mut BIO);
+    fn rustyssl_private_SSL_set1_cert_comp_preference(
         _: *mut SSL,
         _: *mut core::ffi::c_int,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_client_cert_type(
+    fn rustyssl_private_SSL_set1_client_cert_type(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_compressed_cert(
+    fn rustyssl_private_SSL_set1_compressed_cert(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_uchar,
         _: usize,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_host(_: *mut SSL, _: *const core::ffi::c_char) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_initial_peer_addr(
+    fn rustyssl_private_SSL_set1_host(_: *mut SSL, _: *const core::ffi::c_char)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set1_initial_peer_addr(
         _: *mut SSL,
         _: *const BIO_ADDR,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_param(_: *mut SSL, _: *mut X509_VERIFY_PARAM) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set1_server_cert_type(
+    fn rustyssl_private_SSL_set1_param(_: *mut SSL, _: *mut X509_VERIFY_PARAM) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set1_server_cert_type(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_SSL_CTX(_: *mut SSL, _: *mut SSL_CTX) -> *mut SSL_CTX;
-    fn rustssl_private_SSL_set_accept_state(_: *mut SSL);
-    fn rustssl_private_SSL_set_allow_early_data_cb(
+    fn rustyssl_private_SSL_set_SSL_CTX(_: *mut SSL, _: *mut SSL_CTX) -> *mut SSL_CTX;
+    fn rustyssl_private_SSL_set_accept_state(_: *mut SSL);
+    fn rustyssl_private_SSL_set_allow_early_data_cb(
         _: *mut SSL,
         _: SSL_allow_early_data_cb_fn,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_set_alpn_protos(
+    fn rustyssl_private_SSL_set_alpn_protos(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_async_callback(
+    fn rustyssl_private_SSL_set_async_callback(
         _: *mut SSL,
         _: SSL_async_callback_fn,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_async_callback_arg(
+    fn rustyssl_private_SSL_set_async_callback_arg(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_bio(_: *mut SSL, _: *mut BIO, _: *mut BIO);
-    fn rustssl_private_SSL_set_block_padding(_: *mut SSL, _: usize) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_block_padding_ex(
+    fn rustyssl_private_SSL_set_bio(_: *mut SSL, _: *mut BIO, _: *mut BIO);
+    fn rustyssl_private_SSL_set_block_padding(_: *mut SSL, _: usize) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_block_padding_ex(
         _: *mut SSL,
         _: usize,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_blocking_mode(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_cert_cb(
+    fn rustyssl_private_SSL_set_blocking_mode(_: *mut SSL, _: core::ffi::c_int)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_cert_cb(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(ssl: *mut SSL, arg: *mut core::ffi::c_void) -> core::ffi::c_int,
         >,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_set_cipher_list(
+    fn rustyssl_private_SSL_set_cipher_list(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_ciphersuites(
+    fn rustyssl_private_SSL_set_ciphersuites(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_client_CA_list(_: *mut SSL, _: *mut stack_st_X509_NAME);
-    fn rustssl_private_SSL_set_connect_state(_: *mut SSL);
-    fn rustssl_private_SSL_set_ct_validation_callback(
+    fn rustyssl_private_SSL_set_client_CA_list(_: *mut SSL, _: *mut stack_st_X509_NAME);
+    fn rustyssl_private_SSL_set_connect_state(_: *mut SSL);
+    fn rustyssl_private_SSL_set_ct_validation_callback(
         _: *mut SSL,
         _: ssl_ct_validation_cb,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_debug(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_default_passwd_cb(_: *mut SSL, _: pem_password_cb);
-    fn rustssl_private_SSL_set_default_passwd_cb_userdata(_: *mut SSL, _: *mut core::ffi::c_void);
-    fn rustssl_private_SSL_set_default_read_buffer_len(_: *mut SSL, _: usize);
-    fn rustssl_private_SSL_set_default_stream_mode(_: *mut SSL, _: u32) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_ex_data(
+    fn rustyssl_private_SSL_set_debug(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_default_passwd_cb(_: *mut SSL, _: pem_password_cb);
+    fn rustyssl_private_SSL_set_default_passwd_cb_userdata(_: *mut SSL, _: *mut core::ffi::c_void);
+    fn rustyssl_private_SSL_set_default_read_buffer_len(_: *mut SSL, _: usize);
+    fn rustyssl_private_SSL_set_default_stream_mode(_: *mut SSL, _: u32) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_ex_data(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_fd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_generate_session_id(
+    fn rustyssl_private_SSL_set_fd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_generate_session_id(
         _: *mut SSL,
         _: GEN_SESSION_CB,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_hostflags(_: *mut SSL, _: core::ffi::c_uint);
-    fn rustssl_private_SSL_set_incoming_stream_policy(
+    fn rustyssl_private_SSL_set_hostflags(_: *mut SSL, _: core::ffi::c_uint);
+    fn rustyssl_private_SSL_set_incoming_stream_policy(
         _: *mut SSL,
         _: core::ffi::c_int,
         _: u64,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_info_callback(
+    fn rustyssl_private_SSL_set_info_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(ssl: *const SSL, type_: core::ffi::c_int, val: core::ffi::c_int),
         >,
     );
-    fn rustssl_private_SSL_set_max_early_data(_: *mut SSL, _: u32) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_msg_callback(
+    fn rustyssl_private_SSL_set_max_early_data(_: *mut SSL, _: u32) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_msg_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -1526,7 +1549,7 @@ unsafe extern "C" {
             ),
         >,
     );
-    fn rustssl_private_SSL_set_not_resumable_session_callback(
+    fn rustyssl_private_SSL_set_not_resumable_session_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -1535,37 +1558,37 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_set_num_tickets(_: *mut SSL, _: usize) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_options(_: *mut SSL, _: u64) -> u64;
-    fn rustssl_private_SSL_set_post_handshake_auth(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_psk_client_callback(_: *mut SSL, _: SSL_psk_client_cb_func);
-    fn rustssl_private_SSL_set_psk_find_session_callback(
+    fn rustyssl_private_SSL_set_num_tickets(_: *mut SSL, _: usize) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_options(_: *mut SSL, _: u64) -> u64;
+    fn rustyssl_private_SSL_set_post_handshake_auth(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_psk_client_callback(_: *mut SSL, _: SSL_psk_client_cb_func);
+    fn rustyssl_private_SSL_set_psk_find_session_callback(
         _: *mut SSL,
         _: SSL_psk_find_session_cb_func,
     );
-    fn rustssl_private_SSL_set_psk_server_callback(_: *mut SSL, _: SSL_psk_server_cb_func);
-    fn rustssl_private_SSL_set_psk_use_session_callback(
+    fn rustyssl_private_SSL_set_psk_server_callback(_: *mut SSL, _: SSL_psk_server_cb_func);
+    fn rustyssl_private_SSL_set_psk_use_session_callback(
         _: *mut SSL,
         _: SSL_psk_use_session_cb_func,
     );
-    fn rustssl_private_SSL_set_purpose(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_quic_tls_cbs(
+    fn rustyssl_private_SSL_set_purpose(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_quic_tls_cbs(
         _: *mut SSL,
         _: *const OSSL_DISPATCH,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_quic_tls_early_data_enabled(
+    fn rustyssl_private_SSL_set_quic_tls_early_data_enabled(
         _: *mut SSL,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_quic_tls_transport_params(
+    fn rustyssl_private_SSL_set_quic_tls_transport_params(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_quiet_shutdown(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_read_ahead(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_record_padding_callback(
+    fn rustyssl_private_SSL_set_quiet_shutdown(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_read_ahead(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_record_padding_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -1576,10 +1599,10 @@ unsafe extern "C" {
             ) -> usize,
         >,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_record_padding_callback_arg(_: *mut SSL, _: *mut core::ffi::c_void);
-    fn rustssl_private_SSL_set_recv_max_early_data(_: *mut SSL, _: u32) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_rfd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_security_callback(
+    fn rustyssl_private_SSL_set_record_padding_callback_arg(_: *mut SSL, _: *mut core::ffi::c_void);
+    fn rustyssl_private_SSL_set_recv_max_early_data(_: *mut SSL, _: u32) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_rfd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_security_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -1593,30 +1616,30 @@ unsafe extern "C" {
             ) -> core::ffi::c_int,
         >,
     );
-    fn rustssl_private_SSL_set_security_level(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_session(_: *mut SSL, _: *mut SSL_SESSION) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_session_id_context(
+    fn rustyssl_private_SSL_set_security_level(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_session(_: *mut SSL, _: *mut SSL_SESSION) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_session_id_context(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_uint,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_session_secret_cb(
+    fn rustyssl_private_SSL_set_session_secret_cb(
         _: *mut SSL,
         _: tls_session_secret_cb_fn,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_session_ticket_ext(
+    fn rustyssl_private_SSL_set_session_ticket_ext(
         _: *mut SSL,
         _: *mut core::ffi::c_void,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_session_ticket_ext_cb(
+    fn rustyssl_private_SSL_set_session_ticket_ext_cb(
         _: *mut SSL,
         _: tls_session_ticket_ext_cb_fn,
         _: *mut core::ffi::c_void,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_shutdown(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_srp_server_param(
+    fn rustyssl_private_SSL_set_shutdown(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_srp_server_param(
         _: *mut SSL,
         _: *const BIGNUM,
         _: *const BIGNUM,
@@ -1624,19 +1647,19 @@ unsafe extern "C" {
         _: *mut BIGNUM,
         _: *mut core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_srp_server_param_pw(
+    fn rustyssl_private_SSL_set_srp_server_param_pw(
         _: *mut SSL,
         _: *const core::ffi::c_char,
         _: *const core::ffi::c_char,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_ssl_method(_: *mut SSL, _: *const SSL_METHOD) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_tlsext_max_fragment_length(_: *mut SSL, _: u8) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_tlsext_use_srtp(
+    fn rustyssl_private_SSL_set_ssl_method(_: *mut SSL, _: *const SSL_METHOD) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_tlsext_max_fragment_length(_: *mut SSL, _: u8) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_tlsext_use_srtp(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_tmp_dh_callback(
+    fn rustyssl_private_SSL_set_tmp_dh_callback(
         _: *mut SSL,
         _: ::core::option::Option<
             unsafe extern "C" fn(
@@ -1646,33 +1669,34 @@ unsafe extern "C" {
             ) -> *mut DH,
         >,
     );
-    fn rustssl_private_SSL_set_trust(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_value_uint(_: *mut SSL, _: u32, _: u32, _: u64) -> core::ffi::c_int;
-    fn rustssl_private_SSL_set_verify(_: *mut SSL, _: core::ffi::c_int, _: SSL_verify_cb);
-    fn rustssl_private_SSL_set_verify_depth(_: *mut SSL, _: core::ffi::c_int);
-    fn rustssl_private_SSL_set_verify_result(_: *mut SSL, _: core::ffi::c_long);
-    fn rustssl_private_SSL_set_wfd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
-    fn rustssl_private_SSL_shutdown(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_shutdown_ex(
+    fn rustyssl_private_SSL_set_trust(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_value_uint(_: *mut SSL, _: u32, _: u32, _: u64)
+    -> core::ffi::c_int;
+    fn rustyssl_private_SSL_set_verify(_: *mut SSL, _: core::ffi::c_int, _: SSL_verify_cb);
+    fn rustyssl_private_SSL_set_verify_depth(_: *mut SSL, _: core::ffi::c_int);
+    fn rustyssl_private_SSL_set_verify_result(_: *mut SSL, _: core::ffi::c_long);
+    fn rustyssl_private_SSL_set_wfd(_: *mut SSL, _: core::ffi::c_int) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_shutdown(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_shutdown_ex(
         _: *mut SSL,
         _: u64,
         _: *const SSL_SHUTDOWN_EX_ARGS,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_srp_server_param_with_username(
+    fn rustyssl_private_SSL_srp_server_param_with_username(
         _: *mut SSL,
         _: *mut core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_state_string(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_state_string_long(_: *const SSL) -> *const core::ffi::c_char;
-    fn rustssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_stream_conclude(_: *mut SSL, _: u64) -> core::ffi::c_int;
-    fn rustssl_private_SSL_stream_reset(
+    fn rustyssl_private_SSL_state_string(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_state_string_long(_: *const SSL) -> *const core::ffi::c_char;
+    fn rustyssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_stream_conclude(_: *mut SSL, _: u64) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_stream_reset(
         _: *mut SSL,
         _: *const SSL_STREAM_RESET_ARGS,
         _: usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_trace(
+    fn rustyssl_private_SSL_trace(
         _: core::ffi::c_int,
         _: core::ffi::c_int,
         _: core::ffi::c_int,
@@ -1681,109 +1705,109 @@ unsafe extern "C" {
         _: *mut SSL,
         _: *mut core::ffi::c_void,
     );
-    fn rustssl_private_SSL_up_ref(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_PrivateKey(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_PrivateKey_ASN1(
+    fn rustyssl_private_SSL_up_ref(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_use_PrivateKey(_: *mut SSL, _: *mut EVP_PKEY) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_use_PrivateKey_ASN1(
         _: core::ffi::c_int,
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_long,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_PrivateKey_file(
+    fn rustyssl_private_SSL_use_PrivateKey_file(
         _: *mut SSL,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_RSAPrivateKey(_: *mut SSL, _: *mut RSA) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_RSAPrivateKey_ASN1(
+    fn rustyssl_private_SSL_use_RSAPrivateKey(_: *mut SSL, _: *mut RSA) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_use_RSAPrivateKey_ASN1(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_long,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_RSAPrivateKey_file(
+    fn rustyssl_private_SSL_use_RSAPrivateKey_file(
         _: *mut SSL,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_cert_and_key(
+    fn rustyssl_private_SSL_use_cert_and_key(
         _: *mut SSL,
         _: *mut X509,
         _: *mut EVP_PKEY,
         _: *mut stack_st_X509,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_certificate(_: *mut SSL, _: *mut X509) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_certificate_ASN1(
+    fn rustyssl_private_SSL_use_certificate(_: *mut SSL, _: *mut X509) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_use_certificate_ASN1(
         _: *mut SSL,
         _: *const core::ffi::c_uchar,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_certificate_chain_file(
+    fn rustyssl_private_SSL_use_certificate_chain_file(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_certificate_file(
+    fn rustyssl_private_SSL_use_certificate_file(
         _: *mut SSL,
         _: *const core::ffi::c_char,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_use_psk_identity_hint(
+    fn rustyssl_private_SSL_use_psk_identity_hint(
         _: *mut SSL,
         _: *const core::ffi::c_char,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_verify_client_post_handshake(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_version(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_waiting_for_async(_: *mut SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_want(_: *const SSL) -> core::ffi::c_int;
-    fn rustssl_private_SSL_write(
+    fn rustyssl_private_SSL_verify_client_post_handshake(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_version(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_waiting_for_async(_: *mut SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_want(_: *const SSL) -> core::ffi::c_int;
+    fn rustyssl_private_SSL_write(
         _: *mut SSL,
         _: *const core::ffi::c_void,
         _: core::ffi::c_int,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_write_early_data(
+    fn rustyssl_private_SSL_write_early_data(
         _: *mut SSL,
         _: *const core::ffi::c_void,
         _: usize,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_write_ex(
+    fn rustyssl_private_SSL_write_ex(
         _: *mut SSL,
         _: *const core::ffi::c_void,
         _: usize,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_SSL_write_ex2(
+    fn rustyssl_private_SSL_write_ex2(
         _: *mut SSL,
         _: *const core::ffi::c_void,
         _: usize,
         _: u64,
         _: *mut usize,
     ) -> core::ffi::c_int;
-    fn rustssl_private_TLS_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLS_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLS_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_1_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_1_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_1_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_2_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_2_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_2_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_client_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_method() -> *const SSL_METHOD;
-    fn rustssl_private_TLSv1_server_method() -> *const SSL_METHOD;
-    fn rustssl_private_d2i_SSL_SESSION(
+    fn rustyssl_private_TLS_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLS_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLS_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_1_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_1_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_1_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_2_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_2_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_2_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_client_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_method() -> *const SSL_METHOD;
+    fn rustyssl_private_TLSv1_server_method() -> *const SSL_METHOD;
+    fn rustyssl_private_d2i_SSL_SESSION(
         _: *mut *mut SSL_SESSION,
         _: *mut *const core::ffi::c_uchar,
         _: core::ffi::c_long,
     ) -> *mut SSL_SESSION;
-    fn rustssl_private_d2i_SSL_SESSION_ex(
+    fn rustyssl_private_d2i_SSL_SESSION_ex(
         _: *mut *mut SSL_SESSION,
         _: *mut *const core::ffi::c_uchar,
         _: core::ffi::c_long,
         _: *mut OSSL_LIB_CTX,
         _: *const core::ffi::c_char,
     ) -> *mut SSL_SESSION;
-    fn rustssl_private_i2d_SSL_SESSION(
+    fn rustyssl_private_i2d_SSL_SESSION(
         _: *const SSL_SESSION,
         _: *mut *mut core::ffi::c_uchar,
     ) -> core::ffi::c_int;
@@ -1793,133 +1817,133 @@ unsafe extern "C" {
 pub unsafe extern "C" fn BIO_f_ssl() -> *const BIO_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_f_ssl() }
+    unsafe { rustyssl_private_BIO_f_ssl() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_new_buffer_ssl_connect(a0: *mut SSL_CTX) -> *mut BIO {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_new_buffer_ssl_connect(a0) }
+    unsafe { rustyssl_private_BIO_new_buffer_ssl_connect(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_new_ssl(a0: *mut SSL_CTX, a1: core::ffi::c_int) -> *mut BIO {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_new_ssl(a0, a1) }
+    unsafe { rustyssl_private_BIO_new_ssl(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_new_ssl_connect(a0: *mut SSL_CTX) -> *mut BIO {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_new_ssl_connect(a0) }
+    unsafe { rustyssl_private_BIO_new_ssl_connect(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_ssl_copy_session_id(a0: *mut BIO, a1: *mut BIO) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_ssl_copy_session_id(a0, a1) }
+    unsafe { rustyssl_private_BIO_ssl_copy_session_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn BIO_ssl_shutdown(a0: *mut BIO) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_BIO_ssl_shutdown(a0) }
+    unsafe { rustyssl_private_BIO_ssl_shutdown(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLS_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLS_client_method() }
+    unsafe { rustyssl_private_DTLS_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLS_get_data_mtu(a0: *const SSL) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLS_get_data_mtu(a0) }
+    unsafe { rustyssl_private_DTLS_get_data_mtu(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLS_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLS_method() }
+    unsafe { rustyssl_private_DTLS_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLS_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLS_server_method() }
+    unsafe { rustyssl_private_DTLS_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLS_set_timer_cb(a0: *mut SSL, a1: DTLS_timer_cb) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLS_set_timer_cb(a0, a1) }
+    unsafe { rustyssl_private_DTLS_set_timer_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_2_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_2_client_method() }
+    unsafe { rustyssl_private_DTLSv1_2_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_2_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_2_method() }
+    unsafe { rustyssl_private_DTLSv1_2_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_2_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_2_server_method() }
+    unsafe { rustyssl_private_DTLSv1_2_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_client_method() }
+    unsafe { rustyssl_private_DTLSv1_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_listen(a0: *mut SSL, a1: *mut BIO_ADDR) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_listen(a0, a1) }
+    unsafe { rustyssl_private_DTLSv1_listen(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_method() }
+    unsafe { rustyssl_private_DTLSv1_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn DTLSv1_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_DTLSv1_server_method() }
+    unsafe { rustyssl_private_DTLSv1_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ERR_load_SSL_strings() -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_ERR_load_SSL_strings() }
+    unsafe { rustyssl_private_ERR_load_SSL_strings() }
 }
 
 #[unsafe(no_mangle)]
@@ -1928,7 +1952,7 @@ pub unsafe extern "C" fn OPENSSL_cipher_name(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OPENSSL_cipher_name(a0) }
+    unsafe { rustyssl_private_OPENSSL_cipher_name(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -1938,42 +1962,42 @@ pub unsafe extern "C" fn OPENSSL_init_ssl(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OPENSSL_init_ssl(a0, a1) }
+    unsafe { rustyssl_private_OPENSSL_init_ssl(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn OSSL_QUIC_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OSSL_QUIC_client_method() }
+    unsafe { rustyssl_private_OSSL_QUIC_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn OSSL_QUIC_client_thread_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OSSL_QUIC_client_thread_method() }
+    unsafe { rustyssl_private_OSSL_QUIC_client_thread_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn OSSL_QUIC_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OSSL_QUIC_server_method() }
+    unsafe { rustyssl_private_OSSL_QUIC_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn OSSL_default_cipher_list() -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OSSL_default_cipher_list() }
+    unsafe { rustyssl_private_OSSL_default_cipher_list() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn OSSL_default_ciphersuites() -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_OSSL_default_ciphersuites() }
+    unsafe { rustyssl_private_OSSL_default_ciphersuites() }
 }
 
 #[unsafe(no_mangle)]
@@ -1985,7 +2009,7 @@ pub unsafe extern "C" fn PEM_read_SSL_SESSION(
 ) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_PEM_read_SSL_SESSION(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_PEM_read_SSL_SESSION(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -1997,7 +2021,7 @@ pub unsafe extern "C" fn PEM_read_bio_SSL_SESSION(
 ) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_PEM_read_bio_SSL_SESSION(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_PEM_read_bio_SSL_SESSION(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -2007,7 +2031,7 @@ pub unsafe extern "C" fn PEM_write_SSL_SESSION(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_PEM_write_SSL_SESSION(a0, a1) }
+    unsafe { rustyssl_private_PEM_write_SSL_SESSION(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2017,14 +2041,14 @@ pub unsafe extern "C" fn PEM_write_bio_SSL_SESSION(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_PEM_write_bio_SSL_SESSION(a0, a1) }
+    unsafe { rustyssl_private_PEM_write_bio_SSL_SESSION(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SRP_Calc_A_param(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SRP_Calc_A_param(a0) }
+    unsafe { rustyssl_private_SRP_Calc_A_param(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2035,7 +2059,7 @@ pub unsafe extern "C" fn SSL_CIPHER_description(
 ) -> *mut core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_description(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CIPHER_description(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2045,14 +2069,14 @@ pub unsafe extern "C" fn SSL_CIPHER_find(
 ) -> *const SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_find(a0, a1) }
+    unsafe { rustyssl_private_SSL_CIPHER_find(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_auth_nid(a0: *const SSL_CIPHER) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_auth_nid(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_auth_nid(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2062,70 +2086,70 @@ pub unsafe extern "C" fn SSL_CIPHER_get_bits(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_bits(a0, a1) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_bits(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_cipher_nid(a0: *const SSL_CIPHER) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_cipher_nid(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_cipher_nid(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_digest_nid(a0: *const SSL_CIPHER) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_digest_nid(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_digest_nid(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_handshake_digest(a0: *const SSL_CIPHER) -> *const EVP_MD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_handshake_digest(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_handshake_digest(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_id(a0: *const SSL_CIPHER) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_id(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_id(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_kx_nid(a0: *const SSL_CIPHER) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_kx_nid(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_kx_nid(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_name(a0: *const SSL_CIPHER) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_name(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_name(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_protocol_id(a0: *const SSL_CIPHER) -> u16 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_protocol_id(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_protocol_id(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_get_version(a0: *const SSL_CIPHER) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_get_version(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_get_version(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CIPHER_is_aead(a0: *const SSL_CIPHER) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_is_aead(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_is_aead(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2134,7 +2158,7 @@ pub unsafe extern "C" fn SSL_CIPHER_standard_name(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CIPHER_standard_name(a0) }
+    unsafe { rustyssl_private_SSL_CIPHER_standard_name(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2144,35 +2168,35 @@ pub unsafe extern "C" fn SSL_COMP_add_compression_method(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_add_compression_method(a0, a1) }
+    unsafe { rustyssl_private_SSL_COMP_add_compression_method(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_COMP_get0_name(a0: *const SSL_COMP) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_get0_name(a0) }
+    unsafe { rustyssl_private_SSL_COMP_get0_name(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_COMP_get_compression_methods() -> *mut stack_st_SSL_COMP {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_get_compression_methods() }
+    unsafe { rustyssl_private_SSL_COMP_get_compression_methods() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_COMP_get_id(a0: *const SSL_COMP) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_get_id(a0) }
+    unsafe { rustyssl_private_SSL_COMP_get_id(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_COMP_get_name(a0: *const COMP_METHOD) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_get_name(a0) }
+    unsafe { rustyssl_private_SSL_COMP_get_name(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2181,7 +2205,7 @@ pub unsafe extern "C" fn SSL_COMP_set0_compression_methods(
 ) -> *mut stack_st_SSL_COMP {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_COMP_set0_compression_methods(a0) }
+    unsafe { rustyssl_private_SSL_COMP_set0_compression_methods(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2191,28 +2215,28 @@ pub unsafe extern "C" fn SSL_CONF_CTX_clear_flags(
 ) -> core::ffi::c_uint {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_clear_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_clear_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CONF_CTX_finish(a0: *mut SSL_CONF_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_finish(a0) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_finish(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CONF_CTX_free(a0: *mut SSL_CONF_CTX) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_free(a0) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_free(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CONF_CTX_new() -> *mut SSL_CONF_CTX {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_new() }
+    unsafe { rustyssl_private_SSL_CONF_CTX_new() }
 }
 
 #[unsafe(no_mangle)]
@@ -2222,7 +2246,7 @@ pub unsafe extern "C" fn SSL_CONF_CTX_set1_prefix(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_set1_prefix(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_set1_prefix(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2232,21 +2256,21 @@ pub unsafe extern "C" fn SSL_CONF_CTX_set_flags(
 ) -> core::ffi::c_uint {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_set_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_set_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CONF_CTX_set_ssl(a0: *mut SSL_CONF_CTX, a1: *mut SSL) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_set_ssl(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_set_ssl(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CONF_CTX_set_ssl_ctx(a0: *mut SSL_CONF_CTX, a1: *mut SSL_CTX) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_CTX_set_ssl_ctx(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_CTX_set_ssl_ctx(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2257,7 +2281,7 @@ pub unsafe extern "C" fn SSL_CONF_cmd(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_cmd(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CONF_cmd(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2268,7 +2292,7 @@ pub unsafe extern "C" fn SSL_CONF_cmd_argv(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_cmd_argv(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CONF_cmd_argv(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2278,21 +2302,21 @@ pub unsafe extern "C" fn SSL_CONF_cmd_value_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CONF_cmd_value_type(a0, a1) }
+    unsafe { rustyssl_private_SSL_CONF_cmd_value_type(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_SRP_CTX_free(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_SRP_CTX_free(a0) }
+    unsafe { rustyssl_private_SSL_CTX_SRP_CTX_free(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_SRP_CTX_init(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_SRP_CTX_init(a0) }
+    unsafe { rustyssl_private_SSL_CTX_SRP_CTX_init(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2302,7 +2326,7 @@ pub unsafe extern "C" fn SSL_CTX_add1_to_CA_list(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add1_to_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_add1_to_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2312,7 +2336,7 @@ pub unsafe extern "C" fn SSL_CTX_add_client_CA(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add_client_CA(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_add_client_CA(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2327,7 +2351,7 @@ pub unsafe extern "C" fn SSL_CTX_add_client_custom_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add_client_custom_ext(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_CTX_add_client_custom_ext(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
@@ -2343,7 +2367,7 @@ pub unsafe extern "C" fn SSL_CTX_add_custom_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add_custom_ext(a0, a1, a2, a3, a4, a5, a6, a7) }
+    unsafe { rustyssl_private_SSL_CTX_add_custom_ext(a0, a1, a2, a3, a4, a5, a6, a7) }
 }
 
 #[unsafe(no_mangle)]
@@ -2358,7 +2382,7 @@ pub unsafe extern "C" fn SSL_CTX_add_server_custom_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add_server_custom_ext(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_CTX_add_server_custom_ext(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
@@ -2368,7 +2392,7 @@ pub unsafe extern "C" fn SSL_CTX_add_session(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_add_session(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_add_session(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2379,21 +2403,21 @@ pub unsafe extern "C" fn SSL_CTX_callback_ctrl(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_callback_ctrl(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_callback_ctrl(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_check_private_key(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_check_private_key(a0) }
+    unsafe { rustyssl_private_SSL_CTX_check_private_key(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_clear_options(a0: *mut SSL_CTX, a1: u64) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_clear_options(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_clear_options(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2403,7 +2427,7 @@ pub unsafe extern "C" fn SSL_CTX_compress_certs(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_compress_certs(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_compress_certs(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2413,14 +2437,14 @@ pub unsafe extern "C" fn SSL_CTX_config(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_config(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_config(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_ct_is_enabled(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_ct_is_enabled(a0) }
+    unsafe { rustyssl_private_SSL_CTX_ct_is_enabled(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2432,7 +2456,7 @@ pub unsafe extern "C" fn SSL_CTX_ctrl(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_ctrl(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_ctrl(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -2442,14 +2466,14 @@ pub unsafe extern "C" fn SSL_CTX_dane_clear_flags(
 ) -> core::ffi::c_ulong {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_dane_clear_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_dane_clear_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_dane_enable(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_dane_enable(a0) }
+    unsafe { rustyssl_private_SSL_CTX_dane_enable(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2461,7 +2485,7 @@ pub unsafe extern "C" fn SSL_CTX_dane_mtype_set(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_dane_mtype_set(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_dane_mtype_set(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -2471,7 +2495,7 @@ pub unsafe extern "C" fn SSL_CTX_dane_set_flags(
 ) -> core::ffi::c_ulong {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_dane_set_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_dane_set_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2481,42 +2505,42 @@ pub unsafe extern "C" fn SSL_CTX_enable_ct(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_enable_ct(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_enable_ct(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_flush_sessions(a0: *mut SSL_CTX, a1: core::ffi::c_long) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_flush_sessions(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_flush_sessions(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_flush_sessions_ex(a0: *mut SSL_CTX, a1: time_t) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_flush_sessions_ex(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_flush_sessions_ex(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_free(a0: *mut SSL_CTX) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_free(a0) }
+    unsafe { rustyssl_private_SSL_CTX_free(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get0_CA_list(a0: *const SSL_CTX) -> *const stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get0_certificate(a0: *const SSL_CTX) -> *mut X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_certificate(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_certificate(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2527,28 +2551,28 @@ pub unsafe extern "C" fn SSL_CTX_get0_client_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_client_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_get0_client_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get0_ctlog_store(a0: *const SSL_CTX) -> *const CTLOG_STORE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_ctlog_store(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_ctlog_store(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get0_param(a0: *mut SSL_CTX) -> *mut X509_VERIFY_PARAM {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_param(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_param(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get0_privatekey(a0: *const SSL_CTX) -> *mut EVP_PKEY {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_privatekey(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_privatekey(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2557,7 +2581,7 @@ pub unsafe extern "C" fn SSL_CTX_get0_security_ex_data(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_security_ex_data(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get0_security_ex_data(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2568,7 +2592,7 @@ pub unsafe extern "C" fn SSL_CTX_get0_server_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get0_server_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_get0_server_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2580,28 +2604,28 @@ pub unsafe extern "C" fn SSL_CTX_get1_compressed_cert(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get1_compressed_cert(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_get1_compressed_cert(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_cert_store(a0: *const SSL_CTX) -> *mut X509_STORE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_cert_store(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_cert_store(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_ciphers(a0: *const SSL_CTX) -> *mut stack_st_SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_ciphers(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_ciphers(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_client_CA_list(a0: *const SSL_CTX) -> *mut stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_client_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_client_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2616,14 +2640,14 @@ pub unsafe extern "C" fn SSL_CTX_get_client_cert_cb(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_client_cert_cb(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_client_cert_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_default_passwd_cb(a0: *mut SSL_CTX) -> pem_password_cb {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_default_passwd_cb(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_default_passwd_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2632,7 +2656,7 @@ pub unsafe extern "C" fn SSL_CTX_get_default_passwd_cb_userdata(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_default_passwd_cb_userdata(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_default_passwd_cb_userdata(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2642,7 +2666,7 @@ pub unsafe extern "C" fn SSL_CTX_get_domain_flags(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_domain_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_get_domain_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2652,7 +2676,7 @@ pub unsafe extern "C" fn SSL_CTX_get_ex_data(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_ex_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_get_ex_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2663,42 +2687,42 @@ pub unsafe extern "C" fn SSL_CTX_get_info_callback(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_info_callback(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_info_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_keylog_callback(a0: *const SSL_CTX) -> SSL_CTX_keylog_cb_func {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_keylog_callback(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_keylog_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_max_early_data(a0: *const SSL_CTX) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_max_early_data(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_max_early_data(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_num_tickets(a0: *const SSL_CTX) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_num_tickets(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_num_tickets(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_options(a0: *const SSL_CTX) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_options(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_options(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_quiet_shutdown(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_quiet_shutdown(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_quiet_shutdown(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2707,14 +2731,14 @@ pub unsafe extern "C" fn SSL_CTX_get_record_padding_callback_arg(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_record_padding_callback_arg(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_record_padding_callback_arg(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_recv_max_early_data(a0: *const SSL_CTX) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_recv_max_early_data(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_recv_max_early_data(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2733,49 +2757,49 @@ pub unsafe extern "C" fn SSL_CTX_get_security_callback(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_security_callback(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_security_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_security_level(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_security_level(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_security_level(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_ssl_method(a0: *const SSL_CTX) -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_ssl_method(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_ssl_method(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_timeout(a0: *const SSL_CTX) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_timeout(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_timeout(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_verify_callback(a0: *const SSL_CTX) -> SSL_verify_cb {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_verify_callback(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_verify_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_verify_depth(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_verify_depth(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_verify_depth(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_get_verify_mode(a0: *const SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_get_verify_mode(a0) }
+    unsafe { rustyssl_private_SSL_CTX_get_verify_mode(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2785,7 +2809,7 @@ pub unsafe extern "C" fn SSL_CTX_has_client_custom_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_has_client_custom_ext(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_has_client_custom_ext(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2795,7 +2819,7 @@ pub unsafe extern "C" fn SSL_CTX_load_verify_dir(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_load_verify_dir(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_load_verify_dir(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2805,7 +2829,7 @@ pub unsafe extern "C" fn SSL_CTX_load_verify_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_load_verify_file(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_load_verify_file(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2816,7 +2840,7 @@ pub unsafe extern "C" fn SSL_CTX_load_verify_locations(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_load_verify_locations(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_load_verify_locations(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2826,14 +2850,14 @@ pub unsafe extern "C" fn SSL_CTX_load_verify_store(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_load_verify_store(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_load_verify_store(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_new(a0: *const SSL_METHOD) -> *mut SSL_CTX {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_new(a0) }
+    unsafe { rustyssl_private_SSL_CTX_new(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2844,7 +2868,7 @@ pub unsafe extern "C" fn SSL_CTX_new_ex(
 ) -> *mut SSL_CTX {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_new_ex(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_new_ex(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -2854,7 +2878,7 @@ pub unsafe extern "C" fn SSL_CTX_remove_session(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_remove_session(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_remove_session(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2870,7 +2894,7 @@ pub unsafe extern "C" fn SSL_CTX_sess_get_get_cb(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_get_get_cb(a0) }
+    unsafe { rustyssl_private_SSL_CTX_sess_get_get_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2881,7 +2905,7 @@ pub unsafe extern "C" fn SSL_CTX_sess_get_new_cb(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_get_new_cb(a0) }
+    unsafe { rustyssl_private_SSL_CTX_sess_get_new_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2890,7 +2914,7 @@ pub unsafe extern "C" fn SSL_CTX_sess_get_remove_cb(
 ) -> ::core::option::Option<unsafe extern "C" fn(ctx: *mut ssl_ctx_st, arg1: *mut SSL_SESSION)> {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_get_remove_cb(a0) }
+    unsafe { rustyssl_private_SSL_CTX_sess_get_remove_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -2907,7 +2931,7 @@ pub unsafe extern "C" fn SSL_CTX_sess_set_get_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_set_get_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_sess_set_get_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2919,7 +2943,7 @@ pub unsafe extern "C" fn SSL_CTX_sess_set_new_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_set_new_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_sess_set_new_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2929,28 +2953,28 @@ pub unsafe extern "C" fn SSL_CTX_sess_set_remove_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sess_set_remove_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_sess_set_remove_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_sessions(a0: *mut SSL_CTX) -> *mut lhash_st_SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_sessions(a0) }
+    unsafe { rustyssl_private_SSL_CTX_sessions(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set0_CA_list(a0: *mut SSL_CTX, a1: *mut stack_st_X509_NAME) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set0_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set0_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set0_ctlog_store(a0: *mut SSL_CTX, a1: *mut CTLOG_STORE) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set0_ctlog_store(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set0_ctlog_store(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2960,7 +2984,7 @@ pub unsafe extern "C" fn SSL_CTX_set0_security_ex_data(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set0_security_ex_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set0_security_ex_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2970,7 +2994,7 @@ pub unsafe extern "C" fn SSL_CTX_set0_tmp_dh_pkey(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set0_tmp_dh_pkey(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set0_tmp_dh_pkey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2981,14 +3005,14 @@ pub unsafe extern "C" fn SSL_CTX_set1_cert_comp_preference(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_cert_comp_preference(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set1_cert_comp_preference(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set1_cert_store(a0: *mut SSL_CTX, a1: *mut X509_STORE) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_cert_store(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set1_cert_store(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -2999,7 +3023,7 @@ pub unsafe extern "C" fn SSL_CTX_set1_client_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_client_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set1_client_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3012,7 +3036,7 @@ pub unsafe extern "C" fn SSL_CTX_set1_compressed_cert(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_compressed_cert(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_CTX_set1_compressed_cert(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
@@ -3022,7 +3046,7 @@ pub unsafe extern "C" fn SSL_CTX_set1_param(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_param(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set1_param(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3033,7 +3057,7 @@ pub unsafe extern "C" fn SSL_CTX_set1_server_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set1_server_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set1_server_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3044,7 +3068,7 @@ pub unsafe extern "C" fn SSL_CTX_set_allow_early_data_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_allow_early_data_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_allow_early_data_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3055,7 +3079,7 @@ pub unsafe extern "C" fn SSL_CTX_set_alpn_protos(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_alpn_protos(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_alpn_protos(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3066,7 +3090,7 @@ pub unsafe extern "C" fn SSL_CTX_set_alpn_select_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_alpn_select_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_alpn_select_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3076,7 +3100,7 @@ pub unsafe extern "C" fn SSL_CTX_set_async_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_async_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_async_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3086,7 +3110,7 @@ pub unsafe extern "C" fn SSL_CTX_set_async_callback_arg(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_async_callback_arg(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_async_callback_arg(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3096,7 +3120,7 @@ pub unsafe extern "C" fn SSL_CTX_set_block_padding(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_block_padding(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_block_padding(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3107,7 +3131,7 @@ pub unsafe extern "C" fn SSL_CTX_set_block_padding_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_block_padding_ex(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_block_padding_ex(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3120,14 +3144,14 @@ pub unsafe extern "C" fn SSL_CTX_set_cert_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cert_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_cert_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_cert_store(a0: *mut SSL_CTX, a1: *mut X509_STORE) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cert_store(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_cert_store(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3143,7 +3167,7 @@ pub unsafe extern "C" fn SSL_CTX_set_cert_verify_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cert_verify_callback(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_cert_verify_callback(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3153,7 +3177,7 @@ pub unsafe extern "C" fn SSL_CTX_set_cipher_list(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cipher_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_cipher_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3163,14 +3187,14 @@ pub unsafe extern "C" fn SSL_CTX_set_ciphersuites(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_ciphersuites(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_ciphersuites(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_client_CA_list(a0: *mut SSL_CTX, a1: *mut stack_st_X509_NAME) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_client_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_client_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3186,7 +3210,7 @@ pub unsafe extern "C" fn SSL_CTX_set_client_cert_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_client_cert_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_client_cert_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3196,7 +3220,7 @@ pub unsafe extern "C" fn SSL_CTX_set_client_cert_engine(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_client_cert_engine(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_client_cert_engine(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3207,7 +3231,7 @@ pub unsafe extern "C" fn SSL_CTX_set_client_hello_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_client_hello_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_client_hello_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3223,7 +3247,7 @@ pub unsafe extern "C" fn SSL_CTX_set_cookie_generate_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cookie_generate_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_cookie_generate_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3239,7 +3263,7 @@ pub unsafe extern "C" fn SSL_CTX_set_cookie_verify_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_cookie_verify_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_cookie_verify_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3250,7 +3274,7 @@ pub unsafe extern "C" fn SSL_CTX_set_ct_validation_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_ct_validation_callback(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_ct_validation_callback(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3260,21 +3284,21 @@ pub unsafe extern "C" fn SSL_CTX_set_ctlog_list_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_ctlog_list_file(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_ctlog_list_file(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_ctlog_list_file(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_ctlog_list_file(a0) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_ctlog_list_file(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_passwd_cb(a0: *mut SSL_CTX, a1: pem_password_cb) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_passwd_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_passwd_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3284,49 +3308,49 @@ pub unsafe extern "C" fn SSL_CTX_set_default_passwd_cb_userdata(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_passwd_cb_userdata(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_passwd_cb_userdata(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_read_buffer_len(a0: *mut SSL_CTX, a1: usize) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_read_buffer_len(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_read_buffer_len(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_verify_dir(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_verify_dir(a0) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_verify_dir(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_verify_file(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_verify_file(a0) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_verify_file(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_verify_paths(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_verify_paths(a0) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_verify_paths(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_default_verify_store(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_default_verify_store(a0) }
+    unsafe { rustyssl_private_SSL_CTX_set_default_verify_store(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_domain_flags(a0: *mut SSL_CTX, a1: u64) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_domain_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_domain_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3337,7 +3361,7 @@ pub unsafe extern "C" fn SSL_CTX_set_ex_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_ex_data(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_ex_data(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3347,7 +3371,7 @@ pub unsafe extern "C" fn SSL_CTX_set_generate_session_id(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_generate_session_id(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_generate_session_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3359,21 +3383,21 @@ pub unsafe extern "C" fn SSL_CTX_set_info_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_info_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_info_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_keylog_callback(a0: *mut SSL_CTX, a1: SSL_CTX_keylog_cb_func) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_keylog_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_keylog_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_max_early_data(a0: *mut SSL_CTX, a1: u32) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_max_early_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_max_early_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3393,7 +3417,7 @@ pub unsafe extern "C" fn SSL_CTX_set_msg_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_msg_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_msg_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3404,7 +3428,7 @@ pub unsafe extern "C" fn SSL_CTX_set_new_pending_conn_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_new_pending_conn_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_new_pending_conn_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3415,7 +3439,7 @@ pub unsafe extern "C" fn SSL_CTX_set_next_proto_select_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_next_proto_select_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_next_proto_select_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3426,7 +3450,7 @@ pub unsafe extern "C" fn SSL_CTX_set_next_protos_advertised_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_next_protos_advertised_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_next_protos_advertised_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3441,28 +3465,28 @@ pub unsafe extern "C" fn SSL_CTX_set_not_resumable_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_not_resumable_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_not_resumable_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_num_tickets(a0: *mut SSL_CTX, a1: usize) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_num_tickets(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_num_tickets(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_options(a0: *mut SSL_CTX, a1: u64) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_options(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_options(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_post_handshake_auth(a0: *mut SSL_CTX, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_post_handshake_auth(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_post_handshake_auth(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3472,7 +3496,7 @@ pub unsafe extern "C" fn SSL_CTX_set_psk_client_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_psk_client_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_psk_client_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3482,7 +3506,7 @@ pub unsafe extern "C" fn SSL_CTX_set_psk_find_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_psk_find_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_psk_find_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3492,7 +3516,7 @@ pub unsafe extern "C" fn SSL_CTX_set_psk_server_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_psk_server_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_psk_server_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3502,7 +3526,7 @@ pub unsafe extern "C" fn SSL_CTX_set_psk_use_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_psk_use_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_psk_use_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3512,14 +3536,14 @@ pub unsafe extern "C" fn SSL_CTX_set_purpose(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_purpose(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_purpose(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_quiet_shutdown(a0: *mut SSL_CTX, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_quiet_shutdown(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_quiet_shutdown(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3536,7 +3560,7 @@ pub unsafe extern "C" fn SSL_CTX_set_record_padding_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_record_padding_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_record_padding_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3546,7 +3570,7 @@ pub unsafe extern "C" fn SSL_CTX_set_record_padding_callback_arg(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_record_padding_callback_arg(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_record_padding_callback_arg(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3556,7 +3580,7 @@ pub unsafe extern "C" fn SSL_CTX_set_recv_max_early_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_recv_max_early_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_recv_max_early_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3576,14 +3600,14 @@ pub unsafe extern "C" fn SSL_CTX_set_security_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_security_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_security_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_security_level(a0: *mut SSL_CTX, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_security_level(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_security_level(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3594,7 +3618,7 @@ pub unsafe extern "C" fn SSL_CTX_set_session_id_context(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_session_id_context(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_session_id_context(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3606,7 +3630,7 @@ pub unsafe extern "C" fn SSL_CTX_set_session_ticket_cb(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_session_ticket_cb(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_set_session_ticket_cb(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -3616,7 +3640,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_cb_arg(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_cb_arg(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_cb_arg(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3631,7 +3655,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_client_pwd_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_client_pwd_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_client_pwd_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3641,7 +3665,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_password(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_password(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_password(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3651,7 +3675,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_strength(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_strength(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_strength(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3661,7 +3685,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_username(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_username(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_username(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3677,7 +3701,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_username_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_username_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_username_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3689,7 +3713,7 @@ pub unsafe extern "C" fn SSL_CTX_set_srp_verify_param_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_srp_verify_param_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_srp_verify_param_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3699,7 +3723,7 @@ pub unsafe extern "C" fn SSL_CTX_set_ssl_version(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_ssl_version(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_ssl_version(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3715,7 +3739,7 @@ pub unsafe extern "C" fn SSL_CTX_set_stateless_cookie_generate_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_stateless_cookie_generate_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_stateless_cookie_generate_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3731,7 +3755,7 @@ pub unsafe extern "C" fn SSL_CTX_set_stateless_cookie_verify_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_stateless_cookie_verify_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_stateless_cookie_verify_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3741,7 +3765,7 @@ pub unsafe extern "C" fn SSL_CTX_set_timeout(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_timeout(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_timeout(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3751,7 +3775,7 @@ pub unsafe extern "C" fn SSL_CTX_set_tlsext_max_fragment_length(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_tlsext_max_fragment_length(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_tlsext_max_fragment_length(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3770,7 +3794,7 @@ pub unsafe extern "C" fn SSL_CTX_set_tlsext_ticket_key_evp_cb(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_tlsext_ticket_key_evp_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_tlsext_ticket_key_evp_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3780,7 +3804,7 @@ pub unsafe extern "C" fn SSL_CTX_set_tlsext_use_srtp(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_tlsext_use_srtp(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_tlsext_use_srtp(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3796,7 +3820,7 @@ pub unsafe extern "C" fn SSL_CTX_set_tmp_dh_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_tmp_dh_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_tmp_dh_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3806,7 +3830,7 @@ pub unsafe extern "C" fn SSL_CTX_set_trust(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_trust(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_trust(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3817,21 +3841,21 @@ pub unsafe extern "C" fn SSL_CTX_set_verify(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_verify(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_set_verify(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_set_verify_depth(a0: *mut SSL_CTX, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_set_verify_depth(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_set_verify_depth(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_CTX_up_ref(a0: *mut SSL_CTX) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_up_ref(a0) }
+    unsafe { rustyssl_private_SSL_CTX_up_ref(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -3841,7 +3865,7 @@ pub unsafe extern "C" fn SSL_CTX_use_PrivateKey(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_PrivateKey(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_PrivateKey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3853,7 +3877,7 @@ pub unsafe extern "C" fn SSL_CTX_use_PrivateKey_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_PrivateKey_ASN1(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_use_PrivateKey_ASN1(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -3864,7 +3888,7 @@ pub unsafe extern "C" fn SSL_CTX_use_PrivateKey_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_PrivateKey_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_PrivateKey_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3874,7 +3898,7 @@ pub unsafe extern "C" fn SSL_CTX_use_RSAPrivateKey(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_RSAPrivateKey(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_RSAPrivateKey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3885,7 +3909,7 @@ pub unsafe extern "C" fn SSL_CTX_use_RSAPrivateKey_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_RSAPrivateKey_ASN1(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_RSAPrivateKey_ASN1(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3896,7 +3920,7 @@ pub unsafe extern "C" fn SSL_CTX_use_RSAPrivateKey_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_RSAPrivateKey_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_RSAPrivateKey_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3909,7 +3933,7 @@ pub unsafe extern "C" fn SSL_CTX_use_cert_and_key(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_cert_and_key(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_CTX_use_cert_and_key(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
@@ -3919,7 +3943,7 @@ pub unsafe extern "C" fn SSL_CTX_use_certificate(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_certificate(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_certificate(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3930,7 +3954,7 @@ pub unsafe extern "C" fn SSL_CTX_use_certificate_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_certificate_ASN1(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_certificate_ASN1(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3940,7 +3964,7 @@ pub unsafe extern "C" fn SSL_CTX_use_certificate_chain_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_certificate_chain_file(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_certificate_chain_file(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3951,7 +3975,7 @@ pub unsafe extern "C" fn SSL_CTX_use_certificate_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_certificate_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_certificate_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3961,7 +3985,7 @@ pub unsafe extern "C" fn SSL_CTX_use_psk_identity_hint(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_psk_identity_hint(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_psk_identity_hint(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -3972,7 +3996,7 @@ pub unsafe extern "C" fn SSL_CTX_use_serverinfo(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_serverinfo(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_CTX_use_serverinfo(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -3984,7 +4008,7 @@ pub unsafe extern "C" fn SSL_CTX_use_serverinfo_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_serverinfo_ex(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_CTX_use_serverinfo_ex(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -3994,21 +4018,21 @@ pub unsafe extern "C" fn SSL_CTX_use_serverinfo_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_CTX_use_serverinfo_file(a0, a1) }
+    unsafe { rustyssl_private_SSL_CTX_use_serverinfo_file(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_dup(a0: *const SSL_SESSION) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_dup(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_dup(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_free(a0: *mut SSL_SESSION) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_free(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_free(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4019,14 +4043,14 @@ pub unsafe extern "C" fn SSL_SESSION_get0_alpn_selected(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_alpn_selected(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_alpn_selected(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get0_cipher(a0: *const SSL_SESSION) -> *const SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_cipher(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_cipher(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4035,7 +4059,7 @@ pub unsafe extern "C" fn SSL_SESSION_get0_hostname(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_hostname(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_hostname(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4045,21 +4069,21 @@ pub unsafe extern "C" fn SSL_SESSION_get0_id_context(
 ) -> *const core::ffi::c_uchar {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_id_context(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_id_context(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get0_peer(a0: *mut SSL_SESSION) -> *mut X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_peer(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_peer(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get0_peer_rpk(a0: *mut SSL_SESSION) -> *mut EVP_PKEY {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_peer_rpk(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_peer_rpk(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4070,7 +4094,7 @@ pub unsafe extern "C" fn SSL_SESSION_get0_ticket(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_ticket(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_ticket(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4081,14 +4105,14 @@ pub unsafe extern "C" fn SSL_SESSION_get0_ticket_appdata(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get0_ticket_appdata(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_get0_ticket_appdata(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_compress_id(a0: *const SSL_SESSION) -> core::ffi::c_uint {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_compress_id(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_compress_id(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4098,7 +4122,7 @@ pub unsafe extern "C" fn SSL_SESSION_get_ex_data(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_ex_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_get_ex_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4108,7 +4132,7 @@ pub unsafe extern "C" fn SSL_SESSION_get_id(
 ) -> *const core::ffi::c_uchar {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_id(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_get_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4119,21 +4143,21 @@ pub unsafe extern "C" fn SSL_SESSION_get_master_key(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_master_key(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_get_master_key(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_max_early_data(a0: *const SSL_SESSION) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_max_early_data(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_max_early_data(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_max_fragment_length(a0: *const SSL_SESSION) -> u8 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_max_fragment_length(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_max_fragment_length(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4142,7 +4166,7 @@ pub unsafe extern "C" fn SSL_SESSION_get_protocol_version(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_protocol_version(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_protocol_version(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4151,49 +4175,49 @@ pub unsafe extern "C" fn SSL_SESSION_get_ticket_lifetime_hint(
 ) -> core::ffi::c_ulong {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_ticket_lifetime_hint(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_ticket_lifetime_hint(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_time(a0: *const SSL_SESSION) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_time(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_time(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_time_ex(a0: *const SSL_SESSION) -> time_t {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_time_ex(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_time_ex(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_get_timeout(a0: *const SSL_SESSION) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_get_timeout(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_get_timeout(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_has_ticket(a0: *const SSL_SESSION) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_has_ticket(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_has_ticket(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_is_resumable(a0: *const SSL_SESSION) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_is_resumable(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_is_resumable(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_new() -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_new() }
+    unsafe { rustyssl_private_SSL_SESSION_new() }
 }
 
 #[unsafe(no_mangle)]
@@ -4203,7 +4227,7 @@ pub unsafe extern "C" fn SSL_SESSION_print(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_print(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_print(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4213,7 +4237,7 @@ pub unsafe extern "C" fn SSL_SESSION_print_fp(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_print_fp(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_print_fp(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4223,7 +4247,7 @@ pub unsafe extern "C" fn SSL_SESSION_print_keylog(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_print_keylog(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_print_keylog(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4234,7 +4258,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_alpn_selected(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_alpn_selected(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_alpn_selected(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4244,7 +4268,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_hostname(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_hostname(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_hostname(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4255,7 +4279,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_id(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_id(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_id(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4266,7 +4290,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_id_context(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_id_context(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_id_context(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4277,7 +4301,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_master_key(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_master_key(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_master_key(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4288,7 +4312,7 @@ pub unsafe extern "C" fn SSL_SESSION_set1_ticket_appdata(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set1_ticket_appdata(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set1_ticket_appdata(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4298,7 +4322,7 @@ pub unsafe extern "C" fn SSL_SESSION_set_cipher(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_cipher(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_cipher(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4309,7 +4333,7 @@ pub unsafe extern "C" fn SSL_SESSION_set_ex_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_ex_data(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_SESSION_set_ex_data(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4319,7 +4343,7 @@ pub unsafe extern "C" fn SSL_SESSION_set_max_early_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_max_early_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_max_early_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4329,7 +4353,7 @@ pub unsafe extern "C" fn SSL_SESSION_set_protocol_version(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_protocol_version(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_protocol_version(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4339,14 +4363,14 @@ pub unsafe extern "C" fn SSL_SESSION_set_time(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_time(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_time(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_set_time_ex(a0: *mut SSL_SESSION, a1: time_t) -> time_t {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_time_ex(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_time_ex(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4356,49 +4380,49 @@ pub unsafe extern "C" fn SSL_SESSION_set_timeout(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_set_timeout(a0, a1) }
+    unsafe { rustyssl_private_SSL_SESSION_set_timeout(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SESSION_up_ref(a0: *mut SSL_SESSION) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SESSION_up_ref(a0) }
+    unsafe { rustyssl_private_SSL_SESSION_up_ref(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SRP_CTX_free(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SRP_CTX_free(a0) }
+    unsafe { rustyssl_private_SSL_SRP_CTX_free(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_SRP_CTX_init(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_SRP_CTX_init(a0) }
+    unsafe { rustyssl_private_SSL_SRP_CTX_init(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_accept(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_accept(a0) }
+    unsafe { rustyssl_private_SSL_accept(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_accept_connection(a0: *mut SSL, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_accept_connection(a0, a1) }
+    unsafe { rustyssl_private_SSL_accept_connection(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_accept_stream(a0: *mut SSL, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_accept_stream(a0, a1) }
+    unsafe { rustyssl_private_SSL_accept_stream(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4408,21 +4432,21 @@ pub unsafe extern "C" fn SSL_add1_host(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add1_host(a0, a1) }
+    unsafe { rustyssl_private_SSL_add1_host(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_add1_to_CA_list(a0: *mut SSL, a1: *const X509) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add1_to_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_add1_to_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_add_client_CA(a0: *mut SSL, a1: *mut X509) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_client_CA(a0, a1) }
+    unsafe { rustyssl_private_SSL_add_client_CA(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4432,14 +4456,14 @@ pub unsafe extern "C" fn SSL_add_dir_cert_subjects_to_stack(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_dir_cert_subjects_to_stack(a0, a1) }
+    unsafe { rustyssl_private_SSL_add_dir_cert_subjects_to_stack(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_add_expected_rpk(a0: *mut SSL, a1: *mut EVP_PKEY) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_expected_rpk(a0, a1) }
+    unsafe { rustyssl_private_SSL_add_expected_rpk(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4449,14 +4473,14 @@ pub unsafe extern "C" fn SSL_add_file_cert_subjects_to_stack(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_file_cert_subjects_to_stack(a0, a1) }
+    unsafe { rustyssl_private_SSL_add_file_cert_subjects_to_stack(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_add_ssl_module() {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_ssl_module() }
+    unsafe { rustyssl_private_SSL_add_ssl_module() }
 }
 
 #[unsafe(no_mangle)]
@@ -4466,14 +4490,14 @@ pub unsafe extern "C" fn SSL_add_store_cert_subjects_to_stack(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_add_store_cert_subjects_to_stack(a0, a1) }
+    unsafe { rustyssl_private_SSL_add_store_cert_subjects_to_stack(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_alert_desc_string(a0: core::ffi::c_int) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_alert_desc_string(a0) }
+    unsafe { rustyssl_private_SSL_alert_desc_string(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4482,14 +4506,14 @@ pub unsafe extern "C" fn SSL_alert_desc_string_long(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_alert_desc_string_long(a0) }
+    unsafe { rustyssl_private_SSL_alert_desc_string_long(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_alert_type_string(a0: core::ffi::c_int) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_alert_type_string(a0) }
+    unsafe { rustyssl_private_SSL_alert_type_string(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4498,14 +4522,14 @@ pub unsafe extern "C" fn SSL_alert_type_string_long(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_alert_type_string_long(a0) }
+    unsafe { rustyssl_private_SSL_alert_type_string_long(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_alloc_buffers(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_alloc_buffers(a0) }
+    unsafe { rustyssl_private_SSL_alloc_buffers(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4519,7 +4543,7 @@ pub unsafe extern "C" fn SSL_bytes_to_cipher_list(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_bytes_to_cipher_list(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_bytes_to_cipher_list(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
@@ -4530,14 +4554,14 @@ pub unsafe extern "C" fn SSL_callback_ctrl(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_callback_ctrl(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_callback_ctrl(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_certs_clear(a0: *mut SSL) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_certs_clear(a0) }
+    unsafe { rustyssl_private_SSL_certs_clear(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4549,28 +4573,28 @@ pub unsafe extern "C" fn SSL_check_chain(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_check_chain(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_check_chain(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_check_private_key(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_check_private_key(a0) }
+    unsafe { rustyssl_private_SSL_check_private_key(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_clear(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_clear(a0) }
+    unsafe { rustyssl_private_SSL_clear(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_clear_options(a0: *mut SSL, a1: u64) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_clear_options(a0, a1) }
+    unsafe { rustyssl_private_SSL_clear_options(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4580,7 +4604,7 @@ pub unsafe extern "C" fn SSL_client_hello_get0_ciphers(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_ciphers(a0, a1) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_ciphers(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4590,7 +4614,7 @@ pub unsafe extern "C" fn SSL_client_hello_get0_compression_methods(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_compression_methods(a0, a1) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_compression_methods(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4602,14 +4626,14 @@ pub unsafe extern "C" fn SSL_client_hello_get0_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_ext(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_ext(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_client_hello_get0_legacy_version(a0: *mut SSL) -> core::ffi::c_uint {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_legacy_version(a0) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_legacy_version(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4619,7 +4643,7 @@ pub unsafe extern "C" fn SSL_client_hello_get0_random(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_random(a0, a1) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_random(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4629,7 +4653,7 @@ pub unsafe extern "C" fn SSL_client_hello_get0_session_id(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get0_session_id(a0, a1) }
+    unsafe { rustyssl_private_SSL_client_hello_get0_session_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4640,7 +4664,7 @@ pub unsafe extern "C" fn SSL_client_hello_get1_extensions_present(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get1_extensions_present(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_client_hello_get1_extensions_present(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4651,21 +4675,21 @@ pub unsafe extern "C" fn SSL_client_hello_get_extension_order(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_get_extension_order(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_client_hello_get_extension_order(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_client_hello_isv2(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_hello_isv2(a0) }
+    unsafe { rustyssl_private_SSL_client_hello_isv2(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_client_version(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_client_version(a0) }
+    unsafe { rustyssl_private_SSL_client_version(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4675,7 +4699,7 @@ pub unsafe extern "C" fn SSL_compress_certs(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_compress_certs(a0, a1) }
+    unsafe { rustyssl_private_SSL_compress_certs(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4685,28 +4709,28 @@ pub unsafe extern "C" fn SSL_config(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_config(a0, a1) }
+    unsafe { rustyssl_private_SSL_config(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_connect(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_connect(a0) }
+    unsafe { rustyssl_private_SSL_connect(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_copy_session_id(a0: *mut SSL, a1: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_copy_session_id(a0, a1) }
+    unsafe { rustyssl_private_SSL_copy_session_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_ct_is_enabled(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_ct_is_enabled(a0) }
+    unsafe { rustyssl_private_SSL_ct_is_enabled(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4718,7 +4742,7 @@ pub unsafe extern "C" fn SSL_ctrl(
 ) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_ctrl(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_ctrl(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -4728,7 +4752,7 @@ pub unsafe extern "C" fn SSL_dane_clear_flags(
 ) -> core::ffi::c_ulong {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dane_clear_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_dane_clear_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4738,7 +4762,7 @@ pub unsafe extern "C" fn SSL_dane_enable(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dane_enable(a0, a1) }
+    unsafe { rustyssl_private_SSL_dane_enable(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4748,7 +4772,7 @@ pub unsafe extern "C" fn SSL_dane_set_flags(
 ) -> core::ffi::c_ulong {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dane_set_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_dane_set_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4762,35 +4786,35 @@ pub unsafe extern "C" fn SSL_dane_tlsa_add(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dane_tlsa_add(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_dane_tlsa_add(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_do_handshake(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_do_handshake(a0) }
+    unsafe { rustyssl_private_SSL_do_handshake(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_dup(a0: *mut SSL) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dup(a0) }
+    unsafe { rustyssl_private_SSL_dup(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_dup_CA_list(a0: *const stack_st_X509_NAME) -> *mut stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_dup_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_dup_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_enable_ct(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_enable_ct(a0, a1) }
+    unsafe { rustyssl_private_SSL_enable_ct(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -4806,7 +4830,7 @@ pub unsafe extern "C" fn SSL_export_keying_material(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_export_keying_material(a0, a1, a2, a3, a4, a5, a6, a7) }
+    unsafe { rustyssl_private_SSL_export_keying_material(a0, a1, a2, a3, a4, a5, a6, a7) }
 }
 
 #[unsafe(no_mangle)]
@@ -4821,35 +4845,35 @@ pub unsafe extern "C" fn SSL_export_keying_material_early(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_export_keying_material_early(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_export_keying_material_early(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_extension_supported(a0: core::ffi::c_uint) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_extension_supported(a0) }
+    unsafe { rustyssl_private_SSL_extension_supported(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_free(a0: *mut SSL) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_free(a0) }
+    unsafe { rustyssl_private_SSL_free(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_free_buffers(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_free_buffers(a0) }
+    unsafe { rustyssl_private_SSL_free_buffers(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_CA_list(a0: *const SSL) -> *const stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_get0_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4860,7 +4884,7 @@ pub unsafe extern "C" fn SSL_get0_alpn_selected(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_alpn_selected(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get0_alpn_selected(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4871,21 +4895,21 @@ pub unsafe extern "C" fn SSL_get0_client_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_client_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get0_client_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_connection(a0: *mut SSL) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_connection(a0) }
+    unsafe { rustyssl_private_SSL_get0_connection(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_dane(a0: *mut SSL) -> *mut SSL_DANE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_dane(a0) }
+    unsafe { rustyssl_private_SSL_get0_dane(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4896,7 +4920,7 @@ pub unsafe extern "C" fn SSL_get0_dane_authority(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_dane_authority(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get0_dane_authority(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -4910,28 +4934,28 @@ pub unsafe extern "C" fn SSL_get0_dane_tlsa(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_dane_tlsa(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_get0_dane_tlsa(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_domain(a0: *mut SSL) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_domain(a0) }
+    unsafe { rustyssl_private_SSL_get0_domain(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_group_name(a0: *mut SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_group_name(a0) }
+    unsafe { rustyssl_private_SSL_get0_group_name(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_listener(a0: *mut SSL) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_listener(a0) }
+    unsafe { rustyssl_private_SSL_get0_listener(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -4942,56 +4966,56 @@ pub unsafe extern "C" fn SSL_get0_next_proto_negotiated(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_next_proto_negotiated(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get0_next_proto_negotiated(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_param(a0: *mut SSL) -> *mut X509_VERIFY_PARAM {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_param(a0) }
+    unsafe { rustyssl_private_SSL_get0_param(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_peer_CA_list(a0: *const SSL) -> *const stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_peer_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_get0_peer_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_peer_certificate(a0: *const SSL) -> *mut X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_peer_certificate(a0) }
+    unsafe { rustyssl_private_SSL_get0_peer_certificate(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_peer_rpk(a0: *const SSL) -> *mut EVP_PKEY {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_peer_rpk(a0) }
+    unsafe { rustyssl_private_SSL_get0_peer_rpk(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_peer_scts(a0: *mut SSL) -> *const stack_st_SCT {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_peer_scts(a0) }
+    unsafe { rustyssl_private_SSL_get0_peer_scts(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_peername(a0: *mut SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_peername(a0) }
+    unsafe { rustyssl_private_SSL_get0_peername(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_security_ex_data(a0: *const SSL) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_security_ex_data(a0) }
+    unsafe { rustyssl_private_SSL_get0_security_ex_data(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5002,21 +5026,21 @@ pub unsafe extern "C" fn SSL_get0_server_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_server_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get0_server_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get0_verified_chain(a0: *const SSL) -> *mut stack_st_X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get0_verified_chain(a0) }
+    unsafe { rustyssl_private_SSL_get0_verified_chain(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get1_builtin_sigalgs(a0: *mut OSSL_LIB_CTX) -> *mut core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get1_builtin_sigalgs(a0) }
+    unsafe { rustyssl_private_SSL_get1_builtin_sigalgs(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5028,49 +5052,49 @@ pub unsafe extern "C" fn SSL_get1_compressed_cert(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get1_compressed_cert(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_get1_compressed_cert(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get1_peer_certificate(a0: *const SSL) -> *mut X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get1_peer_certificate(a0) }
+    unsafe { rustyssl_private_SSL_get1_peer_certificate(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get1_session(a0: *mut SSL) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get1_session(a0) }
+    unsafe { rustyssl_private_SSL_get1_session(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get1_supported_ciphers(a0: *mut SSL) -> *mut stack_st_SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get1_supported_ciphers(a0) }
+    unsafe { rustyssl_private_SSL_get1_supported_ciphers(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_SSL_CTX(a0: *const SSL) -> *mut SSL_CTX {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_SSL_CTX(a0) }
+    unsafe { rustyssl_private_SSL_get_SSL_CTX(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_accept_connection_queue_len(a0: *mut SSL) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_accept_connection_queue_len(a0) }
+    unsafe { rustyssl_private_SSL_get_accept_connection_queue_len(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_accept_stream_queue_len(a0: *mut SSL) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_accept_stream_queue_len(a0) }
+    unsafe { rustyssl_private_SSL_get_accept_stream_queue_len(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5081,7 +5105,7 @@ pub unsafe extern "C" fn SSL_get_all_async_fds(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_all_async_fds(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_all_async_fds(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5091,21 +5115,21 @@ pub unsafe extern "C" fn SSL_get_async_status(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_async_status(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_async_status(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_blocking_mode(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_blocking_mode(a0) }
+    unsafe { rustyssl_private_SSL_get_blocking_mode(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_certificate(a0: *const SSL) -> *mut X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_certificate(a0) }
+    unsafe { rustyssl_private_SSL_get_certificate(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5118,7 +5142,7 @@ pub unsafe extern "C" fn SSL_get_changed_async_fds(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_changed_async_fds(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_get_changed_async_fds(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
@@ -5128,28 +5152,28 @@ pub unsafe extern "C" fn SSL_get_cipher_list(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_cipher_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_cipher_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_ciphers(a0: *const SSL) -> *mut stack_st_SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_ciphers(a0) }
+    unsafe { rustyssl_private_SSL_get_ciphers(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_client_CA_list(a0: *const SSL) -> *mut stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_client_CA_list(a0) }
+    unsafe { rustyssl_private_SSL_get_client_CA_list(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_client_ciphers(a0: *const SSL) -> *mut stack_st_SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_client_ciphers(a0) }
+    unsafe { rustyssl_private_SSL_get_client_ciphers(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5160,7 +5184,7 @@ pub unsafe extern "C" fn SSL_get_client_random(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_client_random(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_client_random(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5171,35 +5195,35 @@ pub unsafe extern "C" fn SSL_get_conn_close_info(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_conn_close_info(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_conn_close_info(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_current_cipher(a0: *const SSL) -> *const SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_current_cipher(a0) }
+    unsafe { rustyssl_private_SSL_get_current_cipher(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_current_compression(a0: *const SSL) -> *const COMP_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_current_compression(a0) }
+    unsafe { rustyssl_private_SSL_get_current_compression(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_current_expansion(a0: *const SSL) -> *const COMP_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_current_expansion(a0) }
+    unsafe { rustyssl_private_SSL_get_current_expansion(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_default_passwd_cb(a0: *mut SSL) -> pem_password_cb {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_default_passwd_cb(a0) }
+    unsafe { rustyssl_private_SSL_get_default_passwd_cb(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5208,35 +5232,35 @@ pub unsafe extern "C" fn SSL_get_default_passwd_cb_userdata(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_default_passwd_cb_userdata(a0) }
+    unsafe { rustyssl_private_SSL_get_default_passwd_cb_userdata(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_default_timeout(a0: *const SSL) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_default_timeout(a0) }
+    unsafe { rustyssl_private_SSL_get_default_timeout(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_domain_flags(a0: *const SSL, a1: *mut u64) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_domain_flags(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_domain_flags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_early_data_status(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_early_data_status(a0) }
+    unsafe { rustyssl_private_SSL_get_early_data_status(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_error(a0: *const SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_error(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_error(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -5247,7 +5271,7 @@ pub unsafe extern "C" fn SSL_get_event_timeout(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_event_timeout(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_event_timeout(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5257,21 +5281,21 @@ pub unsafe extern "C" fn SSL_get_ex_data(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_ex_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_ex_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_ex_data_X509_STORE_CTX_idx() -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_ex_data_X509_STORE_CTX_idx() }
+    unsafe { rustyssl_private_SSL_get_ex_data_X509_STORE_CTX_idx() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_fd(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_fd(a0) }
+    unsafe { rustyssl_private_SSL_get_fd(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5282,14 +5306,14 @@ pub unsafe extern "C" fn SSL_get_finished(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_finished(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_finished(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_handshake_rtt(a0: *const SSL, a1: *mut u64) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_handshake_rtt(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_handshake_rtt(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -5300,56 +5324,56 @@ pub unsafe extern "C" fn SSL_get_info_callback(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_info_callback(a0) }
+    unsafe { rustyssl_private_SSL_get_info_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_key_update_type(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_key_update_type(a0) }
+    unsafe { rustyssl_private_SSL_get_key_update_type(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_max_early_data(a0: *const SSL) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_max_early_data(a0) }
+    unsafe { rustyssl_private_SSL_get_max_early_data(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_negotiated_client_cert_type(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_negotiated_client_cert_type(a0) }
+    unsafe { rustyssl_private_SSL_get_negotiated_client_cert_type(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_negotiated_server_cert_type(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_negotiated_server_cert_type(a0) }
+    unsafe { rustyssl_private_SSL_get_negotiated_server_cert_type(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_num_tickets(a0: *const SSL) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_num_tickets(a0) }
+    unsafe { rustyssl_private_SSL_get_num_tickets(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_options(a0: *const SSL) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_options(a0) }
+    unsafe { rustyssl_private_SSL_get_options(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_peer_cert_chain(a0: *const SSL) -> *mut stack_st_X509 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_peer_cert_chain(a0) }
+    unsafe { rustyssl_private_SSL_get_peer_cert_chain(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5360,7 +5384,7 @@ pub unsafe extern "C" fn SSL_get_peer_finished(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_peer_finished(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_peer_finished(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5370,56 +5394,56 @@ pub unsafe extern "C" fn SSL_get_peer_signature_type_nid(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_peer_signature_type_nid(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_peer_signature_type_nid(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_pending_cipher(a0: *const SSL) -> *const SSL_CIPHER {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_pending_cipher(a0) }
+    unsafe { rustyssl_private_SSL_get_pending_cipher(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_privatekey(a0: *const SSL) -> *mut evp_pkey_st {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_privatekey(a0) }
+    unsafe { rustyssl_private_SSL_get_privatekey(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_psk_identity(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_psk_identity(a0) }
+    unsafe { rustyssl_private_SSL_get_psk_identity(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_psk_identity_hint(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_psk_identity_hint(a0) }
+    unsafe { rustyssl_private_SSL_get_psk_identity_hint(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_quiet_shutdown(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_quiet_shutdown(a0) }
+    unsafe { rustyssl_private_SSL_get_quiet_shutdown(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_rbio(a0: *const SSL) -> *mut BIO {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_rbio(a0) }
+    unsafe { rustyssl_private_SSL_get_rbio(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_read_ahead(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_read_ahead(a0) }
+    unsafe { rustyssl_private_SSL_get_read_ahead(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5428,21 +5452,21 @@ pub unsafe extern "C" fn SSL_get_record_padding_callback_arg(
 ) -> *mut core::ffi::c_void {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_record_padding_callback_arg(a0) }
+    unsafe { rustyssl_private_SSL_get_record_padding_callback_arg(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_recv_max_early_data(a0: *const SSL) -> u32 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_recv_max_early_data(a0) }
+    unsafe { rustyssl_private_SSL_get_recv_max_early_data(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_rfd(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_rfd(a0) }
+    unsafe { rustyssl_private_SSL_get_rfd(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5452,7 +5476,7 @@ pub unsafe extern "C" fn SSL_get_rpoll_descriptor(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_rpoll_descriptor(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_rpoll_descriptor(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -5471,14 +5495,14 @@ pub unsafe extern "C" fn SSL_get_security_callback(
 > {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_security_callback(a0) }
+    unsafe { rustyssl_private_SSL_get_security_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_security_level(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_security_level(a0) }
+    unsafe { rustyssl_private_SSL_get_security_level(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5487,7 +5511,7 @@ pub unsafe extern "C" fn SSL_get_selected_srtp_profile(
 ) -> *mut SRTP_PROTECTION_PROFILE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_selected_srtp_profile(a0) }
+    unsafe { rustyssl_private_SSL_get_selected_srtp_profile(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5498,7 +5522,7 @@ pub unsafe extern "C" fn SSL_get_server_random(
 ) -> usize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_server_random(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_server_random(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5508,21 +5532,21 @@ pub unsafe extern "C" fn SSL_get_servername(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_servername(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_servername(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_servername_type(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_servername_type(a0) }
+    unsafe { rustyssl_private_SSL_get_servername_type(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_session(a0: *const SSL) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_session(a0) }
+    unsafe { rustyssl_private_SSL_get_session(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5533,7 +5557,7 @@ pub unsafe extern "C" fn SSL_get_shared_ciphers(
 ) -> *mut core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_shared_ciphers(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_get_shared_ciphers(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5548,14 +5572,14 @@ pub unsafe extern "C" fn SSL_get_shared_sigalgs(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_shared_sigalgs(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_get_shared_sigalgs(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_shutdown(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_shutdown(a0) }
+    unsafe { rustyssl_private_SSL_get_shutdown(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5570,7 +5594,7 @@ pub unsafe extern "C" fn SSL_get_sigalgs(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_sigalgs(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_get_sigalgs(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
@@ -5580,35 +5604,35 @@ pub unsafe extern "C" fn SSL_get_signature_type_nid(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_signature_type_nid(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_signature_type_nid(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_srp_N(a0: *mut SSL) -> *mut BIGNUM {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_srp_N(a0) }
+    unsafe { rustyssl_private_SSL_get_srp_N(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_srp_g(a0: *mut SSL) -> *mut BIGNUM {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_srp_g(a0) }
+    unsafe { rustyssl_private_SSL_get_srp_g(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_srp_userinfo(a0: *mut SSL) -> *mut core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_srp_userinfo(a0) }
+    unsafe { rustyssl_private_SSL_get_srp_userinfo(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_srp_username(a0: *mut SSL) -> *mut core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_srp_username(a0) }
+    unsafe { rustyssl_private_SSL_get_srp_username(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5617,28 +5641,28 @@ pub unsafe extern "C" fn SSL_get_srtp_profiles(
 ) -> *mut stack_st_SRTP_PROTECTION_PROFILE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_srtp_profiles(a0) }
+    unsafe { rustyssl_private_SSL_get_srtp_profiles(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_ssl_method(a0: *const SSL) -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_ssl_method(a0) }
+    unsafe { rustyssl_private_SSL_get_ssl_method(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_state(a0: *const SSL) -> OSSL_HANDSHAKE_STATE {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_state(a0) }
+    unsafe { rustyssl_private_SSL_get_state(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_stream_id(a0: *mut SSL) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_id(a0) }
+    unsafe { rustyssl_private_SSL_get_stream_id(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5648,21 +5672,21 @@ pub unsafe extern "C" fn SSL_get_stream_read_error_code(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_read_error_code(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_stream_read_error_code(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_stream_read_state(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_read_state(a0) }
+    unsafe { rustyssl_private_SSL_get_stream_read_state(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_stream_type(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_type(a0) }
+    unsafe { rustyssl_private_SSL_get_stream_type(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5672,14 +5696,14 @@ pub unsafe extern "C" fn SSL_get_stream_write_error_code(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_write_error_code(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_stream_write_error_code(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_stream_write_state(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_stream_write_state(a0) }
+    unsafe { rustyssl_private_SSL_get_stream_write_state(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5691,56 +5715,56 @@ pub unsafe extern "C" fn SSL_get_value_uint(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_value_uint(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_get_value_uint(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_verify_callback(a0: *const SSL) -> SSL_verify_cb {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_verify_callback(a0) }
+    unsafe { rustyssl_private_SSL_get_verify_callback(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_verify_depth(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_verify_depth(a0) }
+    unsafe { rustyssl_private_SSL_get_verify_depth(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_verify_mode(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_verify_mode(a0) }
+    unsafe { rustyssl_private_SSL_get_verify_mode(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_verify_result(a0: *const SSL) -> core::ffi::c_long {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_verify_result(a0) }
+    unsafe { rustyssl_private_SSL_get_verify_result(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_version(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_version(a0) }
+    unsafe { rustyssl_private_SSL_get_version(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_wbio(a0: *const SSL) -> *mut BIO {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_wbio(a0) }
+    unsafe { rustyssl_private_SSL_get_wbio(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_get_wfd(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_wfd(a0) }
+    unsafe { rustyssl_private_SSL_get_wfd(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5750,7 +5774,7 @@ pub unsafe extern "C" fn SSL_get_wpoll_descriptor(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_get_wpoll_descriptor(a0, a1) }
+    unsafe { rustyssl_private_SSL_get_wpoll_descriptor(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -5760,14 +5784,14 @@ pub unsafe extern "C" fn SSL_group_to_name(
 ) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_group_to_name(a0, a1) }
+    unsafe { rustyssl_private_SSL_group_to_name(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_handle_events(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_handle_events(a0) }
+    unsafe { rustyssl_private_SSL_handle_events(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5778,28 +5802,28 @@ pub unsafe extern "C" fn SSL_has_matching_session_id(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_has_matching_session_id(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_has_matching_session_id(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_has_pending(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_has_pending(a0) }
+    unsafe { rustyssl_private_SSL_has_pending(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_in_before(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_in_before(a0) }
+    unsafe { rustyssl_private_SSL_in_before(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_in_init(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_in_init(a0) }
+    unsafe { rustyssl_private_SSL_in_init(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5812,84 +5836,84 @@ pub unsafe extern "C" fn SSL_inject_net_dgram(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_inject_net_dgram(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_inject_net_dgram(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_connection(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_connection(a0) }
+    unsafe { rustyssl_private_SSL_is_connection(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_domain(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_domain(a0) }
+    unsafe { rustyssl_private_SSL_is_domain(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_dtls(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_dtls(a0) }
+    unsafe { rustyssl_private_SSL_is_dtls(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_init_finished(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_init_finished(a0) }
+    unsafe { rustyssl_private_SSL_is_init_finished(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_listener(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_listener(a0) }
+    unsafe { rustyssl_private_SSL_is_listener(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_quic(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_quic(a0) }
+    unsafe { rustyssl_private_SSL_is_quic(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_server(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_server(a0) }
+    unsafe { rustyssl_private_SSL_is_server(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_stream_local(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_stream_local(a0) }
+    unsafe { rustyssl_private_SSL_is_stream_local(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_is_tls(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_is_tls(a0) }
+    unsafe { rustyssl_private_SSL_is_tls(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_key_update(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_key_update(a0, a1) }
+    unsafe { rustyssl_private_SSL_key_update(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_listen(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_listen(a0) }
+    unsafe { rustyssl_private_SSL_listen(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5898,7 +5922,7 @@ pub unsafe extern "C" fn SSL_load_client_CA_file(
 ) -> *mut stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_load_client_CA_file(a0) }
+    unsafe { rustyssl_private_SSL_load_client_CA_file(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -5909,70 +5933,70 @@ pub unsafe extern "C" fn SSL_load_client_CA_file_ex(
 ) -> *mut stack_st_X509_NAME {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_load_client_CA_file_ex(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_load_client_CA_file_ex(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_net_read_desired(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_net_read_desired(a0) }
+    unsafe { rustyssl_private_SSL_net_read_desired(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_net_write_desired(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_net_write_desired(a0) }
+    unsafe { rustyssl_private_SSL_net_write_desired(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new(a0: *mut SSL_CTX) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new(a0) }
+    unsafe { rustyssl_private_SSL_new(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_domain(a0: *mut SSL_CTX, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_domain(a0, a1) }
+    unsafe { rustyssl_private_SSL_new_domain(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_from_listener(a0: *mut SSL, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_from_listener(a0, a1) }
+    unsafe { rustyssl_private_SSL_new_from_listener(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_listener(a0: *mut SSL_CTX, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_listener(a0, a1) }
+    unsafe { rustyssl_private_SSL_new_listener(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_listener_from(a0: *mut SSL, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_listener_from(a0, a1) }
+    unsafe { rustyssl_private_SSL_new_listener_from(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_session_ticket(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_session_ticket(a0) }
+    unsafe { rustyssl_private_SSL_new_session_ticket(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_new_stream(a0: *mut SSL, a1: u64) -> *mut SSL {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_new_stream(a0, a1) }
+    unsafe { rustyssl_private_SSL_new_stream(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -5983,7 +6007,7 @@ pub unsafe extern "C" fn SSL_peek(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_peek(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_peek(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -5995,14 +6019,14 @@ pub unsafe extern "C" fn SSL_peek_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_peek_ex(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_peek_ex(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_pending(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_pending(a0) }
+    unsafe { rustyssl_private_SSL_pending(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -6016,7 +6040,7 @@ pub unsafe extern "C" fn SSL_poll(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_poll(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_poll(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
@@ -6027,7 +6051,7 @@ pub unsafe extern "C" fn SSL_read(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_read(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_read(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6039,7 +6063,7 @@ pub unsafe extern "C" fn SSL_read_early_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_read_early_data(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_read_early_data(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -6051,42 +6075,42 @@ pub unsafe extern "C" fn SSL_read_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_read_ex(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_read_ex(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_renegotiate(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_renegotiate(a0) }
+    unsafe { rustyssl_private_SSL_renegotiate(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_renegotiate_abbreviated(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_renegotiate_abbreviated(a0) }
+    unsafe { rustyssl_private_SSL_renegotiate_abbreviated(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_renegotiate_pending(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_renegotiate_pending(a0) }
+    unsafe { rustyssl_private_SSL_renegotiate_pending(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_rstate_string(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_rstate_string(a0) }
+    unsafe { rustyssl_private_SSL_rstate_string(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_rstate_string_long(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_rstate_string_long(a0) }
+    unsafe { rustyssl_private_SSL_rstate_string_long(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -6100,7 +6124,7 @@ pub unsafe extern "C" fn SSL_select_next_proto(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_select_next_proto(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_select_next_proto(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
@@ -6113,49 +6137,49 @@ pub unsafe extern "C" fn SSL_sendfile(
 ) -> isize {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_sendfile(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_sendfile(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_session_reused(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_session_reused(a0) }
+    unsafe { rustyssl_private_SSL_session_reused(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set0_CA_list(a0: *mut SSL, a1: *mut stack_st_X509_NAME) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set0_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_set0_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set0_rbio(a0: *mut SSL, a1: *mut BIO) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set0_rbio(a0, a1) }
+    unsafe { rustyssl_private_SSL_set0_rbio(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set0_security_ex_data(a0: *mut SSL, a1: *mut core::ffi::c_void) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set0_security_ex_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_set0_security_ex_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set0_tmp_dh_pkey(a0: *mut SSL, a1: *mut EVP_PKEY) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set0_tmp_dh_pkey(a0, a1) }
+    unsafe { rustyssl_private_SSL_set0_tmp_dh_pkey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set0_wbio(a0: *mut SSL, a1: *mut BIO) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set0_wbio(a0, a1) }
+    unsafe { rustyssl_private_SSL_set0_wbio(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6166,7 +6190,7 @@ pub unsafe extern "C" fn SSL_set1_cert_comp_preference(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_cert_comp_preference(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set1_cert_comp_preference(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6177,7 +6201,7 @@ pub unsafe extern "C" fn SSL_set1_client_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_client_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set1_client_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6190,7 +6214,7 @@ pub unsafe extern "C" fn SSL_set1_compressed_cert(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_compressed_cert(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_set1_compressed_cert(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
@@ -6200,7 +6224,7 @@ pub unsafe extern "C" fn SSL_set1_host(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_host(a0, a1) }
+    unsafe { rustyssl_private_SSL_set1_host(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6210,7 +6234,7 @@ pub unsafe extern "C" fn SSL_set1_initial_peer_addr(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_initial_peer_addr(a0, a1) }
+    unsafe { rustyssl_private_SSL_set1_initial_peer_addr(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6220,7 +6244,7 @@ pub unsafe extern "C" fn SSL_set1_param(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_param(a0, a1) }
+    unsafe { rustyssl_private_SSL_set1_param(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6231,21 +6255,21 @@ pub unsafe extern "C" fn SSL_set1_server_cert_type(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set1_server_cert_type(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set1_server_cert_type(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_SSL_CTX(a0: *mut SSL, a1: *mut SSL_CTX) -> *mut SSL_CTX {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_SSL_CTX(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_SSL_CTX(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_accept_state(a0: *mut SSL) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_accept_state(a0) }
+    unsafe { rustyssl_private_SSL_set_accept_state(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -6256,7 +6280,7 @@ pub unsafe extern "C" fn SSL_set_allow_early_data_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_allow_early_data_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_allow_early_data_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6267,7 +6291,7 @@ pub unsafe extern "C" fn SSL_set_alpn_protos(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_alpn_protos(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_alpn_protos(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6277,7 +6301,7 @@ pub unsafe extern "C" fn SSL_set_async_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_async_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_async_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6287,21 +6311,21 @@ pub unsafe extern "C" fn SSL_set_async_callback_arg(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_async_callback_arg(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_async_callback_arg(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_bio(a0: *mut SSL, a1: *mut BIO, a2: *mut BIO) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_bio(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_bio(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_block_padding(a0: *mut SSL, a1: usize) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_block_padding(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_block_padding(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6312,7 +6336,7 @@ pub unsafe extern "C" fn SSL_set_block_padding_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_block_padding_ex(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_block_padding_ex(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6322,7 +6346,7 @@ pub unsafe extern "C" fn SSL_set_blocking_mode(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_blocking_mode(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_blocking_mode(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6335,7 +6359,7 @@ pub unsafe extern "C" fn SSL_set_cert_cb(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_cert_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_cert_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6345,7 +6369,7 @@ pub unsafe extern "C" fn SSL_set_cipher_list(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_cipher_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_cipher_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6355,21 +6379,21 @@ pub unsafe extern "C" fn SSL_set_ciphersuites(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_ciphersuites(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_ciphersuites(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_client_CA_list(a0: *mut SSL, a1: *mut stack_st_X509_NAME) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_client_CA_list(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_client_CA_list(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_connect_state(a0: *mut SSL) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_connect_state(a0) }
+    unsafe { rustyssl_private_SSL_set_connect_state(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -6380,21 +6404,21 @@ pub unsafe extern "C" fn SSL_set_ct_validation_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_ct_validation_callback(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_ct_validation_callback(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_debug(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_debug(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_debug(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_default_passwd_cb(a0: *mut SSL, a1: pem_password_cb) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_default_passwd_cb(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_default_passwd_cb(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6404,21 +6428,21 @@ pub unsafe extern "C" fn SSL_set_default_passwd_cb_userdata(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_default_passwd_cb_userdata(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_default_passwd_cb_userdata(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_default_read_buffer_len(a0: *mut SSL, a1: usize) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_default_read_buffer_len(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_default_read_buffer_len(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_default_stream_mode(a0: *mut SSL, a1: u32) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_default_stream_mode(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_default_stream_mode(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6429,14 +6453,14 @@ pub unsafe extern "C" fn SSL_set_ex_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_ex_data(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_ex_data(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_fd(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_fd(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_fd(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6446,14 +6470,14 @@ pub unsafe extern "C" fn SSL_set_generate_session_id(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_generate_session_id(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_generate_session_id(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_hostflags(a0: *mut SSL, a1: core::ffi::c_uint) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_hostflags(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_hostflags(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6464,7 +6488,7 @@ pub unsafe extern "C" fn SSL_set_incoming_stream_policy(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_incoming_stream_policy(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_incoming_stream_policy(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6476,14 +6500,14 @@ pub unsafe extern "C" fn SSL_set_info_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_info_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_info_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_max_early_data(a0: *mut SSL, a1: u32) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_max_early_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_max_early_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6503,7 +6527,7 @@ pub unsafe extern "C" fn SSL_set_msg_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_msg_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_msg_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6518,35 +6542,35 @@ pub unsafe extern "C" fn SSL_set_not_resumable_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_not_resumable_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_not_resumable_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_num_tickets(a0: *mut SSL, a1: usize) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_num_tickets(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_num_tickets(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_options(a0: *mut SSL, a1: u64) -> u64 {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_options(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_options(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_post_handshake_auth(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_post_handshake_auth(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_post_handshake_auth(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_psk_client_callback(a0: *mut SSL, a1: SSL_psk_client_cb_func) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_psk_client_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_psk_client_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6556,14 +6580,14 @@ pub unsafe extern "C" fn SSL_set_psk_find_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_psk_find_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_psk_find_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_psk_server_callback(a0: *mut SSL, a1: SSL_psk_server_cb_func) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_psk_server_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_psk_server_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6573,14 +6597,14 @@ pub unsafe extern "C" fn SSL_set_psk_use_session_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_psk_use_session_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_psk_use_session_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_purpose(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_purpose(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_purpose(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6591,7 +6615,7 @@ pub unsafe extern "C" fn SSL_set_quic_tls_cbs(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_quic_tls_cbs(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_quic_tls_cbs(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6601,7 +6625,7 @@ pub unsafe extern "C" fn SSL_set_quic_tls_early_data_enabled(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_quic_tls_early_data_enabled(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_quic_tls_early_data_enabled(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6612,21 +6636,21 @@ pub unsafe extern "C" fn SSL_set_quic_tls_transport_params(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_quic_tls_transport_params(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_quic_tls_transport_params(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_quiet_shutdown(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_quiet_shutdown(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_quiet_shutdown(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_read_ahead(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_read_ahead(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_read_ahead(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6643,7 +6667,7 @@ pub unsafe extern "C" fn SSL_set_record_padding_callback(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_record_padding_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_record_padding_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6653,21 +6677,21 @@ pub unsafe extern "C" fn SSL_set_record_padding_callback_arg(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_record_padding_callback_arg(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_record_padding_callback_arg(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_recv_max_early_data(a0: *mut SSL, a1: u32) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_recv_max_early_data(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_recv_max_early_data(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_rfd(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_rfd(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_rfd(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6687,21 +6711,21 @@ pub unsafe extern "C" fn SSL_set_security_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_security_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_security_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_security_level(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_security_level(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_security_level(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_session(a0: *mut SSL, a1: *mut SSL_SESSION) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_session(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_session(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6712,7 +6736,7 @@ pub unsafe extern "C" fn SSL_set_session_id_context(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_session_id_context(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_session_id_context(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6723,7 +6747,7 @@ pub unsafe extern "C" fn SSL_set_session_secret_cb(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_session_secret_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_session_secret_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6734,7 +6758,7 @@ pub unsafe extern "C" fn SSL_set_session_ticket_ext(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_session_ticket_ext(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_session_ticket_ext(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6745,14 +6769,14 @@ pub unsafe extern "C" fn SSL_set_session_ticket_ext_cb(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_session_ticket_ext_cb(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_session_ticket_ext_cb(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_shutdown(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_shutdown(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_shutdown(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6766,7 +6790,7 @@ pub unsafe extern "C" fn SSL_set_srp_server_param(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_srp_server_param(a0, a1, a2, a3, a4, a5) }
+    unsafe { rustyssl_private_SSL_set_srp_server_param(a0, a1, a2, a3, a4, a5) }
 }
 
 #[unsafe(no_mangle)]
@@ -6778,7 +6802,7 @@ pub unsafe extern "C" fn SSL_set_srp_server_param_pw(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_srp_server_param_pw(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_set_srp_server_param_pw(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -6788,7 +6812,7 @@ pub unsafe extern "C" fn SSL_set_ssl_method(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_ssl_method(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_ssl_method(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6798,7 +6822,7 @@ pub unsafe extern "C" fn SSL_set_tlsext_max_fragment_length(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_tlsext_max_fragment_length(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_tlsext_max_fragment_length(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6808,7 +6832,7 @@ pub unsafe extern "C" fn SSL_set_tlsext_use_srtp(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_tlsext_use_srtp(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_tlsext_use_srtp(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6824,14 +6848,14 @@ pub unsafe extern "C" fn SSL_set_tmp_dh_callback(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_tmp_dh_callback(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_tmp_dh_callback(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_trust(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_trust(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_trust(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6843,42 +6867,42 @@ pub unsafe extern "C" fn SSL_set_value_uint(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_value_uint(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_set_value_uint(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_verify(a0: *mut SSL, a1: core::ffi::c_int, a2: SSL_verify_cb) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_verify(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_set_verify(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_verify_depth(a0: *mut SSL, a1: core::ffi::c_int) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_verify_depth(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_verify_depth(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_verify_result(a0: *mut SSL, a1: core::ffi::c_long) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_verify_result(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_verify_result(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_set_wfd(a0: *mut SSL, a1: core::ffi::c_int) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_set_wfd(a0, a1) }
+    unsafe { rustyssl_private_SSL_set_wfd(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_shutdown(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_shutdown(a0) }
+    unsafe { rustyssl_private_SSL_shutdown(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -6890,7 +6914,7 @@ pub unsafe extern "C" fn SSL_shutdown_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_shutdown_ex(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_shutdown_ex(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -6900,35 +6924,35 @@ pub unsafe extern "C" fn SSL_srp_server_param_with_username(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_srp_server_param_with_username(a0, a1) }
+    unsafe { rustyssl_private_SSL_srp_server_param_with_username(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_state_string(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_state_string(a0) }
+    unsafe { rustyssl_private_SSL_state_string(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_state_string_long(a0: *const SSL) -> *const core::ffi::c_char {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_state_string_long(a0) }
+    unsafe { rustyssl_private_SSL_state_string_long(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_stateless(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_stateless(a0) }
+    unsafe { rustyssl_private_SSL_stateless(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_stream_conclude(a0: *mut SSL, a1: u64) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_stream_conclude(a0, a1) }
+    unsafe { rustyssl_private_SSL_stream_conclude(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6939,7 +6963,7 @@ pub unsafe extern "C" fn SSL_stream_reset(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_stream_reset(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_stream_reset(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -6954,21 +6978,21 @@ pub unsafe extern "C" fn SSL_trace(
 ) {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_trace(a0, a1, a2, a3, a4, a5, a6) }
+    unsafe { rustyssl_private_SSL_trace(a0, a1, a2, a3, a4, a5, a6) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_up_ref(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_up_ref(a0) }
+    unsafe { rustyssl_private_SSL_up_ref(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_use_PrivateKey(a0: *mut SSL, a1: *mut EVP_PKEY) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_PrivateKey(a0, a1) }
+    unsafe { rustyssl_private_SSL_use_PrivateKey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -6980,7 +7004,7 @@ pub unsafe extern "C" fn SSL_use_PrivateKey_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_PrivateKey_ASN1(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_use_PrivateKey_ASN1(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -6991,14 +7015,14 @@ pub unsafe extern "C" fn SSL_use_PrivateKey_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_PrivateKey_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_use_PrivateKey_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_use_RSAPrivateKey(a0: *mut SSL, a1: *mut RSA) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_RSAPrivateKey(a0, a1) }
+    unsafe { rustyssl_private_SSL_use_RSAPrivateKey(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -7009,7 +7033,7 @@ pub unsafe extern "C" fn SSL_use_RSAPrivateKey_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_RSAPrivateKey_ASN1(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_use_RSAPrivateKey_ASN1(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7020,7 +7044,7 @@ pub unsafe extern "C" fn SSL_use_RSAPrivateKey_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_RSAPrivateKey_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_use_RSAPrivateKey_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7033,14 +7057,14 @@ pub unsafe extern "C" fn SSL_use_cert_and_key(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_cert_and_key(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_use_cert_and_key(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_use_certificate(a0: *mut SSL, a1: *mut X509) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_certificate(a0, a1) }
+    unsafe { rustyssl_private_SSL_use_certificate(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -7051,7 +7075,7 @@ pub unsafe extern "C" fn SSL_use_certificate_ASN1(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_certificate_ASN1(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_use_certificate_ASN1(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7061,7 +7085,7 @@ pub unsafe extern "C" fn SSL_use_certificate_chain_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_certificate_chain_file(a0, a1) }
+    unsafe { rustyssl_private_SSL_use_certificate_chain_file(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
@@ -7072,7 +7096,7 @@ pub unsafe extern "C" fn SSL_use_certificate_file(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_certificate_file(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_use_certificate_file(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7082,35 +7106,35 @@ pub unsafe extern "C" fn SSL_use_psk_identity_hint(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_use_psk_identity_hint(a0, a1) }
+    unsafe { rustyssl_private_SSL_use_psk_identity_hint(a0, a1) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_verify_client_post_handshake(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_verify_client_post_handshake(a0) }
+    unsafe { rustyssl_private_SSL_verify_client_post_handshake(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_version(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_version(a0) }
+    unsafe { rustyssl_private_SSL_version(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_waiting_for_async(a0: *mut SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_waiting_for_async(a0) }
+    unsafe { rustyssl_private_SSL_waiting_for_async(a0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn SSL_want(a0: *const SSL) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_want(a0) }
+    unsafe { rustyssl_private_SSL_want(a0) }
 }
 
 #[unsafe(no_mangle)]
@@ -7121,7 +7145,7 @@ pub unsafe extern "C" fn SSL_write(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_write(a0, a1, a2) }
+    unsafe { rustyssl_private_SSL_write(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7133,7 +7157,7 @@ pub unsafe extern "C" fn SSL_write_early_data(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_write_early_data(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_write_early_data(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -7145,7 +7169,7 @@ pub unsafe extern "C" fn SSL_write_ex(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_write_ex(a0, a1, a2, a3) }
+    unsafe { rustyssl_private_SSL_write_ex(a0, a1, a2, a3) }
 }
 
 #[unsafe(no_mangle)]
@@ -7158,91 +7182,91 @@ pub unsafe extern "C" fn SSL_write_ex2(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_SSL_write_ex2(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_SSL_write_ex2(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLS_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLS_client_method() }
+    unsafe { rustyssl_private_TLS_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLS_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLS_method() }
+    unsafe { rustyssl_private_TLS_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLS_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLS_server_method() }
+    unsafe { rustyssl_private_TLS_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_1_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_1_client_method() }
+    unsafe { rustyssl_private_TLSv1_1_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_1_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_1_method() }
+    unsafe { rustyssl_private_TLSv1_1_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_1_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_1_server_method() }
+    unsafe { rustyssl_private_TLSv1_1_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_2_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_2_client_method() }
+    unsafe { rustyssl_private_TLSv1_2_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_2_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_2_method() }
+    unsafe { rustyssl_private_TLSv1_2_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_2_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_2_server_method() }
+    unsafe { rustyssl_private_TLSv1_2_server_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_client_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_client_method() }
+    unsafe { rustyssl_private_TLSv1_client_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_method() }
+    unsafe { rustyssl_private_TLSv1_method() }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn TLSv1_server_method() -> *const SSL_METHOD {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_TLSv1_server_method() }
+    unsafe { rustyssl_private_TLSv1_server_method() }
 }
 
 #[unsafe(no_mangle)]
@@ -7253,7 +7277,7 @@ pub unsafe extern "C" fn d2i_SSL_SESSION(
 ) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_d2i_SSL_SESSION(a0, a1, a2) }
+    unsafe { rustyssl_private_d2i_SSL_SESSION(a0, a1, a2) }
 }
 
 #[unsafe(no_mangle)]
@@ -7266,7 +7290,7 @@ pub unsafe extern "C" fn d2i_SSL_SESSION_ex(
 ) -> *mut SSL_SESSION {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_d2i_SSL_SESSION_ex(a0, a1, a2, a3, a4) }
+    unsafe { rustyssl_private_d2i_SSL_SESSION_ex(a0, a1, a2, a3, a4) }
 }
 
 #[unsafe(no_mangle)]
@@ -7276,5 +7300,5 @@ pub unsafe extern "C" fn i2d_SSL_SESSION(
 ) -> core::ffi::c_int {
     // SAFETY: the arguments pass unchanged to libcrypto's definition, which has the same
     // signature and the same contract as this function.
-    unsafe { rustssl_private_i2d_SSL_SESSION(a0, a1) }
+    unsafe { rustyssl_private_i2d_SSL_SESSION(a0, a1) }
 }

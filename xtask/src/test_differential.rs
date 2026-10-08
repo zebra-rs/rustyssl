@@ -3,7 +3,7 @@
 //!
 //! The probe (`tests/differential/probe.c`) reads commands on stdin and prints what the library
 //! did. It is compiled once and linked against the reference OpenSSL, then fed the same input on
-//! the reference and on rustssl, and the outputs must match line for line. Unlike the C
+//! the reference and on rustyssl, and the outputs must match line for line. Unlike the C
 //! conformance tests, nothing states the expected result: the reference is the oracle.
 //!
 //! Inputs are the files in `tests/differential/corpus/` plus `N` (default 200) random command
@@ -66,11 +66,11 @@ pub fn run(args: &[String]) -> Result {
                 .find(|(_, (a, b))| a != b);
             match mismatch {
                 Some((i, (a, b))) => println!(
-                    "FAIL {name}: line {}: reference `{b}`, rustssl `{a}`",
+                    "FAIL {name}: line {}: reference `{b}`, rustyssl `{a}`",
                     i + 1
                 ),
                 None => println!(
-                    "FAIL {name}: rustssl stopped after {} of {lines} lines ({}): {}",
+                    "FAIL {name}: rustyssl stopped after {} of {lines} lines ({}): {}",
                     ours.stdout.lines().count(),
                     ours.status,
                     ours.stderr.trim()

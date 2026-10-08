@@ -79,66 +79,66 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustssl-abi"
+name = "rustyssl-abi"
 version = "0.1.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
-name = "rustssl-asn1"
+name = "rustyssl-asn1"
 version = "0.1.0"
 
 [[package]]
-name = "rustssl-capi"
+name = "rustyssl-capi"
 version = "0.1.0"
 dependencies = [
  "libc",
- "rustssl-abi",
- "rustssl-asn1",
- "rustssl-crypto",
- "rustssl-pki",
- "rustssl-tls",
+ "rustyssl-abi",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
+ "rustyssl-pki",
+ "rustyssl-tls",
  "subtle",
 ]
 
 [[package]]
-name = "rustssl-crypto"
+name = "rustyssl-crypto"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
+ "rustyssl-asn1",
 ]
 
 [[package]]
-name = "rustssl-libcrypto"
+name = "rustyssl-libcrypto"
 version = "0.1.0"
 dependencies = [
- "rustssl-capi",
+ "rustyssl-capi",
 ]
 
 [[package]]
-name = "rustssl-libssl"
+name = "rustyssl-libssl"
 version = "0.1.0"
 dependencies = [
  "libc",
- "rustssl-abi",
+ "rustyssl-abi",
 ]
 
 [[package]]
-name = "rustssl-pki"
+name = "rustyssl-pki"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
- "rustssl-crypto",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
 ]
 
 [[package]]
-name = "rustssl-tls"
+name = "rustyssl-tls"
 version = "0.1.0"
 dependencies = [
- "rustssl-asn1",
- "rustssl-crypto",
- "rustssl-pki",
+ "rustyssl-asn1",
+ "rustyssl-crypto",
+ "rustyssl-pki",
 ]
 
 [[package]]

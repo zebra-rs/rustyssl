@@ -2,9 +2,9 @@
 //!
 //! Each `tests/c/<name>.c` prints TAP. It is compiled once against the vendored headers and
 //! linked against the reference OpenSSL (`cargo xtask ref-openssl`), then run twice: on the
-//! reference libraries, and on rustssl's (`cargo xtask dist`), by pointing the dynamic loader
+//! reference libraries, and on rustyssl's (`cargo xtask dist`), by pointing the dynamic loader
 //! at each in turn. A test passes when both runs pass every check and print exactly the same
-//! output: the reference run validates the test, the rustssl run the implementation.
+//! output: the reference run validates the test, the rustyssl run the implementation.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -56,7 +56,7 @@ pub fn run(args: &[String]) -> Result {
     }
 }
 
-/// Builds the reference OpenSSL and rustssl's libraries, returning both install prefixes.
+/// Builds the reference OpenSSL and rustyssl's libraries, returning both install prefixes.
 pub fn prepare(root: &Path) -> Result<(PathBuf, PathBuf)> {
     let reference = reference::ensure(root, &reference::vendored_version(root)?)?;
     crate::dist::run(&[])?;
@@ -240,7 +240,7 @@ mod tests {
             stderr: if success {
                 ""
             } else {
-                "rustssl: X is not implemented yet; aborting"
+                "rustyssl: X is not implemented yet; aborting"
             }
             .to_owned(),
         }

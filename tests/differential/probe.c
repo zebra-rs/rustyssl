@@ -2,7 +2,7 @@
  * Differential probe (TEST_PLAN.md, layer L5). Reads one command per line on stdin, runs it
  * against whichever libcrypto the dynamic loader picked, and prints a deterministic line per
  * command. `cargo xtask test-differential` runs the same input against the reference and
- * rustssl and compares the output.
+ * rustyssl and compares the output.
  *
  * Commands for BUF_MEM (one buffer at a time):
  *   new <flags>        BUF_MEM_new_ex(flags), replacing any current buffer

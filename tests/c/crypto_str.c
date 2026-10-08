@@ -3,7 +3,7 @@
  * OPENSSL_hexstr2buf(3), OPENSSL_strcasecmp(3), OPENSSL_strtoul), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Results that
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Results that
  * depend on whether char is signed are printed as comments, which the harness compares.
  */
 #include <errno.h>

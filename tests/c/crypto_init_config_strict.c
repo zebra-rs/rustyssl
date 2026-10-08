@@ -4,7 +4,7 @@
  * and the failure sticks, except that OpenSSL skips later loads on the thread that tried first.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #define _POSIX_C_SOURCE 200809L
 #include <pthread.h>
@@ -39,7 +39,7 @@ int main(void)
 
     OPENSSL_INIT_SETTINGS *s = OPENSSL_INIT_new();
 
-    OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustssl-test/openssl.cnf");
+    OPENSSL_INIT_set_config_filename(s, "/nonexistent/rustyssl-test/openssl.cnf");
     OPENSSL_INIT_set_config_file_flags(s, CONF_MFLAGS_DEFAULT_SECTION);
     check(OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, s) == 0,
           "OPENSSL_INIT_LOAD_CONFIG: a missing file fails without CONF_MFLAGS_IGNORE_MISSING_FILE");

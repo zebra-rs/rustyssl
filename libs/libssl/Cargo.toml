@@ -1,5 +1,5 @@
 [package]
-name = "rustssl-libssl"
+name = "rustyssl-libssl"
 description = "libssl.so.3 drop-in: exports the SSL_* symbols and forwards them into libcrypto"
 version.workspace = true
 edition.workspace = true
@@ -16,7 +16,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 libc.workspace = true
-rustssl-abi.workspace = true
+rustyssl-abi.workspace = true
 
 [lints]
 workspace = true

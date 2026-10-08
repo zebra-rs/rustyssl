@@ -1,6 +1,6 @@
 [package]
-name = "rustssl-libcrypto"
-description = "libcrypto.so.3 drop-in: contains the whole rustssl implementation"
+name = "rustyssl-libcrypto"
+description = "libcrypto.so.3 drop-in: contains the whole rustyssl implementation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,7 @@ name = "crypto"
 crate-type = ["staticlib"]
 
 [dependencies]
-rustssl-capi.workspace = true
+rustyssl-capi.workspace = true
 
 [lints]
 workspace = true

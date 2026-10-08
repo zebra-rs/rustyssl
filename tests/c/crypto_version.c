@@ -3,7 +3,7 @@
  * and the small process helpers in crypto.h, in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The numbers must
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The numbers must
  * match the headers exactly. The text may differ where the builds do (directories, compiler,
  * build metadata), so the checks pin down how the strings relate to each other instead.
  */

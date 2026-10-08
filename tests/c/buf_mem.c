@@ -2,8 +2,8 @@
  * Conformance test for BUF_MEM (buffer.h, BUF_MEM_new(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both (TEST_PLAN.md, layer L4). It only calls the functions under
- * test, since anything rustssl doesn't implement yet aborts.
+ * rustyssl: it must pass on both (TEST_PLAN.md, layer L4). It only calls the functions under
+ * test, since anything rustyssl doesn't implement yet aborts.
  */
 #include <stdio.h>
 #include <string.h>

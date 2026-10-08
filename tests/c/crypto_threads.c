@@ -4,7 +4,7 @@
  * OSSL_set_max_threads(3)), in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The concurrent
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). The concurrent
  * checks run 8 threads at once, so a lock or an atomic that doesn't work loses updates.
  */
 #define _POSIX_C_SOURCE 200809L

@@ -5876,4 +5876,4 @@ _i2d_OSSL_TIME_SPEC_MONTH
 _i2d_OSSL_TIME_SPEC_TIME
 _i2d_OSSL_TIME_SPEC_WEEKS
 _i2d_OSSL_TIME_SPEC_X_DAY_OF
-_rustssl_private_*
+_rustyssl_private_*

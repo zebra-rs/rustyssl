@@ -17,7 +17,7 @@ use crate::codegen::exports::LIBRARIES;
 use crate::elf;
 use crate::util::{Result, run_output};
 
-/// Libraries rustssl's may depend on besides libcrypto: the C library, the threading and
+/// Libraries rustyssl's may depend on besides libcrypto: the C library, the threading and
 /// dynamic-loading libraries, and the unwinder Rust's runtime uses.
 const SYSTEM_LIBRARIES: &[&str] = &[
     "libc.so.",
@@ -58,7 +58,7 @@ pub fn symbols(cx: &Context) -> Result<Outcome> {
                 library, whose, actual, expected, &toolchain, versioned,
             ));
         };
-        compare("rustssl", &ours, &expected);
+        compare("rustyssl", &ours, &expected);
         compare("the reference", &theirs, &public);
         counts.push(format!("{} {library}", ours.len()));
         toolchain_extras += toolchain.len();
@@ -177,12 +177,12 @@ fn elf_metadata(library: &str, ours: &elf::Library, theirs: &elf::Library) -> Ve
         ));
     }
     problems.extend(dependencies(library, &ours.needed));
-    // The same version nodes with the same parents, in order; rustssl adds its private node
+    // The same version nodes with the same parents, in order; rustyssl adds its private node
     // to libcrypto only.
     let describe = |versions: &[elf::VersionDefinition]| -> Vec<String> {
         versions
             .iter()
-            .filter(|v| v.name != "RUSTSSL_PRIVATE")
+            .filter(|v| v.name != "RUSTYSSL_PRIVATE")
             .map(|v| {
                 let base = if v.base { " (base)" } else { "" };
                 format!("{}{base} <- [{}]", v.name, v.parents.join(", "))
@@ -195,10 +195,10 @@ fn elf_metadata(library: &str, ours: &elf::Library, theirs: &elf::Library) -> Ve
             "{library}'s version definitions are {ours_versions:?}, the reference's {their_versions:?}"
         ));
     }
-    let private = ours.versions.iter().any(|v| v.name == "RUSTSSL_PRIVATE");
+    let private = ours.versions.iter().any(|v| v.name == "RUSTYSSL_PRIVATE");
     if private != (library == "libcrypto") {
         problems.push(format!(
-            "{library} {} the RUSTSSL_PRIVATE version",
+            "{library} {} the RUSTYSSL_PRIVATE version",
             if private { "defines" } else { "doesn't define" }
         ));
     }
@@ -320,17 +320,17 @@ mod tests {
         let init = "_init".to_owned();
         let allowed = BTreeSet::from([&init]);
         assert_eq!(
-            differences("libssl", "rustssl", &actual, &expected, &allowed, true),
+            differences("libssl", "rustyssl", &actual, &expected, &allowed, true),
             [
-                "rustssl's libssl exports B at \"V2\", not V1",
-                "rustssl's libssl exports C@V2 as a non-default version",
-                "rustssl's libssl doesn't export D",
-                "rustssl's libssl also exports E",
+                "rustyssl's libssl exports B at \"V2\", not V1",
+                "rustyssl's libssl exports C@V2 as a non-default version",
+                "rustyssl's libssl doesn't export D",
+                "rustyssl's libssl also exports E",
             ]
         );
         // Without versions only the names count.
         assert_eq!(
-            differences("libssl", "rustssl", &actual, &expected, &allowed, false).len(),
+            differences("libssl", "rustyssl", &actual, &expected, &allowed, false).len(),
             2
         );
     }

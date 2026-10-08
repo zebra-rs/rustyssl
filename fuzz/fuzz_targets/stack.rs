@@ -10,9 +10,9 @@ use core::ffi::{c_int, c_void};
 use core::ptr;
 
 use libfuzzer_sys::fuzz_target;
-use rustssl_abi::{OPENSSL_STACK, OPENSSL_sk_compfunc};
+use rustyssl_abi::{OPENSSL_STACK, OPENSSL_sk_compfunc};
 // Linked for its exports, which the declarations below resolve to.
-use rustssl_capi as _;
+use rustyssl_capi as _;
 
 unsafe extern "C" {
     fn OPENSSL_sk_new(cmp: OPENSSL_sk_compfunc) -> *mut OPENSSL_STACK;

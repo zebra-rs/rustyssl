@@ -9,16 +9,16 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
-repository = "https://github.com/zebra-rs/rustssl"
+repository = "https://github.com/zebra-rs/rustyssl"
 publish = false
 
 [workspace.dependencies]
-rustssl-abi = { path = "crates/rustssl-abi" }
-rustssl-asn1 = { path = "crates/rustssl-asn1" }
-rustssl-crypto = { path = "crates/rustssl-crypto" }
-rustssl-pki = { path = "crates/rustssl-pki" }
-rustssl-tls = { path = "crates/rustssl-tls" }
-rustssl-capi = { path = "crates/rustssl-capi" }
+rustyssl-abi = { path = "crates/rustyssl-abi" }
+rustyssl-asn1 = { path = "crates/rustyssl-asn1" }
+rustyssl-crypto = { path = "crates/rustyssl-crypto" }
+rustyssl-pki = { path = "crates/rustyssl-pki" }
+rustyssl-tls = { path = "crates/rustyssl-tls" }
+rustyssl-capi = { path = "crates/rustyssl-capi" }
 
 # Third-party crates. Each one is recorded in docs/DEPENDENCIES.md.
 libc = { version = "0.2", default-features = false }
@@ -28,7 +28,7 @@ subtle = { version = "2.6", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing"] }
 
 # Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`
-# outside rustssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
+# outside rustyssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
 # crates. Rule numbers refer to "Security rules" in AGENTS.md.
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

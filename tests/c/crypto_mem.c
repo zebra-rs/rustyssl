@@ -3,7 +3,7 @@
  * CRYPTO_memcmp, and CRYPTO_aligned_alloc, in TAP format.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
- * rustssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Lines starting
+ * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4). Lines starting
  * with "#" record platform-dependent results, which must also match.
  */
 #include <stdint.h>
