@@ -1367,22 +1367,6 @@ pub extern "C" fn ASN1_buf_print(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_check_infinite_end(
-    _: *mut *mut core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_check_infinite_end")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_const_check_infinite_end(
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_const_check_infinite_end")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_d2i_bio(
     _: ::core::option::Option<unsafe extern "C" fn() -> *mut core::ffi::c_void>,
     _: d2i_of_void,
@@ -1433,17 +1417,6 @@ pub extern "C" fn ASN1_generate_v3(
     _: *mut X509V3_CTX,
 ) -> *mut ASN1_TYPE {
     crate::stub::unimplemented("ASN1_generate_v3")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_get_object(
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_get_object")
 }
 
 #[unsafe(no_mangle)]
@@ -1783,15 +1756,6 @@ pub extern "C" fn ASN1_mbstring_ncopy(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_object_size(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_object_size")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_parse(
     _: *mut BIO,
     _: *const core::ffi::c_uchar,
@@ -1810,22 +1774,6 @@ pub extern "C" fn ASN1_parse_dump(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("ASN1_parse_dump")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_put_eoc(_: *mut *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_put_eoc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_put_object(
-    _: *mut *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("ASN1_put_object")
 }
 
 #[unsafe(no_mangle)]
@@ -36121,15 +36069,6 @@ pub extern "C" fn d2i_ASN1_NULL(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_ASN1_OBJECT(
-    _: *mut *mut ASN1_OBJECT,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("d2i_ASN1_OBJECT")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_ASN1_OCTET_STRING(
     _: *mut *mut ASN1_OCTET_STRING,
     _: *mut *const core::ffi::c_uchar,
@@ -38334,14 +38273,6 @@ pub extern "C" fn i2d_ASN1_NULL(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_ASN1_NULL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASN1_OBJECT(
-    _: *const ASN1_OBJECT,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASN1_OBJECT")
 }
 
 #[unsafe(no_mangle)]

@@ -15,6 +15,33 @@ const _: unsafe extern "C" fn(
 ) -> *mut ASN1_OBJECT = crate::objects::ASN1_OBJECT_create;
 const _: unsafe extern "C" fn(*mut ASN1_OBJECT) = crate::objects::ASN1_OBJECT_free;
 const _: unsafe extern "C" fn() -> *mut ASN1_OBJECT = crate::objects::ASN1_OBJECT_new;
+const _: unsafe extern "C" fn(*mut *mut core::ffi::c_uchar, core::ffi::c_long) -> core::ffi::c_int =
+    crate::asn1::ASN1_check_infinite_end;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::asn1::ASN1_const_check_infinite_end;
+const _: unsafe extern "C" fn(
+    *mut *const core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::asn1::ASN1_get_object;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::ASN1_object_size;
+const _: unsafe extern "C" fn(*mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::asn1::ASN1_put_eoc;
+const _: unsafe extern "C" fn(
+    *mut *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::asn1::ASN1_put_object;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDR =
     crate::bio::addr::BIO_ADDRINFO_address;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
@@ -1362,9 +1389,18 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::objects::a2d_ASN1_OBJECT;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_OBJECT,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_OBJECT = crate::objects::d2i_ASN1_OBJECT;
 const _: unsafe extern "C" fn() = crate::err::strings::err_free_strings_int;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_OBJECT) -> core::ffi::c_int =
     crate::objects::i2a_ASN1_OBJECT;
+const _: unsafe extern "C" fn(
+    *const ASN1_OBJECT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::objects::i2d_ASN1_OBJECT;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     core::ffi::c_int,

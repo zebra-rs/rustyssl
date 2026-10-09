@@ -15,7 +15,7 @@
 pub(crate) mod name;
 pub(crate) mod sigid;
 
-use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_long, c_void};
 use core::ptr;
 use core::sync::atomic::{AtomicI32, Ordering};
 use std::collections::HashMap;
@@ -23,13 +23,15 @@ use std::ffi::CString;
 use std::sync::{OnceLock, PoisonError, RwLock};
 
 use rustyssl_abi::{
-    ASN1_OBJECT, ASN1_R_BUFFER_TOO_SMALL, ASN1_R_FIRST_NUM_TOO_LARGE, ASN1_R_INVALID_DIGIT,
+    ASN1_OBJECT, ASN1_R_BAD_OBJECT_HEADER, ASN1_R_BUFFER_TOO_SMALL, ASN1_R_EXPECTING_AN_OBJECT,
+    ASN1_R_FIRST_NUM_TOO_LARGE, ASN1_R_INVALID_DIGIT, ASN1_R_INVALID_OBJECT_ENCODING,
     ASN1_R_INVALID_SEPARATOR, ASN1_R_LENGTH_TOO_LONG, ASN1_R_MISSING_SECOND_NUMBER,
-    ASN1_R_SECOND_NUMBER_TOO_LARGE, BIO, ERR_LIB_ASN1, ERR_LIB_OBJ, ERR_R_ASN1_LIB,
-    ERR_R_PASSED_INVALID_ARGUMENT, NID_undef, OBJ_BSEARCH_FIRST_VALUE_ON_MATCH,
+    ASN1_R_SECOND_NUMBER_TOO_LARGE, ASN1_R_TOO_SMALL, BIO, ERR_LIB_ASN1, ERR_LIB_OBJ,
+    ERR_R_ASN1_LIB, ERR_R_PASSED_INVALID_ARGUMENT, NID_undef, OBJ_BSEARCH_FIRST_VALUE_ON_MATCH,
     OBJ_BSEARCH_VALUE_ON_NOMATCH, OBJ_R_OID_EXISTS, OBJ_R_UNKNOWN_NID, OBJ_R_UNKNOWN_OBJECT_NAME,
-    OPENSSL_INIT_LOAD_CONFIG,
+    OPENSSL_INIT_LOAD_CONFIG, V_ASN1_OBJECT,
 };
+use rustyssl_asn1::der;
 use rustyssl_asn1::objects as table;
 use rustyssl_asn1::oid::{self, TextError};
 
@@ -432,38 +434,212 @@ unsafe fn txt2obj(text: &[u8], no_name: bool) -> *mut Object {
     if length == 0 {
         return ptr::null_mut();
     }
-    // As `d2i_ASN1_OBJECT` does: a known OID gives the shared object.
+    // As `d2i_ASN1_OBJECT` does with the encoding.
+    let _ = length;
+    // SAFETY: no object to reuse.
+    unsafe { c2i(ptr::null_mut(), &data) }
+}
+
+/// OpenSSL's `ossl_c2i_ASN1_OBJECT`: an object from OID content octets. A known OID gives the
+/// shared object (replacing `*a`, freed); otherwise the content must be a valid encoding, and
+/// goes into `*a` if that is a dynamic object (keeping its NID, dropping its names) or into a
+/// new one. Raises `ASN1_R_INVALID_OBJECT_ENCODING` for bad content.
+///
+/// # Safety
+/// `a` is NULL or points to NULL or a live object.
+pub(crate) unsafe fn c2i(a: *mut *mut Object, content: &[u8]) -> *mut Object {
+    let invalid = || {
+        err::raise(
+            ERR_LIB_ASN1,
+            ASN1_R_INVALID_OBJECT_ENCODING,
+            "ossl_c2i_ASN1_OBJECT",
+        );
+        ptr::null_mut()
+    };
+    let Ok(length) = c_int::try_from(content.len()) else {
+        return invalid();
+    };
+    if content.last().is_none_or(|&last| last & 0x80 != 0) {
+        return invalid();
+    }
     let probe = Object {
         sn: ptr::null(),
         ln: ptr::null(),
         nid: NID_undef,
         length,
-        data: data.as_ptr(),
+        data: content.as_ptr(),
         flags: 0,
     };
     // SAFETY: a live object on the stack.
     let nid = unsafe { obj2nid(&raw const probe) };
     if nid != NID_undef {
-        return nid2obj(nid);
+        let shared = nid2obj(nid);
+        if !a.is_null() {
+            // SAFETY: the caller's guarantee.
+            let old = unsafe { *a };
+            // SAFETY: the caller's object, replaced below.
+            unsafe { free_object(old) };
+            // SAFETY: as above.
+            unsafe { *a = shared };
+        }
+        return shared;
     }
-    let object = new_object();
+    if !oid::is_valid_content(content) {
+        return invalid();
+    }
+    let existing = if a.is_null() {
+        ptr::null_mut()
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { *a }
+    };
+    // SAFETY: as above.
+    let reuse = !existing.is_null() && unsafe { (*existing).flags } & FLAG_DYNAMIC != 0;
+    let object = if reuse { existing } else { new_object() };
     if object.is_null() {
         return ptr::null_mut();
     }
-    let copied: *mut u8 = mem::alloc(data.len()).cast();
-    if copied.is_null() {
-        // SAFETY: the new object.
-        unsafe { free_object(object) };
-        return ptr::null_mut();
-    }
-    // SAFETY: `copied` has room for the data.
-    unsafe { ptr::copy_nonoverlapping(data.as_ptr(), copied, data.len()) };
-    // SAFETY: the new object, not yet shared.
+    // SAFETY: a dynamic object, the caller's or a new one.
     let target = unsafe { &mut *object };
-    target.data = copied;
+    // Content octets are reused if they're the object's own and big enough.
+    let own = target.flags & FLAG_DYNAMIC_DATA != 0;
+    let mut data = if own {
+        target.data.cast_mut()
+    } else {
+        ptr::null_mut()
+    };
+    target.data = ptr::null();
+    if data.is_null() || target.length < length {
+        target.length = 0;
+        // SAFETY: the object's own data, from this allocator (or NULL).
+        unsafe { mem::release(data.cast()) };
+        data = mem::alloc(content.len()).cast();
+        if data.is_null() {
+            if !reuse {
+                // SAFETY: the new object.
+                unsafe { free_object(object) };
+            }
+            return ptr::null_mut();
+        }
+        target.flags |= FLAG_DYNAMIC_DATA;
+    }
+    // SAFETY: `data` has room for the content.
+    unsafe { ptr::copy_nonoverlapping(content.as_ptr(), data, content.len()) };
+    if target.flags & FLAG_DYNAMIC_STRINGS != 0 {
+        // SAFETY: dynamic strings came from this allocator.
+        unsafe { mem::release(target.sn.cast_mut().cast()) };
+        // SAFETY: as above.
+        unsafe { mem::release(target.ln.cast_mut().cast()) };
+        target.flags &= !FLAG_DYNAMIC_STRINGS;
+    }
+    target.data = data;
     target.length = length;
-    target.flags |= FLAG_DYNAMIC_DATA;
+    target.sn = ptr::null();
+    target.ln = ptr::null();
+    if !a.is_null() {
+        // SAFETY: the caller's guarantee.
+        unsafe { *a = object };
+    }
     object
+}
+
+ffi_export! {
+    /// Decodes an OBJECT IDENTIFIER (of any class, primitive or not, as in OpenSSL) from at
+    /// most `length` octets at `*pp`, moving `*pp` past it: the shared object for a known OID,
+    /// else a new object, or the reused `*a`. NULL with an error otherwise.
+    ///
+    /// Unlike OpenSSL, NULL `pp` or `*pp` returns NULL rather than crashing
+    /// (docs/DEVIATIONS.md).
+    ///
+    /// # Safety
+    /// `*pp` is valid for reads of `length` octets (or of the whole element); `a` is NULL or
+    /// points to NULL or a live object.
+    pub unsafe extern "C" fn d2i_ASN1_OBJECT(a: *mut *mut ASN1_OBJECT, pp: *mut *const u8, length: c_long) -> *mut ASN1_OBJECT
+    where failure = ptr::null_mut(), library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        let start = if pp.is_null() { ptr::null() } else { unsafe { *pp } };
+        if start.is_null() {
+            return ptr::null_mut();
+        }
+        if length <= 0 {
+            err::raise(ERR_LIB_ASN1, ASN1_R_TOO_SMALL, "ASN1_get_object");
+            err::raise(ERR_LIB_ASN1, ASN1_R_BAD_OBJECT_HEADER, "d2i_ASN1_OBJECT");
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's guarantee.
+        let header = match unsafe { crate::asn1::read_header(start, length) } {
+            Ok(h) if !h.overrun => h,
+            _ => {
+                err::raise(ERR_LIB_ASN1, ASN1_R_BAD_OBJECT_HEADER, "d2i_ASN1_OBJECT");
+                return ptr::null_mut();
+            }
+        };
+        if header.tag != V_ASN1_OBJECT {
+            err::raise(ERR_LIB_ASN1, ASN1_R_EXPECTING_AN_OBJECT, "d2i_ASN1_OBJECT");
+            return ptr::null_mut();
+        }
+        let content_start = start.wrapping_add(header.header_len);
+        let content = match usize::try_from(header.length) {
+            // Within what the header says remains of `length`.
+            Ok(n) if n > 0 && c_int::try_from(n).is_ok() => {
+                // SAFETY: the header's length is within the input the caller provides.
+                unsafe { core::slice::from_raw_parts(content_start, n) }
+            }
+            _ => &[],
+        };
+        // SAFETY: the caller's guarantee about `a`.
+        let object = unsafe { c2i(a.cast(), content) };
+        if !object.is_null() {
+            // SAFETY: past the element, within the input.
+            unsafe { *pp = content_start.wrapping_add(content.len()) };
+        }
+        object.cast()
+    }
+}
+
+ffi_export! {
+    /// Encodes `a` as an OBJECT IDENTIFIER: its size with NULL `pp`; else written at `*pp`
+    /// (moved past it), or into a new buffer (stored in `*pp`) if `*pp` is NULL. 0 for an
+    /// object without content, -1 if it's too long.
+    ///
+    /// # Safety
+    /// `a` is NULL or a live object; `pp` is NULL or valid, and `*pp` NULL or valid for writes
+    /// of the encoding.
+    pub unsafe extern "C" fn i2d_ASN1_OBJECT(a: *const ASN1_OBJECT, pp: *mut *mut u8) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        let object: *const Object = a.cast();
+        // SAFETY: the caller's guarantee.
+        if object.is_null() || unsafe { (*object).data }.is_null() {
+            return 0;
+        }
+        // SAFETY: as above.
+        let length = unsafe { (*object).length };
+        let size = der::object_size(0, length, V_ASN1_OBJECT);
+        if pp.is_null() || size == -1 {
+            return size;
+        }
+        let mut encoding = Vec::new();
+        der::put_header(&mut encoding, 0, length, V_ASN1_OBJECT, 0);
+        // SAFETY: the object's content.
+        encoding.extend_from_slice(unsafe { content(object) });
+        // SAFETY: the caller's guarantee.
+        let target = unsafe { *pp };
+        let out = if target.is_null() {
+            mem::alloc(encoding.len()).cast::<u8>()
+        } else {
+            target
+        };
+        if out.is_null() {
+            return 0;
+        }
+        // SAFETY: room for the encoding, the caller's or just allocated.
+        unsafe { ptr::copy_nonoverlapping(encoding.as_ptr(), out, encoding.len()) };
+        // SAFETY: as above.
+        unsafe { *pp = if target.is_null() { out } else { out.wrapping_add(encoding.len()) } };
+        size
+    }
 }
 
 /// What `OBJ_obj2txt` produces: its result and the text it writes (a prefix of the whole text
