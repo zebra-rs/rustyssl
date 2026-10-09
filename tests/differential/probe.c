@@ -88,6 +88,29 @@
  *   asnput <cons> <len> <tag> <class>   ASN1_put_object and ASN1_object_size
  *   d2iobj <hex>               d2i_ASN1_OBJECT: the NID and text, the octets used, the errors,
  *                              and i2d_ASN1_OBJECT of the result
+ *
+ * Commands for INTEGER and ENUMERATED:
+ *   asnint <type> <hex>        a string of that type and octets: the int64, uint64, long, and
+ *                              ENUMERATED getters, i2a_ASN1_INTEGER, and the errors
+ *   asnset <value>             ASN1_INTEGER_set_int64 and the octets stored
+ *   a2iint <size> <hex>        a2i_ASN1_INTEGER on the text (in hex) with a buffer of <size>
+ *                              (at most 300)
+ *   asnbit <hex> <n> <value> <flags-hex>   a BIT STRING of those octets: ASN1_BIT_STRING_set_bit
+ *                              of bit <n>, the octets after, get_bit around <n>, and
+ *                              ASN1_BIT_STRING_check against the flags
+ *
+ * Commands for character strings:
+ *   asntext <type> <flags> <hex>   a string of that type: ASN1_STRING_print_ex with <flags> (to a
+ *                              BIO and counted), ASN1_STRING_to_UTF8, and the errors
+ *   asnmb <inform> <mask> <min> <max> <hex>   ASN1_mbstring_ncopy: the type, the octets, the
+ *                              errors
+ *
+ * Commands for times:
+ *   asntime <type> <flags> <hex>   a string of that type, flags, and octets: the checks,
+ *                              ASN1_TIME_to_tm, both printouts, ASN1_TIME_normalize, and the
+ *                              difference from a fixed time
+ *   asntimet <time> <days> <secs>  ASN1_TIME_adj, ASN1_UTCTIME_adj, ASN1_GENERALIZEDTIME_adj,
+ *                              and OPENSSL_gmtime_adj of OPENSSL_gmtime
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -98,14 +121,17 @@
 /* ERR_get_state is deprecated. */
 #define OPENSSL_SUPPRESS_DEPRECATED
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <errno.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
@@ -829,6 +855,249 @@ static int asn_command(const char *command, const char *line)
     return 1;
 }
 
+/* Runs an INTEGER command; returns 0 if `command` isn't one. */
+static int int_command(const char *command, const char *line)
+{
+    char hex[700] = "-";
+    unsigned char data[300];
+    size_t len = 0;
+    int number = 0;
+
+    if (strcmp(command, "asnset") == 0) {
+        long long value = 0;
+        ASN1_INTEGER *a = ASN1_INTEGER_new();
+
+        sscanf(line, "%*s %lld", &value);
+        printf("asnset %d type=%d", ASN1_INTEGER_set_int64(a, (int64_t)value), a->type);
+        print_hex("", a->data, (size_t)a->length);
+        ASN1_INTEGER_free(a);
+        return 1;
+    }
+    if (strcmp(command, "asnint") != 0 && strcmp(command, "a2iint") != 0)
+        return 0;
+    sscanf(line, "%*s %d %699s", &number, hex);
+    if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+        printf("%s bad hex\n", command);
+        return 1;
+    }
+    if (strcmp(command, "asnint") == 0) {
+        ASN1_STRING *s = ASN1_STRING_type_new(number);
+        BIO *mem = BIO_new(BIO_s_mem());
+        int64_t v = -7;
+        uint64_t u = 7;
+        char *out;
+        long n;
+        int r1, r2;
+
+        ASN1_STRING_set(s, data, (int)len);
+        r1 = ASN1_INTEGER_get_int64(&v, s);
+        r2 = ASN1_INTEGER_get_uint64(&u, s);
+        printf("asnint %d:%lld %d:%llu %ld %ld i2a=%d:", r1, (long long)v, r2, (unsigned long long)u,
+               ASN1_INTEGER_get(s), ASN1_ENUMERATED_get(s), i2a_ASN1_INTEGER(mem, s));
+        n = BIO_get_mem_data(mem, &out);
+        fwrite(out, 1, (size_t)n, stdout);
+        print_asn_errors();
+        BIO_free(mem);
+        ASN1_STRING_free(s);
+    } else {
+        BIO *in = BIO_new(BIO_s_mem());
+        ASN1_INTEGER *a = ASN1_INTEGER_new();
+        char buf[300];
+        int r;
+
+        if (number < 0 || number > 300)
+            number = 300;
+        BIO_write(in, data, (int)len);
+        memset(buf, 'x', sizeof(buf));
+        r = a2i_ASN1_INTEGER(in, a, buf, number);
+        printf("a2iint %d type=%d", r, a->type);
+        print_hex("", a->data, (size_t)a->length);
+        print_escaped("a2iint buf", 0, buf, number > 0 ? (size_t)number : 0);
+        printf("a2iint");
+        print_asn_errors();
+        ASN1_INTEGER_free(a);
+        BIO_free(in);
+    }
+    return 1;
+}
+
+/* Runs a BIT STRING command; returns 0 if `command` isn't one. */
+static int bit_command(const char *command, const char *line)
+{
+    char hex[600] = "-", flags_hex[600] = "-";
+    unsigned char data[300], flags[300];
+    size_t len = 0, flags_len = 0;
+    int n = 0, value = 0, r;
+    ASN1_BIT_STRING *s;
+
+    if (strcmp(command, "asnbit") != 0)
+        return 0;
+    sscanf(line, "%*s %599s %d %d %599s", hex, &n, &value, flags_hex);
+    if ((strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len))
+        || (strcmp(flags_hex, "-") != 0 && !parse_hex(flags_hex, flags, &flags_len))) {
+        printf("asnbit bad hex\n");
+        return 1;
+    }
+    s = ASN1_BIT_STRING_new();
+    if (len > 0)
+        ASN1_BIT_STRING_set(s, data, (int)len);
+    s->flags = ASN1_STRING_FLAG_BITS_LEFT | 5;
+    r = ASN1_BIT_STRING_set_bit(s, n, value);
+    printf("asnbit %d flags=%#lx get=%d,%d,%d check=%d", r, s->flags, ASN1_BIT_STRING_get_bit(s, n - 1),
+           ASN1_BIT_STRING_get_bit(s, n), ASN1_BIT_STRING_get_bit(s, n + 1),
+           ASN1_BIT_STRING_check(s, flags, (int)flags_len));
+    print_hex("", s->data, (size_t)s->length);
+    ASN1_BIT_STRING_free(s);
+    return 1;
+}
+
+/* Runs a character-string command; returns 0 if `command` isn't one. */
+static int text_command(const char *command, const char *line)
+{
+    char hex[700] = "-";
+    unsigned char data[300];
+    size_t len = 0;
+
+    if (strcmp(command, "asntext") == 0) {
+        int type = 0;
+        unsigned long flags = 0;
+        ASN1_STRING *s;
+        BIO *mem = BIO_new(BIO_s_mem());
+        unsigned char *utf8 = NULL;
+        char *out;
+        long n;
+        int r, counted;
+
+        sscanf(line, "%*s %d %lx %699s", &type, &flags, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asntext bad hex\n");
+            BIO_free(mem);
+            return 1;
+        }
+        s = ASN1_STRING_type_new(type);
+        ASN1_STRING_set(s, data, (int)len);
+        r = ASN1_STRING_print_ex(mem, s, flags);
+        counted = ASN1_STRING_print_ex(NULL, s, flags);
+        n = BIO_get_mem_data(mem, &out);
+        print_escaped("asntext", r, out, n > 0 ? (size_t)n : 0);
+        printf("asntext counted=%d", counted);
+        r = ASN1_STRING_to_UTF8(&utf8, s);
+        print_escaped(" utf8", r, (const char *)utf8, r > 0 ? (size_t)r : 0);
+        printf("asntext");
+        print_asn_errors();
+        OPENSSL_free(utf8);
+        ASN1_STRING_free(s);
+        BIO_free(mem);
+        return 1;
+    }
+    if (strcmp(command, "asnmb") == 0) {
+        int inform = 0, r;
+        unsigned long mask = 0;
+        long min = 0, max = 0;
+        ASN1_STRING *out = NULL;
+
+        sscanf(line, "%*s %x %lx %ld %ld %699s", &inform, &mask, &min, &max, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asnmb bad hex\n");
+            return 1;
+        }
+        r = ASN1_mbstring_ncopy(&out, data, (int)len, inform, mask, min, max);
+        printf("asnmb %d", r);
+        if (out != NULL) {
+            printf(" type=%d", out->type);
+            print_hex("", out->data, (size_t)out->length);
+        } else {
+            printf("\n");
+        }
+        printf("asnmb");
+        print_asn_errors();
+        ASN1_STRING_free(out);
+        return 1;
+    }
+    return 0;
+}
+
+/* Runs a time command; returns 0 if `command` isn't one. */
+static int time_command(const char *command, const char *line)
+{
+    if (strcmp(command, "asntime") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300];
+        size_t len = 0;
+        int type = 0, day = 7, sec = 7, r;
+        long flags = 0;
+        ASN1_STRING *s, *n, *fixed = ASN1_STRING_new();
+        BIO *mem = BIO_new(BIO_s_mem());
+        struct tm tm;
+        char *out;
+        long outlen;
+
+        sscanf(line, "%*s %d %lx %699s", &type, &flags, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asntime bad hex\n");
+            BIO_free(mem);
+            ASN1_STRING_free(fixed);
+            return 1;
+        }
+        s = ASN1_STRING_type_new(type);
+        ASN1_STRING_set(s, data, (int)len);
+        s->flags = flags;
+        memset(&tm, 0, sizeof(tm));
+        r = ASN1_TIME_to_tm(s, &tm);
+        printf("asntime check=%d,%d,%d tm=%d %d-%d-%d %d:%d:%d %d %d", ASN1_TIME_check(s), ASN1_UTCTIME_check(s),
+               ASN1_GENERALIZEDTIME_check(s), r, tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+               tm.tm_wday, tm.tm_yday);
+        r = ASN1_TIME_print(mem, s);
+        BIO_puts(mem, "|");
+        r = r * 10 + ASN1_TIME_print_ex(mem, s, ASN1_DTFLGS_ISO8601);
+        outlen = BIO_get_mem_data(mem, &out);
+        print_escaped(" print", r, out, (size_t)outlen);
+        ASN1_TIME_set_string(fixed, "20240229123456Z");
+        r = ASN1_TIME_diff(&day, &sec, fixed, s);
+        printf("asntime diff=%d %d %d cmp=%d", r, day, sec, ASN1_TIME_compare(s, fixed));
+        n = ASN1_STRING_dup(s);
+        r = ASN1_TIME_normalize(n);
+        printf(" normalize=%d type=%d", r, n->type);
+        print_hex("", n->data, n->length > 0 ? (size_t)n->length : 0);
+        ASN1_STRING_free(n);
+        ASN1_STRING_free(s);
+        ASN1_STRING_free(fixed);
+        BIO_free(mem);
+        ERR_clear_error();
+        return 1;
+    }
+    if (strcmp(command, "asntimet") == 0) {
+        long long when = 0;
+        int days = 0;
+        long secs = 0;
+        time_t t;
+        ASN1_STRING *a, *u, *g;
+        struct tm tm;
+
+        sscanf(line, "%*s %lld %d %ld", &when, &days, &secs);
+        t = (time_t)when;
+        a = ASN1_TIME_adj(NULL, t, days, secs);
+        u = ASN1_UTCTIME_adj(NULL, t, days, secs);
+        g = ASN1_GENERALIZEDTIME_adj(NULL, t, days, secs);
+        printf("asntimet %s %s %s", a ? (a->length > 0 ? (char *)a->data : "-1") : "NULL",
+               u ? (char *)u->data : "NULL", g ? (g->length > 0 ? (char *)g->data : "-1") : "NULL");
+        memset(&tm, 0, sizeof(tm));
+        if (OPENSSL_gmtime(&t, &tm) != NULL) {
+            int r = OPENSSL_gmtime_adj(&tm, days, secs);
+
+            printf(" gmtime_adj=%d %d-%d-%d %d:%d:%d", r, tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min,
+                   tm.tm_sec);
+        }
+        printf("\n");
+        ASN1_STRING_free(a);
+        ASN1_STRING_free(u);
+        ASN1_STRING_free(g);
+        ERR_clear_error();
+        return 1;
+    }
+    return 0;
+}
+
 /* Runs an error-queue command; returns 0 if `command` isn't one. */
 static int err_command(const char *command, const char *line)
 {
@@ -1133,7 +1402,9 @@ int main(void)
             || lhash_command(command, line) || string_command(command, line)
             || bio_command(command, line) || printf_command(command, line)
             || addr_command(command, line) || obj_command(command, line)
-            || asn_command(command, line)) {
+            || asn_command(command, line) || int_command(command, line)
+            || bit_command(command, line) || text_command(command, line)
+            || time_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
