@@ -1201,6 +1201,32 @@ const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
     crate::threads::OSSL_set_max_threads;
 const _: unsafe extern "C" fn(u64) = crate::sleep::OSSL_sleep;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut BIO = crate::trace::OSSL_trace_begin;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::trace::OSSL_trace_enabled;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut BIO) = crate::trace::OSSL_trace_end;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::trace::OSSL_trace_get_category_name;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::trace::OSSL_trace_get_category_num;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    OSSL_trace_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::trace::OSSL_trace_set_callback;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut BIO) -> core::ffi::c_int =
+    crate::trace::OSSL_trace_set_channel;
+const _: unsafe extern "C" fn(core::ffi::c_int, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::trace::OSSL_trace_set_prefix;
+const _: unsafe extern "C" fn(core::ffi::c_int, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::trace::OSSL_trace_set_suffix;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::trace::OSSL_trace_string;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;

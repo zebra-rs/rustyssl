@@ -724,7 +724,7 @@ Everything else depends on this phase.
       `strtoul` sessions, 10,000 of them identical on macOS;
     - fuzz targets `stack` and `lhash`, model-based, and `hex`, against a model decoder
       with a round trip.
-- [ ] **1.6 BIO core**, in four sub-steps, each its own PR (about 200 exports in all; those that
+- [x] **1.6 BIO core**, in five sub-steps, each its own PR (about 200 exports in all; those that
   need later phases are listed at the end):
   - [x] **1.6a The BIO object and the simple types:**
     - the BIO object and chains
@@ -993,7 +993,36 @@ Everything else depends on this phase.
   Later phases: the md and cipher filters (`BIO_f_md`, `BIO_f_cipher`, `BIO_f_reliable`,
   Phase 3); the ASN.1, CMS, PKCS#7, and NDEF BIOs; and the provider core BIO
   (`BIO_s_core`, `BIO_new_from_core_bio`).
-- [ ] **1.7 Tracing:** `OSSL_trace_*` with the default build's behavior (tracing disabled).
+- [x] **1.7 Tracing:** `OSSL_trace_*` with the default build's behavior (tracing disabled).
+
+  *Done:* 10 exports, now 412 of libcrypto's 5,876 (`trace.rs`). This completes phase 1's
+  steps, and its exit criteria hold: the C conformance tests pass identically on both
+  libraries, the printf corpus is byte-identical, and the printf and BIO fuzzers run clean.
+  - **As OpenSSL's default build (`OPENSSL_NO_TRACE`):**
+    - nothing can be attached: `OSSL_trace_set_channel`, `_set_callback`, `_set_prefix`, and
+      `_set_suffix` return 0, and the channel stays the caller's;
+    - no category is enabled, `OSSL_trace_begin` returns NULL, and `OSSL_trace_end` does nothing;
+    - the header's `OSSL_TRACE*` macros compile to nothing in applications, so they never call
+      in.
+  - **What still works:**
+    - the category names map to numbers and back, ignoring ASCII case. The table takes each
+      name from its generated `OSSL_TRACE_CATEGORY_*` constant's identifier, and a
+      compile-time check ties its length to `OSSL_TRACE_CATEGORY_NUM`;
+    - `OSSL_trace_string` formats through the same `BIO_printf` path. So a NUL in text ends
+      the output, NULL text prints the start of `<NULL>`, empty text returns 0, and a NULL BIO
+      returns 0 with no error, all as OpenSSL does.
+  - **Deviations (`DEVIATIONS.md`):** `OSSL_trace_string` overflows OpenSSL's 81-byte buffer
+    when asked to mask more than 80 bytes in full; rustyssl masks them all. NULL data to mask,
+    and sizes over `INT_MAX`, fail with -1.
+  - **Tests:** identical output to the reference:
+    - `tests/c/trace.c` (25 checks, with every category's name and each formatted string
+      printed escaped);
+    - differential: `tracecat` and `tracestr` commands, a `trace.txt` corpus, and random
+      strings of up to 120 bytes around the limit mixing control characters, NULs, and high
+      bytes; 80,000 sessions identical on macOS. The probe never asks the reference to mask
+      more than 80 bytes in full.
+  - No fuzz target: `OSSL_trace_string` parses nothing, and the differential sessions cover
+    its inputs.
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both
 the reference and ours. The printf corpus is byte-identical to the reference. The printf and

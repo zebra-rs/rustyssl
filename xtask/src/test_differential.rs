@@ -547,10 +547,29 @@ fn string_session(random: &mut Random, out: &mut String) -> Result {
     const HEX: &[u8] = b"0123456789abcdefABCDEF::--xg";
     const NUMBER: &[u8] = b"0123456789abcdefxX+-";
     for _ in 0..1 + random.below(20) {
-        if random.below(2) == 0 {
+        let choice = random.below(4);
+        if choice == 0 {
             let text = random_text(random, HEX, 16);
             let separator = random.pick(&["0", "58", "45", "120"]);
             writeln!(out, "hexdecode {text} {separator}")?;
+        } else if choice == 1 {
+            let name = random.pick(&[
+                "ALL",
+                "tls",
+                "Tls_Cipher",
+                "x509v3_policy",
+                "QUERY",
+                "query_",
+                "TLS-CIPHER",
+                "-",
+                "PKCS5v2",
+                "ref_count",
+                "engine",
+            ]);
+            let num = random.below(25).cast_signed() - 2;
+            writeln!(out, "tracecat {name} {num}")?;
+        } else if choice == 2 {
+            writeln!(out, "tracestr {}", trace_string_args(random))?;
         } else {
             let text = random_text(random, NUMBER, 24);
             let base = random.pick(&["0", "8", "10", "16", "36", "1", "99"]);
@@ -558,6 +577,33 @@ fn string_session(random: &mut Random, out: &mut String) -> Result {
         }
     }
     Ok(())
+}
+
+/// `OSSL_trace_string`'s text and full flags and data in hex: up to 120 bytes, around the
+/// 80-byte limit, mixing printable text with newlines, control characters, NULs, and high bytes.
+fn trace_string_args(random: &mut Random) -> String {
+    let len = match random.below(4) {
+        0 => random.below(4),
+        1 => 78 + random.below(5),
+        _ => random.below(121),
+    };
+    let hex: String = (0..len)
+        .map(|_| {
+            let byte = match random.below(8) {
+                0 => b'\n',
+                1 => [0u8, 9, 13, 27, 0x7f]
+                    .get(usize::try_from(random.below(5)).unwrap_or(0))
+                    .copied()
+                    .unwrap_or(0),
+                2 => u8::try_from(0x80 + random.below(0x80)).unwrap_or(0x80),
+                _ => u8::try_from(0x20 + random.below(0x5f)).unwrap_or(b'a'),
+            };
+            format!("{byte:02x}")
+        })
+        .collect();
+    let text = random.below(2);
+    let full = random.below(2);
+    format!("{text} {full} {}", if hex.is_empty() { "-" } else { &hex })
 }
 
 /// Up to `max` characters from `alphabet`, or `-` for none.

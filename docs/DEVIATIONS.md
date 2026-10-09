@@ -54,6 +54,8 @@ OpenSSL never depends on them.
 | `BIO_destroy_bio_pair` on a datagram pair end with a local address (`BIO_dgram_set0_local_addr`), then `BIO_free` | frees the address twice | frees it once | `bio::dgram_pair::tests::unpairing_then_freeing_frees_the_local_address_once` |
 | `BIO_new_bio_dgram_pair` with null out-pointers | writes through null and crashes | returns 0 | `bio::dgram_pair::tests::unpairing_then_freeing_frees_the_local_address_once` |
 | A datagram pair or memory BIO's write with a source or destination address (`BIO_sendmmsg`) | copies a whole `BIO_ADDR` from the caller's pointer, reading past a smaller `sockaddr` such as `BIO_ADDRINFO_address` gives | copies the address's family's bytes and zeroes the rest; what the reader gets is the same for any address made by `BIO_ADDR_new` | `tests/c/bio_dgram_pair.c` |
+| `OSSL_trace_string` with `full` set, `text` clear, and more than `OSSL_TRACE_STRING_MAX` (80) bytes | masks them into an 81-byte stack buffer, overflowing it | masks and prints them all | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
+| `OSSL_trace_string` with NULL `data` to mask, or with `full` and a size over `INT_MAX` | dereferences NULL; truncates the size to an `int` | returns -1 (after the length note, if any), writing no data | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes
