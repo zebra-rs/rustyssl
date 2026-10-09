@@ -4,3 +4,6 @@
 //! Secret-dependent code must be constant-time and must zeroize secrets on drop.
 
 #![forbid(unsafe_code)]
+#![deny(clippy::arithmetic_side_effects)]
+
+pub mod params;
