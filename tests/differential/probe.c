@@ -139,6 +139,19 @@
  *                              text in chunks (enc 0); the results and the output
  *   pemread <flags> <hex>      PEM_read_bio_ex of the text (in hex) with <flags> until it fails:
  *                              each block's name, header, and data, then the errors
+ *   paramset <fn> <type> <size> <null> <value>   OSSL_PARAM_set_<fn> (int32, uint32, int64,
+ *                              uint64, double, int, uint, long, ulong, size_t, time_t) of the
+ *                              value into a parameter of the type and size (data NULL if
+ *                              <null>): the return, return_size, the data, and the errors;
+ *                              cases where OpenSSL touches memory out of bounds print "skip"
+ *   paramget <type> <hex>      every typed getter on a parameter of the type over the octets
+ *                              (`-` for none): each return and value, and the errors
+ *   paramstr <op> <size> <max> <hex>   op 0: OSSL_PARAM_get_utf8_string of <size> of the octets
+ *                              into a buffer of <max>; 1: get_octet_string likewise; 2 and 3:
+ *                              set_utf8_string (the octets up to a NUL) and set_octet_string
+ *                              into a parameter of <size> octets (<max> 0: data NULL)
+ *   parammerge <keys> <keys>   OSSL_PARAM_merge of two arrays of the comma-separated keys (`-`
+ *                              for none): the merged keys and which array each came from
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -168,6 +181,7 @@
 #include <openssl/evp.h>
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
+#include <openssl/params.h>
 #include <openssl/pem.h>
 #include <openssl/stack.h>
 #include <openssl/trace.h>
@@ -1554,6 +1568,211 @@ static int time_command(const char *command, const char *line)
 }
 
 /* Runs an error-queue command; returns 0 if `command` isn't one. */
+static void print_octets(const unsigned char *data, size_t len)
+{
+    printf(" ");
+    for (size_t i = 0; i < len; i++)
+        printf("%02x", data[i]);
+}
+
+static void print_param_errors(void)
+{
+    unsigned long code;
+
+    printf(" errors:");
+    while ((code = ERR_get_error()) != 0)
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+    printf("\n");
+}
+
+static void print_return_size(size_t n)
+{
+    if (n == OSSL_PARAM_UNMODIFIED)
+        printf(" return unmodified");
+    else
+        printf(" return %zu", n);
+}
+
+static int params_command(const char *command, const char *line)
+{
+    if (strcmp(command, "paramset") == 0) {
+        char fn[16] = "", value[64] = "0";
+        unsigned int type = 0;
+        size_t size = 0;
+        int null = 0, r = 0;
+        unsigned char data[40];
+        OSSL_PARAM p = { "p", 0, NULL, 0, 12345 };
+        long long sv;
+        unsigned long long uv;
+        double dv;
+
+        sscanf(line, "%*s %15s %u %zu %d %63s", fn, &type, &size, &null, value);
+        sv = strtoll(value, NULL, 0);
+        uv = strtoull(value, NULL, 0);
+        dv = strtod(value, NULL);
+        if (size > 32)
+            size = 32;
+        memset(data, 0xaa, sizeof(data));
+        p.data_type = type;
+        p.data_size = size;
+        p.data = null ? NULL : data;
+        printf("paramset %s %u %zu %d %s:", fn, type, size, null, value);
+        /* OpenSSL reads before a value narrowed to nothing, and writes a real through NULL. */
+        if ((type == OSSL_PARAM_INTEGER && size == 0 && !null)
+            || (type == OSSL_PARAM_REAL && size == 8 && null
+                && (strcmp(fn, "uint64") == 0 || strcmp(fn, "ulong") == 0 || strcmp(fn, "size_t") == 0))
+            || (strcmp(fn, "double") == 0 && (dv == 9223372036854775808.0 || dv == -9223372036854775808.0
+                                              || dv == 18446744073709551616.0))) {
+            printf(" skip\n");
+            return 1;
+        }
+        if (strcmp(fn, "int32") == 0)
+            r = OSSL_PARAM_set_int32(&p, (int32_t)sv);
+        else if (strcmp(fn, "uint32") == 0)
+            r = OSSL_PARAM_set_uint32(&p, (uint32_t)uv);
+        else if (strcmp(fn, "int64") == 0)
+            r = OSSL_PARAM_set_int64(&p, (int64_t)sv);
+        else if (strcmp(fn, "uint64") == 0)
+            r = OSSL_PARAM_set_uint64(&p, (uint64_t)uv);
+        else if (strcmp(fn, "double") == 0)
+            r = OSSL_PARAM_set_double(&p, dv);
+        else if (strcmp(fn, "int") == 0)
+            r = OSSL_PARAM_set_int(&p, (int)sv);
+        else if (strcmp(fn, "uint") == 0)
+            r = OSSL_PARAM_set_uint(&p, (unsigned int)uv);
+        else if (strcmp(fn, "long") == 0)
+            r = OSSL_PARAM_set_long(&p, (long)sv);
+        else if (strcmp(fn, "ulong") == 0)
+            r = OSSL_PARAM_set_ulong(&p, (unsigned long)uv);
+        else if (strcmp(fn, "size_t") == 0)
+            r = OSSL_PARAM_set_size_t(&p, (size_t)uv);
+        else if (strcmp(fn, "time_t") == 0)
+            r = OSSL_PARAM_set_time_t(&p, (time_t)sv);
+        printf(" %d", r);
+        print_return_size(p.return_size);
+        if (!null)
+            print_octets(data, size);
+        print_param_errors();
+        return 1;
+    }
+    if (strcmp(command, "paramget") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300];
+        size_t len = 0;
+        unsigned int type = 0;
+        OSSL_PARAM p = { "p", 0, NULL, 0, 0 };
+        int32_t i32;
+        uint32_t u32;
+        int64_t i64;
+        uint64_t u64;
+        double d;
+        int r;
+
+        sscanf(line, "%*s %u %699s", &type, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("paramget bad hex\n");
+            return 1;
+        }
+        printf("paramget %u %s:", type, hex);
+        if (type == OSSL_PARAM_INTEGER && len == 0) {
+            printf(" skip\n");
+            return 1;
+        }
+        p.data_type = type;
+        p.data = data;
+        p.data_size = len;
+        r = OSSL_PARAM_get_int32(&p, &i32);
+        printf(" int32 %d %d", r, r ? i32 : 0);
+        r = OSSL_PARAM_get_uint32(&p, &u32);
+        printf(" uint32 %d %u", r, r ? u32 : 0);
+        r = OSSL_PARAM_get_int64(&p, &i64);
+        printf(" int64 %d %lld", r, r ? (long long)i64 : 0);
+        r = OSSL_PARAM_get_uint64(&p, &u64);
+        printf(" uint64 %d %llu", r, r ? (unsigned long long)u64 : 0);
+        r = OSSL_PARAM_get_double(&p, &d);
+        printf(" double %d %.17g", r, r ? d : 0);
+        print_param_errors();
+        return 1;
+    }
+    if (strcmp(command, "paramstr") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300], out[300];
+        size_t len = 0, size = 0, max = 0, used = 99;
+        int op = 0, r;
+        OSSL_PARAM p = { "p", 0, NULL, 0, 12345 };
+        void *buf = out;
+
+        sscanf(line, "%*s %d %zu %zu %699s", &op, &size, &max, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("paramstr bad hex\n");
+            return 1;
+        }
+        if (max > sizeof(out))
+            max = sizeof(out);
+        if (size > sizeof(out))
+            size = sizeof(out);
+        memset(out, 0xaa, sizeof(out));
+        printf("paramstr %d %zu %zu %s:", op, size, max, hex);
+        if (op == 0 || op == 1) {
+            if (size > len)
+                size = len;
+            p.data_type = op == 0 ? OSSL_PARAM_UTF8_STRING : OSSL_PARAM_OCTET_STRING;
+            p.data = data;
+            p.data_size = size;
+            if (op == 0)
+                r = OSSL_PARAM_get_utf8_string(&p, (char **)&buf, max);
+            else
+                r = OSSL_PARAM_get_octet_string(&p, &buf, max, &used);
+            printf(" %d used %zu", r, used);
+            print_octets(out, max + 1 < sizeof(out) ? max + 1 : max);
+        } else {
+            data[len < sizeof(data) ? len : sizeof(data) - 1] = '\0';
+            p.data_type = op == 2 ? OSSL_PARAM_UTF8_STRING : OSSL_PARAM_OCTET_STRING;
+            p.data = max == 0 ? NULL : out;
+            p.data_size = size;
+            if (op == 2)
+                r = OSSL_PARAM_set_utf8_string(&p, (const char *)data);
+            else
+                r = OSSL_PARAM_set_octet_string(&p, data, len);
+            printf(" %d", r);
+            print_return_size(p.return_size);
+            print_octets(out, size + 1 < sizeof(out) ? size + 1 : size);
+        }
+        print_param_errors();
+        return 1;
+    }
+    if (strcmp(command, "parammerge") == 0) {
+        char lists[2][300] = { "-", "-" };
+        OSSL_PARAM arrays[2][40];
+        int values[2][40];
+        OSSL_PARAM *m, *q;
+        int a;
+
+        sscanf(line, "%*s %299s %299s", lists[0], lists[1]);
+        printf("parammerge %s %s:", lists[0], lists[1]);
+        for (a = 0; a < 2; a++) {
+            int n = 0;
+            char *key = strcmp(lists[a], "-") == 0 ? NULL : strtok(lists[a], ",");
+
+            for (; key != NULL && n < 39; key = strtok(NULL, ",")) {
+                values[a][n] = a * 100 + n;
+                arrays[a][n] = OSSL_PARAM_construct_int(key, &values[a][n]);
+                n++;
+            }
+            arrays[a][n] = OSSL_PARAM_construct_end();
+        }
+        m = OSSL_PARAM_merge(arrays[0], arrays[1]);
+        if (m == NULL)
+            printf(" NULL");
+        for (q = m; q != NULL && q->key != NULL; q++)
+            printf(" %s=%d", q->key, *(int *)q->data);
+        OSSL_PARAM_free(m);
+        print_param_errors();
+        return 1;
+    }
+    return 0;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -1859,7 +2078,8 @@ int main(void)
             || addr_command(command, line) || obj_command(command, line)
             || asn_command(command, line) || int_command(command, line)
             || bit_command(command, line) || text_command(command, line)
-            || time_command(command, line) || template_command(command, line)) {
+            || time_command(command, line) || template_command(command, line)
+            || params_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
