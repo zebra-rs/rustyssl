@@ -1,7 +1,8 @@
 //! Library contexts (`OSSL_LIB_CTX(3)`): `OSSL_LIB_CTX_new`, `OSSL_LIB_CTX_free`, the global
 //! default context, each thread's default (`OSSL_LIB_CTX_set0_default`), and the state a
 //! context keeps so far: its thread limit (`OSSL_set_max_threads`), its configuration
-//! diagnostics flag, and its application-data registry ([`crate::ex_data`]).
+//! diagnostics flag, its application-data registry ([`crate::ex_data`]), and its properties
+//! ([`crate::property`]).
 //!
 //! As in OpenSSL, a NULL context means the calling thread's default: the context it set with
 //! `OSSL_LIB_CTX_set0_default`, or else the global default, which is made on first use and
@@ -17,9 +18,9 @@ use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 
 use rustyssl_abi::{ERR_LIB_CRYPTO, OSSL_LIB_CTX};
 
-use crate::ex_data;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, Held, handle_type};
+use crate::{ex_data, property};
 
 /// A library context's state.
 #[derive(Default)]
@@ -30,6 +31,8 @@ pub(crate) struct LibCtx {
     conf_diagnostics: AtomicI32,
     /// The application-data indexes registered in this context.
     pub(crate) ex_data: ex_data::Registry,
+    /// The property names and values numbered in this context, and its default query.
+    pub(crate) properties: property::Store,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
@@ -56,6 +59,12 @@ pub(crate) fn global() -> *mut OSSL_LIB_CTX {
     GLOBAL
         .get_or_init(|| Global(OSSL_LIB_CTX::new_handle(LibCtx::default())))
         .0
+}
+
+/// Whether `ctx` is the global default context.
+pub(crate) fn is_global(ctx: &LibCtx) -> bool {
+    // SAFETY: the global context is never freed.
+    unsafe { OSSL_LIB_CTX::get(global()) }.is_some_and(|g| ptr::eq(g, ctx))
 }
 
 /// The calling thread's default context: the one it set, or the global one.

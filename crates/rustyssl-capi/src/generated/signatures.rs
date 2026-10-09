@@ -1593,6 +1593,14 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeUpdate;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::property::EVP_default_properties_enable_fips;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
+    crate::property::EVP_default_properties_is_fips_enabled;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut core::ffi::c_char =
+    crate::property::EVP_get1_default_properties;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::property::EVP_set_default_properties;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;
