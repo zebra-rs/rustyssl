@@ -7,7 +7,7 @@
 //! and is reused until they change.
 //!
 //! The verified source is kept, unbuilt, in `target/ref/openssl-<version>/src/`: OpenSSL's C is
-//! the behavioral spec where the man pages are silent (AGENTS.md).
+//! the behavioral spec where the man pages are silent (README.md).
 
 use std::fs;
 use std::path::{Path, PathBuf};

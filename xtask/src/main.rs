@@ -22,7 +22,7 @@ mod vendor;
 
 use std::process::ExitCode;
 
-/// Every command named in AGENTS.md and the plans, with a one-line summary.
+/// Every command named in README.md and the plans, with a one-line summary.
 #[rustfmt::skip]
 const COMMANDS: &[(&str, &str)] = &[
     ("vendor", "fetch and verify a pinned OpenSSL release into abi/openssl-<ver>/"),

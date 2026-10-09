@@ -29,7 +29,7 @@ syn = { version = "3", default-features = false, features = ["full", "parsing", 
 
 # Baseline for every crate. Crate-level attributes add more: `forbid(unsafe_code)`
 # outside rustyssl-capi and libs/*, and `arithmetic_side_effects` in parser and protocol
-# crates. Rule numbers refer to "Security rules" in AGENTS.md.
+# crates. Rule numbers refer to "Security rules" in README.md.
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 

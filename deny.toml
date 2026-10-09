@@ -1,4 +1,4 @@
-# `cargo deny check`: the supply-chain gate from AGENTS.md security rule 8. Every dependency
+# `cargo deny check`: the supply-chain gate from README.md security rule 8. Every dependency
 # is also recorded in docs/DEPENDENCIES.md and audited with `cargo vet` (supply-chain/).
 
 [graph]

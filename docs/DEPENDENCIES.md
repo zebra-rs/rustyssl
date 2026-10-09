@@ -1,6 +1,6 @@
 # Third-party dependencies
 
-Every crate from outside this workspace is listed here before it's added (AGENTS.md, security
+Every crate from outside this workspace is listed here before it's added (README.md, security
 rule 8). Only pure-Rust crates are allowed: no C or assembly build scripts, `cc`, or `*-sys`
 crates. CI enforces it with two gates:
 

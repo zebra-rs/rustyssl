@@ -1,4 +1,4 @@
-# Rule 3 of AGENTS.md denies these in library code; tests may use them freely.
+# Rule 3 of README.md denies these in library code; tests may use them freely.
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-indexing-slicing-in-tests = true
