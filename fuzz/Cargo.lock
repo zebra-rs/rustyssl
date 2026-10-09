@@ -106,6 +106,7 @@ dependencies = [
 name = "rustyssl-crypto"
 version = "0.1.0"
 dependencies = [
+ "rustyssl-abi",
  "rustyssl-asn1",
 ]
 
