@@ -80,6 +80,14 @@
  *   objder <hex>               an object with those content octets: OBJ_obj2nid, OBJ_obj2txt
  *                              with names and without, and i2a_ASN1_OBJECT
  *   objname <name>             OBJ_sn2nid, OBJ_ln2nid, and OBJ_txt2nid
+ *
+ * Commands for ASN.1 headers:
+ *   asnhdr <hex> <delta>       ASN1_get_object on the octets with omax their count plus delta
+ *                              (never more than the octets, past the header): the result, the
+ *                              outputs (preset to -7), the octets used, and the errors
+ *   asnput <cons> <len> <tag> <class>   ASN1_put_object and ASN1_object_size
+ *   d2iobj <hex>               d2i_ASN1_OBJECT: the NID and text, the octets used, the errors,
+ *                              and i2d_ASN1_OBJECT of the result
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -746,6 +754,81 @@ static int obj_command(const char *command, const char *line)
     return 1;
 }
 
+static void print_asn_errors(void)
+{
+    unsigned long code;
+
+    printf(" err=");
+    while ((code = ERR_get_error()) != 0)
+        printf("%d/%d,", ERR_GET_LIB(code), ERR_GET_REASON(code));
+    printf("\n");
+}
+
+/* Runs an ASN.1 header command; returns 0 if `command` isn't one. */
+static int asn_command(const char *command, const char *line)
+{
+    char hex[600] = "-";
+    unsigned char data[300];
+    size_t len = 0;
+
+    if (strcmp(command, "asnput") == 0) {
+        unsigned char buf[32], *p = buf;
+        int cons = 0, length = 0, tag = 0, xclass = 0;
+
+        sscanf(line, "%*s %d %d %d %d", &cons, &length, &tag, &xclass);
+        ASN1_put_object(&p, cons, length, tag, xclass);
+        printf("asnput size=%d", ASN1_object_size(cons, length, tag));
+        print_hex("", buf, (size_t)(p - buf));
+        return 1;
+    }
+    if (strcmp(command, "asnhdr") != 0 && strcmp(command, "d2iobj") != 0)
+        return 0;
+    int delta = 0;
+
+    sscanf(line, "%*s %599s %d", hex, &delta);
+    if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+        printf("%s bad hex\n", command);
+        return 1;
+    }
+    if (strcmp(command, "asnhdr") == 0) {
+        const unsigned char *p = data;
+        long length = -7, omax = (long)len + delta;
+        int tag = -7, xclass = -7, ret;
+
+        /* More than the octets is fine only when the header ends within them. */
+        if (delta > 0) {
+            long probe_len = -7;
+            int probe_tag, probe_class;
+            const unsigned char *q = data;
+
+            if (len == 0 || ASN1_get_object(&q, &probe_len, &probe_tag, &probe_class, (long)len) & 0x80)
+                omax = (long)len;
+            ERR_clear_error();
+        }
+        ret = ASN1_get_object(&p, &length, &tag, &xclass, omax);
+        printf("asnhdr ret=%#x tag=%d class=%d length=%ld used=%d", ret, tag, xclass, length, (int)(p - data));
+        print_asn_errors();
+    } else {
+        const unsigned char *p = data;
+        ASN1_OBJECT *o = d2i_ASN1_OBJECT(NULL, &p, (long)len);
+        unsigned char out[300], *q = out;
+        char text[700] = "";
+        int n = 0;
+
+        if (o != NULL) {
+            OBJ_obj2txt(text, sizeof(text), o, 1);
+            n = i2d_ASN1_OBJECT(o, &q);
+        }
+        printf("d2iobj %s nid=%d text=%s used=%d", o == NULL ? "NULL" : "ok", OBJ_obj2nid(o), text, (int)(p - data));
+        print_hex(" i2d", out, n > 0 ? (size_t)n : 0);
+        if (o != NULL && o != OBJ_nid2obj(OBJ_obj2nid(o)))
+            ASN1_OBJECT_free(o);
+        printf("d2iobj");
+        print_asn_errors();
+    }
+    return 1;
+}
+
 /* Runs an error-queue command; returns 0 if `command` isn't one. */
 static int err_command(const char *command, const char *line)
 {
@@ -1049,7 +1132,8 @@ int main(void)
         if (err_command(command, line) || stack_command(command, line)
             || lhash_command(command, line) || string_command(command, line)
             || bio_command(command, line) || printf_command(command, line)
-            || addr_command(command, line) || obj_command(command, line)) {
+            || addr_command(command, line) || obj_command(command, line)
+            || asn_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

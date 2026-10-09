@@ -1091,11 +1091,45 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     - a fuzz target, `oid` (6.4 million runs): text through `a2d_ASN1_OBJECT` and
       `OBJ_txt2obj`, and content through `OBJ_obj2txt`, must round-trip, failing only where
       OpenSSL's rules say.
-- [ ] **2.2 DER/BER engine** (`rustyssl-asn1`):
+- [x] **2.2 DER/BER engine** (`rustyssl-asn1`):
   - safe and zero-copy, with bounded depth and size
   - indefinite-length BER (needed for PKCS#7, CMS, and PKCS#12)
   - strict DER, plus a documented list of the leniencies OpenSSL accepts
   - `ASN1_get_object`/`ASN1_put_object`
+
+  *Done:* 8 exports, now 457 of libcrypto's 5,876: `ASN1_get_object`, `ASN1_put_object`,
+  `ASN1_put_eoc`, `ASN1_object_size`, `ASN1_check_infinite_end`,
+  `ASN1_const_check_infinite_end`, and (from 2.1) `d2i_ASN1_OBJECT`/`i2d_ASN1_OBJECT`
+  (`capi/src/asn1.rs`, `objects.rs`; the safe core is `rustyssl_asn1::der`).
+  - **The header reader accepts what OpenSSL's does,** documented in `rustyssl_asn1::der`:
+    long-form lengths however small, with leading zero octets (up to 127); high-tag form for
+    any tag number, with any number of leading `0x80` octets; the indefinite length on
+    constructed elements. It reports the same results, errors, and partial outputs: a length
+    past `omax` is `ASN1_R_TOO_LONG` with the header returned; the tag and class (and length)
+    are stored before a later fault. `der::is_der` checks a header is in DER's single form,
+    for callers that want strictness.
+  - **Bounds:** a header has no length limit in OpenSSL (leading `0x80` octets), and callers
+    pass `omax` values larger than their buffers (`LONG_MAX`), so the reader fetches one
+    octet at a time and never past the header, and no slice of `omax` octets is made.
+    `der::element` reads whole elements zero-copy; nested indefinite-length content is
+    skipped with a counter, as OpenSSL's `asn1_find_end` does, so depth costs no stack (tested
+    at 100,000 levels). The template engine's `asn1_check_tlen`/`asn1_collect` come with it
+    (2.4).
+  - **The writer** reproduces `ASN1_put_object`'s C arithmetic: negative tags and lengths are
+    written as their low bits, any nonzero `constructed` sets the bit, 2 is indefinite.
+  - **`d2i_ASN1_OBJECT`** takes any class and the constructed bit, as OpenSSL does, and
+    `c2i` (now also behind `OBJ_txt2obj`) reuses a dynamic `*a`, keeping its NID and dropping
+    its names.
+  - **Deviation (`DEVIATIONS.md`):** NULL pointers to these functions.
+  - **Tests:**
+    - `tests/c/asn1_header.c` (15 checks, with every read's result, outputs, octets used, and
+      errors printed), identical on both libraries;
+    - differential: `asnhdr`, `asnput`, and `d2iobj` probe commands with random headers in
+      every form OpenSSL reads, cut short and claimed long; 80,000 sessions identical on
+      macOS;
+    - a `der` fuzz target (15 million runs): exact-size input to `ASN1_get_object`, headers
+      round-tripped through `ASN1_put_object`, objects through `i2d`/`d2i`, and the element
+      reader.
 - [ ] **2.3 Universal types** (public-layout `ASN1_STRING` family):
   - INTEGER/ENUMERATED (BN and int64 conversions, negative handling)
   - BIT STRING (unused bits and flags)

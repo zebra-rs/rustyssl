@@ -16,6 +16,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 libc = "0.2"
 rustyssl-abi = { path = "../crates/rustyssl-abi" }
+rustyssl-asn1 = { path = "../crates/rustyssl-asn1" }
 rustyssl-capi = { path = "../crates/rustyssl-capi" }
 
 [workspace]
@@ -86,6 +87,13 @@ bench = false
 [[bin]]
 name = "oid"
 path = "fuzz_targets/oid.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "der"
+path = "fuzz_targets/der.rs"
 test = false
 doc = false
 bench = false

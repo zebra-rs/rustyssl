@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(9) {
+        match random.below(10) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -157,6 +157,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             5 => printf_session(&mut random, &mut out)?,
             6 => addr_session(&mut random, &mut out)?,
             7 => obj_session(&mut random, &mut out)?,
+            8 => asn_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -256,6 +257,131 @@ fn obj_session(random: &mut Random, out: &mut String) -> Result {
                     *last &= 0x7f;
                 }
                 writeln!(out, "objder {}", hex(&bytes))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of ASN.1 header commands: headers in every form OpenSSL reads (high tag
+/// numbers with leading 0x80 octets, long and zero-padded lengths, indefinite lengths), cut
+/// short and claimed long; header writes; and OBJECT IDENTIFIER elements, well formed or not.
+fn asn_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    let byte = |random: &mut Random, limit: u64| u8::try_from(random.below(limit)).unwrap_or(0);
+    for _ in 0..1 + random.below(20) {
+        match random.below(3) {
+            0 => {
+                let first = byte(random, 256);
+                let high = random.below(3) == 0;
+                let mut bytes = vec![if high { first | 0x1f } else { first }];
+                if high {
+                    for _ in 0..random.below(6) {
+                        bytes.push(if random.below(3) == 0 {
+                            0x80
+                        } else {
+                            0x80 | byte(random, 128)
+                        });
+                    }
+                    bytes.push(byte(random, 128));
+                }
+                match random.below(4) {
+                    0 => bytes.push(byte(random, 128)),
+                    1 => bytes.push(0x80),
+                    2 => {
+                        let count = random.below(11);
+                        bytes.push(0x80 | u8::try_from(count).unwrap_or(0));
+                        for _ in 0..count {
+                            bytes.push(if random.below(3) == 0 {
+                                0
+                            } else {
+                                byte(random, 256)
+                            });
+                        }
+                    }
+                    _ => bytes.push(byte(random, 256)),
+                }
+                for _ in 0..random.below(8) {
+                    bytes.push(byte(random, 256));
+                }
+                let cut = random.below(4) == 0;
+                if cut {
+                    bytes.truncate(
+                        usize::try_from(random.below(u64::try_from(bytes.len()).unwrap_or(1)))
+                            .unwrap_or(0),
+                    );
+                }
+                let delta = match random.below(4) {
+                    0 => -i64::try_from(random.below(3)).unwrap_or(0),
+                    1 => i64::try_from(random.below(1000)).unwrap_or(0),
+                    _ => 0,
+                };
+                writeln!(out, "asnhdr {} {delta}", hex(&bytes))?;
+            }
+            1 => {
+                let constructed = random.below(4);
+                let length = match random.below(4) {
+                    0 => random.below(128).to_string(),
+                    1 => random.below(70_000).to_string(),
+                    2 => random
+                        .pick(&["-1", "-128", "2147483647", "2147483640", "16777216"])
+                        .to_owned(),
+                    _ => random.below(256).to_string(),
+                };
+                let tag = match random.below(3) {
+                    0 => random.below(31).to_string(),
+                    1 => random.below(1 << 21).to_string(),
+                    _ => random
+                        .pick(&["31", "-1", "-31", "2147483647", "127", "128"])
+                        .to_owned(),
+                };
+                writeln!(
+                    out,
+                    "asnput {constructed} {length} {tag} {}",
+                    random.below(512)
+                )?;
+            }
+            _ => {
+                let content_len = random.below(12);
+                let mut content: Vec<u8> = (0..content_len)
+                    .map(|_| match random.below(3) {
+                        0 => 0x80 | byte(random, 128),
+                        1 => random
+                            .pick(&["42", "85", "43", "128", "0"])
+                            .parse()
+                            .unwrap_or(0),
+                        _ => byte(random, 128),
+                    })
+                    .collect();
+                if random.below(2) == 0
+                    && let Some(last) = content.last_mut()
+                {
+                    *last &= 0x7f;
+                }
+                let identifier = match random.below(5) {
+                    0 => 0x86,
+                    1 => 0x26,
+                    2 => byte(random, 256),
+                    _ => 0x06,
+                };
+                let mut bytes = vec![identifier];
+                match random.below(5) {
+                    0 => bytes.extend([0x81, u8::try_from(content.len()).unwrap_or(0)]),
+                    1 => bytes.push(
+                        u8::try_from(content.len() + usize::try_from(random.below(3)).unwrap_or(0))
+                            .unwrap_or(0),
+                    ),
+                    2 => bytes.push(0x80),
+                    _ => bytes.push(u8::try_from(content.len()).unwrap_or(0)),
+                }
+                bytes.extend(content);
+                writeln!(out, "d2iobj {}", hex(&bytes))?;
             }
         }
     }
@@ -774,6 +900,7 @@ mod tests {
             "printf ",
             "\nhostserv ",
             "\nobjtxt ",
+            "\nasnhdr ",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }
