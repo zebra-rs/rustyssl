@@ -1030,12 +1030,67 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
 
 ## Phase 2: ASN.1, objects, encodings
 
-- [ ] **2.1 OBJ:**
+- [x] **2.1 OBJ:**
   - the generated NID table (`rustyssl_asn1::objects`, from 0.4), plus
     `OBJ_create`/`OBJ_add_object` for runtime OIDs
   - `OBJ_txt2obj`/`OBJ_obj2txt` (byte-exact, including large arcs)
   - `OBJ_find_sigid_algs`, `OBJ_add_sigid`
   - the `OBJ_NAME_*` alias registry
+
+  *Done:* 37 exports, now 449 of libcrypto's 5,876: every `OBJ_*` function, the
+  `ASN1_OBJECT` functions, `a2d_ASN1_OBJECT`, `i2t_ASN1_OBJECT`, and `i2a_ASN1_OBJECT`
+  (`capi/src/objects.rs`, `objects/name.rs`, `objects/sigid.rs`; the safe core is
+  `rustyssl_asn1::objects` and `rustyssl_asn1::oid`). `d2i_`/`i2d_ASN1_OBJECT` come with the
+  DER engine (2.2) and `ASN1_OBJECT_it` with the template engine (2.4).
+  - **Lookups are OpenSSL's binary searches, step for step.** Three objects are named `"NULL"`
+    and two share the OID 1.3 (`ORG` and `identified-organization`), so which one a search
+    finds depends on the probe sequence. The indexes are rebuilt the way `obj_dat.pl` builds
+    them (Perl's stable sort over ascending NIDs; for OIDs, shorter first, then bytewise), which
+    reproduces the reference's `sn_objs`, `ln_objs`, and `obj_objs` exactly. The OID index also
+    holds the 7 objects whose OID OpenSSL doesn't encode (single arcs and bare aliases): they
+    never match but shift the midpoints, so the generator now records `indexed` for each
+    object. The signature cross-reference leaves out algorithms without a digest, as
+    `objxref.pl` does; the rest have no ties.
+  - **Built-in objects** have OpenSSL's `ASN1_OBJECT` layout at fixed addresses and are shared;
+    `ASN1_OBJECT_free` and `OBJ_dup` treat non-dynamic objects as OpenSSL does. Objects added
+    at run time are kept by NID, OID, and names (a newer one replaces an older one per key) and
+    never freed; NIDs are handed out from 1487, the first past the table.
+  - **Text conversions** are ports of `a2d_ASN1_OBJECT` and `OBJ_obj2txt` with their
+    leniencies: spaces separate arcs too, empty arcs are 0, a trailing separator is dropped,
+    `"12"` is no OID without an error, and `""` fails with `ASN1_R_FIRST_NUM_TOO_LARGE` (the
+    NUL is read as the first number). Arcs of any size are exact (a small bignum in
+    `rustyssl_asn1::oid`); text is limited to RFC 2578's 586 content octets, as in OpenSSL.
+    `OBJ_obj2txt` writes a prefix of the text when it fails partway, as OpenSSL's does.
+  - **`OBJ_create_objects`** reads 512-byte lines into one buffer, as OpenSSL does, so a line
+    without a long name after one with uses what was left in the buffer (a quirk kept: it
+    usually fails with `OBJ_R_OID_EXISTS` and stops).
+  - **The name registry** is one of our `OPENSSL_LH_*` tables with OpenSSL's hash
+    (`ossl_lh_strcasehash`, with the platform's `char` signedness), so `OBJ_NAME_do_all`
+    visits in OpenSSL's order; `OBJ_NAME_do_all_sorted` sorts with the C library's `qsort`. No
+    lock is held while an application's hash, comparison, free, or visiting function runs.
+  - **Added signature algorithms** live on two of our stacks, sorted with `qsort` and searched
+    as OpenSSL's are, including the comparator that lets an algorithm without a digest match any.
+  - **Configuration:** OpenSSL loads the configuration file before it first consults added
+    objects, and a missing file leaves heap buffers in the error queue's slots (the `fopen`
+    error's text, raised and then dropped). `OPENSSL_init_crypto`'s configuration step now
+    follows `CONF_modules_load_file_ex` and `def_load` (mark, `BIO_new_file`,
+    `CONF_R_NO_SUCH_FILE`, pop or keep), so the error queue matches. The test drivers point
+    both libraries at the same missing `OPENSSL_CONF`, since the text names the path.
+  - **Deviations (`DEVIATIONS.md`):** NULL strings to the name lookups, `OBJ_txt2obj`, and
+    `a2d_ASN1_OBJECT`; a negative `OBJ_obj2txt` length; NULL objects to `OBJ_cmp`; a NULL
+    `OBJ_bsearch_` comparator; `OBJ_add_object` of a built-in object; searches after
+    `OBJ_sigid_free`; and the name registry's NULL free functions, negative types, and reuse
+    after `OBJ_NAME_cleanup(-1)`. In each, OpenSSL crashes.
+  - **Tests:**
+    - `tests/c/objects.c` (60 checks), identical on both libraries. It prints every lookup's
+      result, texts, encodings, `i2a` output, the first new NID, binary-search positions, the
+      signature table's choices, and the registry's visiting orders, so all are compared;
+    - differential: `objtxt`, `objder`, and `objname` probe commands with random dotted texts
+      (known prefixes, large arcs, odd separators), names, and content octets; 80,000 sessions
+      identical on macOS;
+    - a fuzz target, `oid` (6.4 million runs): text through `a2d_ASN1_OBJECT` and
+      `OBJ_txt2obj`, and content through `OBJ_obj2txt`, must round-trip, failing only where
+      OpenSSL's rules say.
 - [ ] **2.2 DER/BER engine** (`rustyssl-asn1`):
   - safe and zero-copy, with bounded depth and size
   - indefinite-length BER (needed for PKCS#7, CMS, and PKCS#12)
