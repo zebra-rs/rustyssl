@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (AGENTS.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 457 | 5419 | 7.8% |
+| libcrypto | 5876 | 502 | 5374 | 8.5% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **458** | **6021** | **7.1%** |
+| **Total** | **6479** | **503** | **5976** | **7.8%** |
 
 ## By header
 
@@ -25,7 +25,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
 | `openssl/aes.h` | libcrypto | 15 | 0 | 0.0% |
-| `openssl/asn1.h` | libcrypto | 291 | 14 | 4.8% |
+| `openssl/asn1.h` | libcrypto | 291 | 59 | 20.3% |
 | `openssl/asn1t.h` | libcrypto | 20 | 0 | 0.0% |
 | `openssl/async.h` | libcrypto | 22 | 0 | 0.0% |
 | `openssl/bio.h` | libcrypto | 184 | 176 | 95.7% |
@@ -104,9 +104,54 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 
 | Export | Library | Header | Called by |
 |---|---|---|---|
+| `ASN1_BIT_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_BIT_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_BMPSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_BMPSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_ENUMERATED_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_ENUMERATED_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_GENERALIZEDTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_GENERALIZEDTIME_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_GENERALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_GENERALSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_IA5STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_IA5STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_INTEGER_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_INTEGER_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_OBJECT_create` | libcrypto | `openssl/asn1.h` | `asn1_header`, `objects` |
 | `ASN1_OBJECT_free` | libcrypto | `openssl/asn1.h` | `asn1_header`, `objects` |
 | `ASN1_OBJECT_new` | libcrypto | `openssl/asn1.h` | `objects` |
+| `ASN1_OCTET_STRING_cmp` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_OCTET_STRING_dup` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_OCTET_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_OCTET_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_OCTET_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_PRINTABLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_PRINTABLESTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_clear_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_cmp` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_copy` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_data` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_dup` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_get0_data` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_length` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_length_set` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_set0` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_type` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_STRING_type_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_T61STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_T61STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UNIVERSALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UNIVERSALSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UTCTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UTCTIME_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UTF8STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UTF8STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_VISIBLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_VISIBLESTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_check_infinite_end` | libcrypto | `openssl/asn1.h` | `asn1_header` |
 | `ASN1_const_check_infinite_end` | libcrypto | `openssl/asn1.h` | `asn1_header` |
 | `ASN1_get_object` | libcrypto | `openssl/asn1.h` | `asn1_header` |
@@ -325,7 +370,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_get_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_get_ex_new_index` | libcrypto | `openssl/crypto.h` | `bio_meth`, `ex_data` |
 | `CRYPTO_get_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
-| `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap`, `err_queue` |
+| `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `asn1_string`, `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap`, `err_queue` |
 | `CRYPTO_memcmp` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_memdup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `CRYPTO_new_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
@@ -349,13 +394,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_header`, `bio_addr`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `objects`, `stack`, `trace` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_string`, `bio_addr`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `objects`, `stack`, `trace` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `ex_data`, `objects`, `stack` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_string`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `ex_data`, `objects`, `stack` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
