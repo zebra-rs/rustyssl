@@ -1524,7 +1524,42 @@ have run for at least 24 CPU-hours with no findings.
     `OSSL_LIB_CTX_new_child` to 3.1d (they take a provider's core dispatch table),
     `OSSL_LIB_CTX_get_data` to 3.1e (it returns the stores that step makes), and
     `OSSL_LIB_CTX_load_config` to 3.12.
-  - [ ] **3.1c The property-query parser and matcher.**
+  - [x] **3.1c The property-query parser and matcher.**
+
+    *Done:* `rustyssl_crypto::property` is a port of `crypto/property/`:
+    - **Numbering:** each context numbers names and values in the order it first sees them,
+      after the predefined names (`provider` … `structure`) and the values `yes` and `no`.
+    - **Parsers:** definitions (unknown plain names refused) and queries (unknown plain names
+      kept as number 0, unparsable values kept as missing, values added only on request),
+      with OpenSSL's errors and their data text (`HERE-->…`, ``Duplicated name `<NULL>'``).
+      The 99-character name and 999-character value limits are kept.
+    - **Matching and merging:** match counts (a missing property compares as `no`), merging,
+      and the `fips` check.
+    - **Canonical text:** names from the highest number down, quoted where needed.
+
+    The four exports, in `capi/src/property.rs`:
+    - `EVP_set_default_properties` and `EVP_get1_default_properties`;
+    - `EVP_default_properties_enable_fips` (merged into the default) and
+      `EVP_default_properties_is_fips_enabled`.
+
+    Each context keeps its strings and default query, and the configuration loads first, as
+    in OpenSSL. A query that parses but has no canonical text (`fips=`) is refused with
+    `ERR_R_INTERNAL_ERROR`.
+
+    The `PROP_R_*` codes come from an internal header, so codegen now emits named constants
+    for internal reasons (from `openssl.txt`) instead of bare numbers.
+
+    Tests:
+    - `tests/c/properties.c`: 13 checks, covering 31 valid and 35 invalid queries, the length
+      limits, numbering per context, the FIPS switch, and defaults per context.
+    - The probe's `propset`/`propfips`/`propnew` commands: corpus `properties.txt`, plus random
+      queries built from names, operators, values in every base and quoting, and stray
+      characters.
+    - The `property` fuzz target: the core never panics, and the C API accepts exactly the
+      queries that have canonical text and reads that text back.
+
+    Hooks for later steps: the cache flushes and provider default-properties updates come with
+    3.1d and 3.1e, and mirroring defaults into child contexts with 3.1d.
   - [ ] **3.1d `OSSL_PROVIDER`:** load, try_load, unload, available, do_all, get_params,
     self_test; `OSSL_LIB_CTX_new_from_dispatch` and `OSSL_LIB_CTX_new_child` (from 3.1b).
   - [ ] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
