@@ -18,6 +18,7 @@ libc = "0.2"
 rustyssl-abi = { path = "../crates/rustyssl-abi" }
 rustyssl-asn1 = { path = "../crates/rustyssl-asn1" }
 rustyssl-capi = { path = "../crates/rustyssl-capi" }
+rustyssl-crypto = { path = "../crates/rustyssl-crypto" }
 
 [workspace]
 
@@ -164,5 +165,11 @@ bench = false
 [[bin]]
 name = "params"
 path = "fuzz_targets/params.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "property"
+path = "fuzz_targets/property.rs"
 test = false
 doc = false
