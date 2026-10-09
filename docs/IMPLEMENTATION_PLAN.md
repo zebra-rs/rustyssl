@@ -1,7 +1,7 @@
 # rustyssl Implementation Plan
 
 Baseline: **OpenSSL 3.5 LTS ABI → 3.6 additions → OpenSSL 4.0 ABI.**
-See [AGENTS.md](../AGENTS.md) for the rules and architecture, and [TEST_PLAN.md](TEST_PLAN.md)
+See [README.md](../README.md) for the rules and architecture, and [TEST_PLAN.md](TEST_PLAN.md)
 for how each step is verified.
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done. Update this file as you work.
@@ -51,12 +51,12 @@ in the version text (`+rustyssl.<version>`).
 ## Phase 0: Foundations and ABI scaffolding → M0
 
 - [x] **0.1 Workspace.** Convert the root `Cargo.toml` into a workspace and remove the
-  placeholder `src/lib.rs`. Create the crate skeletons from AGENTS.md, `rust-toolchain.toml`
+  placeholder `src/lib.rs`. Create the crate skeletons from README.md, `rust-toolchain.toml`
   (stable, at least 1.99), and workspace lints: `forbid(unsafe_code)` everywhere except
   `rustyssl-capi` and `libs/*`, plus the clippy set from the security rules. Add `rustfmt.toml`,
   `license = "Apache-2.0"` in the workspace package metadata, and a `NOTICE` that carries
   OpenSSL's attribution for the vendored files. (`LICENSE.txt` already exists.)
-  *Done.* The workspace has every `crates/*` from AGENTS.md except `rustyssl-quic` (deferred
+  *Done.* The workspace has every `crates/*` from README.md except `rustyssl-quic` (deferred
   to Phase 10), plus `libs/libcrypto` (cdylib + staticlib), `libs/libssl` (cdylib), and
   `xtask`. The lints live in `[workspace.lints]` plus crate-level attributes, with test
   exemptions in `clippy.toml`. The release profile keeps `overflow-checks = true`.
@@ -123,7 +123,7 @@ in the version text (`+rustyssl.<version>`).
     symbols are exported. The generated scripts match mkdef's output exactly. The
     `RUSTYSSL_PRIVATE` node exports the glob `rustyssl_private_*`, a placeholder until 0.6
     settles the names.
-  - **Stubs abort** instead of returning an error (see rule 10 in AGENTS.md). There's one
+  - **Stubs abort** instead of returning an error (see rule 10 in README.md). There's one
     per export: 6,476, generated from bindgen prototypes parsed with `syn`. `va_list`
     parameters become `VaList`. All three targets must produce identical stubs, and they
     compile on each. A C program linked to the built `libcrypto.dylib` gets the message and
@@ -297,7 +297,7 @@ in the version text (`+rustyssl.<version>`).
   prints the status of every export with that prefix: implemented, untested, or stub.
   Starting point: 6 of 6,479 exports (all of `buffer.h`).
   - **Implemented** means `rustyssl-capi` defines the export and a `tests/c` program calls
-    it, which is AGENTS.md's rule made mechanical. Calls come from the undefined symbols of
+    it, which is README.md's rule made mechanical. Calls come from the undefined symbols of
     each test compiled to an object, not from its source text. So a call through a macro
     (`BIO_get_mem_data` → `BIO_ctrl`) or an inline wrapper (`sk_X509_num` →
     `OPENSSL_sk_num`) credits the function that's actually linked; this was checked by
@@ -352,7 +352,7 @@ in the version text (`+rustyssl.<version>`).
     upstream 3.5 ABI doesn't have, so they wouldn't load on rustyssl. Fedora's libcrypto
     (checked) has three extras:
     - MD2 (`EVP_md2`, `MD2_*`; ipmitool, perl-Net-SSLeay, qca), which upstream disables by
-      default and AGENTS.md keeps disabled;
+      default and README.md keeps disabled;
     - SCTP (`BIO_new_dgram_sctp`; Fedora's own `openssl` CLI);
     - an extra `OPENSSL_3.1.0` version node for `EVP_MD_CTX_dup` and `EVP_CIPHER_CTX_dup`
       (dpdk). This is the default version Fedora binaries bind to; upstream exports them
@@ -1294,6 +1294,45 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
   - built-in types exposed as `ASN1_ITYPE_EXTERN` items
   - **generated** `d2i_`/`i2d_`/`_new`/`_free`/`_dup`/`_it` functions for every type declared
     with `DECLARE_ASN1_*` in the headers
+
+  In three sub-steps, each its own PR. The types of later phases (X.509, PKCS#7, ...) get their
+  items and functions with those phases, as `BIGNUM_it`/`CBIGNUM_it` do with `BIGNUM`;
+  `ASN1_item_sign`/`verify`/`digest` come with EVP (Phase 3).
+  - [x] **2.4a The engine, allocation, and encoding:** reading items, templates, ADB tables,
+    and aux data; `ASN1_item_new`/`new_ex`/`ex_new`/`free`/`ex_free`, `ASN1_item_i2d`/
+    `ex_i2d`/`ndef_i2d` (aux callbacks, CHOICE, ADB, EMBED, REFCOUNT, the ENCODING cache, SET OF
+    sorting, NDEF); the universal items (the string types, `ASN1_NULL`, the BOOLEANs, `ASN1_OBJECT`,
+    `ASN1_ANY`, `ASN1_SEQUENCE`, the MSTRINGs, `ASN1_SEQUENCE_ANY`/`ASN1_SET_ANY`,
+    `ASN1_OCTET_STRING_NDEF`, `INT32` to `ZUINT64`, `LONG`/`ZLONG`) and their `new`/`free`/`i2d_`
+    functions.
+
+    *Done:* 80 exports, in `capi/src/asn1/tpl/` (`new`, `free`, `encode`, `items`, `ints`), each
+    step a port of `tasn_new.c`, `tasn_fre.c`, and `tasn_enc.c` in OpenSSL's order, so aux
+    callbacks run at the same points and as often (`ASN1_OP_I2D_PRE` in both passes,
+    `_POST` only when writing). Decisions:
+    - Output goes through a cursor that knows the buffer's end when rustyssl allocated it; a
+      second pass that writes more than the first measured is dropped and fails
+      (docs/DEVIATIONS.md). A caller's buffer has no known size and is written as in C.
+    - A SET OF is encoded into a scratch `Vec` and sorted with a stable sort. The DER is the
+      same as OpenSSL's `qsort`; only the order of equal elements in an `ASN1_TFLG_SET_ORDER`
+      stack could differ, and equal elements encode identically.
+    - The universal items' sizes are OpenSSL's: 0 for `IMPLEMENT_ASN1_TYPE` items (not the
+      struct size), `sizeof(ASN1_STRING)` for MSTRINGs, flags for `INTxx` and the default for
+      `LONG`. `INTxx` and `LONG` get `c2i` and `print` with 2.4b and 2.4c; until then their
+      tables have no such functions.
+    - The ENCODING cache is read and freed here but only filled by decoding (2.4b).
+
+    Tests: `tests/c/asn1_template.c` defines application types with the `asn1t.h` macros
+    (optional, tagged, embedded, SET OF / SET ORDER / SEQUENCE OF fields, a CHOICE, ANY DEFINED
+    BY, a reference count, an NDEF SEQUENCE, a traced aux callback) and compares encodings and
+    callback traces; the probe's `asnany` encodes random SEQUENCE OF and SET OF ANY. Encoding
+    parses no input, so there's no fuzz target yet; decoding gets one.
+  - [ ] **2.4b Decoding:** `ASN1_item_d2i`/`d2i_ex`/`ex_d2i` (tag checks, indefinite-length
+    collection, OPTIONAL and DEFAULT, CHOICE, ADB, the depth limit, the ENCODING cache) and the
+    universal types' `d2i_` functions, fuzzed hard.
+  - [ ] **2.4c The rest of the item API:** `ASN1_item_dup`, `ASN1_item_pack`/`unpack`, the BIO
+    and FILE variants, the universal `_dup` functions, `ASN1_TYPE_pack_sequence`/
+    `unpack_sequence`, and the `int_octetstring` pair.
 - [ ] **2.5 Utilities:**
   - `ASN1_parse_dump` (byte-exact `asn1parse` output)
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (the string → DER mini-language)

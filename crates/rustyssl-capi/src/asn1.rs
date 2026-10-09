@@ -12,6 +12,7 @@ pub(crate) mod integer;
 pub(crate) mod string;
 pub(crate) mod text;
 pub(crate) mod time;
+pub(crate) mod tpl;
 
 use core::ffi::{c_int, c_long, c_uchar};
 use core::ptr;

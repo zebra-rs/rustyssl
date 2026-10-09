@@ -26,7 +26,7 @@ use crate::objects;
 ///
 /// # Safety
 /// `a` is a live `ASN1_TYPE` whose value, if any, is of its type and owned by it.
-unsafe fn free_value(a: *mut ASN1_TYPE) {
+pub(crate) unsafe fn free_value(a: *mut ASN1_TYPE) {
     // SAFETY: the caller's guarantee.
     let typ = unsafe { &mut *a };
     // SAFETY: the pointer member of the union, which a BOOLEAN's value overlaps harmlessly.

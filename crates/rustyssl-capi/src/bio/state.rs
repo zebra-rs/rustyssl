@@ -6,7 +6,7 @@
 //!
 //! A method that calls out (to the next BIO, whose callbacks may free this one) clones the
 //! `Arc` first, so the state outlives the call, and holds the lock only between calls, never
-//! across one (AGENTS.md, security rule 7). A callback that re-enters the BIO sees the state as
+//! across one (README.md, security rule 7). A callback that re-enters the BIO sees the state as
 //! the interrupted call left it.
 //!
 //! A method assembled from a built-in type's functions with another create function finds no

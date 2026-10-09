@@ -1,7 +1,7 @@
 # rustyssl Test Plan
 
 Companion to [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Rules are in
-[AGENTS.md](../AGENTS.md).
+[README.md](../README.md).
 
 ## Goals
 

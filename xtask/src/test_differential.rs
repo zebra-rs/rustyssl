@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(13) {
+        match random.below(14) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -161,6 +161,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             9 => int_session(&mut random, &mut out)?,
             10 => text_session(&mut random, &mut out)?,
             11 => time_session(&mut random, &mut out)?,
+            12 => any_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -567,6 +568,55 @@ fn text_session(random: &mut Random, out: &mut String) -> Result {
             let max = random.pick(&["0", "0", "2", "5", "-1"]);
             writeln!(out, "asnmb {inform} {mask:x} {min} {max} {}", hex(&bytes))?;
         }
+    }
+    Ok(())
+}
+
+/// A random session of `asnany` commands: SEQUENCE OF and SET OF ANY over values of the
+/// universal types (and a few odd ones: none, high tag numbers, a SEQUENCE's raw octets), many
+/// sharing prefixes, so the SET's DER ordering compares lengths and contents.
+fn any_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(6) + 1 {
+        let mut line = String::from("asnany");
+        for _ in 0..random.below(9) {
+            let kind = random.pick(&[
+                "1", "2", "-2", "3", "4", "4", "5", "6", "10", "12", "16", "17", "19", "22", "23",
+                "24", "30", "-1", "31", "99", "200",
+            ]);
+            let len = match random.below(4) {
+                0 => 0,
+                1 => random.below(3),
+                2 => random.below(8),
+                _ => random.below(140),
+            };
+            let shared = random.below(2) == 0;
+            let octets: Vec<u8> = (0..len)
+                .map(|i| {
+                    if shared && i < 2 {
+                        0x01
+                    } else {
+                        u8::try_from(random.below(256)).unwrap_or(0)
+                    }
+                })
+                .collect();
+            let octets = if kind == "6" && !octets.is_empty() {
+                // Mostly valid OID content: the last octet without the continuation bit.
+                let mut o = octets;
+                if let Some(last) = o.last_mut() {
+                    *last &= 0x7f;
+                }
+                o
+            } else {
+                octets
+            };
+            let hex: String = if octets.is_empty() {
+                "-".to_owned()
+            } else {
+                octets.iter().map(|b| format!("{b:02x}")).collect()
+            };
+            write!(line, " {kind}:{hex}")?;
+        }
+        writeln!(out, "{line}")?;
     }
     Ok(())
 }
@@ -1163,6 +1213,7 @@ mod tests {
             "\nasnint ",
             "\nasntext ",
             "\nasntime",
+            "\nasnany",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }

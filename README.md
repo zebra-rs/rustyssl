@@ -1,4 +1,4 @@
-# AGENTS.md — rustyssl
+# rustyssl
 
 ## Mission
 

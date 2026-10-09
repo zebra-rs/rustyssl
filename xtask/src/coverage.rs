@@ -3,7 +3,7 @@
 //! prints the status of every export whose name starts with one of the prefixes instead.
 //!
 //! An export is **implemented** once `rustyssl-capi` defines it (so codegen emits no stub) and a
-//! C conformance test in `tests/c/` calls it (AGENTS.md, "How to work"). A test's calls are the
+//! C conformance test in `tests/c/` calls it (README.md, "How to work"). A test's calls are the
 //! undefined symbols of its compiled object. So a call through a header macro counts for the
 //! function the macro expands to (`BIO_get_mem_data` is `BIO_ctrl`), and a call through an
 //! inline wrapper counts for the function the wrapper calls (`sk_X509_num` calls
@@ -244,7 +244,7 @@ fn render(exports: &[Export]) -> Result<String> {
          edit it by hand:\nCI fails if it's out of date.\n\n\
          An export is **implemented** once `rustyssl-capi` defines it and a C conformance test in \
          `tests/c/`\ncalls it. Every other export is a generated stub that aborts \
-         (AGENTS.md, security rule 10).\n\n\
+         (README.md, security rule 10).\n\n\
          | Library | Exports | Implemented | Stubs | Coverage |\n|---|--:|--:|--:|--:|\n"
     );
     let totals = totals(exports);
