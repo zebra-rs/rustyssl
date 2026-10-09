@@ -38,24 +38,24 @@ const ACPT_S_ACCEPT: c_int = 5;
 const ACPT_S_OK: c_int = 6;
 
 /// A string from `OPENSSL_malloc` that the state owns; the getters hand out its pointer.
-pub(crate) struct CString_(*mut c_char);
+pub(crate) struct CString_(pub(crate) *mut c_char);
 
 impl CString_ {
-    const NONE: Self = Self(ptr::null_mut());
+    pub(crate) const NONE: Self = Self(ptr::null_mut());
 
-    fn ptr(&self) -> *mut c_char {
+    pub(crate) fn ptr(&self) -> *mut c_char {
         self.0
     }
 
     /// Replaces the string, freeing the old one.
-    fn set(&mut self, new: *mut c_char) {
+    pub(crate) fn set(&mut self, new: *mut c_char) {
         // SAFETY: the old string is owned here, freed once.
         unsafe { mem::release(self.0.cast()) };
         self.0 = new;
     }
 
     /// The text, `<NULL>` for none, as OpenSSL's `%s` prints it.
-    fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         if self.0.is_null() {
             return "<NULL>".to_owned();
         }

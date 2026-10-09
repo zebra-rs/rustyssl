@@ -930,13 +930,65 @@ Everything else depends on this phase.
         addresses round-tripped through `BIO_ADDR`, about 12 million runs. It found that
         macOS's `getnameinfo` refuses some multicast-scoped IPv6 addresses, which OpenSSL
         reports identically; the target's model was too strict.
-  - [ ] **1.6e Datagrams and the connect BIO:**
+  - [x] **1.6e Datagrams and the connect BIO:**
     - the datagram BIO (`BIO_s_datagram`, `BIO_new_dgram`, `BIO_dgram_non_fatal_error`,
       `BIO_err_is_non_fatal`): peers, MTU queries, timeouts, local addresses, and
       `sendmmsg`/`recvmmsg`
     - the connect BIO (`BIO_s_connect`, `BIO_new_connect`), stream and datagram
     - the datagram pair and memory BIOs (`BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`,
       `BIO_s_dgram_mem`), moved from 1.6c
+
+    *Done:* 9 exports, now 402 of libcrypto's 5,876 (`bio/dgram.rs`, `bio/dgram_pair.rs`,
+    `bio/connect.rs`). This completes the BIOs of the default build that don't wait for later
+    phases.
+    - **The datagram BIO follows what OpenSSL compiles in per platform,** checked by compiling a
+      probe of the socket macros on each (with OpenSSL's `_GNU_SOURCE`, and on macOS
+      `__APPLE_USE_RFC_3542`, which `internal/sockets.h` defines):
+      - **Linux:** batches of up to 64 through `sendmmsg`/`recvmmsg`; `IP_MTU`/`IPV6_MTU`
+        queries; `IP_MTU_DISCOVER` for discovery and for IPv4's don't-fragment; a 40-byte
+        control buffer.
+      - **macOS:** one message per call through `sendmsg`/`recvmsg`; no MTU queries;
+        `IP_DONTFRAG`; a 64-byte control buffer.
+      - **Both:** destination addresses from `IP_PKTINFO` and `IPV6_RECVPKTINFO`;
+        `IPV6_DONTFRAG`; DTLS's receive timeout adjusted to the next timer, in OpenSSL's
+        nanosecond ticks from `gettimeofday`.
+      SCTP is off in OpenSSL's default build.
+    - **The datagram pair stores datagrams as OpenSSL does,** a header (length, source and
+      destination `BIO_ADDR`) then the payload, in an `OPENSSL_malloc` ring. So the buffer
+      sizes applications see, which depend on `sizeof(BIO_ADDR)`, match on each platform, and
+      allocation failures leave the same errors. A memory BIO grows its ring by 8/5.
+    - **The connect BIO** calls the application's info callback after each state with no lock
+      held, and in datagram mode forwards reads, writes, and messages to a datagram BIO on its
+      socket.
+    - **Quirks kept:**
+      - `BIO_get_conn_ip_family` and `BIO_get_conn_mode` pass a null pointer, which the control
+        refuses, so they return 0.
+      - An info callback that returns 0 ends the state machine before `BIO_R_CONNECT_ERROR` is
+        raised.
+      - A connect BIO's read of a null buffer returns the state machine's result.
+      - The non-blocking connect check polls with no wait, so a pending connect spins until it
+        finishes, as in OpenSSL.
+      - A datagram BIO marked connected writes with `write`.
+      - No truncation fails a short read without a retry.
+    - **Deviations (`DEVIATIONS.md`):**
+      - negative counts and null arguments to the peer and timeout controls;
+      - the datagram pair's double free of its local address;
+      - null out-pointers to `BIO_new_bio_dgram_pair`;
+      - a connect BIO freed with `BIO_NOCLOSE` (as for accept);
+      - only a family's bytes of the addresses written into a datagram's header.
+    - **Tests:** identical output to the reference:
+      - `tests/c/bio_dgram.c` (28 checks, over loopback UDP, with the platform's MTU and
+        don't-fragment results printed and compared);
+      - `tests/c/bio_dgram_pair.c` (28, with the default and grown buffer sizes printed). It
+        clears the local address before unpairing, as the reference would otherwise
+        double-free it;
+      - `tests/c/bio_connect.c` (26, against an accept BIO, with the info callback's states
+        printed and compared);
+      - differential: datagram memory BIOs and pairs as new `bionew` kinds, with no-truncation,
+        MTU, and buffer-size controls; 80,000 sessions identical on macOS;
+      - a model-based `bio_dgram_pair` fuzz target (2.5 million runs). It found two mistakes in
+        its own model, both instructive: `BIO_write` of 0 bytes stops at the generic layer,
+        but `BIO_read` of 0 bytes reaches the BIO and reads (truncates) a datagram.
 
   Later phases: the md and cipher filters (`BIO_f_md`, `BIO_f_cipher`, `BIO_f_reliable`,
   Phase 3); the ASN.1, CMS, PKCS#7, and NDEF BIOs; and the provider core BIO

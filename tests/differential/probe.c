@@ -44,13 +44,14 @@
  *                              3 memory behind a null filter, 4 behind a buffer, 5 behind a
  *                              line buffer, 6 a read buffer over the fixed text, 7 memory
  *                              behind a prefix filter ("> ", indented 2), 8 one end of a BIO
- *                              pair (buffers of 16 and 32 bytes)
+ *                              pair (buffers of 16 and 32 bytes), 9 a datagram memory BIO,
+ *                              10 one end of a datagram pair (default buffers)
  *   biopeer                    switch to the pair's other end
  *   biowrite <word>, bioputs <word>, bioread <n>, biogets <n>, bioline <n>
  *   bionread <n>, bionwrite <word>   BIO_nread and BIO_nwrite (what was read, or copied in)
  *   bioctrl <name> <n>         reset, eof, pending, wpending, seek, tell, eofret, setclose,
  *                              getclose, flush, info, shutdown, guarantee, request, lines,
- *                              bufsize
+ *                              bufsize, wbufsize, notrunc, mtu
  *   biomem                     BIO_get_mem_ptr: the buffer's length and a hash of its data
  *   biostate                   retry flags, bytes read and written
  *
@@ -448,6 +449,13 @@ static int bio_command(const char *command, const char *line)
             if (!BIO_new_bio_pair(&bio, 16, &peer, 32))
                 bio = peer = NULL;
             break;
+        case 9:
+            bio = BIO_new(BIO_s_dgram_mem());
+            break;
+        case 10:
+            if (!BIO_new_bio_dgram_pair(&bio, 0, &peer, 0))
+                bio = peer = NULL;
+            break;
         default:
             bio = BIO_new(BIO_s_mem());
         }
@@ -528,6 +536,12 @@ static int bio_command(const char *command, const char *line)
             ret = BIO_get_buffer_num_lines(bio);
         else if (strcmp(name, "bufsize") == 0)
             ret = BIO_set_buffer_size(bio, arg);
+        else if (strcmp(name, "wbufsize") == 0)
+            ret = BIO_set_write_buf_size(bio, arg);
+        else if (strcmp(name, "notrunc") == 0)
+            ret = BIO_dgram_set_no_trunc(bio, (int)arg);
+        else if (strcmp(name, "mtu") == 0)
+            ret = BIO_dgram_set_mtu(bio, arg) + 1000 * BIO_dgram_get_mtu(bio);
         else if (strcmp(name, "info") == 0) {
             ret = BIO_get_mem_data(bio, &data);
             if (ret > 0 && data != NULL) {

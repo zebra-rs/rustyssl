@@ -2227,16 +2227,6 @@ pub extern "C" fn BIO_asn1_set_suffix(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_dgram_non_fatal_error(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_dgram_non_fatal_error")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_err_is_non_fatal(_: core::ffi::c_uint) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_err_is_non_fatal")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_asn1() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_asn1")
 }
@@ -2297,53 +2287,13 @@ pub extern "C" fn BIO_new_PKCS7(_: *mut BIO, _: *mut PKCS7) -> *mut BIO {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_bio_dgram_pair(
-    _: *mut *mut BIO,
-    _: usize,
-    _: *mut *mut BIO,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_new_bio_dgram_pair")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_connect(_: *const core::ffi::c_char) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_connect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_dgram(_: core::ffi::c_int, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_dgram")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_from_core_bio")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_connect() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_connect")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_core")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_datagram() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_datagram")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_dgram_mem() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_dgram_mem")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_dgram_pair() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_dgram_pair")
 }
 
 #[unsafe(no_mangle)]
