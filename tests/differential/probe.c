@@ -72,6 +72,10 @@
  * Other helpers:
  *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
  *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
+ *   tracecat <name> <num>      OSSL_trace_get_category_num and OSSL_trace_get_category_name
+ *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
+ *                              the return and what it wrote; never full and masked past
+ *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
  *
  *   # ...              comment, echoed
  */
@@ -93,6 +97,7 @@
 #include <openssl/err.h>
 #include <openssl/lhash.h>
 #include <openssl/stack.h>
+#include <openssl/trace.h>
 
 static BUF_MEM *buffer = NULL;
 
@@ -124,6 +129,20 @@ static void print_hex(const char *label, const unsigned char *data, size_t len)
     for (size_t i = 0; i < len; i++)
         printf("%02x", data[i]);
     printf("\n");
+}
+
+static void print_escaped(const char *label, int ret, const char *data, size_t len)
+{
+    printf("%s %d \"", label, ret);
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)data[i];
+
+        if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+            putchar(c);
+        else
+            printf("\\x%02x", c);
+    }
+    printf("\"\n");
 }
 
 /* FNV-1a, to compare long data without printing it. */
@@ -598,6 +617,31 @@ static int string_command(const char *command, const char *line)
         }
         printf("\n");
         ERR_clear_error();
+    } else if (strcmp(command, "tracecat") == 0) {
+        const char *name = OSSL_trace_get_category_name(other);
+
+        printf("tracecat %d %s\n", OSSL_trace_get_category_num(text), name == NULL ? "(null)" : name);
+    } else if (strcmp(command, "tracestr") == 0) {
+        unsigned char data[256];
+        char hex[600] = "-";
+        size_t len = 0;
+        BIO *mem = BIO_new(BIO_s_mem());
+        char *out;
+        long n;
+        int text_mode = 0, full = 0, ret;
+
+        sscanf(line, "%*s %d %d %599s", &text_mode, &full, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("tracestr bad hex\n");
+            BIO_free(mem);
+            return 1;
+        }
+        if (full && !text_mode && len > OSSL_TRACE_STRING_MAX)
+            full = 0;
+        ret = OSSL_trace_string(mem, text_mode, full, data, len);
+        n = BIO_get_mem_data(mem, &out);
+        print_escaped("tracestr", ret, out, (size_t)n);
+        BIO_free(mem);
     } else if (strcmp(command, "strtoul") == 0) {
         unsigned long value = 0;
         char *end = NULL;
@@ -827,20 +871,6 @@ static int call_printf(BIO *bio, const char *f, const char *sig, const ARG *a)
     EVERY_SIGNATURE
 #undef CALL
     return -99;
-}
-
-static void print_escaped(const char *label, int ret, const char *data, size_t len)
-{
-    printf("%s %d \"", label, ret);
-    for (size_t i = 0; i < len; i++) {
-        unsigned char c = (unsigned char)data[i];
-
-        if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
-            putchar(c);
-        else
-            printf("\\x%02x", c);
-    }
-    printf("\"\n");
 }
 
 static int printf_command(const char *command, const char *line)

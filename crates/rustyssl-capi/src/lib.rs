@@ -32,4 +32,5 @@ mod stack;
 mod string;
 mod stub;
 mod threads;
+mod trace;
 mod version;
