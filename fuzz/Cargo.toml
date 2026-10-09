@@ -132,3 +132,10 @@ path = "fuzz_targets/asn1_d2i_bio.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "asn1_parse"
+path = "fuzz_targets/asn1_parse.rs"
+test = false
+doc = false
+bench = false

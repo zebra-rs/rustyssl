@@ -2,7 +2,7 @@
 //! exactly its claimed size, so a read past it is an ASan error) decoded with a universal item
 //! or with an application-style SEQUENCE defined here as C would define it (OPTIONAL, EXPLICIT
 //! and IMPLICIT fields, SET OF ANY, a DirectoryString, and itself, nested). A value that decodes
-//! must encode, and an encoding that decodes must encode the same again.
+//! must encode, and an encoding that decodes must encode the same again; it must also print.
 
 #![no_main]
 
@@ -14,7 +14,7 @@ use libfuzzer_sys::fuzz_target;
 use rustyssl_abi::{
     ASN1_ITEM, ASN1_ITYPE_SEQUENCE, ASN1_TEMPLATE, ASN1_TFLG_CONTEXT, ASN1_TFLG_EXPTAG,
     ASN1_TFLG_IMPTAG, ASN1_TFLG_OPTIONAL, ASN1_TFLG_SEQUENCE_OF, ASN1_TFLG_SET_OF, ASN1_VALUE,
-    V_ASN1_SEQUENCE,
+    BIO, BIO_METHOD, V_ASN1_SEQUENCE,
 };
 // Linked for its exports, which the declarations below resolve to.
 use rustyssl_capi as _;
@@ -23,6 +23,10 @@ unsafe extern "C" {
     fn ASN1_item_d2i(pval: *mut *mut ASN1_VALUE, input: *mut *const c_uchar, len: c_long, it: *const ASN1_ITEM) -> *mut ASN1_VALUE;
     fn ASN1_item_i2d(val: *const ASN1_VALUE, out: *mut *mut c_uchar, it: *const ASN1_ITEM) -> c_int;
     fn ASN1_item_free(val: *mut ASN1_VALUE, it: *const ASN1_ITEM);
+    fn ASN1_item_print(out: *mut BIO, val: *const ASN1_VALUE, indent: c_int, it: *const ASN1_ITEM, pctx: *const c_void) -> c_int;
+    fn BIO_s_mem() -> *const BIO_METHOD;
+    fn BIO_new(method: *const BIO_METHOD) -> *mut BIO;
+    fn BIO_free(b: *mut BIO) -> c_int;
     fn CRYPTO_free(p: *mut c_void, file: *const c_char, line: c_int);
     fn ERR_clear_error();
     fn ASN1_ANY_it() -> *const ASN1_ITEM;
@@ -139,6 +143,13 @@ fuzz_target!(|data: &[u8]| {
     let (value, used) = decode(input, it);
     assert!(used <= input.len());
     if !value.is_null() {
+        // Printing what was decoded must work or fail cleanly.
+        // SAFETY: no preconditions; then a memory BIO and a value of the item.
+        unsafe {
+            let mem = BIO_new(BIO_s_mem());
+            ASN1_item_print(mem, value, 0, it, ptr::null());
+            BIO_free(mem);
+        }
         // OpenSSL can write what it can't read back (an ANY of universal tag 0 is `00 00`, an
         // end-of-contents), so an encoding needn't decode; one that does must be read whole and
         // encode the same again.
