@@ -111,6 +111,12 @@
  *                              difference from a fixed time
  *   asntimet <time> <days> <secs>  ASN1_TIME_adj, ASN1_UTCTIME_adj, ASN1_GENERALIZEDTIME_adj,
  *                              and OPENSSL_gmtime_adj of OPENSSL_gmtime
+ *
+ * Commands for the template engine:
+ *   asnany <type>:<hex> ...    up to 8 ASN1_TYPEs (type -2 is a negative INTEGER, 1 a BOOLEAN
+ *                              from the first octet, 6 an OBJECT from its content octets, `-`
+ *                              for none): i2d_ASN1_TYPE of each, then i2d_ASN1_SEQUENCE_ANY and
+ *                              i2d_ASN1_SET_ANY of them all
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -1017,6 +1023,88 @@ static int text_command(const char *command, const char *line)
     return 0;
 }
 
+/* Encodes `der` as a new buffer, printing its length and octets after `label`. */
+static void print_i2d(const char *label, int len, unsigned char *der)
+{
+    printf(" %s=%d", label, len);
+    if (len > 0) {
+        printf(":");
+        for (int i = 0; i < len; i++)
+            printf("%02x", der[i]);
+    }
+    OPENSSL_free(der);
+}
+
+/* Runs a template engine command; returns 0 if `command` isn't one. */
+static int template_command(const char *command, const char *line)
+{
+    if (strcmp(command, "asnany") == 0) {
+        STACK_OF(ASN1_TYPE) *sk = sk_ASN1_TYPE_new_null();
+        const char *p = line + strlen(command);
+        char item[600];
+        int n, offset;
+        unsigned char *der;
+
+        printf("asnany");
+        while (sk_ASN1_TYPE_num(sk) < 8 && sscanf(p, " %599s%n", item, &offset) == 1) {
+            unsigned char data[300];
+            size_t len = 0;
+            int type = 0;
+            char *colon = strchr(item, ':');
+            ASN1_TYPE *t = ASN1_TYPE_new();
+
+            p += offset;
+            if (colon == NULL || sscanf(item, "%d", &type) != 1
+                || (strcmp(colon + 1, "-") != 0 && !parse_hex(colon + 1, data, &len))) {
+                printf(" bad");
+                ASN1_TYPE_free(t);
+                continue;
+            }
+            if (type == V_ASN1_BOOLEAN) {
+                ASN1_TYPE_set(t, type, len > 0 && data[0] != 0 ? (void *)1 : NULL);
+            } else if (type == V_ASN1_NULL) {
+                ASN1_TYPE_set(t, type, NULL);
+            } else if (type == V_ASN1_OBJECT) {
+                unsigned char object[310];
+                const unsigned char *q = object;
+                ASN1_OBJECT *o;
+
+                object[0] = V_ASN1_OBJECT;
+                object[1] = (unsigned char)len;
+                memcpy(object + 2, data, len);
+                o = len < 128 ? d2i_ASN1_OBJECT(NULL, &q, (long)len + 2) : NULL;
+                if (o == NULL) {
+                    printf(" noobj");
+                    ASN1_TYPE_free(t);
+                    ERR_clear_error();
+                    continue;
+                }
+                ASN1_TYPE_set(t, type, o);
+            } else {
+                ASN1_STRING *str = ASN1_STRING_type_new(type == -2 ? V_ASN1_NEG_INTEGER : type);
+
+                ASN1_STRING_set(str, data, (int)len);
+                ASN1_TYPE_set(t, type == -2 ? V_ASN1_INTEGER : type, str);
+            }
+            der = NULL;
+            n = i2d_ASN1_TYPE(t, &der);
+            print_i2d("e", n, der);
+            sk_ASN1_TYPE_push(sk, t);
+        }
+        der = NULL;
+        n = i2d_ASN1_SEQUENCE_ANY(sk, &der);
+        print_i2d("seq", n, der);
+        der = NULL;
+        n = i2d_ASN1_SET_ANY(sk, &der);
+        print_i2d("set", n, der);
+        printf(" measured=%d,%d\n", i2d_ASN1_SEQUENCE_ANY(sk, NULL), i2d_ASN1_SET_ANY(sk, NULL));
+        sk_ASN1_TYPE_pop_free(sk, ASN1_TYPE_free);
+        ERR_clear_error();
+        return 1;
+    }
+    return 0;
+}
+
 /* Runs a time command; returns 0 if `command` isn't one. */
 static int time_command(const char *command, const char *line)
 {
@@ -1404,7 +1492,7 @@ int main(void)
             || addr_command(command, line) || obj_command(command, line)
             || asn_command(command, line) || int_command(command, line)
             || bit_command(command, line) || text_command(command, line)
-            || time_command(command, line)) {
+            || time_command(command, line) || template_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
