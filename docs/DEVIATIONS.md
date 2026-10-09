@@ -1,6 +1,6 @@
 # Deviations from OpenSSL
 
-rustyssl matches OpenSSL's behavior, including its quirks (AGENTS.md, "Compatibility target"),
+rustyssl matches OpenSSL's behavior, including its quirks (README.md, "Compatibility target"),
 with one exception: where matching it would be unsafe. Every such case is listed here, with
 the reason and the test that pins the behavior down. Each entry names the OpenSSL release it was
 checked against.
@@ -70,6 +70,8 @@ OpenSSL never depends on them.
 | `ASN1_mbstring_copy`/`ncopy` (and `ASN1_STRING_set_by_NID`) with NULL input and a nonzero length; `ASN1_STRING_to_UTF8` with NULL `out`; `ASN1_STRING_print_ex`/`_fp` with a NULL string; `ASN1_UNIVERSALSTRING_to_string` with NULL, or an empty string without data; `ASN1_STRING_set_default_mask_asc` with NULL; `UTF8_getc` with NULL `val` | dereference NULL | -1 or 0 (`ERR_R_PASSED_NULL_PARAMETER` for the first two); `UTF8_getc` doesn't store the value | `asn1::text::tests::null_arguments_are_safe` |
 | `OPENSSL_gmtime`, `OPENSSL_gmtime_adj`, `OPENSSL_gmtime_diff`, `ASN1_TIME_check`, the `_set_string` functions, `ASN1_TIME_to_tm`, `ASN1_UTCTIME_cmp_time_t`, and the time printers with a NULL pointer they need | dereference NULL | NULL, 0, or -2 (`_cmp_time_t`), as each fails | `asn1::time::tests::null_arguments_are_safe` |
 | `ASN1_TYPE_get`, `ASN1_TYPE_set`, `ASN1_TYPE_get_octetstring` with a NULL `ASN1_TYPE` | dereference NULL | 0; nothing; -1 with `ASN1_R_DATA_IS_WRONG` | `asn1::any::tests::null_arguments_are_safe` |
+| `ASN1_item_i2d`, `ASN1_item_ndef_i2d`, and the `i2d_` functions allocating the output, when an application's aux or item callback makes the writing pass longer than the sizing pass | writes past the end of the buffer it allocated | drops the write, frees the buffer, and returns -1 with `ERR_R_INTERNAL_ERROR` | `asn1::tpl::encode::tests::a_callback_cannot_overrun_the_buffer` |
+| Encoding an `ASN1_TYPE` (`ASN1_ANY`) of a string or OBJECT type with no value | dereferences NULL | leaves it out, as an absent value (0) | `asn1::tpl::encode::tests::an_any_without_a_value_is_left_out` |
 | `OSSL_trace_string` with `full` set, `text` clear, and more than `OSSL_TRACE_STRING_MAX` (80) bytes | masks them into an 81-byte stack buffer, overflowing it | masks and prints them all | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
 | `OSSL_trace_string` with NULL `data` to mask, or with `full` and a size over `INT_MAX` | dereferences NULL; truncates the size to an `int` | returns -1 (after the length note, if any), writing no data | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
