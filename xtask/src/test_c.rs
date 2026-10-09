@@ -110,6 +110,11 @@ pub struct Outcome {
     pub stderr: String,
 }
 
+/// The configuration file test programs are pointed at, on both libraries: one that doesn't
+/// exist, so loading it fails the same way on each. (By default each would look in its own
+/// build's directory, and the error OpenSSL keeps names the path.)
+const MISSING_CONFIG: &str = "/nonexistent/rustyssl-tests/openssl.cnf";
+
 /// Runs `exe` with the dynamic loader pointed at `lib_dir`.
 pub fn execute(exe: &Path, lib_dir: &Path, work: &Path) -> Result<Outcome> {
     execute_with_input(exe, lib_dir, work, None)
@@ -131,6 +136,7 @@ pub fn execute_with_input(
     };
     let mut child = Command::new(exe)
         .env(LOADER_PATH, lib_dir)
+        .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(stdin)
         .stdout(fs::File::create(&stdout_path)?)
         .stderr(fs::File::create(&stderr_path)?)
