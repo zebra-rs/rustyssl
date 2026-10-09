@@ -10,7 +10,11 @@
 //! - an OID is encoded only if its `OBJ_x` definition contains a comma. That leaves out the
 //!   single-arc roots (`undef`, `iso`, `itu-t`, `joint-iso-itu-t`) and bare aliases such as
 //!   `OBJ_ac_auditEntity`, which `obj_dat.pl` never expands;
-//! - `NID_x` aliases of other NIDs (`NID_grasshopper_cbc`) aren't entries.
+//! - `NID_x` aliases of other NIDs (`NID_grasshopper_cbc`) aren't entries;
+//! - OpenSSL's index of objects by OID holds every object with an `OBJ_x` macro, including
+//!   those whose OID it doesn't encode. They sort first and never match a search, but they shift
+//!   the binary search's midpoints, which decide between objects sharing an OID (`ORG` and
+//!   `identified-organization`), so each entry records whether it's `indexed`.
 //!
 //! NIDs and names come from the constants clang already evaluated; clang also expands each
 //! `OBJ_x` arc list, so nested references need no reimplementation here.
@@ -29,6 +33,7 @@ struct Object {
     short_name: String,
     long_name: String,
     der: Vec<u8>,
+    indexed: bool,
 }
 
 pub fn generate(ctx: &Context, constants: &Constants) -> Result {
@@ -63,9 +68,8 @@ pub fn generate(ctx: &Context, constants: &Constants) -> Result {
             (Some(only), None) | (None, Some(only)) => (only.clone(), only),
             (None, None) => ("NULL".to_owned(), "NULL".to_owned()),
         };
-        let has_arcs = defined
-            .get(&format!("OBJ_{name}"))
-            .is_some_and(|body| body.contains(','));
+        let obj = defined.get(&format!("OBJ_{name}"));
+        let has_arcs = obj.is_some_and(|body| body.contains(','));
         let der = match arcs.get(name) {
             Some(arcs) if has_arcs => der_content(arcs).map_err(|e| format!("OBJ_{name}: {e}"))?,
             _ => Vec::new(),
@@ -74,6 +78,7 @@ pub fn generate(ctx: &Context, constants: &Constants) -> Result {
             short_name,
             long_name,
             der,
+            indexed: obj.is_some(),
         };
         if let Some((other, _)) = objects.insert(nid, (name.clone(), object)) {
             return Err(format!("NID {nid} is both NID_{other} and NID_{name}").into());
@@ -270,10 +275,11 @@ fn render(
         let der: Vec<String> = object.der.iter().map(|b| format!("{b:#04x}")).collect();
         writeln!(
             out,
-            "    Some(ObjectDef {{ nid: {nid}, short_name: {:?}, long_name: {:?}, der: &[{}] }}), // {name}",
+            "    Some(ObjectDef {{ nid: {nid}, short_name: {:?}, long_name: {:?}, der: &[{}], indexed: {} }}), // {name}",
             object.short_name,
             object.long_name,
-            der.join(", ")
+            der.join(", "),
+            object.indexed
         )?;
     }
     out.push_str(

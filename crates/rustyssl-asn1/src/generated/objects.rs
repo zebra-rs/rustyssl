@@ -10,204 +10,238 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "UNDEF",
         long_name: "undefined",
         der: &[],
+        indexed: true,
     }), // undef
     Some(ObjectDef {
         nid: 1,
         short_name: "rsadsi",
         long_name: "RSA Data Security, Inc.",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d],
+        indexed: true,
     }), // rsadsi
     Some(ObjectDef {
         nid: 2,
         short_name: "pkcs",
         long_name: "RSA Data Security, Inc. PKCS",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01],
+        indexed: true,
     }), // pkcs
     Some(ObjectDef {
         nid: 3,
         short_name: "MD2",
         long_name: "md2",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x02],
+        indexed: true,
     }), // md2
     Some(ObjectDef {
         nid: 4,
         short_name: "MD5",
         long_name: "md5",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x05],
+        indexed: true,
     }), // md5
     Some(ObjectDef {
         nid: 5,
         short_name: "RC4",
         long_name: "rc4",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x03, 0x04],
+        indexed: true,
     }), // rc4
     Some(ObjectDef {
         nid: 6,
         short_name: "rsaEncryption",
         long_name: "rsaEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // rsaEncryption
     Some(ObjectDef {
         nid: 7,
         short_name: "RSA-MD2",
         long_name: "md2WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // md2WithRSAEncryption
     Some(ObjectDef {
         nid: 8,
         short_name: "RSA-MD5",
         long_name: "md5WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x04],
+        indexed: true,
     }), // md5WithRSAEncryption
     Some(ObjectDef {
         nid: 9,
         short_name: "PBE-MD2-DES",
         long_name: "pbeWithMD2AndDES-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x01],
+        indexed: true,
     }), // pbeWithMD2AndDES_CBC
     Some(ObjectDef {
         nid: 10,
         short_name: "PBE-MD5-DES",
         long_name: "pbeWithMD5AndDES-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x03],
+        indexed: true,
     }), // pbeWithMD5AndDES_CBC
     Some(ObjectDef {
         nid: 11,
         short_name: "X500",
         long_name: "directory services (X.500)",
         der: &[0x55],
+        indexed: true,
     }), // X500
     Some(ObjectDef {
         nid: 12,
         short_name: "X509",
         long_name: "X509",
         der: &[0x55, 0x04],
+        indexed: true,
     }), // X509
     Some(ObjectDef {
         nid: 13,
         short_name: "CN",
         long_name: "commonName",
         der: &[0x55, 0x04, 0x03],
+        indexed: true,
     }), // commonName
     Some(ObjectDef {
         nid: 14,
         short_name: "C",
         long_name: "countryName",
         der: &[0x55, 0x04, 0x06],
+        indexed: true,
     }), // countryName
     Some(ObjectDef {
         nid: 15,
         short_name: "L",
         long_name: "localityName",
         der: &[0x55, 0x04, 0x07],
+        indexed: true,
     }), // localityName
     Some(ObjectDef {
         nid: 16,
         short_name: "ST",
         long_name: "stateOrProvinceName",
         der: &[0x55, 0x04, 0x08],
+        indexed: true,
     }), // stateOrProvinceName
     Some(ObjectDef {
         nid: 17,
         short_name: "O",
         long_name: "organizationName",
         der: &[0x55, 0x04, 0x0a],
+        indexed: true,
     }), // organizationName
     Some(ObjectDef {
         nid: 18,
         short_name: "OU",
         long_name: "organizationalUnitName",
         der: &[0x55, 0x04, 0x0b],
+        indexed: true,
     }), // organizationalUnitName
     Some(ObjectDef {
         nid: 19,
         short_name: "RSA",
         long_name: "rsa",
         der: &[0x55, 0x08, 0x01, 0x01],
+        indexed: true,
     }), // rsa
     Some(ObjectDef {
         nid: 20,
         short_name: "pkcs7",
         long_name: "pkcs7",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07],
+        indexed: true,
     }), // pkcs7
     Some(ObjectDef {
         nid: 21,
         short_name: "pkcs7-data",
         long_name: "pkcs7-data",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x01],
+        indexed: true,
     }), // pkcs7_data
     Some(ObjectDef {
         nid: 22,
         short_name: "pkcs7-signedData",
         long_name: "pkcs7-signedData",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x02],
+        indexed: true,
     }), // pkcs7_signed
     Some(ObjectDef {
         nid: 23,
         short_name: "pkcs7-envelopedData",
         long_name: "pkcs7-envelopedData",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x03],
+        indexed: true,
     }), // pkcs7_enveloped
     Some(ObjectDef {
         nid: 24,
         short_name: "pkcs7-signedAndEnvelopedData",
         long_name: "pkcs7-signedAndEnvelopedData",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x04],
+        indexed: true,
     }), // pkcs7_signedAndEnveloped
     Some(ObjectDef {
         nid: 25,
         short_name: "pkcs7-digestData",
         long_name: "pkcs7-digestData",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x05],
+        indexed: true,
     }), // pkcs7_digest
     Some(ObjectDef {
         nid: 26,
         short_name: "pkcs7-encryptedData",
         long_name: "pkcs7-encryptedData",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x06],
+        indexed: true,
     }), // pkcs7_encrypted
     Some(ObjectDef {
         nid: 27,
         short_name: "pkcs3",
         long_name: "pkcs3",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x03],
+        indexed: true,
     }), // pkcs3
     Some(ObjectDef {
         nid: 28,
         short_name: "dhKeyAgreement",
         long_name: "dhKeyAgreement",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x03, 0x01],
+        indexed: true,
     }), // dhKeyAgreement
     Some(ObjectDef {
         nid: 29,
         short_name: "DES-ECB",
         long_name: "des-ecb",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x06],
+        indexed: true,
     }), // des_ecb
     Some(ObjectDef {
         nid: 30,
         short_name: "DES-CFB",
         long_name: "des-cfb",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x09],
+        indexed: true,
     }), // des_cfb64
     Some(ObjectDef {
         nid: 31,
         short_name: "DES-CBC",
         long_name: "des-cbc",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x07],
+        indexed: true,
     }), // des_cbc
     Some(ObjectDef {
         nid: 32,
         short_name: "DES-EDE",
         long_name: "des-ede",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x11],
+        indexed: true,
     }), // des_ede_ecb
     Some(ObjectDef {
         nid: 33,
         short_name: "DES-EDE3",
         long_name: "des-ede3",
         der: &[],
+        indexed: false,
     }), // des_ede3_ecb
     Some(ObjectDef {
         nid: 34,
@@ -216,504 +250,588 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x81, 0x3c, 0x07, 0x01, 0x01, 0x02,
         ],
+        indexed: true,
     }), // idea_cbc
     Some(ObjectDef {
         nid: 35,
         short_name: "IDEA-CFB",
         long_name: "idea-cfb",
         der: &[],
+        indexed: false,
     }), // idea_cfb64
     Some(ObjectDef {
         nid: 36,
         short_name: "IDEA-ECB",
         long_name: "idea-ecb",
         der: &[],
+        indexed: false,
     }), // idea_ecb
     Some(ObjectDef {
         nid: 37,
         short_name: "RC2-CBC",
         long_name: "rc2-cbc",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x03, 0x02],
+        indexed: true,
     }), // rc2_cbc
     Some(ObjectDef {
         nid: 38,
         short_name: "RC2-ECB",
         long_name: "rc2-ecb",
         der: &[],
+        indexed: false,
     }), // rc2_ecb
     Some(ObjectDef {
         nid: 39,
         short_name: "RC2-CFB",
         long_name: "rc2-cfb",
         der: &[],
+        indexed: false,
     }), // rc2_cfb64
     Some(ObjectDef {
         nid: 40,
         short_name: "RC2-OFB",
         long_name: "rc2-ofb",
         der: &[],
+        indexed: false,
     }), // rc2_ofb64
     Some(ObjectDef {
         nid: 41,
         short_name: "SHA",
         long_name: "sha",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x12],
+        indexed: true,
     }), // sha
     Some(ObjectDef {
         nid: 42,
         short_name: "RSA-SHA",
         long_name: "shaWithRSAEncryption",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x0f],
+        indexed: true,
     }), // shaWithRSAEncryption
     Some(ObjectDef {
         nid: 43,
         short_name: "DES-EDE-CBC",
         long_name: "des-ede-cbc",
         der: &[],
+        indexed: false,
     }), // des_ede_cbc
     Some(ObjectDef {
         nid: 44,
         short_name: "DES-EDE3-CBC",
         long_name: "des-ede3-cbc",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x03, 0x07],
+        indexed: true,
     }), // des_ede3_cbc
     Some(ObjectDef {
         nid: 45,
         short_name: "DES-OFB",
         long_name: "des-ofb",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x08],
+        indexed: true,
     }), // des_ofb64
     Some(ObjectDef {
         nid: 46,
         short_name: "IDEA-OFB",
         long_name: "idea-ofb",
         der: &[],
+        indexed: false,
     }), // idea_ofb64
     Some(ObjectDef {
         nid: 47,
         short_name: "pkcs9",
         long_name: "pkcs9",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09],
+        indexed: true,
     }), // pkcs9
     Some(ObjectDef {
         nid: 48,
         short_name: "emailAddress",
         long_name: "emailAddress",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x01],
+        indexed: true,
     }), // pkcs9_emailAddress
     Some(ObjectDef {
         nid: 49,
         short_name: "unstructuredName",
         long_name: "unstructuredName",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x02],
+        indexed: true,
     }), // pkcs9_unstructuredName
     Some(ObjectDef {
         nid: 50,
         short_name: "contentType",
         long_name: "contentType",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x03],
+        indexed: true,
     }), // pkcs9_contentType
     Some(ObjectDef {
         nid: 51,
         short_name: "messageDigest",
         long_name: "messageDigest",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x04],
+        indexed: true,
     }), // pkcs9_messageDigest
     Some(ObjectDef {
         nid: 52,
         short_name: "signingTime",
         long_name: "signingTime",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x05],
+        indexed: true,
     }), // pkcs9_signingTime
     Some(ObjectDef {
         nid: 53,
         short_name: "countersignature",
         long_name: "countersignature",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x06],
+        indexed: true,
     }), // pkcs9_countersignature
     Some(ObjectDef {
         nid: 54,
         short_name: "challengePassword",
         long_name: "challengePassword",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x07],
+        indexed: true,
     }), // pkcs9_challengePassword
     Some(ObjectDef {
         nid: 55,
         short_name: "unstructuredAddress",
         long_name: "unstructuredAddress",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x08],
+        indexed: true,
     }), // pkcs9_unstructuredAddress
     Some(ObjectDef {
         nid: 56,
         short_name: "extendedCertificateAttributes",
         long_name: "extendedCertificateAttributes",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x09],
+        indexed: true,
     }), // pkcs9_extCertAttributes
     Some(ObjectDef {
         nid: 57,
         short_name: "Netscape",
         long_name: "Netscape Communications Corp.",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42],
+        indexed: true,
     }), // netscape
     Some(ObjectDef {
         nid: 58,
         short_name: "nsCertExt",
         long_name: "Netscape Certificate Extension",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01],
+        indexed: true,
     }), // netscape_cert_extension
     Some(ObjectDef {
         nid: 59,
         short_name: "nsDataType",
         long_name: "Netscape Data Type",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x02],
+        indexed: true,
     }), // netscape_data_type
     Some(ObjectDef {
         nid: 60,
         short_name: "DES-EDE-CFB",
         long_name: "des-ede-cfb",
         der: &[],
+        indexed: false,
     }), // des_ede_cfb64
     Some(ObjectDef {
         nid: 61,
         short_name: "DES-EDE3-CFB",
         long_name: "des-ede3-cfb",
         der: &[],
+        indexed: false,
     }), // des_ede3_cfb64
     Some(ObjectDef {
         nid: 62,
         short_name: "DES-EDE-OFB",
         long_name: "des-ede-ofb",
         der: &[],
+        indexed: false,
     }), // des_ede_ofb64
     Some(ObjectDef {
         nid: 63,
         short_name: "DES-EDE3-OFB",
         long_name: "des-ede3-ofb",
         der: &[],
+        indexed: false,
     }), // des_ede3_ofb64
     Some(ObjectDef {
         nid: 64,
         short_name: "SHA1",
         long_name: "sha1",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x1a],
+        indexed: true,
     }), // sha1
     Some(ObjectDef {
         nid: 65,
         short_name: "RSA-SHA1",
         long_name: "sha1WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x05],
+        indexed: true,
     }), // sha1WithRSAEncryption
     Some(ObjectDef {
         nid: 66,
         short_name: "DSA-SHA",
         long_name: "dsaWithSHA",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x0d],
+        indexed: true,
     }), // dsaWithSHA
     Some(ObjectDef {
         nid: 67,
         short_name: "DSA-old",
         long_name: "dsaEncryption-old",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x0c],
+        indexed: true,
     }), // dsa_2
     Some(ObjectDef {
         nid: 68,
         short_name: "PBE-SHA1-RC2-64",
         long_name: "pbeWithSHA1AndRC2-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0b],
+        indexed: true,
     }), // pbeWithSHA1AndRC2_CBC
     Some(ObjectDef {
         nid: 69,
         short_name: "PBKDF2",
         long_name: "PBKDF2",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0c],
+        indexed: true,
     }), // id_pbkdf2
     Some(ObjectDef {
         nid: 70,
         short_name: "DSA-SHA1-old",
         long_name: "dsaWithSHA1-old",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x1b],
+        indexed: true,
     }), // dsaWithSHA1_2
     Some(ObjectDef {
         nid: 71,
         short_name: "nsCertType",
         long_name: "Netscape Cert Type",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x01],
+        indexed: true,
     }), // netscape_cert_type
     Some(ObjectDef {
         nid: 72,
         short_name: "nsBaseUrl",
         long_name: "Netscape Base Url",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x02],
+        indexed: true,
     }), // netscape_base_url
     Some(ObjectDef {
         nid: 73,
         short_name: "nsRevocationUrl",
         long_name: "Netscape Revocation Url",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x03],
+        indexed: true,
     }), // netscape_revocation_url
     Some(ObjectDef {
         nid: 74,
         short_name: "nsCaRevocationUrl",
         long_name: "Netscape CA Revocation Url",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x04],
+        indexed: true,
     }), // netscape_ca_revocation_url
     Some(ObjectDef {
         nid: 75,
         short_name: "nsRenewalUrl",
         long_name: "Netscape Renewal Url",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x07],
+        indexed: true,
     }), // netscape_renewal_url
     Some(ObjectDef {
         nid: 76,
         short_name: "nsCaPolicyUrl",
         long_name: "Netscape CA Policy Url",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x08],
+        indexed: true,
     }), // netscape_ca_policy_url
     Some(ObjectDef {
         nid: 77,
         short_name: "nsSslServerName",
         long_name: "Netscape SSL Server Name",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x0c],
+        indexed: true,
     }), // netscape_ssl_server_name
     Some(ObjectDef {
         nid: 78,
         short_name: "nsComment",
         long_name: "Netscape Comment",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x01, 0x0d],
+        indexed: true,
     }), // netscape_comment
     Some(ObjectDef {
         nid: 79,
         short_name: "nsCertSequence",
         long_name: "Netscape Certificate Sequence",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x02, 0x05],
+        indexed: true,
     }), // netscape_cert_sequence
     Some(ObjectDef {
         nid: 80,
         short_name: "DESX-CBC",
         long_name: "desx-cbc",
         der: &[],
+        indexed: false,
     }), // desx_cbc
     Some(ObjectDef {
         nid: 81,
         short_name: "id-ce",
         long_name: "id-ce",
         der: &[0x55, 0x1d],
+        indexed: true,
     }), // id_ce
     Some(ObjectDef {
         nid: 82,
         short_name: "subjectKeyIdentifier",
         long_name: "X509v3 Subject Key Identifier",
         der: &[0x55, 0x1d, 0x0e],
+        indexed: true,
     }), // subject_key_identifier
     Some(ObjectDef {
         nid: 83,
         short_name: "keyUsage",
         long_name: "X509v3 Key Usage",
         der: &[0x55, 0x1d, 0x0f],
+        indexed: true,
     }), // key_usage
     Some(ObjectDef {
         nid: 84,
         short_name: "privateKeyUsagePeriod",
         long_name: "X509v3 Private Key Usage Period",
         der: &[0x55, 0x1d, 0x10],
+        indexed: true,
     }), // private_key_usage_period
     Some(ObjectDef {
         nid: 85,
         short_name: "subjectAltName",
         long_name: "X509v3 Subject Alternative Name",
         der: &[0x55, 0x1d, 0x11],
+        indexed: true,
     }), // subject_alt_name
     Some(ObjectDef {
         nid: 86,
         short_name: "issuerAltName",
         long_name: "X509v3 Issuer Alternative Name",
         der: &[0x55, 0x1d, 0x12],
+        indexed: true,
     }), // issuer_alt_name
     Some(ObjectDef {
         nid: 87,
         short_name: "basicConstraints",
         long_name: "X509v3 Basic Constraints",
         der: &[0x55, 0x1d, 0x13],
+        indexed: true,
     }), // basic_constraints
     Some(ObjectDef {
         nid: 88,
         short_name: "crlNumber",
         long_name: "X509v3 CRL Number",
         der: &[0x55, 0x1d, 0x14],
+        indexed: true,
     }), // crl_number
     Some(ObjectDef {
         nid: 89,
         short_name: "certificatePolicies",
         long_name: "X509v3 Certificate Policies",
         der: &[0x55, 0x1d, 0x20],
+        indexed: true,
     }), // certificate_policies
     Some(ObjectDef {
         nid: 90,
         short_name: "authorityKeyIdentifier",
         long_name: "X509v3 Authority Key Identifier",
         der: &[0x55, 0x1d, 0x23],
+        indexed: true,
     }), // authority_key_identifier
     Some(ObjectDef {
         nid: 91,
         short_name: "BF-CBC",
         long_name: "bf-cbc",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x97, 0x55, 0x01, 0x02],
+        indexed: true,
     }), // bf_cbc
     Some(ObjectDef {
         nid: 92,
         short_name: "BF-ECB",
         long_name: "bf-ecb",
         der: &[],
+        indexed: false,
     }), // bf_ecb
     Some(ObjectDef {
         nid: 93,
         short_name: "BF-CFB",
         long_name: "bf-cfb",
         der: &[],
+        indexed: false,
     }), // bf_cfb64
     Some(ObjectDef {
         nid: 94,
         short_name: "BF-OFB",
         long_name: "bf-ofb",
         der: &[],
+        indexed: false,
     }), // bf_ofb64
     Some(ObjectDef {
         nid: 95,
         short_name: "MDC2",
         long_name: "mdc2",
         der: &[0x55, 0x08, 0x03, 0x65],
+        indexed: true,
     }), // mdc2
     Some(ObjectDef {
         nid: 96,
         short_name: "RSA-MDC2",
         long_name: "mdc2WithRSA",
         der: &[0x55, 0x08, 0x03, 0x64],
+        indexed: true,
     }), // mdc2WithRSA
     Some(ObjectDef {
         nid: 97,
         short_name: "RC4-40",
         long_name: "rc4-40",
         der: &[],
+        indexed: false,
     }), // rc4_40
     Some(ObjectDef {
         nid: 98,
         short_name: "RC2-40-CBC",
         long_name: "rc2-40-cbc",
         der: &[],
+        indexed: false,
     }), // rc2_40_cbc
     Some(ObjectDef {
         nid: 99,
         short_name: "GN",
         long_name: "givenName",
         der: &[0x55, 0x04, 0x2a],
+        indexed: true,
     }), // givenName
     Some(ObjectDef {
         nid: 100,
         short_name: "SN",
         long_name: "surname",
         der: &[0x55, 0x04, 0x04],
+        indexed: true,
     }), // surname
     Some(ObjectDef {
         nid: 101,
         short_name: "initials",
         long_name: "initials",
         der: &[0x55, 0x04, 0x2b],
+        indexed: true,
     }), // initials
     Some(ObjectDef {
         nid: 102,
         short_name: "uid",
         long_name: "uniqueIdentifier",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2c],
+        indexed: true,
     }), // uniqueIdentifier
     Some(ObjectDef {
         nid: 103,
         short_name: "crlDistributionPoints",
         long_name: "X509v3 CRL Distribution Points",
         der: &[0x55, 0x1d, 0x1f],
+        indexed: true,
     }), // crl_distribution_points
     Some(ObjectDef {
         nid: 104,
         short_name: "RSA-NP-MD5",
         long_name: "md5WithRSA",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x03],
+        indexed: true,
     }), // md5WithRSA
     Some(ObjectDef {
         nid: 105,
         short_name: "serialNumber",
         long_name: "serialNumber",
         der: &[0x55, 0x04, 0x05],
+        indexed: true,
     }), // serialNumber
     Some(ObjectDef {
         nid: 106,
         short_name: "title",
         long_name: "title",
         der: &[0x55, 0x04, 0x0c],
+        indexed: true,
     }), // title
     Some(ObjectDef {
         nid: 107,
         short_name: "description",
         long_name: "description",
         der: &[0x55, 0x04, 0x0d],
+        indexed: true,
     }), // description
     Some(ObjectDef {
         nid: 108,
         short_name: "CAST5-CBC",
         long_name: "cast5-cbc",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf6, 0x7d, 0x07, 0x42, 0x0a],
+        indexed: true,
     }), // cast5_cbc
     Some(ObjectDef {
         nid: 109,
         short_name: "CAST5-ECB",
         long_name: "cast5-ecb",
         der: &[],
+        indexed: false,
     }), // cast5_ecb
     Some(ObjectDef {
         nid: 110,
         short_name: "CAST5-CFB",
         long_name: "cast5-cfb",
         der: &[],
+        indexed: false,
     }), // cast5_cfb64
     Some(ObjectDef {
         nid: 111,
         short_name: "CAST5-OFB",
         long_name: "cast5-ofb",
         der: &[],
+        indexed: false,
     }), // cast5_ofb64
     Some(ObjectDef {
         nid: 112,
         short_name: "pbeWithMD5AndCast5CBC",
         long_name: "pbeWithMD5AndCast5CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf6, 0x7d, 0x07, 0x42, 0x0c],
+        indexed: true,
     }), // pbeWithMD5AndCast5_CBC
     Some(ObjectDef {
         nid: 113,
         short_name: "DSA-SHA1",
         long_name: "dsaWithSHA1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x04, 0x03],
+        indexed: true,
     }), // dsaWithSHA1
     Some(ObjectDef {
         nid: 114,
         short_name: "MD5-SHA1",
         long_name: "md5-sha1",
         der: &[],
+        indexed: false,
     }), // md5_sha1
     Some(ObjectDef {
         nid: 115,
         short_name: "RSA-SHA1-2",
         long_name: "sha1WithRSA",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x1d],
+        indexed: true,
     }), // sha1WithRSA
     Some(ObjectDef {
         nid: 116,
         short_name: "DSA",
         long_name: "dsaEncryption",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x04, 0x01],
+        indexed: true,
     }), // dsa
     Some(ObjectDef {
         nid: 117,
         short_name: "RIPEMD160",
         long_name: "ripemd160",
         der: &[0x2b, 0x24, 0x03, 0x02, 0x01],
+        indexed: true,
     }), // ripemd160
     None,
     Some(ObjectDef {
@@ -721,30 +839,35 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "RSA-RIPEMD160",
         long_name: "ripemd160WithRSA",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x01, 0x02],
+        indexed: true,
     }), // ripemd160WithRSA
     Some(ObjectDef {
         nid: 120,
         short_name: "RC5-CBC",
         long_name: "rc5-cbc",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x03, 0x08],
+        indexed: true,
     }), // rc5_cbc
     Some(ObjectDef {
         nid: 121,
         short_name: "RC5-ECB",
         long_name: "rc5-ecb",
         der: &[],
+        indexed: false,
     }), // rc5_ecb
     Some(ObjectDef {
         nid: 122,
         short_name: "RC5-CFB",
         long_name: "rc5-cfb",
         der: &[],
+        indexed: false,
     }), // rc5_cfb64
     Some(ObjectDef {
         nid: 123,
         short_name: "RC5-OFB",
         long_name: "rc5-ofb",
         der: &[],
+        indexed: false,
     }), // rc5_ofb64
     None,
     Some(ObjectDef {
@@ -754,150 +877,175 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x08,
         ],
+        indexed: true,
     }), // zlib_compression
     Some(ObjectDef {
         nid: 126,
         short_name: "extendedKeyUsage",
         long_name: "X509v3 Extended Key Usage",
         der: &[0x55, 0x1d, 0x25],
+        indexed: true,
     }), // ext_key_usage
     Some(ObjectDef {
         nid: 127,
         short_name: "PKIX",
         long_name: "PKIX",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07],
+        indexed: true,
     }), // id_pkix
     Some(ObjectDef {
         nid: 128,
         short_name: "id-kp",
         long_name: "id-kp",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03],
+        indexed: true,
     }), // id_kp
     Some(ObjectDef {
         nid: 129,
         short_name: "serverAuth",
         long_name: "TLS Web Server Authentication",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01],
+        indexed: true,
     }), // server_auth
     Some(ObjectDef {
         nid: 130,
         short_name: "clientAuth",
         long_name: "TLS Web Client Authentication",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02],
+        indexed: true,
     }), // client_auth
     Some(ObjectDef {
         nid: 131,
         short_name: "codeSigning",
         long_name: "Code Signing",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x03],
+        indexed: true,
     }), // code_sign
     Some(ObjectDef {
         nid: 132,
         short_name: "emailProtection",
         long_name: "E-mail Protection",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x04],
+        indexed: true,
     }), // email_protect
     Some(ObjectDef {
         nid: 133,
         short_name: "timeStamping",
         long_name: "Time Stamping",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x08],
+        indexed: true,
     }), // time_stamp
     Some(ObjectDef {
         nid: 134,
         short_name: "msCodeInd",
         long_name: "Microsoft Individual Code Signing",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x15],
+        indexed: true,
     }), // ms_code_ind
     Some(ObjectDef {
         nid: 135,
         short_name: "msCodeCom",
         long_name: "Microsoft Commercial Code Signing",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x16],
+        indexed: true,
     }), // ms_code_com
     Some(ObjectDef {
         nid: 136,
         short_name: "msCTLSign",
         long_name: "Microsoft Trust List Signing",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x0a, 0x03, 0x01],
+        indexed: true,
     }), // ms_ctl_sign
     Some(ObjectDef {
         nid: 137,
         short_name: "msSGC",
         long_name: "Microsoft Server Gated Crypto",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x0a, 0x03, 0x03],
+        indexed: true,
     }), // ms_sgc
     Some(ObjectDef {
         nid: 138,
         short_name: "msEFS",
         long_name: "Microsoft Encrypted File System",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x0a, 0x03, 0x04],
+        indexed: true,
     }), // ms_efs
     Some(ObjectDef {
         nid: 139,
         short_name: "nsSGC",
         long_name: "Netscape Server Gated Crypto",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf8, 0x42, 0x04, 0x01],
+        indexed: true,
     }), // ns_sgc
     Some(ObjectDef {
         nid: 140,
         short_name: "deltaCRL",
         long_name: "X509v3 Delta CRL Indicator",
         der: &[0x55, 0x1d, 0x1b],
+        indexed: true,
     }), // delta_crl
     Some(ObjectDef {
         nid: 141,
         short_name: "CRLReason",
         long_name: "X509v3 CRL Reason Code",
         der: &[0x55, 0x1d, 0x15],
+        indexed: true,
     }), // crl_reason
     Some(ObjectDef {
         nid: 142,
         short_name: "invalidityDate",
         long_name: "Invalidity Date",
         der: &[0x55, 0x1d, 0x18],
+        indexed: true,
     }), // invalidity_date
     Some(ObjectDef {
         nid: 143,
         short_name: "SXNetID",
         long_name: "Strong Extranet ID",
         der: &[0x2b, 0x65, 0x01, 0x04, 0x01],
+        indexed: true,
     }), // sxnet
     Some(ObjectDef {
         nid: 144,
         short_name: "PBE-SHA1-RC4-128",
         long_name: "pbeWithSHA1And128BitRC4",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x01],
+        indexed: true,
     }), // pbe_WithSHA1And128BitRC4
     Some(ObjectDef {
         nid: 145,
         short_name: "PBE-SHA1-RC4-40",
         long_name: "pbeWithSHA1And40BitRC4",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x02],
+        indexed: true,
     }), // pbe_WithSHA1And40BitRC4
     Some(ObjectDef {
         nid: 146,
         short_name: "PBE-SHA1-3DES",
         long_name: "pbeWithSHA1And3-KeyTripleDES-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x03],
+        indexed: true,
     }), // pbe_WithSHA1And3_Key_TripleDES_CBC
     Some(ObjectDef {
         nid: 147,
         short_name: "PBE-SHA1-2DES",
         long_name: "pbeWithSHA1And2-KeyTripleDES-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x04],
+        indexed: true,
     }), // pbe_WithSHA1And2_Key_TripleDES_CBC
     Some(ObjectDef {
         nid: 148,
         short_name: "PBE-SHA1-RC2-128",
         long_name: "pbeWithSHA1And128BitRC2-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x05],
+        indexed: true,
     }), // pbe_WithSHA1And128BitRC2_CBC
     Some(ObjectDef {
         nid: 149,
         short_name: "PBE-SHA1-RC2-40",
         long_name: "pbeWithSHA1And40BitRC2-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x06],
+        indexed: true,
     }), // pbe_WithSHA1And40BitRC2_CBC
     Some(ObjectDef {
         nid: 150,
@@ -906,6 +1054,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x01,
         ],
+        indexed: true,
     }), // keyBag
     Some(ObjectDef {
         nid: 151,
@@ -914,6 +1063,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x02,
         ],
+        indexed: true,
     }), // pkcs8ShroudedKeyBag
     Some(ObjectDef {
         nid: 152,
@@ -922,6 +1072,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x03,
         ],
+        indexed: true,
     }), // certBag
     Some(ObjectDef {
         nid: 153,
@@ -930,6 +1081,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x04,
         ],
+        indexed: true,
     }), // crlBag
     Some(ObjectDef {
         nid: 154,
@@ -938,6 +1090,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x05,
         ],
+        indexed: true,
     }), // secretBag
     Some(ObjectDef {
         nid: 155,
@@ -946,246 +1099,287 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x0a, 0x01, 0x06,
         ],
+        indexed: true,
     }), // safeContentsBag
     Some(ObjectDef {
         nid: 156,
         short_name: "friendlyName",
         long_name: "friendlyName",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x14],
+        indexed: true,
     }), // friendlyName
     Some(ObjectDef {
         nid: 157,
         short_name: "localKeyID",
         long_name: "localKeyID",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x15],
+        indexed: true,
     }), // localKeyID
     Some(ObjectDef {
         nid: 158,
         short_name: "x509Certificate",
         long_name: "x509Certificate",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x16, 0x01],
+        indexed: true,
     }), // x509Certificate
     Some(ObjectDef {
         nid: 159,
         short_name: "sdsiCertificate",
         long_name: "sdsiCertificate",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x16, 0x02],
+        indexed: true,
     }), // sdsiCertificate
     Some(ObjectDef {
         nid: 160,
         short_name: "x509Crl",
         long_name: "x509Crl",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x17, 0x01],
+        indexed: true,
     }), // x509Crl
     Some(ObjectDef {
         nid: 161,
         short_name: "PBES2",
         long_name: "PBES2",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0d],
+        indexed: true,
     }), // pbes2
     Some(ObjectDef {
         nid: 162,
         short_name: "PBMAC1",
         long_name: "PBMAC1",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0e],
+        indexed: true,
     }), // pbmac1
     Some(ObjectDef {
         nid: 163,
         short_name: "hmacWithSHA1",
         long_name: "hmacWithSHA1",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x07],
+        indexed: true,
     }), // hmacWithSHA1
     Some(ObjectDef {
         nid: 164,
         short_name: "id-qt-cps",
         long_name: "Policy Qualifier CPS",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x02, 0x01],
+        indexed: true,
     }), // id_qt_cps
     Some(ObjectDef {
         nid: 165,
         short_name: "id-qt-unotice",
         long_name: "Policy Qualifier User Notice",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x02, 0x02],
+        indexed: true,
     }), // id_qt_unotice
     Some(ObjectDef {
         nid: 166,
         short_name: "RC2-64-CBC",
         long_name: "rc2-64-cbc",
         der: &[],
+        indexed: false,
     }), // rc2_64_cbc
     Some(ObjectDef {
         nid: 167,
         short_name: "SMIME-CAPS",
         long_name: "S/MIME Capabilities",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x0f],
+        indexed: true,
     }), // SMIMECapabilities
     Some(ObjectDef {
         nid: 168,
         short_name: "PBE-MD2-RC2-64",
         long_name: "pbeWithMD2AndRC2-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x04],
+        indexed: true,
     }), // pbeWithMD2AndRC2_CBC
     Some(ObjectDef {
         nid: 169,
         short_name: "PBE-MD5-RC2-64",
         long_name: "pbeWithMD5AndRC2-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x06],
+        indexed: true,
     }), // pbeWithMD5AndRC2_CBC
     Some(ObjectDef {
         nid: 170,
         short_name: "PBE-SHA1-DES",
         long_name: "pbeWithSHA1AndDES-CBC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0a],
+        indexed: true,
     }), // pbeWithSHA1AndDES_CBC
     Some(ObjectDef {
         nid: 171,
         short_name: "msExtReq",
         long_name: "Microsoft Extension Request",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0e],
+        indexed: true,
     }), // ms_ext_req
     Some(ObjectDef {
         nid: 172,
         short_name: "extReq",
         long_name: "Extension Request",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x0e],
+        indexed: true,
     }), // ext_req
     Some(ObjectDef {
         nid: 173,
         short_name: "name",
         long_name: "name",
         der: &[0x55, 0x04, 0x29],
+        indexed: true,
     }), // name
     Some(ObjectDef {
         nid: 174,
         short_name: "dnQualifier",
         long_name: "dnQualifier",
         der: &[0x55, 0x04, 0x2e],
+        indexed: true,
     }), // dnQualifier
     Some(ObjectDef {
         nid: 175,
         short_name: "id-pe",
         long_name: "id-pe",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01],
+        indexed: true,
     }), // id_pe
     Some(ObjectDef {
         nid: 176,
         short_name: "id-ad",
         long_name: "id-ad",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30],
+        indexed: true,
     }), // id_ad
     Some(ObjectDef {
         nid: 177,
         short_name: "authorityInfoAccess",
         long_name: "Authority Information Access",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x01],
+        indexed: true,
     }), // info_access
     Some(ObjectDef {
         nid: 178,
         short_name: "OCSP",
         long_name: "OCSP",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01],
+        indexed: true,
     }), // ad_OCSP
     Some(ObjectDef {
         nid: 179,
         short_name: "caIssuers",
         long_name: "CA Issuers",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x02],
+        indexed: true,
     }), // ad_ca_issuers
     Some(ObjectDef {
         nid: 180,
         short_name: "OCSPSigning",
         long_name: "OCSP Signing",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x09],
+        indexed: true,
     }), // OCSP_sign
     Some(ObjectDef {
         nid: 181,
         short_name: "ISO",
         long_name: "iso",
         der: &[],
+        indexed: true,
     }), // iso
     Some(ObjectDef {
         nid: 182,
         short_name: "member-body",
         long_name: "ISO Member Body",
         der: &[0x2a],
+        indexed: true,
     }), // member_body
     Some(ObjectDef {
         nid: 183,
         short_name: "ISO-US",
         long_name: "ISO US Member Body",
         der: &[0x2a, 0x86, 0x48],
+        indexed: true,
     }), // ISO_US
     Some(ObjectDef {
         nid: 184,
         short_name: "X9-57",
         long_name: "X9.57",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38],
+        indexed: true,
     }), // X9_57
     Some(ObjectDef {
         nid: 185,
         short_name: "X9cm",
         long_name: "X9.57 CM ?",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x04],
+        indexed: true,
     }), // X9cm
     Some(ObjectDef {
         nid: 186,
         short_name: "pkcs1",
         long_name: "pkcs1",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01],
+        indexed: true,
     }), // pkcs1
     Some(ObjectDef {
         nid: 187,
         short_name: "pkcs5",
         long_name: "pkcs5",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05],
+        indexed: true,
     }), // pkcs5
     Some(ObjectDef {
         nid: 188,
         short_name: "SMIME",
         long_name: "S/MIME",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10],
+        indexed: true,
     }), // SMIME
     Some(ObjectDef {
         nid: 189,
         short_name: "id-smime-mod",
         long_name: "id-smime-mod",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00],
+        indexed: true,
     }), // id_smime_mod
     Some(ObjectDef {
         nid: 190,
         short_name: "id-smime-ct",
         long_name: "id-smime-ct",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01],
+        indexed: true,
     }), // id_smime_ct
     Some(ObjectDef {
         nid: 191,
         short_name: "id-smime-aa",
         long_name: "id-smime-aa",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02],
+        indexed: true,
     }), // id_smime_aa
     Some(ObjectDef {
         nid: 192,
         short_name: "id-smime-alg",
         long_name: "id-smime-alg",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03],
+        indexed: true,
     }), // id_smime_alg
     Some(ObjectDef {
         nid: 193,
         short_name: "id-smime-cd",
         long_name: "id-smime-cd",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x04],
+        indexed: true,
     }), // id_smime_cd
     Some(ObjectDef {
         nid: 194,
         short_name: "id-smime-spq",
         long_name: "id-smime-spq",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x05],
+        indexed: true,
     }), // id_smime_spq
     Some(ObjectDef {
         nid: 195,
         short_name: "id-smime-cti",
         long_name: "id-smime-cti",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06],
+        indexed: true,
     }), // id_smime_cti
     Some(ObjectDef {
         nid: 196,
@@ -1194,6 +1388,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x01,
         ],
+        indexed: true,
     }), // id_smime_mod_cms
     Some(ObjectDef {
         nid: 197,
@@ -1202,6 +1397,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x02,
         ],
+        indexed: true,
     }), // id_smime_mod_ess
     Some(ObjectDef {
         nid: 198,
@@ -1210,6 +1406,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x03,
         ],
+        indexed: true,
     }), // id_smime_mod_oid
     Some(ObjectDef {
         nid: 199,
@@ -1218,6 +1415,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x04,
         ],
+        indexed: true,
     }), // id_smime_mod_msg_v3
     Some(ObjectDef {
         nid: 200,
@@ -1226,6 +1424,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x05,
         ],
+        indexed: true,
     }), // id_smime_mod_ets_eSignature_88
     Some(ObjectDef {
         nid: 201,
@@ -1234,6 +1433,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x06,
         ],
+        indexed: true,
     }), // id_smime_mod_ets_eSignature_97
     Some(ObjectDef {
         nid: 202,
@@ -1242,6 +1442,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x07,
         ],
+        indexed: true,
     }), // id_smime_mod_ets_eSigPolicy_88
     Some(ObjectDef {
         nid: 203,
@@ -1250,6 +1451,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x00, 0x08,
         ],
+        indexed: true,
     }), // id_smime_mod_ets_eSigPolicy_97
     Some(ObjectDef {
         nid: 204,
@@ -1258,6 +1460,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x01,
         ],
+        indexed: true,
     }), // id_smime_ct_receipt
     Some(ObjectDef {
         nid: 205,
@@ -1266,6 +1469,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x02,
         ],
+        indexed: true,
     }), // id_smime_ct_authData
     Some(ObjectDef {
         nid: 206,
@@ -1274,6 +1478,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x03,
         ],
+        indexed: true,
     }), // id_smime_ct_publishCert
     Some(ObjectDef {
         nid: 207,
@@ -1282,6 +1487,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x04,
         ],
+        indexed: true,
     }), // id_smime_ct_TSTInfo
     Some(ObjectDef {
         nid: 208,
@@ -1290,6 +1496,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x05,
         ],
+        indexed: true,
     }), // id_smime_ct_TDTInfo
     Some(ObjectDef {
         nid: 209,
@@ -1298,6 +1505,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x06,
         ],
+        indexed: true,
     }), // id_smime_ct_contentInfo
     Some(ObjectDef {
         nid: 210,
@@ -1306,6 +1514,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x07,
         ],
+        indexed: true,
     }), // id_smime_ct_DVCSRequestData
     Some(ObjectDef {
         nid: 211,
@@ -1314,6 +1523,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x08,
         ],
+        indexed: true,
     }), // id_smime_ct_DVCSResponseData
     Some(ObjectDef {
         nid: 212,
@@ -1322,6 +1532,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x01,
         ],
+        indexed: true,
     }), // id_smime_aa_receiptRequest
     Some(ObjectDef {
         nid: 213,
@@ -1330,6 +1541,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x02,
         ],
+        indexed: true,
     }), // id_smime_aa_securityLabel
     Some(ObjectDef {
         nid: 214,
@@ -1338,6 +1550,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x03,
         ],
+        indexed: true,
     }), // id_smime_aa_mlExpandHistory
     Some(ObjectDef {
         nid: 215,
@@ -1346,6 +1559,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x04,
         ],
+        indexed: true,
     }), // id_smime_aa_contentHint
     Some(ObjectDef {
         nid: 216,
@@ -1354,6 +1568,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x05,
         ],
+        indexed: true,
     }), // id_smime_aa_msgSigDigest
     Some(ObjectDef {
         nid: 217,
@@ -1362,6 +1577,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x06,
         ],
+        indexed: true,
     }), // id_smime_aa_encapContentType
     Some(ObjectDef {
         nid: 218,
@@ -1370,6 +1586,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x07,
         ],
+        indexed: true,
     }), // id_smime_aa_contentIdentifier
     Some(ObjectDef {
         nid: 219,
@@ -1378,6 +1595,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x08,
         ],
+        indexed: true,
     }), // id_smime_aa_macValue
     Some(ObjectDef {
         nid: 220,
@@ -1386,6 +1604,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x09,
         ],
+        indexed: true,
     }), // id_smime_aa_equivalentLabels
     Some(ObjectDef {
         nid: 221,
@@ -1394,6 +1613,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0a,
         ],
+        indexed: true,
     }), // id_smime_aa_contentReference
     Some(ObjectDef {
         nid: 222,
@@ -1402,6 +1622,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0b,
         ],
+        indexed: true,
     }), // id_smime_aa_encrypKeyPref
     Some(ObjectDef {
         nid: 223,
@@ -1410,6 +1631,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0c,
         ],
+        indexed: true,
     }), // id_smime_aa_signingCertificate
     Some(ObjectDef {
         nid: 224,
@@ -1418,6 +1640,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0d,
         ],
+        indexed: true,
     }), // id_smime_aa_smimeEncryptCerts
     Some(ObjectDef {
         nid: 225,
@@ -1426,6 +1649,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0e,
         ],
+        indexed: true,
     }), // id_smime_aa_timeStampToken
     Some(ObjectDef {
         nid: 226,
@@ -1434,6 +1658,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0f,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_sigPolicyId
     Some(ObjectDef {
         nid: 227,
@@ -1442,6 +1667,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x10,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_commitmentType
     Some(ObjectDef {
         nid: 228,
@@ -1450,6 +1676,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x11,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_signerLocation
     Some(ObjectDef {
         nid: 229,
@@ -1458,6 +1685,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x12,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_signerAttr
     Some(ObjectDef {
         nid: 230,
@@ -1466,6 +1694,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x13,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_otherSigCert
     Some(ObjectDef {
         nid: 231,
@@ -1474,6 +1703,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x14,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_contentTimestamp
     Some(ObjectDef {
         nid: 232,
@@ -1482,6 +1712,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x15,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_CertificateRefs
     Some(ObjectDef {
         nid: 233,
@@ -1490,6 +1721,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x16,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_RevocationRefs
     Some(ObjectDef {
         nid: 234,
@@ -1498,6 +1730,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x17,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_certValues
     Some(ObjectDef {
         nid: 235,
@@ -1506,6 +1739,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x18,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_revocationValues
     Some(ObjectDef {
         nid: 236,
@@ -1514,6 +1748,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x19,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_escTimeStamp
     Some(ObjectDef {
         nid: 237,
@@ -1522,6 +1757,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x1a,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_certCRLTimestamp
     Some(ObjectDef {
         nid: 238,
@@ -1530,6 +1766,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x1b,
         ],
+        indexed: true,
     }), // id_smime_aa_ets_archiveTimeStamp
     Some(ObjectDef {
         nid: 239,
@@ -1538,6 +1775,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x1c,
         ],
+        indexed: true,
     }), // id_smime_aa_signatureType
     Some(ObjectDef {
         nid: 240,
@@ -1546,6 +1784,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x1d,
         ],
+        indexed: true,
     }), // id_smime_aa_dvcs_dvc
     Some(ObjectDef {
         nid: 241,
@@ -1554,6 +1793,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x01,
         ],
+        indexed: true,
     }), // id_smime_alg_ESDHwith3DES
     Some(ObjectDef {
         nid: 242,
@@ -1562,6 +1802,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x02,
         ],
+        indexed: true,
     }), // id_smime_alg_ESDHwithRC2
     Some(ObjectDef {
         nid: 243,
@@ -1570,6 +1811,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x03,
         ],
+        indexed: true,
     }), // id_smime_alg_3DESwrap
     Some(ObjectDef {
         nid: 244,
@@ -1578,6 +1820,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x04,
         ],
+        indexed: true,
     }), // id_smime_alg_RC2wrap
     Some(ObjectDef {
         nid: 245,
@@ -1586,6 +1829,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x05,
         ],
+        indexed: true,
     }), // id_smime_alg_ESDH
     Some(ObjectDef {
         nid: 246,
@@ -1594,6 +1838,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x06,
         ],
+        indexed: true,
     }), // id_smime_alg_CMS3DESwrap
     Some(ObjectDef {
         nid: 247,
@@ -1602,6 +1847,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x07,
         ],
+        indexed: true,
     }), // id_smime_alg_CMSRC2wrap
     Some(ObjectDef {
         nid: 248,
@@ -1610,6 +1856,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x04, 0x01,
         ],
+        indexed: true,
     }), // id_smime_cd_ldap
     Some(ObjectDef {
         nid: 249,
@@ -1618,6 +1865,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x05, 0x01,
         ],
+        indexed: true,
     }), // id_smime_spq_ets_sqt_uri
     Some(ObjectDef {
         nid: 250,
@@ -1626,6 +1874,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x05, 0x02,
         ],
+        indexed: true,
     }), // id_smime_spq_ets_sqt_unotice
     Some(ObjectDef {
         nid: 251,
@@ -1634,6 +1883,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x01,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfOrigin
     Some(ObjectDef {
         nid: 252,
@@ -1642,6 +1892,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x02,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfReceipt
     Some(ObjectDef {
         nid: 253,
@@ -1650,6 +1901,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x03,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfDelivery
     Some(ObjectDef {
         nid: 254,
@@ -1658,6 +1910,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x04,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfSender
     Some(ObjectDef {
         nid: 255,
@@ -1666,6 +1919,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x05,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfApproval
     Some(ObjectDef {
         nid: 256,
@@ -1674,564 +1928,658 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x06, 0x06,
         ],
+        indexed: true,
     }), // id_smime_cti_ets_proofOfCreation
     Some(ObjectDef {
         nid: 257,
         short_name: "MD4",
         long_name: "md4",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x04],
+        indexed: true,
     }), // md4
     Some(ObjectDef {
         nid: 258,
         short_name: "id-pkix-mod",
         long_name: "id-pkix-mod",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00],
+        indexed: true,
     }), // id_pkix_mod
     Some(ObjectDef {
         nid: 259,
         short_name: "id-qt",
         long_name: "id-qt",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x02],
+        indexed: true,
     }), // id_qt
     Some(ObjectDef {
         nid: 260,
         short_name: "id-it",
         long_name: "id-it",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04],
+        indexed: true,
     }), // id_it
     Some(ObjectDef {
         nid: 261,
         short_name: "id-pkip",
         long_name: "id-pkip",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05],
+        indexed: true,
     }), // id_pkip
     Some(ObjectDef {
         nid: 262,
         short_name: "id-alg",
         long_name: "id-alg",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x06],
+        indexed: true,
     }), // id_alg
     Some(ObjectDef {
         nid: 263,
         short_name: "id-cmc",
         long_name: "id-cmc",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07],
+        indexed: true,
     }), // id_cmc
     Some(ObjectDef {
         nid: 264,
         short_name: "id-on",
         long_name: "id-on",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08],
+        indexed: true,
     }), // id_on
     Some(ObjectDef {
         nid: 265,
         short_name: "id-pda",
         long_name: "id-pda",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09],
+        indexed: true,
     }), // id_pda
     Some(ObjectDef {
         nid: 266,
         short_name: "id-aca",
         long_name: "id-aca",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a],
+        indexed: true,
     }), // id_aca
     Some(ObjectDef {
         nid: 267,
         short_name: "id-qcs",
         long_name: "id-qcs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0b],
+        indexed: true,
     }), // id_qcs
     Some(ObjectDef {
         nid: 268,
         short_name: "id-cct",
         long_name: "id-cct",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0c],
+        indexed: true,
     }), // id_cct
     Some(ObjectDef {
         nid: 269,
         short_name: "id-pkix1-explicit-88",
         long_name: "id-pkix1-explicit-88",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x01],
+        indexed: true,
     }), // id_pkix1_explicit_88
     Some(ObjectDef {
         nid: 270,
         short_name: "id-pkix1-implicit-88",
         long_name: "id-pkix1-implicit-88",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x02],
+        indexed: true,
     }), // id_pkix1_implicit_88
     Some(ObjectDef {
         nid: 271,
         short_name: "id-pkix1-explicit-93",
         long_name: "id-pkix1-explicit-93",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x03],
+        indexed: true,
     }), // id_pkix1_explicit_93
     Some(ObjectDef {
         nid: 272,
         short_name: "id-pkix1-implicit-93",
         long_name: "id-pkix1-implicit-93",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x04],
+        indexed: true,
     }), // id_pkix1_implicit_93
     Some(ObjectDef {
         nid: 273,
         short_name: "id-mod-crmf",
         long_name: "id-mod-crmf",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x05],
+        indexed: true,
     }), // id_mod_crmf
     Some(ObjectDef {
         nid: 274,
         short_name: "id-mod-cmc",
         long_name: "id-mod-cmc",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x06],
+        indexed: true,
     }), // id_mod_cmc
     Some(ObjectDef {
         nid: 275,
         short_name: "id-mod-kea-profile-88",
         long_name: "id-mod-kea-profile-88",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x07],
+        indexed: true,
     }), // id_mod_kea_profile_88
     Some(ObjectDef {
         nid: 276,
         short_name: "id-mod-kea-profile-93",
         long_name: "id-mod-kea-profile-93",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x08],
+        indexed: true,
     }), // id_mod_kea_profile_93
     Some(ObjectDef {
         nid: 277,
         short_name: "id-mod-cmp",
         long_name: "id-mod-cmp",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x09],
+        indexed: true,
     }), // id_mod_cmp
     Some(ObjectDef {
         nid: 278,
         short_name: "id-mod-qualified-cert-88",
         long_name: "id-mod-qualified-cert-88",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0a],
+        indexed: true,
     }), // id_mod_qualified_cert_88
     Some(ObjectDef {
         nid: 279,
         short_name: "id-mod-qualified-cert-93",
         long_name: "id-mod-qualified-cert-93",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0b],
+        indexed: true,
     }), // id_mod_qualified_cert_93
     Some(ObjectDef {
         nid: 280,
         short_name: "id-mod-attribute-cert",
         long_name: "id-mod-attribute-cert",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0c],
+        indexed: true,
     }), // id_mod_attribute_cert
     Some(ObjectDef {
         nid: 281,
         short_name: "id-mod-timestamp-protocol",
         long_name: "id-mod-timestamp-protocol",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0d],
+        indexed: true,
     }), // id_mod_timestamp_protocol
     Some(ObjectDef {
         nid: 282,
         short_name: "id-mod-ocsp",
         long_name: "id-mod-ocsp",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0e],
+        indexed: true,
     }), // id_mod_ocsp
     Some(ObjectDef {
         nid: 283,
         short_name: "id-mod-dvcs",
         long_name: "id-mod-dvcs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x0f],
+        indexed: true,
     }), // id_mod_dvcs
     Some(ObjectDef {
         nid: 284,
         short_name: "id-mod-cmp2000",
         long_name: "id-mod-cmp2000",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x10],
+        indexed: true,
     }), // id_mod_cmp2000
     Some(ObjectDef {
         nid: 285,
         short_name: "biometricInfo",
         long_name: "Biometric Info",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x02],
+        indexed: true,
     }), // biometricInfo
     Some(ObjectDef {
         nid: 286,
         short_name: "qcStatements",
         long_name: "qcStatements",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x03],
+        indexed: true,
     }), // qcStatements
     Some(ObjectDef {
         nid: 287,
         short_name: "ac-auditIdentity",
         long_name: "X509v3 Audit Identity",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x04],
+        indexed: true,
     }), // ac_auditIdentity
     Some(ObjectDef {
         nid: 288,
         short_name: "ac-targeting",
         long_name: "ac-targeting",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x05],
+        indexed: true,
     }), // ac_targeting
     Some(ObjectDef {
         nid: 289,
         short_name: "aaControls",
         long_name: "aaControls",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x06],
+        indexed: true,
     }), // aaControls
     Some(ObjectDef {
         nid: 290,
         short_name: "sbgp-ipAddrBlock",
         long_name: "sbgp-ipAddrBlock",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x07],
+        indexed: true,
     }), // sbgp_ipAddrBlock
     Some(ObjectDef {
         nid: 291,
         short_name: "sbgp-autonomousSysNum",
         long_name: "sbgp-autonomousSysNum",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x08],
+        indexed: true,
     }), // sbgp_autonomousSysNum
     Some(ObjectDef {
         nid: 292,
         short_name: "sbgp-routerIdentifier",
         long_name: "sbgp-routerIdentifier",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x09],
+        indexed: true,
     }), // sbgp_routerIdentifier
     Some(ObjectDef {
         nid: 293,
         short_name: "textNotice",
         long_name: "textNotice",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x02, 0x03],
+        indexed: true,
     }), // textNotice
     Some(ObjectDef {
         nid: 294,
         short_name: "ipsecEndSystem",
         long_name: "IPSec End System",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x05],
+        indexed: true,
     }), // ipsecEndSystem
     Some(ObjectDef {
         nid: 295,
         short_name: "ipsecTunnel",
         long_name: "IPSec Tunnel",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x06],
+        indexed: true,
     }), // ipsecTunnel
     Some(ObjectDef {
         nid: 296,
         short_name: "ipsecUser",
         long_name: "IPSec User",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x07],
+        indexed: true,
     }), // ipsecUser
     Some(ObjectDef {
         nid: 297,
         short_name: "DVCS",
         long_name: "dvcs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x0a],
+        indexed: true,
     }), // dvcs
     Some(ObjectDef {
         nid: 298,
         short_name: "id-it-caProtEncCert",
         long_name: "id-it-caProtEncCert",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x01],
+        indexed: true,
     }), // id_it_caProtEncCert
     Some(ObjectDef {
         nid: 299,
         short_name: "id-it-signKeyPairTypes",
         long_name: "id-it-signKeyPairTypes",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x02],
+        indexed: true,
     }), // id_it_signKeyPairTypes
     Some(ObjectDef {
         nid: 300,
         short_name: "id-it-encKeyPairTypes",
         long_name: "id-it-encKeyPairTypes",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x03],
+        indexed: true,
     }), // id_it_encKeyPairTypes
     Some(ObjectDef {
         nid: 301,
         short_name: "id-it-preferredSymmAlg",
         long_name: "id-it-preferredSymmAlg",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x04],
+        indexed: true,
     }), // id_it_preferredSymmAlg
     Some(ObjectDef {
         nid: 302,
         short_name: "id-it-caKeyUpdateInfo",
         long_name: "id-it-caKeyUpdateInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x05],
+        indexed: true,
     }), // id_it_caKeyUpdateInfo
     Some(ObjectDef {
         nid: 303,
         short_name: "id-it-currentCRL",
         long_name: "id-it-currentCRL",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x06],
+        indexed: true,
     }), // id_it_currentCRL
     Some(ObjectDef {
         nid: 304,
         short_name: "id-it-unsupportedOIDs",
         long_name: "id-it-unsupportedOIDs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x07],
+        indexed: true,
     }), // id_it_unsupportedOIDs
     Some(ObjectDef {
         nid: 305,
         short_name: "id-it-subscriptionRequest",
         long_name: "id-it-subscriptionRequest",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x08],
+        indexed: true,
     }), // id_it_subscriptionRequest
     Some(ObjectDef {
         nid: 306,
         short_name: "id-it-subscriptionResponse",
         long_name: "id-it-subscriptionResponse",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x09],
+        indexed: true,
     }), // id_it_subscriptionResponse
     Some(ObjectDef {
         nid: 307,
         short_name: "id-it-keyPairParamReq",
         long_name: "id-it-keyPairParamReq",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0a],
+        indexed: true,
     }), // id_it_keyPairParamReq
     Some(ObjectDef {
         nid: 308,
         short_name: "id-it-keyPairParamRep",
         long_name: "id-it-keyPairParamRep",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0b],
+        indexed: true,
     }), // id_it_keyPairParamRep
     Some(ObjectDef {
         nid: 309,
         short_name: "id-it-revPassphrase",
         long_name: "id-it-revPassphrase",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0c],
+        indexed: true,
     }), // id_it_revPassphrase
     Some(ObjectDef {
         nid: 310,
         short_name: "id-it-implicitConfirm",
         long_name: "id-it-implicitConfirm",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0d],
+        indexed: true,
     }), // id_it_implicitConfirm
     Some(ObjectDef {
         nid: 311,
         short_name: "id-it-confirmWaitTime",
         long_name: "id-it-confirmWaitTime",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0e],
+        indexed: true,
     }), // id_it_confirmWaitTime
     Some(ObjectDef {
         nid: 312,
         short_name: "id-it-origPKIMessage",
         long_name: "id-it-origPKIMessage",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x0f],
+        indexed: true,
     }), // id_it_origPKIMessage
     Some(ObjectDef {
         nid: 313,
         short_name: "id-regCtrl",
         long_name: "id-regCtrl",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01],
+        indexed: true,
     }), // id_regCtrl
     Some(ObjectDef {
         nid: 314,
         short_name: "id-regInfo",
         long_name: "id-regInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x02],
+        indexed: true,
     }), // id_regInfo
     Some(ObjectDef {
         nid: 315,
         short_name: "id-regCtrl-regToken",
         long_name: "id-regCtrl-regToken",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x01],
+        indexed: true,
     }), // id_regCtrl_regToken
     Some(ObjectDef {
         nid: 316,
         short_name: "id-regCtrl-authenticator",
         long_name: "id-regCtrl-authenticator",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x02],
+        indexed: true,
     }), // id_regCtrl_authenticator
     Some(ObjectDef {
         nid: 317,
         short_name: "id-regCtrl-pkiPublicationInfo",
         long_name: "id-regCtrl-pkiPublicationInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x03],
+        indexed: true,
     }), // id_regCtrl_pkiPublicationInfo
     Some(ObjectDef {
         nid: 318,
         short_name: "id-regCtrl-pkiArchiveOptions",
         long_name: "id-regCtrl-pkiArchiveOptions",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x04],
+        indexed: true,
     }), // id_regCtrl_pkiArchiveOptions
     Some(ObjectDef {
         nid: 319,
         short_name: "id-regCtrl-oldCertID",
         long_name: "id-regCtrl-oldCertID",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x05],
+        indexed: true,
     }), // id_regCtrl_oldCertID
     Some(ObjectDef {
         nid: 320,
         short_name: "id-regCtrl-protocolEncrKey",
         long_name: "id-regCtrl-protocolEncrKey",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x06],
+        indexed: true,
     }), // id_regCtrl_protocolEncrKey
     Some(ObjectDef {
         nid: 321,
         short_name: "id-regInfo-utf8Pairs",
         long_name: "id-regInfo-utf8Pairs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x02, 0x01],
+        indexed: true,
     }), // id_regInfo_utf8Pairs
     Some(ObjectDef {
         nid: 322,
         short_name: "id-regInfo-certReq",
         long_name: "id-regInfo-certReq",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x02, 0x02],
+        indexed: true,
     }), // id_regInfo_certReq
     Some(ObjectDef {
         nid: 323,
         short_name: "id-alg-des40",
         long_name: "id-alg-des40",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x06, 0x01],
+        indexed: true,
     }), // id_alg_des40
     Some(ObjectDef {
         nid: 324,
         short_name: "id-alg-noSignature",
         long_name: "id-alg-noSignature",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x06, 0x02],
+        indexed: true,
     }), // id_alg_noSignature
     Some(ObjectDef {
         nid: 325,
         short_name: "id-alg-dh-sig-hmac-sha1",
         long_name: "id-alg-dh-sig-hmac-sha1",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x06, 0x03],
+        indexed: true,
     }), // id_alg_dh_sig_hmac_sha1
     Some(ObjectDef {
         nid: 326,
         short_name: "id-alg-dh-pop",
         long_name: "id-alg-dh-pop",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x06, 0x04],
+        indexed: true,
     }), // id_alg_dh_pop
     Some(ObjectDef {
         nid: 327,
         short_name: "id-cmc-statusInfo",
         long_name: "id-cmc-statusInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x01],
+        indexed: true,
     }), // id_cmc_statusInfo
     Some(ObjectDef {
         nid: 328,
         short_name: "id-cmc-identification",
         long_name: "id-cmc-identification",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x02],
+        indexed: true,
     }), // id_cmc_identification
     Some(ObjectDef {
         nid: 329,
         short_name: "id-cmc-identityProof",
         long_name: "id-cmc-identityProof",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x03],
+        indexed: true,
     }), // id_cmc_identityProof
     Some(ObjectDef {
         nid: 330,
         short_name: "id-cmc-dataReturn",
         long_name: "id-cmc-dataReturn",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x04],
+        indexed: true,
     }), // id_cmc_dataReturn
     Some(ObjectDef {
         nid: 331,
         short_name: "id-cmc-transactionId",
         long_name: "id-cmc-transactionId",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x05],
+        indexed: true,
     }), // id_cmc_transactionId
     Some(ObjectDef {
         nid: 332,
         short_name: "id-cmc-senderNonce",
         long_name: "id-cmc-senderNonce",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x06],
+        indexed: true,
     }), // id_cmc_senderNonce
     Some(ObjectDef {
         nid: 333,
         short_name: "id-cmc-recipientNonce",
         long_name: "id-cmc-recipientNonce",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x07],
+        indexed: true,
     }), // id_cmc_recipientNonce
     Some(ObjectDef {
         nid: 334,
         short_name: "id-cmc-addExtensions",
         long_name: "id-cmc-addExtensions",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x08],
+        indexed: true,
     }), // id_cmc_addExtensions
     Some(ObjectDef {
         nid: 335,
         short_name: "id-cmc-encryptedPOP",
         long_name: "id-cmc-encryptedPOP",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x09],
+        indexed: true,
     }), // id_cmc_encryptedPOP
     Some(ObjectDef {
         nid: 336,
         short_name: "id-cmc-decryptedPOP",
         long_name: "id-cmc-decryptedPOP",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x0a],
+        indexed: true,
     }), // id_cmc_decryptedPOP
     Some(ObjectDef {
         nid: 337,
         short_name: "id-cmc-lraPOPWitness",
         long_name: "id-cmc-lraPOPWitness",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x0b],
+        indexed: true,
     }), // id_cmc_lraPOPWitness
     Some(ObjectDef {
         nid: 338,
         short_name: "id-cmc-getCert",
         long_name: "id-cmc-getCert",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x0f],
+        indexed: true,
     }), // id_cmc_getCert
     Some(ObjectDef {
         nid: 339,
         short_name: "id-cmc-getCRL",
         long_name: "id-cmc-getCRL",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x10],
+        indexed: true,
     }), // id_cmc_getCRL
     Some(ObjectDef {
         nid: 340,
         short_name: "id-cmc-revokeRequest",
         long_name: "id-cmc-revokeRequest",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x11],
+        indexed: true,
     }), // id_cmc_revokeRequest
     Some(ObjectDef {
         nid: 341,
         short_name: "id-cmc-regInfo",
         long_name: "id-cmc-regInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x12],
+        indexed: true,
     }), // id_cmc_regInfo
     Some(ObjectDef {
         nid: 342,
         short_name: "id-cmc-responseInfo",
         long_name: "id-cmc-responseInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x13],
+        indexed: true,
     }), // id_cmc_responseInfo
     Some(ObjectDef {
         nid: 343,
         short_name: "id-cmc-queryPending",
         long_name: "id-cmc-queryPending",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x15],
+        indexed: true,
     }), // id_cmc_queryPending
     Some(ObjectDef {
         nid: 344,
         short_name: "id-cmc-popLinkRandom",
         long_name: "id-cmc-popLinkRandom",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x16],
+        indexed: true,
     }), // id_cmc_popLinkRandom
     Some(ObjectDef {
         nid: 345,
         short_name: "id-cmc-popLinkWitness",
         long_name: "id-cmc-popLinkWitness",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x17],
+        indexed: true,
     }), // id_cmc_popLinkWitness
     Some(ObjectDef {
         nid: 346,
         short_name: "id-cmc-confirmCertAcceptance",
         long_name: "id-cmc-confirmCertAcceptance",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x07, 0x18],
+        indexed: true,
     }), // id_cmc_confirmCertAcceptance
     Some(ObjectDef {
         nid: 347,
         short_name: "id-on-personalData",
         long_name: "id-on-personalData",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x01],
+        indexed: true,
     }), // id_on_personalData
     Some(ObjectDef {
         nid: 348,
         short_name: "id-pda-dateOfBirth",
         long_name: "id-pda-dateOfBirth",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09, 0x01],
+        indexed: true,
     }), // id_pda_dateOfBirth
     Some(ObjectDef {
         nid: 349,
         short_name: "id-pda-placeOfBirth",
         long_name: "id-pda-placeOfBirth",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09, 0x02],
+        indexed: true,
     }), // id_pda_placeOfBirth
     None,
     Some(ObjectDef {
@@ -2239,960 +2587,1120 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "id-pda-gender",
         long_name: "id-pda-gender",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09, 0x03],
+        indexed: true,
     }), // id_pda_gender
     Some(ObjectDef {
         nid: 352,
         short_name: "id-pda-countryOfCitizenship",
         long_name: "id-pda-countryOfCitizenship",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09, 0x04],
+        indexed: true,
     }), // id_pda_countryOfCitizenship
     Some(ObjectDef {
         nid: 353,
         short_name: "id-pda-countryOfResidence",
         long_name: "id-pda-countryOfResidence",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x09, 0x05],
+        indexed: true,
     }), // id_pda_countryOfResidence
     Some(ObjectDef {
         nid: 354,
         short_name: "id-aca-authenticationInfo",
         long_name: "id-aca-authenticationInfo",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x01],
+        indexed: true,
     }), // id_aca_authenticationInfo
     Some(ObjectDef {
         nid: 355,
         short_name: "id-aca-accessIdentity",
         long_name: "id-aca-accessIdentity",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x02],
+        indexed: true,
     }), // id_aca_accessIdentity
     Some(ObjectDef {
         nid: 356,
         short_name: "id-aca-chargingIdentity",
         long_name: "id-aca-chargingIdentity",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x03],
+        indexed: true,
     }), // id_aca_chargingIdentity
     Some(ObjectDef {
         nid: 357,
         short_name: "id-aca-group",
         long_name: "id-aca-group",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x04],
+        indexed: true,
     }), // id_aca_group
     Some(ObjectDef {
         nid: 358,
         short_name: "id-aca-role",
         long_name: "id-aca-role",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x05],
+        indexed: true,
     }), // id_aca_role
     Some(ObjectDef {
         nid: 359,
         short_name: "id-qcs-pkixQCSyntax-v1",
         long_name: "id-qcs-pkixQCSyntax-v1",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0b, 0x01],
+        indexed: true,
     }), // id_qcs_pkixQCSyntax_v1
     Some(ObjectDef {
         nid: 360,
         short_name: "id-cct-crs",
         long_name: "id-cct-crs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0c, 0x01],
+        indexed: true,
     }), // id_cct_crs
     Some(ObjectDef {
         nid: 361,
         short_name: "id-cct-PKIData",
         long_name: "id-cct-PKIData",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0c, 0x02],
+        indexed: true,
     }), // id_cct_PKIData
     Some(ObjectDef {
         nid: 362,
         short_name: "id-cct-PKIResponse",
         long_name: "id-cct-PKIResponse",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0c, 0x03],
+        indexed: true,
     }), // id_cct_PKIResponse
     Some(ObjectDef {
         nid: 363,
         short_name: "ad_timestamping",
         long_name: "AD Time Stamping",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x03],
+        indexed: true,
     }), // ad_timeStamping
     Some(ObjectDef {
         nid: 364,
         short_name: "AD_DVCS",
         long_name: "ad dvcs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x04],
+        indexed: true,
     }), // ad_dvcs
     Some(ObjectDef {
         nid: 365,
         short_name: "basicOCSPResponse",
         long_name: "Basic OCSP Response",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x01],
+        indexed: true,
     }), // id_pkix_OCSP_basic
     Some(ObjectDef {
         nid: 366,
         short_name: "Nonce",
         long_name: "OCSP Nonce",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x02],
+        indexed: true,
     }), // id_pkix_OCSP_Nonce
     Some(ObjectDef {
         nid: 367,
         short_name: "CrlID",
         long_name: "OCSP CRL ID",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x03],
+        indexed: true,
     }), // id_pkix_OCSP_CrlID
     Some(ObjectDef {
         nid: 368,
         short_name: "acceptableResponses",
         long_name: "Acceptable OCSP Responses",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x04],
+        indexed: true,
     }), // id_pkix_OCSP_acceptableResponses
     Some(ObjectDef {
         nid: 369,
         short_name: "noCheck",
         long_name: "OCSP No Check",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x05],
+        indexed: true,
     }), // id_pkix_OCSP_noCheck
     Some(ObjectDef {
         nid: 370,
         short_name: "archiveCutoff",
         long_name: "OCSP Archive Cutoff",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x06],
+        indexed: true,
     }), // id_pkix_OCSP_archiveCutoff
     Some(ObjectDef {
         nid: 371,
         short_name: "serviceLocator",
         long_name: "OCSP Service Locator",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x07],
+        indexed: true,
     }), // id_pkix_OCSP_serviceLocator
     Some(ObjectDef {
         nid: 372,
         short_name: "extendedStatus",
         long_name: "Extended OCSP Status",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x08],
+        indexed: true,
     }), // id_pkix_OCSP_extendedStatus
     Some(ObjectDef {
         nid: 373,
         short_name: "valid",
         long_name: "valid",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x09],
+        indexed: true,
     }), // id_pkix_OCSP_valid
     Some(ObjectDef {
         nid: 374,
         short_name: "path",
         long_name: "path",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x0a],
+        indexed: true,
     }), // id_pkix_OCSP_path
     Some(ObjectDef {
         nid: 375,
         short_name: "trustRoot",
         long_name: "Trust Root",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x01, 0x0b],
+        indexed: true,
     }), // id_pkix_OCSP_trustRoot
     Some(ObjectDef {
         nid: 376,
         short_name: "algorithm",
         long_name: "algorithm",
         der: &[0x2b, 0x0e, 0x03, 0x02],
+        indexed: true,
     }), // algorithm
     Some(ObjectDef {
         nid: 377,
         short_name: "rsaSignature",
         long_name: "rsaSignature",
         der: &[0x2b, 0x0e, 0x03, 0x02, 0x0b],
+        indexed: true,
     }), // rsaSignature
     Some(ObjectDef {
         nid: 378,
         short_name: "X500algorithms",
         long_name: "directory services - algorithms",
         der: &[0x55, 0x08],
+        indexed: true,
     }), // X500algorithms
     Some(ObjectDef {
         nid: 379,
         short_name: "ORG",
         long_name: "org",
         der: &[0x2b],
+        indexed: true,
     }), // org
     Some(ObjectDef {
         nid: 380,
         short_name: "DOD",
         long_name: "dod",
         der: &[0x2b, 0x06],
+        indexed: true,
     }), // dod
     Some(ObjectDef {
         nid: 381,
         short_name: "IANA",
         long_name: "iana",
         der: &[0x2b, 0x06, 0x01],
+        indexed: true,
     }), // iana
     Some(ObjectDef {
         nid: 382,
         short_name: "directory",
         long_name: "Directory",
         der: &[0x2b, 0x06, 0x01, 0x01],
+        indexed: true,
     }), // Directory
     Some(ObjectDef {
         nid: 383,
         short_name: "mgmt",
         long_name: "Management",
         der: &[0x2b, 0x06, 0x01, 0x02],
+        indexed: true,
     }), // Management
     Some(ObjectDef {
         nid: 384,
         short_name: "experimental",
         long_name: "Experimental",
         der: &[0x2b, 0x06, 0x01, 0x03],
+        indexed: true,
     }), // Experimental
     Some(ObjectDef {
         nid: 385,
         short_name: "private",
         long_name: "Private",
         der: &[0x2b, 0x06, 0x01, 0x04],
+        indexed: true,
     }), // Private
     Some(ObjectDef {
         nid: 386,
         short_name: "security",
         long_name: "Security",
         der: &[0x2b, 0x06, 0x01, 0x05],
+        indexed: true,
     }), // Security
     Some(ObjectDef {
         nid: 387,
         short_name: "snmpv2",
         long_name: "SNMPv2",
         der: &[0x2b, 0x06, 0x01, 0x06],
+        indexed: true,
     }), // SNMPv2
     Some(ObjectDef {
         nid: 388,
         short_name: "Mail",
         long_name: "Mail",
         der: &[0x2b, 0x06, 0x01, 0x07],
+        indexed: true,
     }), // Mail
     Some(ObjectDef {
         nid: 389,
         short_name: "enterprises",
         long_name: "Enterprises",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01],
+        indexed: true,
     }), // Enterprises
     Some(ObjectDef {
         nid: 390,
         short_name: "dcobject",
         long_name: "dcObject",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x8b, 0x3a, 0x82, 0x58],
+        indexed: true,
     }), // dcObject
     Some(ObjectDef {
         nid: 391,
         short_name: "DC",
         long_name: "domainComponent",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x19],
+        indexed: true,
     }), // domainComponent
     Some(ObjectDef {
         nid: 392,
         short_name: "domain",
         long_name: "Domain",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x0d],
+        indexed: true,
     }), // Domain
     Some(ObjectDef {
         nid: 393,
         short_name: "NULL",
         long_name: "NULL",
         der: &[],
+        indexed: true,
     }), // joint_iso_ccitt
     Some(ObjectDef {
         nid: 394,
         short_name: "selected-attribute-types",
         long_name: "Selected Attribute Types",
         der: &[0x55, 0x01, 0x05],
+        indexed: true,
     }), // selected_attribute_types
     Some(ObjectDef {
         nid: 395,
         short_name: "clearance",
         long_name: "clearance",
         der: &[0x55, 0x01, 0x05, 0x37],
+        indexed: true,
     }), // clearance
     Some(ObjectDef {
         nid: 396,
         short_name: "RSA-MD4",
         long_name: "md4WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x03],
+        indexed: true,
     }), // md4WithRSAEncryption
     Some(ObjectDef {
         nid: 397,
         short_name: "ac-proxying",
         long_name: "ac-proxying",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x0a],
+        indexed: true,
     }), // ac_proxying
     Some(ObjectDef {
         nid: 398,
         short_name: "subjectInfoAccess",
         long_name: "Subject Information Access",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x0b],
+        indexed: true,
     }), // sinfo_access
     Some(ObjectDef {
         nid: 399,
         short_name: "id-aca-encAttrs",
         long_name: "id-aca-encAttrs",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0a, 0x06],
+        indexed: true,
     }), // id_aca_encAttrs
     Some(ObjectDef {
         nid: 400,
         short_name: "role",
         long_name: "role",
         der: &[0x55, 0x04, 0x48],
+        indexed: true,
     }), // role
     Some(ObjectDef {
         nid: 401,
         short_name: "policyConstraints",
         long_name: "X509v3 Policy Constraints",
         der: &[0x55, 0x1d, 0x24],
+        indexed: true,
     }), // policy_constraints
     Some(ObjectDef {
         nid: 402,
         short_name: "targetInformation",
         long_name: "X509v3 AC Targeting",
         der: &[0x55, 0x1d, 0x37],
+        indexed: true,
     }), // target_information
     Some(ObjectDef {
         nid: 403,
         short_name: "noRevAvail",
         long_name: "X509v3 No Revocation Available",
         der: &[0x55, 0x1d, 0x38],
+        indexed: true,
     }), // no_rev_avail
     Some(ObjectDef {
         nid: 404,
         short_name: "NULL",
         long_name: "NULL",
         der: &[],
+        indexed: true,
     }), // ccitt
     Some(ObjectDef {
         nid: 405,
         short_name: "ansi-X9-62",
         long_name: "ANSI X9.62",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d],
+        indexed: true,
     }), // ansi_X9_62
     Some(ObjectDef {
         nid: 406,
         short_name: "prime-field",
         long_name: "prime-field",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x01],
+        indexed: true,
     }), // X9_62_prime_field
     Some(ObjectDef {
         nid: 407,
         short_name: "characteristic-two-field",
         long_name: "characteristic-two-field",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x02],
+        indexed: true,
     }), // X9_62_characteristic_two_field
     Some(ObjectDef {
         nid: 408,
         short_name: "id-ecPublicKey",
         long_name: "id-ecPublicKey",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01],
+        indexed: true,
     }), // X9_62_id_ecPublicKey
     Some(ObjectDef {
         nid: 409,
         short_name: "prime192v1",
         long_name: "prime192v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x01],
+        indexed: true,
     }), // X9_62_prime192v1
     Some(ObjectDef {
         nid: 410,
         short_name: "prime192v2",
         long_name: "prime192v2",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x02],
+        indexed: true,
     }), // X9_62_prime192v2
     Some(ObjectDef {
         nid: 411,
         short_name: "prime192v3",
         long_name: "prime192v3",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x03],
+        indexed: true,
     }), // X9_62_prime192v3
     Some(ObjectDef {
         nid: 412,
         short_name: "prime239v1",
         long_name: "prime239v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x04],
+        indexed: true,
     }), // X9_62_prime239v1
     Some(ObjectDef {
         nid: 413,
         short_name: "prime239v2",
         long_name: "prime239v2",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x05],
+        indexed: true,
     }), // X9_62_prime239v2
     Some(ObjectDef {
         nid: 414,
         short_name: "prime239v3",
         long_name: "prime239v3",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x06],
+        indexed: true,
     }), // X9_62_prime239v3
     Some(ObjectDef {
         nid: 415,
         short_name: "prime256v1",
         long_name: "prime256v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07],
+        indexed: true,
     }), // X9_62_prime256v1
     Some(ObjectDef {
         nid: 416,
         short_name: "ecdsa-with-SHA1",
         long_name: "ecdsa-with-SHA1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x01],
+        indexed: true,
     }), // ecdsa_with_SHA1
     Some(ObjectDef {
         nid: 417,
         short_name: "CSPName",
         long_name: "Microsoft CSP Name",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x11, 0x01],
+        indexed: true,
     }), // ms_csp_name
     Some(ObjectDef {
         nid: 418,
         short_name: "AES-128-ECB",
         long_name: "aes-128-ecb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x01],
+        indexed: true,
     }), // aes_128_ecb
     Some(ObjectDef {
         nid: 419,
         short_name: "AES-128-CBC",
         long_name: "aes-128-cbc",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x02],
+        indexed: true,
     }), // aes_128_cbc
     Some(ObjectDef {
         nid: 420,
         short_name: "AES-128-OFB",
         long_name: "aes-128-ofb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x03],
+        indexed: true,
     }), // aes_128_ofb128
     Some(ObjectDef {
         nid: 421,
         short_name: "AES-128-CFB",
         long_name: "aes-128-cfb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x04],
+        indexed: true,
     }), // aes_128_cfb128
     Some(ObjectDef {
         nid: 422,
         short_name: "AES-192-ECB",
         long_name: "aes-192-ecb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x15],
+        indexed: true,
     }), // aes_192_ecb
     Some(ObjectDef {
         nid: 423,
         short_name: "AES-192-CBC",
         long_name: "aes-192-cbc",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x16],
+        indexed: true,
     }), // aes_192_cbc
     Some(ObjectDef {
         nid: 424,
         short_name: "AES-192-OFB",
         long_name: "aes-192-ofb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x17],
+        indexed: true,
     }), // aes_192_ofb128
     Some(ObjectDef {
         nid: 425,
         short_name: "AES-192-CFB",
         long_name: "aes-192-cfb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x18],
+        indexed: true,
     }), // aes_192_cfb128
     Some(ObjectDef {
         nid: 426,
         short_name: "AES-256-ECB",
         long_name: "aes-256-ecb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x29],
+        indexed: true,
     }), // aes_256_ecb
     Some(ObjectDef {
         nid: 427,
         short_name: "AES-256-CBC",
         long_name: "aes-256-cbc",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2a],
+        indexed: true,
     }), // aes_256_cbc
     Some(ObjectDef {
         nid: 428,
         short_name: "AES-256-OFB",
         long_name: "aes-256-ofb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2b],
+        indexed: true,
     }), // aes_256_ofb128
     Some(ObjectDef {
         nid: 429,
         short_name: "AES-256-CFB",
         long_name: "aes-256-cfb",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2c],
+        indexed: true,
     }), // aes_256_cfb128
     Some(ObjectDef {
         nid: 430,
         short_name: "holdInstructionCode",
         long_name: "Hold Instruction Code",
         der: &[0x55, 0x1d, 0x17],
+        indexed: true,
     }), // hold_instruction_code
     Some(ObjectDef {
         nid: 431,
         short_name: "holdInstructionNone",
         long_name: "Hold Instruction None",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x02, 0x01],
+        indexed: true,
     }), // hold_instruction_none
     Some(ObjectDef {
         nid: 432,
         short_name: "holdInstructionCallIssuer",
         long_name: "Hold Instruction Call Issuer",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x02, 0x02],
+        indexed: true,
     }), // hold_instruction_call_issuer
     Some(ObjectDef {
         nid: 433,
         short_name: "holdInstructionReject",
         long_name: "Hold Instruction Reject",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x38, 0x02, 0x03],
+        indexed: true,
     }), // hold_instruction_reject
     Some(ObjectDef {
         nid: 434,
         short_name: "data",
         long_name: "data",
         der: &[0x09],
+        indexed: true,
     }), // data
     Some(ObjectDef {
         nid: 435,
         short_name: "pss",
         long_name: "pss",
         der: &[0x09, 0x92, 0x26],
+        indexed: true,
     }), // pss
     Some(ObjectDef {
         nid: 436,
         short_name: "ucl",
         long_name: "ucl",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c],
+        indexed: true,
     }), // ucl
     Some(ObjectDef {
         nid: 437,
         short_name: "pilot",
         long_name: "pilot",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64],
+        indexed: true,
     }), // pilot
     Some(ObjectDef {
         nid: 438,
         short_name: "pilotAttributeType",
         long_name: "pilotAttributeType",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01],
+        indexed: true,
     }), // pilotAttributeType
     Some(ObjectDef {
         nid: 439,
         short_name: "pilotAttributeSyntax",
         long_name: "pilotAttributeSyntax",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x03],
+        indexed: true,
     }), // pilotAttributeSyntax
     Some(ObjectDef {
         nid: 440,
         short_name: "pilotObjectClass",
         long_name: "pilotObjectClass",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04],
+        indexed: true,
     }), // pilotObjectClass
     Some(ObjectDef {
         nid: 441,
         short_name: "pilotGroups",
         long_name: "pilotGroups",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x0a],
+        indexed: true,
     }), // pilotGroups
     Some(ObjectDef {
         nid: 442,
         short_name: "iA5StringSyntax",
         long_name: "iA5StringSyntax",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x03, 0x04],
+        indexed: true,
     }), // iA5StringSyntax
     Some(ObjectDef {
         nid: 443,
         short_name: "caseIgnoreIA5StringSyntax",
         long_name: "caseIgnoreIA5StringSyntax",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x03, 0x05],
+        indexed: true,
     }), // caseIgnoreIA5StringSyntax
     Some(ObjectDef {
         nid: 444,
         short_name: "pilotObject",
         long_name: "pilotObject",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x03],
+        indexed: true,
     }), // pilotObject
     Some(ObjectDef {
         nid: 445,
         short_name: "pilotPerson",
         long_name: "pilotPerson",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x04],
+        indexed: true,
     }), // pilotPerson
     Some(ObjectDef {
         nid: 446,
         short_name: "account",
         long_name: "account",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x05],
+        indexed: true,
     }), // account
     Some(ObjectDef {
         nid: 447,
         short_name: "document",
         long_name: "document",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x06],
+        indexed: true,
     }), // document
     Some(ObjectDef {
         nid: 448,
         short_name: "room",
         long_name: "room",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x07],
+        indexed: true,
     }), // room
     Some(ObjectDef {
         nid: 449,
         short_name: "documentSeries",
         long_name: "documentSeries",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x09],
+        indexed: true,
     }), // documentSeries
     Some(ObjectDef {
         nid: 450,
         short_name: "rFC822localPart",
         long_name: "rFC822localPart",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x0e],
+        indexed: true,
     }), // rFC822localPart
     Some(ObjectDef {
         nid: 451,
         short_name: "dNSDomain",
         long_name: "dNSDomain",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x0f],
+        indexed: true,
     }), // dNSDomain
     Some(ObjectDef {
         nid: 452,
         short_name: "domainRelatedObject",
         long_name: "domainRelatedObject",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x11],
+        indexed: true,
     }), // domainRelatedObject
     Some(ObjectDef {
         nid: 453,
         short_name: "friendlyCountry",
         long_name: "friendlyCountry",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x12],
+        indexed: true,
     }), // friendlyCountry
     Some(ObjectDef {
         nid: 454,
         short_name: "simpleSecurityObject",
         long_name: "simpleSecurityObject",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x13],
+        indexed: true,
     }), // simpleSecurityObject
     Some(ObjectDef {
         nid: 455,
         short_name: "pilotOrganization",
         long_name: "pilotOrganization",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x14],
+        indexed: true,
     }), // pilotOrganization
     Some(ObjectDef {
         nid: 456,
         short_name: "pilotDSA",
         long_name: "pilotDSA",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x15],
+        indexed: true,
     }), // pilotDSA
     Some(ObjectDef {
         nid: 457,
         short_name: "qualityLabelledData",
         long_name: "qualityLabelledData",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x04, 0x16],
+        indexed: true,
     }), // qualityLabelledData
     Some(ObjectDef {
         nid: 458,
         short_name: "UID",
         long_name: "userId",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x01],
+        indexed: true,
     }), // userId
     Some(ObjectDef {
         nid: 459,
         short_name: "textEncodedORAddress",
         long_name: "textEncodedORAddress",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x02],
+        indexed: true,
     }), // textEncodedORAddress
     Some(ObjectDef {
         nid: 460,
         short_name: "mail",
         long_name: "rfc822Mailbox",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x03],
+        indexed: true,
     }), // rfc822Mailbox
     Some(ObjectDef {
         nid: 461,
         short_name: "info",
         long_name: "info",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x04],
+        indexed: true,
     }), // info
     Some(ObjectDef {
         nid: 462,
         short_name: "favouriteDrink",
         long_name: "favouriteDrink",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x05],
+        indexed: true,
     }), // favouriteDrink
     Some(ObjectDef {
         nid: 463,
         short_name: "roomNumber",
         long_name: "roomNumber",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x06],
+        indexed: true,
     }), // roomNumber
     Some(ObjectDef {
         nid: 464,
         short_name: "photo",
         long_name: "photo",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x07],
+        indexed: true,
     }), // photo
     Some(ObjectDef {
         nid: 465,
         short_name: "userClass",
         long_name: "userClass",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x08],
+        indexed: true,
     }), // userClass
     Some(ObjectDef {
         nid: 466,
         short_name: "host",
         long_name: "host",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x09],
+        indexed: true,
     }), // host
     Some(ObjectDef {
         nid: 467,
         short_name: "manager",
         long_name: "manager",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0a],
+        indexed: true,
     }), // manager
     Some(ObjectDef {
         nid: 468,
         short_name: "documentIdentifier",
         long_name: "documentIdentifier",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0b],
+        indexed: true,
     }), // documentIdentifier
     Some(ObjectDef {
         nid: 469,
         short_name: "documentTitle",
         long_name: "documentTitle",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0c],
+        indexed: true,
     }), // documentTitle
     Some(ObjectDef {
         nid: 470,
         short_name: "documentVersion",
         long_name: "documentVersion",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0d],
+        indexed: true,
     }), // documentVersion
     Some(ObjectDef {
         nid: 471,
         short_name: "documentAuthor",
         long_name: "documentAuthor",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0e],
+        indexed: true,
     }), // documentAuthor
     Some(ObjectDef {
         nid: 472,
         short_name: "documentLocation",
         long_name: "documentLocation",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x0f],
+        indexed: true,
     }), // documentLocation
     Some(ObjectDef {
         nid: 473,
         short_name: "homeTelephoneNumber",
         long_name: "homeTelephoneNumber",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x14],
+        indexed: true,
     }), // homeTelephoneNumber
     Some(ObjectDef {
         nid: 474,
         short_name: "secretary",
         long_name: "secretary",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x15],
+        indexed: true,
     }), // secretary
     Some(ObjectDef {
         nid: 475,
         short_name: "otherMailbox",
         long_name: "otherMailbox",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x16],
+        indexed: true,
     }), // otherMailbox
     Some(ObjectDef {
         nid: 476,
         short_name: "lastModifiedTime",
         long_name: "lastModifiedTime",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x17],
+        indexed: true,
     }), // lastModifiedTime
     Some(ObjectDef {
         nid: 477,
         short_name: "lastModifiedBy",
         long_name: "lastModifiedBy",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x18],
+        indexed: true,
     }), // lastModifiedBy
     Some(ObjectDef {
         nid: 478,
         short_name: "aRecord",
         long_name: "aRecord",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1a],
+        indexed: true,
     }), // aRecord
     Some(ObjectDef {
         nid: 479,
         short_name: "pilotAttributeType27",
         long_name: "pilotAttributeType27",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1b],
+        indexed: true,
     }), // pilotAttributeType27
     Some(ObjectDef {
         nid: 480,
         short_name: "mXRecord",
         long_name: "mXRecord",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1c],
+        indexed: true,
     }), // mXRecord
     Some(ObjectDef {
         nid: 481,
         short_name: "nSRecord",
         long_name: "nSRecord",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1d],
+        indexed: true,
     }), // nSRecord
     Some(ObjectDef {
         nid: 482,
         short_name: "sOARecord",
         long_name: "sOARecord",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1e],
+        indexed: true,
     }), // sOARecord
     Some(ObjectDef {
         nid: 483,
         short_name: "cNAMERecord",
         long_name: "cNAMERecord",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x1f],
+        indexed: true,
     }), // cNAMERecord
     Some(ObjectDef {
         nid: 484,
         short_name: "associatedDomain",
         long_name: "associatedDomain",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x25],
+        indexed: true,
     }), // associatedDomain
     Some(ObjectDef {
         nid: 485,
         short_name: "associatedName",
         long_name: "associatedName",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x26],
+        indexed: true,
     }), // associatedName
     Some(ObjectDef {
         nid: 486,
         short_name: "homePostalAddress",
         long_name: "homePostalAddress",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x27],
+        indexed: true,
     }), // homePostalAddress
     Some(ObjectDef {
         nid: 487,
         short_name: "personalTitle",
         long_name: "personalTitle",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x28],
+        indexed: true,
     }), // personalTitle
     Some(ObjectDef {
         nid: 488,
         short_name: "mobileTelephoneNumber",
         long_name: "mobileTelephoneNumber",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x29],
+        indexed: true,
     }), // mobileTelephoneNumber
     Some(ObjectDef {
         nid: 489,
         short_name: "pagerTelephoneNumber",
         long_name: "pagerTelephoneNumber",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2a],
+        indexed: true,
     }), // pagerTelephoneNumber
     Some(ObjectDef {
         nid: 490,
         short_name: "friendlyCountryName",
         long_name: "friendlyCountryName",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2b],
+        indexed: true,
     }), // friendlyCountryName
     Some(ObjectDef {
         nid: 491,
         short_name: "organizationalStatus",
         long_name: "organizationalStatus",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2d],
+        indexed: true,
     }), // organizationalStatus
     Some(ObjectDef {
         nid: 492,
         short_name: "janetMailbox",
         long_name: "janetMailbox",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2e],
+        indexed: true,
     }), // janetMailbox
     Some(ObjectDef {
         nid: 493,
         short_name: "mailPreferenceOption",
         long_name: "mailPreferenceOption",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x2f],
+        indexed: true,
     }), // mailPreferenceOption
     Some(ObjectDef {
         nid: 494,
         short_name: "buildingName",
         long_name: "buildingName",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x30],
+        indexed: true,
     }), // buildingName
     Some(ObjectDef {
         nid: 495,
         short_name: "dSAQuality",
         long_name: "dSAQuality",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x31],
+        indexed: true,
     }), // dSAQuality
     Some(ObjectDef {
         nid: 496,
         short_name: "singleLevelQuality",
         long_name: "singleLevelQuality",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x32],
+        indexed: true,
     }), // singleLevelQuality
     Some(ObjectDef {
         nid: 497,
         short_name: "subtreeMinimumQuality",
         long_name: "subtreeMinimumQuality",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x33],
+        indexed: true,
     }), // subtreeMinimumQuality
     Some(ObjectDef {
         nid: 498,
         short_name: "subtreeMaximumQuality",
         long_name: "subtreeMaximumQuality",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x34],
+        indexed: true,
     }), // subtreeMaximumQuality
     Some(ObjectDef {
         nid: 499,
         short_name: "personalSignature",
         long_name: "personalSignature",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x35],
+        indexed: true,
     }), // personalSignature
     Some(ObjectDef {
         nid: 500,
         short_name: "dITRedirect",
         long_name: "dITRedirect",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x36],
+        indexed: true,
     }), // dITRedirect
     Some(ObjectDef {
         nid: 501,
         short_name: "audio",
         long_name: "audio",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x37],
+        indexed: true,
     }), // audio
     Some(ObjectDef {
         nid: 502,
         short_name: "documentPublisher",
         long_name: "documentPublisher",
         der: &[0x09, 0x92, 0x26, 0x89, 0x93, 0xf2, 0x2c, 0x64, 0x01, 0x38],
+        indexed: true,
     }), // documentPublisher
     Some(ObjectDef {
         nid: 503,
         short_name: "x500UniqueIdentifier",
         long_name: "x500UniqueIdentifier",
         der: &[0x55, 0x04, 0x2d],
+        indexed: true,
     }), // x500UniqueIdentifier
     Some(ObjectDef {
         nid: 504,
         short_name: "mime-mhs",
         long_name: "MIME MHS",
         der: &[0x2b, 0x06, 0x01, 0x07, 0x01],
+        indexed: true,
     }), // mime_mhs
     Some(ObjectDef {
         nid: 505,
         short_name: "mime-mhs-headings",
         long_name: "mime-mhs-headings",
         der: &[0x2b, 0x06, 0x01, 0x07, 0x01, 0x01],
+        indexed: true,
     }), // mime_mhs_headings
     Some(ObjectDef {
         nid: 506,
         short_name: "mime-mhs-bodies",
         long_name: "mime-mhs-bodies",
         der: &[0x2b, 0x06, 0x01, 0x07, 0x01, 0x02],
+        indexed: true,
     }), // mime_mhs_bodies
     Some(ObjectDef {
         nid: 507,
         short_name: "id-hex-partial-message",
         long_name: "id-hex-partial-message",
         der: &[0x2b, 0x06, 0x01, 0x07, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // id_hex_partial_message
     Some(ObjectDef {
         nid: 508,
         short_name: "id-hex-multipart-message",
         long_name: "id-hex-multipart-message",
         der: &[0x2b, 0x06, 0x01, 0x07, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // id_hex_multipart_message
     Some(ObjectDef {
         nid: 509,
         short_name: "generationQualifier",
         long_name: "generationQualifier",
         der: &[0x55, 0x04, 0x2c],
+        indexed: true,
     }), // generationQualifier
     Some(ObjectDef {
         nid: 510,
         short_name: "pseudonym",
         long_name: "pseudonym",
         der: &[0x55, 0x04, 0x41],
+        indexed: true,
     }), // pseudonym
     None,
     Some(ObjectDef {
@@ -3200,1434 +3708,1673 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "id-set",
         long_name: "Secure Electronic Transactions",
         der: &[0x67, 0x2a],
+        indexed: true,
     }), // id_set
     Some(ObjectDef {
         nid: 513,
         short_name: "set-ctype",
         long_name: "content types",
         der: &[0x67, 0x2a, 0x00],
+        indexed: true,
     }), // set_ctype
     Some(ObjectDef {
         nid: 514,
         short_name: "set-msgExt",
         long_name: "message extensions",
         der: &[0x67, 0x2a, 0x01],
+        indexed: true,
     }), // set_msgExt
     Some(ObjectDef {
         nid: 515,
         short_name: "set-attr",
         long_name: "set-attr",
         der: &[0x67, 0x2a, 0x03],
+        indexed: true,
     }), // set_attr
     Some(ObjectDef {
         nid: 516,
         short_name: "set-policy",
         long_name: "set-policy",
         der: &[0x67, 0x2a, 0x05],
+        indexed: true,
     }), // set_policy
     Some(ObjectDef {
         nid: 517,
         short_name: "set-certExt",
         long_name: "certificate extensions",
         der: &[0x67, 0x2a, 0x07],
+        indexed: true,
     }), // set_certExt
     Some(ObjectDef {
         nid: 518,
         short_name: "set-brand",
         long_name: "set-brand",
         der: &[0x67, 0x2a, 0x08],
+        indexed: true,
     }), // set_brand
     Some(ObjectDef {
         nid: 519,
         short_name: "setct-PANData",
         long_name: "setct-PANData",
         der: &[0x67, 0x2a, 0x00, 0x00],
+        indexed: true,
     }), // setct_PANData
     Some(ObjectDef {
         nid: 520,
         short_name: "setct-PANToken",
         long_name: "setct-PANToken",
         der: &[0x67, 0x2a, 0x00, 0x01],
+        indexed: true,
     }), // setct_PANToken
     Some(ObjectDef {
         nid: 521,
         short_name: "setct-PANOnly",
         long_name: "setct-PANOnly",
         der: &[0x67, 0x2a, 0x00, 0x02],
+        indexed: true,
     }), // setct_PANOnly
     Some(ObjectDef {
         nid: 522,
         short_name: "setct-OIData",
         long_name: "setct-OIData",
         der: &[0x67, 0x2a, 0x00, 0x03],
+        indexed: true,
     }), // setct_OIData
     Some(ObjectDef {
         nid: 523,
         short_name: "setct-PI",
         long_name: "setct-PI",
         der: &[0x67, 0x2a, 0x00, 0x04],
+        indexed: true,
     }), // setct_PI
     Some(ObjectDef {
         nid: 524,
         short_name: "setct-PIData",
         long_name: "setct-PIData",
         der: &[0x67, 0x2a, 0x00, 0x05],
+        indexed: true,
     }), // setct_PIData
     Some(ObjectDef {
         nid: 525,
         short_name: "setct-PIDataUnsigned",
         long_name: "setct-PIDataUnsigned",
         der: &[0x67, 0x2a, 0x00, 0x06],
+        indexed: true,
     }), // setct_PIDataUnsigned
     Some(ObjectDef {
         nid: 526,
         short_name: "setct-HODInput",
         long_name: "setct-HODInput",
         der: &[0x67, 0x2a, 0x00, 0x07],
+        indexed: true,
     }), // setct_HODInput
     Some(ObjectDef {
         nid: 527,
         short_name: "setct-AuthResBaggage",
         long_name: "setct-AuthResBaggage",
         der: &[0x67, 0x2a, 0x00, 0x08],
+        indexed: true,
     }), // setct_AuthResBaggage
     Some(ObjectDef {
         nid: 528,
         short_name: "setct-AuthRevReqBaggage",
         long_name: "setct-AuthRevReqBaggage",
         der: &[0x67, 0x2a, 0x00, 0x09],
+        indexed: true,
     }), // setct_AuthRevReqBaggage
     Some(ObjectDef {
         nid: 529,
         short_name: "setct-AuthRevResBaggage",
         long_name: "setct-AuthRevResBaggage",
         der: &[0x67, 0x2a, 0x00, 0x0a],
+        indexed: true,
     }), // setct_AuthRevResBaggage
     Some(ObjectDef {
         nid: 530,
         short_name: "setct-CapTokenSeq",
         long_name: "setct-CapTokenSeq",
         der: &[0x67, 0x2a, 0x00, 0x0b],
+        indexed: true,
     }), // setct_CapTokenSeq
     Some(ObjectDef {
         nid: 531,
         short_name: "setct-PInitResData",
         long_name: "setct-PInitResData",
         der: &[0x67, 0x2a, 0x00, 0x0c],
+        indexed: true,
     }), // setct_PInitResData
     Some(ObjectDef {
         nid: 532,
         short_name: "setct-PI-TBS",
         long_name: "setct-PI-TBS",
         der: &[0x67, 0x2a, 0x00, 0x0d],
+        indexed: true,
     }), // setct_PI_TBS
     Some(ObjectDef {
         nid: 533,
         short_name: "setct-PResData",
         long_name: "setct-PResData",
         der: &[0x67, 0x2a, 0x00, 0x0e],
+        indexed: true,
     }), // setct_PResData
     Some(ObjectDef {
         nid: 534,
         short_name: "setct-AuthReqTBS",
         long_name: "setct-AuthReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x10],
+        indexed: true,
     }), // setct_AuthReqTBS
     Some(ObjectDef {
         nid: 535,
         short_name: "setct-AuthResTBS",
         long_name: "setct-AuthResTBS",
         der: &[0x67, 0x2a, 0x00, 0x11],
+        indexed: true,
     }), // setct_AuthResTBS
     Some(ObjectDef {
         nid: 536,
         short_name: "setct-AuthResTBSX",
         long_name: "setct-AuthResTBSX",
         der: &[0x67, 0x2a, 0x00, 0x12],
+        indexed: true,
     }), // setct_AuthResTBSX
     Some(ObjectDef {
         nid: 537,
         short_name: "setct-AuthTokenTBS",
         long_name: "setct-AuthTokenTBS",
         der: &[0x67, 0x2a, 0x00, 0x13],
+        indexed: true,
     }), // setct_AuthTokenTBS
     Some(ObjectDef {
         nid: 538,
         short_name: "setct-CapTokenData",
         long_name: "setct-CapTokenData",
         der: &[0x67, 0x2a, 0x00, 0x14],
+        indexed: true,
     }), // setct_CapTokenData
     Some(ObjectDef {
         nid: 539,
         short_name: "setct-CapTokenTBS",
         long_name: "setct-CapTokenTBS",
         der: &[0x67, 0x2a, 0x00, 0x15],
+        indexed: true,
     }), // setct_CapTokenTBS
     Some(ObjectDef {
         nid: 540,
         short_name: "setct-AcqCardCodeMsg",
         long_name: "setct-AcqCardCodeMsg",
         der: &[0x67, 0x2a, 0x00, 0x16],
+        indexed: true,
     }), // setct_AcqCardCodeMsg
     Some(ObjectDef {
         nid: 541,
         short_name: "setct-AuthRevReqTBS",
         long_name: "setct-AuthRevReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x17],
+        indexed: true,
     }), // setct_AuthRevReqTBS
     Some(ObjectDef {
         nid: 542,
         short_name: "setct-AuthRevResData",
         long_name: "setct-AuthRevResData",
         der: &[0x67, 0x2a, 0x00, 0x18],
+        indexed: true,
     }), // setct_AuthRevResData
     Some(ObjectDef {
         nid: 543,
         short_name: "setct-AuthRevResTBS",
         long_name: "setct-AuthRevResTBS",
         der: &[0x67, 0x2a, 0x00, 0x19],
+        indexed: true,
     }), // setct_AuthRevResTBS
     Some(ObjectDef {
         nid: 544,
         short_name: "setct-CapReqTBS",
         long_name: "setct-CapReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x1a],
+        indexed: true,
     }), // setct_CapReqTBS
     Some(ObjectDef {
         nid: 545,
         short_name: "setct-CapReqTBSX",
         long_name: "setct-CapReqTBSX",
         der: &[0x67, 0x2a, 0x00, 0x1b],
+        indexed: true,
     }), // setct_CapReqTBSX
     Some(ObjectDef {
         nid: 546,
         short_name: "setct-CapResData",
         long_name: "setct-CapResData",
         der: &[0x67, 0x2a, 0x00, 0x1c],
+        indexed: true,
     }), // setct_CapResData
     Some(ObjectDef {
         nid: 547,
         short_name: "setct-CapRevReqTBS",
         long_name: "setct-CapRevReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x1d],
+        indexed: true,
     }), // setct_CapRevReqTBS
     Some(ObjectDef {
         nid: 548,
         short_name: "setct-CapRevReqTBSX",
         long_name: "setct-CapRevReqTBSX",
         der: &[0x67, 0x2a, 0x00, 0x1e],
+        indexed: true,
     }), // setct_CapRevReqTBSX
     Some(ObjectDef {
         nid: 549,
         short_name: "setct-CapRevResData",
         long_name: "setct-CapRevResData",
         der: &[0x67, 0x2a, 0x00, 0x1f],
+        indexed: true,
     }), // setct_CapRevResData
     Some(ObjectDef {
         nid: 550,
         short_name: "setct-CredReqTBS",
         long_name: "setct-CredReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x20],
+        indexed: true,
     }), // setct_CredReqTBS
     Some(ObjectDef {
         nid: 551,
         short_name: "setct-CredReqTBSX",
         long_name: "setct-CredReqTBSX",
         der: &[0x67, 0x2a, 0x00, 0x21],
+        indexed: true,
     }), // setct_CredReqTBSX
     Some(ObjectDef {
         nid: 552,
         short_name: "setct-CredResData",
         long_name: "setct-CredResData",
         der: &[0x67, 0x2a, 0x00, 0x22],
+        indexed: true,
     }), // setct_CredResData
     Some(ObjectDef {
         nid: 553,
         short_name: "setct-CredRevReqTBS",
         long_name: "setct-CredRevReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x23],
+        indexed: true,
     }), // setct_CredRevReqTBS
     Some(ObjectDef {
         nid: 554,
         short_name: "setct-CredRevReqTBSX",
         long_name: "setct-CredRevReqTBSX",
         der: &[0x67, 0x2a, 0x00, 0x24],
+        indexed: true,
     }), // setct_CredRevReqTBSX
     Some(ObjectDef {
         nid: 555,
         short_name: "setct-CredRevResData",
         long_name: "setct-CredRevResData",
         der: &[0x67, 0x2a, 0x00, 0x25],
+        indexed: true,
     }), // setct_CredRevResData
     Some(ObjectDef {
         nid: 556,
         short_name: "setct-PCertReqData",
         long_name: "setct-PCertReqData",
         der: &[0x67, 0x2a, 0x00, 0x26],
+        indexed: true,
     }), // setct_PCertReqData
     Some(ObjectDef {
         nid: 557,
         short_name: "setct-PCertResTBS",
         long_name: "setct-PCertResTBS",
         der: &[0x67, 0x2a, 0x00, 0x27],
+        indexed: true,
     }), // setct_PCertResTBS
     Some(ObjectDef {
         nid: 558,
         short_name: "setct-BatchAdminReqData",
         long_name: "setct-BatchAdminReqData",
         der: &[0x67, 0x2a, 0x00, 0x28],
+        indexed: true,
     }), // setct_BatchAdminReqData
     Some(ObjectDef {
         nid: 559,
         short_name: "setct-BatchAdminResData",
         long_name: "setct-BatchAdminResData",
         der: &[0x67, 0x2a, 0x00, 0x29],
+        indexed: true,
     }), // setct_BatchAdminResData
     Some(ObjectDef {
         nid: 560,
         short_name: "setct-CardCInitResTBS",
         long_name: "setct-CardCInitResTBS",
         der: &[0x67, 0x2a, 0x00, 0x2a],
+        indexed: true,
     }), // setct_CardCInitResTBS
     Some(ObjectDef {
         nid: 561,
         short_name: "setct-MeAqCInitResTBS",
         long_name: "setct-MeAqCInitResTBS",
         der: &[0x67, 0x2a, 0x00, 0x2b],
+        indexed: true,
     }), // setct_MeAqCInitResTBS
     Some(ObjectDef {
         nid: 562,
         short_name: "setct-RegFormResTBS",
         long_name: "setct-RegFormResTBS",
         der: &[0x67, 0x2a, 0x00, 0x2c],
+        indexed: true,
     }), // setct_RegFormResTBS
     Some(ObjectDef {
         nid: 563,
         short_name: "setct-CertReqData",
         long_name: "setct-CertReqData",
         der: &[0x67, 0x2a, 0x00, 0x2d],
+        indexed: true,
     }), // setct_CertReqData
     Some(ObjectDef {
         nid: 564,
         short_name: "setct-CertReqTBS",
         long_name: "setct-CertReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x2e],
+        indexed: true,
     }), // setct_CertReqTBS
     Some(ObjectDef {
         nid: 565,
         short_name: "setct-CertResData",
         long_name: "setct-CertResData",
         der: &[0x67, 0x2a, 0x00, 0x2f],
+        indexed: true,
     }), // setct_CertResData
     Some(ObjectDef {
         nid: 566,
         short_name: "setct-CertInqReqTBS",
         long_name: "setct-CertInqReqTBS",
         der: &[0x67, 0x2a, 0x00, 0x30],
+        indexed: true,
     }), // setct_CertInqReqTBS
     Some(ObjectDef {
         nid: 567,
         short_name: "setct-ErrorTBS",
         long_name: "setct-ErrorTBS",
         der: &[0x67, 0x2a, 0x00, 0x31],
+        indexed: true,
     }), // setct_ErrorTBS
     Some(ObjectDef {
         nid: 568,
         short_name: "setct-PIDualSignedTBE",
         long_name: "setct-PIDualSignedTBE",
         der: &[0x67, 0x2a, 0x00, 0x32],
+        indexed: true,
     }), // setct_PIDualSignedTBE
     Some(ObjectDef {
         nid: 569,
         short_name: "setct-PIUnsignedTBE",
         long_name: "setct-PIUnsignedTBE",
         der: &[0x67, 0x2a, 0x00, 0x33],
+        indexed: true,
     }), // setct_PIUnsignedTBE
     Some(ObjectDef {
         nid: 570,
         short_name: "setct-AuthReqTBE",
         long_name: "setct-AuthReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x34],
+        indexed: true,
     }), // setct_AuthReqTBE
     Some(ObjectDef {
         nid: 571,
         short_name: "setct-AuthResTBE",
         long_name: "setct-AuthResTBE",
         der: &[0x67, 0x2a, 0x00, 0x35],
+        indexed: true,
     }), // setct_AuthResTBE
     Some(ObjectDef {
         nid: 572,
         short_name: "setct-AuthResTBEX",
         long_name: "setct-AuthResTBEX",
         der: &[0x67, 0x2a, 0x00, 0x36],
+        indexed: true,
     }), // setct_AuthResTBEX
     Some(ObjectDef {
         nid: 573,
         short_name: "setct-AuthTokenTBE",
         long_name: "setct-AuthTokenTBE",
         der: &[0x67, 0x2a, 0x00, 0x37],
+        indexed: true,
     }), // setct_AuthTokenTBE
     Some(ObjectDef {
         nid: 574,
         short_name: "setct-CapTokenTBE",
         long_name: "setct-CapTokenTBE",
         der: &[0x67, 0x2a, 0x00, 0x38],
+        indexed: true,
     }), // setct_CapTokenTBE
     Some(ObjectDef {
         nid: 575,
         short_name: "setct-CapTokenTBEX",
         long_name: "setct-CapTokenTBEX",
         der: &[0x67, 0x2a, 0x00, 0x39],
+        indexed: true,
     }), // setct_CapTokenTBEX
     Some(ObjectDef {
         nid: 576,
         short_name: "setct-AcqCardCodeMsgTBE",
         long_name: "setct-AcqCardCodeMsgTBE",
         der: &[0x67, 0x2a, 0x00, 0x3a],
+        indexed: true,
     }), // setct_AcqCardCodeMsgTBE
     Some(ObjectDef {
         nid: 577,
         short_name: "setct-AuthRevReqTBE",
         long_name: "setct-AuthRevReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x3b],
+        indexed: true,
     }), // setct_AuthRevReqTBE
     Some(ObjectDef {
         nid: 578,
         short_name: "setct-AuthRevResTBE",
         long_name: "setct-AuthRevResTBE",
         der: &[0x67, 0x2a, 0x00, 0x3c],
+        indexed: true,
     }), // setct_AuthRevResTBE
     Some(ObjectDef {
         nid: 579,
         short_name: "setct-AuthRevResTBEB",
         long_name: "setct-AuthRevResTBEB",
         der: &[0x67, 0x2a, 0x00, 0x3d],
+        indexed: true,
     }), // setct_AuthRevResTBEB
     Some(ObjectDef {
         nid: 580,
         short_name: "setct-CapReqTBE",
         long_name: "setct-CapReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x3e],
+        indexed: true,
     }), // setct_CapReqTBE
     Some(ObjectDef {
         nid: 581,
         short_name: "setct-CapReqTBEX",
         long_name: "setct-CapReqTBEX",
         der: &[0x67, 0x2a, 0x00, 0x3f],
+        indexed: true,
     }), // setct_CapReqTBEX
     Some(ObjectDef {
         nid: 582,
         short_name: "setct-CapResTBE",
         long_name: "setct-CapResTBE",
         der: &[0x67, 0x2a, 0x00, 0x40],
+        indexed: true,
     }), // setct_CapResTBE
     Some(ObjectDef {
         nid: 583,
         short_name: "setct-CapRevReqTBE",
         long_name: "setct-CapRevReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x41],
+        indexed: true,
     }), // setct_CapRevReqTBE
     Some(ObjectDef {
         nid: 584,
         short_name: "setct-CapRevReqTBEX",
         long_name: "setct-CapRevReqTBEX",
         der: &[0x67, 0x2a, 0x00, 0x42],
+        indexed: true,
     }), // setct_CapRevReqTBEX
     Some(ObjectDef {
         nid: 585,
         short_name: "setct-CapRevResTBE",
         long_name: "setct-CapRevResTBE",
         der: &[0x67, 0x2a, 0x00, 0x43],
+        indexed: true,
     }), // setct_CapRevResTBE
     Some(ObjectDef {
         nid: 586,
         short_name: "setct-CredReqTBE",
         long_name: "setct-CredReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x44],
+        indexed: true,
     }), // setct_CredReqTBE
     Some(ObjectDef {
         nid: 587,
         short_name: "setct-CredReqTBEX",
         long_name: "setct-CredReqTBEX",
         der: &[0x67, 0x2a, 0x00, 0x45],
+        indexed: true,
     }), // setct_CredReqTBEX
     Some(ObjectDef {
         nid: 588,
         short_name: "setct-CredResTBE",
         long_name: "setct-CredResTBE",
         der: &[0x67, 0x2a, 0x00, 0x46],
+        indexed: true,
     }), // setct_CredResTBE
     Some(ObjectDef {
         nid: 589,
         short_name: "setct-CredRevReqTBE",
         long_name: "setct-CredRevReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x47],
+        indexed: true,
     }), // setct_CredRevReqTBE
     Some(ObjectDef {
         nid: 590,
         short_name: "setct-CredRevReqTBEX",
         long_name: "setct-CredRevReqTBEX",
         der: &[0x67, 0x2a, 0x00, 0x48],
+        indexed: true,
     }), // setct_CredRevReqTBEX
     Some(ObjectDef {
         nid: 591,
         short_name: "setct-CredRevResTBE",
         long_name: "setct-CredRevResTBE",
         der: &[0x67, 0x2a, 0x00, 0x49],
+        indexed: true,
     }), // setct_CredRevResTBE
     Some(ObjectDef {
         nid: 592,
         short_name: "setct-BatchAdminReqTBE",
         long_name: "setct-BatchAdminReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x4a],
+        indexed: true,
     }), // setct_BatchAdminReqTBE
     Some(ObjectDef {
         nid: 593,
         short_name: "setct-BatchAdminResTBE",
         long_name: "setct-BatchAdminResTBE",
         der: &[0x67, 0x2a, 0x00, 0x4b],
+        indexed: true,
     }), // setct_BatchAdminResTBE
     Some(ObjectDef {
         nid: 594,
         short_name: "setct-RegFormReqTBE",
         long_name: "setct-RegFormReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x4c],
+        indexed: true,
     }), // setct_RegFormReqTBE
     Some(ObjectDef {
         nid: 595,
         short_name: "setct-CertReqTBE",
         long_name: "setct-CertReqTBE",
         der: &[0x67, 0x2a, 0x00, 0x4d],
+        indexed: true,
     }), // setct_CertReqTBE
     Some(ObjectDef {
         nid: 596,
         short_name: "setct-CertReqTBEX",
         long_name: "setct-CertReqTBEX",
         der: &[0x67, 0x2a, 0x00, 0x4e],
+        indexed: true,
     }), // setct_CertReqTBEX
     Some(ObjectDef {
         nid: 597,
         short_name: "setct-CertResTBE",
         long_name: "setct-CertResTBE",
         der: &[0x67, 0x2a, 0x00, 0x4f],
+        indexed: true,
     }), // setct_CertResTBE
     Some(ObjectDef {
         nid: 598,
         short_name: "setct-CRLNotificationTBS",
         long_name: "setct-CRLNotificationTBS",
         der: &[0x67, 0x2a, 0x00, 0x50],
+        indexed: true,
     }), // setct_CRLNotificationTBS
     Some(ObjectDef {
         nid: 599,
         short_name: "setct-CRLNotificationResTBS",
         long_name: "setct-CRLNotificationResTBS",
         der: &[0x67, 0x2a, 0x00, 0x51],
+        indexed: true,
     }), // setct_CRLNotificationResTBS
     Some(ObjectDef {
         nid: 600,
         short_name: "setct-BCIDistributionTBS",
         long_name: "setct-BCIDistributionTBS",
         der: &[0x67, 0x2a, 0x00, 0x52],
+        indexed: true,
     }), // setct_BCIDistributionTBS
     Some(ObjectDef {
         nid: 601,
         short_name: "setext-genCrypt",
         long_name: "generic cryptogram",
         der: &[0x67, 0x2a, 0x01, 0x01],
+        indexed: true,
     }), // setext_genCrypt
     Some(ObjectDef {
         nid: 602,
         short_name: "setext-miAuth",
         long_name: "merchant initiated auth",
         der: &[0x67, 0x2a, 0x01, 0x03],
+        indexed: true,
     }), // setext_miAuth
     Some(ObjectDef {
         nid: 603,
         short_name: "setext-pinSecure",
         long_name: "setext-pinSecure",
         der: &[0x67, 0x2a, 0x01, 0x04],
+        indexed: true,
     }), // setext_pinSecure
     Some(ObjectDef {
         nid: 604,
         short_name: "setext-pinAny",
         long_name: "setext-pinAny",
         der: &[0x67, 0x2a, 0x01, 0x05],
+        indexed: true,
     }), // setext_pinAny
     Some(ObjectDef {
         nid: 605,
         short_name: "setext-track2",
         long_name: "setext-track2",
         der: &[0x67, 0x2a, 0x01, 0x07],
+        indexed: true,
     }), // setext_track2
     Some(ObjectDef {
         nid: 606,
         short_name: "setext-cv",
         long_name: "additional verification",
         der: &[0x67, 0x2a, 0x01, 0x08],
+        indexed: true,
     }), // setext_cv
     Some(ObjectDef {
         nid: 607,
         short_name: "set-policy-root",
         long_name: "set-policy-root",
         der: &[0x67, 0x2a, 0x05, 0x00],
+        indexed: true,
     }), // set_policy_root
     Some(ObjectDef {
         nid: 608,
         short_name: "setCext-hashedRoot",
         long_name: "setCext-hashedRoot",
         der: &[0x67, 0x2a, 0x07, 0x00],
+        indexed: true,
     }), // setCext_hashedRoot
     Some(ObjectDef {
         nid: 609,
         short_name: "setCext-certType",
         long_name: "setCext-certType",
         der: &[0x67, 0x2a, 0x07, 0x01],
+        indexed: true,
     }), // setCext_certType
     Some(ObjectDef {
         nid: 610,
         short_name: "setCext-merchData",
         long_name: "setCext-merchData",
         der: &[0x67, 0x2a, 0x07, 0x02],
+        indexed: true,
     }), // setCext_merchData
     Some(ObjectDef {
         nid: 611,
         short_name: "setCext-cCertRequired",
         long_name: "setCext-cCertRequired",
         der: &[0x67, 0x2a, 0x07, 0x03],
+        indexed: true,
     }), // setCext_cCertRequired
     Some(ObjectDef {
         nid: 612,
         short_name: "setCext-tunneling",
         long_name: "setCext-tunneling",
         der: &[0x67, 0x2a, 0x07, 0x04],
+        indexed: true,
     }), // setCext_tunneling
     Some(ObjectDef {
         nid: 613,
         short_name: "setCext-setExt",
         long_name: "setCext-setExt",
         der: &[0x67, 0x2a, 0x07, 0x05],
+        indexed: true,
     }), // setCext_setExt
     Some(ObjectDef {
         nid: 614,
         short_name: "setCext-setQualf",
         long_name: "setCext-setQualf",
         der: &[0x67, 0x2a, 0x07, 0x06],
+        indexed: true,
     }), // setCext_setQualf
     Some(ObjectDef {
         nid: 615,
         short_name: "setCext-PGWYcapabilities",
         long_name: "setCext-PGWYcapabilities",
         der: &[0x67, 0x2a, 0x07, 0x07],
+        indexed: true,
     }), // setCext_PGWYcapabilities
     Some(ObjectDef {
         nid: 616,
         short_name: "setCext-TokenIdentifier",
         long_name: "setCext-TokenIdentifier",
         der: &[0x67, 0x2a, 0x07, 0x08],
+        indexed: true,
     }), // setCext_TokenIdentifier
     Some(ObjectDef {
         nid: 617,
         short_name: "setCext-Track2Data",
         long_name: "setCext-Track2Data",
         der: &[0x67, 0x2a, 0x07, 0x09],
+        indexed: true,
     }), // setCext_Track2Data
     Some(ObjectDef {
         nid: 618,
         short_name: "setCext-TokenType",
         long_name: "setCext-TokenType",
         der: &[0x67, 0x2a, 0x07, 0x0a],
+        indexed: true,
     }), // setCext_TokenType
     Some(ObjectDef {
         nid: 619,
         short_name: "setCext-IssuerCapabilities",
         long_name: "setCext-IssuerCapabilities",
         der: &[0x67, 0x2a, 0x07, 0x0b],
+        indexed: true,
     }), // setCext_IssuerCapabilities
     Some(ObjectDef {
         nid: 620,
         short_name: "setAttr-Cert",
         long_name: "setAttr-Cert",
         der: &[0x67, 0x2a, 0x03, 0x00],
+        indexed: true,
     }), // setAttr_Cert
     Some(ObjectDef {
         nid: 621,
         short_name: "setAttr-PGWYcap",
         long_name: "payment gateway capabilities",
         der: &[0x67, 0x2a, 0x03, 0x01],
+        indexed: true,
     }), // setAttr_PGWYcap
     Some(ObjectDef {
         nid: 622,
         short_name: "setAttr-TokenType",
         long_name: "setAttr-TokenType",
         der: &[0x67, 0x2a, 0x03, 0x02],
+        indexed: true,
     }), // setAttr_TokenType
     Some(ObjectDef {
         nid: 623,
         short_name: "setAttr-IssCap",
         long_name: "issuer capabilities",
         der: &[0x67, 0x2a, 0x03, 0x03],
+        indexed: true,
     }), // setAttr_IssCap
     Some(ObjectDef {
         nid: 624,
         short_name: "set-rootKeyThumb",
         long_name: "set-rootKeyThumb",
         der: &[0x67, 0x2a, 0x03, 0x00, 0x00],
+        indexed: true,
     }), // set_rootKeyThumb
     Some(ObjectDef {
         nid: 625,
         short_name: "set-addPolicy",
         long_name: "set-addPolicy",
         der: &[0x67, 0x2a, 0x03, 0x00, 0x01],
+        indexed: true,
     }), // set_addPolicy
     Some(ObjectDef {
         nid: 626,
         short_name: "setAttr-Token-EMV",
         long_name: "setAttr-Token-EMV",
         der: &[0x67, 0x2a, 0x03, 0x02, 0x01],
+        indexed: true,
     }), // setAttr_Token_EMV
     Some(ObjectDef {
         nid: 627,
         short_name: "setAttr-Token-B0Prime",
         long_name: "setAttr-Token-B0Prime",
         der: &[0x67, 0x2a, 0x03, 0x02, 0x02],
+        indexed: true,
     }), // setAttr_Token_B0Prime
     Some(ObjectDef {
         nid: 628,
         short_name: "setAttr-IssCap-CVM",
         long_name: "setAttr-IssCap-CVM",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x03],
+        indexed: true,
     }), // setAttr_IssCap_CVM
     Some(ObjectDef {
         nid: 629,
         short_name: "setAttr-IssCap-T2",
         long_name: "setAttr-IssCap-T2",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x04],
+        indexed: true,
     }), // setAttr_IssCap_T2
     Some(ObjectDef {
         nid: 630,
         short_name: "setAttr-IssCap-Sig",
         long_name: "setAttr-IssCap-Sig",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x05],
+        indexed: true,
     }), // setAttr_IssCap_Sig
     Some(ObjectDef {
         nid: 631,
         short_name: "setAttr-GenCryptgrm",
         long_name: "generate cryptogram",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x03, 0x01],
+        indexed: true,
     }), // setAttr_GenCryptgrm
     Some(ObjectDef {
         nid: 632,
         short_name: "setAttr-T2Enc",
         long_name: "encrypted track 2",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x04, 0x01],
+        indexed: true,
     }), // setAttr_T2Enc
     Some(ObjectDef {
         nid: 633,
         short_name: "setAttr-T2cleartxt",
         long_name: "cleartext track 2",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x04, 0x02],
+        indexed: true,
     }), // setAttr_T2cleartxt
     Some(ObjectDef {
         nid: 634,
         short_name: "setAttr-TokICCsig",
         long_name: "ICC or token signature",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x05, 0x01],
+        indexed: true,
     }), // setAttr_TokICCsig
     Some(ObjectDef {
         nid: 635,
         short_name: "setAttr-SecDevSig",
         long_name: "secure device signature",
         der: &[0x67, 0x2a, 0x03, 0x03, 0x05, 0x02],
+        indexed: true,
     }), // setAttr_SecDevSig
     Some(ObjectDef {
         nid: 636,
         short_name: "set-brand-IATA-ATA",
         long_name: "set-brand-IATA-ATA",
         der: &[0x67, 0x2a, 0x08, 0x01],
+        indexed: true,
     }), // set_brand_IATA_ATA
     Some(ObjectDef {
         nid: 637,
         short_name: "set-brand-Diners",
         long_name: "set-brand-Diners",
         der: &[0x67, 0x2a, 0x08, 0x1e],
+        indexed: true,
     }), // set_brand_Diners
     Some(ObjectDef {
         nid: 638,
         short_name: "set-brand-AmericanExpress",
         long_name: "set-brand-AmericanExpress",
         der: &[0x67, 0x2a, 0x08, 0x22],
+        indexed: true,
     }), // set_brand_AmericanExpress
     Some(ObjectDef {
         nid: 639,
         short_name: "set-brand-JCB",
         long_name: "set-brand-JCB",
         der: &[0x67, 0x2a, 0x08, 0x23],
+        indexed: true,
     }), // set_brand_JCB
     Some(ObjectDef {
         nid: 640,
         short_name: "set-brand-Visa",
         long_name: "set-brand-Visa",
         der: &[0x67, 0x2a, 0x08, 0x04],
+        indexed: true,
     }), // set_brand_Visa
     Some(ObjectDef {
         nid: 641,
         short_name: "set-brand-MasterCard",
         long_name: "set-brand-MasterCard",
         der: &[0x67, 0x2a, 0x08, 0x05],
+        indexed: true,
     }), // set_brand_MasterCard
     Some(ObjectDef {
         nid: 642,
         short_name: "set-brand-Novus",
         long_name: "set-brand-Novus",
         der: &[0x67, 0x2a, 0x08, 0xae, 0x7b],
+        indexed: true,
     }), // set_brand_Novus
     Some(ObjectDef {
         nid: 643,
         short_name: "DES-CDMF",
         long_name: "des-cdmf",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x03, 0x0a],
+        indexed: true,
     }), // des_cdmf
     Some(ObjectDef {
         nid: 644,
         short_name: "rsaOAEPEncryptionSET",
         long_name: "rsaOAEPEncryptionSET",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x06],
+        indexed: true,
     }), // rsaOAEPEncryptionSET
     Some(ObjectDef {
         nid: 645,
         short_name: "ITU-T",
         long_name: "itu-t",
         der: &[],
+        indexed: true,
     }), // itu_t
     Some(ObjectDef {
         nid: 646,
         short_name: "JOINT-ISO-ITU-T",
         long_name: "joint-iso-itu-t",
         der: &[],
+        indexed: true,
     }), // joint_iso_itu_t
     Some(ObjectDef {
         nid: 647,
         short_name: "international-organizations",
         long_name: "International Organizations",
         der: &[0x67],
+        indexed: true,
     }), // international_organizations
     Some(ObjectDef {
         nid: 648,
         short_name: "msSmartcardLogin",
         long_name: "Microsoft Smartcard Login",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x14, 0x02, 0x02],
+        indexed: true,
     }), // ms_smartcard_login
     Some(ObjectDef {
         nid: 649,
         short_name: "msUPN",
         long_name: "Microsoft User Principal Name",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x14, 0x02, 0x03],
+        indexed: true,
     }), // ms_upn
     Some(ObjectDef {
         nid: 650,
         short_name: "AES-128-CFB1",
         long_name: "aes-128-cfb1",
         der: &[],
+        indexed: false,
     }), // aes_128_cfb1
     Some(ObjectDef {
         nid: 651,
         short_name: "AES-192-CFB1",
         long_name: "aes-192-cfb1",
         der: &[],
+        indexed: false,
     }), // aes_192_cfb1
     Some(ObjectDef {
         nid: 652,
         short_name: "AES-256-CFB1",
         long_name: "aes-256-cfb1",
         der: &[],
+        indexed: false,
     }), // aes_256_cfb1
     Some(ObjectDef {
         nid: 653,
         short_name: "AES-128-CFB8",
         long_name: "aes-128-cfb8",
         der: &[],
+        indexed: false,
     }), // aes_128_cfb8
     Some(ObjectDef {
         nid: 654,
         short_name: "AES-192-CFB8",
         long_name: "aes-192-cfb8",
         der: &[],
+        indexed: false,
     }), // aes_192_cfb8
     Some(ObjectDef {
         nid: 655,
         short_name: "AES-256-CFB8",
         long_name: "aes-256-cfb8",
         der: &[],
+        indexed: false,
     }), // aes_256_cfb8
     Some(ObjectDef {
         nid: 656,
         short_name: "DES-CFB1",
         long_name: "des-cfb1",
         der: &[],
+        indexed: false,
     }), // des_cfb1
     Some(ObjectDef {
         nid: 657,
         short_name: "DES-CFB8",
         long_name: "des-cfb8",
         der: &[],
+        indexed: false,
     }), // des_cfb8
     Some(ObjectDef {
         nid: 658,
         short_name: "DES-EDE3-CFB1",
         long_name: "des-ede3-cfb1",
         der: &[],
+        indexed: false,
     }), // des_ede3_cfb1
     Some(ObjectDef {
         nid: 659,
         short_name: "DES-EDE3-CFB8",
         long_name: "des-ede3-cfb8",
         der: &[],
+        indexed: false,
     }), // des_ede3_cfb8
     Some(ObjectDef {
         nid: 660,
         short_name: "street",
         long_name: "streetAddress",
         der: &[0x55, 0x04, 0x09],
+        indexed: true,
     }), // streetAddress
     Some(ObjectDef {
         nid: 661,
         short_name: "postalCode",
         long_name: "postalCode",
         der: &[0x55, 0x04, 0x11],
+        indexed: true,
     }), // postalCode
     Some(ObjectDef {
         nid: 662,
         short_name: "id-ppl",
         long_name: "id-ppl",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x15],
+        indexed: true,
     }), // id_ppl
     Some(ObjectDef {
         nid: 663,
         short_name: "proxyCertInfo",
         long_name: "Proxy Certificate Information",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x0e],
+        indexed: true,
     }), // proxyCertInfo
     Some(ObjectDef {
         nid: 664,
         short_name: "id-ppl-anyLanguage",
         long_name: "Any language",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x15, 0x00],
+        indexed: true,
     }), // id_ppl_anyLanguage
     Some(ObjectDef {
         nid: 665,
         short_name: "id-ppl-inheritAll",
         long_name: "Inherit all",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x15, 0x01],
+        indexed: true,
     }), // id_ppl_inheritAll
     Some(ObjectDef {
         nid: 666,
         short_name: "nameConstraints",
         long_name: "X509v3 Name Constraints",
         der: &[0x55, 0x1d, 0x1e],
+        indexed: true,
     }), // name_constraints
     Some(ObjectDef {
         nid: 667,
         short_name: "id-ppl-independent",
         long_name: "Independent",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x15, 0x02],
+        indexed: true,
     }), // Independent
     Some(ObjectDef {
         nid: 668,
         short_name: "RSA-SHA256",
         long_name: "sha256WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b],
+        indexed: true,
     }), // sha256WithRSAEncryption
     Some(ObjectDef {
         nid: 669,
         short_name: "RSA-SHA384",
         long_name: "sha384WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0c],
+        indexed: true,
     }), // sha384WithRSAEncryption
     Some(ObjectDef {
         nid: 670,
         short_name: "RSA-SHA512",
         long_name: "sha512WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0d],
+        indexed: true,
     }), // sha512WithRSAEncryption
     Some(ObjectDef {
         nid: 671,
         short_name: "RSA-SHA224",
         long_name: "sha224WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0e],
+        indexed: true,
     }), // sha224WithRSAEncryption
     Some(ObjectDef {
         nid: 672,
         short_name: "SHA256",
         long_name: "sha256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01],
+        indexed: true,
     }), // sha256
     Some(ObjectDef {
         nid: 673,
         short_name: "SHA384",
         long_name: "sha384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02],
+        indexed: true,
     }), // sha384
     Some(ObjectDef {
         nid: 674,
         short_name: "SHA512",
         long_name: "sha512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03],
+        indexed: true,
     }), // sha512
     Some(ObjectDef {
         nid: 675,
         short_name: "SHA224",
         long_name: "sha224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04],
+        indexed: true,
     }), // sha224
     Some(ObjectDef {
         nid: 676,
         short_name: "identified-organization",
         long_name: "identified-organization",
         der: &[0x2b],
+        indexed: true,
     }), // identified_organization
     Some(ObjectDef {
         nid: 677,
         short_name: "certicom-arc",
         long_name: "certicom-arc",
         der: &[0x2b, 0x81, 0x04],
+        indexed: true,
     }), // certicom_arc
     Some(ObjectDef {
         nid: 678,
         short_name: "wap",
         long_name: "wap",
         der: &[0x67, 0x2b],
+        indexed: true,
     }), // wap
     Some(ObjectDef {
         nid: 679,
         short_name: "wap-wsg",
         long_name: "wap-wsg",
         der: &[0x67, 0x2b, 0x01],
+        indexed: true,
     }), // wap_wsg
     Some(ObjectDef {
         nid: 680,
         short_name: "id-characteristic-two-basis",
         long_name: "id-characteristic-two-basis",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x02, 0x03],
+        indexed: true,
     }), // X9_62_id_characteristic_two_basis
     Some(ObjectDef {
         nid: 681,
         short_name: "onBasis",
         long_name: "onBasis",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x02, 0x03, 0x01],
+        indexed: true,
     }), // X9_62_onBasis
     Some(ObjectDef {
         nid: 682,
         short_name: "tpBasis",
         long_name: "tpBasis",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x02, 0x03, 0x02],
+        indexed: true,
     }), // X9_62_tpBasis
     Some(ObjectDef {
         nid: 683,
         short_name: "ppBasis",
         long_name: "ppBasis",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x01, 0x02, 0x03, 0x03],
+        indexed: true,
     }), // X9_62_ppBasis
     Some(ObjectDef {
         nid: 684,
         short_name: "c2pnb163v1",
         long_name: "c2pnb163v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x01],
+        indexed: true,
     }), // X9_62_c2pnb163v1
     Some(ObjectDef {
         nid: 685,
         short_name: "c2pnb163v2",
         long_name: "c2pnb163v2",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x02],
+        indexed: true,
     }), // X9_62_c2pnb163v2
     Some(ObjectDef {
         nid: 686,
         short_name: "c2pnb163v3",
         long_name: "c2pnb163v3",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x03],
+        indexed: true,
     }), // X9_62_c2pnb163v3
     Some(ObjectDef {
         nid: 687,
         short_name: "c2pnb176v1",
         long_name: "c2pnb176v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x04],
+        indexed: true,
     }), // X9_62_c2pnb176v1
     Some(ObjectDef {
         nid: 688,
         short_name: "c2tnb191v1",
         long_name: "c2tnb191v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x05],
+        indexed: true,
     }), // X9_62_c2tnb191v1
     Some(ObjectDef {
         nid: 689,
         short_name: "c2tnb191v2",
         long_name: "c2tnb191v2",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x06],
+        indexed: true,
     }), // X9_62_c2tnb191v2
     Some(ObjectDef {
         nid: 690,
         short_name: "c2tnb191v3",
         long_name: "c2tnb191v3",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x07],
+        indexed: true,
     }), // X9_62_c2tnb191v3
     Some(ObjectDef {
         nid: 691,
         short_name: "c2onb191v4",
         long_name: "c2onb191v4",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x08],
+        indexed: true,
     }), // X9_62_c2onb191v4
     Some(ObjectDef {
         nid: 692,
         short_name: "c2onb191v5",
         long_name: "c2onb191v5",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x09],
+        indexed: true,
     }), // X9_62_c2onb191v5
     Some(ObjectDef {
         nid: 693,
         short_name: "c2pnb208w1",
         long_name: "c2pnb208w1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0a],
+        indexed: true,
     }), // X9_62_c2pnb208w1
     Some(ObjectDef {
         nid: 694,
         short_name: "c2tnb239v1",
         long_name: "c2tnb239v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0b],
+        indexed: true,
     }), // X9_62_c2tnb239v1
     Some(ObjectDef {
         nid: 695,
         short_name: "c2tnb239v2",
         long_name: "c2tnb239v2",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0c],
+        indexed: true,
     }), // X9_62_c2tnb239v2
     Some(ObjectDef {
         nid: 696,
         short_name: "c2tnb239v3",
         long_name: "c2tnb239v3",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0d],
+        indexed: true,
     }), // X9_62_c2tnb239v3
     Some(ObjectDef {
         nid: 697,
         short_name: "c2onb239v4",
         long_name: "c2onb239v4",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0e],
+        indexed: true,
     }), // X9_62_c2onb239v4
     Some(ObjectDef {
         nid: 698,
         short_name: "c2onb239v5",
         long_name: "c2onb239v5",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x0f],
+        indexed: true,
     }), // X9_62_c2onb239v5
     Some(ObjectDef {
         nid: 699,
         short_name: "c2pnb272w1",
         long_name: "c2pnb272w1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x10],
+        indexed: true,
     }), // X9_62_c2pnb272w1
     Some(ObjectDef {
         nid: 700,
         short_name: "c2pnb304w1",
         long_name: "c2pnb304w1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x11],
+        indexed: true,
     }), // X9_62_c2pnb304w1
     Some(ObjectDef {
         nid: 701,
         short_name: "c2tnb359v1",
         long_name: "c2tnb359v1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x12],
+        indexed: true,
     }), // X9_62_c2tnb359v1
     Some(ObjectDef {
         nid: 702,
         short_name: "c2pnb368w1",
         long_name: "c2pnb368w1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x13],
+        indexed: true,
     }), // X9_62_c2pnb368w1
     Some(ObjectDef {
         nid: 703,
         short_name: "c2tnb431r1",
         long_name: "c2tnb431r1",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x00, 0x14],
+        indexed: true,
     }), // X9_62_c2tnb431r1
     Some(ObjectDef {
         nid: 704,
         short_name: "secp112r1",
         long_name: "secp112r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x06],
+        indexed: true,
     }), // secp112r1
     Some(ObjectDef {
         nid: 705,
         short_name: "secp112r2",
         long_name: "secp112r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x07],
+        indexed: true,
     }), // secp112r2
     Some(ObjectDef {
         nid: 706,
         short_name: "secp128r1",
         long_name: "secp128r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1c],
+        indexed: true,
     }), // secp128r1
     Some(ObjectDef {
         nid: 707,
         short_name: "secp128r2",
         long_name: "secp128r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1d],
+        indexed: true,
     }), // secp128r2
     Some(ObjectDef {
         nid: 708,
         short_name: "secp160k1",
         long_name: "secp160k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x09],
+        indexed: true,
     }), // secp160k1
     Some(ObjectDef {
         nid: 709,
         short_name: "secp160r1",
         long_name: "secp160r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x08],
+        indexed: true,
     }), // secp160r1
     Some(ObjectDef {
         nid: 710,
         short_name: "secp160r2",
         long_name: "secp160r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1e],
+        indexed: true,
     }), // secp160r2
     Some(ObjectDef {
         nid: 711,
         short_name: "secp192k1",
         long_name: "secp192k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1f],
+        indexed: true,
     }), // secp192k1
     Some(ObjectDef {
         nid: 712,
         short_name: "secp224k1",
         long_name: "secp224k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x20],
+        indexed: true,
     }), // secp224k1
     Some(ObjectDef {
         nid: 713,
         short_name: "secp224r1",
         long_name: "secp224r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x21],
+        indexed: true,
     }), // secp224r1
     Some(ObjectDef {
         nid: 714,
         short_name: "secp256k1",
         long_name: "secp256k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x0a],
+        indexed: true,
     }), // secp256k1
     Some(ObjectDef {
         nid: 715,
         short_name: "secp384r1",
         long_name: "secp384r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x22],
+        indexed: true,
     }), // secp384r1
     Some(ObjectDef {
         nid: 716,
         short_name: "secp521r1",
         long_name: "secp521r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x23],
+        indexed: true,
     }), // secp521r1
     Some(ObjectDef {
         nid: 717,
         short_name: "sect113r1",
         long_name: "sect113r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x04],
+        indexed: true,
     }), // sect113r1
     Some(ObjectDef {
         nid: 718,
         short_name: "sect113r2",
         long_name: "sect113r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x05],
+        indexed: true,
     }), // sect113r2
     Some(ObjectDef {
         nid: 719,
         short_name: "sect131r1",
         long_name: "sect131r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x16],
+        indexed: true,
     }), // sect131r1
     Some(ObjectDef {
         nid: 720,
         short_name: "sect131r2",
         long_name: "sect131r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x17],
+        indexed: true,
     }), // sect131r2
     Some(ObjectDef {
         nid: 721,
         short_name: "sect163k1",
         long_name: "sect163k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x01],
+        indexed: true,
     }), // sect163k1
     Some(ObjectDef {
         nid: 722,
         short_name: "sect163r1",
         long_name: "sect163r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x02],
+        indexed: true,
     }), // sect163r1
     Some(ObjectDef {
         nid: 723,
         short_name: "sect163r2",
         long_name: "sect163r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x0f],
+        indexed: true,
     }), // sect163r2
     Some(ObjectDef {
         nid: 724,
         short_name: "sect193r1",
         long_name: "sect193r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x18],
+        indexed: true,
     }), // sect193r1
     Some(ObjectDef {
         nid: 725,
         short_name: "sect193r2",
         long_name: "sect193r2",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x19],
+        indexed: true,
     }), // sect193r2
     Some(ObjectDef {
         nid: 726,
         short_name: "sect233k1",
         long_name: "sect233k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1a],
+        indexed: true,
     }), // sect233k1
     Some(ObjectDef {
         nid: 727,
         short_name: "sect233r1",
         long_name: "sect233r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x1b],
+        indexed: true,
     }), // sect233r1
     Some(ObjectDef {
         nid: 728,
         short_name: "sect239k1",
         long_name: "sect239k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x03],
+        indexed: true,
     }), // sect239k1
     Some(ObjectDef {
         nid: 729,
         short_name: "sect283k1",
         long_name: "sect283k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x10],
+        indexed: true,
     }), // sect283k1
     Some(ObjectDef {
         nid: 730,
         short_name: "sect283r1",
         long_name: "sect283r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x11],
+        indexed: true,
     }), // sect283r1
     Some(ObjectDef {
         nid: 731,
         short_name: "sect409k1",
         long_name: "sect409k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x24],
+        indexed: true,
     }), // sect409k1
     Some(ObjectDef {
         nid: 732,
         short_name: "sect409r1",
         long_name: "sect409r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x25],
+        indexed: true,
     }), // sect409r1
     Some(ObjectDef {
         nid: 733,
         short_name: "sect571k1",
         long_name: "sect571k1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x26],
+        indexed: true,
     }), // sect571k1
     Some(ObjectDef {
         nid: 734,
         short_name: "sect571r1",
         long_name: "sect571r1",
         der: &[0x2b, 0x81, 0x04, 0x00, 0x27],
+        indexed: true,
     }), // sect571r1
     Some(ObjectDef {
         nid: 735,
         short_name: "wap-wsg-idm-ecid-wtls1",
         long_name: "wap-wsg-idm-ecid-wtls1",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x01],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls1
     Some(ObjectDef {
         nid: 736,
         short_name: "wap-wsg-idm-ecid-wtls3",
         long_name: "wap-wsg-idm-ecid-wtls3",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x03],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls3
     Some(ObjectDef {
         nid: 737,
         short_name: "wap-wsg-idm-ecid-wtls4",
         long_name: "wap-wsg-idm-ecid-wtls4",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x04],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls4
     Some(ObjectDef {
         nid: 738,
         short_name: "wap-wsg-idm-ecid-wtls5",
         long_name: "wap-wsg-idm-ecid-wtls5",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x05],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls5
     Some(ObjectDef {
         nid: 739,
         short_name: "wap-wsg-idm-ecid-wtls6",
         long_name: "wap-wsg-idm-ecid-wtls6",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x06],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls6
     Some(ObjectDef {
         nid: 740,
         short_name: "wap-wsg-idm-ecid-wtls7",
         long_name: "wap-wsg-idm-ecid-wtls7",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x07],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls7
     Some(ObjectDef {
         nid: 741,
         short_name: "wap-wsg-idm-ecid-wtls8",
         long_name: "wap-wsg-idm-ecid-wtls8",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x08],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls8
     Some(ObjectDef {
         nid: 742,
         short_name: "wap-wsg-idm-ecid-wtls9",
         long_name: "wap-wsg-idm-ecid-wtls9",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x09],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls9
     Some(ObjectDef {
         nid: 743,
         short_name: "wap-wsg-idm-ecid-wtls10",
         long_name: "wap-wsg-idm-ecid-wtls10",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x0a],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls10
     Some(ObjectDef {
         nid: 744,
         short_name: "wap-wsg-idm-ecid-wtls11",
         long_name: "wap-wsg-idm-ecid-wtls11",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x0b],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls11
     Some(ObjectDef {
         nid: 745,
         short_name: "wap-wsg-idm-ecid-wtls12",
         long_name: "wap-wsg-idm-ecid-wtls12",
         der: &[0x67, 0x2b, 0x01, 0x04, 0x0c],
+        indexed: true,
     }), // wap_wsg_idm_ecid_wtls12
     Some(ObjectDef {
         nid: 746,
         short_name: "anyPolicy",
         long_name: "X509v3 Any Policy",
         der: &[0x55, 0x1d, 0x20, 0x00],
+        indexed: true,
     }), // any_policy
     Some(ObjectDef {
         nid: 747,
         short_name: "policyMappings",
         long_name: "X509v3 Policy Mappings",
         der: &[0x55, 0x1d, 0x21],
+        indexed: true,
     }), // policy_mappings
     Some(ObjectDef {
         nid: 748,
         short_name: "inhibitAnyPolicy",
         long_name: "X509v3 Inhibit Any Policy",
         der: &[0x55, 0x1d, 0x36],
+        indexed: true,
     }), // inhibit_any_policy
     Some(ObjectDef {
         nid: 749,
         short_name: "Oakley-EC2N-3",
         long_name: "ipsec3",
         der: &[],
+        indexed: false,
     }), // ipsec3
     Some(ObjectDef {
         nid: 750,
         short_name: "Oakley-EC2N-4",
         long_name: "ipsec4",
         der: &[],
+        indexed: false,
     }), // ipsec4
     Some(ObjectDef {
         nid: 751,
@@ -4636,6 +5383,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x01, 0x02,
         ],
+        indexed: true,
     }), // camellia_128_cbc
     Some(ObjectDef {
         nid: 752,
@@ -4644,6 +5392,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x01, 0x03,
         ],
+        indexed: true,
     }), // camellia_192_cbc
     Some(ObjectDef {
         nid: 753,
@@ -4652,114 +5401,133 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x01, 0x04,
         ],
+        indexed: true,
     }), // camellia_256_cbc
     Some(ObjectDef {
         nid: 754,
         short_name: "CAMELLIA-128-ECB",
         long_name: "camellia-128-ecb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x01],
+        indexed: true,
     }), // camellia_128_ecb
     Some(ObjectDef {
         nid: 755,
         short_name: "CAMELLIA-192-ECB",
         long_name: "camellia-192-ecb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x15],
+        indexed: true,
     }), // camellia_192_ecb
     Some(ObjectDef {
         nid: 756,
         short_name: "CAMELLIA-256-ECB",
         long_name: "camellia-256-ecb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x29],
+        indexed: true,
     }), // camellia_256_ecb
     Some(ObjectDef {
         nid: 757,
         short_name: "CAMELLIA-128-CFB",
         long_name: "camellia-128-cfb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x04],
+        indexed: true,
     }), // camellia_128_cfb128
     Some(ObjectDef {
         nid: 758,
         short_name: "CAMELLIA-192-CFB",
         long_name: "camellia-192-cfb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x18],
+        indexed: true,
     }), // camellia_192_cfb128
     Some(ObjectDef {
         nid: 759,
         short_name: "CAMELLIA-256-CFB",
         long_name: "camellia-256-cfb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x2c],
+        indexed: true,
     }), // camellia_256_cfb128
     Some(ObjectDef {
         nid: 760,
         short_name: "CAMELLIA-128-CFB1",
         long_name: "camellia-128-cfb1",
         der: &[],
+        indexed: false,
     }), // camellia_128_cfb1
     Some(ObjectDef {
         nid: 761,
         short_name: "CAMELLIA-192-CFB1",
         long_name: "camellia-192-cfb1",
         der: &[],
+        indexed: false,
     }), // camellia_192_cfb1
     Some(ObjectDef {
         nid: 762,
         short_name: "CAMELLIA-256-CFB1",
         long_name: "camellia-256-cfb1",
         der: &[],
+        indexed: false,
     }), // camellia_256_cfb1
     Some(ObjectDef {
         nid: 763,
         short_name: "CAMELLIA-128-CFB8",
         long_name: "camellia-128-cfb8",
         der: &[],
+        indexed: false,
     }), // camellia_128_cfb8
     Some(ObjectDef {
         nid: 764,
         short_name: "CAMELLIA-192-CFB8",
         long_name: "camellia-192-cfb8",
         der: &[],
+        indexed: false,
     }), // camellia_192_cfb8
     Some(ObjectDef {
         nid: 765,
         short_name: "CAMELLIA-256-CFB8",
         long_name: "camellia-256-cfb8",
         der: &[],
+        indexed: false,
     }), // camellia_256_cfb8
     Some(ObjectDef {
         nid: 766,
         short_name: "CAMELLIA-128-OFB",
         long_name: "camellia-128-ofb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x03],
+        indexed: true,
     }), // camellia_128_ofb128
     Some(ObjectDef {
         nid: 767,
         short_name: "CAMELLIA-192-OFB",
         long_name: "camellia-192-ofb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x17],
+        indexed: true,
     }), // camellia_192_ofb128
     Some(ObjectDef {
         nid: 768,
         short_name: "CAMELLIA-256-OFB",
         long_name: "camellia-256-ofb",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x2b],
+        indexed: true,
     }), // camellia_256_ofb128
     Some(ObjectDef {
         nid: 769,
         short_name: "subjectDirectoryAttributes",
         long_name: "X509v3 Subject Directory Attributes",
         der: &[0x55, 0x1d, 0x09],
+        indexed: true,
     }), // subject_directory_attributes
     Some(ObjectDef {
         nid: 770,
         short_name: "issuingDistributionPoint",
         long_name: "X509v3 Issuing Distribution Point",
         der: &[0x55, 0x1d, 0x1c],
+        indexed: true,
     }), // issuing_distribution_point
     Some(ObjectDef {
         nid: 771,
         short_name: "certificateIssuer",
         long_name: "X509v3 Certificate Issuer",
         der: &[0x55, 0x1d, 0x1d],
+        indexed: true,
     }), // certificate_issuer
     None,
     Some(ObjectDef {
@@ -4767,6 +5535,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "KISA",
         long_name: "kisa",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x44],
+        indexed: true,
     }), // kisa
     None,
     None,
@@ -4775,60 +5544,70 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         short_name: "SEED-ECB",
         long_name: "seed-ecb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x44, 0x01, 0x03],
+        indexed: true,
     }), // seed_ecb
     Some(ObjectDef {
         nid: 777,
         short_name: "SEED-CBC",
         long_name: "seed-cbc",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x44, 0x01, 0x04],
+        indexed: true,
     }), // seed_cbc
     Some(ObjectDef {
         nid: 778,
         short_name: "SEED-OFB",
         long_name: "seed-ofb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x44, 0x01, 0x06],
+        indexed: true,
     }), // seed_ofb128
     Some(ObjectDef {
         nid: 779,
         short_name: "SEED-CFB",
         long_name: "seed-cfb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x44, 0x01, 0x05],
+        indexed: true,
     }), // seed_cfb128
     Some(ObjectDef {
         nid: 780,
         short_name: "HMAC-MD5",
         long_name: "hmac-md5",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x08, 0x01, 0x01],
+        indexed: true,
     }), // hmac_md5
     Some(ObjectDef {
         nid: 781,
         short_name: "HMAC-SHA1",
         long_name: "hmac-sha1",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x08, 0x01, 0x02],
+        indexed: true,
     }), // hmac_sha1
     Some(ObjectDef {
         nid: 782,
         short_name: "id-PasswordBasedMAC",
         long_name: "password based MAC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf6, 0x7d, 0x07, 0x42, 0x0d],
+        indexed: true,
     }), // id_PasswordBasedMAC
     Some(ObjectDef {
         nid: 783,
         short_name: "id-DHBasedMac",
         long_name: "Diffie-Hellman based MAC",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf6, 0x7d, 0x07, 0x42, 0x1e],
+        indexed: true,
     }), // id_DHBasedMac
     Some(ObjectDef {
         nid: 784,
         short_name: "id-it-suppLangTags",
         long_name: "id-it-suppLangTags",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x10],
+        indexed: true,
     }), // id_it_suppLangTags
     Some(ObjectDef {
         nid: 785,
         short_name: "caRepository",
         long_name: "CA Repository",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x05],
+        indexed: true,
     }), // caRepository
     Some(ObjectDef {
         nid: 786,
@@ -4837,6 +5616,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x09,
         ],
+        indexed: true,
     }), // id_smime_ct_compressedData
     Some(ObjectDef {
         nid: 787,
@@ -4845,636 +5625,742 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x1b,
         ],
+        indexed: true,
     }), // id_ct_asciiTextWithCRLF
     Some(ObjectDef {
         nid: 788,
         short_name: "id-aes128-wrap",
         long_name: "id-aes128-wrap",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x05],
+        indexed: true,
     }), // id_aes128_wrap
     Some(ObjectDef {
         nid: 789,
         short_name: "id-aes192-wrap",
         long_name: "id-aes192-wrap",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x19],
+        indexed: true,
     }), // id_aes192_wrap
     Some(ObjectDef {
         nid: 790,
         short_name: "id-aes256-wrap",
         long_name: "id-aes256-wrap",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2d],
+        indexed: true,
     }), // id_aes256_wrap
     Some(ObjectDef {
         nid: 791,
         short_name: "ecdsa-with-Recommended",
         long_name: "ecdsa-with-Recommended",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x02],
+        indexed: true,
     }), // ecdsa_with_Recommended
     Some(ObjectDef {
         nid: 792,
         short_name: "ecdsa-with-Specified",
         long_name: "ecdsa-with-Specified",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03],
+        indexed: true,
     }), // ecdsa_with_Specified
     Some(ObjectDef {
         nid: 793,
         short_name: "ecdsa-with-SHA224",
         long_name: "ecdsa-with-SHA224",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x01],
+        indexed: true,
     }), // ecdsa_with_SHA224
     Some(ObjectDef {
         nid: 794,
         short_name: "ecdsa-with-SHA256",
         long_name: "ecdsa-with-SHA256",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02],
+        indexed: true,
     }), // ecdsa_with_SHA256
     Some(ObjectDef {
         nid: 795,
         short_name: "ecdsa-with-SHA384",
         long_name: "ecdsa-with-SHA384",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x03],
+        indexed: true,
     }), // ecdsa_with_SHA384
     Some(ObjectDef {
         nid: 796,
         short_name: "ecdsa-with-SHA512",
         long_name: "ecdsa-with-SHA512",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x04],
+        indexed: true,
     }), // ecdsa_with_SHA512
     Some(ObjectDef {
         nid: 797,
         short_name: "hmacWithMD5",
         long_name: "hmacWithMD5",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x06],
+        indexed: true,
     }), // hmacWithMD5
     Some(ObjectDef {
         nid: 798,
         short_name: "hmacWithSHA224",
         long_name: "hmacWithSHA224",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x08],
+        indexed: true,
     }), // hmacWithSHA224
     Some(ObjectDef {
         nid: 799,
         short_name: "hmacWithSHA256",
         long_name: "hmacWithSHA256",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x09],
+        indexed: true,
     }), // hmacWithSHA256
     Some(ObjectDef {
         nid: 800,
         short_name: "hmacWithSHA384",
         long_name: "hmacWithSHA384",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x0a],
+        indexed: true,
     }), // hmacWithSHA384
     Some(ObjectDef {
         nid: 801,
         short_name: "hmacWithSHA512",
         long_name: "hmacWithSHA512",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x0b],
+        indexed: true,
     }), // hmacWithSHA512
     Some(ObjectDef {
         nid: 802,
         short_name: "dsa_with_SHA224",
         long_name: "dsa_with_SHA224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x01],
+        indexed: true,
     }), // dsa_with_SHA224
     Some(ObjectDef {
         nid: 803,
         short_name: "dsa_with_SHA256",
         long_name: "dsa_with_SHA256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x02],
+        indexed: true,
     }), // dsa_with_SHA256
     Some(ObjectDef {
         nid: 804,
         short_name: "whirlpool",
         long_name: "whirlpool",
         der: &[0x28, 0xcf, 0x06, 0x03, 0x00, 0x37],
+        indexed: true,
     }), // whirlpool
     Some(ObjectDef {
         nid: 805,
         short_name: "cryptopro",
         long_name: "cryptopro",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02],
+        indexed: true,
     }), // cryptopro
     Some(ObjectDef {
         nid: 806,
         short_name: "cryptocom",
         long_name: "cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09],
+        indexed: true,
     }), // cryptocom
     Some(ObjectDef {
         nid: 807,
         short_name: "id-GostR3411-94-with-GostR3410-2001",
         long_name: "GOST R 34.11-94 with GOST R 34.10-2001",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x03],
+        indexed: true,
     }), // id_GostR3411_94_with_GostR3410_2001
     Some(ObjectDef {
         nid: 808,
         short_name: "id-GostR3411-94-with-GostR3410-94",
         long_name: "GOST R 34.11-94 with GOST R 34.10-94",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x04],
+        indexed: true,
     }), // id_GostR3411_94_with_GostR3410_94
     Some(ObjectDef {
         nid: 809,
         short_name: "md_gost94",
         long_name: "GOST R 34.11-94",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x09],
+        indexed: true,
     }), // id_GostR3411_94
     Some(ObjectDef {
         nid: 810,
         short_name: "id-HMACGostR3411-94",
         long_name: "HMAC GOST 34.11-94",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x0a],
+        indexed: true,
     }), // id_HMACGostR3411_94
     Some(ObjectDef {
         nid: 811,
         short_name: "gost2001",
         long_name: "GOST R 34.10-2001",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x13],
+        indexed: true,
     }), // id_GostR3410_2001
     Some(ObjectDef {
         nid: 812,
         short_name: "gost94",
         long_name: "GOST R 34.10-94",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x14],
+        indexed: true,
     }), // id_GostR3410_94
     Some(ObjectDef {
         nid: 813,
         short_name: "gost89",
         long_name: "GOST 28147-89",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x15],
+        indexed: true,
     }), // id_Gost28147_89
     Some(ObjectDef {
         nid: 814,
         short_name: "gost89-cnt",
         long_name: "gost89-cnt",
         der: &[],
+        indexed: false,
     }), // gost89_cnt
     Some(ObjectDef {
         nid: 815,
         short_name: "gost-mac",
         long_name: "GOST 28147-89 MAC",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x16],
+        indexed: true,
     }), // id_Gost28147_89_MAC
     Some(ObjectDef {
         nid: 816,
         short_name: "prf-gostr3411-94",
         long_name: "GOST R 34.11-94 PRF",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x17],
+        indexed: true,
     }), // id_GostR3411_94_prf
     Some(ObjectDef {
         nid: 817,
         short_name: "id-GostR3410-2001DH",
         long_name: "GOST R 34.10-2001 DH",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x62],
+        indexed: true,
     }), // id_GostR3410_2001DH
     Some(ObjectDef {
         nid: 818,
         short_name: "id-GostR3410-94DH",
         long_name: "GOST R 34.10-94 DH",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x63],
+        indexed: true,
     }), // id_GostR3410_94DH
     Some(ObjectDef {
         nid: 819,
         short_name: "id-Gost28147-89-CryptoPro-KeyMeshing",
         long_name: "id-Gost28147-89-CryptoPro-KeyMeshing",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x0e, 0x01],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_KeyMeshing
     Some(ObjectDef {
         nid: 820,
         short_name: "id-Gost28147-89-None-KeyMeshing",
         long_name: "id-Gost28147-89-None-KeyMeshing",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x0e, 0x00],
+        indexed: true,
     }), // id_Gost28147_89_None_KeyMeshing
     Some(ObjectDef {
         nid: 821,
         short_name: "id-GostR3411-94-TestParamSet",
         long_name: "id-GostR3411-94-TestParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1e, 0x00],
+        indexed: true,
     }), // id_GostR3411_94_TestParamSet
     Some(ObjectDef {
         nid: 822,
         short_name: "id-GostR3411-94-CryptoProParamSet",
         long_name: "id-GostR3411-94-CryptoProParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1e, 0x01],
+        indexed: true,
     }), // id_GostR3411_94_CryptoProParamSet
     Some(ObjectDef {
         nid: 823,
         short_name: "id-Gost28147-89-TestParamSet",
         long_name: "id-Gost28147-89-TestParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x00],
+        indexed: true,
     }), // id_Gost28147_89_TestParamSet
     Some(ObjectDef {
         nid: 824,
         short_name: "id-Gost28147-89-CryptoPro-A-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-A-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x01],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_A_ParamSet
     Some(ObjectDef {
         nid: 825,
         short_name: "id-Gost28147-89-CryptoPro-B-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-B-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x02],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_B_ParamSet
     Some(ObjectDef {
         nid: 826,
         short_name: "id-Gost28147-89-CryptoPro-C-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-C-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x03],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_C_ParamSet
     Some(ObjectDef {
         nid: 827,
         short_name: "id-Gost28147-89-CryptoPro-D-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-D-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x04],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_D_ParamSet
     Some(ObjectDef {
         nid: 828,
         short_name: "id-Gost28147-89-CryptoPro-Oscar-1-1-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-Oscar-1-1-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x05],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_Oscar_1_1_ParamSet
     Some(ObjectDef {
         nid: 829,
         short_name: "id-Gost28147-89-CryptoPro-Oscar-1-0-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-Oscar-1-0-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x06],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_Oscar_1_0_ParamSet
     Some(ObjectDef {
         nid: 830,
         short_name: "id-Gost28147-89-CryptoPro-RIC-1-ParamSet",
         long_name: "id-Gost28147-89-CryptoPro-RIC-1-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x1f, 0x07],
+        indexed: true,
     }), // id_Gost28147_89_CryptoPro_RIC_1_ParamSet
     Some(ObjectDef {
         nid: 831,
         short_name: "id-GostR3410-94-TestParamSet",
         long_name: "id-GostR3410-94-TestParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x20, 0x00],
+        indexed: true,
     }), // id_GostR3410_94_TestParamSet
     Some(ObjectDef {
         nid: 832,
         short_name: "id-GostR3410-94-CryptoPro-A-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-A-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x20, 0x02],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_A_ParamSet
     Some(ObjectDef {
         nid: 833,
         short_name: "id-GostR3410-94-CryptoPro-B-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-B-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x20, 0x03],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_B_ParamSet
     Some(ObjectDef {
         nid: 834,
         short_name: "id-GostR3410-94-CryptoPro-C-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-C-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x20, 0x04],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_C_ParamSet
     Some(ObjectDef {
         nid: 835,
         short_name: "id-GostR3410-94-CryptoPro-D-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-D-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x20, 0x05],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_D_ParamSet
     Some(ObjectDef {
         nid: 836,
         short_name: "id-GostR3410-94-CryptoPro-XchA-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-XchA-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x21, 0x01],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_XchA_ParamSet
     Some(ObjectDef {
         nid: 837,
         short_name: "id-GostR3410-94-CryptoPro-XchB-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-XchB-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x21, 0x02],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_XchB_ParamSet
     Some(ObjectDef {
         nid: 838,
         short_name: "id-GostR3410-94-CryptoPro-XchC-ParamSet",
         long_name: "id-GostR3410-94-CryptoPro-XchC-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x21, 0x03],
+        indexed: true,
     }), // id_GostR3410_94_CryptoPro_XchC_ParamSet
     Some(ObjectDef {
         nid: 839,
         short_name: "id-GostR3410-2001-TestParamSet",
         long_name: "id-GostR3410-2001-TestParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x23, 0x00],
+        indexed: true,
     }), // id_GostR3410_2001_TestParamSet
     Some(ObjectDef {
         nid: 840,
         short_name: "id-GostR3410-2001-CryptoPro-A-ParamSet",
         long_name: "id-GostR3410-2001-CryptoPro-A-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x23, 0x01],
+        indexed: true,
     }), // id_GostR3410_2001_CryptoPro_A_ParamSet
     Some(ObjectDef {
         nid: 841,
         short_name: "id-GostR3410-2001-CryptoPro-B-ParamSet",
         long_name: "id-GostR3410-2001-CryptoPro-B-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x23, 0x02],
+        indexed: true,
     }), // id_GostR3410_2001_CryptoPro_B_ParamSet
     Some(ObjectDef {
         nid: 842,
         short_name: "id-GostR3410-2001-CryptoPro-C-ParamSet",
         long_name: "id-GostR3410-2001-CryptoPro-C-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x23, 0x03],
+        indexed: true,
     }), // id_GostR3410_2001_CryptoPro_C_ParamSet
     Some(ObjectDef {
         nid: 843,
         short_name: "id-GostR3410-2001-CryptoPro-XchA-ParamSet",
         long_name: "id-GostR3410-2001-CryptoPro-XchA-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x24, 0x00],
+        indexed: true,
     }), // id_GostR3410_2001_CryptoPro_XchA_ParamSet
     Some(ObjectDef {
         nid: 844,
         short_name: "id-GostR3410-2001-CryptoPro-XchB-ParamSet",
         long_name: "id-GostR3410-2001-CryptoPro-XchB-ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x24, 0x01],
+        indexed: true,
     }), // id_GostR3410_2001_CryptoPro_XchB_ParamSet
     Some(ObjectDef {
         nid: 845,
         short_name: "id-GostR3410-94-a",
         long_name: "id-GostR3410-94-a",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x14, 0x01],
+        indexed: true,
     }), // id_GostR3410_94_a
     Some(ObjectDef {
         nid: 846,
         short_name: "id-GostR3410-94-aBis",
         long_name: "id-GostR3410-94-aBis",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x14, 0x02],
+        indexed: true,
     }), // id_GostR3410_94_aBis
     Some(ObjectDef {
         nid: 847,
         short_name: "id-GostR3410-94-b",
         long_name: "id-GostR3410-94-b",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x14, 0x03],
+        indexed: true,
     }), // id_GostR3410_94_b
     Some(ObjectDef {
         nid: 848,
         short_name: "id-GostR3410-94-bBis",
         long_name: "id-GostR3410-94-bBis",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x02, 0x14, 0x04],
+        indexed: true,
     }), // id_GostR3410_94_bBis
     Some(ObjectDef {
         nid: 849,
         short_name: "id-Gost28147-89-cc",
         long_name: "GOST 28147-89 Cryptocom ParamSet",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x06, 0x01],
+        indexed: true,
     }), // id_Gost28147_89_cc
     Some(ObjectDef {
         nid: 850,
         short_name: "gost94cc",
         long_name: "GOST 34.10-94 Cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x05, 0x03],
+        indexed: true,
     }), // id_GostR3410_94_cc
     Some(ObjectDef {
         nid: 851,
         short_name: "gost2001cc",
         long_name: "GOST 34.10-2001 Cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x05, 0x04],
+        indexed: true,
     }), // id_GostR3410_2001_cc
     Some(ObjectDef {
         nid: 852,
         short_name: "id-GostR3411-94-with-GostR3410-94-cc",
         long_name: "GOST R 34.11-94 with GOST R 34.10-94 Cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x03, 0x03],
+        indexed: true,
     }), // id_GostR3411_94_with_GostR3410_94_cc
     Some(ObjectDef {
         nid: 853,
         short_name: "id-GostR3411-94-with-GostR3410-2001-cc",
         long_name: "GOST R 34.11-94 with GOST R 34.10-2001 Cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x03, 0x04],
+        indexed: true,
     }), // id_GostR3411_94_with_GostR3410_2001_cc
     Some(ObjectDef {
         nid: 854,
         short_name: "id-GostR3410-2001-ParamSet-cc",
         long_name: "GOST R 3410-2001 Parameter Set Cryptocom",
         der: &[0x2a, 0x85, 0x03, 0x02, 0x09, 0x01, 0x08, 0x01],
+        indexed: true,
     }), // id_GostR3410_2001_ParamSet_cc
     Some(ObjectDef {
         nid: 855,
         short_name: "HMAC",
         long_name: "hmac",
         der: &[],
+        indexed: false,
     }), // hmac
     Some(ObjectDef {
         nid: 856,
         short_name: "LocalKeySet",
         long_name: "Microsoft Local Key set",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x11, 0x02],
+        indexed: true,
     }), // LocalKeySet
     Some(ObjectDef {
         nid: 857,
         short_name: "freshestCRL",
         long_name: "X509v3 Freshest CRL",
         der: &[0x55, 0x1d, 0x2e],
+        indexed: true,
     }), // freshest_crl
     Some(ObjectDef {
         nid: 858,
         short_name: "id-on-permanentIdentifier",
         long_name: "Permanent Identifier",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x03],
+        indexed: true,
     }), // id_on_permanentIdentifier
     Some(ObjectDef {
         nid: 859,
         short_name: "searchGuide",
         long_name: "searchGuide",
         der: &[0x55, 0x04, 0x0e],
+        indexed: true,
     }), // searchGuide
     Some(ObjectDef {
         nid: 860,
         short_name: "businessCategory",
         long_name: "businessCategory",
         der: &[0x55, 0x04, 0x0f],
+        indexed: true,
     }), // businessCategory
     Some(ObjectDef {
         nid: 861,
         short_name: "postalAddress",
         long_name: "postalAddress",
         der: &[0x55, 0x04, 0x10],
+        indexed: true,
     }), // postalAddress
     Some(ObjectDef {
         nid: 862,
         short_name: "postOfficeBox",
         long_name: "postOfficeBox",
         der: &[0x55, 0x04, 0x12],
+        indexed: true,
     }), // postOfficeBox
     Some(ObjectDef {
         nid: 863,
         short_name: "physicalDeliveryOfficeName",
         long_name: "physicalDeliveryOfficeName",
         der: &[0x55, 0x04, 0x13],
+        indexed: true,
     }), // physicalDeliveryOfficeName
     Some(ObjectDef {
         nid: 864,
         short_name: "telephoneNumber",
         long_name: "telephoneNumber",
         der: &[0x55, 0x04, 0x14],
+        indexed: true,
     }), // telephoneNumber
     Some(ObjectDef {
         nid: 865,
         short_name: "telexNumber",
         long_name: "telexNumber",
         der: &[0x55, 0x04, 0x15],
+        indexed: true,
     }), // telexNumber
     Some(ObjectDef {
         nid: 866,
         short_name: "teletexTerminalIdentifier",
         long_name: "teletexTerminalIdentifier",
         der: &[0x55, 0x04, 0x16],
+        indexed: true,
     }), // teletexTerminalIdentifier
     Some(ObjectDef {
         nid: 867,
         short_name: "facsimileTelephoneNumber",
         long_name: "facsimileTelephoneNumber",
         der: &[0x55, 0x04, 0x17],
+        indexed: true,
     }), // facsimileTelephoneNumber
     Some(ObjectDef {
         nid: 868,
         short_name: "x121Address",
         long_name: "x121Address",
         der: &[0x55, 0x04, 0x18],
+        indexed: true,
     }), // x121Address
     Some(ObjectDef {
         nid: 869,
         short_name: "internationaliSDNNumber",
         long_name: "internationaliSDNNumber",
         der: &[0x55, 0x04, 0x19],
+        indexed: true,
     }), // internationaliSDNNumber
     Some(ObjectDef {
         nid: 870,
         short_name: "registeredAddress",
         long_name: "registeredAddress",
         der: &[0x55, 0x04, 0x1a],
+        indexed: true,
     }), // registeredAddress
     Some(ObjectDef {
         nid: 871,
         short_name: "destinationIndicator",
         long_name: "destinationIndicator",
         der: &[0x55, 0x04, 0x1b],
+        indexed: true,
     }), // destinationIndicator
     Some(ObjectDef {
         nid: 872,
         short_name: "preferredDeliveryMethod",
         long_name: "preferredDeliveryMethod",
         der: &[0x55, 0x04, 0x1c],
+        indexed: true,
     }), // preferredDeliveryMethod
     Some(ObjectDef {
         nid: 873,
         short_name: "presentationAddress",
         long_name: "presentationAddress",
         der: &[0x55, 0x04, 0x1d],
+        indexed: true,
     }), // presentationAddress
     Some(ObjectDef {
         nid: 874,
         short_name: "supportedApplicationContext",
         long_name: "supportedApplicationContext",
         der: &[0x55, 0x04, 0x1e],
+        indexed: true,
     }), // supportedApplicationContext
     Some(ObjectDef {
         nid: 875,
         short_name: "member",
         long_name: "member",
         der: &[0x55, 0x04, 0x1f],
+        indexed: true,
     }), // member
     Some(ObjectDef {
         nid: 876,
         short_name: "owner",
         long_name: "owner",
         der: &[0x55, 0x04, 0x20],
+        indexed: true,
     }), // owner
     Some(ObjectDef {
         nid: 877,
         short_name: "roleOccupant",
         long_name: "roleOccupant",
         der: &[0x55, 0x04, 0x21],
+        indexed: true,
     }), // roleOccupant
     Some(ObjectDef {
         nid: 878,
         short_name: "seeAlso",
         long_name: "seeAlso",
         der: &[0x55, 0x04, 0x22],
+        indexed: true,
     }), // seeAlso
     Some(ObjectDef {
         nid: 879,
         short_name: "userPassword",
         long_name: "userPassword",
         der: &[0x55, 0x04, 0x23],
+        indexed: true,
     }), // userPassword
     Some(ObjectDef {
         nid: 880,
         short_name: "userCertificate",
         long_name: "userCertificate",
         der: &[0x55, 0x04, 0x24],
+        indexed: true,
     }), // userCertificate
     Some(ObjectDef {
         nid: 881,
         short_name: "cACertificate",
         long_name: "cACertificate",
         der: &[0x55, 0x04, 0x25],
+        indexed: true,
     }), // cACertificate
     Some(ObjectDef {
         nid: 882,
         short_name: "authorityRevocationList",
         long_name: "authorityRevocationList",
         der: &[0x55, 0x04, 0x26],
+        indexed: true,
     }), // authorityRevocationList
     Some(ObjectDef {
         nid: 883,
         short_name: "certificateRevocationList",
         long_name: "certificateRevocationList",
         der: &[0x55, 0x04, 0x27],
+        indexed: true,
     }), // certificateRevocationList
     Some(ObjectDef {
         nid: 884,
         short_name: "crossCertificatePair",
         long_name: "crossCertificatePair",
         der: &[0x55, 0x04, 0x28],
+        indexed: true,
     }), // crossCertificatePair
     Some(ObjectDef {
         nid: 885,
         short_name: "enhancedSearchGuide",
         long_name: "enhancedSearchGuide",
         der: &[0x55, 0x04, 0x2f],
+        indexed: true,
     }), // enhancedSearchGuide
     Some(ObjectDef {
         nid: 886,
         short_name: "protocolInformation",
         long_name: "protocolInformation",
         der: &[0x55, 0x04, 0x30],
+        indexed: true,
     }), // protocolInformation
     Some(ObjectDef {
         nid: 887,
         short_name: "distinguishedName",
         long_name: "distinguishedName",
         der: &[0x55, 0x04, 0x31],
+        indexed: true,
     }), // distinguishedName
     Some(ObjectDef {
         nid: 888,
         short_name: "uniqueMember",
         long_name: "uniqueMember",
         der: &[0x55, 0x04, 0x32],
+        indexed: true,
     }), // uniqueMember
     Some(ObjectDef {
         nid: 889,
         short_name: "houseIdentifier",
         long_name: "houseIdentifier",
         der: &[0x55, 0x04, 0x33],
+        indexed: true,
     }), // houseIdentifier
     Some(ObjectDef {
         nid: 890,
         short_name: "supportedAlgorithms",
         long_name: "supportedAlgorithms",
         der: &[0x55, 0x04, 0x34],
+        indexed: true,
     }), // supportedAlgorithms
     Some(ObjectDef {
         nid: 891,
         short_name: "deltaRevocationList",
         long_name: "deltaRevocationList",
         der: &[0x55, 0x04, 0x35],
+        indexed: true,
     }), // deltaRevocationList
     Some(ObjectDef {
         nid: 892,
         short_name: "dmdName",
         long_name: "dmdName",
         der: &[0x55, 0x04, 0x36],
+        indexed: true,
     }), // dmdName
     Some(ObjectDef {
         nid: 893,
@@ -5483,84 +6369,98 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x03, 0x09,
         ],
+        indexed: true,
     }), // id_alg_PWRI_KEK
     Some(ObjectDef {
         nid: 894,
         short_name: "CMAC",
         long_name: "cmac",
         der: &[],
+        indexed: false,
     }), // cmac
     Some(ObjectDef {
         nid: 895,
         short_name: "id-aes128-GCM",
         long_name: "aes-128-gcm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x06],
+        indexed: true,
     }), // aes_128_gcm
     Some(ObjectDef {
         nid: 896,
         short_name: "id-aes128-CCM",
         long_name: "aes-128-ccm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x07],
+        indexed: true,
     }), // aes_128_ccm
     Some(ObjectDef {
         nid: 897,
         short_name: "id-aes128-wrap-pad",
         long_name: "id-aes128-wrap-pad",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x08],
+        indexed: true,
     }), // id_aes128_wrap_pad
     Some(ObjectDef {
         nid: 898,
         short_name: "id-aes192-GCM",
         long_name: "aes-192-gcm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x1a],
+        indexed: true,
     }), // aes_192_gcm
     Some(ObjectDef {
         nid: 899,
         short_name: "id-aes192-CCM",
         long_name: "aes-192-ccm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x1b],
+        indexed: true,
     }), // aes_192_ccm
     Some(ObjectDef {
         nid: 900,
         short_name: "id-aes192-wrap-pad",
         long_name: "id-aes192-wrap-pad",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x1c],
+        indexed: true,
     }), // id_aes192_wrap_pad
     Some(ObjectDef {
         nid: 901,
         short_name: "id-aes256-GCM",
         long_name: "aes-256-gcm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2e],
+        indexed: true,
     }), // aes_256_gcm
     Some(ObjectDef {
         nid: 902,
         short_name: "id-aes256-CCM",
         long_name: "aes-256-ccm",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2f],
+        indexed: true,
     }), // aes_256_ccm
     Some(ObjectDef {
         nid: 903,
         short_name: "id-aes256-wrap-pad",
         long_name: "id-aes256-wrap-pad",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x30],
+        indexed: true,
     }), // id_aes256_wrap_pad
     Some(ObjectDef {
         nid: 904,
         short_name: "AES-128-CTR",
         long_name: "aes-128-ctr",
         der: &[],
+        indexed: false,
     }), // aes_128_ctr
     Some(ObjectDef {
         nid: 905,
         short_name: "AES-192-CTR",
         long_name: "aes-192-ctr",
         der: &[],
+        indexed: false,
     }), // aes_192_ctr
     Some(ObjectDef {
         nid: 906,
         short_name: "AES-256-CTR",
         long_name: "aes-256-ctr",
         der: &[],
+        indexed: false,
     }), // aes_256_ctr
     Some(ObjectDef {
         nid: 907,
@@ -5569,6 +6469,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x03, 0x02,
         ],
+        indexed: true,
     }), // id_camellia128_wrap
     Some(ObjectDef {
         nid: 908,
@@ -5577,6 +6478,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x03, 0x03,
         ],
+        indexed: true,
     }), // id_camellia192_wrap
     Some(ObjectDef {
         nid: 909,
@@ -5585,276 +6487,322 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x83, 0x08, 0x8c, 0x9a, 0x4b, 0x3d, 0x01, 0x01, 0x03, 0x04,
         ],
+        indexed: true,
     }), // id_camellia256_wrap
     Some(ObjectDef {
         nid: 910,
         short_name: "anyExtendedKeyUsage",
         long_name: "Any Extended Key Usage",
         der: &[0x55, 0x1d, 0x25, 0x00],
+        indexed: true,
     }), // anyExtendedKeyUsage
     Some(ObjectDef {
         nid: 911,
         short_name: "MGF1",
         long_name: "mgf1",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08],
+        indexed: true,
     }), // mgf1
     Some(ObjectDef {
         nid: 912,
         short_name: "RSASSA-PSS",
         long_name: "rsassaPss",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0a],
+        indexed: true,
     }), // rsassaPss
     Some(ObjectDef {
         nid: 913,
         short_name: "AES-128-XTS",
         long_name: "aes-128-xts",
         der: &[0x2b, 0x6f, 0x02, 0x8c, 0x53, 0x00, 0x01, 0x01],
+        indexed: true,
     }), // aes_128_xts
     Some(ObjectDef {
         nid: 914,
         short_name: "AES-256-XTS",
         long_name: "aes-256-xts",
         der: &[0x2b, 0x6f, 0x02, 0x8c, 0x53, 0x00, 0x01, 0x02],
+        indexed: true,
     }), // aes_256_xts
     Some(ObjectDef {
         nid: 915,
         short_name: "RC4-HMAC-MD5",
         long_name: "rc4-hmac-md5",
         der: &[],
+        indexed: false,
     }), // rc4_hmac_md5
     Some(ObjectDef {
         nid: 916,
         short_name: "AES-128-CBC-HMAC-SHA1",
         long_name: "aes-128-cbc-hmac-sha1",
         der: &[],
+        indexed: false,
     }), // aes_128_cbc_hmac_sha1
     Some(ObjectDef {
         nid: 917,
         short_name: "AES-192-CBC-HMAC-SHA1",
         long_name: "aes-192-cbc-hmac-sha1",
         der: &[],
+        indexed: false,
     }), // aes_192_cbc_hmac_sha1
     Some(ObjectDef {
         nid: 918,
         short_name: "AES-256-CBC-HMAC-SHA1",
         long_name: "aes-256-cbc-hmac-sha1",
         der: &[],
+        indexed: false,
     }), // aes_256_cbc_hmac_sha1
     Some(ObjectDef {
         nid: 919,
         short_name: "RSAES-OAEP",
         long_name: "rsaesOaep",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x07],
+        indexed: true,
     }), // rsaesOaep
     Some(ObjectDef {
         nid: 920,
         short_name: "dhpublicnumber",
         long_name: "X9.42 DH",
         der: &[0x2a, 0x86, 0x48, 0xce, 0x3e, 0x02, 0x01],
+        indexed: true,
     }), // dhpublicnumber
     Some(ObjectDef {
         nid: 921,
         short_name: "brainpoolP160r1",
         long_name: "brainpoolP160r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // brainpoolP160r1
     Some(ObjectDef {
         nid: 922,
         short_name: "brainpoolP160t1",
         long_name: "brainpoolP160t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // brainpoolP160t1
     Some(ObjectDef {
         nid: 923,
         short_name: "brainpoolP192r1",
         long_name: "brainpoolP192r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x03],
+        indexed: true,
     }), // brainpoolP192r1
     Some(ObjectDef {
         nid: 924,
         short_name: "brainpoolP192t1",
         long_name: "brainpoolP192t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x04],
+        indexed: true,
     }), // brainpoolP192t1
     Some(ObjectDef {
         nid: 925,
         short_name: "brainpoolP224r1",
         long_name: "brainpoolP224r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x05],
+        indexed: true,
     }), // brainpoolP224r1
     Some(ObjectDef {
         nid: 926,
         short_name: "brainpoolP224t1",
         long_name: "brainpoolP224t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x06],
+        indexed: true,
     }), // brainpoolP224t1
     Some(ObjectDef {
         nid: 927,
         short_name: "brainpoolP256r1",
         long_name: "brainpoolP256r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07],
+        indexed: true,
     }), // brainpoolP256r1
     Some(ObjectDef {
         nid: 928,
         short_name: "brainpoolP256t1",
         long_name: "brainpoolP256t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x08],
+        indexed: true,
     }), // brainpoolP256t1
     Some(ObjectDef {
         nid: 929,
         short_name: "brainpoolP320r1",
         long_name: "brainpoolP320r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x09],
+        indexed: true,
     }), // brainpoolP320r1
     Some(ObjectDef {
         nid: 930,
         short_name: "brainpoolP320t1",
         long_name: "brainpoolP320t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0a],
+        indexed: true,
     }), // brainpoolP320t1
     Some(ObjectDef {
         nid: 931,
         short_name: "brainpoolP384r1",
         long_name: "brainpoolP384r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0b],
+        indexed: true,
     }), // brainpoolP384r1
     Some(ObjectDef {
         nid: 932,
         short_name: "brainpoolP384t1",
         long_name: "brainpoolP384t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0c],
+        indexed: true,
     }), // brainpoolP384t1
     Some(ObjectDef {
         nid: 933,
         short_name: "brainpoolP512r1",
         long_name: "brainpoolP512r1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0d],
+        indexed: true,
     }), // brainpoolP512r1
     Some(ObjectDef {
         nid: 934,
         short_name: "brainpoolP512t1",
         long_name: "brainpoolP512t1",
         der: &[0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0e],
+        indexed: true,
     }), // brainpoolP512t1
     Some(ObjectDef {
         nid: 935,
         short_name: "PSPECIFIED",
         long_name: "pSpecified",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x09],
+        indexed: true,
     }), // pSpecified
     Some(ObjectDef {
         nid: 936,
         short_name: "dhSinglePass-stdDH-sha1kdf-scheme",
         long_name: "dhSinglePass-stdDH-sha1kdf-scheme",
         der: &[0x2b, 0x81, 0x05, 0x10, 0x86, 0x48, 0x3f, 0x00, 0x02],
+        indexed: true,
     }), // dhSinglePass_stdDH_sha1kdf_scheme
     Some(ObjectDef {
         nid: 937,
         short_name: "dhSinglePass-stdDH-sha224kdf-scheme",
         long_name: "dhSinglePass-stdDH-sha224kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0b, 0x00],
+        indexed: true,
     }), // dhSinglePass_stdDH_sha224kdf_scheme
     Some(ObjectDef {
         nid: 938,
         short_name: "dhSinglePass-stdDH-sha256kdf-scheme",
         long_name: "dhSinglePass-stdDH-sha256kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0b, 0x01],
+        indexed: true,
     }), // dhSinglePass_stdDH_sha256kdf_scheme
     Some(ObjectDef {
         nid: 939,
         short_name: "dhSinglePass-stdDH-sha384kdf-scheme",
         long_name: "dhSinglePass-stdDH-sha384kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0b, 0x02],
+        indexed: true,
     }), // dhSinglePass_stdDH_sha384kdf_scheme
     Some(ObjectDef {
         nid: 940,
         short_name: "dhSinglePass-stdDH-sha512kdf-scheme",
         long_name: "dhSinglePass-stdDH-sha512kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0b, 0x03],
+        indexed: true,
     }), // dhSinglePass_stdDH_sha512kdf_scheme
     Some(ObjectDef {
         nid: 941,
         short_name: "dhSinglePass-cofactorDH-sha1kdf-scheme",
         long_name: "dhSinglePass-cofactorDH-sha1kdf-scheme",
         der: &[0x2b, 0x81, 0x05, 0x10, 0x86, 0x48, 0x3f, 0x00, 0x03],
+        indexed: true,
     }), // dhSinglePass_cofactorDH_sha1kdf_scheme
     Some(ObjectDef {
         nid: 942,
         short_name: "dhSinglePass-cofactorDH-sha224kdf-scheme",
         long_name: "dhSinglePass-cofactorDH-sha224kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0e, 0x00],
+        indexed: true,
     }), // dhSinglePass_cofactorDH_sha224kdf_scheme
     Some(ObjectDef {
         nid: 943,
         short_name: "dhSinglePass-cofactorDH-sha256kdf-scheme",
         long_name: "dhSinglePass-cofactorDH-sha256kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0e, 0x01],
+        indexed: true,
     }), // dhSinglePass_cofactorDH_sha256kdf_scheme
     Some(ObjectDef {
         nid: 944,
         short_name: "dhSinglePass-cofactorDH-sha384kdf-scheme",
         long_name: "dhSinglePass-cofactorDH-sha384kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0e, 0x02],
+        indexed: true,
     }), // dhSinglePass_cofactorDH_sha384kdf_scheme
     Some(ObjectDef {
         nid: 945,
         short_name: "dhSinglePass-cofactorDH-sha512kdf-scheme",
         long_name: "dhSinglePass-cofactorDH-sha512kdf-scheme",
         der: &[0x2b, 0x81, 0x04, 0x01, 0x0e, 0x03],
+        indexed: true,
     }), // dhSinglePass_cofactorDH_sha512kdf_scheme
     Some(ObjectDef {
         nid: 946,
         short_name: "dh-std-kdf",
         long_name: "dh-std-kdf",
         der: &[],
+        indexed: false,
     }), // dh_std_kdf
     Some(ObjectDef {
         nid: 947,
         short_name: "dh-cofactor-kdf",
         long_name: "dh-cofactor-kdf",
         der: &[],
+        indexed: false,
     }), // dh_cofactor_kdf
     Some(ObjectDef {
         nid: 948,
         short_name: "AES-128-CBC-HMAC-SHA256",
         long_name: "aes-128-cbc-hmac-sha256",
         der: &[],
+        indexed: false,
     }), // aes_128_cbc_hmac_sha256
     Some(ObjectDef {
         nid: 949,
         short_name: "AES-192-CBC-HMAC-SHA256",
         long_name: "aes-192-cbc-hmac-sha256",
         der: &[],
+        indexed: false,
     }), // aes_192_cbc_hmac_sha256
     Some(ObjectDef {
         nid: 950,
         short_name: "AES-256-CBC-HMAC-SHA256",
         long_name: "aes-256-cbc-hmac-sha256",
         der: &[],
+        indexed: false,
     }), // aes_256_cbc_hmac_sha256
     Some(ObjectDef {
         nid: 951,
         short_name: "ct_precert_scts",
         long_name: "CT Precertificate SCTs",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0xd6, 0x79, 0x02, 0x04, 0x02],
+        indexed: true,
     }), // ct_precert_scts
     Some(ObjectDef {
         nid: 952,
         short_name: "ct_precert_poison",
         long_name: "CT Precertificate Poison",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0xd6, 0x79, 0x02, 0x04, 0x03],
+        indexed: true,
     }), // ct_precert_poison
     Some(ObjectDef {
         nid: 953,
         short_name: "ct_precert_signer",
         long_name: "CT Precertificate Signer",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0xd6, 0x79, 0x02, 0x04, 0x04],
+        indexed: true,
     }), // ct_precert_signer
     Some(ObjectDef {
         nid: 954,
         short_name: "ct_cert_scts",
         long_name: "CT Certificate SCTs",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0xd6, 0x79, 0x02, 0x04, 0x05],
+        indexed: true,
     }), // ct_cert_scts
     Some(ObjectDef {
         nid: 955,
@@ -5863,6 +6811,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x3c, 0x02, 0x01, 0x01,
         ],
+        indexed: true,
     }), // jurisdictionLocalityName
     Some(ObjectDef {
         nid: 956,
@@ -5871,6 +6820,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x3c, 0x02, 0x01, 0x02,
         ],
+        indexed: true,
     }), // jurisdictionStateOrProvinceName
     Some(ObjectDef {
         nid: 957,
@@ -5879,582 +6829,679 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x3c, 0x02, 0x01, 0x03,
         ],
+        indexed: true,
     }), // jurisdictionCountryName
     Some(ObjectDef {
         nid: 958,
         short_name: "AES-128-OCB",
         long_name: "aes-128-ocb",
         der: &[],
+        indexed: false,
     }), // aes_128_ocb
     Some(ObjectDef {
         nid: 959,
         short_name: "AES-192-OCB",
         long_name: "aes-192-ocb",
         der: &[],
+        indexed: false,
     }), // aes_192_ocb
     Some(ObjectDef {
         nid: 960,
         short_name: "AES-256-OCB",
         long_name: "aes-256-ocb",
         der: &[],
+        indexed: false,
     }), // aes_256_ocb
     Some(ObjectDef {
         nid: 961,
         short_name: "CAMELLIA-128-GCM",
         long_name: "camellia-128-gcm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x06],
+        indexed: true,
     }), // camellia_128_gcm
     Some(ObjectDef {
         nid: 962,
         short_name: "CAMELLIA-128-CCM",
         long_name: "camellia-128-ccm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x07],
+        indexed: true,
     }), // camellia_128_ccm
     Some(ObjectDef {
         nid: 963,
         short_name: "CAMELLIA-128-CTR",
         long_name: "camellia-128-ctr",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x09],
+        indexed: true,
     }), // camellia_128_ctr
     Some(ObjectDef {
         nid: 964,
         short_name: "CAMELLIA-128-CMAC",
         long_name: "camellia-128-cmac",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x0a],
+        indexed: true,
     }), // camellia_128_cmac
     Some(ObjectDef {
         nid: 965,
         short_name: "CAMELLIA-192-GCM",
         long_name: "camellia-192-gcm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x1a],
+        indexed: true,
     }), // camellia_192_gcm
     Some(ObjectDef {
         nid: 966,
         short_name: "CAMELLIA-192-CCM",
         long_name: "camellia-192-ccm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x1b],
+        indexed: true,
     }), // camellia_192_ccm
     Some(ObjectDef {
         nid: 967,
         short_name: "CAMELLIA-192-CTR",
         long_name: "camellia-192-ctr",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x1d],
+        indexed: true,
     }), // camellia_192_ctr
     Some(ObjectDef {
         nid: 968,
         short_name: "CAMELLIA-192-CMAC",
         long_name: "camellia-192-cmac",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x1e],
+        indexed: true,
     }), // camellia_192_cmac
     Some(ObjectDef {
         nid: 969,
         short_name: "CAMELLIA-256-GCM",
         long_name: "camellia-256-gcm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x2e],
+        indexed: true,
     }), // camellia_256_gcm
     Some(ObjectDef {
         nid: 970,
         short_name: "CAMELLIA-256-CCM",
         long_name: "camellia-256-ccm",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x2f],
+        indexed: true,
     }), // camellia_256_ccm
     Some(ObjectDef {
         nid: 971,
         short_name: "CAMELLIA-256-CTR",
         long_name: "camellia-256-ctr",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x31],
+        indexed: true,
     }), // camellia_256_ctr
     Some(ObjectDef {
         nid: 972,
         short_name: "CAMELLIA-256-CMAC",
         long_name: "camellia-256-cmac",
         der: &[0x03, 0xa2, 0x31, 0x05, 0x03, 0x01, 0x09, 0x32],
+        indexed: true,
     }), // camellia_256_cmac
     Some(ObjectDef {
         nid: 973,
         short_name: "id-scrypt",
         long_name: "scrypt",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0xda, 0x47, 0x04, 0x0b],
+        indexed: true,
     }), // id_scrypt
     Some(ObjectDef {
         nid: 974,
         short_name: "id-tc26",
         long_name: "id-tc26",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01],
+        indexed: true,
     }), // id_tc26
     Some(ObjectDef {
         nid: 975,
         short_name: "gost89-cnt-12",
         long_name: "gost89-cnt-12",
         der: &[],
+        indexed: false,
     }), // gost89_cnt_12
     Some(ObjectDef {
         nid: 976,
         short_name: "gost-mac-12",
         long_name: "gost-mac-12",
         der: &[],
+        indexed: false,
     }), // gost_mac_12
     Some(ObjectDef {
         nid: 977,
         short_name: "id-tc26-algorithms",
         long_name: "id-tc26-algorithms",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01],
+        indexed: true,
     }), // id_tc26_algorithms
     Some(ObjectDef {
         nid: 978,
         short_name: "id-tc26-sign",
         long_name: "id-tc26-sign",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // id_tc26_sign
     Some(ObjectDef {
         nid: 979,
         short_name: "gost2012_256",
         long_name: "GOST R 34.10-2012 with 256 bit modulus",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // id_GostR3410_2012_256
     Some(ObjectDef {
         nid: 980,
         short_name: "gost2012_512",
         long_name: "GOST R 34.10-2012 with 512 bit modulus",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // id_GostR3410_2012_512
     Some(ObjectDef {
         nid: 981,
         short_name: "id-tc26-digest",
         long_name: "id-tc26-digest",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // id_tc26_digest
     Some(ObjectDef {
         nid: 982,
         short_name: "md_gost12_256",
         long_name: "GOST R 34.11-2012 with 256 bit hash",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x02, 0x02],
+        indexed: true,
     }), // id_GostR3411_2012_256
     Some(ObjectDef {
         nid: 983,
         short_name: "md_gost12_512",
         long_name: "GOST R 34.11-2012 with 512 bit hash",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x02, 0x03],
+        indexed: true,
     }), // id_GostR3411_2012_512
     Some(ObjectDef {
         nid: 984,
         short_name: "id-tc26-signwithdigest",
         long_name: "id-tc26-signwithdigest",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x03],
+        indexed: true,
     }), // id_tc26_signwithdigest
     Some(ObjectDef {
         nid: 985,
         short_name: "id-tc26-signwithdigest-gost3410-2012-256",
         long_name: "GOST R 34.10-2012 with GOST R 34.11-2012 (256 bit)",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x03, 0x02],
+        indexed: true,
     }), // id_tc26_signwithdigest_gost3410_2012_256
     Some(ObjectDef {
         nid: 986,
         short_name: "id-tc26-signwithdigest-gost3410-2012-512",
         long_name: "GOST R 34.10-2012 with GOST R 34.11-2012 (512 bit)",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x03, 0x03],
+        indexed: true,
     }), // id_tc26_signwithdigest_gost3410_2012_512
     Some(ObjectDef {
         nid: 987,
         short_name: "id-tc26-mac",
         long_name: "id-tc26-mac",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x04],
+        indexed: true,
     }), // id_tc26_mac
     Some(ObjectDef {
         nid: 988,
         short_name: "id-tc26-hmac-gost-3411-2012-256",
         long_name: "HMAC GOST 34.11-2012 256 bit",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x04, 0x01],
+        indexed: true,
     }), // id_tc26_hmac_gost_3411_2012_256
     Some(ObjectDef {
         nid: 989,
         short_name: "id-tc26-hmac-gost-3411-2012-512",
         long_name: "HMAC GOST 34.11-2012 512 bit",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x04, 0x02],
+        indexed: true,
     }), // id_tc26_hmac_gost_3411_2012_512
     Some(ObjectDef {
         nid: 990,
         short_name: "id-tc26-cipher",
         long_name: "id-tc26-cipher",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05],
+        indexed: true,
     }), // id_tc26_cipher
     Some(ObjectDef {
         nid: 991,
         short_name: "id-tc26-agreement",
         long_name: "id-tc26-agreement",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x06],
+        indexed: true,
     }), // id_tc26_agreement
     Some(ObjectDef {
         nid: 992,
         short_name: "id-tc26-agreement-gost-3410-2012-256",
         long_name: "id-tc26-agreement-gost-3410-2012-256",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x06, 0x01],
+        indexed: true,
     }), // id_tc26_agreement_gost_3410_2012_256
     Some(ObjectDef {
         nid: 993,
         short_name: "id-tc26-agreement-gost-3410-2012-512",
         long_name: "id-tc26-agreement-gost-3410-2012-512",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x06, 0x02],
+        indexed: true,
     }), // id_tc26_agreement_gost_3410_2012_512
     Some(ObjectDef {
         nid: 994,
         short_name: "id-tc26-constants",
         long_name: "id-tc26-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02],
+        indexed: true,
     }), // id_tc26_constants
     Some(ObjectDef {
         nid: 995,
         short_name: "id-tc26-sign-constants",
         long_name: "id-tc26-sign-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01],
+        indexed: true,
     }), // id_tc26_sign_constants
     Some(ObjectDef {
         nid: 996,
         short_name: "id-tc26-gost-3410-2012-512-constants",
         long_name: "id-tc26-gost-3410-2012-512-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x02],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_512_constants
     Some(ObjectDef {
         nid: 997,
         short_name: "id-tc26-gost-3410-2012-512-paramSetTest",
         long_name: "GOST R 34.10-2012 (512 bit) testing parameter set",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x02, 0x00],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_512_paramSetTest
     Some(ObjectDef {
         nid: 998,
         short_name: "id-tc26-gost-3410-2012-512-paramSetA",
         long_name: "GOST R 34.10-2012 (512 bit) ParamSet A",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x02, 0x01],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_512_paramSetA
     Some(ObjectDef {
         nid: 999,
         short_name: "id-tc26-gost-3410-2012-512-paramSetB",
         long_name: "GOST R 34.10-2012 (512 bit) ParamSet B",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x02, 0x02],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_512_paramSetB
     Some(ObjectDef {
         nid: 1000,
         short_name: "id-tc26-digest-constants",
         long_name: "id-tc26-digest-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x02],
+        indexed: true,
     }), // id_tc26_digest_constants
     Some(ObjectDef {
         nid: 1001,
         short_name: "id-tc26-cipher-constants",
         long_name: "id-tc26-cipher-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x05],
+        indexed: true,
     }), // id_tc26_cipher_constants
     Some(ObjectDef {
         nid: 1002,
         short_name: "id-tc26-gost-28147-constants",
         long_name: "id-tc26-gost-28147-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x05, 0x01],
+        indexed: true,
     }), // id_tc26_gost_28147_constants
     Some(ObjectDef {
         nid: 1003,
         short_name: "id-tc26-gost-28147-param-Z",
         long_name: "GOST 28147-89 TC26 parameter set",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x05, 0x01, 0x01],
+        indexed: true,
     }), // id_tc26_gost_28147_param_Z
     Some(ObjectDef {
         nid: 1004,
         short_name: "INN",
         long_name: "INN",
         der: &[0x2a, 0x85, 0x03, 0x03, 0x81, 0x03, 0x01, 0x01],
+        indexed: true,
     }), // INN
     Some(ObjectDef {
         nid: 1005,
         short_name: "OGRN",
         long_name: "OGRN",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x01],
+        indexed: true,
     }), // OGRN
     Some(ObjectDef {
         nid: 1006,
         short_name: "SNILS",
         long_name: "SNILS",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x03],
+        indexed: true,
     }), // SNILS
     Some(ObjectDef {
         nid: 1007,
         short_name: "subjectSignTool",
         long_name: "Signing Tool of Subject",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x6f],
+        indexed: true,
     }), // subjectSignTool
     Some(ObjectDef {
         nid: 1008,
         short_name: "issuerSignTool",
         long_name: "Signing Tool of Issuer",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x70],
+        indexed: true,
     }), // issuerSignTool
     Some(ObjectDef {
         nid: 1009,
         short_name: "gost89-cbc",
         long_name: "gost89-cbc",
         der: &[],
+        indexed: false,
     }), // gost89_cbc
     Some(ObjectDef {
         nid: 1010,
         short_name: "gost89-ecb",
         long_name: "gost89-ecb",
         der: &[],
+        indexed: false,
     }), // gost89_ecb
     Some(ObjectDef {
         nid: 1011,
         short_name: "gost89-ctr",
         long_name: "gost89-ctr",
         der: &[],
+        indexed: false,
     }), // gost89_ctr
     Some(ObjectDef {
         nid: 1012,
         short_name: "kuznyechik-ecb",
         long_name: "kuznyechik-ecb",
         der: &[],
+        indexed: false,
     }), // kuznyechik_ecb
     Some(ObjectDef {
         nid: 1013,
         short_name: "kuznyechik-ctr",
         long_name: "kuznyechik-ctr",
         der: &[],
+        indexed: false,
     }), // kuznyechik_ctr
     Some(ObjectDef {
         nid: 1014,
         short_name: "kuznyechik-ofb",
         long_name: "kuznyechik-ofb",
         der: &[],
+        indexed: false,
     }), // kuznyechik_ofb
     Some(ObjectDef {
         nid: 1015,
         short_name: "kuznyechik-cbc",
         long_name: "kuznyechik-cbc",
         der: &[],
+        indexed: false,
     }), // kuznyechik_cbc
     Some(ObjectDef {
         nid: 1016,
         short_name: "kuznyechik-cfb",
         long_name: "kuznyechik-cfb",
         der: &[],
+        indexed: false,
     }), // kuznyechik_cfb
     Some(ObjectDef {
         nid: 1017,
         short_name: "kuznyechik-mac",
         long_name: "kuznyechik-mac",
         der: &[],
+        indexed: false,
     }), // kuznyechik_mac
     Some(ObjectDef {
         nid: 1018,
         short_name: "ChaCha20-Poly1305",
         long_name: "chacha20-poly1305",
         der: &[],
+        indexed: false,
     }), // chacha20_poly1305
     Some(ObjectDef {
         nid: 1019,
         short_name: "ChaCha20",
         long_name: "chacha20",
         der: &[],
+        indexed: false,
     }), // chacha20
     Some(ObjectDef {
         nid: 1020,
         short_name: "tlsfeature",
         long_name: "TLS Feature",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x18],
+        indexed: true,
     }), // tlsfeature
     Some(ObjectDef {
         nid: 1021,
         short_name: "TLS1-PRF",
         long_name: "tls1-prf",
         der: &[],
+        indexed: false,
     }), // tls1_prf
     Some(ObjectDef {
         nid: 1022,
         short_name: "ipsecIKE",
         long_name: "ipsec Internet Key Exchange",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x11],
+        indexed: true,
     }), // ipsec_IKE
     Some(ObjectDef {
         nid: 1023,
         short_name: "capwapAC",
         long_name: "Ctrl/provision WAP Access",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x12],
+        indexed: true,
     }), // capwapAC
     Some(ObjectDef {
         nid: 1024,
         short_name: "capwapWTP",
         long_name: "Ctrl/Provision WAP Termination",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x13],
+        indexed: true,
     }), // capwapWTP
     Some(ObjectDef {
         nid: 1025,
         short_name: "secureShellClient",
         long_name: "SSH Client",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x15],
+        indexed: true,
     }), // sshClient
     Some(ObjectDef {
         nid: 1026,
         short_name: "secureShellServer",
         long_name: "SSH Server",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x16],
+        indexed: true,
     }), // sshServer
     Some(ObjectDef {
         nid: 1027,
         short_name: "sendRouter",
         long_name: "Send Router",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x17],
+        indexed: true,
     }), // sendRouter
     Some(ObjectDef {
         nid: 1028,
         short_name: "sendProxiedRouter",
         long_name: "Send Proxied Router",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x18],
+        indexed: true,
     }), // sendProxiedRouter
     Some(ObjectDef {
         nid: 1029,
         short_name: "sendOwner",
         long_name: "Send Owner",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x19],
+        indexed: true,
     }), // sendOwner
     Some(ObjectDef {
         nid: 1030,
         short_name: "sendProxiedOwner",
         long_name: "Send Proxied Owner",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1a],
+        indexed: true,
     }), // sendProxiedOwner
     Some(ObjectDef {
         nid: 1031,
         short_name: "id-pkinit",
         long_name: "id-pkinit",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x02, 0x03],
+        indexed: true,
     }), // id_pkinit
     Some(ObjectDef {
         nid: 1032,
         short_name: "pkInitClientAuth",
         long_name: "PKINIT Client Auth",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x02, 0x03, 0x04],
+        indexed: true,
     }), // pkInitClientAuth
     Some(ObjectDef {
         nid: 1033,
         short_name: "pkInitKDC",
         long_name: "Signing KDC Response",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x02, 0x03, 0x05],
+        indexed: true,
     }), // pkInitKDC
     Some(ObjectDef {
         nid: 1034,
         short_name: "X25519",
         long_name: "X25519",
         der: &[0x2b, 0x65, 0x6e],
+        indexed: true,
     }), // X25519
     Some(ObjectDef {
         nid: 1035,
         short_name: "X448",
         long_name: "X448",
         der: &[0x2b, 0x65, 0x6f],
+        indexed: true,
     }), // X448
     Some(ObjectDef {
         nid: 1036,
         short_name: "HKDF",
         long_name: "hkdf",
         der: &[],
+        indexed: false,
     }), // hkdf
     Some(ObjectDef {
         nid: 1037,
         short_name: "KxRSA",
         long_name: "kx-rsa",
         der: &[],
+        indexed: false,
     }), // kx_rsa
     Some(ObjectDef {
         nid: 1038,
         short_name: "KxECDHE",
         long_name: "kx-ecdhe",
         der: &[],
+        indexed: false,
     }), // kx_ecdhe
     Some(ObjectDef {
         nid: 1039,
         short_name: "KxDHE",
         long_name: "kx-dhe",
         der: &[],
+        indexed: false,
     }), // kx_dhe
     Some(ObjectDef {
         nid: 1040,
         short_name: "KxECDHE-PSK",
         long_name: "kx-ecdhe-psk",
         der: &[],
+        indexed: false,
     }), // kx_ecdhe_psk
     Some(ObjectDef {
         nid: 1041,
         short_name: "KxDHE-PSK",
         long_name: "kx-dhe-psk",
         der: &[],
+        indexed: false,
     }), // kx_dhe_psk
     Some(ObjectDef {
         nid: 1042,
         short_name: "KxRSA_PSK",
         long_name: "kx-rsa-psk",
         der: &[],
+        indexed: false,
     }), // kx_rsa_psk
     Some(ObjectDef {
         nid: 1043,
         short_name: "KxPSK",
         long_name: "kx-psk",
         der: &[],
+        indexed: false,
     }), // kx_psk
     Some(ObjectDef {
         nid: 1044,
         short_name: "KxSRP",
         long_name: "kx-srp",
         der: &[],
+        indexed: false,
     }), // kx_srp
     Some(ObjectDef {
         nid: 1045,
         short_name: "KxGOST",
         long_name: "kx-gost",
         der: &[],
+        indexed: false,
     }), // kx_gost
     Some(ObjectDef {
         nid: 1046,
         short_name: "AuthRSA",
         long_name: "auth-rsa",
         der: &[],
+        indexed: false,
     }), // auth_rsa
     Some(ObjectDef {
         nid: 1047,
         short_name: "AuthECDSA",
         long_name: "auth-ecdsa",
         der: &[],
+        indexed: false,
     }), // auth_ecdsa
     Some(ObjectDef {
         nid: 1048,
         short_name: "AuthPSK",
         long_name: "auth-psk",
         der: &[],
+        indexed: false,
     }), // auth_psk
     Some(ObjectDef {
         nid: 1049,
         short_name: "AuthDSS",
         long_name: "auth-dss",
         der: &[],
+        indexed: false,
     }), // auth_dss
     Some(ObjectDef {
         nid: 1050,
         short_name: "AuthGOST01",
         long_name: "auth-gost01",
         der: &[],
+        indexed: false,
     }), // auth_gost01
     Some(ObjectDef {
         nid: 1051,
         short_name: "AuthGOST12",
         long_name: "auth-gost12",
         der: &[],
+        indexed: false,
     }), // auth_gost12
     Some(ObjectDef {
         nid: 1052,
         short_name: "AuthSRP",
         long_name: "auth-srp",
         der: &[],
+        indexed: false,
     }), // auth_srp
     Some(ObjectDef {
         nid: 1053,
         short_name: "AuthNULL",
         long_name: "auth-null",
         der: &[],
+        indexed: false,
     }), // auth_null
     None,
     None,
@@ -6465,6 +7512,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x8d, 0x3a, 0x0c, 0x02, 0x01, 0x10,
         ],
+        indexed: true,
     }), // blake2b512
     Some(ObjectDef {
         nid: 1057,
@@ -6473,6 +7521,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2b, 0x06, 0x01, 0x04, 0x01, 0x8d, 0x3a, 0x0c, 0x02, 0x02, 0x08,
         ],
+        indexed: true,
     }), // blake2s256
     Some(ObjectDef {
         nid: 1058,
@@ -6481,6 +7530,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x13,
         ],
+        indexed: true,
     }), // id_smime_ct_contentCollection
     Some(ObjectDef {
         nid: 1059,
@@ -6489,6 +7539,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x17,
         ],
+        indexed: true,
     }), // id_smime_ct_authEnvelopedData
     Some(ObjectDef {
         nid: 1060,
@@ -6497,156 +7548,182 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x1c,
         ],
+        indexed: true,
     }), // id_ct_xml
     Some(ObjectDef {
         nid: 1061,
         short_name: "Poly1305",
         long_name: "poly1305",
         der: &[],
+        indexed: false,
     }), // poly1305
     Some(ObjectDef {
         nid: 1062,
         short_name: "SipHash",
         long_name: "siphash",
         der: &[],
+        indexed: false,
     }), // siphash
     Some(ObjectDef {
         nid: 1063,
         short_name: "KxANY",
         long_name: "kx-any",
         der: &[],
+        indexed: false,
     }), // kx_any
     Some(ObjectDef {
         nid: 1064,
         short_name: "AuthANY",
         long_name: "auth-any",
         der: &[],
+        indexed: false,
     }), // auth_any
     Some(ObjectDef {
         nid: 1065,
         short_name: "ARIA-128-ECB",
         long_name: "aria-128-ecb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // aria_128_ecb
     Some(ObjectDef {
         nid: 1066,
         short_name: "ARIA-128-CBC",
         long_name: "aria-128-cbc",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // aria_128_cbc
     Some(ObjectDef {
         nid: 1067,
         short_name: "ARIA-128-CFB",
         long_name: "aria-128-cfb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x03],
+        indexed: true,
     }), // aria_128_cfb128
     Some(ObjectDef {
         nid: 1068,
         short_name: "ARIA-128-OFB",
         long_name: "aria-128-ofb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x04],
+        indexed: true,
     }), // aria_128_ofb128
     Some(ObjectDef {
         nid: 1069,
         short_name: "ARIA-128-CTR",
         long_name: "aria-128-ctr",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x05],
+        indexed: true,
     }), // aria_128_ctr
     Some(ObjectDef {
         nid: 1070,
         short_name: "ARIA-192-ECB",
         long_name: "aria-192-ecb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x06],
+        indexed: true,
     }), // aria_192_ecb
     Some(ObjectDef {
         nid: 1071,
         short_name: "ARIA-192-CBC",
         long_name: "aria-192-cbc",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x07],
+        indexed: true,
     }), // aria_192_cbc
     Some(ObjectDef {
         nid: 1072,
         short_name: "ARIA-192-CFB",
         long_name: "aria-192-cfb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x08],
+        indexed: true,
     }), // aria_192_cfb128
     Some(ObjectDef {
         nid: 1073,
         short_name: "ARIA-192-OFB",
         long_name: "aria-192-ofb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x09],
+        indexed: true,
     }), // aria_192_ofb128
     Some(ObjectDef {
         nid: 1074,
         short_name: "ARIA-192-CTR",
         long_name: "aria-192-ctr",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0a],
+        indexed: true,
     }), // aria_192_ctr
     Some(ObjectDef {
         nid: 1075,
         short_name: "ARIA-256-ECB",
         long_name: "aria-256-ecb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0b],
+        indexed: true,
     }), // aria_256_ecb
     Some(ObjectDef {
         nid: 1076,
         short_name: "ARIA-256-CBC",
         long_name: "aria-256-cbc",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0c],
+        indexed: true,
     }), // aria_256_cbc
     Some(ObjectDef {
         nid: 1077,
         short_name: "ARIA-256-CFB",
         long_name: "aria-256-cfb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0d],
+        indexed: true,
     }), // aria_256_cfb128
     Some(ObjectDef {
         nid: 1078,
         short_name: "ARIA-256-OFB",
         long_name: "aria-256-ofb",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0e],
+        indexed: true,
     }), // aria_256_ofb128
     Some(ObjectDef {
         nid: 1079,
         short_name: "ARIA-256-CTR",
         long_name: "aria-256-ctr",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x0f],
+        indexed: true,
     }), // aria_256_ctr
     Some(ObjectDef {
         nid: 1080,
         short_name: "ARIA-128-CFB1",
         long_name: "aria-128-cfb1",
         der: &[],
+        indexed: false,
     }), // aria_128_cfb1
     Some(ObjectDef {
         nid: 1081,
         short_name: "ARIA-192-CFB1",
         long_name: "aria-192-cfb1",
         der: &[],
+        indexed: false,
     }), // aria_192_cfb1
     Some(ObjectDef {
         nid: 1082,
         short_name: "ARIA-256-CFB1",
         long_name: "aria-256-cfb1",
         der: &[],
+        indexed: false,
     }), // aria_256_cfb1
     Some(ObjectDef {
         nid: 1083,
         short_name: "ARIA-128-CFB8",
         long_name: "aria-128-cfb8",
         der: &[],
+        indexed: false,
     }), // aria_128_cfb8
     Some(ObjectDef {
         nid: 1084,
         short_name: "ARIA-192-CFB8",
         long_name: "aria-192-cfb8",
         der: &[],
+        indexed: false,
     }), // aria_192_cfb8
     Some(ObjectDef {
         nid: 1085,
         short_name: "ARIA-256-CFB8",
         long_name: "aria-256-cfb8",
         der: &[],
+        indexed: false,
     }), // aria_256_cfb8
     Some(ObjectDef {
         nid: 1086,
@@ -6655,402 +7732,469 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x2f,
         ],
+        indexed: true,
     }), // id_smime_aa_signingCertificateV2
     Some(ObjectDef {
         nid: 1087,
         short_name: "ED25519",
         long_name: "ED25519",
         der: &[0x2b, 0x65, 0x70],
+        indexed: true,
     }), // ED25519
     Some(ObjectDef {
         nid: 1088,
         short_name: "ED448",
         long_name: "ED448",
         der: &[0x2b, 0x65, 0x71],
+        indexed: true,
     }), // ED448
     Some(ObjectDef {
         nid: 1089,
         short_name: "organizationIdentifier",
         long_name: "organizationIdentifier",
         der: &[0x55, 0x04, 0x61],
+        indexed: true,
     }), // organizationIdentifier
     Some(ObjectDef {
         nid: 1090,
         short_name: "c3",
         long_name: "countryCode3c",
         der: &[0x55, 0x04, 0x62],
+        indexed: true,
     }), // countryCode3c
     Some(ObjectDef {
         nid: 1091,
         short_name: "n3",
         long_name: "countryCode3n",
         der: &[0x55, 0x04, 0x63],
+        indexed: true,
     }), // countryCode3n
     Some(ObjectDef {
         nid: 1092,
         short_name: "dnsName",
         long_name: "dnsName",
         der: &[0x55, 0x04, 0x64],
+        indexed: true,
     }), // dnsName
     Some(ObjectDef {
         nid: 1093,
         short_name: "x509ExtAdmission",
         long_name: "Professional Information or basis for Admission",
         der: &[0x2b, 0x24, 0x08, 0x03, 0x03],
+        indexed: true,
     }), // x509ExtAdmission
     Some(ObjectDef {
         nid: 1094,
         short_name: "SHA512-224",
         long_name: "sha512-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x05],
+        indexed: true,
     }), // sha512_224
     Some(ObjectDef {
         nid: 1095,
         short_name: "SHA512-256",
         long_name: "sha512-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x06],
+        indexed: true,
     }), // sha512_256
     Some(ObjectDef {
         nid: 1096,
         short_name: "SHA3-224",
         long_name: "sha3-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x07],
+        indexed: true,
     }), // sha3_224
     Some(ObjectDef {
         nid: 1097,
         short_name: "SHA3-256",
         long_name: "sha3-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08],
+        indexed: true,
     }), // sha3_256
     Some(ObjectDef {
         nid: 1098,
         short_name: "SHA3-384",
         long_name: "sha3-384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x09],
+        indexed: true,
     }), // sha3_384
     Some(ObjectDef {
         nid: 1099,
         short_name: "SHA3-512",
         long_name: "sha3-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0a],
+        indexed: true,
     }), // sha3_512
     Some(ObjectDef {
         nid: 1100,
         short_name: "SHAKE128",
         long_name: "shake128",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0b],
+        indexed: true,
     }), // shake128
     Some(ObjectDef {
         nid: 1101,
         short_name: "SHAKE256",
         long_name: "shake256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0c],
+        indexed: true,
     }), // shake256
     Some(ObjectDef {
         nid: 1102,
         short_name: "id-hmacWithSHA3-224",
         long_name: "hmac-sha3-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0d],
+        indexed: true,
     }), // hmac_sha3_224
     Some(ObjectDef {
         nid: 1103,
         short_name: "id-hmacWithSHA3-256",
         long_name: "hmac-sha3-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0e],
+        indexed: true,
     }), // hmac_sha3_256
     Some(ObjectDef {
         nid: 1104,
         short_name: "id-hmacWithSHA3-384",
         long_name: "hmac-sha3-384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x0f],
+        indexed: true,
     }), // hmac_sha3_384
     Some(ObjectDef {
         nid: 1105,
         short_name: "id-hmacWithSHA3-512",
         long_name: "hmac-sha3-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x10],
+        indexed: true,
     }), // hmac_sha3_512
     Some(ObjectDef {
         nid: 1106,
         short_name: "id-dsa-with-sha384",
         long_name: "dsa_with_SHA384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x03],
+        indexed: true,
     }), // dsa_with_SHA384
     Some(ObjectDef {
         nid: 1107,
         short_name: "id-dsa-with-sha512",
         long_name: "dsa_with_SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x04],
+        indexed: true,
     }), // dsa_with_SHA512
     Some(ObjectDef {
         nid: 1108,
         short_name: "id-dsa-with-sha3-224",
         long_name: "dsa_with_SHA3-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x05],
+        indexed: true,
     }), // dsa_with_SHA3_224
     Some(ObjectDef {
         nid: 1109,
         short_name: "id-dsa-with-sha3-256",
         long_name: "dsa_with_SHA3-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x06],
+        indexed: true,
     }), // dsa_with_SHA3_256
     Some(ObjectDef {
         nid: 1110,
         short_name: "id-dsa-with-sha3-384",
         long_name: "dsa_with_SHA3-384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x07],
+        indexed: true,
     }), // dsa_with_SHA3_384
     Some(ObjectDef {
         nid: 1111,
         short_name: "id-dsa-with-sha3-512",
         long_name: "dsa_with_SHA3-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x08],
+        indexed: true,
     }), // dsa_with_SHA3_512
     Some(ObjectDef {
         nid: 1112,
         short_name: "id-ecdsa-with-sha3-224",
         long_name: "ecdsa_with_SHA3-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x09],
+        indexed: true,
     }), // ecdsa_with_SHA3_224
     Some(ObjectDef {
         nid: 1113,
         short_name: "id-ecdsa-with-sha3-256",
         long_name: "ecdsa_with_SHA3-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0a],
+        indexed: true,
     }), // ecdsa_with_SHA3_256
     Some(ObjectDef {
         nid: 1114,
         short_name: "id-ecdsa-with-sha3-384",
         long_name: "ecdsa_with_SHA3-384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0b],
+        indexed: true,
     }), // ecdsa_with_SHA3_384
     Some(ObjectDef {
         nid: 1115,
         short_name: "id-ecdsa-with-sha3-512",
         long_name: "ecdsa_with_SHA3-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0c],
+        indexed: true,
     }), // ecdsa_with_SHA3_512
     Some(ObjectDef {
         nid: 1116,
         short_name: "id-rsassa-pkcs1-v1_5-with-sha3-224",
         long_name: "RSA-SHA3-224",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0d],
+        indexed: true,
     }), // RSA_SHA3_224
     Some(ObjectDef {
         nid: 1117,
         short_name: "id-rsassa-pkcs1-v1_5-with-sha3-256",
         long_name: "RSA-SHA3-256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0e],
+        indexed: true,
     }), // RSA_SHA3_256
     Some(ObjectDef {
         nid: 1118,
         short_name: "id-rsassa-pkcs1-v1_5-with-sha3-384",
         long_name: "RSA-SHA3-384",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0f],
+        indexed: true,
     }), // RSA_SHA3_384
     Some(ObjectDef {
         nid: 1119,
         short_name: "id-rsassa-pkcs1-v1_5-with-sha3-512",
         long_name: "RSA-SHA3-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x10],
+        indexed: true,
     }), // RSA_SHA3_512
     Some(ObjectDef {
         nid: 1120,
         short_name: "ARIA-128-CCM",
         long_name: "aria-128-ccm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x25],
+        indexed: true,
     }), // aria_128_ccm
     Some(ObjectDef {
         nid: 1121,
         short_name: "ARIA-192-CCM",
         long_name: "aria-192-ccm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x26],
+        indexed: true,
     }), // aria_192_ccm
     Some(ObjectDef {
         nid: 1122,
         short_name: "ARIA-256-CCM",
         long_name: "aria-256-ccm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x27],
+        indexed: true,
     }), // aria_256_ccm
     Some(ObjectDef {
         nid: 1123,
         short_name: "ARIA-128-GCM",
         long_name: "aria-128-gcm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x22],
+        indexed: true,
     }), // aria_128_gcm
     Some(ObjectDef {
         nid: 1124,
         short_name: "ARIA-192-GCM",
         long_name: "aria-192-gcm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x23],
+        indexed: true,
     }), // aria_192_gcm
     Some(ObjectDef {
         nid: 1125,
         short_name: "ARIA-256-GCM",
         long_name: "aria-256-gcm",
         der: &[0x2a, 0x83, 0x1a, 0x8c, 0x9a, 0x6e, 0x01, 0x01, 0x24],
+        indexed: true,
     }), // aria_256_gcm
     Some(ObjectDef {
         nid: 1126,
         short_name: "ffdhe2048",
         long_name: "ffdhe2048",
         der: &[],
+        indexed: false,
     }), // ffdhe2048
     Some(ObjectDef {
         nid: 1127,
         short_name: "ffdhe3072",
         long_name: "ffdhe3072",
         der: &[],
+        indexed: false,
     }), // ffdhe3072
     Some(ObjectDef {
         nid: 1128,
         short_name: "ffdhe4096",
         long_name: "ffdhe4096",
         der: &[],
+        indexed: false,
     }), // ffdhe4096
     Some(ObjectDef {
         nid: 1129,
         short_name: "ffdhe6144",
         long_name: "ffdhe6144",
         der: &[],
+        indexed: false,
     }), // ffdhe6144
     Some(ObjectDef {
         nid: 1130,
         short_name: "ffdhe8192",
         long_name: "ffdhe8192",
         der: &[],
+        indexed: false,
     }), // ffdhe8192
     Some(ObjectDef {
         nid: 1131,
         short_name: "cmcCA",
         long_name: "CMC Certificate Authority",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1b],
+        indexed: true,
     }), // cmcCA
     Some(ObjectDef {
         nid: 1132,
         short_name: "cmcRA",
         long_name: "CMC Registration Authority",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1c],
+        indexed: true,
     }), // cmcRA
     Some(ObjectDef {
         nid: 1133,
         short_name: "SM4-ECB",
         long_name: "sm4-ecb",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x01],
+        indexed: true,
     }), // sm4_ecb
     Some(ObjectDef {
         nid: 1134,
         short_name: "SM4-CBC",
         long_name: "sm4-cbc",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x02],
+        indexed: true,
     }), // sm4_cbc
     Some(ObjectDef {
         nid: 1135,
         short_name: "SM4-OFB",
         long_name: "sm4-ofb",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x03],
+        indexed: true,
     }), // sm4_ofb128
     Some(ObjectDef {
         nid: 1136,
         short_name: "SM4-CFB1",
         long_name: "sm4-cfb1",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x05],
+        indexed: true,
     }), // sm4_cfb1
     Some(ObjectDef {
         nid: 1137,
         short_name: "SM4-CFB",
         long_name: "sm4-cfb",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x04],
+        indexed: true,
     }), // sm4_cfb128
     Some(ObjectDef {
         nid: 1138,
         short_name: "SM4-CFB8",
         long_name: "sm4-cfb8",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x06],
+        indexed: true,
     }), // sm4_cfb8
     Some(ObjectDef {
         nid: 1139,
         short_name: "SM4-CTR",
         long_name: "sm4-ctr",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x07],
+        indexed: true,
     }), // sm4_ctr
     Some(ObjectDef {
         nid: 1140,
         short_name: "ISO-CN",
         long_name: "ISO CN Member Body",
         der: &[0x2a, 0x81, 0x1c],
+        indexed: true,
     }), // ISO_CN
     Some(ObjectDef {
         nid: 1141,
         short_name: "oscca",
         long_name: "oscca",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55],
+        indexed: true,
     }), // oscca
     Some(ObjectDef {
         nid: 1142,
         short_name: "sm-scheme",
         long_name: "sm-scheme",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01],
+        indexed: true,
     }), // sm_scheme
     Some(ObjectDef {
         nid: 1143,
         short_name: "SM3",
         long_name: "sm3",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x83, 0x11],
+        indexed: true,
     }), // sm3
     Some(ObjectDef {
         nid: 1144,
         short_name: "RSA-SM3",
         long_name: "sm3WithRSAEncryption",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x83, 0x78],
+        indexed: true,
     }), // sm3WithRSAEncryption
     Some(ObjectDef {
         nid: 1145,
         short_name: "RSA-SHA512/224",
         long_name: "sha512-224WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0f],
+        indexed: true,
     }), // sha512_224WithRSAEncryption
     Some(ObjectDef {
         nid: 1146,
         short_name: "RSA-SHA512/256",
         long_name: "sha512-256WithRSAEncryption",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x10],
+        indexed: true,
     }), // sha512_256WithRSAEncryption
     Some(ObjectDef {
         nid: 1147,
         short_name: "id-tc26-gost-3410-2012-256-constants",
         long_name: "id-tc26-gost-3410-2012-256-constants",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x01],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_256_constants
     Some(ObjectDef {
         nid: 1148,
         short_name: "id-tc26-gost-3410-2012-256-paramSetA",
         long_name: "GOST R 34.10-2012 (256 bit) ParamSet A",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_256_paramSetA
     Some(ObjectDef {
         nid: 1149,
         short_name: "id-tc26-gost-3410-2012-512-paramSetC",
         long_name: "GOST R 34.10-2012 (512 bit) ParamSet C",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x02, 0x03],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_512_paramSetC
     Some(ObjectDef {
         nid: 1150,
         short_name: "ISO-UA",
         long_name: "ISO-UA",
         der: &[0x2a, 0x86, 0x24],
+        indexed: true,
     }), // ISO_UA
     Some(ObjectDef {
         nid: 1151,
         short_name: "ua-pki",
         long_name: "ua-pki",
         der: &[0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // ua_pki
     Some(ObjectDef {
         nid: 1152,
         short_name: "dstu28147",
         long_name: "DSTU Gost 28147-2009",
         der: &[0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        indexed: true,
     }), // dstu28147
     Some(ObjectDef {
         nid: 1153,
@@ -7059,6 +8203,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02,
         ],
+        indexed: true,
     }), // dstu28147_ofb
     Some(ObjectDef {
         nid: 1154,
@@ -7067,6 +8212,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x03,
         ],
+        indexed: true,
     }), // dstu28147_cfb
     Some(ObjectDef {
         nid: 1155,
@@ -7075,18 +8221,21 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x05,
         ],
+        indexed: true,
     }), // dstu28147_wrap
     Some(ObjectDef {
         nid: 1156,
         short_name: "hmacWithDstu34311",
         long_name: "HMAC DSTU Gost 34311-95",
         der: &[0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // hmacWithDstu34311
     Some(ObjectDef {
         nid: 1157,
         short_name: "dstu34311",
         long_name: "DSTU Gost 34311-95",
         der: &[0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x02, 0x01],
+        indexed: true,
     }), // dstu34311
     Some(ObjectDef {
         nid: 1158,
@@ -7095,6 +8244,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01,
         ],
+        indexed: true,
     }), // dstu4145le
     Some(ObjectDef {
         nid: 1159,
@@ -7103,6 +8253,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x01, 0x01,
         ],
+        indexed: true,
     }), // dstu4145be
     Some(ObjectDef {
         nid: 1160,
@@ -7111,6 +8262,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x00,
         ],
+        indexed: true,
     }), // uacurve0
     Some(ObjectDef {
         nid: 1161,
@@ -7119,6 +8271,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x01,
         ],
+        indexed: true,
     }), // uacurve1
     Some(ObjectDef {
         nid: 1162,
@@ -7127,6 +8280,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x02,
         ],
+        indexed: true,
     }), // uacurve2
     Some(ObjectDef {
         nid: 1163,
@@ -7135,6 +8289,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x03,
         ],
+        indexed: true,
     }), // uacurve3
     Some(ObjectDef {
         nid: 1164,
@@ -7143,6 +8298,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x04,
         ],
+        indexed: true,
     }), // uacurve4
     Some(ObjectDef {
         nid: 1165,
@@ -7151,6 +8307,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x05,
         ],
+        indexed: true,
     }), // uacurve5
     Some(ObjectDef {
         nid: 1166,
@@ -7159,6 +8316,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x06,
         ],
+        indexed: true,
     }), // uacurve6
     Some(ObjectDef {
         nid: 1167,
@@ -7167,6 +8325,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x07,
         ],
+        indexed: true,
     }), // uacurve7
     Some(ObjectDef {
         nid: 1168,
@@ -7175,6 +8334,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x08,
         ],
+        indexed: true,
     }), // uacurve8
     Some(ObjectDef {
         nid: 1169,
@@ -7183,390 +8343,455 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x24, 0x02, 0x01, 0x01, 0x01, 0x01, 0x03, 0x01, 0x01, 0x02, 0x09,
         ],
+        indexed: true,
     }), // uacurve9
     Some(ObjectDef {
         nid: 1170,
         short_name: "ieee",
         long_name: "ieee",
         der: &[0x2b, 0x6f],
+        indexed: true,
     }), // ieee
     Some(ObjectDef {
         nid: 1171,
         short_name: "ieee-siswg",
         long_name: "IEEE Security in Storage Working Group",
         der: &[0x2b, 0x6f, 0x02, 0x8c, 0x53],
+        indexed: true,
     }), // ieee_siswg
     Some(ObjectDef {
         nid: 1172,
         short_name: "SM2",
         long_name: "sm2",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x82, 0x2d],
+        indexed: true,
     }), // sm2
     Some(ObjectDef {
         nid: 1173,
         short_name: "id-tc26-cipher-gostr3412-2015-magma",
         long_name: "id-tc26-cipher-gostr3412-2015-magma",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x01],
+        indexed: true,
     }), // id_tc26_cipher_gostr3412_2015_magma
     Some(ObjectDef {
         nid: 1174,
         short_name: "magma-ctr-acpkm",
         long_name: "magma-ctr-acpkm",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x01, 0x01],
+        indexed: true,
     }), // magma_ctr_acpkm
     Some(ObjectDef {
         nid: 1175,
         short_name: "magma-ctr-acpkm-omac",
         long_name: "magma-ctr-acpkm-omac",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x01, 0x02],
+        indexed: true,
     }), // magma_ctr_acpkm_omac
     Some(ObjectDef {
         nid: 1176,
         short_name: "id-tc26-cipher-gostr3412-2015-kuznyechik",
         long_name: "id-tc26-cipher-gostr3412-2015-kuznyechik",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x02],
+        indexed: true,
     }), // id_tc26_cipher_gostr3412_2015_kuznyechik
     Some(ObjectDef {
         nid: 1177,
         short_name: "kuznyechik-ctr-acpkm",
         long_name: "kuznyechik-ctr-acpkm",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x02, 0x01],
+        indexed: true,
     }), // kuznyechik_ctr_acpkm
     Some(ObjectDef {
         nid: 1178,
         short_name: "kuznyechik-ctr-acpkm-omac",
         long_name: "kuznyechik-ctr-acpkm-omac",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x05, 0x02, 0x02],
+        indexed: true,
     }), // kuznyechik_ctr_acpkm_omac
     Some(ObjectDef {
         nid: 1179,
         short_name: "id-tc26-wrap",
         long_name: "id-tc26-wrap",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x07],
+        indexed: true,
     }), // id_tc26_wrap
     Some(ObjectDef {
         nid: 1180,
         short_name: "id-tc26-wrap-gostr3412-2015-magma",
         long_name: "id-tc26-wrap-gostr3412-2015-magma",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01],
+        indexed: true,
     }), // id_tc26_wrap_gostr3412_2015_magma
     Some(ObjectDef {
         nid: 1181,
         short_name: "magma-kexp15",
         long_name: "magma-kexp15",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x07, 0x01, 0x01],
+        indexed: true,
     }), // magma_kexp15
     Some(ObjectDef {
         nid: 1182,
         short_name: "id-tc26-wrap-gostr3412-2015-kuznyechik",
         long_name: "id-tc26-wrap-gostr3412-2015-kuznyechik",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x07, 0x02],
+        indexed: true,
     }), // id_tc26_wrap_gostr3412_2015_kuznyechik
     Some(ObjectDef {
         nid: 1183,
         short_name: "kuznyechik-kexp15",
         long_name: "kuznyechik-kexp15",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x01, 0x07, 0x02, 0x01],
+        indexed: true,
     }), // kuznyechik_kexp15
     Some(ObjectDef {
         nid: 1184,
         short_name: "id-tc26-gost-3410-2012-256-paramSetB",
         long_name: "GOST R 34.10-2012 (256 bit) ParamSet B",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x01, 0x02],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_256_paramSetB
     Some(ObjectDef {
         nid: 1185,
         short_name: "id-tc26-gost-3410-2012-256-paramSetC",
         long_name: "GOST R 34.10-2012 (256 bit) ParamSet C",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x01, 0x03],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_256_paramSetC
     Some(ObjectDef {
         nid: 1186,
         short_name: "id-tc26-gost-3410-2012-256-paramSetD",
         long_name: "GOST R 34.10-2012 (256 bit) ParamSet D",
         der: &[0x2a, 0x85, 0x03, 0x07, 0x01, 0x02, 0x01, 0x01, 0x04],
+        indexed: true,
     }), // id_tc26_gost_3410_2012_256_paramSetD
     Some(ObjectDef {
         nid: 1187,
         short_name: "magma-ecb",
         long_name: "magma-ecb",
         der: &[],
+        indexed: false,
     }), // magma_ecb
     Some(ObjectDef {
         nid: 1188,
         short_name: "magma-ctr",
         long_name: "magma-ctr",
         der: &[],
+        indexed: false,
     }), // magma_ctr
     Some(ObjectDef {
         nid: 1189,
         short_name: "magma-ofb",
         long_name: "magma-ofb",
         der: &[],
+        indexed: false,
     }), // magma_ofb
     Some(ObjectDef {
         nid: 1190,
         short_name: "magma-cbc",
         long_name: "magma-cbc",
         der: &[],
+        indexed: false,
     }), // magma_cbc
     Some(ObjectDef {
         nid: 1191,
         short_name: "magma-cfb",
         long_name: "magma-cfb",
         der: &[],
+        indexed: false,
     }), // magma_cfb
     Some(ObjectDef {
         nid: 1192,
         short_name: "magma-mac",
         long_name: "magma-mac",
         der: &[],
+        indexed: false,
     }), // magma_mac
     Some(ObjectDef {
         nid: 1193,
         short_name: "hmacWithSHA512-224",
         long_name: "hmacWithSHA512-224",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x0c],
+        indexed: true,
     }), // hmacWithSHA512_224
     Some(ObjectDef {
         nid: 1194,
         short_name: "hmacWithSHA512-256",
         long_name: "hmacWithSHA512-256",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x02, 0x0d],
+        indexed: true,
     }), // hmacWithSHA512_256
     Some(ObjectDef {
         nid: 1195,
         short_name: "GMAC",
         long_name: "gmac",
         der: &[0x28, 0xcc, 0x45, 0x03, 0x04],
+        indexed: true,
     }), // gmac
     Some(ObjectDef {
         nid: 1196,
         short_name: "KMAC128",
         long_name: "kmac128",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x13],
+        indexed: true,
     }), // kmac128
     Some(ObjectDef {
         nid: 1197,
         short_name: "KMAC256",
         long_name: "kmac256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x14],
+        indexed: true,
     }), // kmac256
     Some(ObjectDef {
         nid: 1198,
         short_name: "AES-128-SIV",
         long_name: "aes-128-siv",
         der: &[],
+        indexed: false,
     }), // aes_128_siv
     Some(ObjectDef {
         nid: 1199,
         short_name: "AES-192-SIV",
         long_name: "aes-192-siv",
         der: &[],
+        indexed: false,
     }), // aes_192_siv
     Some(ObjectDef {
         nid: 1200,
         short_name: "AES-256-SIV",
         long_name: "aes-256-siv",
         der: &[],
+        indexed: false,
     }), // aes_256_siv
     Some(ObjectDef {
         nid: 1201,
         short_name: "BLAKE2BMAC",
         long_name: "blake2bmac",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x8d, 0x3a, 0x0c, 0x02, 0x01],
+        indexed: true,
     }), // blake2bmac
     Some(ObjectDef {
         nid: 1202,
         short_name: "BLAKE2SMAC",
         long_name: "blake2smac",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x8d, 0x3a, 0x0c, 0x02, 0x02],
+        indexed: true,
     }), // blake2smac
     Some(ObjectDef {
         nid: 1203,
         short_name: "SSHKDF",
         long_name: "sshkdf",
         der: &[],
+        indexed: false,
     }), // sshkdf
     Some(ObjectDef {
         nid: 1204,
         short_name: "SM2-SM3",
         long_name: "SM2-with-SM3",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x83, 0x75],
+        indexed: true,
     }), // SM2_with_SM3
     Some(ObjectDef {
         nid: 1205,
         short_name: "SSKDF",
         long_name: "sskdf",
         der: &[],
+        indexed: false,
     }), // sskdf
     Some(ObjectDef {
         nid: 1206,
         short_name: "X963KDF",
         long_name: "x963kdf",
         der: &[],
+        indexed: false,
     }), // x963kdf
     Some(ObjectDef {
         nid: 1207,
         short_name: "X942KDF",
         long_name: "x942kdf",
         der: &[],
+        indexed: false,
     }), // x942kdf
     Some(ObjectDef {
         nid: 1208,
         short_name: "id-on-SmtpUTF8Mailbox",
         long_name: "Smtp UTF8 Mailbox",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x09],
+        indexed: true,
     }), // id_on_SmtpUTF8Mailbox
     Some(ObjectDef {
         nid: 1209,
         short_name: "id-on-xmppAddr",
         long_name: "XmppAddr",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x05],
+        indexed: true,
     }), // XmppAddr
     Some(ObjectDef {
         nid: 1210,
         short_name: "id-on-dnsSRV",
         long_name: "SRVName",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x07],
+        indexed: true,
     }), // SRVName
     Some(ObjectDef {
         nid: 1211,
         short_name: "id-on-NAIRealm",
         long_name: "NAIRealm",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x08],
+        indexed: true,
     }), // NAIRealm
     Some(ObjectDef {
         nid: 1212,
         short_name: "modp_1536",
         long_name: "modp_1536",
         der: &[],
+        indexed: false,
     }), // modp_1536
     Some(ObjectDef {
         nid: 1213,
         short_name: "modp_2048",
         long_name: "modp_2048",
         der: &[],
+        indexed: false,
     }), // modp_2048
     Some(ObjectDef {
         nid: 1214,
         short_name: "modp_3072",
         long_name: "modp_3072",
         der: &[],
+        indexed: false,
     }), // modp_3072
     Some(ObjectDef {
         nid: 1215,
         short_name: "modp_4096",
         long_name: "modp_4096",
         der: &[],
+        indexed: false,
     }), // modp_4096
     Some(ObjectDef {
         nid: 1216,
         short_name: "modp_6144",
         long_name: "modp_6144",
         der: &[],
+        indexed: false,
     }), // modp_6144
     Some(ObjectDef {
         nid: 1217,
         short_name: "modp_8192",
         long_name: "modp_8192",
         der: &[],
+        indexed: false,
     }), // modp_8192
     Some(ObjectDef {
         nid: 1218,
         short_name: "KxGOST18",
         long_name: "kx-gost18",
         der: &[],
+        indexed: false,
     }), // kx_gost18
     Some(ObjectDef {
         nid: 1219,
         short_name: "cmcArchive",
         long_name: "CMC Archive Server",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1d],
+        indexed: true,
     }), // cmcArchive
     Some(ObjectDef {
         nid: 1220,
         short_name: "id-kp-bgpsec-router",
         long_name: "BGPsec Router",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1e],
+        indexed: true,
     }), // id_kp_bgpsec_router
     Some(ObjectDef {
         nid: 1221,
         short_name: "id-kp-BrandIndicatorforMessageIdentification",
         long_name: "Brand Indicator for Message Identification",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x1f],
+        indexed: true,
     }), // id_kp_BrandIndicatorforMessageIdentification
     Some(ObjectDef {
         nid: 1222,
         short_name: "cmKGA",
         long_name: "Certificate Management Key Generation Authority",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x20],
+        indexed: true,
     }), // cmKGA
     Some(ObjectDef {
         nid: 1223,
         short_name: "id-it-caCerts",
         long_name: "id-it-caCerts",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x11],
+        indexed: true,
     }), // id_it_caCerts
     Some(ObjectDef {
         nid: 1224,
         short_name: "id-it-rootCaKeyUpdate",
         long_name: "id-it-rootCaKeyUpdate",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x12],
+        indexed: true,
     }), // id_it_rootCaKeyUpdate
     Some(ObjectDef {
         nid: 1225,
         short_name: "id-it-certReqTemplate",
         long_name: "id-it-certReqTemplate",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x13],
+        indexed: true,
     }), // id_it_certReqTemplate
     Some(ObjectDef {
         nid: 1226,
         short_name: "OGRNIP",
         long_name: "OGRNIP",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x05],
+        indexed: true,
     }), // OGRNIP
     Some(ObjectDef {
         nid: 1227,
         short_name: "classSignTool",
         long_name: "Class of Signing Tool",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71],
+        indexed: true,
     }), // classSignTool
     Some(ObjectDef {
         nid: 1228,
         short_name: "classSignToolKC1",
         long_name: "Class of Signing Tool KC1",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x01],
+        indexed: true,
     }), // classSignToolKC1
     Some(ObjectDef {
         nid: 1229,
         short_name: "classSignToolKC2",
         long_name: "Class of Signing Tool KC2",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x02],
+        indexed: true,
     }), // classSignToolKC2
     Some(ObjectDef {
         nid: 1230,
         short_name: "classSignToolKC3",
         long_name: "Class of Signing Tool KC3",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x03],
+        indexed: true,
     }), // classSignToolKC3
     Some(ObjectDef {
         nid: 1231,
         short_name: "classSignToolKB1",
         long_name: "Class of Signing Tool KB1",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x04],
+        indexed: true,
     }), // classSignToolKB1
     Some(ObjectDef {
         nid: 1232,
         short_name: "classSignToolKB2",
         long_name: "Class of Signing Tool KB2",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x05],
+        indexed: true,
     }), // classSignToolKB2
     Some(ObjectDef {
         nid: 1233,
         short_name: "classSignToolKA1",
         long_name: "Class of Signing Tool KA1",
         der: &[0x2a, 0x85, 0x03, 0x64, 0x71, 0x06],
+        indexed: true,
     }), // classSignToolKA1
     Some(ObjectDef {
         nid: 1234,
@@ -7575,6 +8800,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x18,
         ],
+        indexed: true,
     }), // id_ct_routeOriginAuthz
     Some(ObjectDef {
         nid: 1235,
@@ -7583,6 +8809,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x1a,
         ],
+        indexed: true,
     }), // id_ct_rpkiManifest
     Some(ObjectDef {
         nid: 1236,
@@ -7591,6 +8818,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x23,
         ],
+        indexed: true,
     }), // id_ct_rpkiGhostbusters
     Some(ObjectDef {
         nid: 1237,
@@ -7599,54 +8827,63 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x24,
         ],
+        indexed: true,
     }), // id_ct_resourceTaggedAttest
     Some(ObjectDef {
         nid: 1238,
         short_name: "id-cp",
         long_name: "id-cp",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0e],
+        indexed: true,
     }), // id_cp
     Some(ObjectDef {
         nid: 1239,
         short_name: "sbgp-ipAddrBlockv2",
         long_name: "sbgp-ipAddrBlockv2",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x1c],
+        indexed: true,
     }), // sbgp_ipAddrBlockv2
     Some(ObjectDef {
         nid: 1240,
         short_name: "sbgp-autonomousSysNumv2",
         long_name: "sbgp-autonomousSysNumv2",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x01, 0x1d],
+        indexed: true,
     }), // sbgp_autonomousSysNumv2
     Some(ObjectDef {
         nid: 1241,
         short_name: "ipAddr-asNumber",
         long_name: "ipAddr-asNumber",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0e, 0x02],
+        indexed: true,
     }), // ipAddr_asNumber
     Some(ObjectDef {
         nid: 1242,
         short_name: "ipAddr-asNumberv2",
         long_name: "ipAddr-asNumberv2",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x0e, 0x03],
+        indexed: true,
     }), // ipAddr_asNumberv2
     Some(ObjectDef {
         nid: 1243,
         short_name: "rpkiManifest",
         long_name: "RPKI Manifest",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x0a],
+        indexed: true,
     }), // rpkiManifest
     Some(ObjectDef {
         nid: 1244,
         short_name: "signedObject",
         long_name: "Signed Object",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x0b],
+        indexed: true,
     }), // signedObject
     Some(ObjectDef {
         nid: 1245,
         short_name: "rpkiNotify",
         long_name: "RPKI Notify",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x30, 0x0d],
+        indexed: true,
     }), // rpkiNotify
     Some(ObjectDef {
         nid: 1246,
@@ -7655,6 +8892,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x2f,
         ],
+        indexed: true,
     }), // id_ct_geofeedCSVwithCRLF
     Some(ObjectDef {
         nid: 1247,
@@ -7663,18 +8901,21 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x30,
         ],
+        indexed: true,
     }), // id_ct_signedChecklist
     Some(ObjectDef {
         nid: 1248,
         short_name: "SM4-GCM",
         long_name: "sm4-gcm",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x08],
+        indexed: true,
     }), // sm4_gcm
     Some(ObjectDef {
         nid: 1249,
         short_name: "SM4-CCM",
         long_name: "sm4-ccm",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x09],
+        indexed: true,
     }), // sm4_ccm
     Some(ObjectDef {
         nid: 1250,
@@ -7683,66 +8924,77 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x31,
         ],
+        indexed: true,
     }), // id_ct_ASPA
     Some(ObjectDef {
         nid: 1251,
         short_name: "id-mod-cmp2000-02",
         long_name: "id-mod-cmp2000-02",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x32],
+        indexed: true,
     }), // id_mod_cmp2000_02
     Some(ObjectDef {
         nid: 1252,
         short_name: "id-mod-cmp2021-88",
         long_name: "id-mod-cmp2021-88",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x63],
+        indexed: true,
     }), // id_mod_cmp2021_88
     Some(ObjectDef {
         nid: 1253,
         short_name: "id-mod-cmp2021-02",
         long_name: "id-mod-cmp2021-02",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x00, 0x64],
+        indexed: true,
     }), // id_mod_cmp2021_02
     Some(ObjectDef {
         nid: 1254,
         short_name: "id-it-rootCaCert",
         long_name: "id-it-rootCaCert",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x14],
+        indexed: true,
     }), // id_it_rootCaCert
     Some(ObjectDef {
         nid: 1255,
         short_name: "id-it-certProfile",
         long_name: "id-it-certProfile",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x15],
+        indexed: true,
     }), // id_it_certProfile
     Some(ObjectDef {
         nid: 1256,
         short_name: "id-it-crlStatusList",
         long_name: "id-it-crlStatusList",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x16],
+        indexed: true,
     }), // id_it_crlStatusList
     Some(ObjectDef {
         nid: 1257,
         short_name: "id-it-crls",
         long_name: "id-it-crls",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x04, 0x17],
+        indexed: true,
     }), // id_it_crls
     Some(ObjectDef {
         nid: 1258,
         short_name: "id-regCtrl-altCertTemplate",
         long_name: "id-regCtrl-altCertTemplate",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x07],
+        indexed: true,
     }), // id_regCtrl_altCertTemplate
     Some(ObjectDef {
         nid: 1259,
         short_name: "id-regCtrl-algId",
         long_name: "id-regCtrl-algId",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x0b],
+        indexed: true,
     }), // id_regCtrl_algId
     Some(ObjectDef {
         nid: 1260,
         short_name: "id-regCtrl-rsaKeyLen",
         long_name: "id-regCtrl-rsaKeyLen",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x05, 0x01, 0x0c],
+        indexed: true,
     }), // id_regCtrl_rsaKeyLen
     Some(ObjectDef {
         nid: 1261,
@@ -7751,6 +9003,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x2c,
         ],
+        indexed: true,
     }), // id_aa_ets_attrCertificateRefs
     Some(ObjectDef {
         nid: 1262,
@@ -7759,108 +9012,126 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x2d,
         ],
+        indexed: true,
     }), // id_aa_ets_attrRevocationRefs
     Some(ObjectDef {
         nid: 1263,
         short_name: "id-aa-CMSAlgorithmProtection",
         long_name: "id-aa-CMSAlgorithmProtection",
         der: &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x34],
+        indexed: true,
     }), // id_aa_CMSAlgorithmProtection
     Some(ObjectDef {
         nid: 1264,
         short_name: "itu-t-identified-organization",
         long_name: "itu-t-identified-organization",
         der: &[0x04],
+        indexed: true,
     }), // itu_t_identified_organization
     Some(ObjectDef {
         nid: 1265,
         short_name: "etsi",
         long_name: "etsi",
         der: &[0x04, 0x00],
+        indexed: true,
     }), // etsi
     Some(ObjectDef {
         nid: 1266,
         short_name: "electronic-signature-standard",
         long_name: "electronic-signature-standard",
         der: &[0x04, 0x00, 0x8d, 0x45],
+        indexed: true,
     }), // electronic_signature_standard
     Some(ObjectDef {
         nid: 1267,
         short_name: "ess-attributes",
         long_name: "ess-attributes",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02],
+        indexed: true,
     }), // ess_attributes
     Some(ObjectDef {
         nid: 1268,
         short_name: "id-aa-ets-mimeType",
         long_name: "id-aa-ets-mimeType",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02, 0x01],
+        indexed: true,
     }), // id_aa_ets_mimeType
     Some(ObjectDef {
         nid: 1269,
         short_name: "id-aa-ets-longTermValidation",
         long_name: "id-aa-ets-longTermValidation",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02, 0x02],
+        indexed: true,
     }), // id_aa_ets_longTermValidation
     Some(ObjectDef {
         nid: 1270,
         short_name: "id-aa-ets-SignaturePolicyDocument",
         long_name: "id-aa-ets-SignaturePolicyDocument",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02, 0x03],
+        indexed: true,
     }), // id_aa_ets_SignaturePolicyDocument
     Some(ObjectDef {
         nid: 1271,
         short_name: "id-aa-ets-archiveTimestampV3",
         long_name: "id-aa-ets-archiveTimestampV3",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02, 0x04],
+        indexed: true,
     }), // id_aa_ets_archiveTimestampV3
     Some(ObjectDef {
         nid: 1272,
         short_name: "id-aa-ATSHashIndex",
         long_name: "id-aa-ATSHashIndex",
         der: &[0x04, 0x00, 0x8d, 0x45, 0x02, 0x05],
+        indexed: true,
     }), // id_aa_ATSHashIndex
     Some(ObjectDef {
         nid: 1273,
         short_name: "cades",
         long_name: "cades",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32],
+        indexed: true,
     }), // cades
     Some(ObjectDef {
         nid: 1274,
         short_name: "cades-attributes",
         long_name: "cades-attributes",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01],
+        indexed: true,
     }), // cades_attributes
     Some(ObjectDef {
         nid: 1275,
         short_name: "id-aa-ets-signerAttrV2",
         long_name: "id-aa-ets-signerAttrV2",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01, 0x01],
+        indexed: true,
     }), // id_aa_ets_signerAttrV2
     Some(ObjectDef {
         nid: 1276,
         short_name: "id-aa-ets-sigPolicyStore",
         long_name: "id-aa-ets-sigPolicyStore",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01, 0x03],
+        indexed: true,
     }), // id_aa_ets_sigPolicyStore
     Some(ObjectDef {
         nid: 1277,
         short_name: "id-aa-ATSHashIndex-v2",
         long_name: "id-aa-ATSHashIndex-v2",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01, 0x04],
+        indexed: true,
     }), // id_aa_ATSHashIndex_v2
     Some(ObjectDef {
         nid: 1278,
         short_name: "id-aa-ATSHashIndex-v3",
         long_name: "id-aa-ATSHashIndex-v3",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01, 0x05],
+        indexed: true,
     }), // id_aa_ATSHashIndex_v3
     Some(ObjectDef {
         nid: 1279,
         short_name: "signedAssertion",
         long_name: "signedAssertion",
         der: &[0x04, 0x00, 0x81, 0x95, 0x32, 0x01, 0x06],
+        indexed: true,
     }), // signedAssertion
     Some(ObjectDef {
         nid: 1280,
@@ -7869,18 +9140,21 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x30,
         ],
+        indexed: true,
     }), // id_aa_ets_archiveTimestampV2
     Some(ObjectDef {
         nid: 1281,
         short_name: "hmacWithSM3",
         long_name: "hmacWithSM3",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x83, 0x11, 0x03, 0x01],
+        indexed: true,
     }), // hmacWithSM3
     Some(ObjectDef {
         nid: 1282,
         short_name: "oracle-organization",
         long_name: "Oracle organization",
         der: &[0x60, 0x86, 0x48, 0x01, 0x86, 0xf9, 0x66],
+        indexed: true,
     }), // oracle
     Some(ObjectDef {
         nid: 1283,
@@ -7889,6 +9163,7 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x60, 0x86, 0x48, 0x01, 0x86, 0xf9, 0x66, 0xad, 0xca, 0x7b, 0x01, 0x01,
         ],
+        indexed: true,
     }), // oracle_jdk_trustedkeyusage
     Some(ObjectDef {
         nid: 1284,
@@ -7897,216 +9172,252 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x32,
         ],
+        indexed: true,
     }), // id_ct_signedTAL
     Some(ObjectDef {
         nid: 1285,
         short_name: "brainpoolP256r1tls13",
         long_name: "brainpoolP256r1tls13",
         der: &[],
+        indexed: false,
     }), // brainpoolP256r1tls13
     Some(ObjectDef {
         nid: 1286,
         short_name: "brainpoolP384r1tls13",
         long_name: "brainpoolP384r1tls13",
         der: &[],
+        indexed: false,
     }), // brainpoolP384r1tls13
     Some(ObjectDef {
         nid: 1287,
         short_name: "brainpoolP512r1tls13",
         long_name: "brainpoolP512r1tls13",
         der: &[],
+        indexed: false,
     }), // brainpoolP512r1tls13
     Some(ObjectDef {
         nid: 1288,
         short_name: "brotli",
         long_name: "Brotli compression",
         der: &[],
+        indexed: false,
     }), // brotli
     Some(ObjectDef {
         nid: 1289,
         short_name: "zstd",
         long_name: "Zstandard compression",
         der: &[],
+        indexed: false,
     }), // zstd
     Some(ObjectDef {
         nid: 1290,
         short_name: "SM4-XTS",
         long_name: "sm4-xts",
         der: &[0x2a, 0x81, 0x1c, 0xcf, 0x55, 0x01, 0x68, 0x0a],
+        indexed: true,
     }), // sm4_xts
     Some(ObjectDef {
         nid: 1291,
         short_name: "ms-ntds-obj-sid",
         long_name: "Microsoft NTDS AD objectSid",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x19, 0x02, 0x01],
+        indexed: true,
     }), // ms_ntds_obj_sid
     Some(ObjectDef {
         nid: 1292,
         short_name: "ms-ntds-sec-ext",
         long_name: "Microsoft NTDS CA Extension",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x19, 0x02],
+        indexed: true,
     }), // ms_ntds_sec_ext
     Some(ObjectDef {
         nid: 1293,
         short_name: "ms-cert-templ",
         long_name: "Microsoft certificate template",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x15, 0x07],
+        indexed: true,
     }), // ms_cert_templ
     Some(ObjectDef {
         nid: 1294,
         short_name: "ms-app-policies",
         long_name: "Microsoft Application Policies Extension",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x15, 0x0a],
+        indexed: true,
     }), // ms_app_policies
     Some(ObjectDef {
         nid: 1295,
         short_name: "authorityAttributeIdentifier",
         long_name: "X509v3 Authority Attribute Identifier",
         der: &[0x55, 0x1d, 0x26],
+        indexed: true,
     }), // authority_attribute_identifier
     Some(ObjectDef {
         nid: 1296,
         short_name: "roleSpecCertIdentifier",
         long_name: "X509v3 Role Specification Certificate Identifier",
         der: &[0x55, 0x1d, 0x27],
+        indexed: true,
     }), // role_spec_cert_identifier
     Some(ObjectDef {
         nid: 1297,
         short_name: "basicAttConstraints",
         long_name: "X509v3 Basic Attribute Certificate Constraints",
         der: &[0x55, 0x1d, 0x29],
+        indexed: true,
     }), // basic_att_constraints
     Some(ObjectDef {
         nid: 1298,
         short_name: "delegatedNameConstraints",
         long_name: "X509v3 Delegated Name Constraints",
         der: &[0x55, 0x1d, 0x2a],
+        indexed: true,
     }), // delegated_name_constraints
     Some(ObjectDef {
         nid: 1299,
         short_name: "timeSpecification",
         long_name: "X509v3 Time Specification",
         der: &[0x55, 0x1d, 0x2b],
+        indexed: true,
     }), // time_specification
     Some(ObjectDef {
         nid: 1300,
         short_name: "attributeDescriptor",
         long_name: "X509v3 Attribute Descriptor",
         der: &[0x55, 0x1d, 0x30],
+        indexed: true,
     }), // attribute_descriptor
     Some(ObjectDef {
         nid: 1301,
         short_name: "userNotice",
         long_name: "X509v3 User Notice",
         der: &[0x55, 0x1d, 0x31],
+        indexed: true,
     }), // user_notice
     Some(ObjectDef {
         nid: 1302,
         short_name: "sOAIdentifier",
         long_name: "X509v3 Source of Authority Identifier",
         der: &[0x55, 0x1d, 0x32],
+        indexed: true,
     }), // soa_identifier
     Some(ObjectDef {
         nid: 1303,
         short_name: "acceptableCertPolicies",
         long_name: "X509v3 Acceptable Certification Policies",
         der: &[0x55, 0x1d, 0x34],
+        indexed: true,
     }), // acceptable_cert_policies
     Some(ObjectDef {
         nid: 1304,
         short_name: "acceptablePrivPolicies",
         long_name: "X509v3 Acceptable Privilege Policies",
         der: &[0x55, 0x1d, 0x39],
+        indexed: true,
     }), // acceptable_privilege_policies
     Some(ObjectDef {
         nid: 1305,
         short_name: "indirectIssuer",
         long_name: "X509v3 Indirect Issuer",
         der: &[0x55, 0x1d, 0x3d],
+        indexed: true,
     }), // indirect_issuer
     Some(ObjectDef {
         nid: 1306,
         short_name: "noAssertion",
         long_name: "X509v3 No Assertion",
         der: &[0x55, 0x1d, 0x3e],
+        indexed: true,
     }), // no_assertion
     Some(ObjectDef {
         nid: 1307,
         short_name: "aAissuingDistributionPoint",
         long_name: "X509v3 Attribute Authority Issuing Distribution Point",
         der: &[0x55, 0x1d, 0x3f],
+        indexed: true,
     }), // id_aa_issuing_distribution_point
     Some(ObjectDef {
         nid: 1308,
         short_name: "issuedOnBehalfOf",
         long_name: "X509v3 Issued On Behalf Of",
         der: &[0x55, 0x1d, 0x40],
+        indexed: true,
     }), // issued_on_behalf_of
     Some(ObjectDef {
         nid: 1309,
         short_name: "singleUse",
         long_name: "X509v3 Single Use",
         der: &[0x55, 0x1d, 0x41],
+        indexed: true,
     }), // single_use
     Some(ObjectDef {
         nid: 1310,
         short_name: "groupAC",
         long_name: "X509v3 Group Attribute Certificate",
         der: &[0x55, 0x1d, 0x42],
+        indexed: true,
     }), // group_ac
     Some(ObjectDef {
         nid: 1311,
         short_name: "allowedAttributeAssignments",
         long_name: "X509v3 Allowed Attribute Assignments",
         der: &[0x55, 0x1d, 0x43],
+        indexed: true,
     }), // allowed_attribute_assignments
     Some(ObjectDef {
         nid: 1312,
         short_name: "attributeMappings",
         long_name: "X509v3 Attribute Mappings",
         der: &[0x55, 0x1d, 0x44],
+        indexed: true,
     }), // attribute_mappings
     Some(ObjectDef {
         nid: 1313,
         short_name: "holderNameConstraints",
         long_name: "X509v3 Holder Name Constraints",
         der: &[0x55, 0x1d, 0x45],
+        indexed: true,
     }), // holder_name_constraints
     Some(ObjectDef {
         nid: 1314,
         short_name: "authorizationValidation",
         long_name: "X509v3 Authorization Validation",
         der: &[0x55, 0x1d, 0x46],
+        indexed: true,
     }), // authorization_validation
     Some(ObjectDef {
         nid: 1315,
         short_name: "protRestrict",
         long_name: "X509v3 Protocol Restriction",
         der: &[0x55, 0x1d, 0x47],
+        indexed: true,
     }), // prot_restrict
     Some(ObjectDef {
         nid: 1316,
         short_name: "subjectAltPublicKeyInfo",
         long_name: "X509v3 Subject Alternative Public Key Info",
         der: &[0x55, 0x1d, 0x48],
+        indexed: true,
     }), // subject_alt_public_key_info
     Some(ObjectDef {
         nid: 1317,
         short_name: "altSignatureAlgorithm",
         long_name: "X509v3 Alternative Signature Algorithm",
         der: &[0x55, 0x1d, 0x49],
+        indexed: true,
     }), // alt_signature_algorithm
     Some(ObjectDef {
         nid: 1318,
         short_name: "altSignatureValue",
         long_name: "X509v3 Alternative Signature Value",
         der: &[0x55, 0x1d, 0x4a],
+        indexed: true,
     }), // alt_signature_value
     Some(ObjectDef {
         nid: 1319,
         short_name: "associatedInformation",
         long_name: "X509v3 Associated Information",
         der: &[0x55, 0x1d, 0x4b],
+        indexed: true,
     }), // associated_information
     Some(ObjectDef {
         nid: 1320,
@@ -8115,1002 +9426,1169 @@ pub(crate) static OBJECTS: &[Option<ObjectDef>] = &[
         der: &[
             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x01, 0x33,
         ],
+        indexed: true,
     }), // id_ct_rpkiSignedPrefixList
     Some(ObjectDef {
         nid: 1321,
         short_name: "id-on-hardwareModuleName",
         long_name: "Hardware Module Name",
         der: &[0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x08, 0x04],
+        indexed: true,
     }), // id_on_hardwareModuleName
     Some(ObjectDef {
         nid: 1322,
         short_name: "id-kp-wisun-fan-device",
         long_name: "Wi-SUN Alliance Field Area Network (FAN)",
         der: &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0xe4, 0x25, 0x01],
+        indexed: true,
     }), // id_kp_wisun_fan_device
     Some(ObjectDef {
         nid: 1323,
         short_name: "NULL",
         long_name: "NULL",
         der: &[],
+        indexed: true,
     }), // ac_auditEntity
     Some(ObjectDef {
         nid: 1324,
         short_name: "tcg",
         long_name: "Trusted Computing Group",
         der: &[0x67, 0x81, 0x05],
+        indexed: true,
     }), // tcg
     Some(ObjectDef {
         nid: 1325,
         short_name: "tcg-tcpaSpecVersion",
         long_name: "tcg-tcpaSpecVersion",
         der: &[0x67, 0x81, 0x05, 0x01],
+        indexed: true,
     }), // tcg_tcpaSpecVersion
     Some(ObjectDef {
         nid: 1326,
         short_name: "tcg-attribute",
         long_name: "Trusted Computing Group Attributes",
         der: &[0x67, 0x81, 0x05, 0x02],
+        indexed: true,
     }), // tcg_attribute
     Some(ObjectDef {
         nid: 1327,
         short_name: "tcg-protocol",
         long_name: "Trusted Computing Group Protocols",
         der: &[0x67, 0x81, 0x05, 0x03],
+        indexed: true,
     }), // tcg_protocol
     Some(ObjectDef {
         nid: 1328,
         short_name: "tcg-algorithm",
         long_name: "Trusted Computing Group Algorithms",
         der: &[0x67, 0x81, 0x05, 0x04],
+        indexed: true,
     }), // tcg_algorithm
     Some(ObjectDef {
         nid: 1329,
         short_name: "tcg-platformClass",
         long_name: "Trusted Computing Group Platform Classes",
         der: &[0x67, 0x81, 0x05, 0x05],
+        indexed: true,
     }), // tcg_platformClass
     Some(ObjectDef {
         nid: 1330,
         short_name: "tcg-ce",
         long_name: "Trusted Computing Group Certificate Extensions",
         der: &[0x67, 0x81, 0x05, 0x06],
+        indexed: true,
     }), // tcg_ce
     Some(ObjectDef {
         nid: 1331,
         short_name: "tcg-kp",
         long_name: "Trusted Computing Group Key Purposes",
         der: &[0x67, 0x81, 0x05, 0x08],
+        indexed: true,
     }), // tcg_kp
     Some(ObjectDef {
         nid: 1332,
         short_name: "tcg-ca",
         long_name: "Trusted Computing Group Certificate Policies",
         der: &[0x67, 0x81, 0x05, 0x0b],
+        indexed: true,
     }), // tcg_ca
     Some(ObjectDef {
         nid: 1333,
         short_name: "tcg-address",
         long_name: "Trusted Computing Group Address Formats",
         der: &[0x67, 0x81, 0x05, 0x11],
+        indexed: true,
     }), // tcg_address
     Some(ObjectDef {
         nid: 1334,
         short_name: "tcg-registry",
         long_name: "Trusted Computing Group Registry",
         der: &[0x67, 0x81, 0x05, 0x12],
+        indexed: true,
     }), // tcg_registry
     Some(ObjectDef {
         nid: 1335,
         short_name: "tcg-traits",
         long_name: "Trusted Computing Group Traits",
         der: &[0x67, 0x81, 0x05, 0x13],
+        indexed: true,
     }), // tcg_traits
     Some(ObjectDef {
         nid: 1336,
         short_name: "tcg-common",
         long_name: "Trusted Computing Group Common",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01],
+        indexed: true,
     }), // tcg_common
     Some(ObjectDef {
         nid: 1337,
         short_name: "tcg-at-platformManufacturerStr",
         long_name: "TCG Platform Manufacturer String",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x01],
+        indexed: true,
     }), // tcg_at_platformManufacturerStr
     Some(ObjectDef {
         nid: 1338,
         short_name: "tcg-at-platformManufacturerId",
         long_name: "TCG Platform Manufacturer ID",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x02],
+        indexed: true,
     }), // tcg_at_platformManufacturerId
     Some(ObjectDef {
         nid: 1339,
         short_name: "tcg-at-platformConfigUri",
         long_name: "TCG Platform Configuration URI",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x03],
+        indexed: true,
     }), // tcg_at_platformConfigUri
     Some(ObjectDef {
         nid: 1340,
         short_name: "tcg-at-platformModel",
         long_name: "TCG Platform Model",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x04],
+        indexed: true,
     }), // tcg_at_platformModel
     Some(ObjectDef {
         nid: 1341,
         short_name: "tcg-at-platformVersion",
         long_name: "TCG Platform Version",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x05],
+        indexed: true,
     }), // tcg_at_platformVersion
     Some(ObjectDef {
         nid: 1342,
         short_name: "tcg-at-platformSerial",
         long_name: "TCG Platform Serial Number",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x06],
+        indexed: true,
     }), // tcg_at_platformSerial
     Some(ObjectDef {
         nid: 1343,
         short_name: "tcg-at-platformConfiguration",
         long_name: "TCG Platform Configuration",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x07],
+        indexed: true,
     }), // tcg_at_platformConfiguration
     Some(ObjectDef {
         nid: 1344,
         short_name: "tcg-at-platformIdentifier",
         long_name: "TCG Platform Identifier",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x08],
+        indexed: true,
     }), // tcg_at_platformIdentifier
     Some(ObjectDef {
         nid: 1345,
         short_name: "tcg-at-tpmManufacturer",
         long_name: "TPM Manufacturer",
         der: &[0x67, 0x81, 0x05, 0x02, 0x01],
+        indexed: true,
     }), // tcg_at_tpmManufacturer
     Some(ObjectDef {
         nid: 1346,
         short_name: "tcg-at-tpmModel",
         long_name: "TPM Model",
         der: &[0x67, 0x81, 0x05, 0x02, 0x02],
+        indexed: true,
     }), // tcg_at_tpmModel
     Some(ObjectDef {
         nid: 1347,
         short_name: "tcg-at-tpmVersion",
         long_name: "TPM Version",
         der: &[0x67, 0x81, 0x05, 0x02, 0x03],
+        indexed: true,
     }), // tcg_at_tpmVersion
     Some(ObjectDef {
         nid: 1348,
         short_name: "tcg-at-securityQualities",
         long_name: "Security Qualities",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0a],
+        indexed: true,
     }), // tcg_at_securityQualities
     Some(ObjectDef {
         nid: 1349,
         short_name: "tcg-at-tpmProtectionProfile",
         long_name: "TPM Protection Profile",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0b],
+        indexed: true,
     }), // tcg_at_tpmProtectionProfile
     Some(ObjectDef {
         nid: 1350,
         short_name: "tcg-at-tpmSecurityTarget",
         long_name: "TPM Security Target",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0c],
+        indexed: true,
     }), // tcg_at_tpmSecurityTarget
     Some(ObjectDef {
         nid: 1351,
         short_name: "tcg-at-tbbProtectionProfile",
         long_name: "TBB Protection Profile",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0d],
+        indexed: true,
     }), // tcg_at_tbbProtectionProfile
     Some(ObjectDef {
         nid: 1352,
         short_name: "tcg-at-tbbSecurityTarget",
         long_name: "TBB Security Target",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0e],
+        indexed: true,
     }), // tcg_at_tbbSecurityTarget
     Some(ObjectDef {
         nid: 1353,
         short_name: "tcg-at-tpmIdLabel",
         long_name: "TPM ID Label",
         der: &[0x67, 0x81, 0x05, 0x02, 0x0f],
+        indexed: true,
     }), // tcg_at_tpmIdLabel
     Some(ObjectDef {
         nid: 1354,
         short_name: "tcg-at-tpmSpecification",
         long_name: "TPM Specification",
         der: &[0x67, 0x81, 0x05, 0x02, 0x10],
+        indexed: true,
     }), // tcg_at_tpmSpecification
     Some(ObjectDef {
         nid: 1355,
         short_name: "tcg-at-tcgPlatformSpecification",
         long_name: "TPM Platform Specification",
         der: &[0x67, 0x81, 0x05, 0x02, 0x11],
+        indexed: true,
     }), // tcg_at_tcgPlatformSpecification
     Some(ObjectDef {
         nid: 1356,
         short_name: "tcg-at-tpmSecurityAssertions",
         long_name: "TPM Security Assertions",
         der: &[0x67, 0x81, 0x05, 0x02, 0x12],
+        indexed: true,
     }), // tcg_at_tpmSecurityAssertions
     Some(ObjectDef {
         nid: 1357,
         short_name: "tcg-at-tbbSecurityAssertions",
         long_name: "TBB Security Assertions",
         der: &[0x67, 0x81, 0x05, 0x02, 0x13],
+        indexed: true,
     }), // tcg_at_tbbSecurityAssertions
     Some(ObjectDef {
         nid: 1358,
         short_name: "tcg-at-tcgCredentialSpecification",
         long_name: "TCG Credential Specification",
         der: &[0x67, 0x81, 0x05, 0x02, 0x17],
+        indexed: true,
     }), // tcg_at_tcgCredentialSpecification
     Some(ObjectDef {
         nid: 1359,
         short_name: "tcg-at-tcgCredentialType",
         long_name: "TCG Credential Type",
         der: &[0x67, 0x81, 0x05, 0x02, 0x19],
+        indexed: true,
     }), // tcg_at_tcgCredentialType
     Some(ObjectDef {
         nid: 1360,
         short_name: "tcg-at-previousPlatformCertificates",
         long_name: "TCG Previous Platform Certificates",
         der: &[0x67, 0x81, 0x05, 0x02, 0x1a],
+        indexed: true,
     }), // tcg_at_previousPlatformCertificates
     Some(ObjectDef {
         nid: 1361,
         short_name: "tcg-at-tbbSecurityAssertions-v3",
         long_name: "TCG TBB Security Assertions V3",
         der: &[0x67, 0x81, 0x05, 0x02, 0x1b],
+        indexed: true,
     }), // tcg_at_tbbSecurityAssertions_v3
     Some(ObjectDef {
         nid: 1362,
         short_name: "tcg-at-cryptographicAnchors",
         long_name: "TCG Cryptographic Anchors",
         der: &[0x67, 0x81, 0x05, 0x02, 0x1c],
+        indexed: true,
     }), // tcg_at_cryptographicAnchors
     Some(ObjectDef {
         nid: 1363,
         short_name: "tcg-at-platformConfiguration-v1",
         long_name: "Platform Configuration Version 1",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x07, 0x01],
+        indexed: true,
     }), // tcg_at_platformConfiguration_v1
     Some(ObjectDef {
         nid: 1364,
         short_name: "tcg-at-platformConfiguration-v2",
         long_name: "Platform Configuration Version 2",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x07, 0x02],
+        indexed: true,
     }), // tcg_at_platformConfiguration_v2
     Some(ObjectDef {
         nid: 1365,
         short_name: "tcg-at-platformConfiguration-v3",
         long_name: "Platform Configuration Version 3",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x07, 0x03],
+        indexed: true,
     }), // tcg_at_platformConfiguration_v3
     Some(ObjectDef {
         nid: 1366,
         short_name: "tcg-at-platformConfigUri-v3",
         long_name: "Platform Configuration URI Version 3",
         der: &[0x67, 0x81, 0x05, 0x05, 0x01, 0x07, 0x04],
+        indexed: true,
     }), // tcg_at_platformConfigUri_v3
     Some(ObjectDef {
         nid: 1367,
         short_name: "tcg-algorithm-null",
         long_name: "TCG NULL Algorithm",
         der: &[0x67, 0x81, 0x05, 0x04, 0x01],
+        indexed: true,
     }), // tcg_algorithm_null
     Some(ObjectDef {
         nid: 1368,
         short_name: "tcg-kp-EKCertificate",
         long_name: "Endorsement Key Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x01],
+        indexed: true,
     }), // tcg_kp_EKCertificate
     Some(ObjectDef {
         nid: 1369,
         short_name: "tcg-kp-PlatformAttributeCertificate",
         long_name: "Platform Attribute Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x02],
+        indexed: true,
     }), // tcg_kp_PlatformAttributeCertificate
     Some(ObjectDef {
         nid: 1370,
         short_name: "tcg-kp-AIKCertificate",
         long_name: "Attestation Identity Key Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x03],
+        indexed: true,
     }), // tcg_kp_AIKCertificate
     Some(ObjectDef {
         nid: 1371,
         short_name: "tcg-kp-PlatformKeyCertificate",
         long_name: "Platform Key Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x04],
+        indexed: true,
     }), // tcg_kp_PlatformKeyCertificate
     Some(ObjectDef {
         nid: 1372,
         short_name: "tcg-kp-DeltaPlatformAttributeCertificate",
         long_name: "Delta Platform Attribute Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x05],
+        indexed: true,
     }), // tcg_kp_DeltaPlatformAttributeCertificate
     Some(ObjectDef {
         nid: 1373,
         short_name: "tcg-kp-DeltaPlatformKeyCertificate",
         long_name: "Delta Platform Key Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x06],
+        indexed: true,
     }), // tcg_kp_DeltaPlatformKeyCertificate
     Some(ObjectDef {
         nid: 1374,
         short_name: "tcg-kp-AdditionalPlatformAttributeCertificate",
         long_name: "Additional Platform Attribute Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x07],
+        indexed: true,
     }), // tcg_kp_AdditionalPlatformAttributeCertificate
     Some(ObjectDef {
         nid: 1375,
         short_name: "tcg-kp-AdditionalPlatformKeyCertificate",
         long_name: "Additional Platform Key Certificate",
         der: &[0x67, 0x81, 0x05, 0x08, 0x08],
+        indexed: true,
     }), // tcg_kp_AdditionalPlatformKeyCertificate
     Some(ObjectDef {
         nid: 1376,
         short_name: "tcg-ce-relevantCredentials",
         long_name: "Relevant Credentials",
         der: &[0x67, 0x81, 0x05, 0x06, 0x02],
+        indexed: true,
     }), // tcg_ce_relevantCredentials
     Some(ObjectDef {
         nid: 1377,
         short_name: "tcg-ce-relevantManifests",
         long_name: "Relevant Manifests",
         der: &[0x67, 0x81, 0x05, 0x06, 0x03],
+        indexed: true,
     }), // tcg_ce_relevantManifests
     Some(ObjectDef {
         nid: 1378,
         short_name: "tcg-ce-virtualPlatformAttestationService",
         long_name: "Virtual Platform Attestation Service",
         der: &[0x67, 0x81, 0x05, 0x06, 0x04],
+        indexed: true,
     }), // tcg_ce_virtualPlatformAttestationService
     Some(ObjectDef {
         nid: 1379,
         short_name: "tcg-ce-migrationControllerAttestationService",
         long_name: "Migration Controller Attestation Service",
         der: &[0x67, 0x81, 0x05, 0x06, 0x05],
+        indexed: true,
     }), // tcg_ce_migrationControllerAttestationService
     Some(ObjectDef {
         nid: 1380,
         short_name: "tcg-ce-migrationControllerRegistrationService",
         long_name: "Migration Controller Registration Service",
         der: &[0x67, 0x81, 0x05, 0x06, 0x06],
+        indexed: true,
     }), // tcg_ce_migrationControllerRegistrationService
     Some(ObjectDef {
         nid: 1381,
         short_name: "tcg-ce-virtualPlatformBackupService",
         long_name: "Virtual Platform Backup Service",
         der: &[0x67, 0x81, 0x05, 0x06, 0x07],
+        indexed: true,
     }), // tcg_ce_virtualPlatformBackupService
     Some(ObjectDef {
         nid: 1382,
         short_name: "tcg-prt-tpmIdProtocol",
         long_name: "TCG TPM Protocol",
         der: &[0x67, 0x81, 0x05, 0x03, 0x01],
+        indexed: true,
     }), // tcg_prt_tpmIdProtocol
     Some(ObjectDef {
         nid: 1383,
         short_name: "tcg-address-ethernetmac",
         long_name: "Ethernet MAC Address",
         der: &[0x67, 0x81, 0x05, 0x11, 0x01],
+        indexed: true,
     }), // tcg_address_ethernetmac
     Some(ObjectDef {
         nid: 1384,
         short_name: "tcg-address-wlanmac",
         long_name: "WLAN MAC Address",
         der: &[0x67, 0x81, 0x05, 0x11, 0x02],
+        indexed: true,
     }), // tcg_address_wlanmac
     Some(ObjectDef {
         nid: 1385,
         short_name: "tcg-address-bluetoothmac",
         long_name: "Bluetooth MAC Address",
         der: &[0x67, 0x81, 0x05, 0x11, 0x03],
+        indexed: true,
     }), // tcg_address_bluetoothmac
     Some(ObjectDef {
         nid: 1386,
         short_name: "tcg-registry-componentClass",
         long_name: "TCG Component Class",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03],
+        indexed: true,
     }), // tcg_registry_componentClass
     Some(ObjectDef {
         nid: 1387,
         short_name: "tcg-registry-componentClass-tcg",
         long_name: "Trusted Computed Group Registry",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03, 0x01],
+        indexed: true,
     }), // tcg_registry_componentClass_tcg
     Some(ObjectDef {
         nid: 1388,
         short_name: "tcg-registry-componentClass-ietf",
         long_name: "Internet Engineering Task Force Registry",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03, 0x02],
+        indexed: true,
     }), // tcg_registry_componentClass_ietf
     Some(ObjectDef {
         nid: 1389,
         short_name: "tcg-registry-componentClass-dmtf",
         long_name: "Distributed Management Task Force Registry",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03, 0x03],
+        indexed: true,
     }), // tcg_registry_componentClass_dmtf
     Some(ObjectDef {
         nid: 1390,
         short_name: "tcg-registry-componentClass-pcie",
         long_name: "PCIE Component Class",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03, 0x04],
+        indexed: true,
     }), // tcg_registry_componentClass_pcie
     Some(ObjectDef {
         nid: 1391,
         short_name: "tcg-registry-componentClass-disk",
         long_name: "Disk Component Class",
         der: &[0x67, 0x81, 0x05, 0x12, 0x03, 0x05],
+        indexed: true,
     }), // tcg_registry_componentClass_disk
     Some(ObjectDef {
         nid: 1392,
         short_name: "tcg-cap-verifiedPlatformCertificate",
         long_name: "TCG Verified Platform Certificate CA Policy",
         der: &[0x67, 0x81, 0x05, 0x0b, 0x04],
+        indexed: true,
     }), // tcg_cap_verifiedPlatformCertificate
     Some(ObjectDef {
         nid: 1393,
         short_name: "tcg-tr-ID",
         long_name: "TCG Trait Identifiers",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01],
+        indexed: true,
     }), // tcg_tr_ID
     Some(ObjectDef {
         nid: 1394,
         short_name: "tcg-tr-category",
         long_name: "TCG Trait Categories",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02],
+        indexed: true,
     }), // tcg_tr_category
     Some(ObjectDef {
         nid: 1395,
         short_name: "tcg-tr-registry",
         long_name: "TCG Trait Registries",
         der: &[0x67, 0x81, 0x05, 0x13, 0x03],
+        indexed: true,
     }), // tcg_tr_registry
     Some(ObjectDef {
         nid: 1396,
         short_name: "tcg-tr-ID-Boolean",
         long_name: "Boolean Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x01],
+        indexed: true,
     }), // tcg_tr_ID_Boolean
     Some(ObjectDef {
         nid: 1397,
         short_name: "tcg-tr-ID-CertificateIdentifier",
         long_name: "Certificate Identifier Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x02],
+        indexed: true,
     }), // tcg_tr_ID_CertificateIdentifier
     Some(ObjectDef {
         nid: 1398,
         short_name: "tcg-tr-ID-CommonCriteria",
         long_name: "Common Criteria Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x03],
+        indexed: true,
     }), // tcg_tr_ID_CommonCriteria
     Some(ObjectDef {
         nid: 1399,
         short_name: "tcg-tr-ID-componentClass",
         long_name: "Component Class Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x04],
+        indexed: true,
     }), // tcg_tr_ID_componentClass
     Some(ObjectDef {
         nid: 1400,
         short_name: "tcg-tr-ID-componentIdentifierV11",
         long_name: "Component Identifier V1.1 Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x05],
+        indexed: true,
     }), // tcg_tr_ID_componentIdentifierV11
     Some(ObjectDef {
         nid: 1401,
         short_name: "tcg-tr-ID-FIPSLevel",
         long_name: "FIPS Level Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x06],
+        indexed: true,
     }), // tcg_tr_ID_FIPSLevel
     Some(ObjectDef {
         nid: 1402,
         short_name: "tcg-tr-ID-ISO9000Level",
         long_name: "ISO 9000 Level Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x07],
+        indexed: true,
     }), // tcg_tr_ID_ISO9000Level
     Some(ObjectDef {
         nid: 1403,
         short_name: "tcg-tr-ID-networkMAC",
         long_name: "Network MAC Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x08],
+        indexed: true,
     }), // tcg_tr_ID_networkMAC
     Some(ObjectDef {
         nid: 1404,
         short_name: "tcg-tr-ID-OID",
         long_name: "Object Identifier Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x09],
+        indexed: true,
     }), // tcg_tr_ID_OID
     Some(ObjectDef {
         nid: 1405,
         short_name: "tcg-tr-ID-PEN",
         long_name: "Private Enterprise Number Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0a],
+        indexed: true,
     }), // tcg_tr_ID_PEN
     Some(ObjectDef {
         nid: 1406,
         short_name: "tcg-tr-ID-platformFirmwareCapabilities",
         long_name: "Platform Firmware Capabilities Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0b],
+        indexed: true,
     }), // tcg_tr_ID_platformFirmwareCapabilities
     Some(ObjectDef {
         nid: 1407,
         short_name: "tcg-tr-ID-platformFirmwareSignatureVerification",
         long_name: "Platform Firmware Signature Verification Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0c],
+        indexed: true,
     }), // tcg_tr_ID_platformFirmwareSignatureVerification
     Some(ObjectDef {
         nid: 1408,
         short_name: "tcg-tr-ID-platformFirmwareUpdateCompliance",
         long_name: "Platform Firmware Update Compliance Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0d],
+        indexed: true,
     }), // tcg_tr_ID_platformFirmwareUpdateCompliance
     Some(ObjectDef {
         nid: 1409,
         short_name: "tcg-tr-ID-platformHardwareCapabilities",
         long_name: "Platform Hardware Capabilities Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0e],
+        indexed: true,
     }), // tcg_tr_ID_platformHardwareCapabilities
     Some(ObjectDef {
         nid: 1410,
         short_name: "tcg-tr-ID-RTM",
         long_name: "Root of Trust for Measurement Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x0f],
+        indexed: true,
     }), // tcg_tr_ID_RTM
     Some(ObjectDef {
         nid: 1411,
         short_name: "tcg-tr-ID-status",
         long_name: "Attribute Status Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x10],
+        indexed: true,
     }), // tcg_tr_ID_status
     Some(ObjectDef {
         nid: 1412,
         short_name: "tcg-tr-ID-URI",
         long_name: "Uniform Resource Identifier Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x11],
+        indexed: true,
     }), // tcg_tr_ID_URI
     Some(ObjectDef {
         nid: 1413,
         short_name: "tcg-tr-ID-UTF8String",
         long_name: "UTF8String Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x12],
+        indexed: true,
     }), // tcg_tr_ID_UTF8String
     Some(ObjectDef {
         nid: 1414,
         short_name: "tcg-tr-ID-IA5String",
         long_name: "IA5String Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x13],
+        indexed: true,
     }), // tcg_tr_ID_IA5String
     Some(ObjectDef {
         nid: 1415,
         short_name: "tcg-tr-ID-PEMCertString",
         long_name: "PEM-Encoded Certificate String Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x14],
+        indexed: true,
     }), // tcg_tr_ID_PEMCertString
     Some(ObjectDef {
         nid: 1416,
         short_name: "tcg-tr-ID-PublicKey",
         long_name: "Public Key Trait",
         der: &[0x67, 0x81, 0x05, 0x13, 0x01, 0x15],
+        indexed: true,
     }), // tcg_tr_ID_PublicKey
     Some(ObjectDef {
         nid: 1417,
         short_name: "tcg-tr-cat-platformManufacturer",
         long_name: "Platform Manufacturer Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x01],
+        indexed: true,
     }), // tcg_tr_cat_platformManufacturer
     Some(ObjectDef {
         nid: 1418,
         short_name: "tcg-tr-cat-platformModel",
         long_name: "Platform Model Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x02],
+        indexed: true,
     }), // tcg_tr_cat_platformModel
     Some(ObjectDef {
         nid: 1419,
         short_name: "tcg-tr-cat-platformVersion",
         long_name: "Platform Version Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x03],
+        indexed: true,
     }), // tcg_tr_cat_platformVersion
     Some(ObjectDef {
         nid: 1420,
         short_name: "tcg-tr-cat-platformSerial",
         long_name: "Platform Serial Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x04],
+        indexed: true,
     }), // tcg_tr_cat_platformSerial
     Some(ObjectDef {
         nid: 1421,
         short_name: "tcg-tr-cat-platformManufacturerIdentifier",
         long_name: "Platform Manufacturer Identifier Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x05],
+        indexed: true,
     }), // tcg_tr_cat_platformManufacturerIdentifier
     Some(ObjectDef {
         nid: 1422,
         short_name: "tcg-tr-cat-platformOwnership",
         long_name: "Platform Ownership Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x06],
+        indexed: true,
     }), // tcg_tr_cat_platformOwnership
     Some(ObjectDef {
         nid: 1423,
         short_name: "tcg-tr-cat-componentClass",
         long_name: "Component Class Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x07],
+        indexed: true,
     }), // tcg_tr_cat_componentClass
     Some(ObjectDef {
         nid: 1424,
         short_name: "tcg-tr-cat-componentManufacturer",
         long_name: "Component Manufacturer Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x08],
+        indexed: true,
     }), // tcg_tr_cat_componentManufacturer
     Some(ObjectDef {
         nid: 1425,
         short_name: "tcg-tr-cat-componentModel",
         long_name: "Component Model Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x09],
+        indexed: true,
     }), // tcg_tr_cat_componentModel
     Some(ObjectDef {
         nid: 1426,
         short_name: "tcg-tr-cat-componentSerial",
         long_name: "Component Serial Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0a],
+        indexed: true,
     }), // tcg_tr_cat_componentSerial
     Some(ObjectDef {
         nid: 1427,
         short_name: "tcg-tr-cat-componentStatus",
         long_name: "Component Status Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0b],
+        indexed: true,
     }), // tcg_tr_cat_componentStatus
     Some(ObjectDef {
         nid: 1428,
         short_name: "tcg-tr-cat-componentLocation",
         long_name: "Component Location Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0c],
+        indexed: true,
     }), // tcg_tr_cat_componentLocation
     Some(ObjectDef {
         nid: 1429,
         short_name: "tcg-tr-cat-componentRevision",
         long_name: "Component Revision Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0d],
+        indexed: true,
     }), // tcg_tr_cat_componentRevision
     Some(ObjectDef {
         nid: 1430,
         short_name: "tcg-tr-cat-componentFieldReplaceable",
         long_name: "Component Field Replaceable Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0e],
+        indexed: true,
     }), // tcg_tr_cat_componentFieldReplaceable
     Some(ObjectDef {
         nid: 1431,
         short_name: "tcg-tr-cat-EKCertificate",
         long_name: "EK Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x0f],
+        indexed: true,
     }), // tcg_tr_cat_EKCertificate
     Some(ObjectDef {
         nid: 1432,
         short_name: "tcg-tr-cat-IAKCertificate",
         long_name: "IAK Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x10],
+        indexed: true,
     }), // tcg_tr_cat_IAKCertificate
     Some(ObjectDef {
         nid: 1433,
         short_name: "tcg-tr-cat-IDevIDCertificate",
         long_name: "IDevID Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x11],
+        indexed: true,
     }), // tcg_tr_cat_IDevIDCertificate
     Some(ObjectDef {
         nid: 1434,
         short_name: "tcg-tr-cat-DICECertificate",
         long_name: "DICE Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x12],
+        indexed: true,
     }), // tcg_tr_cat_DICECertificate
     Some(ObjectDef {
         nid: 1435,
         short_name: "tcg-tr-cat-SPDMCertificate",
         long_name: "SPDM Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x13],
+        indexed: true,
     }), // tcg_tr_cat_SPDMCertificate
     Some(ObjectDef {
         nid: 1436,
         short_name: "tcg-tr-cat-PEMCertificate",
         long_name: "PEM Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x14],
+        indexed: true,
     }), // tcg_tr_cat_PEMCertificate
     Some(ObjectDef {
         nid: 1437,
         short_name: "tcg-tr-cat-PlatformCertificate",
         long_name: "Platform Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x15],
+        indexed: true,
     }), // tcg_tr_cat_PlatformCertificate
     Some(ObjectDef {
         nid: 1438,
         short_name: "tcg-tr-cat-DeltaPlatformCertificate",
         long_name: "Delta Platform Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x16],
+        indexed: true,
     }), // tcg_tr_cat_DeltaPlatformCertificate
     Some(ObjectDef {
         nid: 1439,
         short_name: "tcg-tr-cat-RebasePlatformCertificate",
         long_name: "Rebase Platform Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x17],
+        indexed: true,
     }), // tcg_tr_cat_RebasePlatformCertificate
     Some(ObjectDef {
         nid: 1440,
         short_name: "tcg-tr-cat-genericCertificate",
         long_name: "Generic Certificate Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x18],
+        indexed: true,
     }), // tcg_tr_cat_genericCertificate
     Some(ObjectDef {
         nid: 1441,
         short_name: "tcg-tr-cat-CommonCriteria",
         long_name: "Common Criteria Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x19],
+        indexed: true,
     }), // tcg_tr_cat_CommonCriteria
     Some(ObjectDef {
         nid: 1442,
         short_name: "tcg-tr-cat-componentIdentifierV11",
         long_name: "Component Identifier V1.1 Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1a],
+        indexed: true,
     }), // tcg_tr_cat_componentIdentifierV11
     Some(ObjectDef {
         nid: 1443,
         short_name: "tcg-tr-cat-FIPSLevel",
         long_name: "FIPS Level Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1b],
+        indexed: true,
     }), // tcg_tr_cat_FIPSLevel
     Some(ObjectDef {
         nid: 1444,
         short_name: "tcg-tr-cat-ISO9000",
         long_name: "ISO 9000 Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1c],
+        indexed: true,
     }), // tcg_tr_cat_ISO9000
     Some(ObjectDef {
         nid: 1445,
         short_name: "tcg-tr-cat-networkMAC",
         long_name: "Network MAC Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1d],
+        indexed: true,
     }), // tcg_tr_cat_networkMAC
     Some(ObjectDef {
         nid: 1446,
         short_name: "tcg-tr-cat-attestationProtocol",
         long_name: "Attestation Protocol Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1e],
+        indexed: true,
     }), // tcg_tr_cat_attestationProtocol
     Some(ObjectDef {
         nid: 1447,
         short_name: "tcg-tr-cat-PEN",
         long_name: "Private Enterprise Number Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x1f],
+        indexed: true,
     }), // tcg_tr_cat_PEN
     Some(ObjectDef {
         nid: 1448,
         short_name: "tcg-tr-cat-platformFirmwareCapabilities",
         long_name: "Platform Firmware Capabilities Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x20],
+        indexed: true,
     }), // tcg_tr_cat_platformFirmwareCapabilities
     Some(ObjectDef {
         nid: 1449,
         short_name: "tcg-tr-cat-platformHardwareCapabilities",
         long_name: "Platform Hardware Capabilities Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x21],
+        indexed: true,
     }), // tcg_tr_cat_platformHardwareCapabilities
     Some(ObjectDef {
         nid: 1450,
         short_name: "tcg-tr-cat-platformFirmwareSignatureVerification",
         long_name: "Platform Firmware Signature Verification Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x22],
+        indexed: true,
     }), // tcg_tr_cat_platformFirmwareSignatureVerification
     Some(ObjectDef {
         nid: 1451,
         short_name: "tcg-tr-cat-platformFirmwareUpdateCompliance",
         long_name: "Platform Firmware Update Compliance Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x23],
+        indexed: true,
     }), // tcg_tr_cat_platformFirmwareUpdateCompliance
     Some(ObjectDef {
         nid: 1452,
         short_name: "tcg-tr-cat-RTM",
         long_name: "Root of Trust of Measurement Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x24],
+        indexed: true,
     }), // tcg_tr_cat_RTM
     Some(ObjectDef {
         nid: 1453,
         short_name: "tcg-tr-cat-PublicKey",
         long_name: "Public Key Trait Category",
         der: &[0x67, 0x81, 0x05, 0x13, 0x02, 0x25],
+        indexed: true,
     }), // tcg_tr_cat_PublicKey
     Some(ObjectDef {
         nid: 1454,
         short_name: "id-alg-ml-kem-512",
         long_name: "ML-KEM-512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x04, 0x01],
+        indexed: true,
     }), // ML_KEM_512
     Some(ObjectDef {
         nid: 1455,
         short_name: "id-alg-ml-kem-768",
         long_name: "ML-KEM-768",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x04, 0x02],
+        indexed: true,
     }), // ML_KEM_768
     Some(ObjectDef {
         nid: 1456,
         short_name: "id-alg-ml-kem-1024",
         long_name: "ML-KEM-1024",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x04, 0x03],
+        indexed: true,
     }), // ML_KEM_1024
     Some(ObjectDef {
         nid: 1457,
         short_name: "id-ml-dsa-44",
         long_name: "ML-DSA-44",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x11],
+        indexed: true,
     }), // ML_DSA_44
     Some(ObjectDef {
         nid: 1458,
         short_name: "id-ml-dsa-65",
         long_name: "ML-DSA-65",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x12],
+        indexed: true,
     }), // ML_DSA_65
     Some(ObjectDef {
         nid: 1459,
         short_name: "id-ml-dsa-87",
         long_name: "ML-DSA-87",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x13],
+        indexed: true,
     }), // ML_DSA_87
     Some(ObjectDef {
         nid: 1460,
         short_name: "id-slh-dsa-sha2-128s",
         long_name: "SLH-DSA-SHA2-128s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x14],
+        indexed: true,
     }), // SLH_DSA_SHA2_128s
     Some(ObjectDef {
         nid: 1461,
         short_name: "id-slh-dsa-sha2-128f",
         long_name: "SLH-DSA-SHA2-128f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x15],
+        indexed: true,
     }), // SLH_DSA_SHA2_128f
     Some(ObjectDef {
         nid: 1462,
         short_name: "id-slh-dsa-sha2-192s",
         long_name: "SLH-DSA-SHA2-192s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x16],
+        indexed: true,
     }), // SLH_DSA_SHA2_192s
     Some(ObjectDef {
         nid: 1463,
         short_name: "id-slh-dsa-sha2-192f",
         long_name: "SLH-DSA-SHA2-192f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x17],
+        indexed: true,
     }), // SLH_DSA_SHA2_192f
     Some(ObjectDef {
         nid: 1464,
         short_name: "id-slh-dsa-sha2-256s",
         long_name: "SLH-DSA-SHA2-256s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x18],
+        indexed: true,
     }), // SLH_DSA_SHA2_256s
     Some(ObjectDef {
         nid: 1465,
         short_name: "id-slh-dsa-sha2-256f",
         long_name: "SLH-DSA-SHA2-256f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x19],
+        indexed: true,
     }), // SLH_DSA_SHA2_256f
     Some(ObjectDef {
         nid: 1466,
         short_name: "id-slh-dsa-shake-128s",
         long_name: "SLH-DSA-SHAKE-128s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1a],
+        indexed: true,
     }), // SLH_DSA_SHAKE_128s
     Some(ObjectDef {
         nid: 1467,
         short_name: "id-slh-dsa-shake-128f",
         long_name: "SLH-DSA-SHAKE-128f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1b],
+        indexed: true,
     }), // SLH_DSA_SHAKE_128f
     Some(ObjectDef {
         nid: 1468,
         short_name: "id-slh-dsa-shake-192s",
         long_name: "SLH-DSA-SHAKE-192s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1c],
+        indexed: true,
     }), // SLH_DSA_SHAKE_192s
     Some(ObjectDef {
         nid: 1469,
         short_name: "id-slh-dsa-shake-192f",
         long_name: "SLH-DSA-SHAKE-192f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1d],
+        indexed: true,
     }), // SLH_DSA_SHAKE_192f
     Some(ObjectDef {
         nid: 1470,
         short_name: "id-slh-dsa-shake-256s",
         long_name: "SLH-DSA-SHAKE-256s",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1e],
+        indexed: true,
     }), // SLH_DSA_SHAKE_256s
     Some(ObjectDef {
         nid: 1471,
         short_name: "id-slh-dsa-shake-256f",
         long_name: "SLH-DSA-SHAKE-256f",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x1f],
+        indexed: true,
     }), // SLH_DSA_SHAKE_256f
     Some(ObjectDef {
         nid: 1472,
         short_name: "id-hash-ml-dsa-44-with-sha512",
         long_name: "HASH-ML-DSA-44-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x20],
+        indexed: true,
     }), // HASH_ML_DSA_44_WITH_SHA512
     Some(ObjectDef {
         nid: 1473,
         short_name: "id-hash-ml-dsa-65-with-sha512",
         long_name: "HASH-ML-DSA-65-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x21],
+        indexed: true,
     }), // HASH_ML_DSA_65_WITH_SHA512
     Some(ObjectDef {
         nid: 1474,
         short_name: "id-hash-ml-dsa-87-with-sha512",
         long_name: "HASH-ML-DSA-87-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x22],
+        indexed: true,
     }), // HASH_ML_DSA_87_WITH_SHA512
     Some(ObjectDef {
         nid: 1475,
         short_name: "id-hash-slh-dsa-sha2-128s-with-sha256",
         long_name: "SLH-DSA-SHA2-128s-WITH-SHA256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x23],
+        indexed: true,
     }), // SLH_DSA_SHA2_128s_WITH_SHA256
     Some(ObjectDef {
         nid: 1476,
         short_name: "id-hash-slh-dsa-sha2-128f-with-sha256",
         long_name: "SLH-DSA-SHA2-128f-WITH-SHA256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x24],
+        indexed: true,
     }), // SLH_DSA_SHA2_128f_WITH_SHA256
     Some(ObjectDef {
         nid: 1477,
         short_name: "id-hash-slh-dsa-sha2-192s-with-sha512",
         long_name: "SLH-DSA-SHA2-192s-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x25],
+        indexed: true,
     }), // SLH_DSA_SHA2_192s_WITH_SHA512
     Some(ObjectDef {
         nid: 1478,
         short_name: "id-hash-slh-dsa-sha2-192f-with-sha512",
         long_name: "SLH-DSA-SHA2-192f-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x26],
+        indexed: true,
     }), // SLH_DSA_SHA2_192f_WITH_SHA512
     Some(ObjectDef {
         nid: 1479,
         short_name: "id-hash-slh-dsa-sha2-256s-with-sha512",
         long_name: "SLH-DSA-SHA2-256s-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x27],
+        indexed: true,
     }), // SLH_DSA_SHA2_256s_WITH_SHA512
     Some(ObjectDef {
         nid: 1480,
         short_name: "id-hash-slh-dsa-sha2-256f-with-sha512",
         long_name: "SLH-DSA-SHA2-256f-WITH-SHA512",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x28],
+        indexed: true,
     }), // SLH_DSA_SHA2_256f_WITH_SHA512
     Some(ObjectDef {
         nid: 1481,
         short_name: "id-hash-slh-dsa-shake-128s-with-shake128",
         long_name: "SLH-DSA-SHAKE-128s-WITH-SHAKE128",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x29],
+        indexed: true,
     }), // SLH_DSA_SHAKE_128s_WITH_SHAKE128
     Some(ObjectDef {
         nid: 1482,
         short_name: "id-hash-slh-dsa-shake-128f-with-shake128",
         long_name: "SLH-DSA-SHAKE-128f-WITH-SHAKE128",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x2a],
+        indexed: true,
     }), // SLH_DSA_SHAKE_128f_WITH_SHAKE128
     Some(ObjectDef {
         nid: 1483,
         short_name: "id-hash-slh-dsa-shake-192s-with-shake256",
         long_name: "SLH-DSA-SHAKE-192s-WITH-SHAKE256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x2b],
+        indexed: true,
     }), // SLH_DSA_SHAKE_192s_WITH_SHAKE256
     Some(ObjectDef {
         nid: 1484,
         short_name: "id-hash-slh-dsa-shake-192f-with-shake256",
         long_name: "SLH-DSA-SHAKE-192f-WITH-SHAKE256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x2c],
+        indexed: true,
     }), // SLH_DSA_SHAKE_192f_WITH_SHAKE256
     Some(ObjectDef {
         nid: 1485,
         short_name: "id-hash-slh-dsa-shake-256s-with-shake256",
         long_name: "SLH-DSA-SHAKE-256s-WITH-SHAKE256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x2d],
+        indexed: true,
     }), // SLH_DSA_SHAKE_256s_WITH_SHAKE256
     Some(ObjectDef {
         nid: 1486,
         short_name: "id-hash-slh-dsa-shake-256f-with-shake256",
         long_name: "SLH-DSA-SHAKE-256f-WITH-SHAKE256",
         der: &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x2e],
+        indexed: true,
     }), // SLH_DSA_SHAKE_256f_WITH_SHAKE256
 ];
 

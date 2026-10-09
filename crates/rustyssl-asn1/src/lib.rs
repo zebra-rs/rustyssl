@@ -9,3 +9,4 @@
 
 mod generated;
 pub mod objects;
+pub mod oid;
