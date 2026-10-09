@@ -119,6 +119,7 @@ dependencies = [
  "rustyssl-abi",
  "rustyssl-asn1",
  "rustyssl-capi",
+ "rustyssl-crypto",
 ]
 
 [[package]]

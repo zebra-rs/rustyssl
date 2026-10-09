@@ -4442,20 +4442,41 @@ pub(crate) static ASYNC_REASONS: Table = &[
 
 /// `SM2_str_reasons`.
 pub(crate) static SM2_REASONS: Table = &[
-    (pack(ERR_LIB_SM2, 100), c"asn1 error"), // SM2_R_ASN1_ERROR (internal)
-    (pack(ERR_LIB_SM2, 101), c"bad signature"), // SM2_R_BAD_SIGNATURE (internal)
-    (pack(ERR_LIB_SM2, 107), c"buffer too small"), // SM2_R_BUFFER_TOO_SMALL (internal)
-    (pack(ERR_LIB_SM2, 110), c"dist id too large"), // SM2_R_DIST_ID_TOO_LARGE (internal)
-    (pack(ERR_LIB_SM2, 112), c"id not set"), // SM2_R_ID_NOT_SET (internal)
-    (pack(ERR_LIB_SM2, 111), c"id too large"), // SM2_R_ID_TOO_LARGE (internal)
-    (pack(ERR_LIB_SM2, 108), c"invalid curve"), // SM2_R_INVALID_CURVE (internal)
-    (pack(ERR_LIB_SM2, 102), c"invalid digest"), // SM2_R_INVALID_DIGEST (internal)
-    (pack(ERR_LIB_SM2, 103), c"invalid digest type"), // SM2_R_INVALID_DIGEST_TYPE (internal)
-    (pack(ERR_LIB_SM2, 104), c"invalid encoding"), // SM2_R_INVALID_ENCODING (internal)
-    (pack(ERR_LIB_SM2, 105), c"invalid field"), // SM2_R_INVALID_FIELD (internal)
-    (pack(ERR_LIB_SM2, 113), c"invalid private key"), // SM2_R_INVALID_PRIVATE_KEY (internal)
-    (pack(ERR_LIB_SM2, 109), c"no parameters set"), // SM2_R_NO_PARAMETERS_SET (internal)
-    (pack(ERR_LIB_SM2, 106), c"user id too large"), // SM2_R_USER_ID_TOO_LARGE (internal)
+    (pack(ERR_LIB_SM2, SM2_R_ASN1_ERROR), c"asn1 error"),
+    (pack(ERR_LIB_SM2, SM2_R_BAD_SIGNATURE), c"bad signature"),
+    (
+        pack(ERR_LIB_SM2, SM2_R_BUFFER_TOO_SMALL),
+        c"buffer too small",
+    ),
+    (
+        pack(ERR_LIB_SM2, SM2_R_DIST_ID_TOO_LARGE),
+        c"dist id too large",
+    ),
+    (pack(ERR_LIB_SM2, SM2_R_ID_NOT_SET), c"id not set"),
+    (pack(ERR_LIB_SM2, SM2_R_ID_TOO_LARGE), c"id too large"),
+    (pack(ERR_LIB_SM2, SM2_R_INVALID_CURVE), c"invalid curve"),
+    (pack(ERR_LIB_SM2, SM2_R_INVALID_DIGEST), c"invalid digest"),
+    (
+        pack(ERR_LIB_SM2, SM2_R_INVALID_DIGEST_TYPE),
+        c"invalid digest type",
+    ),
+    (
+        pack(ERR_LIB_SM2, SM2_R_INVALID_ENCODING),
+        c"invalid encoding",
+    ),
+    (pack(ERR_LIB_SM2, SM2_R_INVALID_FIELD), c"invalid field"),
+    (
+        pack(ERR_LIB_SM2, SM2_R_INVALID_PRIVATE_KEY),
+        c"invalid private key",
+    ),
+    (
+        pack(ERR_LIB_SM2, SM2_R_NO_PARAMETERS_SET),
+        c"no parameters set",
+    ),
+    (
+        pack(ERR_LIB_SM2, SM2_R_USER_ID_TOO_LARGE),
+        c"user id too large",
+    ),
 ];
 
 /// `OSSL_STORE_str_reasons`.
@@ -4566,17 +4587,41 @@ pub(crate) static OSSL_STORE_REASONS: Table = &[
 
 /// `PROP_str_reasons`.
 pub(crate) static PROP_REASONS: Table = &[
-    (pack(ERR_LIB_PROP, 100), c"name too long"), // PROP_R_NAME_TOO_LONG (internal)
-    (pack(ERR_LIB_PROP, 101), c"not an ascii character"), // PROP_R_NOT_AN_ASCII_CHARACTER (internal)
-    (pack(ERR_LIB_PROP, 102), c"not an hexadecimal digit"), // PROP_R_NOT_AN_HEXADECIMAL_DIGIT (internal)
-    (pack(ERR_LIB_PROP, 103), c"not an identifier"),        // PROP_R_NOT_AN_IDENTIFIER (internal)
-    (pack(ERR_LIB_PROP, 104), c"not an octal digit"),       // PROP_R_NOT_AN_OCTAL_DIGIT (internal)
-    (pack(ERR_LIB_PROP, 105), c"not a decimal digit"),      // PROP_R_NOT_A_DECIMAL_DIGIT (internal)
-    (pack(ERR_LIB_PROP, 106), c"no matching string delimiter"), // PROP_R_NO_MATCHING_STRING_DELIMITER (internal)
-    (pack(ERR_LIB_PROP, 107), c"no value"),                     // PROP_R_NO_VALUE (internal)
-    (pack(ERR_LIB_PROP, 108), c"parse failed"),                 // PROP_R_PARSE_FAILED (internal)
-    (pack(ERR_LIB_PROP, 109), c"string too long"),              // PROP_R_STRING_TOO_LONG (internal)
-    (pack(ERR_LIB_PROP, 110), c"trailing characters"), // PROP_R_TRAILING_CHARACTERS (internal)
+    (pack(ERR_LIB_PROP, PROP_R_NAME_TOO_LONG), c"name too long"),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NOT_AN_ASCII_CHARACTER),
+        c"not an ascii character",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NOT_AN_HEXADECIMAL_DIGIT),
+        c"not an hexadecimal digit",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NOT_AN_IDENTIFIER),
+        c"not an identifier",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NOT_AN_OCTAL_DIGIT),
+        c"not an octal digit",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NOT_A_DECIMAL_DIGIT),
+        c"not a decimal digit",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_NO_MATCHING_STRING_DELIMITER),
+        c"no matching string delimiter",
+    ),
+    (pack(ERR_LIB_PROP, PROP_R_NO_VALUE), c"no value"),
+    (pack(ERR_LIB_PROP, PROP_R_PARSE_FAILED), c"parse failed"),
+    (
+        pack(ERR_LIB_PROP, PROP_R_STRING_TOO_LONG),
+        c"string too long",
+    ),
+    (
+        pack(ERR_LIB_PROP, PROP_R_TRAILING_CHARACTERS),
+        c"trailing characters",
+    ),
 ];
 
 /// `PROV_str_reasons`.
@@ -6370,3 +6415,103 @@ pub(crate) static CRYPTO_TABLES: &[Table] = &[
     PROP_REASONS,
     PROV_REASONS,
 ];
+
+/// `SM2_R_ASN1_ERROR`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_ASN1_ERROR: core::ffi::c_int = 100;
+
+/// `SM2_R_BAD_SIGNATURE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_BAD_SIGNATURE: core::ffi::c_int = 101;
+
+/// `SM2_R_BUFFER_TOO_SMALL`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_BUFFER_TOO_SMALL: core::ffi::c_int = 107;
+
+/// `SM2_R_DIST_ID_TOO_LARGE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_DIST_ID_TOO_LARGE: core::ffi::c_int = 110;
+
+/// `SM2_R_ID_NOT_SET`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_ID_NOT_SET: core::ffi::c_int = 112;
+
+/// `SM2_R_ID_TOO_LARGE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_ID_TOO_LARGE: core::ffi::c_int = 111;
+
+/// `SM2_R_INVALID_CURVE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_CURVE: core::ffi::c_int = 108;
+
+/// `SM2_R_INVALID_DIGEST`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_DIGEST: core::ffi::c_int = 102;
+
+/// `SM2_R_INVALID_DIGEST_TYPE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_DIGEST_TYPE: core::ffi::c_int = 103;
+
+/// `SM2_R_INVALID_ENCODING`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_ENCODING: core::ffi::c_int = 104;
+
+/// `SM2_R_INVALID_FIELD`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_FIELD: core::ffi::c_int = 105;
+
+/// `SM2_R_INVALID_PRIVATE_KEY`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_INVALID_PRIVATE_KEY: core::ffi::c_int = 113;
+
+/// `SM2_R_NO_PARAMETERS_SET`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_NO_PARAMETERS_SET: core::ffi::c_int = 109;
+
+/// `SM2_R_USER_ID_TOO_LARGE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const SM2_R_USER_ID_TOO_LARGE: core::ffi::c_int = 106;
+
+/// `PROP_R_NAME_TOO_LONG`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NAME_TOO_LONG: core::ffi::c_int = 100;
+
+/// `PROP_R_NOT_AN_ASCII_CHARACTER`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NOT_AN_ASCII_CHARACTER: core::ffi::c_int = 101;
+
+/// `PROP_R_NOT_AN_HEXADECIMAL_DIGIT`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NOT_AN_HEXADECIMAL_DIGIT: core::ffi::c_int = 102;
+
+/// `PROP_R_NOT_AN_IDENTIFIER`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NOT_AN_IDENTIFIER: core::ffi::c_int = 103;
+
+/// `PROP_R_NOT_AN_OCTAL_DIGIT`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NOT_AN_OCTAL_DIGIT: core::ffi::c_int = 104;
+
+/// `PROP_R_NOT_A_DECIMAL_DIGIT`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NOT_A_DECIMAL_DIGIT: core::ffi::c_int = 105;
+
+/// `PROP_R_NO_MATCHING_STRING_DELIMITER`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NO_MATCHING_STRING_DELIMITER: core::ffi::c_int = 106;
+
+/// `PROP_R_NO_VALUE`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_NO_VALUE: core::ffi::c_int = 107;
+
+/// `PROP_R_PARSE_FAILED`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_PARSE_FAILED: core::ffi::c_int = 108;
+
+/// `PROP_R_STRING_TOO_LONG`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_STRING_TOO_LONG: core::ffi::c_int = 109;
+
+/// `PROP_R_TRAILING_CHARACTERS`, from openssl.txt (an internal header defines it).
+#[allow(dead_code, reason = "used once its library is implemented")]
+pub(crate) const PROP_R_TRAILING_CHARACTERS: core::ffi::c_int = 110;

@@ -7,3 +7,4 @@
 #![deny(clippy::arithmetic_side_effects)]
 
 pub mod params;
+pub mod property;

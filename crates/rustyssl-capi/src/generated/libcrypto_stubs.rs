@@ -15092,19 +15092,6 @@ pub extern "C" fn EVP_chacha20_poly1305() -> *const EVP_CIPHER {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_default_properties_enable_fips(
-    _: *mut OSSL_LIB_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_default_properties_enable_fips")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_default_properties_is_fips_enabled(_: *mut OSSL_LIB_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_default_properties_is_fips_enabled")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_des_cbc() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_des_cbc")
 }
@@ -15207,11 +15194,6 @@ pub extern "C" fn EVP_desx_cbc() -> *const EVP_CIPHER {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_enc_null() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_enc_null")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_get1_default_properties(_: *mut OSSL_LIB_CTX) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("EVP_get1_default_properties")
 }
 
 #[unsafe(no_mangle)]
@@ -15363,14 +15345,6 @@ pub extern "C" fn EVP_seed_ecb() -> *const EVP_CIPHER {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_seed_ofb() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_seed_ofb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_set_default_properties(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_set_default_properties")
 }
 
 #[unsafe(no_mangle)]
