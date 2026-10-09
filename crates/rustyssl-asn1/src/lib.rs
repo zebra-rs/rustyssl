@@ -7,11 +7,13 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod base64;
 pub mod content;
 pub mod der;
 mod generated;
 pub mod number;
 pub mod objects;
 pub mod oid;
+pub mod pem;
 pub mod text;
 pub mod time;
