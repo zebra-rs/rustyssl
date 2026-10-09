@@ -334,11 +334,6 @@ pub extern "C" fn ASN1_BIT_STRING_check(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_BIT_STRING_free(_: *mut ASN1_BIT_STRING) {
-    crate::stub::unimplemented("ASN1_BIT_STRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_BIT_STRING_get_bit(
     _: *const ASN1_BIT_STRING,
     _: core::ffi::c_int,
@@ -359,11 +354,6 @@ pub extern "C" fn ASN1_BIT_STRING_name_print(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("ASN1_BIT_STRING_name_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_BIT_STRING_new() -> *mut ASN1_BIT_STRING {
-    crate::stub::unimplemented("ASN1_BIT_STRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -403,28 +393,13 @@ pub extern "C" fn ASN1_BIT_STRING_set_bit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_BMPSTRING_free(_: *mut ASN1_BMPSTRING) {
-    crate::stub::unimplemented("ASN1_BMPSTRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_BMPSTRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_BMPSTRING_it")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_BMPSTRING_new() -> *mut ASN1_BMPSTRING {
-    crate::stub::unimplemented("ASN1_BMPSTRING_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_BOOLEAN_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_BOOLEAN_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_ENUMERATED_free(_: *mut ASN1_ENUMERATED) {
-    crate::stub::unimplemented("ASN1_ENUMERATED_free")
 }
 
 #[unsafe(no_mangle)]
@@ -443,11 +418,6 @@ pub extern "C" fn ASN1_ENUMERATED_get_int64(
 #[unsafe(no_mangle)]
 pub extern "C" fn ASN1_ENUMERATED_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_ENUMERATED_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_ENUMERATED_new() -> *mut ASN1_ENUMERATED {
-    crate::stub::unimplemented("ASN1_ENUMERATED_new")
 }
 
 #[unsafe(no_mangle)]
@@ -496,18 +466,8 @@ pub extern "C" fn ASN1_GENERALIZEDTIME_dup(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_GENERALIZEDTIME_free(_: *mut ASN1_GENERALIZEDTIME) {
-    crate::stub::unimplemented("ASN1_GENERALIZEDTIME_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_GENERALIZEDTIME_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_GENERALIZEDTIME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_GENERALIZEDTIME_new() -> *mut ASN1_GENERALIZEDTIME {
-    crate::stub::unimplemented("ASN1_GENERALIZEDTIME_new")
 }
 
 #[unsafe(no_mangle)]
@@ -535,33 +495,13 @@ pub extern "C" fn ASN1_GENERALIZEDTIME_set_string(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_GENERALSTRING_free(_: *mut ASN1_GENERALSTRING) {
-    crate::stub::unimplemented("ASN1_GENERALSTRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_GENERALSTRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_GENERALSTRING_it")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_GENERALSTRING_new() -> *mut ASN1_GENERALSTRING {
-    crate::stub::unimplemented("ASN1_GENERALSTRING_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_IA5STRING_free(_: *mut ASN1_IA5STRING) {
-    crate::stub::unimplemented("ASN1_IA5STRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_IA5STRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_IA5STRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_IA5STRING_new() -> *mut ASN1_IA5STRING {
-    crate::stub::unimplemented("ASN1_IA5STRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -575,11 +515,6 @@ pub extern "C" fn ASN1_INTEGER_cmp(
 #[unsafe(no_mangle)]
 pub extern "C" fn ASN1_INTEGER_dup(_: *const ASN1_INTEGER) -> *mut ASN1_INTEGER {
     crate::stub::unimplemented("ASN1_INTEGER_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_INTEGER_free(_: *mut ASN1_INTEGER) {
-    crate::stub::unimplemented("ASN1_INTEGER_free")
 }
 
 #[unsafe(no_mangle)]
@@ -600,11 +535,6 @@ pub extern "C" fn ASN1_INTEGER_get_uint64(_: *mut u64, _: *const ASN1_INTEGER) -
 #[unsafe(no_mangle)]
 pub extern "C" fn ASN1_INTEGER_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_INTEGER_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_INTEGER_new() -> *mut ASN1_INTEGER {
-    crate::stub::unimplemented("ASN1_INTEGER_new")
 }
 
 #[unsafe(no_mangle)]
@@ -663,40 +593,8 @@ pub extern "C" fn ASN1_OCTET_STRING_NDEF_it() -> *const ASN1_ITEM {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OCTET_STRING_cmp(
-    _: *const ASN1_OCTET_STRING,
-    _: *const ASN1_OCTET_STRING,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_OCTET_STRING_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OCTET_STRING_dup(_: *const ASN1_OCTET_STRING) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("ASN1_OCTET_STRING_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OCTET_STRING_free(_: *mut ASN1_OCTET_STRING) {
-    crate::stub::unimplemented("ASN1_OCTET_STRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_OCTET_STRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_OCTET_STRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OCTET_STRING_new() -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("ASN1_OCTET_STRING_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OCTET_STRING_set(
-    _: *mut ASN1_OCTET_STRING,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_OCTET_STRING_set")
 }
 
 #[unsafe(no_mangle)]
@@ -760,18 +658,8 @@ pub extern "C" fn ASN1_PCTX_set_str_flags(_: *mut ASN1_PCTX, _: core::ffi::c_ulo
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_PRINTABLESTRING_free(_: *mut ASN1_PRINTABLESTRING) {
-    crate::stub::unimplemented("ASN1_PRINTABLESTRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_PRINTABLESTRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_PRINTABLESTRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_PRINTABLESTRING_new() -> *mut ASN1_PRINTABLESTRING {
-    crate::stub::unimplemented("ASN1_PRINTABLESTRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -871,61 +759,8 @@ pub extern "C" fn ASN1_STRING_TABLE_get(_: core::ffi::c_int) -> *mut ASN1_STRING
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_clear_free(_: *mut ASN1_STRING) {
-    crate::stub::unimplemented("ASN1_STRING_clear_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_cmp(
-    _: *const ASN1_STRING,
-    _: *const ASN1_STRING,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_STRING_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_copy(_: *mut ASN1_STRING, _: *const ASN1_STRING) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_STRING_copy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_data(_: *mut ASN1_STRING) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("ASN1_STRING_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_dup(_: *const ASN1_STRING) -> *mut ASN1_STRING {
-    crate::stub::unimplemented("ASN1_STRING_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_free(_: *mut ASN1_STRING) {
-    crate::stub::unimplemented("ASN1_STRING_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_get0_data(_: *const ASN1_STRING) -> *const core::ffi::c_uchar {
-    crate::stub::unimplemented("ASN1_STRING_get0_data")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_STRING_get_default_mask() -> core::ffi::c_ulong {
     crate::stub::unimplemented("ASN1_STRING_get_default_mask")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_length(_: *const ASN1_STRING) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_STRING_length")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_length_set(_: *mut ASN1_STRING, _: core::ffi::c_int) {
-    crate::stub::unimplemented("ASN1_STRING_length_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_new() -> *mut ASN1_STRING {
-    crate::stub::unimplemented("ASN1_STRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -949,24 +784,6 @@ pub extern "C" fn ASN1_STRING_print_ex_fp(
     _: core::ffi::c_ulong,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("ASN1_STRING_print_ex_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_set(
-    _: *mut ASN1_STRING,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_STRING_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_set0(
-    _: *mut ASN1_STRING,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("ASN1_STRING_set0")
 }
 
 #[unsafe(no_mangle)]
@@ -1001,28 +818,8 @@ pub extern "C" fn ASN1_STRING_to_UTF8(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_type(_: *const ASN1_STRING) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_STRING_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_STRING_type_new(_: core::ffi::c_int) -> *mut ASN1_STRING {
-    crate::stub::unimplemented("ASN1_STRING_type_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_T61STRING_free(_: *mut ASN1_T61STRING) {
-    crate::stub::unimplemented("ASN1_T61STRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_T61STRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_T61STRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_T61STRING_new() -> *mut ASN1_T61STRING {
-    crate::stub::unimplemented("ASN1_T61STRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -1228,18 +1025,8 @@ pub extern "C" fn ASN1_TYPE_unpack_sequence(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UNIVERSALSTRING_free(_: *mut ASN1_UNIVERSALSTRING) {
-    crate::stub::unimplemented("ASN1_UNIVERSALSTRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_UNIVERSALSTRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_UNIVERSALSTRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UNIVERSALSTRING_new() -> *mut ASN1_UNIVERSALSTRING {
-    crate::stub::unimplemented("ASN1_UNIVERSALSTRING_new")
 }
 
 #[unsafe(no_mangle)]
@@ -1273,18 +1060,8 @@ pub extern "C" fn ASN1_UTCTIME_dup(_: *const ASN1_UTCTIME) -> *mut ASN1_UTCTIME 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UTCTIME_free(_: *mut ASN1_UTCTIME) {
-    crate::stub::unimplemented("ASN1_UTCTIME_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_UTCTIME_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_UTCTIME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UTCTIME_new() -> *mut ASN1_UTCTIME {
-    crate::stub::unimplemented("ASN1_UTCTIME_new")
 }
 
 #[unsafe(no_mangle)]
@@ -1306,33 +1083,13 @@ pub extern "C" fn ASN1_UTCTIME_set_string(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UTF8STRING_free(_: *mut ASN1_UTF8STRING) {
-    crate::stub::unimplemented("ASN1_UTF8STRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_UTF8STRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_UTF8STRING_it")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_UTF8STRING_new() -> *mut ASN1_UTF8STRING {
-    crate::stub::unimplemented("ASN1_UTF8STRING_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_VISIBLESTRING_free(_: *mut ASN1_VISIBLESTRING) {
-    crate::stub::unimplemented("ASN1_VISIBLESTRING_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_VISIBLESTRING_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_VISIBLESTRING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_VISIBLESTRING_new() -> *mut ASN1_VISIBLESTRING {
-    crate::stub::unimplemented("ASN1_VISIBLESTRING_new")
 }
 
 #[unsafe(no_mangle)]

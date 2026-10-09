@@ -1130,15 +1130,38 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     - a `der` fuzz target (15 million runs): exact-size input to `ASN1_get_object`, headers
       round-tripped through `ASN1_put_object`, objects through `i2d`/`d2i`, and the element
       reader.
-- [ ] **2.3 Universal types** (public-layout `ASN1_STRING` family):
-  - INTEGER/ENUMERATED (BN and int64 conversions, negative handling)
-  - BIT STRING (unused bits and flags)
-  - OCTET STRING and every string type
-  - `ASN1_mbstring_copy`, `ASN1_STRING_to_UTF8`, `ASN1_STRING_print_ex` (RFC 2253 flags)
-  - OBJECT, BOOLEAN, NULL
-  - TIME/UTCTIME/GENERALIZEDTIME (parse, compare, diff, print formats, the
-    `OPENSSL_gmtime*` family)
-  - `ASN1_TYPE`, `ASN1_STRING_TABLE`
+- [ ] **2.3 Universal types** (public-layout `ASN1_STRING` family), in six sub-steps, each its
+  own PR. The `d2i_`/`i2d_`/`_it` functions of these types, and the `new`/`free` of those
+  built from templates (`ASN1_TIME`, `ASN1_PRINTABLE`, `DIRECTORYSTRING`, ...), come from the
+  template engine (2.4).
+  - [x] **2.3a `ASN1_STRING` and the string types' `new`/`free`:**
+    `ASN1_STRING_new`/`type_new`/`free`/`clear_free`/`set`/`set0`/`copy`/`dup`/`cmp` and
+    the accessors; the 14 types whose `new`/`free` are plain functions
+    (`IMPLEMENT_ASN1_STRING_FUNCTIONS`); `ASN1_OCTET_STRING_dup`/`cmp`/`set`.
+
+    *Done:* 48 exports, now 502 of libcrypto's 5,876 (`capi/src/asn1/string.rs`).
+    - **The struct is the application's** (`length`, `type`, `data`, `flags`), so its fields
+      are taken as they are, as OpenSSL takes them. `ASN1_STRING_set` keeps a NUL after the
+      data, reuses the buffer only when the new length is below the old one (an equal length
+      is reallocated), sizes without copying for NULL data, and fails with
+      `ASN1_R_TOO_LARGE` past `INT_MAX` - 1 octets. `ASN1_STRING_FLAG_NDEF` strings don't
+      own their data and `ASN1_STRING_FLAG_EMBED` ones are part of another structure;
+      `ASN1_STRING_copy` keeps the destination's `EMBED` flag. `ASN1_STRING_cmp` orders by
+      length, then octets, then type.
+    - **Deviations (`DEVIATIONS.md`):** NULL strings to the setters, comparison, and
+      accessors; `ASN1_STRING_clear_free` with a negative length.
+    - **Tests:** `tests/c/asn1_string.c` (19 checks), identical on both libraries. Nothing here
+      parses input, so there's no probe command or fuzz target.
+  - [ ] **2.3b INTEGER and ENUMERATED:** `get`/`set` for `long`, `int64`, and `uint64`,
+    negative values, `cmp`, `dup`. The `BIGNUM` conversions wait for `BIGNUM` (Phase 4).
+  - [ ] **2.3c BIT STRING, OCTET STRING, BOOLEAN, NULL:** bits, unused bits and flags.
+  - [ ] **2.3d Character strings:** `ASN1_mbstring_copy`/`ncopy`, `ASN1_STRING_TABLE`, the
+    default mask, `ASN1_STRING_to_UTF8`, `ASN1_STRING_print_ex` (RFC 2253 flags),
+    `ASN1_PRINTABLE_type`.
+  - [ ] **2.3e Times:** UTCTIME, GENERALIZEDTIME, and TIME (parse, compare, diff, print
+    formats), the `OPENSSL_gmtime*` family.
+  - [ ] **2.3f `ASN1_TYPE`:** `get`/`set`, `set1`, `cmp`, the `get_octetstring` and
+    `get_int_octetstring` helpers.
 - [ ] **2.4 ASN1_ITEM template engine** (in `capi`; this is the most security-sensitive unsafe
   code):
   - interprets `ASN1_ITEM`, `ASN1_TEMPLATE`, and `ASN1_AUX` tables, including callbacks,

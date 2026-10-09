@@ -6,6 +6,8 @@
 //! the header is read one octet at a time, never past what it needs, rather than through a
 //! slice of `omax` octets.
 
+pub(crate) mod string;
+
 use core::ffi::{c_int, c_long, c_uchar};
 use core::ptr;
 
