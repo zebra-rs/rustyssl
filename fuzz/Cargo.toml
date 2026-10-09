@@ -97,3 +97,24 @@ path = "fuzz_targets/der.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "a2i_integer"
+path = "fuzz_targets/a2i_integer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "asn1_text"
+path = "fuzz_targets/asn1_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "asn1_time"
+path = "fuzz_targets/asn1_time.rs"
+test = false
+doc = false
+bench = false

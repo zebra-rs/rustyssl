@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(10) {
+        match random.below(13) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -158,6 +158,9 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             6 => addr_session(&mut random, &mut out)?,
             7 => obj_session(&mut random, &mut out)?,
             8 => asn_session(&mut random, &mut out)?,
+            9 => int_session(&mut random, &mut out)?,
+            10 => text_session(&mut random, &mut out)?,
+            11 => time_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -388,6 +391,262 @@ fn asn_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
+/// A random session of INTEGER commands: octet strings of every length around 8 under the
+/// integer types (and others), int64 values at the edges, and hex text with the endings,
+/// junk, and continuations `a2i_ASN1_INTEGER` handles; and BIT STRING bit changes and checks.
+fn int_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    for _ in 0..1 + random.below(20) {
+        match random.below(4) {
+            0 => {
+                let kind = random.pick(&["2", "258", "10", "266", "4", "0"]);
+                let len = random.below(11);
+                let bytes: Vec<u8> = (0..len)
+                    .map(|_| match random.below(4) {
+                        0 => 0,
+                        1 => 0xff,
+                        2 => 0x80,
+                        _ => u8::try_from(random.below(256)).unwrap_or(0),
+                    })
+                    .collect();
+                writeln!(out, "asnint {kind} {}", hex(&bytes))?;
+            }
+            1 => {
+                let value = match random.below(4) {
+                    0 => random
+                        .pick(&[
+                            "0",
+                            "-1",
+                            "9223372036854775807",
+                            "-9223372036854775808",
+                            "128",
+                            "-128",
+                            "-129",
+                        ])
+                        .to_owned(),
+                    1 => (random.next() >> random.below(64)).to_string(),
+                    2 => format!("-{}", random.next() >> (1 + random.below(63))),
+                    _ => random.below(70_000).to_string(),
+                };
+                writeln!(out, "asnset {value}")?;
+            }
+            3 => {
+                let bytes: Vec<u8> = (0..random.below(6))
+                    .map(|_| match random.below(3) {
+                        0 => 0,
+                        _ => u8::try_from(random.below(256)).unwrap_or(0),
+                    })
+                    .collect();
+                let flags: Vec<u8> = (0..random.below(5))
+                    .map(|_| u8::try_from(random.below(256)).unwrap_or(0))
+                    .collect();
+                let n = i64::try_from(random.below(60)).unwrap_or(0) - 2;
+                writeln!(
+                    out,
+                    "asnbit {} {n} {} {}",
+                    hex(&bytes),
+                    random.below(3),
+                    hex(&flags)
+                )?;
+            }
+            _ => {
+                let mut text = String::new();
+                for line in 0..1 + random.below(3) {
+                    if line == 0 && random.below(3) == 0 {
+                        text.push_str("00");
+                    }
+                    let digits = random.below(14);
+                    for _ in 0..digits {
+                        text.push(char::from(
+                            b"0123456789abcdefABCDEF"
+                                .get(usize::try_from(random.below(22)).unwrap_or(0))
+                                .copied()
+                                .unwrap_or(b'0'),
+                        ));
+                    }
+                    text.push_str(random.pick(&["", " junk", "z", "\\", "\\"]));
+                    text.push_str(random.pick(&["\n", "\r\n", "", "\n"]));
+                }
+                let size = random.pick(&["300", "300", "8", "3", "1", "0"]);
+                writeln!(out, "a2iint {size} {}", hex(text.as_bytes()))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of character-string commands: strings of every universal type (and some
+/// others) holding text in every form, valid and not, printed with random combinations of the
+/// `ASN1_STRFLGS_*` flags; and conversions between forms with random masks and size limits.
+fn text_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    let pieces: &[&[u8]] = &[
+        b"a",
+        b"Z",
+        b"0",
+        b" ",
+        b",",
+        b"+",
+        b"\"",
+        b"\\",
+        b"<",
+        b">",
+        b";",
+        b"#",
+        b"=",
+        b"(",
+        b"*",
+        b"@",
+        b"\x00",
+        b"\x01",
+        b"\x7f",
+        b"\x80",
+        b"\xe9",
+        b"\xc3\xa9",
+        b"\xe2\x82\xac",
+        b"\xf0\x9f\x98\x80",
+        b"\xc3",
+        b"\xed\xa0\x80",
+        b"\xff",
+        b"\x00\x00",
+        b"\x00h",
+    ];
+    for _ in 0..1 + random.below(20) {
+        let mut bytes = Vec::new();
+        for _ in 0..random.below(8) {
+            let i = usize::try_from(random.below(u64::try_from(pieces.len()).unwrap_or(1)))
+                .unwrap_or(0);
+            bytes.extend_from_slice(pieces.get(i).copied().unwrap_or(b"a"));
+        }
+        if random.below(2) == 0 {
+            // Not BOOLEAN or OBJECT: dumping their DER, OpenSSL reads the string as another
+            // structure and prints part of a heap address (docs/DEVIATIONS.md).
+            let kind = random.pick(&[
+                "12", "12", "19", "20", "22", "30", "30", "28", "28", "4", "2", "258", "3", "16",
+                "5", "26", "21", "99", "-1", "-3", "0",
+            ]);
+            let flag_bits = [
+                0x1u64, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400,
+            ];
+            let flags = if random.below(4) == 0 {
+                random.pick(&["317", "2", "0", "10317"]).to_owned()
+            } else {
+                let mut f = 0u64;
+                for bit in flag_bits {
+                    if random.below(3) == 0 {
+                        f |= bit;
+                    }
+                }
+                format!("{f:x}")
+            };
+            writeln!(out, "asntext {kind} {flags} {}", hex(&bytes))?;
+        } else {
+            let inform = random.pick(&["1000", "1001", "1002", "1004", "1003", "0"]);
+            let masks = [
+                0x1u64, 0x2, 0x4, 0x10, 0x100, 0x200, 0x800, 0x2000, 0x2_0000, 0x4,
+            ];
+            let mut mask = 0u64;
+            for m in masks {
+                if random.below(3) == 0 {
+                    mask |= m;
+                }
+            }
+            let min = random.pick(&["0", "0", "1", "3", "-1"]);
+            let max = random.pick(&["0", "0", "2", "5", "-1"]);
+            writeln!(out, "asnmb {inform} {mask:x} {min} {max} {}", hex(&bytes))?;
+        }
+    }
+    Ok(())
+}
+
+/// A random session of time commands: UTCTime and GeneralizedTime text near the valid forms
+/// (field values at their limits, leap days, fractions, offsets, cut short, stray characters),
+/// strict or not; and times and offsets around the edges of both types and of 9999.
+fn time_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    for _ in 0..1 + random.below(20) {
+        if random.below(3) == 0 {
+            let when = match random.below(4) {
+                0 => random
+                    .pick(&[
+                        "0",
+                        "-1",
+                        "2524607999",
+                        "2524608000",
+                        "-631152000",
+                        "-631152001",
+                        "253402300799",
+                        "253402300800",
+                    ])
+                    .to_owned(),
+                1 => (random.next() % 5_000_000_000).to_string(),
+                2 => format!("-{}", random.next() % 3_000_000_000),
+                _ => (random.next() % 300_000_000_000).to_string(),
+            };
+            let days = i64::try_from(random.below(80_000)).unwrap_or(0) - 40_000;
+            let secs = match random.below(3) {
+                0 => 0,
+                1 => i64::try_from(random.below(200_000)).unwrap_or(0) - 100_000,
+                _ => i64::try_from(random.below(2_000_000_000)).unwrap_or(0) - 1_000_000_000,
+            };
+            writeln!(out, "asntimet {when} {days} {secs}")?;
+            continue;
+        }
+        let generalized = random.below(2) == 0;
+        let two = |random: &mut Random, max: u64| format!("{:02}", random.below(max + 2));
+        let mut text = String::new();
+        if generalized {
+            text.push_str(random.pick(&["19", "20", "99", "00", "16", "17", "24"]));
+        }
+        text.push_str(random.pick(&["24", "49", "50", "99", "00", "23"]));
+        text.push_str(&two(random, 12));
+        text.push_str(random.pick(&["01", "28", "29", "30", "31", "00", "32"]));
+        text.push_str(&two(random, 23));
+        text.push_str(&two(random, 59));
+        if random.below(5) != 0 {
+            text.push_str(&two(random, 59));
+        }
+        if generalized && random.below(4) == 0 {
+            text.push('.');
+            for _ in 0..random.below(4) {
+                text.push(char::from(
+                    b'0' + u8::try_from(random.below(10)).unwrap_or(0),
+                ));
+            }
+        }
+        text.push_str(random.pick(&[
+            "Z", "Z", "Z", "+0000", "-0130", "+1200", "+1300", "-0060", "+01", "", "ZZ", "z",
+        ]));
+        if random.below(8) == 0 {
+            let cut =
+                usize::try_from(random.below(u64::try_from(text.len()).unwrap_or(1))).unwrap_or(0);
+            text.truncate(cut);
+        }
+        let kind = random.pick(&["23", "24", "23", "24", "4"]);
+        let flags = random.pick(&["0", "0", "100"]);
+        writeln!(out, "asntime {kind} {flags} {}", hex(text.as_bytes()))?;
+    }
+    Ok(())
+}
+
 /// A random session of `printf` and `bioprintf` commands.
 fn printf_session(random: &mut Random, out: &mut String) -> Result {
     for _ in 0..1 + random.below(20) {
@@ -593,7 +852,7 @@ fn addr_session(random: &mut Random, out: &mut String) -> Result {
 fn buf_mem_session(random: &mut Random, out: &mut String) -> Result {
     writeln!(out, "new {}", random.below(2))?;
     for _ in 0..1 + random.below(40) {
-        match random.below(10) {
+        match random.below(13) {
             0..=3 => writeln!(out, "grow {}", length(random))?,
             4..=6 => writeln!(out, "grow_clean {}", length(random))?,
             7 => writeln!(out, "fill {}", random.below(256))?,
@@ -901,6 +1160,9 @@ mod tests {
             "\nhostserv ",
             "\nobjtxt ",
             "\nasnhdr ",
+            "\nasnint ",
+            "\nasntext ",
+            "\nasntime",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }
