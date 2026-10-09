@@ -117,6 +117,13 @@
  *                              from the first octet, 6 an OBJECT from its content octets, `-`
  *                              for none): i2d_ASN1_TYPE of each, then i2d_ASN1_SEQUENCE_ANY and
  *                              i2d_ASN1_SET_ANY of them all
+ *   asnd2i <item> <hex>        ASN1_item_d2i of the octets with item <item> (0 ANY, 1 SEQUENCE_ANY,
+ *                              2 SET_ANY, 3 OCTET_STRING, 4 INTEGER, 5 BIT_STRING, 6 BMPSTRING,
+ *                              7 TIME, 8 DIRECTORYSTRING, 9 INT64, 10 UINT32, 11 the probe's
+ *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING): how much was read
+ *                              and the re-encoding, or the errors with their data
+ *   asnbio <hex>               ASN1_item_d2i_bio (as ANY) from a memory BIO over the octets until
+ *                              a read fails: each element's re-encoding, then the errors
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -138,6 +145,7 @@
 #include <sys/socket.h>
 
 #include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
@@ -1035,9 +1043,151 @@ static void print_i2d(const char *label, int len, unsigned char *der)
     OPENSSL_free(der);
 }
 
+/* An application type for asnd2i: most kinds of field, a CHOICE, ANY DEFINED BY, and itself. */
+typedef struct {
+    int type;
+    union {
+        ASN1_INTEGER *num;
+        ASN1_UTF8STRING *str;
+    } d;
+} PROBEPICK;
+
+ASN1_CHOICE(PROBEPICK) = {
+    ASN1_SIMPLE(PROBEPICK, d.num, ASN1_INTEGER),
+    ASN1_EXP(PROBEPICK, d.str, ASN1_UTF8STRING, 3)
+} ASN1_CHOICE_END(PROBEPICK)
+
+typedef struct PROBEREC_st PROBEREC;
+struct PROBEREC_st {
+    ASN1_OBJECT *type;
+    void *value;
+    ASN1_OCTET_STRING *opt;
+    ASN1_IA5STRING *imp;
+    ASN1_BOOLEAN flag;
+    STACK_OF(ASN1_TYPE) *set;
+    PROBEPICK *pick;
+    int64_t i64;
+    PROBEREC *inner;
+};
+DECLARE_ASN1_ITEM(PROBEREC)
+
+ASN1_ADB_TEMPLATE(PROBEREC_default) = ASN1_SIMPLE(PROBEREC, value, ASN1_ANY);
+
+ASN1_ADB(PROBEREC) = {
+    ADB_ENTRY(NID_sha256, ASN1_SIMPLE(PROBEREC, value, ASN1_INTEGER)),
+    ADB_ENTRY(NID_sha1, ASN1_OPT(PROBEREC, value, ASN1_UTF8STRING))
+} ASN1_ADB_END(PROBEREC, 0, type, 0, &PROBEREC_default_tt, NULL);
+
+ASN1_SEQUENCE(PROBEREC) = {
+    ASN1_SIMPLE(PROBEREC, type, ASN1_OBJECT),
+    ASN1_ADB_OBJECT(PROBEREC),
+    ASN1_EXP_OPT(PROBEREC, opt, ASN1_OCTET_STRING, 0),
+    ASN1_IMP_OPT(PROBEREC, imp, ASN1_IA5STRING, 1),
+    ASN1_OPT(PROBEREC, flag, ASN1_FBOOLEAN),
+    ASN1_SET_OF_OPT(PROBEREC, set, ASN1_ANY),
+    ASN1_OPT(PROBEREC, pick, PROBEPICK),
+    ASN1_IMP_EX(PROBEREC, i64, INT64, 4, ASN1_TFLG_OPTIONAL | ASN1_TFLG_EMBED),
+    ASN1_EXP_OPT(PROBEREC, inner, PROBEREC, 2)
+} ASN1_SEQUENCE_END(PROBEREC)
+
+static const ASN1_ITEM *probe_item(int n)
+{
+    switch (n) {
+    case 0: return ASN1_ITEM_rptr(ASN1_ANY);
+    case 1: return ASN1_ITEM_rptr(ASN1_SEQUENCE_ANY);
+    case 2: return ASN1_ITEM_rptr(ASN1_SET_ANY);
+    case 3: return ASN1_ITEM_rptr(ASN1_OCTET_STRING);
+    case 4: return ASN1_ITEM_rptr(ASN1_INTEGER);
+    case 5: return ASN1_ITEM_rptr(ASN1_BIT_STRING);
+    case 6: return ASN1_ITEM_rptr(ASN1_BMPSTRING);
+    case 7: return ASN1_ITEM_rptr(ASN1_TIME);
+    case 8: return ASN1_ITEM_rptr(DIRECTORYSTRING);
+    case 9: return ASN1_ITEM_rptr(INT64);
+    case 10: return ASN1_ITEM_rptr(UINT32);
+    case 11: return ASN1_ITEM_rptr(PROBEREC);
+    case 12: return ASN1_ITEM_rptr(ASN1_SEQUENCE);
+    default: return ASN1_ITEM_rptr(ASN1_UTF8STRING);
+    }
+}
+
 /* Runs a template engine command; returns 0 if `command` isn't one. */
 static int template_command(const char *command, const char *line)
 {
+    if (strcmp(command, "asnbio") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300], *der;
+        size_t len = 0;
+        int i, dlen;
+        BIO *b;
+        ASN1_VALUE *v;
+        unsigned long code;
+        const char *edata;
+        int eflags;
+
+        sscanf(line, "%*s %699s", hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asnbio bad hex\n");
+            return 1;
+        }
+        b = BIO_new_mem_buf(data, (int)len);
+        printf("asnbio");
+        while ((v = ASN1_item_d2i_bio(ASN1_ITEM_rptr(ASN1_ANY), b, NULL)) != NULL) {
+            der = NULL;
+            dlen = ASN1_item_i2d(v, &der, ASN1_ITEM_rptr(ASN1_ANY));
+            printf(" %d:", dlen);
+            for (i = 0; i < dlen; i++)
+                printf("%02x", der[i]);
+            OPENSSL_free(der);
+            ASN1_item_free(v, ASN1_ITEM_rptr(ASN1_ANY));
+        }
+        printf(" left=%d", (int)BIO_pending(b));
+        while ((code = ERR_get_error_all(NULL, NULL, NULL, &edata, &eflags)) != 0) {
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+            if ((eflags & ERR_TXT_STRING) != 0 && edata[0] != '\0')
+                printf("[%s]", edata);
+        }
+        printf("\n");
+        BIO_free(b);
+        return 1;
+    }
+    if (strcmp(command, "asnd2i") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300], *der = NULL;
+        const unsigned char *q = data;
+        size_t len = 0;
+        int n = 0, i;
+        const ASN1_ITEM *it;
+        ASN1_VALUE *v;
+        unsigned long code;
+        const char *edata;
+        int eflags;
+
+        sscanf(line, "%*s %d %699s", &n, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asnd2i bad hex\n");
+            return 1;
+        }
+        it = probe_item(n);
+        v = ASN1_item_d2i(NULL, &q, (long)len, it);
+        if (v != NULL) {
+            int dlen = ASN1_item_i2d(v, &der, it);
+
+            printf("asnd2i ok used=%ld der=%d:", (long)(q - data), dlen);
+            for (i = 0; i < dlen; i++)
+                printf("%02x", der[i]);
+            OPENSSL_free(der);
+            ASN1_item_free(v, it);
+        } else {
+            printf("asnd2i fail used=%ld", (long)(q - data));
+        }
+        while ((code = ERR_get_error_all(NULL, NULL, NULL, &edata, &eflags)) != 0) {
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+            if ((eflags & ERR_TXT_STRING) != 0 && edata[0] != '\0')
+                printf("[%s]", edata);
+        }
+        printf("\n");
+        return 1;
+    }
     if (strcmp(command, "asnany") == 0) {
         STACK_OF(ASN1_TYPE) *sk = sk_ASN1_TYPE_new_null();
         const char *p = line + strlen(command);

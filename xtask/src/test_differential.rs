@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(14) {
+        match random.below(15) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -162,6 +162,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             10 => text_session(&mut random, &mut out)?,
             11 => time_session(&mut random, &mut out)?,
             12 => any_session(&mut random, &mut out)?,
+            13 => d2i_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -619,6 +620,119 @@ fn any_session(random: &mut Random, out: &mut String) -> Result {
         writeln!(out, "{line}")?;
     }
     Ok(())
+}
+
+/// A random session of `asnd2i` and `asnbio` commands: BER near what each item takes (nested TLVs of its
+/// types and others, indefinite lengths, constructed strings, end-of-contents octets, lengths a
+/// little off, and cut short), decoded with one of the probe's items.
+fn d2i_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(8) + 1 {
+        let item = random.below(14);
+        let mut der = Vec::new();
+        ber_value(random, &mut der, item, 0);
+        if random.below(10) == 0 {
+            let cut = usize::try_from(random.below(u64::try_from(der.len()).unwrap_or(1) + 1))
+                .unwrap_or(0);
+            der.truncate(cut);
+        } else if random.below(10) == 0 {
+            der.push(u8::try_from(random.below(256)).unwrap_or(0));
+        }
+        // Sometimes a stream of elements for a BIO to read.
+        let stream = random.below(4) == 0;
+        if stream {
+            for _ in 0..random.below(3) {
+                ber_value(random, &mut der, 0, 1);
+            }
+        }
+        der.truncate(256);
+        let hex: String = if der.is_empty() {
+            "-".to_owned()
+        } else {
+            der.iter().map(|b| format!("{b:02x}")).collect()
+        };
+        if stream {
+            writeln!(out, "asnbio {hex}")?;
+        } else {
+            writeln!(out, "asnd2i {item} {hex}")?;
+        }
+    }
+    Ok(())
+}
+
+/// One of `octets`, at random.
+fn pick_octet(random: &mut Random, octets: &[u8]) -> u8 {
+    let i = usize::try_from(random.below(u64::try_from(octets.len()).unwrap_or(1))).unwrap_or(0);
+    octets.get(i).copied().unwrap_or(0)
+}
+
+/// Appends a random BER value, mostly of a type `item` takes, nested at most a few deep.
+fn ber_value(random: &mut Random, out: &mut Vec<u8>, item: u64, depth: u32) {
+    // Identifier octets: the item's usual tags, others, context tags, and the high form.
+    let identifier: Vec<u8> = match random.below(12) {
+        0 => vec![0x30],
+        1 => vec![0x31],
+        2 => vec![0x04],
+        3 => vec![0x24],
+        4 => vec![0x02],
+        5 => vec![0x03],
+        6 => vec![pick_octet(
+            random,
+            &[0x01, 0x05, 0x06, 0x0c, 0x13, 0x16, 0x17, 0x18, 0x1e, 0x00],
+        )],
+        7 => vec![pick_octet(random, &[0xa0, 0xa2, 0xa3, 0x81, 0x84, 0x80])],
+        8 => vec![0x1f, u8::try_from(random.below(0x80)).unwrap_or(0)],
+        9 if item == 11 => vec![0x06],
+        _ => vec![u8::try_from(random.below(256)).unwrap_or(0)],
+    };
+    let constructed = identifier.first().is_some_and(|b| b & 0x20 != 0);
+    let mut content = Vec::new();
+    if constructed && depth < 4 {
+        for _ in 0..random.below(4) {
+            ber_value(random, &mut content, item, depth + 1);
+        }
+    } else {
+        let len = match random.below(4) {
+            0 => 0,
+            1 => 1,
+            2 => random.below(4),
+            _ => random.below(20),
+        };
+        for _ in 0..len {
+            content.push(u8::try_from(random.below(256)).unwrap_or(0));
+        }
+        if identifier == [0x06] && item == 11 {
+            let oids: [&[u8]; 3] = [
+                &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01],
+                &[0x2b, 0x0e, 0x03, 0x02, 0x1a],
+                &[0x2a, 0x03],
+            ];
+            let which = usize::try_from(random.below(3)).unwrap_or(0);
+            content = oids.get(which).copied().unwrap_or(&[]).to_vec();
+        }
+    }
+    out.extend(&identifier);
+    let indefinite = constructed && random.below(4) == 0;
+    if indefinite {
+        out.push(0x80);
+        out.extend(&content);
+        if random.below(8) != 0 {
+            out.extend([0, 0]);
+        }
+    } else {
+        let mut len = content.len();
+        match random.below(12) {
+            0 => len = len.saturating_add(1),
+            1 => len = len.saturating_sub(1),
+            _ => {}
+        }
+        if len < 0x80 && random.below(8) != 0 {
+            out.push(u8::try_from(len).unwrap_or(0));
+        } else {
+            out.push(0x81);
+            out.push(u8::try_from(len.min(255)).unwrap_or(0));
+        }
+        out.extend(&content);
+    }
 }
 
 /// A random session of time commands: UTCTime and GeneralizedTime text near the valid forms
@@ -1214,6 +1328,8 @@ mod tests {
             "\nasntext ",
             "\nasntime",
             "\nasnany",
+            "\nasnd2i",
+            "\nasnbio",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }
