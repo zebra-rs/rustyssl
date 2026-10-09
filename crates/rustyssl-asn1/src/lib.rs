@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod content;
 pub mod der;
 mod generated;
 pub mod objects;
