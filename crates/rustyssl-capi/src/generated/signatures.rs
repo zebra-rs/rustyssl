@@ -1938,6 +1938,16 @@ const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_n
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) = crate::libctx::OSSL_LIB_CTX_free;
+const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX =
+    crate::libctx::OSSL_LIB_CTX_get0_global_default;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
+    crate::libctx::OSSL_LIB_CTX_get_conf_diagnostics;
+const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX = crate::libctx::OSSL_LIB_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut OSSL_LIB_CTX =
+    crate::libctx::OSSL_LIB_CTX_set0_default;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) =
+    crate::libctx::OSSL_LIB_CTX_set_conf_diagnostics;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM_BLD) = crate::params::build::OSSL_PARAM_BLD_free;
 const _: unsafe extern "C" fn() -> *mut OSSL_PARAM_BLD = crate::params::build::OSSL_PARAM_BLD_new;
 const _: unsafe extern "C" fn(
@@ -2168,10 +2178,10 @@ const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core
     crate::params::OSSL_PARAM_set_utf8_ptr;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_utf8_string;
-const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::threads::OSSL_get_max_threads;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
-    crate::threads::OSSL_set_max_threads;
+    crate::libctx::OSSL_set_max_threads;
 const _: unsafe extern "C" fn(u64) = crate::sleep::OSSL_sleep;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut BIO = crate::trace::OSSL_trace_begin;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =

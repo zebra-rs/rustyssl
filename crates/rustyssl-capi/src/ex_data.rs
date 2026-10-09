@@ -11,8 +11,9 @@
 //!   order is whatever `qsort` leaves, which this reproduces by calling it.
 //! - A freed index keeps its number, with callbacks that do nothing.
 //!
-//! The registry stands for the default library context's; a context's own (step 3.1) comes
-//! later. No lock is held while a callback runs.
+//! Each library context has its own registry: the index functions use the calling thread's
+//! default context, and an object's data uses the context in its `CRYPTO_EX_DATA` (NULL, the
+//! thread's default, for the public API's). No lock is held while a callback runs.
 
 use core::ffi::{c_int, c_long, c_void};
 use core::ptr;
@@ -20,11 +21,12 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use rustyssl_abi::{
     CRYPTO_EX_DATA, CRYPTO_EX_INDEX__COUNT, CRYPTO_EX_dup, CRYPTO_EX_free, CRYPTO_EX_new,
-    ERR_LIB_CRYPTO, ERR_R_CRYPTO_LIB, ERR_R_PASSED_INVALID_ARGUMENT, OPENSSL_STACK,
+    ERR_LIB_CRYPTO, ERR_R_CRYPTO_LIB, ERR_R_PASSED_INVALID_ARGUMENT, OPENSSL_STACK, OSSL_LIB_CTX,
 };
 
 use crate::ffi::ffi_export;
-use crate::{err, init, stack};
+use crate::handle::Held;
+use crate::{err, init, libctx, stack};
 
 /// The number of classes.
 const CLASSES: usize = CRYPTO_EX_INDEX__COUNT.unsigned_abs() as usize;
@@ -57,7 +59,24 @@ unsafe impl Sync for Callback {}
 /// count is -1), then one entry per index, with index 0 empty.
 type Indexes = Option<Vec<Option<Arc<Callback>>>>;
 
-static REGISTRY: Mutex<[Indexes; CLASSES]> = Mutex::new([const { None }; CLASSES]);
+/// A library context's registry: each class's indexes.
+pub(crate) struct Registry(Mutex<[Indexes; CLASSES]>);
+
+impl Default for Registry {
+    fn default() -> Self {
+        Self(Mutex::new([const { None }; CLASSES]))
+    }
+}
+
+/// The context `ctx` stands for (the thread's default for NULL), or `None` without an error
+/// for a pointer that isn't one (OpenSSL finds no registry).
+///
+/// # Safety
+/// `ctx` is NULL or a live library context.
+unsafe fn context(ctx: *const OSSL_LIB_CTX) -> Option<Held<OSSL_LIB_CTX>> {
+    // SAFETY: the caller's guarantee.
+    unsafe { libctx::resolve(ctx) }
+}
 
 /// The registry slot for `class_index`, or `None` with `ERR_R_PASSED_INVALID_ARGUMENT` if it's
 /// out of range, or without an error after `OPENSSL_cleanup` (OpenSSL's freed lock).
@@ -70,11 +89,25 @@ fn class(class_index: c_int, function: &str) -> Option<usize> {
     init::base().then_some(class)
 }
 
-/// A copy of a class's indexes, taken so the callbacks run without the lock.
+/// A copy of a class's indexes in `ctx`'s registry, taken so the callbacks run without the
+/// lock.
+///
+/// # Safety
+/// `ctx` is NULL or a live library context.
 #[track_caller]
-fn snapshot(class_index: c_int, function: &str) -> Option<Indexes> {
+unsafe fn snapshot(
+    ctx: *const OSSL_LIB_CTX,
+    class_index: c_int,
+    function: &str,
+) -> Option<Indexes> {
+    // SAFETY: the caller's guarantee.
+    let held = unsafe { context(ctx) }?;
     let class = class(class_index, function)?;
-    let registry = REGISTRY.lock().unwrap_or_else(PoisonError::into_inner);
+    let registry = held
+        .ex_data
+        .0
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
     registry.get(class).cloned()
 }
 
@@ -158,10 +191,14 @@ ffi_export! {
     pub unsafe extern "C" fn CRYPTO_get_ex_new_index(class_index: c_int, argl: c_long, argp: *mut c_void, new_func: CRYPTO_EX_new, dup_func: CRYPTO_EX_dup, free_func: CRYPTO_EX_free) -> c_int
     where failure = -1, library = ERR_LIB_CRYPTO
     {
+        // SAFETY: NULL is the thread's default context.
+        let Some(held) = (unsafe { context(ptr::null()) }) else {
+            return -1;
+        };
         let Some(class) = class(class_index, "CRYPTO_get_ex_new_index") else {
             return -1;
         };
-        let mut registry = REGISTRY.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut registry = held.ex_data.0.lock().unwrap_or_else(PoisonError::into_inner);
         let Some(indexes) = registry.get_mut(class) else {
             return -1;
         };
@@ -189,10 +226,14 @@ ffi_export! {
     pub unsafe extern "C" fn CRYPTO_free_ex_index(class_index: c_int, idx: c_int) -> c_int
     where failure = 0, library = ERR_LIB_CRYPTO
     {
+        // SAFETY: NULL is the thread's default context.
+        let Some(held) = (unsafe { context(ptr::null()) }) else {
+            return 0;
+        };
         let Some(class) = class(class_index, "CRYPTO_free_ex_index") else {
             return 0;
         };
-        let mut registry = REGISTRY.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut registry = held.ex_data.0.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = registry
             .get_mut(class)
             .and_then(Option::as_mut)
@@ -224,7 +265,8 @@ ffi_export! {
         if ad.is_null() {
             return 0;
         }
-        let Some(indexes) = snapshot(class_index, "CRYPTO_new_ex_data") else {
+        // SAFETY: NULL is the thread's default context.
+        let Some(indexes) = (unsafe { snapshot(ptr::null(), class_index, "CRYPTO_new_ex_data") }) else {
             return 0;
         };
         // SAFETY: the caller's guarantee.
@@ -265,7 +307,8 @@ ffi_export! {
         if from_values.is_null() {
             return 1;
         }
-        let Some(indexes) = snapshot(class_index, "CRYPTO_dup_ex_data") else {
+        // SAFETY: the caller's guarantee: `from`'s context is NULL or live.
+        let Some(indexes) = (unsafe { snapshot(ctx, class_index, "CRYPTO_dup_ex_data") }) else {
             return 0;
         };
         // SAFETY: as above.
@@ -345,7 +388,10 @@ ffi_export! {
         if ad.is_null() {
             return;
         }
-        if let Some(Some(callbacks)) = snapshot(class_index, "CRYPTO_free_ex_data") {
+        // SAFETY: the caller's guarantee: `ad`'s context is NULL or live.
+        let ctx = unsafe { (*ad).ctx };
+        // SAFETY: as above.
+        if let Some(Some(callbacks)) = unsafe { snapshot(ctx, class_index, "CRYPTO_free_ex_data") } {
             let mut entries: Vec<FreeEntry> = callbacks
                 .iter()
                 .enumerate()
@@ -427,7 +473,10 @@ ffi_export! {
         if !unsafe { get(ad, idx) }.is_null() {
             return 1;
         }
-        let Some(indexes) = snapshot(class_index, "CRYPTO_alloc_ex_data") else {
+        // SAFETY: the caller's guarantee: `ad`'s context is NULL or live.
+        let ctx = unsafe { (*ad).ctx };
+        // SAFETY: as above.
+        let Some(indexes) = (unsafe { snapshot(ctx, class_index, "CRYPTO_alloc_ex_data") }) else {
             return 0;
         };
         let callback = indexes
