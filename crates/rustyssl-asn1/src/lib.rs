@@ -11,3 +11,5 @@ pub mod der;
 mod generated;
 pub mod objects;
 pub mod oid;
+pub mod text;
+pub mod time;
