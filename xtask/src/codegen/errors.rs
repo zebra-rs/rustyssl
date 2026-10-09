@@ -16,7 +16,7 @@
 //!
 //! Entries refer to library and reason codes by their `rustyssl-abi` names, so they can't
 //! drift from the headers. Reasons of internal libraries (SM2, the property parser) have no
-//! header constant; their codes come from `openssl.txt` alone.
+//! header constant; their codes come from `openssl.txt` alone, as constants defined here.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -150,6 +150,7 @@ pub fn generate(ctx: &Context, constants: &Constants) -> Result {
     out.push_str("];\n");
 
     let mut count = names.entries.len() + common.entries.len();
+    let mut internal_constants = String::new();
     for library in &libraries {
         let name = format!("{library}_str_reasons");
         let table = by_name
@@ -166,9 +167,12 @@ pub fn generate(ctx: &Context, constants: &Constants) -> Result {
                 .ok_or_else(|| format!("{name}: {} isn't in openssl.txt", entry.reason))?;
             if reason.internal {
                 let (library, code, name) = (&entry.library, reason.code, &entry.reason);
+                writeln!(out, "    (pack({library}, {name}), c\"{text}\"),")?;
                 writeln!(
-                    out,
-                    "    (pack({library}, {code}), c\"{text}\"), // {name} (internal)"
+                    internal_constants,
+                    "\n/// `{name}`, from openssl.txt (an internal header defines it).\n\
+                     #[allow(dead_code, reason = \"used once its library is implemented\")]\n\
+                     pub(crate) const {name}: core::ffi::c_int = {code};"
                 )?;
             } else {
                 writeln!(
@@ -192,6 +196,7 @@ pub fn generate(ctx: &Context, constants: &Constants) -> Result {
         writeln!(out, "    {library}_REASONS,")?;
     }
     out.push_str("];\n");
+    out.push_str(&internal_constants);
 
     let path = ctx
         .root
