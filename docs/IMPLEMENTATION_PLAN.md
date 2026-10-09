@@ -1382,12 +1382,49 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     impossible lengths), and FILE round trips. The probe's `asnbio` reads random element
     streams through a BIO, and the `asn1_d2i_bio` fuzz target checks each element read from a
     BIO decodes the same in place.
-- [ ] **2.5 Utilities:**
-  - `ASN1_parse_dump` (byte-exact `asn1parse` output)
-  - `ASN1_item_print` and the `ASN1_PCTX` functions (moved from 2.4c), with the `INTxx`/`LONG`
-    items' `print`
-  - `ASN1_generate_nconf`/`ASN1_generate_v3` (the string → DER mini-language)
-  - the `i2a_*`/`a2i_*` helpers (`ASN1_tag2str` came with 2.3d, and the INTEGER ones with 2.3b)
+- [x] **2.5 Utilities**, in three sub-steps, each its own PR. `ASN1_generate_nconf`/`_v3` (the
+  string → DER mini-language) move to 6.1, as they read their SEQUENCE and SET sections through
+  NCONF and an `X509V3_CTX` (`X509V3_get_section`, Phase 5); `ASN1_bn_print` moves to 4.1 with
+  BIGNUM.
+  - [x] **2.5a `ASN1_parse` and `ASN1_parse_dump`** (byte-exact `asn1parse` output).
+
+    *Done:* 2 exports, in `capi/src/asn1/parse.rs`, a port of `asn1_parse.c`: one slice of the
+    caller's input, each element read within its parent, nesting stopped at 128 levels
+    ("BAD RECURSION DEPTH"), and the line prefix written through a prefix BIO pushed onto the
+    caller's (or the caller's own, its indent restored), so the listing is OpenSSL's byte for
+    byte. Contents are decoded with the same `d2i_` functions, so their errors queue as in
+    OpenSSL. Tests: `tests/c/asn1_parse.c` (19 checks) lists every kind of element with each
+    dump setting, malformed input, nesting past the limit, and a BIO that already has a prefix;
+    the probe's `asnparse` lists random BER (corpus `asn1_parse.txt`); the `asn1_parse` fuzz
+    target runs arbitrary input under ASan.
+  - [x] **2.5b `ASN1_item_print`** and the `ASN1_PCTX` functions (moved from 2.4c), with the
+    `INTxx`/`LONG` items' `print`, and the `i2s_`/`s2i_ASN1_INTEGER`, `_ENUMERATED`,
+    `_ENUMERATED_TABLE`, and `_OCTET_STRING` conversions it prints INTEGERs with (decimal
+    below 128 bits, hex above), done on octet strings rather than through BIGNUM.
+
+    *Done:* 19 exports: `ASN1_item_print` (`capi/src/asn1/tpl/print.rs`, a port of
+    `tasn_prn.c`), the 12 `ASN1_PCTX` functions, and the six X509V3 conversions in a new
+    `capi/src/x509v3.rs`, over `rustyssl_asn1::number` (`bignum_to_string`'s text, and
+    `s2i_ASN1_INTEGER`'s parse with `BN_dec2bn`/`BN_hex2bn`'s rules: a sign in either place,
+    nothing after the digits). Formatted output goes through `BIO_printf` with OpenSSL's format
+    strings. Quirks kept: an ENUMERATED field fails the print (it goes through
+    `i2s_ASN1_INTEGER`), OIDs are cut to 79 characters, an extern item without a print function
+    writes only its indent, and a LONG of 0 at the top prints `<ABSENT>`. Tests:
+    `tests/c/asn1_print.c` (21 checks) prints an application type under each context flag;
+    the probe's `asns2i` converts random number text, and `asnd2i` now prints what it decodes;
+    the `asn1_d2i` fuzz target prints every value it decodes.
+  - [x] **2.5c `i2a_ASN1_STRING`/`a2i_ASN1_STRING`** and `ASN1_buf_print` (`ASN1_tag2str` came
+    with 2.3d, and the INTEGER helpers with 2.3b).
+
+    *Done:* 3 exports, in `capi/src/asn1/hex.rs`. `a2i_ASN1_STRING` reads its lines as
+    OpenSSL's does, unlike `a2i_ASN1_INTEGER`'s: a line is cut only at its last character if
+    that isn't a hex digit (scanning back to the second), so junk before it is an error
+    (`ASN1_R_NON_HEX_CHARACTERS`), and a trailing backslash takes the digit before it, so what
+    `i2a_ASN1_STRING` writes over several lines doesn't read back; the test pins that. Tests:
+    `tests/c/asn1_hex.c` (23 checks); the probe's `a2istr` (random lines, beside `a2iint`); the
+    `a2i_integer` fuzz target runs both readers.
+
+  *Step 2.5 done:* 24 exports over the three sub-steps, now 730 of libcrypto's 5,876.
 - [ ] **2.6 Base64 and PEM framing:**
   - `EVP_Encode*`/`EVP_Decode*`, including the exact line-handling quirks, and
     `EVP_EncodeBlock`/`EVP_DecodeBlock`
@@ -1474,6 +1511,7 @@ chunking) is clean.
 - [ ] **4.1 BIGNUM** (the full `BN_*` API, about 200 functions):
   - arithmetic, shifts, and bit operations
   - conversions: bin, lebin, native, hex, dec, mpi, ASN.1
+  - `ASN1_bn_print` (moved from 2.5)
   - `BN_CTX`, `BN_MONT_CTX`, `BN_RECP_CTX`, `BN_BLINDING`, `BN_GENCB`
   - primes: `BN_check_prime`, `BN_generate_prime_ex(2)`
   - `BN_mod_sqrt` (with the CVE-2022-0778 loop bound), `BN_mod_inverse`, `BN_gcd`,
@@ -1603,6 +1641,7 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   - `CONF_modules_load_file`, `OPENSSL_config`, `OPENSSL_INIT_LOAD_CONFIG`
   - modules: providers, `alg_section`, random, `ssl_conf` (handed to libssl), engines
     (compatible no-op), `oid_section`, `stbl_section`
+  - `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language
 - [ ] **6.2 UI:** `UI_*` (including `UI_OpenSSL` reading the tty), `UI_UTIL_read_pw`,
   `PEM_def_callback`, `EVP_read_pw_string`.
 - [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
