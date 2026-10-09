@@ -13,14 +13,18 @@
 //! reference to its BIO, so a callback that frees the BIO doesn't free it under the call.
 //!
 //! The built-in types are in [`mem`], [`null`], [`file`], [`fd`], [`buffer`], [`prefix`],
-//! [`pair`], [`sock`], and [`accept`] (those from [`buffer`] on keep their private state as
-//! [`state`] describes); addresses and lookups are in [`addr`]. OpenSSL's printf is in
+//! [`pair`], [`sock`], [`accept`], [`connect`], [`dgram`], and [`dgram_pair`] (those from
+//! [`buffer`] on keep their private state as [`state`] describes); addresses and lookups are in
+//! [`addr`]. OpenSSL's printf is in
 //! [`print`], with the hex dumps in [`dump`] and the debug callback in [`debug`].
 
 pub(crate) mod accept;
 pub(crate) mod addr;
 pub(crate) mod buffer;
+pub(crate) mod connect;
 pub(crate) mod debug;
+pub(crate) mod dgram;
+pub(crate) mod dgram_pair;
 pub(crate) mod dump;
 pub(crate) mod fd;
 pub(crate) mod file;

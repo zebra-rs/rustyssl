@@ -487,7 +487,7 @@ fn lhash_session(random: &mut Random, out: &mut String) -> Result {
 /// A random memory BIO session: writes and reads of every kind, seeks, resets, and the EOF
 /// return, on a writable, secure, read-only, or filtered memory BIO.
 fn bio_session(random: &mut Random, out: &mut String) -> Result {
-    let kind = random.below(9);
+    let kind = random.below(11);
     writeln!(out, "bionew {kind}")?;
     for _ in 0..1 + random.below(50) {
         match random.below(19) {
@@ -515,8 +515,11 @@ fn bio_session(random: &mut Random, out: &mut String) -> Result {
                     "request",
                     "lines",
                     "bufsize",
+                    "wbufsize",
+                    "notrunc",
+                    "mtu",
                 ]);
-                let arg = if name == "bufsize" {
+                let arg = if name == "bufsize" || name == "wbufsize" {
                     random.offset(-2, 9000)
                 } else if name == "eofret" && (4..=7).contains(&kind) {
                     // A positive EOF return reads bytes nobody wrote; behind a filter, those
@@ -528,7 +531,7 @@ fn bio_session(random: &mut Random, out: &mut String) -> Result {
                 writeln!(out, "bioctrl {name} {arg}")?;
             }
             12 => writeln!(out, "biomem")?,
-            13 | 14 if kind == 8 => writeln!(out, "biopeer")?,
+            13 | 14 if kind == 8 || kind == 10 => writeln!(out, "biopeer")?,
             15 if kind == 8 => writeln!(out, "bionread {}", random.below(20))?,
             16 if kind == 8 => writeln!(out, "bionwrite {}", random_text(random, b"pqr", 20))?,
             _ => writeln!(out, "biostate")?,
