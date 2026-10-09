@@ -130,6 +130,15 @@
  *                              memory BIO: the return, the listing (escaped), and the errors
  *   asns2i <text>              s2i_ASN1_INTEGER of the text (`-` for none, `_` for a space), then
  *                              i2s_ASN1_INTEGER and the octets of what it made, and the errors
+ *   b64enc <chunk> <hex>       EVP_EncodeUpdate of the octets in chunks, then EVP_EncodeFinal, and
+ *                              EVP_EncodeBlock of them all: each step's return and output
+ *   b64dec <chunk> <hex>       EVP_DecodeUpdate of the text (in hex) in chunks, then
+ *                              EVP_DecodeFinal, and EVP_DecodeBlock of it all
+ *   b64bio <enc> <nonl> <chunk> <hex>   through BIO_f_base64 (BIO_FLAGS_BASE64_NO_NL if <nonl>):
+ *                              writes the octets in chunks and flushes (enc 1), or reads the
+ *                              text in chunks (enc 0); the results and the output
+ *   pemread <flags> <hex>      PEM_read_bio_ex of the text (in hex) with <flags> until it fails:
+ *                              each block's name, header, and data, then the errors
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -156,8 +165,10 @@
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
+#include <openssl/pem.h>
 #include <openssl/stack.h>
 #include <openssl/trace.h>
 #include <openssl/x509v3.h>
@@ -1130,6 +1141,131 @@ static const ASN1_ITEM *probe_item(int n)
 /* Runs a template engine command; returns 0 if `command` isn't one. */
 static int template_command(const char *command, const char *line)
 {
+    if (strcmp(command, "pemread") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300];
+        size_t len = 0;
+        unsigned int flags = 0;
+        BIO *in;
+        char *name, *header;
+        unsigned char *body;
+        long blen;
+        int r;
+        unsigned long code;
+
+        sscanf(line, "%*s %u %699s", &flags, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("pemread bad hex\n");
+            return 1;
+        }
+        flags &= ~(unsigned int)PEM_FLAG_SECURE;
+        in = BIO_new_mem_buf(data, (int)len);
+        while ((r = PEM_read_bio_ex(in, &name, &header, &body, &blen, flags)) == 1) {
+            print_escaped("pemread name", 1, name, strlen(name));
+            print_escaped("pemread header", 1, header, strlen(header));
+            print_escaped("pemread data", (int)blen, (char *)body, (size_t)blen);
+            OPENSSL_free(name);
+            OPENSSL_free(header);
+            OPENSSL_free(body);
+        }
+        printf("pemread %d left %d", r, (int)BIO_pending(in));
+        while ((code = ERR_get_error()) != 0)
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        printf("\n");
+        BIO_free(in);
+        return 1;
+    }
+    if (strcmp(command, "b64bio") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300], out[1200];
+        size_t len = 0;
+        int enc = 0, nonl = 0, chunk = 1, r, total = 0;
+        BIO *mem, *b64 = BIO_new(BIO_f_base64());
+        char *text;
+        long n;
+
+        sscanf(line, "%*s %d %d %d %699s", &enc, &nonl, &chunk, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("b64bio bad hex\n");
+            BIO_free(b64);
+            return 1;
+        }
+        if (chunk < 1)
+            chunk = 1;
+        if (nonl)
+            BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+        printf("b64bio");
+        if (enc) {
+            size_t i;
+
+            mem = BIO_new(BIO_s_mem());
+            BIO_push(b64, mem);
+            for (i = 0; i < len; i += (size_t)chunk)
+                printf(" %d", BIO_write(b64, data + i, len - i < (size_t)chunk ? (int)(len - i) : chunk));
+            printf(" wpending %ld flush %d", (long)BIO_wpending(b64), BIO_flush(b64));
+            n = BIO_get_mem_data(mem, &text);
+            print_escaped(" out", 0, text, (size_t)n);
+        } else {
+            mem = BIO_new_mem_buf(data, (int)len);
+            BIO_push(b64, mem);
+            while ((r = BIO_read(b64, out + total, chunk)) > 0 && total < 900)
+                total += r;
+            printf(" last %d eof %d", r, (int)BIO_eof(b64));
+            print_hex("", out, (size_t)total);
+        }
+        BIO_free_all(b64);
+        ERR_clear_error();
+        return 1;
+    }
+    if (strcmp(command, "b64enc") == 0 || strcmp(command, "b64dec") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300], out[1200];
+        size_t len = 0, i;
+        int chunk = 1, outl, r;
+        int enc = strcmp(command, "b64enc") == 0;
+        EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+
+        sscanf(line, "%*s %d %699s", &chunk, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("%s bad hex\n", command);
+            EVP_ENCODE_CTX_free(ctx);
+            return 1;
+        }
+        if (chunk < 1)
+            chunk = 1;
+        printf("%s", command);
+        if (enc)
+            EVP_EncodeInit(ctx);
+        else
+            EVP_DecodeInit(ctx);
+        for (i = 0; i < len || i == 0; i += (size_t)chunk) {
+            int n = len - i < (size_t)chunk ? (int)(len - i) : chunk;
+
+            memset(out, 0xee, sizeof(out));
+            r = enc ? EVP_EncodeUpdate(ctx, out, &outl, data + i, n) : EVP_DecodeUpdate(ctx, out, &outl, data + i, n);
+            printf(" [%d %d num=%d", r, outl, EVP_ENCODE_CTX_num(ctx));
+            print_hex("", out, (size_t)(outl > 0 ? outl + 1 : 0));
+            printf("]");
+            if (len == 0 || (!enc && r < 0))
+                break;
+        }
+        memset(out, 0xee, sizeof(out));
+        if (enc) {
+            EVP_EncodeFinal(ctx, out, &outl);
+            r = 1;
+        } else {
+            r = EVP_DecodeFinal(ctx, out, &outl);
+        }
+        printf(" final %d %d", r, outl);
+        print_hex("", out, (size_t)(outl > 0 ? outl + 1 : 0));
+        memset(out, 0xee, sizeof(out));
+        r = enc ? EVP_EncodeBlock(out, data, (int)len) : EVP_DecodeBlock(out, data, (int)len);
+        printf(" block %d", r);
+        print_hex("", out, (size_t)(r > 0 ? r + 1 : 0));
+        printf("\n");
+        EVP_ENCODE_CTX_free(ctx);
+        return 1;
+    }
     if (strcmp(command, "asns2i") == 0) {
         char text[300] = "";
         ASN1_INTEGER *a;
