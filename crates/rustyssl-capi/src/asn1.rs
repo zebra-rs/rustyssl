@@ -37,6 +37,20 @@ pub(crate) unsafe fn read_header(p: *const c_uchar, omax: c_long) -> Result<Head
     // SAFETY: `read_header` asks only for octets below `omax`, within the header, which the
     // caller provides.
     let result = der::read_header(omax, |i| unsafe { p.wrapping_add(i).read() });
+    raise_header_errors(&result);
+    result
+}
+
+/// `ASN1_get_object` on a slice: reads the header at the start of `input`, raising OpenSSL's
+/// errors (`ASN1_R_TOO_LONG` too when the length runs past `input`).
+pub(crate) fn read_header_in(input: &[u8]) -> Result<Header, HeaderError> {
+    let result = der::header(input);
+    raise_header_errors(&result);
+    result
+}
+
+/// Raises the errors `ASN1_get_object` raises for a header read.
+fn raise_header_errors(result: &Result<Header, HeaderError>) {
     match result {
         Err(HeaderError::TooSmall) => err::raise(ERR_LIB_ASN1, ASN1_R_TOO_SMALL, "ASN1_get_object"),
         Err(HeaderError::Malformed { .. }) => {
@@ -45,7 +59,6 @@ pub(crate) unsafe fn read_header(p: *const c_uchar, omax: c_long) -> Result<Head
         Ok(h) if h.overrun => err::raise(ERR_LIB_ASN1, ASN1_R_TOO_LONG, "ASN1_get_object"),
         Ok(_) => {}
     }
-    result
 }
 
 /// `ASN1_get_object`'s result for a header read: the constructed bit, the error bit for a

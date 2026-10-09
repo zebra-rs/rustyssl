@@ -3,18 +3,21 @@
 //! their `Z` variants), and `LONG` and `ZLONG` keep a `long` in the slot itself (left out when it
 //! equals the item's size: `ASN1_LONG_UNDEF` or 0). Their item sizes are flags, not sizes.
 //!
-//! Decoding and printing come with `ASN1_item_d2i` and `ASN1_item_print`.
+//! Printing comes with `ASN1_item_print`.
 
-use core::ffi::{c_int, c_long, c_uchar, c_void};
+use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ASN1_ITEM, ASN1_ITYPE_PRIMITIVE, ASN1_LONG_UNDEF, ASN1_PRIMITIVE_FUNCS, ASN1_VALUE,
-    ERR_LIB_ASN1, V_ASN1_INTEGER,
+    ASN1_ITEM, ASN1_ITYPE_PRIMITIVE, ASN1_LONG_UNDEF, ASN1_PRIMITIVE_FUNCS,
+    ASN1_R_ILLEGAL_NEGATIVE_VALUE, ASN1_R_ILLEGAL_PADDING, ASN1_R_INTEGER_TOO_LARGE_FOR_LONG,
+    ASN1_R_TOO_LARGE, ASN1_R_TOO_SMALL, ASN1_VALUE, ERR_LIB_ASN1, V_ASN1_INTEGER,
 };
+use rustyssl_asn1::content::{self, IntegerError};
 use rustyssl_asn1::text::integer_content;
 
 use super::{Item, PrimitiveFuncs, Pval, item, item_fns};
+use crate::err;
 use crate::ffi::ffi_callback;
 use crate::mem;
 
@@ -106,32 +109,38 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `uint64_clear`: zeroes the number.
+    /// `uint64_clear`: zeroes the number, if there is one.
     ///
     /// # Safety
-    /// `pval` holds a number of 8 octets.
+    /// `pval` holds NULL or a number of 8 octets.
     pub(crate) unsafe extern "C" fn uint64_clear(pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM)
     where failure = (), library = ERR_LIB_ASN1
     {
         // SAFETY: the caller's guarantee.
         let number = unsafe { pval.read() };
-        // SAFETY: as above.
-        unsafe { number.cast::<u64>().write_unaligned(0) };
+        // An OPTIONAL field that isn't embedded has no number yet; OpenSSL writes through NULL.
+        if !number.is_null() {
+            // SAFETY: as above.
+            unsafe { number.cast::<u64>().write_unaligned(0) };
+        }
     }
 }
 
 ffi_callback! {
-    /// `uint32_clear`: zeroes the number.
+    /// `uint32_clear`: zeroes the number, if there is one.
     ///
     /// # Safety
-    /// `pval` holds a number of 4 octets.
+    /// `pval` holds NULL or a number of 4 octets.
     pub(crate) unsafe extern "C" fn uint32_clear(pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM)
     where failure = (), library = ERR_LIB_ASN1
     {
         // SAFETY: the caller's guarantee.
         let number = unsafe { pval.read() };
-        // SAFETY: as above.
-        unsafe { number.cast::<u32>().write_unaligned(0) };
+        // An OPTIONAL field that isn't embedded has no number yet; OpenSSL writes through NULL.
+        if !number.is_null() {
+            // SAFETY: as above.
+            unsafe { number.cast::<u32>().write_unaligned(0) };
+        }
     }
 }
 
@@ -253,6 +262,186 @@ ffi_callback! {
     }
 }
 
+/// The content octets an item's `c2i` is given.
+///
+/// # Safety
+/// `cont` holds `len` octets when `len` is positive.
+unsafe fn content_of<'a>(cont: *const c_uchar, len: c_int) -> &'a [u8] {
+    match usize::try_from(len) {
+        // SAFETY: the caller's guarantee.
+        Ok(n) if n > 0 && !cont.is_null() => unsafe { core::slice::from_raw_parts(cont, n) },
+        _ => &[],
+    }
+}
+
+/// `ossl_c2i_uint64_int` with its errors raised.
+fn c2i_uint64(octets: &[u8]) -> Option<(u64, bool)> {
+    match content::integer_u64(octets) {
+        Ok(v) => Some(v),
+        Err(e) => {
+            let reason = match e {
+                IntegerError::ZeroContent => rustyssl_abi::ASN1_R_ILLEGAL_ZERO_CONTENT,
+                IntegerError::IllegalPadding => ASN1_R_ILLEGAL_PADDING,
+                IntegerError::TooLarge => ASN1_R_TOO_LARGE,
+            };
+            err::raise(ERR_LIB_ASN1, reason, "ossl_c2i_uint64_int");
+            None
+        }
+    }
+}
+
+ffi_callback! {
+    /// `uint64_c2i`: an INTEGER into the number (allocated if there's none). A zero length is
+    /// read as 0, as OpenSSL reads it for what `long_i2c` once wrote.
+    ///
+    /// # Safety
+    /// `pval` holds NULL or a number of 8 octets; `cont` holds `len` octets.
+    pub(crate) unsafe extern "C" fn uint64_c2i(pval: *mut *mut ASN1_VALUE, cont: *const c_uchar, len: c_int, _utype: c_int, _free_cont: *mut c_char, it: *const ASN1_ITEM) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { pval.read() }.is_null() && unsafe { number_new(pval, size_of::<u64>()) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let octets = unsafe { content_of(cont, len) };
+        let mut utmp = 0u64;
+        if !octets.is_empty() {
+            let Some((value, neg)) = c2i_uint64(octets) else {
+                return 0;
+            };
+            // SAFETY: as above.
+            let flags = unsafe { size(it) };
+            if flags & FLAG_SIGNED == 0 && neg {
+                err::raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_NEGATIVE_VALUE, "uint64_c2i");
+                return 0;
+            }
+            if flags & FLAG_SIGNED != 0 && !neg && value > i64::MAX.cast_unsigned() {
+                err::raise(ERR_LIB_ASN1, ASN1_R_TOO_LARGE, "uint64_c2i");
+                return 0;
+            }
+            utmp = if neg { value.wrapping_neg() } else { value };
+        }
+        // SAFETY: as above.
+        let number = unsafe { pval.read() };
+        // SAFETY: a number of 8 octets.
+        unsafe { number.cast::<u64>().write_unaligned(utmp) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `uint32_c2i`: an INTEGER into the number (allocated, 8 octets as OpenSSL allocates it,
+    /// if there's none).
+    ///
+    /// # Safety
+    /// `pval` holds NULL or a number of 4 octets; `cont` holds `len` octets.
+    pub(crate) unsafe extern "C" fn uint32_c2i(pval: *mut *mut ASN1_VALUE, cont: *const c_uchar, len: c_int, _utype: c_int, _free_cont: *mut c_char, it: *const ASN1_ITEM) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { pval.read() }.is_null() && unsafe { number_new(pval, size_of::<u64>()) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let octets = unsafe { content_of(cont, len) };
+        let mut utmp = 0u64;
+        if !octets.is_empty() {
+            let Some((value, neg)) = c2i_uint64(octets) else {
+                return 0;
+            };
+            // SAFETY: as above.
+            let signed = unsafe { size(it) } & FLAG_SIGNED != 0;
+            if !signed && neg {
+                err::raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_NEGATIVE_VALUE, "uint32_c2i");
+                return 0;
+            }
+            let abs_int32_min = u64::from(i32::MAX.cast_unsigned()).wrapping_add(1);
+            if neg {
+                if value > abs_int32_min {
+                    err::raise(ERR_LIB_ASN1, ASN1_R_TOO_SMALL, "uint32_c2i");
+                    return 0;
+                }
+                utmp = value.wrapping_neg();
+            } else {
+                let max = if signed { u64::from(i32::MAX.cast_unsigned()) } else { u64::from(u32::MAX) };
+                if value > max {
+                    err::raise(ERR_LIB_ASN1, ASN1_R_TOO_LARGE, "uint32_c2i");
+                    return 0;
+                }
+                utmp = value;
+            }
+        }
+        let [a, b, c, d, ..] = utmp.to_le_bytes();
+        // SAFETY: as above.
+        let number = unsafe { pval.read() };
+        // SAFETY: a number of at least 4 octets.
+        unsafe { number.cast::<u32>().write_unaligned(u32::from_le_bytes([a, b, c, d])) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `long_c2i`: an INTEGER into the `long` in the slot. A value that doesn't fit, or that
+    /// equals the item's size (its "absent" value), is refused.
+    ///
+    /// # Safety
+    /// `pval` is a slot holding a `long`; `cont` holds `len` octets.
+    pub(crate) unsafe extern "C" fn long_c2i(pval: *mut *mut ASN1_VALUE, cont: *const c_uchar, len: c_int, _utype: c_int, _free_cont: *mut c_char, it: *const ASN1_ITEM) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        let too_large = || {
+            err::raise(ERR_LIB_ASN1, ASN1_R_INTEGER_TOO_LARGE_FOR_LONG, "long_c2i");
+            0
+        };
+        // SAFETY: the caller's guarantee.
+        let mut c = unsafe { content_of(cont, len) };
+        let mut sign: Option<u8> = None;
+        if c.len() > 1 {
+            match c.split_first() {
+                Some((0xff, rest)) => {
+                    c = rest;
+                    sign = Some(0xff);
+                }
+                Some((0, rest)) => {
+                    c = rest;
+                    sign = Some(0);
+                }
+                _ => {}
+            }
+        }
+        if c.len() > size_of::<c_long>() {
+            return too_large();
+        }
+        let first = c.first().copied().unwrap_or(0);
+        let sign = match sign {
+            None => if first & 0x80 != 0 { 0xff } else { 0 },
+            Some(s) => {
+                if (s ^ first) & 0x80 == 0 {
+                    err::raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_PADDING, "long_c2i");
+                    return 0;
+                }
+                s
+            }
+        };
+        let utmp = c.iter().fold(0u64, |u, &b| (u << 8) | u64::from(b ^ sign));
+        let mut ltmp = utmp.cast_signed();
+        if ltmp < 0 {
+            return too_large();
+        }
+        if sign != 0 {
+            ltmp = ltmp.wrapping_neg().wrapping_sub(1);
+        }
+        // SAFETY: the caller's guarantee.
+        if ltmp == unsafe { size(it) } {
+            return too_large();
+        }
+        // SAFETY: a `long` fits the slot.
+        unsafe { pval.cast::<c_long>().write_unaligned(ltmp) };
+        1
+    }
+}
+
 /// `uint32_pf`.
 static UINT32_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     app_data: ptr::null_mut(),
@@ -260,7 +449,7 @@ static UINT32_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_new: Some(uint32_new),
     prim_free: Some(number_free),
     prim_clear: Some(uint32_clear),
-    prim_c2i: None,
+    prim_c2i: Some(uint32_c2i),
     prim_i2c: Some(uint32_i2c),
     prim_print: None,
 });
@@ -272,7 +461,7 @@ static UINT64_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_new: Some(uint64_new),
     prim_free: Some(number_free),
     prim_clear: Some(uint64_clear),
-    prim_c2i: None,
+    prim_c2i: Some(uint64_c2i),
     prim_i2c: Some(uint64_i2c),
     prim_print: None,
 });
@@ -284,7 +473,7 @@ static LONG_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_new: Some(long_new),
     prim_free: Some(long_set),
     prim_clear: Some(long_set),
-    prim_c2i: None,
+    prim_c2i: Some(long_c2i),
     prim_i2c: Some(long_i2c),
     prim_print: None,
 });
@@ -328,4 +517,19 @@ item_fns! {
     pub unsafe extern "C" fn LONG_it = integer(&LONG_PF, ASN1_LONG_UNDEF, c"LONG");
     /// A `long` in the slot itself, left out when zero.
     pub unsafe extern "C" fn ZLONG_it = integer(&LONG_PF, 0, c"ZLONG");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clearing_no_number_does_nothing() {
+        let mut slot: *mut ASN1_VALUE = ptr::null_mut();
+        // SAFETY: a slot holding NULL.
+        unsafe { uint64_clear(&raw mut slot, ptr::null()) };
+        // SAFETY: as above.
+        unsafe { uint32_clear(&raw mut slot, ptr::null()) };
+        assert!(slot.is_null());
+    }
 }
