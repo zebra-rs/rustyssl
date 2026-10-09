@@ -6,6 +6,15 @@
 use libc::{FILE, time_t};
 use rustyssl_abi::*;
 
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut ASN1_OBJECT = crate::objects::ASN1_OBJECT_create;
+const _: unsafe extern "C" fn(*mut ASN1_OBJECT) = crate::objects::ASN1_OBJECT_free;
+const _: unsafe extern "C" fn() -> *mut ASN1_OBJECT = crate::objects::ASN1_OBJECT_new;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDR =
     crate::bio::addr::BIO_ADDRINFO_address;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
@@ -981,6 +990,123 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::objects::name::OBJ_NAME_add;
+const _: unsafe extern "C" fn(core::ffi::c_int) = crate::objects::name::OBJ_NAME_cleanup;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *const OBJ_NAME, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::objects::name::OBJ_NAME_do_all;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *const OBJ_NAME, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::objects::name::OBJ_NAME_do_all_sorted;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *const core::ffi::c_char = crate::objects::name::OBJ_NAME_get;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::objects::name::OBJ_NAME_init;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(arg1: *const core::ffi::c_char) -> core::ffi::c_ulong,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_char,
+            arg2: *const core::ffi::c_char,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_char,
+            arg2: core::ffi::c_int,
+            arg3: *const core::ffi::c_char,
+        ),
+    >,
+) -> core::ffi::c_int = crate::objects::name::OBJ_NAME_new_index;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> core::ffi::c_int =
+    crate::objects::name::OBJ_NAME_remove;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::objects::OBJ_add_object;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::objects::sigid::OBJ_add_sigid;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_void,
+            arg2: *const core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+) -> *const core::ffi::c_void = crate::objects::OBJ_bsearch_;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_void,
+            arg2: *const core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    core::ffi::c_int,
+) -> *const core::ffi::c_void = crate::objects::OBJ_bsearch_ex_;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::objects::OBJ_cmp;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::objects::OBJ_create;
+const _: unsafe extern "C" fn(*mut BIO) -> core::ffi::c_int = crate::objects::OBJ_create_objects;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT) -> *mut ASN1_OBJECT = crate::objects::OBJ_dup;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::objects::sigid::OBJ_find_sigid_algs;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::objects::sigid::OBJ_find_sigid_by_algs;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT) -> *const core::ffi::c_uchar =
+    crate::objects::OBJ_get0_data;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT) -> usize = crate::objects::OBJ_length;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::objects::OBJ_ln2nid;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int = crate::objects::OBJ_new_nid;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::objects::OBJ_nid2ln;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ASN1_OBJECT = crate::objects::OBJ_nid2obj;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::objects::OBJ_nid2sn;
+const _: unsafe extern "C" fn(*const ASN1_OBJECT) -> core::ffi::c_int = crate::objects::OBJ_obj2nid;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::objects::OBJ_obj2txt;
+const _: unsafe extern "C" fn() = crate::objects::sigid::OBJ_sigid_free;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::objects::OBJ_sn2nid;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::objects::OBJ_txt2nid;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> *mut ASN1_OBJECT =
+    crate::objects::OBJ_txt2obj;
 const _: unsafe extern "C" fn(*mut *mut OPENSSL_DIR_CTX) -> core::ffi::c_int =
     crate::dir::OPENSSL_DIR_end;
 const _: unsafe extern "C" fn(
@@ -1230,6 +1356,19 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::objects::a2d_ASN1_OBJECT;
 const _: unsafe extern "C" fn() = crate::err::strings::err_free_strings_int;
+const _: unsafe extern "C" fn(*mut BIO, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::objects::i2a_ASN1_OBJECT;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *const ASN1_OBJECT,
+) -> core::ffi::c_int = crate::objects::i2t_ASN1_OBJECT;
 const _: unsafe extern "C" fn() -> core::ffi::c_int =
     crate::err::strings::rustyssl_private_ERR_load_SSL_strings;

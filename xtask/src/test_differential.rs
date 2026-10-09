@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(8) {
+        match random.below(9) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -156,10 +156,110 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             4 => bio_session(&mut random, &mut out)?,
             5 => printf_session(&mut random, &mut out)?,
             6 => addr_session(&mut random, &mut out)?,
+            7 => obj_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
     Ok(out)
+}
+
+/// A random session of object commands: dotted texts (mostly well formed, around known OIDs,
+/// with large arcs, odd separators, and stray characters), names, and content octets.
+fn obj_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    for _ in 0..1 + random.below(20) {
+        match random.below(3) {
+            0 => {
+                let mut text = random
+                    .pick(&[
+                        "",
+                        "0",
+                        "1",
+                        "2",
+                        "3",
+                        "2.5.4",
+                        "1.2.840.113549.1.1",
+                        "1.3.6.1.5.5.7",
+                        "x",
+                    ])
+                    .to_owned();
+                for _ in 0..random.below(6) {
+                    text.push_str(random.pick(&[".", ".", ".", " ", "..", "-"]));
+                    let arc = match random.below(6) {
+                        0 => random.below(40).to_string(),
+                        1 => random.below(200).to_string(),
+                        2 => random.next().to_string(),
+                        3 => format!(
+                            "{}{:019}",
+                            random.below(1000),
+                            random.next() % 10_000_000_000_000_000_000
+                        ),
+                        4 => random
+                            .pick(&["", "a", "007", "18446744073709551616"])
+                            .to_owned(),
+                        _ => random.below(20).to_string(),
+                    };
+                    text.push_str(&arc);
+                }
+                writeln!(out, "objtxt {} {}", hex(text.as_bytes()), random.below(2))?;
+            }
+            1 => {
+                let name = random.pick(&[
+                    "CN",
+                    "commonName",
+                    "SHA256",
+                    "sha256",
+                    "NULL",
+                    "UNDEF",
+                    "undefined",
+                    "rsaEncryption",
+                    "ORG",
+                    "org",
+                    "2.5.4.3",
+                    "1.3",
+                    "x",
+                    "ISO",
+                    "iso",
+                ]);
+                writeln!(out, "objname {name}")?;
+            }
+            _ => {
+                let len = match random.below(4) {
+                    0 => random.below(4),
+                    1 => random.below(12),
+                    2 => random.below(40),
+                    _ => 200 + random.below(57),
+                };
+                let mut bytes: Vec<u8> = (0..len)
+                    .map(|_| {
+                        let byte = match random.below(4) {
+                            0 => 0x80 | random.below(0x80),
+                            1 => random.below(0x80),
+                            2 => random
+                                .pick(&["0", "42", "85", "96", "128", "134"])
+                                .parse()
+                                .unwrap_or(0),
+                            _ => random.below(256),
+                        };
+                        u8::try_from(byte).unwrap_or(0)
+                    })
+                    .collect();
+                if random.below(3) == 0
+                    && let Some(last) = bytes.last_mut()
+                {
+                    *last &= 0x7f;
+                }
+                writeln!(out, "objder {}", hex(&bytes))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A random session of `printf` and `bioprintf` commands.
@@ -673,6 +773,7 @@ mod tests {
             "\nhexdecode ",
             "printf ",
             "\nhostserv ",
+            "\nobjtxt ",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }

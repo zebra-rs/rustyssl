@@ -26,6 +26,7 @@ mod handle;
 mod init;
 mod lhash;
 mod mem;
+mod objects;
 mod secure;
 mod sleep;
 mod stack;
