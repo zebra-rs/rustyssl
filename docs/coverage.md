@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 824 | 5052 | 14.0% |
+| libcrypto | 5876 | 830 | 5046 | 14.1% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **825** | **5654** | **12.7%** |
+| **Total** | **6479** | **831** | **5648** | **12.8%** |
 
 ## By header
 
@@ -41,7 +41,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/comp.h` | libcrypto | 17 | 0 | 0.0% |
 | `openssl/conf.h` | libcrypto | 46 | 0 | 0.0% |
 | `openssl/crmf.h` | libcrypto | 92 | 0 | 0.0% |
-| `openssl/crypto.h` | libcrypto | 101 | 91 | 90.1% |
+| `openssl/crypto.h` | libcrypto | 101 | 97 | 96.0% |
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 29 | 100.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
@@ -516,15 +516,15 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_header`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_sock`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `params`, `pem` |
-| `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data` |
+| `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
+| `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_get_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_get_ex_new_index` | libcrypto | `openssl/crypto.h` | `bio_meth`, `ex_data` |
+| `CRYPTO_get_ex_new_index` | libcrypto | `openssl/crypto.h` | `bio_meth`, `ex_data`, `lib_ctx` |
 | `CRYPTO_get_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_malloc` | libcrypto | `openssl/crypto.h` | `asn1_string`, `asn1_template`, `crypto_mem`, `crypto_mem_hooks`, `crypto_secure_heap`, `err_queue` |
 | `CRYPTO_memcmp` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_memdup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
-| `CRYPTO_new_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
+| `CRYPTO_new_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_secure_actual_size` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_allocated` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap`, `params` |
@@ -551,7 +551,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `objects`, `pem`, `stack`, `trace` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `lib_ctx`, `objects`, `pem`, `stack`, `trace` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -596,7 +596,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_load_strings` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_load_strings_const` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_new` | libcrypto | `openssl/err.h` | `bio_print`, `err_bio`, `err_queue`, `err_strings` |
-| `ERR_peek_error` | libcrypto | `openssl/err.h` | `asn1_template`, `bio_dgram_pair`, `bio_mem`, `crypto_str`, `err_bio`, `err_queue`, `stack`, `trace` |
+| `ERR_peek_error` | libcrypto | `openssl/err.h` | `asn1_template`, `bio_dgram_pair`, `bio_mem`, `crypto_str`, `err_bio`, `err_queue`, `lib_ctx`, `stack`, `trace` |
 | `ERR_peek_error_all` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_peek_error_data` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_peek_error_func` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -759,6 +759,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_ERR_STATE_restore` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
+| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
+| `OSSL_LIB_CTX_get0_global_default` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
+| `OSSL_LIB_CTX_get_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
+| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
+| `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
+| `OSSL_LIB_CTX_set_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
 | `OSSL_PARAM_BLD_free` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_BLD_new` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_BLD_push_double` | libcrypto | `openssl/param_build.h` | `params` |
@@ -833,9 +839,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_set_ulong` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_utf8_ptr` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_utf8_string` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
+| `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads`, `lib_ctx` |
 | `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
-| `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads` |
+| `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads`, `lib_ctx` |
 | `OSSL_sleep` | libcrypto | `openssl/crypto.h` | `bio_sock` |
 | `OSSL_trace_begin` | libcrypto | `openssl/trace.h` | `trace` |
 | `OSSL_trace_enabled` | libcrypto | `openssl/trace.h` | `trace` |

@@ -93,6 +93,7 @@ OpenSSL never depends on them.
 | `OSSL_PARAM_dup` of a parameter with NULL data (and a nonzero size, or a pointer type) | reads through NULL | copies zeroed data | `params::tests::dup_merge_and_build` |
 | The `OSSL_PARAM` getters given a `data_size` over `PTRDIFF_MAX` | read it | fail with `CRYPTO_R_PARAM_VALUE_TOO_LARGE_FOR_DESTINATION` without reading | `params::tests::deviations_are_safe` |
 | `OSSL_PARAM_BLD_push_utf8_string` with a `bsize` of `SIZE_MAX` | counts no room for the string and its NUL, then copies `SIZE_MAX` octets into the array | fails with `ERR_R_PASSED_NULL_PARAMETER` | `params::tests::deviations_are_safe` |
+| `OSSL_LIB_CTX_free` of the global default context while the thread's default is another | frees the library's static object, so the next use of the default context touches freed memory | does nothing | `libctx::tests::defaults_follow_the_thread` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes

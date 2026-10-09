@@ -156,6 +156,16 @@
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
  *
+ * Commands for library contexts, in four slots (a context is named by its slot, g for the
+ * global default, `-` for NULL):
+ *   ctxnew <slot>              OSSL_LIB_CTX_new into an empty slot
+ *   ctxfree <slot>             OSSL_LIB_CTX_free; the slot stays filled if it was the default
+ *   ctxfreeglobal              OSSL_LIB_CTX_free of the global default, while it's the default
+ *   ctxdefault <name>          OSSL_LIB_CTX_set0_default: the previous default's name
+ *   ctxmax <name> <n>          OSSL_set_max_threads, then OSSL_get_max_threads of every context
+ *   ctxdiag <name> <n>         OSSL_LIB_CTX_set_conf_diagnostics, then every context's flag
+ *   ctxexidx <class>           CRYPTO_get_ex_new_index in the class: the index
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -184,6 +194,7 @@
 #include <openssl/params.h>
 #include <openssl/pem.h>
 #include <openssl/stack.h>
+#include <openssl/thread.h>
 #include <openssl/trace.h>
 #include <openssl/x509v3.h>
 
@@ -1773,6 +1784,124 @@ static int params_command(const char *command, const char *line)
     return 0;
 }
 
+static OSSL_LIB_CTX *ctx_slots[4];
+
+static OSSL_LIB_CTX *ctx_named(const char *name, int *ok)
+{
+    *ok = 1;
+    if (strcmp(name, "-") == 0)
+        return NULL;
+    if (strcmp(name, "g") == 0)
+        return OSSL_LIB_CTX_get0_global_default();
+    if (name[0] >= '0' && name[0] <= '3' && name[1] == '\0' && ctx_slots[name[0] - '0'] != NULL)
+        return ctx_slots[name[0] - '0'];
+    *ok = 0;
+    return NULL;
+}
+
+static void print_ctx_name(OSSL_LIB_CTX *ctx)
+{
+    int i;
+
+    if (ctx == NULL) {
+        printf(" NULL");
+        return;
+    }
+    if (ctx == OSSL_LIB_CTX_get0_global_default()) {
+        printf(" g");
+        return;
+    }
+    for (i = 0; i < 4; i++)
+        if (ctx == ctx_slots[i]) {
+            printf(" %d", i);
+            return;
+        }
+    printf(" other");
+}
+
+static int ctx_command(const char *command, const char *line)
+{
+    char name[16] = "-";
+    long long n = 0;
+    int slot = -1, ok, i;
+    OSSL_LIB_CTX *ctx;
+
+    if (strncmp(command, "ctx", 3) != 0)
+        return 0;
+    sscanf(line, "%*s %15s %lld", name, &n);
+    if (name[0] >= '0' && name[0] <= '3' && name[1] == '\0')
+        slot = name[0] - '0';
+    printf("%s %s:", command, name);
+    if (strcmp(command, "ctxnew") == 0) {
+        if (slot < 0 || ctx_slots[slot] != NULL)
+            printf(" busy");
+        else
+            printf(" %s", (ctx_slots[slot] = OSSL_LIB_CTX_new()) != NULL ? "made" : "NULL");
+    } else if (strcmp(command, "ctxfree") == 0) {
+        if (slot < 0 || ctx_slots[slot] == NULL) {
+            printf(" empty");
+        } else {
+            int is_default = OSSL_LIB_CTX_set0_default(NULL) == ctx_slots[slot];
+
+            OSSL_LIB_CTX_free(ctx_slots[slot]);
+            if (is_default) {
+                printf(" default, kept");
+            } else {
+                ctx_slots[slot] = NULL;
+                printf(" freed");
+            }
+        }
+    } else if (strcmp(command, "ctxfreeglobal") == 0) {
+        if (OSSL_LIB_CTX_set0_default(NULL) == OSSL_LIB_CTX_get0_global_default()) {
+            OSSL_LIB_CTX_free(OSSL_LIB_CTX_get0_global_default());
+            printf(" kept %llu", (unsigned long long)OSSL_get_max_threads(NULL));
+        } else {
+            printf(" skip");
+        }
+    } else if (strcmp(command, "ctxdefault") == 0) {
+        ctx = ctx_named(name, &ok);
+        if (ok)
+            print_ctx_name(OSSL_LIB_CTX_set0_default(ctx));
+        else
+            printf(" empty");
+        printf(" now");
+        print_ctx_name(OSSL_LIB_CTX_set0_default(NULL));
+    } else if (strcmp(command, "ctxmax") == 0 || strcmp(command, "ctxdiag") == 0) {
+        int max = strcmp(command, "ctxmax") == 0;
+
+        ctx = ctx_named(name, &ok);
+        if (!ok) {
+            printf(" empty\n");
+            return 1;
+        }
+        if (max)
+            printf(" %d", OSSL_set_max_threads(ctx, (uint64_t)n));
+        else
+            OSSL_LIB_CTX_set_conf_diagnostics(ctx, (int)n);
+        for (i = -1; i < 4; i++) {
+            OSSL_LIB_CTX *c = i < 0 ? OSSL_LIB_CTX_get0_global_default() : ctx_slots[i];
+
+            if (c == NULL)
+                continue;
+            if (max)
+                printf(" %llu", (unsigned long long)OSSL_get_max_threads(c));
+            else
+                printf(" %d", OSSL_LIB_CTX_get_conf_diagnostics(c));
+        }
+        if (max)
+            printf(" default %llu", (unsigned long long)OSSL_get_max_threads(NULL));
+        else
+            printf(" default %d", OSSL_LIB_CTX_get_conf_diagnostics(NULL));
+    } else if (strcmp(command, "ctxexidx") == 0) {
+        printf(" %d", CRYPTO_get_ex_new_index(atoi(name), 0, NULL, NULL, NULL, NULL));
+    } else {
+        printf(" unknown");
+    }
+    printf("\n");
+    ERR_clear_error();
+    return 1;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2079,7 +2208,7 @@ int main(void)
             || asn_command(command, line) || int_command(command, line)
             || bit_command(command, line) || text_command(command, line)
             || time_command(command, line) || template_command(command, line)
-            || params_command(command, line)) {
+            || params_command(command, line) || ctx_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

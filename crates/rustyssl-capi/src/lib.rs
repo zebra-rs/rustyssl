@@ -27,6 +27,7 @@ mod generated;
 mod handle;
 mod init;
 mod lhash;
+mod libctx;
 mod mem;
 mod objects;
 mod params;

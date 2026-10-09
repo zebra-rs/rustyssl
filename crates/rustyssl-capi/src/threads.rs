@@ -443,10 +443,6 @@ ffi_export! {
     }
 }
 
-/// The default library context's thread limit. Library contexts come in step 3.1, which moves
-/// this into them.
-static MAX_THREADS: AtomicU64 = AtomicU64::new(0);
-
 ffi_export! {
     /// What the build supports: a thread pool, and spawning its threads by default.
     ///
@@ -458,38 +454,6 @@ ffi_export! {
         // The default build enables both (no OPENSSL_NO_THREAD_POOL, no
         // OPENSSL_NO_DEFAULT_THREAD_POOL).
         OSSL_THREAD_SUPPORT_FLAG_THREAD_POOL | OSSL_THREAD_SUPPORT_FLAG_DEFAULT_SPAWN
-    }
-}
-
-ffi_export! {
-    /// Sets how many threads the library may use for one operation in `ctx` (null for the
-    /// default context). Returns 1, or 0 for a context that doesn't exist.
-    ///
-    /// # Safety
-    /// `ctx` is null or a live library context.
-    pub unsafe extern "C" fn OSSL_set_max_threads(ctx: *mut OSSL_LIB_CTX, max_threads: u64) -> c_int
-    where failure = 0, library = ERR_LIB_CRYPTO
-    {
-        if !ctx.is_null() {
-            return 0;
-        }
-        MAX_THREADS.store(max_threads, Ordering::Release);
-        1
-    }
-}
-
-ffi_export! {
-    /// The thread limit for `ctx` (null for the default context), 0 by default.
-    ///
-    /// # Safety
-    /// `ctx` is null or a live library context.
-    pub unsafe extern "C" fn OSSL_get_max_threads(ctx: *mut OSSL_LIB_CTX) -> u64
-    where failure = 0, library = ERR_LIB_CRYPTO
-    {
-        if !ctx.is_null() {
-            return 0;
-        }
-        MAX_THREADS.load(Ordering::Acquire)
     }
 }
 

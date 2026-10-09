@@ -1,0 +1,43 @@
+# Library contexts: new and free, each thread's default and what NULL means under it, freeing a
+# default (nothing happens), the thread limit and diagnostics flag per context, and the
+# application-data indexes, numbered per context
+ctxdefault -
+ctxnew 0
+ctxnew 0
+ctxnew 1
+ctxmax 0 5
+ctxmax - 3
+ctxmax 1 7
+ctxdiag 1 2
+ctxdiag - 1
+ctxexidx 13
+ctxexidx 13
+ctxdefault 0
+ctxmax - 11
+ctxdiag - 4
+ctxexidx 13
+ctxexidx 13
+ctxexidx 13
+ctxfree 0
+ctxfreeglobal
+ctxdefault 1
+ctxexidx 13
+ctxfree 0
+ctxdefault g
+ctxexidx 13
+ctxfreeglobal
+ctxfree 1
+ctxfree 1
+ctxdefault 1
+ctxdefault 2
+ctxnew 2
+ctxdefault 2
+ctxmax 2 1
+ctxdefault g
+ctxexidx 16
+ctxexidx 99
+ctxexidx -1
+ctxfree 2
+ctxmax g 0
+ctxdiag g 0
+ctxfree 3

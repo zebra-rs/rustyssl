@@ -580,9 +580,8 @@ Everything else depends on this phase.
     the lock, as OpenSSL's does when `__atomic_is_lock_free` says no.
   - **Thread pool:**
     - `OSSL_get_thread_support_flags` reports both flags, as the default build does.
-    - `OSSL_set_max_threads`/`OSSL_get_max_threads` keep the default context's limit
-      until library contexts exist (3.1 moves it into them). They return 0 for any other
-      context, none of which can exist yet.
+    - `OSSL_set_max_threads`/`OSSL_get_max_threads` kept the default context's limit
+      until library contexts existed; 3.1b moved it into each context.
     - Argon2 uses the limit (3.6).
   - **Thread stop:** `OPENSSL_thread_stop` frees the thread's error queue, and
     `OPENSSL_cleanup` calls it, as OpenSSL's does. `OPENSSL_thread_stop_ex(ctx)` has no
@@ -1505,13 +1504,32 @@ have run for at least 24 CPU-hours with no findings.
     exactly `data_size`. Moved to 4.1: `OSSL_PARAM_get_BN`, `OSSL_PARAM_set_BN`,
     `OSSL_PARAM_BLD_push_BN`, `OSSL_PARAM_BLD_push_BN_pad`, `OSSL_PARAM_allocate_from_text`
     (its numbers are BIGNUMs), and `OSSL_PARAM_print_to_bio` (it prints them).
-  - [ ] **3.1b `OSSL_LIB_CTX`** (default and child contexts); move `OSSL_set_max_threads`'s
+  - [x] **3.1b `OSSL_LIB_CTX`** (default and child contexts); move `OSSL_set_max_threads`'s
     limit, kept for the default context since 1.3, into each context.
+
+    *Done:* 6 new exports (`OSSL_LIB_CTX_new`, `_free`, `_get0_global_default`,
+    `_set0_default`, `_get_conf_diagnostics`, `_set_conf_diagnostics`), and
+    `OSSL_set_max_threads`/`OSSL_get_max_threads` moved into `capi/src/libctx.rs`. A context
+    is an opaque handle. The global default is made on first use and never freed. Each thread
+    may set its own default, which NULL then means everywhere. Freeing NULL or the thread's
+    default does nothing, as in OpenSSL. A thread's default is held with its own reference, so
+    a context freed by another thread stays valid while it's a default (it would dangle in
+    OpenSSL). Each context keeps its thread limit, its configuration diagnostics flag, and its
+    own application-data registry: `CRYPTO_get_ex_new_index` and `CRYPTO_free_ex_index` use
+    the thread's default, and an object's data uses the context in its `CRYPTO_EX_DATA` (NULL
+    through the public API), as OpenSSL's do. Tests: `tests/c/lib_ctx.c` (25 checks: defaults
+    across threads, freeing defaults, per-context settings, and indexes per context); the
+    probe's `ctx*` commands (corpus `lib_ctx.txt`, random sessions). There is no fuzz target:
+    nothing here parses input. Moved: `OSSL_LIB_CTX_new_from_dispatch` and
+    `OSSL_LIB_CTX_new_child` to 3.1d (they take a provider's core dispatch table),
+    `OSSL_LIB_CTX_get_data` to 3.1e (it returns the stores that step makes), and
+    `OSSL_LIB_CTX_load_config` to 3.12.
   - [ ] **3.1c The property-query parser and matcher.**
   - [ ] **3.1d `OSSL_PROVIDER`:** load, try_load, unload, available, do_all, get_params,
-    self_test.
+    self_test; `OSSL_LIB_CTX_new_from_dispatch` and `OSSL_LIB_CTX_new_child` (from 3.1b).
   - [ ] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
-    `do_all_provided`; implicit fetch for the legacy `EVP_sha256()`-style getters.
+    `do_all_provided`; implicit fetch for the legacy `EVP_sha256()`-style getters;
+    `OSSL_LIB_CTX_get_data` (from 3.1b).
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
@@ -1567,7 +1585,8 @@ have run for at least 24 CPU-hours with no findings.
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
   application-defined algorithms implemented in C that we call back into.
 - [ ] **3.12 Config subset:** enough of `openssl.cnf` (see 6.1) to activate providers and set
-  `default_properties`. Distro crypto policies depend on it.
+  `default_properties`. Distro crypto policies depend on it. Includes
+  `OSSL_LIB_CTX_load_config` (from 3.1b).
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random

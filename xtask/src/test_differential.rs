@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(19) {
+        match random.below(20) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -167,6 +167,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             16 => pem_session(&mut random, &mut out)?,
             13 => d2i_session(&mut random, &mut out)?,
             17 => params_session(&mut random, &mut out)?,
+            18 => ctx_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -787,6 +788,35 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
         }
         writeln!(out, "asns2i {text}")?;
     }
+    Ok(())
+}
+
+/// A random session of library-context commands: contexts made and freed in four slots,
+/// defaults switched among them and the global one, thread limits and diagnostics flags set
+/// through a context or NULL, and indexes registered under whichever is the default. The
+/// session ends on the global default with its settings cleared, so later sessions start as
+/// the first did.
+fn ctx_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(12) + 1 {
+        let slot = random.below(4);
+        let name = match random.below(6) {
+            0 => "g".to_owned(),
+            1 => "-".to_owned(),
+            _ => slot.to_string(),
+        };
+        match random.below(8) {
+            0 | 1 => writeln!(out, "ctxnew {slot}")?,
+            2 => writeln!(out, "ctxfree {slot}")?,
+            3 => writeln!(out, "ctxdefault {name}")?,
+            4 => writeln!(out, "ctxmax {name} {}", random.below(20))?,
+            5 => writeln!(out, "ctxdiag {name} {}", random.below(3))?,
+            6 => writeln!(out, "ctxexidx {}", random.below(18))?,
+            _ => writeln!(out, "ctxfreeglobal")?,
+        }
+    }
+    writeln!(out, "ctxdefault g")?;
+    writeln!(out, "ctxmax g 0")?;
+    writeln!(out, "ctxdiag g 0")?;
     Ok(())
 }
 

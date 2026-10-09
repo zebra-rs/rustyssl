@@ -20312,21 +20312,6 @@ pub extern "C" fn OSSL_ISSUER_SERIAL_set1_serial(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_free(_: *mut OSSL_LIB_CTX) {
-    crate::stub::unimplemented("OSSL_LIB_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_get0_global_default() -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_get0_global_default")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_get_conf_diagnostics(_: *mut OSSL_LIB_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_LIB_CTX_get_conf_diagnostics")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_LIB_CTX_get_data(
     _: *mut OSSL_LIB_CTX,
     _: core::ffi::c_int,
@@ -20343,11 +20328,6 @@ pub extern "C" fn OSSL_LIB_CTX_load_config(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_new() -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_LIB_CTX_new_child(
     _: *const OSSL_CORE_HANDLE,
     _: *const OSSL_DISPATCH,
@@ -20361,16 +20341,6 @@ pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
     _: *const OSSL_DISPATCH,
 ) -> *mut OSSL_LIB_CTX {
     crate::stub::unimplemented("OSSL_LIB_CTX_new_from_dispatch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_set0_default(_: *mut OSSL_LIB_CTX) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_set0_default")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_set_conf_diagnostics(_: *mut OSSL_LIB_CTX, _: core::ffi::c_int) {
-    crate::stub::unimplemented("OSSL_LIB_CTX_set_conf_diagnostics")
 }
 
 #[unsafe(no_mangle)]
