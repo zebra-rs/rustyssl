@@ -20,6 +20,7 @@
 
 pub(crate) mod accept;
 pub(crate) mod addr;
+pub(crate) mod base64;
 pub(crate) mod buffer;
 pub(crate) mod connect;
 pub(crate) mod debug;

@@ -718,6 +718,7 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_dup_chain;
 const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
     crate::bio::dgram::BIO_err_is_non_fatal;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::base64::BIO_f_base64;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_linebuffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_null;
@@ -1553,6 +1554,45 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::encode::EVP_DecodeBlock;
+const _: unsafe extern "C" fn(
+    *mut EVP_ENCODE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::encode::EVP_DecodeFinal;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX) = crate::evp::encode::EVP_DecodeInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_ENCODE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::encode::EVP_DecodeUpdate;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX, *const EVP_ENCODE_CTX) -> core::ffi::c_int =
+    crate::evp::encode::EVP_ENCODE_CTX_copy;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX) = crate::evp::encode::EVP_ENCODE_CTX_free;
+const _: unsafe extern "C" fn() -> *mut EVP_ENCODE_CTX = crate::evp::encode::EVP_ENCODE_CTX_new;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX) -> core::ffi::c_int =
+    crate::evp::encode::EVP_ENCODE_CTX_num;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeBlock;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX, *mut core::ffi::c_uchar, *mut core::ffi::c_int) =
+    crate::evp::encode::EVP_EncodeFinal;
+const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX) = crate::evp::encode::EVP_EncodeInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_ENCODE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeUpdate;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;
@@ -1932,6 +1972,49 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) = crate::pem::PEM_dek_info;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, core::ffi::c_int) = crate::pem::PEM_proc_type;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+) -> core::ffi::c_int = crate::pem::PEM_read;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+) -> core::ffi::c_int = crate::pem::PEM_read_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::pem::PEM_read_bio_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::pem::PEM_write;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::pem::PEM_write_bio;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn(

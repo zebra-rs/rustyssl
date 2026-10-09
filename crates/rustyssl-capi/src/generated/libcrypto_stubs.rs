@@ -882,11 +882,6 @@ pub extern "C" fn BIO_f_asn1() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_base64() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_base64")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_brotli() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_brotli")
 }
@@ -9567,40 +9562,6 @@ pub extern "C" fn EVP_CipherUpdate(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_DecodeBlock(
-    _: *mut core::ffi::c_uchar,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DecodeBlock")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DecodeFinal(
-    _: *mut EVP_ENCODE_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DecodeFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DecodeInit(_: *mut EVP_ENCODE_CTX) {
-    crate::stub::unimplemented("EVP_DecodeInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DecodeUpdate(
-    _: *mut EVP_ENCODE_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DecodeUpdate")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_DecryptFinal(
     _: *mut EVP_CIPHER_CTX,
     _: *mut core::ffi::c_uchar,
@@ -9845,63 +9806,6 @@ pub extern "C" fn EVP_DigestVerifyUpdate(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_DigestVerifyUpdate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_ENCODE_CTX_copy(
-    _: *mut EVP_ENCODE_CTX,
-    _: *const EVP_ENCODE_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_ENCODE_CTX_copy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_ENCODE_CTX_free(_: *mut EVP_ENCODE_CTX) {
-    crate::stub::unimplemented("EVP_ENCODE_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_ENCODE_CTX_new() -> *mut EVP_ENCODE_CTX {
-    crate::stub::unimplemented("EVP_ENCODE_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_ENCODE_CTX_num(_: *mut EVP_ENCODE_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_ENCODE_CTX_num")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_EncodeBlock(
-    _: *mut core::ffi::c_uchar,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_EncodeBlock")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_EncodeFinal(
-    _: *mut EVP_ENCODE_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) {
-    crate::stub::unimplemented("EVP_EncodeFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_EncodeInit(_: *mut EVP_ENCODE_CTX) {
-    crate::stub::unimplemented("EVP_EncodeInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_EncodeUpdate(
-    _: *mut EVP_ENCODE_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_EncodeUpdate")
 }
 
 #[unsafe(no_mangle)]
@@ -22382,16 +22286,6 @@ pub extern "C" fn PEM_def_callback(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_dek_info(
-    _: *mut core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-) {
-    crate::stub::unimplemented("PEM_dek_info")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_do_header(
     _: *mut EVP_CIPHER_INFO,
     _: *mut core::ffi::c_uchar,
@@ -22408,22 +22302,6 @@ pub extern "C" fn PEM_get_EVP_CIPHER_INFO(
     _: *mut EVP_CIPHER_INFO,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_get_EVP_CIPHER_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_proc_type(_: *mut core::ffi::c_char, _: core::ffi::c_int) {
-    crate::stub::unimplemented("PEM_proc_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read(
-    _: *mut FILE,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_read")
 }
 
 #[unsafe(no_mangle)]
@@ -22678,17 +22556,6 @@ pub extern "C" fn PEM_read_X509_REQ(
     _: *mut core::ffi::c_void,
 ) -> *mut X509_REQ {
     crate::stub::unimplemented("PEM_read_X509_REQ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio(
-    _: *mut BIO,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_read_bio")
 }
 
 #[unsafe(no_mangle)]
@@ -22961,29 +22828,6 @@ pub extern "C" fn PEM_read_bio_X509_REQ(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_ex(
-    _: *mut BIO,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_read_bio_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write(
-    _: *mut FILE,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_CMS(_: *mut FILE, _: *const CMS_ContentInfo) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_CMS")
 }
@@ -23195,17 +23039,6 @@ pub extern "C" fn PEM_write_X509_REQ(_: *mut FILE, _: *const X509_REQ) -> core::
 #[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_X509_REQ_NEW(_: *mut FILE, _: *const X509_REQ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_X509_REQ_NEW")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio(
-    _: *mut BIO,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio")
 }
 
 #[unsafe(no_mangle)]

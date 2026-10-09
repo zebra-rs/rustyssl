@@ -825,7 +825,7 @@ Everything else depends on this phase.
     - buffer, linebuffer, readbuffer, prefix
     - the BIO pair (`BIO_s_bio`, `BIO_new_bio_pair`, `BIO_nread`/`nwrite`)
     - *Moved out:*
-      - base64 to step 2.5, where the plan already had it beside its `EVP_Encode*` codec;
+      - base64 to step 2.6, where the plan already had it beside its `EVP_Encode*` codec;
       - `BIO_f_nbio_test` to step 3.7, as it needs `RAND_priv_bytes`;
       - `BIO_s_dgram_pair`, `BIO_new_bio_dgram_pair`, and `BIO_s_dgram_mem` to 1.6e, as they
         carry peer addresses (`BIO_ADDR`).
@@ -1026,7 +1026,7 @@ Everything else depends on this phase.
 
 **Exit:** C conformance tests for ERR, BIO, stack, lhash, ex_data, and memory pass on both
 the reference and ours. The printf corpus is byte-identical to the reference. The printf and
-BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
+BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.6).
 
 ## Phase 2: ASN.1, objects, encodings
 
@@ -1425,14 +1425,53 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     `a2i_integer` fuzz target runs both readers.
 
   *Step 2.5 done:* 24 exports over the three sub-steps, now 730 of libcrypto's 5,876.
-- [ ] **2.6 Base64 and PEM framing:**
-  - `EVP_Encode*`/`EVP_Decode*`, including the exact line-handling quirks, and
-    `EVP_EncodeBlock`/`EVP_DecodeBlock`
-  - `BIO_f_base64`
-  - `PEM_read_bio`/`PEM_write_bio`/`PEM_read_bio_ex`/`PEM_bytes_read_bio`, plus
-    `Proc-Type`/`DEK-Info` header handling
+- [x] **2.6 Base64 and PEM framing**, in three sub-steps, each its own PR. The typed PEM
+  functions arrive with their types.
+  - [x] **2.6a The codec:** `EVP_Encode*`/`EVP_Decode*`, including the exact line-handling
+    quirks, `EVP_EncodeBlock`/`EVP_DecodeBlock`, and the `EVP_ENCODE_CTX` functions.
 
-  The typed PEM functions arrive with their types.
+    *Done:* 12 exports, in `capi/src/evp/encode.rs` over `rustyssl_asn1::base64`, a port of
+    `encode.c` as a state machine on OpenSSL's context layout (any bit pattern a valid state):
+    both alphabets (SRP's for later), the NUL written after encoded lines, the octets reported
+    on a decoding error, groups held until a line has a multiple of 4, an empty update as the
+    end and a negative one as not. `EVP_DecodeFinal` counts padding by comparing decoded values
+    with `'='`, as OpenSSL does, though the API can't reach that (it only ever holds a count
+    that isn't a multiple of 4). Tests: `tests/c/evp_encode.c` (11 checks, every chunk size);
+    the probe's `b64enc`/`b64dec` (corpus `base64.txt`, random streams); the `base64` fuzz
+    target round-trips arbitrary data with output buffers of exactly the documented room.
+  - [x] **2.6b `BIO_f_base64`.**
+
+    *Done:* 1 export, in `capi/src/bio/base64.rs`, a port of `bio_b64.c` over the 2.6a codec:
+    lines of 64 (or none with `BIO_FLAGS_BASE64_NO_NL`, in groups of 3 written through
+    `EVP_EncodeBlock`) finished by `BIO_flush`; reading that skips lines until one decodes,
+    an overlong line first included, and stops on retries as OpenSSL does. The filter's state is
+    taken out of its lock while the next BIO is called. OpenSSL's surprises are kept: PEM-style
+    text with a non-base64 line before the data fails, and a junk line that happens to decode
+    is the start. Tests:
+    `tests/c/bio_base64.c` (every write size, both modes, ten decodings in four chunk sizes,
+    retries, controls); the probe's `b64bio` (random streams both ways); the `bio_base64` fuzz
+    target round-trips arbitrary data through the filter and reads arbitrary text.
+  - [x] **2.6c PEM framing:** `PEM_read_bio`/`PEM_write_bio`/`PEM_read_bio_ex`/
+    `PEM_bytes_read_bio`, plus `Proc-Type`/`DEK-Info` header handling.
+
+    *Done:* 7 exports (`PEM_read_bio_ex`, `PEM_read_bio`, `PEM_read`, `PEM_write_bio`,
+    `PEM_write`, `PEM_proc_type`, `PEM_dek_info`), in `capi/src/pem.rs` over
+    `rustyssl_asn1::pem`, a line-driven port of `get_name`, `sanitize_line`, and
+    `get_header_and_data`: lines of up to 254 characters with partial lines tracked, a UTF-8
+    BOM dropped, C-string semantics (a NUL ends what a line compares and copies), the header up
+    to a blank line, the 64-character rule after one, and the three reading flags. With
+    `PEM_FLAG_EAY_COMPATIBLE`, trailing characters are compared with `' '` as a C `char`, so
+    octets from 0x80 are trimmed where `char` is signed (macOS, x86_64) and kept where it isn't
+    (Linux aarch64), as OpenSSL does on each. Reading the rest moves on with what it needs:
+    encrypted PEM (`PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`) and `PEM_ASN1_write*` (which
+    may encrypt) to 3.4; `PEM_bytes_read_bio`/`_secmem` and `PEM_ASN1_read*`, whose name
+    matching consults the `EVP_PKEY` ASN.1 methods, to 4.2; `PEM_Sign*` to 3.3;
+    `PEM_def_callback` to 6.2; `PEM_write_bio_ASN1_stream` to 6.3. Tests: `tests/c/pem.c`
+    (twenty texts under each flag, long lines, NULs, BOM, headers, files, and the header
+    helpers); the probe's `pemread` (corpus `pem.txt`, random PEM-like text); the `pem` fuzz
+    target reads arbitrary text and round-trips arbitrary data.
+
+  *Step 2.6 done:* 20 exports over the three sub-steps, now 750 of libcrypto's 5,876.
 
 **Exit:** d2i → i2d round trips and print output are identical to the reference on the
 corpora (OpenSSL fuzz corpora, CT certificates). The DER, template, PEM, and base64 fuzzers
@@ -1463,6 +1502,7 @@ have run for at least 24 CPU-hours with no findings.
   - the full `EVP_MD_CTX` API, `EVP_Digest`, `EVP_Q_digest`
   - the digest name table behind `EVP_get_digestbyname`, which `OPENSSL_INIT_ADD_ALL_DIGESTS`
     fills (it aborts until then; see 1.2)
+  - `PEM_SignInit`/`Update`/`Final` (from 2.6)
 - [ ] **3.4 EVP_CIPHER:**
   - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
     and the CBC-HMAC composites
@@ -1471,6 +1511,8 @@ have run for at least 24 CPU-hours with no findings.
   - the full `EVP_CIPHER_CTX` API, including padding, AEAD ctrls, and the TLS AAD and IV ctrls
   - the cipher name table behind `EVP_get_cipherbyname`, which `OPENSSL_INIT_ADD_ALL_CIPHERS`
     fills (it aborts until then; see 1.2)
+  - encrypted PEM (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
+    `PEM_ASN1_write`/`_bio`/`_bio_ctx`
 - [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
   the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
@@ -1532,6 +1574,8 @@ chunking) is clean.
   - `EVP_PKEY_print_*` (byte-exact), `eq`, `bits`, `security_bits`, `size`
   - the legacy `EVP_PKEY_assign` / `get1_*` APIs, and the `EVP_PKEY_meth_*` and
     `EVP_PKEY_asn1_*` custom-method APIs
+  - `PEM_bytes_read_bio`/`_secmem` and `PEM_ASN1_read`/`_bio` (from 2.6), whose matching of
+    `ANY PRIVATE KEY` and `PARAMETERS` names consults the ASN.1 methods
 - [ ] **4.3 RSA:**
   - keygen (multi-prime)
   - PKCS#1 v1.5 signatures
@@ -1643,9 +1687,10 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     (compatible no-op), `oid_section`, `stbl_section`
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language
 - [ ] **6.2 UI:** `UI_*` (including `UI_OpenSSL` reading the tty), `UI_UTIL_read_pw`,
-  `PEM_def_callback`, `EVP_read_pw_string`.
+  `PEM_def_callback` (from 2.6), `EVP_read_pw_string`.
 - [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
   decrypt. `SMIME_read/write_PKCS7` uses a strict, bounded MIME parser.
+  `PEM_write_bio_ASN1_stream` comes here (from 2.6), with the ASN.1 streaming BIO.
 - [ ] **6.4 CMS:**
   - every content type and recipient-info type present in the target headers
   - signed attributes and receipts

@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(16) {
+        match random.below(18) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -163,6 +163,8 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             11 => time_session(&mut random, &mut out)?,
             12 => any_session(&mut random, &mut out)?,
             14 => s2i_session(&mut random, &mut out)?,
+            15 => base64_session(&mut random, &mut out)?,
+            16 => pem_session(&mut random, &mut out)?,
             13 => d2i_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
@@ -787,6 +789,164 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
+/// A random session of `b64enc` and `b64dec` commands: octets of every length near the
+/// 48-octet line, and base64 text with whitespace, CR LF, `-`, padding in and out of place, and
+/// stray characters, fed in chunks of every size.
+fn base64_session(random: &mut Random, out: &mut String) -> Result {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for _ in 0..random.below(6) + 1 {
+        let chunk = match random.below(4) {
+            0 => 1,
+            1 => random.below(8) + 1,
+            2 => random.below(70) + 1,
+            _ => 1000,
+        };
+        let mut data: Vec<u8> = Vec::new();
+        if random.below(2) == 0 {
+            let len = match random.below(3) {
+                0 => random.below(5),
+                1 => 44 + random.below(10),
+                _ => random.below(200),
+            };
+            for _ in 0..len {
+                data.push(u8::try_from(random.below(256)).unwrap_or(0));
+            }
+            let hex: String = if data.is_empty() {
+                "-".to_owned()
+            } else {
+                data.iter().map(|b| format!("{b:02x}")).collect()
+            };
+            if random.below(2) == 0 {
+                writeln!(out, "b64bio 1 {} {chunk} {hex}", random.below(2))?;
+            } else {
+                writeln!(out, "b64enc {chunk} {hex}")?;
+            }
+            continue;
+        }
+        if random.below(4) == 0 {
+            data.extend_from_slice(
+                random
+                    .pick(&["-----BEGIN X-----\n", "junk\n", "a b\n", "QUJD\n"])
+                    .as_bytes(),
+            );
+        }
+        for _ in 0..random.below(120) {
+            let c = match random.below(40) {
+                0 => *random
+                    .pick(&["\n", "\r", " ", "\t", "=", "-", "*", "\u{e9}"])
+                    .as_bytes()
+                    .first()
+                    .unwrap_or(&b' '),
+                1 => b'=',
+                _ => ALPHABET
+                    .get(usize::try_from(random.below(64)).unwrap_or(0))
+                    .copied()
+                    .unwrap_or(b'A'),
+            };
+            data.push(c);
+        }
+        if random.below(3) == 0 {
+            data.extend_from_slice(random.pick(&["=", "==", "\n", "-", "===", "=A"]).as_bytes());
+        }
+        data.truncate(300);
+        let hex: String = if data.is_empty() {
+            "-".to_owned()
+        } else {
+            data.iter().map(|b| format!("{b:02x}")).collect()
+        };
+        if random.below(2) == 0 {
+            writeln!(out, "b64bio 0 {} {chunk} {hex}", random.below(2))?;
+        } else {
+            writeln!(out, "b64dec {chunk} {hex}")?;
+        }
+    }
+    Ok(())
+}
+
+/// A random session of `pemread` commands: PEM-like text from pieces (lines before the BEGIN
+/// line, a BOM, names matching or not, headers with and without the blank line, base64 lines of
+/// every length, CR LF, trailing spaces and controls, high octets, NULs, truncation), read with
+/// each flag.
+fn pem_session(random: &mut Random, out: &mut String) -> Result {
+    const B64: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for _ in 0..random.below(5) + 1 {
+        let mut text: Vec<u8> = Vec::new();
+        let eol = |random: &mut Random| -> &'static str {
+            random.pick(&["\n", "\n", "\r\n", "  \n", "\t\n", "\x01\n"])
+        };
+        if random.below(4) == 0 {
+            text.extend_from_slice(
+                random
+                    .pick(&["junk\n", "-----BEGIN-----\n", "\u{feff}", "\n"])
+                    .as_bytes(),
+            );
+        }
+        let name = random.pick(&["X", "CERTIFICATE", "A B", "", "Y"]);
+        text.extend_from_slice(format!("-----BEGIN {name}-----").as_bytes());
+        let e = eol(random);
+        text.extend_from_slice(e.as_bytes());
+        if random.below(3) == 0 {
+            text.extend_from_slice(
+                random
+                    .pick(&["Proc-Type: 4,ENCRYPTED\n", "K: v\n", "Key:value\n"])
+                    .as_bytes(),
+            );
+            if random.below(4) != 0 {
+                text.push(b'\n');
+            }
+        }
+        for _ in 0..random.below(4) {
+            let len = match random.below(4) {
+                0 => 64,
+                1 => random.below(8) * 4,
+                2 => random.below(70),
+                _ => random.below(120),
+            };
+            for _ in 0..len {
+                let c = match random.below(60) {
+                    0 => b'=',
+                    1 => *random
+                        .pick(&["\u{0}", "*", " ", "\u{a0}"])
+                        .as_bytes()
+                        .first()
+                        .unwrap_or(&b' '),
+                    _ => B64
+                        .get(usize::try_from(random.below(64)).unwrap_or(0))
+                        .copied()
+                        .unwrap_or(b'A'),
+                };
+                text.push(c);
+            }
+            let e = eol(random);
+            text.extend_from_slice(e.as_bytes());
+        }
+        let end = if random.below(5) == 0 {
+            random.pick(&["X", "Z", "CERTIFICATE"])
+        } else {
+            name
+        };
+        if random.below(8) != 0 {
+            text.extend_from_slice(format!("-----END {end}-----").as_bytes());
+            let e = eol(random);
+            text.extend_from_slice(e.as_bytes());
+        }
+        if random.below(8) == 0 {
+            let cut =
+                usize::try_from(random.below(u64::try_from(text.len()).unwrap_or(1))).unwrap_or(0);
+            text.truncate(cut);
+        }
+        text.truncate(256);
+        let flags = random.pick(&["0", "2", "2", "4", "6"]);
+        let hex: String = if text.is_empty() {
+            "-".to_owned()
+        } else {
+            text.iter().map(|b| format!("{b:02x}")).collect()
+        };
+        writeln!(out, "pemread {flags} {hex}")?;
+    }
+    Ok(())
+}
+
 /// A random session of time commands: UTCTime and GeneralizedTime text near the valid forms
 /// (field values at their limits, leap days, fractions, offsets, cut short, stray characters),
 /// strict or not; and times and offsets around the edges of both types and of 9999.
@@ -1361,9 +1521,9 @@ mod tests {
 
     #[test]
     fn a_seed_replays_the_same_sessions() {
-        let first = random_sessions(42, 100).unwrap();
-        assert_eq!(first, random_sessions(42, 100).unwrap());
-        assert_ne!(first, random_sessions(43, 100).unwrap());
+        let first = random_sessions(42, 300).unwrap();
+        assert_eq!(first, random_sessions(42, 300).unwrap());
+        assert_ne!(first, random_sessions(43, 300).unwrap());
         // Every kind of session.
         for start in [
             "\nnew ",
@@ -1384,6 +1544,10 @@ mod tests {
             "\nasnbio",
             "\nasnparse",
             "\nasns2i",
+            "\nb64enc",
+            "\nb64dec",
+            "\nb64bio",
+            "\npemread",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }
