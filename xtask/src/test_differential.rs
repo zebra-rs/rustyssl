@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(20) {
+        match random.below(21) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -168,6 +168,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             13 => d2i_session(&mut random, &mut out)?,
             17 => params_session(&mut random, &mut out)?,
             18 => ctx_session(&mut random, &mut out)?,
+            19 => prop_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -787,6 +788,106 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
             text.push('-');
         }
         writeln!(out, "asns2i {text}")?;
+    }
+    Ok(())
+}
+
+/// A random property query: known, unknown, and dotted names in any case, each alone, negated,
+/// optional, or compared with `=` or `!=` to a word, a quoted string, or a number in any base,
+/// with stray spaces, separators, and characters.
+fn property_query(random: &mut Random) -> String {
+    let mut q = String::new();
+    for i in 0..random.below(5) {
+        if i > 0 {
+            q.push_str(random.pick(&[",", ",", ", ", " ,", ",,", " "]));
+        }
+        if random.below(8) == 0 {
+            q.push(' ');
+        }
+        q.push_str(random.pick(&["", "", "", "?", "-", "?"]));
+        q.push_str(random.pick(&[
+            "provider",
+            "fips",
+            "FIPS",
+            "version",
+            "output",
+            "input",
+            "structure",
+            "x.y",
+            "X.Y",
+            "a.b",
+            "a.b.c",
+            "my_name.v2",
+            "unknown",
+            "other",
+            "a..b",
+            "1x",
+            "",
+            "_x",
+            "a.",
+        ]));
+        match random.below(4) {
+            0 => {}
+            1 => q.push_str(random.pick(&["=", " = ", "!=", " != ", "==", "=!"])),
+            _ => {
+                q.push_str(random.pick(&["=", "!=", " = "]));
+                let value = match random.below(7) {
+                    0 => random
+                        .pick(&["yes", "no", "YES", "default", "legacy", "der", "Mixed"])
+                        .to_owned(),
+                    1 => format!("{}", random.below(1000)),
+                    2 => random
+                        .pick(&[
+                            "0x1f",
+                            "0X1F",
+                            "0xg",
+                            "017",
+                            "08",
+                            "+5",
+                            "-5",
+                            "+",
+                            "-",
+                            "0x",
+                            "9223372036854775808",
+                        ])
+                        .to_owned(),
+                    3 => random
+                        .pick(&["'a b'", "\"it's\"", "'a\"b'", "'open", "\"x'", "''", "\"\""])
+                        .to_owned(),
+                    4 => random
+                        .pick(&["a\u{1}", "a~b", "a/b", "a=b", "a\u{7f}"])
+                        .to_owned(),
+                    5 => String::new(),
+                    _ => format!("v{}", random.below(5)),
+                };
+                q.push_str(&value);
+            }
+        }
+        if random.below(10) == 0 {
+            q.push_str(random.pick(&[" ", "  ", " junk", "!", "\t"]));
+        }
+    }
+    q
+}
+
+/// A random session of default-property commands: random queries set in the probe's context
+/// (sometimes a new one, numbering names afresh), NULL, and the FIPS switch.
+fn prop_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(10) + 1 {
+        match random.below(10) {
+            0 => writeln!(out, "propnew")?,
+            1 => writeln!(out, "propfips {}", random.below(3))?,
+            2 => writeln!(out, "propset")?,
+            _ => {
+                let q = property_query(random);
+                let hex: String = if q.is_empty() {
+                    "-".to_owned()
+                } else {
+                    q.bytes().map(|b| format!("{b:02x}")).collect()
+                };
+                writeln!(out, "propset {hex}")?;
+            }
+        }
     }
     Ok(())
 }

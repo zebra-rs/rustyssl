@@ -166,6 +166,14 @@
  *   ctxdiag <name> <n>         OSSL_LIB_CTX_set_conf_diagnostics, then every context's flag
  *   ctxexidx <class>           CRYPTO_get_ex_new_index in the class: the index
  *
+ * Commands for default properties, in one library context of the probe's (`-` for an empty
+ * query; a query is in hex):
+ *   propnew                    a new context, so names are numbered afresh
+ *   propset <hex>              EVP_set_default_properties (propset with no argument: NULL):
+ *                              the return, the errors with their data, whether FIPS is
+ *                              required, and EVP_get1_default_properties
+ *   propfips <enable>          EVP_default_properties_enable_fips, then as propset
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -1902,6 +1910,82 @@ static int ctx_command(const char *command, const char *line)
     return 1;
 }
 
+static OSSL_LIB_CTX *prop_ctx;
+
+/* Prints text quoted on the same line, bytes outside printable ASCII escaped. */
+static void print_quoted(const char *text)
+{
+    printf(" \"");
+    for (; *text != '\0'; text++) {
+        unsigned char c = (unsigned char)*text;
+
+        if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+            putchar(c);
+        else
+            printf("\\x%02x", c);
+    }
+    printf("\"");
+}
+
+static void print_prop_state(int r)
+{
+    unsigned long code;
+    const char *data;
+    int flags;
+    char *text;
+
+    printf(" %d errors:", r);
+    while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        if ((flags & ERR_TXT_STRING) != 0 && data[0] != '\0')
+            print_quoted(data);
+    }
+    text = EVP_get1_default_properties(prop_ctx);
+    printf(" fips %d now", EVP_default_properties_is_fips_enabled(prop_ctx));
+    if (text == NULL)
+        printf(" NULL");
+    else
+        print_quoted(text);
+    printf("\n");
+    OPENSSL_free(text);
+}
+
+static int prop_command(const char *command, const char *line)
+{
+    if (strcmp(command, "propnew") == 0) {
+        OSSL_LIB_CTX_free(prop_ctx);
+        prop_ctx = OSSL_LIB_CTX_new();
+        printf("propnew\n");
+        return 1;
+    }
+    if (prop_ctx == NULL)
+        prop_ctx = OSSL_LIB_CTX_new();
+    if (strcmp(command, "propset") == 0) {
+        char hex[700] = "";
+        unsigned char q[300];
+        size_t len = 0;
+
+        sscanf(line, "%*s %699s", hex);
+        if (hex[0] != '\0' && strcmp(hex, "-") != 0 && !parse_hex(hex, q, &len)) {
+            printf("propset bad hex\n");
+            return 1;
+        }
+        q[len] = '\0';
+        printf("propset %s:", hex[0] == '\0' ? "NULL" : hex);
+        print_prop_state(EVP_set_default_properties(prop_ctx, hex[0] == '\0' ? NULL : (const char *)q));
+        return 1;
+    }
+    if (strcmp(command, "propfips") == 0) {
+        int enable = 0;
+
+        sscanf(line, "%*s %d", &enable);
+        printf("propfips %d:", enable);
+        print_prop_state(EVP_default_properties_enable_fips(prop_ctx, enable));
+        return 1;
+    }
+    return 0;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2208,7 +2292,8 @@ int main(void)
             || asn_command(command, line) || int_command(command, line)
             || bit_command(command, line) || text_command(command, line)
             || time_command(command, line) || template_command(command, line)
-            || params_command(command, line) || ctx_command(command, line)) {
+            || params_command(command, line) || ctx_command(command, line)
+            || prop_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
