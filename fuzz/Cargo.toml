@@ -139,3 +139,24 @@ path = "fuzz_targets/asn1_parse.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "base64"
+path = "fuzz_targets/base64.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bio_base64"
+path = "fuzz_targets/bio_base64.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pem"
+path = "fuzz_targets/pem.rs"
+test = false
+doc = false
+bench = false
