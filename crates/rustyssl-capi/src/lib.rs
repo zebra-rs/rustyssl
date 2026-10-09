@@ -29,6 +29,7 @@ mod init;
 mod lhash;
 mod mem;
 mod objects;
+mod params;
 mod pem;
 mod secure;
 mod sleep;

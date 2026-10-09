@@ -152,7 +152,7 @@ static START: AtomicUsize = AtomicUsize::new(0);
 static END: AtomicUsize = AtomicUsize::new(0);
 
 /// Whether `block` lies in the arena.
-fn in_arena(block: *const c_void) -> bool {
+pub(crate) fn in_arena(block: *const c_void) -> bool {
     INITIALIZED.load(Ordering::Acquire)
         && (START.load(Ordering::Acquire)..END.load(Ordering::Acquire)).contains(&block.addr())
 }
@@ -232,6 +232,17 @@ unsafe fn secure_free(block: *mut c_void, clear: Option<usize>, file: *const c_c
 #[track_caller]
 pub(crate) fn alloc(size: usize) -> *mut c_void {
     secure_malloc(size, mem::FILE.as_ptr(), mem::caller_line())
+}
+
+/// Like [`alloc`], zeroed, like `OPENSSL_secure_zalloc`: a secure block is zero already, and
+/// without a secure heap the ordinary allocator's memory is zeroed.
+#[track_caller]
+pub(crate) fn alloc_zeroed(size: usize) -> *mut c_void {
+    if INITIALIZED.load(Ordering::Acquire) {
+        alloc(size)
+    } else {
+        mem::alloc_zeroed(size)
+    }
 }
 
 /// Zeroes and frees a block from [`alloc`] or the ordinary allocator, like
