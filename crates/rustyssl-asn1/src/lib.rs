@@ -10,6 +10,7 @@
 pub mod content;
 pub mod der;
 mod generated;
+pub mod number;
 pub mod objects;
 pub mod oid;
 pub mod text;
