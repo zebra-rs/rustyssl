@@ -1938,6 +1938,236 @@ const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_n
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM_BLD) = crate::params::build::OSSL_PARAM_BLD_free;
+const _: unsafe extern "C" fn() -> *mut OSSL_PARAM_BLD = crate::params::build::OSSL_PARAM_BLD_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    f64,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_double;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_int;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    i32,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_int32;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    i64,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_int64;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_long;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_octet_ptr;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_octet_string;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_size_t;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    time_t,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_time_t;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_uint;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    u32,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_uint32;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    u64,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_uint64;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_ulong;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_utf8_ptr;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_utf8_string;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM_BLD) -> *mut OSSL_PARAM =
+    crate::params::build::OSSL_PARAM_BLD_to_param;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_BN;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut f64) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_double;
+const _: unsafe extern "C" fn() -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_end;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut core::ffi::c_int) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_int;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut i32) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_int32;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut i64) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_int64;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut core::ffi::c_long) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_long;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_void,
+    usize,
+) -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_octet_ptr;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_void,
+    usize,
+) -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_octet_string;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut usize) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_size_t;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut time_t) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_time_t;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut core::ffi::c_uint) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_uint;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut u32) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_uint32;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut u64) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_uint64;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut core::ffi::c_ulong) -> OSSL_PARAM =
+    crate::params::OSSL_PARAM_construct_ulong;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    usize,
+) -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_utf8_ptr;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_char,
+    usize,
+) -> OSSL_PARAM = crate::params::OSSL_PARAM_construct_utf8_string;
+const _: unsafe extern "C" fn(*const OSSL_PARAM) -> *mut OSSL_PARAM =
+    crate::params::dup::OSSL_PARAM_dup;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM) = crate::params::dup::OSSL_PARAM_free;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut f64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_double;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_int;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut i32) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_int32;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut i64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_int64;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut core::ffi::c_long) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_long;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *const core::ffi::c_void,
+    *mut usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_octet_ptr;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *mut core::ffi::c_void,
+    usize,
+    *mut usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_octet_string;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *const core::ffi::c_void,
+    *mut usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_octet_string_ptr;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut usize) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_size_t;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut time_t) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_time_t;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut core::ffi::c_uint) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_uint;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut u32) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_uint32;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut u64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_uint64;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_get_ulong;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_utf8_ptr;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *mut core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_utf8_string;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_get_utf8_string_ptr;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> *mut OSSL_PARAM =
+    crate::params::OSSL_PARAM_locate;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *const core::ffi::c_char) -> *const OSSL_PARAM =
+    crate::params::OSSL_PARAM_locate_const;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *const OSSL_PARAM) -> *mut OSSL_PARAM =
+    crate::params::dup::OSSL_PARAM_merge;
+const _: unsafe extern "C" fn(*const OSSL_PARAM) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_modified;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM) = crate::params::OSSL_PARAM_set_all_unmodified;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, f64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_double;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_int;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, i32) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_int32;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, i64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_int64;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, core::ffi::c_long) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_long;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_set_octet_ptr;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_set_octet_string;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, usize) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_size_t;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, time_t) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_time_t;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, core::ffi::c_uint) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_uint;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, u32) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_uint32;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, u64) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_uint64;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_ulong;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_utf8_ptr;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::params::OSSL_PARAM_set_utf8_string;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::threads::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =

@@ -85,6 +85,14 @@ OpenSSL never depends on them.
 | `PEM_proc_type` and `PEM_dek_info` on a string that already fills `PEM_BUFSIZE` | write past the buffer | leave it alone | `pem::tests::null_arguments_and_full_buffers_are_safe` |
 | `OSSL_trace_string` with `full` set, `text` clear, and more than `OSSL_TRACE_STRING_MAX` (80) bytes | masks them into an 81-byte stack buffer, overflowing it | masks and prints them all | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
 | `OSSL_trace_string` with NULL `data` to mask, or with `full` and a size over `INT_MAX` | dereferences NULL; truncates the size to an `int` | returns -1 (after the length note, if any), writing no data | `trace::tests::full_masking_past_the_limit_and_bad_arguments_are_safe` |
+| `OSSL_PARAM_get_int32` and the other integer getters on a signed integer parameter of 0 octets; the setters into one | read the octet before the data for its sign | an empty integer is zero: it reads as 0, and only 0 is stored in it | `params::tests::deviations_are_safe` |
+| `OSSL_PARAM_set_uint64` (and `_ulong`, `_size_t`) into a real parameter of 8 octets with NULL data | writes through NULL | a size query, as for the other setters: `return_size` 8, returns 1 | `params::tests::deviations_are_safe` |
+| `OSSL_PARAM_set_double` of exactly 2^63 into a signed integer, or 2^64 into an unsigned one | converts the double to an integer it can't hold (undefined; inexact on x86-64, out of range on AArch64) | out of range (`CRYPTO_R_PARAM_VALUE_TOO_LARGE_FOR_DESTINATION`), as on AArch64 | `rustyssl_crypto::params::tests::sets_with_return_sizes` |
+| `OSSL_PARAM_get_utf8_string` with a NULL parameter | reads through NULL | returns 0 with `ERR_R_PASSED_NULL_PARAMETER` | `params::tests::deviations_are_safe` |
+| `OSSL_PARAM_get_utf8_ptr`, `OSSL_PARAM_get_octet_ptr` with NULL data | read through NULL | return 0 with `ERR_R_PASSED_NULL_PARAMETER` | `params::tests::deviations_are_safe` |
+| `OSSL_PARAM_dup` of a parameter with NULL data (and a nonzero size, or a pointer type) | reads through NULL | copies zeroed data | `params::tests::dup_merge_and_build` |
+| The `OSSL_PARAM` getters given a `data_size` over `PTRDIFF_MAX` | read it | fail with `CRYPTO_R_PARAM_VALUE_TOO_LARGE_FOR_DESTINATION` without reading | `params::tests::deviations_are_safe` |
+| `OSSL_PARAM_BLD_push_utf8_string` with a `bsize` of `SIZE_MAX` | counts no room for the string and its NUL, then copies `SIZE_MAX` octets into the array | fails with `ERR_R_PASSED_NULL_PARAMETER` | `params::tests::deviations_are_safe` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata` | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata` |
 
 ## Notes

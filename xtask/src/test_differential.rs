@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(18) {
+        match random.below(19) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -166,6 +166,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             15 => base64_session(&mut random, &mut out)?,
             16 => pem_session(&mut random, &mut out)?,
             13 => d2i_session(&mut random, &mut out)?,
+            17 => params_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -785,6 +786,134 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
             text.push('-');
         }
         writeln!(out, "asns2i {text}")?;
+    }
+    Ok(())
+}
+
+/// A random session of `OSSL_PARAM` commands: setters of values near the type limits into
+/// parameters of every type and many sizes, getters over native octets, string copies around
+/// the buffer sizes, and merges of keys that differ in case.
+fn params_session(random: &mut Random, out: &mut String) -> Result {
+    const SIGNED: &[i64] = &[
+        0,
+        1,
+        -1,
+        127,
+        128,
+        -128,
+        -129,
+        255,
+        256,
+        32767,
+        -32769,
+        2_147_483_647,
+        2_147_483_648,
+        -2_147_483_648,
+        -2_147_483_649,
+        4_294_967_295,
+        4_294_967_296,
+        9_007_199_254_740_992,
+        9_007_199_254_740_993,
+        -9_007_199_254_740_993,
+        i64::MAX,
+        i64::MIN,
+    ];
+    let hex = |bytes: &[u8]| -> String {
+        if bytes.is_empty() {
+            "-".to_owned()
+        } else {
+            bytes.iter().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    for _ in 0..random.below(8) + 1 {
+        match random.below(5) {
+            0 | 1 => {
+                let function = random.pick(&[
+                    "int32", "uint32", "int64", "uint64", "double", "int", "uint", "long", "ulong",
+                    "size_t", "time_t",
+                ]);
+                let i = usize::try_from(random.below(SIGNED.len() as u64)).unwrap_or(0);
+                let base = SIGNED.get(i).copied().unwrap_or(0);
+                let delta = i64::try_from(random.below(3)).unwrap_or(0) - 1;
+                let v = base.wrapping_add(delta);
+                let value = match function {
+                    "uint32" | "uint64" | "uint" | "ulong" | "size_t" => {
+                        if random.below(4) == 0 {
+                            format!("{}", u64::MAX - random.below(3))
+                        } else {
+                            format!("{}", v.unsigned_abs())
+                        }
+                    }
+                    "double" => match random.below(4) {
+                        0 => random
+                            .pick(&["nan", "inf", "-inf", "0.5", "-0.5", "1e300", "-0"])
+                            .to_owned(),
+                        1 => format!("{}.25", v / 4),
+                        _ => format!("{v}"),
+                    },
+                    _ => format!("{v}"),
+                };
+                let data_type = random.pick(&["1", "1", "2", "2", "3", "4", "5", "6"]);
+                let size = match random.below(3) {
+                    0 => random.pick(&["4", "8"]).to_owned(),
+                    _ => format!("{}", random.below(18)),
+                };
+                writeln!(
+                    out,
+                    "paramset {function} {data_type} {size} {} {value}",
+                    u8::from(random.below(6) == 0)
+                )?;
+            }
+            2 => {
+                let data_type = random.pick(&["1", "2", "3", "4", "5"]);
+                let len = match random.below(3) {
+                    0 => *[4usize, 8]
+                        .get(usize::try_from(random.below(2)).unwrap_or(0))
+                        .unwrap_or(&4),
+                    _ => usize::try_from(random.below(18)).unwrap_or(0),
+                };
+                let mut data = Vec::new();
+                for _ in 0..len {
+                    data.push(pick_octet(
+                        random,
+                        &[0x00, 0xff, 0x7f, 0x80, 0x01, 0x3f, 0xf0, 0x43, 0xc3],
+                    ));
+                }
+                writeln!(out, "paramget {data_type} {}", hex(&data))?;
+            }
+            3 => {
+                let len = usize::try_from(random.below(12)).unwrap_or(0);
+                let mut data = Vec::new();
+                for _ in 0..len {
+                    data.push(pick_octet(random, &[0x00, b'a', b'b', 0xff]));
+                }
+                let op = random.below(4);
+                let size = random.below(14);
+                let max = random.below(14);
+                writeln!(out, "paramstr {op} {size} {max} {}", hex(&data))?;
+            }
+            _ => {
+                let keys = |random: &mut Random| -> String {
+                    let n = random.below(5);
+                    let mut used: Vec<String> = Vec::new();
+                    for _ in 0..n {
+                        let key = random
+                            .pick(&["a", "A", "b", "B", "key", "KEY", "kez", "a_b", "a-b", "z"]);
+                        if !used.iter().any(|k| k.eq_ignore_ascii_case(key)) {
+                            used.push(key.to_owned());
+                        }
+                    }
+                    if used.is_empty() {
+                        "-".to_owned()
+                    } else {
+                        used.join(",")
+                    }
+                };
+                let a = keys(random);
+                let b = keys(random);
+                writeln!(out, "parammerge {a} {b}")?;
+            }
+        }
     }
     Ok(())
 }
