@@ -653,29 +653,8 @@ pub extern "C" fn ASN1_NULL_new() -> *mut ASN1_NULL {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OBJECT_create(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("ASN1_OBJECT_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OBJECT_free(_: *mut ASN1_OBJECT) {
-    crate::stub::unimplemented("ASN1_OBJECT_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_OBJECT_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_OBJECT_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_OBJECT_new() -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("ASN1_OBJECT_new")
 }
 
 #[unsafe(no_mangle)]
@@ -17722,247 +17701,6 @@ pub extern "C" fn NOTICEREF_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn NOTICEREF_new() -> *mut NOTICEREF {
     crate::stub::unimplemented("NOTICEREF_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_add(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_NAME_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_cleanup(_: core::ffi::c_int) {
-    crate::stub::unimplemented("OBJ_NAME_cleanup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_do_all(
-    _: core::ffi::c_int,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(arg1: *const OBJ_NAME, arg: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("OBJ_NAME_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_do_all_sorted(
-    _: core::ffi::c_int,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(arg1: *const OBJ_NAME, arg: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("OBJ_NAME_do_all_sorted")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_get(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OBJ_NAME_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_init() -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_NAME_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_new_index(
-    _: ::core::option::Option<
-        unsafe extern "C" fn(arg1: *const core::ffi::c_char) -> core::ffi::c_ulong,
-    >,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const core::ffi::c_char,
-            arg2: *const core::ffi::c_char,
-        ) -> core::ffi::c_int,
-    >,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const core::ffi::c_char,
-            arg2: core::ffi::c_int,
-            arg3: *const core::ffi::c_char,
-        ),
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_NAME_new_index")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_NAME_remove(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_NAME_remove")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_add_object(_: *const ASN1_OBJECT) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_add_object")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_add_sigid(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_add_sigid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_bsearch_(
-    _: *const core::ffi::c_void,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const core::ffi::c_void,
-            arg2: *const core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-) -> *const core::ffi::c_void {
-    crate::stub::unimplemented("OBJ_bsearch_")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_bsearch_ex_(
-    _: *const core::ffi::c_void,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const core::ffi::c_void,
-            arg2: *const core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_void {
-    crate::stub::unimplemented("OBJ_bsearch_ex_")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_cmp(_: *const ASN1_OBJECT, _: *const ASN1_OBJECT) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_create(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_create_objects(_: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_create_objects")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_dup(_: *const ASN1_OBJECT) -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("OBJ_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_find_sigid_algs(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_find_sigid_algs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_find_sigid_by_algs(
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_find_sigid_by_algs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_get0_data(_: *const ASN1_OBJECT) -> *const core::ffi::c_uchar {
-    crate::stub::unimplemented("OBJ_get0_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_length(_: *const ASN1_OBJECT) -> usize {
-    crate::stub::unimplemented("OBJ_length")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_ln2nid(_: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_ln2nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_new_nid(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_new_nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_nid2ln(_: core::ffi::c_int) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OBJ_nid2ln")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_nid2obj(_: core::ffi::c_int) -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("OBJ_nid2obj")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_nid2sn(_: core::ffi::c_int) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OBJ_nid2sn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_obj2nid(_: *const ASN1_OBJECT) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_obj2nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_obj2txt(
-    _: *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_obj2txt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_sigid_free() {
-    crate::stub::unimplemented("OBJ_sigid_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_sn2nid(_: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_sn2nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_txt2nid(_: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("OBJ_txt2nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OBJ_txt2obj(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut ASN1_OBJECT {
-    crate::stub::unimplemented("OBJ_txt2obj")
 }
 
 #[unsafe(no_mangle)]
@@ -36127,16 +35865,6 @@ pub extern "C" fn ZUINT64_it() -> *const ASN1_ITEM {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn a2d_ASN1_OBJECT(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("a2d_ASN1_OBJECT")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn a2i_ASN1_ENUMERATED(
     _: *mut BIO,
     _: *mut ASN1_ENUMERATED,
@@ -38454,11 +38182,6 @@ pub extern "C" fn i2a_ASN1_INTEGER(_: *mut BIO, _: *const ASN1_INTEGER) -> core:
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2a_ASN1_OBJECT(_: *mut BIO, _: *const ASN1_OBJECT) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2a_ASN1_OBJECT")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2a_ASN1_STRING(
     _: *mut BIO,
     _: *const ASN1_STRING,
@@ -40525,15 +40248,6 @@ pub extern "C" fn i2s_ASN1_UTF8STRING(
     _: *mut ASN1_UTF8STRING,
 ) -> *mut core::ffi::c_char {
     crate::stub::unimplemented("i2s_ASN1_UTF8STRING")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2t_ASN1_OBJECT(
-    _: *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const ASN1_OBJECT,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2t_ASN1_OBJECT")
 }
 
 #[unsafe(no_mangle)]

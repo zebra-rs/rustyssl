@@ -82,3 +82,10 @@ path = "fuzz_targets/bio_dgram_pair.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "oid"
+path = "fuzz_targets/oid.rs"
+test = false
+doc = false
+bench = false

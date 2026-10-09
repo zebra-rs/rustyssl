@@ -17,21 +17,20 @@
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::ffi::{CString, OsStr};
-use std::os::unix::ffi::OsStrExt;
+use std::ffi::CString;
 use std::sync::{Mutex, OnceLock};
 
 use rustyssl_abi::{
-    CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE, CONF_MFLAGS_IGNORE_RETURN_CODES,
-    CONF_R_NO_SUCH_FILE, ERR_LIB_CONF, ERR_LIB_CRYPTO, ERR_R_INIT_FAIL,
-    OPENSSL_INIT_ADD_ALL_CIPHERS, OPENSSL_INIT_ADD_ALL_DIGESTS, OPENSSL_INIT_ASYNC,
-    OPENSSL_INIT_ENGINE_AFALG, OPENSSL_INIT_ENGINE_ALL_BUILTIN, OPENSSL_INIT_ENGINE_CAPI,
-    OPENSSL_INIT_ENGINE_CRYPTODEV, OPENSSL_INIT_ENGINE_DYNAMIC, OPENSSL_INIT_ENGINE_OPENSSL,
-    OPENSSL_INIT_ENGINE_PADLOCK, OPENSSL_INIT_ENGINE_RDRAND, OPENSSL_INIT_LOAD_CONFIG,
-    OPENSSL_INIT_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_LOAD_SSL_STRINGS,
-    OPENSSL_INIT_NO_ADD_ALL_CIPHERS, OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT,
-    OPENSSL_INIT_NO_LOAD_CONFIG, OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS,
-    OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
+    BIO_R_NO_SUCH_FILE, CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE,
+    CONF_MFLAGS_IGNORE_RETURN_CODES, CONF_R_NO_SUCH_FILE, ERR_LIB_CONF, ERR_LIB_CRYPTO,
+    ERR_R_INIT_FAIL, ERR_R_SYS_LIB, ERR_REASON_MASK, OPENSSL_INIT_ADD_ALL_CIPHERS,
+    OPENSSL_INIT_ADD_ALL_DIGESTS, OPENSSL_INIT_ASYNC, OPENSSL_INIT_ENGINE_AFALG,
+    OPENSSL_INIT_ENGINE_ALL_BUILTIN, OPENSSL_INIT_ENGINE_CAPI, OPENSSL_INIT_ENGINE_CRYPTODEV,
+    OPENSSL_INIT_ENGINE_DYNAMIC, OPENSSL_INIT_ENGINE_OPENSSL, OPENSSL_INIT_ENGINE_PADLOCK,
+    OPENSSL_INIT_ENGINE_RDRAND, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS,
+    OPENSSL_INIT_LOAD_SSL_STRINGS, OPENSSL_INIT_NO_ADD_ALL_CIPHERS,
+    OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT, OPENSSL_INIT_NO_LOAD_CONFIG,
+    OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
 };
 
 use crate::err;
@@ -255,25 +254,51 @@ fn load_config(settings: *const OPENSSL_INIT_SETTINGS) -> c_int {
             CString::new(path).ok()
         })
     });
-    let Some(file) = file else {
-        return 0;
-    };
-    if file.as_bytes().is_empty() {
-        return 1;
-    }
-    match std::fs::File::open(OsStr::from_bytes(file.as_bytes())) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            if flags & CONF_MFLAGS_IGNORE_MISSING_FILE.cast_unsigned() as c_ulong != 0
-                || flags & CONF_MFLAGS_IGNORE_RETURN_CODES.cast_unsigned() as c_ulong != 0
-            {
-                1
-            } else {
-                err::raise(ERR_LIB_CONF, CONF_R_NO_SUCH_FILE, "OPENSSL_init_crypto");
-                0
+    // As CONF_modules_load_file_ex: errors from loading are dropped (back to a mark) when the
+    // load counts as a success, and kept otherwise.
+    // SAFETY: no preconditions.
+    unsafe { err::ERR_set_mark() };
+    let ret = match file {
+        None => 0,
+        Some(file) if file.as_bytes().is_empty() => 1,
+        Some(file) => {
+            // SAFETY: NUL-terminated strings.
+            let bio = unsafe { crate::bio::file::BIO_new_file(file.as_ptr(), c"rb".as_ptr()) };
+            if !bio.is_null() {
+                // SAFETY: the BIO just made.
+                unsafe { crate::bio::BIO_free(bio) };
+                stub::unimplemented("OPENSSL_init_crypto loading a configuration file");
             }
+            // As def_load reports a file BIO_new_file couldn't open.
+            // SAFETY: no preconditions.
+            let code = unsafe { err::ERR_peek_last_error() };
+            // ERR_GET_REASON of a non-system error.
+            let reason =
+                c_int::try_from(code & c_ulong::from(ERR_REASON_MASK.cast_unsigned())).unwrap_or(0);
+            if reason == BIO_R_NO_SUCH_FILE {
+                err::raise(ERR_LIB_CONF, CONF_R_NO_SUCH_FILE, "def_load");
+            } else {
+                err::raise(ERR_LIB_CONF, ERR_R_SYS_LIB, "def_load");
+            }
+            c_int::from(
+                flags & CONF_MFLAGS_IGNORE_MISSING_FILE.cast_unsigned() as c_ulong != 0
+                    && reason == BIO_R_NO_SUCH_FILE,
+            )
         }
-        _ => stub::unimplemented("OPENSSL_init_crypto loading a configuration file"),
+    };
+    let ret = if flags & CONF_MFLAGS_IGNORE_RETURN_CODES.cast_unsigned() as c_ulong != 0 {
+        1
+    } else {
+        ret
+    };
+    if ret > 0 {
+        // SAFETY: no preconditions.
+        unsafe { err::ERR_pop_to_mark() };
+    } else {
+        // SAFETY: no preconditions.
+        unsafe { err::ERR_clear_last_mark() };
     }
+    ret
 }
 
 /// `DEFAULT_CONF_MFLAGS` from OpenSSL's `include/internal/conf.h`.

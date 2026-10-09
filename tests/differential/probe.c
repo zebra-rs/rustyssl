@@ -73,6 +73,13 @@
  *   hexdecode <text> <sep>     OPENSSL_hexstr2buf_ex with the separator's code
  *   strtoul <text> <base>      OPENSSL_strtoul, with and without an end pointer
  *   tracecat <name> <num>      OSSL_trace_get_category_num and OSSL_trace_get_category_name
+ *
+ * Commands for objects (`-` for empty hex):
+ *   objtxt <hex> <no_name>     OBJ_txt2obj of the text in hex: its NID, OBJ_obj2txt with names
+ *                              and without, and a2d_ASN1_OBJECT of the text; or the error
+ *   objder <hex>               an object with those content octets: OBJ_obj2nid, OBJ_obj2txt
+ *                              with names and without, and i2a_ASN1_OBJECT
+ *   objname <name>             OBJ_sn2nid, OBJ_ln2nid, and OBJ_txt2nid
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -96,6 +103,7 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/lhash.h>
+#include <openssl/objects.h>
 #include <openssl/stack.h>
 #include <openssl/trace.h>
 
@@ -658,6 +666,86 @@ static int string_command(const char *command, const char *line)
     return 1;
 }
 
+/* Prints OBJ_obj2txt of `o` with names and without, as `label`. */
+static void print_obj_texts(const ASN1_OBJECT *o)
+{
+    char buf[700];
+    int n;
+
+    n = OBJ_obj2txt(buf, sizeof(buf), o, 0);
+    printf(" txt=%d:%s", n, buf);
+    n = OBJ_obj2txt(buf, sizeof(buf), o, 1);
+    printf(" num=%d:%s", n, buf);
+}
+
+static void print_obj_error(void)
+{
+    unsigned long code = ERR_peek_last_error();
+
+    printf(" err=%d/%d\n", ERR_GET_LIB(code), ERR_GET_REASON(code));
+    ERR_clear_error();
+}
+
+/* Runs an object command; returns 0 if `command` isn't one. */
+static int obj_command(const char *command, const char *line)
+{
+    char hex[600] = "-", text[300];
+    unsigned char data[300];
+    size_t len = 0;
+    int other = 0;
+
+    sscanf(line, "%*s %599s %d", hex, &other);
+    if (strcmp(command, "objname") == 0) {
+        printf("objname %d %d %d", OBJ_sn2nid(hex), OBJ_ln2nid(hex), OBJ_txt2nid(hex));
+        print_obj_error();
+        return 1;
+    }
+    if (strcmp(command, "objtxt") != 0 && strcmp(command, "objder") != 0)
+        return 0;
+    if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+        printf("%s bad hex\n", command);
+        return 1;
+    }
+    if (strcmp(command, "objtxt") == 0) {
+        ASN1_OBJECT *o;
+        unsigned char out[300];
+        int n;
+
+        memcpy(text, data, len);
+        text[len] = '\0';
+        o = OBJ_txt2obj(text, other);
+        printf("objtxt nid=%d", OBJ_obj2nid(o));
+        if (o != NULL)
+            print_obj_texts(o);
+        ASN1_OBJECT_free(o);
+        print_obj_error();
+        n = a2d_ASN1_OBJECT(out, sizeof(out), text, -1);
+        printf("a2d %d ", n);
+        for (int i = 0; i < n; i++)
+            printf("%02x", out[i]);
+        printf(" measured=%d", a2d_ASN1_OBJECT(NULL, 0, text, -1));
+        print_obj_error();
+    } else {
+        ASN1_OBJECT *o = ASN1_OBJECT_create(0, data, (int)len, NULL, NULL);
+        BIO *mem = BIO_new(BIO_s_mem());
+        char *out;
+        long n;
+        int ret;
+
+        printf("objder nid=%d", OBJ_obj2nid(o));
+        print_obj_texts(o);
+        ret = i2a_ASN1_OBJECT(mem, o);
+        n = BIO_get_mem_data(mem, &out);
+        printf(" i2a=%d:", ret);
+        for (long i = 0; i < n; i++)
+            putchar(out[i] == '\n' ? '|' : out[i]);
+        BIO_free(mem);
+        ASN1_OBJECT_free(o);
+        print_obj_error();
+    }
+    return 1;
+}
+
 /* Runs an error-queue command; returns 0 if `command` isn't one. */
 static int err_command(const char *command, const char *line)
 {
@@ -961,7 +1049,7 @@ int main(void)
         if (err_command(command, line) || stack_command(command, line)
             || lhash_command(command, line) || string_command(command, line)
             || bio_command(command, line) || printf_command(command, line)
-            || addr_command(command, line)) {
+            || addr_command(command, line) || obj_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

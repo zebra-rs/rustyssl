@@ -113,7 +113,9 @@ rustyssl itself**. You can only regenerate golden files with
 - Each test in `tests/c/<family>/*.c` is a small C program with TAP output, compiled **once**
   against the official headers and then **run twice**: against the reference libraries and
   against ours. Passing on the reference validates the test. Passing on ours validates the
-  implementation.
+  implementation. Both runs (and the L5 probe's) get the same `OPENSSL_CONF`, a file that
+  doesn't exist: each library would otherwise look in its own build's directory, and the
+  error OpenSSL keeps (in the error queue's slots) after a missing file names the path.
 - Each test asserts:
   - return values, and NULL and edge-argument behavior, per the man page
   - ownership (`get0`/`get1`/`set0`/`set1`), with tests run under ASan+LSan and valgrind to
