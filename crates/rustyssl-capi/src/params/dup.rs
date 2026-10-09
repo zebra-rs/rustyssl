@@ -213,7 +213,7 @@ ffi_export! {
         }
         for (i, p) in merged.into_iter().enumerate() {
             // SAFETY: the array has room for every merged parameter and a zeroed terminator.
-            unsafe { array.add(i).write(p) };
+            unsafe { array.wrapping_add(i).write(p) };
         }
         array
     }

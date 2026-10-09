@@ -330,7 +330,7 @@ unsafe fn fill(d: &Def, to: *mut u8) {
             }
             if d.data_type == UTF8_STRING {
                 // SAFETY: the room counted one octet more for the NUL.
-                unsafe { to.add(d.size).write(0) };
+                unsafe { to.wrapping_add(d.size).write(0) };
             }
         }
         _ => {
@@ -401,10 +401,10 @@ ffi_export! {
                 return_size: unmodified(),
             };
             // SAFETY: the array has room for every parameter and the terminator.
-            unsafe { array.add(i).write(param) };
+            unsafe { array.wrapping_add(i).write(param) };
         }
         // SAFETY: the terminator's place.
-        unsafe { array.add(defs.len()).write(allocated_end(secure_block.cast(), secure_size)) };
+        unsafe { array.wrapping_add(defs.len()).write(allocated_end(secure_block.cast(), secure_size)) };
         array
     }
 }

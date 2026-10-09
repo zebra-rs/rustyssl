@@ -570,7 +570,7 @@ ffi_export! {
             return 0;
         }
         // SAFETY: `length` is within the `room` octets of `*val`.
-        unsafe { out.add(length).write(0) };
+        unsafe { out.wrapping_add(length).write(0) };
         1
     }
 }
@@ -629,7 +629,7 @@ unsafe fn set_string(
     unsafe { ptr::copy(val.cast::<u8>(), p.data.cast::<u8>(), len) };
     if data_type == UTF8_STRING && p.data_size > len {
         // SAFETY: the octet after the string is within the data.
-        unsafe { p.data.cast::<u8>().add(len).write(0) };
+        unsafe { p.data.cast::<u8>().wrapping_add(len).write(0) };
     }
     1
 }
@@ -1006,18 +1006,18 @@ mod tests {
         let dup = unsafe { OSSL_PARAM_dup(params.as_ptr()) };
         assert!(!dup.is_null());
         // SAFETY: the copy of the second parameter.
-        let second = unsafe { &*dup.add(1) };
+        let second = unsafe { &*dup.wrapping_add(1) };
         // SAFETY: its data holds 3 octets.
-        assert_eq!(
-            unsafe { core::slice::from_raw_parts(second.data.cast::<u8>(), 3) },
-            b"abc"
-        );
+        let copied = unsafe { core::slice::from_raw_parts(second.data.cast::<u8>(), 3) };
+        assert_eq!(copied, b"abc");
         // SAFETY: the copy's terminator.
-        assert_eq!(unsafe { (*dup.add(3)).data_type }, ALLOCATED_END);
+        assert_eq!(unsafe { (*dup.wrapping_add(3)).data_type }, ALLOCATED_END);
         // SAFETY: both arrays end with a NULL key.
         let merged = unsafe { OSSL_PARAM_merge(params.as_ptr(), dup) };
         // SAFETY: the merge's first entry.
-        assert_eq!(unsafe { CStr::from_ptr((*merged).key) }, c"n");
+        let first = unsafe { &*merged };
+        // SAFETY: its key is a string.
+        assert_eq!(unsafe { CStr::from_ptr(first.key) }, c"n");
         // SAFETY: from merge and dup.
         unsafe { OSSL_PARAM_free(merged) };
         // SAFETY: as above.
@@ -1026,16 +1026,16 @@ mod tests {
         // SAFETY: no preconditions.
         let bld = unsafe { OSSL_PARAM_BLD_new() };
         // SAFETY: a live builder; the keys and strings are static.
-        let pushed = unsafe {
-            OSSL_PARAM_BLD_push_int(bld, c"i".as_ptr(), -2)
-                + OSSL_PARAM_BLD_push_utf8_string(bld, c"s".as_ptr(), c"text".as_ptr(), 0)
-                + OSSL_PARAM_BLD_push_octet_ptr(bld, c"p".as_ptr(), ptr::null_mut(), 0)
-        };
-        assert_eq!(pushed, 3);
+        let a = unsafe { OSSL_PARAM_BLD_push_int(bld, c"i".as_ptr(), -2) };
+        // SAFETY: as above.
+        let b = unsafe { OSSL_PARAM_BLD_push_utf8_string(bld, c"s".as_ptr(), c"text".as_ptr(), 0) };
+        // SAFETY: as above.
+        let c = unsafe { OSSL_PARAM_BLD_push_octet_ptr(bld, c"p".as_ptr(), ptr::null_mut(), 0) };
+        assert_eq!((a, b, c), (1, 1, 1));
         // SAFETY: a live builder.
         let built = unsafe { OSSL_PARAM_BLD_to_param(bld) };
         // SAFETY: the built array has three parameters and a terminator.
-        let s = unsafe { &*built.add(1) };
+        let s = unsafe { &*built.wrapping_add(1) };
         // SAFETY: a UTF-8 string with its NUL.
         assert_eq!(unsafe { CStr::from_ptr(s.data.cast()) }, c"text");
         let mut v = 0i32;
