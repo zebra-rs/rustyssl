@@ -1479,14 +1479,39 @@ have run for at least 24 CPU-hours with no findings.
 
 ## Phase 3: Provider core, EVP symmetric, RAND → M1
 
-- [ ] **3.1 Library contexts, params, and providers:**
-  - `OSSL_LIB_CTX` (default and child contexts); move `OSSL_set_max_threads`'s limit, kept
-    for the default context since 1.3, into each context
-  - `OSSL_PARAM`: all types, the `*_ptr` semantics, the modified flags, and `OSSL_PARAM_BLD`
-  - `OSSL_PROVIDER`: load, try_load, unload, available, do_all, get_params, self_test
-  - the property-query parser and matcher
-  - the method store and cache: `EVP_*_fetch`, `is_a`, names, `do_all_provided`
-  - implicit fetch for the legacy `EVP_sha256()`-style getters
+- [ ] **3.1 Library contexts, params, and providers**, in five sub-steps, each its own PR:
+  - [x] **3.1a `OSSL_PARAM`:** all types, the `*_ptr` semantics, the modified flags,
+    `OSSL_PARAM_dup`/`merge`/`free`, and `OSSL_PARAM_BLD`.
+
+    *Done:* 74 exports. The conversions are a port of `params.c` in
+    `rustyssl_crypto::params`: the 4- and 8-octet fast paths, `copy_integer` for other sizes
+    (sign-extended or zero-padded, and narrowed only when the dropped octets are padding and
+    the sign is kept), the real checks against 53 mantissa bits, and each function's own
+    `return_size` and error on every path, quirks included (`set_int32` of a negative number
+    into an unsigned parameter is a type error; `set_uint32` leaves `return_size` 4 when a
+    signed 4-octet parameter overflows). Setters return the octets to store, and
+    `capi/src/params.rs` writes them, so no reference to a caller's buffer is made. Strings,
+    pointers, `locate`, the constructors, and the modified flags are in the same file.
+    `params/dup.rs` lays copies out as OpenSSL does (the array, then each parameter's data in
+    8-octet units, secure-heap data copied to a secure block that the
+    `OSSL_PARAM_ALLOCATED_END` terminator records), and merges with a stable sort by key without
+    case. `params/build.rs` is the builder, an opaque handle that keeps the caller's keys and
+    strings until `OSSL_PARAM_BLD_to_param`, with the same layout. Tests:
+    `tests/c/params.c` (35 checks, 9,364 lines: every setter into four types, eight sizes, and
+    NULL data; every getter over those; strings, pointers, dup, merge, the builder, and the
+    secure heap, layouts included); the probe's `paramset`/`paramget`/`paramstr`/`parammerge`
+    (corpus `params.txt`, random sessions); the `params` fuzz target checks that every value
+    read stores back to the same octets and every value stored reads back, with buffers of
+    exactly `data_size`. Moved to 4.1: `OSSL_PARAM_get_BN`, `OSSL_PARAM_set_BN`,
+    `OSSL_PARAM_BLD_push_BN`, `OSSL_PARAM_BLD_push_BN_pad`, `OSSL_PARAM_allocate_from_text`
+    (its numbers are BIGNUMs), and `OSSL_PARAM_print_to_bio` (it prints them).
+  - [ ] **3.1b `OSSL_LIB_CTX`** (default and child contexts); move `OSSL_set_max_threads`'s
+    limit, kept for the default context since 1.3, into each context.
+  - [ ] **3.1c The property-query parser and matcher.**
+  - [ ] **3.1d `OSSL_PROVIDER`:** load, try_load, unload, available, do_all, get_params,
+    self_test.
+  - [ ] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
+    `do_all_provided`; implicit fetch for the legacy `EVP_sha256()`-style getters.
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
@@ -1554,6 +1579,9 @@ chunking) is clean.
   - arithmetic, shifts, and bit operations
   - conversions: bin, lebin, native, hex, dec, mpi, ASN.1
   - `ASN1_bn_print` (moved from 2.5)
+  - the `OSSL_PARAM` big-number functions (moved from 3.1a): `OSSL_PARAM_get_BN`,
+    `OSSL_PARAM_set_BN`, `OSSL_PARAM_BLD_push_BN`, `OSSL_PARAM_BLD_push_BN_pad`,
+    `OSSL_PARAM_allocate_from_text`, `OSSL_PARAM_print_to_bio`
   - `BN_CTX`, `BN_MONT_CTX`, `BN_RECP_CTX`, `BN_BLINDING`, `BN_GENCB`
   - primes: `BN_check_prime`, `BN_generate_prime_ex(2)`
   - `BN_mod_sqrt` (with the CVE-2022-0778 loop bound), `BN_mod_inverse`, `BN_gcd`,
