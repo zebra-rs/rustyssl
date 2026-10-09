@@ -85,6 +85,9 @@ dependencies = [
 [[package]]
 name = "rustyssl-asn1"
 version = "0.1.0"
+dependencies = [
+ "rustyssl-abi",
+]
 
 [[package]]
 name = "rustyssl-capi"
