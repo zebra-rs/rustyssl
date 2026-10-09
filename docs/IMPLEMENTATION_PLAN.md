@@ -1130,7 +1130,7 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     - a `der` fuzz target (15 million runs): exact-size input to `ASN1_get_object`, headers
       round-tripped through `ASN1_put_object`, objects through `i2d`/`d2i`, and the element
       reader.
-- [ ] **2.3 Universal types** (public-layout `ASN1_STRING` family), in six sub-steps, each its
+- [x] **2.3 Universal types** (public-layout `ASN1_STRING` family), in six sub-steps, each its
   own PR. The `d2i_`/`i2d_`/`_it` functions of these types, and the `new`/`free` of those
   built from templates (`ASN1_TIME`, `ASN1_PRINTABLE`, `DIRECTORYSTRING`, ...), come from the
   template engine (2.4).
@@ -1152,16 +1152,139 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
       accessors; `ASN1_STRING_clear_free` with a negative length.
     - **Tests:** `tests/c/asn1_string.c` (19 checks), identical on both libraries. Nothing here
       parses input, so there's no probe command or fuzz target.
-  - [ ] **2.3b INTEGER and ENUMERATED:** `get`/`set` for `long`, `int64`, and `uint64`,
+  - [x] **2.3b INTEGER and ENUMERATED:** `get`/`set` for `long`, `int64`, and `uint64`,
     negative values, `cmp`, `dup`. The `BIGNUM` conversions wait for `BIGNUM` (Phase 4).
-  - [ ] **2.3c BIT STRING, OCTET STRING, BOOLEAN, NULL:** bits, unused bits and flags.
-  - [ ] **2.3d Character strings:** `ASN1_mbstring_copy`/`ncopy`, `ASN1_STRING_TABLE`, the
+
+    *Done:* 17 exports, now 519 of libcrypto's 5,876: the 10 getters and setters,
+    `ASN1_INTEGER_cmp`/`dup`, `i2a_`/`a2i_ASN1_INTEGER` and `_ENUMERATED`, and
+    `d2i_ASN1_UINTEGER` (`capi/src/asn1/integer.rs`). `ASN1_INTEGER_to_BN`,
+    `BN_to_ASN1_INTEGER` (and the ENUMERATED ones) and `i2s_`/`s2i_ASN1_INTEGER` wait for
+    `BIGNUM`.
+    - **Values are magnitudes as stored**, with `V_ASN1_NEG` in the type: leading zero octets
+      count toward the 8 a 64-bit value allows; the setters write the shortest magnitude (one
+      zero octet for 0). The getters check the type, then (unsigned) the sign, then the size,
+      raising what OpenSSL raises (`ASN1_R_WRONG_INTEGER_TYPE`, `ILLEGAL_NEGATIVE_VALUE`,
+      `TOO_LARGE`, `TOO_SMALL`); `ASN1_INTEGER_get` gives -1 on failure and 0 for NULL;
+      `ASN1_ENUMERATED_get` gives `0xffffffff` past 8 octets.
+    - **`i2a_ASN1_INTEGER`** writes uppercase hex with a backslash and newline every 35
+      octets. **`a2i_ASN1_INTEGER`** is a port, quirks included: a leading `00` is dropped on
+      the first line only; on a continued line the character before the backslash is dropped
+      too, so `i2a`'s own continued output reads as an odd number of characters; it writes NULs
+      into the caller's buffer; it doesn't free the string's earlier data; the result is always
+      an INTEGER. **`d2i_ASN1_UINTEGER`** takes any class and drops one leading zero.
+    - **Deviation (`DEVIATIONS.md`):** NULL integers, outputs, and buffers.
+    - **Tests:**
+      - `tests/c/asn1_integer.c` (10 checks, with every value's octets, getter results, texts,
+        and errors printed), identical on both libraries;
+      - differential: `asnint`, `asnset`, and `a2iint` probe commands. They found two
+        orderings this needed: the unsigned getter refuses a negative value before checking
+        its size, and `00\` on the first line is an odd count (-1), not a short line. Both are
+        in the C test now; 120,000 sessions identical on macOS;
+      - an `a2i_integer` fuzz target (9 million runs): arbitrary text and buffer sizes, and
+        values round-tripped through `i2a_ASN1_INTEGER`.
+  - [x] **2.3c BIT STRING, OCTET STRING, BOOLEAN, NULL:** bits, unused bits and flags.
+
+    *Done:* 7 exports, now 526 of libcrypto's 5,876: `ASN1_BIT_STRING_set`/`set_bit`/
+    `get_bit`/`check`/`num_asc`/`set_asc`/`name_print` (`capi/src/asn1/bit_string.rs`). The
+    OCTET STRING functions came with 2.3a; BOOLEAN and NULL have only template functions
+    (`ASN1_NULL_new`/`free`, the `_it` items), which come with 2.4, as does the content
+    encoding of the unused-bits octet.
+    - **As in OpenSSL:** bit 0 is the first octet's most significant bit; setting a bit past
+      the end grows the string with zero octets (clearing one there does nothing); every change
+      drops trailing zero octets and the stored unused-bits count (`ASN1_STRING_FLAG_BITS_LEFT`
+      and its 3 bits), leaving the other flags; `ASN1_BIT_STRING_check` allows no bits past
+      the flags given; `name_print` writes the long names of the set bits after `%*s`
+      indentation (negative widths included).
+    - **Deviation (`DEVIATIONS.md`):** a negative length to `set_bit`; NULL flags to `check`;
+      NULL names to `num_asc`.
+    - **Tests:** `tests/c/asn1_bit_string.c` (17 checks, with the octets and flags after each
+      change printed), identical on both libraries; an `asnbit` probe command with random
+      octets, bits, values, and flags (80,000 sessions identical on macOS). Nothing here
+      parses input, so there's no fuzz target.
+  - [x] **2.3d Character strings:** `ASN1_mbstring_copy`/`ncopy`, `ASN1_STRING_TABLE`, the
     default mask, `ASN1_STRING_to_UTF8`, `ASN1_STRING_print_ex` (RFC 2253 flags),
     `ASN1_PRINTABLE_type`.
-  - [ ] **2.3e Times:** UTCTIME, GENERALIZEDTIME, and TIME (parse, compare, diff, print
+
+    *Done:* 19 exports, now 545 of libcrypto's 5,876: those, `ASN1_STRING_print_ex_fp`,
+    `ASN1_STRING_print`, `ASN1_UNIVERSALSTRING_to_string`, `UTF8_getc`/`UTF8_putc`,
+    `ASN1_tag2bit`, and `ASN1_tag2str` (brought forward from 2.5, as `print_ex` names types)
+    (`capi/src/asn1/text.rs`; the safe core is `rustyssl_asn1::text`). `X509_NAME_print_ex`
+    comes with X.509.
+    - **Conversions are ports of `ASN1_mbstring_ncopy`:** the same checks in the same order
+      (lengths, UTF-8 validity, `minsize`/`maxsize` with their `minsize=N` error data, the
+      character check per type), the same choice of type from the mask (other types in the
+      mask counting as UTF-8, an empty string keeping the mask as given), the same reuse of
+      `*out`, and a BMPString or UniversalString past `INT_MAX` octets refused before it is made.
+    - **`ASN1_STRING_print_ex` is a port of `do_print_ex`:** OpenSSL's `char_type` table,
+      computed from `charmap.pl`'s rules over the public flag constants; RFC 2253 escapes
+      (first and last characters too), quoting with `ESC_QUOTE`, `\XX` for control and
+      high characters, `\UXXXX` and `\WXXXXXXXX` for wide ones, type names, UTF-8 conversion,
+      and hex dumps. The output goes out in OpenSSL's writes, so a failing BIO stops at the
+      same point; no BIO only counts. Dumping DER (`ASN1_STRFLGS_DUMP_DER`, which RFC 2253 output
+      uses for unknown types) encodes the string as `i2d_ASN1_TYPE` would: BIT STRING and
+      INTEGER content converted (`rustyssl_asn1::text::bit_string_content`, `integer_content`,
+      ready for the template engine), SEQUENCE and SET as they are, types past 30 in high-tag
+      form.
+    - **The string table** is OpenSSL's built-in one (two bounds, `ub_serial_number` and
+      `ub_rfc822_mailbox`, are `tbl_standard.h`'s own, not in the public headers) and the
+      entries applications add, found first; lookups load the configuration first, as
+      OpenSSL's do.
+    - **Deviations (`DEVIATIONS.md`):** dumping the DER of a string typed BOOLEAN or OBJECT,
+      where OpenSSL reads the string as another structure and prints part of a heap address
+      (so the probe's generator leaves those two types out); NULL arguments.
+    - **Tests:**
+      - `tests/c/asn1_text.c` (17 checks, 250 printed lines: every conversion and printout
+        escaped, with errors and their data), identical on both libraries;
+      - differential: `asntext` (strings of many types, valid and malformed text, random
+        flag combinations, printed to a BIO and counted, and converted to UTF-8) and `asnmb`
+        (random forms, masks, and limits); 120,000 sessions identical on macOS;
+      - an `asn1_text` fuzz target (3.6 million runs): counts match output, and conversions
+        round-trip through UTF-8.
+  - [x] **2.3e Times:** UTCTIME, GENERALIZEDTIME, and TIME (parse, compare, diff, print
     formats), the `OPENSSL_gmtime*` family.
-  - [ ] **2.3f `ASN1_TYPE`:** `get`/`set`, `set1`, `cmp`, the `get_octetstring` and
+
+    *Done:* 27 exports, now 572 of libcrypto's 5,876 (`capi/src/asn1/time.rs`; the safe core
+    is `rustyssl_asn1::time`). `ASN1_TIME_new`/`free`/`dup` and the typed `_dup` functions are
+    built from templates and come with 2.4.
+    - **The parser is a port of `ossl_asn1_time_to_tm`:** the minimum lengths (so a UTCTIME
+      leaves out its seconds only before a `+hhmm` offset), field limits and days per month,
+      fractions in a GENERALIZEDTIME only, offsets up to 12 hours folded in only when a `tm` is
+      wanted (a check doesn't apply them), and the strict RFC 5280 form under
+      `ASN1_STRING_FLAG_X509_TIME`. The weekday and day of the year are computed before an
+      offset moves the date, as there.
+    - **The date arithmetic** (`OPENSSL_gmtime_adj`/`_diff`, Julian days) keeps C's `int` and
+      `long` arithmetic, wrapping where C would; results outside 1900 to 9999 fail.
+    - **Writing** goes into 20 octets as `BIO_snprintf` does, so a year too long to fit leaves
+      the string with length -1, as in OpenSSL. `ASN1_TIME_set_string_X509` copies the
+      `ASN1_STRING_FLAG_X509_TIME` flag into the result, as there.
+    - **Deviation (`DEVIATIONS.md`):** NULL arguments.
+    - **Tests:**
+      - `tests/c/asn1_time.c` (15 checks; parsed fields, normal forms, both printouts, X.509
+        conversions, and the arithmetic at fixed times printed, nothing clock-dependent but
+        relations), identical on both libraries;
+      - differential: `asntime` (text near the valid forms, strict or not) and `asntimet`
+        (times and offsets around the edges of both types and of 9999); 80,000 sessions
+        identical on macOS;
+      - an `asn1_time` fuzz target (15.6 million runs): valid times normalize to the same time,
+        and comparisons agree with differences.
+  - [x] **2.3f `ASN1_TYPE`:** `get`/`set`, `set1`, `cmp`, the `get_octetstring` and
     `get_int_octetstring` helpers.
+
+    *Done:* 6 exports, now 578 of libcrypto's 5,876: `ASN1_TYPE_get`/`set`/`set1`/`cmp`/
+    `set_octetstring`/`get_octetstring` (`capi/src/asn1/any.rs`). `ASN1_TYPE_new`/`free`,
+    `ASN1_TYPE_pack_sequence`/`unpack_sequence`, and the `int_octetstring` pair (which pack a
+    SEQUENCE through a template) come with 2.4.
+    - **As in OpenSSL:** `ASN1_TYPE_get` counts BOOLEAN and NULL as holding a value; setting
+      frees the old value as `ossl_asn1_primitive_free` does (objects with
+      `ASN1_OBJECT_free`, a nested ANY recursively, strings even if marked embedded, BOOLEAN
+      and NULL not at all); a BOOLEAN is 0xff or 0; `ASN1_TYPE_set1` copies objects and
+      strings (a built-in object stays shared); `ASN1_TYPE_cmp` gives -1 for NULL or different
+      types and compares BOOLEANs by subtraction.
+    - **Deviation (`DEVIATIONS.md`):** NULL `ASN1_TYPE`s.
+    - **Tests:** `tests/c/asn1_type.c` (22 checks), identical on both libraries. Nothing here
+      parses input, so there's no probe command or fuzz target.
+
+  *Step 2.3 done:* 121 exports over the six sub-steps, now 578 of libcrypto's 5,876.
 - [ ] **2.4 ASN1_ITEM template engine** (in `capi`; this is the most security-sensitive unsafe
   code):
   - interprets `ASN1_ITEM`, `ASN1_TEMPLATE`, and `ASN1_AUX` tables, including callbacks,
@@ -1174,7 +1297,7 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
 - [ ] **2.5 Utilities:**
   - `ASN1_parse_dump` (byte-exact `asn1parse` output)
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (the string → DER mini-language)
-  - the `i2a_*`/`a2i_*` helpers, `ASN1_tag2str`
+  - the `i2a_*`/`a2i_*` helpers (`ASN1_tag2str` came with 2.3d, and the INTEGER ones with 2.3b)
 - [ ] **2.6 Base64 and PEM framing:**
   - `EVP_Encode*`/`EVP_Decode*`, including the exact line-handling quirks, and
     `EVP_EncodeBlock`/`EVP_DecodeBlock`
