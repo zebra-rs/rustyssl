@@ -141,6 +141,28 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::string::ASN1_OCTET_STRING_set;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX) = crate::asn1::tpl::print::ASN1_PCTX_free;
+const _: unsafe extern "C" fn(*const ASN1_PCTX) -> core::ffi::c_ulong =
+    crate::asn1::tpl::print::ASN1_PCTX_get_cert_flags;
+const _: unsafe extern "C" fn(*const ASN1_PCTX) -> core::ffi::c_ulong =
+    crate::asn1::tpl::print::ASN1_PCTX_get_flags;
+const _: unsafe extern "C" fn(*const ASN1_PCTX) -> core::ffi::c_ulong =
+    crate::asn1::tpl::print::ASN1_PCTX_get_nm_flags;
+const _: unsafe extern "C" fn(*const ASN1_PCTX) -> core::ffi::c_ulong =
+    crate::asn1::tpl::print::ASN1_PCTX_get_oid_flags;
+const _: unsafe extern "C" fn(*const ASN1_PCTX) -> core::ffi::c_ulong =
+    crate::asn1::tpl::print::ASN1_PCTX_get_str_flags;
+const _: unsafe extern "C" fn() -> *mut ASN1_PCTX = crate::asn1::tpl::print::ASN1_PCTX_new;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX, core::ffi::c_ulong) =
+    crate::asn1::tpl::print::ASN1_PCTX_set_cert_flags;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX, core::ffi::c_ulong) =
+    crate::asn1::tpl::print::ASN1_PCTX_set_flags;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX, core::ffi::c_ulong) =
+    crate::asn1::tpl::print::ASN1_PCTX_set_nm_flags;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX, core::ffi::c_ulong) =
+    crate::asn1::tpl::print::ASN1_PCTX_set_oid_flags;
+const _: unsafe extern "C" fn(*mut ASN1_PCTX, core::ffi::c_ulong) =
+    crate::asn1::tpl::print::ASN1_PCTX_set_str_flags;
 const _: unsafe extern "C" fn(*mut ASN1_PRINTABLESTRING) =
     crate::asn1::string::ASN1_PRINTABLESTRING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
@@ -346,6 +368,12 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::asn1::tpl::items::ASN1_VISIBLESTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_VISIBLESTRING =
     crate::asn1::string::ASN1_VISIBLESTRING_new;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_uchar,
+    usize,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::hex::ASN1_buf_print;
 const _: unsafe extern "C" fn(*mut *mut core::ffi::c_uchar, core::ffi::c_long) -> core::ffi::c_int =
     crate::asn1::ASN1_check_infinite_end;
 const _: unsafe extern "C" fn(
@@ -482,6 +510,13 @@ const _: unsafe extern "C" fn(
     *const ASN1_ITEM,
     *mut *mut ASN1_OCTET_STRING,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::util::ASN1_item_pack;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const ASN1_VALUE,
+    core::ffi::c_int,
+    *const ASN1_ITEM,
+    *const ASN1_PCTX,
+) -> core::ffi::c_int = crate::asn1::tpl::print::ASN1_item_print;
 const _: unsafe extern "C" fn(*const ASN1_STRING, *const ASN1_ITEM) -> *mut core::ffi::c_void =
     crate::asn1::tpl::util::ASN1_item_unpack;
 const _: unsafe extern "C" fn(
@@ -511,6 +546,19 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::ASN1_object_size;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::parse::ASN1_parse;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::parse::ASN1_parse_dump;
 const _: unsafe extern "C" fn(*mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::asn1::ASN1_put_eoc;
 const _: unsafe extern "C" fn(
@@ -1920,6 +1968,12 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::integer::a2i_ASN1_INTEGER;
 const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut ASN1_STRING,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::hex::a2i_ASN1_STRING;
+const _: unsafe extern "C" fn(
     *mut *mut ASN1_BIT_STRING,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -2046,6 +2100,8 @@ const _: unsafe extern "C" fn(*mut BIO, *const ASN1_INTEGER) -> core::ffi::c_int
     crate::asn1::integer::i2a_ASN1_INTEGER;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_OBJECT) -> core::ffi::c_int =
     crate::objects::i2a_ASN1_OBJECT;
+const _: unsafe extern "C" fn(*mut BIO, *const ASN1_STRING, core::ffi::c_int) -> core::ffi::c_int =
+    crate::asn1::hex::i2a_ASN1_STRING;
 const _: unsafe extern "C" fn(
     *const ASN1_BIT_STRING,
     *mut *mut core::ffi::c_uchar,
@@ -2133,9 +2189,34 @@ const _: unsafe extern "C" fn(
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *const ASN1_ENUMERATED,
+) -> *mut core::ffi::c_char = crate::x509v3::i2s_ASN1_ENUMERATED;
+const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *const ASN1_ENUMERATED,
+) -> *mut core::ffi::c_char = crate::x509v3::i2s_ASN1_ENUMERATED_TABLE;
+const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *const ASN1_INTEGER,
+) -> *mut core::ffi::c_char = crate::x509v3::i2s_ASN1_INTEGER;
+const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *const ASN1_OCTET_STRING,
+) -> *mut core::ffi::c_char = crate::x509v3::i2s_ASN1_OCTET_STRING;
+const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     core::ffi::c_int,
     *const ASN1_OBJECT,
 ) -> core::ffi::c_int = crate::objects::i2t_ASN1_OBJECT;
+const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *const core::ffi::c_char,
+) -> *mut ASN1_INTEGER = crate::x509v3::s2i_ASN1_INTEGER;
+const _: unsafe extern "C" fn(
+    *mut X509V3_EXT_METHOD,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+) -> *mut ASN1_OCTET_STRING = crate::x509v3::s2i_ASN1_OCTET_STRING;
 const _: unsafe extern "C" fn() -> core::ffi::c_int =
     crate::err::strings::rustyssl_private_ERR_load_SSL_strings;

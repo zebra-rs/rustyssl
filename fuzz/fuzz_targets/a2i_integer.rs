@@ -1,4 +1,5 @@
-//! Fuzzes `a2i_ASN1_INTEGER`, which parses hex text from a BIO, through the C ABI: arbitrary
+//! Fuzzes `a2i_ASN1_INTEGER` and `a2i_ASN1_STRING`, which parse hex text from a BIO, through the
+//! C ABI: arbitrary
 //! text, with an arbitrary line buffer size, must never read or write outside the buffer (an
 //! exact-size allocation, so ASan catches it), and a value it parses that fits on one line of
 //! `i2a_ASN1_INTEGER` (35 octets) must parse back to the same octets from that line.
@@ -34,6 +35,7 @@ unsafe extern "C" {
     fn ASN1_INTEGER_new() -> *mut AsnString;
     fn ASN1_INTEGER_free(a: *mut AsnString);
     fn a2i_ASN1_INTEGER(bp: *mut Bio, bs: *mut AsnString, buf: *mut c_char, size: c_int) -> c_int;
+    fn a2i_ASN1_STRING(bp: *mut Bio, bs: *mut AsnString, buf: *mut c_char, size: c_int) -> c_int;
     fn i2a_ASN1_INTEGER(bp: *mut Bio, a: *const AsnString) -> c_int;
     fn ERR_clear_error();
 }
@@ -43,6 +45,14 @@ const BIO_CTRL_INFO: c_int = 3;
 
 /// Parses `text` with a line buffer of `size` octets; the octets on success.
 fn parse(text: &[u8], size: usize) -> Option<Vec<u8>> {
+    parse_with(text, size, a2i_ASN1_INTEGER)
+}
+
+/// The function `parse` uses.
+type A2i = unsafe extern "C" fn(*mut Bio, *mut AsnString, *mut c_char, c_int) -> c_int;
+
+/// `parse` with `a2i`.
+fn parse_with(text: &[u8], size: usize, a2i: A2i) -> Option<Vec<u8>> {
     // SAFETY: the memory method; the BIO is freed below.
     let bio = unsafe { BIO_new(BIO_s_mem()) };
     // SAFETY: `text` holds its length.
@@ -52,7 +62,7 @@ fn parse(text: &[u8], size: usize) -> Option<Vec<u8>> {
     // At least one octet: BIO_gets writes a NUL even for size 0, in OpenSSL too.
     let mut buf = vec![0u8; size.max(1)].into_boxed_slice();
     // SAFETY: `buf` holds `size` octets.
-    let ok = unsafe { a2i_ASN1_INTEGER(bio, a, buf.as_mut_ptr().cast(), c_int::try_from(size).unwrap()) };
+    let ok = unsafe { a2i(bio, a, buf.as_mut_ptr().cast(), c_int::try_from(size).unwrap()) };
     // SAFETY: a live string.
     let result = (ok == 1).then(|| unsafe {
         let s = &*a;
@@ -70,6 +80,8 @@ fuzz_target!(|input: &[u8]| {
     let Some((&size, text)) = input.split_first() else {
         return;
     };
+    // a2i_ASN1_STRING reads the same lines, cut differently; it must stay within them too.
+    let _ = parse_with(text, usize::from(size), a2i_ASN1_STRING);
     let Some(octets) = parse(text, usize::from(size)) else {
         // SAFETY: no preconditions.
         unsafe { ERR_clear_error() };

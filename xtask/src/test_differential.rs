@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(15) {
+        match random.below(16) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -162,6 +162,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             10 => text_session(&mut random, &mut out)?,
             11 => time_session(&mut random, &mut out)?,
             12 => any_session(&mut random, &mut out)?,
+            14 => s2i_session(&mut random, &mut out)?,
             13 => d2i_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
@@ -476,7 +477,8 @@ fn int_session(random: &mut Random, out: &mut String) -> Result {
                     text.push_str(random.pick(&["\n", "\r\n", "", "\n"]));
                 }
                 let size = random.pick(&["300", "300", "8", "3", "1", "0"]);
-                writeln!(out, "a2iint {size} {}", hex(text.as_bytes()))?;
+                let command = random.pick(&["a2iint", "a2istr"]);
+                writeln!(out, "{command} {size} {}", hex(text.as_bytes()))?;
             }
         }
     }
@@ -622,7 +624,7 @@ fn any_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
-/// A random session of `asnd2i` and `asnbio` commands: BER near what each item takes (nested TLVs of its
+/// A random session of `asnd2i`, `asnbio`, and `asnparse` commands: BER near what each item takes (nested TLVs of its
 /// types and others, indefinite lengths, constructed strings, end-of-contents octets, lengths a
 /// little off, and cut short), decoded with one of the probe's items.
 fn d2i_session(random: &mut Random, out: &mut String) -> Result {
@@ -650,7 +652,11 @@ fn d2i_session(random: &mut Random, out: &mut String) -> Result {
         } else {
             der.iter().map(|b| format!("{b:02x}")).collect()
         };
-        if stream {
+        if random.below(4) == 0 {
+            let indent = random.below(2);
+            let dump = random.pick(&["-2", "-1", "0", "4", "16"]);
+            writeln!(out, "asnparse {indent} {dump} {hex}")?;
+        } else if stream {
             writeln!(out, "asnbio {hex}")?;
         } else {
             writeln!(out, "asnd2i {item} {hex}")?;
@@ -733,6 +739,52 @@ fn ber_value(random: &mut Random, out: &mut Vec<u8>, item: u64, depth: u32) {
         }
         out.extend(&content);
     }
+}
+
+/// A random session of `asns2i` commands: numbers in decimal and hex around 128 bits (where
+/// printing turns to hex), with signs in both places `s2i_ASN1_INTEGER` takes them, leading
+/// zeros, and stray characters.
+fn s2i_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(6) + 1 {
+        let mut text = String::new();
+        if random.below(3) == 0 {
+            text.push('-');
+        }
+        let hex = random.below(2) == 0;
+        if hex {
+            text.push_str(random.pick(&["0x", "0X"]));
+        }
+        if random.below(6) == 0 {
+            text.push('-');
+        }
+        let digits = match random.below(4) {
+            0 => random.below(4),
+            1 => random.below(20),
+            2 => {
+                if hex {
+                    30 + random.below(5)
+                } else {
+                    37 + random.below(4)
+                }
+            }
+            _ => random.below(80),
+        };
+        if random.below(4) == 0 {
+            text.push_str("000");
+        }
+        for _ in 0..digits {
+            let d = random.below(if hex { 16 } else { 10 });
+            text.push(char::from_digit(u32::try_from(d).unwrap_or(0), 16).unwrap_or('0'));
+        }
+        if random.below(10) == 0 {
+            text.push_str(random.pick(&["g", "_", "-", "x"]));
+        }
+        if text.is_empty() {
+            text.push('-');
+        }
+        writeln!(out, "asns2i {text}")?;
+    }
+    Ok(())
 }
 
 /// A random session of time commands: UTCTime and GeneralizedTime text near the valid forms
@@ -1330,6 +1382,8 @@ mod tests {
             "\nasnany",
             "\nasnd2i",
             "\nasnbio",
+            "\nasnparse",
+            "\nasns2i",
         ] {
             assert!(first.contains(start), "no session starting {start:?}");
         }

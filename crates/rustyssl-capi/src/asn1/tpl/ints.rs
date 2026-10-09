@@ -3,20 +3,21 @@
 //! their `Z` variants), and `LONG` and `ZLONG` keep a `long` in the slot itself (left out when it
 //! equals the item's size: `ASN1_LONG_UNDEF` or 0). Their item sizes are flags, not sizes.
 //!
-//! Printing comes with `ASN1_item_print`.
+//! Each prints its number in decimal for `ASN1_item_print`.
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ASN1_ITEM, ASN1_ITYPE_PRIMITIVE, ASN1_LONG_UNDEF, ASN1_PRIMITIVE_FUNCS,
+    ASN1_ITEM, ASN1_ITYPE_PRIMITIVE, ASN1_LONG_UNDEF, ASN1_PCTX, ASN1_PRIMITIVE_FUNCS,
     ASN1_R_ILLEGAL_NEGATIVE_VALUE, ASN1_R_ILLEGAL_PADDING, ASN1_R_INTEGER_TOO_LARGE_FOR_LONG,
-    ASN1_R_TOO_LARGE, ASN1_R_TOO_SMALL, ASN1_VALUE, ERR_LIB_ASN1, V_ASN1_INTEGER,
+    ASN1_R_TOO_LARGE, ASN1_R_TOO_SMALL, ASN1_VALUE, BIO, ERR_LIB_ASN1, V_ASN1_INTEGER,
 };
 use rustyssl_asn1::content::{self, IntegerError};
 use rustyssl_asn1::text::integer_content;
 
 use super::{Item, PrimitiveFuncs, Pval, item, item_fns};
+use crate::bio::print::BIO_printf;
 use crate::err;
 use crate::ffi::ffi_callback;
 use crate::mem;
@@ -442,6 +443,67 @@ ffi_callback! {
     }
 }
 
+ffi_callback! {
+    /// `uint64_print`: the number, signed or not, and a newline.
+    ///
+    /// # Safety
+    /// `out` is NULL or a live BIO; `pval` holds a number of 8 octets; `it` is a live item.
+    pub(crate) unsafe extern "C" fn uint64_print(out: *mut BIO, pval: *mut *const ASN1_VALUE, it: *const ASN1_ITEM, _indent: c_int, _pctx: *const ASN1_PCTX) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        let number = unsafe { pval.read() };
+        // SAFETY: as above.
+        let value = unsafe { number.cast::<u64>().read_unaligned() };
+        // SAFETY: as above.
+        if unsafe { size(it) } & FLAG_SIGNED != 0 {
+            // SAFETY: the caller's BIO; the format takes an intmax_t.
+            unsafe { BIO_printf(out, c"%jd\n".as_ptr(), value.cast_signed()) }
+        } else {
+            // SAFETY: as above; a uintmax_t.
+            unsafe { BIO_printf(out, c"%ju\n".as_ptr(), value) }
+        }
+    }
+}
+
+ffi_callback! {
+    /// `uint32_print`: the number, signed or not, and a newline.
+    ///
+    /// # Safety
+    /// `out` is NULL or a live BIO; `pval` holds a number of 4 octets; `it` is a live item.
+    pub(crate) unsafe extern "C" fn uint32_print(out: *mut BIO, pval: *mut *const ASN1_VALUE, it: *const ASN1_ITEM, _indent: c_int, _pctx: *const ASN1_PCTX) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        let number = unsafe { pval.read() };
+        // SAFETY: as above.
+        let value = unsafe { number.cast::<u32>().read_unaligned() };
+        // SAFETY: as above.
+        if unsafe { size(it) } & FLAG_SIGNED != 0 {
+            // SAFETY: the caller's BIO; the format takes an int.
+            unsafe { BIO_printf(out, c"%d\n".as_ptr(), value.cast_signed()) }
+        } else {
+            // SAFETY: as above; an unsigned int.
+            unsafe { BIO_printf(out, c"%u\n".as_ptr(), value) }
+        }
+    }
+}
+
+ffi_callback! {
+    /// `long_print`: the `long` in the slot and a newline.
+    ///
+    /// # Safety
+    /// `out` is NULL or a live BIO; `pval` is a slot holding a `long`.
+    pub(crate) unsafe extern "C" fn long_print(out: *mut BIO, pval: *mut *const ASN1_VALUE, _it: *const ASN1_ITEM, _indent: c_int, _pctx: *const ASN1_PCTX) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        let value = unsafe { pval.cast::<c_long>().read_unaligned() };
+        // SAFETY: the caller's BIO; the format takes a long.
+        unsafe { BIO_printf(out, c"%ld\n".as_ptr(), value) }
+    }
+}
+
 /// `uint32_pf`.
 static UINT32_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     app_data: ptr::null_mut(),
@@ -451,7 +513,7 @@ static UINT32_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_clear: Some(uint32_clear),
     prim_c2i: Some(uint32_c2i),
     prim_i2c: Some(uint32_i2c),
-    prim_print: None,
+    prim_print: Some(uint32_print),
 });
 
 /// `uint64_pf`.
@@ -463,7 +525,7 @@ static UINT64_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_clear: Some(uint64_clear),
     prim_c2i: Some(uint64_c2i),
     prim_i2c: Some(uint64_i2c),
-    prim_print: None,
+    prim_print: Some(uint64_print),
 });
 
 /// `long_pf`: clearing sets the initial value, as freeing does.
@@ -475,7 +537,7 @@ static LONG_PF: PrimitiveFuncs = PrimitiveFuncs(ASN1_PRIMITIVE_FUNCS {
     prim_clear: Some(long_set),
     prim_c2i: Some(long_c2i),
     prim_i2c: Some(long_i2c),
-    prim_print: None,
+    prim_print: Some(long_print),
 });
 
 /// An INTEGER item with functions `pf` and flags (or default) `size`.

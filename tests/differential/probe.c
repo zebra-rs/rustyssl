@@ -94,6 +94,7 @@
  *                              ENUMERATED getters, i2a_ASN1_INTEGER, and the errors
  *   asnset <value>             ASN1_INTEGER_set_int64 and the octets stored
  *   a2iint <size> <hex>        a2i_ASN1_INTEGER on the text (in hex) with a buffer of <size>
+ *   a2istr <size> <hex>        the same with a2i_ASN1_STRING, then i2a_ASN1_STRING of the result
  *                              (at most 300)
  *   asnbit <hex> <n> <value> <flags-hex>   a BIT STRING of those octets: ASN1_BIT_STRING_set_bit
  *                              of bit <n>, the octets after, get_bit around <n>, and
@@ -121,9 +122,14 @@
  *                              2 SET_ANY, 3 OCTET_STRING, 4 INTEGER, 5 BIT_STRING, 6 BMPSTRING,
  *                              7 TIME, 8 DIRECTORYSTRING, 9 INT64, 10 UINT32, 11 the probe's
  *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING): how much was read
- *                              and the re-encoding, or the errors with their data
+ *                              and the re-encoding and ASN1_item_print listing, or the errors with
+ *                              their data
  *   asnbio <hex>               ASN1_item_d2i_bio (as ANY) from a memory BIO over the octets until
  *                              a read fails: each element's re-encoding, then the errors
+ *   asnparse <indent> <dump> <hex>   ASN1_parse_dump of the octets (dump -2: ASN1_parse) to a
+ *                              memory BIO: the return, the listing (escaped), and the errors
+ *   asns2i <text>              s2i_ASN1_INTEGER of the text (`-` for none, `_` for a space), then
+ *                              i2s_ASN1_INTEGER and the octets of what it made, and the errors
  *   tracestr <text> <full> <hex>   OSSL_trace_string to a memory BIO (`-` for no data), printing
  *                              the return and what it wrote; never full and masked past
  *                              OSSL_TRACE_STRING_MAX, where OpenSSL overflows its buffer
@@ -154,6 +160,7 @@
 #include <openssl/objects.h>
 #include <openssl/stack.h>
 #include <openssl/trace.h>
+#include <openssl/x509v3.h>
 
 static BUF_MEM *buffer = NULL;
 
@@ -887,7 +894,7 @@ static int int_command(const char *command, const char *line)
         ASN1_INTEGER_free(a);
         return 1;
     }
-    if (strcmp(command, "asnint") != 0 && strcmp(command, "a2iint") != 0)
+    if (strcmp(command, "asnint") != 0 && strcmp(command, "a2iint") != 0 && strcmp(command, "a2istr") != 0)
         return 0;
     sscanf(line, "%*s %d %699s", &number, hex);
     if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
@@ -923,11 +930,21 @@ static int int_command(const char *command, const char *line)
             number = 300;
         BIO_write(in, data, (int)len);
         memset(buf, 'x', sizeof(buf));
-        r = a2i_ASN1_INTEGER(in, a, buf, number);
-        printf("a2iint %d type=%d", r, a->type);
+        r = strcmp(command, "a2istr") == 0 ? a2i_ASN1_STRING(in, a, buf, number) : a2i_ASN1_INTEGER(in, a, buf, number);
+        printf("%s %d type=%d", command, r, a->type);
         print_hex("", a->data, (size_t)a->length);
-        print_escaped("a2iint buf", 0, buf, number > 0 ? (size_t)number : 0);
-        printf("a2iint");
+        print_escaped(" buf", 0, buf, number > 0 ? (size_t)number : 0);
+        if (r == 1 && strcmp(command, "a2istr") == 0) {
+            BIO *mem = BIO_new(BIO_s_mem());
+            char *out;
+            long n;
+
+            r = i2a_ASN1_STRING(mem, a, V_ASN1_OCTET_STRING);
+            n = BIO_get_mem_data(mem, &out);
+            print_escaped(" i2a", r, out, (size_t)n);
+            BIO_free(mem);
+        }
+        printf("%s", command);
         print_asn_errors();
         ASN1_INTEGER_free(a);
         BIO_free(in);
@@ -1113,6 +1130,61 @@ static const ASN1_ITEM *probe_item(int n)
 /* Runs a template engine command; returns 0 if `command` isn't one. */
 static int template_command(const char *command, const char *line)
 {
+    if (strcmp(command, "asns2i") == 0) {
+        char text[300] = "";
+        ASN1_INTEGER *a;
+        char *s;
+        unsigned long code;
+        int i;
+
+        sscanf(line, "%*s %299s", text);
+        if (strcmp(text, "-") == 0)
+            text[0] = '\0';
+        for (i = 0; text[i] != '\0'; i++)
+            if (text[i] == '_')
+                text[i] = ' ';
+        a = s2i_ASN1_INTEGER(NULL, text);
+        if (a != NULL) {
+            s = i2s_ASN1_INTEGER(NULL, a);
+            printf("asns2i %s type=%d", s != NULL ? s : "NULL", a->type);
+            print_hex("", a->data, (size_t)a->length);
+            OPENSSL_free(s);
+            ASN1_INTEGER_free(a);
+        } else {
+            printf("asns2i NULL\n");
+        }
+        printf("asns2i errors:");
+        while ((code = ERR_get_error()) != 0)
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        printf("\n");
+        return 1;
+    }
+    if (strcmp(command, "asnparse") == 0) {
+        char hex[700] = "-";
+        unsigned char data[300];
+        size_t len = 0;
+        int indent = 0, dump = 0, r;
+        BIO *mem = BIO_new(BIO_s_mem());
+        char *out;
+        long outlen;
+        unsigned long code;
+
+        sscanf(line, "%*s %d %d %699s", &indent, &dump, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+            printf("asnparse bad hex\n");
+            BIO_free(mem);
+            return 1;
+        }
+        r = dump < -1 ? ASN1_parse(mem, data, (long)len, indent) : ASN1_parse_dump(mem, data, (long)len, indent, dump);
+        outlen = BIO_get_mem_data(mem, &out);
+        print_escaped("asnparse", r, out, (size_t)outlen);
+        printf("asnparse errors:");
+        while ((code = ERR_get_error()) != 0)
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        printf("\n");
+        BIO_free(mem);
+        return 1;
+    }
     if (strcmp(command, "asnbio") == 0) {
         char hex[700] = "-";
         unsigned char data[300], *der;
@@ -1172,10 +1244,19 @@ static int template_command(const char *command, const char *line)
         if (v != NULL) {
             int dlen = ASN1_item_i2d(v, &der, it);
 
+            BIO *mem = BIO_new(BIO_s_mem());
+            char *text;
+            long tlen;
+            int r;
+
             printf("asnd2i ok used=%ld der=%d:", (long)(q - data), dlen);
             for (i = 0; i < dlen; i++)
                 printf("%02x", der[i]);
             OPENSSL_free(der);
+            r = ASN1_item_print(mem, v, 2, it, NULL);
+            tlen = BIO_get_mem_data(mem, &text);
+            print_escaped(" print", r, text, (size_t)tlen);
+            BIO_free(mem);
             ASN1_item_free(v, it);
         } else {
             printf("asnd2i fail used=%ld", (long)(q - data));
