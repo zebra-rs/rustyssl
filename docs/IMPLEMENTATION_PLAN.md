@@ -1318,8 +1318,8 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
       stack could differ, and equal elements encode identically.
     - The universal items' sizes are OpenSSL's: 0 for `IMPLEMENT_ASN1_TYPE` items (not the
       struct size), `sizeof(ASN1_STRING)` for MSTRINGs, flags for `INTxx` and the default for
-      `LONG`. `INTxx` and `LONG` get `c2i` and `print` with 2.4b and 2.4c; until then their
-      tables have no such functions.
+      `LONG`. `INTxx` and `LONG` get `c2i` with 2.4b and `print` with 2.5 (it moved there
+      with `ASN1_item_print`); until then their tables have no such functions.
     - The ENCODING cache is read and freed here but only filled by decoding (2.4b).
 
     Tests: `tests/c/asn1_template.c` defines application types with the `asn1t.h` macros
@@ -1327,14 +1327,65 @@ BIO fuzzers run clean (the base64 fuzzer comes with the codec, step 2.5).
     BY, a reference count, an NDEF SEQUENCE, a traced aux callback) and compares encodings and
     callback traces; the probe's `asnany` encodes random SEQUENCE OF and SET OF ANY. Encoding
     parses no input, so there's no fuzz target yet; decoding gets one.
-  - [ ] **2.4b Decoding:** `ASN1_item_d2i`/`d2i_ex`/`ex_d2i` (tag checks, indefinite-length
+  - [x] **2.4b Decoding:** `ASN1_item_d2i`/`d2i_ex`/`ex_d2i` (tag checks, indefinite-length
     collection, OPTIONAL and DEFAULT, CHOICE, ADB, the depth limit, the ENCODING cache) and the
     universal types' `d2i_` functions, fuzzed hard.
-  - [ ] **2.4c The rest of the item API:** `ASN1_item_dup`, `ASN1_item_pack`/`unpack`, the BIO
+
+    *Done:* 25 exports (`ASN1_item_d2i`, `_d2i_ex`, `_ex_d2i`, and the universal `d2i_`
+    functions), in `capi/src/asn1/tpl/decode.rs`, a port of `tasn_dec.c` in OpenSSL's order:
+    the same callbacks, the same error queue (reasons and the `Field=, Type=` data), the same
+    nesting limits (30 constructed levels, 5 for constructed strings). Decisions:
+    - The caller's pointer and length become one slice at the boundary, and every read is
+      bounded by it. An extern item's function gets a pointer into it, as in C; one that moves
+      past its input is refused (docs/DEVIATIONS.md).
+    - The header cache (`ASN1_TLC`) is kept as OpenSSL keeps it, because which errors bad
+      input raises depends on it. Its layout is OpenSSL's private one; applications only pass on
+      the pointer they were given. A cached header is used only where it fits the input.
+    - Content parsing that needs no C structures (INTEGER and BIT STRING content, end-of-contents
+      octets) is in `rustyssl_asn1::content`.
+    - Collected constructed strings go into a `CRYPTO_malloc` block a string takes over (or an
+      item's `c2i` may), as OpenSSL's `BUF_MEM` does.
+    - `INTxx`/`LONG` items got their `c2i` functions; their `print` comes with 2.5.
+
+    Tests: `tests/c/asn1_d2i.c` (84 checks) decodes DER and BER with the universal items and
+    with application types (optional, tagged, SET OF, CHOICE, ADB, the ENCODING cache, traced
+    callbacks, nesting), malformed input included, and compares the error queues. The probe's
+    `asnd2i` decodes random BER with 14 items (one an application type with a CHOICE, ADB, and
+    itself), comparing results and errors with the reference. The `asn1_d2i` fuzz target decodes
+    arbitrary input with those items, re-encodes what decodes, and checks the encoding is
+    stable. The fuzzer showed OpenSSL can write what it can't read back (an ANY of universal tag
+    0 encodes as `00 00`, an end-of-contents); rustyssl does the same.
+  - [x] **2.4c The rest of the item API:** `ASN1_item_dup`, `ASN1_item_pack`/`unpack`, the BIO
     and FILE variants, the universal `_dup` functions, `ASN1_TYPE_pack_sequence`/
     `unpack_sequence`, and the `int_octetstring` pair.
+
+    *Done:* 23 exports, in `capi/src/asn1/tpl/util.rs` and `io.rs`: `ASN1_item_dup` and
+    `ASN1_dup`, the three time `_dup`s, `ASN1_item_pack`/`unpack`/`unpack_ex`,
+    `ASN1_TYPE_pack_sequence`/`unpack_sequence`, `ASN1_TYPE_set_int_octetstring`/`get`, and
+    the BIO and FILE functions (`ASN1_item_d2i_bio`/`_ex`/`_fp`/`_fp_ex`,
+    `ASN1_item_i2d_bio`/`_fp`/`_mem_bio`, `ASN1_d2i_bio`/`_fp`, `ASN1_i2d_bio`/`_fp`).
+    Decisions:
+    - `ASN1_item_print` and `ASN1_PCTX` moved to 2.5: printing a SEQUENCE, SET, or
+      non-universal ANY needs `ASN1_parse_dump`, and INTEGERs print through the decimal
+      conversion of `i2s_ASN1_INTEGER`.
+    - `asn1_d2i_read_bio` is ported over a real `BUF_MEM`, so its growth and errors are
+      OpenSSL's, with every look at the buffer bounded by its length: header octets not read
+      yet count as the zeros the buffer was grown with, as they are in C. A clean end of input
+      before an element queues no error, so loops over concatenated elements end quietly.
+    - `ASN1_TYPE_set_int_octetstring(NULL, ...)` frees the `ASN1_TYPE` it makes, which OpenSSL
+      leaks.
+
+    Tests: `tests/c/asn1_item_io.c` (62 checks): dup with callback traces (`DUP_PRE`, the
+    library-context queries, `DUP_POST` with the original), packing, the int/octet pair, and
+    reading streams of DER and BER through a memory BIO and through one giving an octet per
+    read (high tag numbers, long lengths, 40,000-octet content read in chunks, truncation,
+    impossible lengths), and FILE round trips. The probe's `asnbio` reads random element
+    streams through a BIO, and the `asn1_d2i_bio` fuzz target checks each element read from a
+    BIO decodes the same in place.
 - [ ] **2.5 Utilities:**
   - `ASN1_parse_dump` (byte-exact `asn1parse` output)
+  - `ASN1_item_print` and the `ASN1_PCTX` functions (moved from 2.4c), with the `INTxx`/`LONG`
+    items' `print`
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (the string → DER mini-language)
   - the `i2a_*`/`a2i_*` helpers (`ASN1_tag2str` came with 2.3d, and the INTEGER ones with 2.3b)
 - [ ] **2.6 Base64 and PEM framing:**

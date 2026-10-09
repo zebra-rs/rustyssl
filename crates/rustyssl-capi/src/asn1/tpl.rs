@@ -14,11 +14,14 @@
 //! `tasn_typ.c`), and [`ints`] (the `INT32`..`ZUINT64` and `LONG` items, `x_int64.c` and
 //! `x_long.c`).
 
+pub(crate) mod decode;
 pub(crate) mod encode;
 pub(crate) mod free;
 pub(crate) mod ints;
+pub(crate) mod io;
 pub(crate) mod items;
 pub(crate) mod new;
+pub(crate) mod util;
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
 use core::ptr;
@@ -122,6 +125,32 @@ pub(crate) const fn template(
         field_name: field_name.as_ptr(),
         item: Some(item),
     })
+}
+
+/// A template at `offset` in its structure, as `ASN1_EX_TYPE(flags, tag, stname, field, type)`.
+pub(crate) const fn template_at(
+    flags: c_int,
+    tag: c_long,
+    offset: usize,
+    field_name: &'static CStr,
+    item: unsafe extern "C" fn() -> *const ASN1_ITEM,
+) -> ASN1_TEMPLATE {
+    ASN1_TEMPLATE {
+        flags: flags.cast_unsigned() as c_ulong,
+        tag,
+        offset: offset as c_ulong,
+        field_name: field_name.as_ptr(),
+        item: Some(item),
+    }
+}
+
+/// A C string's bytes, or `None` for NULL.
+///
+/// # Safety
+/// `s` is NULL or a string.
+pub(crate) unsafe fn cstr_bytes<'a>(s: *const c_char) -> Option<&'a [u8]> {
+    // SAFETY: the caller's guarantee.
+    (!s.is_null()).then(|| unsafe { CStr::from_ptr(s) }.to_bytes())
 }
 
 /// A value's slot, as the engine passes it: `ASN1_VALUE **`. For an embedded field or a BOOLEAN
@@ -365,6 +394,37 @@ pub(crate) unsafe fn enc_free(pval: Pval, it: *const ASN1_ITEM) {
             })
         };
     }
+}
+
+/// `ossl_asn1_enc_save`: keeps a copy of the encoding a SEQUENCE was decoded from. Returns 1,
+/// or 0 for an empty encoding or no memory.
+///
+/// # Safety
+/// As for [`enc_ptr`].
+pub(crate) unsafe fn enc_save(pval: Pval, encoding: &[u8], it: *const ASN1_ITEM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let enc = unsafe { enc_ptr(pval, it) };
+    if enc.is_null() {
+        return 1;
+    }
+    // SAFETY: a live cache.
+    let cache = unsafe { &mut *enc };
+    // SAFETY: its encoding came from this allocator.
+    unsafe { mem::release(cache.enc.cast()) };
+    cache.enc = ptr::null_mut();
+    if encoding.is_empty() {
+        return 0;
+    }
+    let copy: *mut u8 = mem::alloc(encoding.len()).cast();
+    if copy.is_null() {
+        return 0;
+    }
+    // SAFETY: a new block of the encoding's size.
+    unsafe { ptr::copy_nonoverlapping(encoding.as_ptr(), copy, encoding.len()) };
+    cache.enc = copy;
+    cache.len = c_long::try_from(encoding.len()).unwrap_or(c_long::MAX);
+    cache.modified = 0;
+    1
 }
 
 /// `ossl_asn1_do_adb`: the template a field uses, through its ANY DEFINED BY table if it has one

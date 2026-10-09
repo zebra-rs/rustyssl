@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 658 | 5218 | 11.2% |
+| libcrypto | 5876 | 706 | 5170 | 12.0% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **659** | **5820** | **10.2%** |
+| **Total** | **6479** | **707** | **5772** | **10.9%** |
 
 ## By header
 
@@ -25,8 +25,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
 | `openssl/aes.h` | libcrypto | 15 | 0 | 0.0% |
-| `openssl/asn1.h` | libcrypto | 291 | 195 | 67.0% |
-| `openssl/asn1t.h` | libcrypto | 20 | 17 | 85.0% |
+| `openssl/asn1.h` | libcrypto | 291 | 242 | 83.2% |
+| `openssl/asn1t.h` | libcrypto | 20 | 18 | 90.0% |
 | `openssl/async.h` | libcrypto | 22 | 0 | 0.0% |
 | `openssl/bio.h` | libcrypto | 184 | 176 | 95.7% |
 | `openssl/blowfish.h` | libcrypto | 8 | 0 | 0.0% |
@@ -104,87 +104,88 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 
 | Export | Library | Header | Called by |
 |---|---|---|---|
-| `ASN1_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
 | `ASN1_BIT_STRING_check` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
-| `ASN1_BIT_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_string`, `asn1_template` |
-| `ASN1_BIT_STRING_get_bit` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
-| `ASN1_BIT_STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_BIT_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_string`, `asn1_template` |
+| `ASN1_BIT_STRING_get_bit` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_d2i` |
+| `ASN1_BIT_STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_BIT_STRING_name_print` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
 | `ASN1_BIT_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_string`, `asn1_template` |
 | `ASN1_BIT_STRING_num_asc` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
 | `ASN1_BIT_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
 | `ASN1_BIT_STRING_set_asc` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
 | `ASN1_BIT_STRING_set_bit` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_template` |
-| `ASN1_BMPSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_BMPSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_BMPSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
+| `ASN1_BMPSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_BMPSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_BOOLEAN_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `ASN1_ENUMERATED_free` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string` |
-| `ASN1_ENUMERATED_get` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
+| `ASN1_ENUMERATED_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_string` |
+| `ASN1_ENUMERATED_get` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer` |
 | `ASN1_ENUMERATED_get_int64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_ENUMERATED_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_ENUMERATED_new` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string` |
 | `ASN1_ENUMERATED_set` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_ENUMERATED_set_int64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
-| `ASN1_FBOOLEAN_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `ASN1_FBOOLEAN_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_GENERALIZEDTIME_adj` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_GENERALIZEDTIME_check` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_GENERALIZEDTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_GENERALIZEDTIME_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_GENERALIZEDTIME_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_GENERALIZEDTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_string` |
+| `ASN1_GENERALIZEDTIME_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_GENERALIZEDTIME_new` | libcrypto | `openssl/asn1.h` | `asn1_string`, `asn1_time` |
 | `ASN1_GENERALIZEDTIME_print` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_GENERALIZEDTIME_set` | libcrypto | `openssl/asn1.h` | `asn1_time` |
+| `ASN1_GENERALIZEDTIME_set` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_time` |
 | `ASN1_GENERALIZEDTIME_set_string` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_GENERALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_GENERALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_GENERALSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_GENERALSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_IA5STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_IA5STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_IA5STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_IA5STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
+| `ASN1_IA5STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
+| `ASN1_IA5STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_INTEGER_cmp` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_INTEGER_dup` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
-| `ASN1_INTEGER_free` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string`, `asn1_template` |
-| `ASN1_INTEGER_get` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_template` |
+| `ASN1_INTEGER_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_item_io`, `asn1_string`, `asn1_template` |
+| `ASN1_INTEGER_get` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_item_io`, `asn1_template` |
 | `ASN1_INTEGER_get_int64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_INTEGER_get_uint64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
-| `ASN1_INTEGER_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_INTEGER_new` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string`, `asn1_template` |
-| `ASN1_INTEGER_set` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_template` |
+| `ASN1_INTEGER_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
+| `ASN1_INTEGER_new` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_item_io`, `asn1_string`, `asn1_template` |
+| `ASN1_INTEGER_set` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_item_io`, `asn1_template` |
 | `ASN1_INTEGER_set_int64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_INTEGER_set_uint64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
-| `ASN1_NULL_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_NULL_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_NULL_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
+| `ASN1_NULL_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_NULL_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_OBJECT_create` | libcrypto | `openssl/asn1.h` | `asn1_header`, `objects` |
 | `ASN1_OBJECT_free` | libcrypto | `openssl/asn1.h` | `asn1_header`, `asn1_type`, `objects` |
-| `ASN1_OBJECT_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_OBJECT_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_OBJECT_new` | libcrypto | `openssl/asn1.h` | `objects` |
 | `ASN1_OCTET_STRING_NDEF_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_OCTET_STRING_cmp` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_OCTET_STRING_dup` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_OCTET_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_OCTET_STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_OCTET_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_OCTET_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_string` |
+| `ASN1_OCTET_STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
+| `ASN1_OCTET_STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_string` |
 | `ASN1_OCTET_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_PRINTABLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_PRINTABLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_PRINTABLESTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_PRINTABLESTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_PRINTABLE_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_PRINTABLE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_PRINTABLE_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_PRINTABLE_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_PRINTABLE_type` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_SEQUENCE_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_SEQUENCE_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `ASN1_SEQUENCE_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_SET_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_STRING_TABLE_add` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_TABLE_cleanup` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_TABLE_get` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_clear_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_STRING_cmp` | libcrypto | `openssl/asn1.h` | `asn1_string`, `asn1_type` |
+| `ASN1_STRING_cmp` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_string`, `asn1_type` |
 | `ASN1_STRING_copy` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_STRING_data` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_STRING_dup` | libcrypto | `openssl/asn1.h` | `asn1_string`, `asn1_time` |
-| `ASN1_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type` |
+| `ASN1_STRING_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_string`, `asn1_time` |
+| `ASN1_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_item_io`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type` |
 | `ASN1_STRING_get0_data` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_STRING_get_default_mask` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_length` | libcrypto | `openssl/asn1.h` | `asn1_string` |
@@ -193,7 +194,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_STRING_print` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_print_ex` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_print_ex_fp` | libcrypto | `openssl/asn1.h` | `asn1_text` |
-| `ASN1_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type` |
+| `ASN1_STRING_set` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_integer`, `asn1_item_io`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type` |
 | `ASN1_STRING_set0` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_STRING_set_by_NID` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_set_default_mask` | libcrypto | `openssl/asn1.h` | `asn1_text` |
@@ -201,64 +202,89 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_STRING_to_UTF8` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_STRING_type` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_STRING_type_new` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_type` |
-| `ASN1_T61STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_T61STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_T61STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_T61STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_TBOOLEAN_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `ASN1_TIME_adj` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_check` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_cmp_time_t` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_TIME_compare` | libcrypto | `openssl/asn1.h` | `asn1_time` |
+| `ASN1_TIME_compare` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_time` |
 | `ASN1_TIME_diff` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_TIME_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_TIME_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_TIME_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_TIME_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_TIME_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
+| `ASN1_TIME_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
+| `ASN1_TIME_new` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_template` |
 | `ASN1_TIME_normalize` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_print` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_print_ex` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_set` | libcrypto | `openssl/asn1.h` | `asn1_template`, `asn1_time` |
-| `ASN1_TIME_set_string` | libcrypto | `openssl/asn1.h` | `asn1_template`, `asn1_time` |
+| `ASN1_TIME_set_string` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_template`, `asn1_time` |
 | `ASN1_TIME_set_string_X509` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_to_generalizedtime` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_to_tm` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_TYPE_cmp` | libcrypto | `openssl/asn1.h` | `asn1_type` |
-| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_TYPE_cmp` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_type` |
+| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
 | `ASN1_TYPE_get` | libcrypto | `openssl/asn1.h` | `asn1_type` |
+| `ASN1_TYPE_get_int_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_TYPE_get_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type` |
 | `ASN1_TYPE_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_TYPE_set` | libcrypto | `openssl/asn1.h` | `asn1_template`, `asn1_type` |
+| `ASN1_TYPE_pack_sequence` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_TYPE_set` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template`, `asn1_type` |
 | `ASN1_TYPE_set1` | libcrypto | `openssl/asn1.h` | `asn1_type` |
+| `ASN1_TYPE_set_int_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_TYPE_set_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type` |
-| `ASN1_UNIVERSALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_UNIVERSALSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_TYPE_unpack_sequence` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_UNIVERSALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
+| `ASN1_UNIVERSALSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_UNIVERSALSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_UNIVERSALSTRING_to_string` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_UTCTIME_adj` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_UTCTIME_check` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_UTCTIME_cmp_time_t` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_UTCTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_UTCTIME_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_UTCTIME_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_UTCTIME_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_string` |
+| `ASN1_UTCTIME_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_UTCTIME_new` | libcrypto | `openssl/asn1.h` | `asn1_string`, `asn1_time` |
 | `ASN1_UTCTIME_print` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_UTCTIME_set` | libcrypto | `openssl/asn1.h` | `asn1_time` |
+| `ASN1_UTCTIME_set` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_time` |
 | `ASN1_UTCTIME_set_string` | libcrypto | `openssl/asn1.h` | `asn1_time` |
-| `ASN1_UTF8STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_UTF8STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_UTF8STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
-| `ASN1_VISIBLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_string` |
+| `ASN1_UTF8STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
+| `ASN1_UTF8STRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
+| `ASN1_UTF8STRING_new` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
+| `ASN1_VISIBLESTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_VISIBLESTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_VISIBLESTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_string` |
 | `ASN1_check_infinite_end` | libcrypto | `openssl/asn1.h` | `asn1_header` |
 | `ASN1_const_check_infinite_end` | libcrypto | `openssl/asn1.h` | `asn1_header` |
+| `ASN1_d2i_bio` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_d2i_fp` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_get_object` | libcrypto | `openssl/asn1.h` | `asn1_header` |
+| `ASN1_i2d_bio` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_i2d_fp` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_d2i` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `ASN1_item_d2i_bio` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_d2i_bio_ex` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_d2i_ex` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `ASN1_item_d2i_fp` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_d2i_fp_ex` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_dup` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_ex_d2i` | libcrypto | `openssl/asn1t.h` | `asn1_d2i` |
 | `ASN1_item_ex_free` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `ASN1_item_ex_i2d` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `ASN1_item_ex_new` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `ASN1_item_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_item_i2d` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_item_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
+| `ASN1_item_i2d` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
+| `ASN1_item_i2d_bio` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_i2d_fp` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_i2d_mem_bio` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_item_ndef_i2d` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `ASN1_item_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_item_new` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_template` |
 | `ASN1_item_new_ex` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `ASN1_item_pack` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_unpack` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
+| `ASN1_item_unpack_ex` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_mbstring_copy` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_mbstring_ncopy` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_object_size` | libcrypto | `openssl/asn1.h` | `asn1_header` |
@@ -292,7 +318,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_closesocket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_connect` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_copy_next_retry` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
+| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_item_io`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
 | `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_dgram_pair`, `bio_pair` |
 | `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_mem` |
@@ -318,7 +344,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_fd_non_fatal_error` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_fd_should_retry` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_find_type` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_free` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
+| `BIO_free` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_item_io`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
 | `BIO_free_all` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem`, `bio_sock` |
 | `BIO_get_accept_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_get_callback` | libcrypto | `openssl/bio.h` | `bio_meth` |
@@ -329,7 +355,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_get_host_ip` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_get_init` | libcrypto | `openssl/bio.h` | `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair` |
 | `BIO_get_line` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_get_new_index` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_meth` |
+| `BIO_get_new_index` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_dump`, `bio_filter`, `bio_meth` |
 | `BIO_get_port` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_get_retry_BIO` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_get_retry_reason` | libcrypto | `openssl/bio.h` | `bio_connect`, `bio_mem`, `bio_sock` |
@@ -357,14 +383,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_meth_get_sendmmsg` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_get_write` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_get_write_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
-| `BIO_meth_new` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_filter`, `bio_meth` |
+| `BIO_meth_new` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_dump`, `bio_filter`, `bio_meth` |
 | `BIO_meth_set_callback_ctrl` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_set_create` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_meth` |
-| `BIO_meth_set_ctrl` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_meth` |
+| `BIO_meth_set_ctrl` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_filter`, `bio_meth` |
 | `BIO_meth_set_destroy` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_set_gets` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_set_puts` | libcrypto | `openssl/bio.h` | `bio_meth` |
-| `BIO_meth_set_read` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_meth` |
+| `BIO_meth_set_read` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_filter`, `bio_meth` |
 | `BIO_meth_set_read_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_set_recvmmsg` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_meth_set_sendmmsg` | libcrypto | `openssl/bio.h` | `bio_meth` |
@@ -372,7 +398,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_meth_set_write_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_method_name` | libcrypto | `openssl/bio.h` | `bio_file`, `bio_mem`, `bio_meth` |
 | `BIO_method_type` | libcrypto | `openssl/bio.h` | `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_mem`, `bio_meth`, `bio_sock` |
-| `BIO_new` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
+| `BIO_new` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_item_io`, `asn1_text`, `asn1_time`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
 | `BIO_new_accept` | libcrypto | `openssl/bio.h` | `bio_connect`, `bio_sock` |
 | `BIO_new_bio_dgram_pair` | libcrypto | `openssl/bio.h` | `bio_dgram_pair` |
 | `BIO_new_bio_pair` | libcrypto | `openssl/bio.h` | `bio_pair` |
@@ -382,7 +408,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_new_fd` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file` |
 | `BIO_new_file` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_new_fp` | libcrypto | `openssl/bio.h` | `bio_file` |
-| `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem` |
+| `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_filter`, `bio_mem` |
 | `BIO_new_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_next` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_sock` |
 | `BIO_nread` | libcrypto | `openssl/bio.h` | `bio_pair` |
@@ -408,7 +434,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_s_dgram_pair` | libcrypto | `openssl/bio.h` | `bio_dgram_pair` |
 | `BIO_s_fd` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_s_file` | libcrypto | `openssl/bio.h` | `bio_file` |
-| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_text`, `asn1_time`, `bio_dgram_pair`, `bio_dump`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
+| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_integer`, `asn1_item_io`, `asn1_text`, `asn1_time`, `bio_dgram_pair`, `bio_dump`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `bio_sock`, `err_bio`, `lhash`, `objects`, `trace` |
 | `BIO_s_null` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_s_secmem` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_s_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
@@ -419,7 +445,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_set_data` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_set_ex_data` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_set_flags` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_mem`, `bio_meth` |
-| `BIO_set_init` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_meth` |
+| `BIO_set_init` | libcrypto | `openssl/bio.h` | `asn1_item_io`, `bio_filter`, `bio_meth` |
 | `BIO_set_next` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_set_retry_reason` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_set_shutdown` | libcrypto | `openssl/bio.h` | `bio_meth` |
@@ -472,7 +498,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_header`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_sock`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str` |
+| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_header`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_sock`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str` |
 | `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_get_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
@@ -498,24 +524,24 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_strdup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `CRYPTO_strndup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `asn1_type`, `crypto_mem`, `crypto_mem_hooks`, `err_queue` |
-| `DIRECTORYSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `DIRECTORYSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `DIRECTORYSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
+| `DIRECTORYSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `DIRECTORYSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `DISPLAYTEXT_free` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `DISPLAYTEXT_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `DISPLAYTEXT_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `DISPLAYTEXT_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ERR_add_error_data` | libcrypto | `openssl/err.h` | `bio_print`, `err_bio`, `err_queue` |
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_header`, `asn1_integer`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `objects`, `stack`, `trace` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_integer`, `asn1_item_io`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `ex_data`, `objects`, `stack`, `trace` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_integer`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `ex_data`, `objects`, `stack` |
-| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_text`, `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `stack` |
+| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -579,9 +605,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_set_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_unload_strings` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_vset_error` | libcrypto | `openssl/err.h` | `bio_print`, `err_queue` |
-| `INT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `INT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `INT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `LONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `LONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `OBJ_NAME_add` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_NAME_cleanup` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_NAME_do_all` | libcrypto | `openssl/objects.h` | `objects` |
@@ -601,7 +627,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OBJ_find_sigid_algs` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_find_sigid_by_algs` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_get0_data` | libcrypto | `openssl/objects.h` | `objects` |
-| `OBJ_length` | libcrypto | `openssl/objects.h` | `objects` |
+| `OBJ_length` | libcrypto | `openssl/objects.h` | `asn1_d2i`, `objects` |
 | `OBJ_ln2nid` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_new_nid` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_nid2ln` | libcrypto | `openssl/objects.h` | `objects` |
@@ -674,17 +700,17 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OPENSSL_sk_new` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_new_null` | libcrypto | `openssl/stack.h` | `asn1_template`, `stack` |
 | `OPENSSL_sk_new_reserve` | libcrypto | `openssl/stack.h` | `stack` |
-| `OPENSSL_sk_num` | libcrypto | `openssl/stack.h` | `asn1_template`, `ex_data`, `stack` |
+| `OPENSSL_sk_num` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `ex_data`, `stack` |
 | `OPENSSL_sk_pop` | libcrypto | `openssl/stack.h` | `stack` |
-| `OPENSSL_sk_pop_free` | libcrypto | `openssl/stack.h` | `asn1_template`, `stack` |
-| `OPENSSL_sk_push` | libcrypto | `openssl/stack.h` | `asn1_template`, `stack` |
+| `OPENSSL_sk_pop_free` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `stack` |
+| `OPENSSL_sk_push` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `stack` |
 | `OPENSSL_sk_reserve` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_set` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_set_cmp_func` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_shift` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_sort` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_unshift` | libcrypto | `openssl/stack.h` | `stack` |
-| `OPENSSL_sk_value` | libcrypto | `openssl/stack.h` | `asn1_template`, `stack` |
+| `OPENSSL_sk_value` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `stack` |
 | `OPENSSL_sk_zero` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_strcasecmp` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `OPENSSL_strlcat` | libcrypto | `openssl/crypto.h` | `crypto_str` |
@@ -721,19 +747,41 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OpenSSL_version` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OpenSSL_version_num` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `UINT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `UINT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `UINT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `UTF8_getc` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `UTF8_putc` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ZINT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `ZINT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `ZLONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
-| `ZUINT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
+| `ZLONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
+| `ZUINT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `ZUINT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `a2d_ASN1_OBJECT` | libcrypto | `openssl/asn1.h` | `objects` |
 | `a2i_ASN1_ENUMERATED` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `a2i_ASN1_INTEGER` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
+| `d2i_ASN1_BIT_STRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_BMPSTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_ENUMERATED` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_GENERALIZEDTIME` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_GENERALSTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_IA5STRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_INTEGER` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io` |
+| `d2i_ASN1_NULL` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
 | `d2i_ASN1_OBJECT` | libcrypto | `openssl/asn1.h` | `asn1_header` |
+| `d2i_ASN1_OCTET_STRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io` |
+| `d2i_ASN1_PRINTABLE` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_PRINTABLESTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_SEQUENCE_ANY` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_SET_ANY` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_T61STRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_TIME` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_TYPE` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
 | `d2i_ASN1_UINTEGER` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
+| `d2i_ASN1_UNIVERSALSTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_UTCTIME` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_UTF8STRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_ASN1_VISIBLESTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_DIRECTORYSTRING` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
+| `d2i_DISPLAYTEXT` | libcrypto | `openssl/asn1.h` | `asn1_d2i` |
 | `err_free_strings_int` | libcrypto | `internal/err.h` | `err_queue` |
 | `i2a_ASN1_ENUMERATED` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `i2a_ASN1_INTEGER` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
@@ -744,10 +792,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `i2d_ASN1_GENERALIZEDTIME` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_GENERALSTRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_IA5STRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `i2d_ASN1_INTEGER` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `i2d_ASN1_INTEGER` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_template` |
 | `i2d_ASN1_NULL` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_OBJECT` | libcrypto | `openssl/asn1.h` | `asn1_header` |
-| `i2d_ASN1_OCTET_STRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
+| `i2d_ASN1_OCTET_STRING` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_template` |
 | `i2d_ASN1_PRINTABLE` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_PRINTABLESTRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_SEQUENCE_ANY` | libcrypto | `openssl/asn1.h` | `asn1_template` |

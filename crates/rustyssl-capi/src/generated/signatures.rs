@@ -67,6 +67,8 @@ const _: unsafe extern "C" fn(
 ) -> *mut ASN1_GENERALIZEDTIME = crate::asn1::time::ASN1_GENERALIZEDTIME_adj;
 const _: unsafe extern "C" fn(*const ASN1_GENERALIZEDTIME) -> core::ffi::c_int =
     crate::asn1::time::ASN1_GENERALIZEDTIME_check;
+const _: unsafe extern "C" fn(*const ASN1_GENERALIZEDTIME) -> *mut ASN1_GENERALIZEDTIME =
+    crate::asn1::tpl::util::ASN1_GENERALIZEDTIME_dup;
 const _: unsafe extern "C" fn(*mut ASN1_GENERALIZEDTIME) =
     crate::asn1::string::ASN1_GENERALIZEDTIME_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
@@ -241,6 +243,8 @@ const _: unsafe extern "C" fn(
     *const ASN1_TIME,
     *const ASN1_TIME,
 ) -> core::ffi::c_int = crate::asn1::time::ASN1_TIME_diff;
+const _: unsafe extern "C" fn(*const ASN1_TIME) -> *mut ASN1_TIME =
+    crate::asn1::tpl::util::ASN1_TIME_dup;
 const _: unsafe extern "C" fn(*mut ASN1_TIME) = crate::asn1::tpl::items::ASN1_TIME_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_TIME_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_TIME = crate::asn1::tpl::items::ASN1_TIME_new;
@@ -269,10 +273,21 @@ const _: unsafe extern "C" fn(*const ASN1_TYPE) -> core::ffi::c_int =
     crate::asn1::any::ASN1_TYPE_get;
 const _: unsafe extern "C" fn(
     *const ASN1_TYPE,
+    *mut core::ffi::c_long,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::tpl::util::ASN1_TYPE_get_int_octetstring;
+const _: unsafe extern "C" fn(
+    *const ASN1_TYPE,
     *mut core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::any::ASN1_TYPE_get_octetstring;
 const _: unsafe extern "C" fn() -> *mut ASN1_TYPE = crate::asn1::tpl::items::ASN1_TYPE_new;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut core::ffi::c_void,
+    *mut *mut ASN1_TYPE,
+) -> *mut ASN1_TYPE = crate::asn1::tpl::util::ASN1_TYPE_pack_sequence;
 const _: unsafe extern "C" fn(*mut ASN1_TYPE, core::ffi::c_int, *mut core::ffi::c_void) =
     crate::asn1::any::ASN1_TYPE_set;
 const _: unsafe extern "C" fn(
@@ -282,9 +297,17 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::asn1::any::ASN1_TYPE_set1;
 const _: unsafe extern "C" fn(
     *mut ASN1_TYPE,
+    core::ffi::c_long,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::asn1::tpl::util::ASN1_TYPE_set_int_octetstring;
+const _: unsafe extern "C" fn(
+    *mut ASN1_TYPE,
     *mut core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::any::ASN1_TYPE_set_octetstring;
+const _: unsafe extern "C" fn(*const ASN1_ITEM, *const ASN1_TYPE) -> *mut core::ffi::c_void =
+    crate::asn1::tpl::util::ASN1_TYPE_unpack_sequence;
 const _: unsafe extern "C" fn(*mut ASN1_UNIVERSALSTRING) =
     crate::asn1::string::ASN1_UNIVERSALSTRING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
@@ -303,6 +326,8 @@ const _: unsafe extern "C" fn(*const ASN1_UTCTIME) -> core::ffi::c_int =
     crate::asn1::time::ASN1_UTCTIME_check;
 const _: unsafe extern "C" fn(*const ASN1_UTCTIME, time_t) -> core::ffi::c_int =
     crate::asn1::time::ASN1_UTCTIME_cmp_time_t;
+const _: unsafe extern "C" fn(*const ASN1_UTCTIME) -> *mut ASN1_UTCTIME =
+    crate::asn1::tpl::util::ASN1_UTCTIME_dup;
 const _: unsafe extern "C" fn(*mut ASN1_UTCTIME) = crate::asn1::string::ASN1_UTCTIME_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_UTCTIME_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_UTCTIME = crate::asn1::string::ASN1_UTCTIME_new;
@@ -328,12 +353,88 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::asn1::ASN1_const_check_infinite_end;
 const _: unsafe extern "C" fn(
+    ::core::option::Option<unsafe extern "C" fn() -> *mut core::ffi::c_void>,
+    d2i_of_void,
+    *mut BIO,
+    *mut *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_d2i_bio;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<unsafe extern "C" fn() -> *mut core::ffi::c_void>,
+    d2i_of_void,
+    *mut FILE,
+    *mut *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_d2i_fp;
+const _: unsafe extern "C" fn(
+    i2d_of_void,
+    d2i_of_void,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::util::ASN1_dup;
+const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     *mut core::ffi::c_long,
     *mut core::ffi::c_int,
     *mut core::ffi::c_int,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::asn1::ASN1_get_object;
+const _: unsafe extern "C" fn(i2d_of_void, *mut BIO, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::asn1::tpl::io::ASN1_i2d_bio;
+const _: unsafe extern "C" fn(
+    i2d_of_void,
+    *mut FILE,
+    *const core::ffi::c_void,
+) -> core::ffi::c_int = crate::asn1::tpl::io::ASN1_i2d_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_VALUE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const ASN1_ITEM,
+) -> *mut ASN1_VALUE = crate::asn1::tpl::decode::ASN1_item_d2i;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut BIO,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_item_d2i_bio;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut BIO,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_item_d2i_bio_ex;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_VALUE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const ASN1_ITEM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut ASN1_VALUE = crate::asn1::tpl::decode::ASN1_item_d2i_ex;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut FILE,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_item_d2i_fp;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut FILE,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::io::ASN1_item_d2i_fp_ex;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *const core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::util::ASN1_item_dup;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_VALUE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const ASN1_ITEM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_char,
+    *mut ASN1_TLC,
+) -> core::ffi::c_int = crate::asn1::tpl::decode::ASN1_item_ex_d2i;
 const _: unsafe extern "C" fn(*mut *mut ASN1_VALUE, *const ASN1_ITEM) =
     crate::asn1::tpl::free::ASN1_item_ex_free;
 const _: unsafe extern "C" fn(
@@ -353,6 +454,18 @@ const _: unsafe extern "C" fn(
     *const ASN1_ITEM,
 ) -> core::ffi::c_int = crate::asn1::tpl::encode::ASN1_item_i2d;
 const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut BIO,
+    *const core::ffi::c_void,
+) -> core::ffi::c_int = crate::asn1::tpl::io::ASN1_item_i2d_bio;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut FILE,
+    *const core::ffi::c_void,
+) -> core::ffi::c_int = crate::asn1::tpl::io::ASN1_item_i2d_fp;
+const _: unsafe extern "C" fn(*const ASN1_ITEM, *const ASN1_VALUE) -> *mut BIO =
+    crate::asn1::tpl::io::ASN1_item_i2d_mem_bio;
+const _: unsafe extern "C" fn(
     *const ASN1_VALUE,
     *mut *mut core::ffi::c_uchar,
     *const ASN1_ITEM,
@@ -364,6 +477,19 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> *mut ASN1_VALUE = crate::asn1::tpl::new::ASN1_item_new_ex;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    *const ASN1_ITEM,
+    *mut *mut ASN1_OCTET_STRING,
+) -> *mut ASN1_STRING = crate::asn1::tpl::util::ASN1_item_pack;
+const _: unsafe extern "C" fn(*const ASN1_STRING, *const ASN1_ITEM) -> *mut core::ffi::c_void =
+    crate::asn1::tpl::util::ASN1_item_unpack;
+const _: unsafe extern "C" fn(
+    *const ASN1_STRING,
+    *const ASN1_ITEM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_void = crate::asn1::tpl::util::ASN1_item_unpack_ex;
 const _: unsafe extern "C" fn(
     *mut *mut ASN1_STRING,
     *const core::ffi::c_uchar,
@@ -1794,15 +1920,125 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::integer::a2i_ASN1_INTEGER;
 const _: unsafe extern "C" fn(
+    *mut *mut ASN1_BIT_STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_BIT_STRING = crate::asn1::tpl::items::d2i_ASN1_BIT_STRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_BMPSTRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_BMPSTRING = crate::asn1::tpl::items::d2i_ASN1_BMPSTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_ENUMERATED,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_ENUMERATED = crate::asn1::tpl::items::d2i_ASN1_ENUMERATED;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_GENERALIZEDTIME = crate::asn1::tpl::items::d2i_ASN1_GENERALIZEDTIME;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_GENERALSTRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_GENERALSTRING = crate::asn1::tpl::items::d2i_ASN1_GENERALSTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_IA5STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_IA5STRING = crate::asn1::tpl::items::d2i_ASN1_IA5STRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_INTEGER,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_INTEGER = crate::asn1::tpl::items::d2i_ASN1_INTEGER;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_NULL,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_NULL = crate::asn1::tpl::items::d2i_ASN1_NULL;
+const _: unsafe extern "C" fn(
     *mut *mut ASN1_OBJECT,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut ASN1_OBJECT = crate::objects::d2i_ASN1_OBJECT;
 const _: unsafe extern "C" fn(
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_OCTET_STRING = crate::asn1::tpl::items::d2i_ASN1_OCTET_STRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_ASN1_PRINTABLE;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_PRINTABLESTRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_PRINTABLESTRING = crate::asn1::tpl::items::d2i_ASN1_PRINTABLESTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_SEQUENCE_ANY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_SEQUENCE_ANY = crate::asn1::tpl::items::d2i_ASN1_SEQUENCE_ANY;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_SEQUENCE_ANY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_SEQUENCE_ANY = crate::asn1::tpl::items::d2i_ASN1_SET_ANY;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_T61STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_T61STRING = crate::asn1::tpl::items::d2i_ASN1_T61STRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_TIME,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_TIME = crate::asn1::tpl::items::d2i_ASN1_TIME;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_TYPE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_TYPE = crate::asn1::tpl::items::d2i_ASN1_TYPE;
+const _: unsafe extern "C" fn(
     *mut *mut ASN1_INTEGER,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut ASN1_INTEGER = crate::asn1::integer::d2i_ASN1_UINTEGER;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_UNIVERSALSTRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_UNIVERSALSTRING = crate::asn1::tpl::items::d2i_ASN1_UNIVERSALSTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_UTCTIME,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_UTCTIME = crate::asn1::tpl::items::d2i_ASN1_UTCTIME;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_UTF8STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_UTF8STRING = crate::asn1::tpl::items::d2i_ASN1_UTF8STRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_VISIBLESTRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_VISIBLESTRING = crate::asn1::tpl::items::d2i_ASN1_VISIBLESTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DIRECTORYSTRING;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_STRING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn() = crate::err::strings::err_free_strings_int;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_ENUMERATED) -> core::ffi::c_int =
     crate::asn1::integer::i2a_ASN1_ENUMERATED;

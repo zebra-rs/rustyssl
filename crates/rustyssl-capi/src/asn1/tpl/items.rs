@@ -3,7 +3,7 @@
 //! is the default left out of an encoding: -1 for none), and SEQUENCE OF / SET OF ANY. With
 //! them, their `new`, `free`, and `i2d_` functions, each through its item.
 
-use core::ffi::{c_int, c_uchar};
+use core::ffi::{c_int, c_long, c_uchar};
 use core::ptr;
 
 use rustyssl_abi::{
@@ -19,6 +19,7 @@ use rustyssl_abi::{
     V_ASN1_UNIVERSALSTRING, V_ASN1_UTCTIME, V_ASN1_UTF8STRING, V_ASN1_VISIBLESTRING,
 };
 
+use super::decode::ASN1_item_d2i;
 use super::encode::ASN1_item_i2d;
 use super::free::ASN1_item_free;
 use super::new::ASN1_item_new;
@@ -191,6 +192,74 @@ i2d! {
     pub unsafe extern "C" fn i2d_ASN1_SEQUENCE_ANY(ASN1_SEQUENCE_ANY) = ASN1_SEQUENCE_ANY_it;
     /// Encodes a stack of `ASN1_TYPE`s as a SET OF ANY, in DER order.
     pub unsafe extern "C" fn i2d_ASN1_SET_ANY(ASN1_SEQUENCE_ANY) = ASN1_SET_ANY_it;
+}
+
+/// Defines `d2i_` functions, each decoding through its item.
+macro_rules! d2i {
+    ($(
+        $(#[$attr:meta])*
+        pub unsafe extern "C" fn $name:ident($ty:ty) = $it:ident;
+    )*) => {$(
+        ffi_export! {
+            $(#[$attr])*
+            ///
+            /// # Safety
+            /// As for `ASN1_item_d2i`, with `a` NULL or a slot for a value of the type.
+            pub unsafe extern "C" fn $name(a: *mut *mut $ty, in_: *mut *const c_uchar, len: c_long) -> *mut $ty
+            where failure = ptr::null_mut(), library = ERR_LIB_ASN1
+            {
+                // SAFETY: the caller's guarantee; the item is the type's.
+                unsafe { ASN1_item_d2i(a.cast(), in_, len, $it()) }.cast()
+            }
+        }
+    )*};
+}
+
+d2i! {
+    /// Decodes an OCTET STRING (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_OCTET_STRING(ASN1_OCTET_STRING) = ASN1_OCTET_STRING_it;
+    /// Decodes an INTEGER (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_INTEGER(ASN1_INTEGER) = ASN1_INTEGER_it;
+    /// Decodes an ENUMERATED (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_ENUMERATED(ASN1_ENUMERATED) = ASN1_ENUMERATED_it;
+    /// Decodes a BIT STRING (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_BIT_STRING(ASN1_BIT_STRING) = ASN1_BIT_STRING_it;
+    /// Decodes a UTF8String (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_UTF8STRING(ASN1_UTF8STRING) = ASN1_UTF8STRING_it;
+    /// Decodes a PrintableString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_PRINTABLESTRING(ASN1_PRINTABLESTRING) = ASN1_PRINTABLESTRING_it;
+    /// Decodes a T61String (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_T61STRING(ASN1_T61STRING) = ASN1_T61STRING_it;
+    /// Decodes an IA5String (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_IA5STRING(ASN1_IA5STRING) = ASN1_IA5STRING_it;
+    /// Decodes a GeneralString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_GENERALSTRING(ASN1_GENERALSTRING) = ASN1_GENERALSTRING_it;
+    /// Decodes a UTCTime (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_UTCTIME(ASN1_UTCTIME) = ASN1_UTCTIME_it;
+    /// Decodes a GeneralizedTime (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_GENERALIZEDTIME(ASN1_GENERALIZEDTIME) = ASN1_GENERALIZEDTIME_it;
+    /// Decodes a VisibleString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_VISIBLESTRING(ASN1_VISIBLESTRING) = ASN1_VISIBLESTRING_it;
+    /// Decodes a UniversalString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_UNIVERSALSTRING(ASN1_UNIVERSALSTRING) = ASN1_UNIVERSALSTRING_it;
+    /// Decodes a BMPString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_BMPSTRING(ASN1_BMPSTRING) = ASN1_BMPSTRING_it;
+    /// Decodes a NULL (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_NULL(ASN1_NULL) = ASN1_NULL_it;
+    /// Decodes any value, as an `ASN1_TYPE` (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_TYPE(ASN1_TYPE) = ASN1_ANY_it;
+    /// Decodes a UTCTime or GeneralizedTime, as a Time (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_TIME(ASN1_TIME) = ASN1_TIME_it;
+    /// Decodes one of the printable string types (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_PRINTABLE(ASN1_STRING) = ASN1_PRINTABLE_it;
+    /// Decodes a DirectoryString (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_DIRECTORYSTRING(ASN1_STRING) = DIRECTORYSTRING_it;
+    /// Decodes a DisplayText (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_DISPLAYTEXT(ASN1_STRING) = DISPLAYTEXT_it;
+    /// Decodes a SEQUENCE OF ANY, as a stack of `ASN1_TYPE`s (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_SEQUENCE_ANY(ASN1_SEQUENCE_ANY) = ASN1_SEQUENCE_ANY_it;
+    /// Decodes a SET OF ANY, as a stack of `ASN1_TYPE`s (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_ASN1_SET_ANY(ASN1_SEQUENCE_ANY) = ASN1_SET_ANY_it;
 }
 
 /// Defines `_new` and `_free` functions through an item.

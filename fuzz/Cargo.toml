@@ -118,3 +118,17 @@ path = "fuzz_targets/asn1_time.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "asn1_d2i"
+path = "fuzz_targets/asn1_d2i.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "asn1_d2i_bio"
+path = "fuzz_targets/asn1_d2i_bio.rs"
+test = false
+doc = false
+bench = false
