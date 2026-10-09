@@ -36,3 +36,4 @@ mod stub;
 mod threads;
 mod trace;
 mod version;
+mod x509v3;

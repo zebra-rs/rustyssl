@@ -252,7 +252,7 @@ fn raise_text_error(error: TextError) {
 }
 
 /// A copy of `bytes` as a NUL-terminated string in C memory, or NULL.
-fn c_string(bytes: &[u8]) -> *mut c_char {
+pub(crate) fn c_string(bytes: &[u8]) -> *mut c_char {
     let Some(size) = bytes.len().checked_add(1) else {
         return ptr::null_mut();
     };
