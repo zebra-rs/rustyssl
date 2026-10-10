@@ -1,0 +1,496 @@
+# Ciphers: modes of each block cipher in pieces, padding, EVP_Cipher, IVs, flags, ctrls,
+# copies, names, and misuse
+cinit AES-128-ECB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-192-CBC 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-256-OFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-128-CFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-192-CFB1 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-256-CFB8 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-128-CTR 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit ARIA-256-CBC 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit ARIA-128-CFB1 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit CAMELLIA-192-CTR 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit CAMELLIA-128-ECB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit DES-EDE3-CBC 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit DES-EDE3-CFB1 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit DES-EDE3-CFB8 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit DES-EDE-OFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit DES-EDE-CFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit SM4-CBC 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit SM4-CTR 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit SM4-OFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit SM4-CFB 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit ChaCha20 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit NULL 1 1 1
+cupdate 5
+cupdate 27
+cupdate 0
+cstate
+cfinal
+cinit - 0 0 1
+cupdate 37
+cupdate 11
+cfinal
+cinit - 0 1 1
+cupdate 48
+cupdate 0
+cfinal
+cstate
+ccipher 32
+ccipher 7
+cinit AES-128-CBC 1 1 1
+cpad 0
+cupdate 20
+cfinal
+cpad 1
+cfinal
+cinit AES-128-CBC 0 1 1
+cupdate 16
+cfinal
+cupdate 15
+cfinal
+cupdate 32
+cfinal
+cinit - 1 0 0
+cupdate 16
+cinit - -1 1 0
+cupdate 16
+cinit - 1 0 1
+cupdate 16
+cnum 0
+cnum 1
+cnum 15
+cnum 16
+cstate
+ckeylen 16
+ckeylen 24
+cstate
+cctrl 9 16
+cctrl 9 24
+cctrl 1 0
+cctrl 30583 0
+cctrl 9 -1
+cctrl 18 12
+cstate
+cctrl 20 4
+cctrl 22 -1
+cctrl 16 16
+cctrl 17 16
+cctrl 28 4096
+cctrl 23 -1
+cctrl 11 1
+cinit AES-128-CFB1 1 1 1
+cflags set 2000
+cupdate 13
+cupdate 6
+cflags clear 2000
+cupdate 2
+cstate
+cinit DES-EDE3-CFB1 1 1 1
+cflags set 2000
+cupdate 21
+ccipher 9
+cflags clear 2000
+cinitp AES-128-CBC padding 0
+cupdate 20
+cfinal
+cinitp AES-128-CBC keylen 24
+cstate
+cinitp ChaCha20 keylen 16
+cinitp ChaCha20 ivlen 16
+cupdate 70
+cinitp AES-128-OFB num 3
+cinitp AES-128-CFB1 use-bits 1
+cupdate 12
+cinit ChaCha20 1 1 1
+cupdate 63
+ccopy
+cupdate 70
+cctx 1
+cupdate 70
+cstate
+creset
+cupdate 1
+cstate
+cctx 0
+ccopy
+cctx 1
+cupdate 10
+cctx 0
+cinit AES-256-CTR 0 1 1
+cupdate 5
+cfinal
+cinit AES-256-CTR 1 1 1
+cupdate 5
+cfinal
+creset
+cupdate 1
+cfinal
+cinit - 1 1 1
+cstate
+ccipher 16
+cctrl 1 0
+ckeylen 16
+cpad 0
+cname AES-128-CBC
+cname aes128
+cname AES128
+cname des3
+cname DES-EDE3
+cname 2.16.840.1.101.3.4.1.2
+cname AES-128-CFB1
+cname aes-128-ctr
+cname id-aes128-GCM
+cname ChaCha20
+cname SHA256
+cname nonesuch
+cname NULL
+cname sm4-ofb128
+cname RC2
+cname rc4
+cnid 419
+cnid 421
+cnid 650
+cnid 904
+cnid 44
+cnid 0
+cnid 1019
+cnid 99999
+cnid 31
+cnid 895

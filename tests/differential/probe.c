@@ -214,6 +214,25 @@
  *   dname <name>               EVP_get_digestbyname: the digest's name, NID, and signature NID
  *   dnid <nid>                 EVP_get_digestbynid likewise
  *
+ * Commands for encrypting and decrypting with the default provider's ciphers, on two contexts
+ * (each line prints the result, lengths, output, and the errors as library/reason; inputs are a
+ * fixed pattern from a rolling offset, keys and IVs another):
+ *   cctx <0|1>                 work on context 0 or 1
+ *   cinit <name|-> <enc> <k> <i>   EVP_CipherInit_ex with the cipher fetched by name (`-`: NULL),
+ *                              direction <enc> (1, 0, -1), and a key and IV if <k> and <i> are 1
+ *                              (skipped when ECB or CBC turns around without a key)
+ *   cinitp <name> <key> <n>    EVP_CipherInit_ex2 to encrypt with a key, an IV, and a size_t or
+ *                              uint parameter (keylen, ivlen, padding, num, use-bits)
+ *   cupdate <n>, cfinal        EVP_CipherUpdate of <n> octets; EVP_CipherFinal_ex
+ *   ccipher <n>                EVP_Cipher of <n> octets (the stream ciphers' only for a length
+ *                              that isn't whole blocks; see docs/DEVIATIONS.md)
+ *   cpad <0|1>, ckeylen <n>, cnum <n>   EVP_CIPHER_CTX_set_padding, _set_key_length, _set_num
+ *   cflags <set|clear> <hex>   EVP_CIPHER_CTX_set_flags or _clear_flags
+ *   cstate                     the lengths, num, IVs, flags, and direction
+ *   cctrl <type> <arg>         EVP_CIPHER_CTX_ctrl with a 64-octet buffer
+ *   ccopy, creset              EVP_CIPHER_CTX_copy onto the other context; EVP_CIPHER_CTX_reset
+ *   cname <name>, cnid <nid>   EVP_get_cipherbyname, _bynid: the name, NID, and type
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -2440,6 +2459,193 @@ static int digest_command(const char *command, const char *line)
     return 1;
 }
 
+static EVP_CIPHER_CTX *cipher_ctx[2];
+static int cipher_current;
+static size_t cipher_offset;
+static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16];
+
+static void print_out(const unsigned char *p, int n)
+{
+    int i;
+
+    printf(" ");
+    for (i = 0; i < n && i < 1100; i++)
+        printf("%02x", p[i]);
+}
+
+static int cipher_command(const char *command, const char *line)
+{
+    static const char *const commands[] = { "cctx", "cinit", "cinitp", "cupdate", "cfinal",
+                                            "ccipher", "cpad", "ckeylen", "cnum", "cflags",
+                                            "cstate", "cctrl", "ccopy", "creset", "cname",
+                                            "cnid", NULL };
+    const char *const *c;
+    EVP_CIPHER_CTX *ctx;
+    char a[64] = "", key[32] = "";
+    unsigned char out[1100];
+    long n = 0, m = 0, k = 0;
+    int r = 0, outl = -7;
+
+    for (c = commands; *c != NULL && strcmp(*c, command) != 0; c++)
+        ;
+    if (*c == NULL)
+        return 0;
+    if (cipher_ctx[0] == NULL) {
+        size_t i;
+
+        for (i = 0; i < sizeof(cipher_data); i++)
+            cipher_data[i] = (unsigned char)(i * 13 + 1);
+        for (i = 0; i < sizeof(cipher_key); i++)
+            cipher_key[i] = (unsigned char)(i * 5 + 7);
+        for (i = 0; i < sizeof(cipher_iv); i++)
+            cipher_iv[i] = (unsigned char)(0xf0 + i);
+        cipher_ctx[0] = EVP_CIPHER_CTX_new();
+        cipher_ctx[1] = EVP_CIPHER_CTX_new();
+    }
+    ctx = cipher_ctx[cipher_current];
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "cctx") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        cipher_current = n != 0;
+        printf("\n");
+        return 1;
+    } else if (strcmp(command, "cinit") == 0) {
+        EVP_CIPHER *ciph = NULL;
+
+        sscanf(line, "%*s %63s %ld %ld %ld", a, &n, &m, &k);
+        if (strcmp(a, "-") == 0 && m == 0 && n != -1 && (n != 0) != EVP_CIPHER_CTX_is_encrypting(ctx)
+            && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+            && EVP_CIPHER_CTX_get_block_size(ctx) > 1
+            && (EVP_CIPHER_CTX_get_block_size(ctx) != 8
+                || strncmp(EVP_CIPHER_get0_name(EVP_CIPHER_CTX_get0_cipher(ctx)), "DES", 3) != 0)) {
+            /*
+             * ECB and CBC keep the old direction's key schedule in OpenSSL: turning around
+             * without a key runs it the platform's way (docs/DEVIATIONS.md).
+             */
+            printf(" skipped\n");
+            return 1;
+        }
+        if (strcmp(a, "-") != 0 && (ciph = EVP_CIPHER_fetch(NULL, a, NULL)) == NULL) {
+            printf(" fetch failed");
+            print_digest_errors();
+            return 1;
+        }
+        r = EVP_CipherInit_ex(ctx, ciph, NULL, m ? cipher_key : NULL, k ? cipher_iv : NULL,
+                              (int)n);
+        EVP_CIPHER_free(ciph);
+        printf(" %d", r);
+    } else if (strcmp(command, "cinitp") == 0) {
+        EVP_CIPHER *ciph;
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+        size_t sz;
+        unsigned int u;
+
+        sscanf(line, "%*s %63s %31s %ld", a, key, &n);
+        if ((ciph = EVP_CIPHER_fetch(NULL, a, NULL)) == NULL) {
+            printf(" fetch failed");
+            print_digest_errors();
+            return 1;
+        }
+        sz = (size_t)n;
+        u = (unsigned int)n;
+        if (strcmp(key, "keylen") == 0 || strcmp(key, "ivlen") == 0)
+            params[0] = OSSL_PARAM_construct_size_t(key, &sz);
+        else
+            params[0] = OSSL_PARAM_construct_uint(key, &u);
+        r = EVP_CipherInit_ex2(ctx, ciph, cipher_key, cipher_iv, 1, params);
+        EVP_CIPHER_free(ciph);
+        printf(" %d", r);
+    } else if (strcmp(command, "cupdate") == 0 || strcmp(command, "ccipher") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (n < 0 || n > 1024)
+            n = 1024;
+        if (command[1] == 'u') {
+            r = EVP_CipherUpdate(ctx, out, &outl, cipher_data + cipher_offset, (int)n);
+            printf(" %d %d", r, outl);
+            print_out(out, r ? outl : 0);
+        } else if (EVP_CIPHER_CTX_get_block_size(ctx) > 1
+                   && n % EVP_CIPHER_CTX_get_block_size(ctx) != 0) {
+            printf(" skipped\n");
+            return 1;
+        } else {
+            r = EVP_Cipher(ctx, out, cipher_data + cipher_offset, (unsigned int)n);
+            printf(" %d", r);
+            print_out(out, (int)n);
+        }
+        cipher_offset = (cipher_offset + (size_t)n * 3 + 1) % 1024;
+    } else if (strcmp(command, "cfinal") == 0) {
+        r = EVP_CipherFinal_ex(ctx, out, &outl);
+        printf(" %d %d", r, outl);
+        print_out(out, r ? outl : 0);
+    } else if (strcmp(command, "cpad") == 0 || strcmp(command, "ckeylen") == 0
+               || strcmp(command, "cnum") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (command[1] == 'k' && EVP_CIPHER_CTX_get0_cipher(ctx) == NULL) {
+            /* OpenSSL dereferences the missing cipher (docs/DEVIATIONS.md). */
+            printf(" skipped\n");
+            return 1;
+        }
+        r = command[1] == 'p' ? EVP_CIPHER_CTX_set_padding(ctx, (int)n)
+            : command[1] == 'k' ? EVP_CIPHER_CTX_set_key_length(ctx, (int)n)
+                                : EVP_CIPHER_CTX_set_num(ctx, (int)n);
+        printf(" %d", r);
+    } else if (strcmp(command, "cflags") == 0) {
+        unsigned int f = 0;
+
+        sscanf(line, "%*s %63s %x", a, &f);
+        if (strcmp(a, "set") == 0)
+            EVP_CIPHER_CTX_set_flags(ctx, (int)f);
+        else
+            EVP_CIPHER_CTX_clear_flags(ctx, (int)f);
+        printf(" %x", EVP_CIPHER_CTX_test_flags(ctx, 0x7fffffff));
+    } else if (strcmp(command, "cstate") == 0) {
+        unsigned char iv[16];
+        int ivl;
+
+        printf(" cipher %s key %d", EVP_CIPHER_CTX_get0_cipher(ctx) == NULL ? "-"
+                                    : EVP_CIPHER_get0_name(EVP_CIPHER_CTX_get0_cipher(ctx)),
+               EVP_CIPHER_CTX_get_key_length(ctx));
+        ivl = EVP_CIPHER_CTX_get_iv_length(ctx);
+        printf(" iv %d block %d num %d enc %d flags %x", ivl, EVP_CIPHER_CTX_get_block_size(ctx),
+               EVP_CIPHER_CTX_get0_cipher(ctx) == NULL ? -9 : EVP_CIPHER_CTX_get_num(ctx),
+               EVP_CIPHER_CTX_is_encrypting(ctx), EVP_CIPHER_CTX_test_flags(ctx, 0x7fffffff));
+        if (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL && ivl > 0 && ivl <= 16) {
+            memset(iv, 0, sizeof(iv));
+            printf(" updated %d", EVP_CIPHER_CTX_get_updated_iv(ctx, iv, sizeof(iv)));
+            print_out(iv, ivl);
+            printf(" original %d", EVP_CIPHER_CTX_get_original_iv(ctx, iv, sizeof(iv)));
+            print_out(iv, ivl);
+        }
+    } else if (strcmp(command, "cctrl") == 0) {
+        sscanf(line, "%*s %ld %ld", &n, &m);
+        if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL || (n != EVP_CTRL_RAND_KEY && n != 0x19
+                                                        && n != 0x1a)) {
+            r = EVP_CIPHER_CTX_ctrl(ctx, (int)n, (int)m, out);
+            printf(" %d", r);
+        } else {
+            printf(" skipped");
+        }
+    } else if (strcmp(command, "cname") == 0 || strcmp(command, "cnid") == 0) {
+        const EVP_CIPHER *ciph;
+
+        sscanf(line, "%*s %63s", a);
+        ciph = command[1] == 'n' && command[2] == 'a' ? EVP_get_cipherbyname(a)
+                                                     : EVP_get_cipherbynid(atoi(a));
+        if (ciph == NULL)
+            printf(" NULL");
+        else
+            printf(" %s %d %d", EVP_CIPHER_get0_name(ciph), EVP_CIPHER_get_nid(ciph),
+                   EVP_CIPHER_get_type(ciph));
+    } else if (strcmp(command, "ccopy") == 0) {
+        printf(" %d", EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx));
+    } else {
+        printf(" %d", EVP_CIPHER_CTX_reset(ctx));
+    }
+    print_digest_errors();
+    return 1;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2748,7 +2954,8 @@ int main(void)
             || time_command(command, line) || template_command(command, line)
             || params_command(command, line) || ctx_command(command, line)
             || prop_command(command, line) || prov_command(command, line)
-            || fetch_command(command, line) || digest_command(command, line)) {
+            || fetch_command(command, line) || digest_command(command, line)
+            || cipher_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
