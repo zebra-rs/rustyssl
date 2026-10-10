@@ -904,7 +904,7 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
         }
     };
     for _ in 0..random.below(20) + 1 {
-        match random.below(16) {
+        match random.below(17) {
             0 | 1 => writeln!(out, "dinit {}", random.pick(DIGESTS))?,
             2 => writeln!(out, "dinit -")?,
             3 => {
@@ -923,6 +923,58 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
             11 | 12 => writeln!(out, "dsqueeze {}", length(random).min(256))?,
             13 => writeln!(out, "dcopy")?,
             14 => writeln!(out, "dctx {}", random.below(2))?,
+            15 if random.below(2) == 0 => {
+                let name = random.pick(&[
+                    "SHA256",
+                    "sha256",
+                    "SHA2-256",
+                    "sha-256",
+                    "2.16.840.1.101.3.4.2.1",
+                    "RSA-SHA256",
+                    "rsa-sha1-2",
+                    "ssl3-md5",
+                    "ripemd",
+                    "RMD160",
+                    "SHAKE-128",
+                    "shake256",
+                    "KECCAK-512",
+                    "SHA2-256/192",
+                    "blake2s256",
+                    "BLAKE2B-512",
+                    "MD4",
+                    "whirlpool",
+                    "mdc2",
+                    "NULL",
+                    "UNDEF",
+                    "md5-sha1",
+                    "SM3",
+                    "nonesuch",
+                ]);
+                // Mixed case, as the names compare without it.
+                let name: String = name
+                    .chars()
+                    .map(|c| {
+                        if random.below(4) == 0 {
+                            c.to_ascii_lowercase()
+                        } else {
+                            c
+                        }
+                    })
+                    .collect();
+                writeln!(out, "dname {name}")?;
+            }
+            // Digest, signature, and non-algorithm NIDs: a cipher's or key type's name is in
+            // the reference's name map (its pre-filling adds them), so looking one up doesn't
+            // fetch there; until 3.4 and Phase 4 it does here.
+            15 => writeln!(
+                out,
+                "dnid {}",
+                random.pick(&[
+                    "4", "64", "672", "673", "674", "675", "1094", "1095", "1096", "1097", "1100",
+                    "1101", "117", "95", "257", "804", "1143", "1056", "1057", "114", "668", "65",
+                    "13", "0", "99999", "-1",
+                ])
+            )?,
             _ => writeln!(
                 out,
                 "{}",
