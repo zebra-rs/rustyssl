@@ -1689,10 +1689,32 @@ const _: unsafe extern "C" fn(
     ) -> core::ffi::c_int,
 > = crate::evp::md_ctx::EVP_MD_CTX_update_fn;
 const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ciph: *const EVP_MD,
+            from: *const core::ffi::c_char,
+            to: *const core::ffi::c_char,
+            x: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::legacy_md::EVP_MD_do_all;
+const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     ::core::option::Option<unsafe extern "C" fn(md: *mut EVP_MD, arg: *mut core::ffi::c_void)>,
     *mut core::ffi::c_void,
 ) = crate::evp::digest::EVP_MD_do_all_provided;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ciph: *const EVP_MD,
+            from: *const core::ffi::c_char,
+            to: *const core::ffi::c_char,
+            x: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::legacy_md::EVP_MD_do_all_sorted;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
@@ -1711,6 +1733,8 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_ulong =
     crate::evp::digest::EVP_MD_get_flags;
 const _: unsafe extern "C" fn(*const EVP_MD, *mut OSSL_PARAM) -> core::ffi::c_int =
     crate::evp::digest::EVP_MD_get_params;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_get_pkey_type;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
     crate::evp::digest::EVP_MD_get_size;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
@@ -1741,14 +1765,41 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *mut usize,
 ) -> core::ffi::c_int = crate::evp::md_ctx::EVP_Q_digest;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::legacy_md::EVP_add_digest;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_blake2b512;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_blake2s256;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::property::EVP_default_properties_enable_fips;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
     crate::property::EVP_default_properties_is_fips_enabled;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut core::ffi::c_char =
     crate::property::EVP_get1_default_properties;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const EVP_MD =
+    crate::evp::legacy_md::EVP_get_digestbyname;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md4;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md5;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md5_sha1;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md_null;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_mdc2;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_ripemd160;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::property::EVP_set_default_properties;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha1;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha224;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha256;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha384;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha3_224;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha3_256;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha3_384;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha3_512;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha512;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha512_224;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha512_256;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_shake128;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_shake256;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sm3;
+const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_whirlpool;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;

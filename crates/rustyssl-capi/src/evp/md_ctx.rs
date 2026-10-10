@@ -17,8 +17,9 @@
 //!   have the same digest.
 //!
 //! What OpenSSL dereferences without checking (a NULL context in most of these) is refused
-//! here instead (docs/DEVIATIONS.md). Signing contexts (`EVP_PKEY_CTX`) come with Phase 4, and
-//! the legacy `EVP_MD_meth_*` digests and the `EVP_sha256()` getters with 3.3c and 3.11.
+//! here instead (docs/DEVIATIONS.md). A static digest (`EVP_sha256()`) is replaced by the
+//! provider's, fetched by its short name, as OpenSSL does. Signing contexts (`EVP_PKEY_CTX`)
+//! come with Phase 4, and the legacy `EVP_MD_meth_*` digests with 3.11.
 
 use core::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 use core::ptr;
@@ -29,7 +30,7 @@ use rustyssl_abi::{
     EVP_MD_CTX_FLAG_NO_INIT, EVP_MD_CTX_FLAG_ONESHOT, EVP_MD_FLAG_XOF, EVP_R_CTRL_NOT_IMPLEMENTED,
     EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_NULL_ALGORITHM,
     EVP_R_METHOD_NOT_SUPPORTED, EVP_R_NO_DIGEST_SET, EVP_R_NOT_ABLE_TO_COPY_CTX,
-    EVP_R_UPDATE_ERROR, OSSL_DIGEST_PARAM_MICALG, OSSL_DIGEST_PARAM_SIZE,
+    EVP_R_UPDATE_ERROR, NID_undef, OSSL_DIGEST_PARAM_MICALG, OSSL_DIGEST_PARAM_SIZE,
     OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOFLEN, OSSL_LIB_CTX, OSSL_PARAM,
 };
 
@@ -39,6 +40,7 @@ use super::digest::{
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::mem;
+use crate::objects::OBJ_nid2sn;
 use crate::params::{OSSL_PARAM_locate_const, construct, end};
 
 /// `EVP_MD_CTX_FLAG_KEEP_PKEY_CTX`, from the reference's internal `include/crypto/evp.h`.
@@ -284,6 +286,42 @@ unsafe fn init_internal(
         }
     }
     // SAFETY: the caller's guarantee.
+    let Some(requested) = (unsafe { method(type_) }) else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_INITIALIZATION_ERROR,
+            "evp_md_init_internal",
+        );
+        return 0;
+    };
+    let mut type_ = type_;
+    if requested.prov.0.is_null() {
+        // A static digest: fetch the provider's by its short name ("NULL" for the NULL
+        // digest), from the default context with no query.
+        let nid = requested.nid;
+        // SAFETY: no preconditions.
+        let short = unsafe { OBJ_nid2sn(nid) };
+        let name = if nid == NID_undef {
+            c"NULL".as_ptr()
+        } else {
+            short
+        };
+        // SAFETY: the default context, a static name, and an empty query.
+        let provmd = unsafe { EVP_MD_fetch(ptr::null_mut(), name, c"".as_ptr()) };
+        if provmd.is_null() {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_INITIALIZATION_ERROR,
+                "evp_md_init_internal",
+            );
+            return 0;
+        }
+        // SAFETY: the context's own reference, replaced by the fetched one.
+        unsafe { EVP_MD_free(c.fetched_digest) };
+        c.fetched_digest = provmd;
+        type_ = provmd;
+    }
+    // SAFETY: a live method.
     let Some(md) = (unsafe { method(type_) }) else {
         err::raise(
             ERR_LIB_EVP,

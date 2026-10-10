@@ -10356,41 +10356,6 @@ pub extern "C" fn EVP_MD_CTX_set_pkey_ctx(_: *mut EVP_MD_CTX, _: *mut EVP_PKEY_C
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_do_all(
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            ciph: *const EVP_MD,
-            from: *const core::ffi::c_char,
-            to: *const core::ffi::c_char,
-            x: *mut core::ffi::c_void,
-        ),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("EVP_MD_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_do_all_sorted(
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            ciph: *const EVP_MD,
-            from: *const core::ffi::c_char,
-            to: *const core::ffi::c_char,
-            x: *mut core::ffi::c_void,
-        ),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("EVP_MD_do_all_sorted")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_pkey_type(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_get_pkey_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_meth_dup(_: *const EVP_MD) -> *mut EVP_MD {
     crate::stub::unimplemented("EVP_MD_meth_dup")
 }
@@ -14244,11 +14209,6 @@ pub extern "C" fn EVP_add_cipher(_: *const EVP_CIPHER) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_add_digest(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_add_digest")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_aes_128_cbc() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_aes_128_cbc")
 }
@@ -14614,16 +14574,6 @@ pub extern "C" fn EVP_bf_ofb() -> *const EVP_CIPHER {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_blake2b512() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_blake2b512")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_blake2s256() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_blake2s256")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_camellia_128_cbc() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_camellia_128_cbc")
 }
@@ -14869,11 +14819,6 @@ pub extern "C" fn EVP_get_cipherbyname(_: *const core::ffi::c_char) -> *const EV
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_get_digestbyname(_: *const core::ffi::c_char) -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_get_digestbyname")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_get_pw_prompt() -> *mut core::ffi::c_char {
     crate::stub::unimplemented("EVP_get_pw_prompt")
 }
@@ -14896,31 +14841,6 @@ pub extern "C" fn EVP_idea_ecb() -> *const EVP_CIPHER {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_idea_ofb() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_idea_ofb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_md4() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_md4")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_md5() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_md5")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_md5_sha1() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_md5_sha1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_md_null() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_md_null")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_mdc2() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_mdc2")
 }
 
 #[unsafe(no_mangle)]
@@ -14990,11 +14910,6 @@ pub extern "C" fn EVP_read_pw_string_min(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_ripemd160() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_ripemd160")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_seed_cbc() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_seed_cbc")
 }
@@ -15020,76 +14935,6 @@ pub extern "C" fn EVP_set_pw_prompt(_: *const core::ffi::c_char) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha1() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha224() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha224")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha256() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha256")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha384() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha384")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha3_224() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha3_224")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha3_256() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha3_256")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha3_384() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha3_384")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha3_512() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha3_512")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha512() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha512")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha512_224() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha512_224")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sha512_256() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sha512_256")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_shake128() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_shake128")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_shake256() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_shake256")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_sm3() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_sm3")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_sm4_cbc() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_sm4_cbc")
 }
@@ -15112,11 +14957,6 @@ pub extern "C" fn EVP_sm4_ecb() -> *const EVP_CIPHER {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_sm4_ofb() -> *const EVP_CIPHER {
     crate::stub::unimplemented("EVP_sm4_ofb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_whirlpool() -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_whirlpool")
 }
 
 #[unsafe(no_mangle)]

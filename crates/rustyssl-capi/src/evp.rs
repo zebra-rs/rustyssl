@@ -5,4 +5,5 @@
 pub(crate) mod digest;
 pub(crate) mod encode;
 pub(crate) mod fetch;
+pub(crate) mod legacy_md;
 pub(crate) mod md_ctx;

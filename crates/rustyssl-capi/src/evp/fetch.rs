@@ -411,6 +411,7 @@ unsafe fn inner_fetch(
         return (None, None);
     };
     let propq = properties.map_or(&b""[..], CStr::to_bytes);
+    prefill(&ctx);
     let mut name_id = name.map_or(0, |n| ctx.evp.lock().names.number(n.to_bytes()));
     let id = method_id(name_id, kind.operation);
     let mut unsupported = name_id == 0;
@@ -538,13 +539,44 @@ pub(crate) unsafe fn all(libctx: *mut OSSL_LIB_CTX, kind: &'static Kind) -> Vec<
     out
 }
 
+/// `ossl_namemap_stored`'s pre-filling: an empty name map starts with the legacy digests'
+/// names (each NID's short and long names and its OID), as OpenSSL's does after
+/// `OPENSSL_INIT_ADD_ALL_DIGESTS`. (OpenSSL adds the legacy ciphers' names first and the key
+/// types' after; they come with 3.4 and Phase 4.)
+pub(crate) fn prefill(ctx: &libctx::LibCtx) {
+    if !ctx.evp.lock().names.is_empty() {
+        return;
+    }
+    // Gathered without the lock: adding the digests runs the library's initialization.
+    let nids = super::legacy_md::md_nids();
+    let mut state = ctx.evp.lock();
+    if !state.names.is_empty() {
+        return;
+    }
+    for nid in nids {
+        let Some(obj) = rustyssl_asn1::objects::object(nid).filter(|_| nid != 0) else {
+            continue;
+        };
+        let mut num = state.names.add_name(0, obj.short_name.as_bytes());
+        num = state.names.add_name(num, obj.long_name.as_bytes());
+        if !obj.der.is_empty() {
+            let text = rustyssl_asn1::oid::decode_text(obj.der);
+            if text.complete && !text.text.is_empty() {
+                state.names.add_name(num, &text.text);
+            }
+        }
+    }
+}
+
 /// The names of `name_id` in `prov`'s context, in the order they were added.
 pub(crate) fn names_of(prov: *const OSSL_PROVIDER, name_id: u32) -> Vec<Vec<u8>> {
     // SAFETY: a live provider's context.
     let libctx = unsafe { provider::libctx_of(prov) };
     // SAFETY: as above.
-    unsafe { libctx::resolve(libctx) }
-        .map_or_else(Vec::new, |ctx| ctx.evp.lock().names.names(name_id).to_vec())
+    unsafe { libctx::resolve(libctx) }.map_or_else(Vec::new, |ctx| {
+        prefill(&ctx);
+        ctx.evp.lock().names.names(name_id).to_vec()
+    })
 }
 
 /// The number of `name` in `prov`'s context (`ossl_namemap_name2num`).
@@ -552,5 +584,8 @@ pub(crate) fn number_in(prov: *const OSSL_PROVIDER, name: &[u8]) -> u32 {
     // SAFETY: a live provider's context.
     let libctx = unsafe { provider::libctx_of(prov) };
     // SAFETY: as above.
-    unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| ctx.evp.lock().names.number(name))
+    unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| {
+        prefill(&ctx);
+        ctx.evp.lock().names.number(name)
+    })
 }
