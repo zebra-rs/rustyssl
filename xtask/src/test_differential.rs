@@ -1166,7 +1166,7 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
             17 => writeln!(
                 out,
                 "{}",
-                random.pick(&["cstate", "ccopy", "creset", "cctx 1", "cctx 0"])
+                random.pick(&["cstate", "ccopy", "creset", "cctx 1", "cctx 0", "casn1"])
             )?,
             18 => {
                 let name = random.pick(&[

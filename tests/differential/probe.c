@@ -2541,7 +2541,7 @@ static int cipher_command(const char *command, const char *line)
                                             "ccipher", "cpad", "ckeylen", "cnum", "cflags",
                                             "cstate", "cctrl", "ccopy", "creset", "cname",
                                             "cnid", "caad", "cmsglen", "ctagget", "ctagset",
-                                            "ctaglen", "cparam", "ctlsaad", NULL };
+                                            "ctaglen", "cparam", "ctlsaad", "casn1", NULL };
     const char *const *c;
     EVP_CIPHER_CTX *ctx;
     char a[64] = "", key[32] = "";
@@ -2826,6 +2826,20 @@ static int cipher_command(const char *command, const char *line)
         params[0] = OSSL_PARAM_construct_size_t(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, &pad);
         printf(" %d length %d pad %d %zu", r, aad[11] << 8 | aad[12],
                EVP_CIPHER_CTX_get_params(ctx, params), pad);
+    } else if (strcmp(command, "casn1") == 0) {
+        /* The context's AlgorithmIdentifier parameters, then set back from them. */
+        ASN1_TYPE *t = ASN1_TYPE_new();
+        unsigned char *der = NULL;
+        int len;
+
+        r = EVP_CIPHER_param_to_asn1(ctx, t);
+        len = ASN1_TYPE_get(t) != 0 ? i2d_ASN1_TYPE(t, &der) : 0;
+        printf(" %d", r);
+        print_out(der, len > 0 ? len : 0);
+        OPENSSL_free(der);
+        print_digest_errors();
+        printf(" back %d", EVP_CIPHER_asn1_to_param(ctx, t));
+        ASN1_TYPE_free(t);
     } else if (strcmp(command, "ccopy") == 0) {
         cipher_keyed[!cipher_current] = cipher_keyed[cipher_current];
         cipher_ready[!cipher_current] = cipher_ready[cipher_current];
