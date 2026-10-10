@@ -11,33 +11,33 @@ publish.workspace = true
 [dependencies]
 aes = { version = "0.9", default-features = false, features = ["zeroize"] }
 aria = { version = "0.2", default-features = false, features = ["zeroize"] }
-blake2 = { version = "0.11", default-features = false }
+blake2 = { version = "0.11", default-features = false, features = ["zeroize"] }
 blowfish = { version = "0.10", default-features = false, features = ["bcrypt", "zeroize"] }
 camellia = { version = "0.2", default-features = false, features = ["zeroize"] }
 cast5 = { version = "0.12", default-features = false, features = ["zeroize"] }
 chacha20 = { version = "0.10", default-features = false, features = ["cipher", "legacy", "zeroize"] }
 cipher = { version = "0.5", default-features = false }
 des = { version = "0.9", default-features = false, features = ["zeroize"] }
-digest = { version = "0.11", default-features = false }
+digest = { version = "0.11", default-features = false, features = ["zeroize"] }
 ghash = { version = "0.6", default-features = false, features = ["zeroize"] }
 hybrid-array = { version = "0.4", default-features = false }
 idea = { version = "0.6", default-features = false, features = ["zeroize"] }
 keccak = { version = "0.2", default-features = false }
-md-5 = { version = "0.11", default-features = false }
-md4 = { version = "0.11", default-features = false }
+md-5 = { version = "0.11", default-features = false, features = ["zeroize"] }
+md4 = { version = "0.11", default-features = false, features = ["zeroize"] }
 poly1305 = { version = "0.9", default-features = false, features = ["zeroize"] }
 polyval = { version = "0.7", default-features = false, features = ["zeroize"] }
 rc2 = { version = "0.9", default-features = false, features = ["zeroize"] }
-ripemd = { version = "0.2", default-features = false }
+ripemd = { version = "0.2", default-features = false, features = ["zeroize"] }
 rustyssl-abi.workspace = true
 rustyssl-asn1.workspace = true
-sha1 = { version = "0.11", default-features = false }
-sha2 = { version = "0.11", default-features = false }
-sm3 = { version = "0.5", default-features = false }
+sha1 = { version = "0.11", default-features = false, features = ["zeroize"] }
+sha2 = { version = "0.11", default-features = false, features = ["zeroize"] }
+sm3 = { version = "0.5", default-features = false, features = ["zeroize"] }
 sm4 = { version = "0.6", default-features = false, features = ["zeroize"] }
 universal-hash = { version = "0.6", default-features = false }
-whirlpool = { version = "0.11", default-features = false }
-zeroize = { version = "1", default-features = false }
+whirlpool = { version = "0.11", default-features = false, features = ["zeroize"] }
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true

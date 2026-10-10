@@ -14,6 +14,7 @@
 //! instructions) need no configuration.
 
 use digest::Digest;
+use zeroize::Zeroize;
 
 /// The digests the built-in providers offer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -431,6 +432,13 @@ impl Sponge {
             *o = self.octet(self.position);
             self.position = self.position.saturating_add(1);
         }
+    }
+}
+
+impl Drop for Sponge {
+    fn drop(&mut self) {
+        // The state can hold a key (KMAC's) or a keyed HMAC's.
+        self.state.zeroize();
     }
 }
 
