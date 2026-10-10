@@ -184,13 +184,25 @@ fn verdict(theirs: &Outcome, ours: &Outcome) -> std::result::Result<usize, Strin
         ));
     }
     if ours.stdout != theirs.stdout {
-        let line = ours
+        let first = ours
             .stdout
             .lines()
             .zip(theirs.stdout.lines())
-            .position(|(a, b)| a != b)
-            .map_or_else(|| "length".to_owned(), |i| format!("line {}", i + 1));
-        return Err(format!("output differs from the reference at {line}"));
+            .position(|(a, b)| a != b);
+        let Some(i) = first else {
+            return Err("output differs from the reference in length".to_owned());
+        };
+        // The differing line of each, cut short, so a failure elsewhere (CI) can be read.
+        let show = |s: &str| -> String {
+            let l = s.lines().nth(i).unwrap_or("");
+            l.chars().take(300).collect()
+        };
+        return Err(format!(
+            "output differs from the reference at line {}:\n  reference: {}\n  rustyssl:  {}",
+            i + 1,
+            show(&theirs.stdout),
+            show(&ours.stdout)
+        ));
     }
     Ok(checks)
 }
