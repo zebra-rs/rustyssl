@@ -232,6 +232,11 @@
  *   cctrl <type> <arg>         EVP_CIPHER_CTX_ctrl with a 64-octet buffer
  *   ccopy, creset              EVP_CIPHER_CTX_copy onto the other context; EVP_CIPHER_CTX_reset
  *   cname <name>, cnid <nid>   EVP_get_cipherbyname, _bynid: the name, NID, and type
+ *   caad <n>, cmsglen <n>      EVP_CipherUpdate of <n> octets of AAD (no output); of no input
+ *                              and no output (CCM's message length); skipped for ciphers that
+ *                              take neither
+ *   ctagget <n>, ctagset <n>, ctaglen <n>   the AEAD tag: got into the probe's tag buffer, set
+ *                              from it, or its length set (no data)
  *
  *   # ...              comment, echoed
  */
@@ -2462,7 +2467,7 @@ static int digest_command(const char *command, const char *line)
 static EVP_CIPHER_CTX *cipher_ctx[2];
 static int cipher_current;
 static size_t cipher_offset;
-static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16];
+static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16], cipher_tag[16];
 
 static void print_out(const unsigned char *p, int n)
 {
@@ -2473,12 +2478,27 @@ static void print_out(const unsigned char *p, int n)
         printf("%02x", p[i]);
 }
 
+/* Whether GCM made its IV up at random (its output then differs from run to run). */
+static int random_iv(EVP_CIPHER_CTX *ctx)
+{
+    unsigned int gen = 0;
+    OSSL_PARAM params[2];
+
+    if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL
+        || EVP_CIPHER_get_mode(EVP_CIPHER_CTX_get0_cipher(ctx)) != EVP_CIPH_GCM_MODE)
+        return 0;
+    params[0] = OSSL_PARAM_construct_uint(OSSL_CIPHER_PARAM_AEAD_IV_GENERATED, &gen);
+    params[1] = OSSL_PARAM_construct_end();
+    return EVP_CIPHER_CTX_get_params(ctx, params) == 1 && gen != 0;
+}
+
 static int cipher_command(const char *command, const char *line)
 {
     static const char *const commands[] = { "cctx", "cinit", "cinitp", "cupdate", "cfinal",
                                             "ccipher", "cpad", "ckeylen", "cnum", "cflags",
                                             "cstate", "cctrl", "ccopy", "creset", "cname",
-                                            "cnid", NULL };
+                                            "cnid", "caad", "cmsglen", "ctagget", "ctagset",
+                                            "ctaglen", NULL };
     const char *const *c;
     EVP_CIPHER_CTX *ctx;
     char a[64] = "", key[32] = "";
@@ -2563,7 +2583,10 @@ static int cipher_command(const char *command, const char *line)
         if (command[1] == 'u') {
             r = EVP_CipherUpdate(ctx, out, &outl, cipher_data + cipher_offset, (int)n);
             printf(" %d %d", r, outl);
-            print_out(out, r ? outl : 0);
+            if (random_iv(ctx))
+                printf(" random IV");
+            else
+                print_out(out, r ? outl : 0);
         } else if (EVP_CIPHER_CTX_get_block_size(ctx) > 1
                    && n % EVP_CIPHER_CTX_get_block_size(ctx) != 0) {
             printf(" skipped\n");
@@ -2571,7 +2594,10 @@ static int cipher_command(const char *command, const char *line)
         } else {
             r = EVP_Cipher(ctx, out, cipher_data + cipher_offset, (unsigned int)n);
             printf(" %d", r);
-            print_out(out, (int)n);
+            if (random_iv(ctx))
+                printf(" random IV");
+            else
+                print_out(out, (int)n);
         }
         cipher_offset = (cipher_offset + (size_t)n * 3 + 1) % 1024;
     } else if (strcmp(command, "cfinal") == 0) {
@@ -2610,7 +2636,9 @@ static int cipher_command(const char *command, const char *line)
         printf(" iv %d block %d num %d enc %d flags %x", ivl, EVP_CIPHER_CTX_get_block_size(ctx),
                EVP_CIPHER_CTX_get0_cipher(ctx) == NULL ? -9 : EVP_CIPHER_CTX_get_num(ctx),
                EVP_CIPHER_CTX_is_encrypting(ctx), EVP_CIPHER_CTX_test_flags(ctx, 0x7fffffff));
-        if (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL && ivl > 0 && ivl <= 16) {
+        if (random_iv(ctx)) {
+            printf(" random IV");
+        } else if (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL && ivl > 0 && ivl <= 16) {
             memset(iv, 0, sizeof(iv));
             printf(" updated %d", EVP_CIPHER_CTX_get_updated_iv(ctx, iv, sizeof(iv)));
             print_out(iv, ivl);
@@ -2637,6 +2665,44 @@ static int cipher_command(const char *command, const char *line)
         else
             printf(" %s %d %d", EVP_CIPHER_get0_name(ciph), EVP_CIPHER_get_nid(ciph),
                    EVP_CIPHER_get_type(ciph));
+    } else if (strcmp(command, "caad") == 0 || strcmp(command, "cmsglen") == 0) {
+        const EVP_CIPHER *ciph = EVP_CIPHER_CTX_get0_cipher(ctx);
+
+        sscanf(line, "%*s %ld", &n);
+        /*
+         * Only an AEAD takes input without output (only CCM no input either): the others write
+         * or read through NULL in OpenSSL (docs/DEVIATIONS.md).
+         */
+        if (ciph == NULL || (EVP_CIPHER_get_flags(ciph) & EVP_CIPH_FLAG_AEAD_CIPHER) == 0
+            || (command[1] == 'm' && EVP_CIPHER_get_mode(ciph) != EVP_CIPH_CCM_MODE)) {
+            printf(" skipped\n");
+            return 1;
+        }
+        if (n < 0 || n > 1024)
+            n = 1024;
+        r = EVP_CipherUpdate(ctx, NULL, &outl,
+                             command[1] == 'a' ? cipher_data + cipher_offset : NULL, (int)n);
+        printf(" %d %d", r, outl);
+        if (command[1] == 'a')
+            cipher_offset = (cipher_offset + (size_t)n * 5 + 3) % 1024;
+    } else if (strcmp(command, "ctagget") == 0 || strcmp(command, "ctagset") == 0
+               || strcmp(command, "ctaglen") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (n < 0 || n > 16)
+            n = 16;
+        if (command[4] == 'g') {
+            memset(cipher_tag, 0, sizeof(cipher_tag));
+            r = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, (int)n, cipher_tag);
+            printf(" %d", r);
+            if (random_iv(ctx))
+                printf(" random IV");
+            else
+                print_out(cipher_tag, r > 0 ? (int)n : 0);
+        } else {
+            r = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG, (int)n,
+                                    command[4] == 's' ? cipher_tag : NULL);
+            printf(" %d", r);
+        }
     } else if (strcmp(command, "ccopy") == 0) {
         printf(" %d", EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx));
     } else {

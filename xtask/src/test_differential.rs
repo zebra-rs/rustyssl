@@ -1040,6 +1040,17 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
         "SM4-CFB",
         "ChaCha20",
         "NULL",
+        "AES-128-GCM",
+        "AES-256-GCM",
+        "ARIA-192-GCM",
+        "SM4-GCM",
+        "AES-128-CCM",
+        "AES-192-CCM",
+        "ARIA-256-CCM",
+        "SM4-CCM",
+        "AES-128-OCB",
+        "AES-256-OCB",
+        "ChaCha20-Poly1305",
         "nonesuch",
     ];
     let length = |random: &mut Random| -> u64 {
@@ -1056,7 +1067,7 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
     };
     let bit = |random: &mut Random| random.below(2);
     for _ in 0..random.below(25) + 1 {
-        match random.below(20) {
+        match random.below(24) {
             0..=2 => {
                 let enc = random.pick(&["1", "0"]);
                 writeln!(out, "cinit {} {enc} 1 1", random.pick(CIPHERS))?;
@@ -1081,6 +1092,17 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
                 writeln!(out, "cinitp {} {key} {n}", random.pick(CIPHERS))?;
             }
             6..=9 => writeln!(out, "cupdate {}", length(random))?,
+            20 | 21 => writeln!(
+                out,
+                "{} {}",
+                random.pick(&["caad", "caad", "cmsglen"]),
+                length(random)
+            )?,
+            22 | 23 => {
+                let n = random.pick(&["0", "1", "4", "6", "8", "12", "13", "16"]);
+                let c = random.pick(&["ctagget", "ctagget", "ctagset", "ctaglen"]);
+                writeln!(out, "{c} {n}")?;
+            }
             10 | 11 => writeln!(out, "cfinal")?,
             12 => writeln!(out, "ccipher {}", length(random))?,
             13 => writeln!(out, "cpad {}", bit(random))?,
@@ -1100,7 +1122,13 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
                     "9", "1", "9", "16", "17", "20", "18", "19", "24", "22", "2", "3", "4", "5",
                     "11", "23", "28", "30583",
                 ]);
-                let a = random.pick(&["-1", "0", "1", "4", "12", "13", "16", "24", "32"]);
+                // A fixed IV past the IV (or an inverted one past it) writes outside the
+                // reference's context (docs/DEVIATIONS.md): not drawn.
+                let a = match t {
+                    "18" => random.pick(&["-1", "4", "8", "12"]),
+                    "24" => random.pick(&["0", "4", "8"]),
+                    _ => random.pick(&["-1", "0", "1", "4", "12", "13", "16", "24", "32"]),
+                };
                 writeln!(out, "cctrl {t} {a}")?;
             }
             17 => writeln!(
