@@ -44,6 +44,7 @@ use crate::ffi::ffi_export;
 use crate::handle::{Handle, Held, handle_type};
 use crate::{err, init, libctx};
 
+pub(crate) mod aeads;
 pub(crate) mod builtin;
 pub(crate) mod ciphers;
 pub(crate) mod digests;
