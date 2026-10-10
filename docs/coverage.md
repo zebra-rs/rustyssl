@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 834 | 5042 | 14.2% |
+| libcrypto | 5876 | 852 | 5024 | 14.5% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **835** | **5644** | **12.9%** |
+| **Total** | **6479** | **853** | **5626** | **13.2%** |
 
 ## By header
 
@@ -72,7 +72,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/pem.h` | libcrypto | 145 | 7 | 4.8% |
 | `openssl/pkcs12.h` | libcrypto | 117 | 0 | 0.0% |
 | `openssl/pkcs7.h` | libcrypto | 118 | 0 | 0.0% |
-| `openssl/provider.h` | libcrypto | 22 | 0 | 0.0% |
+| `openssl/provider.h` | libcrypto | 22 | 18 | 81.8% |
 | `openssl/quic.h` | libssl | 3 | 0 | 0.0% |
 | `openssl/rand.h` | libcrypto | 25 | 0 | 0.0% |
 | `openssl/rc2.h` | libcrypto | 7 | 0 | 0.0% |
@@ -558,10 +558,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `ex_data`, `objects`, `stack` |
-| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `params`, `pem`, `properties`, `stack` |
+| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `params`, `pem`, `properties`, `provider`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue` |
+| `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue`, `provider` |
 | `ERR_get_state` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_lib_error_string` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_load_ASN1_strings` | libcrypto | `openssl/cryptoerr_legacy.h` | `err_queue` |
@@ -763,10 +763,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_ERR_STATE_restore` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
-| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
+| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties`, `provider` |
 | `OSSL_LIB_CTX_get0_global_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
 | `OSSL_LIB_CTX_get_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
-| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
+| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties`, `provider` |
 | `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
 | `OSSL_LIB_CTX_set_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
 | `OSSL_PARAM_BLD_free` | libcrypto | `openssl/param_build.h` | `params` |
@@ -789,8 +789,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_BLD_to_param` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_construct_BN` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_double` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_int` | libcrypto | `openssl/params.h` | `params` |
+| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `params`, `provider` |
+| `OSSL_PARAM_construct_int` | libcrypto | `openssl/params.h` | `params`, `provider` |
 | `OSSL_PARAM_construct_int32` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_int64` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_long` | libcrypto | `openssl/params.h` | `params` |
@@ -802,8 +802,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_construct_uint32` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_uint64` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_ulong` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_utf8_ptr` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_utf8_string` | libcrypto | `openssl/params.h` | `params` |
+| `OSSL_PARAM_construct_utf8_ptr` | libcrypto | `openssl/params.h` | `params`, `provider` |
+| `OSSL_PARAM_construct_utf8_string` | libcrypto | `openssl/params.h` | `params`, `provider` |
 | `OSSL_PARAM_dup` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_free` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_get_double` | libcrypto | `openssl/params.h` | `params` |
@@ -826,7 +826,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_locate` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_locate_const` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_merge` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_modified` | libcrypto | `openssl/params.h` | `params` |
+| `OSSL_PARAM_modified` | libcrypto | `openssl/params.h` | `params`, `provider` |
 | `OSSL_PARAM_set_all_unmodified` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_double` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_int` | libcrypto | `openssl/params.h` | `params` |
@@ -843,6 +843,24 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_set_ulong` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_utf8_ptr` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_utf8_string` | libcrypto | `openssl/params.h` | `params` |
+| `OSSL_PROVIDER_add_conf_parameter` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_available` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_conf_get_bool` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_do_all` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get0_default_search_path` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get0_dispatch` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get0_name` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get0_provider_ctx` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get_conf_parameters` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_get_params` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_gettable_params` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_load` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_self_test` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_set_default_search_path` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_try_load` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_try_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
+| `OSSL_PROVIDER_unload` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads`, `lib_ctx` |
 | `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
 | `OSSL_set_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads`, `lib_ctx` |
