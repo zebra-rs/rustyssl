@@ -15,30 +15,32 @@ use core::ffi::{CStr, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, EVP_CIPH_CCM_MODE, EVP_CIPH_GCM_MODE, EVP_CIPH_OCB_MODE,
+    ERR_LIB_EVP, ERR_LIB_PROV, EVP_CIPH_CCM_MODE, EVP_CIPH_GCM_MODE, EVP_CIPH_GCM_SIV_MODE,
+    EVP_CIPH_OCB_MODE, EVP_CIPH_SIV_MODE, EVP_R_INPUT_NOT_INITIALIZED,
     OSSL_CIPHER_PARAM_AEAD_IV_GENERATED, OSSL_CIPHER_PARAM_AEAD_IVLEN, OSSL_CIPHER_PARAM_AEAD_TAG,
     OSSL_CIPHER_PARAM_AEAD_TAGLEN, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD,
     OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN,
     OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV,
     OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN,
-    OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT,
-    OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL,
-    OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
-    OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
-    OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
-    OSSL_FUNC_CIPHER_UPDATE, OSSL_PARAM, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER,
-    PROV_R_FAILED_TO_GET_PARAMETER, PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_AAD,
-    PROV_R_INVALID_DATA, PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_TAG,
-    PROV_R_TAG_NOT_SET,
+    OSSL_CIPHER_PARAM_SPEED, OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_FUNC_CIPHER_CIPHER,
+    OSSL_FUNC_CIPHER_DECRYPT_INIT, OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT,
+    OSSL_FUNC_CIPHER_FINAL, OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS,
+    OSSL_FUNC_CIPHER_GET_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
+    OSSL_FUNC_CIPHER_GETTABLE_PARAMS, OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS,
+    OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_UPDATE, OSSL_PARAM,
+    OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, PROV_R_FAILED_TO_GET_PARAMETER,
+    PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_AAD, PROV_R_INVALID_DATA,
+    PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_TAG, PROV_R_TAG_NOT_SET,
 };
 use rustyssl_crypto::provided::aead::{Ccm, ChaChaPoly, Gcm, Io, Ocb, Raised};
 use rustyssl_crypto::provided::cipher::{Error, Output};
+use rustyssl_crypto::provided::siv::{GCM_SIV_NONCE, GcmSiv, Siv};
 use rustyssl_crypto::sym::BlockAlgorithm;
 
 use super::ciphers::{
     CtxParamsFn, DupFn, FinalFn, FreeFn, GENERIC_GETTABLE, GetCtxFn, GetParamsFn, GettableFn, Info,
     InitFn, NewCtxFn, SIZE_T, SetCtxFn, UINT, UpdateFn, Value, get_param, get_params_of, get_size,
-    is_empty, raise, set_param, write,
+    get_uint, is_empty, raise, set_param, write,
 };
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::err;
@@ -52,6 +54,8 @@ pub(crate) enum Aead {
     Ccm(Box<Ccm>),
     Ocb(Box<Ocb>),
     ChaChaPoly(Box<ChaChaPoly>),
+    Siv(Box<Siv>),
+    GcmSiv(Box<GcmSiv>),
 }
 
 /// The context behind `vctx`, or `None` for NULL.
@@ -116,7 +120,15 @@ ffi_callback! {
     where failure = ptr::null_mut(), library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
-        unsafe { context(vctx) }.map_or(ptr::null_mut(), |c| new_context(c.clone()))
+        let Some(c) = (unsafe { context(vctx) }) else { return ptr::null_mut() };
+        if let Aead::Siv(g) = c
+            && !g.keyed()
+        {
+            // `ossl_siv128_copy_ctx` copies the CTR context, which has none to copy.
+            err::raise(ERR_LIB_EVP, EVP_R_INPUT_NOT_INITIALIZED, "EVP_CIPHER_CTX_copy");
+            return ptr::null_mut();
+        }
+        new_context(c.clone())
     }
 }
 
@@ -159,6 +171,9 @@ unsafe fn init(
         Aead::Ccm(g) => g.init(enc, key, iv),
         Aead::Ocb(g) => g.init(enc, key, iv),
         Aead::ChaChaPoly(g) => g.init(enc, key, iv),
+        // SIV takes no IV.
+        Aead::Siv(g) => g.init(enc, key),
+        Aead::GcmSiv(g) => g.init(enc, key, iv),
     };
     if let Err(e) = r {
         raise(e, F);
@@ -269,6 +284,17 @@ unsafe fn process(
             g.cipher(io).map_err(Raised::from),
             "chacha20_poly1305_cipher",
         ),
+        // `update` is `cipher` for both.
+        (Aead::Siv(g), _) => (
+            g.cipher(io.input, io.inl, io.out, io.outsize)
+                .map_err(Raised::from),
+            "siv_cipher",
+        ),
+        (Aead::GcmSiv(g), _) => (
+            g.cipher(io.input, io.inl, io.out, io.outsize)
+                .map_err(Raised::from),
+            "ossl_aes_gcm_siv_cipher",
+        ),
     };
     // SAFETY: the caller's guarantee.
     unsafe { finish(r, out, outl, f) }
@@ -316,6 +342,8 @@ ffi_callback! {
             Aead::Ccm(g) => g.finalize(),
             Aead::Ocb(g) => g.finalize(),
             Aead::ChaChaPoly(g) => g.finalize(),
+            Aead::Siv(g) => g.finalize(),
+            Aead::GcmSiv(g) => g.finalize(),
         };
         // SAFETY: the caller's guarantee.
         unsafe { finish(r.map_err(Raised::from), out, outl, "aead_final") }
@@ -386,6 +414,10 @@ ffi_callback! {
             Aead::Ocb(g) => unsafe { ocb_get(g, params) },
             // SAFETY: the caller's guarantee.
             Aead::ChaChaPoly(g) => unsafe { chacha_poly_get(g, params) },
+            // SAFETY: the caller's guarantee.
+            Aead::Siv(g) => unsafe { siv_get(SivCtx::Siv(g), params) },
+            // SAFETY: the caller's guarantee.
+            Aead::GcmSiv(g) => unsafe { siv_get(SivCtx::GcmSiv(g), params) },
         }
     }
 }
@@ -414,6 +446,10 @@ ffi_callback! {
             Aead::Ocb(g) => unsafe { ocb_set(g, params) },
             // SAFETY: the caller's guarantee.
             Aead::ChaChaPoly(g) => unsafe { chacha_poly_set(g, params) },
+            // SAFETY: the caller's guarantee.
+            Aead::Siv(g) => unsafe { siv_set(g, params) },
+            // SAFETY: the caller's guarantee.
+            Aead::GcmSiv(g) => unsafe { gcm_siv_set(g, params) },
         }
     }
 }
@@ -961,6 +997,161 @@ unsafe fn chacha_poly_set(g: &mut ChaChaPoly, params: *const OSSL_PARAM) -> c_in
     1
 }
 
+/// SIV's or GCM-SIV's context, for their common `get_ctx_params`.
+enum SivCtx<'a> {
+    Siv(&'a mut Siv),
+    GcmSiv(&'a mut GcmSiv),
+}
+
+/// `aes_siv_get_ctx_params` and `ossl_aes_gcm_siv_get_ctx_params`: the tag (an octet string
+/// of exactly 16 octets, encrypting, after a message for GCM-SIV), its length, and the key's.
+///
+/// # Safety
+/// As for `get_ctx_params`.
+unsafe fn siv_get(c: SivCtx<'_>, params: *mut OSSL_PARAM) -> c_int {
+    let (f, keylen) = match &c {
+        SivCtx::Siv(g) => ("aes_siv_get_ctx_params", g.key_len()),
+        SivCtx::GcmSiv(g) => ("ossl_aes_gcm_siv_get_ctx_params", g.key_len()),
+    };
+    // SAFETY: the caller's array.
+    let tag_param = unsafe { find(params, OSSL_CIPHER_PARAM_AEAD_TAG) };
+    if let Some((p, q)) = tag_param.filter(|(_, q)| is_octets(q)) {
+        let tag = match &c {
+            SivCtx::Siv(g) => g.tag(q.data_size),
+            SivCtx::GcmSiv(g) => g.tag(q.data_size),
+        };
+        let ok = tag.is_ok_and(|t| {
+            // SAFETY: a parameter of the array; the tag's 16 octets.
+            (unsafe { OSSL_PARAM_set_octet_string(p, t.as_ptr().cast(), t.len()) }) != 0
+        });
+        if !ok {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, f);
+            return 0;
+        }
+    }
+    for (key, v) in [
+        (OSSL_CIPHER_PARAM_AEAD_TAGLEN, 16),
+        (OSSL_CIPHER_PARAM_KEYLEN, keylen),
+    ] {
+        // SAFETY: the caller's array.
+        if !unsafe { set_param(params, key, f, Value::Size(v)) } {
+            return 0;
+        }
+    }
+    1
+}
+
+/// The `speed` parameter, if any.
+///
+/// # Safety
+/// `params` is NULL or a parameter array.
+unsafe fn speed_of(params: *const OSSL_PARAM, f: &str) -> Result<Option<u32>, ()> {
+    // SAFETY: the caller's guarantee.
+    unsafe { get_param(params, OSSL_CIPHER_PARAM_SPEED, f, get_uint) }
+}
+
+/// `aes_siv_set_ctx_params`: the tag (ignored encrypting), `speed`, and `keylen` (only as it
+/// is); `final` then fails until the next message.
+///
+/// # Safety
+/// As for `set_ctx_params`.
+unsafe fn siv_set(g: &mut Siv, params: *const OSSL_PARAM) -> c_int {
+    const F: &str = "aes_siv_set_ctx_params";
+    // SAFETY: the caller's array.
+    if let Some((_, q)) = unsafe { find(params.cast_mut(), OSSL_CIPHER_PARAM_AEAD_TAG) } {
+        if g.encrypting() {
+            return 1;
+        }
+        let tag = if is_octets(q) {
+            // SAFETY: the caller's guarantee.
+            unsafe { data_of(q) }
+        } else {
+            None
+        };
+        if !tag.is_some_and(|t| g.set_tag(t).is_ok()) {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
+            return 0;
+        }
+    }
+    // SAFETY: the caller's array.
+    match unsafe { speed_of(params, F) } {
+        Err(()) => return 0,
+        Ok(Some(v)) => g.set_speed(v),
+        Ok(None) => {}
+    }
+    // SAFETY: the caller's array.
+    match unsafe { get_param(params, OSSL_CIPHER_PARAM_KEYLEN, F, get_size) } {
+        Err(()) => return 0,
+        Ok(Some(n)) if n != g.key_len() => return 0,
+        Ok(_) => {}
+    }
+    g.reset_final();
+    1
+}
+
+/// `ossl_aes_gcm_siv_set_ctx_params`: the tag (exactly 16 octets; kept decrypting), `speed`,
+/// and `keylen` (only as it is).
+///
+/// # Safety
+/// As for `set_ctx_params`.
+unsafe fn gcm_siv_set(g: &mut GcmSiv, params: *const OSSL_PARAM) -> c_int {
+    const F: &str = "ossl_aes_gcm_siv_set_ctx_params";
+    // SAFETY: the caller's array.
+    if let Some((_, q)) = unsafe { find(params.cast_mut(), OSSL_CIPHER_PARAM_AEAD_TAG) } {
+        let tag = if is_octets(q) {
+            // SAFETY: the caller's guarantee.
+            unsafe { data_of(q) }
+        } else {
+            None
+        };
+        if !tag.is_some_and(|t| g.set_tag(t).is_ok()) {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
+            return 0;
+        }
+    }
+    // SAFETY: the caller's array.
+    match unsafe { speed_of(params, F) } {
+        Err(()) => return 0,
+        Ok(Some(v)) => g.set_speed(v),
+        Ok(None) => {}
+    }
+    // SAFETY: the caller's array.
+    match unsafe { get_param(params, OSSL_CIPHER_PARAM_KEYLEN, F, get_size) } {
+        Err(()) => return 0,
+        Ok(Some(n)) if n != g.key_len() => {
+            err::raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH, F);
+            return 0;
+        }
+        Ok(_) => {}
+    }
+    1
+}
+
+static SIV_GETTABLE: Params<4> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_AEAD_TAGLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
+static SIV_SETTABLE: Params<4> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_SPEED, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
+
 static AEAD_GETTABLE: Params<10> = Params([
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
@@ -1103,6 +1294,8 @@ list!(ocb_gettable_ctx_params, OCB_GETTABLE);
 list!(ocb_settable_ctx_params, OCB_SETTABLE);
 list!(chacha_poly_gettable_ctx_params, CHACHA_POLY_GETTABLE);
 list!(chacha_poly_settable_ctx_params, CHACHA_POLY_SETTABLE);
+list!(siv_gettable_ctx_params, SIV_GETTABLE);
+list!(siv_settable_ctx_params, SIV_SETTABLE);
 
 ffi_callback! {
     /// `ossl_cipher_generic_gettable_params`.
@@ -1122,10 +1315,27 @@ const fn aead_info(mode: c_int, key_len: usize, block_size: usize) -> Info {
         mode: mode.cast_unsigned(),
         aead: true,
         custom_iv: true,
+        cts: false,
+        multiblock: false,
         rand_key: false,
         key_len,
         block_size,
         iv_len: 12,
+    }
+}
+
+/// SIV's and GCM-SIV's `get_params` facts: AEAD and custom IV, a block of 1.
+const fn siv_info(mode: c_int, key_len: usize, iv_len: usize) -> Info {
+    Info {
+        mode: mode.cast_unsigned(),
+        aead: true,
+        custom_iv: true,
+        cts: false,
+        multiblock: false,
+        rand_key: false,
+        key_len,
+        block_size: 1,
+        iv_len,
     }
 }
 
@@ -1248,6 +1458,37 @@ aead!(
     chacha_poly_settable_ctx_params
 );
 
+macro_rules! siv {
+    ($name:ident, $len:expr) => {
+        aead!(
+            $name,
+            Aead::Siv(Box::new(Siv::new($len))),
+            siv_info(EVP_CIPH_SIV_MODE, $len, 0),
+            siv_gettable_ctx_params,
+            siv_settable_ctx_params
+        );
+    };
+}
+
+macro_rules! gcm_siv {
+    ($name:ident, $len:expr) => {
+        aead!(
+            $name,
+            Aead::GcmSiv(Box::new(GcmSiv::new($len))),
+            siv_info(EVP_CIPH_GCM_SIV_MODE, $len, GCM_SIV_NONCE),
+            siv_gettable_ctx_params,
+            siv_settable_ctx_params
+        );
+    };
+}
+
+siv!(aes128siv, 32);
+siv!(aes192siv, 48);
+siv!(aes256siv, 64);
+gcm_siv!(aes128gcm_siv, 16);
+gcm_siv!(aes192gcm_siv, 24);
+gcm_siv!(aes256gcm_siv, 32);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1276,6 +1517,125 @@ mod tests {
         assert_eq!((r, outl), (1, 16));
         // SAFETY: a NULL output for the buffered octets, the case under test.
         let r = unsafe { final_(ctx, ptr::null_mut(), &raw mut outl, 32) };
+        assert_eq!(r, 0);
+        // SAFETY: the context from `newctx`.
+        unsafe { freectx(ctx) };
+    }
+
+    /// docs/DEVIATIONS.md: SIV's and GCM-SIV's tag with NULL data fails decrypting (the
+    /// reference copies 16 octets from NULL).
+    #[test]
+    fn null_tags_are_refused() {
+        for newctx in [aes128siv::newctx, aes128gcm_siv::newctx] {
+            // SAFETY: no preconditions.
+            let ctx = unsafe { newctx(ptr::null_mut()) };
+            let key = [1u8; 32];
+            let iv = [2u8; 12];
+            // SAFETY: a live context; a key and IV long enough for either.
+            let r = unsafe {
+                dinit(
+                    ctx,
+                    key.as_ptr(),
+                    key_len(ctx),
+                    iv.as_ptr(),
+                    12,
+                    ptr::null(),
+                )
+            };
+            assert_eq!(r, 1);
+            let params = [
+                crate::params::construct(
+                    OSSL_CIPHER_PARAM_AEAD_TAG.as_ptr(),
+                    OSSL_PARAM_OCTET_STRING.cast_unsigned(),
+                    ptr::null_mut(),
+                    16,
+                ),
+                crate::params::end(),
+            ];
+            // SAFETY: a live context and a parameter array, NULL data the case under test.
+            assert_eq!(unsafe { set_ctx_params(ctx, params.as_ptr()) }, 0);
+            // SAFETY: the context from `newctx`.
+            unsafe { freectx(ctx) };
+        }
+    }
+
+    /// The key length of a SIV or GCM-SIV context.
+    fn key_len(ctx: *mut c_void) -> usize {
+        // SAFETY: a live context from one of this module's `newctx`.
+        match unsafe { context(ctx) } {
+            Some(Aead::Siv(g)) => g.key_len(),
+            Some(Aead::GcmSiv(g)) => g.key_len(),
+            _ => 0,
+        }
+    }
+
+    /// docs/DEVIATIONS.md: GCM-SIV's message and final before an init fail (the reference
+    /// uses a cipher context it hasn't made).
+    #[test]
+    fn gcm_siv_before_an_init_is_refused() {
+        // SAFETY: no preconditions.
+        let ctx = unsafe { aes128gcm_siv::newctx(ptr::null_mut()) };
+        let data = [1u8; 5];
+        let mut out = [0u8; 16];
+        let mut outl = 0usize;
+        // SAFETY: room for the output; the input.
+        let r = unsafe { update(ctx, out.as_mut_ptr(), &raw mut outl, 16, data.as_ptr(), 5) };
+        assert_eq!(r, 0);
+        // SAFETY: as above.
+        let r = unsafe { final_(ctx, out.as_mut_ptr(), &raw mut outl, 16) };
+        assert_eq!(r, 0);
+        // SAFETY: the context from `newctx`.
+        unsafe { freectx(ctx) };
+    }
+
+    /// docs/DEVIATIONS.md: SIV's AAD, and its messages with `speed`, without a key fail (the
+    /// reference crashes).
+    #[test]
+    fn siv_aad_without_a_key_is_refused() {
+        // SAFETY: no preconditions.
+        let ctx = unsafe { aes128siv::newctx(ptr::null_mut()) };
+        // SAFETY: a live context, no key, no parameters.
+        let r = unsafe { einit(ctx, ptr::null(), 0, ptr::null(), 0, ptr::null()) };
+        assert_eq!(r, 1);
+        let aad = [1u8; 5];
+        let mut outl = 0usize;
+        // SAFETY: AAD (no output) without a key, the case under test.
+        let r = unsafe { update(ctx, ptr::null_mut(), &raw mut outl, 5, aad.as_ptr(), 5) };
+        assert_eq!(r, 0);
+        // A message with `speed` set: the reference uses the key's contexts unmade.
+        let mut speed: core::ffi::c_uint = 1;
+        let params = [
+            crate::params::construct(
+                OSSL_CIPHER_PARAM_SPEED.as_ptr(),
+                OSSL_PARAM_UNSIGNED_INTEGER.cast_unsigned(),
+                (&raw mut speed).cast(),
+                size_of::<core::ffi::c_uint>(),
+            ),
+            crate::params::end(),
+        ];
+        // SAFETY: a live context and a parameter array.
+        assert_eq!(unsafe { set_ctx_params(ctx, params.as_ptr()) }, 1);
+        let mut out = [0u8; 5];
+        // SAFETY: room for the output; the input.
+        let r = unsafe { update(ctx, out.as_mut_ptr(), &raw mut outl, 5, aad.as_ptr(), 5) };
+        assert_eq!(r, 0);
+        // Its copy fails, and what a failed EVP copy leaves (no algorithm context) is refused.
+        // SAFETY: a live context.
+        assert!(unsafe { dupctx(ctx) }.is_null());
+        // SAFETY: a NULL context, the case under test.
+        let r = unsafe { final_(ptr::null_mut(), out.as_mut_ptr(), &raw mut outl, 5) };
+        assert_eq!(r, 0);
+        // SAFETY: as above.
+        let r = unsafe {
+            update(
+                ptr::null_mut(),
+                out.as_mut_ptr(),
+                &raw mut outl,
+                5,
+                aad.as_ptr(),
+                5,
+            )
+        };
         assert_eq!(r, 0);
         // SAFETY: the context from `newctx`.
         unsafe { freectx(ctx) };

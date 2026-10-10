@@ -129,7 +129,7 @@ impl Static {
 
 /// Whether the CPU has AES-NI, as OpenSSL's `AESNI_CAPABLE` (its `OPENSSL_ia32cap` override
 /// aside): where the AES-CBC-HMAC composites exist.
-fn aesni() -> bool {
+pub(crate) fn aesni() -> bool {
     #[cfg(target_arch = "x86_64")]
     {
         std::arch::is_x86_feature_detected!("aes")
