@@ -3,7 +3,7 @@
 //! external provider has (`providers/defltprov.c`, `baseprov.c`, `nullprov.c`).
 //!
 //! Each reports its name, version, build information, and status. The algorithms they offer
-//! come with the algorithm steps; until then their `query_operation` offers none. `legacy` is
+//! come with the algorithm steps: `default` offers the digests (`digests.rs`). `legacy` is
 //! a module in OpenSSL's default build, and comes with module loading.
 
 use core::ffi::{CStr, c_int, c_void};
@@ -13,7 +13,7 @@ use rustyssl_abi::{
     ERR_LIB_CRYPTO, OPENSSL_CORE_CTX, OPENSSL_FULL_VERSION_STRING, OPENSSL_VERSION_STR,
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
-    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_PARAM,
+    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_OP_DIGEST, OSSL_PARAM,
     OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME,
     OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
 };
@@ -149,7 +149,7 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `deflt_query` (and the others) until the algorithms arrive: none, cacheable.
+    /// `base_query` and `null_query` until their algorithms arrive: none, cacheable.
     ///
     /// # Safety
     /// `no_cache` is NULL or valid for a write.
@@ -161,6 +161,26 @@ ffi_callback! {
             unsafe { no_cache.write(0) };
         }
         ptr::null()
+    }
+}
+
+ffi_callback! {
+    /// `deflt_query`: the default provider's algorithms for an operation, cacheable. The
+    /// digests so far; the other operations come with their steps.
+    ///
+    /// # Safety
+    /// `no_cache` is NULL or valid for a write.
+    pub(crate) unsafe extern "C" fn default_query(_provctx: *mut c_void, operation_id: c_int, no_cache: *mut c_int) -> *const OSSL_ALGORITHM
+    where failure = ptr::null(), library = ERR_LIB_CRYPTO
+    {
+        if !no_cache.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { no_cache.write(0) };
+        }
+        match operation_id {
+            OSSL_OP_DIGEST => super::digests::default_digests(),
+            _ => ptr::null(),
+        }
     }
 }
 
@@ -213,7 +233,7 @@ static DEFAULT_DISPATCH: [OSSL_DISPATCH; 5] = [
         default_get_params,
         GetParamsFn
     ),
-    entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, query_operation, QueryFn),
+    entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, default_query, QueryFn),
     END,
 ];
 

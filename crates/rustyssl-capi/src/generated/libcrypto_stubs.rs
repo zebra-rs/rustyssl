@@ -9623,68 +9623,6 @@ pub extern "C" fn EVP_DecryptUpdate(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_Digest(
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *const EVP_MD,
-    _: *mut ENGINE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_Digest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestFinal(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestFinalXOF(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestFinalXOF")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestFinal_ex(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestFinal_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestInit(_: *mut EVP_MD_CTX, _: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestInit_ex(
-    _: *mut EVP_MD_CTX,
-    _: *const EVP_MD,
-    _: *mut ENGINE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestInit_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestInit_ex2(
-    _: *mut EVP_MD_CTX,
-    _: *const EVP_MD,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestInit_ex2")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_DigestSign(
     _: *mut EVP_MD_CTX,
     _: *mut core::ffi::c_uchar,
@@ -9735,24 +9673,6 @@ pub extern "C" fn EVP_DigestSignUpdate(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_DigestSignUpdate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSqueeze(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSqueeze")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestUpdate(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_void,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestUpdate")
 }
 
 #[unsafe(no_mangle)]
@@ -10426,149 +10346,13 @@ pub extern "C" fn EVP_MAC_update(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_clear_flags(_: *mut EVP_MD_CTX, _: core::ffi::c_int) {
-    crate::stub::unimplemented("EVP_MD_CTX_clear_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_copy(_: *mut EVP_MD_CTX, _: *const EVP_MD_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_copy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_copy_ex(_: *mut EVP_MD_CTX, _: *const EVP_MD_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_copy_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_ctrl(
-    _: *mut EVP_MD_CTX,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_dup(_: *const EVP_MD_CTX) -> *mut EVP_MD_CTX {
-    crate::stub::unimplemented("EVP_MD_CTX_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_free(_: *mut EVP_MD_CTX) {
-    crate::stub::unimplemented("EVP_MD_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get0_md(_: *const EVP_MD_CTX) -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_MD_CTX_get0_md")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get0_md_data(_: *const EVP_MD_CTX) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("EVP_MD_CTX_get0_md_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get1_md(_: *mut EVP_MD_CTX) -> *mut EVP_MD {
-    crate::stub::unimplemented("EVP_MD_CTX_get1_md")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get_params(
-    _: *mut EVP_MD_CTX,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_get_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_CTX_get_pkey_ctx(_: *const EVP_MD_CTX) -> *mut EVP_PKEY_CTX {
     crate::stub::unimplemented("EVP_MD_CTX_get_pkey_ctx")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get_size_ex(_: *const EVP_MD_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_get_size_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_gettable_params(_: *mut EVP_MD_CTX) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_MD_CTX_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_md(_: *const EVP_MD_CTX) -> *const EVP_MD {
-    crate::stub::unimplemented("EVP_MD_CTX_md")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_new() -> *mut EVP_MD_CTX {
-    crate::stub::unimplemented("EVP_MD_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_reset(_: *mut EVP_MD_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_reset")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_set_flags(_: *mut EVP_MD_CTX, _: core::ffi::c_int) {
-    crate::stub::unimplemented("EVP_MD_CTX_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_set_params(
-    _: *mut EVP_MD_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_set_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_CTX_set_pkey_ctx(_: *mut EVP_MD_CTX, _: *mut EVP_PKEY_CTX) {
     crate::stub::unimplemented("EVP_MD_CTX_set_pkey_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_set_update_fn(
-    _: *mut EVP_MD_CTX,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            ctx: *mut EVP_MD_CTX,
-            data: *const core::ffi::c_void,
-            count: usize,
-        ) -> core::ffi::c_int,
-    >,
-) {
-    crate::stub::unimplemented("EVP_MD_CTX_set_update_fn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_settable_params(_: *mut EVP_MD_CTX) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_MD_CTX_settable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_test_flags(
-    _: *const EVP_MD_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_CTX_test_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_update_fn(
-    _: *mut EVP_MD_CTX,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        ctx: *mut EVP_MD_CTX,
-        arg1: *const core::ffi::c_void,
-        arg2: usize,
-    ) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("EVP_MD_CTX_update_fn")
 }
 
 #[unsafe(no_mangle)]
@@ -10604,11 +10388,6 @@ pub extern "C" fn EVP_MD_do_all_sorted(
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_get_pkey_type(_: *const EVP_MD) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_MD_get_pkey_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_gettable_ctx_params(_: *const EVP_MD) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_MD_gettable_ctx_params")
 }
 
 #[unsafe(no_mangle)]
@@ -10797,16 +10576,6 @@ pub extern "C" fn EVP_MD_meth_set_update(
     >,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_MD_meth_set_update")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_settable_ctx_params(_: *const EVP_MD) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_MD_settable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_xof(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_xof")
 }
 
 #[unsafe(no_mangle)]
@@ -13927,19 +13696,6 @@ pub extern "C" fn EVP_PKEY_verify_recover_init_ex2(
     _: *const OSSL_PARAM,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_verify_recover_init_ex2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_Q_digest(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_Q_digest")
 }
 
 #[unsafe(no_mangle)]
