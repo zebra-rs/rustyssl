@@ -25,6 +25,8 @@ allow-wildcard-paths = true
 # Build scripts are where C sneaks in (`cc`, `*-sys`). These only probe the compiler and set
 # cfgs; anything new must be reviewed and added here.
 allow-build-scripts = [
+    # Sets `getrandom_msan` when built with MemorySanitizer; nothing else.
+    { crate = "getrandom" },
     { crate = "libc" },
     { crate = "proc-macro2" },
     { crate = "quote" },

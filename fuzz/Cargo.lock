@@ -382,6 +382,7 @@ dependencies = [
  "cipher",
  "des",
  "digest",
+ "getrandom",
  "ghash",
  "hybrid-array",
  "idea",
