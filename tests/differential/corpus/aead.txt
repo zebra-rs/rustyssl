@@ -1,0 +1,440 @@
+# AEADs: GCM, CCM, OCB, ChaCha20-Poly1305 with AAD, tags, IV lengths, TLS ctrls, misuse
+cinit AES-128-GCM 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit AES-128-GCM 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit AES-128-GCM 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit AES-128-GCM 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit AES-128-GCM 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit AES-256-GCM 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit AES-256-GCM 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit AES-256-GCM 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit AES-256-GCM 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit AES-256-GCM 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit ARIA-128-GCM 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit ARIA-128-GCM 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit ARIA-128-GCM 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit ARIA-128-GCM 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit ARIA-128-GCM 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit SM4-GCM 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit SM4-GCM 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit SM4-GCM 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit SM4-GCM 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit SM4-GCM 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit AES-128-OCB 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit AES-128-OCB 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit AES-128-OCB 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit AES-128-OCB 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit AES-128-OCB 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit AES-192-OCB 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit AES-192-OCB 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit AES-192-OCB 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit AES-192-OCB 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit AES-192-OCB 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit ChaCha20-Poly1305 1 1 1
+caad 13
+caad 7
+cupdate 33
+cupdate 0
+cupdate 31
+cfinal
+ctagget 16
+cstate
+cinit ChaCha20-Poly1305 0 1 1
+ctagset 16
+caad 20
+cupdate 64
+cfinal
+cinit ChaCha20-Poly1305 0 1 1
+ctagset 12
+caad 20
+cupdate 64
+cfinal
+cupdate 3
+cfinal
+cinit ChaCha20-Poly1305 1 1 1
+cupdate 16
+caad 4
+cfinal
+cfinal
+ctagget 17
+ctagget 4
+ctagset 16
+cinit ChaCha20-Poly1305 0 1 1
+cupdate 16
+cfinal
+ctaglen 8
+ctaglen 0
+ctaglen 17
+cinit AES-128-CCM 1 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 1 1 1
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+ctagget 16
+ctagget 12
+cstate
+cinit AES-128-CCM 0 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 0 1 1
+ctagset 16
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+cinit AES-128-CCM 1 1 1
+caad 4
+cupdate 20
+cfinal
+ctagget 12
+cupdate 5
+cinit AES-128-CCM 0 1 1
+cupdate 20
+ctagset 12
+cupdate 20
+cfinal
+cctrl 20 1
+cctrl 20 9
+cctrl 20 4
+cstate
+cinit AES-256-CCM 1 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 1 1 1
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+ctagget 16
+ctagget 12
+cstate
+cinit AES-256-CCM 0 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 0 1 1
+ctagset 16
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+cinit AES-256-CCM 1 1 1
+caad 4
+cupdate 20
+cfinal
+ctagget 12
+cupdate 5
+cinit AES-256-CCM 0 1 1
+cupdate 20
+ctagset 12
+cupdate 20
+cfinal
+cctrl 20 1
+cctrl 20 9
+cctrl 20 4
+cstate
+cinit ARIA-192-CCM 1 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 1 1 1
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+ctagget 16
+ctagget 12
+cstate
+cinit ARIA-192-CCM 0 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 0 1 1
+ctagset 16
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+cinit ARIA-192-CCM 1 1 1
+caad 4
+cupdate 20
+cfinal
+ctagget 12
+cupdate 5
+cinit ARIA-192-CCM 0 1 1
+cupdate 20
+ctagset 12
+cupdate 20
+cfinal
+cctrl 20 1
+cctrl 20 9
+cctrl 20 4
+cstate
+cinit SM4-CCM 1 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 1 1 1
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+ctagget 16
+ctagget 12
+cstate
+cinit SM4-CCM 0 0 0
+ctaglen 16
+cctrl 9 13
+cinit - 0 1 1
+ctagset 16
+cmsglen 40
+caad 9
+cupdate 40
+cfinal
+cinit SM4-CCM 1 1 1
+caad 4
+cupdate 20
+cfinal
+ctagget 12
+cupdate 5
+cinit SM4-CCM 0 1 1
+cupdate 20
+ctagset 12
+cupdate 20
+cfinal
+cctrl 20 1
+cctrl 20 9
+cctrl 20 4
+cstate
+cinit AES-128-GCM 1 1 0
+cctrl 18 4
+cctrl 18 3
+cctrl 18 -1
+cctrl 19 8
+cctrl 19 -1
+cctrl 22 13
+ccipher 40
+cctrl 24 8
+cinit AES-128-GCM 0 1 0
+cctrl 18 4
+cctrl 24 8
+cctrl 22 13
+ccipher 40
+cstate
+cinit ChaCha20-Poly1305 1 1 0
+cctrl 18 12
+cctrl 22 13
+ccipher 56
+cinit ChaCha20-Poly1305 0 1 1
+cctrl 22 13
+ccipher 56
+cinit AES-128-CCM 1 0 0
+cctrl 9 12
+ctaglen 16
+cinit - 1 1 0
+cctrl 18 4
+cctrl 22 13
+ccipher 40
+cinit AES-128-GCM 1 1 1
+ccopy
+cupdate 5
+cctx 1
+cupdate 5
+cfinal
+ctagget 16
+cctx 0
+cfinal
+ctagget 16
+cinit AES-256-GCM 1 1 1
+cctrl 9 16
+cinit - 1 0 1
+cupdate 20
+cfinal
+ctagget 16
+cctrl 9 0
+cctrl 9 129
+# CCM keeps its last tag when its key is set again (CRYPTO_ccm128_init keeps the CMAC)
+cinit ARIA-256-CCM 1 1 1
+ccipher 294
+cinit - -1 1 1
+ctagget 12
+cinit - -1 0 1
+ctagget 12

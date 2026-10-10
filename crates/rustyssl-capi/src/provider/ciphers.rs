@@ -18,27 +18,31 @@ use core::ffi::{c_int, c_uint, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, OSSL_ALGORITHM, OSSL_CIPHER_PARAM_AEAD,
-    OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS, OSSL_CIPHER_PARAM_CUSTOM_IV,
-    OSSL_CIPHER_PARAM_DECRYPT_ONLY, OSSL_CIPHER_PARAM_HAS_RAND_KEY, OSSL_CIPHER_PARAM_IV,
-    OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_MODE,
-    OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING, OSSL_CIPHER_PARAM_RANDOM_KEY,
-    OSSL_CIPHER_PARAM_TLS_MAC, OSSL_CIPHER_PARAM_TLS_MAC_SIZE, OSSL_CIPHER_PARAM_TLS_VERSION,
-    OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_CIPHER_PARAM_USE_BITS,
-    OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT, OSSL_FUNC_CIPHER_DUPCTX,
-    OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL, OSSL_FUNC_CIPHER_FREECTX,
-    OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
+    ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, OSSL_ALGORITHM,
+    OSSL_CIPHER_PARAM_AEAD, OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS,
+    OSSL_CIPHER_PARAM_CUSTOM_IV, OSSL_CIPHER_PARAM_DECRYPT_ONLY, OSSL_CIPHER_PARAM_HAS_RAND_KEY,
+    OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN,
+    OSSL_CIPHER_PARAM_MODE, OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING,
+    OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_TLS_MAC, OSSL_CIPHER_PARAM_TLS_MAC_SIZE,
+    OSSL_CIPHER_PARAM_TLS_VERSION, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV,
+    OSSL_CIPHER_PARAM_USE_BITS, OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT,
+    OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL,
+    OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
     OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
     OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_CIPHER_UPDATE, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_PTR,
     OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, PROV_R_BAD_DECRYPT,
     PROV_R_CIPHER_OPERATION_FAILED, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_FAILED_TO_GET_PARAMETER,
-    PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH,
-    PROV_R_NO_KEY_SET, PROV_R_OUTPUT_BUFFER_TOO_SMALL, PROV_R_WRONG_FINAL_BLOCK_LENGTH,
+    PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_AAD, PROV_R_INVALID_DATA,
+    PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_TAG,
+    PROV_R_INVALID_TAG_LENGTH, PROV_R_NO_KEY_SET, PROV_R_OUTPUT_BUFFER_TOO_SMALL,
+    PROV_R_TAG_NOT_NEEDED, PROV_R_TAG_NOT_SET, PROV_R_TOO_MANY_RECORDS,
+    PROV_R_WRONG_FINAL_BLOCK_LENGTH,
 };
 use rustyssl_crypto::provided::cipher::{Ctx, Error, Kind, Mode, Output};
 use rustyssl_crypto::sym::BlockAlgorithm;
 
+use super::aeads;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry};
 use crate::err;
 use crate::ffi::ffi_callback;
@@ -69,7 +73,7 @@ unsafe fn context<'a>(vctx: *mut c_void) -> Option<&'a mut AlgCtx> {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
+pub(crate) unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
     // SAFETY: the caller's guarantee.
     unsafe { params.as_ref() }.is_none_or(|p| p.key.is_null())
 }
@@ -85,7 +89,7 @@ fn new_context(kind: Kind) -> *mut c_void {
 
 /// Raises the error for a core failure from `function`.
 #[track_caller]
-fn raise(e: Error, function: &str) {
+pub(crate) fn raise(e: Error, function: &str) {
     let reason = match e {
         Error::Silent => return,
         Error::NoKeySet => PROV_R_NO_KEY_SET,
@@ -98,6 +102,15 @@ fn raise(e: Error, function: &str) {
         Error::FailedToGetParameter => PROV_R_FAILED_TO_GET_PARAMETER,
         Error::FailedToGenerateKey => PROV_R_FAILED_TO_GENERATE_KEY,
         Error::Internal => ERR_R_INTERNAL_ERROR,
+        Error::InvalidTag => PROV_R_INVALID_TAG,
+        Error::InvalidTagLength => PROV_R_INVALID_TAG_LENGTH,
+        Error::TagNotNeeded => PROV_R_TAG_NOT_NEEDED,
+        Error::TagNotSet => PROV_R_TAG_NOT_SET,
+        Error::TooManyRecords => PROV_R_TOO_MANY_RECORDS,
+        Error::InvalidAad => PROV_R_INVALID_AAD,
+        Error::InvalidData => PROV_R_INVALID_DATA,
+        Error::PassedInvalidArgument => ERR_R_PASSED_INVALID_ARGUMENT,
+        Error::FailedToSetParameter => PROV_R_FAILED_TO_SET_PARAMETER,
     };
     err::raise(ERR_LIB_PROV, reason, function);
 }
@@ -106,7 +119,7 @@ fn raise(e: Error, function: &str) {
 ///
 /// # Safety
 /// `p` is NULL or holds `len` octets.
-unsafe fn input<'a>(p: *const u8, len: usize) -> Option<&'a [u8]> {
+pub(crate) unsafe fn input<'a>(p: *const u8, len: usize) -> Option<&'a [u8]> {
     if len == 0 {
         return Some(&[]);
     }
@@ -121,7 +134,7 @@ unsafe fn input<'a>(p: *const u8, len: usize) -> Option<&'a [u8]> {
 ///
 /// # Safety
 /// `out` is NULL or has room for `o.data.len()` octets.
-unsafe fn write(out: *mut u8, o: &Output) -> bool {
+pub(crate) unsafe fn write(out: *mut u8, o: &Output) -> bool {
     let n = o.data.len();
     if n == 0 {
         return true;
@@ -404,7 +417,7 @@ ffi_callback! {
 
 /// A value a provider function reports.
 #[derive(Clone, Copy)]
-enum Value {
+pub(crate) enum Value {
     Int(c_int),
     Uint(c_uint),
     Size(usize),
@@ -412,6 +425,8 @@ enum Value {
     Ptr(*const u8, usize),
     /// The context's IV: as an octet pointer, or else copied as an octet string.
     Iv(*const u8, usize),
+    /// Likewise, copied as an octet string first (the AEADs' order).
+    IvCopyFirst(*const u8, usize),
 }
 
 /// Sets the parameter `key` of `params`, if there is one, to `value`, raising
@@ -419,7 +434,7 @@ enum Value {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array; a pointer value holds its length.
-unsafe fn set_param(
+pub(crate) unsafe fn set_param(
     params: *mut OSSL_PARAM,
     key: &core::ffi::CStr,
     function: &str,
@@ -439,6 +454,16 @@ unsafe fn set_param(
         Value::Size(v) => unsafe { OSSL_PARAM_set_size_t(p, v) },
         // SAFETY: as above; the caller's pointer.
         Value::Ptr(v, n) => unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) },
+        Value::IvCopyFirst(v, n) => {
+            // SAFETY: as above; the IV holds `n` octets.
+            let r = unsafe { OSSL_PARAM_set_octet_string(p, v.cast(), n) };
+            if r == 0 {
+                // SAFETY: as above.
+                unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) }
+            } else {
+                r
+            }
+        }
         Value::Iv(v, n) => {
             // SAFETY: as above.
             let r = unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) };
@@ -457,27 +482,54 @@ unsafe fn set_param(
     true
 }
 
-/// `ossl_cipher_generic_get_params` (`ossl_tdes_get_params` adds `decrypt-only`).
+/// What `ossl_cipher_generic_get_params` reports for a cipher.
+#[derive(Clone, Copy)]
+pub(crate) struct Info {
+    pub(crate) mode: u32,
+    pub(crate) aead: bool,
+    pub(crate) custom_iv: bool,
+    pub(crate) rand_key: bool,
+    pub(crate) key_len: usize,
+    pub(crate) block_size: usize,
+    pub(crate) iv_len: usize,
+}
+
+impl Info {
+    const fn of(kind: Kind) -> Self {
+        Self {
+            mode: kind.mode(),
+            aead: false,
+            custom_iv: kind.custom_iv(),
+            rand_key: kind.has_rand_key(),
+            key_len: kind.key_len(),
+            block_size: kind.block_size(),
+            iv_len: kind.iv_len(),
+        }
+    }
+}
+
+/// `ossl_cipher_generic_get_params` (`ossl_tdes_get_params`, for random keys, adds
+/// `decrypt-only`).
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
+pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int {
     const F: &str = "ossl_cipher_generic_get_params";
-    if kind.has_rand_key() {
+    if info.rand_key {
         // SAFETY: the caller's array; a located parameter.
         if !unsafe { set_param(params, OSSL_CIPHER_PARAM_DECRYPT_ONLY, F, Value::Int(0)) } {
             return 0;
         }
     }
     let flags = [
-        (OSSL_CIPHER_PARAM_AEAD, false),
-        (OSSL_CIPHER_PARAM_CUSTOM_IV, kind.custom_iv()),
+        (OSSL_CIPHER_PARAM_AEAD, info.aead),
+        (OSSL_CIPHER_PARAM_CUSTOM_IV, info.custom_iv),
         (OSSL_CIPHER_PARAM_CTS, false),
         (OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, false),
-        (OSSL_CIPHER_PARAM_HAS_RAND_KEY, kind.has_rand_key()),
+        (OSSL_CIPHER_PARAM_HAS_RAND_KEY, info.rand_key),
     ];
     // SAFETY: the caller's array; a located parameter.
-    if !unsafe { set_param(params, OSSL_CIPHER_PARAM_MODE, F, Value::Uint(kind.mode())) } {
+    if !unsafe { set_param(params, OSSL_CIPHER_PARAM_MODE, F, Value::Uint(info.mode)) } {
         return 0;
     }
     for (key, on) in flags {
@@ -487,9 +539,9 @@ unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
         }
     }
     for (key, value) in [
-        (OSSL_CIPHER_PARAM_KEYLEN, kind.key_len()),
-        (OSSL_CIPHER_PARAM_BLOCK_SIZE, kind.block_size()),
-        (OSSL_CIPHER_PARAM_IVLEN, kind.iv_len()),
+        (OSSL_CIPHER_PARAM_KEYLEN, info.key_len),
+        (OSSL_CIPHER_PARAM_BLOCK_SIZE, info.block_size),
+        (OSSL_CIPHER_PARAM_IVLEN, info.iv_len),
     ] {
         // SAFETY: as above.
         if !unsafe { set_param(params, key, F, Value::Size(value)) } {
@@ -497,6 +549,15 @@ unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
         }
     }
     1
+}
+
+/// `get_params` for one of this module's ciphers.
+///
+/// # Safety
+/// `params` is NULL or a parameter array.
+unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe { get_params_of(Info::of(kind), params) }
 }
 
 ffi_callback! {
@@ -579,7 +640,7 @@ ffi_callback! {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn get_param<T: Default>(
+pub(crate) unsafe fn get_param<T: Default>(
     params: *const OSSL_PARAM,
     key: &core::ffi::CStr,
     function: &str,
@@ -599,13 +660,13 @@ unsafe fn get_param<T: Default>(
 }
 
 /// Gets an unsigned int parameter.
-fn get_uint(p: *const OSSL_PARAM, v: *mut c_uint) -> c_int {
+pub(crate) fn get_uint(p: *const OSSL_PARAM, v: *mut c_uint) -> c_int {
     // SAFETY: a located parameter and a local.
     unsafe { OSSL_PARAM_get_uint(p, v) }
 }
 
 /// Gets a size_t parameter.
-fn get_size(p: *const OSSL_PARAM, v: *mut usize) -> c_int {
+pub(crate) fn get_size(p: *const OSSL_PARAM, v: *mut usize) -> c_int {
     // SAFETY: a located parameter and a local.
     unsafe { OSSL_PARAM_get_size_t(p, v) }
 }
@@ -772,11 +833,11 @@ ffi_callback! {
     }
 }
 
-const SIZE_T: usize = size_of::<usize>();
-const INT: usize = size_of::<c_int>();
-const UINT: usize = size_of::<c_uint>();
+pub(crate) const SIZE_T: usize = size_of::<usize>();
+pub(crate) const INT: usize = size_of::<c_int>();
+pub(crate) const UINT: usize = size_of::<c_uint>();
 
-static GENERIC_GETTABLE: Params<10> = Params([
+pub(crate) static GENERIC_GETTABLE: Params<10> = Params([
     defn(OSSL_CIPHER_PARAM_MODE, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
@@ -915,10 +976,10 @@ ffi_callback! {
     }
 }
 
-type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
-type FreeFn = unsafe extern "C" fn(*mut c_void);
-type DupFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
-type InitFn = unsafe extern "C" fn(
+pub(crate) type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(crate) type FreeFn = unsafe extern "C" fn(*mut c_void);
+pub(crate) type DupFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(crate) type InitFn = unsafe extern "C" fn(
     *mut c_void,
     *const u8,
     usize,
@@ -926,14 +987,14 @@ type InitFn = unsafe extern "C" fn(
     usize,
     *const OSSL_PARAM,
 ) -> c_int;
-type UpdateFn =
+pub(crate) type UpdateFn =
     unsafe extern "C" fn(*mut c_void, *mut u8, *mut usize, usize, *const u8, usize) -> c_int;
-type FinalFn = unsafe extern "C" fn(*mut c_void, *mut u8, *mut usize, usize) -> c_int;
-type GetParamsFn = unsafe extern "C" fn(*mut OSSL_PARAM) -> c_int;
-type GettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
-type GetCtxFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
-type SetCtxFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
-type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
+pub(crate) type FinalFn = unsafe extern "C" fn(*mut c_void, *mut u8, *mut usize, usize) -> c_int;
+pub(crate) type GetParamsFn = unsafe extern "C" fn(*mut OSSL_PARAM) -> c_int;
+pub(crate) type GettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
+pub(crate) type GetCtxFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
+pub(crate) type SetCtxFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
+pub(crate) type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
 /// One cipher: its `newctx` and `get_params`, and its family's table.
 macro_rules! cipher {
@@ -1236,9 +1297,9 @@ cipher!(sm4128ofb128, block(Sm4, 16, Ofb), generic);
 cipher!(sm4128cfb128, block(Sm4, 16, Cfb), generic);
 cipher!(chacha20, Kind::ChaCha20, chacha20);
 
-/// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order: those of this
-/// step (the AEADs, XTS, SIV, the key wraps, CTS, and the composites come with 3.4b and 3.4c).
-pub(crate) static DEFAULT_CIPHERS: Algorithms<81> = Algorithms([
+/// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order (XTS, SIV, the key
+/// wraps, CTS, and the composites come with 3.4c).
+pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
     alg(c"NULL", &null::TABLE),
     alg(c"AES-256-ECB:2.16.840.1.101.3.4.1.41", &aes256ecb::TABLE),
     alg(c"AES-192-ECB:2.16.840.1.101.3.4.1.21", &aes192ecb::TABLE),
@@ -1270,6 +1331,57 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<81> = Algorithms([
     alg(c"AES-256-CTR", &aes256ctr::TABLE),
     alg(c"AES-192-CTR", &aes192ctr::TABLE),
     alg(c"AES-128-CTR", &aes128ctr::TABLE),
+    alg(c"AES-256-OCB", &aeads::aes256ocb::TABLE),
+    alg(c"AES-192-OCB", &aeads::aes192ocb::TABLE),
+    alg(c"AES-128-OCB", &aeads::aes128ocb::TABLE),
+    alg(
+        c"AES-256-GCM:id-aes256-GCM:2.16.840.1.101.3.4.1.46",
+        &aeads::aes256gcm::TABLE,
+    ),
+    alg(
+        c"AES-192-GCM:id-aes192-GCM:2.16.840.1.101.3.4.1.26",
+        &aeads::aes192gcm::TABLE,
+    ),
+    alg(
+        c"AES-128-GCM:id-aes128-GCM:2.16.840.1.101.3.4.1.6",
+        &aeads::aes128gcm::TABLE,
+    ),
+    alg(
+        c"AES-256-CCM:id-aes256-CCM:2.16.840.1.101.3.4.1.47",
+        &aeads::aes256ccm::TABLE,
+    ),
+    alg(
+        c"AES-192-CCM:id-aes192-CCM:2.16.840.1.101.3.4.1.27",
+        &aeads::aes192ccm::TABLE,
+    ),
+    alg(
+        c"AES-128-CCM:id-aes128-CCM:2.16.840.1.101.3.4.1.7",
+        &aeads::aes128ccm::TABLE,
+    ),
+    alg(
+        c"ARIA-256-GCM:1.2.410.200046.1.1.36",
+        &aeads::aria256gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-192-GCM:1.2.410.200046.1.1.35",
+        &aeads::aria192gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-128-GCM:1.2.410.200046.1.1.34",
+        &aeads::aria128gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-256-CCM:1.2.410.200046.1.1.39",
+        &aeads::aria256ccm::TABLE,
+    ),
+    alg(
+        c"ARIA-192-CCM:1.2.410.200046.1.1.38",
+        &aeads::aria192ccm::TABLE,
+    ),
+    alg(
+        c"ARIA-128-CCM:1.2.410.200046.1.1.37",
+        &aeads::aria128ccm::TABLE,
+    ),
     alg(c"ARIA-256-ECB:1.2.410.200046.1.1.11", &aria256ecb::TABLE),
     alg(c"ARIA-192-ECB:1.2.410.200046.1.1.6", &aria192ecb::TABLE),
     alg(c"ARIA-128-ECB:1.2.410.200046.1.1.1", &aria128ecb::TABLE),
@@ -1379,6 +1491,8 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<81> = Algorithms([
     alg(c"DES-EDE-CBC", &tdes_ede2_cbc::TABLE),
     alg(c"DES-EDE-OFB", &tdes_ede2_ofb::TABLE),
     alg(c"DES-EDE-CFB", &tdes_ede2_cfb::TABLE),
+    alg(c"SM4-GCM:1.2.156.10197.1.104.8", &aeads::sm4128gcm::TABLE),
+    alg(c"SM4-CCM:1.2.156.10197.1.104.9", &aeads::sm4128ccm::TABLE),
     alg(c"SM4-ECB:1.2.156.10197.1.104.1", &sm4128ecb::TABLE),
     alg(c"SM4-CBC:SM4:1.2.156.10197.1.104.2", &sm4128cbc::TABLE),
     alg(c"SM4-CTR:1.2.156.10197.1.104.7", &sm4128ctr::TABLE),
@@ -1391,6 +1505,7 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<81> = Algorithms([
         &sm4128cfb128::TABLE,
     ),
     alg(c"ChaCha20", &chacha20::TABLE),
+    alg(c"ChaCha20-Poly1305", &aeads::chacha20_poly1305::TABLE),
     ALG_END,
 ]);
 
