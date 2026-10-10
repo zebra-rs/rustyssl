@@ -13,5 +13,6 @@ pub mod method_store;
 pub mod namemap;
 pub mod params;
 pub mod property;
+pub mod provided;
 pub mod rand;
 pub mod sym;

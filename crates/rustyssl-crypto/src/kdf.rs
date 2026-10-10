@@ -998,7 +998,7 @@ fn le32(n: usize) -> Result<[u8; 4], Error> {
 
 /// Unkeyed BLAKE2b of `size` octets (1 to 64) over the concatenated `parts`.
 fn blake2b(size: usize, parts: &[&[u8]], out: &mut [u8]) -> Result<(), Error> {
-    let mut m = mac::blake2b_unkeyed(size)?;
+    let mut m = mac::blake2_unkeyed(mac::Blake2Algorithm::Blake2b, size)?;
     for part in parts {
         m.update(part)?;
     }
