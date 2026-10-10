@@ -26,12 +26,19 @@
 
 use zeroize::{Zeroize, Zeroizing};
 
+mod composite;
+mod modes;
+
+pub use composite::{Multiblock, TLS1_AAD_LEN};
+
 use crate::sym::{self, BlockAlgorithm, BlockCipher};
 
 /// The largest block (and IV) the generic context holds (`GENERIC_BLOCK_SIZE`).
 const MAX_BLOCK: usize = 16;
 /// ChaCha20's block.
 const CHACHA_BLOCK: usize = 64;
+/// CTS's block (`CTS_BLOCK_SIZE`): only 128-bit block ciphers have it.
+const CTS_BLOCK: usize = 16;
 
 /// The modes of the block ciphers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -50,6 +57,23 @@ pub enum Mode {
     Cfb8,
     /// CTR with a 128-bit big-endian counter.
     Ctr,
+    /// CBC with ciphertext stealing (`cipher_cts.c`): CBC to the reference (`mode`), one
+    /// update per message, in the variant `cts_mode` names.
+    CbcCts,
+    /// XTS (`cipher_aes_xts.c`, `cipher_sm4_xts.c`): the key length is both keys'.
+    Xts,
+    /// The key wrap (RFC 3394; for triple DES, RFC 3217's `cipher_tdes_wrap.c`).
+    Wrap,
+    /// The key wrap with padding (RFC 5649).
+    WrapPad,
+    /// The key wrap with the inverse cipher as its forward transformation (`-INV`).
+    WrapInv,
+    /// The padded key wrap likewise.
+    WrapPadInv,
+    /// AES-CBC-HMAC-SHA1 (`cipher_aes_cbc_hmac_sha.c`): CBC to the reference (`mode`).
+    CbcHmacSha1,
+    /// AES-CBC-HMAC-SHA256.
+    CbcHmacSha256,
 }
 
 /// The default provider's ciphers handled here.
@@ -76,12 +100,18 @@ impl Kind {
         match self {
             Self::Block { mode, .. } => match mode {
                 Mode::Ecb => rustyssl_abi::EVP_CIPH_ECB_MODE.cast_unsigned(),
-                Mode::Cbc => rustyssl_abi::EVP_CIPH_CBC_MODE.cast_unsigned(),
+                Mode::Cbc | Mode::CbcCts | Mode::CbcHmacSha1 | Mode::CbcHmacSha256 => {
+                    rustyssl_abi::EVP_CIPH_CBC_MODE.cast_unsigned()
+                }
                 Mode::Ofb => rustyssl_abi::EVP_CIPH_OFB_MODE.cast_unsigned(),
                 Mode::Cfb | Mode::Cfb1 | Mode::Cfb8 => {
                     rustyssl_abi::EVP_CIPH_CFB_MODE.cast_unsigned()
                 }
                 Mode::Ctr => rustyssl_abi::EVP_CIPH_CTR_MODE.cast_unsigned(),
+                Mode::Xts => rustyssl_abi::EVP_CIPH_XTS_MODE.cast_unsigned(),
+                Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv => {
+                    rustyssl_abi::EVP_CIPH_WRAP_MODE.cast_unsigned()
+                }
             },
             Self::ChaCha20 | Self::Null => 0,
         }
@@ -101,9 +131,13 @@ impl Kind {
         match self {
             Self::Block {
                 algorithm,
-                mode: Mode::Ecb | Mode::Cbc,
+                mode: Mode::Ecb | Mode::Cbc | Mode::CbcCts | Mode::CbcHmacSha1 | Mode::CbcHmacSha256,
                 ..
             } => algorithm.block_size(),
+            Self::Block {
+                mode: Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv,
+                ..
+            } => 8,
             _ => 1,
         }
     }
@@ -115,6 +149,19 @@ impl Kind {
                 mode: Mode::Ecb, ..
             }
             | Self::Null => 0,
+            Self::Block {
+                algorithm: BlockAlgorithm::TripleDes,
+                mode: Mode::Wrap,
+                ..
+            } => 0,
+            Self::Block {
+                mode: Mode::Wrap | Mode::WrapInv,
+                ..
+            } => 8,
+            Self::Block {
+                mode: Mode::WrapPad | Mode::WrapPadInv,
+                ..
+            } => 4,
             Self::Block { algorithm, .. } => algorithm.block_size(),
             Self::ChaCha20 => 16,
         }
@@ -131,9 +178,83 @@ impl Kind {
         )
     }
 
-    /// Whether the cipher handles its IV itself (`custom-iv`; ChaCha20).
+    /// Whether the cipher is CBC with ciphertext stealing (`cts`).
+    pub const fn cts(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::CbcCts,
+                ..
+            }
+        )
+    }
+
+    /// Whether the cipher handles its IV itself (`custom-iv`: ChaCha20, XTS, the key wraps).
     pub const fn custom_iv(self) -> bool {
-        matches!(self, Self::ChaCha20)
+        matches!(
+            self,
+            Self::ChaCha20
+                | Self::Block {
+                    mode: Mode::Xts | Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv,
+                    ..
+                }
+        )
+    }
+
+    /// Whether the key wrap's forward transformation is the inverse cipher (`inverse-cipher`).
+    pub const fn inverse_cipher(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::WrapInv | Mode::WrapPadInv,
+                ..
+            }
+        )
+    }
+
+    /// Whether the mode is one of the key wraps.
+    pub const fn wrap(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv,
+                ..
+            }
+        )
+    }
+
+    /// Whether the cipher is an AES-CBC-HMAC composite (an AEAD with TLS multi-block to the
+    /// reference's flags).
+    pub const fn composite(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::CbcHmacSha1 | Mode::CbcHmacSha256,
+                ..
+            }
+        )
+    }
+
+    /// Whether the composite's MAC is HMAC-SHA256.
+    pub const fn composite_sha256(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::CbcHmacSha256,
+                ..
+            }
+        )
+    }
+
+    /// Whether the mode is XTS.
+    pub const fn xts(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::Xts,
+                ..
+            }
+        )
     }
 }
 
@@ -180,6 +301,14 @@ pub enum Error {
     PassedInvalidArgument,
     /// `PROV_R_FAILED_TO_SET_PARAMETER`.
     FailedToSetParameter,
+    /// `PROV_R_XTS_DUPLICATED_KEYS`.
+    XtsDuplicatedKeys,
+    /// `PROV_R_XTS_DATA_UNIT_IS_TOO_LARGE`.
+    XtsDataUnitIsTooLarge,
+    /// `PROV_R_INVALID_INPUT_LENGTH`.
+    InvalidInputLength,
+    /// `PROV_R_INVALID_OUTPUT_LENGTH`.
+    InvalidOutputLength,
 }
 
 /// What a function writes and reports.
@@ -195,6 +324,12 @@ pub struct Output {
     /// Set when the function fails after writing `data` (an AEAD's decryption that doesn't
     /// authenticate wipes its output): the error to raise, or [`Error::Silent`].
     pub failed: Option<Error>,
+    /// An error raised although the function succeeds (the AES key wraps report a failure as
+    /// a length of `SIZE_MAX`, which `EVP_CipherUpdate` refuses).
+    pub raised: Option<Error>,
+    /// Where `data` goes: this many octets into the output, those before left as they were
+    /// (a TLS 1.1 record's explicit IV, which AES-CBC-HMAC-SHA1 decrypts past).
+    pub at: usize,
 }
 
 impl Output {
@@ -204,6 +339,8 @@ impl Output {
             len,
             last_mask: 0xff,
             failed: None,
+            raised: None,
+            at: 0,
         }
     }
 }
@@ -299,6 +436,19 @@ pub struct Generic {
     use_bits: bool,
     tlsmacsize: usize,
     num: u32,
+    /// CTS's variant: 0, 1, 2 for CS1, CS2, CS3.
+    cts_mode: u8,
+    /// Whether CTS has had its one update since the last init.
+    updated: bool,
+    /// XTS's tweak key.
+    cipher2: Option<Box<dyn BlockCipher>>,
+    /// The direction when the key was set: XTS and the key wraps keep the transformation
+    /// chosen then, as the reference's key schedules do.
+    key_enc: bool,
+    /// SM4-XTS's standard: IEEE 1619 (true) or GB/T 17964-2021 (false, the default).
+    xts_ieee: bool,
+    /// The AES-CBC-HMAC composites' MAC and TLS state.
+    hmac: Option<Box<composite::Hmac>>,
     cipher: Option<Box<dyn BlockCipher>>,
     chacha: Option<ChaCha>,
 }
@@ -321,6 +471,12 @@ impl Clone for Generic {
             use_bits: self.use_bits,
             tlsmacsize: self.tlsmacsize,
             num: self.num,
+            cts_mode: self.cts_mode,
+            updated: self.updated,
+            cipher2: self.cipher2.as_ref().map(|c| c.clone_box()),
+            key_enc: self.key_enc,
+            xts_ieee: self.xts_ieee,
+            hmac: self.hmac.clone(),
             cipher: self.cipher.as_ref().map(|c| c.clone_box()),
             chacha: self.chacha.clone(),
         }
@@ -365,13 +521,29 @@ impl Ctx {
             ivlen: kind.iv_len(),
             blocksize: kind.block_size(),
             bufsz: 0,
-            pad: true,
+            // The AES key wraps report padding as whether they pad (`ivlen == 4`).
+            pad: !(kind.wrap() && kind.iv_len() == 8),
             enc: false,
             iv_set: false,
             key_set: false,
             use_bits: false,
             tlsmacsize: 0,
             num: 0,
+            cts_mode: 0,
+            updated: false,
+            cipher2: None,
+            key_enc: false,
+            // AES-XTS is IEEE 1619's; SM4-XTS starts as GB/T's.
+            xts_ieee: !matches!(
+                kind,
+                Kind::Block {
+                    algorithm: BlockAlgorithm::Sm4,
+                    ..
+                }
+            ),
+            hmac: kind
+                .composite()
+                .then(|| Box::new(composite::Hmac::new(kind.composite_sha256()))),
             cipher: None,
             chacha: (kind == Kind::ChaCha20).then(ChaCha::new),
         }))
@@ -396,7 +568,16 @@ impl Ctx {
                 }
                 Ok(())
             }
-            Self::Generic(g) => g.init(enc, key, iv),
+            Self::Generic(g) => {
+                let kind = g.kind;
+                if kind.xts() {
+                    g.xts_init(enc, key, iv)
+                } else if kind.wrap() && !kind.has_rand_key() {
+                    g.wrap_init(enc, key, iv)
+                } else {
+                    g.init(enc, key, iv)
+                }
+            }
         }
     }
 
@@ -406,7 +587,9 @@ impl Ctx {
         match self {
             Self::Null(n) => n.cipher(input, outsize),
             Self::Generic(g) => {
-                if g.is_block() {
+                if g.kind.cts() {
+                    g.cts_update(input, outsize, true)
+                } else if g.is_block() {
                     g.block_update(input, outsize)
                 } else {
                     g.stream_update(input, inl, outsize)
@@ -420,7 +603,10 @@ impl Ctx {
         match self {
             Self::Null(_) => Ok(Output::new(Vec::new(), 0)),
             Self::Generic(g) => {
-                if g.is_block() {
+                if g.kind.cts() {
+                    // `ossl_cipher_cbc_cts_block_final`: nothing, unconditionally.
+                    Ok(Output::new(Vec::new(), 0))
+                } else if g.is_block() {
                     g.block_final(outsize)
                 } else if !g.key_set {
                     Err(Error::NoKeySet)
@@ -507,7 +693,7 @@ impl Generic {
         matches!(
             self.kind,
             Kind::Block {
-                mode: Mode::Ecb | Mode::Cbc,
+                mode: Mode::Ecb | Mode::Cbc | Mode::CbcCts,
                 ..
             }
         )
@@ -534,6 +720,7 @@ impl Generic {
     fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.num = 0;
         self.bufsz = 0;
+        self.updated = false;
         self.enc = enc;
         let mode = self.mode();
         if let Some(iv) = iv {
@@ -543,7 +730,16 @@ impl Generic {
         } else if self.iv_set
             && matches!(
                 mode,
-                Some(Mode::Cbc | Mode::Cfb | Mode::Cfb1 | Mode::Cfb8 | Mode::Ofb)
+                Some(
+                    Mode::Cbc
+                        | Mode::CbcCts
+                        | Mode::CbcHmacSha1
+                        | Mode::CbcHmacSha256
+                        | Mode::Cfb
+                        | Mode::Cfb1
+                        | Mode::Cfb8
+                        | Mode::Ofb
+                )
             )
         {
             // Back to the IV as set, as OpenSSL 1.1.1 did. (CFB1 and CFB8 are CFB to the
@@ -591,6 +787,9 @@ impl Generic {
                 let c = sym::block_cipher(algorithm, key, None)
                     .map_err(|_| Error::CipherOperationFailed)?;
                 self.cipher = Some(c);
+                if self.is_composite() {
+                    self.composite_key();
+                }
             }
             Kind::ChaCha20 => {
                 let c = self.chacha.as_mut().ok_or(Error::Internal)?;
@@ -794,7 +993,9 @@ impl Generic {
                         };
                         r.map_err(|_| Error::CipherOperationFailed)?;
                     }
-                    Mode::Cbc => cbc(cipher.as_ref(), iv, data, enc)?,
+                    Mode::Cbc | Mode::CbcCts | Mode::CbcHmacSha1 | Mode::CbcHmacSha256 => {
+                        cbc(cipher.as_ref(), iv, data, enc)?;
+                    }
                     Mode::Ofb => self.num = ofb(cipher.as_ref(), iv, data, self.num)?,
                     Mode::Cfb => self.num = cfb(cipher.as_ref(), iv, data, self.num, enc)?,
                     Mode::Cfb8 => {
@@ -814,10 +1015,216 @@ impl Generic {
                         let ks = self.buf.get_mut(..bs).ok_or(Error::Internal)?;
                         self.num = ctr(cipher.as_ref(), iv, ks, data, self.num)?;
                     }
+                    // XTS and the key wraps run in `modes`, not here.
+                    Mode::Xts | Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv => {
+                        return Err(Error::Silent);
+                    }
                 }
                 Ok(0xff)
             }
         }
+    }
+
+    /// CBC over `data` (whole blocks) in place, from the running IV.
+    fn cbc_blocks(&mut self, data: &mut [u8]) -> Result<(), Error> {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let cipher = self.cipher.as_ref().ok_or(Error::Silent)?;
+        let iv = self.iv.get_mut(..CTS_BLOCK).ok_or(Error::Internal)?;
+        cbc(cipher.as_ref(), iv, data, self.enc).map_err(|_| Error::Silent)
+    }
+
+    /// `ossl_cipher_cbc_cts_block_update`: the whole message, once per init, in the variant
+    /// set; with no output (`out` false) only its length. Failures raise nothing.
+    pub fn cts_update(&mut self, input: &[u8], outsize: usize, out: bool) -> Result<Output, Error> {
+        let inl = input.len();
+        if inl < CTS_BLOCK || outsize < inl {
+            return Err(Error::Silent);
+        }
+        if !out {
+            return Ok(Output::new(Vec::new(), inl));
+        }
+        if self.updated {
+            return Err(Error::Silent);
+        }
+        if self.cipher.is_none() {
+            // The reference runs CBC on a key schedule never set (docs/DEVIATIONS.md).
+            return Err(Error::Silent);
+        }
+        let mut out = vec![0u8; inl];
+        let residue = inl % CTS_BLOCK;
+        match (self.enc, self.cts_mode) {
+            (true, 0) => self.cs1_encrypt(input, &mut out)?,
+            (false, 0) => self.cs1_decrypt(input, &mut out)?,
+            (true, 1) if residue == 0 => {
+                out.copy_from_slice(input);
+                self.cbc_blocks(&mut out)?;
+            }
+            (false, 1) if residue == 0 => {
+                out.copy_from_slice(input);
+                self.cbc_blocks(&mut out)?;
+            }
+            (true, _) => self.cs3_encrypt(input, &mut out)?,
+            (false, _) => self.cs3_decrypt(input, &mut out)?,
+        }
+        self.updated = true;
+        Ok(Output::new(out, inl))
+    }
+
+    /// `cts128_cs1_encrypt`: CBC, then the last partial block, zero-padded, encrypted over the
+    /// end of the block before it.
+    fn cs1_encrypt(&mut self, input: &[u8], out: &mut [u8]) -> Result<(), Error> {
+        let residue = input.len() % CTS_BLOCK;
+        let whole = sub(input.len(), residue)?;
+        let (head, tail) = input.split_at(whole);
+        let o = out.get_mut(..whole).ok_or(Error::Internal)?;
+        o.copy_from_slice(head);
+        self.cbc_blocks(o)?;
+        if residue == 0 {
+            return Ok(());
+        }
+        let mut tmp = [0u8; CTS_BLOCK];
+        tmp.get_mut(..residue)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(tail);
+        self.cbc_blocks(&mut tmp)?;
+        let at = sub(add(whole, residue)?, CTS_BLOCK)?;
+        out.get_mut(at..add(at, CTS_BLOCK)?)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(&tmp);
+        Ok(())
+    }
+
+    /// `cts128_cs1_decrypt`.
+    fn cs1_decrypt(&mut self, input: &[u8], out: &mut [u8]) -> Result<(), Error> {
+        let residue = input.len() % CTS_BLOCK;
+        if residue == 0 {
+            out.copy_from_slice(input);
+            return self.cbc_blocks(out);
+        }
+        let len = sub(input.len(), add(CTS_BLOCK, residue)?)?;
+        let o = out.get_mut(..len).ok_or(Error::Internal)?;
+        o.copy_from_slice(input.get(..len).ok_or(Error::Internal)?);
+        self.cbc_blocks(o)?;
+        let rest = input.get(len..).ok_or(Error::Internal)?;
+        let out = out.get_mut(len..).ok_or(Error::Internal)?;
+        // The C(n-1) partial block, then C(n).
+        let (part, cn) = rest.split_at(residue);
+        self.steal_decrypt(part, cn, residue, out)
+    }
+
+    /// `cts128_cs3_encrypt` (CS2's for a partial last block): the last two blocks swapped.
+    fn cs3_encrypt(&mut self, input: &[u8], out: &mut [u8]) -> Result<(), Error> {
+        let inl = input.len();
+        if inl == CTS_BLOCK {
+            out.copy_from_slice(input);
+            return self.cbc_blocks(out);
+        }
+        let residue = match inl % CTS_BLOCK {
+            0 => CTS_BLOCK,
+            r => r,
+        };
+        let len = sub(inl, residue)?;
+        let o = out.get_mut(..len).ok_or(Error::Internal)?;
+        o.copy_from_slice(input.get(..len).ok_or(Error::Internal)?);
+        self.cbc_blocks(o)?;
+        let mut tmp = [0u8; CTS_BLOCK];
+        tmp.get_mut(..residue)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(input.get(len..).ok_or(Error::Internal)?);
+        let prev = sub(len, CTS_BLOCK)?;
+        let saved: [u8; CTS_BLOCK] = out
+            .get(prev..len)
+            .and_then(|b| b.try_into().ok())
+            .ok_or(Error::Internal)?;
+        out.get_mut(len..)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(saved.get(..residue).ok_or(Error::Internal)?);
+        self.cbc_blocks(&mut tmp)?;
+        out.get_mut(prev..len)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(&tmp);
+        Ok(())
+    }
+
+    /// `cts128_cs3_decrypt`.
+    fn cs3_decrypt(&mut self, input: &[u8], out: &mut [u8]) -> Result<(), Error> {
+        let inl = input.len();
+        if inl == CTS_BLOCK {
+            out.copy_from_slice(input);
+            return self.cbc_blocks(out);
+        }
+        let residue = match inl % CTS_BLOCK {
+            0 => CTS_BLOCK,
+            r => r,
+        };
+        let len = sub(inl, add(CTS_BLOCK, residue)?)?;
+        let o = out.get_mut(..len).ok_or(Error::Internal)?;
+        o.copy_from_slice(input.get(..len).ok_or(Error::Internal)?);
+        self.cbc_blocks(o)?;
+        let rest = input.get(len..).ok_or(Error::Internal)?;
+        let out = out.get_mut(len..).ok_or(Error::Internal)?;
+        // C(n), then the C(n-1) partial block.
+        let (cn, part) = rest.split_at(CTS_BLOCK);
+        self.steal_decrypt(part, cn, residue, out)
+    }
+
+    /// The last two blocks of a CTS decryption: `cn` (a whole block) decrypted with an IV of
+    /// zero completes the partial block `part` into C(n-1); writes P(n-1) and the partial P(n)
+    /// to `out`, leaving C(n) as the running IV.
+    fn steal_decrypt(
+        &mut self,
+        part: &[u8],
+        cn: &[u8],
+        residue: usize,
+        out: &mut [u8],
+    ) -> Result<(), Error> {
+        let mid_iv: [u8; CTS_BLOCK] = self
+            .iv
+            .get(..CTS_BLOCK)
+            .and_then(|v| v.try_into().ok())
+            .ok_or(Error::Internal)?;
+        let cn: [u8; CTS_BLOCK] = cn.try_into().map_err(|_| Error::Internal)?;
+        let mut pt_last = Zeroizing::new(cn);
+        self.iv.get_mut(..CTS_BLOCK).ok_or(Error::Internal)?.fill(0);
+        self.cbc_blocks(pt_last.as_mut_slice())?;
+        let mut ct_mid = [0u8; CTS_BLOCK];
+        ct_mid
+            .get_mut(..residue)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(part);
+        if let (Some(d), Some(s)) = (ct_mid.get_mut(residue..), pt_last.get(residue..)) {
+            d.copy_from_slice(s);
+        }
+        let last = out
+            .get_mut(CTS_BLOCK..add(CTS_BLOCK, residue)?)
+            .ok_or(Error::Internal)?;
+        for ((o, a), b) in last.iter_mut().zip(ct_mid.iter()).zip(pt_last.iter()) {
+            *o = a ^ b;
+        }
+        self.iv
+            .get_mut(..CTS_BLOCK)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(&mid_iv);
+        let first = out.get_mut(..CTS_BLOCK).ok_or(Error::Internal)?;
+        first.copy_from_slice(&ct_mid);
+        self.cbc_blocks(first)?;
+        self.iv
+            .get_mut(..CTS_BLOCK)
+            .ok_or(Error::Internal)?
+            .copy_from_slice(&cn);
+        Ok(())
+    }
+
+    /// CTS's variant (`cts_mode`): 0, 1, 2 for CS1, CS2, CS3.
+    pub fn cts_mode(&self) -> u8 {
+        self.cts_mode
+    }
+
+    /// Sets CTS's variant.
+    pub fn set_cts_mode(&mut self, mode: u8) {
+        self.cts_mode = mode;
     }
 
     fn blocksize_of_cipher(&self) -> usize {
@@ -931,6 +1338,16 @@ impl Generic {
     pub fn encrypting(&self) -> bool {
         self.enc
     }
+}
+
+/// `a + b`, or an internal error.
+fn add(a: usize, b: usize) -> Result<usize, Error> {
+    a.checked_add(b).ok_or(Error::Internal)
+}
+
+/// `a - b`, or an internal error.
+fn sub(a: usize, b: usize) -> Result<usize, Error> {
+    a.checked_sub(b).ok_or(Error::Internal)
 }
 
 /// A DES key octet with odd parity (its low bit set so the octet has an odd number of ones).

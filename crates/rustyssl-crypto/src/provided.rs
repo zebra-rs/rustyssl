@@ -5,3 +5,4 @@
 pub mod aead;
 pub mod cipher;
 pub mod digest;
+pub mod siv;
