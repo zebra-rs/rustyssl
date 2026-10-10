@@ -1,29 +1,31 @@
 //! The universal types' items (`tasn_typ.c`, `a_time.c`): primitives by `V_ASN1_*` type, the
 //! MSTRING items that take any of a mask of string types, the three BOOLEAN items (whose size
-//! is the default left out of an encoding: -1 for none), and SEQUENCE OF / SET OF ANY. With
-//! them, their `new`, `free`, and `i2d_` functions, each through its item.
+//! is the default left out of an encoding: -1 for none), SEQUENCE OF / SET OF ANY, and
+//! `X509_ALGOR` (`x_algor.c`), the AlgorithmIdentifier the EVP layer decodes. With them, their
+//! `new`, `free`, and `i2d_` functions, each through its item.
 
 use core::ffi::{c_int, c_long, c_uchar};
 use core::ptr;
 
 use rustyssl_abi::{
     ASN1_BIT_STRING, ASN1_BMPSTRING, ASN1_ENUMERATED, ASN1_GENERALIZEDTIME, ASN1_GENERALSTRING,
-    ASN1_IA5STRING, ASN1_INTEGER, ASN1_ITEM, ASN1_ITYPE_MSTRING, ASN1_ITYPE_PRIMITIVE, ASN1_NULL,
-    ASN1_OCTET_STRING, ASN1_PRINTABLESTRING, ASN1_SEQUENCE_ANY, ASN1_STRING, ASN1_T61STRING,
-    ASN1_TFLG_NDEF, ASN1_TFLG_SEQUENCE_OF, ASN1_TFLG_SET_OF, ASN1_TIME, ASN1_TYPE,
-    ASN1_UNIVERSALSTRING, ASN1_UTCTIME, ASN1_UTF8STRING, ASN1_VISIBLESTRING,
-    B_ASN1_DIRECTORYSTRING, B_ASN1_DISPLAYTEXT, B_ASN1_PRINTABLE, B_ASN1_TIME, ERR_LIB_ASN1,
-    V_ASN1_ANY, V_ASN1_BIT_STRING, V_ASN1_BMPSTRING, V_ASN1_BOOLEAN, V_ASN1_ENUMERATED,
-    V_ASN1_GENERALIZEDTIME, V_ASN1_GENERALSTRING, V_ASN1_IA5STRING, V_ASN1_INTEGER, V_ASN1_NULL,
-    V_ASN1_OBJECT, V_ASN1_OCTET_STRING, V_ASN1_PRINTABLESTRING, V_ASN1_SEQUENCE, V_ASN1_T61STRING,
-    V_ASN1_UNIVERSALSTRING, V_ASN1_UTCTIME, V_ASN1_UTF8STRING, V_ASN1_VISIBLESTRING,
+    ASN1_IA5STRING, ASN1_INTEGER, ASN1_ITEM, ASN1_ITYPE_MSTRING, ASN1_ITYPE_PRIMITIVE,
+    ASN1_ITYPE_SEQUENCE, ASN1_NULL, ASN1_OCTET_STRING, ASN1_PRINTABLESTRING, ASN1_SEQUENCE_ANY,
+    ASN1_STRING, ASN1_T61STRING, ASN1_TEMPLATE, ASN1_TFLG_NDEF, ASN1_TFLG_OPTIONAL,
+    ASN1_TFLG_SEQUENCE_OF, ASN1_TFLG_SET_OF, ASN1_TIME, ASN1_TYPE, ASN1_UNIVERSALSTRING,
+    ASN1_UTCTIME, ASN1_UTF8STRING, ASN1_VISIBLESTRING, B_ASN1_DIRECTORYSTRING, B_ASN1_DISPLAYTEXT,
+    B_ASN1_PRINTABLE, B_ASN1_TIME, ERR_LIB_ASN1, V_ASN1_ANY, V_ASN1_BIT_STRING, V_ASN1_BMPSTRING,
+    V_ASN1_BOOLEAN, V_ASN1_ENUMERATED, V_ASN1_GENERALIZEDTIME, V_ASN1_GENERALSTRING,
+    V_ASN1_IA5STRING, V_ASN1_INTEGER, V_ASN1_NULL, V_ASN1_OBJECT, V_ASN1_OCTET_STRING,
+    V_ASN1_PRINTABLESTRING, V_ASN1_SEQUENCE, V_ASN1_T61STRING, V_ASN1_UNIVERSALSTRING,
+    V_ASN1_UTCTIME, V_ASN1_UTF8STRING, V_ASN1_VISIBLESTRING, X509_ALGOR,
 };
 
 use super::decode::ASN1_item_d2i;
 use super::encode::ASN1_item_i2d;
 use super::free::ASN1_item_free;
 use super::new::ASN1_item_new;
-use super::{Item, Template, item, item_fns, size_of_long, template};
+use super::{Item, Template, item, item_fns, size_of_long, template, template_at};
 use crate::ffi::ffi_export;
 
 /// A primitive item of type `utype`, with `size` (`IMPLEMENT_ASN1_TYPE_ex`).
@@ -126,6 +128,33 @@ item_fns! {
     pub unsafe extern "C" fn ASN1_SET_ANY_it = item(ASN1_ITYPE_PRIMITIVE, -1, &raw const SET_ANY.0, 0, ptr::null(), 0, c"ASN1_SET_ANY");
 }
 
+/// The templates of `X509_ALGOR`: its OID, then its parameters, optional.
+struct AlgorTemplates([ASN1_TEMPLATE; 2]);
+// SAFETY: immutable tables of pointers to static data.
+unsafe impl Sync for AlgorTemplates {}
+
+static ALGOR_TT: AlgorTemplates = AlgorTemplates([
+    template_at(
+        0,
+        0,
+        core::mem::offset_of!(X509_ALGOR, algorithm),
+        c"algorithm",
+        ASN1_OBJECT_it,
+    ),
+    template_at(
+        ASN1_TFLG_OPTIONAL,
+        0,
+        core::mem::offset_of!(X509_ALGOR, parameter),
+        c"parameter",
+        ASN1_ANY_it,
+    ),
+]);
+
+item_fns! {
+    /// AlgorithmIdentifier: SEQUENCE { algorithm OBJECT IDENTIFIER, parameters ANY OPTIONAL }.
+    pub unsafe extern "C" fn X509_ALGOR_it = item(ASN1_ITYPE_SEQUENCE, V_ASN1_SEQUENCE, &raw const ALGOR_TT.0 as *const ASN1_TEMPLATE, 2, ptr::null(), size_of_long::<X509_ALGOR>(), c"X509_ALGOR");
+}
+
 /// Defines `i2d_` functions, each encoding through its item.
 macro_rules! i2d {
     ($(
@@ -192,6 +221,8 @@ i2d! {
     pub unsafe extern "C" fn i2d_ASN1_SEQUENCE_ANY(ASN1_SEQUENCE_ANY) = ASN1_SEQUENCE_ANY_it;
     /// Encodes a stack of `ASN1_TYPE`s as a SET OF ANY, in DER order.
     pub unsafe extern "C" fn i2d_ASN1_SET_ANY(ASN1_SEQUENCE_ANY) = ASN1_SET_ANY_it;
+    /// Encodes an AlgorithmIdentifier.
+    pub unsafe extern "C" fn i2d_X509_ALGOR(X509_ALGOR) = X509_ALGOR_it;
 }
 
 /// Defines `d2i_` functions, each decoding through its item.
@@ -260,6 +291,8 @@ d2i! {
     pub unsafe extern "C" fn d2i_ASN1_SEQUENCE_ANY(ASN1_SEQUENCE_ANY) = ASN1_SEQUENCE_ANY_it;
     /// Decodes a SET OF ANY, as a stack of `ASN1_TYPE`s (`ASN1_item_d2i`).
     pub unsafe extern "C" fn d2i_ASN1_SET_ANY(ASN1_SEQUENCE_ANY) = ASN1_SET_ANY_it;
+    /// Decodes an AlgorithmIdentifier (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_X509_ALGOR(X509_ALGOR) = X509_ALGOR_it;
 }
 
 /// Defines `_new` and `_free` functions through an item.
@@ -302,4 +335,5 @@ new_free! {
     pub unsafe extern "C" fn ASN1_PRINTABLE_new, pub unsafe extern "C" fn ASN1_PRINTABLE_free(ASN1_STRING) = ASN1_PRINTABLE_it;
     pub unsafe extern "C" fn DIRECTORYSTRING_new, pub unsafe extern "C" fn DIRECTORYSTRING_free(ASN1_STRING) = DIRECTORYSTRING_it;
     pub unsafe extern "C" fn DISPLAYTEXT_new, pub unsafe extern "C" fn DISPLAYTEXT_free(ASN1_STRING) = DISPLAYTEXT_it;
+    pub unsafe extern "C" fn X509_ALGOR_new, pub unsafe extern "C" fn X509_ALGOR_free(X509_ALGOR) = X509_ALGOR_it;
 }

@@ -1,6 +1,6 @@
 //! Fuzzes the template engine's decoder through the C ABI: arbitrary input (DER or BER, of
-//! exactly its claimed size, so a read past it is an ASan error) decoded with a universal item
-//! or with an application-style SEQUENCE defined here as C would define it (OPTIONAL, EXPLICIT
+//! exactly its claimed size, so a read past it is an ASan error) decoded with a universal item,
+//! `X509_ALGOR`, or an application-style SEQUENCE defined here as C would define it (OPTIONAL, EXPLICIT
 //! and IMPLICIT fields, SET OF ANY, a DirectoryString, and itself, nested). A value that decodes
 //! must encode, and an encoding that decodes must encode the same again; it must also print.
 
@@ -41,6 +41,7 @@ unsafe extern "C" {
     fn DIRECTORYSTRING_it() -> *const ASN1_ITEM;
     fn INT64_it() -> *const ASN1_ITEM;
     fn UINT32_it() -> *const ASN1_ITEM;
+    fn X509_ALGOR_it() -> *const ASN1_ITEM;
 }
 
 /// The application's structure.
@@ -125,7 +126,7 @@ fuzz_target!(|data: &[u8]| {
     };
     // SAFETY: the item functions take no arguments.
     let it = unsafe {
-        match which % 13 {
+        match which % 14 {
             0 => ASN1_ANY_it(),
             1 => ASN1_SEQUENCE_ANY_it(),
             2 => ASN1_SET_ANY_it(),
@@ -137,6 +138,7 @@ fuzz_target!(|data: &[u8]| {
             8 => DIRECTORYSTRING_it(),
             9 => INT64_it(),
             10 => UINT32_it(),
+            11 => X509_ALGOR_it(),
             _ => record_it(),
         }
     };
