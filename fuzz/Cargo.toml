@@ -193,3 +193,9 @@ name = "cipher"
 path = "fuzz_targets/cipher.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "aead"
+path = "fuzz_targets/aead.rs"
+test = false
+doc = false
