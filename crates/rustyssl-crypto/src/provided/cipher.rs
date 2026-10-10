@@ -162,6 +162,24 @@ pub enum Error {
     FailedToGenerateKey,
     /// `ERR_R_INTERNAL_ERROR`.
     Internal,
+    /// `PROV_R_INVALID_TAG`.
+    InvalidTag,
+    /// `PROV_R_INVALID_TAG_LENGTH`.
+    InvalidTagLength,
+    /// `PROV_R_TAG_NOT_NEEDED`.
+    TagNotNeeded,
+    /// `PROV_R_TAG_NOT_SET`.
+    TagNotSet,
+    /// `PROV_R_TOO_MANY_RECORDS`.
+    TooManyRecords,
+    /// `PROV_R_INVALID_AAD`.
+    InvalidAad,
+    /// `PROV_R_INVALID_DATA`.
+    InvalidData,
+    /// `ERR_R_PASSED_INVALID_ARGUMENT`.
+    PassedInvalidArgument,
+    /// `PROV_R_FAILED_TO_SET_PARAMETER`.
+    FailedToSetParameter,
 }
 
 /// What a function writes and reports.
@@ -174,14 +192,18 @@ pub struct Output {
     /// The bits of the last octet of `data` to write, the rest keeping the output's (CFB1
     /// counting bits leaves the rest of a partial octet as it was); 0xff otherwise.
     pub last_mask: u8,
+    /// Set when the function fails after writing `data` (an AEAD's decryption that doesn't
+    /// authenticate wipes its output): the error to raise, or [`Error::Silent`].
+    pub failed: Option<Error>,
 }
 
 impl Output {
-    fn new(data: Vec<u8>, len: usize) -> Self {
+    pub(crate) fn new(data: Vec<u8>, len: usize) -> Self {
         Self {
             data: Zeroizing::new(data),
             len,
             last_mask: 0xff,
+            failed: None,
         }
     }
 }
@@ -189,13 +211,72 @@ impl Output {
 /// ChaCha20's state (`PROV_CHACHA20_CTX`): the key, the counter and nonce, and the rest of the
 /// partial block's key stream.
 #[derive(Clone)]
-struct ChaCha {
-    key: Zeroizing<[u8; 32]>,
-    /// The 64-bit block counter.
-    counter: u64,
-    nonce: [u8; 8],
-    stream: Zeroizing<[u8; CHACHA_BLOCK]>,
-    partial: usize,
+pub(crate) struct ChaCha {
+    pub(crate) key: Zeroizing<[u8; 32]>,
+    /// The 64-bit block counter (OpenSSL's first two counter words).
+    pub(crate) counter: u64,
+    /// The nonce (OpenSSL's last two counter words).
+    pub(crate) nonce: [u8; 8],
+    pub(crate) stream: Zeroizing<[u8; CHACHA_BLOCK]>,
+    pub(crate) partial: usize,
+}
+
+impl ChaCha {
+    /// A zero key, counter, and nonce (`OPENSSL_zalloc`).
+    pub(crate) fn new() -> Self {
+        Self {
+            key: Zeroizing::new([0; 32]),
+            counter: 0,
+            nonce: [0; 8],
+            stream: Zeroizing::new([0; CHACHA_BLOCK]),
+            partial: 0,
+        }
+    }
+
+    /// `chacha20_cipher`: the partial block's key stream, then whole blocks, then a new
+    /// partial block.
+    pub(crate) fn apply(&mut self, data: &mut [u8]) -> Result<(), Error> {
+        let mut data = data;
+        if self.partial > 0 {
+            let take = CHACHA_BLOCK.saturating_sub(self.partial).min(data.len());
+            let (head, rest) = data.split_at_mut(take);
+            let end = self.partial.checked_add(take).ok_or(Error::Internal)?;
+            for (b, k) in head
+                .iter_mut()
+                .zip(self.stream.get(self.partial..end).ok_or(Error::Internal)?)
+            {
+                *b ^= k;
+            }
+            self.partial = end;
+            data = rest;
+            if data.is_empty() {
+                return Ok(());
+            }
+            if self.partial == CHACHA_BLOCK {
+                self.partial = 0;
+                self.counter = self.counter.wrapping_add(1);
+            }
+        }
+        let whole = data.len() & !(CHACHA_BLOCK - 1);
+        let (blocks, rest) = data.split_at_mut(whole);
+        self.counter = sym::chacha20_blocks(&self.key, self.nonce, self.counter, blocks)
+            .map_err(|_| Error::Internal)?;
+        if !rest.is_empty() {
+            self.stream.fill(0);
+            sym::chacha20_blocks(
+                &self.key,
+                self.nonce,
+                self.counter,
+                self.stream.as_mut_slice(),
+            )
+            .map_err(|_| Error::Internal)?;
+            for (b, k) in rest.iter_mut().zip(self.stream.iter()) {
+                *b ^= k;
+            }
+            self.partial = rest.len();
+        }
+        Ok(())
+    }
 }
 
 /// The generic cipher context (`PROV_CIPHER_CTX`), ChaCha20's included.
@@ -292,13 +373,7 @@ impl Ctx {
             tlsmacsize: 0,
             num: 0,
             cipher: None,
-            chacha: (kind == Kind::ChaCha20).then(|| ChaCha {
-                key: Zeroizing::new([0; 32]),
-                counter: 0,
-                nonce: [0; 8],
-                stream: Zeroizing::new([0; CHACHA_BLOCK]),
-                partial: 0,
-            }),
+            chacha: (kind == Kind::ChaCha20).then(ChaCha::new),
         }))
     }
 
@@ -752,45 +827,9 @@ impl Generic {
         }
     }
 
-    /// `chacha20_cipher`: the partial block's key stream, then whole blocks, then a new
-    /// partial block.
+    /// `chacha20_cipher`.
     fn chacha(&mut self, data: &mut [u8]) -> Result<(), Error> {
-        let c = self.chacha.as_mut().ok_or(Error::Internal)?;
-        let mut data = data;
-        if c.partial > 0 {
-            let take = CHACHA_BLOCK.saturating_sub(c.partial).min(data.len());
-            let (head, rest) = data.split_at_mut(take);
-            let end = c.partial.checked_add(take).ok_or(Error::Internal)?;
-            for (b, k) in head
-                .iter_mut()
-                .zip(c.stream.get(c.partial..end).ok_or(Error::Internal)?)
-            {
-                *b ^= k;
-            }
-            c.partial = end;
-            data = rest;
-            if data.is_empty() {
-                return Ok(());
-            }
-            if c.partial == CHACHA_BLOCK {
-                c.partial = 0;
-                c.counter = c.counter.wrapping_add(1);
-            }
-        }
-        let whole = data.len() & !(CHACHA_BLOCK - 1);
-        let (blocks, rest) = data.split_at_mut(whole);
-        c.counter = sym::chacha20_blocks(&c.key, c.nonce, c.counter, blocks)
-            .map_err(|_| Error::Internal)?;
-        if !rest.is_empty() {
-            c.stream.fill(0);
-            sym::chacha20_blocks(&c.key, c.nonce, c.counter, c.stream.as_mut_slice())
-                .map_err(|_| Error::Internal)?;
-            for (b, k) in rest.iter_mut().zip(c.stream.iter()) {
-                *b ^= k;
-            }
-            c.partial = rest.len();
-        }
-        Ok(())
+        self.chacha.as_mut().ok_or(Error::Internal)?.apply(data)
     }
 
     /// The cipher.
