@@ -1239,6 +1239,8 @@ static const ASN1_ITEM *probe_item(int n)
     }
 }
 
+static void print_out(const unsigned char *p, int n);
+
 /* Runs a template engine command; returns 0 if `command` isn't one. */
 static int template_command(const char *command, const char *line)
 {
@@ -1265,6 +1267,25 @@ static int template_command(const char *command, const char *line)
             print_escaped("pemread name", 1, name, strlen(name));
             print_escaped("pemread header", 1, header, strlen(header));
             print_escaped("pemread data", (int)blen, (char *)body, (size_t)blen);
+            {
+                /* The header as encryption, and the body decrypted under "pw". */
+                EVP_CIPHER_INFO info;
+                unsigned long e;
+                int ok = PEM_get_EVP_CIPHER_INFO(header, &info);
+
+                printf("pemread cipher %d %s", ok,
+                       info.cipher == NULL ? "-" : EVP_CIPHER_get0_name(info.cipher));
+                print_out(info.iv, sizeof(info.iv));
+                if (ok && info.cipher != NULL) {
+                    ok = PEM_do_header(&info, body, &blen, NULL, "pw");
+                    printf(" decrypt %d", ok);
+                    if (ok)
+                        print_out(body, (int)blen);
+                }
+                while ((e = ERR_get_error()) != 0)
+                    printf(" %d/%d", ERR_GET_LIB(e), ERR_GET_REASON(e));
+                printf("\n");
+            }
             OPENSSL_free(name);
             OPENSSL_free(header);
             OPENSSL_free(body);
