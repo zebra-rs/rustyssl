@@ -45,8 +45,10 @@ use crate::handle::{Handle, Held, handle_type};
 use crate::{err, init, libctx};
 
 pub(crate) mod builtin;
+pub(crate) mod ciphers;
 pub(crate) mod digests;
 mod module;
+pub(crate) mod tables;
 pub(crate) mod upcalls;
 
 /// A raw pointer kept in a provider or store, never dereferenced without its owner's guarantee.

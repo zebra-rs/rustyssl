@@ -201,9 +201,10 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
                     return true;
                 }
                 if with == OPENSSL_INIT_ADD_ALL_CIPHERS {
-                    unavailable("OPENSSL_INIT_ADD_ALL_CIPHERS");
+                    crate::evp::legacy_cipher::add_all_ciphers();
+                } else {
+                    crate::evp::legacy_md::add_all_digests();
                 }
-                crate::evp::legacy_md::add_all_digests();
                 true
             });
         }

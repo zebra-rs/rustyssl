@@ -8,13 +8,13 @@
 //! have no context parameters at all. An algorithm context is a boxed
 //! [`Ctx`], freed by `freectx`.
 
-use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ffi::{c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
     ERR_LIB_PROV, OSSL_ALGORITHM, OSSL_DIGEST_PARAM_ALGID_ABSENT, OSSL_DIGEST_PARAM_BLOCK_SIZE,
     OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOF,
-    OSSL_DIGEST_PARAM_XOFLEN, OSSL_DISPATCH, OSSL_FUNC_DIGEST_COPYCTX, OSSL_FUNC_DIGEST_DUPCTX,
+    OSSL_DIGEST_PARAM_XOFLEN, OSSL_FUNC_DIGEST_COPYCTX, OSSL_FUNC_DIGEST_DUPCTX,
     OSSL_FUNC_DIGEST_FINAL, OSSL_FUNC_DIGEST_FREECTX, OSSL_FUNC_DIGEST_GET_CTX_PARAMS,
     OSSL_FUNC_DIGEST_GET_PARAMS, OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS,
     OSSL_FUNC_DIGEST_GETTABLE_PARAMS, OSSL_FUNC_DIGEST_INIT, OSSL_FUNC_DIGEST_NEWCTX,
@@ -25,6 +25,9 @@ use rustyssl_abi::{
 };
 use rustyssl_crypto::provided::digest::{Ctx, Error, Kind};
 
+use super::tables::{
+    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, bare, defn, entry,
+};
 use crate::err;
 use crate::ffi::ffi_callback;
 use crate::params::{
@@ -455,48 +458,31 @@ ffi_callback! {
     }
 }
 
-/// A static array of parameter descriptions (`OSSL_PARAM_DEFN`s), ended by an empty one.
-pub(crate) struct Params<const N: usize>(pub(crate) [OSSL_PARAM; N]);
-
-// SAFETY: the keys are static strings; the arrays are never written.
-unsafe impl<const N: usize> Sync for Params<N> {}
-
-const fn defn(key: &'static CStr, data_type: c_int) -> OSSL_PARAM {
-    OSSL_PARAM {
-        key: key.as_ptr(),
-        data_type: data_type.cast_unsigned(),
-        data: ptr::null_mut(),
-        data_size: 0,
-        return_size: 0,
-    }
-}
-
-const PARAM_END: OSSL_PARAM = OSSL_PARAM {
-    key: ptr::null(),
-    data_type: 0,
-    data: ptr::null_mut(),
-    data_size: 0,
-    return_size: 0,
-};
+const SIZE_T: usize = size_of::<usize>();
+const INT: usize = size_of::<c_int>();
 
 static DEFAULT_GETTABLE: Params<5> = Params([
-    defn(OSSL_DIGEST_PARAM_BLOCK_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
-    defn(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
-    defn(OSSL_DIGEST_PARAM_XOF, OSSL_PARAM_INTEGER),
-    defn(OSSL_DIGEST_PARAM_ALGID_ABSENT, OSSL_PARAM_INTEGER),
+    defn(
+        OSSL_DIGEST_PARAM_BLOCK_SIZE,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
+    defn(OSSL_DIGEST_PARAM_XOF, OSSL_PARAM_INTEGER, INT),
+    defn(OSSL_DIGEST_PARAM_ALGID_ABSENT, OSSL_PARAM_INTEGER, INT),
     PARAM_END,
 ]);
 static SSL3_SETTABLE: Params<2> = Params([
-    defn(OSSL_DIGEST_PARAM_SSL3_MS, OSSL_PARAM_OCTET_STRING),
+    bare(OSSL_DIGEST_PARAM_SSL3_MS, OSSL_PARAM_OCTET_STRING),
     PARAM_END,
 ]);
 static XOF_CTX_PARAMS: Params<3> = Params([
-    defn(OSSL_DIGEST_PARAM_XOFLEN, OSSL_PARAM_UNSIGNED_INTEGER),
-    defn(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
+    bare(OSSL_DIGEST_PARAM_XOFLEN, OSSL_PARAM_UNSIGNED_INTEGER),
+    bare(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
     PARAM_END,
 ]);
 static BLAKE2_CTX_PARAMS: Params<2> = Params([
-    defn(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
+    bare(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
     PARAM_END,
 ]);
 
@@ -560,29 +546,6 @@ type GettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
 type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 type SetCtxFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
 type GetCtxFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
-
-/// A function as a dispatch table holds it.
-macro_rules! entry {
-    ($id:expr, $f:expr, $ty:ty) => {
-        OSSL_DISPATCH {
-            function_id: $id,
-            // SAFETY: function pointers all have one representation; the core casts it back to
-            // the type its id stands for before calling it.
-            function: Some(unsafe { core::mem::transmute::<$ty, unsafe extern "C" fn()>($f) }),
-        }
-    };
-}
-
-const END: OSSL_DISPATCH = OSSL_DISPATCH {
-    function_id: 0,
-    function: None,
-};
-
-/// A dispatch table.
-pub(crate) struct Dispatch<const N: usize>([OSSL_DISPATCH; N]);
-
-// SAFETY: function pointers only; never written.
-unsafe impl<const N: usize> Sync for Dispatch<N> {}
 
 /// The table and per-algorithm functions of one digest of a family.
 macro_rules! digest {
@@ -748,23 +711,6 @@ digest!(md5_sha1, Kind::Md5Sha1, ssl3);
 digest!(ripemd160, Kind::Ripemd160, plain);
 digest!(nullmd, Kind::Null, plain);
 
-/// The algorithm table (`OSSL_ALGORITHM`s, ended by an empty one).
-pub(crate) struct Algorithms<const N: usize>([OSSL_ALGORITHM; N]);
-
-// SAFETY: static strings and tables only; never written.
-unsafe impl<const N: usize> Sync for Algorithms<N> {}
-
-const DEFAULT_PROPERTIES: *const c_char = c"provider=default".as_ptr();
-
-const fn alg<const N: usize>(names: &'static CStr, table: &'static Dispatch<N>) -> OSSL_ALGORITHM {
-    OSSL_ALGORITHM {
-        algorithm_names: names.as_ptr(),
-        property_definition: DEFAULT_PROPERTIES,
-        implementation: table.0.as_ptr(),
-        algorithm_description: ptr::null(),
-    }
-}
-
 /// `deflt_digests`, with the reference's names (`PROV_NAMES_*`) in its order.
 pub(crate) static DEFAULT_DIGESTS: Algorithms<28> = Algorithms([
     alg(c"SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", &sha1::TABLE),
@@ -827,12 +773,7 @@ pub(crate) static DEFAULT_DIGESTS: Algorithms<28> = Algorithms([
         &ripemd160::TABLE,
     ),
     alg(c"NULL", &nullmd::TABLE),
-    OSSL_ALGORITHM {
-        algorithm_names: ptr::null(),
-        property_definition: ptr::null(),
-        implementation: ptr::null(),
-        algorithm_description: ptr::null(),
-    },
+    ALG_END,
 ]);
 
 /// The default provider's digest table.
