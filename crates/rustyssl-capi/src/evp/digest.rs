@@ -38,6 +38,34 @@ use crate::provider::Ptr;
 type GetParamsFn = unsafe extern "C" fn(*mut OSSL_PARAM) -> c_int;
 type GettableParamsFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
 type AnyFn = unsafe extern "C" fn();
+pub(crate) type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(crate) type InitFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
+pub(crate) type UpdateFn = unsafe extern "C" fn(*mut c_void, *const u8, usize) -> c_int;
+pub(crate) type FinalFn = unsafe extern "C" fn(*mut c_void, *mut u8, *mut usize, usize) -> c_int;
+pub(crate) type FreeCtxFn = unsafe extern "C" fn(*mut c_void);
+pub(crate) type DupCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(crate) type CopyCtxFn = unsafe extern "C" fn(*mut c_void, *mut c_void);
+pub(crate) type SetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
+pub(crate) type GetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
+pub(crate) type CtxParamsListFn =
+    unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
+
+/// A digest algorithm's context functions, as its dispatch table gave them.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct Funcs {
+    pub(crate) newctx: Option<NewCtxFn>,
+    pub(crate) init: Option<InitFn>,
+    pub(crate) update: Option<UpdateFn>,
+    pub(crate) final_: Option<FinalFn>,
+    pub(crate) squeeze: Option<FinalFn>,
+    pub(crate) freectx: Option<FreeCtxFn>,
+    pub(crate) dupctx: Option<DupCtxFn>,
+    pub(crate) copyctx: Option<CopyCtxFn>,
+    pub(crate) set_ctx_params: Option<SetCtxParamsFn>,
+    pub(crate) get_ctx_params: Option<GetCtxParamsFn>,
+    pub(crate) settable_ctx_params: Option<CtxParamsListFn>,
+    pub(crate) gettable_ctx_params: Option<CtxParamsListFn>,
+}
 
 /// A digest method (`EVP_MD`) made from a provider's algorithm.
 pub(crate) struct Md {
@@ -53,9 +81,16 @@ pub(crate) struct Md {
     flags: c_ulong,
     get_params: Option<GetParamsFn>,
     gettable_params: Option<GettableParamsFn>,
-    /// The context functions, kept for the digest operations (step 3.3).
-    #[expect(dead_code, reason = "the digest operations (3.3) call them")]
-    functions: Vec<(c_int, AnyFn)>,
+    /// The context functions.
+    pub(crate) funcs: Funcs,
+}
+
+impl Md {
+    /// The provider's context, which the parameter-list functions take.
+    pub(crate) fn provider_ctx(&self) -> *mut c_void {
+        // SAFETY: the method holds a reference to its live provider.
+        unsafe { crate::provider::OSSL_PROVIDER_get0_provider_ctx(self.prov.0) }
+    }
 }
 
 handle_type!(EVP_MD => Md);
@@ -159,6 +194,7 @@ unsafe fn from_algorithm(
         return ptr::null_mut();
     };
     let mut functions: Vec<(c_int, AnyFn)> = Vec::new();
+    let mut funcs = Funcs::default();
     let mut get_params_fn = None;
     let mut gettable_params = None;
     let mut counted = 0;
@@ -177,6 +213,28 @@ unsafe fn from_algorithm(
             continue;
         }
         functions.push((id, f));
+        /// Stores `f` as the function its id stands for.
+        macro_rules! set {
+            ($field:ident) => {
+                // SAFETY: the provider's guarantee of the function type for this id.
+                funcs.$field = Some(unsafe { cast(f) })
+            };
+        }
+        match id {
+            OSSL_FUNC_DIGEST_NEWCTX => set!(newctx),
+            OSSL_FUNC_DIGEST_INIT => set!(init),
+            OSSL_FUNC_DIGEST_UPDATE => set!(update),
+            OSSL_FUNC_DIGEST_FINAL => set!(final_),
+            OSSL_FUNC_DIGEST_SQUEEZE => set!(squeeze),
+            OSSL_FUNC_DIGEST_FREECTX => set!(freectx),
+            OSSL_FUNC_DIGEST_DUPCTX => set!(dupctx),
+            OSSL_FUNC_DIGEST_COPYCTX => set!(copyctx),
+            OSSL_FUNC_DIGEST_SET_CTX_PARAMS => set!(set_ctx_params),
+            OSSL_FUNC_DIGEST_GET_CTX_PARAMS => set!(get_ctx_params),
+            OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS => set!(settable_ctx_params),
+            OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS => set!(gettable_ctx_params),
+            _ => {}
+        }
         match id {
             OSSL_FUNC_DIGEST_NEWCTX
             | OSSL_FUNC_DIGEST_INIT
@@ -225,7 +283,7 @@ unsafe fn from_algorithm(
         flags: 0,
         get_params: get_params_fn,
         gettable_params,
-        functions,
+        funcs,
     };
     if !cache_constants(&mut md) {
         err::raise(
@@ -262,7 +320,7 @@ static DIGESTS: Kind = Kind {
 ///
 /// # Safety
 /// `md` is NULL or a live digest method.
-unsafe fn method<'a>(md: *const EVP_MD) -> Option<&'a Md> {
+pub(crate) unsafe fn method<'a>(md: *const EVP_MD) -> Option<&'a Md> {
     // SAFETY: the caller's guarantee.
     unsafe { EVP_MD::get(md) }
 }

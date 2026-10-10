@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(23) {
+        match random.below(24) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -171,6 +171,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             19 => prop_session(&mut random, &mut out)?,
             20 => prov_session(&mut random, &mut out)?,
             21 => fetch_session(&mut random, &mut out)?,
+            22 => digest_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -852,6 +853,84 @@ fn fetch_session(random: &mut Random, out: &mut String) -> Result {
         }
     }
     writeln!(out, "fdefault -")?;
+    Ok(())
+}
+
+/// A random session of digest commands on the probe's two contexts: initializations with
+/// the default provider's digests (with and without an XOF length or BLAKE2 size), updates of
+/// random lengths around block sizes, finals, XOF finals, and squeezes in random pieces (also
+/// after finals and before updates), parameters, copies, and resets.
+fn digest_session(random: &mut Random, out: &mut String) -> Result {
+    const DIGESTS: &[&str] = &[
+        "SHA1",
+        "SHA224",
+        "SHA256",
+        "SHA2-256/192",
+        "SHA384",
+        "SHA512",
+        "SHA512-224",
+        "SHA512-256",
+        "SHA3-224",
+        "SHA3-256",
+        "SHA3-384",
+        "SHA3-512",
+        "KECCAK-224",
+        "KECCAK-256",
+        "KECCAK-384",
+        "KECCAK-512",
+        "KECCAK-KMAC-128",
+        "KECCAK-KMAC-256",
+        "SHAKE128",
+        "SHAKE256",
+        "BLAKE2s256",
+        "BLAKE2b512",
+        "SM3",
+        "MD5",
+        "MD5-SHA1",
+        "RIPEMD160",
+        "NULL",
+        "nonesuch",
+    ];
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&[
+                    "63", "64", "65", "71", "72", "104", "135", "136", "137", "167", "168", "169",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(400),
+        }
+    };
+    for _ in 0..random.below(20) + 1 {
+        match random.below(16) {
+            0 | 1 => writeln!(out, "dinit {}", random.pick(DIGESTS))?,
+            2 => writeln!(out, "dinit -")?,
+            3 => {
+                let key = random.pick(&["xoflen", "size"]);
+                let n = random.below(70);
+                writeln!(out, "dinitp {} {key} {n}", random.pick(DIGESTS))?;
+            }
+            4 => {
+                let key = random.pick(&["xoflen", "size"]);
+                let n = random.below(300);
+                writeln!(out, "dset {key} {n}")?;
+            }
+            5..=8 => writeln!(out, "dupdate {}", length(random))?,
+            9 => writeln!(out, "dfinal")?,
+            10 => writeln!(out, "dxof {}", random.below(257))?,
+            11 | 12 => writeln!(out, "dsqueeze {}", length(random).min(256))?,
+            13 => writeln!(out, "dcopy")?,
+            14 => writeln!(out, "dctx {}", random.below(2))?,
+            _ => writeln!(
+                out,
+                "{}",
+                random.pick(&["dsize", "dflags", "dreset", "dfinal"])
+            )?,
+        }
+    }
+    writeln!(out, "dctx 0")?;
     Ok(())
 }
 

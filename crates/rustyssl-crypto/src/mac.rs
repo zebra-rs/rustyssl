@@ -913,17 +913,27 @@ pub fn blake2(
     })
 }
 
-/// Unkeyed BLAKE2b with a digest of `size` octets (1 to 64) in its parameter block, as
-/// Argon2's variable-length hash uses it.
-pub(crate) fn blake2b_unkeyed(size: usize) -> Result<Box<dyn Mac>, Error> {
-    if size == 0 || size > Blake2Algorithm::Blake2b.max_size() {
+/// Unkeyed BLAKE2 with a digest of `size` octets (1 to the digest's maximum) in its
+/// parameter block: the BLAKE2 digests, and Argon2's variable-length hash.
+pub(crate) fn blake2_unkeyed(
+    algorithm: Blake2Algorithm,
+    size: usize,
+) -> Result<Box<dyn Mac>, Error> {
+    if size == 0 || size > algorithm.max_size() {
         return Err(Error::OutputSize);
     }
-    Ok(Box::new(Blake2Mac::new(
-        blake2::Blake2bVarCore::new_with_params(&[], &[], 0, size),
-        &[],
-        size,
-    )))
+    Ok(match algorithm {
+        Blake2Algorithm::Blake2b => Box::new(Blake2Mac::new(
+            blake2::Blake2bVarCore::new_with_params(&[], &[], 0, size),
+            &[],
+            size,
+        )),
+        Blake2Algorithm::Blake2s => Box::new(Blake2Mac::new(
+            blake2::Blake2sVarCore::new_with_params(&[], &[], 0, size),
+            &[],
+            size,
+        )),
+    })
 }
 
 impl<C> Blake2Mac<C>

@@ -1,0 +1,97 @@
+# Digesting: every default digest whole and in pieces, XOFs, squeezing, copies, and misuse
+dinit SHA256
+dupdate 3
+dupdate 64
+dupdate 0
+dfinal
+dfinal
+dupdate 1
+dinit -
+dupdate 100
+dfinal
+dinit SHA3-512
+dupdate 71
+dupdate 1
+dfinal
+dinit SHAKE256
+dsize
+dfinal
+dinit -
+dset xoflen 100
+dsize
+dupdate 500
+dfinal
+dinit -
+dupdate 10
+dsqueeze 5
+dupdate 3
+dsqueeze 200
+dsqueeze 1
+dfinal
+dxof 10
+dinit SHAKE128
+dupdate 167
+dcopy
+dsqueeze 168
+dctx 1
+dsqueeze 100
+dsqueeze 68
+dctx 0
+dinitp BLAKE2b512 size 33
+dupdate 128
+dupdate 1
+dsize
+dfinal
+dinit -
+dset size 7
+dsize
+dupdate 20
+dfinal
+dinitp BLAKE2s256 size 33
+dinitp SHAKE128 xoflen 17
+dupdate 20
+dfinal
+dinit KECCAK-KMAC-128
+dupdate 300
+dxof 200
+dinit MD5-SHA1
+dupdate 1000
+dfinal
+dinit SHA2-256/192
+dupdate 64
+dfinal
+dinit NULL
+dupdate 10
+dfinal
+dinit SHA1
+dxof 10
+dinit SHA1
+dxof 64
+dinit SHA512-224
+dsqueeze 4
+dinit nonesuch
+dreset
+dupdate 4
+dfinal
+dsqueeze 1
+dxof 1
+dsize
+dinit -
+dflags
+dcopy
+dctx 1
+dsize
+dflags
+dinit KECCAK-KMAC-128
+dupdate 10
+dsqueeze 0
+dsqueeze 5
+dfinal
+dinitp BLAKE2s256 size 42
+dupdate 107
+dsize
+dfinal
+dxof 5
+dinitp BLAKE2b512 size 0
+dupdate 3
+dxof 0

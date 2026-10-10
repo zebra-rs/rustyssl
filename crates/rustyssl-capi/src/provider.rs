@@ -45,6 +45,7 @@ use crate::handle::{Handle, Held, handle_type};
 use crate::{err, init, libctx};
 
 pub(crate) mod builtin;
+pub(crate) mod digests;
 mod module;
 pub(crate) mod upcalls;
 

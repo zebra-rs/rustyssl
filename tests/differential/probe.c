@@ -200,6 +200,18 @@
  *   fload <p|q>, funload <p|q> load or unload one of the providers
  * Each frees the thread's error state afterwards, as the provider commands do.
  *
+ * Commands for digesting with the default provider's digests, on two contexts (each line
+ * prints the result and the errors as library/reason; outputs are at most 256 octets of a
+ * fixed pattern, taken from a rolling offset):
+ *   dctx <0|1>                 work on context 0 or 1
+ *   dinit <name|->             EVP_DigestInit_ex with the digest fetched by name (`-`: NULL)
+ *   dinitp <name> <key> <n>    EVP_DigestInit_ex2 with a size_t parameter (xoflen or size)
+ *   dset <key> <n>             EVP_MD_CTX_set_params with a size_t parameter
+ *   dupdate <n>                EVP_DigestUpdate of <n> octets
+ *   dfinal, dxof <n>, dsqueeze <n>   EVP_DigestFinal_ex, EVP_DigestFinalXOF, EVP_DigestSqueeze
+ *   dsize, dflags              EVP_MD_CTX_get_size_ex; the flags
+ *   dcopy, dreset              EVP_MD_CTX_copy_ex onto the other context; EVP_MD_CTX_reset
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -2304,6 +2316,117 @@ static int fetch_command(const char *command, const char *line)
     return 1;
 }
 
+static EVP_MD_CTX *digest_ctx[2];
+static int digest_current;
+static size_t digest_offset;
+static unsigned char digest_data[2048];
+
+static void print_digest_errors(void)
+{
+    unsigned long code;
+
+    printf(" errors:");
+    while ((code = ERR_get_error()) != 0)
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+    printf("\n");
+}
+
+static int digest_command(const char *command, const char *line)
+{
+    EVP_MD_CTX *ctx;
+    char a[64] = "", key[32] = "";
+    unsigned char out[300];
+    unsigned long n = 0;
+    size_t sz;
+    int r = 0;
+
+    if (command[0] != 'd' || (strcmp(command, "dctx") != 0 && strcmp(command, "dinit") != 0
+            && strcmp(command, "dinitp") != 0 && strcmp(command, "dset") != 0
+            && strcmp(command, "dupdate") != 0 && strcmp(command, "dfinal") != 0
+            && strcmp(command, "dxof") != 0 && strcmp(command, "dsqueeze") != 0
+            && strcmp(command, "dsize") != 0 && strcmp(command, "dflags") != 0
+            && strcmp(command, "dcopy") != 0 && strcmp(command, "dreset") != 0))
+        return 0;
+    if (digest_ctx[0] == NULL) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+        digest_ctx[0] = EVP_MD_CTX_new();
+        digest_ctx[1] = EVP_MD_CTX_new();
+    }
+    ctx = digest_ctx[digest_current];
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "dctx") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        digest_current = n != 0;
+        printf("\n");
+        return 1;
+    } else if (strcmp(command, "dinit") == 0 || strcmp(command, "dinitp") == 0) {
+        EVP_MD *md = NULL;
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+
+        sscanf(line, "%*s %63s %31s %lu", a, key, &n);
+        sz = n;
+        if (strcmp(a, "-") != 0 && (md = EVP_MD_fetch(NULL, a, NULL)) == NULL) {
+            printf(" fetch failed");
+            print_digest_errors();
+            return 1;
+        }
+        if (strcmp(command, "dinitp") == 0) {
+            params[0] = OSSL_PARAM_construct_size_t(key, &sz);
+            r = EVP_DigestInit_ex2(ctx, md, params);
+        } else {
+            r = EVP_DigestInit_ex(ctx, md, NULL);
+        }
+        EVP_MD_free(md);
+        printf(" %d", r);
+    } else if (strcmp(command, "dset") == 0) {
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+
+        sscanf(line, "%*s %31s %lu", key, &n);
+        sz = n;
+        params[0] = OSSL_PARAM_construct_size_t(key, &sz);
+        printf(" %d", EVP_MD_CTX_set_params(ctx, params));
+    } else if (strcmp(command, "dupdate") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 1024)
+            n = 1024;
+        printf(" %d", EVP_DigestUpdate(ctx, digest_data + digest_offset, n));
+        digest_offset = (digest_offset + n * 3 + 1) % 1024;
+    } else if (strcmp(command, "dfinal") == 0) {
+        unsigned int len = 0;
+
+        if (EVP_MD_CTX_get_size_ex(ctx) > 256) {
+            printf(" too long\n");
+            return 1;
+        }
+        r = EVP_DigestFinal_ex(ctx, out, &len);
+        printf(" %d %u ", r, len);
+        for (sz = 0; sz < (r ? len : 0) && sz < 256; sz++)
+            printf("%02x", out[sz]);
+    } else if (strcmp(command, "dxof") == 0 || strcmp(command, "dsqueeze") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 256)
+            n = 256;
+        r = command[1] == 'x' ? EVP_DigestFinalXOF(ctx, out, n) : EVP_DigestSqueeze(ctx, out, n);
+        printf(" %d ", r);
+        for (sz = 0; sz < (r ? n : 0); sz++)
+            printf("%02x", out[sz]);
+    } else if (strcmp(command, "dsize") == 0) {
+        printf(" %d", EVP_MD_CTX_get_size_ex(ctx));
+    } else if (strcmp(command, "dflags") == 0) {
+        printf(" %x", EVP_MD_CTX_test_flags(ctx, 0xffffff));
+    } else if (strcmp(command, "dcopy") == 0) {
+        printf(" %d", EVP_MD_CTX_copy_ex(digest_ctx[!digest_current], ctx));
+    } else {
+        printf(" %d", EVP_MD_CTX_reset(ctx));
+    }
+    print_digest_errors();
+    return 1;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2612,7 +2735,7 @@ int main(void)
             || time_command(command, line) || template_command(command, line)
             || params_command(command, line) || ctx_command(command, line)
             || prop_command(command, line) || prov_command(command, line)
-            || fetch_command(command, line)) {
+            || fetch_command(command, line) || digest_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

@@ -1572,6 +1572,42 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_DecodeUpdate;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    usize,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *const EVP_MD,
+    *mut ENGINE,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_Digest;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_DigestFinal;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *mut core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_DigestFinalXOF;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_DigestFinal_ex;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_DigestInit;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD, *mut ENGINE) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_DigestInit_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *const EVP_MD,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_DigestInit_ex2;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *mut core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_DigestSqueeze;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_DigestUpdate;
 const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX, *const EVP_ENCODE_CTX) -> core::ffi::c_int =
     crate::evp::encode::EVP_ENCODE_CTX_copy;
 const _: unsafe extern "C" fn(*mut EVP_ENCODE_CTX) = crate::evp::encode::EVP_ENCODE_CTX_free;
@@ -1593,6 +1629,65 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeUpdate;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, core::ffi::c_int) =
+    crate::evp::md_ctx::EVP_MD_CTX_clear_flags;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD_CTX) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_copy;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD_CTX) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_copy_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_MD_CTX_ctrl;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX) -> *mut EVP_MD_CTX =
+    crate::evp::md_ctx::EVP_MD_CTX_dup;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX) = crate::evp::md_ctx::EVP_MD_CTX_free;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX) -> *const EVP_MD =
+    crate::evp::md_ctx::EVP_MD_CTX_get0_md;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX) -> *mut core::ffi::c_void =
+    crate::evp::md_ctx::EVP_MD_CTX_get0_md_data;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX) -> *mut EVP_MD =
+    crate::evp::md_ctx::EVP_MD_CTX_get1_md;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_get_params;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_get_size_ex;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX) -> *const OSSL_PARAM =
+    crate::evp::md_ctx::EVP_MD_CTX_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX) -> *const EVP_MD =
+    crate::evp::md_ctx::EVP_MD_CTX_md;
+const _: unsafe extern "C" fn() -> *mut EVP_MD_CTX = crate::evp::md_ctx::EVP_MD_CTX_new;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_reset;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, core::ffi::c_int) =
+    crate::evp::md_ctx::EVP_MD_CTX_set_flags;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_set_params;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            data: *const core::ffi::c_void,
+            count: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::md_ctx::EVP_MD_CTX_set_update_fn;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX) -> *const OSSL_PARAM =
+    crate::evp::md_ctx::EVP_MD_CTX_settable_params;
+const _: unsafe extern "C" fn(*const EVP_MD_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::md_ctx::EVP_MD_CTX_test_flags;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        ctx: *mut EVP_MD_CTX,
+        arg1: *const core::ffi::c_void,
+        arg2: usize,
+    ) -> core::ffi::c_int,
+> = crate::evp::md_ctx::EVP_MD_CTX_update_fn;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     ::core::option::Option<unsafe extern "C" fn(md: *mut EVP_MD, arg: *mut core::ffi::c_void)>,
@@ -1621,6 +1716,8 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
     crate::evp::digest::EVP_MD_get_type;
 const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
+    crate::evp::md_ctx::EVP_MD_gettable_ctx_params;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
     crate::evp::digest::EVP_MD_gettable_params;
 const _: unsafe extern "C" fn(*const EVP_MD, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::evp::digest::EVP_MD_is_a;
@@ -1631,7 +1728,19 @@ const _: unsafe extern "C" fn(
     >,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_int = crate::evp::digest::EVP_MD_names_do_all;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
+    crate::evp::md_ctx::EVP_MD_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut EVP_MD) -> core::ffi::c_int = crate::evp::digest::EVP_MD_up_ref;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int = crate::evp::md_ctx::EVP_MD_xof;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_void,
+    usize,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::md_ctx::EVP_Q_digest;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::property::EVP_default_properties_enable_fips;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =

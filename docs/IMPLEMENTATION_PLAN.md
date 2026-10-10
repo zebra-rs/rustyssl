@@ -1908,17 +1908,63 @@ have run for at least 24 CPU-hours with no findings.
 
     Dependencies: `getrandom` (its build script read and allowed) and `r-efi` (UEFI only),
     exempted in `supply-chain/` pending audit.
-- [ ] **3.3 EVP_MD:**
-  - SHA-1, the SHA-2 family (including 512/224 and 512/256), SHA-3, SHAKE (XOF,
-    `EVP_DigestFinalXOF`, `EVP_DigestSqueeze`), KECCAK-KMAC, MD5, MD5-SHA1, SM3, BLAKE2s/b,
-    RIPEMD-160, NULL
-  - legacy provider: MD4, MDC2 (with DES, 3.4), Whirlpool
-  - the full `EVP_MD_CTX` API, `EVP_Digest`, `EVP_Q_digest`
-  - the digest name table behind `EVP_get_digestbyname`, which `OPENSSL_INIT_ADD_ALL_DIGESTS`
-    fills (it aborts until then; see 1.2), and with it the legacy names each context's name map
-    starts with, the NIDs of fetched digests (`EVP_MD_get_type`), and implicit fetch for the
-    `EVP_sha256()`-style getters (from 3.1e)
-  - `PEM_SignInit`/`Update`/`Final` (from 2.6)
+- [ ] **3.3 EVP_MD**, in two sub-steps, each its own PR:
+  - [x] **3.3a Digesting:** the default provider's digests and the `EVP_MD_CTX` API.
+
+    *Done:* 34 exports. They cover the context's life cycle (new, free, reset, copy, copy_ex,
+    dup), `EVP_DigestInit`/`_ex`/`_ex2`, `EVP_DigestUpdate`, `EVP_DigestFinal`/`_ex`,
+    `EVP_DigestFinalXOF`, `EVP_DigestSqueeze`, `EVP_Digest`, `EVP_Q_digest`, the context's and
+    digest's parameters and parameter lists, `EVP_MD_CTX_get_size_ex`, the accessors, flags,
+    `EVP_MD_CTX_ctrl`, the legacy update function, and `EVP_MD_xof`.
+    - **The provider:** the default provider offers its 27 digests (`deflt_digests`, with the
+      reference's names) through dispatch tables in `rustyssl-capi`
+      (`provider/digests.rs`). Each family's table has exactly the reference's functions,
+      since the EVP layer's behavior follows from which exist. The semantics are in
+      `rustyssl_crypto::provided::digest`:
+      - plain digests over `md`, and SHA2-256/192 (new in 3.5; SHA-256 truncated);
+      - SHA-1's and MD5-SHA1's SSLv3 master secret (`ssl3-ms`);
+      - a port of the reference's `KECCAK1600_CTX` for SHA-3, KECCAK (new), SHAKE, and
+        KECCAK-KMAC. It reproduces SHAKE's missing default length, a length that persists
+        across re-initialization, updates after a squeeze (not absorbed, but they shift the
+        buffered output), finals after a squeeze, and KECCAK-KMAC's squeeze always failing
+        silently (it gets SHA-3's methods on the reference's generic and ARMv8 builds);
+      - BLAKE2's `size`, applied at the next init while the gettable size follows at once;
+        a context whose init refused its size still takes data and finishes empty.
+    - **The EVP layer** (`evp/md_ctx.rs`) follows `crypto/evp/digest.c`'s paths:
+      - the algorithm context is reused when re-initializing with the same digest;
+      - `EVP_MD_CTX_FLAG_NO_INIT` takes the legacy path;
+      - the finalized flag: updates and finals after a final fail, squeezes don't set it;
+      - `EVP_DigestFinalXOF` passes `xoflen` and then finalizes any digest;
+      - `copy_ex` reuses the destination's algorithm context (`copyctx`) when the digests
+        match.
+      The two internal flags (`KEEP_PKEY_CTX`, `FINALISED`) come from the reference's
+      internal header, which the vendored public headers don't include.
+    - **Deviations:** NULL contexts and NULL output buffers are refused, and `FinalXOF` on
+      a fixed-size Keccak digest writes only the length asked for (docs/DEVIATIONS.md). An
+      `ENGINE` argument is refused: the engine API can't make one.
+
+    Tests:
+    - `tests/c/evp_digest.c`, 142 checks: every digest whole and in pieces at lengths
+      around the block sizes; SHAKE's lengths, squeezing, and misuse; FinalXOF on fixed-size
+      digests; BLAKE2's size; SSLv3's master secret; copies, resets, flags, NO_INIT with a
+      legacy update function, ctrl, and the accessors.
+    - The probe's `d*` commands on two contexts: corpus `digest.txt` and random sessions.
+      The random sessions found the KECCAK-KMAC squeeze and the uninitialized BLAKE2 context
+      above. 10,000 more sessions were clean.
+    - Unit tests: the Keccak port against the backend, and the deviations.
+
+    Moved:
+    - MD4, Whirlpool, and MDC2 (with DES) to 9.1, with the legacy provider they're in, which
+      OpenSSL ships as a module;
+    - `EVP_MD_CTX_get_pkey_ctx`/`set_pkey_ctx`, `EVP_DigestSign*`/`Verify*`, and
+      `PEM_SignInit`/`Update`/`Final` (from 2.6) to Phase 4, which has keys;
+    - the `EVP_MD_meth_*` digests to 3.11.
+  - [ ] **3.3b Legacy names:** the digest name table behind `EVP_get_digestbyname` (and
+    `EVP_get_digestbynid`/`_byobj`), which `OPENSSL_INIT_ADD_ALL_DIGESTS` fills (it aborts
+    until then; see 1.2); `EVP_add_digest`, `EVP_MD_do_all`/`_sorted`; the legacy names each
+    context's name map starts with; the NIDs of fetched digests (`EVP_MD_get_type`,
+    `EVP_MD_get_pkey_type`); and the `EVP_sha256()`-style getters with implicit fetch (from
+    3.1e).
 - [ ] **3.4 EVP_CIPHER:**
   - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
     and the CBC-HMAC composites
