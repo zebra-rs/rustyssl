@@ -95,6 +95,7 @@ OpenSSL never depends on them.
 | `OSSL_PARAM_BLD_push_utf8_string` with a `bsize` of `SIZE_MAX` | counts no room for the string and its NUL, then copies `SIZE_MAX` octets into the array | fails with `ERR_R_PASSED_NULL_PARAMETER` | `params::tests::deviations_are_safe` |
 | `OSSL_LIB_CTX_free` of the global default context while the thread's default is another | frees the library's static object, so the next use of the default context touches freed memory | does nothing | `libctx::tests::defaults_follow_the_thread` |
 | `OSSL_PROVIDER_load`, `_load_ex`, `_try_load`, `_try_load_ex`, `_available` with a NULL name; `OSSL_PROVIDER_get0_name`, `_get_params`, `_self_test`, `_add_conf_parameter`, `_get_conf_parameters` with a NULL provider; `OSSL_PROVIDER_do_all` with a NULL callback | read through NULL | return NULL or 0 (`ERR_R_PASSED_NULL_PARAMETER` for a NULL name); `do_all` with no callback returns 1 | `provider::tests::null_arguments_fail` |
+| `EVP_MD_get0_description`, `EVP_MD_names_do_all`, `EVP_MD_get0_provider`, `EVP_MD_get_type`, `EVP_MD_get_flags` with a NULL digest | read through NULL | return NULL or 0 | `evp::digest::tests::null_digests` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata`, and the built-in providers' `buildinfo` parameter | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata`, `provider::tests::lifecycle_in_a_context` |
 
 ## Notes

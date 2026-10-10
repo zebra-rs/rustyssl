@@ -188,6 +188,18 @@
  * Each frees the thread's error state afterwards (OPENSSL_thread_stop), so no error slot keeps
  * a buffer sized by a module lookup's message, which differs between the libraries.
  *
+ * Commands for fetching, from two providers of the probe's own ("fp" and "fq", registered with
+ * OSSL_PROVIDER_add_builtin) whose digests ALG-1 to ALG-4 have several implementations with
+ * different properties, each described by its own text (a query is in hex; numbers in error
+ * data print as #, as the libraries number names differently until step 3.3):
+ *   fnew                       a new context with both providers loaded
+ *   ffetch <name> <hex>        EVP_MD_fetch (`-` for no query): the implementation chosen, and
+ *                              the errors
+ *   fdefault <hex>             EVP_set_default_properties (`-` for NULL)
+ *   fall                       EVP_MD_do_all_provided: the implementations, in order
+ *   fload <p|q>, funload <p|q> load or unload one of the providers
+ * Each frees the thread's error state afterwards, as the provider commands do.
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -216,6 +228,8 @@
 #include <openssl/params.h>
 #include <openssl/provider.h>
 #include <openssl/core_names.h>
+#include <openssl/core_dispatch.h>
+#include <ctype.h>
 #include <openssl/pem.h>
 #include <openssl/stack.h>
 #include <openssl/thread.h>
@@ -2113,6 +2127,183 @@ static int prov_command(const char *command, const char *line)
     return 1;
 }
 
+static void *f_newctx(void *provctx) { return provctx; }
+static void f_freectx(void *ctx) { (void)ctx; }
+static int f_init(void *ctx, const OSSL_PARAM params[]) { (void)ctx, (void)params; return 1; }
+static int f_update(void *ctx, const unsigned char *in, size_t inl) { (void)ctx, (void)in, (void)inl; return 1; }
+static int f_final(void *ctx, unsigned char *out, size_t *outl, size_t outsz)
+{
+    (void)ctx, (void)out, (void)outsz;
+    *outl = 0;
+    return 1;
+}
+static int f_get_params(OSSL_PARAM params[])
+{
+    OSSL_PARAM *p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE);
+
+    return p == NULL || OSSL_PARAM_set_size_t(p, 20);
+}
+
+static const OSSL_DISPATCH f_digest[] = {
+    { OSSL_FUNC_DIGEST_NEWCTX, (void (*)(void))f_newctx },
+    { OSSL_FUNC_DIGEST_INIT, (void (*)(void))f_init },
+    { OSSL_FUNC_DIGEST_UPDATE, (void (*)(void))f_update },
+    { OSSL_FUNC_DIGEST_FINAL, (void (*)(void))f_final },
+    { OSSL_FUNC_DIGEST_FREECTX, (void (*)(void))f_freectx },
+    { OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void))f_get_params },
+    OSSL_DISPATCH_END
+};
+static const OSSL_ALGORITHM fp_digests[] = {
+    { "ALG-1:A1", "provider=fp,x.n=1,x.s=a,fips=yes", f_digest, "p1a" },
+    { "ALG-1", "provider=fp,x.n=2,x.s=b", f_digest, "p1b" },
+    { "ALG-1", "provider=fp,x.n=3,fips=no,x.flag", f_digest, "p1c" },
+    { "ALG-2:A2", "provider=fp,x.n=1", f_digest, "p2a" },
+    { "ALG-2", "provider=fp,x.s='Q',x.n=-1", f_digest, "p2b" },
+    { "ALG-3", "provider=fp", f_digest, "p3" },
+    { NULL, NULL, NULL, NULL }
+};
+static const OSSL_ALGORITHM fq_digests[] = {
+    { "ALG-1", "provider=fq,x.n=1", f_digest, "q1" },
+    { "ALG-4:A4", "provider=fq,fips=yes,x.s=a", f_digest, "q4" },
+    { "ALG-2", "provider=fq,x.flag=no", f_digest, "q2" },
+    { NULL, NULL, NULL, NULL }
+};
+static const OSSL_ALGORITHM *fp_query(void *provctx, int op, int *no_cache)
+{
+    (void)provctx;
+    *no_cache = 0;
+    return op == OSSL_OP_DIGEST ? fp_digests : NULL;
+}
+static const OSSL_ALGORITHM *fq_query(void *provctx, int op, int *no_cache)
+{
+    (void)provctx;
+    *no_cache = 0;
+    return op == OSSL_OP_DIGEST ? fq_digests : NULL;
+}
+static const OSSL_DISPATCH fp_dispatch[] = { { OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))fp_query },
+                                             OSSL_DISPATCH_END };
+static const OSSL_DISPATCH fq_dispatch[] = { { OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))fq_query },
+                                             OSSL_DISPATCH_END };
+static int fp_init(const OSSL_CORE_HANDLE *handle, const OSSL_DISPATCH *in, const OSSL_DISPATCH **out, void **provctx)
+{
+    (void)in;
+    *out = fp_dispatch;
+    *provctx = (void *)handle;
+    return 1;
+}
+static int fq_init(const OSSL_CORE_HANDLE *handle, const OSSL_DISPATCH *in, const OSSL_DISPATCH **out, void **provctx)
+{
+    (void)in;
+    *out = fq_dispatch;
+    *provctx = (void *)handle;
+    return 1;
+}
+
+static OSSL_LIB_CTX *fetch_ctx;
+static OSSL_PROVIDER *fetch_provs[2];
+
+static void print_fetch_errors(void)
+{
+    unsigned long code;
+    const char *data;
+    int flags;
+
+    printf(" errors:");
+    while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        if ((flags & ERR_TXT_STRING) != 0 && data[0] != '\0') {
+            printf(" \"");
+            for (; *data != '\0'; data++) {
+                unsigned char c = (unsigned char)*data;
+
+                if (isdigit(c)) {
+                    putchar('#');
+                    while (isdigit((unsigned char)data[1]))
+                        data++;
+                } else if (c >= ' ' && c <= '~' && c != '\\' && c != '"') {
+                    putchar(c);
+                } else {
+                    printf("\\x%02x", c);
+                }
+            }
+            printf("\"");
+        }
+    }
+    printf("\n");
+}
+
+static void print_impl(EVP_MD *md, void *arg)
+{
+    (void)arg;
+    printf(" %s", EVP_MD_get0_description(md));
+}
+
+static int fetch_command(const char *command, const char *line)
+{
+    char a[64] = "", hex[700] = "-";
+    unsigned char q[300];
+    size_t len = 0;
+    int which;
+
+    if (strcmp(command, "fnew") != 0 && strcmp(command, "ffetch") != 0 && strcmp(command, "fdefault") != 0
+        && strcmp(command, "fall") != 0 && strcmp(command, "fload") != 0 && strcmp(command, "funload") != 0)
+        return 0;
+    if (strcmp(command, "fnew") == 0 || fetch_ctx == NULL) {
+        OSSL_PROVIDER_unload(fetch_provs[0]);
+        OSSL_PROVIDER_unload(fetch_provs[1]);
+        OSSL_LIB_CTX_free(fetch_ctx);
+        fetch_ctx = OSSL_LIB_CTX_new();
+        OSSL_PROVIDER_add_builtin(fetch_ctx, "fp", fp_init);
+        OSSL_PROVIDER_add_builtin(fetch_ctx, "fq", fq_init);
+        fetch_provs[0] = OSSL_PROVIDER_load(fetch_ctx, "fp");
+        fetch_provs[1] = OSSL_PROVIDER_load(fetch_ctx, "fq");
+        if (strcmp(command, "fnew") == 0) {
+            printf("fnew\n");
+            return 1;
+        }
+    }
+    printf("%s", line);
+    if (strcmp(command, "ffetch") == 0) {
+        EVP_MD *md;
+
+        sscanf(line, "%*s %63s %699s", a, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, q, &len)) {
+            printf(": bad hex\n");
+            return 1;
+        }
+        q[len] = '\0';
+        md = EVP_MD_fetch(fetch_ctx, a, strcmp(hex, "-") == 0 ? NULL : (const char *)q);
+        printf(": %s", md == NULL ? "NULL" : EVP_MD_get0_description(md));
+        EVP_MD_free(md);
+    } else if (strcmp(command, "fdefault") == 0) {
+        sscanf(line, "%*s %699s", hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex(hex, q, &len)) {
+            printf(": bad hex\n");
+            return 1;
+        }
+        q[len] = '\0';
+        printf(": %d", EVP_set_default_properties(fetch_ctx, strcmp(hex, "-") == 0 ? NULL : (const char *)q));
+    } else if (strcmp(command, "fall") == 0) {
+        printf(":");
+        EVP_MD_do_all_provided(fetch_ctx, print_impl, NULL);
+    } else {
+        sscanf(line, "%*s %63s", a);
+        which = a[0] == 'q';
+        if (strcmp(command, "fload") == 0) {
+            if (fetch_provs[which] == NULL)
+                fetch_provs[which] = OSSL_PROVIDER_load(fetch_ctx, which ? "fq" : "fp");
+            printf(": %s", fetch_provs[which] != NULL ? "loaded" : "NULL");
+        } else {
+            printf(": %d", fetch_provs[which] == NULL ? -1 : OSSL_PROVIDER_unload(fetch_provs[which]));
+            fetch_provs[which] = NULL;
+        }
+    }
+    print_fetch_errors();
+    /* The data's name numbers differ between the libraries: drop the buffers they sized. */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2420,7 +2611,8 @@ int main(void)
             || bit_command(command, line) || text_command(command, line)
             || time_command(command, line) || template_command(command, line)
             || params_command(command, line) || ctx_command(command, line)
-            || prop_command(command, line) || prov_command(command, line)) {
+            || prop_command(command, line) || prov_command(command, line)
+            || fetch_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

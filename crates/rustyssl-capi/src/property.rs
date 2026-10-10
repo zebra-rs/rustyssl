@@ -36,6 +36,8 @@ pub(crate) struct Properties {
     pub(crate) strings: Strings,
     /// The default query (`EVP_set_default_properties`), if any.
     pub(crate) global: Option<List>,
+    /// Parsed property definitions by text (`ossl_prop_defn_get`).
+    pub(crate) definitions: std::collections::HashMap<Vec<u8>, List>,
 }
 
 /// A context's properties, behind their lock.
@@ -113,6 +115,9 @@ fn set_parsed(ctx: &libctx::LibCtx, list: Option<List>, load: bool, function: &s
         return false;
     }
     properties.global = list;
+    drop(properties);
+    // Choices made under the old defaults are stale (`ossl_method_store_cache_flush_all`).
+    ctx.evp.flush();
     true
 }
 
@@ -224,7 +229,7 @@ ffi_export! {
             return 0;
         }
         let mut properties = ctx.properties.lock();
-        let Properties { strings, global } = &mut *properties;
+        let Properties { strings, global, .. } = &mut *properties;
         c_int::from(property::is_enabled(strings, b"fips", global.as_ref()))
     }
 }

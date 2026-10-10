@@ -1593,6 +1593,45 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeUpdate;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<unsafe extern "C" fn(md: *mut EVP_MD, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::evp::digest::EVP_MD_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_MD = crate::evp::digest::EVP_MD_fetch;
+const _: unsafe extern "C" fn(*mut EVP_MD) = crate::evp::digest::EVP_MD_free;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const core::ffi::c_char =
+    crate::evp::digest::EVP_MD_get0_description;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const core::ffi::c_char =
+    crate::evp::digest::EVP_MD_get0_name;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PROVIDER =
+    crate::evp::digest::EVP_MD_get0_provider;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_get_block_size;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_ulong =
+    crate::evp::digest::EVP_MD_get_flags;
+const _: unsafe extern "C" fn(*const EVP_MD, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_get_params;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_get_size;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_get_type;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
+    crate::evp::digest::EVP_MD_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_MD, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::digest::EVP_MD_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::digest::EVP_MD_names_do_all;
+const _: unsafe extern "C" fn(*mut EVP_MD) -> core::ffi::c_int = crate::evp::digest::EVP_MD_up_ref;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::property::EVP_default_properties_enable_fips;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
@@ -2187,6 +2226,11 @@ const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_utf8_string;
 const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    OSSL_provider_init_fn,
+) -> core::ffi::c_int = crate::provider::OSSL_PROVIDER_add_builtin;
+const _: unsafe extern "C" fn(
     *mut OSSL_PROVIDER,
     *const core::ffi::c_char,
     *const core::ffi::c_char,
@@ -2229,6 +2273,11 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *mut OSSL_PARAM,
 ) -> *mut OSSL_PROVIDER = crate::provider::OSSL_PROVIDER_load_ex;
+const _: unsafe extern "C" fn(
+    *const OSSL_PROVIDER,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *const OSSL_ALGORITHM = crate::provider::OSSL_PROVIDER_query_operation;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> core::ffi::c_int =
     crate::provider::OSSL_PROVIDER_self_test;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
@@ -2246,6 +2295,8 @@ const _: unsafe extern "C" fn(
 ) -> *mut OSSL_PROVIDER = crate::provider::OSSL_PROVIDER_try_load_ex;
 const _: unsafe extern "C" fn(*mut OSSL_PROVIDER) -> core::ffi::c_int =
     crate::provider::OSSL_PROVIDER_unload;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER, core::ffi::c_int, *const OSSL_ALGORITHM) =
+    crate::provider::OSSL_PROVIDER_unquery_operation;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =

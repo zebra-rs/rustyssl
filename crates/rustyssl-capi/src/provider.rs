@@ -31,7 +31,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
     ERR_LIB_CRYPTO, ERR_R_INIT_FAIL, ERR_R_PASSED_NULL_PARAMETER, OPENSSL_INIT_LOAD_CONFIG,
-    OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_PROVIDER_GET_CAPABILITIES,
+    OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_PROVIDER_GET_CAPABILITIES,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_SELF_TEST, OSSL_FUNC_PROVIDER_TEARDOWN,
     OSSL_FUNC_PROVIDER_UNQUERY_OPERATION, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PROVIDER,
@@ -70,6 +70,8 @@ type TeardownFn = unsafe extern "C" fn(*mut c_void);
 type GettableParamsFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
 type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type SelfTestFn = unsafe extern "C" fn(*mut c_void) -> c_int;
+type QueryFn = unsafe extern "C" fn(*mut c_void, c_int, *mut c_int) -> *const OSSL_ALGORITHM;
+type UnqueryFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_ALGORITHM);
 
 /// The provider functions the core calls, from its dispatch table.
 #[derive(Default, Clone, Copy)]
@@ -78,6 +80,8 @@ struct Functions {
     gettable_params: Option<GettableParamsFn>,
     get_params: Option<GetParamsFn>,
     self_test: Option<SelfTestFn>,
+    query_operation: Option<QueryFn>,
+    unquery_operation: Option<UnqueryFn>,
 }
 
 /// What changes as a provider is initialized and activated.
@@ -94,6 +98,9 @@ struct State {
     provctx: Option<Ptr<c_void>>,
     dispatch: Option<Ptr<OSSL_DISPATCH>>,
     functions: Functions,
+    /// The operations whose algorithms are in the context's method store
+    /// (`operation_bits`), bit `n` for operation `n`.
+    operations: u64,
 }
 
 /// A provider (`OSSL_PROVIDER`).
@@ -185,6 +192,8 @@ pub(crate) struct StoreState {
     /// Earlier search paths, kept so a pointer `OSSL_PROVIDER_get0_default_search_path`
     /// returned stays valid (OpenSSL frees it).
     old_paths: Vec<CString>,
+    /// The application's built-in providers (`OSSL_PROVIDER_add_builtin`), in order.
+    infos: Vec<(CString, OSSL_provider_init_fn)>,
 }
 
 impl Default for StoreState {
@@ -195,6 +204,7 @@ impl Default for StoreState {
             use_fallbacks: true,
             default_path: None,
             old_paths: Vec::new(),
+            infos: Vec::new(),
         }
     }
 }
@@ -227,9 +237,9 @@ impl Drop for StoreState {
     /// `provider_deactivate_free` for each provider, as the context goes.
     fn drop(&mut self) {
         for p in self.providers.drain(..) {
-            if p.get().is_some_and(|p| p.state().activated) {
-                // SAFETY: the store's reference keeps it live.
-                unsafe { deactivate(p.0.0) };
+            // The context is going, its method store with it: only the count changes.
+            if let Some(prov) = p.get().filter(|p| p.state().activated) {
+                count_deactivation(prov);
             }
             // SAFETY: the store's reference, given up.
             unsafe { OSSL_PROVIDER::free(p.0.0) };
@@ -321,7 +331,17 @@ unsafe fn new(
     name: &CStr,
     params: *const OSSL_PARAM,
 ) -> *mut OSSL_PROVIDER {
-    let init = predefined(name).and_then(|(init, _)| init);
+    // A predefined built-in, else the first the application registered under the name.
+    // SAFETY: the caller's guarantee.
+    let registered = with_store(unsafe { context(libctx) }, |s| {
+        s.lock()
+            .infos
+            .iter()
+            .find(|(n, _)| n.as_c_str() == name)
+            .and_then(|(_, init)| *init)
+    })
+    .flatten();
+    let init = predefined(name).and_then(|(init, _)| init).or(registered);
     let mut parameters = Vec::new();
     let mut at = params;
     // SAFETY: the caller's guarantee: the array goes on to its end.
@@ -422,11 +442,14 @@ impl Functions {
             OSSL_FUNC_PROVIDER_GET_PARAMS => self.get_params = Some(unsafe { cast(f) }),
             // SAFETY: as above.
             OSSL_FUNC_PROVIDER_SELF_TEST => self.self_test = Some(unsafe { cast(f) }),
-            // Operations come with fetching (3.1e), capabilities with the TLS groups and
-            // signature algorithms they describe.
-            OSSL_FUNC_PROVIDER_QUERY_OPERATION
-            | OSSL_FUNC_PROVIDER_UNQUERY_OPERATION
-            | OSSL_FUNC_PROVIDER_GET_CAPABILITIES => {}
+            // SAFETY: as above.
+            OSSL_FUNC_PROVIDER_QUERY_OPERATION => self.query_operation = Some(unsafe { cast(f) }),
+            OSSL_FUNC_PROVIDER_UNQUERY_OPERATION => {
+                // SAFETY: as above.
+                self.unquery_operation = Some(unsafe { cast(f) });
+            }
+            // Capabilities come with the TLS groups and signature algorithms they describe.
+            OSSL_FUNC_PROVIDER_GET_CAPABILITIES => {}
             _ => {}
         }
     }
@@ -449,9 +472,16 @@ unsafe fn activate(handle: *mut OSSL_PROVIDER) -> bool {
     if needs_init && !provider_init(handle, prov) {
         return false;
     }
-    let mut s = prov.state();
-    s.activations = s.activations.saturating_add(1);
-    s.activated = true;
+    let first = {
+        let mut s = prov.state();
+        s.activations = s.activations.saturating_add(1);
+        s.activated = true;
+        s.activations == 1
+    };
+    if first {
+        // `provider_flush_store_cache`: choices made without this provider are stale.
+        crate::evp::fetch::flush_cache(prov.libctx());
+    }
     true
 }
 
@@ -465,12 +495,23 @@ unsafe fn deactivate(handle: *mut OSSL_PROVIDER) -> bool {
     let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
         return false;
     };
+    let count = count_deactivation(prov);
+    if count == 0 {
+        // `provider_remove_store_methods`: its algorithms go from the method store.
+        prov.state().operations = 0;
+        crate::evp::fetch::remove_provider(prov.libctx(), handle);
+    }
+    count >= 0
+}
+
+/// `provider_deactivate`'s count: one activation fewer. Returns the new count.
+fn count_deactivation(prov: &Provider) -> i32 {
     let mut s = prov.state();
     s.activations = s.activations.saturating_sub(1);
     if s.activations < 1 {
         s.activated = false;
     }
-    s.activations >= 0
+    s.activations
 }
 
 /// `ossl_provider_add_to_store`: adds a new provider to its store, or finds that another of
@@ -780,28 +821,8 @@ ffi_export! {
         if !unsafe { activate_fallbacks(ctx) } {
             return 0;
         }
-        // The active providers, each held and activated once more for the calls.
-        let held = {
-            // SAFETY: the caller's guarantee.
-            with_store(unsafe { context(ctx) }, |s| {
-                let store = s.lock();
-                let mut held = Vec::new();
-                for p in &store.providers {
-                    let Some(prov) = p.get() else { continue };
-                    let mut st = prov.state();
-                    if !st.activated {
-                        continue;
-                    }
-                    st.activations = st.activations.saturating_add(1);
-                    drop(st);
-                    // SAFETY: in the store, so live.
-                    if unsafe { OSSL_PROVIDER::up_ref(p.0.0) } {
-                        held.push(p.0.0);
-                    }
-                }
-                held
-            })
-        }.unwrap_or_default();
+        // SAFETY: the caller's guarantee.
+        let held = unsafe { hold_activated(ctx) };
         let mut ret = 1;
         if let Some(cb) = cb {
             for &prov in &held {
@@ -812,21 +833,206 @@ ffi_export! {
                 }
             }
         }
-        for prov in held {
-            // SAFETY: held above.
-            if let Some(p) = unsafe { OSSL_PROVIDER::get(prov) } {
-                let mut st = p.state();
-                st.activations = st.activations.saturating_sub(1);
-                if st.activations < 1 {
-                    // A callback unloaded it: the extra activation was its last.
-                    st.activated = false;
-                }
-            }
-            // SAFETY: the reference taken above.
-            unsafe { OSSL_PROVIDER::free(prov) };
-        }
+        release_activated(held);
         ret
     }
+}
+
+/// The active providers of `libctx`'s store, in its order, each held with a reference and one
+/// more activation while the caller works with it (`ossl_provider_doall_activated`).
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+unsafe fn hold_activated(libctx: *mut OSSL_LIB_CTX) -> Vec<*mut OSSL_PROVIDER> {
+    // SAFETY: the caller's guarantee.
+    with_store(unsafe { context(libctx) }, |s| {
+        let store = s.lock();
+        let mut held = Vec::new();
+        for p in &store.providers {
+            let Some(prov) = p.get() else { continue };
+            let mut st = prov.state();
+            if !st.activated {
+                continue;
+            }
+            st.activations = st.activations.saturating_add(1);
+            drop(st);
+            // SAFETY: in the store, so live.
+            if unsafe { OSSL_PROVIDER::up_ref(p.0.0) } {
+                held.push(p.0.0);
+            }
+        }
+        held
+    })
+    .unwrap_or_default()
+}
+
+/// Gives back what [`hold_activated`] took. A provider unloaded meanwhile (its extra
+/// activation the last) is left inactive, without its algorithms going from the method store,
+/// as OpenSSL does.
+fn release_activated(held: Vec<*mut OSSL_PROVIDER>) {
+    for prov in held {
+        // SAFETY: held, so live.
+        if let Some(p) = unsafe { OSSL_PROVIDER::get(prov) } {
+            count_deactivation(p);
+        }
+        // SAFETY: the reference taken by `hold_activated`.
+        unsafe { OSSL_PROVIDER::free(prov) };
+    }
+}
+
+/// The providers a fetch looks through (`ossl_provider_doall_activated`): the configuration
+/// loaded for the default context, the fallback activated, then the active providers, held.
+/// Give them back with [`release_activated`].
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn activated(libctx: *mut OSSL_LIB_CTX) -> Vec<*mut OSSL_PROVIDER> {
+    load_config_for(libctx);
+    // SAFETY: the caller's guarantee.
+    if !unsafe { activate_fallbacks(libctx) } {
+        return Vec::new();
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { hold_activated(libctx) }
+}
+
+/// Gives back the providers [`activated`] held.
+pub(crate) fn release(held: Vec<*mut OSSL_PROVIDER>) {
+    release_activated(held);
+}
+
+/// `ossl_provider_query_operation`: the provider's algorithms for `operation` (NULL if it has
+/// none or no `query_operation`), and whether they mustn't be stored.
+///
+/// # Safety
+/// `prov` is a live provider.
+pub(crate) unsafe fn query_operation(
+    prov: *const OSSL_PROVIDER,
+    operation: c_int,
+) -> (*const OSSL_ALGORITHM, bool) {
+    // SAFETY: the caller's guarantee.
+    let Some(p) = (unsafe { provider(prov) }) else {
+        return (ptr::null(), false);
+    };
+    let (provctx, f) = p.functions();
+    let Some(query) = f.query_operation else {
+        return (ptr::null(), false);
+    };
+    let mut no_store: c_int = 0;
+    // SAFETY: the provider's function with its context.
+    let algs = unsafe { query(provctx, operation, &raw mut no_store) };
+    (algs, no_store != 0)
+}
+
+/// `ossl_provider_unquery_operation`: gives the provider back the algorithms it returned.
+///
+/// # Safety
+/// `prov` is a live provider; `algs` is what its `query_operation` returned for `operation`.
+pub(crate) unsafe fn unquery_operation(
+    prov: *const OSSL_PROVIDER,
+    operation: c_int,
+    algs: *const OSSL_ALGORITHM,
+) {
+    // SAFETY: the caller's guarantee.
+    let Some(p) = (unsafe { provider(prov) }) else {
+        return;
+    };
+    let (provctx, f) = p.functions();
+    if let Some(unquery) = f.unquery_operation {
+        // SAFETY: the provider's function with its context and its own algorithms.
+        unsafe { unquery(provctx, operation, algs) };
+    }
+}
+
+/// The bit standing for `operation` (`ossl_provider_test_operation_bit` and `_set_`).
+fn operation_bit(operation: c_int) -> u64 {
+    u32::try_from(operation)
+        .ok()
+        .and_then(|n| 1u64.checked_shl(n))
+        .unwrap_or(0)
+}
+
+/// Whether the provider's algorithms for `operation` are in the method store.
+///
+/// # Safety
+/// `prov` is a live provider.
+pub(crate) unsafe fn operation_stored(prov: *const OSSL_PROVIDER, operation: c_int) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { provider(prov) }.is_some_and(|p| p.state().operations & operation_bit(operation) != 0)
+}
+
+/// Records that the provider's algorithms for `operation` are in the method store.
+///
+/// # Safety
+/// `prov` is a live provider.
+pub(crate) unsafe fn set_operation_stored(prov: *const OSSL_PROVIDER, operation: c_int) {
+    // SAFETY: the caller's guarantee.
+    if let Some(p) = unsafe { provider(prov) } {
+        p.state().operations |= operation_bit(operation);
+    }
+}
+
+ffi_export! {
+    /// The provider's algorithms for `operation_id`, and through `no_cache` whether they may be
+    /// kept. NULL if it has none.
+    ///
+    /// # Safety
+    /// `prov` is NULL or a live provider; `no_cache` is NULL or valid for a write.
+    pub unsafe extern "C" fn OSSL_PROVIDER_query_operation(prov: *const OSSL_PROVIDER, operation_id: c_int, no_cache: *mut c_int) -> *const OSSL_ALGORITHM
+    where failure = ptr::null(), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(p) = (unsafe { provider(prov) }) else { return ptr::null() };
+        let (provctx, f) = p.functions();
+        let Some(query) = f.query_operation else { return ptr::null() };
+        // SAFETY: the provider's function with its context and the caller's flag.
+        unsafe { query(provctx, operation_id, no_cache) }
+    }
+}
+
+ffi_export! {
+    /// Gives the provider back algorithms `OSSL_PROVIDER_query_operation` returned.
+    ///
+    /// # Safety
+    /// `prov` is NULL or a live provider; `algs` came from its `query_operation`.
+    pub unsafe extern "C" fn OSSL_PROVIDER_unquery_operation(prov: *const OSSL_PROVIDER, operation_id: c_int, algs: *const OSSL_ALGORITHM)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unquery_operation(prov, operation_id, algs) };
+    }
+}
+
+ffi_export! {
+    /// Registers an application's built-in provider `name` with its init function in `libctx`
+    /// (the thread's default context for NULL), for a later load. Returns 1, or 0 for a NULL
+    /// name or function.
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `name` is NULL or a string; `init_fn` is
+    /// NULL or a provider init function.
+    pub unsafe extern "C" fn OSSL_PROVIDER_add_builtin(libctx: *mut OSSL_LIB_CTX, name: *const c_char, init_fn: OSSL_provider_init_fn) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        if name.is_null() || init_fn.is_none() {
+            err::raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER, "OSSL_PROVIDER_add_builtin");
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let name = unsafe { CStr::from_ptr(name) }.to_owned();
+        // SAFETY: the caller's guarantee.
+        let added = with_store(unsafe { context(libctx) }, |s| s.lock().infos.push((name, init_fn)));
+        c_int::from(added.is_some())
+    }
+}
+
+/// The library context a provider was loaded into, as given (NULL for the default).
+///
+/// # Safety
+/// `prov` is NULL or a live provider.
+pub(crate) unsafe fn libctx_of(prov: *const OSSL_PROVIDER) -> *mut OSSL_LIB_CTX {
+    // SAFETY: the caller's guarantee.
+    unsafe { provider(prov) }.map_or(ptr::null_mut(), Provider::libctx)
 }
 
 /// The provider behind `prov`, or `None` for NULL.

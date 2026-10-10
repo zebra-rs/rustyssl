@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(22) {
+        match random.below(23) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -170,6 +170,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             18 => ctx_session(&mut random, &mut out)?,
             19 => prop_session(&mut random, &mut out)?,
             20 => prov_session(&mut random, &mut out)?,
+            21 => fetch_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -790,6 +791,67 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
         }
         writeln!(out, "asns2i {text}")?;
     }
+    Ok(())
+}
+
+/// A random property query over the probe's fetch providers' properties (`provider`, `fips`,
+/// `x.n`, `x.s`, `x.flag`, and ones they don't have), each optional, negated, or compared.
+fn fetch_query(random: &mut Random) -> String {
+    let mut q = String::new();
+    for i in 0..random.below(4) {
+        if i > 0 {
+            q.push(',');
+        }
+        q.push_str(random.pick(&["", "", "?", "?", "-"]));
+        q.push_str(random.pick(&[
+            "provider", "fips", "x.n", "x.n", "x.s", "x.flag", "x.other", "unknown",
+        ]));
+        match random.below(4) {
+            0 => {}
+            _ => {
+                q.push_str(random.pick(&["=", "=", "!="]));
+                q.push_str(random.pick(&[
+                    "fp", "fq", "yes", "no", "1", "2", "3", "-1", "0x2", "a", "b", "'Q'", "q", "",
+                ]));
+            }
+        }
+    }
+    q
+}
+
+/// A random session of fetches from the probe's two providers: random names and property
+/// queries, default properties set and cleared, providers unloaded and reloaded, listings,
+/// and sometimes a fresh context.
+fn fetch_session(random: &mut Random, out: &mut String) -> Result {
+    let hex = |q: &str| -> String {
+        if q.is_empty() {
+            "-".to_owned()
+        } else {
+            q.bytes().map(|b| format!("{b:02x}")).collect()
+        }
+    };
+    for _ in 0..random.below(12) + 1 {
+        match random.below(14) {
+            0 => writeln!(out, "fnew")?,
+            1 => writeln!(out, "fdefault {}", hex(&fetch_query(random)))?,
+            2 => writeln!(out, "fdefault -")?,
+            3 => writeln!(out, "fall")?,
+            4 => writeln!(out, "funload {}", random.pick(&["p", "q"]))?,
+            5 => writeln!(out, "fload {}", random.pick(&["p", "q"]))?,
+            _ => {
+                let name = random.pick(&[
+                    "ALG-1", "alg-1", "A1", "ALG-2", "A2", "ALG-3", "ALG-4", "a4", "NOPE",
+                ]);
+                let q = if random.below(5) == 0 {
+                    String::new()
+                } else {
+                    fetch_query(random)
+                };
+                writeln!(out, "ffetch {name} {}", hex(&q))?;
+            }
+        }
+    }
+    writeln!(out, "fdefault -")?;
     Ok(())
 }
 
