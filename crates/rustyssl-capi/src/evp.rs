@@ -3,6 +3,7 @@
 //! the message digest and cipher methods ([`digest`], [`cipher`]) and their contexts.
 
 pub(crate) mod cipher;
+pub(crate) mod cipher_asn1;
 pub(crate) mod cipher_ctx;
 pub(crate) mod digest;
 pub(crate) mod encode;

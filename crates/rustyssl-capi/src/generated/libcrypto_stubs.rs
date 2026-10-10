@@ -8794,46 +8794,6 @@ pub extern "C" fn EVP_BytesToKey(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_CTX_get_algor(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut *mut X509_ALGOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_CTX_get_algor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_CTX_get_algor_params(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut X509_ALGOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_CTX_get_algor_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_CTX_set_algor_params(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const X509_ALGOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_CTX_set_algor_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_asn1_to_param(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_asn1_to_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_get_asn1_iv(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_get_asn1_iv")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_CIPHER_impl_ctx_size(_: *const EVP_CIPHER) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_CIPHER_impl_ctx_size")
 }
@@ -9019,22 +8979,6 @@ pub extern "C" fn EVP_CIPHER_meth_set_set_asn1_params(
     >,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_CIPHER_meth_set_set_asn1_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_param_to_asn1(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_param_to_asn1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CIPHER_set_asn1_iv(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CIPHER_set_asn1_iv")
 }
 
 #[unsafe(no_mangle)]
@@ -27357,11 +27301,6 @@ pub extern "C" fn X509_ALGOR_dup(_: *const X509_ALGOR) -> *mut X509_ALGOR {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_ALGOR_free(_: *mut X509_ALGOR) {
-    crate::stub::unimplemented("X509_ALGOR_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_ALGOR_get0(
     _: *mut *const ASN1_OBJECT,
     _: *mut core::ffi::c_int,
@@ -27369,16 +27308,6 @@ pub extern "C" fn X509_ALGOR_get0(
     _: *const X509_ALGOR,
 ) {
     crate::stub::unimplemented("X509_ALGOR_get0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_ALGOR_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("X509_ALGOR_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_ALGOR_new() -> *mut X509_ALGOR {
-    crate::stub::unimplemented("X509_ALGOR_new")
 }
 
 #[unsafe(no_mangle)]
@@ -33522,15 +33451,6 @@ pub extern "C" fn d2i_X509_ACERT_fp(_: *mut FILE, _: *mut *mut X509_ACERT) -> *m
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_X509_ALGOR(
-    _: *mut *mut X509_ALGOR,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("d2i_X509_ALGOR")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_X509_ALGORS(
     _: *mut *mut X509_ALGORS,
     _: *mut *const core::ffi::c_uchar,
@@ -35328,14 +35248,6 @@ pub extern "C" fn i2d_X509_ACERT_bio(_: *mut BIO, _: *const X509_ACERT) -> core:
 #[unsafe(no_mangle)]
 pub extern "C" fn i2d_X509_ACERT_fp(_: *mut FILE, _: *const X509_ACERT) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_X509_ACERT_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_X509_ALGOR(
-    _: *const X509_ALGOR,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_X509_ALGOR")
 }
 
 #[unsafe(no_mangle)]

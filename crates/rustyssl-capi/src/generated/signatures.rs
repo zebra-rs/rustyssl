@@ -1575,6 +1575,10 @@ const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const EVP_CIPHER =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_get0_cipher;
 const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *mut EVP_CIPHER =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_get1_cipher;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut *mut X509_ALGOR) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_CTX_get_algor;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut X509_ALGOR) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_CTX_get_algor_params;
 const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *mut core::ffi::c_void =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_app_data;
 const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
@@ -1618,6 +1622,8 @@ const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut core::ffi::c_uchar) -> c
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_rand_key;
 const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> core::ffi::c_int =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_reset;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *const X509_ALGOR) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_CTX_set_algor_params;
 const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut core::ffi::c_void) =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_app_data;
 const _: unsafe extern "C" fn(
@@ -1638,6 +1644,8 @@ const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *const OSSL_PARAM =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_settable_params;
 const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_test_flags;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut ASN1_TYPE) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_asn1_to_param;
 const _: unsafe extern "C" fn(*const EVP_CIPHER, core::ffi::c_int) -> core::ffi::c_int =
     crate::evp::cipher::EVP_CIPHER_can_pipeline;
 const _: unsafe extern "C" fn(
@@ -1681,6 +1689,8 @@ const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const core::ffi::c_char =
     crate::evp::cipher::EVP_CIPHER_get0_name;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PROVIDER =
     crate::evp::cipher::EVP_CIPHER_get0_provider;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut ASN1_TYPE) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_get_asn1_iv;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
     crate::evp::cipher::EVP_CIPHER_get_block_size;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_ulong =
@@ -1710,6 +1720,10 @@ const _: unsafe extern "C" fn(
     >,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_int = crate::evp::cipher::EVP_CIPHER_names_do_all;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut ASN1_TYPE) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_param_to_asn1;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut ASN1_TYPE) -> core::ffi::c_int =
+    crate::evp::cipher_asn1::EVP_CIPHER_set_asn1_iv;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
     crate::evp::cipher::EVP_CIPHER_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut EVP_CIPHER) -> core::ffi::c_int =
@@ -3009,6 +3023,9 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_ulong,
 ) -> core::ffi::c_int = crate::asn1::text::UTF8_putc;
+const _: unsafe extern "C" fn(*mut X509_ALGOR) = crate::asn1::tpl::items::X509_ALGOR_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::X509_ALGOR_it;
+const _: unsafe extern "C" fn() -> *mut X509_ALGOR = crate::asn1::tpl::items::X509_ALGOR_new;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::ZINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::ZINT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::ZLONG_it;
@@ -3158,6 +3175,11 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
+const _: unsafe extern "C" fn(
+    *mut *mut X509_ALGOR,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut X509_ALGOR = crate::asn1::tpl::items::d2i_X509_ALGOR;
 const _: unsafe extern "C" fn() = crate::err::strings::err_free_strings_int;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_ENUMERATED) -> core::ffi::c_int =
     crate::asn1::integer::i2a_ASN1_ENUMERATED;
@@ -3253,6 +3275,8 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const X509_ALGOR, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::asn1::tpl::items::i2d_X509_ALGOR;
 const _: unsafe extern "C" fn(
     *mut X509V3_EXT_METHOD,
     *const ASN1_ENUMERATED,
