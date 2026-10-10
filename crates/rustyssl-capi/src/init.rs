@@ -241,13 +241,7 @@ fn load_config(settings: *const OPENSSL_INIT_SETTINGS) -> c_int {
     let flags = settings.map_or_else(default_flags, |s| s.flags.load(Ordering::Relaxed));
     let file = settings.and_then(|s| s.filename.lock().ok().and_then(|f| f.clone()));
     let file = file.or_else(|| {
-        // SAFETY: getenv with a NUL-terminated name returns null or a C string we copy at once.
-        let set = (issetugid() == 0)
-            .then(|| unsafe { libc::getenv(c"OPENSSL_CONF".as_ptr()) })
-            .filter(|value| !value.is_null())
-            // SAFETY: as above.
-            .map(|value| unsafe { CStr::from_ptr(value) }.to_owned());
-        set.or_else(|| {
+        safe_getenv(c"OPENSSL_CONF").or_else(|| {
             let dir = version::config_dir().to_bytes();
             let mut path = dir.to_vec();
             path.extend_from_slice(b"/openssl.cnf");
@@ -307,6 +301,21 @@ fn default_flags() -> c_ulong {
         | CONF_MFLAGS_IGNORE_MISSING_FILE
         | CONF_MFLAGS_IGNORE_RETURN_CODES;
     c_ulong::from(flags.cast_unsigned())
+}
+
+/// `ossl_safe_getenv`: the environment variable `name`, unless the process runs with privileges
+/// it didn't start with.
+pub(crate) fn safe_getenv(name: &CStr) -> Option<CString> {
+    if issetugid() != 0 {
+        return None;
+    }
+    // SAFETY: getenv with a NUL-terminated name returns null or a C string we copy at once.
+    let value = unsafe { libc::getenv(name.as_ptr()) };
+    if value.is_null() {
+        return None;
+    }
+    // SAFETY: as above.
+    Some(unsafe { CStr::from_ptr(value) }.to_owned())
 }
 
 /// `OPENSSL_issetugid`: whether the process runs with privileges it didn't start with, so the

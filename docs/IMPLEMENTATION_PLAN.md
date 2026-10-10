@@ -1560,11 +1560,55 @@ have run for at least 24 CPU-hours with no findings.
 
     Hooks for later steps: the cache flushes and provider default-properties updates come with
     3.1d and 3.1e, and mirroring defaults into child contexts with 3.1d.
-  - [ ] **3.1d `OSSL_PROVIDER`:** load, try_load, unload, available, do_all, get_params,
-    self_test; `OSSL_LIB_CTX_new_from_dispatch` and `OSSL_LIB_CTX_new_child` (from 3.1b).
+  - [x] **3.1d `OSSL_PROVIDER`:** load, try_load, unload, available, do_all, get_params,
+    self_test.
+
+    *Done:* 18 exports, in `capi/src/provider.rs`, a port of `crypto/provider_core.c`:
+    - **Store and lifecycle:** each library context has its own store. A provider has
+      references and activations. It is initialized once (its init function gets the core's
+      dispatch table and returns its own) and torn down with its last reference. Unloading
+      deactivates it and leaves it in the store, so a later load reactivates the same
+      provider.
+    - **Fallback and order:** any `OSSL_PROVIDER_load`, even one that fails, stops the
+      fallback to `default`; otherwise `OSSL_PROVIDER_available` and `OSSL_PROVIDER_do_all`
+      activate it. `try_load` can keep the fallback, which can then add a second `default`,
+      as OpenSSL's does. The store keeps OpenSSL's order: sorted at each lookup, with later
+      additions last.
+    - **Error libraries:** every provider made takes a number from
+      `ERR_get_next_error_library`.
+    - **Built-ins** (`provider/builtin.rs`): `default`, `base`, and `null`, each an init
+      function and dispatch tables in the form an external provider has. They report the
+      same names, versions, status, gettable parameters, and context (null's is its handle),
+      and offer no algorithms until the algorithm steps.
+    - **Modules** (`provider/module.rs`): any other name is looked up as OpenSSL's DSO loader
+      does: the search path, `$OPENSSL_MODULES`, or `MODULESDIR`; the platform's extension;
+      `dlopen`, with OpenSSL's errors and the loader's message. A module that opens isn't run
+      yet (9.1).
+    - **Core table:** so far it offers `core_get_libctx` (`provider/upcalls.rs`).
+    - **Other exports:** `get0_name`, `get0_provider_ctx`, `get0_dispatch`,
+      `gettable_params`, the search path, and the configuration parameters (given to
+      `load_ex`, added, read, and read as Booleans).
+
+    Tests:
+    - `tests/c/provider.c`: 23 checks, covering the fallback, the built-ins and what they
+      report, repeated loads, the store's order, callbacks that stop or unload, failed module
+      lookups (codes only: on macOS the loader's message lists `DYLD_LIBRARY_PATH`), the
+      error libraries taken, and configuration parameters.
+    - The probe's `pload`/`ptry`/`punload`/`pavail`/`pall`/`pparams` commands: corpus
+      `provider.txt`, and random sequences in eight slots.
+
+    There is no fuzz target: nothing here parses input.
+
+    Moved:
+    - `OSSL_PROVIDER_query_operation` and `_unquery_operation` to 3.1e;
+    - the default provider's `get_capabilities` (TLS groups and signature algorithms) to 7.3;
+    - `OSSL_PROVIDER_add_builtin`, `OSSL_LIB_CTX_new_from_dispatch`, `OSSL_LIB_CTX_new_child`,
+      the rest of the core table, and the `legacy` provider (a module in OpenSSL's default
+      build) to 9.1.
   - [ ] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
     `do_all_provided`; implicit fetch for the legacy `EVP_sha256()`-style getters;
-    `OSSL_LIB_CTX_get_data` (from 3.1b).
+    `OSSL_LIB_CTX_get_data` (from 3.1b); `OSSL_PROVIDER_query_operation` and
+    `_unquery_operation` (from 3.1d).
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
@@ -1835,7 +1879,8 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
 - [ ] **7.3 TLS 1.3:**
   - the full handshake, HRR, and the default 3.5 groups and key shares (hybrid
     **X25519MLKEM768** and X25519), including the 3.5 group-list syntax (tuples and key-share
-    markers)
+    markers); the default provider's `TLS-GROUP` and `TLS-SIGALG` capabilities
+    (`OSSL_PROVIDER_get_capabilities`, from 3.1d)
   - PSK (external, and resumption with stateful or stateless tickets, `num_tickets`, ticket
     key callbacks)
   - 0-RTT (`SSL_{read,write}_early_data`, limits, anti-replay)
@@ -1913,8 +1958,10 @@ DTLS interop with the reference and GnuTLS works under loss and reordering.
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 
 - [ ] **9.1 Loading external C providers:**
-  - `OSSL_PROVIDER_load` of `.so` modules (`OSSL_provider_init`, MODULESDIR),
-    `OSSL_PROVIDER_add_builtin`
+  - `OSSL_PROVIDER_load` of `.so` modules (`OSSL_provider_init`, MODULESDIR; 3.1d finds
+    them), `OSSL_PROVIDER_add_builtin`, `OSSL_LIB_CTX_new_from_dispatch` and
+    `OSSL_LIB_CTX_new_child` (from 3.1b), and the `legacy` provider as a module in
+    `MODULESDIR`, as OpenSSL ships it
   - **every core upcall**: params, thread start, libctx, error raising and marks, obj sigid
     and create, memory, BIO, self-test, entropy and nonce, child-provider callbacks
   - EVP operations dispatched through external function tables, and key import/export across

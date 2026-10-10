@@ -174,6 +174,20 @@
  *                              required, and EVP_get1_default_properties
  *   propfips <enable>          EVP_default_properties_enable_fips, then as propset
  *
+ * Commands for providers, in one library context of the probe's, with eight slots for the
+ * providers loaded (names: default, base, null, and ones no module exists for):
+ *   pnew                       a new context
+ *   pload <slot> <name>        OSSL_PROVIDER_load into an empty slot: loaded or NULL, and the
+ *                              errors (codes; the data of CRYPTO's)
+ *   ptry <slot> <name> <keep>  OSSL_PROVIDER_try_load, keeping the fallback if <keep>
+ *   punload <slot>             OSSL_PROVIDER_unload, emptying the slot
+ *   pavail <name>              OSSL_PROVIDER_available
+ *   pall                       OSSL_PROVIDER_do_all: the names, in order; then which slots hold
+ *                              the same provider as another, and the error libraries taken
+ *   pparams <slot>             the provider's name, version, and status parameters
+ * Each frees the thread's error state afterwards (OPENSSL_thread_stop), so no error slot keeps
+ * a buffer sized by a module lookup's message, which differs between the libraries.
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -200,6 +214,8 @@
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
 #include <openssl/params.h>
+#include <openssl/provider.h>
+#include <openssl/core_names.h>
 #include <openssl/pem.h>
 #include <openssl/stack.h>
 #include <openssl/thread.h>
@@ -1986,6 +2002,117 @@ static int prop_command(const char *command, const char *line)
     return 0;
 }
 
+static OSSL_LIB_CTX *prov_ctx;
+static OSSL_PROVIDER *prov_slots[8];
+static int prov_library_base = -1;
+
+static void print_prov_errors(void)
+{
+    unsigned long code;
+    const char *data;
+    int flags;
+
+    printf(" errors:");
+    while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        if (ERR_GET_LIB(code) == ERR_LIB_CRYPTO && (flags & ERR_TXT_STRING) != 0 && data[0] != '\0')
+            print_quoted(data);
+    }
+    printf("\n");
+}
+
+static int print_prov_name(OSSL_PROVIDER *prov, void *arg)
+{
+    (void)arg;
+    printf(" %s", OSSL_PROVIDER_get0_name(prov));
+    return 1;
+}
+
+static int prov_command(const char *command, const char *line)
+{
+    char name[64] = "";
+    int slot = -1, keep = 0;
+
+    if (command[0] != 'p' || (strcmp(command, "pnew") != 0 && strcmp(command, "pload") != 0
+                              && strcmp(command, "ptry") != 0 && strcmp(command, "punload") != 0
+                              && strcmp(command, "pavail") != 0 && strcmp(command, "pall") != 0
+                              && strcmp(command, "pparams") != 0))
+        return 0;
+    if (prov_library_base < 0)
+        prov_library_base = ERR_get_next_error_library();
+    if (strcmp(command, "pnew") == 0 || prov_ctx == NULL) {
+        int i;
+
+        for (i = 0; i < 8; i++) {
+            OSSL_PROVIDER_unload(prov_slots[i]);
+            prov_slots[i] = NULL;
+        }
+        OSSL_LIB_CTX_free(prov_ctx);
+        prov_ctx = OSSL_LIB_CTX_new();
+        if (strcmp(command, "pnew") == 0) {
+            printf("pnew\n");
+            return 1;
+        }
+    }
+    printf("%s", line);
+    if (strcmp(command, "pload") == 0 || strcmp(command, "ptry") == 0) {
+        sscanf(line, "%*s %d %63s %d", &slot, name, &keep);
+        if (slot < 0 || slot > 7 || prov_slots[slot] != NULL) {
+            printf(": busy\n");
+            return 1;
+        }
+        prov_slots[slot] = strcmp(command, "pload") == 0 ? OSSL_PROVIDER_load(prov_ctx, name)
+                                                         : OSSL_PROVIDER_try_load(prov_ctx, name, keep);
+        printf(": %s", prov_slots[slot] == NULL ? "NULL" : "loaded");
+    } else if (strcmp(command, "punload") == 0) {
+        sscanf(line, "%*s %d", &slot);
+        if (slot < 0 || slot > 7 || prov_slots[slot] == NULL) {
+            printf(": empty\n");
+            return 1;
+        }
+        printf(": %d", OSSL_PROVIDER_unload(prov_slots[slot]));
+        prov_slots[slot] = NULL;
+    } else if (strcmp(command, "pavail") == 0) {
+        sscanf(line, "%*s %63s", name);
+        printf(": %d", OSSL_PROVIDER_available(prov_ctx, name));
+    } else if (strcmp(command, "pall") == 0) {
+        int i, j, r;
+
+        printf(":");
+        r = OSSL_PROVIDER_do_all(prov_ctx, print_prov_name, NULL);
+        printf(" (%d) same:", r);
+        for (i = 0; i < 8; i++)
+            for (j = i + 1; j < 8; j++)
+                if (prov_slots[i] != NULL && prov_slots[i] == prov_slots[j])
+                    printf(" %d=%d", i, j);
+        printf(" libraries %d", ERR_get_next_error_library() - prov_library_base);
+    } else {
+        const char *pname = NULL, *version = NULL;
+        int status = -1;
+        OSSL_PARAM params[4];
+
+        sscanf(line, "%*s %d", &slot);
+        if (slot < 0 || slot > 7 || prov_slots[slot] == NULL) {
+            printf(": empty\n");
+            return 1;
+        }
+        params[0] = OSSL_PARAM_construct_utf8_ptr(OSSL_PROV_PARAM_NAME, (char **)&pname, 0);
+        params[1] = OSSL_PARAM_construct_utf8_ptr(OSSL_PROV_PARAM_VERSION, (char **)&version, 0);
+        params[2] = OSSL_PARAM_construct_int(OSSL_PROV_PARAM_STATUS, &status);
+        params[3] = OSSL_PARAM_construct_end();
+        printf(": %s %d", OSSL_PROVIDER_get0_name(prov_slots[slot]), OSSL_PROVIDER_get_params(prov_slots[slot], params));
+        printf(" \"%s\" \"%s\" %d self-test %d", pname, version, status, OSSL_PROVIDER_self_test(prov_slots[slot]));
+    }
+    print_prov_errors();
+    /*
+     * A failed module lookup's data holds the module directory and the system loader's message,
+     * which differ between the libraries; drop the error state so no slot keeps a buffer sized
+     * by it (the err commands print the sizes).
+     */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 static int err_command(const char *command, const char *line)
 {
     static ERR_STATE *saved = NULL;
@@ -2293,7 +2420,7 @@ int main(void)
             || bit_command(command, line) || text_command(command, line)
             || time_command(command, line) || template_command(command, line)
             || params_command(command, line) || ctx_command(command, line)
-            || prop_command(command, line)) {
+            || prop_command(command, line) || prov_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
