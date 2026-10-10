@@ -101,6 +101,7 @@ OpenSSL never depends on them.
 | `EVP_DigestUpdate` (of one octet or more), `EVP_DigestFinal_ex`, `EVP_DigestFinal`, `EVP_DigestInit`, `EVP_DigestInit_ex`, `EVP_DigestInit_ex2`, `EVP_DigestFinalXOF`, `EVP_DigestSqueeze`, `EVP_MD_CTX_set_params`, `EVP_MD_CTX_get_params`, the `EVP_MD_CTX_*_flags` functions, `EVP_MD_CTX_get0_md_data`, `EVP_MD_CTX_update_fn`, and `EVP_MD_CTX_set_update_fn` with a NULL context | dereference NULL and crash | return 0 (the inits with `ERR_R_PASSED_NULL_PARAMETER`) or NULL, or do nothing | `evp::md_ctx::tests::null_contexts_are_refused` |
 | `EVP_DigestFinalXOF` on a fixed-size SHA-3 or KECCAK digest with a length below the digest's size | writes the whole digest, past the caller's buffer, and returns 1 | writes only the length asked for (the digest's first octets) and returns 1 | `evp::md_ctx::tests::final_xof_of_a_fixed_keccak_digest_writes_only_its_length` |
 | `EVP_DigestFinal_ex`, `EVP_DigestFinalXOF`, `EVP_DigestSqueeze` with a NULL output buffer and output to write (a SHA-3, KECCAK, SHAKE, or BLAKE2 digest) | writes through NULL and crashes | the algorithm fails without finishing, so the call returns 0 | `evp::md_ctx::tests::final_xof_of_a_fixed_keccak_digest_writes_only_its_length` |
+| `EVP_add_digest` and `EVP_MD_get_pkey_type` with a NULL digest | dereference NULL and crash | return 0 | `evp::legacy_md::tests::null_digests_are_refused` |
 
 ## Notes
 

@@ -10,7 +10,7 @@
 //!   `OPENSSL_init_crypto` fails.
 //!
 //! Flags whose subsystem rustyssl doesn't have yet abort, as an unimplemented export does
-//! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS`/`_DIGESTS` (Phase 3), `OPENSSL_INIT_ASYNC`,
+//! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS` (step 3.4), `OPENSSL_INIT_ASYNC`,
 //! and the `OPENSSL_INIT_ENGINE_*` flags. `OPENSSL_INIT_LOAD_CONFIG` succeeds when there is no
 //! file to load, as OpenSSL's does by default, and aborts if there is one (configuration comes
 //! in Phase 6).
@@ -203,7 +203,8 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
                 if with == OPENSSL_INIT_ADD_ALL_CIPHERS {
                     unavailable("OPENSSL_INIT_ADD_ALL_CIPHERS");
                 }
-                unavailable("OPENSSL_INIT_ADD_ALL_DIGESTS");
+                crate::evp::legacy_md::add_all_digests();
+                true
             });
         }
     }

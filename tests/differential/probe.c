@@ -211,6 +211,8 @@
  *   dfinal, dxof <n>, dsqueeze <n>   EVP_DigestFinal_ex, EVP_DigestFinalXOF, EVP_DigestSqueeze
  *   dsize, dflags              EVP_MD_CTX_get_size_ex; the flags
  *   dcopy, dreset              EVP_MD_CTX_copy_ex onto the other context; EVP_MD_CTX_reset
+ *   dname <name>               EVP_get_digestbyname: the digest's name, NID, and signature NID
+ *   dnid <nid>                 EVP_get_digestbynid likewise
  *
  *   # ...              comment, echoed
  */
@@ -2345,7 +2347,8 @@ static int digest_command(const char *command, const char *line)
             && strcmp(command, "dupdate") != 0 && strcmp(command, "dfinal") != 0
             && strcmp(command, "dxof") != 0 && strcmp(command, "dsqueeze") != 0
             && strcmp(command, "dsize") != 0 && strcmp(command, "dflags") != 0
-            && strcmp(command, "dcopy") != 0 && strcmp(command, "dreset") != 0))
+            && strcmp(command, "dcopy") != 0 && strcmp(command, "dreset") != 0
+            && strcmp(command, "dname") != 0 && strcmp(command, "dnid") != 0))
         return 0;
     if (digest_ctx[0] == NULL) {
         size_t i;
@@ -2418,6 +2421,16 @@ static int digest_command(const char *command, const char *line)
         printf(" %d", EVP_MD_CTX_get_size_ex(ctx));
     } else if (strcmp(command, "dflags") == 0) {
         printf(" %x", EVP_MD_CTX_test_flags(ctx, 0xffffff));
+    } else if (strcmp(command, "dname") == 0 || strcmp(command, "dnid") == 0) {
+        const EVP_MD *md;
+
+        sscanf(line, "%*s %63s", a);
+        md = command[1] == 'n' && command[2] == 'a' ? EVP_get_digestbyname(a)
+                                                     : EVP_get_digestbynid(atoi(a));
+        if (md == NULL)
+            printf(" NULL");
+        else
+            printf(" %s %d %d", EVP_MD_get0_name(md), EVP_MD_get_type(md), EVP_MD_get_pkey_type(md));
     } else if (strcmp(command, "dcopy") == 0) {
         printf(" %d", EVP_MD_CTX_copy_ex(digest_ctx[!digest_current], ctx));
     } else {

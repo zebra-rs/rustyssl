@@ -95,3 +95,21 @@ dxof 5
 dinitp BLAKE2b512 size 0
 dupdate 3
 dxof 0
+dname SHA256
+dname sha256
+dname SHA2-256
+dname 2.16.840.1.101.3.4.2.1
+dname RSA-SHA256
+dname RSA-SHA1-2
+dname rmd160
+dname SHAKE-128
+dname KECCAK-256
+dname SHA2-256/192
+dname BLAKE2B-512
+dname MD4
+dname NULL
+dname nonesuch
+dnid 672
+dnid 0
+dnid 1100
+dnid 99999

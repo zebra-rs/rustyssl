@@ -6,24 +6,24 @@
 //! As in OpenSSL, a digest algorithm must offer either `digest` alone or the context functions
 //! (`newctx`, `init`, `update`, `final`, `freectx`, and optionally `squeeze`), and its block
 //! size, size, and XOF and absent-AlgorithmIdentifier flags are read from its parameters when
-//! it's made. The contexts and digesting come with step 3.3, which also brings the legacy
-//! digests (`EVP_sha256()`) and the NIDs their names map to; until then a fetched digest's
-//! NID is `NID_undef`.
+//! it's made, and its NID from the legacy digest its names map to (`set_legacy_nid`). The
+//! static legacy digests (`EVP_sha256()`, `legacy_md.rs`) are methods too, without a provider
+//! and with references that aren't counted, as OpenSSL's `EVP_ORIG_GLOBAL` ones.
 
 use core::ffi::{CStr, c_char, c_int, c_ulong, c_void};
 use core::ptr;
 use std::ffi::CString;
 
 use rustyssl_abi::{
-    ERR_LIB_EVP, ERR_R_EVP_LIB, EVP_MD, EVP_MD_FLAG_DIGALGID_ABSENT, EVP_MD_FLAG_XOF,
-    EVP_R_CACHE_CONSTANTS_FAILED, EVP_R_CANNOT_GET_PARAMETERS, EVP_R_INVALID_PROVIDER_FUNCTIONS,
-    EVP_R_MESSAGE_DIGEST_IS_NULL, OSSL_ALGORITHM, OSSL_DIGEST_PARAM_ALGID_ABSENT,
-    OSSL_DIGEST_PARAM_BLOCK_SIZE, OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_XOF,
-    OSSL_FUNC_DIGEST_COPYCTX, OSSL_FUNC_DIGEST_DIGEST, OSSL_FUNC_DIGEST_DUPCTX,
-    OSSL_FUNC_DIGEST_FINAL, OSSL_FUNC_DIGEST_FREECTX, OSSL_FUNC_DIGEST_GET_CTX_PARAMS,
-    OSSL_FUNC_DIGEST_GET_PARAMS, OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS,
-    OSSL_FUNC_DIGEST_GETTABLE_PARAMS, OSSL_FUNC_DIGEST_INIT, OSSL_FUNC_DIGEST_NEWCTX,
-    OSSL_FUNC_DIGEST_SET_CTX_PARAMS, OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,
+    ERR_LIB_EVP, ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, EVP_MD, EVP_MD_FLAG_DIGALGID_ABSENT,
+    EVP_MD_FLAG_XOF, EVP_R_CACHE_CONSTANTS_FAILED, EVP_R_CANNOT_GET_PARAMETERS,
+    EVP_R_INVALID_PROVIDER_FUNCTIONS, EVP_R_MESSAGE_DIGEST_IS_NULL, OBJ_NAME_TYPE_MD_METH,
+    OSSL_ALGORITHM, OSSL_DIGEST_PARAM_ALGID_ABSENT, OSSL_DIGEST_PARAM_BLOCK_SIZE,
+    OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_XOF, OSSL_FUNC_DIGEST_COPYCTX,
+    OSSL_FUNC_DIGEST_DIGEST, OSSL_FUNC_DIGEST_DUPCTX, OSSL_FUNC_DIGEST_FINAL,
+    OSSL_FUNC_DIGEST_FREECTX, OSSL_FUNC_DIGEST_GET_CTX_PARAMS, OSSL_FUNC_DIGEST_GET_PARAMS,
+    OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS, OSSL_FUNC_DIGEST_GETTABLE_PARAMS, OSSL_FUNC_DIGEST_INIT,
+    OSSL_FUNC_DIGEST_NEWCTX, OSSL_FUNC_DIGEST_SET_CTX_PARAMS, OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_DIGEST_SQUEEZE, OSSL_FUNC_DIGEST_UPDATE, OSSL_LIB_CTX, OSSL_OP_DIGEST, OSSL_PARAM,
     OSSL_PROVIDER,
 };
@@ -67,15 +67,27 @@ pub(crate) struct Funcs {
     pub(crate) gettable_ctx_params: Option<CtxParamsListFn>,
 }
 
-/// A digest method (`EVP_MD`) made from a provider's algorithm.
+/// Where a digest method came from (`EVP_ORIG_*`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Origin {
+    /// Fetched from a provider, reference counted.
+    Dynamic,
+    /// One of the static legacy digests (`EVP_sha256()`): references aren't counted.
+    Global,
+}
+
+/// A digest method (`EVP_MD`): made from a provider's algorithm, or a static legacy one.
 pub(crate) struct Md {
+    pub(crate) origin: Origin,
     name_id: u32,
-    type_name: CString,
+    /// The first name, for fetched methods; a static one's is its NID's short name.
+    type_name: Option<CString>,
+    pub(crate) pkey_type: c_int,
     /// The provider's description, a static string of its, or NULL.
     description: Ptr<c_char>,
     /// The provider, with a reference.
-    prov: Ptr<OSSL_PROVIDER>,
-    nid: c_int,
+    pub(crate) prov: Ptr<OSSL_PROVIDER>,
+    pub(crate) nid: c_int,
     block_size: c_int,
     md_size: c_int,
     flags: c_ulong,
@@ -86,6 +98,32 @@ pub(crate) struct Md {
 }
 
 impl Md {
+    /// A static legacy digest: no provider, the NIDs, sizes, and flags of OpenSSL's
+    /// `EVP_sha256()`-style definitions.
+    pub(crate) fn legacy(
+        nid: c_int,
+        pkey_type: c_int,
+        md_size: c_int,
+        flags: c_ulong,
+        block_size: c_int,
+    ) -> Self {
+        Self {
+            origin: Origin::Global,
+            name_id: 0,
+            type_name: None,
+            pkey_type,
+            description: Ptr(ptr::null_mut()),
+            prov: Ptr(ptr::null_mut()),
+            nid,
+            block_size,
+            md_size,
+            flags,
+            get_params: None,
+            gettable_params: None,
+            funcs: Funcs::default(),
+        }
+    }
+
     /// The provider's context, which the parameter-list functions take.
     pub(crate) fn provider_ctx(&self) -> *mut c_void {
         // SAFETY: the method holds a reference to its live provider.
@@ -272,12 +310,32 @@ unsafe fn from_algorithm(
     if !unsafe { OSSL_PROVIDER::up_ref(prov) } {
         return ptr::null_mut();
     }
+    // `set_legacy_nid`: the NID of the legacy digest any of its names has (0 for none; a clash
+    // between two fails).
+    let mut nid = 0;
+    for n in fetch::names_of(prov, name_id) {
+        let Ok(c) = CString::new(n) else { continue };
+        // SAFETY: a string and a type.
+        let legacy =
+            unsafe { crate::objects::name::OBJ_NAME_get(c.as_ptr(), OBJ_NAME_TYPE_MD_METH) };
+        // SAFETY: the table holds digest methods for this type.
+        let Some(m) = (unsafe { method(legacy.cast()) }) else {
+            continue;
+        };
+        if nid != 0 && nid != m.nid {
+            err::raise(ERR_LIB_EVP, ERR_R_INTERNAL_ERROR, "evp_md_from_algorithm");
+            return ptr::null_mut();
+        }
+        nid = m.nid;
+    }
     let mut md = Md {
+        origin: Origin::Dynamic,
         name_id,
-        type_name,
+        type_name: Some(type_name),
+        pkey_type: 0,
         description: Ptr(algo.algorithm_description.cast_mut()),
         prov: Ptr(prov),
-        nid: 0,
+        nid,
         block_size: 0,
         md_size: 0,
         flags: 0,
@@ -362,7 +420,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { EVP_MD::up_ref(md) };
+        if unsafe { method(md) }.is_some_and(|m| m.origin == Origin::Dynamic) {
+            // SAFETY: as above.
+            unsafe { EVP_MD::up_ref(md) };
+        }
         1
     }
 }
@@ -376,7 +437,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { EVP_MD::free(md) };
+        if unsafe { method(md) }.is_some_and(|m| m.origin == Origin::Dynamic) {
+            // SAFETY: as above.
+            unsafe { EVP_MD::free(md) };
+        }
     }
 }
 
@@ -389,7 +453,12 @@ ffi_export! {
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(md) }.map_or(ptr::null(), |m| m.type_name.as_ptr())
+        let Some(m) = (unsafe { method(md) }) else { return ptr::null() };
+        match &m.type_name {
+            Some(name) => name.as_ptr(),
+            // SAFETY: no preconditions.
+            None => unsafe { crate::objects::OBJ_nid2sn(m.nid) },
+        }
     }
 }
 
@@ -424,6 +493,15 @@ ffi_export! {
         let Some(m) = (unsafe { method(md) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         let n = unsafe { text(name) }.map_or(&b""[..], CStr::to_bytes);
+        if m.origin == Origin::Global {
+            // A static digest compares its name's number with `name`'s in the default
+            // context (so two unknown names are "equal", as in OpenSSL).
+            // SAFETY: the caller's live method.
+            let own_name = unsafe { EVP_MD_get0_name(md) };
+            // SAFETY: a static string or NULL.
+            let own = unsafe { text(own_name) }.map_or(&b""[..], CStr::to_bytes);
+            return c_int::from(fetch::number_in(ptr::null(), own) == fetch::number_in(ptr::null(), n));
+        }
         c_int::from(fetch::number_in(m.prov.0, n) == m.name_id)
     }
 }
@@ -442,6 +520,10 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { method(md) }) else { return 0 };
+        if m.origin == Origin::Global {
+            // A static digest has no names of its own to list.
+            return 1;
+        }
         let names = fetch::names_of(m.prov.0, m.name_id);
         for n in &names {
             let Ok(c) = CString::new(n.clone()) else { continue };
@@ -528,8 +610,8 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The digest's NID (`NID_undef` until the legacy names arrive, step 3.3); 0 for NULL
-    /// (docs/DEVIATIONS.md).
+    /// The digest's NID: a static digest's own, a fetched one's from the legacy digest any of
+    /// its names has (`NID_undef` if none); 0 for NULL (docs/DEVIATIONS.md).
     ///
     /// # Safety
     /// `md` is NULL or a live digest method.
@@ -538,6 +620,21 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { method(md) }.map_or(0, |m| m.nid)
+    }
+}
+
+ffi_export! {
+    /// The NID of the signature algorithm the digest pairs with by default
+    /// (`NID_sha256WithRSAEncryption` for `EVP_sha256()`); 0 for fetched digests and for NULL
+    /// (docs/DEVIATIONS.md).
+    ///
+    /// # Safety
+    /// `md` is NULL or a live digest method.
+    pub unsafe extern "C" fn EVP_MD_get_pkey_type(md: *const EVP_MD) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { method(md) }.map_or(0, |m| m.pkey_type)
     }
 }
 
