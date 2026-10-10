@@ -2121,8 +2121,33 @@ have run for at least 24 CPU-hours with no findings.
     - The fuzz target `modes`.
     - The probe's `cparam` and `ctlsaad` commands and guards for the reference's crashes
       (corpus `modes.txt`, random sessions).
-  - [ ] **3.4d AlgorithmIdentifiers:** `EVP_CIPHER_param_to_asn1`, `_asn1_to_param`, the IV
+  - [x] **3.4d AlgorithmIdentifiers:** `EVP_CIPHER_param_to_asn1`, `_asn1_to_param`, the IV
     helpers, and `EVP_CIPHER_CTX_get_algor`/`_get_algor_params`/`_set_algor_params`.
+
+    *Done:* 12 exports.
+    - **`evp/cipher_asn1.rs`**, ported from `evp_lib.c`:
+      - The block and stream modes' parameters are the IV as an OCTET STRING, both ways.
+      - The key wraps have none, except DES3-WRAP's NULL.
+      - GCM's need the CMS layer's tag length (CMS, Phase 6), so the public functions fail
+        as the reference's do. CCM, XTS, and OCB are unsupported.
+      - A cipher whose context parameters include `alg_id_param` (`EVP_CIPH_FLAG_CUSTOM_ASN1`)
+        gives and takes its provider's own DER.
+      - `EVP_CIPHER_CTX_get_algor` decodes the provider's whole `algorithm-id`. The default
+        provider has none, so it fails with the reference's error.
+    - **`X509_ALGOR`'s item and DER functions** (`X509_ALGOR_it`, `_new`, `_free`,
+      `d2i_`/`i2d_X509_ALGOR`), which `get_algor` needs, come here ahead of the rest of
+      `X509_ALGOR` (Phase 4). They are a built-in SEQUENCE item of the template engine.
+    - **Deviations** (docs/DEVIATIONS.md): a NULL `X509_ALGOR` fails; an IV longer than 16
+      octets isn't written by `EVP_CIPHER_set_asn1_iv` (the reference asserts).
+
+    Tests:
+    - `tests/c/evp_cipher_asn1.c`, 87 checks:
+      - every family's parameters both ways, and the IV helpers and their errors;
+      - `X509_ALGOR`'s DER;
+      - a provider of the test's own whose cipher answers `alg_id_param` and `algorithm-id`,
+        which reaches the custom path and `EVP_CIPHER_CTX_get_algor`'s decoding.
+    - The probe's `casn1` command (corpus `modes.txt`, random sessions).
+    - The decoder fuzz target `asn1_d2i` now decodes `X509_ALGOR` too.
   - [ ] **3.4e Encrypted PEM** (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
     `PEM_ASN1_write`/`_bio`/`_bio_ctx`.
   - The legacy provider's ciphers (DES, BF, CAST5, IDEA, RC2, RC4 including RC4-HMAC-MD5,
