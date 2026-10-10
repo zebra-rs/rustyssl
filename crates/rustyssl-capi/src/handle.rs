@@ -77,10 +77,6 @@ pub(crate) unsafe trait Handle: Sized {
     ///
     /// # Safety
     /// As for [`Handle::get`].
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "first used by a `*_up_ref` export")
-    )]
     unsafe fn up_ref(handle: *const Self) -> bool {
         // SAFETY: the caller's guarantee is the one `get` needs.
         if unsafe { Self::get(handle) }.is_none() {

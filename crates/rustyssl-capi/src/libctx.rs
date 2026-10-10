@@ -1,8 +1,8 @@
 //! Library contexts (`OSSL_LIB_CTX(3)`): `OSSL_LIB_CTX_new`, `OSSL_LIB_CTX_free`, the global
 //! default context, each thread's default (`OSSL_LIB_CTX_set0_default`), and the state a
 //! context keeps so far: its thread limit (`OSSL_set_max_threads`), its configuration
-//! diagnostics flag, its application-data registry ([`crate::ex_data`]), and its properties
-//! ([`crate::property`]).
+//! diagnostics flag, its application-data registry ([`crate::ex_data`]), its properties
+//! ([`crate::property`]), and its providers ([`crate::provider`]).
 //!
 //! As in OpenSSL, a NULL context means the calling thread's default: the context it set with
 //! `OSSL_LIB_CTX_set0_default`, or else the global default, which is made on first use and
@@ -20,7 +20,7 @@ use rustyssl_abi::{ERR_LIB_CRYPTO, OSSL_LIB_CTX};
 
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, Held, handle_type};
-use crate::{ex_data, property};
+use crate::{ex_data, property, provider};
 
 /// A library context's state.
 #[derive(Default)]
@@ -33,6 +33,8 @@ pub(crate) struct LibCtx {
     pub(crate) ex_data: ex_data::Registry,
     /// The property names and values numbered in this context, and its default query.
     pub(crate) properties: property::Store,
+    /// The providers loaded into this context.
+    pub(crate) providers: provider::Store,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);

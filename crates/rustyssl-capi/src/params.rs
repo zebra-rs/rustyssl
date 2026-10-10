@@ -54,12 +54,12 @@ fn raise(error: Error, function: &str) {
 }
 
 /// `OSSL_PARAM_UNMODIFIED`, as a `size_t`.
-fn unmodified() -> usize {
+pub(crate) fn unmodified() -> usize {
     usize::try_from(OSSL_PARAM_UNMODIFIED).unwrap_or(usize::MAX)
 }
 
 /// `ossl_param_construct`.
-fn construct(
+pub(crate) fn construct(
     key: *const c_char,
     data_type: u32,
     data: *mut c_void,

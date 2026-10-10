@@ -70,7 +70,8 @@ fn enginesdir() -> &'static CStr {
     )
 }
 
-fn modulesdir() -> &'static CStr {
+/// The directory providers' modules are loaded from (`MODULESDIR`).
+pub(crate) fn modulesdir() -> &'static CStr {
     directory(
         &MODULESDIR,
         option_env!("RUSTYSSL_MODULESDIR"),

@@ -33,6 +33,7 @@ mod objects;
 mod params;
 mod pem;
 mod property;
+mod provider;
 mod secure;
 mod sleep;
 mod stack;

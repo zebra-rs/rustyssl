@@ -2186,6 +2186,66 @@ const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core
     crate::params::OSSL_PARAM_set_utf8_ptr;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_utf8_string;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PROVIDER,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::provider::OSSL_PROVIDER_add_conf_parameter;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_available;
+const _: unsafe extern "C" fn(
+    *const OSSL_PROVIDER,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::provider::OSSL_PROVIDER_conf_get_bool;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            provider: *mut OSSL_PROVIDER,
+            cbdata: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::provider::OSSL_PROVIDER_do_all;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *const core::ffi::c_char =
+    crate::provider::OSSL_PROVIDER_get0_default_search_path;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *const OSSL_DISPATCH =
+    crate::provider::OSSL_PROVIDER_get0_dispatch;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *const core::ffi::c_char =
+    crate::provider::OSSL_PROVIDER_get0_name;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *mut core::ffi::c_void =
+    crate::provider::OSSL_PROVIDER_get0_provider_ctx;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_get_conf_parameters;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_get_params;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *const OSSL_PARAM =
+    crate::provider::OSSL_PROVIDER_gettable_params;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut OSSL_PROVIDER =
+    crate::provider::OSSL_PROVIDER_load;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut OSSL_PARAM,
+) -> *mut OSSL_PROVIDER = crate::provider::OSSL_PROVIDER_load_ex;
+const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_self_test;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_set_default_search_path;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut OSSL_PROVIDER = crate::provider::OSSL_PROVIDER_try_load;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut OSSL_PARAM,
+    core::ffi::c_int,
+) -> *mut OSSL_PROVIDER = crate::provider::OSSL_PROVIDER_try_load_ex;
+const _: unsafe extern "C" fn(*mut OSSL_PROVIDER) -> core::ffi::c_int =
+    crate::provider::OSSL_PROVIDER_unload;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =

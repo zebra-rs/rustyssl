@@ -20437,70 +20437,6 @@ pub extern "C" fn OSSL_PROVIDER_add_builtin(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_add_conf_parameter(
-    _: *mut OSSL_PROVIDER,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_add_conf_parameter")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_available(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_available")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_conf_get_bool(
-    _: *const OSSL_PROVIDER,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_conf_get_bool")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_do_all(
-    _: *mut OSSL_LIB_CTX,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            provider: *mut OSSL_PROVIDER,
-            cbdata: *mut core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get0_default_search_path(
-    _: *mut OSSL_LIB_CTX,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_PROVIDER_get0_default_search_path")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get0_dispatch(_: *const OSSL_PROVIDER) -> *const OSSL_DISPATCH {
-    crate::stub::unimplemented("OSSL_PROVIDER_get0_dispatch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get0_name(_: *const OSSL_PROVIDER) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_PROVIDER_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get0_provider_ctx(
-    _: *const OSSL_PROVIDER,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OSSL_PROVIDER_get0_provider_ctx")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_PROVIDER_get_capabilities(
     _: *const OSSL_PROVIDER,
     _: *const core::ffi::c_char,
@@ -20511,87 +20447,12 @@ pub extern "C" fn OSSL_PROVIDER_get_capabilities(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get_conf_parameters(
-    _: *const OSSL_PROVIDER,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_get_conf_parameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get_params(
-    _: *const OSSL_PROVIDER,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_get_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_gettable_params(_: *const OSSL_PROVIDER) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("OSSL_PROVIDER_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_load(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_PROVIDER {
-    crate::stub::unimplemented("OSSL_PROVIDER_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_load_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut OSSL_PARAM,
-) -> *mut OSSL_PROVIDER {
-    crate::stub::unimplemented("OSSL_PROVIDER_load_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_PROVIDER_query_operation(
     _: *const OSSL_PROVIDER,
     _: core::ffi::c_int,
     _: *mut core::ffi::c_int,
 ) -> *const OSSL_ALGORITHM {
     crate::stub::unimplemented("OSSL_PROVIDER_query_operation")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_self_test(_: *const OSSL_PROVIDER) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_self_test")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_set_default_search_path(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_set_default_search_path")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_try_load(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut OSSL_PROVIDER {
-    crate::stub::unimplemented("OSSL_PROVIDER_try_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_try_load_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut OSSL_PARAM,
-    _: core::ffi::c_int,
-) -> *mut OSSL_PROVIDER {
-    crate::stub::unimplemented("OSSL_PROVIDER_try_load_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_unload(_: *mut OSSL_PROVIDER) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_unload")
 }
 
 #[unsafe(no_mangle)]
