@@ -97,6 +97,7 @@ OpenSSL never depends on them.
 | `OSSL_PROVIDER_load`, `_load_ex`, `_try_load`, `_try_load_ex`, `_available` with a NULL name; `OSSL_PROVIDER_get0_name`, `_get_params`, `_self_test`, `_add_conf_parameter`, `_get_conf_parameters` with a NULL provider; `OSSL_PROVIDER_do_all` with a NULL callback | read through NULL | return NULL or 0 (`ERR_R_PASSED_NULL_PARAMETER` for a NULL name); `do_all` with no callback returns 1 | `provider::tests::null_arguments_fail` |
 | `EVP_MD_get0_description`, `EVP_MD_names_do_all`, `EVP_MD_get0_provider`, `EVP_MD_get_type`, `EVP_MD_get_flags` with a NULL digest | read through NULL | return NULL or 0 | `evp::digest::tests::null_digests` |
 | `OpenSSL_version(OPENSSL_VERSION)`, `OPENSSL_FULL_VERSION_STRING`, `OPENSSL_version_build_metadata`, and the built-in providers' `buildinfo` parameter | no build metadata: `OpenSSL 3.5.9 29 Sep 2026` | build metadata `+rustyssl.<version>`: `OpenSSL 3.5.9+rustyssl.0.1.0 29 Sep 2026` | `version::tests::version_text_names_rustyssl_in_the_build_metadata`, `provider::tests::lifecycle_in_a_context` |
+| `EVP_KDF_derive` with SSHKDF over the NULL digest (`digest` = `NULL`) | loops forever: each extension block advances by the digest's size, 0 | fails: the KDFs refuse a digest of no size (the error the EVP layer raises comes with it in 3.6) | `rustyssl-crypto` `tests/kdf.rs` `refusals` |
 
 ## Notes
 

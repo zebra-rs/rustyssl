@@ -913,16 +913,34 @@ pub fn blake2(
     })
 }
 
+/// Unkeyed BLAKE2b with a digest of `size` octets (1 to 64) in its parameter block, as
+/// Argon2's variable-length hash uses it.
+pub(crate) fn blake2b_unkeyed(size: usize) -> Result<Box<dyn Mac>, Error> {
+    if size == 0 || size > Blake2Algorithm::Blake2b.max_size() {
+        return Err(Error::OutputSize);
+    }
+    Ok(Box::new(Blake2Mac::new(
+        blake2::Blake2bVarCore::new_with_params(&[], &[], 0, size),
+        &[],
+        size,
+    )))
+}
+
 impl<C> Blake2Mac<C>
 where
     C: VariableOutputCore + UpdateCore + BufferKindUser<BufferKind = Lazy> + Clone,
 {
     fn new(core: C, key: &[u8], size: usize) -> Self {
-        // The key, zero-padded to a block, is the first block.
-        let mut block = blake2::digest::block_api::Block::<C>::default();
-        block.iter_mut().zip(key).for_each(|(b, &k)| *b = k);
-        let buffer = LazyBuffer::new(&block);
-        block.zeroize();
+        // The key, zero-padded to a block, is the first block; unkeyed, there's none.
+        let buffer = if key.is_empty() {
+            LazyBuffer::default()
+        } else {
+            let mut block = blake2::digest::block_api::Block::<C>::default();
+            block.iter_mut().zip(key).for_each(|(b, &k)| *b = k);
+            let buffer = LazyBuffer::new(&block);
+            block.zeroize();
+            buffer
+        };
         Self {
             initial: (core.clone(), buffer.clone()),
             core,
