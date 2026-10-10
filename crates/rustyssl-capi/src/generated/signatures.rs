@@ -1554,6 +1554,16 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::key::EVP_BytesToKey;
 const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *mut core::ffi::c_uchar =
     crate::evp::cipher_ctx::EVP_CIPHER_CTX_buf_noconst;
 const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const EVP_CIPHER =
@@ -2969,11 +2979,60 @@ const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
 const _: unsafe extern "C" fn(
+    i2d_of_void,
+    *const core::ffi::c_char,
+    *mut FILE,
+    *const core::ffi::c_void,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_cipher::PEM_ASN1_write;
+const _: unsafe extern "C" fn(
+    i2d_of_void,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *const core::ffi::c_void,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_cipher::PEM_ASN1_write_bio;
+const _: unsafe extern "C" fn(
+    OSSL_i2d_of_void_ctx,
+    *mut core::ffi::c_void,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *const core::ffi::c_void,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_cipher::PEM_ASN1_write_bio_ctx;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_cipher::PEM_def_callback;
+const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     *const core::ffi::c_char,
     core::ffi::c_int,
     *const core::ffi::c_char,
 ) = crate::pem::PEM_dek_info;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_INFO,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_cipher::PEM_do_header;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, *mut EVP_CIPHER_INFO) -> core::ffi::c_int =
+    crate::pem_cipher::PEM_get_EVP_CIPHER_INFO;
 const _: unsafe extern "C" fn(*mut core::ffi::c_char, core::ffi::c_int) = crate::pem::PEM_proc_type;
 const _: unsafe extern "C" fn(
     *mut FILE,

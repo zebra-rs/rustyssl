@@ -32,6 +32,7 @@ mod mem;
 mod objects;
 mod params;
 mod pem;
+mod pem_cipher;
 mod property;
 mod provider;
 mod secure;
