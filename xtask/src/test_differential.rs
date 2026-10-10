@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(21) {
+        match random.below(22) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -169,6 +169,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             17 => params_session(&mut random, &mut out)?,
             18 => ctx_session(&mut random, &mut out)?,
             19 => prop_session(&mut random, &mut out)?,
+            20 => prov_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -789,6 +790,29 @@ fn s2i_session(random: &mut Random, out: &mut String) -> Result {
         }
         writeln!(out, "asns2i {text}")?;
     }
+    Ok(())
+}
+
+/// A random session of provider commands in the probe's context: loads (keeping the fallback
+/// or not) of the built-in providers and of modules that don't exist, into eight slots;
+/// unloads; availability, the store's order, and parameters; sometimes a fresh context.
+fn prov_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(14) + 1 {
+        let slot = random.below(8);
+        let name = random.pick(&[
+            "default", "default", "base", "base", "null", "null", "nosuch", "a/b",
+        ]);
+        match random.below(12) {
+            0 => writeln!(out, "pnew")?,
+            1..=3 => writeln!(out, "pload {slot} {name}")?,
+            4 | 5 => writeln!(out, "ptry {slot} {name} {}", random.below(2))?,
+            6..=8 => writeln!(out, "punload {slot}")?,
+            9 => writeln!(out, "pavail {name}")?,
+            10 => writeln!(out, "pparams {slot}")?,
+            _ => writeln!(out, "pall")?,
+        }
+    }
+    writeln!(out, "pall")?;
     Ok(())
 }
 

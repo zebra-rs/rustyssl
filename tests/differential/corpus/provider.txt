@@ -1,0 +1,48 @@
+# Providers: the fallback, loads and unloads in slots, references to the same provider, the
+# store's order, failed module lookups, and the error libraries taken
+pavail default
+pall
+pload 0 default
+pload 1 default
+pall
+punload 0
+punload 1
+pavail default
+pall
+pnew
+pload 0 null
+pavail default
+pall
+ptry 1 base 1
+pall
+punload 0
+pall
+pload 0 null
+pall
+pnew
+ptry 0 null 1
+pavail default
+pall
+ptry 1 default 0
+pall
+pparams 0
+pparams 1
+pnew
+pload 0 nosuch
+pall
+pload 1 base
+pparams 1
+punload 1
+punload 1
+pall
+pavail base
+pnew
+pload 0 base
+pload 0 base
+pload 2 base
+pall
+punload 2
+pavail base
+punload 0
+pavail base
+pall
