@@ -161,3 +161,23 @@ cupdate 24
 cinit DES3-WRAP 1 1 0
 cinit - 0 0 0
 cupdate 40
+# AlgorithmIdentifier parameters: the IV both ways, and the modes without them
+cinit AES-128-CBC 1 1 1
+casn1
+cinit AES-256-ECB 0 1 0
+casn1
+cinit ChaCha20 1 1 1
+casn1
+cinit AES-128-GCM 1 1 1
+casn1
+cinit AES-128-CCM 1 1 1
+casn1
+cinit AES-128-XTS 1 1 1
+casn1
+cinit DES3-WRAP 1 1 0
+casn1
+cinit AES-128-WRAP 1 1 1
+casn1
+cinit AES-128-GCM-SIV 1 1 1
+casn1
+casn1
