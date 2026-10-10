@@ -1127,7 +1127,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_locate` | libcrypto | `openssl/params.h` | `fetch`, `params` |
 | `OSSL_PARAM_locate_const` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_merge` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_modified` | libcrypto | `openssl/params.h` | `params`, `provider` |
+| `OSSL_PARAM_modified` | libcrypto | `openssl/params.h` | `evp_cipher`, `params`, `provider` |
 | `OSSL_PARAM_set_all_unmodified` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_double` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_set_int` | libcrypto | `openssl/params.h` | `fetch`, `params` |
