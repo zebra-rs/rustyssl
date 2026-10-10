@@ -199,3 +199,9 @@ name = "aead"
 path = "fuzz_targets/aead.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "modes"
+path = "fuzz_targets/modes.rs"
+test = false
+doc = false
