@@ -10587,15 +10587,6 @@ pub extern "C" fn EVP_MD_do_all(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_do_all_provided(
-    _: *mut OSSL_LIB_CTX,
-    _: ::core::option::Option<unsafe extern "C" fn(md: *mut EVP_MD, arg: *mut core::ffi::c_void)>,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("EVP_MD_do_all_provided")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_do_all_sorted(
     _: ::core::option::Option<
         unsafe extern "C" fn(
@@ -10611,77 +10602,13 @@ pub extern "C" fn EVP_MD_do_all_sorted(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_fetch(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_MD {
-    crate::stub::unimplemented("EVP_MD_fetch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_free(_: *mut EVP_MD) {
-    crate::stub::unimplemented("EVP_MD_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get0_description(_: *const EVP_MD) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_MD_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get0_name(_: *const EVP_MD) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_MD_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get0_provider(_: *const EVP_MD) -> *const OSSL_PROVIDER {
-    crate::stub::unimplemented("EVP_MD_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_block_size(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_get_block_size")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_flags(_: *const EVP_MD) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("EVP_MD_get_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_params(_: *const EVP_MD, _: *mut OSSL_PARAM) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_get_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_get_pkey_type(_: *const EVP_MD) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_MD_get_pkey_type")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_size(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_get_size")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_get_type(_: *const EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_get_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_gettable_ctx_params(_: *const EVP_MD) -> *const OSSL_PARAM {
     crate::stub::unimplemented("EVP_MD_gettable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_gettable_params(_: *const EVP_MD) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_MD_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_is_a(_: *const EVP_MD, _: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_is_a")
 }
 
 #[unsafe(no_mangle)]
@@ -10873,24 +10800,8 @@ pub extern "C" fn EVP_MD_meth_set_update(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_names_do_all(
-    _: *const EVP_MD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_names_do_all")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MD_settable_ctx_params(_: *const EVP_MD) -> *const OSSL_PARAM {
     crate::stub::unimplemented("EVP_MD_settable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_up_ref(_: *mut EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_MD_up_ref")
 }
 
 #[unsafe(no_mangle)]
@@ -20428,15 +20339,6 @@ pub extern "C" fn OSSL_PRIVILEGE_POLICY_ID_new() -> *mut OSSL_PRIVILEGE_POLICY_I
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_add_builtin(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: OSSL_provider_init_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_add_builtin")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_PROVIDER_get_capabilities(
     _: *const OSSL_PROVIDER,
     _: *const core::ffi::c_char,
@@ -20444,24 +20346,6 @@ pub extern "C" fn OSSL_PROVIDER_get_capabilities(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_PROVIDER_get_capabilities")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_query_operation(
-    _: *const OSSL_PROVIDER,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-) -> *const OSSL_ALGORITHM {
-    crate::stub::unimplemented("OSSL_PROVIDER_query_operation")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_unquery_operation(
-    _: *const OSSL_PROVIDER,
-    _: core::ffi::c_int,
-    _: *const OSSL_ALGORITHM,
-) {
-    crate::stub::unimplemented("OSSL_PROVIDER_unquery_operation")
 }
 
 #[unsafe(no_mangle)]

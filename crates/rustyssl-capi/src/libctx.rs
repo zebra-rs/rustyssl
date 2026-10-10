@@ -35,6 +35,8 @@ pub(crate) struct LibCtx {
     pub(crate) properties: property::Store,
     /// The providers loaded into this context.
     pub(crate) providers: provider::Store,
+    /// The algorithm names and EVP methods fetched in this context.
+    pub(crate) evp: crate::evp::fetch::Store,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
