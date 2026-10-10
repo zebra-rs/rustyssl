@@ -2043,7 +2043,39 @@ have run for at least 24 CPU-hours with no findings.
     - `rustyssl-crypto` `tests/cipher.rs`: 116 vectors from the reference in every piece size
       up to 40 octets, padding for all 256 last octets, and the edges; the fuzz target
       `cipher`; the probe's `c*` commands (corpus `cipher.txt`, random sessions).
-  - [ ] **3.4b AEADs:** GCM, CCM, OCB, and ChaCha20-Poly1305, and the AEAD and TLS ctrls.
+  - [x] **3.4b AEADs:** GCM, CCM, OCB, and ChaCha20-Poly1305, and the AEAD and TLS ctrls.
+
+    *Done:* no new exports; the default provider gains the 18 AEADs, and the 3.4a contexts,
+    ctrls, and static ciphers now reach them.
+    - **The modes** (`rustyssl_crypto::provided::aead`): ports of `gcm128.c`, `ccm128.c`, and
+      `ocb128.c`'s state machines and of the provider functions over them, over the vetted
+      block ciphers, GHASH, and Poly1305 (`sym`), because OpenSSL feeds them AAD and data in
+      pieces and its observable state follows those machines: GCM's AAD after data fails and a
+      zero-length update ends the AAD; CCM takes its tag and nonce lengths with the key, the
+      message length before AAD, checks the tag with the last update, and keeps its CMAC (so
+      its last tag) when the key is set again; OCB buffers whole blocks and finishes partial
+      ones in `final`, writing them even when the tag fails; ChaCha20-Poly1305 restarts its key
+      stream after each tag. Tags are compared in constant time and a decryption that doesn't
+      authenticate wipes the output it wrote, as OpenSSL does. Random IVs (GCM's own, the TLS
+      fixed IV's random part) come from the operating system until 3.7.
+    - **The provider** (`provider/aeads.rs`): GCM and CCM of AES, ARIA, and SM4, AES-OCB, and
+      ChaCha20-Poly1305 in the reference's order, functions, and parameter lists; GCM's
+      parameter functions walk the array in its order as the reference's do; the TLS record
+      modes (`tlsaad`, `tlsivfixed`, `tlsivinv`, generated explicit IVs) for GCM, CCM, and
+      ChaCha20-Poly1305.
+    - **Deviations** (docs/DEVIATIONS.md): GCM's TLS fixed and inverted IVs longer than the
+      IV fail; CCM's IV requested into more room than its buffer is zero-filled (and its
+      pointer covers the buffer); OCB with a NULL output fails.
+
+    Tests:
+    - `tests/c/evp_aead.c`, 192 checks: each AEAD's metadata, messages in pieces with tags and
+      IV lengths, bad tags, misuse, IVs, the TLS modes of GCM, CCM, and ChaCha20-Poly1305,
+      `EVP_Cipher`, and copies; `tests/c/evp_cipher_names.c` (now 420 checks) also encrypts
+      through the static AEADs.
+    - `rustyssl-crypto` `tests/aead.rs`: 48 vectors from the reference in eight piece sizes,
+      decrypted back and with a bad tag; the fuzz target `aead`; the probe's `caad`,
+      `cmsglen`, and `ctag*` commands (corpus `aead.txt`, random sessions, which mask
+      generated IVs).
   - [ ] **3.4c Other modes:** XTS, SIV, GCM-SIV, the key wraps (and their inverses), CTS, and
     the AES-CBC-HMAC composites.
   - [ ] **3.4d AlgorithmIdentifiers:** `EVP_CIPHER_param_to_asn1`, `_asn1_to_param`, the IV
