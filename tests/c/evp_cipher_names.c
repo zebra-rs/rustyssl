@@ -107,13 +107,18 @@ static const struct getter getters[] = {
 
 static unsigned char key[64], iv[16], data[100];
 
-/* The modes of this step; the AEADs, XTS, OCB, and the key wraps come with steps 3.4b and c. */
+/* The modes so far; XTS, SIV, GCM-SIV, the key wraps, CTS, and the composites come with 3.4c. */
 static int plain(const EVP_CIPHER *c)
 {
     int mode = EVP_CIPHER_get_mode(c);
+    unsigned long flags = EVP_CIPHER_get_flags(c);
 
-    return (EVP_CIPHER_get_flags(c) & (EVP_CIPH_FLAG_AEAD_CIPHER | EVP_CIPH_FLAG_CTS)) == 0
-           && mode <= EVP_CIPH_CTR_MODE && mode != EVP_CIPH_GCM_MODE;
+    if ((flags & EVP_CIPH_FLAG_CTS) != 0)
+        return 0;
+    if ((flags & EVP_CIPH_FLAG_AEAD_CIPHER) != 0 && mode == EVP_CIPH_CBC_MODE)
+        return 0;
+    return mode != EVP_CIPH_XTS_MODE && mode != EVP_CIPH_WRAP_MODE && mode != EVP_CIPH_SIV_MODE
+           && mode != EVP_CIPH_GCM_SIV_MODE;
 }
 
 static void statics(void)
