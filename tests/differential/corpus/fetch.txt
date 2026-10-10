@@ -1,0 +1,102 @@
+# Fetching: implementations chosen by property query among two providers' digests, defaults, unloading
+ffetch ALG-1 -
+ffetch ALG-1 782e6e3d32
+ffetch ALG-1 782e6e3d33
+ffetch ALG-1 666970733d796573
+ffetch ALG-1 666970733d6e6f
+ffetch ALG-1 3f666970733d796573
+ffetch ALG-1 782e666c6167
+ffetch ALG-1 3f782e666c61672c3f782e6e3d32
+ffetch ALG-1 70726f76696465723d6671
+ffetch ALG-1 2d70726f7669646572
+ffetch ALG-1 782e733d61
+ffetch ALG-1 782e733d275127
+ffetch ALG-1 782e6e3d2d31
+ffetch ALG-1 782e6e213d31
+ffetch ALG-1 3f782e6e3d312c3f782e733d62
+ffetch ALG-1 6261642c
+ffetch ALG-1 782e6e3d307832
+ffetch ALG-1 782e6e3d3032
+ffetch ALG-1 782e756e6b6e6f776e3d31
+ffetch ALG-1 3f782e756e6b6e6f776e
+ffetch ALG-1 666970733d7965732c782e6e3d31
+ffetch ALG-1 70726f76696465723d66702c782e6e3d31
+ffetch a1 -
+ffetch a1 782e6e3d32
+ffetch a1 782e6e3d33
+ffetch a1 666970733d796573
+ffetch a1 666970733d6e6f
+ffetch a1 3f666970733d796573
+ffetch a1 782e666c6167
+ffetch a1 3f782e666c61672c3f782e6e3d32
+ffetch a1 70726f76696465723d6671
+ffetch a1 2d70726f7669646572
+ffetch a1 782e733d61
+ffetch a1 782e733d275127
+ffetch ALG-2 -
+ffetch ALG-2 782e6e3d32
+ffetch ALG-2 782e6e3d33
+ffetch ALG-2 666970733d796573
+ffetch ALG-2 666970733d6e6f
+ffetch ALG-2 3f666970733d796573
+ffetch ALG-2 782e666c6167
+ffetch ALG-2 3f782e666c61672c3f782e6e3d32
+ffetch ALG-2 70726f76696465723d6671
+ffetch ALG-2 2d70726f7669646572
+ffetch ALG-2 782e733d61
+ffetch ALG-2 782e733d275127
+ffetch ALG-3 -
+ffetch ALG-3 782e6e3d32
+ffetch ALG-3 782e6e3d33
+ffetch ALG-3 666970733d796573
+ffetch ALG-3 666970733d6e6f
+ffetch ALG-3 3f666970733d796573
+ffetch ALG-3 782e666c6167
+ffetch ALG-3 3f782e666c61672c3f782e6e3d32
+ffetch ALG-3 70726f76696465723d6671
+ffetch ALG-3 2d70726f7669646572
+ffetch ALG-3 782e733d61
+ffetch ALG-3 782e733d275127
+ffetch ALG-4 -
+ffetch ALG-4 782e6e3d32
+ffetch ALG-4 782e6e3d33
+ffetch ALG-4 666970733d796573
+ffetch ALG-4 666970733d6e6f
+ffetch ALG-4 3f666970733d796573
+ffetch ALG-4 782e666c6167
+ffetch ALG-4 3f782e666c61672c3f782e6e3d32
+ffetch ALG-4 70726f76696465723d6671
+ffetch ALG-4 2d70726f7669646572
+ffetch ALG-4 782e733d61
+ffetch ALG-4 782e733d275127
+ffetch NOPE -
+ffetch NOPE 782e6e3d32
+ffetch NOPE 782e6e3d33
+ffetch NOPE 666970733d796573
+ffetch NOPE 666970733d6e6f
+ffetch NOPE 3f666970733d796573
+ffetch NOPE 782e666c6167
+ffetch NOPE 3f782e666c61672c3f782e6e3d32
+ffetch NOPE 70726f76696465723d6671
+ffetch NOPE 2d70726f7669646572
+ffetch NOPE 782e733d61
+ffetch NOPE 782e733d275127
+fall
+fdefault 782e6e3d32
+ffetch ALG-1 -
+ffetch ALG-1 782e6e3d31
+ffetch ALG-1 2d782e6e
+ffetch ALG-2 -
+fdefault -
+ffetch ALG-1 -
+funload p
+ffetch ALG-1 -
+ffetch ALG-3 -
+fall
+fload p
+ffetch ALG-1 -
+fall
+funload q
+ffetch ALG-4 -
+fnew
+ffetch A4 -
