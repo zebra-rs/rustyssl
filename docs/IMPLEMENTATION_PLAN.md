@@ -1660,7 +1660,7 @@ have run for at least 24 CPU-hours with no findings.
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
-- [ ] **3.2 Backend layer** (`rustyssl-crypto`): Digest, Cipher (block, stream, AEAD), Mac,
+- [x] **3.2 Backend layer** (`rustyssl-crypto`): Digest, Cipher (block, stream, AEAD), Mac,
   Kdf, and Rng traits; adapters for the vetted RustCrypto crates; entries in
   `docs/DEPENDENCIES.md`; CPU-feature dispatch (AES-NI, ARMv8 crypto, SHA extensions) through
   crate features. In five sub-steps, each its own PR:
@@ -1785,8 +1785,35 @@ have run for at least 24 CPU-hours with no findings.
     block-stream output's prefix is the shorter output.
 
     Dependencies: none new.
-  - [ ] **3.2e Random generators:** the CTR, Hash, and HMAC DRBGs (SP 800-90A), HMAC-DRBG-KDF
-    over the HMAC DRBG, and the OS seed source, for 3.7.
+  - [x] **3.2e Random generators:** `rustyssl_crypto::rand`, the DRBG mechanisms as the
+    reference implements them, behind a `Drbg` trait (instantiate, reseed, generate,
+    uninstantiate, and the limits each publishes), plus the OS entropy source.
+    - **Mechanisms:**
+      - CTR-DRBG over AES-128/192/256, with or without the derivation function. Its 128-bit
+        counter, the derivation function's output reused after generating with additional
+        input, and inputs XORed and truncated without it.
+      - Hash-DRBG (seed length 55 or 111) and HMAC-DRBG over any non-XOF digest.
+      - HMAC-DRBG-KDF is HMAC-DRBG with no personalization and no request limit.
+    - **Seed source:** `os_entropy` over the `getrandom` crate (`getrandom(2)` on Linux,
+      `getentropy` on macOS).
+    - **Decision:** everything around the mechanisms is 3.7's: entropy and nonces from the
+      parent, the default personalization string (`"OpenSSL NIST SP 800-90A DRBG"` with its
+      NUL, 29 octets), reseed intervals and forks, prediction resistance (a reseed with the
+      request's additional input, then generating without it), and a caller's entropy (a
+      reseed with it, then another from the parent). The EVP layer skips empty requests and
+      splits requests over the limit into chunks, each with the same additional input. The
+      mechanisms report their limits (`Limits`) rather than enforce them, as HMAC-DRBG-KDF
+      needs.
+
+    Tests: `tests/rand.rs` replays 32 schedules from the reference's EVP_RAND API (a TEST-RAND
+    parent) on every mechanism and configuration. Each schedule instantiates with the default
+    or a given personalization, then generates with and without additional input, reseeds,
+    uses prediction resistance, and reseeds with the caller's entropy. It also checks
+    HMAC-DRBG-KDF (70,000 octets, past the request limit), the life cycle, the limits, and OS
+    entropy. Fuzz target `drbg`: arbitrary operation sequences on two instances.
+
+    Dependencies: `getrandom` (its build script read and allowed) and `r-efi` (UEFI only),
+    exempted in `supply-chain/` pending audit.
   - [x] **3.2c MACs:** `rustyssl_crypto::mac`, the computations behind every MAC 3.5 offers,
     behind one `Mac` trait (update, finalize into exactly the MAC's size, reset with the same
     key, copy).
@@ -1852,8 +1879,35 @@ have run for at least 24 CPU-hours with no findings.
     block-stream output's prefix is the shorter output.
 
     Dependencies: none new.
-  - [ ] **3.2e Random generators:** the CTR, Hash, and HMAC DRBGs (SP 800-90A), HMAC-DRBG-KDF
-    over the HMAC DRBG, and the OS seed source, for 3.7.
+  - [x] **3.2e Random generators:** `rustyssl_crypto::rand`, the DRBG mechanisms as the
+    reference implements them, behind a `Drbg` trait (instantiate, reseed, generate,
+    uninstantiate, and the limits each publishes), plus the OS entropy source.
+    - **Mechanisms:**
+      - CTR-DRBG over AES-128/192/256, with or without the derivation function. Its 128-bit
+        counter, the derivation function's output reused after generating with additional
+        input, and inputs XORed and truncated without it.
+      - Hash-DRBG (seed length 55 or 111) and HMAC-DRBG over any non-XOF digest.
+      - HMAC-DRBG-KDF is HMAC-DRBG with no personalization and no request limit.
+    - **Seed source:** `os_entropy` over the `getrandom` crate (`getrandom(2)` on Linux,
+      `getentropy` on macOS).
+    - **Decision:** everything around the mechanisms is 3.7's: entropy and nonces from the
+      parent, the default personalization string (`"OpenSSL NIST SP 800-90A DRBG"` with its
+      NUL, 29 octets), reseed intervals and forks, prediction resistance (a reseed with the
+      request's additional input, then generating without it), and a caller's entropy (a
+      reseed with it, then another from the parent). The EVP layer skips empty requests and
+      splits requests over the limit into chunks, each with the same additional input. The
+      mechanisms report their limits (`Limits`) rather than enforce them, as HMAC-DRBG-KDF
+      needs.
+
+    Tests: `tests/rand.rs` replays 32 schedules from the reference's EVP_RAND API (a TEST-RAND
+    parent) on every mechanism and configuration. Each schedule instantiates with the default
+    or a given personalization, then generates with and without additional input, reseeds,
+    uses prediction resistance, and reseeds with the caller's entropy. It also checks
+    HMAC-DRBG-KDF (70,000 octets, past the request limit), the life cycle, the limits, and OS
+    entropy. Fuzz target `drbg`: arbitrary operation sequences on two instances.
+
+    Dependencies: `getrandom` (its build script read and allowed) and `r-efi` (UEFI only),
+    exempted in `supply-chain/` pending audit.
 - [ ] **3.3 EVP_MD:**
   - SHA-1, the SHA-2 family (including 512/224 and 512/256), SHA-3, SHAKE (XOF,
     `EVP_DigestFinalXOF`, `EVP_DigestSqueeze`), KECCAK-KMAC, MD5, MD5-SHA1, SM3, BLAKE2s/b,
