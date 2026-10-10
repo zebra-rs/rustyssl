@@ -8,6 +8,7 @@ pub(crate) mod cipher_ctx;
 pub(crate) mod digest;
 pub(crate) mod encode;
 pub(crate) mod fetch;
+pub(crate) mod key;
 pub(crate) mod legacy_cipher;
 pub(crate) mod legacy_md;
 pub(crate) mod md_ctx;

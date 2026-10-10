@@ -1,6 +1,8 @@
 //! Fuzzes PEM framing through the C ABI: arbitrary text read block by block with
 //! `PEM_read_bio_ex` and each flag must parse or fail without going out of bounds (ASan), and
-//! arbitrary octets written with `PEM_write_bio` must read back unchanged, name and all.
+//! arbitrary octets written with `PEM_write_bio` must read back unchanged, name and all. Each
+//! block's header is read as encryption (`PEM_get_EVP_CIPHER_INFO`) and, naming a cipher, its
+//! body decrypted in place (`PEM_do_header`), which must stay within it.
 
 #![no_main]
 
@@ -20,6 +22,15 @@ unsafe extern "C" {
     fn PEM_write_bio(bp: *mut c_void, name: *const c_char, header: *const c_char, data: *const c_uchar, len: c_long) -> c_int;
     fn CRYPTO_free(p: *mut c_void, file: *const c_char, line: c_int);
     fn ERR_clear_error();
+    fn PEM_get_EVP_CIPHER_INFO(header: *mut c_char, cipher: *mut CipherInfo) -> c_int;
+    fn PEM_do_header(cipher: *mut CipherInfo, data: *mut c_uchar, plen: *mut c_long, cb: *const c_void, u: *const c_void) -> c_int;
+}
+
+/// `EVP_CIPHER_INFO`.
+#[repr(C)]
+struct CipherInfo {
+    cipher: *const c_void,
+    iv: [u8; 16],
 }
 
 /// Reads every block from `bio`: (name, header, data) of each.
@@ -31,6 +42,14 @@ fn read_blocks(bio: *mut c_void, flags: c_uint) -> Vec<(Vec<u8>, Vec<u8>, Vec<u8
         let r = unsafe { PEM_read_bio_ex(bio, &mut name, &mut header, &mut data, &mut len, flags) };
         if r != 1 {
             break;
+        }
+        let mut info = CipherInfo { cipher: ptr::null(), iv: [0; 16] };
+        // SAFETY: the header the call allocated (a string), and a local.
+        if unsafe { PEM_get_EVP_CIPHER_INFO(header, &mut info) } == 1 && !info.cipher.is_null() {
+            let before = len;
+            // SAFETY: the body of `len` octets, decrypted in place under a password string.
+            unsafe { PEM_do_header(&mut info, data, &mut len, ptr::null(), c"pw".as_ptr().cast()) };
+            assert!(len <= before);
         }
         // SAFETY: the strings and data the call allocated, freed after copying.
         unsafe {

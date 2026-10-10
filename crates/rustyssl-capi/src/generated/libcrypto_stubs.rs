@@ -8780,20 +8780,6 @@ pub extern "C" fn EVP_ASYM_CIPHER_up_ref(_: *mut EVP_ASYM_CIPHER) -> core::ffi::
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_BytesToKey(
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: *const core::ffi::c_uchar,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_BytesToKey")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_CIPHER_impl_ctx_size(_: *const EVP_CIPHER) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_CIPHER_impl_ctx_size")
 }
@@ -19491,52 +19477,6 @@ pub extern "C" fn PEM_ASN1_read_bio(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_ASN1_write(
-    _: i2d_of_void,
-    _: *const core::ffi::c_char,
-    _: *mut FILE,
-    _: *const core::ffi::c_void,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_ASN1_write")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_ASN1_write_bio(
-    _: i2d_of_void,
-    _: *const core::ffi::c_char,
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_ASN1_write_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_ASN1_write_bio_ctx(
-    _: OSSL_i2d_of_void_ctx,
-    _: *mut core::ffi::c_void,
-    _: *const core::ffi::c_char,
-    _: *mut BIO,
-    _: *const core::ffi::c_void,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_ASN1_write_bio_ctx")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_SignFinal(
     _: *mut EVP_MD_CTX,
     _: *mut core::ffi::c_uchar,
@@ -19641,35 +19581,6 @@ pub extern "C" fn PEM_bytes_read_bio_secmem(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_bytes_read_bio_secmem")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_def_callback(
-    _: *mut core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_def_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_do_header(
-    _: *mut EVP_CIPHER_INFO,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_do_header")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_get_EVP_CIPHER_INFO(
-    _: *mut core::ffi::c_char,
-    _: *mut EVP_CIPHER_INFO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_get_EVP_CIPHER_INFO")
 }
 
 #[unsafe(no_mangle)]

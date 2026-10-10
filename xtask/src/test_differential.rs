@@ -1602,6 +1602,28 @@ fn pem_session(random: &mut Random, out: &mut String) -> Result {
                     .pick(&["Proc-Type: 4,ENCRYPTED\n", "K: v\n", "Key:value\n"])
                     .as_bytes(),
             );
+            if random.below(2) == 0 {
+                // A DEK-Info line, right or wrong in each part.
+                let cipher = random.pick(&[
+                    "AES-128-CBC",
+                    "aes-256-cbc",
+                    "DES-EDE3-CBC",
+                    "AES-128-ECB",
+                    "NOSUCH",
+                    "",
+                ]);
+                let sep = random.pick(&[",", ",", " ,", " ", ""]);
+                let digits: usize = random
+                    .pick(&["32", "32", "16", "0", "3", "40"])
+                    .parse()
+                    .unwrap_or(0);
+                let mut iv = String::new();
+                for _ in 0..digits {
+                    iv.push_str(random.pick(&["0", "7", "a", "F", "c", "z"]));
+                }
+                let tag = random.pick(&["DEK-Info: ", "DEK-Info:", "Dek-Info: "]);
+                text.extend_from_slice(format!("{tag}{cipher}{sep}{iv}\n").as_bytes());
+            }
             if random.below(4) != 0 {
                 text.push(b'\n');
             }

@@ -2,9 +2,8 @@
 //! `PEM_write`, `PEM_proc_type`, `PEM_dek_info`), as OpenSSL's `pem_lib.c` does it, over
 //! `rustyssl_asn1::pem` and the base64 codec.
 //!
-//! The typed PEM functions come with their types, and the encrypted forms (`Proc-Type` and
-//! `DEK-Info` read back, `PEM_do_header`, and the functions built on them) with the EVP
-//! ciphers.
+//! The typed PEM functions come with their types; the encrypted forms (`Proc-Type` and
+//! `DEK-Info` read back, `PEM_do_header`, `PEM_ASN1_write*`) are in `pem_cipher`.
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_uchar};
 use core::ptr;
@@ -219,7 +218,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `fp` is an open `FILE`.
-unsafe fn file_bio(fp: *mut FILE, function: &str) -> *mut BIO {
+pub(crate) unsafe fn file_bio(fp: *mut FILE, function: &str) -> *mut BIO {
     // SAFETY: the caller's guarantee.
     let b = unsafe { bio::file::BIO_new_fp(fp, BIO_NOCLOSE) };
     if b.is_null() {
