@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod md;
 pub mod method_store;
 pub mod namemap;
 pub mod params;
