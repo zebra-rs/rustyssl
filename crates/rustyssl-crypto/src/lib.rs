@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod kdf;
 pub mod mac;
 pub mod md;
 pub mod method_store;
