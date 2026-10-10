@@ -173,3 +173,10 @@ name = "property"
 path = "fuzz_targets/property.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "kdf"
+path = "fuzz_targets/kdf.rs"
+test = false
+doc = false
+bench = false
