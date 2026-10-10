@@ -1989,7 +1989,7 @@ have run for at least 24 CPU-hours with no findings.
     OpenSSL pre-fills each name map with the legacy cipher names before the digests', in
     one `OBJ_NAME` table; 3.4a added them (the probe now draws cipher NIDs too). Key types'
     names (Phase 4) are still to come.
-- [ ] **3.4 EVP_CIPHER**, in five sub-steps, each its own PR:
+- [x] **3.4 EVP_CIPHER**, in five sub-steps, each its own PR:
   - [x] **3.4a Ciphers and contexts:** the `EVP_CIPHER` method, the static ciphers and the
     cipher name table, the `EVP_CIPHER_CTX` API, and the default provider's plain modes.
 
@@ -2148,10 +2148,40 @@ have run for at least 24 CPU-hours with no findings.
         which reaches the custom path and `EVP_CIPHER_CTX_get_algor`'s decoding.
     - The probe's `casn1` command (corpus `modes.txt`, random sessions).
     - The decoder fuzz target `asn1_d2i` now decodes `X509_ALGOR` too.
-  - [ ] **3.4e Encrypted PEM** (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
+  - [x] **3.4e Encrypted PEM** (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
     `PEM_ASN1_write`/`_bio`/`_bio_ctx`.
+
+    *Done:* 7 exports.
+    - **`pem_cipher.rs`**, ported from `pem_lib.c` over the EVP API on the caller's buffers:
+      - `PEM_get_EVP_CIPHER_INFO` reads `Proc-Type: 4,ENCRYPTED` and `DEK-Info:
+        cipher,hex-IV`, with every one of the reference's errors. It no longer writes into the
+        header for a moment, as the reference does.
+      - `PEM_do_header` decrypts the body in place.
+      - `PEM_ASN1_write`, `_bio`, and `_bio_ctx` write a DER value as PEM, plain or
+        encrypted, under a random IV that is also the salt. The IV comes from the operating
+        system until 3.7.
+    - **The password** comes from `kstr`, the callback, or `PEM_def_callback`. With no
+      userdata, `PEM_def_callback` prompts through the UI (6.2), whose functions are aborting
+      stubs until then, so it fails closed.
+    - **`EVP_BytesToKey`** (`evp/key.rs`), which the key needs (MD5, one round, the IV's
+      first 8 octets as the salt). It runs over the `EVP_MD_CTX` functions, so any digest
+      works.
+    - **Deviation** (docs/DEVIATIONS.md): `EVP_BytesToKey` treats a negative count as one
+      round (the reference runs about 2^32).
+
+    Tests:
+    - `tests/c/pem_crypt.c`, 49 checks: 23 headers right and wrong, `EVP_BytesToKey` vectors
+      for four ciphers and three digests, decryption under the caller's data and the
+      callback (wrong, failing, empty, and cut passwords), writing plain and encrypted then
+      reading back, the write errors, and `PEM_def_callback`.
+    - The probe's `pemread` now reads each block's header as encryption and decrypts under
+      "pw", with random DEK-Info lines (corpus `pem.txt`).
+    - The `pem` fuzz target does likewise.
   - The legacy provider's ciphers (DES, BF, CAST5, IDEA, RC2, RC4 including RC4-HMAC-MD5,
     SEED) come with 9.1; their static ciphers exist already.
+
+  *Step 3.4 done:* 243 exports over the five sub-steps, now 1,175 of libcrypto's 5,876. The
+  default provider offers every cipher the reference's does.
 - [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
   the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
