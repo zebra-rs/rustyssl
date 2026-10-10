@@ -107,20 +107,6 @@ static const struct getter getters[] = {
 
 static unsigned char key[64], iv[16], data[100];
 
-/* The modes so far; XTS, SIV, GCM-SIV, the key wraps, CTS, and the composites come with 3.4c. */
-static int plain(const EVP_CIPHER *c)
-{
-    int mode = EVP_CIPHER_get_mode(c);
-    unsigned long flags = EVP_CIPHER_get_flags(c);
-
-    if ((flags & EVP_CIPH_FLAG_CTS) != 0)
-        return 0;
-    if ((flags & EVP_CIPH_FLAG_AEAD_CIPHER) != 0 && mode == EVP_CIPH_CBC_MODE)
-        return 0;
-    return mode != EVP_CIPH_XTS_MODE && mode != EVP_CIPH_WRAP_MODE && mode != EVP_CIPH_SIV_MODE
-           && mode != EVP_CIPH_GCM_SIV_MODE;
-}
-
 static void statics(void)
 {
     const struct getter *g;
@@ -149,13 +135,15 @@ static void statics(void)
                EVP_CIPHER_get_params((EVP_CIPHER *)c, NULL), EVP_CIPHER_gettable_params(c) == NULL,
                EVP_CIPHER_settable_ctx_params(c) == NULL, EVP_CIPHER_names_do_all(c, NULL, NULL),
                EVP_CIPHER_can_pipeline(c, 1));
-        if (!plain(c))
-            continue;
         ctx = EVP_CIPHER_CTX_new();
         if (EVP_EncryptInit_ex(ctx, c, NULL, key, iv) && EVP_EncryptUpdate(ctx, out, &n, data, 40)
             && EVP_EncryptFinal_ex(ctx, out + n, &m)) {
             printf("  encrypted: %d ", n + m);
-            hex(out, n + m);
+            /* Triple DES's key wrap wraps under a random IV. */
+            if (EVP_CIPHER_get_nid(c) == NID_id_smime_alg_CMS3DESwrap)
+                printf("random");
+            else
+                hex(out, n + m);
             printf("\n");
             check(EVP_CIPHER_CTX_get0_cipher(ctx) != c
                       && EVP_CIPHER_get0_provider(EVP_CIPHER_CTX_get0_cipher(ctx)) != NULL,
@@ -260,7 +248,7 @@ static int compare(const void *a, const void *b)
 static void provided(EVP_CIPHER *c, void *arg)
 {
     (void)arg;
-    if (plain(c) && count < 600)
+    if (count < 600)
         snprintf(entries[count++], sizeof(entries[0]), "%s", EVP_CIPHER_get0_name(c));
 }
 
