@@ -11,8 +11,8 @@
 //!
 //! What the reference would crash on (an input pointer of NULL with a length, an output of
 //! NULL where it writes) fails here instead, without an error (docs/DEVIATIONS.md). The SKEY
-//! init functions come with `EVP_SKEY` (3.10); the AEADs and the other modes with 3.4b and
-//! 3.4c.
+//! init functions come with `EVP_SKEY` (3.10). The AEADs' tables are in `aeads`, the other
+//! modes' (CTS, XTS, the key wraps, the composites) in `modes`; all are listed here.
 
 use core::ffi::{c_int, c_uint, c_void};
 use core::ptr;
@@ -34,16 +34,18 @@ use rustyssl_abi::{
     OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, PROV_R_BAD_DECRYPT,
     PROV_R_CIPHER_OPERATION_FAILED, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_FAILED_TO_GET_PARAMETER,
     PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_AAD, PROV_R_INVALID_DATA,
-    PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_TAG,
-    PROV_R_INVALID_TAG_LENGTH, PROV_R_NO_KEY_SET, PROV_R_OUTPUT_BUFFER_TOO_SMALL,
-    PROV_R_TAG_NOT_NEEDED, PROV_R_TAG_NOT_SET, PROV_R_TOO_MANY_RECORDS,
-    PROV_R_WRONG_FINAL_BLOCK_LENGTH,
+    PROV_R_INVALID_INPUT_LENGTH, PROV_R_INVALID_IV_LENGTH, PROV_R_INVALID_KEY_LENGTH,
+    PROV_R_INVALID_OUTPUT_LENGTH, PROV_R_INVALID_TAG, PROV_R_INVALID_TAG_LENGTH, PROV_R_NO_KEY_SET,
+    PROV_R_OUTPUT_BUFFER_TOO_SMALL, PROV_R_TAG_NOT_NEEDED, PROV_R_TAG_NOT_SET,
+    PROV_R_TOO_MANY_RECORDS, PROV_R_WRONG_FINAL_BLOCK_LENGTH, PROV_R_XTS_DATA_UNIT_IS_TOO_LARGE,
+    PROV_R_XTS_DUPLICATED_KEYS,
 };
+use rustyssl_crypto::provided::aead::{Io, Raised};
 use rustyssl_crypto::provided::cipher::{Ctx, Error, Kind, Mode, Output};
 use rustyssl_crypto::sym::BlockAlgorithm;
 
-use super::aeads;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry};
+use super::{aeads, modes};
 use crate::err;
 use crate::ffi::ffi_callback;
 use crate::params::{
@@ -55,15 +57,15 @@ use crate::params::{
 /// An algorithm context: the cipher's, and where the NULL cipher found the TLS MAC (in the
 /// caller's input, which the reference points into).
 pub(crate) struct AlgCtx {
-    core: Ctx,
-    tlsmac: *const u8,
+    pub(crate) core: Ctx,
+    pub(crate) tlsmac: *const u8,
 }
 
 /// The algorithm context behind `vctx`, or `None` for NULL.
 ///
 /// # Safety
 /// `vctx` is NULL or a context `newctx` made and `freectx` hasn't freed.
-unsafe fn context<'a>(vctx: *mut c_void) -> Option<&'a mut AlgCtx> {
+pub(crate) unsafe fn context<'a>(vctx: *mut c_void) -> Option<&'a mut AlgCtx> {
     // SAFETY: the caller's guarantee: a box from `newctx`, used by one caller at a time as an
     // algorithm context is.
     unsafe { vctx.cast::<AlgCtx>().as_mut() }
@@ -79,7 +81,7 @@ pub(crate) unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
 }
 
 /// `newctx` for `kind`.
-fn new_context(kind: Kind) -> *mut c_void {
+pub(crate) fn new_context(kind: Kind) -> *mut c_void {
     Box::into_raw(Box::new(AlgCtx {
         core: Ctx::new(kind),
         tlsmac: ptr::null(),
@@ -111,6 +113,10 @@ pub(crate) fn raise(e: Error, function: &str) {
         Error::InvalidData => PROV_R_INVALID_DATA,
         Error::PassedInvalidArgument => ERR_R_PASSED_INVALID_ARGUMENT,
         Error::FailedToSetParameter => PROV_R_FAILED_TO_SET_PARAMETER,
+        Error::XtsDuplicatedKeys => PROV_R_XTS_DUPLICATED_KEYS,
+        Error::XtsDataUnitIsTooLarge => PROV_R_XTS_DATA_UNIT_IS_TOO_LARGE,
+        Error::InvalidInputLength => PROV_R_INVALID_INPUT_LENGTH,
+        Error::InvalidOutputLength => PROV_R_INVALID_OUTPUT_LENGTH,
     };
     err::raise(ERR_LIB_PROV, reason, function);
 }
@@ -130,10 +136,11 @@ pub(crate) unsafe fn input<'a>(p: *const u8, len: usize) -> Option<&'a [u8]> {
     Some(unsafe { core::slice::from_raw_parts(p, len) })
 }
 
-/// Writes `o` at `out`: false if there's something to write and `out` is NULL.
+/// Writes `o` at `out` (`o.at` octets in): false if there's something to write and `out` is
+/// NULL.
 ///
 /// # Safety
-/// `out` is NULL or has room for `o.data.len()` octets.
+/// `out` is NULL or has room for `o.at + o.data.len()` octets.
 pub(crate) unsafe fn write(out: *mut u8, o: &Output) -> bool {
     let n = o.data.len();
     if n == 0 {
@@ -142,6 +149,8 @@ pub(crate) unsafe fn write(out: *mut u8, o: &Output) -> bool {
     if out.is_null() {
         return false;
     }
+    // Past the octets the operation leaves as they were.
+    let out = out.wrapping_add(o.at);
     let mut data = o.data.clone();
     if o.last_mask != 0xff {
         // The bits of the last octet that aren't written keep the output's.
@@ -162,7 +171,7 @@ pub(crate) unsafe fn write(out: *mut u8, o: &Output) -> bool {
 /// # Safety
 /// `out` is NULL or has room for what the operation writes; `outl` is NULL or valid for a
 /// write.
-unsafe fn finish(
+pub(crate) unsafe fn finish(
     result: Result<Output, Error>,
     out: *mut u8,
     outl: *mut usize,
@@ -171,7 +180,17 @@ unsafe fn finish(
     match result {
         Ok(o) => {
             // SAFETY: the caller's guarantee.
-            if !unsafe { write(out, &o) } || outl.is_null() {
+            if !unsafe { write(out, &o) } {
+                return 0;
+            }
+            if let Some(e) = o.failed {
+                raise(e, function);
+                return 0;
+            }
+            if let Some(e) = o.raised {
+                raise(e, function);
+            }
+            if outl.is_null() {
                 return 0;
             }
             // SAFETY: the caller's guarantee.
@@ -250,6 +269,29 @@ unsafe fn init(
     (enc, family): (bool, Family),
 ) -> c_int {
     // SAFETY: the caller's guarantee.
+    if unsafe { init_core(vctx, (key, keylen), (iv, ivlen), enc) } == 0 {
+        return 0;
+    }
+    match family {
+        // SAFETY: the caller's guarantee.
+        Family::Generic => unsafe { generic_set_ctx_params(vctx, params) },
+        // SAFETY: the caller's guarantee.
+        Family::ChaCha20 => unsafe { chacha20_set_ctx_params(vctx, params) },
+        Family::Null => 1,
+    }
+}
+
+/// An init's key and IV (the mode's own init before its parameters).
+///
+/// # Safety
+/// As for `init`.
+pub(crate) unsafe fn init_core(
+    vctx: *mut c_void,
+    (key, keylen): (*const u8, usize),
+    (iv, ivlen): (*const u8, usize),
+    enc: bool,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
     let Some(ctx) = (unsafe { context(vctx) }) else {
         return 0;
     };
@@ -269,13 +311,7 @@ unsafe fn init(
         raise(e, "cipher_generic_init_internal");
         return 0;
     }
-    match family {
-        // SAFETY: the caller's guarantee.
-        Family::Generic => unsafe { generic_set_ctx_params(vctx, params) },
-        // SAFETY: the caller's guarantee.
-        Family::ChaCha20 => unsafe { chacha20_set_ctx_params(vctx, params) },
-        Family::Null => 1,
-    }
+    1
 }
 
 macro_rules! inits {
@@ -357,6 +393,36 @@ unsafe fn process(
     let Some(ctx) = (unsafe { context(vctx) }) else {
         return 0;
     };
+    let io = Io {
+        input: if in_.is_null() {
+            None
+        } else {
+            // SAFETY: the caller's guarantee.
+            unsafe { input(in_, inl) }
+        },
+        inl,
+        out: !out.is_null(),
+        in_place: out.cast_const() == in_,
+        outsize,
+    };
+    if let Some(r) = ctx.core.process(io, one_shot) {
+        let function = if one_shot { "cipher" } else { "update" };
+        // SAFETY: the caller's guarantee.
+        return unsafe { finish_raised(r, out, outl, function) };
+    }
+    let kind = ctx.core.kind();
+    if kind.cts() && !one_shot {
+        // SAFETY: the caller's guarantee.
+        let Some(data) = (unsafe { input(in_, inl) }) else {
+            return 0;
+        };
+        let Some(g) = ctx.core.generic_mut() else {
+            return 0;
+        };
+        let r = g.cts_update(data, outsize, !out.is_null());
+        // SAFETY: the caller's guarantee.
+        return unsafe { finish(r, out, outl, "ossl_cipher_cbc_cts_block_update") };
+    }
     let n = ctx.core.input_len(inl);
     // SAFETY: the caller's guarantee.
     let Some(data) = (unsafe { input(in_, n) }) else {
@@ -409,9 +475,32 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
-        let result = ctx.core.finalize(outsize);
+        let result = ctx.core.process_final().unwrap_or_else(|| ctx.core.finalize(outsize));
         // SAFETY: the caller's guarantee.
         unsafe { finish(result, out, outl, "ossl_cipher_generic_final") }
+    }
+}
+
+/// [`finish`] for a function that can raise two errors.
+///
+/// # Safety
+/// As for [`finish`].
+pub(crate) unsafe fn finish_raised(
+    result: Result<Output, Raised>,
+    out: *mut u8,
+    outl: *mut usize,
+    function: &str,
+) -> c_int {
+    match result {
+        // SAFETY: the caller's guarantee.
+        Ok(o) => unsafe { finish(Ok(o), out, outl, function) },
+        Err(r) => {
+            raise(r.first, function);
+            if let Some(e) = r.then {
+                raise(e, function);
+            }
+            0
+        }
     }
 }
 
@@ -488,6 +577,8 @@ pub(crate) struct Info {
     pub(crate) mode: u32,
     pub(crate) aead: bool,
     pub(crate) custom_iv: bool,
+    pub(crate) cts: bool,
+    pub(crate) multiblock: bool,
     pub(crate) rand_key: bool,
     pub(crate) key_len: usize,
     pub(crate) block_size: usize,
@@ -498,8 +589,10 @@ impl Info {
     const fn of(kind: Kind) -> Self {
         Self {
             mode: kind.mode(),
-            aead: false,
+            aead: kind.composite(),
             custom_iv: kind.custom_iv(),
+            cts: kind.cts(),
+            multiblock: kind.composite(),
             rand_key: kind.has_rand_key(),
             key_len: kind.key_len(),
             block_size: kind.block_size(),
@@ -524,8 +617,8 @@ pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int
     let flags = [
         (OSSL_CIPHER_PARAM_AEAD, info.aead),
         (OSSL_CIPHER_PARAM_CUSTOM_IV, info.custom_iv),
-        (OSSL_CIPHER_PARAM_CTS, false),
-        (OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, false),
+        (OSSL_CIPHER_PARAM_CTS, info.cts),
+        (OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, info.multiblock),
         (OSSL_CIPHER_PARAM_HAS_RAND_KEY, info.rand_key),
     ];
     // SAFETY: the caller's array; a located parameter.
@@ -555,7 +648,7 @@ pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
+pub(crate) unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
     // SAFETY: the caller's guarantee.
     unsafe { get_params_of(Info::of(kind), params) }
 }
@@ -1297,9 +1390,9 @@ cipher!(sm4128ofb128, block(Sm4, 16, Ofb), generic);
 cipher!(sm4128cfb128, block(Sm4, 16, Cfb), generic);
 cipher!(chacha20, Kind::ChaCha20, chacha20);
 
-/// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order (XTS, SIV, the key
-/// wraps, CTS, and the composites come with 3.4c).
-pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
+/// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order. The composites
+/// (`ALGC`) are taken out where the CPU lacks AES-NI, as the reference's are.
+pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
     alg(c"NULL", &null::TABLE),
     alg(c"AES-256-ECB:2.16.840.1.101.3.4.1.41", &aes256ecb::TABLE),
     alg(c"AES-192-ECB:2.16.840.1.101.3.4.1.21", &aes192ecb::TABLE),
@@ -1317,6 +1410,9 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
         &aes128cbc::TABLE,
     ),
     alg(c"AES-256-OFB:2.16.840.1.101.3.4.1.43", &aes256ofb::TABLE),
+    alg(c"AES-128-CBC-CTS", &modes::aes128cbc_cts::TABLE),
+    alg(c"AES-192-CBC-CTS", &modes::aes192cbc_cts::TABLE),
+    alg(c"AES-256-CBC-CTS", &modes::aes256cbc_cts::TABLE),
     alg(c"AES-192-OFB:2.16.840.1.101.3.4.1.23", &aes192ofb::TABLE),
     alg(c"AES-128-OFB:2.16.840.1.101.3.4.1.3", &aes128ofb::TABLE),
     alg(c"AES-256-CFB:2.16.840.1.101.3.4.1.44", &aes256cfb::TABLE),
@@ -1331,9 +1427,23 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
     alg(c"AES-256-CTR", &aes256ctr::TABLE),
     alg(c"AES-192-CTR", &aes192ctr::TABLE),
     alg(c"AES-128-CTR", &aes128ctr::TABLE),
+    alg(
+        c"AES-256-XTS:1.3.111.2.1619.0.1.2",
+        &modes::aes256xts::TABLE,
+    ),
+    alg(
+        c"AES-128-XTS:1.3.111.2.1619.0.1.1",
+        &modes::aes128xts::TABLE,
+    ),
     alg(c"AES-256-OCB", &aeads::aes256ocb::TABLE),
     alg(c"AES-192-OCB", &aeads::aes192ocb::TABLE),
     alg(c"AES-128-OCB", &aeads::aes128ocb::TABLE),
+    alg(c"AES-128-SIV", &aeads::aes128siv::TABLE),
+    alg(c"AES-192-SIV", &aeads::aes192siv::TABLE),
+    alg(c"AES-256-SIV", &aeads::aes256siv::TABLE),
+    alg(c"AES-128-GCM-SIV", &aeads::aes128gcm_siv::TABLE),
+    alg(c"AES-192-GCM-SIV", &aeads::aes192gcm_siv::TABLE),
+    alg(c"AES-256-GCM-SIV", &aeads::aes256gcm_siv::TABLE),
     alg(
         c"AES-256-GCM:id-aes256-GCM:2.16.840.1.101.3.4.1.46",
         &aeads::aes256gcm::TABLE,
@@ -1383,6 +1493,64 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
         &aeads::aria128ccm::TABLE,
     ),
     alg(c"ARIA-256-ECB:1.2.410.200046.1.1.11", &aria256ecb::TABLE),
+    alg(
+        c"AES-256-WRAP:id-aes256-wrap:AES256-WRAP:2.16.840.1.101.3.4.1.45",
+        &modes::aes256wrap::TABLE,
+    ),
+    alg(
+        c"AES-192-WRAP:id-aes192-wrap:AES192-WRAP:2.16.840.1.101.3.4.1.25",
+        &modes::aes192wrap::TABLE,
+    ),
+    alg(
+        c"AES-128-WRAP:id-aes128-wrap:AES128-WRAP:2.16.840.1.101.3.4.1.5",
+        &modes::aes128wrap::TABLE,
+    ),
+    alg(
+        c"AES-256-WRAP-PAD:id-aes256-wrap-pad:AES256-WRAP-PAD:2.16.840.1.101.3.4.1.48",
+        &modes::aes256wrappad::TABLE,
+    ),
+    alg(
+        c"AES-192-WRAP-PAD:id-aes192-wrap-pad:AES192-WRAP-PAD:2.16.840.1.101.3.4.1.28",
+        &modes::aes192wrappad::TABLE,
+    ),
+    alg(
+        c"AES-128-WRAP-PAD:id-aes128-wrap-pad:AES128-WRAP-PAD:2.16.840.1.101.3.4.1.8",
+        &modes::aes128wrappad::TABLE,
+    ),
+    alg(
+        c"AES-256-WRAP-INV:AES256-WRAP-INV",
+        &modes::aes256wrapinv::TABLE,
+    ),
+    alg(
+        c"AES-192-WRAP-INV:AES192-WRAP-INV",
+        &modes::aes192wrapinv::TABLE,
+    ),
+    alg(
+        c"AES-128-WRAP-INV:AES128-WRAP-INV",
+        &modes::aes128wrapinv::TABLE,
+    ),
+    alg(
+        c"AES-256-WRAP-PAD-INV:AES256-WRAP-PAD-INV",
+        &modes::aes256wrappadinv::TABLE,
+    ),
+    alg(
+        c"AES-192-WRAP-PAD-INV:AES192-WRAP-PAD-INV",
+        &modes::aes192wrappadinv::TABLE,
+    ),
+    alg(
+        c"AES-128-WRAP-PAD-INV:AES128-WRAP-PAD-INV",
+        &modes::aes128wrappadinv::TABLE,
+    ),
+    alg(c"AES-128-CBC-HMAC-SHA1", &modes::aes128cbc_hmac_sha1::TABLE),
+    alg(c"AES-256-CBC-HMAC-SHA1", &modes::aes256cbc_hmac_sha1::TABLE),
+    alg(
+        c"AES-128-CBC-HMAC-SHA256",
+        &modes::aes128cbc_hmac_sha256::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA256",
+        &modes::aes256cbc_hmac_sha256::TABLE,
+    ),
     alg(c"ARIA-192-ECB:1.2.410.200046.1.1.6", &aria192ecb::TABLE),
     alg(c"ARIA-128-ECB:1.2.410.200046.1.1.1", &aria128ecb::TABLE),
     alg(
@@ -1461,6 +1629,9 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
         &camellia128cfb::TABLE,
     ),
     alg(c"CAMELLIA-256-CFB1", &camellia256cfb1::TABLE),
+    alg(c"CAMELLIA-128-CBC-CTS", &modes::camellia128cbc_cts::TABLE),
+    alg(c"CAMELLIA-192-CBC-CTS", &modes::camellia192cbc_cts::TABLE),
+    alg(c"CAMELLIA-256-CBC-CTS", &modes::camellia256cbc_cts::TABLE),
     alg(c"CAMELLIA-192-CFB1", &camellia192cfb1::TABLE),
     alg(c"CAMELLIA-128-CFB1", &camellia128cfb1::TABLE),
     alg(c"CAMELLIA-256-CFB8", &camellia256cfb8::TABLE),
@@ -1487,6 +1658,10 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
     alg(c"DES-EDE3-CFB", &tdes_ede3_cfb::TABLE),
     alg(c"DES-EDE3-CFB8", &tdes_ede3_cfb8::TABLE),
     alg(c"DES-EDE3-CFB1", &tdes_ede3_cfb1::TABLE),
+    alg(
+        c"DES3-WRAP:id-smime-alg-CMS3DESwrap:1.2.840.113549.1.9.16.3.6",
+        &modes::tdes_wrap_cbc::TABLE,
+    ),
     alg(c"DES-EDE-ECB:DES-EDE:1.3.14.3.2.17", &tdes_ede2_ecb::TABLE),
     alg(c"DES-EDE-CBC", &tdes_ede2_cbc::TABLE),
     alg(c"DES-EDE-OFB", &tdes_ede2_ofb::TABLE),
@@ -1505,13 +1680,43 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<99> = Algorithms([
         &sm4128cfb128::TABLE,
     ),
     alg(c"ChaCha20", &chacha20::TABLE),
+    alg(c"SM4-XTS:1.2.156.10197.1.104.10", &modes::sm4128xts::TABLE),
     alg(c"ChaCha20-Poly1305", &aeads::chacha20_poly1305::TABLE),
     ALG_END,
 ]);
 
-/// The default provider's cipher table.
+/// The default provider's cipher table: `DEFAULT_CIPHERS`, less the composites without AES-NI
+/// (`ossl_prov_cache_exported_algorithms`).
 pub(crate) fn default_ciphers() -> *const OSSL_ALGORITHM {
-    DEFAULT_CIPHERS.0.as_ptr()
+    /// The table without the composites.
+    struct Table(Vec<OSSL_ALGORITHM>);
+    // SAFETY: the static table's entries, never written.
+    unsafe impl Send for Table {}
+    // SAFETY: as above.
+    unsafe impl Sync for Table {}
+    static WITHOUT: std::sync::OnceLock<Table> = std::sync::OnceLock::new();
+    if crate::evp::legacy_cipher::aesni() {
+        return DEFAULT_CIPHERS.0.as_ptr();
+    }
+    let composites = [
+        modes::aes128cbc_hmac_sha1::TABLE.0.as_ptr(),
+        modes::aes256cbc_hmac_sha1::TABLE.0.as_ptr(),
+        modes::aes128cbc_hmac_sha256::TABLE.0.as_ptr(),
+        modes::aes256cbc_hmac_sha256::TABLE.0.as_ptr(),
+    ];
+    WITHOUT
+        .get_or_init(|| {
+            Table(
+                DEFAULT_CIPHERS
+                    .0
+                    .iter()
+                    .filter(|a| !composites.contains(&a.implementation))
+                    .copied()
+                    .collect(),
+            )
+        })
+        .0
+        .as_ptr()
 }
 
 #[cfg(test)]

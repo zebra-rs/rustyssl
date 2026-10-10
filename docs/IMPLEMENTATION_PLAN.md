@@ -2076,8 +2076,51 @@ have run for at least 24 CPU-hours with no findings.
       decrypted back and with a bad tag; the fuzz target `aead`; the probe's `caad`,
       `cmsglen`, and `ctag*` commands (corpus `aead.txt`, random sessions, which mask
       generated IVs).
-  - [ ] **3.4c Other modes:** XTS, SIV, GCM-SIV, the key wraps (and their inverses), CTS, and
+  - [x] **3.4c Other modes:** XTS, SIV, GCM-SIV, the key wraps (and their inverses), CTS, and
     the AES-CBC-HMAC composites.
+
+    *Done:* no new exports; the default provider gains 32 algorithms (the 4 composites only on
+    x86-64 with AES-NI, as the reference's), so it now offers every cipher the reference's
+    does, and the static ciphers of 3.4a reach them all.
+    - **On the generic context** (`rustyssl_crypto::provided::cipher`, `cipher/modes.rs`,
+      `cipher/composite.rs`; dispatch tables in `provider/modes.rs`):
+      - CTS for AES and Camellia in CS1, CS2, and CS3 (`cts_mode`), one update a message.
+      - XTS of AES (two equal keys refused when encrypting) and SM4 (`xts_standard`: GB/T
+        17964's tweak or IEEE 1619's), at most 2^20 blocks a data unit.
+      - The AES key wraps of RFC 3394 and 5649 and their `-INV` variants; a failure is
+        reported, as the reference reports it, as `SIZE_MAX` octets, which `EVP_CipherUpdate`
+        refuses.
+      - Triple DES's key wrap (RFC 3217), under a random IV from the operating system until
+        3.7.
+      - The AES-CBC-HMAC-SHA1 and -SHA256 composites: CBC, or after a TLS AAD a TLS record's
+        MAC-then-encrypt, and its decryption with the MAC and padding checked in constant time
+        (the reference's Lucky-13 code over SHA's compression function). Multi-block's sizes
+        are reported.
+      - XTS and the wraps keep the transformation their key was set for, as the reference's
+        key schedules do.
+    - **SIV and GCM-SIV** (`rustyssl_crypto::provided::siv`, in `provider/aeads.rs`): RFC 5297
+      over CMAC and CTR, and RFC 8452 over POLYVAL. Each takes AAD in pieces and allows one
+      message a key unless `speed` is set, as the reference does. SIV starts as the
+      reference's zeroed context: it allows no message, and can't be copied, before a key.
+    - **Deviations** (docs/DEVIATIONS.md): data without a key fails for CTS, the AES wraps,
+      SIV, and DES3-WRAP (the reference crashes, or wraps under an unset key schedule).
+      GCM-SIV before an init fails. NULL tag and `cts_mode` data fail. A context whose copy
+      failed is refused. Multi-block encryption fails, since it writes past its declared
+      output. Multi-block's buffer size fails before a fragment size (the reference aborts).
+      The turnaround row now covers CTS and the composites.
+
+    Tests:
+    - `tests/c/evp_modes.c`, 298 checks, more where the composites exist: each cipher's
+      metadata and parameter lists, round trips in every variant and many lengths, the
+      lengths each refuses, size queries, wiped outputs, tags, `speed`, copies, and the
+      composites' TLS 1.2 and 1.0 records (short, and long enough for the Lucky-13 path) with
+      bad MACs and padding.
+    - `tests/c/evp_cipher_names.c` (now 429 checks) encrypts through every static cipher.
+    - `rustyssl-crypto` `tests/modes.rs`: 324 vectors from the reference, decrypted back, SIV
+      and GCM-SIV with bad tags.
+    - The fuzz target `modes`.
+    - The probe's `cparam` and `ctlsaad` commands and guards for the reference's crashes
+      (corpus `modes.txt`, random sessions).
   - [ ] **3.4d AlgorithmIdentifiers:** `EVP_CIPHER_param_to_asn1`, `_asn1_to_param`, the IV
     helpers, and `EVP_CIPHER_CTX_get_algor`/`_get_algor_params`/`_set_algor_params`.
   - [ ] **3.4e Encrypted PEM** (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and

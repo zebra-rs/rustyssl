@@ -224,6 +224,20 @@ mod tests {
         let mut pt = ctx.update(&ct, 32, 48).unwrap().data.to_vec();
         pt.extend_from_slice(&ctx.finalize(16).unwrap().data);
         assert_eq!(pt, data);
+
+        // CTS likewise (a message of a block and a half).
+        let cts = Kind::Block {
+            algorithm: BlockAlgorithm::Aes,
+            key_len: 16,
+            mode: Mode::CbcCts,
+        };
+        let mut enc = Ctx::new(cts);
+        enc.init(true, Some(&key), Some(&[0; 16])).unwrap();
+        let ct = enc.update(&data[..24], 24, 24).unwrap().data.to_vec();
+        let mut ctx = Ctx::new(cts);
+        ctx.init(true, Some(&key), Some(&[0; 16])).unwrap();
+        ctx.init(false, None, Some(&[0; 16])).unwrap();
+        assert_eq!(ctx.update(&ct, 24, 24).unwrap().data.to_vec(), &data[..24]);
     }
 
     #[test]

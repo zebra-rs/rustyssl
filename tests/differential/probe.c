@@ -2466,6 +2466,8 @@ static int digest_command(const char *command, const char *line)
 
 static EVP_CIPHER_CTX *cipher_ctx[2];
 static int cipher_current;
+/* Whether each context's cipher has had a key, and an init that succeeded, since it was set. */
+static int cipher_keyed[2], cipher_ready[2];
 static size_t cipher_offset;
 static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16], cipher_tag[16];
 
@@ -2479,11 +2481,52 @@ static void print_out(const unsigned char *p, int n)
 }
 
 /* Whether GCM made its IV up at random (its output then differs from run to run). */
+/* Whether the context's cipher is `name` (or has it as a name). */
+static int cipher_is(EVP_CIPHER_CTX *ctx, const char *name)
+{
+    const EVP_CIPHER *c = EVP_CIPHER_CTX_get0_cipher(ctx);
+
+    return c != NULL && EVP_CIPHER_is_a(c, name);
+}
+
+/* Whether the context's cipher is one of the AES key wraps. */
+static int aes_wrap(EVP_CIPHER_CTX *ctx)
+{
+    const EVP_CIPHER *c = EVP_CIPHER_CTX_get0_cipher(ctx);
+
+    return c != NULL && EVP_CIPHER_get_mode(c) == EVP_CIPH_WRAP_MODE
+           && !cipher_is(ctx, "DES3-WRAP");
+}
+
+/* Whether the context's cipher is SIV or GCM-SIV. */
+static int siv(EVP_CIPHER_CTX *ctx)
+{
+    const EVP_CIPHER *c = EVP_CIPHER_CTX_get0_cipher(ctx);
+
+    return c != NULL && (EVP_CIPHER_get_mode(c) == EVP_CIPH_SIV_MODE
+                         || EVP_CIPHER_get_mode(c) == EVP_CIPH_GCM_SIV_MODE);
+}
+
+/*
+ * Whether the context is GCM-SIV with no init that succeeded: OpenSSL then uses a cipher
+ * context it hasn't made for a message or final (docs/DEVIATIONS.md).
+ */
+static int gcm_siv_unready(EVP_CIPHER_CTX *ctx)
+{
+    const EVP_CIPHER *c = EVP_CIPHER_CTX_get0_cipher(ctx);
+
+    return c != NULL && EVP_CIPHER_get_mode(c) == EVP_CIPH_GCM_SIV_MODE
+           && !cipher_ready[cipher_current];
+}
+
+/* Whether the context's output is random: GCM's generated IV, triple DES's key wrap. */
 static int random_iv(EVP_CIPHER_CTX *ctx)
 {
     unsigned int gen = 0;
     OSSL_PARAM params[2];
 
+    if (cipher_is(ctx, "DES3-WRAP") && EVP_CIPHER_CTX_is_encrypting(ctx))
+        return 1;
     if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL
         || EVP_CIPHER_get_mode(EVP_CIPHER_CTX_get0_cipher(ctx)) != EVP_CIPH_GCM_MODE)
         return 0;
@@ -2498,7 +2541,7 @@ static int cipher_command(const char *command, const char *line)
                                             "ccipher", "cpad", "ckeylen", "cnum", "cflags",
                                             "cstate", "cctrl", "ccopy", "creset", "cname",
                                             "cnid", "caad", "cmsglen", "ctagget", "ctagset",
-                                            "ctaglen", NULL };
+                                            "ctaglen", "cparam", "ctlsaad", NULL };
     const char *const *c;
     EVP_CIPHER_CTX *ctx;
     char a[64] = "", key[32] = "";
@@ -2537,6 +2580,7 @@ static int cipher_command(const char *command, const char *line)
         if (strcmp(a, "-") == 0 && m == 0 && n != -1 && (n != 0) != EVP_CIPHER_CTX_is_encrypting(ctx)
             && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
             && EVP_CIPHER_CTX_get_block_size(ctx) > 1
+            && EVP_CIPHER_CTX_get_mode(ctx) != EVP_CIPH_WRAP_MODE
             && (EVP_CIPHER_CTX_get_block_size(ctx) != 8
                 || strncmp(EVP_CIPHER_get0_name(EVP_CIPHER_CTX_get0_cipher(ctx)), "DES", 3) != 0)) {
             /*
@@ -2553,6 +2597,13 @@ static int cipher_command(const char *command, const char *line)
         }
         r = EVP_CipherInit_ex(ctx, ciph, NULL, m ? cipher_key : NULL, k ? cipher_iv : NULL,
                               (int)n);
+        if (ciph != NULL) {
+            cipher_keyed[cipher_current] = m && r;
+            cipher_ready[cipher_current] = r;
+        } else {
+            cipher_keyed[cipher_current] |= m && r;
+            cipher_ready[cipher_current] |= r;
+        }
         EVP_CIPHER_free(ciph);
         printf(" %d", r);
     } else if (strcmp(command, "cinitp") == 0) {
@@ -2574,12 +2625,33 @@ static int cipher_command(const char *command, const char *line)
         else
             params[0] = OSSL_PARAM_construct_uint(key, &u);
         r = EVP_CipherInit_ex2(ctx, ciph, cipher_key, cipher_iv, 1, params);
+        cipher_keyed[cipher_current] = r;
+        cipher_ready[cipher_current] = r;
         EVP_CIPHER_free(ciph);
         printf(" %d", r);
     } else if (strcmp(command, "cupdate") == 0 || strcmp(command, "ccipher") == 0) {
         sscanf(line, "%*s %ld", &n);
         if (n < 0 || n > 1024)
             n = 1024;
+        if (gcm_siv_unready(ctx)) {
+            printf(" skipped\n");
+            return 1;
+        }
+        if (!cipher_keyed[cipher_current]
+            && (aes_wrap(ctx) || cipher_is(ctx, "DES3-WRAP")
+                /* SIV with `speed` set uses the key's CMAC and CTR contexts unmade. */
+                || (siv(ctx) && EVP_CIPHER_get_mode(EVP_CIPHER_CTX_get0_cipher(ctx))
+                                    == EVP_CIPH_SIV_MODE)
+                || (command[1] == 'u' && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+                    && (EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
+                        & EVP_CIPH_FLAG_CTS) != 0))) {
+            /*
+             * Without a key, OpenSSL's AES key wraps and CTS crash and its triple-DES key
+             * wrap runs on a key schedule never set (docs/DEVIATIONS.md).
+             */
+            printf(" skipped\n");
+            return 1;
+        }
         if (command[1] == 'u') {
             r = EVP_CipherUpdate(ctx, out, &outl, cipher_data + cipher_offset, (int)n);
             printf(" %d %d", r, outl);
@@ -2601,6 +2673,10 @@ static int cipher_command(const char *command, const char *line)
         }
         cipher_offset = (cipher_offset + (size_t)n * 3 + 1) % 1024;
     } else if (strcmp(command, "cfinal") == 0) {
+        if (gcm_siv_unready(ctx)) {
+            printf(" skipped\n");
+            return 1;
+        }
         r = EVP_CipherFinal_ex(ctx, out, &outl);
         printf(" %d %d", r, outl);
         print_out(out, r ? outl : 0);
@@ -2647,8 +2723,13 @@ static int cipher_command(const char *command, const char *line)
         }
     } else if (strcmp(command, "cctrl") == 0) {
         sscanf(line, "%*s %ld %ld", &n, &m);
-        if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL || (n != EVP_CTRL_RAND_KEY && n != 0x19
-                                                        && n != 0x1a)) {
+        if (n == EVP_CTRL_TLS1_1_MULTIBLOCK_MAX_BUFSIZE && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+            && (EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
+                & EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK) != 0) {
+            /* OpenSSL asserts a fragment size has been set (docs/DEVIATIONS.md). */
+            printf(" skipped");
+        } else if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL
+                   || (n != EVP_CTRL_RAND_KEY && n != 0x19 && n != 0x1a)) {
             r = EVP_CIPHER_CTX_ctrl(ctx, (int)n, (int)m, out);
             printf(" %d", r);
         } else {
@@ -2674,7 +2755,12 @@ static int cipher_command(const char *command, const char *line)
          * or read through NULL in OpenSSL (docs/DEVIATIONS.md).
          */
         if (ciph == NULL || (EVP_CIPHER_get_flags(ciph) & EVP_CIPH_FLAG_AEAD_CIPHER) == 0
-            || (command[1] == 'm' && EVP_CIPHER_get_mode(ciph) != EVP_CIPH_CCM_MODE)) {
+            || (command[1] == 'm' && EVP_CIPHER_get_mode(ciph) != EVP_CIPH_CCM_MODE)
+            /* The composites are AEADs to the flags but write through NULL, and SIV's
+             * AAD crashes OpenSSL without a key (docs/DEVIATIONS.md). */
+            || EVP_CIPHER_get_mode(ciph) == EVP_CIPH_CBC_MODE
+            || (EVP_CIPHER_get_mode(ciph) == EVP_CIPH_SIV_MODE
+                && !cipher_keyed[cipher_current])) {
             printf(" skipped\n");
             return 1;
         }
@@ -2690,6 +2776,11 @@ static int cipher_command(const char *command, const char *line)
         sscanf(line, "%*s %ld", &n);
         if (n < 0 || n > 16)
             n = 16;
+        if (command[4] == 'l' && n == 16 && siv(ctx)) {
+            /* A tag with no octets: OpenSSL copies 16 from NULL (docs/DEVIATIONS.md). */
+            printf(" skipped\n");
+            return 1;
+        }
         if (command[4] == 'g') {
             memset(cipher_tag, 0, sizeof(cipher_tag));
             r = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, (int)n, cipher_tag);
@@ -2703,9 +2794,54 @@ static int cipher_command(const char *command, const char *line)
                                     command[4] == 's' ? cipher_tag : NULL);
             printf(" %d", r);
         }
+    } else if (strcmp(command, "cparam") == 0) {
+        /* A context parameter: `speed` as an unsigned int, the others as strings. */
+        char v[32] = "";
+        unsigned int u;
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+
+        sscanf(line, "%*s %63s %31s", a, v);
+        u = (unsigned int)strtoul(v, NULL, 10);
+        params[0] = strcmp(a, "speed") == 0 ? OSSL_PARAM_construct_uint(a, &u)
+                                            : OSSL_PARAM_construct_utf8_string(a, v, 0);
+        r = EVP_CIPHER_CTX_set_params(ctx, params);
+        printf(" %d", r);
+    } else if (strcmp(command, "ctlsaad") == 0) {
+        /* A TLS record's AAD: sequence 0, type 23, the version, the length. */
+        unsigned char aad[13] = { 0 };
+        size_t pad = 0;
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+
+        sscanf(line, "%*s %lx %ld", &n, &m);
+        aad[8] = 23;
+        aad[9] = (unsigned char)(n >> 8);
+        aad[10] = (unsigned char)n;
+        aad[11] = (unsigned char)(m >> 8);
+        aad[12] = (unsigned char)m;
+        if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL) {
+            printf(" skipped\n");
+            return 1;
+        }
+        r = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_TLS1_AAD, 13, aad);
+        params[0] = OSSL_PARAM_construct_size_t(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, &pad);
+        printf(" %d length %d pad %d %zu", r, aad[11] << 8 | aad[12],
+               EVP_CIPHER_CTX_get_params(ctx, params), pad);
     } else if (strcmp(command, "ccopy") == 0) {
-        printf(" %d", EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx));
+        cipher_keyed[!cipher_current] = cipher_keyed[cipher_current];
+        cipher_ready[!cipher_current] = cipher_ready[cipher_current];
+        r = EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx);
+        printf(" %d", r);
+        if (!r) {
+            /*
+             * A copy that fails in the provider leaves OpenSSL's destination with the cipher and
+             * no algorithm context, which crashes when used (docs/DEVIATIONS.md): start it over.
+             */
+            EVP_CIPHER_CTX_reset(cipher_ctx[!cipher_current]);
+            cipher_keyed[!cipher_current] = cipher_ready[!cipher_current] = 0;
+        }
     } else {
+        cipher_keyed[cipher_current] = 0;
+        cipher_ready[cipher_current] = 0;
         printf(" %d", EVP_CIPHER_CTX_reset(ctx));
     }
     print_digest_errors();
