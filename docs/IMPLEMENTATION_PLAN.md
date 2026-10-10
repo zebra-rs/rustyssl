@@ -1478,7 +1478,7 @@ have run for at least 24 CPU-hours with no findings.
 
 ## Phase 3: Provider core, EVP symmetric, RAND → M1
 
-- [ ] **3.1 Library contexts, params, and providers**, in five sub-steps, each its own PR:
+- [x] **3.1 Library contexts, params, and providers**, in five sub-steps, each its own PR:
   - [x] **3.1a `OSSL_PARAM`:** all types, the `*_ptr` semantics, the modified flags,
     `OSSL_PARAM_dup`/`merge`/`free`, and `OSSL_PARAM_BLD`.
 
@@ -1605,10 +1605,58 @@ have run for at least 24 CPU-hours with no findings.
     - `OSSL_PROVIDER_add_builtin`, `OSSL_LIB_CTX_new_from_dispatch`, `OSSL_LIB_CTX_new_child`,
       the rest of the core table, and the `legacy` provider (a module in OpenSSL's default
       build) to 9.1.
-  - [ ] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
-    `do_all_provided`; implicit fetch for the legacy `EVP_sha256()`-style getters;
-    `OSSL_LIB_CTX_get_data` (from 3.1b); `OSSL_PROVIDER_query_operation` and
-    `_unquery_operation` (from 3.1d).
+  - [x] **3.1e The method store and cache:** `EVP_*_fetch`, `is_a`, names,
+    `do_all_provided`; `OSSL_PROVIDER_query_operation` and `_unquery_operation` (from 3.1d).
+
+    *Done:* 18 exports. The machinery, ported from `core_namemap.c`, `property/property.c`,
+    `core_fetch.c`, `core_algorithm.c`, and `evp/evp_fetch.c`:
+    - **Name map** (`rustyssl_crypto::namemap`): each context numbers algorithm names. Keys are
+      OpenSSL's hash-table keys: the first 63 octets with bit 5 cleared, so letters match
+      without case and a few other pairs collide as in OpenSSL. Lists like
+      `"SHA2-256:SHA-256"` get one number, with OpenSSL's errors for empty and conflicting
+      names.
+    - **Method store** (`rustyssl_crypto::method_store`): implementations by method number
+      (name number and operation), with their provider and property definition. A choice is
+      the first non-optional match, or the most matches when the query has optional
+      properties, and is cached per query text.
+    - **Fetch** (`capi/src/evp/fetch.rs`):
+      - Each active provider is asked for the operation's algorithms on every construction
+        pass, but they're stored only once while it stays active. Algorithms a provider says
+        not to store go to a store for that fetch, whose choices aren't cached.
+      - Property definitions are parsed once per context, and queries are parsed in the
+        context with its default properties added.
+      - The cache is flushed when a provider is activated or the default properties change,
+        and a fully deactivated provider's methods are removed.
+      - Failures raise `ERR_R_UNSUPPORTED`, or `ERR_R_FETCH_FAILED` if a method couldn't be
+        made, with OpenSSL's text.
+      - Providers' functions and constructors run without a lock held.
+    - **`EVP_MD`** (`capi/src/evp/digest.rs`): made from an algorithm (the function-count
+      rule, and its sizes and flags read from its parameters, with OpenSSL's errors). Exports:
+      `EVP_MD_fetch`, `_up_ref`, `_free`, `_get0_name`, `_get0_description`, `_is_a`,
+      `_names_do_all`, `_get0_provider`, `_do_all_provided`, `_get_params`,
+      `_gettable_params`, `_get_type`, `_get_size`, `_get_block_size`, and `_get_flags`.
+    - **Providers:** `OSSL_PROVIDER_add_builtin` (moved back from 9.1, as the tests need it;
+      such a provider sees the core table 3.1d offers) and `query_operation`/
+      `unquery_operation`.
+
+    Tests:
+    - `tests/c/fetch.c`: 17 checks, with test providers of its own. It covers names and
+      aliases, property queries with and without defaults, the same method on repeated
+      fetches, optional matches and ties, algorithms that can't be made and their errors,
+      providers asked once, a provider that mustn't be stored, `do_all_provided`, and
+      unloading and reloading.
+    - The probe's `fnew`/`ffetch`/`fdefault`/`fall`/`fload`/`funload` commands: two providers
+      of the probe's own, corpus `fetch.txt`, and random queries.
+
+    Error data is compared with its numbers masked: OpenSSL numbers a context's names after the
+    legacy algorithms' (`OBJ_NAME` digests and ciphers, `EVP_PKEY` methods), which rustyssl adds
+    with those tables (3.3 onwards).
+
+    Moved:
+    - the legacy-name pre-filling, the NIDs `EVP_MD_get_type` reports, and implicit fetch for
+      the `EVP_sha256()`-style getters to 3.3;
+    - the other `EVP_*_fetch` methods to their own steps;
+    - `OSSL_LIB_CTX_get_data` (it returns internal stores) to 9.4.
 
   The built-in providers (`default`, `base`, `legacy`, `null`) are Rust implementations
   registered through the **same dispatch model** that external providers use in Phase 9.
@@ -1623,7 +1671,9 @@ have run for at least 24 CPU-hours with no findings.
   - legacy provider: MD4, MDC2, Whirlpool
   - the full `EVP_MD_CTX` API, `EVP_Digest`, `EVP_Q_digest`
   - the digest name table behind `EVP_get_digestbyname`, which `OPENSSL_INIT_ADD_ALL_DIGESTS`
-    fills (it aborts until then; see 1.2)
+    fills (it aborts until then; see 1.2), and with it the legacy names each context's name map
+    starts with, the NIDs of fetched digests (`EVP_MD_get_type`), and implicit fetch for the
+    `EVP_sha256()`-style getters (from 3.1e)
   - `PEM_SignInit`/`Update`/`Final` (from 2.6)
 - [ ] **3.4 EVP_CIPHER:**
   - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
@@ -1959,7 +2009,7 @@ DTLS interop with the reference and GnuTLS works under loss and reordering.
 
 - [ ] **9.1 Loading external C providers:**
   - `OSSL_PROVIDER_load` of `.so` modules (`OSSL_provider_init`, MODULESDIR; 3.1d finds
-    them), `OSSL_PROVIDER_add_builtin`, `OSSL_LIB_CTX_new_from_dispatch` and
+    them), `OSSL_LIB_CTX_new_from_dispatch` and
     `OSSL_LIB_CTX_new_child` (from 3.1b), and the `legacy` provider as a module in
     `MODULESDIR`, as OpenSSL ships it
   - **every core upcall**: params, thread start, libctx, error raising and marks, obj sigid
@@ -1975,7 +2025,7 @@ DTLS interop with the reference and GnuTLS works under loss and reordering.
   details by testing against consumers.
 - [ ] **9.4 Long-tail sweep:** every remaining `DEPRECATEDIN_*` family, the exported data
   symbols, and the platform helpers (`OPENSSL_ia32cap_loc`, …), until libcrypto coverage
-  reaches 100%.
+  reaches 100%; `OSSL_LIB_CTX_get_data` (from 3.1e).
 - [ ] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
   additions under the `OPENSSL_3.6.0` node, and re-run the full test plan against the 3.6
   reference.
