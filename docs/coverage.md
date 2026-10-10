@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 904 | 4972 | 15.4% |
+| libcrypto | 5876 | 932 | 4944 | 15.9% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **905** | **5574** | **14.0%** |
+| **Total** | **6479** | **933** | **5546** | **14.4%** |
 
 ## By header
 
@@ -53,7 +53,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/engine.h` | libcrypto | 121 | 0 | 0.0% |
 | `openssl/err.h` | libcrypto | 51 | 51 | 100.0% |
 | `openssl/ess.h` | libcrypto | 30 | 0 | 0.0% |
-| `openssl/evp.h` | libcrypto | 828 | 66 | 8.0% |
+| `openssl/evp.h` | libcrypto | 828 | 94 | 11.4% |
 | `openssl/hmac.h` | libcrypto | 12 | 0 | 0.0% |
 | `openssl/hpke.h` | libcrypto | 20 | 0 | 0.0% |
 | `openssl/http.h` | libcrypto | 24 | 0 | 0.0% |
@@ -551,13 +551,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `evp_digest`, `ex_data`, `lib_ctx`, `objects`, `pem`, `stack`, `trace` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `evp_digest`, `evp_md_names`, `ex_data`, `lib_ctx`, `objects`, `pem`, `stack`, `trace` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `evp_digest`, `ex_data`, `objects`, `stack` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `crypto_str`, `err_queue`, `err_strings`, `evp_digest`, `evp_md_names`, `ex_data`, `objects`, `stack` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `crypto_secure_heap`, `err_queue`, `fetch`, `params`, `pem`, `properties`, `provider`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -626,15 +626,15 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_DecodeFinal` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeUpdate` | libcrypto | `openssl/evp.h` | `evp_encode` |
-| `EVP_Digest` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_Digest` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_DigestFinal` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_DigestFinalXOF` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_DigestFinal_ex` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_DigestFinal_ex` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_DigestInit` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_DigestInit_ex` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_DigestInit_ex` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_DigestInit_ex2` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_DigestSqueeze` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_DigestUpdate` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_DigestUpdate` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_ENCODE_CTX_copy` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_ENCODE_CTX_free` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_ENCODE_CTX_new` | libcrypto | `openssl/evp.h` | `evp_encode` |
@@ -648,45 +648,73 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_MD_CTX_copy_ex` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_ctrl` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_dup` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_free` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_get0_md` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_CTX_free` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
+| `EVP_MD_CTX_get0_md` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_MD_CTX_get0_md_data` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_get1_md` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_CTX_get1_md` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_MD_CTX_get_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_get_size_ex` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_CTX_get_size_ex` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_MD_CTX_gettable_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_md` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_new` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_CTX_new` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_MD_CTX_reset` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_set_flags` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_MD_CTX_set_update_fn` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_test_flags` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_CTX_update_fn` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_do_all` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_MD_do_all_provided` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_fetch` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_free` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_get0_description` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_get0_name` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_get0_provider` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_get_block_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_get_flags` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_get_params` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_get_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `fetch` |
-| `EVP_MD_get_type` | libcrypto | `openssl/evp.h` | `fetch` |
+| `EVP_MD_do_all_sorted` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_MD_fetch` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_free` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_get0_description` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_get0_name` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_get0_provider` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_get_block_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_get_flags` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_get_params` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_get_pkey_type` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_MD_get_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names`, `fetch` |
+| `EVP_MD_get_type` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
 | `EVP_MD_gettable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_gettable_params` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_is_a` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_names_do_all` | libcrypto | `openssl/evp.h` | `fetch` |
+| `EVP_MD_gettable_params` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_is_a` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_names_do_all` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
 | `EVP_MD_settable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
-| `EVP_MD_up_ref` | libcrypto | `openssl/evp.h` | `fetch` |
-| `EVP_MD_xof` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_MD_up_ref` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
+| `EVP_MD_xof` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_names` |
 | `EVP_Q_digest` | libcrypto | `openssl/evp.h` | `evp_digest` |
+| `EVP_add_digest` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_blake2b512` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_blake2s256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_default_properties_enable_fips` | libcrypto | `openssl/evp.h` | `properties` |
 | `EVP_default_properties_is_fips_enabled` | libcrypto | `openssl/evp.h` | `properties` |
 | `EVP_get1_default_properties` | libcrypto | `openssl/evp.h` | `properties` |
+| `EVP_get_digestbyname` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_md4` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_md5` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_md5_sha1` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_md_null` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_mdc2` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_ripemd160` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_set_default_properties` | libcrypto | `openssl/evp.h` | `fetch`, `properties` |
+| `EVP_sha1` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha224` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha384` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha3_224` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha3_256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha3_384` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha3_512` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha512` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha512_224` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sha512_256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_shake128` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_shake256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_sm3` | libcrypto | `openssl/evp.h` | `evp_md_names` |
+| `EVP_whirlpool` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `INT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
 | `INT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `LONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
@@ -713,9 +741,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OBJ_ln2nid` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_new_nid` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_nid2ln` | libcrypto | `openssl/objects.h` | `objects` |
-| `OBJ_nid2obj` | libcrypto | `openssl/objects.h` | `asn1_header`, `asn1_print`, `asn1_template`, `asn1_type`, `objects` |
-| `OBJ_nid2sn` | libcrypto | `openssl/objects.h` | `asn1_header`, `objects` |
-| `OBJ_obj2nid` | libcrypto | `openssl/objects.h` | `asn1_header`, `objects` |
+| `OBJ_nid2obj` | libcrypto | `openssl/objects.h` | `asn1_header`, `asn1_print`, `asn1_template`, `asn1_type`, `evp_md_names`, `objects` |
+| `OBJ_nid2sn` | libcrypto | `openssl/objects.h` | `asn1_header`, `evp_md_names`, `objects` |
+| `OBJ_obj2nid` | libcrypto | `openssl/objects.h` | `asn1_header`, `evp_md_names`, `objects` |
 | `OBJ_obj2txt` | libcrypto | `openssl/objects.h` | `asn1_header`, `objects` |
 | `OBJ_sigid_free` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_sn2nid` | libcrypto | `openssl/objects.h` | `objects` |
@@ -766,7 +794,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OPENSSL_hexstr2buf_ex` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `OPENSSL_info` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_init` | libcrypto | `openssl/crypto.h` | `crypto_version` |
-| `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict`, `err_queue`, `err_strings` |
+| `OPENSSL_init_crypto` | libcrypto | `openssl/crypto.h` | `crypto_init`, `crypto_init_config`, `crypto_init_config_strict`, `err_queue`, `err_strings`, `evp_md_names` |
 | `OPENSSL_isservice` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_issetugid` | libcrypto | `openssl/crypto.h` | `crypto_version` |
 | `OPENSSL_sk_deep_copy` | libcrypto | `openssl/stack.h` | `stack` |
@@ -838,14 +866,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_BLD_to_param` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_construct_BN` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_double` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `evp_digest`, `fetch`, `params`, `provider` |
+| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `evp_digest`, `evp_md_names`, `fetch`, `params`, `provider` |
 | `OSSL_PARAM_construct_int` | libcrypto | `openssl/params.h` | `params`, `provider` |
 | `OSSL_PARAM_construct_int32` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_int64` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_long` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_octet_ptr` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_octet_string` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_size_t` | libcrypto | `openssl/params.h` | `evp_digest`, `fetch`, `params` |
+| `OSSL_PARAM_construct_size_t` | libcrypto | `openssl/params.h` | `evp_digest`, `evp_md_names`, `fetch`, `params` |
 | `OSSL_PARAM_construct_time_t` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_uint` | libcrypto | `openssl/params.h` | `evp_digest`, `params` |
 | `OSSL_PARAM_construct_uint32` | libcrypto | `openssl/params.h` | `params` |

@@ -1908,7 +1908,7 @@ have run for at least 24 CPU-hours with no findings.
 
     Dependencies: `getrandom` (its build script read and allowed) and `r-efi` (UEFI only),
     exempted in `supply-chain/` pending audit.
-- [ ] **3.3 EVP_MD**, in two sub-steps, each its own PR:
+- [x] **3.3 EVP_MD**, in two sub-steps, each its own PR:
   - [x] **3.3a Digesting:** the default provider's digests and the `EVP_MD_CTX` API.
 
     *Done:* 34 exports. They cover the context's life cycle (new, free, reset, copy, copy_ex,
@@ -1959,12 +1959,38 @@ have run for at least 24 CPU-hours with no findings.
     - `EVP_MD_CTX_get_pkey_ctx`/`set_pkey_ctx`, `EVP_DigestSign*`/`Verify*`, and
       `PEM_SignInit`/`Update`/`Final` (from 2.6) to Phase 4, which has keys;
     - the `EVP_MD_meth_*` digests to 3.11.
-  - [ ] **3.3b Legacy names:** the digest name table behind `EVP_get_digestbyname` (and
-    `EVP_get_digestbynid`/`_byobj`), which `OPENSSL_INIT_ADD_ALL_DIGESTS` fills (it aborts
-    until then; see 1.2); `EVP_add_digest`, `EVP_MD_do_all`/`_sorted`; the legacy names each
-    context's name map starts with; the NIDs of fetched digests (`EVP_MD_get_type`,
-    `EVP_MD_get_pkey_type`); and the `EVP_sha256()`-style getters with implicit fetch (from
-    3.1e).
+  - [x] **3.3b Legacy names:** the static digests, the digest name table, and NIDs.
+
+    *Done:* 28 exports.
+    - **Static digests:** the 23 `EVP_sha256()`-style getters return static methods with
+      OpenSSL's NIDs, signature NIDs, sizes, and flags (`EVP_shake128()` has a size, 16,
+      where the fetched SHAKE128 has none). They have no provider, `EVP_MD_up_ref` and
+      `EVP_MD_free` do nothing to them, and `EVP_DigestInit_ex` fetches the provider's digest
+      by their short name. MD4, MDC2, and Whirlpool exist as in OpenSSL's default build;
+      initializing with them fails until the legacy provider (9.1).
+    - **The name table:** `OPENSSL_INIT_ADD_ALL_DIGESTS` (no longer an abort) adds them to the
+      `OBJ_NAME` table with OpenSSL's aliases. `EVP_add_digest`, `EVP_get_digestbyname`
+      (through the table, then the default context's name map, fetching once to learn a new
+      name), and `EVP_MD_do_all`/`_sorted` work over it.
+    - **The name map** of every context starts with the legacy digests' short and long names
+      and OIDs, so fetched digests list their names in OpenSSL's order. A fetched digest's
+      NID is that of the legacy digest any of its names has (`set_legacy_nid`).
+      `EVP_MD_is_a` on a static digest compares name numbers in the default context, as
+      OpenSSL does, including two unknown names counting as equal.
+    - **Deviation:** `EVP_add_digest` and `EVP_MD_get_pkey_type` refuse NULL.
+
+    Tests:
+    - `tests/c/evp_md_names.c`, 106 checks: every static digest, digesting through them,
+      lookups by short, long, provider, OID, alias, and unknown names, fetched digests' NIDs
+      and name order, `is_a`, `do_all` (as a sorted set) and `do_all_sorted`, and static
+      digests in contexts.
+    - The probe's `dname`/`dnid` commands: corpus `digest.txt` and random, mixed-case names.
+
+    For 3.4: OpenSSL pre-fills each name map with the legacy cipher names before the
+    digests', in one `OBJ_NAME` table. Until rustyssl adds them, `EVP_MD_do_all`'s order
+    differs, and looking up a cipher's name with `EVP_get_digestbyname` fetches (leaving an
+    error buffer) where OpenSSL's doesn't. The random probe draws NIDs that aren't ciphers'
+    until then. Key types' names (Phase 4) are the same case.
 - [ ] **3.4 EVP_CIPHER:**
   - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
     and the CBC-HMAC composites
