@@ -19,6 +19,7 @@ chacha20 = { version = "0.10", default-features = false, features = ["cipher", "
 cipher = { version = "0.5", default-features = false }
 des = { version = "0.9", default-features = false, features = ["zeroize"] }
 digest = { version = "0.11", default-features = false, features = ["zeroize"] }
+getrandom = { version = "0.4", default-features = false }
 ghash = { version = "0.6", default-features = false, features = ["zeroize"] }
 hybrid-array = { version = "0.4", default-features = false }
 idea = { version = "0.6", default-features = false, features = ["zeroize"] }

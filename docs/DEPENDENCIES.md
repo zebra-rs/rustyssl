@@ -12,7 +12,7 @@ crates. CI enforces it with two gates:
   added there.
 - **`cargo vet --locked`** (`supply-chain/`) imports the audits published by Bytecode
   Alliance, Google, ISRG, and Mozilla. With them, `quote` and `subtle` are fully audited; the
-  other 41 crates in the graph are recorded as exemptions (a reviewed snapshot, not an audit)
+  other 43 crates in the graph are recorded as exemptions (a reviewed snapshot, not an audit)
   and must be audited before the 1.0 release. A crate that isn't audited or exempted fails CI.
 
 CI pins the tools (cargo-deny 0.20.2, cargo-vet 0.10.2); use the same versions locally.
@@ -48,6 +48,8 @@ Another cargo-vet version reformats `supply-chain/`, which fails the check.
 | `cipher` | 0.5 | `rustyssl-crypto` | Yes | The traits the block ciphers and ChaCha20 implement | RustCrypto, MIT OR Apache-2.0, `#![forbid(unsafe_code)]`. Brings `inout` (in-place and out-of-place buffers; three `unsafe` sites). |
 | `universal-hash` | 0.6 | `rustyssl-crypto` | Yes | The trait GHASH, POLYVAL, and Poly1305 implement | RustCrypto, MIT OR Apache-2.0, `#![forbid(unsafe_code)]`. |
 | `zeroize` | 1 (`default-features = false`; `alloc`) | `rustyssl-crypto`, the cipher and hash crates | Yes | Wipes secrets when they're dropped (security rule 4): key schedules, our own key copies (ChaCha20's key, RC4's state, the MACs' keys and subkeys), and digest states, which hold keys inside HMAC and KMAC (each hash crate's `zeroize` feature) | RustCrypto, Apache-2.0 OR MIT. **Inline assembly:** an empty `asm!` that takes the wiped buffer's address, as an optimization barrier so the wipe isn't removed. |
+| `getrandom` | 0.4 (`default-features = false`) | `rustyssl-crypto` | Yes | The operating system's entropy for the seed source (step 3.2e): `getrandom(2)` on Linux (found with `dlsym`, statically on musl), which waits until the kernel's pool is initialized, falling back to `/dev/urandom` after polling `/dev/random` on kernels without it; `getentropy` on macOS | rust-random project, MIT OR Apache-2.0. `unsafe` for the system calls; no C, no `asm!`. **Build script:** sets `getrandom_msan` under MemorySanitizer and nothing else (read, and allowed in `deny.toml`). Brings `r-efi` (UEFI targets only; never built for ours). |
+| `r-efi` | 6 | `getrandom` (UEFI targets) | No | UEFI's RNG protocol, for `getrandom` on UEFI | MIT OR Apache-2.0 OR LGPL-2.1-or-later; we use it under MIT. In the lockfile, so vetted, but not compiled for our targets. |
 | `libc` | 0.2 (`default-features = false`) | `rustyssl-abi`, `rustyssl-capi` | Yes | Per-target definitions of the libc types in the OpenSSL API (`pthread_once_t` behind `CRYPTO_ONCE`, `pthread_t`, `pthread_key_t`, ...) | Maintained by the Rust project, MIT OR Apache-2.0. Type declarations only; its build script compiles no C. Already in the lock file through `cpufeatures`. |
 | `syn` | 3 (`default-features = false`; `full`, `parsing`, `printing`) | `xtask` | No | Parses bindgen's function prototypes to generate the stubs in `cargo xtask codegen` | MIT OR Apache-2.0. Pulls in `proc-macro2` and `unicode-ident`. |
 | `quote` | 1 (`default-features = false`) | `xtask` | No | Prints the parsed parameter and return types back as Rust source | MIT OR Apache-2.0. |

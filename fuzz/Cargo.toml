@@ -180,3 +180,10 @@ path = "fuzz_targets/kdf.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "drbg"
+path = "fuzz_targets/drbg.rs"
+test = false
+doc = false
+bench = false

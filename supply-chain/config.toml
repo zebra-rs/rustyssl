@@ -88,6 +88,10 @@ criteria = "safe-to-deploy"
 version = "0.11.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.getrandom]]
+version = "0.4.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.ghash]]
 version = "0.6.0"
 criteria = "safe-to-deploy"
@@ -130,6 +134,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.proc-macro2]]
 version = "1.0.107"
+criteria = "safe-to-deploy"
+
+[[exemptions.r-efi]]
+version = "6.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rc2]]
