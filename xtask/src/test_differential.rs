@@ -1051,6 +1051,22 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
         "AES-128-OCB",
         "AES-256-OCB",
         "ChaCha20-Poly1305",
+        "AES-128-CBC-CTS",
+        "CAMELLIA-256-CBC-CTS",
+        "AES-128-XTS",
+        "AES-256-XTS",
+        "SM4-XTS",
+        "AES-128-WRAP",
+        "AES-192-WRAP-PAD",
+        "AES-256-WRAP-INV",
+        "AES-128-WRAP-PAD-INV",
+        "DES3-WRAP",
+        "AES-128-SIV",
+        "AES-256-SIV",
+        "AES-128-GCM-SIV",
+        "AES-256-GCM-SIV",
+        "AES-128-CBC-HMAC-SHA1",
+        "AES-256-CBC-HMAC-SHA256",
         "nonesuch",
     ];
     let length = |random: &mut Random| -> u64 {
@@ -1067,7 +1083,7 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
     };
     let bit = |random: &mut Random| random.below(2);
     for _ in 0..random.below(25) + 1 {
-        match random.below(24) {
+        match random.below(27) {
             0..=2 => {
                 let enc = random.pick(&["1", "0"]);
                 writeln!(out, "cinit {} {enc} 1 1", random.pick(CIPHERS))?;
@@ -1104,6 +1120,22 @@ fn cipher_session(random: &mut Random, out: &mut String) -> Result {
                 writeln!(out, "{c} {n}")?;
             }
             10 | 11 => writeln!(out, "cfinal")?,
+            24 => {
+                let (name, value) = match random.below(3) {
+                    0 => (
+                        "cts_mode",
+                        random.pick(&["CS1", "CS2", "CS3", "cs2", "CS4"]),
+                    ),
+                    1 => ("xts_standard", random.pick(&["GB", "IEEE", "ieee", "ISO"])),
+                    _ => ("speed", random.pick(&["0", "1", "2"])),
+                };
+                writeln!(out, "cparam {name} {value}")?;
+            }
+            25 | 26 => {
+                let version = random.pick(&["301", "302", "303", "304", "fefd"]);
+                let len = random.pick(&["0", "15", "16", "17", "32", "33", "50", "100"]);
+                writeln!(out, "ctlsaad {version} {len}")?;
+            }
             12 => writeln!(out, "ccipher {}", length(random))?,
             13 => writeln!(out, "cpad {}", bit(random))?,
             14 => {

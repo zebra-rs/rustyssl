@@ -1,0 +1,163 @@
+# The other modes: CTS in its three variants, XTS (SM4's in both standards), the key wraps,
+# SIV and GCM-SIV with AAD, tags, and speed, and the composites' TLS AAD (where present)
+cinit AES-128-CBC-CTS 1 1 1
+cupdate 40
+cupdate 40
+cfinal
+cstate
+cinit - 1 0 1
+cparam cts_mode CS2
+cupdate 48
+cinit - 1 0 1
+cparam cts_mode cs3
+cupdate 33
+cparam cts_mode CS4
+ccipher 32
+cinit CAMELLIA-256-CBC-CTS 0 1 1
+cupdate 17
+cupdate 15
+cinit - 0 0 1
+cupdate 16
+cinit AES-128-XTS 1 1 1
+cupdate 16
+cupdate 31
+cupdate 15
+ccipher 100
+cfinal
+cstate
+cinit AES-128-XTS 0 1 1
+cupdate 31
+cinit AES-128-XTS 1 1 0
+cupdate 32
+cinit SM4-XTS 1 1 1
+cupdate 40
+cparam xts_standard IEEE
+cupdate 40
+cparam xts_standard ISO
+cparam xts_standard gb
+cupdate 40
+cinit AES-256-XTS 1 1 1
+ckeylen 64
+ckeylen 32
+cupdate 77
+cinit AES-128-WRAP 1 1 1
+cupdate 16
+cupdate 24
+cupdate 12
+cupdate 0
+cfinal
+cinit AES-128-WRAP 0 1 1
+cupdate 24
+cupdate 8
+cupdate 40
+cinit AES-192-WRAP-PAD 1 1 0
+cupdate 1
+cupdate 9
+cinit AES-192-WRAP-PAD 0 1 0
+cupdate 16
+cinit AES-256-WRAP-INV 1 1 1
+cupdate 32
+cinit AES-128-WRAP-PAD-INV 1 1 1
+cupdate 20
+cstate
+cinit DES3-WRAP 1 1 0
+cupdate 24
+cupdate 12
+cfinal
+cinit DES3-WRAP 0 1 0
+cupdate 40
+cupdate 16
+ccopy
+cinit AES-128-SIV 1 1 0
+caad 10
+caad 0
+caad 7
+cupdate 30
+cupdate 30
+cfinal
+ctagget 16
+ctagget 12
+cparam speed 1
+cupdate 30
+cfinal
+ctagget 16
+cinit AES-128-SIV 0 1 0
+ctagset 16
+cupdate 30
+cfinal
+ctaglen 12
+cinit AES-256-SIV 1 1 0
+cfinal
+cupdate 0
+cfinal
+ctagget 16
+cinit AES-128-GCM-SIV 1 1 1
+cfinal
+ctagget 16
+caad 20
+caad 0
+cupdate 40
+cupdate 40
+cfinal
+cparam speed 1
+cupdate 40
+ctagget 16
+cinit AES-128-GCM-SIV 0 1 1
+ctagset 16
+cupdate 40
+cfinal
+ccopy
+cctx 1
+cfinal
+cctx 0
+cinit AES-256-GCM-SIV 0 1 1
+cupdate 5
+cfinal
+cinit AES-128-CBC-HMAC-SHA1 1 1 1
+cupdate 32
+cupdate 20
+cctrl 23 20
+ctlsaad 303 50
+ccipher 80
+ctlsaad 301 50
+ccipher 80
+ctlsaad 303 10
+cinit AES-128-CBC-HMAC-SHA1 0 1 1
+cctrl 23 20
+ctlsaad 303 80
+ccipher 80
+ccipher 32
+cinit AES-256-CBC-HMAC-SHA256 1 1 1
+cctrl 23 32
+ctlsaad 302 40
+ccipher 96
+cinit AES-256-CBC-HMAC-SHA256 0 1 1
+ctlsaad 302 96
+ccipher 96
+cctrl 28 0
+ctlsaad 303 50
+# Turned around without a new key: XTS and the key wraps keep the key's direction
+cinit AES-128-XTS 1 1 1
+cinit - 0 0 1
+cupdate 40
+cupdate 33
+cinit SM4-XTS 1 1 1
+cinit - 0 0 1
+cupdate 40
+cparam xts_standard IEEE
+cupdate 33
+cinit AES-256-XTS 0 1 1
+cinit - 1 0 1
+cupdate 47
+cinit AES-128-WRAP 1 1 0
+cinit - 0 0 0
+cupdate 24
+cinit AES-128-WRAP-INV 0 1 0
+cinit - 1 0 0
+cupdate 24
+cinit AES-192-WRAP-PAD 1 1 0
+cinit - 0 0 0
+cupdate 24
+cinit DES3-WRAP 1 1 0
+cinit - 0 0 0
+cupdate 40
