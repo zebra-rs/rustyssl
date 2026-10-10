@@ -653,7 +653,7 @@ static void null_cipher(void)
     size_t macsize = 4;
     void *mac = NULL;
     OSSL_PARAM params[2];
-    int n = 0;
+    int n = 0, r;
 
     printf("# NULL\n");
     EVP_DecryptInit_ex2(ctx, c, NULL, NULL, NULL);
@@ -662,8 +662,12 @@ static void null_cipher(void)
     printf("  mac size %d\n", EVP_CIPHER_CTX_set_params(ctx, params));
     printf("  update %d %d\n", EVP_DecryptUpdate(ctx, out, &n, data, 10), n);
     params[0] = OSSL_PARAM_construct_octet_ptr(OSSL_CIPHER_PARAM_TLS_MAC, &mac, 0);
-    printf("  get mac %d at %d size %zu\n", EVP_CIPHER_CTX_get_params(ctx, params),
-           (int)((unsigned char *)mac - data), params[0].return_size);
+    r = EVP_CIPHER_CTX_get_params(ctx, params);
+    /* Where the pointer isn't set, its value isn't printed (it differs from run to run). */
+    printf("  get mac %d", r);
+    if (OSSL_PARAM_modified(params) && mac != NULL)
+        printf(" at %d size %zu", (int)((unsigned char *)mac - data), params[0].return_size);
+    printf("\n");
     printf("  too short %d\n", EVP_DecryptUpdate(ctx, out, &n, data, 3));
     printf("  in place %d %d\n", EVP_DecryptUpdate(ctx, data, &n, data, 10), n);
     errors();
