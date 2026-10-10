@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(24) {
+        match random.below(25) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -172,6 +172,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             20 => prov_session(&mut random, &mut out)?,
             21 => fetch_session(&mut random, &mut out)?,
             22 => digest_session(&mut random, &mut out)?,
+            23 => cipher_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -963,16 +964,16 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
                     .collect();
                 writeln!(out, "dname {name}")?;
             }
-            // Digest, signature, and non-algorithm NIDs: a cipher's or key type's name is in
-            // the reference's name map (its pre-filling adds them), so looking one up doesn't
-            // fetch there; until 3.4 and Phase 4 it does here.
+            // Digest, signature, cipher, and non-algorithm NIDs. (A key type's name is in the
+            // reference's name map, which pre-fills it, so looking one up doesn't fetch there;
+            // until Phase 4 it does here.)
             15 => writeln!(
                 out,
                 "dnid {}",
                 random.pick(&[
                     "4", "64", "672", "673", "674", "675", "1094", "1095", "1096", "1097", "1100",
                     "1101", "117", "95", "257", "804", "1143", "1056", "1057", "114", "668", "65",
-                    "13", "0", "99999", "-1",
+                    "13", "0", "99999", "-1", "419", "421", "650", "904", "44", "1019", "895",
                 ])
             )?,
             _ => writeln!(
@@ -983,6 +984,179 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
         }
     }
     writeln!(out, "dctx 0")?;
+    Ok(())
+}
+
+/// A random session of cipher commands on the probe's two contexts: inits by name (or with
+/// none, keeping the cipher, with and without a key and IV, in either direction), updates of
+/// lengths around the block sizes, finals, `EVP_Cipher`, padding, key lengths, `num`, flags
+/// (CFB1 counting bits), ctrls, init parameters, copies, resets, and name lookups.
+fn cipher_session(random: &mut Random, out: &mut String) -> Result {
+    const CIPHERS: &[&str] = &[
+        "AES-128-ECB",
+        "AES-192-ECB",
+        "AES-256-ECB",
+        "AES-128-CBC",
+        "AES-192-CBC",
+        "AES-256-CBC",
+        "AES-128-OFB",
+        "AES-256-OFB",
+        "AES-128-CFB",
+        "AES-192-CFB",
+        "AES-128-CFB1",
+        "AES-256-CFB1",
+        "AES-128-CFB8",
+        "AES-192-CFB8",
+        "AES-128-CTR",
+        "AES-256-CTR",
+        "ARIA-128-ECB",
+        "ARIA-192-CBC",
+        "ARIA-256-OFB",
+        "ARIA-128-CFB",
+        "ARIA-192-CFB1",
+        "ARIA-256-CFB8",
+        "ARIA-128-CTR",
+        "CAMELLIA-256-ECB",
+        "CAMELLIA-128-CBC",
+        "CAMELLIA-192-OFB",
+        "CAMELLIA-256-CFB",
+        "CAMELLIA-128-CFB1",
+        "CAMELLIA-192-CFB8",
+        "CAMELLIA-256-CTR",
+        "DES-EDE3-ECB",
+        "DES-EDE3-CBC",
+        "DES-EDE3-OFB",
+        "DES-EDE3-CFB",
+        "DES-EDE3-CFB8",
+        "DES-EDE3-CFB1",
+        "DES-EDE-ECB",
+        "DES-EDE-CBC",
+        "DES-EDE-OFB",
+        "DES-EDE-CFB",
+        "SM4-ECB",
+        "SM4-CBC",
+        "SM4-CTR",
+        "SM4-OFB",
+        "SM4-CFB",
+        "ChaCha20",
+        "NULL",
+        "nonesuch",
+    ];
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&[
+                    "7", "8", "9", "15", "16", "17", "31", "32", "33", "63", "64", "65",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(300),
+        }
+    };
+    let bit = |random: &mut Random| random.below(2);
+    for _ in 0..random.below(25) + 1 {
+        match random.below(20) {
+            0..=2 => {
+                let enc = random.pick(&["1", "0"]);
+                writeln!(out, "cinit {} {enc} 1 1", random.pick(CIPHERS))?;
+            }
+            3 => {
+                let enc = random.pick(&["1", "0", "-1"]);
+                writeln!(
+                    out,
+                    "cinit {} {enc} {} {}",
+                    random.pick(CIPHERS),
+                    bit(random),
+                    bit(random)
+                )?;
+            }
+            4 => {
+                let enc = random.pick(&["1", "0", "-1"]);
+                writeln!(out, "cinit - {enc} {} {}", bit(random), bit(random))?;
+            }
+            5 => {
+                let key = random.pick(&["keylen", "ivlen", "padding", "num", "use-bits"]);
+                let n = random.pick(&["0", "1", "3", "8", "12", "16", "24", "32", "4294967295"]);
+                writeln!(out, "cinitp {} {key} {n}", random.pick(CIPHERS))?;
+            }
+            6..=9 => writeln!(out, "cupdate {}", length(random))?,
+            10 | 11 => writeln!(out, "cfinal")?,
+            12 => writeln!(out, "ccipher {}", length(random))?,
+            13 => writeln!(out, "cpad {}", bit(random))?,
+            14 => {
+                let n = random.pick(&["0", "1", "8", "15", "16", "24", "32", "-1"]);
+                writeln!(out, "{} {n}", random.pick(&["ckeylen", "cnum"]))?;
+            }
+            15 => {
+                let f = random.pick(&["2000", "100", "1", "2100", "ffff"]);
+                writeln!(out, "cflags {} {f}", random.pick(&["set", "clear"]))?;
+            }
+            16 => {
+                // SET_KEY_LENGTH, INIT, AEAD_SET_IVLEN, GET_TAG, SET_TAG, CCM_SET_L,
+                // AEAD_SET_IV_FIXED, GCM_IV_GEN, GCM_SET_IV_INV, TLS1_AAD, the RC2 and RC5
+                // ones, SET_SPEED, AEAD_SET_MAC_KEY, MULTIBLOCK_MAX_BUFSIZE, an unknown one.
+                let t = random.pick(&[
+                    "9", "1", "9", "16", "17", "20", "18", "19", "24", "22", "2", "3", "4", "5",
+                    "11", "23", "28", "30583",
+                ]);
+                let a = random.pick(&["-1", "0", "1", "4", "12", "13", "16", "24", "32"]);
+                writeln!(out, "cctrl {t} {a}")?;
+            }
+            17 => writeln!(
+                out,
+                "{}",
+                random.pick(&["cstate", "ccopy", "creset", "cctx 1", "cctx 0"])
+            )?,
+            18 => {
+                let name = random.pick(&[
+                    "AES-128-CBC",
+                    "aes128",
+                    "AES256",
+                    "des3",
+                    "DES-EDE3",
+                    "des-ede3-ecb",
+                    "2.16.840.1.101.3.4.1.2",
+                    "AES-128-CFB1",
+                    "aes-128-ctr",
+                    "id-aes128-GCM",
+                    "AES-128-GCM",
+                    "ChaCha20",
+                    "chacha20-poly1305",
+                    "SHA256",
+                    "sm4-ofb128",
+                    "camellia256",
+                    "ARIA128",
+                    "rc2-40",
+                    "blowfish",
+                    "desx",
+                    "NULL",
+                    "UNDEF",
+                    "nonesuch",
+                ]);
+                let name: String = name
+                    .chars()
+                    .map(|c| {
+                        if random.below(4) == 0 {
+                            c.to_ascii_uppercase()
+                        } else {
+                            c
+                        }
+                    })
+                    .collect();
+                writeln!(out, "cname {name}")?;
+            }
+            _ => writeln!(
+                out,
+                "cnid {}",
+                random.pick(&[
+                    "419", "421", "650", "653", "904", "44", "33", "32", "1019", "1018", "895",
+                    "31", "5", "0", "64", "99999", "-1",
+                ])
+            )?,
+        }
+    }
+    writeln!(out, "cctx 0")?;
     Ok(())
 }
 

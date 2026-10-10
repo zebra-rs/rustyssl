@@ -237,6 +237,37 @@ pub fn chacha20(key: &[u8], iv: &[u8]) -> Result<Box<dyn KeyStream>, Error> {
     Ok(Box::new(ChaCha::new(key, nonce, position)?))
 }
 
+/// XORs ChaCha20's key stream into whole 64-octet blocks of `data`, starting at block
+/// `counter` of the stream for `key` and the 64-bit `nonce`. The block counter wraps at 2^64
+/// as OpenSSL's does (its second word carries from the first, and nothing carries from the
+/// second), where the crate's stream refuses to go on. Returns the next block's counter.
+pub fn chacha20_blocks(
+    key: &[u8; 32],
+    nonce: [u8; 8],
+    counter: u64,
+    data: &mut [u8],
+) -> Result<u64, Error> {
+    use cipher::StreamCipherCore;
+
+    let (mut blocks, rest) = Array::slice_as_chunks_mut(data);
+    if !rest.is_empty() {
+        return Err(Error::BlockLength);
+    }
+    let mut core = chacha20::ChaCha20LegacyCore::new(key.into(), (&nonce).into());
+    let mut counter = counter;
+    while !blocks.is_empty() {
+        // Up to the wrap, so no backend has to carry past the counter's end.
+        let to_wrap = u64::MAX.wrapping_sub(counter).saturating_add(1);
+        let n = usize::try_from(to_wrap).map_or(blocks.len(), |w| w.min(blocks.len()));
+        let (now, later) = blocks.split_at_mut(n);
+        core.set_block_pos(counter);
+        core.apply_keystream_blocks(now);
+        counter = counter.wrapping_add(u64::try_from(n).map_err(|_| Error::BlockLength)?);
+        blocks = later;
+    }
+    Ok(counter)
+}
+
 /// RC4: the crate's can't be copied, and RC4 is a few lines, so it's ours. **Not constant
 /// time:** its state lookups depend on the key and the stream, as every RC4's do.
 #[derive(Clone)]

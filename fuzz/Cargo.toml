@@ -187,3 +187,9 @@ path = "fuzz_targets/drbg.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "cipher"
+path = "fuzz_targets/cipher.rs"
+test = false
+doc = false

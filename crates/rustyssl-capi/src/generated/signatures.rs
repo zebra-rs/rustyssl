@@ -1554,6 +1554,212 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *mut core::ffi::c_uchar =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_buf_noconst;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const EVP_CIPHER =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_cipher;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, core::ffi::c_int) =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_clear_flags;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_copy;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CIPHER_CTX_ctrl;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *mut EVP_CIPHER_CTX =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_dup;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) = crate::evp::cipher_ctx::EVP_CIPHER_CTX_free;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const EVP_CIPHER =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get0_cipher;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *mut EVP_CIPHER =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get1_cipher;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *mut core::ffi::c_void =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_app_data;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_block_size;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *mut core::ffi::c_void =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_cipher_data;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_iv_length;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_key_length;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_nid;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_num;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_original_iv;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_tag_length;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CIPHER_CTX_get_updated_iv;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *const OSSL_PARAM =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_is_encrypting;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const core::ffi::c_uchar =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_iv;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *mut core::ffi::c_uchar =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_iv_noconst;
+const _: unsafe extern "C" fn() -> *mut EVP_CIPHER_CTX = crate::evp::cipher_ctx::EVP_CIPHER_CTX_new;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX) -> *const core::ffi::c_uchar =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_original_iv;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_rand_key;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_reset;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *mut core::ffi::c_void) =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_app_data;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_cipher_data;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, core::ffi::c_int) =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_flags;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_key_length;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_num;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_padding;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_set_params;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER_CTX) -> *const OSSL_PARAM =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_settable_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_ctx::EVP_CIPHER_CTX_test_flags;
+const _: unsafe extern "C" fn(*const EVP_CIPHER, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_can_pipeline;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ciph: *const EVP_CIPHER,
+            from: *const core::ffi::c_char,
+            to: *const core::ffi::c_char,
+            x: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::legacy_cipher::EVP_CIPHER_do_all;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(cipher: *mut EVP_CIPHER, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::cipher::EVP_CIPHER_do_all_provided;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ciph: *const EVP_CIPHER,
+            from: *const core::ffi::c_char,
+            to: *const core::ffi::c_char,
+            x: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::legacy_cipher::EVP_CIPHER_do_all_sorted;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_CIPHER = crate::evp::cipher::EVP_CIPHER_fetch;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER) = crate::evp::cipher::EVP_CIPHER_free;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const core::ffi::c_char =
+    crate::evp::cipher::EVP_CIPHER_get0_description;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const core::ffi::c_char =
+    crate::evp::cipher::EVP_CIPHER_get0_name;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PROVIDER =
+    crate::evp::cipher::EVP_CIPHER_get0_provider;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_block_size;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_ulong =
+    crate::evp::cipher::EVP_CIPHER_get_flags;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_iv_length;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_key_length;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_mode;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_nid;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_get_type;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
+    crate::evp::cipher::EVP_CIPHER_gettable_ctx_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
+    crate::evp::cipher::EVP_CIPHER_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::cipher::EVP_CIPHER_names_do_all;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
+    crate::evp::cipher::EVP_CIPHER_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher::EVP_CIPHER_up_ref;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_Cipher;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherFinal_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit_ex2;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherUpdate;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *const core::ffi::c_uchar,
@@ -1572,6 +1778,43 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_DecodeUpdate;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptFinal_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptInit_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptInit_ex2;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_DecryptUpdate;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
@@ -1629,6 +1872,43 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::encode::EVP_EncodeUpdate;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptFinal_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptInit_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptInit_ex2;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptUpdate;
 const _: unsafe extern "C" fn(*mut EVP_MD_CTX, core::ffi::c_int) =
     crate::evp::md_ctx::EVP_MD_CTX_clear_flags;
 const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD_CTX) -> core::ffi::c_int =
@@ -1765,24 +2045,202 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *mut usize,
 ) -> core::ffi::c_int = crate::evp::md_ctx::EVP_Q_digest;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::legacy_cipher::EVP_add_cipher;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
     crate::evp::legacy_md::EVP_add_digest;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_128_cbc_hmac_sha1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_128_cbc_hmac_sha256;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_128_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_ocb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_wrap;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_128_wrap_pad;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_128_xts;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_192_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_ocb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_192_wrap;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_192_wrap_pad;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_256_cbc_hmac_sha1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_256_cbc_hmac_sha256;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_256_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_ocb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_wrap;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aes_256_wrap_pad;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aes_256_xts;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aria_128_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_128_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aria_192_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_192_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_ccm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_aria_256_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_gcm;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_aria_256_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_bf_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_bf_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_bf_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_bf_ofb;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_blake2b512;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_blake2s256;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_128_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_192_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_camellia_256_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_cast5_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_cast5_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_cast5_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_cast5_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_chacha20;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_chacha20_poly1305;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::property::EVP_default_properties_enable_fips;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
     crate::property::EVP_default_properties_is_fips_enabled;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_cfb1;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_des_ede3_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_cfb8;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede3_wrap;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ede_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_des_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_desx_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_enc_null;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut core::ffi::c_char =
     crate::property::EVP_get1_default_properties;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const EVP_CIPHER =
+    crate::evp::legacy_cipher::EVP_get_cipherbyname;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const EVP_MD =
     crate::evp::legacy_md::EVP_get_digestbyname;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_ofb;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md4;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md5;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md5_sha1;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_md_null;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_mdc2;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_40_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_64_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_cfb64;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc2_ofb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4_40;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4_hmac_md5;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_ripemd160;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_ofb;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::property::EVP_set_default_properties;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha1;
@@ -1799,6 +2257,11 @@ const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sh
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_shake128;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_shake256;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sm3;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_cbc;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_cfb128;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_ctr;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_ecb;
+const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_ofb;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_whirlpool;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;

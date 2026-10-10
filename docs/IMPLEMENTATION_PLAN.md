@@ -1986,21 +1986,72 @@ have run for at least 24 CPU-hours with no findings.
       digests in contexts.
     - The probe's `dname`/`dnid` commands: corpus `digest.txt` and random, mixed-case names.
 
-    For 3.4: OpenSSL pre-fills each name map with the legacy cipher names before the
-    digests', in one `OBJ_NAME` table. Until rustyssl adds them, `EVP_MD_do_all`'s order
-    differs, and looking up a cipher's name with `EVP_get_digestbyname` fetches (leaving an
-    error buffer) where OpenSSL's doesn't. The random probe draws NIDs that aren't ciphers'
-    until then. Key types' names (Phase 4) are the same case.
-- [ ] **3.4 EVP_CIPHER:**
-  - AES in ECB, CBC, CFB1/8/128, OFB, CTR, GCM, CCM, XTS, OCB, SIV, GCM-SIV, wrap, wrap-pad,
-    and the CBC-HMAC composites
-  - ARIA, Camellia, ChaCha20, ChaCha20-Poly1305, SM4, 3DES (all modes and wrap), NULL
-  - legacy provider: DES, BF, CAST5, IDEA, RC2, RC4 (including RC4-HMAC-MD5), SEED
-  - the full `EVP_CIPHER_CTX` API, including padding, AEAD ctrls, and the TLS AAD and IV ctrls
-  - the cipher name table behind `EVP_get_cipherbyname`, which `OPENSSL_INIT_ADD_ALL_CIPHERS`
-    fills (it aborts until then; see 1.2)
-  - encrypted PEM (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
-    `PEM_ASN1_write`/`_bio`/`_bio_ctx`
+    OpenSSL pre-fills each name map with the legacy cipher names before the digests', in
+    one `OBJ_NAME` table; 3.4a added them (the probe now draws cipher NIDs too). Key types'
+    names (Phase 4) are still to come.
+- [ ] **3.4 EVP_CIPHER**, in five sub-steps, each its own PR:
+  - [x] **3.4a Ciphers and contexts:** the `EVP_CIPHER` method, the static ciphers and the
+    cipher name table, the `EVP_CIPHER_CTX` API, and the default provider's plain modes.
+
+    *Done:* 224 exports.
+    - **The provider's ciphers** (`rustyssl_crypto::provided::cipher`, dispatch tables in
+      `provider/ciphers.rs`): ECB, CBC, OFB, CFB, CFB1, CFB8, and CTR of AES, ARIA, Camellia,
+      and SM4 (SM4's five), triple DES (`DES-EDE3` in ECB, CBC, OFB, CFB, CFB8, CFB1;
+      `DES-EDE` in ECB, CBC, OFB, CFB), ChaCha20, and NULL, with the reference's names, order,
+      functions, and parameter lists per family (generic, triple DES, ChaCha20, NULL), and its
+      buffering: a decrypting update holds back a last whole block while padding is on, the
+      stream modes' partial-block position is `num` (settable only to 0, their block size being
+      1), CFB1 counts bits after `use-bits`, an init without an IV takes CBC, CFB, and OFB back
+      to the IV as set, ChaCha20's 64-bit counter wraps as OpenSSL's. Padding is checked in
+      constant time. Triple DES's random keys come from the operating system until 3.7, with
+      odd parity.
+    - **`EVP_CIPHER`** (`evp/cipher.rs`): fetching (`evp_cipher_from_algorithm`'s function
+      checks, NID from the legacy names, constants and flags from `get_params`), the accessors,
+      `EVP_CIPHER_get_type` (CFB, RC2, RC4 collapsing; no OID, no type),
+      `EVP_CIPHER_do_all_provided`, `EVP_CIPHER_can_pipeline`.
+    - **Static ciphers and names** (`evp/legacy_cipher.rs`): the 139 `EVP_aes_128_cbc()`-style
+      getters with OpenSSL's NIDs, lengths, and flags (the AES-CBC-HMAC composites only on
+      x86-64 with AES-NI, as OpenSSL's), `EVP_add_cipher`, `OPENSSL_INIT_ADD_ALL_CIPHERS` (no
+      longer an abort) with `c_allc.c`'s order and aliases, `EVP_get_cipherbyname`,
+      `EVP_CIPHER_do_all`/`_sorted`. Each name map now starts with the ciphers' types' names,
+      then the digests'.
+    - **`EVP_CIPHER_CTX`** (`evp/cipher_ctx.rs`), ported from `evp_enc.c` and `evp_lib.c`: the
+      inits (static ciphers fetched by short name, a new cipher resetting the context and
+      freeing its cipher data, `EVP_CIPH_NO_PADDING` carried over, lengths in the parameters
+      set first), update, final, `EVP_Cipher`, `set_key_length`, `set_padding`, every
+      `EVP_CIPHER_CTX_ctrl` command (as its provider parameter), parameters, IVs, `num`,
+      flags (`EVP_CIPH_FLAG_LENGTH_BITS` as `use-bits`), `rand_key`, copy and dup, and the
+      accessors.
+    - **Deviations** (docs/DEVIATIONS.md): NULL contexts, ciphers, and buffers are refused;
+      `EVP_Cipher` on a partial ECB or CBC block (platform-dependent in OpenSSL) processes the
+      whole blocks; ECB and CBC turned around without a key use the key in the new direction.
+    - **Not yet:** TLS record padding (`tls-version`, set by libssl) fails until Phase 7; the
+      SKEY inits with 3.10; the pipeline functions later; the AlgorithmIdentifier functions
+      (`EVP_CIPHER_param_to_asn1` and the `EVP_CIPHER_CTX_*_algor*` ones) with 3.4d;
+      `EVP_CIPHER_impl_ctx_size` with 3.11. Parameter lists of the digests that the reference
+      writes with `OSSL_PARAM_*` macros now carry their sizes and `OSSL_PARAM_UNMODIFIED`.
+
+    Tests:
+    - `tests/c/evp_cipher.c`, 969 checks: every cipher's lengths, flags, and parameter lists,
+      round trips in five piece sizes with and without padding, `EVP_Cipher`, padding errors for
+      every last octet, IVs and their accessors, re-inits, key lengths, init parameters, every
+      ctrl, CFB1 in bits, copies, accessors, the errors of each entry point, the NULL cipher's
+      TLS MAC, ChaCha20's counter wrapping, and static ciphers in contexts.
+    - `tests/c/evp_cipher_names.c`, 404 checks: every static cipher, lookups by short, long,
+      provider, OID, alias, and unknown names, fetched ciphers' NIDs, types, and names,
+      `is_a`, `do_all`, `do_all_sorted`, and the provided ciphers (sorted).
+    - `rustyssl-crypto` `tests/cipher.rs`: 116 vectors from the reference in every piece size
+      up to 40 octets, padding for all 256 last octets, and the edges; the fuzz target
+      `cipher`; the probe's `c*` commands (corpus `cipher.txt`, random sessions).
+  - [ ] **3.4b AEADs:** GCM, CCM, OCB, and ChaCha20-Poly1305, and the AEAD and TLS ctrls.
+  - [ ] **3.4c Other modes:** XTS, SIV, GCM-SIV, the key wraps (and their inverses), CTS, and
+    the AES-CBC-HMAC composites.
+  - [ ] **3.4d AlgorithmIdentifiers:** `EVP_CIPHER_param_to_asn1`, `_asn1_to_param`, the IV
+    helpers, and `EVP_CIPHER_CTX_get_algor`/`_get_algor_params`/`_set_algor_params`.
+  - [ ] **3.4e Encrypted PEM** (from 2.6): `PEM_get_EVP_CIPHER_INFO`, `PEM_do_header`, and
+    `PEM_ASN1_write`/`_bio`/`_bio_ctx`.
+  - The legacy provider's ciphers (DES, BF, CAST5, IDEA, RC2, RC4 including RC4-HMAC-MD5,
+    SEED) come with 9.1; their static ciphers exist already.
 - [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
   the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,

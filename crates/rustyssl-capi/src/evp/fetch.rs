@@ -539,16 +539,18 @@ pub(crate) unsafe fn all(libctx: *mut OSSL_LIB_CTX, kind: &'static Kind) -> Vec<
     out
 }
 
-/// `ossl_namemap_stored`'s pre-filling: an empty name map starts with the legacy digests'
-/// names (each NID's short and long names and its OID), as OpenSSL's does after
-/// `OPENSSL_INIT_ADD_ALL_DIGESTS`. (OpenSSL adds the legacy ciphers' names first and the key
-/// types' after; they come with 3.4 and Phase 4.)
+/// `ossl_namemap_stored`'s pre-filling: an empty name map starts with the legacy ciphers' and
+/// then digests' names (each type's short and long names and its OID), as OpenSSL's does after
+/// `OPENSSL_INIT_ADD_ALL_CIPHERS` and `_DIGESTS`. (OpenSSL adds the key types' after; they
+/// come with Phase 4.)
 pub(crate) fn prefill(ctx: &libctx::LibCtx) {
     if !ctx.evp.lock().names.is_empty() {
         return;
     }
-    // Gathered without the lock: adding the digests runs the library's initialization.
-    let nids = super::legacy_md::md_nids();
+    // Gathered without the lock: adding the ciphers and digests runs the library's
+    // initialization. The ciphers' names come first, as in OpenSSL.
+    let mut nids = super::legacy_cipher::cipher_types();
+    nids.extend(super::legacy_md::md_nids());
     let mut state = ctx.evp.lock();
     if !state.names.is_empty() {
         return;

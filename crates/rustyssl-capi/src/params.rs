@@ -53,9 +53,14 @@ fn raise(error: Error, function: &str) {
     err::raise(ERR_LIB_CRYPTO, reason, function);
 }
 
+/// `OSSL_PARAM_UNMODIFIED`, as a `size_t` (it is `SIZE_MAX`, which the cast keeps on 32-bit
+/// targets too).
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) const UNMODIFIED: usize = OSSL_PARAM_UNMODIFIED as usize;
+
 /// `OSSL_PARAM_UNMODIFIED`, as a `size_t`.
 pub(crate) fn unmodified() -> usize {
-    usize::try_from(OSSL_PARAM_UNMODIFIED).unwrap_or(usize::MAX)
+    UNMODIFIED
 }
 
 /// `ossl_param_construct`.
