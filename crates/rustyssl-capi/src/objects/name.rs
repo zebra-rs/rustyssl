@@ -6,9 +6,15 @@
 //! of OpenSSL's hash tables (`OPENSSL_LH_*`, by default hashing and comparing names without
 //! regard to ASCII case), so `OBJ_NAME_do_all` visits names in OpenSSL's order. No lock is held
 //! while an application's hash, comparison, free, or visiting function runs.
+//!
+//! Since the table compares entries without its lock, an entry taken out of it (removed,
+//! replaced, or cleaned up) can still be in another thread's hands; OpenSSL avoids that with a
+//! lock held throughout. So every use of the table counts itself in `USERS`, and an entry taken
+//! out is freed only once no use is in progress.
 
 use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 use core::ptr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use rustyssl_abi::{ERR_LIB_OBJ, OBJ_NAME, OBJ_NAME_ALIAS, OBJ_NAME_TYPE_NUM, OPENSSL_LHASH};
@@ -43,6 +49,8 @@ struct State {
     funcs: Option<Vec<Funcs>>,
     /// The type `OBJ_NAME_new_index` hands out next.
     next_type: c_int,
+    /// Entries taken out of the table, to free once no use of it is in progress.
+    taken_out: Vec<*mut OBJ_NAME>,
 }
 
 // SAFETY: the table is safe to use from any thread; the rest is only used under the mutex.
@@ -53,7 +61,46 @@ static STATE: Mutex<State> = Mutex::new(State {
     retired: Vec::new(),
     funcs: None,
     next_type: OBJ_NAME_TYPE_NUM,
+    taken_out: Vec::new(),
 });
+
+/// Uses of the table in progress (lookups, changes, walks), each of which may hold entries.
+static USERS: AtomicUsize = AtomicUsize::new(0);
+
+/// A use of the table: while one is in progress, entries taken out stay allocated.
+struct Use;
+
+impl Use {
+    fn begin() -> Self {
+        USERS.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for Use {
+    fn drop(&mut self) {
+        if USERS.fetch_sub(1, Ordering::SeqCst) == 1 {
+            reclaim();
+        }
+    }
+}
+
+/// Frees the entries taken out, if no use of the table is in progress. An entry is taken out
+/// before it is queued here, so a use that begins after the count is seen to be zero can't
+/// reach it, and one that began earlier is in the count.
+fn reclaim() {
+    let entries = {
+        let mut state = state();
+        if USERS.load(Ordering::SeqCst) != 0 {
+            return;
+        }
+        core::mem::take(&mut state.taken_out)
+    };
+    for entry in entries {
+        // SAFETY: entries come from this allocator, and nothing can reach them now.
+        unsafe { mem::release(entry.cast()) };
+    }
+}
 
 fn state() -> std::sync::MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(PoisonError::into_inner)
@@ -156,10 +203,11 @@ fn existing_table() -> *mut OPENSSL_LHASH {
     state().table
 }
 
-/// Runs the type's free function on a removed entry, then frees the entry.
+/// Runs the type's free function on a removed entry, then queues the entry to be freed once
+/// no use of the table is in progress (the caller's is).
 ///
 /// # Safety
-/// `entry` is a live entry just taken out of the table.
+/// `entry` is a live entry just taken out of the table, during a `Use`.
 unsafe fn discard(entry: *mut OBJ_NAME) {
     // SAFETY: the caller's guarantee.
     let removed = unsafe { *entry };
@@ -167,8 +215,7 @@ unsafe fn discard(entry: *mut OBJ_NAME) {
         // SAFETY: the application's function, with what it was given.
         unsafe { free(removed.name, removed.type_, removed.data) };
     }
-    // SAFETY: entries come from this allocator.
-    unsafe { mem::release(entry.cast()) };
+    state().taken_out.push(entry);
 }
 
 ffi_export! {
@@ -235,6 +282,7 @@ ffi_export! {
         if table.is_null() {
             return ptr::null();
         }
+        let _use = Use::begin();
         let alias = type_ & OBJ_NAME_ALIAS != 0;
         let mut key = OBJ_NAME { type_: type_ & !OBJ_NAME_ALIAS, alias: 0, name, data: ptr::null() };
         let mut hops = 0;
@@ -277,6 +325,7 @@ ffi_export! {
             return 0;
         }
         let alias = type_ & OBJ_NAME_ALIAS;
+        let _use = Use::begin();
         // SAFETY: just allocated, big enough.
         unsafe { entry.write(OBJ_NAME { type_: type_ & !OBJ_NAME_ALIAS, alias, name, data }) };
         // SAFETY: a table of `OBJ_NAME`s; the entry is one.
@@ -308,6 +357,7 @@ ffi_export! {
             return 0;
         }
         let key = OBJ_NAME { type_: type_ & !OBJ_NAME_ALIAS, alias: 0, name, data: ptr::null() };
+        let _use = Use::begin();
         // SAFETY: a table of `OBJ_NAME`s; the key is one.
         let removed = unsafe { OPENSSL_LH_delete(table, (&raw const key).cast()) };
         if removed.is_null() {
@@ -353,6 +403,7 @@ ffi_callback! {
 unsafe fn walk(visit: unsafe extern "C" fn(*mut c_void, *mut c_void), arg: *mut c_void) {
     let table = existing_table();
     if !table.is_null() {
+        let _use = Use::begin();
         // SAFETY: a table of `OBJ_NAME`s; the caller's guarantee about `arg`.
         unsafe { OPENSSL_LH_doall_arg(table, Some(visit), arg) };
     }
@@ -429,6 +480,8 @@ ffi_export! {
         let Some(visit) = fn_ else {
             return;
         };
+        // The entries collected stay allocated through the visits.
+        let _use = Use::begin();
         let mut collect = Collect { kind: type_, names: Vec::new() };
         // SAFETY: the walk passes the `Collect`.
         unsafe { walk(collect_entry, (&raw mut collect).cast()) };
@@ -529,6 +582,49 @@ mod tests {
         assert_eq!(kind, OBJ_NAME_TYPE_NUM);
         // SAFETY: no preconditions.
         unsafe { OBJ_NAME_cleanup(-1) };
+    }
+
+    /// Entries removed or replaced while other threads look names up, add, and walk stay
+    /// allocated until those are done (Miri checks the accesses).
+    #[test]
+    fn entries_outlive_concurrent_uses() {
+        const NAMES: [&core::ffi::CStr; 4] = [c"race-a", c"race-b", c"race-c", c"race-d"];
+        const TYPE: c_int = rustyssl_abi::OBJ_NAME_TYPE_PKEY_METH;
+        let rounds = if cfg!(miri) { 20 } else { 2000 };
+        let changer = std::thread::spawn(move || {
+            for i in 0..rounds {
+                for name in NAMES {
+                    // SAFETY: static strings.
+                    unsafe { OBJ_NAME_add(name.as_ptr(), TYPE, c"data".as_ptr()) };
+                    if i % 2 == 0 {
+                        // SAFETY: a static string.
+                        unsafe { OBJ_NAME_remove(name.as_ptr(), TYPE) };
+                    }
+                }
+            }
+        });
+        unsafe extern "C" fn visit(name: *const OBJ_NAME, arg: *mut c_void) {
+            // SAFETY: a live entry.
+            let named = !unsafe { (*name).name }.is_null();
+            // SAFETY: the counter.
+            unsafe { *arg.cast::<usize>() += usize::from(named) };
+        }
+        let mut seen = 0usize;
+        for _ in 0..rounds {
+            for name in NAMES {
+                // SAFETY: a static string.
+                let data = unsafe { OBJ_NAME_get(name.as_ptr(), TYPE) };
+                // SAFETY: NULL or the static string added.
+                assert!(data.is_null() || unsafe { core::ffi::CStr::from_ptr(data) } == c"data");
+            }
+            // SAFETY: a visiting function and its counter.
+            unsafe { OBJ_NAME_do_all(TYPE, Some(visit), (&raw mut seen).cast()) };
+        }
+        changer.join().unwrap();
+        for name in NAMES {
+            // SAFETY: a static string.
+            unsafe { OBJ_NAME_remove(name.as_ptr(), TYPE) };
+        }
     }
 
     #[test]
