@@ -16,6 +16,14 @@ url = "https://raw.githubusercontent.com/divviup/libprio-rs/main/supply-chain/au
 [imports.mozilla]
 url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 
+[[exemptions.aes]]
+version = "0.9.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.aria]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.blake2]]
 version = "0.11.0"
 criteria = "safe-to-deploy"
@@ -24,12 +32,40 @@ criteria = "safe-to-deploy"
 version = "0.12.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.blowfish]]
+version = "0.10.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.byteorder]]
+version = "1.5.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.camellia]]
+version = "0.2.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.cast5]]
+version = "0.12.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.cfg-if]]
 version = "1.0.5"
 criteria = "safe-to-deploy"
 
+[[exemptions.chacha20]]
+version = "0.10.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.cipher]]
+version = "0.5.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.cmov]]
 version = "0.5.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.cpubits]]
+version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.cpufeatures]]
@@ -44,12 +80,28 @@ criteria = "safe-to-deploy"
 version = "0.4.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.des]]
+version = "0.9.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.digest]]
 version = "0.11.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.ghash]]
+version = "0.6.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.hybrid-array]]
 version = "0.4.15"
+criteria = "safe-to-deploy"
+
+[[exemptions.idea]]
+version = "0.6.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.inout]]
+version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.keccak]]
@@ -68,8 +120,20 @@ criteria = "safe-to-deploy"
 version = "0.11.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.poly1305]]
+version = "0.9.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.polyval]]
+version = "0.7.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.proc-macro2]]
 version = "1.0.107"
+criteria = "safe-to-deploy"
+
+[[exemptions.rc2]]
+version = "0.9.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ripemd]]
@@ -88,6 +152,10 @@ criteria = "safe-to-deploy"
 version = "0.5.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.sm4]]
+version = "0.6.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.syn]]
 version = "3.0.6"
 criteria = "safe-to-deploy"
@@ -100,6 +168,14 @@ criteria = "safe-to-deploy"
 version = "1.0.26"
 criteria = "safe-to-deploy"
 
+[[exemptions.universal-hash]]
+version = "0.6.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.whirlpool]]
 version = "0.11.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zeroize]]
+version = "1.9.1"
 criteria = "safe-to-deploy"
