@@ -48,6 +48,7 @@ pub(crate) mod aeads;
 pub(crate) mod builtin;
 pub(crate) mod ciphers;
 pub(crate) mod digests;
+pub(crate) mod kdfs;
 pub(crate) mod macs;
 pub(crate) mod modes;
 mod module;

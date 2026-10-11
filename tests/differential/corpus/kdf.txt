@@ -1,0 +1,145 @@
+# KDFs: HKDF, TLS13-KDF, PBKDF2, TLS1-PRF, SSKDF, X963KDF through their parameters and errors
+kderive 16
+knew NO-SUCH-KDF
+knew HKDF
+ksize
+kget
+kderive 42
+kderive 42 digest=SHA256
+kderive 42 key=22 salt=13 info=10
+kderive 0
+kget
+kdup
+kset mode=EXTRACT_ONLY
+ksize
+kget
+kderive 31
+kderive 32
+kset mode=2 key=32
+kderive 42
+kderive 8161
+kset mode=both
+kset mode=3
+kset digest=SHAKE256
+kset digest=nonesuch
+kset digest=SHA1 properties=provider=default
+kset digest=SHA1 properties=provider=nonesuch
+kset info=0 info=5 info=7
+kget
+kderive 100
+kctx 1
+kderive 42
+kreset
+kderive 42
+kctx 0
+kreset
+kderive 42 digest=MD5 key=0
+kderive 42 digest=NULL key=5
+knew TLS13-KDF
+kset digest=SHA256
+kderive 32
+kderive 32 mode=1 digest=SHA256
+kderive 32 salt=32 prefix=6 label=7
+kderive 31
+kderive 16 mode=2 key=32 label=3 data=0
+kderive 16 label=250 prefix=6
+kderive 16 data=256
+kderive 70000
+knew TLS13-KDF
+kderive 16 mode=EXPAND_ONLY digest=SHA384
+kderive 48 mode=EXTRACT_ONLY key=48 salt=48 label=5
+knew PBKDF2
+ksize
+kderive 20
+kderive 20 pass=8
+kderive 20 salt=4
+kderive 20 iter=2
+kdup
+kderive 25 iter=1
+kctx 1
+kderive 25
+kctx 0
+kset iter=0
+kset pkcs5=0
+kderive 20
+kset salt=4
+kset salt=16 iter=999
+kset salt=16 iter=1000
+kderive 13
+kderive 14
+kset digest=SHA512 pass=0
+kderive 64
+kset digest=SHAKE128
+kreset
+kderive 20
+kpbkdf2 SHA1 -1 4 1 20
+kpbkdf2 SHA256 9 5 4096 16
+kpbkdf2 SHA256 0 0 3 10
+kpbkdf2 SHA256 1 1 0 10
+kpbkdf2 MD5 199 199 7 300
+kpbkdf2 nonesuch 1 1 1 10
+knew TLS1-PRF
+ksize
+kderive 48
+kderive 48 digest=SHA256
+kderive 48 secret=48
+kset seed=13 seed=13 seed=0 seed=13
+kdup
+kderive 100
+kctx 1
+kderive 50
+kctx 0
+kderive 48 digest=md5-sha1 secret=47
+kderive 48 digest=MD5-SHA1 secret=1
+kderive 1 digest=SHA384
+kderive 0
+kset digest=SHAKE128
+kset digest=nonesuch
+kderive 48 secret=0
+knew SSKDF
+ksize
+kderive 16
+kderive 16 secret=0
+kderive 16 key=32
+kderive 100 digest=SHA224 info=5
+ksize
+kderive 40 mac=HMAC
+kderive 40 mac=HMAC digest=SHA224
+kdup
+kderive 40 salt=8
+kctx 1
+kderive 40
+kctx 0
+kderive 50 mac=KMAC128 salt=0
+ksize
+kderive 50 mac-size=20
+kderive 50 mac-size=21
+kset mac-size=0
+kderive 16 mac=CMAC
+kset mac=NO-SUCH-MAC
+kderive 16 mac=KMAC256
+kreset
+ksize
+knew X963KDF
+kderive 70 digest=SHA256 secret=24 info=6
+kderive 16 mac=HMAC
+knew X942KDF-CONCAT
+kderive 33 digest=SHA1 secret=20
+kfree
+kderive 1
+# A context holding an empty (allocated) buffer doesn't copy: OPENSSL_memdup of nothing is NULL
+knew HKDF
+kset key=0
+kdup
+kset key=1
+kdup
+knew PBKDF2
+kset pass=0
+kdup
+knew TLS1-PRF
+kset secret=0
+kdup
+knew SSKDF
+kset info=0
+kdup
+kfree

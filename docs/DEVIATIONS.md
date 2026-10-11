@@ -129,6 +129,10 @@ OpenSSL never depends on them.
 | Poly1305 (the MAC) updated with data or finalized again after its final | its state, assembly function pointers included, was zeroed: it crashes | fails | `crypto` `provided::mac::tests::poly1305_after_its_final_fails` |
 | A BLAKE2 MAC whose `size` is set below the size it was started with, then finalized | writes the whole output it started with, past the room `EVP_MAC_final` checked for | writes what fits the room (what the caller can read is the same) | `provider::macs::tests::blake2_writes_only_what_fits` |
 | SipHash's, the BLAKE2 MACs', and Poly1305's updates, and SipHash's and the BLAKE2 MACs' `key`, `custom`, and `salt` parameters, with NULL data of a nonzero length; HMAC's TLS mode (`tls-data-size`) given a record without a digest set | read through NULL, and crash | fail | `provider::macs::tests::null_data_is_refused` |
+| `EVP_KDF_up_ref`, `EVP_KDF_get0_name` and the other method accessors, `EVP_KDF_get_params`, and the `*_gettable_*`/`*_settable_*` lists with a NULL method; `EVP_KDF_CTX_kdf`, `EVP_KDF_CTX_get_params`, `_set_params`, and their lists with a NULL context | dereference NULL and crash | fail (0, NULL) | `evp::kdf::tests::null_methods_and_contexts_are_refused` |
+| `PKCS5_PBKDF2_HMAC` and `PKCS5_PBKDF2_HMAC_SHA1` with a negative password length (but -1), salt length, or key length | read and write the huge `size_t`s they convert to | fail | `evp::kdf::tests::negative_pbkdf2_lengths_are_refused` |
+| TLS1-PRF's `digest` parameter with NULL data | compares a string through NULL | fails | `provider::kdfs::tests::tls1_prf_null_digest_data_is_refused` |
+| PBKDF2 with a salt or a key longer than `INT_MAX` octets | converts the length to a negative `int` and copies past the buffers | fails | none: it needs buffers of 2 GiB |
 
 ## Notes
 

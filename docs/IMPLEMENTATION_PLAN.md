@@ -2246,6 +2246,38 @@ have run for at least 24 CPU-hours with no findings.
   KBKDF, TLS1-PRF, SSHKDF, PKCS12KDF, KRB5KDF, Argon2i/d/id, HMAC-DRBG-KDF, and the legacy
   provider's PVKKDF; `PKCS5_PBKDF2_HMAC*`, `EVP_PBE_scrypt`, `EVP_BytesToKey`. Over the
   backend of 3.2d; a C test pins the SSHKDF-over-NULL deviation (docs/DEVIATIONS.md).
+  PBKDF1 and PVKKDF are the legacy provider's, so they come with it (9.1); `EVP_BytesToKey`
+  came with 3.4e. Split in two:
+  - [x] **3.6a The KDF layer and the hash-based KDFs:** `EVP_KDF` methods and contexts
+    (`kdf_meth.c`, `kdf_lib.c`), `PKCS5_PBKDF2_HMAC` and `_SHA1`, and the default provider's
+    HKDF, TLS13-KDF, PBKDF2, TLS1-PRF, SSKDF, and X963KDF (`provider/kdfs.rs`). 26 exports;
+    libcrypto now 1,250 of 5,876.
+    Decisions and findings:
+    - **Decision:** these KDFs run over our EVP layer, as the reference's do (HMAC through
+      `EVP_Q_mac` and `HMAC_*`, digests through `EVP_MD_CTX`, MACs through `EVP_MAC_CTX`),
+      not over the 3.2d backend: so any provider's digest works, and the errors the inner calls
+      raise are the reference's. The backend stays the computations of the KDFs that aren't
+      over EVP (scrypt, Argon2, ...), and is the oracle of the new fuzz target.
+    - Quirks kept: TLS13-KDF refuses any parameter call in its default mode and clears its
+      `data` on each; SSKDF's HMAC takes its digest only from the call that names the MAC, and
+      keeps the default salt it made; a context holding an empty buffer doesn't copy
+      (`OPENSSL_memdup` of nothing is NULL); PBKDF2 starts as SHA-1 with 2048 iterations and
+      no lower-bound checks.
+    - Fixed on the way (found by the new mix of random sessions): a BLAKE2 digest after its
+      final is zeroed in the reference, as before an init, so an init that fails then (a size
+      too large) leaves updates working and a final of nothing; ours kept the finished state.
+    - New deviations: NULL methods and contexts where the reference crashes; negative
+      `PKCS5_PBKDF2_HMAC` lengths; TLS1-PRF's `digest` with NULL data; PBKDF2 lengths past
+      `INT_MAX`.
+    - `tests/c/evp_kdf.c`, 122 checks: every name and parameter list, the RFC 5869, 6070, and
+      8448 vectors, each KDF's errors and quirks, copies, resets, and the NULL arguments the
+      reference takes.
+    - The probe's `k*` commands (corpus `kdf.txt`, random KDF sessions, `PKCS5_PBKDF2_HMAC`).
+    - The `evp_kdf` fuzz target: each KDF through the C ABI against the backend, and copies
+      against their originals.
+  - [ ] **3.6b The rest:** scrypt and `EVP_PBE_scrypt(_ex)`, X942KDF-ASN1, KBKDF, SSHKDF
+    (the C test of its NULL-digest deviation), PKCS12KDF, KRB5KDF, Argon2i/d/id, and
+    HMAC-DRBG-KDF.
 - [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
   generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.)
   - `EVP_RAND`: CTR-, HASH-, and HMAC-DRBG, SEED-SRC, TEST-RAND
