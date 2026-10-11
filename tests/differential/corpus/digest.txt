@@ -113,3 +113,18 @@ dnid 672
 dnid 0
 dnid 1100
 dnid 99999
+# BLAKE2 after a final is zeroed, as before an init: an init refused (a size too large) leaves
+# updates working and a final of nothing
+dinit BLAKE2s256
+dxof 212
+dinitp BLAKE2s256 size 63
+dupdate 64
+dfinal
+dinit BLAKE2b512
+dupdate 3
+dfinal
+dinitp BLAKE2b512 size 65
+dupdate 3
+dfinal
+dinit -
+dfinal

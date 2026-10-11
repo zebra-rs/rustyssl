@@ -663,6 +663,8 @@ impl Blake2 {
         }
     }
 
+    /// A final leaves the reference's context zeroed (`ossl_blake2*_final` cleanses it), as
+    /// before an init: updates then succeed and a final writes nothing.
     fn finalize(&mut self, out: &mut [u8], outl: &mut usize) -> Result<(), Error> {
         let Some((m, size)) = self.running.as_mut() else {
             *outl = 0;
@@ -675,8 +677,11 @@ impl Blake2 {
         if out.len() < *size {
             return Err(Error::InvalidDigestSize);
         }
-        m.finalize(out.get_mut(..*size).unwrap_or(&mut []))
-            .map_err(|_| Error::Silent)
+        let r = m
+            .finalize(out.get_mut(..*size).unwrap_or(&mut []))
+            .map_err(|_| Error::Silent);
+        self.running = None;
+        r
     }
 }
 
