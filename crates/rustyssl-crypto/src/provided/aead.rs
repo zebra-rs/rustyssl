@@ -161,16 +161,20 @@ struct Gcm128 {
 }
 
 impl Gcm128 {
-    /// `CRYPTO_gcm128_init`: H from the key.
+    /// `CRYPTO_gcm128_init`: H from the key, and everything else zero, the hash too (so a
+    /// context re-keyed without a new IV hashes from zero, as OpenSSL's does).
     fn new(key: &Key) -> Result<Self, Error> {
         let mut h = Zeroizing::new([0u8; 16]);
         key.encrypt(&mut h)?;
+        let hash = sym::universal_hash(HashAlgorithm::Ghash, &h[..])
+            .map(Hash)
+            .map_err(|_| Error::Internal)?;
         Ok(Self {
             h,
             yi: [0; 16],
             ek0: Zeroizing::new([0; 16]),
             eki: Zeroizing::new([0; 16]),
-            hash: None,
+            hash: Some(hash),
             pend: Zeroizing::new([0; 16]),
             ares: 0,
             mres: 0,

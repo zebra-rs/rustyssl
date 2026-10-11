@@ -501,10 +501,9 @@ unsafe fn get_string(
         // SAFETY: the caller's guarantee.
         unsafe { used_len.write(size) };
     }
-    // SAFETY: the caller's guarantee.
-    let Some(data) = (unsafe { data(param) }).map_err(Some)? else {
+    if param.data.is_null() {
         return Err(Some(Error::NullArgument));
-    };
+    }
     if val.is_null() {
         return Ok(max_len);
     }
@@ -525,6 +524,11 @@ unsafe fn get_string(
     if room < size {
         return Err(Some(Error::TooSmall));
     }
+    // (Only now, as the reference checks the room first.)
+    // SAFETY: the caller's guarantee.
+    let Some(data) = (unsafe { data(param) }).map_err(Some)? else {
+        return Err(Some(Error::NullArgument));
+    };
     // SAFETY: `out` has room for `size` octets, checked above, and the data holds them.
     unsafe { ptr::copy_nonoverlapping(data.as_ptr(), out.cast::<u8>(), size) };
     Ok(room)
