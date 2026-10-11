@@ -1210,6 +1210,28 @@ const _: unsafe extern "C" fn() -> *mut BUF_MEM = crate::buffer::BUF_MEM_new;
 const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *mut BUF_MEM = crate::buffer::BUF_MEM_new_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const core::ffi::c_uchar, usize) =
     crate::buffer::BUF_reverse;
+const _: unsafe extern "C" fn(*mut CMAC_CTX) = crate::cmac::CMAC_CTX_cleanup;
+const _: unsafe extern "C" fn(*mut CMAC_CTX, *const CMAC_CTX) -> core::ffi::c_int =
+    crate::cmac::CMAC_CTX_copy;
+const _: unsafe extern "C" fn(*mut CMAC_CTX) = crate::cmac::CMAC_CTX_free;
+const _: unsafe extern "C" fn(*mut CMAC_CTX) -> *mut EVP_CIPHER_CTX =
+    crate::cmac::CMAC_CTX_get0_cipher_ctx;
+const _: unsafe extern "C" fn() -> *mut CMAC_CTX = crate::cmac::CMAC_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut CMAC_CTX,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::cmac::CMAC_Final;
+const _: unsafe extern "C" fn(
+    *mut CMAC_CTX,
+    *const core::ffi::c_void,
+    usize,
+    *const EVP_CIPHER,
+    *mut ENGINE,
+) -> core::ffi::c_int = crate::cmac::CMAC_Init;
+const _: unsafe extern "C" fn(*mut CMAC_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
+    crate::cmac::CMAC_Update;
+const _: unsafe extern "C" fn(*mut CMAC_CTX) -> core::ffi::c_int = crate::cmac::CMAC_resume;
 const _: unsafe extern "C" fn(*mut CRYPTO_THREAD_LOCAL) -> core::ffi::c_int =
     crate::threads::CRYPTO_THREAD_cleanup_local;
 const _: unsafe extern "C" fn(CRYPTO_THREAD_ID, CRYPTO_THREAD_ID) -> core::ffi::c_int =
@@ -1933,6 +1955,81 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptUpdate;
+const _: unsafe extern "C" fn(*const EVP_MAC_CTX) -> *mut EVP_MAC_CTX =
+    crate::evp::mac::EVP_MAC_CTX_dup;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) = crate::evp::mac::EVP_MAC_CTX_free;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) -> *mut EVP_MAC =
+    crate::evp::mac::EVP_MAC_CTX_get0_mac;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) -> usize =
+    crate::evp::mac::EVP_MAC_CTX_get_block_size;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) -> usize =
+    crate::evp::mac::EVP_MAC_CTX_get_mac_size;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::mac::EVP_MAC_CTX_get_params;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) -> *const OSSL_PARAM =
+    crate::evp::mac::EVP_MAC_CTX_gettable_params;
+const _: unsafe extern "C" fn(*mut EVP_MAC) -> *mut EVP_MAC_CTX = crate::evp::mac::EVP_MAC_CTX_new;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::mac::EVP_MAC_CTX_set_params;
+const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) -> *const OSSL_PARAM =
+    crate::evp::mac::EVP_MAC_CTX_settable_params;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<unsafe extern "C" fn(mac: *mut EVP_MAC, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::evp::mac::EVP_MAC_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_MAC = crate::evp::mac::EVP_MAC_fetch;
+const _: unsafe extern "C" fn(
+    *mut EVP_MAC_CTX,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    usize,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_final;
+const _: unsafe extern "C" fn(
+    *mut EVP_MAC_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_finalXOF;
+const _: unsafe extern "C" fn(*mut EVP_MAC) = crate::evp::mac::EVP_MAC_free;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const core::ffi::c_char =
+    crate::evp::mac::EVP_MAC_get0_description;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const core::ffi::c_char =
+    crate::evp::mac::EVP_MAC_get0_name;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const OSSL_PROVIDER =
+    crate::evp::mac::EVP_MAC_get0_provider;
+const _: unsafe extern "C" fn(*mut EVP_MAC, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::mac::EVP_MAC_get_params;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const OSSL_PARAM =
+    crate::evp::mac::EVP_MAC_gettable_ctx_params;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const OSSL_PARAM =
+    crate::evp::mac::EVP_MAC_gettable_params;
+const _: unsafe extern "C" fn(
+    *mut EVP_MAC_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_init;
+const _: unsafe extern "C" fn(*const EVP_MAC, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::mac::EVP_MAC_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_MAC,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_names_do_all;
+const _: unsafe extern "C" fn(*const EVP_MAC) -> *const OSSL_PARAM =
+    crate::evp::mac::EVP_MAC_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut EVP_MAC) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_up_ref;
+const _: unsafe extern "C" fn(
+    *mut EVP_MAC_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_update;
 const _: unsafe extern "C" fn(*mut EVP_MD_CTX, core::ffi::c_int) =
     crate::evp::md_ctx::EVP_MD_CTX_clear_flags;
 const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *const EVP_MD_CTX) -> core::ffi::c_int =
@@ -2069,6 +2166,20 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *mut usize,
 ) -> core::ffi::c_int = crate::evp::md_ctx::EVP_Q_digest;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const OSSL_PARAM,
+    *const core::ffi::c_void,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut usize,
+) -> *mut core::ffi::c_uchar = crate::evp::mac::EVP_Q_mac;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
     crate::evp::legacy_cipher::EVP_add_cipher;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
@@ -2287,6 +2398,43 @@ const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_ecb;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_sm4_ofb;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_whirlpool;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) -> *mut core::ffi::c_uchar = crate::hmac::HMAC;
+const _: unsafe extern "C" fn(*mut HMAC_CTX, *mut HMAC_CTX) -> core::ffi::c_int =
+    crate::hmac::HMAC_CTX_copy;
+const _: unsafe extern "C" fn(*mut HMAC_CTX) = crate::hmac::HMAC_CTX_free;
+const _: unsafe extern "C" fn(*const HMAC_CTX) -> *const EVP_MD = crate::hmac::HMAC_CTX_get_md;
+const _: unsafe extern "C" fn() -> *mut HMAC_CTX = crate::hmac::HMAC_CTX_new;
+const _: unsafe extern "C" fn(*mut HMAC_CTX) -> core::ffi::c_int = crate::hmac::HMAC_CTX_reset;
+const _: unsafe extern "C" fn(*mut HMAC_CTX, core::ffi::c_ulong) = crate::hmac::HMAC_CTX_set_flags;
+const _: unsafe extern "C" fn(
+    *mut HMAC_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) -> core::ffi::c_int = crate::hmac::HMAC_Final;
+const _: unsafe extern "C" fn(
+    *mut HMAC_CTX,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::hmac::HMAC_Init;
+const _: unsafe extern "C" fn(
+    *mut HMAC_CTX,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    *const EVP_MD,
+    *mut ENGINE,
+) -> core::ffi::c_int = crate::hmac::HMAC_Init_ex;
+const _: unsafe extern "C" fn(*mut HMAC_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::hmac::HMAC_Update;
+const _: unsafe extern "C" fn(*const HMAC_CTX) -> usize = crate::hmac::HMAC_size;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;

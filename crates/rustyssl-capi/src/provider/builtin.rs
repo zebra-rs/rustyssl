@@ -13,9 +13,10 @@ use rustyssl_abi::{
     ERR_LIB_CRYPTO, OPENSSL_CORE_CTX, OPENSSL_FULL_VERSION_STRING, OPENSSL_VERSION_STR,
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
-    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_OP_CIPHER,
-    OSSL_OP_DIGEST, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO,
-    OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
+    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX, OSSL_OP_CIPHER,
+    OSSL_OP_DIGEST, OSSL_OP_MAC, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
+    OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
+    OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
 };
 
 use crate::ffi::ffi_callback;
@@ -32,11 +33,20 @@ pub(crate) static PREDEFINED: &[(&CStr, OSSL_provider_init_fn, bool)] = &[
 /// The context of `default` and `base`: what OpenSSL's `PROV_CTX` holds so far.
 struct ProvCtx {
     /// The library context the provider was loaded into.
-    #[expect(dead_code, reason = "the algorithms (Phase 3 onwards) use it")]
     libctx: *mut OPENSSL_CORE_CTX,
     /// The provider's handle.
     #[expect(dead_code, reason = "the algorithms (Phase 3 onwards) use it")]
     handle: *const OSSL_CORE_HANDLE,
+}
+
+/// `PROV_LIBCTX_OF`: the library context of the default or base provider's context `provctx`
+/// (NULL, the default context, for NULL).
+///
+/// # Safety
+/// `provctx` is NULL or a context `default_init` or `base_init` made and not yet torn down.
+pub(crate) unsafe fn libctx_of(provctx: *mut c_void) -> *mut OSSL_LIB_CTX {
+    // SAFETY: the caller's guarantee.
+    unsafe { provctx.cast::<ProvCtx>().as_ref() }.map_or(ptr::null_mut(), |c| c.libctx.cast())
 }
 
 /// The parameters each built-in reports (`OSSL_PARAM_DEFN`s), ended by an empty one.
@@ -180,6 +190,7 @@ ffi_callback! {
         match operation_id {
             OSSL_OP_DIGEST => super::digests::default_digests(),
             OSSL_OP_CIPHER => super::ciphers::default_ciphers(),
+            OSSL_OP_MAC => super::macs::default_macs(),
             _ => ptr::null(),
         }
     }
