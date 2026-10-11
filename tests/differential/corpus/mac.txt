@@ -162,3 +162,154 @@ mq GMAC AES-128-GCM 16 3 64
 mq NO-SUCH-MAC SHA256 4 28 64
 mq HMAC SHA1 4 28 64 properties=provider=default
 mfree
+# The other MACs: KMAC, Poly1305, SipHash, the BLAKE2 MACs; HMAC's TLS record mode
+mnew KMAC-128
+msize
+minit -
+minit 3
+minit 32
+mupdate 4
+mfinal
+mdup
+minit - custom=21 size=20
+mupdate 100
+mfinal
+minit - xof=1
+mupdate 7
+mfinal 32
+mxof 40
+mset size=100
+mset custom=0 key=64
+minit -
+mupdate 200
+mfinal 300
+mfinal 120
+mnew KMAC256
+msize
+mget
+minit 16 custom=9
+mupdate 64
+mfinal
+mnew POLY1305
+msize
+mupdate 1
+mfinal
+minit 31
+minit 32
+minit -
+mupdate 10
+mdup
+minit -
+mupdate 0
+mfinal
+mupdate 0
+mfinal
+mupdate 5
+minit 32
+mupdate 33
+mfinal 15
+mfinal
+mctx 1
+mupdate 24
+mfinal
+mctx 0
+mnew SIPHASH
+msize
+mget
+mfinal
+mupdate 9
+minit 15
+minit 16 size=8
+mupdate 15
+mfinal
+mfinal
+mset size=16
+msize
+minit -
+mupdate 15
+mfinal 15
+mfinal
+mset c-rounds=1 d-rounds=3 key=16
+mget
+mupdate 64
+mfinal
+mset size=12
+minit - size=0
+mfinal
+mnew BLAKE2BMAC
+msize
+minit -
+mupdate 3
+mfinal
+minit 65
+minit 64
+mfinal
+mfinal
+minit -
+mupdate 100
+mdup
+mupdate 100
+mfinal
+minit 7 size=20 salt=16 custom=16
+mupdate 31
+mfinal
+minit -
+mset size=64
+mfinal
+mset salt=17
+mset custom=17
+mset size=0
+mnew BLAKE2SMAC
+msize
+minit 32
+mupdate 65
+mfinal
+minit 1 size=1 salt=8 custom=8
+mupdate 1
+mfinal
+mset salt=9
+mnew HMAC
+minit 20 digest=SHA256 tls-data-size=300
+mfinal
+mupdate 12
+mupdate 13
+mupdate 301
+mupdate 200
+mfinal
+mupdate 10
+mfinal
+mdup
+mctx 1
+mupdate 100
+mfinal
+mctx 0
+minit 20 digest=SHA1 tls-data-size=64
+mupdate 17
+mfinal
+minit 20 digest=MD5 tls-data-size=96
+mupdate 64
+mfinal
+minit 48 digest=SHA384 tls-data-size=300
+mupdate 250
+mfinal
+minit 20 digest=SHA3-256 tls-data-size=300
+mupdate 10
+mfinal
+mq KMAC-128 - 32 4 0
+mq POLY1305 - 32 34 16
+mq SIPHASH - 16 15 16 size=8
+mq BLAKE2SMAC - 32 0 32
+mq BLAKE2BMAC SHA256 64 0 64
+mfree
+# GMAC keyed again after use without a new IV: skipped (the platform's GCM); a new IV resumes
+mnew GMAC
+minit 16 cipher=AES-128-GCM iv=12
+mupdate 5
+mfinal
+minit 16
+mupdate 5
+mfinal
+minit - iv=12
+mupdate 5
+mfinal
+mfree

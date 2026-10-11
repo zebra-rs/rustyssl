@@ -3206,11 +3206,20 @@ static int printf_command(const char *command, const char *line)
  * MACs (EVP_MAC(3)): two contexts, each made by name, initialized and set with parameters
  * written name=value (digest, cipher, and properties as strings; key and iv as that many
  * octets of the data; xof and the digest flags as ints; anything else as a size_t), updated
- * with the data, and finished. GMAC without an IV would make one up at random, so its
- * updates and finals are skipped until it has had one.
+ * with the data, and finished. GMAC without an IV would make one up at random, and keyed
+ * again without a new one runs as the platform's GCM does (docs/DEVIATIONS.md), so its
+ * updates and finals are skipped until it has a new IV.
  */
 static EVP_MAC_CTX *mac_ctx[2];
-static int mac_current, mac_gmac[2], mac_iv[2];
+static int mac_current, mac_gmac[2], mac_iv[2], mac_used[2];
+/*
+ * OpenSSL's Poly1305 crashes used after its final, and HMAC's TLS mode without a digest
+ * (docs/DEVIATIONS.md): each context's kind, and whether it's in either state.
+ */
+static int mac_poly[2], mac_poly_done[2], mac_hmac[2], mac_nodigest[2], mac_tls[2];
+/* What the last parameter list had: a digest, a nonzero TLS data size, a key. */
+static int mac_has_digest, mac_has_tls, mac_has_key;
+static unsigned int mac_uints[8];
 static size_t mac_offset;
 static unsigned char mac_data[2048];
 
@@ -3222,6 +3231,7 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
     size_t off = mac_offset;
 
     *has_cipher = *has_iv = 0;
+    mac_has_digest = mac_has_tls = mac_has_key = 0;
     line += strcspn(line, " ");
     while (sscanf(line, "%95s%n", tok, &used) == 1 && n < 7) {
         char *eq = strchr(tok, '=');
@@ -3237,12 +3247,18 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
             snprintf(strs[n], 64, "%s", eq + 1);
             params[n] = OSSL_PARAM_construct_utf8_string(tok, strs[n], 0);
             *has_cipher |= strcmp(tok, "cipher") == 0;
-        } else if (strcmp(tok, "key") == 0 || strcmp(tok, "iv") == 0) {
+            mac_has_digest |= strcmp(tok, "digest") == 0;
+        } else if (strcmp(tok, "key") == 0 || strcmp(tok, "iv") == 0
+                   || strcmp(tok, "custom") == 0 || strcmp(tok, "salt") == 0) {
             size_t len = strtoul(eq + 1, NULL, 10) % 200;
 
             params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
             off = (off + len + 5) % 1024;
             *has_iv |= strcmp(tok, "iv") == 0;
+            mac_has_key |= strcmp(tok, "key") == 0;
+        } else if (strcmp(tok, "c-rounds") == 0 || strcmp(tok, "d-rounds") == 0) {
+            mac_uints[n] = (unsigned int)strtoul(eq + 1, NULL, 10);
+            params[n] = OSSL_PARAM_construct_uint(tok, &mac_uints[n]);
         } else if (strcmp(tok, "xof") == 0 || strcmp(tok, "digest-noinit") == 0
                    || strcmp(tok, "digest-oneshot") == 0) {
             ints[n] = atoi(eq + 1);
@@ -3250,6 +3266,7 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
         } else {
             sizes[n] = strtoul(eq + 1, NULL, 10);
             params[n] = OSSL_PARAM_construct_size_t(tok, &sizes[n]);
+            mac_has_tls |= strcmp(tok, "tls-data-size") == 0 && sizes[n] != 0;
         }
         /* The key names are the tokens' own text: keep them. */
         params[n].key = OPENSSL_strdup(params[n].key);
@@ -3315,7 +3332,11 @@ static int mac_command(const char *command, const char *line)
             mac_ctx[mac_current] = EVP_MAC_CTX_new(mac);
             printf(" %s %s", EVP_MAC_get0_name(mac), mac_ctx[mac_current] != NULL ? "ok" : "failed");
             mac_gmac[mac_current] = EVP_MAC_is_a(mac, "GMAC");
-            mac_iv[mac_current] = 0;
+            mac_iv[mac_current] = mac_used[mac_current] = 0;
+            mac_poly[mac_current] = EVP_MAC_is_a(mac, "POLY1305");
+            mac_hmac[mac_current] = EVP_MAC_is_a(mac, "HMAC");
+            mac_poly_done[mac_current] = mac_tls[mac_current] = 0;
+            mac_nodigest[mac_current] = 1;
         } else {
             printf(" fetch failed");
         }
@@ -3370,6 +3391,18 @@ static int mac_command(const char *command, const char *line)
             r = EVP_MAC_CTX_set_params(ctx, params);
         }
         mac_flags_after(mac_current, r, has_cipher, has_iv);
+        if (mac_has_digest)
+            mac_nodigest[mac_current] = r != 1;
+        if (mac_has_tls)
+            mac_tls[mac_current] = 1;
+        if (r == 1 && ((init && strcmp(keyarg, "-") != 0) || mac_has_key))
+            mac_poly_done[mac_current] = 0;
+        /* GMAC keyed again after use without a new IV: GCM's output is then the platform's. */
+        if (((init && strcmp(keyarg, "-") != 0) || mac_has_key) && !has_iv
+            && mac_used[mac_current])
+            mac_iv[mac_current] = 0;
+        if (has_iv || has_cipher)
+            mac_used[mac_current] = 0;
         mac_params_free(params);
         printf(" %d", r);
     } else if ((strcmp(command, "mupdate") == 0 || strcmp(command, "mfinal") == 0
@@ -3377,7 +3410,16 @@ static int mac_command(const char *command, const char *line)
                && mac_gmac[mac_current] && !mac_iv[mac_current]) {
         printf(" skipped: GMAC without an IV\n");
         return 1;
+    } else if (((strcmp(command, "mfinal") == 0 || strcmp(command, "mxof") == 0)
+                && mac_poly[mac_current] && mac_poly_done[mac_current])
+               || (strcmp(command, "mupdate") == 0 && strtoul(line + 7, NULL, 10) != 0
+                   && ((mac_poly[mac_current] && mac_poly_done[mac_current])
+                       || (mac_hmac[mac_current] && mac_tls[mac_current]
+                           && mac_nodigest[mac_current])))) {
+        printf(" skipped\n");
+        return 1;
     } else if (strcmp(command, "mupdate") == 0) {
+        mac_used[mac_current] = 1;
         sscanf(line, "%*s %lu", &n);
         if (n > 1024)
             n = 1024;
@@ -3387,6 +3429,9 @@ static int mac_command(const char *command, const char *line)
         n = 64;
         sscanf(line, "%*s %lu", &n);
         r = EVP_MAC_final(ctx, n > 256 ? NULL : out, &outl, n % 257);
+        mac_used[mac_current] = 1;
+        if (r == 1 && n <= 256)
+            mac_poly_done[mac_current] = 1;
         /* The length is only set on success. */
         printf(" %d", r);
         if (r == 1) {
@@ -3399,6 +3444,9 @@ static int mac_command(const char *command, const char *line)
         if (n > 256)
             n = 256;
         r = EVP_MAC_finalXOF(ctx, out, n);
+        mac_used[mac_current] = 1;
+        if (r == 1)
+            mac_poly_done[mac_current] = 1;
         printf(" %d ", r);
         for (sz = 0; sz < (r ? n : 0); sz++)
             printf("%02x", out[sz]);
@@ -3421,6 +3469,12 @@ static int mac_command(const char *command, const char *line)
             mac_ctx[!mac_current] = dup;
             mac_gmac[!mac_current] = mac_gmac[mac_current];
             mac_iv[!mac_current] = mac_iv[mac_current];
+            mac_used[!mac_current] = mac_used[mac_current];
+            mac_poly[!mac_current] = mac_poly[mac_current];
+            mac_poly_done[!mac_current] = mac_poly_done[mac_current];
+            mac_hmac[!mac_current] = mac_hmac[mac_current];
+            mac_nodigest[!mac_current] = mac_nodigest[mac_current];
+            mac_tls[!mac_current] = mac_tls[mac_current];
         }
     } else {
         EVP_MAC_CTX_free(ctx);
