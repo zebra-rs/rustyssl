@@ -14,7 +14,7 @@ use rustyssl_abi::{
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX, OSSL_OP_CIPHER,
-    OSSL_OP_DIGEST, OSSL_OP_MAC, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
+    OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_MAC, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
     OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
     OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
 };
@@ -191,6 +191,7 @@ ffi_callback! {
             OSSL_OP_DIGEST => super::digests::default_digests(),
             OSSL_OP_CIPHER => super::ciphers::default_ciphers(),
             OSSL_OP_MAC => super::macs::default_macs(),
+            OSSL_OP_KDF => super::kdfs::default_kdfs(),
             _ => ptr::null(),
         }
     }

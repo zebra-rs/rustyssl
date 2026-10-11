@@ -82,15 +82,15 @@ type GetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_in
 type SetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
 type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
-const SIZE_T: usize = size_of::<usize>();
-const INT: usize = size_of::<c_int>();
+pub(crate) const SIZE_T: usize = size_of::<usize>();
+pub(crate) const INT: usize = size_of::<c_int>();
 const UINT: usize = size_of::<c_uint>();
 
 /// `ossl_param_is_empty`.
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
+pub(crate) unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
     // SAFETY: the caller's guarantee.
     unsafe { params.as_ref() }.is_none_or(|p| p.key.is_null())
 }
@@ -99,7 +99,10 @@ unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn locate<'a>(params: *const OSSL_PARAM, key: &core::ffi::CStr) -> Option<&'a OSSL_PARAM> {
+pub(crate) unsafe fn locate<'a>(
+    params: *const OSSL_PARAM,
+    key: &core::ffi::CStr,
+) -> Option<&'a OSSL_PARAM> {
     // SAFETY: the caller's guarantee.
     let p = unsafe { OSSL_PARAM_locate_const(params, key.as_ptr()) };
     // SAFETY: a parameter of the array.
@@ -111,7 +114,7 @@ unsafe fn locate<'a>(params: *const OSSL_PARAM, key: &core::ffi::CStr) -> Option
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn load_common(params: *const OSSL_PARAM) -> Option<*const c_char> {
+pub(crate) unsafe fn load_common(params: *const OSSL_PARAM) -> Option<*const c_char> {
     let mut propquery = ptr::null();
     // SAFETY: the caller's guarantee.
     if let Some(p) = unsafe { locate(params, OSSL_ALG_PARAM_PROPERTIES) } {
@@ -129,12 +132,12 @@ unsafe fn load_common(params: *const OSSL_PARAM) -> Option<*const c_char> {
 }
 
 /// `PROV_DIGEST`/`PROV_CIPHER`: the method a MAC was given, with a reference (NULL for none).
-struct Prov<T: Method> {
-    method: *mut T,
+pub(crate) struct Prov<T: Method> {
+    pub(crate) method: *mut T,
 }
 
 /// What a fetched method of either kind offers [`Prov`].
-trait Method {
+pub(crate) trait Method {
     /// `EVP_*_up_ref`.
     unsafe fn up_ref(m: *mut Self) -> c_int;
     /// `EVP_*_free`.
@@ -194,19 +197,19 @@ impl Method for EVP_CIPHER {
 }
 
 impl<T: Method> Prov<T> {
-    const NONE: Self = Self {
+    pub(crate) const NONE: Self = Self {
         method: ptr::null_mut(),
     };
 
     /// `ossl_prov_*_reset`.
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         // SAFETY: the reference this holds, or NULL.
         unsafe { T::free(self.method) };
         self.method = ptr::null_mut();
     }
 
     /// `ossl_prov_*_copy`.
-    fn copy(&self) -> Option<Self> {
+    pub(crate) fn copy(&self) -> Option<Self> {
         // SAFETY: the method this holds a reference to.
         if !self.method.is_null() && unsafe { T::up_ref(self.method) } == 0 {
             return None;
@@ -221,7 +224,7 @@ impl<T: Method> Prov<T> {
     ///
     /// # Safety
     /// `params` is NULL or a parameter array.
-    unsafe fn load(
+    pub(crate) unsafe fn load(
         &mut self,
         params: *const OSSL_PARAM,
         key: &core::ffi::CStr,
@@ -269,13 +272,13 @@ impl<T: Method> Drop for Prov<T> {
 }
 
 /// The octets of an octet-string parameter, if it is one.
-fn octets(p: &OSSL_PARAM) -> Option<(*const u8, usize)> {
+pub(crate) fn octets(p: &OSSL_PARAM) -> Option<(*const u8, usize)> {
     (p.data_type == OSSL_PARAM_OCTET_STRING as u32)
         .then_some((p.data.cast_const().cast(), p.data_size))
 }
 
 /// Zeroes `b` (`OPENSSL_cleanse`).
-fn wipe(b: &mut [u8]) {
+pub(crate) fn wipe(b: &mut [u8]) {
     // SAFETY: the slice's own octets.
     unsafe { OPENSSL_cleanse(b.as_mut_ptr().cast(), b.len()) };
 }
@@ -284,7 +287,7 @@ fn wipe(b: &mut [u8]) {
 ///
 /// # Safety
 /// `vctx` is NULL or a box of a `T` from its `newctx`, used by one caller at a time.
-unsafe fn context<'a, T>(vctx: *mut c_void) -> Option<&'a mut T> {
+pub(crate) unsafe fn context<'a, T>(vctx: *mut c_void) -> Option<&'a mut T> {
     // SAFETY: the caller's guarantee.
     unsafe { vctx.cast::<T>().as_mut() }
 }
@@ -293,7 +296,11 @@ unsafe fn context<'a, T>(vctx: *mut c_void) -> Option<&'a mut T> {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
-unsafe fn set_size(params: *mut OSSL_PARAM, key: &core::ffi::CStr, value: usize) -> bool {
+pub(crate) unsafe fn set_size(
+    params: *mut OSSL_PARAM,
+    key: &core::ffi::CStr,
+    value: usize,
+) -> bool {
     // SAFETY: the caller's guarantee.
     let p = unsafe { OSSL_PARAM_locate(params, key.as_ptr()) };
     // SAFETY: a parameter of the array.
@@ -1393,7 +1400,7 @@ static GMAC_FUNCTIONS: Dispatch<11> = Dispatch([
 ///
 /// # Safety
 /// `data` is NULL or holds `len` octets that outlive `'a`.
-unsafe fn octets_at<'a>(data: *const u8, len: usize) -> Option<&'a [u8]> {
+pub(crate) unsafe fn octets_at<'a>(data: *const u8, len: usize) -> Option<&'a [u8]> {
     if len == 0 {
         Some(&[])
     } else if data.is_null() {
@@ -1409,7 +1416,7 @@ unsafe fn octets_at<'a>(data: *const u8, len: usize) -> Option<&'a [u8]> {
 ///
 /// # Safety
 /// The parameter's data is NULL or holds `data_size` octets that outlive `'a`.
-unsafe fn param_octets<'a>(p: &OSSL_PARAM) -> Option<&'a [u8]> {
+pub(crate) unsafe fn param_octets<'a>(p: &OSSL_PARAM) -> Option<&'a [u8]> {
     // SAFETY: the caller's guarantee.
     unsafe { octets_at(p.data.cast_const().cast(), p.data_size) }
 }
@@ -1431,7 +1438,7 @@ fn raise_mac(e: MacError, function: &str) {
 ///
 /// # Safety
 /// `outl` is NULL or valid for a write.
-unsafe fn set_outl(outl: *mut usize, n: usize) {
+pub(crate) unsafe fn set_outl(outl: *mut usize, n: usize) {
     if !outl.is_null() {
         // SAFETY: the caller's guarantee.
         unsafe { outl.write(n) };
@@ -1439,7 +1446,7 @@ unsafe fn set_outl(outl: *mut usize, n: usize) {
 }
 
 /// Boxes a context for `newctx`.
-fn boxed<T>(t: T) -> *mut c_void {
+pub(crate) fn boxed<T>(t: T) -> *mut c_void {
     Box::into_raw(Box::new(t)).cast()
 }
 
@@ -1447,7 +1454,7 @@ fn boxed<T>(t: T) -> *mut c_void {
 ///
 /// # Safety
 /// `vctx` is NULL or a box of a `T` from [`boxed`], not used afterwards.
-unsafe fn unbox<T>(vctx: *mut c_void) {
+pub(crate) unsafe fn unbox<T>(vctx: *mut c_void) {
     if !vctx.is_null() {
         // SAFETY: the caller's guarantee.
         drop(unsafe { Box::from_raw(vctx.cast::<T>()) });
@@ -1458,7 +1465,7 @@ unsafe fn unbox<T>(vctx: *mut c_void) {
 ///
 /// # Safety
 /// `vctx` is NULL or a live box of a `T`.
-unsafe fn dup_boxed<T: Clone>(vctx: *mut c_void) -> *mut c_void {
+pub(crate) unsafe fn dup_boxed<T: Clone>(vctx: *mut c_void) -> *mut c_void {
     // SAFETY: the caller's guarantee.
     unsafe { context::<T>(vctx) }.map_or(ptr::null_mut(), |t| boxed(t.clone()))
 }
