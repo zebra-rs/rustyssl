@@ -2489,6 +2489,11 @@ static EVP_CIPHER_CTX *cipher_ctx[2];
 static int cipher_current;
 /* Whether each context's cipher has had a key, and an init that succeeded, since it was set. */
 static int cipher_keyed[2], cipher_ready[2];
+/*
+ * Whether each context is GCM given a key without an IV: what it then does with data is the
+ * platform's in OpenSSL (docs/DEVIATIONS.md), so its data operations are skipped.
+ */
+static int cipher_gcm_noiv[2];
 static size_t cipher_offset;
 static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16], cipher_tag[16];
 
@@ -2589,6 +2594,13 @@ static int cipher_command(const char *command, const char *line)
     ctx = cipher_ctx[cipher_current];
     printf("%s:", line);
     memset(out, 0xee, sizeof(out));
+    if (cipher_gcm_noiv[cipher_current]
+        && (strcmp(command, "cupdate") == 0 || strcmp(command, "ccipher") == 0
+            || strcmp(command, "cfinal") == 0 || strcmp(command, "caad") == 0
+            || strcmp(command, "cmsglen") == 0)) {
+        printf(" skipped: GCM without an IV\n");
+        return 1;
+    }
     if (strcmp(command, "cctx") == 0) {
         sscanf(line, "%*s %ld", &n);
         cipher_current = n != 0;
@@ -2625,6 +2637,11 @@ static int cipher_command(const char *command, const char *line)
             cipher_keyed[cipher_current] |= m && r;
             cipher_ready[cipher_current] |= r;
         }
+        if (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+            && EVP_CIPHER_CTX_get_mode(ctx) == EVP_CIPH_GCM_MODE && m && !k)
+            cipher_gcm_noiv[cipher_current] = 1;
+        else if (k && r)
+            cipher_gcm_noiv[cipher_current] = 0;
         EVP_CIPHER_free(ciph);
         printf(" %d", r);
     } else if (strcmp(command, "cinitp") == 0) {
@@ -2646,6 +2663,8 @@ static int cipher_command(const char *command, const char *line)
         else
             params[0] = OSSL_PARAM_construct_uint(key, &u);
         r = EVP_CipherInit_ex2(ctx, ciph, cipher_key, cipher_iv, 1, params);
+        if (r)
+            cipher_gcm_noiv[cipher_current] = 0;
         cipher_keyed[cipher_current] = r;
         cipher_ready[cipher_current] = r;
         EVP_CIPHER_free(ciph);
@@ -2878,6 +2897,7 @@ static int cipher_command(const char *command, const char *line)
     } else if (strcmp(command, "ccopy") == 0) {
         cipher_keyed[!cipher_current] = cipher_keyed[cipher_current];
         cipher_ready[!cipher_current] = cipher_ready[cipher_current];
+        cipher_gcm_noiv[!cipher_current] = cipher_gcm_noiv[cipher_current];
         r = EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx);
         printf(" %d", r);
         if (!r) {
@@ -2891,6 +2911,7 @@ static int cipher_command(const char *command, const char *line)
     } else {
         cipher_keyed[cipher_current] = 0;
         cipher_ready[cipher_current] = 0;
+        cipher_gcm_noiv[cipher_current] = 0;
         printf(" %d", EVP_CIPHER_CTX_reset(ctx));
     }
     print_digest_errors();

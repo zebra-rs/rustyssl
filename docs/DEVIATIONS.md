@@ -125,6 +125,7 @@ OpenSSL never depends on them.
 | The `HMAC_*` and `CMAC_*` functions (but the frees) with a NULL context | dereference NULL and crash | fail (0, NULL) or do nothing | `hmac::tests::null_contexts_are_refused`, `cmac::tests::null_contexts_are_refused` |
 | CMAC (`CMAC_*`, the `CMAC` MAC) with a cipher whose block is larger than `EVP_MAX_BLOCK_LENGTH` (32 octets) | overruns its buffers | fails | none yet: no cipher this library can load has such a block (third-party providers come in a later phase) |
 | An `engine` parameter to the HMAC, CMAC, or GMAC MAC | looks the engine up (`ENGINE_by_id`) and uses it | fails, as there are no engines | `provider::macs::tests::engines_are_refused` |
+| GCM given a key without an IV after it was used (`EVP_EncryptInit_ex(ctx, NULL, NULL, key, NULL)`), then data | the platform's: the generic and ARMv8 code go on with the counter and the hash from zero; x86-64's AVX-512 code keeps a state of its own and gives other output | as the generic code (the tests pin the macOS reference's output); the probe skips data operations in that state | `evp::cipher_ctx::tests::gcm_keyed_again_without_an_iv` |
 
 ## Notes
 

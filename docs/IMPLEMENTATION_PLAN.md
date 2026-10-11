@@ -2198,7 +2198,9 @@ have run for at least 24 CPU-hours with no findings.
     - HMAC's TLS record mode (`tls-data-size` nonzero, `ssl3_cbc_digest_record`) is refused
       with `ERR_R_UNSUPPORTED` until 3.5b.
     - Fixed on the way: GCM re-keyed without a new IV after use now hashes from zero, as
-      `CRYPTO_gcm128_init` leaves it (the tag was all zeros); and
+      the generic and ARMv8 `CRYPTO_gcm128_init` leave it (the tag was all zeros). On x86-64
+      with AVX-512 the reference gives other output, so this is the platform's (a deviation;
+      the probe skips data in that state). And
       `OSSL_PARAM_get_octet_string`/`_utf8_string` check the room before an impossible
       `data_size` (`CRYPTO_R_TOO_SMALL_BUFFER`, as the reference).
     - New deviations: NULL methods and contexts; CMAC with a block over 32 octets; the
