@@ -184,4 +184,22 @@ mod tests {
             assert_eq!(o.data.to_vec(), vec![0; wiped]);
         }
     }
+
+    /// docs/DEVIATIONS.md: a copy of an XTS context without a key fails to encrypt (the
+    /// reference's copy points at key schedules never set, and crashes).
+    #[test]
+    fn copies_of_unkeyed_xts_fail() {
+        for algorithm in [BlockAlgorithm::Aes, BlockAlgorithm::Sm4] {
+            let k = Kind::Block {
+                algorithm,
+                key_len: 32,
+                mode: Mode::Xts,
+            };
+            let mut c = Ctx::new(k);
+            c.init(true, None, Some(&[7; 16])).unwrap();
+            let mut copy = c.clone();
+            let r = copy.process(io(&[1; 32], 48), false).unwrap();
+            assert!(r.is_err());
+        }
+    }
 }

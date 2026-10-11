@@ -1,0 +1,164 @@
+# MACs: HMAC, CMAC, and GMAC through their lifecycles, parameters, copies, sizes, and misuse
+mfinal
+mnew NO-SUCH-MAC
+mupdate 3
+mnew HMAC
+msize
+mget
+mupdate 3
+mfinal
+minit -
+minit 4
+minit 4 digest=SHA256
+msize
+mget
+mupdate 0
+mupdate 63
+mupdate 64
+mdup
+mfinal 31
+mfinal
+mfinal
+minit -
+mupdate 100
+mfinal 300
+mfinal
+mctx 1
+mfinal
+mctx 0
+minit 200 digest=SHA2-512
+mupdate 129
+mxof 64
+minit 10 digest=SHA3-256 properties=provider=default
+mupdate 136
+mfinal
+minit 10 digest=SHAKE128
+minit 10 digest=NULL
+msize
+mupdate 5
+mfinal
+minit 10 digest=MD5-SHA1
+mupdate 5
+mfinal
+mset digest=SHA1 key=20
+mupdate 50
+mfinal
+mset key=0
+mupdate 1
+mfinal
+mset digest=nonesuch
+mset digest=SHA224 properties=provider=nonesuch
+mset tls-data-size=0 digest-noinit=1 digest-oneshot=1
+msize
+mfree
+mfinal
+mnew CMAC
+msize
+mdup
+minit 16
+minit 16 cipher=AES-128-ECB
+minit 16 cipher=AES-128-GCM
+minit 16 cipher=AES-128-CBC
+msize
+mget
+mupdate 0
+mfinal
+minit -
+mupdate 16
+mfinal
+minit -
+mupdate 40
+mdup
+mfinal 15
+mfinal
+mctx 1
+mupdate 24
+mfinal
+mupdate 1
+mfinal
+mctx 0
+minit 15
+mupdate 1
+minit 32 cipher=AES-256-CBC
+mupdate 64
+mfinal
+mset cipher=DES-EDE3-CBC key=24
+msize
+mupdate 13
+mfinal
+mset cipher=ARIA-128-CBC key=16
+mupdate 33
+mfinal
+mset cipher=CAMELLIA-192-CBC key=24
+mupdate 1000
+mfinal
+mset cipher=SM4-CBC key=16
+mupdate 17
+mfinal
+mset cipher=AES-128-CBC-CTS key=16
+mupdate 48
+mfinal
+mset key=16
+mset cipher=AES-192-CBC
+mupdate 3
+minit 24
+mupdate 3
+mfinal
+mxof 16
+mset cipher=nonesuch
+mfree
+mnew GMAC
+msize
+mget
+mupdate 3
+mfinal
+mset cipher=AES-128-CBC
+mset cipher=AES-128-GCM
+minit -
+mset iv=12
+minit 15
+minit 16
+mupdate 20
+mdup
+mfinal
+mctx 1
+mupdate 1
+mfinal
+mctx 0
+mfinal
+mupdate 1
+minit - iv=16
+mupdate 0
+mfinal
+minit - iv=1
+mupdate 1000
+mfinal 15
+mfinal
+minit 32 cipher=AES-256-GCM iv=12
+mupdate 5
+mfinal
+minit 32 cipher=ARIA-256-GCM iv=12
+mupdate 5
+mfinal
+mfree
+mnew 1.0.9797.3.4
+mnew hmac
+minit 3 digest=SHA256
+mupdate 2
+mfinal
+mxof 32
+mq HMAC SHA256 4 28 64
+mq HMAC SHA256 4 28 0
+mq HMAC SHA256 0 3 64
+mq HMAC SHA256 4 28 31
+mq HMAC - 4 28 64
+mq HMAC nonesuch 4 28 64
+mq HMAC SHAKE256 4 28 64
+mq CMAC AES-128-CBC 16 0 64
+mq CMAC AES-128-CBC 16 100 0
+mq CMAC AES-128-CBC 15 100 64
+mq GMAC AES-128-GCM 16 3 64 iv=12
+mq GMAC AES-128-GCM 16 3 64
+mq NO-SUCH-MAC SHA256 4 28 64
+mq HMAC SHA1 4 28 64 properties=provider=default
+mfree

@@ -11,4 +11,5 @@ pub(crate) mod fetch;
 pub(crate) mod key;
 pub(crate) mod legacy_cipher;
 pub(crate) mod legacy_md;
+pub(crate) mod mac;
 pub(crate) mod md_ctx;

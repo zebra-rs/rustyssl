@@ -1902,4 +1902,70 @@ mod tests {
         unsafe { EVP_CIPHER_CTX_free(ctx) };
         crate::err::take_all();
     }
+
+    /// docs/DEVIATIONS.md: GCM keyed again after use without a new IV goes on as OpenSSL's
+    /// generic and ARMv8 code does (the counter and hash from zero); the vector is the macOS
+    /// reference's.
+    #[test]
+    #[cfg_attr(miri, ignore = "fetches the cipher, which loads the configuration")]
+    fn gcm_keyed_again_without_an_iv() {
+        let octet = |i: usize| u8::try_from(i % 256).unwrap_or(0);
+        let key: [u8; 16] = core::array::from_fn(octet);
+        let iv: [u8; 12] = core::array::from_fn(|i| 0xa0 + octet(i));
+        let input: [u8; 64] = core::array::from_fn(|i| octet(i * 3));
+        let mut out = [0u8; 64];
+        let mut tag = [0u8; 16];
+        let mut l = 0;
+        // SAFETY: no preconditions.
+        let c = unsafe { EVP_CIPHER_CTX_new() };
+        // SAFETY: a static cipher.
+        let gcm = unsafe { crate::evp::legacy_cipher::EVP_aes_128_gcm() };
+        // SAFETY: the context; the buffers above, of the lengths given, here and below.
+        let r = unsafe { EVP_DecryptInit_ex(c, gcm, ptr::null_mut(), key.as_ptr(), iv.as_ptr()) };
+        assert_eq!(r, 1);
+        // SAFETY: as above.
+        let r = unsafe { EVP_DecryptUpdate(c, out.as_mut_ptr(), &raw mut l, input.as_ptr(), 20) };
+        assert_eq!(r, 1);
+        // SAFETY: as above.
+        let r = unsafe {
+            EVP_EncryptInit_ex(c, ptr::null(), ptr::null_mut(), key.as_ptr(), ptr::null())
+        };
+        assert_eq!(r, 1);
+        // SAFETY: as above.
+        let r = unsafe { EVP_EncryptUpdate(c, ptr::null_mut(), &raw mut l, input.as_ptr(), 5) };
+        assert_eq!(r, 1);
+        // SAFETY: as above.
+        let r = unsafe { EVP_EncryptUpdate(c, out.as_mut_ptr(), &raw mut l, input.as_ptr(), 40) };
+        assert_eq!(r, 1);
+        assert_eq!(
+            out[..40],
+            [
+                0xc6, 0xa2, 0x3d, 0x3e, 0x8b, 0x80, 0x49, 0x97, 0x77, 0x54, 0x9f, 0x43, 0x85, 0xef,
+                0xf2, 0x54, 0x43, 0x75, 0x25, 0xac, 0xa9, 0xff, 0xf6, 0x5b, 0x01, 0x30, 0xf3, 0xb2,
+                0x31, 0xa3, 0x77, 0x57, 0x29, 0xb5, 0xe1, 0x3a, 0xf5, 0xf4, 0xd4, 0xf9,
+            ]
+        );
+        // SAFETY: as above.
+        let r = unsafe { EVP_EncryptFinal_ex(c, out.as_mut_ptr(), &raw mut l) };
+        assert_eq!(r, 1);
+        // SAFETY: as above; room for the tag.
+        let r = unsafe {
+            EVP_CIPHER_CTX_ctrl(
+                c,
+                EVP_CTRL_AEAD_GET_TAG as c_int,
+                16,
+                tag.as_mut_ptr().cast(),
+            )
+        };
+        assert_eq!(r, 1);
+        assert_eq!(
+            tag,
+            [
+                0x1c, 0x4a, 0x6f, 0x89, 0x3c, 0xe4, 0x4c, 0x60, 0xec, 0x70, 0xa9, 0x5d, 0xf6, 0x4a,
+                0x95, 0x97,
+            ]
+        );
+        // SAFETY: the test's context.
+        unsafe { EVP_CIPHER_CTX_free(c) };
+    }
 }

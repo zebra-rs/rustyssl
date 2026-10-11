@@ -17,6 +17,7 @@
 mod asn1;
 mod bio;
 mod buffer;
+mod cmac;
 mod dir;
 mod err;
 mod errno;
@@ -25,6 +26,7 @@ mod ex_data;
 mod ffi;
 mod generated;
 mod handle;
+mod hmac;
 mod init;
 mod lhash;
 mod libctx;

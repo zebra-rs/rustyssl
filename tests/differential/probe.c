@@ -2489,6 +2489,11 @@ static EVP_CIPHER_CTX *cipher_ctx[2];
 static int cipher_current;
 /* Whether each context's cipher has had a key, and an init that succeeded, since it was set. */
 static int cipher_keyed[2], cipher_ready[2];
+/*
+ * Whether each context is GCM given a key without an IV: what it then does with data is the
+ * platform's in OpenSSL (docs/DEVIATIONS.md), so its data operations are skipped.
+ */
+static int cipher_gcm_noiv[2];
 static size_t cipher_offset;
 static unsigned char cipher_data[2048], cipher_key[64], cipher_iv[16], cipher_tag[16];
 
@@ -2589,6 +2594,13 @@ static int cipher_command(const char *command, const char *line)
     ctx = cipher_ctx[cipher_current];
     printf("%s:", line);
     memset(out, 0xee, sizeof(out));
+    if (cipher_gcm_noiv[cipher_current]
+        && (strcmp(command, "cupdate") == 0 || strcmp(command, "ccipher") == 0
+            || strcmp(command, "cfinal") == 0 || strcmp(command, "caad") == 0
+            || strcmp(command, "cmsglen") == 0)) {
+        printf(" skipped: GCM without an IV\n");
+        return 1;
+    }
     if (strcmp(command, "cctx") == 0) {
         sscanf(line, "%*s %ld", &n);
         cipher_current = n != 0;
@@ -2625,6 +2637,11 @@ static int cipher_command(const char *command, const char *line)
             cipher_keyed[cipher_current] |= m && r;
             cipher_ready[cipher_current] |= r;
         }
+        if (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+            && EVP_CIPHER_CTX_get_mode(ctx) == EVP_CIPH_GCM_MODE && m && !k)
+            cipher_gcm_noiv[cipher_current] = 1;
+        else if (k && r)
+            cipher_gcm_noiv[cipher_current] = 0;
         EVP_CIPHER_free(ciph);
         printf(" %d", r);
     } else if (strcmp(command, "cinitp") == 0) {
@@ -2646,6 +2663,8 @@ static int cipher_command(const char *command, const char *line)
         else
             params[0] = OSSL_PARAM_construct_uint(key, &u);
         r = EVP_CipherInit_ex2(ctx, ciph, cipher_key, cipher_iv, 1, params);
+        if (r)
+            cipher_gcm_noiv[cipher_current] = 0;
         cipher_keyed[cipher_current] = r;
         cipher_ready[cipher_current] = r;
         EVP_CIPHER_free(ciph);
@@ -2663,6 +2682,9 @@ static int cipher_command(const char *command, const char *line)
                 /* SIV with `speed` set uses the key's CMAC and CTR contexts unmade. */
                 || (siv(ctx) && EVP_CIPHER_get_mode(EVP_CIPHER_CTX_get0_cipher(ctx))
                                     == EVP_CIPH_SIV_MODE)
+                /* A copy of XTS without a key points at key schedules never set. */
+                || (EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+                    && EVP_CIPHER_get_mode(EVP_CIPHER_CTX_get0_cipher(ctx)) == EVP_CIPH_XTS_MODE)
                 || (command[1] == 'u' && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
                     && (EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
                         & EVP_CIPH_FLAG_CTS) != 0))) {
@@ -2748,6 +2770,11 @@ static int cipher_command(const char *command, const char *line)
             && (EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
                 & EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK) != 0) {
             /* OpenSSL asserts a fragment size has been set (docs/DEVIATIONS.md). */
+            printf(" skipped");
+        } else if ((n == EVP_CTRL_GCM_SET_IV_FIXED || n == EVP_CTRL_GCM_SET_IV_INV) && m != -1
+                   && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+                   && m > EVP_CIPHER_CTX_get_iv_length(ctx)) {
+            /* OpenSSL copies past the IV (docs/DEVIATIONS.md). */
             printf(" skipped");
         } else if (EVP_CIPHER_CTX_get0_cipher(ctx) == NULL
                    || (n != EVP_CTRL_RAND_KEY && n != 0x19 && n != 0x1a)) {
@@ -2853,6 +2880,12 @@ static int cipher_command(const char *command, const char *line)
         unsigned char *der = NULL;
         int len;
 
+        if (EVP_CIPHER_CTX_get_iv_length(ctx) > EVP_MAX_IV_LENGTH) {
+            /* OpenSSL asserts the IV fits its buffer (docs/DEVIATIONS.md). */
+            printf(" skipped\n");
+            ASN1_TYPE_free(t);
+            return 1;
+        }
         r = EVP_CIPHER_param_to_asn1(ctx, t);
         len = ASN1_TYPE_get(t) != 0 ? i2d_ASN1_TYPE(t, &der) : 0;
         printf(" %d", r);
@@ -2864,6 +2897,7 @@ static int cipher_command(const char *command, const char *line)
     } else if (strcmp(command, "ccopy") == 0) {
         cipher_keyed[!cipher_current] = cipher_keyed[cipher_current];
         cipher_ready[!cipher_current] = cipher_ready[cipher_current];
+        cipher_gcm_noiv[!cipher_current] = cipher_gcm_noiv[cipher_current];
         r = EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx);
         printf(" %d", r);
         if (!r) {
@@ -2877,6 +2911,7 @@ static int cipher_command(const char *command, const char *line)
     } else {
         cipher_keyed[cipher_current] = 0;
         cipher_ready[cipher_current] = 0;
+        cipher_gcm_noiv[cipher_current] = 0;
         printf(" %d", EVP_CIPHER_CTX_reset(ctx));
     }
     print_digest_errors();
@@ -3167,6 +3202,237 @@ static int printf_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * MACs (EVP_MAC(3)): two contexts, each made by name, initialized and set with parameters
+ * written name=value (digest, cipher, and properties as strings; key and iv as that many
+ * octets of the data; xof and the digest flags as ints; anything else as a size_t), updated
+ * with the data, and finished. GMAC without an IV would make one up at random, so its
+ * updates and finals are skipped until it has had one.
+ */
+static EVP_MAC_CTX *mac_ctx[2];
+static int mac_current, mac_gmac[2], mac_iv[2];
+static size_t mac_offset;
+static unsigned char mac_data[2048];
+
+static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *sizes, int *ints,
+                      char (*strs)[64], int *has_cipher, int *has_iv)
+{
+    char tok[96];
+    int n = 0, used, k = 0;
+    size_t off = mac_offset;
+
+    *has_cipher = *has_iv = 0;
+    line += strcspn(line, " ");
+    while (sscanf(line, "%95s%n", tok, &used) == 1 && n < 7) {
+        char *eq = strchr(tok, '=');
+
+        line += used;
+        if (k++ < skip)
+            continue;
+        if (eq == NULL)
+            continue;
+        *eq = '\0';
+        if (strcmp(tok, "digest") == 0 || strcmp(tok, "cipher") == 0
+            || strcmp(tok, "properties") == 0) {
+            snprintf(strs[n], 64, "%s", eq + 1);
+            params[n] = OSSL_PARAM_construct_utf8_string(tok, strs[n], 0);
+            *has_cipher |= strcmp(tok, "cipher") == 0;
+        } else if (strcmp(tok, "key") == 0 || strcmp(tok, "iv") == 0) {
+            size_t len = strtoul(eq + 1, NULL, 10) % 200;
+
+            params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
+            off = (off + len + 5) % 1024;
+            *has_iv |= strcmp(tok, "iv") == 0;
+        } else if (strcmp(tok, "xof") == 0 || strcmp(tok, "digest-noinit") == 0
+                   || strcmp(tok, "digest-oneshot") == 0) {
+            ints[n] = atoi(eq + 1);
+            params[n] = OSSL_PARAM_construct_int(tok, &ints[n]);
+        } else {
+            sizes[n] = strtoul(eq + 1, NULL, 10);
+            params[n] = OSSL_PARAM_construct_size_t(tok, &sizes[n]);
+        }
+        /* The key names are the tokens' own text: keep them. */
+        params[n].key = OPENSSL_strdup(params[n].key);
+        n++;
+    }
+    params[n] = OSSL_PARAM_construct_end();
+    return n;
+}
+
+static void mac_params_free(OSSL_PARAM *params)
+{
+    for (; params->key != NULL; params++)
+        OPENSSL_free((char *)params->key);
+}
+
+static void mac_flags_after(int slot, int r, int has_cipher, int has_iv)
+{
+    if (has_cipher)
+        mac_iv[slot] = 0;
+    if (has_iv)
+        mac_iv[slot] = r == 1;
+}
+
+static int mac_command(const char *command, const char *line)
+{
+    EVP_MAC_CTX *ctx;
+    OSSL_PARAM params[8];
+    size_t sizes[8], outl = 0, sz;
+    int ints[8], has_cipher = 0, has_iv = 0, r = 0;
+    char strs[8][64], a[64] = "";
+    unsigned char out[300];
+    unsigned long n = 0;
+
+    if (command[0] != 'm' || (strcmp(command, "mctx") != 0 && strcmp(command, "mnew") != 0
+            && strcmp(command, "minit") != 0 && strcmp(command, "mset") != 0
+            && strcmp(command, "mupdate") != 0 && strcmp(command, "mfinal") != 0
+            && strcmp(command, "mxof") != 0 && strcmp(command, "msize") != 0
+            && strcmp(command, "mdup") != 0 && strcmp(command, "mfree") != 0
+            && strcmp(command, "mget") != 0 && strcmp(command, "mq") != 0))
+        return 0;
+    if (mac_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(mac_data); i++)
+            mac_data[i] = (unsigned char)(i * 11 + 5);
+    }
+    ctx = mac_ctx[mac_current];
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "mctx") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        mac_current = n != 0;
+        printf("\n");
+        return 1;
+    } else if (strcmp(command, "mnew") == 0) {
+        EVP_MAC *mac;
+
+        sscanf(line, "%*s %63s", a);
+        EVP_MAC_CTX_free(ctx);
+        mac_ctx[mac_current] = NULL;
+        mac = EVP_MAC_fetch(NULL, a, NULL);
+        if (mac != NULL) {
+            mac_ctx[mac_current] = EVP_MAC_CTX_new(mac);
+            printf(" %s %s", EVP_MAC_get0_name(mac), mac_ctx[mac_current] != NULL ? "ok" : "failed");
+            mac_gmac[mac_current] = EVP_MAC_is_a(mac, "GMAC");
+            mac_iv[mac_current] = 0;
+        } else {
+            printf(" fetch failed");
+        }
+        EVP_MAC_free(mac);
+    } else if (strcmp(command, "mq") == 0) {
+        char alg[64] = "", sub[64] = "";
+        unsigned long keylen = 0, datalen = 0, outsize = 0;
+        unsigned char *p;
+
+        if (sscanf(line, "%*s %63s %63s %lu %lu %lu", alg, sub, &keylen, &datalen, &outsize) != 5)
+            return printf(" usage\n"), 1;
+        mac_params(line, 5, params, sizes, ints, strs, &has_cipher, &has_iv);
+        ERR_set_mark();
+        {
+            EVP_MAC *mac = EVP_MAC_fetch(NULL, alg, NULL);
+
+            r = mac != NULL && EVP_MAC_is_a(mac, "GMAC");
+            EVP_MAC_free(mac);
+        }
+        ERR_pop_to_mark();
+        if (r && !has_iv) {
+            printf(" skipped: GMAC without an IV\n");
+            mac_params_free(params);
+            return 1;
+        }
+        p = EVP_Q_mac(NULL, alg, NULL, strcmp(sub, "-") == 0 ? NULL : sub, params,
+                      mac_data + 100, keylen % 200, mac_data + 300, datalen % 1500,
+                      outsize == 0 ? NULL : out, outsize % 300, &outl);
+        printf(" %s", p == NULL ? "NULL" : p == out ? "out" : "allocated");
+        if (p != NULL) {
+            printf(" %zu ", outl);
+            for (sz = 0; sz < outl && sz < 256; sz++)
+                printf("%02x", p[sz]);
+            if (p != out)
+                OPENSSL_free(p);
+        }
+        mac_params_free(params);
+    } else if (ctx == NULL) {
+        printf(" no context\n");
+        return 1;
+    } else if (strcmp(command, "minit") == 0 || strcmp(command, "mset") == 0) {
+        int init = command[1] == 'i';
+        char keyarg[32] = "";
+
+        mac_params(line, init, params, sizes, ints, strs, &has_cipher, &has_iv);
+        if (init) {
+            sscanf(line, "%*s %31s", keyarg);
+            n = strtoul(keyarg, NULL, 10) % 200;
+            r = EVP_MAC_init(ctx, strcmp(keyarg, "-") == 0 ? NULL : mac_data + 600, n,
+                             params[0].key == NULL ? NULL : params);
+        } else {
+            r = EVP_MAC_CTX_set_params(ctx, params);
+        }
+        mac_flags_after(mac_current, r, has_cipher, has_iv);
+        mac_params_free(params);
+        printf(" %d", r);
+    } else if ((strcmp(command, "mupdate") == 0 || strcmp(command, "mfinal") == 0
+                || strcmp(command, "mxof") == 0)
+               && mac_gmac[mac_current] && !mac_iv[mac_current]) {
+        printf(" skipped: GMAC without an IV\n");
+        return 1;
+    } else if (strcmp(command, "mupdate") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 1024)
+            n = 1024;
+        printf(" %d", EVP_MAC_update(ctx, mac_data + mac_offset, n));
+        mac_offset = (mac_offset + n * 3 + 1) % 1024;
+    } else if (strcmp(command, "mfinal") == 0) {
+        n = 64;
+        sscanf(line, "%*s %lu", &n);
+        r = EVP_MAC_final(ctx, n > 256 ? NULL : out, &outl, n % 257);
+        /* The length is only set on success. */
+        printf(" %d", r);
+        if (r == 1) {
+            printf(" %zu ", outl);
+            for (sz = 0; sz < outl && sz < 256 && n <= 256; sz++)
+                printf("%02x", out[sz]);
+        }
+    } else if (strcmp(command, "mxof") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 256)
+            n = 256;
+        r = EVP_MAC_finalXOF(ctx, out, n);
+        printf(" %d ", r);
+        for (sz = 0; sz < (r ? n : 0); sz++)
+            printf("%02x", out[sz]);
+    } else if (strcmp(command, "msize") == 0) {
+        printf(" %zu %zu", EVP_MAC_CTX_get_mac_size(ctx), EVP_MAC_CTX_get_block_size(ctx));
+    } else if (strcmp(command, "mget") == 0) {
+        size_t size = 1234, block = 1234;
+
+        params[0] = OSSL_PARAM_construct_size_t("size", &size);
+        params[1] = OSSL_PARAM_construct_size_t("block-size", &block);
+        params[2] = OSSL_PARAM_construct_end();
+        r = EVP_MAC_CTX_get_params(ctx, params);
+        printf(" %d %zu %zu", r, size, block);
+    } else if (strcmp(command, "mdup") == 0) {
+        EVP_MAC_CTX *dup = EVP_MAC_CTX_dup(ctx);
+
+        printf(" %s", dup == NULL ? "NULL" : "ok");
+        if (dup != NULL) {
+            EVP_MAC_CTX_free(mac_ctx[!mac_current]);
+            mac_ctx[!mac_current] = dup;
+            mac_gmac[!mac_current] = mac_gmac[mac_current];
+            mac_iv[!mac_current] = mac_iv[mac_current];
+        }
+    } else {
+        EVP_MAC_CTX_free(ctx);
+        mac_ctx[mac_current] = NULL;
+    }
+    print_digest_errors();
+    /* A failed fetch's error text has the name's number, which differs between the libraries:
+     * drop the buffers it sized. */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -3192,7 +3458,7 @@ int main(void)
             || params_command(command, line) || ctx_command(command, line)
             || prop_command(command, line) || prov_command(command, line)
             || fetch_command(command, line) || digest_command(command, line)
-            || cipher_command(command, line)) {
+            || cipher_command(command, line) || mac_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

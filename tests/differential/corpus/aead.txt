@@ -438,3 +438,23 @@ cinit - -1 1 1
 ctagget 12
 cinit - -1 0 1
 ctagget 12
+# GCM keyed again without a new IV: the data operations are the platform's, so skipped
+cctx 0
+cinit AES-128-GCM 0 1 1
+cupdate 33
+cinit - 1 1 0
+cupdate 140
+cfinal
+ctagget 12
+cinit AES-256-GCM 0 1 1
+cupdate 3
+cinit - 1 1 0
+caad 5
+cupdate 17
+cfinal
+ctagget 16
+# A tag length no buffer has: the room is checked first
+cinit AES-128-GCM 1 1 1
+cctrl 17 -1
+cinit AES-128-GCM 0 1 1
+cctrl 17 -1
