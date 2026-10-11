@@ -2183,7 +2183,38 @@ have run for at least 24 CPU-hours with no findings.
   *Step 3.4 done:* 243 exports over the five sub-steps, now 1,175 of libcrypto's 5,876. The
   default provider offers every cipher the reference's does.
 - [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
-  the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`.
+  the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`. Split in two:
+  - [x] **3.5a The MAC layer, HMAC, CMAC, and GMAC:** `EVP_MAC` methods fetched from
+    providers (`mac_meth.c`: an algorithm needs `newctx`, `freectx`, `update`, `final`, and
+    `init`), `EVP_MAC_CTX` (`mac_lib.c`), and `EVP_Q_mac`; the legacy `HMAC_*` (with
+    `HMAC()`'s static buffer) and `CMAC_*` (with `CMAC_resume`) ported over our own
+    `EVP_MD_CTX` and `EVP_CIPHER_CTX` exports, as OpenSSL's are; and the default provider's
+    HMAC, CMAC, and GMAC on them (`provider/macs.rs`), with the reference's parameter lists.
+    49 exports. Decisions and findings:
+    - A MAC fetches its digest or cipher from the provider's library context, as
+      `ossl_prov_*_load_from_params` does, and on failure makes the legacy-name lookup too
+      (`EVP_get_*byname`): nothing it can find is used before 3.11, but the lookup touches
+      the error queue's slots, which applications can see through later errors' flags.
+    - HMAC's TLS record mode (`tls-data-size` nonzero, `ssl3_cbc_digest_record`) is refused
+      with `ERR_R_UNSUPPORTED` until 3.5b.
+    - Fixed on the way: GCM re-keyed without a new IV after use now hashes from zero, as
+      `CRYPTO_gcm128_init` leaves it (the tag was all zeros); and
+      `OSSL_PARAM_get_octet_string`/`_utf8_string` check the room before an impossible
+      `data_size` (`CRYPTO_R_TOO_SMALL_BUFFER`, as the reference).
+    - New deviations: NULL methods and contexts; CMAC with a block over 32 octets; the
+      `engine` parameter; and a copy of an XTS context without a key, which the reference
+      crashes on (found by the random sessions).
+    - `tests/c/evp_mac.c`, 171 checks: the methods and their parameter lists, each MAC's
+      lifecycle (RFC 4231 and RFC 4493 vectors, copies, reinit, sizes, bad parameters), the
+      legacy APIs, and `EVP_Q_mac`.
+    - The probe's `m*` commands (corpus `mac.txt`, random MAC sessions; GMAC without an IV
+      would pick one at random, so its updates and finals are skipped then). The probe also
+      guards three reference crashes the new mix of sessions reached: `casn1` with an IV over
+      16 octets, a GCM fixed IV longer than the IV through `cctrl`, and XTS copies.
+    - The `mac` fuzz target: random splits, copies, and reinits must match `EVP_Q_mac` and
+      the legacy APIs.
+  - [ ] **3.5b The other MACs:** KMAC-128/256, Poly1305, SipHash, BLAKE2BMAC/BLAKE2SMAC, and
+    HMAC's TLS record mode (constant-time `ssl3_cbc_digest_record`).
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
   KBKDF, TLS1-PRF, SSHKDF, PKCS12KDF, KRB5KDF, Argon2i/d/id, HMAC-DRBG-KDF, and the legacy
   provider's PVKKDF; `PKCS5_PBKDF2_HMAC*`, `EVP_PBE_scrypt`, `EVP_BytesToKey`. Over the
