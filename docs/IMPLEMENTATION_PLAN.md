@@ -2182,7 +2182,7 @@ have run for at least 24 CPU-hours with no findings.
 
   *Step 3.4 done:* 243 exports over the five sub-steps, now 1,175 of libcrypto's 5,876. The
   default provider offers every cipher the reference's does.
-- [ ] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
+- [x] **3.5 EVP_MAC:** HMAC, CMAC, GMAC, KMAC128/256, Poly1305, SipHash, and BLAKE2 MACs;
   the legacy `HMAC_*` and `CMAC_*` APIs; `EVP_Q_mac`. Split in two:
   - [x] **3.5a The MAC layer, HMAC, CMAC, and GMAC:** `EVP_MAC` methods fetched from
     providers (`mac_meth.c`: an algorithm needs `newctx`, `freectx`, `update`, `final`, and
@@ -2215,8 +2215,33 @@ have run for at least 24 CPU-hours with no findings.
       16 octets, a GCM fixed IV longer than the IV through `cctrl`, and XTS copies.
     - The `mac` fuzz target: random splits, copies, and reinits must match `EVP_Q_mac` and
       the legacy APIs.
-  - [ ] **3.5b The other MACs:** KMAC-128/256, Poly1305, SipHash, BLAKE2BMAC/BLAKE2SMAC, and
-    HMAC's TLS record mode (constant-time `ssl3_cbc_digest_record`).
+  - [x] **3.5b The other MACs:** KMAC-128/256, Poly1305, SipHash, BLAKE2BMAC/BLAKE2SMAC, and
+    HMAC's TLS record mode (constant-time `ssl3_cbc_digest_record`). No new exports: the
+    default provider's MAC table is now the reference's, all nine. Decisions and findings:
+    - `rustyssl-crypto`'s `provided::mac` has the providers' state machines over the 3.2c
+      backend: Poly1305 (no init again once used), SipHash (OpenSSL's own `SIPHASH` state,
+      ported: it runs with no rounds before a key and changes its output size in place, and
+      honors any round count, up to 2^32 - 1), and the BLAKE2 MACs (all zeros before an init
+      and after a final, which then finishes into nothing).
+    - KMAC is ported over our `EVP_MD_CTX` with the KECCAK-KMAC digests, as the reference's
+      runs over the EVP layer; its `key` and `custom` parameters aren't type-checked, and NULL
+      data encodes as nothing, as there.
+    - The TLS record MAC (`tls_cbc_record_mac`) computes over the record's public length in
+      constant time, with the RustCrypto crates' compression functions and their own initial
+      states (read through `SerializableState`, so no constant is retyped). It covers what
+      TLS can produce: after the data, the MAC and 1 to 256 octets of padding.
+    - New deviations: Poly1305 after its final; a BLAKE2 size set below the one it started
+      with; NULL data of a length; HMAC's TLS mode without a digest.
+    - `tests/c/evp_mac_others.c`, 94 checks: every name and parameter list, the SP 800-185,
+      RFC 8439, SipHash, and BLAKE2 vectors, the lifecycles and errors, and TLS records of
+      seven digests and paddings against HMAC.
+    - The probe's MAC commands take `custom`, `salt`, and the rounds; random sessions cover the
+      new MACs and TLS mode (the probe guards the reference's two crashes, and skips GMAC
+      keyed again after use without a new IV, which is the platform's GCM, as in 3.5a).
+    - The `mac` fuzz target also checks the new MACs against `EVP_Q_mac` and TLS records
+      against HMAC.
+
+  *Step 3.5 done:* 49 exports; the default provider offers every MAC the reference's does.
 - [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
   KBKDF, TLS1-PRF, SSHKDF, PKCS12KDF, KRB5KDF, Argon2i/d/id, HMAC-DRBG-KDF, and the legacy
   provider's PVKKDF; `PKCS5_PBKDF2_HMAC*`, `EVP_PBE_scrypt`, `EVP_BytesToKey`. Over the

@@ -126,6 +126,9 @@ OpenSSL never depends on them.
 | CMAC (`CMAC_*`, the `CMAC` MAC) with a cipher whose block is larger than `EVP_MAX_BLOCK_LENGTH` (32 octets) | overruns its buffers | fails | none yet: no cipher this library can load has such a block (third-party providers come in a later phase) |
 | An `engine` parameter to the HMAC, CMAC, or GMAC MAC | looks the engine up (`ENGINE_by_id`) and uses it | fails, as there are no engines | `provider::macs::tests::engines_are_refused` |
 | GCM given a key without an IV after it was used (`EVP_EncryptInit_ex(ctx, NULL, NULL, key, NULL)`), then data | the platform's: the generic and ARMv8 code go on with the counter and the hash from zero; x86-64's AVX-512 code keeps a state of its own and gives other output | as the generic code (the tests pin the macOS reference's output); the probe skips data operations in that state | `evp::cipher_ctx::tests::gcm_keyed_again_without_an_iv` |
+| Poly1305 (the MAC) updated with data or finalized again after its final | its state, assembly function pointers included, was zeroed: it crashes | fails | `crypto` `provided::mac::tests::poly1305_after_its_final_fails` |
+| A BLAKE2 MAC whose `size` is set below the size it was started with, then finalized | writes the whole output it started with, past the room `EVP_MAC_final` checked for | writes what fits the room (what the caller can read is the same) | `provider::macs::tests::blake2_writes_only_what_fits` |
+| SipHash's, the BLAKE2 MACs', and Poly1305's updates, and SipHash's and the BLAKE2 MACs' `key`, `custom`, and `salt` parameters, with NULL data of a nonzero length; HMAC's TLS mode (`tls-data-size`) given a record without a digest set | read through NULL, and crash | fail | `provider::macs::tests::null_data_is_refused` |
 
 ## Notes
 
