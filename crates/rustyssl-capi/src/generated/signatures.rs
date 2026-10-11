@@ -1955,6 +1955,64 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_EncryptUpdate;
+const _: unsafe extern "C" fn(*const EVP_KDF_CTX) -> *mut EVP_KDF_CTX =
+    crate::evp::kdf::EVP_KDF_CTX_dup;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) = crate::evp::kdf::EVP_KDF_CTX_free;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> usize =
+    crate::evp::kdf::EVP_KDF_CTX_get_kdf_size;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::kdf::EVP_KDF_CTX_get_params;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> *const OSSL_PARAM =
+    crate::evp::kdf::EVP_KDF_CTX_gettable_params;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> *const EVP_KDF =
+    crate::evp::kdf::EVP_KDF_CTX_kdf;
+const _: unsafe extern "C" fn(*mut EVP_KDF) -> *mut EVP_KDF_CTX = crate::evp::kdf::EVP_KDF_CTX_new;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) = crate::evp::kdf::EVP_KDF_CTX_reset;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::kdf::EVP_KDF_CTX_set_params;
+const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> *const OSSL_PARAM =
+    crate::evp::kdf::EVP_KDF_CTX_settable_params;
+const _: unsafe extern "C" fn(
+    *mut EVP_KDF_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_derive;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<unsafe extern "C" fn(kdf: *mut EVP_KDF, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::evp::kdf::EVP_KDF_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_KDF = crate::evp::kdf::EVP_KDF_fetch;
+const _: unsafe extern "C" fn(*mut EVP_KDF) = crate::evp::kdf::EVP_KDF_free;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const core::ffi::c_char =
+    crate::evp::kdf::EVP_KDF_get0_description;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const core::ffi::c_char =
+    crate::evp::kdf::EVP_KDF_get0_name;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const OSSL_PROVIDER =
+    crate::evp::kdf::EVP_KDF_get0_provider;
+const _: unsafe extern "C" fn(*mut EVP_KDF, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::kdf::EVP_KDF_get_params;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const OSSL_PARAM =
+    crate::evp::kdf::EVP_KDF_gettable_ctx_params;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const OSSL_PARAM =
+    crate::evp::kdf::EVP_KDF_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_KDF, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::kdf::EVP_KDF_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_KDF,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_names_do_all;
+const _: unsafe extern "C" fn(*const EVP_KDF) -> *const OSSL_PARAM =
+    crate::evp::kdf::EVP_KDF_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut EVP_KDF) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_up_ref;
 const _: unsafe extern "C" fn(*const EVP_MAC_CTX) -> *mut EVP_MAC_CTX =
     crate::evp::mac::EVP_MAC_CTX_dup;
 const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) = crate::evp::mac::EVP_MAC_CTX_free;
@@ -3218,6 +3276,25 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_write_bio;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const EVP_MD,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::kdf::PKCS5_PBKDF2_HMAC;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::evp::kdf::PKCS5_PBKDF2_HMAC_SHA1;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn(
