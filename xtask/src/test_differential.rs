@@ -994,7 +994,21 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
 /// updates of lengths around the block sizes, finals into buffers of sizes around the MAC's,
 /// XOF finals, sizes, copies, and one-shot MACs. (HMAC's TLS data size comes with step 3.5b.)
 fn mac_session(random: &mut Random, out: &mut String) -> Result {
-    const MACS: &[&str] = &["HMAC", "CMAC", "GMAC", "hmac", "1.0.9797.3.4", "KMAC-128x"];
+    const MACS: &[&str] = &[
+        "HMAC",
+        "CMAC",
+        "GMAC",
+        "hmac",
+        "1.0.9797.3.4",
+        "KMAC-128",
+        "KMAC256",
+        "2.16.840.1.101.3.4.2.19",
+        "POLY1305",
+        "SIPHASH",
+        "BLAKE2BMAC",
+        "BLAKE2SMAC",
+        "KMAC-128x",
+    ];
     const DIGESTS: &[&str] = &[
         "SHA1",
         "SHA224",
@@ -1036,15 +1050,21 @@ fn mac_session(random: &mut Random, out: &mut String) -> Result {
     ];
     let key_length = |random: &mut Random| -> u64 {
         match random.below(3) {
-            0 => random.pick(&["16", "24", "32"]).parse().unwrap_or(16),
-            1 => random.below(4) + random.pick(&["14", "22", "30"]).parse().unwrap_or(14),
+            0 => random.pick(&["16", "24", "32", "64"]).parse().unwrap_or(16),
+            1 => {
+                random.below(4)
+                    + random
+                        .pick(&["2", "14", "22", "30", "62"])
+                        .parse()
+                        .unwrap_or(14)
+            }
             _ => random.below(200),
         }
     };
     let params = |random: &mut Random| -> String {
         let mut text = String::new();
         for _ in 0..random.below(3) {
-            let param = match random.below(9) {
+            let param = match random.below(13) {
                 0 | 1 => format!("digest={}", random.pick(DIGESTS)),
                 2 | 3 => format!("cipher={}", random.pick(CIPHERS)),
                 4 => format!("key={}", key_length(random)),
@@ -1055,6 +1075,29 @@ fn mac_session(random: &mut Random, out: &mut String) -> Result {
                 7 => format!(
                     "properties={}",
                     random.pick(&["provider=default", "provider=nonesuch", "-fips", "?x"])
+                ),
+                // KMAC's, SipHash's, and the BLAKE2 MACs' (rounds kept small: OpenSSL runs
+                // as many as asked for).
+                9 => format!(
+                    "{}={}",
+                    random.pick(&["custom", "salt"]),
+                    random.pick(&["0", "1", "8", "9", "16", "17", "21"])
+                ),
+                10 => format!(
+                    "{}={}",
+                    random.pick(&["c-rounds", "d-rounds"]),
+                    random.below(6)
+                ),
+                11 => format!(
+                    "size={}",
+                    random.pick(&[
+                        "0", "1", "8", "12", "16", "20", "32", "33", "64", "65", "100"
+                    ])
+                ),
+                // HMAC's TLS mode: the record's whole length (data, MAC, padding).
+                12 => format!(
+                    "tls-data-size={}",
+                    random.pick(&["0", "48", "64", "100", "300", "1000"])
                 ),
                 _ => random
                     .pick(&[
@@ -1076,7 +1119,7 @@ fn mac_session(random: &mut Random, out: &mut String) -> Result {
             0 => random.below(4),
             1 => random
                 .pick(&[
-                    "7", "8", "9", "15", "16", "17", "63", "64", "65", "127", "128", "129",
+                    "7", "8", "9", "13", "15", "16", "17", "63", "64", "65", "127", "128", "129",
                 ])
                 .parse()
                 .unwrap_or(0),
