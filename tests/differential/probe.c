@@ -261,6 +261,7 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
 #include <openssl/params.h>
@@ -3220,6 +3221,7 @@ static int mac_poly[2], mac_poly_done[2], mac_hmac[2], mac_nodigest[2], mac_tls[
 /* What the last parameter list had: a digest, a nonzero TLS data size, a key. */
 static int mac_has_digest, mac_has_tls, mac_has_key;
 static unsigned int mac_uints[8];
+static uint64_t mac_u64s[8];
 static size_t mac_offset;
 static unsigned char mac_data[2048];
 
@@ -3243,24 +3245,33 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
             continue;
         *eq = '\0';
         if (strcmp(tok, "digest") == 0 || strcmp(tok, "cipher") == 0
-            || strcmp(tok, "properties") == 0) {
+            || strcmp(tok, "properties") == 0 || strcmp(tok, "mac") == 0
+            || (strcmp(tok, "mode") == 0 && (eq[1] < '0' || eq[1] > '9'))) {
             snprintf(strs[n], 64, "%s", eq + 1);
             params[n] = OSSL_PARAM_construct_utf8_string(tok, strs[n], 0);
             *has_cipher |= strcmp(tok, "cipher") == 0;
             mac_has_digest |= strcmp(tok, "digest") == 0;
         } else if (strcmp(tok, "key") == 0 || strcmp(tok, "iv") == 0
-                   || strcmp(tok, "custom") == 0 || strcmp(tok, "salt") == 0) {
+                   || strcmp(tok, "custom") == 0 || strcmp(tok, "salt") == 0
+                   || strcmp(tok, "info") == 0 || strcmp(tok, "secret") == 0
+                   || strcmp(tok, "seed") == 0 || strcmp(tok, "pass") == 0
+                   || strcmp(tok, "prefix") == 0 || strcmp(tok, "label") == 0
+                   || strcmp(tok, "data") == 0) {
             size_t len = strtoul(eq + 1, NULL, 10) % 200;
 
             params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
             off = (off + len + 5) % 1024;
             *has_iv |= strcmp(tok, "iv") == 0;
             mac_has_key |= strcmp(tok, "key") == 0;
+        } else if (strcmp(tok, "iter") == 0) {
+            mac_u64s[n] = strtoull(eq + 1, NULL, 10);
+            params[n] = OSSL_PARAM_construct_uint64(tok, &mac_u64s[n]);
         } else if (strcmp(tok, "c-rounds") == 0 || strcmp(tok, "d-rounds") == 0) {
             mac_uints[n] = (unsigned int)strtoul(eq + 1, NULL, 10);
             params[n] = OSSL_PARAM_construct_uint(tok, &mac_uints[n]);
         } else if (strcmp(tok, "xof") == 0 || strcmp(tok, "digest-noinit") == 0
-                   || strcmp(tok, "digest-oneshot") == 0) {
+                   || strcmp(tok, "digest-oneshot") == 0 || strcmp(tok, "pkcs5") == 0
+                   || strcmp(tok, "mode") == 0) {
             ints[n] = atoi(eq + 1);
             params[n] = OSSL_PARAM_construct_int(tok, &ints[n]);
         } else {
@@ -3487,6 +3498,128 @@ static int mac_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * KDFs (EVP_KDF(3)): two contexts, each made by name, given parameters as the MAC commands
+ * write them (with the KDFs' names: secret, seed, info, pass, prefix, label, and data as
+ * octets of the data; iter as a uint64; pkcs5 and a numeric mode as ints; mac and a named mode
+ * as strings), and derived from into buffers of the lengths asked for.
+ */
+static EVP_KDF_CTX *kdf_ctx[2];
+static int kdf_current;
+
+static int kdf_command(const char *command, const char *line)
+{
+    EVP_KDF_CTX *ctx;
+    OSSL_PARAM params[8];
+    size_t sizes[8], sz;
+    int ints[8], has_cipher = 0, has_iv = 0, r = 0;
+    char strs[8][64], a[64] = "";
+    unsigned char out[1100];
+    unsigned long n = 0;
+
+    if (command[0] != 'k' || (strcmp(command, "kctx") != 0 && strcmp(command, "knew") != 0
+            && strcmp(command, "kset") != 0 && strcmp(command, "kderive") != 0
+            && strcmp(command, "ksize") != 0 && strcmp(command, "kdup") != 0
+            && strcmp(command, "kreset") != 0 && strcmp(command, "kfree") != 0
+            && strcmp(command, "kget") != 0 && strcmp(command, "kpbkdf2") != 0))
+        return 0;
+    if (mac_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(mac_data); i++)
+            mac_data[i] = (unsigned char)(i * 11 + 5);
+    }
+    ctx = kdf_ctx[kdf_current];
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "kctx") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        kdf_current = n != 0;
+        printf("\n");
+        return 1;
+    } else if (strcmp(command, "knew") == 0) {
+        EVP_KDF *kdf;
+
+        sscanf(line, "%*s %63s", a);
+        EVP_KDF_CTX_free(ctx);
+        kdf = EVP_KDF_fetch(NULL, a, NULL);
+        kdf_ctx[kdf_current] = EVP_KDF_CTX_new(kdf);
+        if (kdf != NULL)
+            printf(" %s %s", EVP_KDF_get0_name(kdf), kdf_ctx[kdf_current] != NULL ? "ok" : "failed");
+        else
+            printf(" fetch failed");
+        EVP_KDF_free(kdf);
+    } else if (strcmp(command, "kpbkdf2") == 0) {
+        int passlen = 0, saltlen = 0, iter = 0, keylen = 0;
+        char md[64] = "";
+        EVP_MD *digest;
+
+        if (sscanf(line, "%*s %63s %d %d %d %d", md, &passlen, &saltlen, &iter, &keylen) != 5)
+            return printf(" usage\n"), 1;
+        digest = EVP_MD_fetch(NULL, md, NULL);
+        if (digest == NULL) {
+            printf(" fetch failed");
+        } else if (passlen < -1 || saltlen < 0 || keylen < 0 || keylen > 1024) {
+            /* OpenSSL reads and writes past them (docs/DEVIATIONS.md). */
+            printf(" skipped");
+        } else {
+            r = PKCS5_PBKDF2_HMAC(passlen == -1 ? "password" : (const char *)mac_data + 50,
+                                  passlen % 200, mac_data + 400, saltlen % 200, iter, digest,
+                                  keylen, out);
+            printf(" %d ", r);
+            for (sz = 0; sz < (size_t)(r == 1 ? keylen : 0) && sz < 256; sz++)
+                printf("%02x", out[sz]);
+        }
+        EVP_MD_free(digest);
+    } else if (ctx == NULL) {
+        printf(" no context\n");
+        return 1;
+    } else if (strcmp(command, "kset") == 0) {
+        mac_params(line, 0, params, sizes, ints, strs, &has_cipher, &has_iv);
+        printf(" %d", EVP_KDF_CTX_set_params(ctx, params));
+        mac_params_free(params);
+    } else if (strcmp(command, "kderive") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 1024)
+            n = 1024;
+        mac_params(line, 1, params, sizes, ints, strs, &has_cipher, &has_iv);
+        r = EVP_KDF_derive(ctx, out, n, params[0].key == NULL ? NULL : params);
+        mac_params_free(params);
+        printf(" %d ", r);
+        for (sz = 0; sz < (r == 1 ? n : 0) && sz < 256; sz++)
+            printf("%02x", out[sz]);
+    } else if (strcmp(command, "ksize") == 0) {
+        printf(" %zu", EVP_KDF_CTX_get_kdf_size(ctx));
+    } else if (strcmp(command, "kget") == 0) {
+        size_t size = 1234;
+        unsigned char info[64];
+
+        params[0] = OSSL_PARAM_construct_size_t("size", &size);
+        params[1] = OSSL_PARAM_construct_octet_string("info", info, sizeof(info));
+        params[2] = OSSL_PARAM_construct_end();
+        params[1].return_size = 4321;
+        r = EVP_KDF_CTX_get_params(ctx, params);
+        printf(" %d %zu %zu", r, size, params[1].return_size);
+    } else if (strcmp(command, "kdup") == 0) {
+        EVP_KDF_CTX *dup = EVP_KDF_CTX_dup(ctx);
+
+        printf(" %s", dup == NULL ? "NULL" : "ok");
+        if (dup != NULL) {
+            EVP_KDF_CTX_free(kdf_ctx[!kdf_current]);
+            kdf_ctx[!kdf_current] = dup;
+        }
+    } else if (strcmp(command, "kreset") == 0) {
+        EVP_KDF_CTX_reset(ctx);
+    } else {
+        EVP_KDF_CTX_free(ctx);
+        kdf_ctx[kdf_current] = NULL;
+    }
+    print_digest_errors();
+    /* A failed fetch's error text has the name's number: drop the buffers it sized. */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -3512,7 +3645,8 @@ int main(void)
             || params_command(command, line) || ctx_command(command, line)
             || prop_command(command, line) || prov_command(command, line)
             || fetch_command(command, line) || digest_command(command, line)
-            || cipher_command(command, line) || mac_command(command, line)) {
+            || cipher_command(command, line) || mac_command(command, line)
+            || kdf_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

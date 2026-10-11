@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(26) {
+        match random.below(27) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -174,6 +174,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             22 => digest_session(&mut random, &mut out)?,
             23 => cipher_session(&mut random, &mut out)?,
             24 => mac_session(&mut random, &mut out)?,
+            25 => kdf_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -1177,6 +1178,137 @@ fn mac_session(random: &mut Random, out: &mut String) -> Result {
     writeln!(out, "mctx 1")?;
     writeln!(out, "mfree")?;
     writeln!(out, "mctx 0")?;
+    Ok(())
+}
+
+/// A random session of KDF commands on the probe's two contexts: HKDF, TLS13-KDF, PBKDF2,
+/// TLS1-PRF, SSKDF, and X963KDF made by name, given random digests, MACs, modes, keys, salts,
+/// secrets, seeds, info, labels, iterations (kept small), and sizes, and derived from into
+/// lengths around the digests' sizes; sizes, copies, resets, and `PKCS5_PBKDF2_HMAC`.
+fn kdf_session(random: &mut Random, out: &mut String) -> Result {
+    const KDFS: &[&str] = &[
+        "HKDF",
+        "TLS13-KDF",
+        "PBKDF2",
+        "1.2.840.113549.1.5.12",
+        "TLS1-PRF",
+        "SSKDF",
+        "X963KDF",
+        "X942KDF-CONCAT",
+        "hkdf",
+        "NO-SUCH-KDF",
+    ];
+    const DIGESTS: &[&str] = &[
+        "SHA1",
+        "SHA224",
+        "SHA256",
+        "SHA384",
+        "SHA512",
+        "SHA512-256",
+        "SHA3-256",
+        "MD5",
+        "MD5-SHA1",
+        "md5-sha1",
+        "SM3",
+        "BLAKE2s256",
+        "RIPEMD160",
+        "SHAKE128",
+        "NULL",
+        "nonesuch",
+    ];
+    let octets = |random: &mut Random| -> String {
+        random
+            .pick(&[
+                "0", "1", "4", "8", "13", "16", "20", "32", "48", "64", "100", "199",
+            ])
+            .to_owned()
+    };
+    let params = |random: &mut Random| -> String {
+        let mut text = String::new();
+        for _ in 0..random.below(4) {
+            let param = match random.below(12) {
+                0 | 1 => format!("digest={}", random.pick(DIGESTS)),
+                2 => format!(
+                    "mac={}",
+                    random.pick(&["HMAC", "KMAC128", "KMAC-256", "CMAC", "nonesuch"])
+                ),
+                3 => format!(
+                    "mode={}",
+                    random.pick(&[
+                        "0",
+                        "1",
+                        "2",
+                        "3",
+                        "EXTRACT_ONLY",
+                        "expand_only",
+                        "EXTRACT_AND_EXPAND",
+                        "both"
+                    ])
+                ),
+                4..=8 => format!(
+                    "{}={}",
+                    random.pick(&[
+                        "key", "salt", "info", "secret", "seed", "pass", "prefix", "label", "data"
+                    ]),
+                    octets(random)
+                ),
+                9 => format!(
+                    "iter={}",
+                    random.pick(&["0", "1", "2", "999", "1000", "2048", "3"])
+                ),
+                10 => format!("pkcs5={}", random.below(2)),
+                _ => format!(
+                    "{}={}",
+                    random.pick(&["mac-size", "properties"]),
+                    random.pick(&["0", "20", "21", "32", "64"])
+                ),
+            };
+            let param = param.replace("properties=0", "properties=provider=default");
+            text.push(' ');
+            text.push_str(&param);
+        }
+        text
+    };
+    let length = |random: &mut Random| -> u64 {
+        match random.below(3) {
+            0 => random
+                .pick(&[
+                    "0", "1", "13", "14", "16", "20", "28", "31", "32", "33", "48", "64",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(300),
+        }
+    };
+    for _ in 0..random.below(25) + 1 {
+        match random.below(14) {
+            0 | 1 => writeln!(out, "knew {}", random.pick(KDFS))?,
+            2..=4 => writeln!(out, "kset{}", params(random))?,
+            5..=8 => writeln!(out, "kderive {}{}", length(random), params(random))?,
+            9 => writeln!(out, "kdup")?,
+            10 => writeln!(out, "kctx {}", random.below(2))?,
+            11 => {
+                let passlen = random.pick(&["-1", "0", "1", "8", "199"]);
+                writeln!(
+                    out,
+                    "kpbkdf2 {} {passlen} {} {} {}",
+                    random.pick(DIGESTS),
+                    random.below(30),
+                    random.pick(&["0", "1", "2", "100"]),
+                    length(random)
+                )?;
+            }
+            _ => writeln!(
+                out,
+                "{}",
+                random.pick(&["ksize", "kget", "kreset", "kfree"])
+            )?,
+        }
+    }
+    writeln!(out, "kfree")?;
+    writeln!(out, "kctx 1")?;
+    writeln!(out, "kfree")?;
+    writeln!(out, "kctx 0")?;
     Ok(())
 }
 
