@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(25) {
+        match random.below(26) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -173,6 +173,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             21 => fetch_session(&mut random, &mut out)?,
             22 => digest_session(&mut random, &mut out)?,
             23 => cipher_session(&mut random, &mut out)?,
+            24 => mac_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -984,6 +985,155 @@ fn digest_session(random: &mut Random, out: &mut String) -> Result {
         }
     }
     writeln!(out, "dctx 0")?;
+    Ok(())
+}
+
+/// A random session of MAC commands on the probe's two contexts: HMAC, CMAC, and GMAC made by
+/// name, initialized and set with random digests, ciphers (of every mode, so the wrong ones
+/// too), properties, keys and IVs of lengths around the right ones, and the other parameters;
+/// updates of lengths around the block sizes, finals into buffers of sizes around the MAC's,
+/// XOF finals, sizes, copies, and one-shot MACs. (HMAC's TLS data size comes with step 3.5b.)
+fn mac_session(random: &mut Random, out: &mut String) -> Result {
+    const MACS: &[&str] = &["HMAC", "CMAC", "GMAC", "hmac", "1.0.9797.3.4", "KMAC-128x"];
+    const DIGESTS: &[&str] = &[
+        "SHA1",
+        "SHA224",
+        "SHA256",
+        "SHA384",
+        "SHA512",
+        "SHA512-224",
+        "SHA3-256",
+        "SHA3-512",
+        "KECCAK-256",
+        "SHAKE128",
+        "BLAKE2s256",
+        "BLAKE2b512",
+        "SM3",
+        "MD5",
+        "MD5-SHA1",
+        "RIPEMD160",
+        "NULL",
+        "nonesuch",
+    ];
+    const CIPHERS: &[&str] = &[
+        "AES-128-CBC",
+        "AES-192-CBC",
+        "AES-256-CBC",
+        "DES-EDE3-CBC",
+        "ARIA-128-CBC",
+        "CAMELLIA-256-CBC",
+        "SM4-CBC",
+        "AES-128-CBC-CTS",
+        "AES-128-ECB",
+        "AES-128-CTR",
+        "AES-128-GCM",
+        "AES-192-GCM",
+        "AES-256-GCM",
+        "ARIA-128-GCM",
+        "AES-128-CCM",
+        "ChaCha20-Poly1305",
+        "nonesuch",
+    ];
+    let key_length = |random: &mut Random| -> u64 {
+        match random.below(3) {
+            0 => random.pick(&["16", "24", "32"]).parse().unwrap_or(16),
+            1 => random.below(4) + random.pick(&["14", "22", "30"]).parse().unwrap_or(14),
+            _ => random.below(200),
+        }
+    };
+    let params = |random: &mut Random| -> String {
+        let mut text = String::new();
+        for _ in 0..random.below(3) {
+            let param = match random.below(9) {
+                0 | 1 => format!("digest={}", random.pick(DIGESTS)),
+                2 | 3 => format!("cipher={}", random.pick(CIPHERS)),
+                4 => format!("key={}", key_length(random)),
+                5 | 6 => format!(
+                    "iv={}",
+                    random.pick(&["12", "12", "16", "1", "0", "13", "64"])
+                ),
+                7 => format!(
+                    "properties={}",
+                    random.pick(&["provider=default", "provider=nonesuch", "-fips", "?x"])
+                ),
+                _ => random
+                    .pick(&[
+                        "tls-data-size=0",
+                        "digest-noinit=1",
+                        "digest-oneshot=0",
+                        "xof=1",
+                        "size=20",
+                    ])
+                    .to_owned(),
+            };
+            text.push(' ');
+            text.push_str(&param);
+        }
+        text
+    };
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&[
+                    "7", "8", "9", "15", "16", "17", "63", "64", "65", "127", "128", "129",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(600),
+        }
+    };
+    for _ in 0..random.below(25) + 1 {
+        match random.below(16) {
+            0 | 1 => writeln!(out, "mnew {}", random.pick(MACS))?,
+            2..=4 => {
+                let key = if random.below(4) == 0 {
+                    "-".to_owned()
+                } else {
+                    key_length(random).to_string()
+                };
+                writeln!(out, "minit {key}{}", params(random))?;
+            }
+            5 => writeln!(out, "mset{}", params(random))?,
+            6..=8 => writeln!(out, "mupdate {}", length(random))?,
+            9 | 10 => {
+                let size =
+                    random.pick(&["", " 64", " 0", " 7", " 15", " 16", " 19", " 31", " 300"]);
+                writeln!(out, "mfinal{size}")?;
+            }
+            11 => writeln!(out, "mxof {}", random.below(70))?,
+            12 => writeln!(out, "mdup")?,
+            13 => writeln!(out, "mctx {}", random.below(2))?,
+            14 => {
+                let (mac, sub) = match random.below(4) {
+                    0 => ("HMAC", random.pick(DIGESTS)),
+                    1 => ("CMAC", random.pick(CIPHERS)),
+                    2 => ("GMAC", random.pick(CIPHERS)),
+                    _ => (
+                        random.pick(MACS),
+                        random.pick(&["-", "SHA256", "AES-128-CBC"]),
+                    ),
+                };
+                let outsize = random.pick(&["0", "64", "16", "15", "31", "20"]);
+                writeln!(
+                    out,
+                    "mq {mac} {sub} {} {} {outsize}{}",
+                    key_length(random),
+                    length(random),
+                    params(random)
+                )?;
+            }
+            _ => writeln!(
+                out,
+                "{}",
+                random.pick(&["msize", "mget", "mfree", "mfinal"])
+            )?,
+        }
+    }
+    writeln!(out, "mfree")?;
+    writeln!(out, "mctx 1")?;
+    writeln!(out, "mfree")?;
+    writeln!(out, "mctx 0")?;
     Ok(())
 }
 

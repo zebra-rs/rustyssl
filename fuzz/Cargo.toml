@@ -205,3 +205,10 @@ name = "modes"
 path = "fuzz_targets/modes.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "mac"
+path = "fuzz_targets/mac.rs"
+test = false
+doc = false
+bench = false
