@@ -152,3 +152,80 @@ fn consttime_swap_swaps_whole_numbers() {
     // SAFETY: as above.
     unsafe { BN_free(y) };
 }
+
+/// A new number holding `v`.
+fn num(v: u64) -> *mut BIGNUM {
+    new_bignum(BigNum::from_word(v), false)
+}
+
+/// docs/DEVIATIONS.md: a failed `BN_MONT_CTX_set` leaves the context as it was.
+#[test]
+fn a_failed_montgomery_set_changes_nothing() {
+    let (seven, ten, five, r) = (num(7), num(10), num(5), num(0));
+    // SAFETY: no preconditions.
+    let mont = unsafe { mont::BN_MONT_CTX_new() };
+    // SAFETY: the context and numbers made here, here and below.
+    let got = unsafe { mont::BN_MONT_CTX_set(mont, seven, ptr::null_mut()) };
+    assert_eq!(got, 1);
+    // SAFETY: as above.
+    let got = unsafe { mont::BN_MONT_CTX_set(mont, ten, ptr::null_mut()) };
+    assert_eq!(got, 0);
+    // SAFETY: as above.
+    let got = unsafe { mont::BN_to_montgomery(r, five, mont, ptr::null_mut()) };
+    assert_eq!(got, 1);
+    // SAFETY: as above.
+    let got = unsafe { mont::BN_from_montgomery(r, r, mont, ptr::null_mut()) };
+    assert_eq!(got, 1);
+    // SAFETY: as above.
+    assert_eq!(unsafe { BN_is_word(r, 5) }, 1);
+    // SAFETY: ours to free.
+    unsafe { mont::BN_MONT_CTX_free(mont) };
+    for n in [seven, ten, five, r] {
+        // SAFETY: ours to free.
+        unsafe { BN_free(n) };
+    }
+    crate::err::take_all();
+}
+
+/// docs/DEVIATIONS.md: results aliasing operands that OpenSSL still reads get the
+/// arithmetic's answer.
+#[test]
+fn aliased_results_are_the_arithmetics() {
+    let (q, n7) = (num(100), num(7));
+    // SAFETY: no preconditions.
+    let recp = unsafe { mont::BN_RECP_CTX_new() };
+    // SAFETY: the context and numbers made here, here and below.
+    let got = unsafe { mont::BN_RECP_CTX_set(recp, n7, ptr::null_mut()) };
+    assert_eq!(got, 1);
+    let rem = num(0);
+    // The quotient into the dividend: 100 = 14 * 7 + 2.
+    // SAFETY: as above.
+    let got = unsafe { mont::BN_div_recp(q, rem, q, recp, ptr::null_mut()) };
+    assert_eq!(got, 1);
+    // SAFETY: as above.
+    let quotient = unsafe { BN_get_word(q) };
+    // SAFETY: as above.
+    let remainder = unsafe { BN_get_word(rem) };
+    assert_eq!((quotient, remainder), (14, 2));
+    // The inverse into the modulus: 3^-1 mod 7 = 5.
+    let (three, m) = (num(3), num(7));
+    // SAFETY: as above.
+    let got = unsafe { modular::BN_mod_inverse(m, three, m, ptr::null_mut()) };
+    assert_eq!(got, m);
+    // SAFETY: as above.
+    assert_eq!(unsafe { BN_get_word(m) }, 5);
+    // A square root into the prime: 2 = 3^2 mod 7, so 3 or 4.
+    let (two, p) = (num(2), num(7));
+    // SAFETY: as above.
+    let got = unsafe { modular::BN_mod_sqrt(p, two, p, ptr::null_mut()) };
+    assert_eq!(got, p);
+    // SAFETY: as above.
+    let root = unsafe { BN_get_word(p) };
+    assert!(root == 3 || root == 4);
+    // SAFETY: ours to free.
+    unsafe { mont::BN_RECP_CTX_free(recp) };
+    for n in [q, n7, rem, three, m, two, p] {
+        // SAFETY: ours to free.
+        unsafe { BN_free(n) };
+    }
+}
