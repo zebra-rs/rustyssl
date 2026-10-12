@@ -1425,10 +1425,10 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         c"AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2",
         &aes128cbc::TABLE,
     ),
-    alg(c"AES-256-OFB:2.16.840.1.101.3.4.1.43", &aes256ofb::TABLE),
     alg(c"AES-128-CBC-CTS", &modes::aes128cbc_cts::TABLE),
     alg(c"AES-192-CBC-CTS", &modes::aes192cbc_cts::TABLE),
     alg(c"AES-256-CBC-CTS", &modes::aes256cbc_cts::TABLE),
+    alg(c"AES-256-OFB:2.16.840.1.101.3.4.1.43", &aes256ofb::TABLE),
     alg(c"AES-192-OFB:2.16.840.1.101.3.4.1.23", &aes192ofb::TABLE),
     alg(c"AES-128-OFB:2.16.840.1.101.3.4.1.3", &aes128ofb::TABLE),
     alg(c"AES-256-CFB:2.16.840.1.101.3.4.1.44", &aes256cfb::TABLE),
@@ -1484,31 +1484,6 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         c"AES-128-CCM:id-aes128-CCM:2.16.840.1.101.3.4.1.7",
         &aeads::aes128ccm::TABLE,
     ),
-    alg(
-        c"ARIA-256-GCM:1.2.410.200046.1.1.36",
-        &aeads::aria256gcm::TABLE,
-    ),
-    alg(
-        c"ARIA-192-GCM:1.2.410.200046.1.1.35",
-        &aeads::aria192gcm::TABLE,
-    ),
-    alg(
-        c"ARIA-128-GCM:1.2.410.200046.1.1.34",
-        &aeads::aria128gcm::TABLE,
-    ),
-    alg(
-        c"ARIA-256-CCM:1.2.410.200046.1.1.39",
-        &aeads::aria256ccm::TABLE,
-    ),
-    alg(
-        c"ARIA-192-CCM:1.2.410.200046.1.1.38",
-        &aeads::aria192ccm::TABLE,
-    ),
-    alg(
-        c"ARIA-128-CCM:1.2.410.200046.1.1.37",
-        &aeads::aria128ccm::TABLE,
-    ),
-    alg(c"ARIA-256-ECB:1.2.410.200046.1.1.11", &aria256ecb::TABLE),
     alg(
         c"AES-256-WRAP:id-aes256-wrap:AES256-WRAP:2.16.840.1.101.3.4.1.45",
         &modes::aes256wrap::TABLE,
@@ -1567,6 +1542,31 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         c"AES-256-CBC-HMAC-SHA256",
         &modes::aes256cbc_hmac_sha256::TABLE,
     ),
+    alg(
+        c"ARIA-256-GCM:1.2.410.200046.1.1.36",
+        &aeads::aria256gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-192-GCM:1.2.410.200046.1.1.35",
+        &aeads::aria192gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-128-GCM:1.2.410.200046.1.1.34",
+        &aeads::aria128gcm::TABLE,
+    ),
+    alg(
+        c"ARIA-256-CCM:1.2.410.200046.1.1.39",
+        &aeads::aria256ccm::TABLE,
+    ),
+    alg(
+        c"ARIA-192-CCM:1.2.410.200046.1.1.38",
+        &aeads::aria192ccm::TABLE,
+    ),
+    alg(
+        c"ARIA-128-CCM:1.2.410.200046.1.1.37",
+        &aeads::aria128ccm::TABLE,
+    ),
+    alg(c"ARIA-256-ECB:1.2.410.200046.1.1.11", &aria256ecb::TABLE),
     alg(c"ARIA-192-ECB:1.2.410.200046.1.1.6", &aria192ecb::TABLE),
     alg(c"ARIA-128-ECB:1.2.410.200046.1.1.1", &aria128ecb::TABLE),
     alg(
@@ -1620,6 +1620,9 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         c"CAMELLIA-128-CBC:CAMELLIA128:1.2.392.200011.61.1.1.1.2",
         &camellia128cbc::TABLE,
     ),
+    alg(c"CAMELLIA-128-CBC-CTS", &modes::camellia128cbc_cts::TABLE),
+    alg(c"CAMELLIA-192-CBC-CTS", &modes::camellia192cbc_cts::TABLE),
+    alg(c"CAMELLIA-256-CBC-CTS", &modes::camellia256cbc_cts::TABLE),
     alg(
         c"CAMELLIA-256-OFB:0.3.4401.5.3.1.9.43",
         &camellia256ofb::TABLE,
@@ -1645,9 +1648,6 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         &camellia128cfb::TABLE,
     ),
     alg(c"CAMELLIA-256-CFB1", &camellia256cfb1::TABLE),
-    alg(c"CAMELLIA-128-CBC-CTS", &modes::camellia128cbc_cts::TABLE),
-    alg(c"CAMELLIA-192-CBC-CTS", &modes::camellia192cbc_cts::TABLE),
-    alg(c"CAMELLIA-256-CBC-CTS", &modes::camellia256cbc_cts::TABLE),
     alg(c"CAMELLIA-192-CFB1", &camellia192cfb1::TABLE),
     alg(c"CAMELLIA-128-CFB1", &camellia128cfb1::TABLE),
     alg(c"CAMELLIA-256-CFB8", &camellia256cfb8::TABLE),
@@ -1695,8 +1695,8 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
         c"SM4-CFB:SM4-CFB128:1.2.156.10197.1.104.4",
         &sm4128cfb128::TABLE,
     ),
-    alg(c"ChaCha20", &chacha20::TABLE),
     alg(c"SM4-XTS:1.2.156.10197.1.104.10", &modes::sm4128xts::TABLE),
+    alg(c"ChaCha20", &chacha20::TABLE),
     alg(c"ChaCha20-Poly1305", &aeads::chacha20_poly1305::TABLE),
     ALG_END,
 ]);

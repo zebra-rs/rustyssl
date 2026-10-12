@@ -70,6 +70,26 @@ pub(crate) const fn alg_desc<const N: usize>(
     }
 }
 
+/// The dispatch table of an algorithm the default provider will offer but doesn't yet: fetching
+/// registers its names, as OpenSSL's does when it builds the method store, so names keep the
+/// numbers OpenSSL gives them, but makes no method of it ([`is_pending`]).
+static PENDING: Dispatch<1> = Dispatch([END]);
+
+/// One of the default provider's algorithms that comes with a later step (see [`PENDING`]).
+pub(crate) const fn pending(names: &'static CStr) -> OSSL_ALGORITHM {
+    OSSL_ALGORITHM {
+        algorithm_names: names.as_ptr(),
+        property_definition: DEFAULT_PROPERTIES,
+        implementation: PENDING.0.as_ptr(),
+        algorithm_description: ptr::null(),
+    }
+}
+
+/// Whether an algorithm's dispatch table is [`PENDING`]'s.
+pub(crate) fn is_pending(implementation: *const OSSL_DISPATCH) -> bool {
+    core::ptr::eq(implementation, PENDING.0.as_ptr())
+}
+
 /// One of the base provider's algorithms (`{ names, "provider=base", functions }` in
 /// `baseprov.c`).
 pub(crate) const fn base_alg<const N: usize>(

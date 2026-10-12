@@ -357,6 +357,11 @@ unsafe fn add_algorithm(
             return true;
         }
     };
+    // An algorithm of the default provider's that comes with a later step: its names are
+    // registered, as above, but there's no method to make.
+    if provider::tables::is_pending(algo.implementation) {
+        return true;
+    }
     // SAFETY: the caller's guarantee.
     let made = unsafe { (kind.from_algorithm)(name_id, algo, prov) };
     if made.is_null() {
@@ -512,6 +517,24 @@ pub(crate) unsafe fn fetch(
     method.map_or(core::ptr::null_mut(), Method::into_raw)
 }
 
+/// `evp_generic_fetch_from_prov`: the method `name` of the kind from `prov` only (in its
+/// library context), with a reference, or NULL.
+///
+/// # Safety
+/// `prov` is a live provider.
+pub(crate) unsafe fn fetch_from_prov(
+    prov: *mut OSSL_PROVIDER,
+    kind: &'static Kind,
+    name: Option<&CStr>,
+    properties: Option<&CStr>,
+) -> *mut c_void {
+    // SAFETY: the caller's live provider.
+    let libctx = unsafe { provider::libctx_of(prov) };
+    // SAFETY: the provider's context.
+    let (method, _) = unsafe { inner_fetch(libctx, kind, name, properties, Some(prov)) };
+    method.map_or(core::ptr::null_mut(), Method::into_raw)
+}
+
 /// `evp_generic_do_all`: every method of the kind the active providers offer (the temporary
 /// store's first), each with a reference while the caller has it.
 ///
@@ -548,7 +571,15 @@ pub(crate) fn prefill(ctx: &libctx::LibCtx) {
         return;
     }
     // Gathered without the lock: adding the ciphers and digests runs the library's
-    // initialization. The ciphers' names come first, as in OpenSSL.
+    // initialization. Both are added before either is walked, as `ossl_namemap_stored` does
+    // (the walk's order depends on everything in the name table); the ciphers' names come
+    // first.
+    let opts = u64::try_from(
+        rustyssl_abi::OPENSSL_INIT_ADD_ALL_CIPHERS | rustyssl_abi::OPENSSL_INIT_ADD_ALL_DIGESTS,
+    )
+    .unwrap_or(0);
+    // SAFETY: no settings.
+    unsafe { init::OPENSSL_init_crypto(opts, core::ptr::null()) };
     let mut nids = super::legacy_cipher::cipher_types();
     nids.extend(super::legacy_md::md_nids());
     let mut state = ctx.evp.lock();
@@ -611,5 +642,29 @@ pub(crate) fn number_in(prov: *const OSSL_PROVIDER, name: &[u8]) -> u32 {
     unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| {
         prefill(&ctx);
         ctx.evp.lock().names.number(name)
+    })
+}
+
+/// The number of `name` in `libctx` (the default for NULL), or 0.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn number_in_libctx(libctx: *mut OSSL_LIB_CTX, name: &[u8]) -> u32 {
+    // SAFETY: the caller's guarantee.
+    unsafe { libctx::resolve(libctx) }.map_or(0, |ctx| {
+        prefill(&ctx);
+        ctx.evp.lock().names.number(name)
+    })
+}
+
+/// The names of `name_id` in `libctx` (the default for NULL), in the order they were added.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn names_in_libctx(libctx: *mut OSSL_LIB_CTX, name_id: u32) -> Vec<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    unsafe { libctx::resolve(libctx) }.map_or_else(Vec::new, |ctx| {
+        prefill(&ctx);
+        ctx.evp.lock().names.names(name_id).to_vec()
     })
 }

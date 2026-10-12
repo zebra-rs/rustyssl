@@ -29,7 +29,9 @@ use rustyssl_abi::{
 
 use super::builtin::libctx_of;
 use super::macs::{Prov, locate};
-use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg_desc, defn, entry};
+use super::tables::{
+    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg_desc, defn, entry, pending,
+};
 use crate::err;
 use crate::evp::cipher::{EVP_CIPHER_get0_name, EVP_CIPHER_is_a};
 use crate::ffi::ffi_callback;
@@ -140,6 +142,38 @@ fn mac_key_new(libctx: *mut OSSL_LIB_CTX, cmac: bool) -> *mut c_void {
 pub(crate) unsafe fn mac_key<'a>(keydata: *const c_void) -> Option<&'a MacKey> {
     // SAFETY: the caller's guarantee.
     unsafe { keydata.cast::<MacKey>().as_ref() }
+}
+
+/// `ossl_mac_key_up_ref`: another reference to a MAC key.
+///
+/// # Safety
+/// `keydata` is a live key from `mac_key_new`.
+pub(crate) unsafe fn mac_key_up_ref(keydata: *mut c_void) {
+    // SAFETY: the caller's guarantee: a live `Arc` pointer.
+    unsafe { Arc::increment_strong_count(keydata.cast::<MacKey>().cast_const()) };
+}
+
+impl MacKey {
+    /// Runs `f` with the key's octets (`None` without a key), its cipher's name (NULL without
+    /// one), and its properties, holding its lock: the octets stay in place for `f`.
+    pub(crate) fn with<R>(
+        &self,
+        f: impl FnOnce(Option<&[u8]>, *const core::ffi::c_char, Option<&CStr>) -> R,
+    ) -> R {
+        let d = self.lock();
+        let cipher = d.cipher.ptr();
+        let name = if cipher.is_null() {
+            ptr::null()
+        } else {
+            // SAFETY: the key's fetched cipher.
+            unsafe { EVP_CIPHER_get0_name(cipher) }
+        };
+        f(
+            d.priv_key.as_ref().map(SecureBytes::as_slice),
+            name,
+            d.properties.as_deref(),
+        )
+    }
 }
 
 ffi_callback! {
@@ -908,8 +942,22 @@ static KDF_KEYMGMT: Dispatch<4> = Dispatch([
     END,
 ]);
 
-/// The default provider's key managers so far, in `deflt_keymgmt`'s order.
-static DEFAULT_KEYMGMT: Algorithms<8> = Algorithms([
+/// The default provider's key managers, in `deflt_keymgmt`'s order; the key types of later
+/// steps are pending (their names registered, nothing offered).
+static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
+    pending(c"DH:dhKeyAgreement:1.2.840.113549.1.3.1"),
+    pending(c"DHX:X9.42 DH:dhpublicnumber:1.2.840.10046.2.1"),
+    pending(c"DSA:dsaEncryption:1.2.840.10040.4.1"),
+    pending(c"RSA:rsaEncryption:1.2.840.113549.1.1.1"),
+    pending(c"RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10"),
+    pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
+    pending(c"X25519:1.3.101.110"),
+    pending(c"X448:1.3.101.111"),
+    pending(c"ED25519:1.3.101.112"),
+    pending(c"ED448:1.3.101.113"),
+    pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
+    pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
+    pending(c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87"),
     alg_desc(
         c"TLS1-PRF",
         &KDF_KEYMGMT,
@@ -945,6 +993,26 @@ static DEFAULT_KEYMGMT: Algorithms<8> = Algorithms([
         &CMAC_LEGACY_KEYMGMT,
         c"OpenSSL CMAC via EVP_PKEY implementation",
     ),
+    pending(c"SM2:1.2.156.10197.1.301"),
+    pending(c"ML-KEM-512:MLKEM512:id-alg-ml-kem-512:2.16.840.1.101.3.4.4.1"),
+    pending(c"ML-KEM-768:MLKEM768:id-alg-ml-kem-768:2.16.840.1.101.3.4.4.2"),
+    pending(c"ML-KEM-1024:MLKEM1024:id-alg-ml-kem-1024:2.16.840.1.101.3.4.4.3"),
+    pending(c"X25519MLKEM768"),
+    pending(c"X448MLKEM1024"),
+    pending(c"SecP256r1MLKEM768"),
+    pending(c"SecP384r1MLKEM1024"),
+    pending(c"SLH-DSA-SHA2-128s:id-slh-dsa-sha2-128s:2.16.840.1.101.3.4.3.20"),
+    pending(c"SLH-DSA-SHA2-128f:id-slh-dsa-sha2-128f:2.16.840.1.101.3.4.3.21"),
+    pending(c"SLH-DSA-SHA2-192s:id-slh-dsa-sha2-192s:2.16.840.1.101.3.4.3.22"),
+    pending(c"SLH-DSA-SHA2-192f:id-slh-dsa-sha2-192f:2.16.840.1.101.3.4.3.23"),
+    pending(c"SLH-DSA-SHA2-256s:id-slh-dsa-sha2-256s:2.16.840.1.101.3.4.3.24"),
+    pending(c"SLH-DSA-SHA2-256f:id-slh-dsa-sha2-256f:2.16.840.1.101.3.4.3.25"),
+    pending(c"SLH-DSA-SHAKE-128s:id-slh-dsa-shake-128s:2.16.840.1.101.3.4.3.26"),
+    pending(c"SLH-DSA-SHAKE-128f:id-slh-dsa-shake-128f:2.16.840.1.101.3.4.3.27"),
+    pending(c"SLH-DSA-SHAKE-192s:id-slh-dsa-shake-192s:2.16.840.1.101.3.4.3.28"),
+    pending(c"SLH-DSA-SHAKE-192f:id-slh-dsa-shake-192f:2.16.840.1.101.3.4.3.29"),
+    pending(c"SLH-DSA-SHAKE-256s:id-slh-dsa-shake-256s:2.16.840.1.101.3.4.3.30"),
+    pending(c"SLH-DSA-SHAKE-256f:id-slh-dsa-shake-256f:2.16.840.1.101.3.4.3.31"),
     ALG_END,
 ]);
 

@@ -25,10 +25,10 @@ use rustyssl_abi::{
     NID_sha384WithRSAEncryption, NID_sha512, NID_sha512_224, NID_sha512_224WithRSAEncryption,
     NID_sha512_256, NID_sha512_256WithRSAEncryption, NID_sha512WithRSAEncryption, NID_shake128,
     NID_shake256, NID_sm3, NID_sm3WithRSAEncryption, NID_undef, NID_whirlpool, OBJ_NAME,
-    OBJ_NAME_ALIAS, OBJ_NAME_TYPE_MD_METH, OPENSSL_INIT_ADD_ALL_DIGESTS, RIPEMD160_CBLOCK,
-    RIPEMD160_DIGEST_LENGTH, SHA_CBLOCK, SHA_DIGEST_LENGTH, SHA224_DIGEST_LENGTH, SHA256_CBLOCK,
-    SHA256_DIGEST_LENGTH, SHA384_DIGEST_LENGTH, SHA512_CBLOCK, SHA512_DIGEST_LENGTH, SN_md5,
-    SN_ripemd160, SN_sha1, SN_sha1WithRSA, SN_sha1WithRSAEncryption, WHIRLPOOL_BBLOCK,
+    OBJ_NAME_ALIAS, OBJ_NAME_TYPE_MD_METH, OPENSSL_INIT_ADD_ALL_DIGESTS, OSSL_LIB_CTX,
+    RIPEMD160_CBLOCK, RIPEMD160_DIGEST_LENGTH, SHA_CBLOCK, SHA_DIGEST_LENGTH, SHA224_DIGEST_LENGTH,
+    SHA256_CBLOCK, SHA256_DIGEST_LENGTH, SHA384_DIGEST_LENGTH, SHA512_CBLOCK, SHA512_DIGEST_LENGTH,
+    SN_md5, SN_ripemd160, SN_sha1, SN_sha1WithRSA, SN_sha1WithRSAEncryption, WHIRLPOOL_BBLOCK,
     WHIRLPOOL_DIGEST_LENGTH,
 };
 use rustyssl_crypto::provided::digest::Kind;
@@ -577,8 +577,9 @@ pub(crate) fn md_nids() -> Vec<c_int> {
 
 /// `ossl_namemap_doall_names` with `digest_from_name`: the first of a number's names that's
 /// a digest name.
-fn digest_from_names(id: u32) -> *const EVP_MD {
-    for n in fetch::names_of(ptr::null(), id) {
+fn digest_from_names(libctx: *mut OSSL_LIB_CTX, id: u32) -> *const EVP_MD {
+    // SAFETY: the caller's context (NULL or live).
+    for n in unsafe { fetch::names_in_libctx(libctx, id) } {
         let Ok(c) = std::ffi::CString::new(n) else {
             continue;
         };
@@ -591,6 +592,50 @@ fn digest_from_names(id: u32) -> *const EVP_MD {
     ptr::null()
 }
 
+/// `evp_get_digestbyname_ex`: the digest named `name`, looking up its other names in
+/// `libctx`'s name map (fetching once there to learn a new name). NULL if there's none.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context; `name` is NULL or a string.
+pub(crate) unsafe fn get_digestbyname_ex(
+    libctx: *mut OSSL_LIB_CTX,
+    name: *const c_char,
+) -> *const EVP_MD {
+    if init_digests() == 0 {
+        return ptr::null();
+    }
+    // SAFETY: the caller's guarantee.
+    let dp = unsafe { OBJ_NAME_get(name, OBJ_NAME_TYPE_MD_METH) };
+    if !dp.is_null() {
+        return dp.cast();
+    }
+    let bytes = if name.is_null() {
+        &b""[..]
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { core::ffi::CStr::from_ptr(name) }.to_bytes()
+    };
+    // SAFETY: the caller's guarantee.
+    let mut id = unsafe { fetch::number_in_libctx(libctx, bytes) };
+    if id == 0 {
+        // The name may not be known yet: a fetch teaches the context its names.
+        // SAFETY: no preconditions.
+        unsafe { ERR_set_mark() };
+        // SAFETY: the caller's context and name.
+        let fetched = unsafe { EVP_MD_fetch(libctx, name, ptr::null()) };
+        // SAFETY: the fetched reference, or NULL.
+        unsafe { EVP_MD_free(fetched) };
+        // SAFETY: no preconditions.
+        unsafe { ERR_pop_to_mark() };
+        // SAFETY: as above.
+        id = unsafe { fetch::number_in_libctx(libctx, bytes) };
+        if id == 0 {
+            return ptr::null();
+        }
+    }
+    digest_from_names(libctx, id)
+}
+
 ffi_export! {
     /// The digest named `name`: a digest name's, or else the first digest name among the
     /// names `name` shares a number with in the default context's name map (fetching once to
@@ -601,37 +646,8 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_get_digestbyname(name: *const c_char) -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        if init_digests() == 0 {
-            return ptr::null();
-        }
-        // SAFETY: the caller's guarantee.
-        let dp = unsafe { OBJ_NAME_get(name, OBJ_NAME_TYPE_MD_METH) };
-        if !dp.is_null() {
-            return dp.cast();
-        }
-        let bytes = if name.is_null() {
-            &b""[..]
-        } else {
-            // SAFETY: the caller's guarantee.
-            unsafe { core::ffi::CStr::from_ptr(name) }.to_bytes()
-        };
-        let mut id = fetch::number_in(ptr::null(), bytes);
-        if id == 0 {
-            // The name may not be known yet: a fetch teaches the context its names.
-            // SAFETY: no preconditions.
-            unsafe { ERR_set_mark() };
-            // SAFETY: the default context and the caller's name.
-            let fetched = unsafe { EVP_MD_fetch(ptr::null_mut(), name, ptr::null()) };
-            // SAFETY: the fetched reference, or NULL.
-            unsafe { EVP_MD_free(fetched) };
-            // SAFETY: no preconditions.
-            unsafe { ERR_pop_to_mark() };
-            id = fetch::number_in(ptr::null(), bytes);
-            if id == 0 {
-                return ptr::null();
-            }
-        }
-        digest_from_names(id)
+        // SAFETY: the default context; the caller's guarantee.
+        unsafe { get_digestbyname_ex(ptr::null_mut(), name) }
     }
 }
 

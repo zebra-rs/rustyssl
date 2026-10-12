@@ -330,6 +330,22 @@ pub(crate) unsafe fn fetch_by_name(
     unsafe { Ref::adopt(m.cast()) }
 }
 
+/// `evp_keymgmt_fetch_from_prov`: the key manager `name` from `prov` only, with a reference,
+/// or `None`.
+///
+/// # Safety
+/// `prov` is a live provider.
+pub(crate) unsafe fn fetch_from_prov(
+    prov: *mut OSSL_PROVIDER,
+    name: &CStr,
+    properties: Option<&CStr>,
+) -> Option<Ref> {
+    // SAFETY: the caller's guarantee.
+    let m = unsafe { fetch::fetch_from_prov(prov, &KEYMGMTS, Some(name), properties) };
+    // SAFETY: a new reference, given to the `Ref`.
+    unsafe { Ref::adopt(m.cast()) }
+}
+
 /// The key manager behind `keymgmt`, or `None` for NULL.
 ///
 /// # Safety
@@ -651,6 +667,20 @@ impl Keymgmt {
             Some(f) => unsafe { f(self.provider_ctx()) },
             None => ptr::null(),
         }
+    }
+
+    /// `evp_keymgmt_util_query_operation_name`: the algorithm name for the operation, the key
+    /// manager's own name if the provider gives none.
+    pub(crate) fn query_operation_name(&self, op: c_int) -> CString {
+        if let Some(f) = self.funcs.query_operation_name {
+            // SAFETY: the provider's function.
+            let name = unsafe { f(op) };
+            if !name.is_null() {
+                // SAFETY: the provider's string.
+                return unsafe { CStr::from_ptr(name) }.to_owned();
+            }
+        }
+        self.type_name.clone()
     }
 
     /// `evp_keymgmt_has` (the function is mandatory).

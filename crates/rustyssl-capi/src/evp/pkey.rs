@@ -1544,7 +1544,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `mdname` has room for `mdname_sz` characters.
-unsafe fn default_digest_name(
+pub(crate) unsafe fn default_digest_name(
     km: &Keymgmt,
     keydata: *mut c_void,
     mdname: *mut c_char,
@@ -1674,6 +1674,39 @@ ffi_export! {
             }
         }
         rv
+    }
+}
+
+ffi_export! {
+    /// Whether the key can sign: for a provided key, whether a signature algorithm of its key
+    /// manager's signing name can be fetched (its errors left if not); for a typed key, by its
+    /// base type.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_can_sign(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        let Some(km) = k.provided().0 else {
+            return match ameth::pkey_type(k.type_()) {
+                rustyssl_abi::EVP_PKEY_RSA
+                | rustyssl_abi::EVP_PKEY_RSA_PSS
+                | EVP_PKEY_DSA
+                | rustyssl_abi::EVP_PKEY_ED25519
+                | rustyssl_abi::EVP_PKEY_ED448 => 1,
+                // `EC_KEY_can_sign` of the key's data, which a typed key doesn't have yet.
+                EVP_PKEY_EC => crate::stub::unimplemented("EVP_PKEY_can_sign of an EC key"),
+                _ => 0,
+            };
+        };
+        let name = km.get().query_operation_name(rustyssl_abi::OSSL_OP_SIGNATURE);
+        // SAFETY: the key manager's live provider.
+        let libctx = unsafe { crate::provider::libctx_of(km.get().prov.0) };
+        // SAFETY: the provider's context; the name.
+        let sig = unsafe { super::signature::fetch_by_name(libctx, &name, None) };
+        c_int::from(sig.is_some())
     }
 }
 

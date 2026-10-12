@@ -22,18 +22,19 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use rustyssl_abi::{
     ENGINE, ERR_LIB_EVP, ERR_R_ENGINE_LIB, ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, EVP_PKEY,
     EVP_PKEY_CTX, EVP_PKEY_KEYPAIR, EVP_PKEY_OP_FROMDATA, EVP_PKEY_OP_KEYGEN, EVP_PKEY_OP_PARAMGEN,
-    EVP_PKEY_OP_TYPE_GEN, EVP_PKEY_OP_UNDEFINED, EVP_PKEY_gen_cb, EVP_R_COMMAND_NOT_SUPPORTED,
-    EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_LENGTH, EVP_R_NO_KEY_SET,
-    EVP_R_OPERATION_NOT_INITIALIZED, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-    EVP_R_UNSUPPORTED_ALGORITHM, NID_undef, OSSL_GEN_PARAM_ITERATION, OSSL_GEN_PARAM_POTENTIAL,
-    OSSL_KEYMGMT_SELECT_ALL_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
-    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+    EVP_PKEY_OP_TYPE_GEN, EVP_PKEY_OP_TYPE_SIG, EVP_PKEY_OP_UNDEFINED, EVP_PKEY_gen_cb,
+    EVP_R_COMMAND_NOT_SUPPORTED, EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_LENGTH,
+    EVP_R_NO_KEY_SET, EVP_R_OPERATION_NOT_INITIALIZED,
+    EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, EVP_R_UNSUPPORTED_ALGORITHM, NID_undef,
+    OSSL_GEN_PARAM_ITERATION, OSSL_GEN_PARAM_POTENTIAL, OSSL_KEYMGMT_SELECT_ALL_PARAMETERS,
+    OSSL_KEYMGMT_SELECT_KEYPAIR, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
     OSSL_KEYMGMT_VALIDATE_FULL_CHECK, OSSL_KEYMGMT_VALIDATE_QUICK_CHECK, OSSL_LIB_CTX, OSSL_PARAM,
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PROVIDER,
 };
 
 use super::keymgmt;
 use super::pkey::{self, KeyData, PkeyRef};
+use super::signature;
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
@@ -60,8 +61,8 @@ pub(crate) struct PkeyCtx {
 
 /// A context's state.
 pub(crate) struct State {
-    libctx: Ptr<OSSL_LIB_CTX>,
-    propquery: Option<CString>,
+    pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    pub(crate) propquery: Option<CString>,
     /// The key type's name the key manager was fetched by.
     keytype: Option<CString>,
     pub(crate) keymgmt: Option<keymgmt::Ref>,
@@ -69,6 +70,10 @@ pub(crate) struct State {
     pub(crate) operation: c_int,
     /// The key manager's generation context, during a generation operation.
     genctx: Ptr<c_void>,
+    /// The signature algorithm, during a signature operation.
+    pub(crate) signature: Option<signature::Ref>,
+    /// Its context.
+    pub(crate) sigctx: Ptr<c_void>,
     pub(crate) pkey: Option<PkeyRef>,
     peerkey: Option<PkeyRef>,
     app_data: Ptr<c_void>,
@@ -91,8 +96,22 @@ impl State {
         self.operation & EVP_PKEY_OP_TYPE_GEN != 0
     }
 
+    /// `EVP_PKEY_CTX_IS_SIGNATURE_OP`.
+    pub(crate) fn is_sig_op(&self) -> bool {
+        self.operation & EVP_PKEY_OP_TYPE_SIG != 0
+    }
+
     /// `evp_pkey_ctx_free_old_ops`: ends the operation's provider side.
-    fn free_old_ops(&mut self) {
+    pub(crate) fn free_old_ops(&mut self) {
+        if self.is_sig_op() {
+            if let Some(sig) = self.signature.take()
+                && !self.sigctx.0.is_null()
+            {
+                // SAFETY: the algorithm's context, freed once.
+                unsafe { sig.get().freectx(self.sigctx.0) };
+            }
+            self.sigctx = Ptr(ptr::null_mut());
+        }
         if self.is_gen_op()
             && !self.genctx.0.is_null()
             && let Some(km) = &self.keymgmt
@@ -106,7 +125,8 @@ impl State {
     /// Whether the context has a provider-side operation (`EVP_PKEY_STATE_PROVIDER`); otherwise
     /// one that's set has a legacy state.
     fn provider_state(&self) -> bool {
-        self.is_gen_op() && !self.genctx.0.is_null()
+        (self.is_gen_op() && !self.genctx.0.is_null())
+            || (self.is_sig_op() && !self.sigctx.0.is_null())
     }
 }
 
@@ -246,6 +266,8 @@ unsafe fn int_ctx_new(
             legacy_keytype: r.id,
             operation: EVP_PKEY_OP_UNDEFINED,
             genctx: Ptr(ptr::null_mut()),
+            signature: None,
+            sigctx: Ptr(ptr::null_mut()),
             pkey,
             peerkey: None,
             app_data: Ptr(ptr::null_mut()),
@@ -361,8 +383,35 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(pctx) }) else { return ptr::null_mut() };
         let s = c.lock();
-        // Without an EVP_PKEY_METHOD (4.2d) or a provider operation context (4.2b, 4.2c), only
-        // a context without an operation is copied.
+        if s.is_sig_op() && !s.sigctx.0.is_null() {
+            // A signature operation: the copy gets a copy of the algorithm's context.
+            let Some(sig) = s.signature.clone() else { return ptr::null_mut() };
+            // SAFETY: the algorithm's context.
+            let algctx = unsafe { sig.get().dupctx(s.sigctx.0) };
+            if algctx.is_null() {
+                return ptr::null_mut();
+            }
+            let new = State {
+                libctx: s.libctx,
+                propquery: s.propquery.clone(),
+                keytype: s.keytype.clone(),
+                keymgmt: s.keymgmt.clone(),
+                legacy_keytype: s.legacy_keytype,
+                operation: s.operation,
+                genctx: Ptr(ptr::null_mut()),
+                signature: Some(sig),
+                sigctx: Ptr(algctx),
+                pkey: s.pkey.clone(),
+                peerkey: None,
+                app_data: Ptr(ptr::null_mut()),
+                data: Ptr(ptr::null_mut()),
+                pkey_gencb: None,
+                keygen_info: KeygenInfo::None(0),
+            };
+            return EVP_PKEY_CTX::new_handle(PkeyCtx { state: Mutex::new(new) });
+        }
+        // Without an EVP_PKEY_METHOD (none can exist before 4.2d), an operation without a
+        // provider context can't be copied.
         if s.operation != EVP_PKEY_OP_UNDEFINED {
             return ptr::null_mut();
         }
@@ -376,6 +425,8 @@ ffi_export! {
             legacy_keytype: s.legacy_keytype,
             operation: s.operation,
             genctx: Ptr(ptr::null_mut()),
+            signature: None,
+            sigctx: Ptr(ptr::null_mut()),
             pkey: s.pkey.clone(),
             peerkey: s.peerkey.clone(),
             app_data: Ptr(ptr::null_mut()),
@@ -472,6 +523,9 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return ptr::null() };
         let s = c.lock();
+        if s.is_sig_op() {
+            return s.signature.as_ref().map_or(ptr::null(), |m| m.get().prov().cast_const());
+        }
         if s.is_gen_op() {
             return s.keymgmt.as_ref().map_or(ptr::null(), |m| m.get().prov.0.cast_const());
         }
@@ -649,6 +703,12 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         let s = c.lock();
+        if s.provider_state() && s.is_sig_op() {
+            let (sig, algctx) = (s.signature.clone(), s.sigctx.0);
+            drop(s);
+            // SAFETY: the algorithm's context; the caller's array.
+            return sig.and_then(|m| unsafe { m.get().set_ctx_params(algctx, params) }).unwrap_or(0);
+        }
         if s.provider_state() {
             let (km, genctx) = (s.keymgmt.clone(), s.genctx.0);
             drop(s);
@@ -678,6 +738,12 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         let s = c.lock();
+        if s.provider_state() && s.is_sig_op() {
+            let (sig, algctx) = (s.signature.clone(), s.sigctx.0);
+            drop(s);
+            // SAFETY: the algorithm's context; the caller's array.
+            return sig.and_then(|m| unsafe { m.get().get_ctx_params(algctx, params) }).unwrap_or(0);
+        }
         if s.provider_state() {
             let (km, genctx) = (s.keymgmt.clone(), s.genctx.0);
             drop(s);
@@ -706,6 +772,15 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return ptr::null() };
         let s = c.lock();
+        if s.is_sig_op() {
+            let (sig, algctx) = (s.signature.clone(), s.sigctx.0);
+            drop(s);
+            // SAFETY: the algorithm's context, or NULL.
+            if let Some(list) = sig.and_then(|m| unsafe { m.get().gettable_ctx_params(algctx) }) {
+                return list;
+            }
+            return ptr::null();
+        }
         if !s.is_gen_op() {
             return ptr::null();
         }
@@ -727,6 +802,15 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return ptr::null() };
         let s = c.lock();
+        if s.is_sig_op() {
+            let (sig, algctx) = (s.signature.clone(), s.sigctx.0);
+            drop(s);
+            // SAFETY: the algorithm's context, or NULL.
+            if let Some(list) = sig.and_then(|m| unsafe { m.get().settable_ctx_params(algctx) }) {
+                return list;
+            }
+            return ptr::null();
+        }
         if !s.is_gen_op() {
             return ptr::null();
         }

@@ -18,8 +18,9 @@
 //!
 //! What OpenSSL dereferences without checking (a NULL context in most of these) is refused
 //! here instead (docs/DEVIATIONS.md). A static digest (`EVP_sha256()`) is replaced by the
-//! provider's, fetched by its short name, as OpenSSL does. Signing contexts (`EVP_PKEY_CTX`)
-//! come with Phase 4, and the legacy `EVP_MD_meth_*` digests with 3.11.
+//! provider's, fetched by its short name, as OpenSSL does. A context set up to sign or verify
+//! (`EVP_DigestSignInit`, `sigver.rs`) holds its key context, and its init, update, and
+//! parameters go to the signature operation. The legacy `EVP_MD_meth_*` digests come with 3.11.
 
 use core::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 use core::ptr;
@@ -27,16 +28,18 @@ use core::ptr;
 use rustyssl_abi::{
     ENGINE, ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, EVP_CTRL_SSL3_MASTER_SECRET, EVP_MD,
     EVP_MD_CTRL_MICALG, EVP_MD_CTRL_XOF_LEN, EVP_MD_CTX, EVP_MD_CTX_FLAG_CLEANED,
-    EVP_MD_CTX_FLAG_NO_INIT, EVP_MD_CTX_FLAG_ONESHOT, EVP_MD_FLAG_XOF, EVP_R_CTRL_NOT_IMPLEMENTED,
-    EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_NULL_ALGORITHM,
-    EVP_R_METHOD_NOT_SUPPORTED, EVP_R_NO_DIGEST_SET, EVP_R_NOT_ABLE_TO_COPY_CTX,
-    EVP_R_UPDATE_ERROR, NID_undef, OSSL_DIGEST_PARAM_MICALG, OSSL_DIGEST_PARAM_SIZE,
-    OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOFLEN, OSSL_LIB_CTX, OSSL_PARAM,
+    EVP_MD_CTX_FLAG_NO_INIT, EVP_MD_CTX_FLAG_ONESHOT, EVP_MD_FLAG_XOF, EVP_PKEY_CTX,
+    EVP_R_CTRL_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
+    EVP_R_INVALID_NULL_ALGORITHM, EVP_R_METHOD_NOT_SUPPORTED, EVP_R_NO_DIGEST_SET,
+    EVP_R_NOT_ABLE_TO_COPY_CTX, EVP_R_UPDATE_ERROR, NID_undef, OSSL_DIGEST_PARAM_MICALG,
+    OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOFLEN, OSSL_LIB_CTX,
+    OSSL_PARAM,
 };
 
 use super::digest::{
     EVP_MD_fetch, EVP_MD_free, EVP_MD_get_flags, EVP_MD_get_size, EVP_MD_up_ref, Md, method,
 };
+use super::pkey_ctx::{EVP_PKEY_CTX_dup, EVP_PKEY_CTX_free};
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::mem;
@@ -44,28 +47,29 @@ use crate::objects::OBJ_nid2sn;
 use crate::params::{OSSL_PARAM_locate_const, construct, end};
 
 /// `EVP_MD_CTX_FLAG_KEEP_PKEY_CTX`, from the reference's internal `include/crypto/evp.h`.
-const FLAG_KEEP_PKEY_CTX: c_ulong = 0x0400;
+pub(crate) const FLAG_KEEP_PKEY_CTX: c_ulong = 0x0400;
 /// `EVP_MD_CTX_FLAG_FINALISED`, from the same header: set by a final, cleared by an init.
-const FLAG_FINALISED: c_ulong = 0x0800;
+pub(crate) const FLAG_FINALISED: c_ulong = 0x0800;
 
 /// A legacy update function (`EVP_MD_CTX_set_update_fn`).
 type LegacyUpdateFn = unsafe extern "C" fn(*mut EVP_MD_CTX, *const c_void, usize) -> c_int;
 
 /// What an `EVP_MD_CTX *` points to (`struct evp_md_ctx_st`): every field is valid zeroed.
 #[repr(C)]
-struct MdCtx {
+pub(crate) struct MdCtx {
     /// The digest the caller asked for (`EVP_MD_CTX_get0_md`).
-    reqdigest: *const EVP_MD,
+    pub(crate) reqdigest: *const EVP_MD,
     /// The digest in use.
-    digest: *const EVP_MD,
+    pub(crate) digest: *const EVP_MD,
     /// The context's reference to the digest in use.
-    fetched_digest: *mut EVP_MD,
-    flags: c_ulong,
+    pub(crate) fetched_digest: *mut EVP_MD,
+    pub(crate) flags: c_ulong,
     /// The legacy digests' state; always NULL for provided digests.
     md_data: *mut c_void,
-    /// The signing context (Phase 4); always NULL until then.
-    pctx: *mut c_void,
-    update: Option<LegacyUpdateFn>,
+    /// The key context of a signing or verifying operation: the context's own unless
+    /// `FLAG_KEEP_PKEY_CTX` says the application keeps it.
+    pub(crate) pctx: *mut EVP_PKEY_CTX,
+    pub(crate) update: Option<LegacyUpdateFn>,
     /// The provider's algorithm context.
     algctx: *mut c_void,
 }
@@ -74,7 +78,7 @@ struct MdCtx {
 ///
 /// # Safety
 /// `ctx` is NULL or a live context from `EVP_MD_CTX_new`, not used elsewhere meanwhile.
-unsafe fn context<'a>(ctx: *mut EVP_MD_CTX) -> Option<&'a mut MdCtx> {
+pub(crate) unsafe fn context<'a>(ctx: *mut EVP_MD_CTX) -> Option<&'a mut MdCtx> {
     // SAFETY: the caller's guarantee: an allocation of an `MdCtx`, any bit pattern of which
     // is valid.
     unsafe { ctx.cast::<MdCtx>().as_mut() }
@@ -94,7 +98,7 @@ unsafe fn digest_of<'a>(c: &MdCtx) -> Option<&'a Md> {
 ///
 /// # Safety
 /// The context's fields are its own.
-unsafe fn free_algctx(c: &mut MdCtx) -> bool {
+pub(crate) unsafe fn free_algctx(c: &mut MdCtx) -> bool {
     if !c.algctx.is_null() {
         // SAFETY: the caller's guarantee.
         let Some(md) = (unsafe { digest_of(c) }) else {
@@ -118,7 +122,7 @@ unsafe fn free_algctx(c: &mut MdCtx) -> bool {
 ///
 /// # Safety
 /// As for [`free_algctx`].
-unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool) {
+pub(crate) unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool) {
     if !c.algctx.is_null() {
         // SAFETY: the caller's guarantee.
         if let Some(free) = unsafe { digest_of(c) }.and_then(|m| m.funcs.freectx) {
@@ -146,6 +150,8 @@ unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool) {
 /// As for [`free_algctx`].
 unsafe fn reset_ex(c: &mut MdCtx, keep_fetched: bool) {
     if c.flags & FLAG_KEEP_PKEY_CTX == 0 {
+        // SAFETY: the context's own key context, or NULL.
+        unsafe { EVP_PKEY_CTX_free(c.pctx) };
         c.pctx = ptr::null_mut();
     }
     // SAFETY: the caller's guarantee.
@@ -237,6 +243,36 @@ unsafe fn init_internal(
         );
         return 0;
     };
+    // A context set up to sign or verify starts that again (as before OpenSSL 3).
+    // SAFETY: the context's key context, or NULL.
+    if let Some(op) = unsafe { super::sigver::sig_operation(c.pctx) } {
+        return match op {
+            // SAFETY: the caller's context and digest; no key (the context's is kept).
+            Some(false) => unsafe {
+                super::sigver::EVP_DigestSignInit(
+                    ctx,
+                    ptr::null_mut(),
+                    type_,
+                    engine,
+                    ptr::null_mut(),
+                )
+            },
+            // SAFETY: as above.
+            Some(true) => unsafe {
+                super::sigver::EVP_DigestVerifyInit(
+                    ctx,
+                    ptr::null_mut(),
+                    type_,
+                    engine,
+                    ptr::null_mut(),
+                )
+            },
+            None => {
+                err::raise(ERR_LIB_EVP, EVP_R_UPDATE_ERROR, "evp_md_init_internal");
+                0
+            }
+        };
+    }
     c.flags &= !(flag(EVP_MD_CTX_FLAG_CLEANED) | FLAG_FINALISED);
     let type_ = if type_.is_null() {
         if c.digest.is_null() {
@@ -277,6 +313,11 @@ unsafe fn init_internal(
             c.fetched_digest = type_.cast_mut();
         }
         c.digest = type_;
+        // The key context of a legacy context is told of the init (`EVP_PKEY_CTRL_DIGESTINIT`).
+        // SAFETY: the context's key context, or NULL.
+        if !unsafe { super::sigver::digest_init_ctrl(c.pctx) } {
+            return 0;
+        }
         return 1;
     }
     if c.digest != type_ {
@@ -432,6 +473,20 @@ ffi_export! {
         if c.flags & FLAG_FINALISED != 0 {
             err::raise(ERR_LIB_EVP, EVP_R_UPDATE_ERROR, "EVP_DigestUpdate");
             return 0;
+        }
+        // A context set up to sign or verify takes the data that way (as before OpenSSL 3).
+        // SAFETY: the context's key context, or NULL.
+        if let Some(op) = unsafe { super::sigver::sig_operation(c.pctx) } {
+            return match op {
+                // SAFETY: the caller's context and data.
+                Some(false) => unsafe { super::sigver::EVP_DigestSignUpdate(ctx, data, count) },
+                // SAFETY: as above.
+                Some(true) => unsafe { super::sigver::EVP_DigestVerifyUpdate(ctx, data, count) },
+                None => {
+                    err::raise(ERR_LIB_EVP, EVP_R_UPDATE_ERROR, "EVP_DigestUpdate");
+                    0
+                }
+            };
         }
         // SAFETY: the context's digest.
         let md = unsafe { digest_of(c) };
@@ -646,6 +701,8 @@ ffi_export! {
                         let (to, from) = (dst.algctx, src.algctx);
                         // SAFETY: the provider's function with two of its contexts.
                         unsafe { copyctx(to, from) };
+                        // SAFETY: the destination's own key context, or NULL.
+                        unsafe { EVP_PKEY_CTX_free(dst.pctx) };
                         dst.pctx = ptr::null_mut();
                         dst.flags = src.flags;
                         dst.update = src.update;
@@ -678,6 +735,22 @@ ffi_export! {
             }
         }
         dst.flags &= !FLAG_KEEP_PKEY_CTX;
+        // The copy gets a copy of the key context (`clone_pkey`).
+        dst.pctx = ptr::null_mut();
+        if !src.pctx.is_null() {
+            // SAFETY: the source's live key context.
+            let p = unsafe { EVP_PKEY_CTX_dup(src.pctx) };
+            if p.is_null() {
+                err::raise(ERR_LIB_EVP, EVP_R_NOT_ABLE_TO_COPY_CTX, "EVP_MD_CTX_copy_ex");
+                // SAFETY: the destination.
+                unsafe { EVP_MD_CTX_reset(out) };
+                return 0;
+            }
+            // SAFETY: as above.
+            if let Some(dst) = unsafe { context(out) } {
+                dst.pctx = p;
+            }
+        }
         1
     }
 }
@@ -786,6 +859,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
+        // A signing or verifying operation's algorithm takes them first.
+        // SAFETY: the context's key context, or NULL.
+        if let Some((sig, algctx)) = unsafe { super::sigver::sig_ctx(c.pctx) }
+            && let Some(f) = sig.get().funcs.set_ctx_md_params
+        {
+            // SAFETY: the algorithm's function with its context and the caller's array.
+            return unsafe { f(algctx, params) };
+        }
         // SAFETY: the context's digest.
         let Some(set) = unsafe { digest_of(c) }.and_then(|m| m.funcs.set_ctx_params) else {
             return 0;
@@ -806,6 +887,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
+        // A signing or verifying operation's algorithm takes them first.
+        // SAFETY: the context's key context, or NULL.
+        if let Some((sig, algctx)) = unsafe { super::sigver::sig_ctx(c.pctx) }
+            && let Some(f) = sig.get().funcs.get_ctx_md_params
+        {
+            // SAFETY: the algorithm's function with its context and the caller's array.
+            return unsafe { f(algctx, params) };
+        }
         // SAFETY: the context's digest.
         let Some(get) = unsafe { digest_of(c) }.and_then(|m| m.funcs.get_ctx_params) else {
             return 0;
@@ -826,6 +915,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return ptr::null() };
+        // A signing or verifying operation's algorithm reports them first.
+        // SAFETY: the context's key context, or NULL.
+        if let Some((sig, algctx)) = unsafe { super::sigver::sig_ctx(c.pctx) }
+            && let Some(f) = sig.get().funcs.settable_ctx_md_params
+        {
+            // SAFETY: the algorithm's function with its context.
+            return unsafe { f(algctx) };
+        }
         // SAFETY: the context's digest.
         let Some(m) = (unsafe { digest_of(c) }) else { return ptr::null() };
         let Some(list) = m.funcs.settable_ctx_params else { return ptr::null() };
@@ -844,6 +941,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return ptr::null() };
+        // A signing or verifying operation's algorithm reports them first.
+        // SAFETY: the context's key context, or NULL.
+        if let Some((sig, algctx)) = unsafe { super::sigver::sig_ctx(c.pctx) }
+            && let Some(f) = sig.get().funcs.gettable_ctx_md_params
+        {
+            // SAFETY: the algorithm's function with its context.
+            return unsafe { f(algctx) };
+        }
         // SAFETY: the context's digest.
         let Some(m) = (unsafe { digest_of(c) }) else { return ptr::null() };
         let Some(list) = m.funcs.gettable_ctx_params else { return ptr::null() };
