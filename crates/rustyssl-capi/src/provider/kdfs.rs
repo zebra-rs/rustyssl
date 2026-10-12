@@ -1,7 +1,7 @@
-//! The default provider's KDFs (`deflt_kdfs` in `providers/defltprov.c`), so far HKDF and
-//! TLS13-KDF (`hkdf.c`), PBKDF2 (`pbkdf2.c`), TLS1-PRF (`tls1_prf.c`), SSKDF and X963KDF
-//! (`sskdf.c`), SSHKDF (`sshkdf.c`), KBKDF (`kbkdf.c`), X942KDF-ASN1 (`x942kdf.c`), and scrypt
-//! (`scrypt.c`).
+//! The default provider's KDFs (`deflt_kdfs` in `providers/defltprov.c`): HKDF and TLS13-KDF
+//! (`hkdf.c`), PBKDF2 (`pbkdf2.c`), TLS1-PRF (`tls1_prf.c`), SSKDF and X963KDF (`sskdf.c`),
+//! SSHKDF (`sshkdf.c`), KBKDF (`kbkdf.c`), X942KDF-ASN1 (`x942kdf.c`), and scrypt (`scrypt.c`)
+//! here, and the rest in `kdfs_more.rs`, with the table of them all.
 //!
 //! Like the reference's, they run over the EVP layer: HMAC through `EVP_Q_mac` and the legacy
 //! `HMAC_*` functions, digests through `EVP_MD_CTX`, and MACs through `EVP_MAC_CTX`, with the
@@ -51,6 +51,7 @@ use rustyssl_abi::{
 };
 
 use super::builtin::libctx_of;
+use super::kdfs_more;
 use super::macs::{Prov, SIZE_T, boxed, context, is_empty, locate, unbox, wipe};
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry};
 use crate::err;
@@ -81,23 +82,24 @@ use crate::params::{
     OSSL_PARAM_set_octet_string, OSSL_PARAM_set_size_t, end,
 };
 
-type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
-type DupCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
-type FreeCtxFn = unsafe extern "C" fn(*mut c_void);
-type ResetFn = unsafe extern "C" fn(*mut c_void);
-type DeriveFn = unsafe extern "C" fn(*mut c_void, *mut c_uchar, usize, *const OSSL_PARAM) -> c_int;
-type GetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
-type SetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
-type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
+pub(super) type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(super) type DupCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+pub(super) type FreeCtxFn = unsafe extern "C" fn(*mut c_void);
+pub(super) type ResetFn = unsafe extern "C" fn(*mut c_void);
+pub(super) type DeriveFn =
+    unsafe extern "C" fn(*mut c_void, *mut c_uchar, usize, *const OSSL_PARAM) -> c_int;
+pub(super) type GetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
+pub(super) type SetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
+pub(super) type CtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
-const MAX_MD: usize = EVP_MAX_MD_SIZE as usize;
+pub(super) const MAX_MD: usize = EVP_MAX_MD_SIZE as usize;
 
 // -------------------------------------------------------------------------------------------
 // Shared
 
 /// Octets a KDF keeps (a key, salt, secret, ...), wiped when dropped.
 #[derive(Clone, Default)]
-pub(crate) struct Secret(Vec<u8>);
+pub(crate) struct Secret(pub(super) Vec<u8>);
 
 impl Drop for Secret {
     fn drop(&mut self) {
@@ -106,17 +108,17 @@ impl Drop for Secret {
 }
 
 impl Secret {
-    fn ptr(&self) -> *const u8 {
+    pub(super) fn ptr(&self) -> *const u8 {
         self.0.as_ptr()
     }
-    fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.0.len()
     }
 }
 
 /// `ossl_prov_memdup` of a buffer: none for none, but a failure for an empty one (whose copy,
 /// `OPENSSL_memdup` of no octets, is NULL there).
-fn memdup(s: &Option<Secret>) -> Option<Option<Secret>> {
+pub(super) fn memdup(s: &Option<Secret>) -> Option<Option<Secret>> {
     match s {
         None => Some(None),
         Some(v) if v.len() == 0 => None,
@@ -139,7 +141,7 @@ fn len_of(s: Option<&Secret>) -> usize {
 ///
 /// # Safety
 /// `p` is a parameter whose data is NULL or holds `data_size` octets.
-unsafe fn get_octets(p: &OSSL_PARAM) -> Option<Secret> {
+pub(super) unsafe fn get_octets(p: &OSSL_PARAM) -> Option<Secret> {
     let mut buf: *mut c_void = ptr::null_mut();
     let mut len = 0usize;
     // SAFETY: the caller's guarantee; locals for the buffer and its length.
@@ -218,7 +220,7 @@ unsafe fn concat_octets(
 }
 
 /// Raises `reason` in `ERR_LIB_PROV`.
-fn raise(reason: c_int, function: &str) {
+pub(super) fn raise(reason: c_int, function: &str) {
     err::raise(ERR_LIB_PROV, reason, function);
 }
 
@@ -226,7 +228,7 @@ fn raise(reason: c_int, function: &str) {
 ///
 /// # Safety
 /// `md` is NULL or a live digest.
-unsafe fn md_size(md: *const EVP_MD) -> Option<usize> {
+pub(super) unsafe fn md_size(md: *const EVP_MD) -> Option<usize> {
     // SAFETY: the caller's guarantee.
     let sz = unsafe { EVP_MD_get_size(md) };
     usize::try_from(sz).ok().filter(|&n| n > 0)
@@ -237,7 +239,7 @@ unsafe fn md_size(md: *const EVP_MD) -> Option<usize> {
 ///
 /// # Safety
 /// `params` is NULL or a parameter array; `provctx` is the provider's context.
-unsafe fn load_digest(
+pub(super) unsafe fn load_digest(
     digest: &mut Prov<EVP_MD>,
     params: *const OSSL_PARAM,
     provctx: *mut c_void,
@@ -261,7 +263,7 @@ unsafe fn load_digest(
 }
 
 /// A C string parameter's text, if it's a UTF-8 string.
-fn utf8(p: &OSSL_PARAM) -> Option<*const c_char> {
+pub(super) fn utf8(p: &OSSL_PARAM) -> Option<*const c_char> {
     (p.data_type == OSSL_PARAM_UTF8_STRING as u32).then_some(p.data.cast_const().cast())
 }
 
@@ -321,7 +323,7 @@ unsafe fn set_macctx(
 /// # Safety
 /// `macctx` is NULL or a live MAC context of the caller's; `params` is NULL or a parameter
 /// array; the names are NULL or strings.
-unsafe fn macctx_load(
+pub(super) unsafe fn macctx_load(
     macctx: &mut *mut EVP_MAC_CTX,
     params: *const OSSL_PARAM,
     macname: *const c_char,
@@ -542,7 +544,7 @@ struct Hkdf {
 
 /// A provider context pointer, defaulting to NULL.
 #[derive(Clone, Copy)]
-struct Ptr(*mut c_void);
+pub(super) struct Ptr(pub(super) *mut c_void);
 
 impl Default for Ptr {
     fn default() -> Self {
@@ -1280,7 +1282,7 @@ ffi_callback! {
 ///
 /// # Safety
 /// `p`'s data is NULL or holds `data_size` octets.
-unsafe fn set_membuf(slot: &mut Option<Secret>, p: &OSSL_PARAM) -> bool {
+pub(super) unsafe fn set_membuf(slot: &mut Option<Secret>, p: &OSSL_PARAM) -> bool {
     *slot = None;
     if p.data_size == 0 {
         *slot = Some(Secret::default());
@@ -4051,12 +4053,12 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `kdf_scrypt_get_ctx_params`: the size, any; -2 when it isn't asked for, as the
-    /// reference returns.
+    /// `kdf_scrypt_get_ctx_params` (PKCS12KDF's and Argon2's too): the size, any; -2 when it
+    /// isn't asked for, as the reference returns.
     ///
     /// # Safety
     /// `params` is NULL or a parameter array.
-    pub(crate) unsafe extern "C" fn scrypt_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    pub(crate) unsafe extern "C" fn size_or_unasked_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
@@ -4135,18 +4137,19 @@ static SCRYPT_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        scrypt_get_ctx_params,
+        size_or_unasked_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
 ]);
 
-/// `deflt_kdfs` so far (the rest come with step 3.6c), in the reference's order.
-static DEFAULT_KDFS: Algorithms<11> = Algorithms([
+/// `deflt_kdfs`, in the reference's order.
+static DEFAULT_KDFS: Algorithms<17> = Algorithms([
     alg(c"HKDF", &HKDF_FUNCTIONS),
     alg(c"TLS13-KDF", &TLS13_FUNCTIONS),
     alg(c"SSKDF", &SSKDF_FUNCTIONS),
     alg(c"PBKDF2:1.2.840.113549.1.5.12", &PBKDF2_FUNCTIONS),
+    alg(c"PKCS12KDF", &kdfs_more::PKCS12_FUNCTIONS),
     alg(c"SSHKDF", &SSHKDF_FUNCTIONS),
     alg(c"X963KDF:X942KDF-CONCAT", &X963KDF_FUNCTIONS),
     alg(c"TLS1-PRF", &TLS1_PRF_FUNCTIONS),
@@ -4156,6 +4159,11 @@ static DEFAULT_KDFS: Algorithms<11> = Algorithms([
         c"SCRYPT:id-scrypt:1.3.6.1.4.1.11591.4.11",
         &SCRYPT_FUNCTIONS,
     ),
+    alg(c"KRB5KDF", &kdfs_more::KRB5_FUNCTIONS),
+    alg(c"HMAC-DRBG-KDF", &kdfs_more::HMAC_DRBG_FUNCTIONS),
+    alg(c"ARGON2I", &kdfs_more::ARGON2I_FUNCTIONS),
+    alg(c"ARGON2D", &kdfs_more::ARGON2D_FUNCTIONS),
+    alg(c"ARGON2ID", &kdfs_more::ARGON2ID_FUNCTIONS),
     ALG_END,
 ]);
 

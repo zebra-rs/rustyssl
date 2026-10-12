@@ -662,7 +662,7 @@ pub fn sshkdf(
 }
 
 /// RFC 3961's n-fold of `constant` to `size` octets, computed as the reference does.
-fn n_fold(constant: &[u8], size: usize) -> Result<Vec<u8>, Error> {
+pub fn n_fold(constant: &[u8], size: usize) -> Result<Vec<u8>, Error> {
     if constant.len() == size {
         return Ok(constant.to_vec());
     }
@@ -722,7 +722,7 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 /// Triple DES's key from 21 random octets in the first 21 of `key` (RFC 3961's
 /// random-to-key): each 7 octets spread to 8 with odd parity. Refuses keys that degrade to
 /// single DES.
-fn des3_random_to_key(key: &mut [u8]) -> Result<(), Error> {
+pub fn des3_random_to_key(key: &mut [u8]) -> Result<(), Error> {
     for i in (0..3usize).rev() {
         let src = i.wrapping_mul(7);
         let dst = i.wrapping_mul(8);
