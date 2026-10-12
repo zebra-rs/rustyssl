@@ -6,8 +6,9 @@
 //! The pool asks for its entropy's octets (at least its minimum length, at most its maximum,
 //! which is capped at `RAND_POOL_MAX_LENGTH`); asking for more than fits raises
 //! `RAND_R_RANDOM_POOL_OVERFLOW` and gathers nothing. As the reference does with its two Unix
-//! sources (the `getrandom`/`getentropy` system call, then the random device), a pool that
-//! gathered nothing asks a second time, so an overflow is raised twice. A nonce is the
+//! sources (the `getrandom`/`getentropy` system call, then the random device, which Linux
+//! skips), a pool that gathered nothing asks a second time outside Linux, so an overflow is
+//! raised twice there and once on Linux. A nonce is the
 //! process id, the thread id, and a timestamp, followed by its caller's salt.
 
 use core::ffi::c_int;
@@ -21,6 +22,11 @@ use crate::err;
 
 /// `RAND_POOL_MAX_LENGTH`: `RAND_POOL_FACTOR` (256) * 3 * (`RAND_DRBG_STRENGTH` (256) / 16).
 const POOL_MAX_LENGTH: usize = 256 * 3 * (256 / 16);
+
+/// The Unix sources that ask the pool for entropy: the system call, then the random device,
+/// which on Linux (from kernel 4.8, the reference's `DEVRANDOM_SAFE_KERNEL`) is skipped, as
+/// the system call already waited for the kernel's pool (`wait_random_seeded`).
+const SOURCES: usize = if cfg!(target_os = "linux") { 1 } else { 2 };
 
 /// A buffer of random octets, wiped when dropped.
 pub(crate) struct Seed(pub(crate) Vec<u8>);
@@ -117,7 +123,7 @@ impl Pool {
     /// `ossl_pool_acquire_entropy` on Unix: the system call, then (if that gathered too
     /// little) the random device, each asked for what's still needed. The entropy available.
     pub(crate) fn acquire_entropy(&mut self) -> usize {
-        for _source in 0..2 {
+        for _source in 0..SOURCES {
             let n = self.bytes_needed();
             self.gather(n);
             let available = self.entropy_available();

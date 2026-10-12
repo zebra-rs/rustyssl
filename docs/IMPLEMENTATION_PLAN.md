@@ -2344,8 +2344,8 @@ have run for at least 24 CPU-hours with no findings.
       strength or personalization error) and returns 1; HMAC-DRBG fetches its algorithms on
       every parameter call, a refused XOF digest stays and refuses later calls, and a failed
       MAC fetch drops the MAC context; TEST-RAND generates before it's instantiated and lends
-      its entropy (not consumed) as a seed; SEED-SRC's pool overflow is raised twice (both
-      Unix sources ask).
+      its entropy (not consumed) as a seed; SEED-SRC's pool overflow is raised twice on
+      macOS (both Unix sources ask) and once on Linux (which skips the random device).
     - Fixed on the way: the base provider's algorithms now carry `provider=base` (a new
       `base_alg` in the tables), so `EVP_RAND_fetch(..., "SEED-SRC", "provider=base")` finds
       the base provider's.
