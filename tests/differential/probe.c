@@ -4797,6 +4797,287 @@ static int bn_command(const char *command, const char *line)
     return 1;
 }
 
+
+/* Keys (EVP_PKEY) of the MAC and KDF key types, in eight slots. */
+static EVP_PKEY *pkeys[8];
+
+static void print_hex_inline(const char *label, const void *data, size_t len)
+{
+    const unsigned char *d = data;
+
+    printf(" %s=", label);
+    for (size_t i = 0; i < len; i++)
+        printf("%02x", d[i]);
+}
+
+static void pk_show(EVP_PKEY *k)
+{
+    const OSSL_PROVIDER *prov;
+    unsigned char buf[128];
+    size_t len = sizeof(buf);
+    OSSL_PARAM *out = NULL, *p;
+
+    if (k == NULL) {
+        printf(" (none)");
+        return;
+    }
+    prov = EVP_PKEY_get0_provider(k);
+    printf(" id %d base %d name %s desc %s prov %s", EVP_PKEY_get_id(k), EVP_PKEY_get_base_id(k),
+           EVP_PKEY_get0_type_name(k) == NULL ? "(null)" : EVP_PKEY_get0_type_name(k),
+           EVP_PKEY_get0_description(k) == NULL ? "(null)" : EVP_PKEY_get0_description(k),
+           prov == NULL ? "(null)" : OSSL_PROVIDER_get0_name(prov));
+    /* A key typed without data reaches its ASN.1 method's functions, which need the data. */
+    if (prov == NULL) {
+        ERR_clear_error();
+        return;
+    }
+    if (EVP_PKEY_get_raw_private_key(k, buf, &len) == 1)
+        print_hex_inline("raw", buf, len);
+    else
+        printf(" raw -");
+    if (EVP_PKEY_todata(k, OSSL_KEYMGMT_SELECT_ALL, &out) == 1) {
+        printf(" data");
+        for (p = out; p != NULL && p->key != NULL; p++) {
+            if (p->data_type == OSSL_PARAM_UTF8_STRING)
+                printf(" %s=%s", p->key, (const char *)p->data);
+            else
+                print_hex_inline(p->key, p->data, p->data_size);
+        }
+        OSSL_PARAM_free(out);
+    }
+    printf(" missing %d", EVP_PKEY_missing_parameters(k));
+    ERR_clear_error();
+}
+
+static int pk_slot(const char *s)
+{
+    return (int)(strtoul(s, NULL, 10) % 8);
+}
+
+/*
+ * Keys typed without data (EVP_PKEY_set_type) reach their ASN.1 methods' functions, which come
+ * with the key types, and generating into one typed by name crashes the reference: those are
+ * replaced or skipped.
+ */
+static int pk_typed(int s)
+{
+    return pkeys[s] != NULL && EVP_PKEY_get0_provider(pkeys[s]) == NULL;
+}
+
+static void pk_fresh(int s)
+{
+    if (pk_typed(s)) {
+        EVP_PKEY_free(pkeys[s]);
+        pkeys[s] = NULL;
+    }
+}
+
+static size_t pk_hex(const char *text, unsigned char *out, size_t max)
+{
+    size_t n = 0;
+    unsigned int b;
+
+    if (strcmp(text, "-") == 0)
+        return 0;
+    while (n < max && text[0] != '\0' && text[1] != '\0' && sscanf(text, "%2x", &b) == 1) {
+        out[n++] = (unsigned char)b;
+        text += 2;
+    }
+    return n;
+}
+
+static int pk_selection(const char *name)
+{
+    if (strcmp(name, "public") == 0)
+        return EVP_PKEY_PUBLIC_KEY;
+    if (strcmp(name, "private") == 0)
+        return OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
+    if (strcmp(name, "params") == 0)
+        return EVP_PKEY_KEY_PARAMETERS;
+    if (strcmp(name, "all") == 0)
+        return OSSL_KEYMGMT_SELECT_ALL;
+    return EVP_PKEY_KEYPAIR;
+}
+
+static EVP_PKEY_CTX *pk_ctx(const char *name)
+{
+    char *end;
+    long id = strtol(name, &end, 10);
+
+    if (*end == '\0')
+        return EVP_PKEY_CTX_new_id((int)id, NULL);
+    return EVP_PKEY_CTX_new_from_name(NULL, name, NULL);
+}
+
+static int pkey_command(const char *command, const char *line)
+{
+    char a[64] = "", b[64] = "", c[600] = "";
+    unsigned char key[300];
+    size_t len;
+    int s, t, r = 0;
+
+    if (command[0] != 'p' || command[1] != 'k'
+        || (strcmp(command, "pkraw") != 0 && strcmp(command, "pkrawid") != 0
+            && strcmp(command, "pkpub") != 0 && strcmp(command, "pkcmac") != 0
+            && strcmp(command, "pkmac") != 0 && strcmp(command, "pkgen") != 0
+            && strcmp(command, "pkparamgen") != 0 && strcmp(command, "pkfrom") != 0
+            && strcmp(command, "pkset") != 0 && strcmp(command, "pksetstr") != 0
+            && strcmp(command, "pkeq") != 0 && strcmp(command, "pkcopy") != 0
+            && strcmp(command, "pkdup") != 0 && strcmp(command, "pktype") != 0
+            && strcmp(command, "pktypestr") != 0 && strcmp(command, "pkshow") != 0
+            && strcmp(command, "pkcheck") != 0 && strcmp(command, "pkfree") != 0))
+        return 0;
+    printf("%s:", line);
+    sscanf(line, "%*s %63s %63s %599s", a, b, c);
+    s = pk_slot(a);
+    if (strcmp(command, "pkraw") == 0 || strcmp(command, "pkrawid") == 0
+        || strcmp(command, "pkpub") == 0 || strcmp(command, "pkcmac") == 0
+        || strcmp(command, "pkmac") == 0) {
+        len = pk_hex(c, key, sizeof(key));
+        EVP_PKEY_free(pkeys[s]);
+        if (strcmp(command, "pkraw") == 0)
+            pkeys[s] = EVP_PKEY_new_raw_private_key_ex(NULL, b, NULL, key, len);
+        else if (strcmp(command, "pkrawid") == 0)
+            pkeys[s] = EVP_PKEY_new_raw_private_key(atoi(b), NULL, key, len);
+        else if (strcmp(command, "pkpub") == 0)
+            pkeys[s] = EVP_PKEY_new_raw_public_key_ex(NULL, b, NULL, key, len);
+        else if (strcmp(command, "pkcmac") == 0)
+            pkeys[s] = EVP_PKEY_new_CMAC_key(NULL, key, len, EVP_get_cipherbyname(b));
+        else
+            pkeys[s] = EVP_PKEY_new_mac_key(atoi(b), NULL, key, (int)len);
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkgen") == 0 || strcmp(command, "pkparamgen") == 0) {
+        EVP_PKEY_CTX *ctx = pk_ctx(b);
+        int gen = strcmp(command, "pkgen") == 0;
+
+        pk_fresh(s);
+        printf(" ctx %d", ctx != NULL);
+        if (ctx != NULL) {
+            r = gen ? EVP_PKEY_keygen_init(ctx) : EVP_PKEY_paramgen_init(ctx);
+            printf(" init %d", r);
+            if (strcmp(c, "none") != 0) {
+                len = pk_hex(c, key, sizeof(key));
+                printf(" key %d", EVP_PKEY_CTX_set_mac_key(ctx, key, (int)len));
+            }
+            r = gen ? EVP_PKEY_keygen(ctx, &pkeys[s]) : EVP_PKEY_paramgen(ctx, &pkeys[s]);
+            printf(" gen %d", r);
+            EVP_PKEY_CTX_free(ctx);
+        }
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkfrom") == 0) {
+        /* pkfrom SLOT NAME SELECTION [key=value ...] */
+        EVP_PKEY_CTX *ctx = pk_ctx(b);
+        OSSL_PARAM params[5];
+        static unsigned char data[4][300];
+        static char strs[4][300];
+        int n = 0, sel;
+        const char *rest = line;
+        char k[32], v[300];
+
+        sscanf(line, "%*s %*s %*s %63s", c);
+        sel = pk_selection(c);
+        pk_fresh(s);
+        for (t = 0; t < 4 && *rest != '\0'; t++) {
+            rest = strchr(rest, ' ');
+            if (rest == NULL)
+                break;
+            rest++;
+        }
+        while (rest != NULL && *rest != '\0' && n < 4
+               && sscanf(rest, "%31[^=]=%299s", k, v) == 2) {
+            if (strcmp(k, "priv") == 0 || strcmp(k, "pub") == 0) {
+                len = pk_hex(v, data[n], sizeof(data[n]));
+                params[n] = OSSL_PARAM_construct_octet_string(k[1] == 'r' ? "priv" : "pub",
+                                                              data[n], len);
+            } else {
+                snprintf(strs[n], sizeof(strs[n]), "%s", v);
+                params[n] = OSSL_PARAM_construct_utf8_string(
+                    strcmp(k, "privstr") == 0 ? "priv" : strcmp(k, "cipher") == 0 ? "cipher"
+                                                                                   : "properties",
+                    strs[n], 0);
+            }
+            n++;
+            rest = strchr(rest, ' ');
+            if (rest != NULL)
+                rest++;
+        }
+        params[n] = OSSL_PARAM_construct_end();
+        printf(" ctx %d", ctx != NULL);
+        if (ctx != NULL) {
+            printf(" init %d", EVP_PKEY_fromdata_init(ctx));
+            printf(" from %d", EVP_PKEY_fromdata(ctx, &pkeys[s], sel, params));
+            EVP_PKEY_CTX_free(ctx);
+        }
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkset") == 0) {
+        len = pk_hex(c, key, sizeof(key));
+        if (pkeys[s] != NULL)
+            printf(" %d", EVP_PKEY_set_octet_string_param(pkeys[s], b, key, len));
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pksetstr") == 0) {
+        if (pkeys[s] != NULL)
+            printf(" %d", EVP_PKEY_set_utf8_string_param(pkeys[s], b, c));
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkeq") == 0) {
+        t = pk_slot(b);
+        if (pk_typed(s) && pk_typed(t))
+            printf(" skipped: typed");
+        else if (pkeys[s] != NULL && pkeys[t] != NULL)
+            printf(" eq %d params %d", EVP_PKEY_eq(pkeys[s], pkeys[t]),
+                   EVP_PKEY_parameters_eq(pkeys[s], pkeys[t]));
+    } else if (strcmp(command, "pkcopy") == 0) {
+        t = pk_slot(b);
+        if (pkeys[s] == NULL)
+            pkeys[s] = EVP_PKEY_new();
+        if (pkeys[t] == NULL || EVP_PKEY_get0_provider(pkeys[t]) == NULL)
+            printf(" skipped: typed");
+        else
+            printf(" %d", EVP_PKEY_copy_parameters(pkeys[s], pkeys[t]));
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkdup") == 0) {
+        t = pk_slot(b);
+        if (pk_typed(t))
+            printf(" skipped: typed");
+        else if (pkeys[t] != NULL && s != t) {
+            EVP_PKEY_free(pkeys[s]);
+            pkeys[s] = EVP_PKEY_dup(pkeys[t]);
+        }
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pktype") == 0) {
+        if (pkeys[s] == NULL)
+            pkeys[s] = EVP_PKEY_new();
+        printf(" %d", EVP_PKEY_set_type(pkeys[s], atoi(b)));
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pktypestr") == 0) {
+        if (pkeys[s] == NULL)
+            pkeys[s] = EVP_PKEY_new();
+        t = atoi(c);
+        if (t > (int)strlen(b))
+            t = -1;
+        printf(" %d", EVP_PKEY_set_type_str(pkeys[s], b, t));
+        pk_show(pkeys[s]);
+    } else if (strcmp(command, "pkshow") == 0) {
+        pk_show(pkeys[s]);
+        if (pkeys[s] != NULL && EVP_PKEY_get0_provider(pkeys[s]) != NULL)
+            printf(" bits %d size %d", EVP_PKEY_get_bits(pkeys[s]), EVP_PKEY_get_size(pkeys[s]));
+    } else if (strcmp(command, "pkcheck") == 0) {
+        if (pkeys[s] != NULL && EVP_PKEY_get0_provider(pkeys[s]) != NULL) {
+            EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pkeys[s], NULL);
+
+            printf(" ctx %d", ctx != NULL);
+            if (ctx != NULL)
+                printf(" checks %d %d %d %d", EVP_PKEY_check(ctx), EVP_PKEY_public_check(ctx),
+                       EVP_PKEY_param_check(ctx), EVP_PKEY_private_check(ctx));
+            EVP_PKEY_CTX_free(ctx);
+        }
+    } else {
+        EVP_PKEY_free(pkeys[s]);
+        pkeys[s] = NULL;
+    }
+    print_digest_errors();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -4824,7 +5105,7 @@ int main(void)
             || fetch_command(command, line) || digest_command(command, line)
             || cipher_command(command, line) || mac_command(command, line)
             || kdf_command(command, line) || rand_command(command, line)
-            || bn_command(command, line)) {
+            || bn_command(command, line) || pkey_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

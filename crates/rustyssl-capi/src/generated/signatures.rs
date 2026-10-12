@@ -2844,6 +2844,44 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const EVP_KDF) -> *const OSSL_PARAM =
     crate::evp::kdf::EVP_KDF_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut EVP_KDF) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_up_ref;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(keymgmt: *mut EVP_KEYMGMT, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::keymgmt::EVP_KEYMGMT_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_KEYMGMT = crate::evp::keymgmt::EVP_KEYMGMT_fetch;
+const _: unsafe extern "C" fn(*mut EVP_KEYMGMT) = crate::evp::keymgmt::EVP_KEYMGMT_free;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::keymgmt::EVP_KEYMGMT_gen_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::keymgmt::EVP_KEYMGMT_gen_settable_params;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const core::ffi::c_char =
+    crate::evp::keymgmt::EVP_KEYMGMT_get0_description;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const core::ffi::c_char =
+    crate::evp::keymgmt::EVP_KEYMGMT_get0_name;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const OSSL_PROVIDER =
+    crate::evp::keymgmt::EVP_KEYMGMT_get0_provider;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::keymgmt::EVP_KEYMGMT_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::keymgmt::EVP_KEYMGMT_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_KEYMGMT,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::keymgmt::EVP_KEYMGMT_names_do_all;
+const _: unsafe extern "C" fn(*const EVP_KEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::keymgmt::EVP_KEYMGMT_settable_params;
+const _: unsafe extern "C" fn(*mut EVP_KEYMGMT) -> core::ffi::c_int =
+    crate::evp::keymgmt::EVP_KEYMGMT_up_ref;
 const _: unsafe extern "C" fn(*const EVP_MAC_CTX) -> *mut EVP_MAC_CTX =
     crate::evp::mac::EVP_MAC_CTX_dup;
 const _: unsafe extern "C" fn(*mut EVP_MAC_CTX) = crate::evp::mac::EVP_MAC_CTX_free;
@@ -3072,6 +3110,313 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::evp::kdf::EVP_PBE_scrypt_ex;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *mut EVP_PKEY_CTX =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_dup;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) = crate::evp::pkey_ctx::EVP_PKEY_CTX_free;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> *mut OSSL_LIB_CTX =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_libctx;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> *mut EVP_PKEY =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_peerkey;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> *mut EVP_PKEY =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_pkey;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const core::ffi::c_char =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_propq;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const OSSL_PROVIDER =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_provider;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> *mut core::ffi::c_void =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_app_data;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> EVP_PKEY_gen_cb =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_cb;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *mut core::ffi::c_void =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_data;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_keygen_info;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_operation;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_get_params;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const OSSL_PARAM =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_gettable_params;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_is_a;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut ENGINE) -> *mut EVP_PKEY_CTX =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY_CTX = crate::evp::pkey_ctx::EVP_PKEY_CTX_new_from_name;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY_CTX = crate::evp::pkey_ctx::EVP_PKEY_CTX_new_from_pkey;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut ENGINE) -> *mut EVP_PKEY_CTX =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_new_id;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut core::ffi::c_int, core::ffi::c_int) =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_set0_keygen_info;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut core::ffi::c_void) =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_set_app_data;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, EVP_PKEY_gen_cb) =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_set_cb;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut core::ffi::c_void) =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_set_data;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey_ctx::EVP_PKEY_CTX_set_mac_key;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_set_params;
+const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const OSSL_PARAM =
+    crate::evp::pkey_ctx::EVP_PKEY_CTX_settable_params;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    ...
+) -> *mut EVP_PKEY = crate::evp::pkey_ctx::EVP_PKEY_Q_keygen;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_check;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_cmp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_cmp_parameters;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_copy_parameters;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut EVP_PKEY = crate::evp::pkey::EVP_PKEY_dup;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_eq;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    OSSL_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_export;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) = crate::evp::pkey::EVP_PKEY_free;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    *mut *mut EVP_PKEY,
+    core::ffi::c_int,
+    *mut OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::pkey_ctx::EVP_PKEY_fromdata;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_fromdata_init;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, core::ffi::c_int) -> *const OSSL_PARAM =
+    crate::evp::pkey_ctx::EVP_PKEY_fromdata_settable;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_generate;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut core::ffi::c_void =
+    crate::evp::pkey::EVP_PKEY_get0;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
+    crate::evp::pkey::EVP_PKEY_get0_description;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut ENGINE =
+    crate::evp::pkey::EVP_PKEY_get0_engine;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut usize) -> *const core::ffi::c_uchar =
+    crate::evp::pkey::EVP_PKEY_get0_hmac;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut usize) -> *const core::ffi::c_uchar =
+    crate::evp::pkey::EVP_PKEY_get0_poly1305;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const OSSL_PROVIDER =
+    crate::evp::pkey::EVP_PKEY_get0_provider;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut usize) -> *const core::ffi::c_uchar =
+    crate::evp::pkey::EVP_PKEY_get0_siphash;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
+    crate::evp::pkey::EVP_PKEY_get0_type_name;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut *mut core::ffi::c_uchar) -> usize =
+    crate::evp::pkey::params::EVP_PKEY_get1_encoded_public_key;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_base_id;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_bits;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut *mut BIGNUM,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_bn_param;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut core::ffi::c_char, usize) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_default_digest_name;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_default_digest_nid;
+const _: unsafe extern "C" fn(*const EVP_PKEY, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::evp::pkey::EVP_PKEY_get_ex_data;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *mut core::ffi::c_char,
+    usize,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_group_name;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_id;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_int_param;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_octet_string_param;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::pkey::params::EVP_PKEY_get_params;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::raw::EVP_PKEY_get_raw_private_key;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::raw::EVP_PKEY_get_raw_public_key;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_security_bits;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_size;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_size_t_param;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_char,
+    usize,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_get_utf8_string_param;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const OSSL_PARAM =
+    crate::evp::pkey::params::EVP_PKEY_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_is_a;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_keygen;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_keygen_init;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_missing_parameters;
+const _: unsafe extern "C" fn() -> *mut EVP_PKEY = crate::evp::pkey::EVP_PKEY_new;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    usize,
+    *const EVP_CIPHER,
+) -> *mut EVP_PKEY = crate::evp::pkey::raw::EVP_PKEY_new_CMAC_key;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut EVP_PKEY = crate::evp::pkey_ctx::EVP_PKEY_new_mac_key;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    usize,
+) -> *mut EVP_PKEY = crate::evp::pkey::raw::EVP_PKEY_new_raw_private_key;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    usize,
+) -> *mut EVP_PKEY = crate::evp::pkey::raw::EVP_PKEY_new_raw_private_key_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut ENGINE,
+    *const core::ffi::c_uchar,
+    usize,
+) -> *mut EVP_PKEY = crate::evp::pkey::raw::EVP_PKEY_new_raw_public_key;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    usize,
+) -> *mut EVP_PKEY = crate::evp::pkey::raw::EVP_PKEY_new_raw_public_key_ex;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_pairwise_check;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_param_check;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_param_check_quick;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_parameters_eq;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_paramgen;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_paramgen_init;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_private_check;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_public_check;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
+    crate::evp::pkey_ctx::EVP_PKEY_public_check_quick;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_save_parameters;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::evp::pkey::params::EVP_PKEY_set1_encoded_public_key;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut ENGINE) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_set1_engine;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    *const BIGNUM,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_set_bn_param;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_set_ex_data;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_set_int_param;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_set_octet_string_param;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::pkey::params::EVP_PKEY_set_params;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *const core::ffi::c_char, usize) -> core::ffi::c_int =
+    crate::evp::pkey::params::EVP_PKEY_set_size_t_param;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_set_type;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut EVP_KEYMGMT) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_set_type_by_keymgmt;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_set_type_str;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pkey::params::EVP_PKEY_set_utf8_string_param;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const OSSL_PARAM =
+    crate::evp::pkey::params::EVP_PKEY_settable_params;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut *mut OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_todata;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_type;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_type_names_do_all;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_up_ref;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,

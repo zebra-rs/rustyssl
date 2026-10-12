@@ -1,0 +1,2037 @@
+//! Keys (`EVP_PKEY(3)`, `EVP_PKEY_new(3)`, `EVP_PKEY_is_a(3)`, ...; `p_lib.c`, `keymgmt_lib.c`):
+//! an `EVP_PKEY` holding a provider's key data through its key manager, or typed by one of the
+//! built-in ASN.1 methods without data (`EVP_PKEY_set_type`).
+//!
+//! As in OpenSSL:
+//! - A provided key's type is the ASN.1 method's that one of its key manager's names is the PEM
+//!   name of, else `EVP_PKEY_KEYMGMT`; key generation gives its key the context's legacy type.
+//! - Its bits, security bits, and maximum size are asked of the key manager when the data is
+//!   assigned, and cached.
+//! - Using a key with another provider's key manager exports it to that one, and the copy is
+//!   kept in the key's operation cache until the key's parameters are set.
+//! - Comparisons give 1 (equal), 0 (different), -1 (different types), or -2 (can't compare).
+//!
+//! Keys with legacy data (`EVP_PKEY_assign`) come with 4.2d and the key types; a path that would
+//! need the key types' ASN.1 methods' functions aborts until then (AGENTS.md rule 10). Functions
+//! given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
+
+use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ptr;
+use core::sync::atomic::{AtomicI32, Ordering};
+use std::cell::UnsafeCell;
+use std::ffi::CString;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+
+use rustyssl_abi::{
+    CRYPTO_EX_DATA, CRYPTO_EX_INDEX_EVP_PKEY, ENGINE, ERR_LIB_EVP, ERR_R_EVP_LIB,
+    ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYMGMT, EVP_PKEY, EVP_PKEY_DSA,
+    EVP_PKEY_EC, EVP_PKEY_KEYMGMT, EVP_PKEY_NONE, EVP_R_DIFFERENT_KEY_TYPES,
+    EVP_R_DIFFERENT_PARAMETERS, EVP_R_EXPECTING_A_POLY1305_KEY, EVP_R_EXPECTING_A_SIPHASH_KEY,
+    EVP_R_EXPECTING_AN_HMAC_KEY, EVP_R_MISSING_PARAMETERS, EVP_R_UNKNOWN_BITS,
+    EVP_R_UNKNOWN_MAX_SIZE, EVP_R_UNKNOWN_SECURITY_BITS, EVP_R_UNSUPPORTED_ALGORITHM,
+    EVP_R_UNSUPPORTED_KEY_TYPE, NID_undef, OSSL_CALLBACK, OSSL_KEYMGMT_SELECT_ALL,
+    OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_BITS,
+    OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE,
+    OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PROVIDER, SN_undef,
+};
+
+use super::keymgmt::{self, Keymgmt};
+use crate::err;
+use crate::ex_data::{
+    CRYPTO_dup_ex_data, CRYPTO_free_ex_data, CRYPTO_get_ex_data, CRYPTO_new_ex_data,
+    CRYPTO_set_ex_data,
+};
+use crate::ffi::ffi_export;
+use crate::handle::{Handle, handle_type};
+use crate::objects::OBJ_nid2sn;
+use crate::params::{
+    OSSL_PARAM_construct_int, OSSL_PARAM_construct_utf8_string, OSSL_PARAM_modified, end,
+};
+use crate::provider::Ptr;
+
+pub(crate) mod ameth;
+pub(crate) mod params;
+pub(crate) mod raw;
+
+use ameth::Ameth;
+
+/// `OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS`, which `p_lib.c` calls `SELECT_PARAMETERS`.
+const SELECT_PARAMETERS: c_int = OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS as c_int;
+
+/// A key manager's key data, freed by it when the last holder lets go.
+pub(crate) struct KeyData {
+    keymgmt: keymgmt::Ref,
+    ptr: Ptr<c_void>,
+}
+
+impl KeyData {
+    /// Takes over `ptr`, key data of `keymgmt`; `None` for NULL.
+    pub(crate) fn adopt(keymgmt: keymgmt::Ref, ptr: *mut c_void) -> Option<Arc<Self>> {
+        (!ptr.is_null()).then(|| {
+            Arc::new(Self {
+                keymgmt,
+                ptr: Ptr(ptr),
+            })
+        })
+    }
+
+    /// The provider's pointer.
+    pub(crate) fn ptr(&self) -> *mut c_void {
+        self.ptr.0
+    }
+}
+
+impl Drop for KeyData {
+    fn drop(&mut self) {
+        // SAFETY: the key manager's own data, freed once.
+        unsafe { self.keymgmt.get().freedata(self.ptr.0) };
+    }
+}
+
+/// An export of the key to another key manager (`OP_CACHE_ELEM`).
+struct OpCache {
+    keymgmt: keymgmt::Ref,
+    keydata: Arc<KeyData>,
+    selection: c_int,
+}
+
+/// What `EVP_PKEY` handles point to.
+pub(crate) struct Pkey {
+    references: AtomicI32,
+    state: Mutex<State>,
+    ex_data: ExData,
+}
+
+/// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
+struct ExData(UnsafeCell<CRYPTO_EX_DATA>);
+
+// SAFETY: the ex_data functions are the only users, and OpenSSL leaves serializing them to the
+// application.
+unsafe impl Send for ExData {}
+// SAFETY: as above.
+unsafe impl Sync for ExData {}
+
+/// A key's state.
+pub(crate) struct State {
+    pub(crate) type_: c_int,
+    save_type: c_int,
+    /// The ASN.1 method of a key typed without a key manager.
+    pub(crate) ameth: Option<&'static Ameth>,
+    pub(crate) keymgmt: Option<keymgmt::Ref>,
+    pub(crate) keydata: Option<Arc<KeyData>>,
+    /// `cache`: bits, security bits, and maximum size.
+    bits: c_int,
+    security_bits: c_int,
+    size: c_int,
+    dirty_cnt: u64,
+    dirty_cnt_copy: u64,
+    operation_cache: Vec<OpCache>,
+    save_parameters: c_int,
+}
+
+handle_type!(EVP_PKEY => Pkey);
+
+/// What a cleared key drops: freed after its lock is released, as freeing calls providers.
+#[derive(Default)]
+struct Dropped {
+    _keymgmt: Option<keymgmt::Ref>,
+    _keydata: Option<Arc<KeyData>>,
+    _cache: Vec<OpCache>,
+}
+
+impl Pkey {
+    /// The state, locked.
+    pub(crate) fn lock(&self) -> MutexGuard<'_, State> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn ex_data(&self) -> *mut CRYPTO_EX_DATA {
+        self.ex_data.0.get()
+    }
+
+    /// The key manager and data (each with a reference), as they are now.
+    pub(crate) fn provided(&self) -> (Option<keymgmt::Ref>, Option<Arc<KeyData>>) {
+        let s = self.lock();
+        (s.keymgmt.clone(), s.keydata.clone())
+    }
+
+    /// `evp_pkey_is_provided`.
+    pub(crate) fn is_provided(&self) -> bool {
+        self.lock().keymgmt.is_some()
+    }
+
+    /// The key type (`EVP_PKEY_get_id`).
+    pub(crate) fn type_(&self) -> c_int {
+        self.lock().type_
+    }
+}
+
+impl State {
+    /// Whether the key's ASN.1 method has the function `f` (an `ameth::F_*`).
+    pub(crate) fn ameth_has(&self, f: u32) -> bool {
+        self.ameth.is_some_and(|m| m.has(f))
+    }
+
+    /// `evp_pkey_is_assigned` (there's no legacy data before 4.2d).
+    pub(crate) fn is_assigned(&self) -> bool {
+        self.keydata.is_some()
+    }
+
+    /// `evp_pkey_is_blank`.
+    fn is_blank(&self) -> bool {
+        self.type_ == EVP_PKEY_NONE && self.keymgmt.is_none()
+    }
+
+    /// `evp_pkey_is_typed`.
+    fn is_typed(&self) -> bool {
+        self.type_ != EVP_PKEY_NONE || self.keymgmt.is_some()
+    }
+
+    /// `evp_pkey_is_legacy`.
+    pub(crate) fn is_legacy(&self) -> bool {
+        self.type_ != EVP_PKEY_NONE && self.keymgmt.is_none()
+    }
+
+    /// `evp_pkey_free_it`: clears the data, the key manager, and the type.
+    fn free_it(&mut self) -> Dropped {
+        let d = Dropped {
+            _keymgmt: self.keymgmt.take(),
+            _keydata: self.keydata.take(),
+            _cache: core::mem::take(&mut self.operation_cache),
+        };
+        self.type_ = EVP_PKEY_NONE;
+        d
+    }
+}
+
+/// The key behind `pkey`, or `None` for NULL.
+///
+/// # Safety
+/// `pkey` is NULL or a live key.
+pub(crate) unsafe fn pkey<'a>(pkey: *const EVP_PKEY) -> Option<&'a Pkey> {
+    // SAFETY: the caller's guarantee.
+    unsafe { EVP_PKEY::get(pkey) }
+}
+
+/// A C string argument, `None` for NULL.
+///
+/// # Safety
+/// `s` is NULL or a string.
+pub(crate) unsafe fn text<'a>(s: *const c_char) -> Option<&'a CStr> {
+    // SAFETY: the caller's guarantee.
+    (!s.is_null()).then(|| unsafe { CStr::from_ptr(s) })
+}
+
+/// `EVP_PKEY_new`: a blank key, or NULL.
+pub(crate) fn new() -> *mut EVP_PKEY {
+    let p = EVP_PKEY::new_handle(Pkey {
+        references: AtomicI32::new(1),
+        state: Mutex::new(State {
+            type_: EVP_PKEY_NONE,
+            save_type: EVP_PKEY_NONE,
+            ameth: None,
+            keymgmt: None,
+            keydata: None,
+            bits: 0,
+            security_bits: 0,
+            size: 0,
+            dirty_cnt: 0,
+            dirty_cnt_copy: 0,
+            operation_cache: Vec::new(),
+            save_parameters: 1,
+        }),
+        ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
+            ctx: ptr::null_mut(),
+            sk: ptr::null_mut(),
+        })),
+    });
+    // SAFETY: just made.
+    let Some(k) = (unsafe { pkey(p) }) else {
+        return ptr::null_mut();
+    };
+    // SAFETY: the key's own ex_data.
+    if unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, p.cast(), k.ex_data()) } == 0 {
+        err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_CRYPTO_LIB, "EVP_PKEY_new");
+        // SAFETY: nothing else has the new handle.
+        unsafe { EVP_PKEY::free(p) };
+        return ptr::null_mut();
+    }
+    p
+}
+
+/// `EVP_PKEY_free`.
+///
+/// # Safety
+/// `p` is NULL or a live key whose reference the caller gives up.
+pub(crate) unsafe fn free(p: *mut EVP_PKEY) {
+    // SAFETY: the caller's guarantee.
+    let Some(held) = (unsafe { EVP_PKEY::hold(p) }) else {
+        return;
+    };
+    if held.references.fetch_sub(1, Ordering::AcqRel) > 1 {
+        return;
+    }
+    let dropped = held.lock().free_it();
+    drop(dropped);
+    // SAFETY: the key's own ex_data; its last reference.
+    unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, p.cast(), held.ex_data()) };
+    // SAFETY: the last reference; the hold keeps the object until this returns.
+    unsafe { EVP_PKEY::free(p) };
+}
+
+/// A key handle with a reference, given up when dropped.
+pub(crate) struct PkeyRef(Ptr<EVP_PKEY>);
+
+impl PkeyRef {
+    /// A new reference to `p`; `None` for NULL.
+    ///
+    /// # Safety
+    /// `p` is NULL or a live key.
+    pub(crate) unsafe fn new(p: *mut EVP_PKEY) -> Option<Self> {
+        // SAFETY: the caller's guarantee.
+        let k = unsafe { pkey(p) }?;
+        k.references.fetch_add(1, Ordering::AcqRel);
+        Some(Self(Ptr(p)))
+    }
+
+    /// Takes over the caller's reference to `p`; `None` for NULL.
+    ///
+    /// # Safety
+    /// `p` is NULL or a live key whose reference the caller gives up.
+    pub(crate) unsafe fn adopt(p: *mut EVP_PKEY) -> Option<Self> {
+        // SAFETY: the caller's guarantee.
+        unsafe { pkey(p) }.map(|_| Self(Ptr(p)))
+    }
+
+    /// The handle (no reference is taken).
+    pub(crate) fn as_ptr(&self) -> *mut EVP_PKEY {
+        self.0.0
+    }
+
+    /// The handle, with this reference for the caller.
+    pub(crate) fn into_raw(self) -> *mut EVP_PKEY {
+        let p = self.0.0;
+        core::mem::forget(self);
+        p
+    }
+
+    /// The key.
+    pub(crate) fn get(&self) -> &Pkey {
+        // SAFETY: this holds a reference to a live key.
+        match unsafe { pkey(self.0.0) } {
+            Some(k) => k,
+            None => crate::ffi::die("a held EVP_PKEY is live"),
+        }
+    }
+}
+
+impl Clone for PkeyRef {
+    fn clone(&self) -> Self {
+        self.get().references.fetch_add(1, Ordering::AcqRel);
+        Self(self.0)
+    }
+}
+
+impl Drop for PkeyRef {
+    fn drop(&mut self) {
+        // SAFETY: the reference this holds.
+        unsafe { free(self.0.0) };
+    }
+}
+
+/// `pkey_set_type`: types `pkey` (or, without one, only checks the type exists) by the key type
+/// `type_`, the PEM name `name`, or the key manager. False with an error if there's no such
+/// type.
+pub(crate) fn set_type(
+    pkey: Option<&Pkey>,
+    type_: c_int,
+    name: Option<&[u8]>,
+    keymgmt: Option<&keymgmt::Ref>,
+) -> bool {
+    let mut dropped = Dropped::default();
+    if let Some(k) = pkey {
+        let mut s = k.lock();
+        if s.keydata.is_some() {
+            dropped = s.free_it();
+        }
+        // Retyping to the type it was given keeps a key as it is.
+        if s.type_ != EVP_PKEY_NONE && type_ == s.save_type && s.ameth.is_some() {
+            return true;
+        }
+    }
+    drop(dropped);
+    let found = match name {
+        Some(n) => ameth::find_str(n),
+        None if type_ != EVP_PKEY_NONE => ameth::find(type_),
+        None => None,
+    };
+    if found.is_none() && keymgmt.is_none() {
+        err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_ALGORITHM, "pkey_set_type");
+        return false;
+    }
+    if let Some(k) = pkey {
+        let mut s = k.lock();
+        let old = core::mem::replace(&mut s.keymgmt, keymgmt.cloned());
+        s.save_type = type_;
+        s.type_ = type_;
+        if keymgmt.is_none() {
+            s.ameth = found;
+        }
+        match found {
+            Some(m) if type_ == EVP_PKEY_NONE => s.type_ = m.pkey_id,
+            Some(_) => {}
+            None => s.type_ = EVP_PKEY_KEYMGMT,
+        }
+        drop(s);
+        drop(old);
+    }
+    true
+}
+
+/// `EVP_PKEY_set_type_by_keymgmt`: types the key by the ASN.1 method whose PEM name is one of the
+/// key manager's names (or as `EVP_PKEY_KEYMGMT`).
+pub(crate) fn set_type_by_keymgmt(k: &Pkey, keymgmt: &keymgmt::Ref) -> bool {
+    let mut found: Vec<Vec<u8>> = Vec::new();
+    for n in keymgmt.get().names() {
+        // `find_ameth`: whether the name is a PEM name, raising nothing.
+        // SAFETY: no preconditions.
+        unsafe { err::ERR_set_mark() };
+        if set_type(None, EVP_PKEY_NONE, Some(&n), None) && found.len() < 2 {
+            found.push(n);
+        }
+        // SAFETY: the mark set above.
+        unsafe { err::ERR_pop_to_mark() };
+    }
+    if found.len() > 1 {
+        err::raise(
+            ERR_LIB_EVP,
+            ERR_R_INTERNAL_ERROR,
+            "EVP_PKEY_set_type_by_keymgmt",
+        );
+        return false;
+    }
+    set_type(
+        Some(k),
+        EVP_PKEY_NONE,
+        found.first().map(Vec::as_slice),
+        Some(keymgmt),
+    )
+}
+
+/// `evp_keymgmt_util_cache_keyinfo`: asks the key manager for the key's bits, security bits,
+/// and maximum size, and caches them.
+pub(crate) fn cache_keyinfo(k: &Pkey) {
+    let (Some(km), Some(kd)) = k.provided() else {
+        return;
+    };
+    let (mut bits, mut security_bits, mut size): (c_int, c_int, c_int) = (0, 0, 0);
+    // SAFETY: a static key; a local that outlives the array, here and below.
+    let p0 = unsafe { OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_BITS.as_ptr(), &raw mut bits) };
+    // SAFETY: as above.
+    let p1 = unsafe {
+        OSSL_PARAM_construct_int(
+            OSSL_PKEY_PARAM_SECURITY_BITS.as_ptr(),
+            &raw mut security_bits,
+        )
+    };
+    // SAFETY: as above.
+    let p2 = unsafe { OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_MAX_SIZE.as_ptr(), &raw mut size) };
+    let mut params = [p0, p1, p2, end()];
+    // SAFETY: the key manager's data; the array above.
+    if unsafe { km.get().get_params(kd.ptr(), params.as_mut_ptr()) } != 0 {
+        let mut s = k.lock();
+        s.size = size;
+        s.bits = bits;
+        s.security_bits = security_bits;
+    }
+}
+
+/// `evp_keymgmt_util_assign_pkey`: gives the key the key manager's data.
+pub(crate) fn assign(k: &Pkey, keydata: Arc<KeyData>) -> bool {
+    // A key typed by name keeps its type when typed again, so it gets no key manager; OpenSSL
+    // then reaches the missing key manager (docs/DEVIATIONS.md).
+    let typed = set_type_by_keymgmt(k, &keydata.keymgmt)
+        && k.lock()
+            .keymgmt
+            .as_ref()
+            .is_some_and(|m| m.same(&keydata.keymgmt));
+    if !typed {
+        err::raise(
+            ERR_LIB_EVP,
+            ERR_R_INTERNAL_ERROR,
+            "evp_keymgmt_util_assign_pkey",
+        );
+        return false;
+    }
+    k.lock().keydata = Some(keydata);
+    cache_keyinfo(k);
+    true
+}
+
+/// `evp_keymgmt_util_has`.
+pub(crate) fn has(k: &Pkey, selection: c_int) -> bool {
+    let (Some(km), kd) = k.provided() else {
+        return false;
+    };
+    let ptr = kd.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+    // SAFETY: the key manager's data, or NULL.
+    unsafe { km.get().has(ptr, selection) != 0 }
+}
+
+/// `evp_keymgmt_util_export`: has the key manager export the selection to `cb`.
+///
+/// # Safety
+/// `cb` takes `cbarg`.
+pub(crate) unsafe fn export(
+    k: &Pkey,
+    selection: c_int,
+    cb: OSSL_CALLBACK,
+    cbarg: *mut c_void,
+) -> c_int {
+    if cb.is_none() {
+        return 0;
+    }
+    let (Some(km), kd) = k.provided() else {
+        // OpenSSL calls through a NULL key manager here.
+        crate::stub::unimplemented("evp_keymgmt_util_export of a key without a key manager");
+    };
+    let ptr = kd.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+    // SAFETY: the key manager's data; the caller's guarantee.
+    unsafe { km.get().export(ptr, selection, cb, cbarg) }
+}
+
+/// What `evp_keymgmt_util_try_import` fills.
+struct TryImport {
+    keymgmt: keymgmt::Ref,
+    keydata: *mut c_void,
+    selection: c_int,
+    /// Whether `keydata` was made here.
+    allocated: bool,
+}
+
+/// `evp_keymgmt_util_try_import`: imports the parameters into the key data (made first if
+/// there's none).
+///
+/// # Safety
+/// `params` is a parameter array; `arg` is a `TryImport`.
+unsafe extern "C" fn try_import(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(data) = (unsafe { arg.cast::<TryImport>().as_mut() }) else {
+        return 0;
+    };
+    let mut delete_on_error = false;
+    if data.keydata.is_null() {
+        data.keydata = data.keymgmt.get().newdata();
+        if data.keydata.is_null() {
+            err::raise(ERR_LIB_EVP, ERR_R_EVP_LIB, "evp_keymgmt_util_try_import");
+            return 0;
+        }
+        data.allocated = true;
+        delete_on_error = true;
+    }
+    // An empty export is fine.
+    // SAFETY: the caller's guarantee.
+    if unsafe { params.as_ref() }.is_none_or(|p| p.key.is_null()) {
+        return 1;
+    }
+    // SAFETY: the key manager's data; the caller's array.
+    if unsafe {
+        data.keymgmt
+            .get()
+            .import(data.keydata, data.selection, params)
+    } != 0
+    {
+        return 1;
+    }
+    if delete_on_error {
+        // SAFETY: made above.
+        unsafe { data.keymgmt.get().freedata(data.keydata) };
+        data.keydata = ptr::null_mut();
+        data.allocated = false;
+    }
+    0
+}
+
+/// `evp_keymgmt_util_find_operation_cache`.
+fn find_cache<'a>(
+    s: &'a State,
+    keymgmt: &Keymgmt,
+    km: &keymgmt::Ref,
+    selection: c_int,
+) -> Option<&'a OpCache> {
+    s.operation_cache.iter().find(|p| {
+        (p.selection & selection) == selection
+            && (p.keymgmt.same(km)
+                || (keymgmt.name_id == p.keymgmt.get().name_id
+                    && keymgmt.prov.0 == p.keymgmt.get().prov.0))
+    })
+}
+
+/// `evp_keymgmt_util_export_to_provider`: the key's data for `keymgmt`: its own if that's its key
+/// manager (or the same algorithm of the same provider), else a cached or new export.
+pub(crate) fn export_to_provider(
+    k: &Pkey,
+    km: &keymgmt::Ref,
+    selection: c_int,
+) -> Option<Arc<KeyData>> {
+    let (Some(own), Some(kd)) = k.provided() else {
+        return None;
+    };
+    let m = km.get();
+    if own.same(km) || (own.get().name_id == m.name_id && own.get().prov.0 == m.prov.0) {
+        return Some(kd);
+    }
+    {
+        let s = k.lock();
+        if s.dirty_cnt == s.dirty_cnt_copy
+            && let Some(op) = find_cache(&s, m, km, selection)
+        {
+            return Some(op.keydata.clone());
+        }
+    }
+    if !own.get().has_export() {
+        return None;
+    }
+    // The key managers must be of the same key type (OpenSSL asserts).
+    if !own.get().match_type(m) {
+        return None;
+    }
+    let mut data = TryImport {
+        keymgmt: km.clone(),
+        keydata: ptr::null_mut(),
+        selection,
+        allocated: false,
+    };
+    // SAFETY: the callback takes the `TryImport`, which outlives the call.
+    if unsafe { export(k, selection, Some(try_import), (&raw mut data).cast()) } == 0 {
+        if data.allocated {
+            // SAFETY: made by `try_import`.
+            unsafe { m.freedata(data.keydata) };
+        }
+        return None;
+    }
+    let new = KeyData::adopt(km.clone(), data.keydata)?;
+    let mut s = k.lock();
+    if let Some(op) = find_cache(&s, m, km, selection) {
+        // Another thread got there first.
+        return Some(op.keydata.clone());
+    }
+    if s.dirty_cnt != s.dirty_cnt_copy {
+        let old = core::mem::take(&mut s.operation_cache);
+        s.operation_cache.push(OpCache {
+            keymgmt: km.clone(),
+            keydata: new.clone(),
+            selection,
+        });
+        s.dirty_cnt_copy = s.dirty_cnt;
+        drop(s);
+        drop(old);
+        return Some(new);
+    }
+    s.operation_cache.push(OpCache {
+        keymgmt: km.clone(),
+        keydata: new.clone(),
+        selection,
+    });
+    s.dirty_cnt_copy = s.dirty_cnt;
+    Some(new)
+}
+
+/// `evp_pkey_export_to_provider`: the key's data for `keymgmt` (if given), else for the key
+/// manager a context for the key would fetch from `libctx` with `propq`. The key manager used
+/// and the data, or `None`.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn export_to_any(
+    k: &PkeyRef,
+    libctx: *mut OSSL_LIB_CTX,
+    keymgmt: Option<keymgmt::Ref>,
+    propq: Option<&CStr>,
+) -> Option<(keymgmt::Ref, Arc<KeyData>)> {
+    if !k.get().lock().is_assigned() {
+        return None;
+    }
+    let km = match keymgmt {
+        Some(km) => km,
+        // SAFETY: the caller's guarantee.
+        None => unsafe { super::pkey_ctx::keymgmt_for(libctx, k, propq) }?,
+    };
+    let kd = export_to_provider(k.get(), &km, OSSL_KEYMGMT_SELECT_ALL as c_int)?;
+    Some((km, kd))
+}
+
+/// `evp_keymgmt_util_match`: compares two keys' selections, exporting one to the other's key
+/// manager if they differ.
+fn keymgmt_match(a: &Pkey, b: &Pkey, selection: c_int) -> c_int {
+    let (km1, kd1) = a.provided();
+    let (km2, kd2) = b.provided();
+    let (mut km1, mut kd1, mut km2, mut kd2) = (km1, kd1, km2, kd2);
+    let differ = match (&km1, &km2) {
+        (Some(x), Some(y)) => !x.same(y),
+        (None, None) => false,
+        _ => true,
+    };
+    if differ {
+        if let (Some(x), Some(y)) = (&km1, &km2)
+            && !x.get().match_type(y.get())
+        {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_DIFFERENT_KEY_TYPES,
+                "evp_keymgmt_util_match",
+            );
+            return -1;
+        }
+        let mut ok = false;
+        if let Some(y) = km2.clone().filter(|y| y.get().has_match()) {
+            ok = true;
+            let mut tmp = None;
+            if kd1.is_some() {
+                tmp = export_to_provider(a, &y, selection);
+                ok = tmp.is_some();
+            }
+            if ok {
+                km1 = Some(y);
+                kd1 = tmp;
+            }
+        }
+        if !ok && let Some(x) = km1.clone().filter(|x| x.get().has_match()) {
+            ok = true;
+            let mut tmp = None;
+            if kd2.is_some() {
+                tmp = export_to_provider(b, &x, selection);
+                ok = tmp.is_some();
+            }
+            if ok {
+                km2 = Some(x);
+                kd2 = tmp;
+            }
+        }
+    }
+    let same = match (&km1, &km2) {
+        (Some(x), Some(y)) => x.same(y),
+        (None, None) => true,
+        _ => false,
+    };
+    if !same {
+        return -2;
+    }
+    match (km1, kd1, kd2) {
+        (_, None, None) => 1,
+        (_, None, _) | (_, _, None) => 0,
+        // SAFETY: both data are the key manager's.
+        (Some(m), Some(x), Some(y)) => unsafe { m.get().match_(x.ptr(), y.ptr(), selection) },
+        // Neither key has a key manager, yet there's data (can't happen).
+        (None, Some(_), Some(_)) => -2,
+    }
+}
+
+/// `evp_pkey_cmp_any`.
+fn cmp_any(a: &Pkey, b: &Pkey, selection: c_int) -> c_int {
+    let (pa, pb) = (a.is_provided(), b.is_provided());
+    if !pa && !pb {
+        return -2;
+    }
+    if pa && pb {
+        return keymgmt_match(a, b, selection);
+    }
+    // One is a typed key without data: its type must be one of the other's key manager's
+    // names, and there's nothing of it to export.
+    let (legacy, provided) = if pa { (b, a) } else { (a, b) };
+    let t = legacy.type_();
+    if t == EVP_PKEY_NONE {
+        // A blank key has nothing to export.
+        return -2;
+    }
+    // SAFETY: a type number.
+    let sn = unsafe { OBJ_nid2sn(t) };
+    // SAFETY: NULL or a static string.
+    let name = unsafe { text(sn) }.map_or(&b""[..], CStr::to_bytes);
+    let Some(km) = provided.provided().0 else {
+        return -2;
+    };
+    if !km.get().is_a(name) {
+        return -1;
+    }
+    // The other's export to this key manager needs legacy data; a typed key has none.
+    -2
+}
+
+/// `copy`'s helper `evp_keymgmt_util_copy`: copies the selection of `from`'s data into `to`.
+fn keymgmt_copy(to: &Pkey, from: &Pkey, selection: c_int) -> bool {
+    let (from_km, from_kd) = from.provided();
+    let (Some(from_km), Some(from_kd)) = (from_km, from_kd) else {
+        return false;
+    };
+    let (to_km, to_kd) = to.provided();
+    let to_km = to_km.unwrap_or_else(|| from_km.clone());
+    let mut to_ptr = to_kd.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+    let mut allocated = None;
+    if to_km.same(&from_km) && to_km.get().has_dup() && to_kd.is_none() {
+        // SAFETY: `from`'s data, of this key manager.
+        let d = unsafe { to_km.get().dup(from_kd.ptr(), selection) };
+        let Some(d) = KeyData::adopt(to_km.clone(), d) else {
+            return false;
+        };
+        to_ptr = d.ptr();
+        allocated = Some(d);
+    } else if to_km.get().match_type(from_km.get()) {
+        let mut data = TryImport {
+            keymgmt: to_km.clone(),
+            keydata: to_ptr,
+            selection,
+            allocated: false,
+        };
+        // SAFETY: the callback takes the `TryImport`, which outlives the call.
+        if unsafe { export(from, selection, Some(try_import), (&raw mut data).cast()) } == 0 {
+            if data.allocated {
+                // SAFETY: made by `try_import`.
+                unsafe { to_km.get().freedata(data.keydata) };
+            }
+            return false;
+        }
+        if to_kd.is_none() {
+            allocated = KeyData::adopt(to_km.clone(), data.keydata);
+            to_ptr = data.keydata;
+        }
+    } else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_DIFFERENT_KEY_TYPES,
+            "evp_keymgmt_util_copy",
+        );
+        return false;
+    }
+    let _ = to_ptr;
+    if !to.is_provided() && !set_type_by_keymgmt(to, &to_km) {
+        return false;
+    }
+    if let Some(d) = allocated {
+        to.lock().keydata = Some(d);
+    }
+    cache_keyinfo(to);
+    true
+}
+
+/// `evp_pkey_copy_downgraded` of a provided key: a typed key of its type. Its data would need
+/// the key type's ASN.1 method, which comes with the key types.
+fn copy_downgraded(src: &Pkey) -> Option<PkeyRef> {
+    let (type_, assigned) = {
+        let s = src.lock();
+        (s.type_, s.is_assigned() && s.keymgmt.is_some())
+    };
+    if !assigned {
+        return None;
+    }
+    // SAFETY: just made, with its reference.
+    let dest = unsafe { PkeyRef::adopt(new()) }?;
+    if !set_type(Some(dest.get()), type_, None, None) {
+        return None;
+    }
+    crate::stub::unimplemented("downgrading a provided key to its legacy form");
+}
+
+ffi_export! {
+    /// A new blank key with one reference, or NULL.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn EVP_PKEY_new() -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        new()
+    }
+}
+
+ffi_export! {
+    /// Adds a reference. Returns 1 (0 for NULL, where OpenSSL would crash).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_up_ref(pkey: *mut EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        c_int::from(k.references.fetch_add(1, Ordering::AcqRel) >= 1)
+    }
+}
+
+ffi_export! {
+    /// Drops a reference; with the last, frees the key's data and runs the ex_data callbacks.
+    ///
+    /// # Safety
+    /// `x` is NULL or a key the caller holds, not used afterwards.
+    pub unsafe extern "C" fn EVP_PKEY_free(x: *mut EVP_PKEY)
+    where failure = (), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { free(x) };
+    }
+}
+
+ffi_export! {
+    /// The key type (`EVP_PKEY_NONE` for a blank key, `EVP_PKEY_KEYMGMT` for a provided key of
+    /// a type without an ASN.1 method); 0 for NULL.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_id(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { self::pkey(pkey) }.map_or(0, Pkey::type_)
+    }
+}
+
+ffi_export! {
+    /// The type the key's type stands for (`EVP_PKEY_type`); 0 for NULL.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_base_id(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { self::pkey(pkey) }.map_or(0, |k| ameth::pkey_type(k.type_()))
+    }
+}
+
+ffi_export! {
+    /// The key type `type_` stands for (an alias's base type), `NID_undef` if none.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn EVP_PKEY_type(type_: c_int) -> c_int
+    where failure = NID_undef, library = ERR_LIB_EVP
+    {
+        ameth::pkey_type(type_)
+    }
+}
+
+ffi_export! {
+    /// The key manager's name, or the ASN.1 method's PEM name; NULL for a blank key.
+    ///
+    /// # Safety
+    /// `key` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get0_type_name(key: *const EVP_PKEY) -> *const c_char
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { pkey(key) }) else { return ptr::null() };
+        let s = k.lock();
+        if let Some(km) = &s.keymgmt {
+            // The key manager outlives the key's reference to it.
+            return km.get().name().as_ptr();
+        }
+        s.ameth.and_then(|m| m.pem_str).map_or(ptr::null(), CStr::as_ptr)
+    }
+}
+
+ffi_export! {
+    /// The key manager's description, or the ASN.1 method's; NULL for a key without data.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get0_description(pkey: *const EVP_PKEY) -> *const c_char
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return ptr::null() };
+        let s = k.lock();
+        if !s.is_assigned() {
+            return ptr::null();
+        }
+        if let Some(km) = &s.keymgmt {
+            let d = km.get().description();
+            if !d.is_null() {
+                return d;
+            }
+        }
+        s.ameth.and_then(|m| m.info).map_or(ptr::null(), CStr::as_ptr)
+    }
+}
+
+ffi_export! {
+    /// The provider of a provided key's key manager, else NULL.
+    ///
+    /// # Safety
+    /// `key` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get0_provider(key: *const EVP_PKEY) -> *const OSSL_PROVIDER
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { pkey(key) }) else { return ptr::null() };
+        k.lock().keymgmt.as_ref().map_or(ptr::null(), |m| m.get().prov.0.cast_const())
+    }
+}
+
+ffi_export! {
+    /// Whether the key is of the type `name` (one of its key manager's names, or the type
+    /// `evp_pkey_name2type` gives). 0 for NULL.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `name` is NULL or a string.
+    pub unsafe extern "C" fn EVP_PKEY_is_a(pkey: *const EVP_PKEY, name: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        // SAFETY: the caller's guarantee.
+        let n = unsafe { text(name) }.map_or(&b""[..], CStr::to_bytes);
+        let (km, type_) = {
+            let s = k.lock();
+            (s.keymgmt.clone(), s.type_)
+        };
+        match km {
+            Some(m) => c_int::from(m.get().is_a(n)),
+            None => c_int::from(type_ == ameth::name2type(n)),
+        }
+    }
+}
+
+/// A names callback.
+type NameFn = unsafe extern "C" fn(*const c_char, *mut c_void);
+
+ffi_export! {
+    /// Calls `fn_` with each name of the key's type (its key manager's, or the type's short
+    /// name). 0 for a blank key.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `fn_` is a function of the documented type.
+    pub unsafe extern "C" fn EVP_PKEY_type_names_do_all(pkey: *const EVP_PKEY, fn_: Option<NameFn>, data: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        let (typed, km, type_) = {
+            let s = k.lock();
+            (s.is_typed(), s.keymgmt.clone(), s.type_)
+        };
+        if !typed {
+            return 0;
+        }
+        match km {
+            // SAFETY: the caller's guarantee.
+            Some(m) => unsafe { keymgmt::names_do_all(m.get(), fn_, data) },
+            None => {
+                // SAFETY: a type number.
+                let sn = unsafe { OBJ_nid2sn(type_) };
+                if let Some(f) = fn_ {
+                    // SAFETY: the caller's callback with the static name and its data.
+                    unsafe { f(sn, data) };
+                }
+                1
+            }
+        }
+    }
+}
+
+/// What `EVP_PKEY_get_bits` and its kin read.
+#[derive(Clone, Copy)]
+enum Info {
+    Bits,
+    SecurityBits,
+    Size,
+}
+
+/// The cached information, or 0 with `reason`.
+///
+/// # Safety
+/// `pkey` is NULL or a live key.
+unsafe fn info(pkey: *const EVP_PKEY, which: Info, reason: c_int, function: &str) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let size = unsafe { self::pkey(pkey) }.map_or(0, |k| {
+        let s = k.lock();
+        if s.ameth_has(ameth::F_SIZES) {
+            // The ASN.1 methods' functions come with the key types.
+            crate::stub::unimplemented("the size of a key typed by an ASN.1 method");
+        }
+        match which {
+            Info::Bits => s.bits,
+            Info::SecurityBits => s.security_bits,
+            Info::Size => s.size,
+        }
+    });
+    if size <= 0 {
+        err::raise(ERR_LIB_EVP, reason, function);
+        return 0;
+    }
+    size
+}
+
+ffi_export! {
+    /// The key's size in bits, or 0 with `EVP_R_UNKNOWN_BITS`.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_bits(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { info(pkey, Info::Bits, EVP_R_UNKNOWN_BITS, "EVP_PKEY_get_bits") }
+    }
+}
+
+ffi_export! {
+    /// The key's security bits, or 0 with `EVP_R_UNKNOWN_SECURITY_BITS`.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_security_bits(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { info(pkey, Info::SecurityBits, EVP_R_UNKNOWN_SECURITY_BITS, "EVP_PKEY_get_security_bits") }
+    }
+}
+
+ffi_export! {
+    /// The maximum size of the key's output (a signature, ...), or 0 with
+    /// `EVP_R_UNKNOWN_MAX_SIZE`.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_size(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { info(pkey, Info::Size, EVP_R_UNKNOWN_MAX_SIZE, "EVP_PKEY_get_size") }
+    }
+}
+
+ffi_export! {
+    /// For a DSA or EC key: whether its parameters are saved with it, set to `mode` unless that's
+    /// negative; the setting before. 0 for other keys.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_save_parameters(pkey: *mut EVP_PKEY, mode: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        let mut s = k.lock();
+        if s.type_ != EVP_PKEY_DSA && s.type_ != EVP_PKEY_EC {
+            return 0;
+        }
+        let ret = s.save_parameters;
+        if mode >= 0 {
+            s.save_parameters = mode;
+        }
+        ret
+    }
+}
+
+ffi_export! {
+    /// Sets the application data at `idx`. 0 for NULL.
+    ///
+    /// # Safety
+    /// `key` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_set_ex_data(key: *mut EVP_PKEY, idx: c_int, arg: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { pkey(key) }) else { return 0 };
+        // SAFETY: the key's own ex_data.
+        unsafe { CRYPTO_set_ex_data(k.ex_data(), idx, arg) }
+    }
+}
+
+ffi_export! {
+    /// The application data at `idx`, or NULL.
+    ///
+    /// # Safety
+    /// `key` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_ex_data(key: *const EVP_PKEY, idx: c_int) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { pkey(key) }) else { return ptr::null_mut() };
+        // SAFETY: the key's own ex_data.
+        unsafe { CRYPTO_get_ex_data(k.ex_data(), idx) }
+    }
+}
+
+ffi_export! {
+    /// Types the key by `type_` (an ASN.1 method's key type), freeing its data. 0 with
+    /// `EVP_R_UNSUPPORTED_ALGORITHM` for a type without one.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_set_type(pkey: *mut EVP_PKEY, type_: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let k = unsafe { self::pkey(pkey) };
+        c_int::from(set_type(k, type_, None, None))
+    }
+}
+
+ffi_export! {
+    /// Types the key by the ASN.1 method whose PEM name is the `len` characters of `str_` (all
+    /// of it for -1), ignoring case.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `str_` is a string of at least `len` characters.
+    pub unsafe extern "C" fn EVP_PKEY_set_type_str(pkey: *mut EVP_PKEY, str_: *const c_char, len: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let k = unsafe { self::pkey(pkey) };
+        // SAFETY: as above.
+        let Some(s) = (unsafe { text(str_) }) else { return 0 };
+        let all = s.to_bytes();
+        let name = if len == -1 {
+            all
+        } else {
+            let Ok(n) = usize::try_from(len) else { return 0 };
+            // OpenSSL compares `len` characters of a longer name, and none of a shorter one.
+            let Some(n) = all.get(..n) else {
+                return c_int::from(set_type(k, EVP_PKEY_NONE, Some(b"\0"), None));
+            };
+            n
+        };
+        c_int::from(set_type(k, EVP_PKEY_NONE, Some(name), None))
+    }
+}
+
+ffi_export! {
+    /// Types the key by the key manager (keeping a reference).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `keymgmt` is NULL or a live key manager.
+    pub unsafe extern "C" fn EVP_PKEY_set_type_by_keymgmt(pkey: *mut EVP_PKEY, keymgmt: *mut EVP_KEYMGMT) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        // SAFETY: as above.
+        let Some(km) = (unsafe { keymgmt::Ref::new(keymgmt) }) else { return 0 };
+        c_int::from(set_type_by_keymgmt(k, &km))
+    }
+}
+
+ffi_export! {
+    /// The key's engine: always NULL, as there are no engines.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get0_engine(pkey: *const EVP_PKEY) -> *mut ENGINE
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        let _ = pkey;
+        ptr::null_mut()
+    }
+}
+
+ffi_export! {
+    /// Sets the engine the key's operations use: only NULL can be set, as there are no engines
+    /// (their API can't make one).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_set1_engine(pkey: *mut EVP_PKEY, e: *mut ENGINE) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { self::pkey(pkey) }.is_none() || !e.is_null() {
+            err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_ENGINE_LIB, "EVP_PKEY_set1_engine");
+            return 0;
+        }
+        1
+    }
+}
+
+ffi_export! {
+    /// Whether the key lacks parameters it needs (its key manager doesn't have them).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_missing_parameters(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        c_int::from(missing_parameters(k))
+    }
+}
+
+/// `EVP_PKEY_missing_parameters`.
+fn missing_parameters(k: &Pkey) -> bool {
+    if k.is_provided() {
+        return !has(k, SELECT_PARAMETERS);
+    }
+    if k.lock().ameth_has(ameth::F_PARAM_MISSING) {
+        // The ASN.1 methods' functions come with the key types.
+        crate::stub::unimplemented("the parameters of a key typed by an ASN.1 method");
+    }
+    false
+}
+
+/// `EVP_PKEY_parameters_eq`.
+fn parameters_eq(a: &Pkey, b: &Pkey) -> c_int {
+    if a.is_provided() || b.is_provided() {
+        return cmp_any(a, b, SELECT_PARAMETERS);
+    }
+    let (ta, tb) = (a.type_(), b.type_());
+    if ta != tb {
+        return -1;
+    }
+    if a.lock().ameth_has(ameth::F_PARAM_CMP) {
+        // The ASN.1 methods' functions come with the key types.
+        crate::stub::unimplemented("comparing keys typed by an ASN.1 method");
+    }
+    -2
+}
+
+ffi_export! {
+    /// Compares the keys' parameters: 1 equal, 0 different, -1 different types, -2 can't.
+    ///
+    /// # Safety
+    /// `a` and `b` are NULL or live keys.
+    pub unsafe extern "C" fn EVP_PKEY_parameters_eq(a: *const EVP_PKEY, b: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let (Some(x), Some(y)) = (unsafe { pkey(a) }, unsafe { pkey(b) }) else { return 0 };
+        parameters_eq(x, y)
+    }
+}
+
+ffi_export! {
+    /// `EVP_PKEY_parameters_eq`.
+    ///
+    /// # Safety
+    /// As for `EVP_PKEY_parameters_eq`.
+    pub unsafe extern "C" fn EVP_PKEY_cmp_parameters(a: *const EVP_PKEY, b: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { EVP_PKEY_parameters_eq(a, b) }
+    }
+}
+
+ffi_export! {
+    /// Compares the keys (their parameters and public keys, or their key pairs when either has
+    /// no public key): 1 equal, 0 different, -1 different types, -2 can't compare.
+    ///
+    /// # Safety
+    /// `a` and `b` are NULL or live keys.
+    pub unsafe extern "C" fn EVP_PKEY_eq(a: *const EVP_PKEY, b: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        if a == b {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        let (Some(x), Some(y)) = (unsafe { pkey(a) }, unsafe { pkey(b) }) else { return 0 };
+        if x.is_provided() || y.is_provided() {
+            let pubkey = OSSL_KEYMGMT_SELECT_PUBLIC_KEY as c_int;
+            let mut selection = SELECT_PARAMETERS;
+            if has(x, pubkey) && has(y, pubkey) {
+                selection |= pubkey;
+            } else {
+                selection |= OSSL_KEYMGMT_SELECT_KEYPAIR as c_int;
+            }
+            return cmp_any(x, y, selection);
+        }
+        if x.type_() != y.type_() {
+            return -1;
+        }
+        let s = x.lock();
+        if s.ameth_has(ameth::F_PARAM_CMP) || s.ameth_has(ameth::F_PUB_CMP) {
+            // The ASN.1 methods' functions come with the key types.
+            crate::stub::unimplemented("comparing keys typed by an ASN.1 method");
+        }
+        -2
+    }
+}
+
+ffi_export! {
+    /// `EVP_PKEY_eq`.
+    ///
+    /// # Safety
+    /// As for `EVP_PKEY_eq`.
+    pub unsafe extern "C" fn EVP_PKEY_cmp(a: *const EVP_PKEY, b: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { EVP_PKEY_eq(a, b) }
+    }
+}
+
+ffi_export! {
+    /// Copies `from`'s parameters into `to` (typing a blank `to` like `from`): 1 if `to` has
+    /// them after (also when they were already equal), else 0 with an error.
+    ///
+    /// # Safety
+    /// `to` and `from` are NULL or live keys.
+    pub unsafe extern "C" fn EVP_PKEY_copy_parameters(to: *mut EVP_PKEY, from: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_PKEY_copy_parameters";
+        // SAFETY: the caller's guarantee.
+        let (Some(t), Some(f)) = (unsafe { pkey(to) }, unsafe { pkey(from) }) else { return 0 };
+        let (to_legacy, to_blank) = {
+            let s = t.lock();
+            (s.is_legacy(), s.is_blank())
+        };
+        let from_provided = f.is_provided();
+        if to_legacy && from_provided {
+            // The parameters would be copied from `from`'s legacy form.
+            if copy_downgraded(f).is_none() {
+                return 0;
+            }
+        }
+        if to_blank {
+            let (km, from_type, from_legacy) = {
+                let s = f.lock();
+                (s.keymgmt.clone(), s.type_, s.is_legacy())
+            };
+            let ok = if from_legacy {
+                set_type(Some(t), from_type, None, None)
+            } else {
+                match km {
+                    Some(km) => set_type_by_keymgmt(t, &km),
+                    // `from` is blank too: OpenSSL calls through a NULL key manager.
+                    None => crate::stub::unimplemented("EVP_PKEY_copy_parameters from a blank key"),
+                }
+            };
+            if !ok {
+                return 0;
+            }
+        } else if to_legacy && t.type_() != f.type_() {
+            err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_KEY_TYPES, F);
+            return 0;
+        }
+        if missing_parameters(f) {
+            err::raise(ERR_LIB_EVP, EVP_R_MISSING_PARAMETERS, F);
+            return 0;
+        }
+        if !missing_parameters(t) {
+            if parameters_eq(t, f) == 1 {
+                return 1;
+            }
+            err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_PARAMETERS, F);
+            return 0;
+        }
+        if t.is_provided() && f.is_provided() {
+            return c_int::from(keymgmt_copy(t, f, SELECT_PARAMETERS));
+        }
+        let (to_km, to_has_data) = {
+            let s = t.lock();
+            (s.keymgmt.clone(), s.keydata.is_some())
+        };
+        if let Some(km) = to_km.filter(|_| !to_has_data) {
+            // `from` is a typed key without data: there's nothing to export.
+            let _ = km;
+            err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_KEY_TYPES, F);
+            return 0;
+        }
+        if f.lock().ameth_has(ameth::F_PARAM_COPY) {
+            // The ASN.1 methods' functions come with the key types.
+            crate::stub::unimplemented("copying parameters of a key typed by an ASN.1 method");
+        }
+        0
+    }
+}
+
+ffi_export! {
+    /// A new key with a copy of `pkey`'s data and application data; NULL with an error if it
+    /// can't be copied.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_dup(pkey: *mut EVP_PKEY) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else {
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, "EVP_PKEY_dup");
+            return ptr::null_mut();
+        };
+        // SAFETY: just made, with its reference.
+        let Some(dup) = (unsafe { PkeyRef::adopt(new()) }) else { return ptr::null_mut() };
+        let (blank, provided) = {
+            let s = k.lock();
+            (s.is_blank(), s.keymgmt.is_some())
+        };
+        if !blank {
+            if provided {
+                if !keymgmt_copy(dup.get(), k, OSSL_KEYMGMT_SELECT_ALL as c_int) {
+                    return ptr::null_mut();
+                }
+            } else {
+                let (copy, type_) = {
+                    let s = k.lock();
+                    (s.ameth_has(ameth::F_COPY), s.type_)
+                };
+                if copy {
+                    // The ASN.1 methods' functions come with the key types.
+                    crate::stub::unimplemented("EVP_PKEY_dup of a key typed by an ASN.1 method");
+                }
+                // A typed key without data and a copy function: typed alike.
+                if !set_type(Some(dup.get()), type_, None, None) {
+                    err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_KEY_TYPE, "EVP_PKEY_dup");
+                    return ptr::null_mut();
+                }
+            }
+        }
+        // SAFETY: both keys' own ex_data.
+        if unsafe { CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, dup.get().ex_data(), k.ex_data()) } == 0 {
+            return ptr::null_mut();
+        }
+        dup.into_raw()
+    }
+}
+
+ffi_export! {
+    /// Has the key manager pass the selected parts of the key to `export_cb` as parameters.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `export_cb` takes `export_cbarg`.
+    pub unsafe extern "C" fn EVP_PKEY_export(pkey: *const EVP_PKEY, selection: c_int, export_cb: OSSL_CALLBACK, export_cbarg: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else {
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, "EVP_PKEY_export");
+            return 0;
+        };
+        if k.lock().is_legacy() {
+            // A typed key's ASN.1 method exports it.
+            crate::stub::unimplemented("EVP_PKEY_export of a key typed by an ASN.1 method");
+        }
+        // SAFETY: the caller's guarantee.
+        unsafe { export(k, selection, export_cb, export_cbarg) }
+    }
+}
+
+/// `ossl_pkey_todata_cb`: keeps a copy of the parameters.
+///
+/// # Safety
+/// `params` is a parameter array; `arg` is a `*mut *mut OSSL_PARAM`.
+unsafe extern "C" fn todata_cb(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+    let ret = arg.cast::<*mut OSSL_PARAM>();
+    // SAFETY: the caller's guarantee.
+    let dup = unsafe { crate::params::dup::OSSL_PARAM_dup(params) };
+    // SAFETY: as above.
+    unsafe { ret.write(dup) };
+    1
+}
+
+ffi_export! {
+    /// The selected parts of the key as a new parameter array (freed with `OSSL_PARAM_free`).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `params` is NULL or room for a pointer.
+    pub unsafe extern "C" fn EVP_PKEY_todata(pkey: *const EVP_PKEY, selection: c_int, params: *mut *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        if params.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee; the callback writes the caller's pointer.
+        unsafe { EVP_PKEY_export(pkey, selection, Some(todata_cb), params.cast()) }
+    }
+}
+
+/// `evp_keymgmt_util_get_deflt_digest_name`: 2 for a mandatory digest, 1 for a default one (its
+/// name, or `UNDEF` for an empty one, in `mdname`), -2 for none, 0 if the key manager fails.
+///
+/// # Safety
+/// `mdname` has room for `mdname_sz` characters.
+unsafe fn default_digest_name(
+    km: &Keymgmt,
+    keydata: *mut c_void,
+    mdname: *mut c_char,
+    mdname_sz: usize,
+) -> c_int {
+    let mut mddefault = [0u8; 100];
+    let mut mdmandatory = [0u8; 100];
+    // SAFETY: a static key; a local buffer that outlives the array, here and below.
+    let p0 = unsafe {
+        OSSL_PARAM_construct_utf8_string(
+            OSSL_PKEY_PARAM_DEFAULT_DIGEST.as_ptr(),
+            mddefault.as_mut_ptr().cast(),
+            mddefault.len(),
+        )
+    };
+    // SAFETY: as above.
+    let p1 = unsafe {
+        OSSL_PARAM_construct_utf8_string(
+            OSSL_PKEY_PARAM_MANDATORY_DIGEST.as_ptr(),
+            mdmandatory.as_mut_ptr().cast(),
+            mdmandatory.len(),
+        )
+    };
+    let mut params = [p0, p1, end()];
+    // SAFETY: the key manager's data; the array above.
+    if unsafe { km.get_params(keydata, params.as_mut_ptr()) } == 0 {
+        return 0;
+    }
+    let [default, mandatory, _] = &params;
+    let pick = |p: &OSSL_PARAM, buf: &[u8]| -> Vec<u8> {
+        if p.return_size <= 1 {
+            SN_undef.to_bytes().to_vec()
+        } else {
+            buf.split(|&c| c == 0).next().unwrap_or(&[]).to_vec()
+        }
+    };
+    // SAFETY: parameters of the array.
+    let (result, rv) = if unsafe { OSSL_PARAM_modified(mandatory) } != 0 {
+        (pick(mandatory, &mdmandatory), 2)
+    // SAFETY: as above.
+    } else if unsafe { OSSL_PARAM_modified(default) } != 0 {
+        (pick(default, &mddefault), 1)
+    } else {
+        return -2;
+    };
+    // `OPENSSL_strlcpy`.
+    if mdname_sz > 0 && !mdname.is_null() {
+        let n = result.len().min(mdname_sz - 1);
+        // SAFETY: the caller's buffer has room for `mdname_sz` characters.
+        unsafe { ptr::copy_nonoverlapping(result.as_ptr().cast(), mdname, n) };
+        // SAFETY: as above: `n` is below `mdname_sz`.
+        unsafe { mdname.wrapping_add(n).write(0) };
+    }
+    rv
+}
+
+ffi_export! {
+    /// The name of the digest the key signs with by default into `mdname`: 2 if it's
+    /// mandatory, 1 if it's a default, -2 if there's none, 0 on failure.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `mdname` has room for `mdname_sz` characters.
+    pub unsafe extern "C" fn EVP_PKEY_get_default_digest_name(pkey: *mut EVP_PKEY, mdname: *mut c_char, mdname_sz: usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        let (typed, ctrl) = {
+            let s = k.lock();
+            (s.ameth.is_some(), s.ameth_has(ameth::F_CTRL))
+        };
+        if ctrl {
+            // The ASN.1 methods' functions come with the key types.
+            crate::stub::unimplemented("the default digest of a key typed by an ASN.1 method");
+        }
+        if typed {
+            // Its method has no ctrl to ask.
+            return -2;
+        }
+        let (Some(km), kd) = k.provided() else {
+            // OpenSSL calls through a NULL key manager.
+            crate::stub::unimplemented("EVP_PKEY_get_default_digest_name of a blank key");
+        };
+        let ptr = kd.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+        // SAFETY: the key manager's data; the caller's buffer.
+        unsafe { default_digest_name(km.get(), ptr, mdname, mdname_sz) }
+    }
+}
+
+ffi_export! {
+    /// The digest the key signs with by default, as a NID in `pnid`: as
+    /// `EVP_PKEY_get_default_digest_name`.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `pnid` is room for an int.
+    pub unsafe extern "C" fn EVP_PKEY_get_default_digest_nid(pkey: *mut EVP_PKEY, pnid: *mut c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        let (typed, ctrl) = {
+            let s = k.lock();
+            (s.ameth.is_some(), s.ameth_has(ameth::F_CTRL))
+        };
+        if ctrl {
+            // The ASN.1 methods' functions come with the key types.
+            crate::stub::unimplemented("the default digest of a key typed by an ASN.1 method");
+        }
+        if typed {
+            // Its method has no ctrl to ask.
+            return -2;
+        }
+        if !k.is_provided() {
+            return 0;
+        }
+        let mut name = [0 as c_char; 80];
+        // SAFETY: the caller's key; the buffer above.
+        let rv = unsafe { EVP_PKEY_get_default_digest_name(pkey, name.as_mut_ptr(), name.len()) };
+        if rv > 0 {
+            // SAFETY: a NUL-terminated name.
+            let n = unsafe { CStr::from_ptr(name.as_ptr()) };
+            let (Some(km), _) = k.provided() else { return 0 };
+            let Some(nid) = digest_nid(km.get(), n) else { return 0 };
+            if !pnid.is_null() {
+                // SAFETY: the caller's guarantee.
+                unsafe { pnid.write(nid) };
+            }
+        }
+        rv
+    }
+}
+
+ffi_export! {
+    /// The key's legacy data: NULL for a provided or typed key (there's no legacy data yet).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get0(pkey: *const EVP_PKEY) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        let _ = pkey;
+        ptr::null_mut()
+    }
+}
+
+/// `EVP_PKEY_get0_hmac` and its kin: the raw key of a legacy MAC key of `type_`.
+///
+/// # Safety
+/// `pkey` is NULL or a live key.
+unsafe fn get0_mac(
+    pkey: *const EVP_PKEY,
+    type_: c_int,
+    reason: c_int,
+    function: &str,
+) -> *const u8 {
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { self::pkey(pkey) }) else {
+        return ptr::null();
+    };
+    if k.type_() != type_ {
+        err::raise(ERR_LIB_EVP, reason, function);
+        return ptr::null();
+    }
+    // `evp_pkey_get_legacy`: a provided key's legacy form, which a MAC key can't have.
+    if copy_downgraded(k).is_none() {
+        return ptr::null();
+    }
+    ptr::null()
+}
+
+ffi_export! {
+    /// The raw key of an HMAC key with legacy data, or NULL (always, as the MAC key types have
+    /// no legacy form) with `EVP_R_EXPECTING_AN_HMAC_KEY` for another type.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `len` is room for a size.
+    pub unsafe extern "C" fn EVP_PKEY_get0_hmac(pkey: *const EVP_PKEY, len: *mut usize) -> *const u8
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        let _ = len;
+        // SAFETY: the caller's guarantee.
+        unsafe { get0_mac(pkey, rustyssl_abi::EVP_PKEY_HMAC, EVP_R_EXPECTING_AN_HMAC_KEY, "EVP_PKEY_get0_hmac") }
+    }
+}
+
+ffi_export! {
+    /// As `EVP_PKEY_get0_hmac` for a Poly1305 key.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `len` is room for a size.
+    pub unsafe extern "C" fn EVP_PKEY_get0_poly1305(pkey: *const EVP_PKEY, len: *mut usize) -> *const u8
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        let _ = len;
+        // SAFETY: the caller's guarantee.
+        unsafe { get0_mac(pkey, rustyssl_abi::EVP_PKEY_POLY1305, EVP_R_EXPECTING_A_POLY1305_KEY, "EVP_PKEY_get0_poly1305") }
+    }
+}
+
+ffi_export! {
+    /// As `EVP_PKEY_get0_hmac` for a SipHash key.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `len` is room for a size.
+    pub unsafe extern "C" fn EVP_PKEY_get0_siphash(pkey: *const EVP_PKEY, len: *mut usize) -> *const u8
+    where failure = ptr::null(), library = ERR_LIB_EVP
+    {
+        let _ = len;
+        // SAFETY: the caller's guarantee.
+        unsafe { get0_mac(pkey, rustyssl_abi::EVP_PKEY_SIPHASH, EVP_R_EXPECTING_A_SIPHASH_KEY, "EVP_PKEY_get0_siphash") }
+    }
+}
+
+/// `legacy_asn1_ctrl_to_param`'s digest lookup: the NID of the first of the digest's names
+/// (in the key manager's context) that is an object's short or long name, or `NID_undef`;
+/// `None` if the name isn't known there.
+fn digest_nid(km: &Keymgmt, name: &CStr) -> Option<c_int> {
+    let libctx = {
+        // SAFETY: the key manager's live provider.
+        unsafe { crate::provider::libctx_of(km.prov.0) }
+    };
+    // Fetched only so the digest's names are in the name map.
+    // SAFETY: no preconditions.
+    unsafe { err::ERR_set_mark() };
+    // SAFETY: the provider's context; a string.
+    let md = unsafe { super::digest::EVP_MD_fetch(libctx, name.as_ptr(), ptr::null()) };
+    // SAFETY: the mark set above.
+    unsafe { err::ERR_pop_to_mark() };
+    // SAFETY: the reference fetched above, or NULL.
+    unsafe { super::digest::EVP_MD_free(md) };
+    let num = super::fetch::number_in(km.prov.0, name.to_bytes());
+    if num == 0 {
+        return None;
+    }
+    let mut nid = NID_undef;
+    for n in super::fetch::names_of(km.prov.0, num) {
+        if nid != NID_undef {
+            break;
+        }
+        let Ok(c) = CString::new(n) else { continue };
+        // SAFETY: a string.
+        nid = unsafe { crate::objects::OBJ_sn2nid(c.as_ptr()) };
+        if nid == NID_undef {
+            // SAFETY: as above.
+            nid = unsafe { crate::objects::OBJ_ln2nid(c.as_ptr()) };
+        }
+    }
+    Some(nid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::params::{EVP_PKEY_get_params, EVP_PKEY_set_params};
+    use super::raw::{
+        EVP_PKEY_get_raw_private_key, EVP_PKEY_new_CMAC_key, EVP_PKEY_new_raw_private_key,
+    };
+    use super::*;
+    use crate::evp::pkey_ctx::{
+        EVP_PKEY_CTX_free, EVP_PKEY_CTX_get_keygen_info, EVP_PKEY_CTX_new,
+        EVP_PKEY_CTX_new_from_name, EVP_PKEY_CTX_new_id, EVP_PKEY_CTX_set_mac_key,
+        EVP_PKEY_CTX_set0_keygen_info, EVP_PKEY_keygen, EVP_PKEY_keygen_init,
+    };
+
+    /// A library context of its own: fetching from it loads no configuration, which Miri
+    /// can't run.
+    fn libctx() -> *mut OSSL_LIB_CTX {
+        // SAFETY: no preconditions.
+        unsafe { crate::libctx::OSSL_LIB_CTX_new() }
+    }
+
+    /// The raw private key of `k`.
+    fn raw(k: *const EVP_PKEY) -> Option<Vec<u8>> {
+        let mut buf = [0u8; 64];
+        let mut len = buf.len();
+        // SAFETY: a live key; the buffer above.
+        let r = unsafe { EVP_PKEY_get_raw_private_key(k, buf.as_mut_ptr(), &raw mut len) };
+        (r == 1).then(|| buf.get(..len).unwrap_or_default().to_vec())
+    }
+
+    /// docs/DEVIATIONS.md: NULL keys are refused (the reference crashes).
+    #[test]
+    fn null_keys_are_refused() {
+        let k: *mut EVP_PKEY = ptr::null_mut();
+        let mut len = 0usize;
+        // SAFETY: NULL is the case under test, here and below.
+        assert_eq!(unsafe { EVP_PKEY_up_ref(k) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_get_id(k) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_get_base_id(k) }, 0);
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_get0_type_name(k) }.is_null());
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_get0_description(k) }.is_null());
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_save_parameters(k, 1) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set_ex_data(k, 1, ptr::null_mut()) }, 0);
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_get_ex_data(k, 1) }.is_null());
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set_type(k, EVP_PKEY_DSA) }, 1);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set_type_str(k, c"RSA".as_ptr(), -1) }, 1);
+        // SAFETY: as above.
+        let got = unsafe { EVP_PKEY_set_type_by_keymgmt(k, ptr::null_mut()) };
+        assert_eq!(got, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set1_engine(k, ptr::null_mut()) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_copy_parameters(k, k) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_parameters_eq(k, k) }, 0);
+        // SAFETY: as above.
+        let got = unsafe { EVP_PKEY_get_raw_private_key(k, ptr::null_mut(), &raw mut len) };
+        assert_eq!(got, 0);
+        // SAFETY: as above.
+        let got = unsafe { EVP_PKEY_get_default_digest_name(k, ptr::null_mut(), 0) };
+        assert_eq!(got, 0);
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_get0_hmac(k, &raw mut len) }.is_null());
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_get_params(k, ptr::null_mut()) }, 0);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set_params(k, ptr::null_mut()) }, 0);
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_dup(k) }.is_null());
+        crate::err::take_all();
+    }
+
+    /// docs/DEVIATIONS.md: an engine argument is refused, as there are no engines.
+    #[test]
+    fn engines_are_refused() {
+        let e = ptr::NonNull::<u8>::dangling().as_ptr().cast::<ENGINE>();
+        let key = [7u8; 16];
+        // SAFETY: the engine is never used: it's refused first.
+        let k = unsafe {
+            EVP_PKEY_new_raw_private_key(rustyssl_abi::EVP_PKEY_HMAC, e, key.as_ptr(), 16)
+        };
+        assert!(k.is_null());
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_CTX_new_id(rustyssl_abi::EVP_PKEY_HMAC, e) }.is_null());
+        // SAFETY: no preconditions.
+        let cipher = unsafe { crate::evp::legacy_cipher::EVP_aes_128_cbc() };
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_new_CMAC_key(e, key.as_ptr(), 16, cipher) }.is_null());
+        let p = new();
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_set1_engine(p, e) }, 0);
+        // SAFETY: as above.
+        assert!(unsafe { EVP_PKEY_CTX_new(p, e) }.is_null());
+        // SAFETY: made above.
+        unsafe { EVP_PKEY_free(p) };
+        crate::err::take_all();
+    }
+
+    /// docs/DEVIATIONS.md: `EVP_PKEY_CTX_get_keygen_info` past the end, or without an array,
+    /// gives 0 (the reference reads past the array, or through NULL).
+    #[test]
+    fn keygen_info_past_the_end_is_zero() {
+        let lib = libctx();
+        // SAFETY: the context; a static name.
+        let c = unsafe { EVP_PKEY_CTX_new_from_name(lib, c"HMAC".as_ptr(), ptr::null()) };
+        assert!(!c.is_null());
+        let mut info = [5, 6];
+        // SAFETY: the context above; the array of two.
+        unsafe { EVP_PKEY_CTX_set0_keygen_info(c, info.as_mut_ptr(), 2) };
+        // SAFETY: the context above, here and below.
+        assert_eq!(unsafe { EVP_PKEY_CTX_get_keygen_info(c, 1) }, 6);
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_CTX_get_keygen_info(c, 2) }, 0);
+        // SAFETY: as above.
+        unsafe { EVP_PKEY_CTX_set0_keygen_info(c, ptr::null_mut(), 2) };
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_CTX_get_keygen_info(c, 0) }, 0);
+        // SAFETY: as above.
+        unsafe { EVP_PKEY_CTX_free(c) };
+        // SAFETY: made above, its keys freed.
+        unsafe { crate::libctx::OSSL_LIB_CTX_free(lib) };
+    }
+
+    /// An HMAC key through its lifecycle: made raw, exported, copied, compared, regenerated.
+    #[test]
+    fn mac_keys_round_trip() {
+        let key = *b"0123456789abcdef";
+        let lib = libctx();
+        // SAFETY: the context; a static name; the key's octets.
+        let k = unsafe {
+            super::raw::EVP_PKEY_new_raw_private_key_ex(
+                lib,
+                c"HMAC".as_ptr(),
+                ptr::null(),
+                key.as_ptr(),
+                16,
+            )
+        };
+        assert!(!k.is_null());
+        // SAFETY: the key above, here and below.
+        assert_eq!(unsafe { EVP_PKEY_get_id(k) }, EVP_PKEY_KEYMGMT);
+        assert_eq!(raw(k).as_deref(), Some(&key[..]));
+        // SAFETY: as above.
+        let d = unsafe { EVP_PKEY_dup(k) };
+        assert_eq!(raw(d).as_deref(), Some(&key[..]));
+        // SAFETY: both keys.
+        assert_eq!(unsafe { EVP_PKEY_eq(k, d) }, 1);
+        let mut out: *mut OSSL_PARAM = ptr::null_mut();
+        // SAFETY: the key; room for the array.
+        let got =
+            unsafe { EVP_PKEY_todata(k, rustyssl_abi::EVP_PKEY_KEYPAIR as c_int, &raw mut out) };
+        assert_eq!(got, 1);
+        // SAFETY: the array made by the export.
+        unsafe { crate::params::dup::OSSL_PARAM_free(out) };
+
+        // SAFETY: the key.
+        let c = unsafe { EVP_PKEY_CTX_new(k, ptr::null_mut()) };
+        // SAFETY: the context, here and below.
+        assert_eq!(unsafe { EVP_PKEY_keygen_init(c) }, 1);
+        let other = [9u8; 8];
+        // SAFETY: as above; the octets.
+        assert_eq!(unsafe { EVP_PKEY_CTX_set_mac_key(c, other.as_ptr(), 8) }, 1);
+        let mut g: *mut EVP_PKEY = ptr::null_mut();
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_keygen(c, &raw mut g) }, 1);
+        assert_eq!(raw(g).as_deref(), Some(&other[..]));
+        // SAFETY: made above.
+        unsafe { EVP_PKEY_CTX_free(c) };
+        for p in [k, d, g] {
+            // SAFETY: made above.
+            unsafe { EVP_PKEY_free(p) };
+        }
+        let mut params = [end()];
+        // SAFETY: a blank key; the array.
+        let b = new();
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_PKEY_get_params(b, params.as_mut_ptr()) }, 0);
+        // SAFETY: made above.
+        unsafe { EVP_PKEY_free(b) };
+        // SAFETY: made above, its keys freed.
+        unsafe { crate::libctx::OSSL_LIB_CTX_free(lib) };
+        crate::err::take_all();
+    }
+
+    /// docs/DEVIATIONS.md: key data for a key typed by name (which keeps its type, so gets no
+    /// key manager) is refused (the reference uses the NULL key manager).
+    #[test]
+    fn keys_typed_by_name_take_no_data() {
+        let lib = libctx();
+        let k = new();
+        // SAFETY: the key above; a static name.
+        assert_eq!(unsafe { EVP_PKEY_set_type_str(k, c"DH".as_ptr(), -1) }, 1);
+        // SAFETY: a static name.
+        let c = unsafe { EVP_PKEY_CTX_new_from_name(lib, c"HMAC".as_ptr(), ptr::null()) };
+        // SAFETY: the context, here and below.
+        assert_eq!(unsafe { EVP_PKEY_keygen_init(c) }, 1);
+        let key = [1u8; 4];
+        // SAFETY: as above; the octets.
+        assert_eq!(unsafe { EVP_PKEY_CTX_set_mac_key(c, key.as_ptr(), 4) }, 1);
+        let mut out = k;
+        // SAFETY: as above; the key.
+        assert_eq!(unsafe { EVP_PKEY_keygen(c, &raw mut out) }, 0);
+        // SAFETY: the key.
+        assert!(!unsafe { pkey(k) }.is_some_and(|p| p.lock().is_assigned()));
+        // SAFETY: made above.
+        unsafe { EVP_PKEY_CTX_free(c) };
+        // SAFETY: as above.
+        unsafe { EVP_PKEY_free(k) };
+        // SAFETY: made above, its keys freed.
+        unsafe { crate::libctx::OSSL_LIB_CTX_free(lib) };
+        crate::err::take_all();
+    }
+
+    /// The type table: aliases resolve, PEM names ignore case, and the standard names win.
+    #[test]
+    fn key_types() {
+        assert_eq!(
+            ameth::pkey_type(rustyssl_abi::EVP_PKEY_RSA2),
+            rustyssl_abi::EVP_PKEY_RSA
+        );
+        assert_eq!(ameth::pkey_type(rustyssl_abi::EVP_PKEY_DSA3), NID_undef);
+        assert_eq!(ameth::pkey_type(rustyssl_abi::EVP_PKEY_SM2), EVP_PKEY_EC);
+        assert!(ameth::find_str(b"x9.42 dh").is_some());
+        assert!(ameth::find_str(b"DHX").is_none());
+        assert_eq!(ameth::name2type(b"dhx"), rustyssl_abi::EVP_PKEY_DHX);
+        assert_eq!(
+            ameth::name2type(b"rsaEncryption"),
+            rustyssl_abi::EVP_PKEY_RSA
+        );
+        assert_eq!(ameth::name2type(b"HMAC"), NID_undef);
+    }
+}

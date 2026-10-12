@@ -51,6 +51,7 @@ pub(crate) mod ciphers;
 pub(crate) mod digests;
 pub(crate) mod kdfs;
 mod kdfs_more;
+pub(crate) mod keymgmt;
 pub(crate) mod macs;
 pub(crate) mod modes;
 mod module;
