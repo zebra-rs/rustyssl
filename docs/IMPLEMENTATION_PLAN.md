@@ -2427,7 +2427,7 @@ chunking) is clean.
 
 ## Phase 4: BIGNUM and public-key cryptography
 
-- [ ] **4.1 BIGNUM** (the full `BN_*` API, about 210 functions). General arithmetic is our own
+- [x] **4.1 BIGNUM** (the full `BN_*` API, about 210 functions). General arithmetic is our own
   implementation on u64 limbs. Secret-dependent operations go through a constant-time backend
   (crypto-bigint). Split in three:
   - [x] **4.1a The numbers, their conversions, and the plain arithmetic:** `rustyssl_crypto::bn`
@@ -2514,8 +2514,38 @@ chunking) is clean.
       target checks the exponentiations against each other and repeated multiplication,
       inverses, gcds against Euclid's, Montgomery round trips, the quick forms, and square
       roots.
-  - [ ] **4.1c Primes and GF(2^m):** `BN_GENCB`, `BN_generate_prime_ex(2)`, `BN_check_prime`,
-    `BN_is_prime*`, the X9.31 functions, and `BN_GF2m_*`.
+  - [x] **4.1c Primes and GF(2^m):** `bn/prime.rs` and `bn/gf2m.rs` in capi (`bn_prime.c`,
+    `bn_depr.c`, `bn_x931p.c`, `bn_gf2m.c`) over `rustyssl_crypto::bn::{prime, gf2m}`: 36
+    exports; libcrypto now 1,520 of 5,876, and every `BN_*` export is implemented. Decisions
+    and findings:
+    - **Decision:** primality and generation are OpenSSL's algorithms step for step: trial
+      division by the first 2048 primes (computed at compile time, not copied), Miller-Rabin
+      with random bases from the private generator, and the candidate sieve with its deltas;
+      every random number is drawn as OpenSSL draws it, so a known generator gives OpenSSL's
+      primes, and the callbacks see the same progress. A callback runs with no lock held.
+    - **Decision:** binary-field polynomials are reduced, multiplied, and inverted by our own
+      bit-level arithmetic; the C layer reproduces where OpenSSL writes and which sign a
+      result gets.
+    - Quirks kept: GF(2^m) results reduced into `r` (sums too) keep `r`'s own sign, while
+      ones copied from temporaries are non-negative; `BN_GF2m_mod` (and so the inverse) takes
+      at most five terms (`BN_R_INVALID_LENGTH`), the others any odd polynomial of degree at
+      most 661; an exponent of 1 gives the base unreduced, with its sign; a failed inverse
+      leaves the blinded product in `r`; `BN_GF2m_poly2arr` counts terms past `max`;
+      `BN_generate_prime_ex2` with `add` can give a prime a bit longer than asked;
+      `BN_X931_derive_prime_ex` fails without an error for an even `e`.
+    - New deviations: a `BN_GENCB` never set stops, and a NULL new-style callback goes on;
+      `BN_generate_prime` keeps the caller's number when it fails (OpenSSL frees it); arrays
+      without a constant term reduce by what they list.
+    - `tests/c/bn_prime.c`, 36 checks and about 800 printed values: callbacks of both styles;
+      the primality of primes, composites, Carmichael numbers, strong pseudoprimes, and a
+      prime's square, with the callbacks' progress counted; primes from 2 to 256 bits, safe,
+      with `add` and `rem`, and by the deprecated functions, from a known DRBG; the X9.31
+      functions; GF(2^m) over trinomials and pentanomials by number and by array, the sign
+      rules, and the errors.
+    - The probe's `bnisprime`, `bngen`, and `bngf2m` commands (corpus `bn.txt`, random
+      sessions); the `bn_gf2m` fuzz target checks field identities and primality against
+      trial division.
+
 - [ ] **4.2 EVP_PKEY framework:**
   - EVP_PKEY lifecycle and keymgmt (import and export through `OSSL_PARAM`, `fromdata` /
     `todata`, get/set params)
