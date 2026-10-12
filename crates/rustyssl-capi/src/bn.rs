@@ -16,8 +16,11 @@
 //! or nothing), and work without a `BN_CTX` (docs/DEVIATIONS.md).
 
 pub(crate) mod arith;
+pub(crate) mod blind;
 pub(crate) mod conv;
 pub(crate) mod ctx;
+pub(crate) mod modular;
+pub(crate) mod mont;
 pub(crate) mod rand;
 
 use core::cmp::Ordering;
@@ -29,7 +32,8 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use rustyssl_abi::{
     BIGNUM, BN_FLG_CONSTTIME, BN_FLG_MALLOCED, BN_FLG_SECURE, BN_FLG_STATIC_DATA,
     BN_R_ARG2_LT_ARG3, BN_R_BIGNUM_TOO_LONG, BN_R_DIV_BY_ZERO, BN_R_ENCODING_ERROR,
-    BN_R_EXPAND_ON_STATIC_BIGNUM_DATA, BN_R_INVALID_LENGTH, ERR_LIB_BN,
+    BN_R_EXPAND_ON_STATIC_BIGNUM_DATA, BN_R_INPUT_NOT_REDUCED, BN_R_INVALID_LENGTH,
+    BN_R_NO_INVERSE, BN_R_NOT_A_SQUARE, BN_R_P_IS_NOT_PRIME, BN_R_TOO_MANY_ITERATIONS, ERR_LIB_BN,
 };
 use rustyssl_crypto::bn::{self as core_bn, BigNum, Error};
 
@@ -178,6 +182,13 @@ pub(crate) fn raise(e: Error) {
         Error::Arg2LtArg3 => (BN_R_ARG2_LT_ARG3, "BN_usub"),
         Error::InvalidLength => (BN_R_INVALID_LENGTH, "BN_mpi2bn"),
         Error::EncodingError => (BN_R_ENCODING_ERROR, "BN_mpi2bn"),
+        Error::InputNotReduced => (BN_R_INPUT_NOT_REDUCED, "BN_mod_lshift_quick"),
+        Error::PIsNotPrime => (BN_R_P_IS_NOT_PRIME, "BN_mod_sqrt"),
+        Error::NotASquare => (BN_R_NOT_A_SQUARE, "BN_mod_sqrt"),
+        Error::TooManyIterations => (BN_R_TOO_MANY_ITERATIONS, "BN_mod_sqrt"),
+        Error::NoInverse => (BN_R_NO_INVERSE, "BN_mod_inverse"),
+        // The generator raised its own.
+        Error::Rand => return,
     };
     err::raise(ERR_LIB_BN, reason, function);
 }

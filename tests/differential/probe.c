@@ -266,6 +266,22 @@
  *   bnasn1 <r>                 BN_to_ASN1_INTEGER, back with ASN1_INTEGER_to_BN, and
  *                              ASN1_bn_print (newlines as |)
  *   bnparam <r> <u|s> <size>   OSSL_PARAM_set_BN into <size> octets, then OSSL_PARAM_get_BN
+ *   bnmod <op> <r> <a> <b> <m> r = a op b mod m: add, sub, mul, sqr (of a), lshift1 (of a),
+ *                              addq, subq, lshift1q (the quick forms)
+ *   bnmshift <q|n> <r> <a> <n> <m>   BN_mod_lshift_quick (not into m) or BN_mod_lshift by <n>
+ *   bnexp <kind> <r> <a> <p> <m>   BN_mod_exp, _mont, _mont_consttime, _recp, _simple, or
+ *                              _mont_word (exp, mont, ct, recp, simple, word; the word is a's;
+ *                              skipped past 2048-bit exponents or moduli)
+ *   bnexp2 <r> <a1> <p1> <a2> <p2> <m>   BN_mod_exp2_mont (registers by index mod 4)
+ *   bninv <r|-> <a> <n>, bngcd <r> <a> <b>, bnkron <a> <b>, bncoprime <a> <b>
+ *                              (bninv skipped into the modulus)
+ *   bnsqrt <r|-> <a> <p>       BN_mod_sqrt (skipped past 512-bit moduli, and into an operand)
+ *   bnmont <op> <r> <a> <b> <m>   with a context set to m: mul, to (of a), from (of a)
+ *                              (skipped when the set fails)
+ *   bnrecp <op> <r> <a> <b> <m>   with a context set to m: div (rem into a's register's
+ *                              neighbour), mul, recip (BN_reciprocal of m by b's bits)
+ *   bnnist <bits> <r> <a>      BN_nist_mod_<bits>, and BN_nist_mod_func's answer for a
+ *   bnprime <n> <r>            the RFC prime n (0-7), into the register
  *
  *   # ...              comment, echoed
  */
@@ -4051,7 +4067,13 @@ static int bn_command(const char *command, const char *line)
             && strcmp(command, "bnshow") != 0 && strcmp(command, "bnto") != 0
             && strcmp(command, "bnfrom") != 0 && strcmp(command, "bnrand") != 0
             && strcmp(command, "bnrange") != 0 && strcmp(command, "bnasn1") != 0
-            && strcmp(command, "bnparam") != 0))
+            && strcmp(command, "bnparam") != 0 && strcmp(command, "bnmod") != 0
+            && strcmp(command, "bnmshift") != 0 && strcmp(command, "bnexp") != 0
+            && strcmp(command, "bnexp2") != 0 && strcmp(command, "bninv") != 0
+            && strcmp(command, "bngcd") != 0 && strcmp(command, "bnkron") != 0
+            && strcmp(command, "bncoprime") != 0 && strcmp(command, "bnsqrt") != 0
+            && strcmp(command, "bnmont") != 0 && strcmp(command, "bnrecp") != 0
+            && strcmp(command, "bnnist") != 0 && strcmp(command, "bnprime") != 0))
         return 0;
     printf("%s:", line);
     if (strcmp(command, "bnset") == 0) {
@@ -4346,6 +4368,268 @@ static int bn_command(const char *command, const char *line)
         printf(" print %d", ASN1_bn_print(mem, "n:", x, NULL, 2));
         bn_print_bio(mem);
         BIO_free(mem);
+    } else if (strcmp(command, "bnmod") == 0) {
+        unsigned long m = 0;
+        BN_CTX *ctx = BN_CTX_new();
+        BIGNUM *ra, *rb, *rm;
+
+        sscanf(line, "%*s %15s %lu %lu %lu %lu", op, &r, &a, &b, &m);
+        x = bn_at(r);
+        ra = bn_at(a);
+        rb = bn_at(b);
+        rm = bn_at(m);
+        if (BN_num_bits(ra) + BN_num_bits(rb) > 200000) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (strcmp(op, "add") == 0)
+            ret = BN_mod_add(x, ra, rb, rm, ctx);
+        else if (strcmp(op, "sub") == 0)
+            ret = BN_mod_sub(x, ra, rb, rm, ctx);
+        else if (strcmp(op, "mul") == 0)
+            ret = BN_mod_mul(x, ra, rb, rm, ctx);
+        else if (strcmp(op, "sqr") == 0)
+            ret = BN_mod_sqr(x, ra, rm, ctx);
+        else if (strcmp(op, "lshift1") == 0)
+            ret = BN_mod_lshift1(x, ra, rm, ctx);
+        else if (strcmp(op, "addq") == 0)
+            ret = BN_mod_add_quick(x, ra, rb, rm);
+        else if (strcmp(op, "subq") == 0)
+            ret = BN_mod_sub_quick(x, ra, rb, rm);
+        else
+            ret = BN_mod_lshift1_quick(x, ra, rm);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnmshift") == 0) {
+        unsigned long m = 0;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %15s %lu %lu %ld %lu", op, &r, &a, &n, &m);
+        x = bn_at(r);
+        if (n > 10000 || (op[0] == 'q' && x == bn_at(m))) {
+            printf(" skipped: too far, or into the modulus\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (op[0] == 'q')
+            ret = BN_mod_lshift_quick(x, bn_at(a), (int)n, bn_at(m));
+        else
+            ret = BN_mod_lshift(x, bn_at(a), (int)n, bn_at(m), ctx);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnexp") == 0) {
+        unsigned long p = 0, m = 0;
+        BN_CTX *ctx = BN_CTX_new();
+        BIGNUM *ra, *rp, *rm;
+
+        sscanf(line, "%*s %15s %lu %lu %lu %lu", op, &r, &a, &p, &m);
+        x = bn_at(r);
+        ra = bn_at(a);
+        rp = bn_at(p);
+        rm = bn_at(m);
+        if (BN_num_bits(rp) > 2048 || BN_num_bits(rm) > 2048 || BN_num_bits(ra) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (strcmp(op, "exp") == 0)
+            ret = BN_mod_exp(x, ra, rp, rm, ctx);
+        else if (strcmp(op, "mont") == 0)
+            ret = BN_mod_exp_mont(x, ra, rp, rm, ctx, NULL);
+        else if (strcmp(op, "ct") == 0)
+            ret = BN_mod_exp_mont_consttime(x, ra, rp, rm, ctx, NULL);
+        else if (strcmp(op, "recp") == 0)
+            ret = BN_mod_exp_recp(x, ra, rp, rm, ctx);
+        else if (strcmp(op, "simple") == 0)
+            ret = BN_mod_exp_simple(x, ra, rp, rm, ctx);
+        else
+            ret = BN_mod_exp_mont_word(x, BN_get_word(ra), rp, rm, ctx, NULL);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnexp2") == 0) {
+        unsigned long p1 = 0, a2 = 0, p2 = 0, m = 0;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %lu %lu %lu %lu %lu %lu", &r, &a, &p1, &a2, &p2, &m);
+        x = bn_at(r);
+        if (BN_num_bits(bn_at(p1)) > 2048 || BN_num_bits(bn_at(p2)) > 2048
+            || BN_num_bits(bn_at(m)) > 2048 || BN_num_bits(bn_at(a)) > 4096
+            || BN_num_bits(bn_at(a2)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        ret = BN_mod_exp2_mont(x, bn_at(a), bn_at(p1), bn_at(a2), bn_at(p2), bn_at(m), ctx, NULL);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bninv") == 0) {
+        char t[8] = "";
+        BIGNUM *in, *got;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %7s %lu %lu", t, &a, &b);
+        in = t[0] == '-' ? NULL : bn_at(strtoul(t, NULL, 10));
+        /* OpenSSL's result into the modulus fails (or not) depending on its reduction. */
+        if (in == bn_at(b)) {
+            printf(" skipped: into the modulus\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (BN_num_bits(bn_at(b)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        got = BN_mod_inverse(in, bn_at(a), bn_at(b), ctx);
+        BN_CTX_free(ctx);
+        printf(" %s", got == NULL ? "none" : got == in ? "in" : "new");
+        if (got != NULL)
+            bn_print_value("r", got);
+        if (got != NULL && got != in)
+            BN_free(got);
+    } else if (strcmp(command, "bngcd") == 0) {
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %lu %lu %lu", &r, &a, &b);
+        x = bn_at(r);
+        if (BN_num_bits(bn_at(a)) > 4096 || BN_num_bits(bn_at(b)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        printf(" %d", BN_gcd(x, bn_at(a), bn_at(b), ctx));
+        BN_CTX_free(ctx);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnkron") == 0 || strcmp(command, "bncoprime") == 0) {
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %lu %lu", &a, &b);
+        if (BN_num_bits(bn_at(a)) > 4096 || BN_num_bits(bn_at(b)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (command[2] == 'k')
+            printf(" %d", BN_kronecker(bn_at(a), bn_at(b), ctx));
+        else
+            printf(" %d flags %x", BN_are_coprime(bn_at(a), bn_at(b), ctx), BN_get_flags(bn_at(a), ~0));
+        BN_CTX_free(ctx);
+    } else if (strcmp(command, "bnsqrt") == 0) {
+        char t[8] = "";
+        BIGNUM *in, *got;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %7s %lu %lu", t, &a, &b);
+        in = t[0] == '-' ? NULL : bn_at(strtoul(t, NULL, 10));
+        /* OpenSSL writes the result while it still reads its operands. */
+        if (in == bn_at(a) || in == bn_at(b)) {
+            printf(" skipped: into an operand\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (BN_num_bits(bn_at(b)) > 512 || BN_num_bits(bn_at(a)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        got = BN_mod_sqrt(in, bn_at(a), bn_at(b), ctx);
+        BN_CTX_free(ctx);
+        printf(" %s", got == NULL ? "none" : got == in ? "in" : "new");
+        if (got != NULL)
+            bn_print_value("r", got);
+        if (in != NULL)
+            bn_print_value("in", in);
+        if (got != NULL && got != in)
+            BN_free(got);
+    } else if (strcmp(command, "bnmont") == 0 || strcmp(command, "bnrecp") == 0) {
+        unsigned long m = 0;
+        BN_CTX *ctx = BN_CTX_new();
+        BN_MONT_CTX *mont = BN_MONT_CTX_new();
+        BN_RECP_CTX *recp = BN_RECP_CTX_new();
+
+        sscanf(line, "%*s %15s %lu %lu %lu %lu", op, &r, &a, &b, &m);
+        x = bn_at(r);
+        if (BN_num_bits(bn_at(a)) > 8192 || BN_num_bits(bn_at(b)) > 8192 || BN_num_bits(bn_at(m)) > 4096) {
+            printf(" skipped: too large\n");
+        } else if (command[2] == 'm') {
+            ret = BN_MONT_CTX_set(mont, bn_at(m), ctx);
+            printf(" set %d", ret);
+            /* A context whose set failed holds what OpenSSL's assembly makes of it. */
+            if (ret == 0)
+                printf(" skipped: no context");
+            else if (strcmp(op, "mul") == 0)
+                ret = BN_mod_mul_montgomery(x, bn_at(a), bn_at(b), mont, ctx);
+            else if (strcmp(op, "to") == 0)
+                ret = BN_to_montgomery(x, bn_at(a), mont, ctx);
+            else
+                ret = BN_from_montgomery(x, bn_at(a), mont, ctx);
+            printf(" %d", ret);
+            bn_print_value("r", x);
+        } else {
+            printf(" set %d", BN_RECP_CTX_set(recp, bn_at(m), ctx));
+            if (strcmp(op, "div") == 0) {
+                BIGNUM *rem = bn_at(r + 1);
+
+                /* OpenSSL writes the quotient while it still reads the dividend. */
+                if (rem == x || rem == bn_at(a) || x == bn_at(a)) {
+                    printf(" skipped: one register\n");
+                    BN_CTX_free(ctx);
+                    BN_MONT_CTX_free(mont);
+                    BN_RECP_CTX_free(recp);
+                    return 1;
+                }
+                ret = BN_div_recp(x, rem, bn_at(a), recp, ctx);
+                printf(" %d", ret);
+                bn_print_value("q", x);
+                bn_print_value("rem", rem);
+            } else if (strcmp(op, "mul") == 0) {
+                ret = BN_mod_mul_reciprocal(x, bn_at(a), bn_at(b), recp, ctx);
+                printf(" %d", ret);
+                bn_print_value("r", x);
+            } else {
+                ret = BN_reciprocal(x, bn_at(m), BN_num_bits(bn_at(b)), ctx);
+                printf(" %d", ret);
+                bn_print_value("r", x);
+            }
+        }
+        BN_CTX_free(ctx);
+        BN_MONT_CTX_free(mont);
+        BN_RECP_CTX_free(recp);
+    } else if (strcmp(command, "bnnist") == 0) {
+        static int (*const funcs[])(BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *) = {
+            BN_nist_mod_192, BN_nist_mod_224, BN_nist_mod_256, BN_nist_mod_384, BN_nist_mod_521
+        };
+        static const int bits[] = {192, 224, 256, 384, 521};
+        BN_CTX *ctx = BN_CTX_new();
+        int i;
+
+        sscanf(line, "%*s %ld %lu %lu", &n, &r, &a);
+        for (i = 0; i < 4 && bits[i] != n; i++)
+            continue;
+        if (BN_num_bits(bn_at(a)) > 4096) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        ret = funcs[i](bn_at(r), bn_at(a), NULL, ctx);
+        BN_CTX_free(ctx);
+        printf(" %d func %d", ret, (int)(BN_nist_mod_func(bn_at(a)) != NULL));
+        bn_print_value("r", bn_at(r));
+    } else if (strcmp(command, "bnprime") == 0) {
+        static BIGNUM *(*const rfc[])(BIGNUM *) = {
+            BN_get_rfc2409_prime_768, BN_get_rfc2409_prime_1024, BN_get_rfc3526_prime_1536,
+            BN_get_rfc3526_prime_2048, BN_get_rfc3526_prime_3072, BN_get_rfc3526_prime_4096,
+            BN_get_rfc3526_prime_6144, BN_get_rfc3526_prime_8192
+        };
+
+        sscanf(line, "%*s %ld %lu", &n, &r);
+        x = bn_at(r);
+        printf(" %d bits %d", rfc[n & 7](x) == x, BN_num_bits(x));
     } else {
         unsigned char buf[64];
         char kind[4] = "u";

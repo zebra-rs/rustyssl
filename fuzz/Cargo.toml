@@ -231,3 +231,9 @@ name = "bn"
 path = "fuzz_targets/bn.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "bn_mod"
+path = "fuzz_targets/bn_mod.rs"
+test = false
+doc = false

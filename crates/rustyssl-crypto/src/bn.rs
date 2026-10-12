@@ -11,7 +11,11 @@
 //! have at most [`MAX_LIMBS`] limbs, as `bn_expand_internal` allows.
 
 mod conv;
+pub mod ct;
 mod div;
+pub mod modular;
+pub mod mont;
+pub mod rfc_primes;
 
 use core::cmp::Ordering;
 
@@ -46,6 +50,18 @@ pub enum Error {
     InvalidLength,
     /// `BN_R_ENCODING_ERROR`: an MPI whose header disagrees with its length.
     EncodingError,
+    /// `BN_R_INPUT_NOT_REDUCED`: `BN_mod_lshift_quick` of a number longer than the modulus.
+    InputNotReduced,
+    /// `BN_R_P_IS_NOT_PRIME`: `BN_mod_sqrt` found the modulus composite.
+    PIsNotPrime,
+    /// `BN_R_NOT_A_SQUARE`: `BN_mod_sqrt` of a non-residue.
+    NotASquare,
+    /// `BN_R_TOO_MANY_ITERATIONS`: `BN_mod_sqrt` found no non-residue.
+    TooManyIterations,
+    /// `BN_R_NO_INVERSE`.
+    NoInverse,
+    /// The random generator failed (and raised its own error).
+    Rand,
 }
 
 /// A number's limbs, zeroized when dropped or replaced.
