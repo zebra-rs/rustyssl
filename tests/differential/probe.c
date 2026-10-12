@@ -238,6 +238,35 @@
  *   ctagget <n>, ctagset <n>, ctaglen <n>   the AEAD tag: got into the probe's tag buffer, set
  *                              from it, or its length set (no data)
  *
+ * Commands for big numbers, in four registers (0-3) that start at zero; each line prints the
+ * result, the registers it wrote (as BN_bn2hex), and the errors as library/reason:
+ *   bnset <r> <hex>            BN_hex2bn of the hex (with an optional -) into register <r>
+ *   bntext <r> <kind> <text>   BN_dec2bn, BN_hex2bn, or BN_asc2bn (dec, hex, asc): the count
+ *   bnop <op> <r> <a> <b>      r = a op b: add, sub, uadd, usub, mul, sqr (of a), nnmod, exp
+ *                              (exp skipped when the result would pass 65536 bits, mul and
+ *                              sqr past 200000), cmp (prints BN_cmp and BN_ucmp), copy (of a),
+ *                              swap (a and b)
+ *   bndiv <q|-> <rem|-> <a> <b>   BN_div (skipped if q and rem are one register)
+ *   bnshift <op> <r> <a> <n>   lshift, rshift (n at most 100000, a left shift's result at
+ *                              most 300000 bits), lshift1, rshift1
+ *   bnword <op> <r> <w>        add, sub, mul, div, mod with a word (decimal)
+ *   bnbit <op> <r> <n>         set, clear, isset, mask
+ *   bnflag <r>                 BN_set_flags(BN_FLG_CONSTTIME)
+ *   bnshow <r>                 hex, decimal, bits, bytes, the predicates, the word, BN_print
+ *   bnto <r> <kind> <len>      BN_bn2bin, BN_bn2binpad, BN_bn2lebinpad, BN_bn2nativepad,
+ *                              BN_signed_bn2bin, _bn2lebin, _bn2native, BN_bn2mpi (bin, binpad,
+ *                              lebin, native, sbin, slebin, snative, mpi) into <len> octets
+ *   bnfrom <r> <kind> <hex|->  BN_bin2bn, BN_lebin2bn, BN_native2bn, the signed forms (bin,
+ *                              lebin, native, sbin, slebin, snative), or BN_mpi2bn (mpi)
+ *   bnrand <r> <bits> <top> <bottom> <kind>   BN_rand, BN_priv_rand, BN_bntest_rand (0-2):
+ *                              the number only from a deterministic generator (another's is
+ *                              checked, then zeroed)
+ *   bnrange <r> <range> <kind> BN_rand_range or BN_priv_rand_range (0, 1) below register
+ *                              <range>, likewise
+ *   bnasn1 <r>                 BN_to_ASN1_INTEGER, back with ASN1_INTEGER_to_BN, and
+ *                              ASN1_bn_print (newlines as |)
+ *   bnparam <r> <u|s> <size>   OSSL_PARAM_set_BN into <size> octets, then OSSL_PARAM_get_BN
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -257,6 +286,7 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/bio.h>
+#include <openssl/bn.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -3973,6 +4003,378 @@ static int rand_command(const char *command, const char *line)
     return 1;
 }
 
+/* ---------------------------------------------------------------------------------------- */
+
+static BIGNUM *bn_reg[4];
+
+static BIGNUM *bn_at(unsigned long i)
+{
+    i &= 3;
+    if (bn_reg[i] == NULL)
+        bn_reg[i] = BN_new();
+    return bn_reg[i];
+}
+
+static void bn_print_value(const char *label, const BIGNUM *a)
+{
+    char *h = BN_bn2hex(a);
+
+    printf(" %s=%s", label, h == NULL ? "(null)" : h);
+    OPENSSL_free(h);
+}
+
+/* What a memory BIO holds, newlines as |. */
+static void bn_print_bio(BIO *mem)
+{
+    char *p = NULL;
+    long n = BIO_get_mem_data(mem, &p);
+
+    printf(" [");
+    for (long i = 0; i < n; i++)
+        putchar(p[i] == '\n' ? '|' : p[i]);
+    printf("]");
+}
+
+static int bn_command(const char *command, const char *line)
+{
+    char op[16] = "", text[1000] = "";
+    unsigned long r = 0, a = 0, b = 0;
+    long n = 0;
+    int ret = 0;
+    BIGNUM *x;
+
+    if (command[0] != 'b' || command[1] != 'n'
+        || (strcmp(command, "bnset") != 0 && strcmp(command, "bntext") != 0
+            && strcmp(command, "bnop") != 0 && strcmp(command, "bndiv") != 0
+            && strcmp(command, "bnshift") != 0 && strcmp(command, "bnword") != 0
+            && strcmp(command, "bnbit") != 0 && strcmp(command, "bnflag") != 0
+            && strcmp(command, "bnshow") != 0 && strcmp(command, "bnto") != 0
+            && strcmp(command, "bnfrom") != 0 && strcmp(command, "bnrand") != 0
+            && strcmp(command, "bnrange") != 0 && strcmp(command, "bnasn1") != 0
+            && strcmp(command, "bnparam") != 0))
+        return 0;
+    printf("%s:", line);
+    if (strcmp(command, "bnset") == 0) {
+        sscanf(line, "%*s %lu %999s", &r, text);
+        x = bn_at(r);
+        printf(" %d", BN_hex2bn(&x, text));
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bntext") == 0) {
+        sscanf(line, "%*s %lu %15s %999s", &r, op, text);
+        x = bn_at(r);
+        if (strcmp(op, "dec") == 0)
+            ret = BN_dec2bn(&x, text);
+        else if (strcmp(op, "hex") == 0)
+            ret = BN_hex2bn(&x, text);
+        else
+            ret = BN_asc2bn(&x, text);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnop") == 0) {
+        BIGNUM *ra, *rb;
+
+        sscanf(line, "%*s %15s %lu %lu %lu", op, &r, &a, &b);
+        x = bn_at(r);
+        ra = bn_at(a);
+        rb = bn_at(b);
+        if ((strcmp(op, "mul") == 0 || strcmp(op, "sqr") == 0)
+            && BN_num_bits(ra) + BN_num_bits(strcmp(op, "sqr") == 0 ? ra : rb) > 200000) {
+            printf(" skipped: too large\n");
+            return 1;
+        }
+        if (strcmp(op, "add") == 0) {
+            ret = BN_add(x, ra, rb);
+        } else if (strcmp(op, "sub") == 0) {
+            ret = BN_sub(x, ra, rb);
+        } else if (strcmp(op, "uadd") == 0) {
+            ret = BN_uadd(x, ra, rb);
+        } else if (strcmp(op, "usub") == 0) {
+            ret = BN_usub(x, ra, rb);
+        } else if (strcmp(op, "mul") == 0) {
+            BN_CTX *ctx = BN_CTX_new();
+
+            ret = BN_mul(x, ra, rb, ctx);
+            BN_CTX_free(ctx);
+        } else if (strcmp(op, "sqr") == 0) {
+            BN_CTX *ctx = BN_CTX_new();
+
+            ret = BN_sqr(x, ra, ctx);
+            BN_CTX_free(ctx);
+        } else if (strcmp(op, "nnmod") == 0) {
+            BN_CTX *ctx = BN_CTX_new();
+
+            ret = BN_nnmod(x, ra, rb, ctx);
+            BN_CTX_free(ctx);
+        } else if (strcmp(op, "exp") == 0) {
+            BN_CTX *ctx = BN_CTX_new();
+
+            if (BN_num_bits(rb) > 16
+                || (unsigned long)BN_num_bits(ra) * BN_get_word(rb) > 65536) {
+                printf(" skipped: too large\n");
+                BN_CTX_free(ctx);
+                return 1;
+            }
+            ret = BN_exp(x, ra, rb, ctx);
+            BN_CTX_free(ctx);
+        } else if (strcmp(op, "cmp") == 0) {
+            printf(" %d %d\n", BN_cmp(ra, rb), BN_ucmp(ra, rb));
+            return 1;
+        } else if (strcmp(op, "copy") == 0) {
+            ret = BN_copy(x, ra) != NULL;
+        } else if (strcmp(op, "swap") == 0) {
+            BN_swap(ra, rb);
+            bn_print_value("a", ra);
+            bn_print_value("b", rb);
+            printf(" flags %x %x\n", BN_get_flags(ra, ~0), BN_get_flags(rb, ~0));
+            return 1;
+        } else {
+            printf(" unknown\n");
+            return 1;
+        }
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bndiv") == 0) {
+        char q[8] = "", rem[8] = "";
+        BIGNUM *dv, *rv;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %7s %7s %lu %lu", q, rem, &a, &b);
+        dv = q[0] == '-' ? NULL : bn_at(strtoul(q, NULL, 10));
+        rv = rem[0] == '-' ? NULL : bn_at(strtoul(rem, NULL, 10));
+        if (dv != NULL && dv == rv) {
+            printf(" skipped: one register\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        ret = BN_div(dv, rv, bn_at(a), bn_at(b), ctx);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        if (dv != NULL)
+            bn_print_value("q", dv);
+        if (rv != NULL)
+            bn_print_value("rem", rv);
+    } else if (strcmp(command, "bnshift") == 0) {
+        sscanf(line, "%*s %15s %lu %lu %ld", op, &r, &a, &n);
+        x = bn_at(r);
+        if (n > 100000 || (op[0] == 'l' && BN_num_bits(bn_at(a)) + n > 300000)) {
+            printf(" skipped: too far\n");
+            return 1;
+        }
+        if (strcmp(op, "lshift") == 0)
+            ret = BN_lshift(x, bn_at(a), (int)n);
+        else if (strcmp(op, "rshift") == 0)
+            ret = BN_rshift(x, bn_at(a), (int)n);
+        else if (strcmp(op, "lshift1") == 0)
+            ret = BN_lshift1(x, bn_at(a));
+        else
+            ret = BN_rshift1(x, bn_at(a));
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnword") == 0) {
+        unsigned long long w = 0;
+
+        sscanf(line, "%*s %15s %lu %llu", op, &r, &w);
+        x = bn_at(r);
+        if (strcmp(op, "add") == 0)
+            printf(" %d", BN_add_word(x, (BN_ULONG)w));
+        else if (strcmp(op, "sub") == 0)
+            printf(" %d", BN_sub_word(x, (BN_ULONG)w));
+        else if (strcmp(op, "mul") == 0)
+            printf(" %d", BN_mul_word(x, (BN_ULONG)w));
+        else if (strcmp(op, "div") == 0)
+            printf(" %llu", (unsigned long long)BN_div_word(x, (BN_ULONG)w));
+        else
+            printf(" %llu", (unsigned long long)BN_mod_word(x, (BN_ULONG)w));
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnbit") == 0) {
+        sscanf(line, "%*s %15s %lu %ld", op, &r, &n);
+        x = bn_at(r);
+        if (n > 100000) {
+            printf(" skipped: too far\n");
+            return 1;
+        }
+        if (strcmp(op, "set") == 0)
+            ret = BN_set_bit(x, (int)n);
+        else if (strcmp(op, "clear") == 0)
+            ret = BN_clear_bit(x, (int)n);
+        else if (strcmp(op, "isset") == 0)
+            ret = BN_is_bit_set(x, (int)n);
+        else
+            ret = BN_mask_bits(x, (int)n);
+        printf(" %d", ret);
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnflag") == 0) {
+        sscanf(line, "%*s %lu", &r);
+        BN_set_flags(bn_at(r), BN_FLG_CONSTTIME);
+        printf(" %x", BN_get_flags(bn_at(r), ~0));
+    } else if (strcmp(command, "bnshow") == 0) {
+        BIO *mem = BIO_new(BIO_s_mem());
+        char *d;
+
+        sscanf(line, "%*s %lu", &r);
+        x = bn_at(r);
+        d = BN_bn2dec(x);
+        bn_print_value("hex", x);
+        printf(" dec=%s bits %d bytes %d zero %d one %d odd %d neg %d word %llx", d,
+               BN_num_bits(x), BN_num_bytes(x), BN_is_zero(x), BN_is_one(x), BN_is_odd(x),
+               BN_is_negative(x), (unsigned long long)BN_get_word(x));
+        OPENSSL_free(d);
+        printf(" print %d", BN_print(mem, x));
+        bn_print_bio(mem);
+        BIO_free(mem);
+    } else if (strcmp(command, "bnto") == 0) {
+        unsigned char out[600];
+
+        sscanf(line, "%*s %lu %15s %ld", &r, op, &n);
+        x = bn_at(r);
+        if (n > 512 || BN_num_bytes(x) > 500) {
+            printf(" skipped: too long\n");
+            return 1;
+        }
+        memset(out, 0xee, sizeof(out));
+        if (strcmp(op, "bin") == 0)
+            ret = BN_bn2bin(x, out);
+        else if (strcmp(op, "binpad") == 0)
+            ret = BN_bn2binpad(x, out, (int)n);
+        else if (strcmp(op, "lebin") == 0)
+            ret = BN_bn2lebinpad(x, out, (int)n);
+        else if (strcmp(op, "native") == 0)
+            ret = BN_bn2nativepad(x, out, (int)n);
+        else if (strcmp(op, "sbin") == 0)
+            ret = BN_signed_bn2bin(x, out, (int)n);
+        else if (strcmp(op, "slebin") == 0)
+            ret = BN_signed_bn2lebin(x, out, (int)n);
+        else if (strcmp(op, "snative") == 0)
+            ret = BN_signed_bn2native(x, out, (int)n);
+        else
+            ret = BN_bn2mpi(x, out);
+        printf(" %d ", ret);
+        for (int i = 0; i < ret; i++)
+            printf("%02x", out[i]);
+    } else if (strcmp(command, "bnfrom") == 0) {
+        unsigned char in[300];
+        size_t len = 0;
+        BIGNUM *got;
+
+        sscanf(line, "%*s %lu %15s %999s", &r, op, text);
+        x = bn_at(r);
+        if (strcmp(text, "-") != 0 && !parse_hex(text, in, &len)) {
+            printf(" bad hex\n");
+            return 1;
+        }
+        if (strcmp(op, "bin") == 0)
+            got = BN_bin2bn(in, (int)len, x);
+        else if (strcmp(op, "lebin") == 0)
+            got = BN_lebin2bn(in, (int)len, x);
+        else if (strcmp(op, "native") == 0)
+            got = BN_native2bn(in, (int)len, x);
+        else if (strcmp(op, "sbin") == 0)
+            got = BN_signed_bin2bn(in, (int)len, x);
+        else if (strcmp(op, "slebin") == 0)
+            got = BN_signed_lebin2bn(in, (int)len, x);
+        else if (strcmp(op, "snative") == 0)
+            got = BN_signed_native2bn(in, (int)len, x);
+        else
+            got = BN_mpi2bn(in, (int)len, x);
+        printf(" %s", got == x ? "ok" : got == NULL ? "failed" : "other");
+        bn_print_value("r", x);
+    } else if (strcmp(command, "bnrand") == 0) {
+        unsigned long kind = 0;
+        long top = 0, bottom = 0;
+        int det;
+
+        sscanf(line, "%*s %lu %ld %ld %ld %lu", &r, &n, &top, &bottom, &kind);
+        x = bn_at(r);
+        if (n > 4096) {
+            printf(" skipped: too long\n");
+            return 1;
+        }
+        if (kind == 0) {
+            ret = BN_rand(x, (int)n, (int)top, (int)bottom);
+            det = rand_pub_det;
+        } else if (kind == 1) {
+            ret = BN_priv_rand(x, (int)n, (int)top, (int)bottom);
+            det = rand_priv_det;
+        } else {
+            ret = BN_bntest_rand(x, (int)n, (int)top, (int)bottom);
+            det = rand_pub_det && rand_priv_det;
+        }
+        printf(" %d", ret);
+        if (det) {
+            bn_print_value("r", x);
+        } else {
+            /* Zeroed after, so later commands don't see the random number. */
+            printf(" (random) bits %s", BN_num_bits(x) <= n ? "ok" : "too many");
+            BN_zero(x);
+        }
+    } else if (strcmp(command, "bnrange") == 0) {
+        unsigned long kind = 0;
+        BIGNUM *range;
+
+        sscanf(line, "%*s %lu %lu %lu", &r, &a, &kind);
+        x = bn_at(r);
+        range = bn_at(a);
+        if (x == range) {
+            printf(" skipped: one register\n");
+            return 1;
+        }
+        ret = kind == 0 ? BN_rand_range(x, range) : BN_priv_rand_range(x, range);
+        printf(" %d", ret);
+        if (kind == 0 ? rand_pub_det : rand_priv_det) {
+            bn_print_value("r", x);
+        } else {
+            printf(" (random) %s", ret != 1 || BN_cmp(x, range) < 0 ? "ok" : "out of range");
+            BN_zero(x);
+        }
+    } else if (strcmp(command, "bnasn1") == 0) {
+        ASN1_INTEGER *ai;
+        BIGNUM *back;
+        BIO *mem = BIO_new(BIO_s_mem());
+
+        sscanf(line, "%*s %lu", &r);
+        x = bn_at(r);
+        ai = BN_to_ASN1_INTEGER(x, NULL);
+        if (ai != NULL) {
+            printf(" type %d ", ai->type);
+            for (int i = 0; i < ai->length && i < 300; i++)
+                printf("%02x", ai->data[i]);
+            back = ASN1_INTEGER_to_BN(ai, NULL);
+            printf(" back %d", back != NULL && BN_cmp(back, x) == 0);
+            BN_free(back);
+        }
+        ASN1_INTEGER_free(ai);
+        printf(" print %d", ASN1_bn_print(mem, "n:", x, NULL, 2));
+        bn_print_bio(mem);
+        BIO_free(mem);
+    } else {
+        unsigned char buf[64];
+        char kind[4] = "u";
+        OSSL_PARAM p[2];
+        BIGNUM *got = NULL;
+
+        sscanf(line, "%*s %lu %3s %ld", &r, kind, &n);
+        x = bn_at(r);
+        if (n < 0 || n > 64) {
+            printf(" skipped: size\n");
+            return 1;
+        }
+        memset(buf, 0xee, sizeof(buf));
+        p[0] = OSSL_PARAM_construct_BN("n", buf, (size_t)n);
+        if (kind[0] == 's')
+            p[0].data_type = OSSL_PARAM_INTEGER;
+        p[1] = OSSL_PARAM_construct_end();
+        ret = OSSL_PARAM_set_BN(p, x);
+        printf(" %d return %zu ", ret, p[0].return_size);
+        for (long i = 0; i < n; i++)
+            printf("%02x", buf[i]);
+        if (ret == 1 && OSSL_PARAM_get_BN(p, &got))
+            bn_print_value("got", got);
+        BN_free(got);
+    }
+    print_digest_errors();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -3999,7 +4401,8 @@ int main(void)
             || prop_command(command, line) || prov_command(command, line)
             || fetch_command(command, line) || digest_command(command, line)
             || cipher_command(command, line) || mac_command(command, line)
-            || kdf_command(command, line) || rand_command(command, line)) {
+            || kdf_command(command, line) || rand_command(command, line)
+            || bn_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

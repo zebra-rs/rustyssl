@@ -16,6 +16,7 @@
 
 mod asn1;
 mod bio;
+mod bn;
 mod buffer;
 mod cmac;
 mod dir;

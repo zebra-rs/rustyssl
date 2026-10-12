@@ -2427,21 +2427,55 @@ chunking) is clean.
 
 ## Phase 4: BIGNUM and public-key cryptography
 
-- [ ] **4.1 BIGNUM** (the full `BN_*` API, about 200 functions):
-  - arithmetic, shifts, and bit operations
-  - conversions: bin, lebin, native, hex, dec, mpi, ASN.1
-  - `ASN1_bn_print` (moved from 2.5)
-  - the `OSSL_PARAM` big-number functions (moved from 3.1a): `OSSL_PARAM_get_BN`,
-    `OSSL_PARAM_set_BN`, `OSSL_PARAM_BLD_push_BN`, `OSSL_PARAM_BLD_push_BN_pad`,
-    `OSSL_PARAM_allocate_from_text`, `OSSL_PARAM_print_to_bio`
-  - `BN_CTX`, `BN_MONT_CTX`, `BN_RECP_CTX`, `BN_BLINDING`, `BN_GENCB`
-  - primes: `BN_check_prime`, `BN_generate_prime_ex(2)`
-  - `BN_mod_sqrt` (with the CVE-2022-0778 loop bound), `BN_mod_inverse`, `BN_gcd`,
-    `BN_kronecker`, `BN_GF2m_*`
-  - `BN_FLG_CONSTTIME` semantics, print functions
-
-  General arithmetic is our own implementation on u64 limbs. Secret-dependent operations go
-  through a constant-time backend (crypto-bigint).
+- [ ] **4.1 BIGNUM** (the full `BN_*` API, about 210 functions). General arithmetic is our own
+  implementation on u64 limbs. Secret-dependent operations go through a constant-time backend
+  (crypto-bigint). Split in three:
+  - [x] **4.1a The numbers, their conversions, and the plain arithmetic:** `rustyssl_crypto::bn`
+    (`BigNum`: a sign and normalized limbs, zeroized when dropped; schoolbook multiplication,
+    Knuth's division) and `bn.rs` in capi (`bn_lib.c`, `bn_add.c`, `bn_mul.c`, `bn_div.c`,
+    `bn_shift.c`, `bn_word.c`, `bn_exp.c`'s `BN_exp`, `bn_conv.c`, `bn_print.c`, `bn_mpi.c`,
+    `bn_ctx.c`, `bn_rand.c`), the ASN.1 conversions and `ASN1_bn_print` (moved from 2.5), and
+    the `OSSL_PARAM` big-number functions (moved from 3.1a): 105 exports; libcrypto now 1,413
+    of 5,876. Decisions and findings:
+    - **Decision:** a `BIGNUM *` is a handle to a number and its flags behind a lock, and an
+      operation copies its inputs before it stores its result, so results may alias inputs.
+      Who frees a number is fixed when it's made (the application's from `BN_new`, a
+      `BN_CTX`'s, or `BN_value_one()`'s, never), not read from flags an application can set.
+    - **Decision:** `BN_FLG_STATIC_DATA` numbers are never written; OpenSSL refuses only a
+      write that must grow and otherwise writes into memory it doesn't own (a deviation).
+      `BN_with_flags` copies its source instead of sharing the digits.
+    - **Decision:** numbers are always normalized. OpenSSL's internal `BN_FLG_FIXED_TOP` is
+      never set, and a negative zero (which OpenSSL makes from zero octets read into a
+      negative number) is zero (a deviation).
+    - Quirks kept: `BN_ucmp` returns the difference in words for numbers of different
+      lengths (unless one is `BN_FLG_CONSTTIME`); `BN_usub` of a larger number of the same
+      length wraps; a signed number in octets gets no sign octet when its magnitude fills the
+      top octet, so -129 writes as `7f` (and as `ff ff 7f` given room); `BN_hex2bn` refuses
+      static data but `BN_dec2bn` doesn't check; `BN_asc2bn` takes a second `-` after the
+      first or after `0x`; `OSSL_PARAM_BLD_push_BN` reads the number when the array is made,
+      and `push_BN_pad` gives a negative number its magnitude's length (too short for some);
+      `OSSL_PARAM_print_to_bio` prints wide integers without a newline; random numbers draw
+      on the RAND layer exactly as OpenSSL does, so a known generator gives the same numbers.
+    - New deviations: NULL numbers and contexts; static data; `BN_free` on a `BN_CTX`'s
+      number (OpenSSL frees its digits twice); `BN_CTX_end` without a frame; negative zero;
+      `BN_consttime_swap` of numbers longer than `nwords`; `OSSL_PARAM_print_to_bio` of wide
+      integers (OpenSSL passes an uninitialized pointer); `OSSL_PARAM_get_BN` past `INT_MAX`;
+      `OSSL_PARAM_allocate_from_text` with a NULL key or value.
+    - `tests/c/bn.c`, 192 checks: the lifecycle and flags, every conversion of values around
+      the octet and sign boundaries, text with partial and failed parses, MPIs, ASN.1
+      integers and printing, the arithmetic on pairs of signed values (with aliasing and
+      every error), bits, `BN_CTX` frames, random numbers from a known DRBG, the parameters
+      (set, get, built, from text, printed).
+    - The probe's `bn*` commands (four registers; corpus `bn.txt`, random sessions with and
+      without a known generator); the `bn` fuzz target checks the parsers, the arithmetic
+      against `i128` and its identities, and the conversions' round trips.
+  - [ ] **4.1b Modular arithmetic:** the `BN_mod_*` functions, the `BN_mod_exp*` family
+    (constant-time for `BN_FLG_CONSTTIME`), `BN_MONT_CTX`, `BN_RECP_CTX`, `BN_mod_inverse`,
+    `BN_gcd`, `BN_are_coprime`, `BN_kronecker`, `BN_mod_sqrt` (with the CVE-2022-0778 loop
+    bound), `BN_BLINDING`, the NIST and RFC 2409/3526 primes and the NIST reductions,
+    `BN_generate_dsa_nonce`.
+  - [ ] **4.1c Primes and GF(2^m):** `BN_GENCB`, `BN_generate_prime_ex(2)`, `BN_check_prime`,
+    `BN_is_prime*`, the X9.31 functions, and `BN_GF2m_*`.
 - [ ] **4.2 EVP_PKEY framework:**
   - EVP_PKEY lifecycle and keymgmt (import and export through `OSSL_PARAM`, `fromdata` /
     `todata`, get/set params)

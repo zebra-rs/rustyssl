@@ -3,15 +3,19 @@
 //! secure block.
 //!
 //! The builder keeps the caller's pointers, as OpenSSL does: the keys go into the array as they
-//! are, and strings are read only by `OSSL_PARAM_BLD_to_param`, so each must stay valid until
-//! then. The big-number pushes come with BIGNUM (step 4.1).
+//! are, and strings and big numbers are read only by `OSSL_PARAM_BLD_to_param`, so each must
+//! stay valid until then (a number changed in between goes in as it is then).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_uint, c_ulong, c_void};
 use core::ptr;
 use std::sync::Mutex;
 
 use libc::time_t;
-use rustyssl_abi::{ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER, OSSL_PARAM, OSSL_PARAM_BLD};
+use rustyssl_abi::{
+    BIGNUM, BN_FLG_SECURE, CRYPTO_R_TOO_SMALL_BUFFER, ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER,
+    ERR_R_UNSUPPORTED, OSSL_PARAM, OSSL_PARAM_BLD,
+};
+use rustyssl_crypto::bn::Endian;
 use rustyssl_crypto::params::{
     INTEGER, OCTET_PTR, OCTET_STRING, REAL, UNSIGNED_INTEGER, UTF8_PTR, UTF8_STRING,
 };
@@ -44,6 +48,8 @@ struct Def {
     num: [u8; 8],
     /// A string's or pointer's address.
     string: Kept,
+    /// A big number's address.
+    bn: Kept,
 }
 
 /// The builder: the parameters pushed since it was made or last turned into an array.
@@ -94,6 +100,7 @@ fn def(data_type: u32, size: usize, alloc: usize, secure: bool) -> Option<Def> {
         secure,
         num: [0; 8],
         string: Kept(ptr::null()),
+        bn: Kept(ptr::null()),
     })
 }
 
@@ -310,11 +317,132 @@ ffi_export! {
     }
 }
 
+/// `push_BN`: a big number `key` of `sz` octets, as `data_type`, read when the array is made.
+///
+/// # Safety
+/// `bld` is NULL or a live builder; `bn` is NULL or a live `BIGNUM`.
+unsafe fn push_bn(
+    bld: *mut OSSL_PARAM_BLD,
+    key: *const c_char,
+    bn: *const BIGNUM,
+    mut sz: usize,
+    data_type: u32,
+) -> c_int {
+    const F: &str = "push_BN";
+    // SAFETY: the caller's guarantee.
+    let Some(b) = (unsafe { builder(bld, key, F) }) else {
+        return 0;
+    };
+    let mut secure = false;
+    // SAFETY: the caller's guarantee.
+    if let Some(n) = unsafe { crate::bn::bignum(bn) } {
+        let s = n.state();
+        if data_type == UNSIGNED_INTEGER && s.value.is_negative() {
+            err::raise_with_text(
+                ERR_LIB_CRYPTO,
+                ERR_R_UNSUPPORTED,
+                F,
+                "Negative big numbers are unsupported for OSSL_PARAM_UNSIGNED_INTEGER",
+            );
+            return 0;
+        }
+        if sz < s.value.num_bytes() {
+            err::raise(ERR_LIB_CRYPTO, CRYPTO_R_TOO_SMALL_BUFFER, F);
+            return 0;
+        }
+        secure = s.flags & BN_FLG_SECURE != 0;
+        sz = sz.max(1);
+    }
+    let Some(mut d) = def(data_type, sz, sz, secure) else {
+        return 0;
+    };
+    d.bn = Kept(bn.cast());
+    push(b, key, d)
+}
+
+/// A number's length in octets (0 for NULL).
+///
+/// # Safety
+/// `bn` is NULL or a live `BIGNUM`.
+unsafe fn num_bytes(bn: *const BIGNUM) -> Option<(usize, bool)> {
+    // SAFETY: the caller's guarantee.
+    let v = unsafe { crate::bn::value(bn) }?;
+    Some((v.num_bytes(), v.is_negative()))
+}
+
+ffi_export! {
+    /// Adds a big number parameter `key`: unsigned, as long as the number, or for a negative
+    /// one signed and an octet longer. Read when the array is made. Returns 1, or 0.
+    ///
+    /// # Safety
+    /// `bld` is NULL or a live builder; `key` is NULL or a string; `bn` is NULL or a live
+    /// `BIGNUM` until the array is made.
+    pub unsafe extern "C" fn OSSL_PARAM_BLD_push_BN(bld: *mut OSSL_PARAM_BLD, key: *const c_char, bn: *const BIGNUM) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { builder(bld, key, "OSSL_PARAM_BLD_push_BN") }.is_none() {
+            return 0;
+        }
+        // SAFETY: as above.
+        match unsafe { num_bytes(bn) } {
+            // SAFETY: as above.
+            Some((n, true)) => unsafe { push_bn(bld, key, bn, n.saturating_add(1), INTEGER) },
+            // SAFETY: as above.
+            Some((n, false)) => unsafe { push_bn(bld, key, bn, n, UNSIGNED_INTEGER) },
+            // SAFETY: as above.
+            None => unsafe { push_bn(bld, key, bn, 0, UNSIGNED_INTEGER) },
+        }
+    }
+}
+
+ffi_export! {
+    /// As `OSSL_PARAM_BLD_push_BN`, padded to `sz` octets if non-negative (which must hold
+    /// it); a negative number is signed and as long as its magnitude.
+    ///
+    /// # Safety
+    /// As for `OSSL_PARAM_BLD_push_BN`.
+    pub unsafe extern "C" fn OSSL_PARAM_BLD_push_BN_pad(bld: *mut OSSL_PARAM_BLD, key: *const c_char, bn: *const BIGNUM, sz: usize) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { builder(bld, key, "OSSL_PARAM_BLD_push_BN_pad") }.is_none() {
+            return 0;
+        }
+        // SAFETY: as above.
+        match unsafe { num_bytes(bn) } {
+            // SAFETY: as above.
+            Some((n, true)) => unsafe { push_bn(bld, key, bn, n, INTEGER) },
+            // SAFETY: as above.
+            _ => unsafe { push_bn(bld, key, bn, sz, UNSIGNED_INTEGER) },
+        }
+    }
+}
+
 /// Writes a parameter's data at `to`, which has room for its units.
 ///
 /// # Safety
-/// `to` has room for `d.blocks` units; a string `d` points to holds `d.size` octets.
+/// `to` has room for `d.blocks` units; a string `d` points to holds `d.size` octets, and a big
+/// number is live.
 unsafe fn fill(d: &Def, to: *mut u8) {
+    if !d.bn.0.is_null() {
+        // A number that no longer fits leaves its octets zero, as in OpenSSL.
+        // SAFETY: the caller's guarantee.
+        let Some(v) = (unsafe { crate::bn::value(d.bn.0.cast()) }) else {
+            return;
+        };
+        let signed = d.data_type == INTEGER;
+        let order = if cfg!(target_endian = "little") {
+            Endian::Little
+        } else {
+            Endian::Big
+        };
+        if let Some(octets) = v.to_bin(Some(d.size), order, signed) {
+            // SAFETY: the room counted for `size` octets.
+            unsafe { ptr::copy_nonoverlapping(octets.as_ptr(), to, octets.len()) };
+        }
+        return;
+    }
     match d.data_type {
         OCTET_PTR | UTF8_PTR => {
             // SAFETY: the room counted for a pointer, perhaps unaligned.

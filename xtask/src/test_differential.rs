@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(28) {
+        match random.below(29) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -176,6 +176,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             24 => mac_session(&mut random, &mut out)?,
             25 => kdf_session(&mut random, &mut out)?,
             26 => rand_session(&mut random, &mut out)?,
+            27 => bn_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -1560,6 +1561,229 @@ fn rand_session(random: &mut Random, out: &mut String) -> Result {
     writeln!(out, "rctx 1")?;
     writeln!(out, "rfree")?;
     writeln!(out, "rctx 0")?;
+    Ok(())
+}
+
+/// A hex number for the big-number commands: zero, values around octet and word boundaries, or
+/// random digits with runs of 0 and F, of either sign.
+fn bn_hex(random: &mut Random) -> String {
+    let digits = if random.below(4) == 0 {
+        random
+            .pick(&[
+                "0",
+                "1",
+                "7F",
+                "80",
+                "FF",
+                "100",
+                "7FFFFFFFFFFFFFFF",
+                "FFFFFFFFFFFFFFFF",
+                "10000000000000000",
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+                "100000000000000000000000000000000",
+            ])
+            .to_owned()
+    } else {
+        let len = random.below(96) + 1;
+        (0..len)
+            .map(|_| match random.below(8) {
+                0 | 1 => '0',
+                2 | 3 => 'F',
+                _ => char::from_digit(u32::try_from(random.below(16)).unwrap_or(0), 16)
+                    .unwrap_or('0')
+                    .to_ascii_uppercase(),
+            })
+            .collect()
+    };
+    if random.below(3) == 0 {
+        format!("-{digits}")
+    } else {
+        digits
+    }
+}
+
+/// A random session of big-number commands on the probe's four registers: text in and out,
+/// the arithmetic (aliasing results with operands), words, bits, octets either way round and
+/// signed, MPIs, ASN.1 integers, parameters, and random numbers, from a known generator in a
+/// third of the sessions.
+fn bn_session(random: &mut Random, out: &mut String) -> Result {
+    const OPS: &[&str] = &[
+        "add", "sub", "uadd", "usub", "mul", "sqr", "nnmod", "exp", "cmp", "copy", "swap",
+    ];
+    const KINDS: &[&str] = &["bin", "lebin", "native", "sbin", "slebin", "snative"];
+    let known = random.below(3) == 0;
+    if known {
+        for line in [
+            "rctx 0",
+            "rnew TEST-RAND",
+            "rset strength=256 test_entropy=64 test_nonce=32",
+            "rinst 0 0",
+            "rctx 1",
+            "rnew HASH-DRBG child",
+            "rset digest=SHA256",
+            "rinst 0 0",
+            "rsetpub",
+            "rsetpriv",
+        ] {
+            writeln!(out, "{line}")?;
+        }
+    }
+    for r in 0..4 {
+        writeln!(out, "bnset {r} {}", bn_hex(random))?;
+    }
+    let reg = |random: &mut Random| random.below(4);
+    for _ in 0..random.below(30) + 1 {
+        match random.below(22) {
+            0 => writeln!(out, "bnset {} {}", reg(random), bn_hex(random))?,
+            1 => {
+                let kind = random.pick(&["dec", "hex", "asc"]);
+                let text = match random.below(4) {
+                    0 => format!("0x{}", bn_hex(random)),
+                    1 => format!("{}z{}", random.below(1_000_000_000), random.below(10)),
+                    2 => random
+                        .pick(&[
+                            "-",
+                            "",
+                            "--1",
+                            "-0x-1",
+                            "0x",
+                            "-0",
+                            "00000000000000000000001",
+                        ])
+                        .to_owned(),
+                    _ => bn_hex(random),
+                };
+                let text = if text.is_empty() {
+                    "-".to_owned()
+                } else {
+                    text
+                };
+                writeln!(out, "bntext {} {kind} {text}", reg(random))?;
+            }
+            2..=6 => writeln!(
+                out,
+                "bnop {} {} {} {}",
+                random.pick(OPS),
+                reg(random),
+                reg(random),
+                reg(random)
+            )?,
+            7 | 8 => {
+                let q = if random.below(4) == 0 {
+                    "-".to_owned()
+                } else {
+                    reg(random).to_string()
+                };
+                let rem = if random.below(4) == 0 {
+                    "-".to_owned()
+                } else {
+                    reg(random).to_string()
+                };
+                writeln!(out, "bndiv {q} {rem} {} {}", reg(random), reg(random))?;
+            }
+            9 => writeln!(
+                out,
+                "bnshift {} {} {} {}",
+                random.pick(&["lshift", "rshift", "lshift1", "rshift1"]),
+                reg(random),
+                reg(random),
+                random.offset(-2, 300)
+            )?,
+            10 => writeln!(
+                out,
+                "bnword {} {} {}",
+                random.pick(&["add", "sub", "mul", "div", "mod"]),
+                reg(random),
+                random.pick(&[
+                    "0",
+                    "1",
+                    "2",
+                    "7",
+                    "10",
+                    "1000000007",
+                    "4294967296",
+                    "9223372036854775808",
+                    "18446744073709551615"
+                ])
+            )?,
+            11 => writeln!(
+                out,
+                "bnbit {} {} {}",
+                random.pick(&["set", "clear", "isset", "mask"]),
+                reg(random),
+                random.offset(-1, 400)
+            )?,
+            12 => {
+                if random.below(4) == 0 {
+                    writeln!(out, "bnflag {}", reg(random))?;
+                } else {
+                    writeln!(out, "bnshow {}", reg(random))?;
+                }
+            }
+            13 | 14 => writeln!(
+                out,
+                "bnto {} {} {}",
+                reg(random),
+                random.pick(&[
+                    "bin", "binpad", "lebin", "native", "sbin", "slebin", "snative", "mpi"
+                ]),
+                random.offset(-2, 70)
+            )?,
+            15 => {
+                let len = random.below(40);
+                let hex: String = (0..len)
+                    .map(|_| match random.below(5) {
+                        0 => "00".to_owned(),
+                        1 => "ff".to_owned(),
+                        _ => format!("{:02x}", random.below(256)),
+                    })
+                    .collect();
+                let hex = if hex.is_empty() { "-".to_owned() } else { hex };
+                writeln!(out, "bnfrom {} {} {hex}", reg(random), random.pick(KINDS))?;
+            }
+            16 => {
+                let body = random.below(20);
+                let len = if random.below(4) == 0 {
+                    random.below(30)
+                } else {
+                    body
+                };
+                let hex: String = (0..body)
+                    .map(|_| format!("{:02x}", random.below(256)))
+                    .collect();
+                writeln!(out, "bnfrom {} mpi {len:08x}{hex}", reg(random))?;
+            }
+            17 => writeln!(
+                out,
+                "bnrand {} {} {} {} {}",
+                reg(random),
+                random.offset(-1, 300),
+                random.offset(-1, 3),
+                random.below(2),
+                random.below(3)
+            )?,
+            18 => writeln!(
+                out,
+                "bnrange {} {} {}",
+                reg(random),
+                reg(random),
+                random.below(2)
+            )?,
+            19 => writeln!(out, "bnasn1 {}", reg(random))?,
+            _ => writeln!(
+                out,
+                "bnparam {} {} {}",
+                reg(random),
+                random.pick(&["u", "s"]),
+                random.below(40)
+            )?,
+        }
+    }
+    if known {
+        for line in ["rreset", "rctx 0", "rfree", "rctx 1", "rfree", "rctx 0"] {
+            writeln!(out, "{line}")?;
+        }
+    }
     Ok(())
 }
 

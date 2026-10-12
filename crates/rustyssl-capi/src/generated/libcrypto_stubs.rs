@@ -320,16 +320,6 @@ pub extern "C" fn ASIdentifiers_new() -> *mut ASIdentifiers {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_ENUMERATED_to_BN(_: *const ASN1_ENUMERATED, _: *mut BIGNUM) -> *mut BIGNUM {
-    crate::stub::unimplemented("ASN1_ENUMERATED_to_BN")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_INTEGER_to_BN(_: *const ASN1_INTEGER, _: *mut BIGNUM) -> *mut BIGNUM {
-    crate::stub::unimplemented("ASN1_INTEGER_to_BN")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_ITEM_get(_: usize) -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_ITEM_get")
 }
@@ -384,17 +374,6 @@ pub extern "C" fn ASN1_add_oid_module() {
 #[unsafe(no_mangle)]
 pub extern "C" fn ASN1_add_stable_module() {
     crate::stub::unimplemented("ASN1_add_stable_module")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_bn_print(
-    _: *mut BIO,
-    _: *const core::ffi::c_char,
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_bn_print")
 }
 
 #[unsafe(no_mangle)]
@@ -1061,46 +1040,6 @@ pub extern "C" fn BN_BLINDING_update(_: *mut BN_BLINDING, _: *mut BN_CTX) -> cor
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_end(_: *mut BN_CTX) {
-    crate::stub::unimplemented("BN_CTX_end")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_free(_: *mut BN_CTX) {
-    crate::stub::unimplemented("BN_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_get(_: *mut BN_CTX) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_CTX_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_new() -> *mut BN_CTX {
-    crate::stub::unimplemented("BN_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_new_ex(_: *mut OSSL_LIB_CTX) -> *mut BN_CTX {
-    crate::stub::unimplemented("BN_CTX_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_secure_new() -> *mut BN_CTX {
-    crate::stub::unimplemented("BN_CTX_secure_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_secure_new_ex(_: *mut OSSL_LIB_CTX) -> *mut BN_CTX {
-    crate::stub::unimplemented("BN_CTX_secure_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_CTX_start(_: *mut BN_CTX) {
-    crate::stub::unimplemented("BN_CTX_start")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_GENCB_call(
     _: *mut BN_GENCB,
     _: core::ffi::c_int,
@@ -1435,98 +1374,12 @@ pub extern "C" fn BN_X931_generate_prime_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_abs_is_word(_: *const BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_abs_is_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_add(_: *mut BIGNUM, _: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_add_word(_: *mut BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_add_word")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_are_coprime(
     _: *mut BIGNUM,
     _: *const BIGNUM,
     _: *mut BN_CTX,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BN_are_coprime")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_asc2bn(_: *mut *mut BIGNUM, _: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_asc2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bin2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_bin2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2bin(_: *const BIGNUM, _: *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bn2bin")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2binpad(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bn2binpad")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2dec(_: *const BIGNUM) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("BN_bn2dec")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2hex(_: *const BIGNUM) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("BN_bn2hex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2lebinpad(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bn2lebinpad")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2mpi(_: *const BIGNUM, _: *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bn2mpi")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bn2nativepad(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bn2nativepad")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_bntest_rand(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_bntest_rand")
 }
 
 #[unsafe(no_mangle)]
@@ -1539,57 +1392,6 @@ pub extern "C" fn BN_check_prime(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_clear(_: *mut BIGNUM) {
-    crate::stub::unimplemented("BN_clear")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_clear_bit(_: *mut BIGNUM, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_clear_bit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_clear_free(_: *mut BIGNUM) {
-    crate::stub::unimplemented("BN_clear_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_cmp(_: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_consttime_swap(
-    _: core::ffi::c_ulong,
-    _: *mut BIGNUM,
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("BN_consttime_swap")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_copy(_: *mut BIGNUM, _: *const BIGNUM) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_copy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_dec2bn(_: *mut *mut BIGNUM, _: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_dec2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_div(
-    _: *mut BIGNUM,
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_div")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_div_recp(
     _: *mut BIGNUM,
     _: *mut BIGNUM,
@@ -1598,31 +1400,6 @@ pub extern "C" fn BN_div_recp(
     _: *mut BN_CTX,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BN_div_recp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_div_word(_: *mut BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("BN_div_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_dup(_: *const BIGNUM) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_exp(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_exp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_free(_: *mut BIGNUM) {
-    crate::stub::unimplemented("BN_free")
 }
 
 #[unsafe(no_mangle)]
@@ -1727,16 +1504,6 @@ pub extern "C" fn BN_get0_nist_prime_521() -> *const BIGNUM {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_get_flags(_: *const BIGNUM, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_get_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_get_params(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_get_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_get_rfc2409_prime_1024(_: *mut BIGNUM) -> *mut BIGNUM {
     crate::stub::unimplemented("BN_get_rfc2409_prime_1024")
 }
@@ -1774,36 +1541,6 @@ pub extern "C" fn BN_get_rfc3526_prime_6144(_: *mut BIGNUM) -> *mut BIGNUM {
 #[unsafe(no_mangle)]
 pub extern "C" fn BN_get_rfc3526_prime_8192(_: *mut BIGNUM) -> *mut BIGNUM {
     crate::stub::unimplemented("BN_get_rfc3526_prime_8192")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_get_word(_: *const BIGNUM) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("BN_get_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_hex2bn(_: *mut *mut BIGNUM, _: *const core::ffi::c_char) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_hex2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_is_bit_set(_: *const BIGNUM, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_bit_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_is_negative(_: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_negative")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_is_odd(_: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_odd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_is_one(_: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_one")
 }
 
 #[unsafe(no_mangle)]
@@ -1863,50 +1600,12 @@ pub extern "C" fn BN_is_prime_fasttest_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_is_word(_: *const BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_is_zero(_: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_is_zero")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_kronecker(
     _: *const BIGNUM,
     _: *const BIGNUM,
     _: *mut BN_CTX,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BN_kronecker")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_lebin2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_lebin2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_lshift(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_lshift")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_lshift1(_: *mut BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_lshift1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_mask_bits(_: *mut BIGNUM, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_mask_bits")
 }
 
 #[unsafe(no_mangle)]
@@ -2155,49 +1854,6 @@ pub extern "C" fn BN_mod_sub_quick(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_mod_word(_: *const BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("BN_mod_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_mpi2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_mpi2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_mul(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_mul")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_mul_word(_: *mut BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_mul_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_native2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_native2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_new() -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_nist_mod_192(
     _: *mut BIGNUM,
     _: *const BIGNUM,
@@ -2262,130 +1918,6 @@ pub extern "C" fn BN_nist_mod_func(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_nnmod(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_nnmod")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_num_bits(_: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_num_bits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_num_bits_word(_: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_num_bits_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_options() -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("BN_options")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_print(_: *mut BIO, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_print_fp(_: *mut FILE, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_priv_rand(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_priv_rand")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_priv_rand_ex(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_uint,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_priv_rand_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_priv_rand_range(_: *mut BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_priv_rand_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_priv_rand_range_ex(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: core::ffi::c_uint,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_priv_rand_range_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_pseudo_rand(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_pseudo_rand")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_pseudo_rand_range(_: *mut BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_pseudo_rand_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_rand(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rand")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_rand_ex(
-    _: *mut BIGNUM,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_uint,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rand_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_rand_range(_: *mut BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rand_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_rand_range_ex(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: core::ffi::c_uint,
-    _: *mut BN_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rand_range_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_reciprocal(
     _: *mut BIGNUM,
     _: *const BIGNUM,
@@ -2396,147 +1928,6 @@ pub extern "C" fn BN_reciprocal(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BN_rshift(
-    _: *mut BIGNUM,
-    _: *const BIGNUM,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rshift")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_rshift1(_: *mut BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_rshift1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_secure_new() -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_secure_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_security_bits(_: core::ffi::c_int, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_security_bits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_set_bit(_: *mut BIGNUM, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_set_bit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_set_flags(_: *mut BIGNUM, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BN_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_set_negative(_: *mut BIGNUM, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BN_set_negative")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_set_params(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("BN_set_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_set_word(_: *mut BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_set_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_bin2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_signed_bin2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_bn2bin(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_signed_bn2bin")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_bn2lebin(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_signed_bn2lebin")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_bn2native(
-    _: *const BIGNUM,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_signed_bn2native")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_lebin2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_signed_lebin2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_signed_native2bn(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut BIGNUM,
-) -> *mut BIGNUM {
-    crate::stub::unimplemented("BN_signed_native2bn")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_sqr(_: *mut BIGNUM, _: *const BIGNUM, _: *mut BN_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_sqr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_sub(_: *mut BIGNUM, _: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_sub")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_sub_word(_: *mut BIGNUM, _: core::ffi::c_ulong) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_sub_word")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_swap(_: *mut BIGNUM, _: *mut BIGNUM) {
-    crate::stub::unimplemented("BN_swap")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_to_ASN1_ENUMERATED(
-    _: *const BIGNUM,
-    _: *mut ASN1_ENUMERATED,
-) -> *mut ASN1_ENUMERATED {
-    crate::stub::unimplemented("BN_to_ASN1_ENUMERATED")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_to_ASN1_INTEGER(_: *const BIGNUM, _: *mut ASN1_INTEGER) -> *mut ASN1_INTEGER {
-    crate::stub::unimplemented("BN_to_ASN1_INTEGER")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BN_to_montgomery(
     _: *mut BIGNUM,
     _: *const BIGNUM,
@@ -2544,36 +1935,6 @@ pub extern "C" fn BN_to_montgomery(
     _: *mut BN_CTX,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("BN_to_montgomery")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_uadd(_: *mut BIGNUM, _: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_uadd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_ucmp(_: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_ucmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_usub(_: *mut BIGNUM, _: *const BIGNUM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("BN_usub")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_value_one() -> *const BIGNUM {
-    crate::stub::unimplemented("BN_value_one")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_with_flags(_: *mut BIGNUM, _: *const BIGNUM, _: core::ffi::c_int) {
-    crate::stub::unimplemented("BN_with_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BN_zero_ex(_: *mut BIGNUM) {
-    crate::stub::unimplemented("BN_zero_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -17765,56 +17126,6 @@ pub extern "C" fn OSSL_OBJECT_DIGEST_INFO_set1_digest(
     _: *mut ASN1_BIT_STRING,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_OBJECT_DIGEST_INFO_set1_digest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_BLD_push_BN(
-    _: *mut OSSL_PARAM_BLD,
-    _: *const core::ffi::c_char,
-    _: *const BIGNUM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_BLD_push_BN")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_BLD_push_BN_pad(
-    _: *mut OSSL_PARAM_BLD,
-    _: *const core::ffi::c_char,
-    _: *const BIGNUM,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_BLD_push_BN_pad")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_allocate_from_text(
-    _: *mut OSSL_PARAM,
-    _: *const OSSL_PARAM,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_allocate_from_text")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_get_BN(_: *const OSSL_PARAM, _: *mut *mut BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_get_BN")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_print_to_bio(
-    _: *const OSSL_PARAM,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_print_to_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_set_BN(_: *mut OSSL_PARAM, _: *const BIGNUM) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_set_BN")
 }
 
 #[unsafe(no_mangle)]
