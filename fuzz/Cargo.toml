@@ -249,3 +249,9 @@ name = "pkey"
 path = "fuzz_targets/pkey.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "signature"
+path = "fuzz_targets/signature.rs"
+test = false
+doc = false
