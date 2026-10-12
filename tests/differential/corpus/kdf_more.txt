@@ -1,0 +1,115 @@
+# KDFs: PKCS12KDF, KRB5KDF, HMAC-DRBG-KDF, and ARGON2I/D/ID through their parameters and errors
+knew PKCS12KDF
+ksize
+kget
+kderive 16
+kderive 16 pass=10
+kderive 16 salt=8
+kderive 24 digest=SHA1 pkcs12-id=1 iter=1
+kderive 100 digest=SHA256 pkcs12-id=3 iter=3
+kderive 0
+kderive 33 digest=SHAKE128
+kderive 33 digest=NULL
+kderive 33 digest=nonesuch
+kderive 40 digest=SHA3-256 pass=0 salt=0
+kderive 40 pass=0 salt=1
+kderive 40 pkcs12-id=256
+kdup
+kset pass=0
+kdup
+kset pass=4
+kdup
+kctx 1
+kderive 48
+kreset
+kderive 48
+kctx 0
+knew KRB5KDF
+ksize
+kget
+kderive 16
+kderive 16 cipher=AES-128-CBC
+ksize
+kderive 16 key=16
+kderive 16 constant=5
+kderive 32 constant=5
+kderive 17 key=17
+kderive 32 cipher=AES-256-CBC key=32 constant=16
+kderive 32 constant=17
+kderive 32 constant=0
+kderive 24 cipher=DES-EDE3-CBC key=24 constant=5
+kderive 21
+kderive 16 cipher=AES-128-CTR key=16 constant=1
+kderive 16 constant=2
+kderive 16 cipher=AES-128-WRAP constant=8
+kderive 16 cipher=nonesuch
+kderive 16 cipher=CAMELLIA-256-CBC key=32 constant=13
+kderive 32
+kdup
+kctx 1
+kderive 32
+kreset
+kderive 32
+kctx 0
+knew HMAC-DRBG-KDF
+ksize
+kget
+kderive 20
+kderive 20 entropy=20 nonce=16
+kderive 20 digest=SHA1
+kderive 20
+kderive 50
+kderive 0
+kdup
+kctx 1
+kderive 45
+kctx 0
+kderive 45
+kderive 40 digest=SHA256
+kderive 40 entropy=32
+kset digest=SHAKE128
+kset digest=NULL
+kset digest=nonesuch
+kderive 20
+kset digest=SHA512 properties=provider=default
+kderive 100 nonce=0
+kdup
+kderive 100 nonce=13
+kreset
+kderive 20 entropy=4 nonce=4
+knew ARGON2D
+ksize
+kget
+kdup
+kderive 32
+kderive 32 salt=7
+kderive 32 salt=16
+kderive 32 pass=32 secret=8 ad=13 lanes=4 iter=3 memcost=32
+kderive 64 lanes=1 iter=1 memcost=8
+kderive 3
+kderive 16 size=32
+kderive 32 size=32
+kderive 20 version=16
+kset version=1
+kset iter=0
+kset memcost=7
+kset lanes=0
+kset lanes=2
+kderive 20
+kderive 20 memcost=21
+kderive 20 threads=2
+kset threads=0
+kderive 20 threads=1 early_clean=1
+kderive 20
+kset properties=provider=nonesuch
+kderive 20
+kset properties=provider=default
+kderive 20
+knew ARGON2I
+kderive 32 pass=32 salt=16 secret=8 ad=13 lanes=4 iter=3
+kderive 32 memcost=32
+kreset
+kderive 64 salt=8
+knew argon2id
+kderive 100 pass=10 salt=16 lanes=2 memcost=16 iter=2
+kfree
