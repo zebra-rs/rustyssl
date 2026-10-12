@@ -282,3 +282,196 @@ fn swaps() {
     consttime_swap(true, &mut a, &mut b, 2);
     assert_eq!((&a, &b), (&n(1 << 70), &n(-5)));
 }
+
+/// `a^p mod m` by repeated multiplication, for small exponents.
+fn naive_exp(a: &BigNum, p: u64, m: &BigNum) -> BigNum {
+    let m = m.abs();
+    let mut r = div_rem(&BigNum::one(), &m).unwrap().1;
+    for _ in 0..p {
+        r = nnmod(&mul(&r, a).unwrap(), &m).unwrap();
+    }
+    r
+}
+
+#[test]
+fn exponentiation_matches_repeated_multiplication() {
+    let mut rng = Rng(99);
+    for _ in 0..300 {
+        let a = rng.number(4).abs();
+        let mut m = rng.number(4);
+        if m.is_zero() {
+            m = n(7);
+        }
+        let p = rng.next() % 40;
+        let got = modular::exp_mod(&a, &BigNum::from_word(p), &m).unwrap();
+        if p == 0 {
+            assert_eq!(got, modular::exp_by_zero(&m));
+        } else {
+            assert_eq!(got, naive_exp(&a, p, &m), "{a:?}^{p} mod {m:?}");
+        }
+    }
+    // A long exponent against Fermat: a^(q-1) = 1 mod a prime q.
+    let q = hex(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+    );
+    let p521 = modular::nist_prime(521).unwrap();
+    let mut e = p521.clone();
+    e.sub_word(1).unwrap();
+    assert!(modular::exp_mod(&n(3), &e, &p521).unwrap().is_one());
+    let _ = q;
+}
+
+#[test]
+fn montgomery_round_trips() {
+    let mut rng = Rng(5);
+    for _ in 0..300 {
+        let mut m = rng.number(5).abs();
+        if !m.is_odd() {
+            m.add_word(1).unwrap();
+        }
+        if m.is_one() {
+            continue;
+        }
+        let mont = mont::Montgomery::new(&m).unwrap();
+        let a = div_rem(&rng.number(5).abs(), &m).unwrap().1;
+        let b = div_rem(&rng.number(5).abs(), &m).unwrap().1;
+        let am = mont.to_mont(&a).unwrap();
+        let bm = mont.to_mont(&b).unwrap();
+        assert_eq!(mont.from_mont(&am), a);
+        let prod = mont.from_mont(&mont.mul(&am, &bm).unwrap());
+        assert_eq!(prod, nnmod(&mul(&a, &b).unwrap(), &m).unwrap());
+    }
+    assert_eq!(
+        mont::Montgomery::new(&n(10)).err(),
+        Some(mont::MontError::NoInverse)
+    );
+    assert_eq!(
+        mont::Montgomery::new(&n(0)).err(),
+        Some(mont::MontError::Zero)
+    );
+}
+
+/// Euclid's algorithm, for comparison.
+fn euclid(a: &BigNum, b: &BigNum) -> BigNum {
+    let (mut a, mut b) = (a.abs(), b.abs());
+    while !b.is_zero() {
+        let r = div_rem(&a, &b).unwrap().1;
+        a = b;
+        b = r;
+    }
+    a
+}
+
+#[test]
+fn constant_time_gcd_and_inverse() {
+    let mut rng = Rng(77);
+    for _ in 0..400 {
+        let a = rng.number(4);
+        let b = rng.number(4);
+        if a.is_zero() || b.is_zero() {
+            continue;
+        }
+        assert_eq!(ct::gcd(&a, &b).0, euclid(&a, &b), "gcd({a:?}, {b:?})");
+        let m = b.abs();
+        if m.is_one() {
+            continue;
+        }
+        let x = nnmod(&a, &m).unwrap();
+        let inv = ct::inverse(&x, &m);
+        if euclid(&x, &m).is_one() {
+            let inv = inv.expect("an inverse");
+            assert!(ucmp(&inv, &m) == Ordering::Less);
+            assert!(
+                nnmod(&mul(&inv, &x).unwrap(), &m).unwrap().is_one(),
+                "{x:?}^-1 mod {m:?}"
+            );
+        } else {
+            assert!(inv.is_none());
+        }
+    }
+    // An even modulus and a word: RSA's d = e^-1 mod lambda.
+    let lambda = hex("D8E2B2C3A1F4B9C8E7D6A5B4C3D2E1F00123456789ABCDEF0123456789ABCDE0");
+    let inv = ct::inverse(&n(65537), &lambda).unwrap();
+    assert!(
+        nnmod(&mul(&inv, &n(65537)).unwrap(), &lambda)
+            .unwrap()
+            .is_one()
+    );
+    assert_eq!(ct::gcd(&n(12), &n(18)).0, n(6));
+    assert_eq!(ct::gcd(&n(-1 << 70), &n(1 << 66)).0, n(1 << 66));
+}
+
+#[test]
+fn kronecker_symbols() {
+    // (a | 7) for a in 0..7: the quadratic residues 1, 2, 4.
+    let got: Vec<i32> = (0..7)
+        .map(|a| modular::kronecker(&n(a), &n(7)).unwrap())
+        .collect();
+    assert_eq!(got, vec![0, 1, 1, -1, 1, -1, -1]);
+    assert_eq!(modular::kronecker(&n(2), &n(0)).unwrap(), 0);
+    assert_eq!(modular::kronecker(&n(-1), &n(0)).unwrap(), 1);
+    assert_eq!(modular::kronecker(&n(4), &n(6)).unwrap(), 0);
+    assert_eq!(modular::kronecker(&n(5), &n(-3)).unwrap(), -1);
+}
+
+#[test]
+fn square_roots() {
+    let mut never = |_: usize| -> Option<BigNum> { None };
+    // e = 1 (p = 3 mod 4), e = 2 (p = 5 mod 8), and Tonelli-Shanks (p = 17, 97, 2^255 - 19).
+    for p in [
+        n(7),
+        n(13),
+        n(17),
+        n(97),
+        sub(&lshift(&BigNum::one(), 255).unwrap(), &n(19)).unwrap(),
+    ] {
+        for a in 2..30 {
+            let a = n(a);
+            let square = modular::mod_mul(&a, &a, &p).unwrap();
+            let root = modular::mod_sqrt(&square, &p, &mut never)
+                .ok()
+                .expect("a root");
+            assert_eq!(modular::mod_mul(&root, &root, &p).unwrap(), square);
+        }
+    }
+    assert_eq!(
+        modular::mod_sqrt(&n(3), &n(7), &mut never)
+            .err()
+            .map(|f| f.error),
+        Some(Error::NotASquare)
+    );
+    assert_eq!(
+        modular::mod_sqrt(&n(3), &n(9), &mut never)
+            .err()
+            .map(|f| f.error),
+        Some(Error::PIsNotPrime)
+    );
+    assert_eq!(modular::mod_sqrt(&n(5), &n(2), &mut never).ok(), Some(n(1)));
+}
+
+#[test]
+fn quick_forms() {
+    assert_eq!(modular::mod_add_quick(&n(5), &n(4), &n(7)), n(2));
+    assert_eq!(modular::mod_add_quick(&n(1), &n(2), &n(7)), n(3));
+    assert_eq!(
+        modular::mod_lshift_quick(&n(3), 5, &n(7)).ok(),
+        Some(n(3 * 32 % 7))
+    );
+    assert_eq!(
+        modular::mod_lshift_quick(&n(300), 1, &n(7)).err(),
+        Some((Error::InputNotReduced, n(300)))
+    );
+    // A negative number grows past the modulus: OpenSSL stops with -10.
+    assert_eq!(
+        modular::mod_lshift_quick(&n(-5), 5, &n(7)).err(),
+        Some((Error::InputNotReduced, n(-10)))
+    );
+    assert_eq!(
+        modular::nist_prime(192).unwrap(),
+        hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFF")
+    );
+    assert_eq!(
+        modular::nist_prime(256).unwrap().to_hex(),
+        "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"
+    );
+}
