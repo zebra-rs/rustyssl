@@ -55,6 +55,20 @@ pub(crate) const fn alg<const N: usize>(
     }
 }
 
+/// One of the base provider's algorithms (`{ names, "provider=base", functions }` in
+/// `baseprov.c`).
+pub(crate) const fn base_alg<const N: usize>(
+    names: &'static CStr,
+    table: &'static Dispatch<N>,
+) -> OSSL_ALGORITHM {
+    OSSL_ALGORITHM {
+        algorithm_names: names.as_ptr(),
+        property_definition: c"provider=base".as_ptr(),
+        implementation: table.0.as_ptr(),
+        algorithm_description: ptr::null(),
+    }
+}
+
 /// The end of an algorithm table.
 pub(crate) const ALG_END: OSSL_ALGORITHM = OSSL_ALGORITHM {
     algorithm_names: ptr::null(),

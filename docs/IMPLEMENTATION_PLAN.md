@@ -2323,15 +2323,58 @@ have run for at least 24 CPU-hours with no findings.
       the `evp_kdf` fuzz target checks PKCS12KDF, KRB5KDF over AES, and Argon2 against the
       backend, and HMAC-DRBG-KDF copies against their originals.
 - [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
-  generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.)
-  - `EVP_RAND`: CTR-, HASH-, and HMAC-DRBG, SEED-SRC, TEST-RAND
-  - the primary/public/private DRBG hierarchy, per thread, with reseed policy and fork safety
-  - `RAND_bytes(_ex)`, `RAND_priv_bytes(_ex)`, `RAND_seed`, `RAND_add`, `RAND_status`,
-    `RAND_poll`, `RAND_load_file`, `RAND_write_file`, `RAND_set_DRBG_type`
-  - `BIO_f_nbio_test` (moved from 1.6c: it picks its short reads and writes with
-    `RAND_priv_bytes`)
-  - legacy `RAND_METHOD`
-  - seeding from the OS (getrandom/getentropy)
+  generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.) Split in two:
+  - [x] **3.7a `EVP_RAND` and the default provider's generators:** the methods and contexts
+    (`evp_rand.c`: 30 exports; libcrypto now 1,282 of 5,876), and CTR-, HASH-, and HMAC-DRBG,
+    SEED-SRC, and TEST-RAND (`provider/rands.rs`; SEED-SRC in the base provider too), with
+    the entropy pool and the core's entropy and nonces (`rand.rs`). Decisions and findings:
+    - **Decision:** as with the KDFs, the DRBG mechanisms run over the EVP layer, as the
+      reference's do (CTR-DRBG over `EVP_CIPHER_CTX`, HASH-DRBG over `EVP_MD_CTX`, HMAC-DRBG
+      over `EVP_MAC_CTX`, fetched with `provider=default` unless `properties` say otherwise),
+      so another provider's cipher or digest works and inner errors are the reference's; the
+      3.2e backend mechanisms are the new fuzz target's oracle. HMAC-DRBG-KDF (3.6c) now runs
+      the provider's HMAC-DRBG state.
+    - **Decision:** each context keeps its state behind a mutex whether or not locking was
+      enabled; `lock` and `unlock` do nothing and succeed, as `ossl_drbg_lock` does.
+    - The framework is `drbg.c`'s: the states and automatic restart, the limits, the default
+      personalization string, entropy from the parent's `get_seed` (or the core), nonces from
+      the parent's `nonce` (or extra entropy, or the core's: pid, thread, time, and a salt),
+      reseeding on requests, time, fork, the parent's reseed, and prediction resistance.
+    - Quirks kept: instantiating a ready DRBG raises `PROV_R_ALREADY_INSTANTIATED` (or a
+      strength or personalization error) and returns 1; HMAC-DRBG fetches its algorithms on
+      every parameter call, a refused XOF digest stays and refuses later calls, and a failed
+      MAC fetch drops the MAC context; TEST-RAND generates before it's instantiated and lends
+      its entropy (not consumed) as a seed; SEED-SRC's pool overflow is raised twice on
+      macOS (both Unix sources ask) and once on Linux (which skips the random device).
+    - Fixed on the way: the base provider's algorithms now carry `provider=base` (a new
+      `base_alg` in the tables), so `EVP_RAND_fetch(..., "SEED-SRC", "provider=base")` finds
+      the base provider's.
+    - New deviations: NULL methods and contexts; a CTR-DRBG instantiated without a cipher
+      under a parent that gives entropy; TEST-RAND's nonce length in generating mode; NULL
+      DRBG parameters, and a CTR cipher name whose size isn't its length; and (found by the
+      random sessions, which hung on both libraries) a HASH- or HMAC-DRBG that kept a digest
+      it refused before taking any, whose block length is 0: the reference loops forever,
+      ours fails.
+    - `tests/c/evp_rand.c`, 194 checks: 90 known answers from `evprand.txt` (each mechanism,
+      cipher or digest, derivation function, prediction resistance, personalization,
+      additional input, reseed), driven as its `evp_test` does; the methods and lists;
+      TEST-RAND; each DRBG's parameters, states, limits, reseeding, and errors; SEED-SRC and
+      chains of DRBGs (their random output checked, not printed); the NULL arguments.
+    - The probe's `r*` commands (corpus `rand.txt`, random sessions), printing output only
+      where it's deterministic and guarding the reference's two crashes; the `evp_rand` fuzz
+      target checks the DRBGs under TEST-RAND against the backend mechanisms.
+  - [ ] **3.7b The RAND layer:**
+    - the primary/public/private DRBG hierarchy, per thread, with reseed policy and fork
+      safety, the seed source (`RAND_set_seed_source_type`), and the core's entropy and nonces
+      drawing on it
+    - `RAND_bytes(_ex)`, `RAND_priv_bytes(_ex)`, `RAND_seed`, `RAND_add`, `RAND_status`,
+      `RAND_poll`, `RAND_load_file`, `RAND_write_file`, `RAND_set_DRBG_type`,
+      `RAND_get0_primary`/`public`/`private`, `RAND_set0_*`, `RAND_set1_random_provider`
+    - `BIO_f_nbio_test` (moved from 1.6c: it picks its short reads and writes with
+      `RAND_priv_bytes`)
+    - legacy `RAND_METHOD`, the EGD functions
+    - the probe then runs DRBGs that were never set up too: without a parent, the reference
+      seeds them from the seed source once the RAND layer made it (3.7a's probe skips them)
 - [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x):
   - `SHA*_`, `MD4_`, `MD5_`, `RIPEMD160_`
   - `AES_*` (including `AES_wrap_key` and IGE)

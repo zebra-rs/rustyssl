@@ -1,0 +1,106 @@
+# Random generators: TEST-RAND, the DRBGs under it (and under each other), SEED-SRC
+rgen 16 0 0 0
+rnew NO-SUCH-RAND
+rnew TEST-RAND
+rget
+rgen 8 0 0 0
+rset strength=128 test_entropy=48 test_nonce=16
+rgen 8 0 0 0
+rgen 8 129 0 0
+rinst 128 0
+rinst 129 0
+rgen 48 0 0 0
+rgen 1 0 0 0
+rnonce 4
+rnonce 30
+rset max_request=5 test_entropy=40
+rgen 40 0 0 0
+rset generate=1
+rgen 20 0 0 0
+rnonce 7
+rinst 0 0
+rgen 20 0 0 0
+rset generate=0 strength=256 test_entropy=100 test_nonce=32 max_request=1000
+rinst 0 0
+rget
+rzero
+rlock
+rctx 1
+rnew CTR-DRBG child
+rget
+rinst 0 0
+rset cipher=AES-128-CBC
+rset cipher=NOPE-CTR
+rset cipher=AES-256-CTR
+rget
+rinst 256 0
+rgen 64 0 0 0
+rgen 64 256 1 20
+rinst 0 0
+rreseed 0 0 0
+rreseed 0 5 0
+rgen 16 0 0 0
+rreseed 0 48 7
+rgen 16 0 0 0
+rnonce 24
+rset use_derivation_function=0
+rget
+runinst
+rinst 0 0 49
+rinst 0 0 48
+rgen 100 0 0 49
+rgen 100 0 0 48
+rset reseed_requests=2
+rgen 8 0 0 0
+rgen 8 0 0 0
+rgen 8 0 0 0
+rget
+rzero
+rlock
+rnew HASH-DRBG child
+rset digest=SHAKE256
+rset digest=nonesuch
+rset digest=SHA256
+rget
+rinst 0 0
+rgen 200 0 0 0
+rgen 77 0 1 33
+rset digest=SHA512
+rget
+rgen 77 0 0 0
+runinst
+rnew HMAC-DRBG child
+rset mac=HMAC
+rget
+rset digest=SHA1
+rinst 0 0 20
+rgen 150 0 0 5
+rset digest=SHA256 mac=KMAC128
+rget
+rgen 50 0 0 0
+rset digest=SHAKE128
+rset reseed_requests=7
+rctx 0
+rset generate=1
+rnew SEED-SRC
+rctx 1
+rnew CTR-DRBG child
+rset cipher=AES-128-CTR
+rinst 0 0
+rgen 32 0 0 0
+rctx 0
+rgen 16 256 0 0
+rinst 0 0
+rgen 32 256 0 0
+rgen 16 256 0 0
+rgen 300 128 0 4
+rget
+rnew SEED-SRC child
+rnew HMAC-DRBG
+rset digest=SHA384
+rinst 0 0
+rgen 64 192 1 0
+rnonce 16
+rfree
+rctx 1
+rfree

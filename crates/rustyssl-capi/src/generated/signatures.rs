@@ -2264,6 +2264,97 @@ const _: unsafe extern "C" fn(
     usize,
     *mut usize,
 ) -> *mut core::ffi::c_uchar = crate::evp::mac::EVP_Q_mac;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) = crate::evp::rand::EVP_RAND_CTX_free;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> *mut EVP_RAND =
+    crate::evp::rand::EVP_RAND_CTX_get0_rand;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_CTX_get_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> *const OSSL_PARAM =
+    crate::evp::rand::EVP_RAND_CTX_gettable_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND, *mut EVP_RAND_CTX) -> *mut EVP_RAND_CTX =
+    crate::evp::rand::EVP_RAND_CTX_new;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_CTX_set_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> *const OSSL_PARAM =
+    crate::evp::rand::EVP_RAND_CTX_settable_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_CTX_up_ref;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<unsafe extern "C" fn(rand: *mut EVP_RAND, arg: *mut core::ffi::c_void)>,
+    *mut core::ffi::c_void,
+) = crate::evp::rand::EVP_RAND_do_all_provided;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_enable_locking;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_RAND = crate::evp::rand::EVP_RAND_fetch;
+const _: unsafe extern "C" fn(*mut EVP_RAND) = crate::evp::rand::EVP_RAND_free;
+const _: unsafe extern "C" fn(
+    *mut EVP_RAND_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+    core::ffi::c_uint,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::rand::EVP_RAND_generate;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const core::ffi::c_char =
+    crate::evp::rand::EVP_RAND_get0_description;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const core::ffi::c_char =
+    crate::evp::rand::EVP_RAND_get0_name;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const OSSL_PROVIDER =
+    crate::evp::rand::EVP_RAND_get0_provider;
+const _: unsafe extern "C" fn(*mut EVP_RAND, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_get_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_get_state;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_uint =
+    crate::evp::rand::EVP_RAND_get_strength;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const OSSL_PARAM =
+    crate::evp::rand::EVP_RAND_gettable_ctx_params;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const OSSL_PARAM =
+    crate::evp::rand::EVP_RAND_gettable_params;
+const _: unsafe extern "C" fn(
+    *mut EVP_RAND_CTX,
+    core::ffi::c_uint,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    usize,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::rand::EVP_RAND_instantiate;
+const _: unsafe extern "C" fn(*const EVP_RAND, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_RAND,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::rand::EVP_RAND_names_do_all;
+const _: unsafe extern "C" fn(
+    *mut EVP_RAND_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::rand::EVP_RAND_nonce;
+const _: unsafe extern "C" fn(
+    *mut EVP_RAND_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::rand::EVP_RAND_reseed;
+const _: unsafe extern "C" fn(*const EVP_RAND) -> *const OSSL_PARAM =
+    crate::evp::rand::EVP_RAND_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_uninstantiate;
+const _: unsafe extern "C" fn(*mut EVP_RAND) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_up_ref;
+const _: unsafe extern "C" fn(*mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::evp::rand::EVP_RAND_verify_zeroization;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
     crate::evp::legacy_cipher::EVP_add_cipher;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
