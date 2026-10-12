@@ -1606,7 +1606,8 @@ fn bn_hex(random: &mut Random) -> String {
 /// the arithmetic (aliasing results with operands), words, bits, octets either way round and
 /// signed, MPIs, ASN.1 integers, parameters, random numbers (from a known generator in a third
 /// of the sessions), and the modular arithmetic: each exponentiation, inverses, gcds, square
-/// roots, the Montgomery and reciprocal contexts, and the NIST and RFC primes.
+/// roots, the Montgomery and reciprocal contexts, the NIST and RFC primes, primality tests,
+/// prime generation, and binary fields.
 fn bn_session(random: &mut Random, out: &mut String) -> Result {
     const OPS: &[&str] = &[
         "add", "sub", "uadd", "usub", "mul", "sqr", "nnmod", "exp", "cmp", "copy", "swap",
@@ -1634,7 +1635,7 @@ fn bn_session(random: &mut Random, out: &mut String) -> Result {
     }
     let reg = |random: &mut Random| random.below(4);
     for _ in 0..random.below(30) + 1 {
-        match random.below(39) {
+        match random.below(44) {
             0 => writeln!(out, "bnset {} {}", reg(random), bn_hex(random))?,
             1 => {
                 let kind = random.pick(&["dec", "hex", "asc"]);
@@ -1857,7 +1858,43 @@ fn bn_session(random: &mut Random, out: &mut String) -> Result {
                 reg(random),
                 reg(random)
             )?,
-            _ => writeln!(out, "bnprime {} {}", random.below(8), reg(random))?,
+            38 => writeln!(out, "bnprime {} {}", random.below(8), reg(random))?,
+            39 => writeln!(
+                out,
+                "bnisprime {} {} {}",
+                reg(random),
+                random.pick(&["check", "ex", "fast"]),
+                random.offset(-1, 80)
+            )?,
+            40 => {
+                // Only combinations that end: a safe prime with add needs rem 11 mod 12.
+                let (safe, add, rem) = match random.below(5) {
+                    0 => (1, 0, 0),
+                    1 => (0, 12, 7),
+                    2 => (0, 12, 0),
+                    3 => (1, 12, 11),
+                    _ => (0, 0, 0),
+                };
+                let bits = if safe == 1 {
+                    6 + random.below(40)
+                } else {
+                    random.below(120)
+                };
+                let bits = if add != 0 { bits.max(8) } else { bits };
+                writeln!(out, "bngen {} {bits} {safe} {add} {rem}", reg(random))?;
+            }
+            _ => writeln!(
+                out,
+                "bngf2m {} {} {} {} {}",
+                random.pick(&[
+                    "mod", "add", "mul", "sqr", "inv", "div", "exp", "sqrt", "solve", "modarr",
+                    "mularr", "sqrarr", "invarr", "divarr", "exparr", "sqrtarr", "solvearr"
+                ]),
+                reg(random),
+                reg(random),
+                reg(random),
+                random.below(6)
+            )?,
         }
     }
     if known {
