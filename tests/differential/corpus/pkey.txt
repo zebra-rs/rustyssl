@@ -1,0 +1,99 @@
+# Keys (EVP_PKEY) of the default provider's MAC and KDF key types: raw keys, MAC and CMAC keys,
+# generation (by name and by id), keys from parameters, parameters, comparison, copies, typing,
+# checks, and the errors.
+pkraw 0 HMAC 30313233343536373839616263646566
+pkshow 0
+pkraw 1 hmac 3031323334353637383961626364656630
+pkeq 0 1
+pkraw 2 SIPHASH 000102030405060708090a0b0c0d0e0f
+pkeq 0 2
+pkraw 3 SIPHASH 0001
+pkraw 3 POLY1305 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+pkraw 4 HMAC -
+pkshow 4
+pkraw 4 HKDF 00
+pkraw 4 TLS1-PRF 00
+pkraw 4 SCRYPT 00
+pkraw 4 id-scrypt 00
+pkraw 4 CMAC 00112233445566778899aabbccddeeff
+pkraw 4 NOPE 00
+pkrawid 4 855 aabbcc
+pkrawid 5 1062 00112233445566778899aabbccddeeff
+pkrawid 5 99999 00
+pkpub 5 HMAC 00
+pkpub 5 SIPHASH 00
+pkcmac 5 AES-128-CBC 00112233445566778899aabbccddeeff
+pkshow 5
+pkcmac 6 AES-256-CBC 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+pkeq 5 6
+pkcmac 6 AES-128-CBC 00112233445566778899aabbccddeeff
+pkeq 5 6
+pkcmac 6 NOPE 00
+pkcmac 6 RC4 00112233445566778899aabbccddeeff
+pkcmac 6 DES-EDE3-CBC 00112233445566778899aabbccddeeff0011223344556677
+pkmac 6 855 6b6579
+pkmac 6 855 -
+pkmac 6 1062 000102030405060708090a0b0c0d0e0f
+pkmac 6 1061 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+pkmac 6 894 00112233445566778899aabbccddeeff
+pkmac 6 1036 00
+pkgen 7 HMAC 0102
+pkgen 7 HMAC none
+pkgen 7 855 0304
+pkgen 7 CMAC 0506
+pkgen 7 HKDF 00
+pkgen 7 NOPE 00
+pkgen 7 POLY1305 -
+pkparamgen 7 SIPHASH none
+pkparamgen 7 HMAC 00
+pkeq 7 0
+pkfree 7
+pkfrom 7 HMAC keypair priv=00112233
+pkfrom 7 HMAC public priv=00112233
+pkfrom 7 HMAC params priv=00112233
+pkfrom 7 HMAC private priv=44556677
+pkfrom 7 HMAC keypair privstr=abc
+pkfrom 7 HMAC keypair properties=x
+pkfrom 7 CMAC keypair priv=00112233445566778899aabbccddeeff cipher=AES-192-CBC
+pkfrom 7 CMAC all priv=00112233445566778899aabbccddeeff cipher=NOPE
+pkfrom 7 CMAC keypair priv=00112233445566778899aabbccddeeff cipher=AES-128-CBC properties=provider=default
+pkfrom 7 CMAC keypair priv=00112233445566778899aabbccddeeff cipher=AES-128-CBC properties=provider=base
+pkfrom 7 HKDF keypair priv=00
+pkfrom 7 1036 keypair
+pkset 0 priv 0a0b0c
+pkset 0 bits 01
+pksetstr 0 priv abc
+pksetstr 5 cipher AES-256-CBC
+pkset 5 priv 00112233445566778899aabbccddeeff
+pkshow 5
+pkcopy 3 0
+pkcopy 7 0
+pkcopy 0 1
+pkcopy 0 2
+pkdup 3 0
+pkeq 3 0
+pkdup 3 5
+pktype 3 6
+pktype 3 19
+pktype 3 855
+pktype 3 66
+pktypestr 3 dh 2
+pktypestr 3 rsa 3
+pkfree 3
+pktypestr 3 ED448 -1
+pktypestr 3 rsaxx 3
+pktypestr 3 nope -1
+pkeq 3 0
+pkcopy 3 0
+pkcheck 0
+pkcheck 5
+pkcheck 4
+pkshow 1
+pkfree 0
+pkfree 1
+pkfree 2
+pkfree 3
+pkfree 4
+pkfree 5
+pkfree 6
+pkfree 7

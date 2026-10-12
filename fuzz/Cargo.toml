@@ -243,3 +243,9 @@ name = "bn_gf2m"
 path = "fuzz_targets/bn_gf2m.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "pkey"
+path = "fuzz_targets/pkey.rs"
+test = false
+doc = false

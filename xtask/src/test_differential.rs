@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(29) {
+        match random.below(30) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -177,6 +177,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             25 => kdf_session(&mut random, &mut out)?,
             26 => rand_session(&mut random, &mut out)?,
             27 => bn_session(&mut random, &mut out)?,
+            28 => pkey_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -3164,6 +3165,169 @@ fn length(random: &mut Random) -> u64 {
         17..=18 => random.below(8193),
         _ => 0x5fff_fffd,
     }
+}
+
+/// Random octets as the probe's hex (`-` for none).
+fn pkey_hex(random: &mut Random, max: u64) -> String {
+    let len = if random.below(8) == 0 {
+        0
+    } else {
+        random.below(max) + 1
+    };
+    if len == 0 {
+        return "-".to_owned();
+    }
+    (0..len)
+        .map(|_| format!("{:02x}", random.below(256)))
+        .collect()
+}
+
+/// A random session of key commands (`EVP_PKEY`) on the probe's eight slots: raw keys by name
+/// and id, MAC and CMAC keys, generation and parameter generation (with and without a key),
+/// keys from parameters (with every selection, wrong types, and ciphers), parameters, copies,
+/// comparisons, typing, and checks, over the MAC and KDF key types and some that don't exist.
+fn pkey_session(random: &mut Random, out: &mut String) -> Result {
+    const NAMES: &[&str] = &[
+        "HMAC",
+        "SIPHASH",
+        "POLY1305",
+        "CMAC",
+        "HKDF",
+        "TLS1-PRF",
+        "SCRYPT",
+        "id-scrypt",
+        "hmac",
+        "NOPE",
+        "855",
+        "1062",
+        "1061",
+        "894",
+        "1036",
+        "99999",
+    ];
+    const IDS: &[&str] = &[
+        "855", "1062", "1061", "894", "1036", "1021", "973", "0", "-1", "99999",
+    ];
+    const CIPHERS: &[&str] = &[
+        "AES-128-CBC",
+        "AES-192-CBC",
+        "AES-256-CBC",
+        "DES-EDE3-CBC",
+        "AES-128-GCM",
+        "RC4",
+        "NOPE",
+    ];
+    const SELECTIONS: &[&str] = &["keypair", "public", "private", "params", "all"];
+    const TYPES: &[&str] = &[
+        "6", "19", "28", "116", "67", "66", "408", "912", "920", "1034", "1087", "1172", "855", "0",
+    ];
+    const TYPE_NAMES: &[&str] = &[
+        "RSA", "rsa", "DH", "DSA", "EC", "X25519", "ED448", "RSA-PSS", "nope", "SM2",
+    ];
+    let slot = |random: &mut Random| random.below(8);
+    for _ in 0..random.below(25) + 1 {
+        let s = slot(random);
+        match random.below(16) {
+            0 | 1 => writeln!(
+                out,
+                "pkraw {s} {} {}",
+                random.pick(NAMES),
+                pkey_hex(random, 40)
+            )?,
+            2 => writeln!(
+                out,
+                "pkrawid {s} {} {}",
+                random.pick(IDS),
+                pkey_hex(random, 40)
+            )?,
+            3 => writeln!(
+                out,
+                "pkpub {s} {} {}",
+                random.pick(NAMES),
+                pkey_hex(random, 40)
+            )?,
+            4 => {
+                let len = random.pick(&["16", "24", "32", "8", "0"]);
+                let n: u64 = len.parse().unwrap_or(16);
+                let key = if n == 0 {
+                    "-".to_owned()
+                } else {
+                    (0..n)
+                        .map(|_| format!("{:02x}", random.below(256)))
+                        .collect()
+                };
+                writeln!(out, "pkcmac {s} {} {key}", random.pick(CIPHERS))?;
+            }
+            5 => writeln!(
+                out,
+                "pkmac {s} {} {}",
+                random.pick(IDS),
+                pkey_hex(random, 40)
+            )?,
+            6 => {
+                let key = if random.below(4) == 0 {
+                    "none".to_owned()
+                } else {
+                    pkey_hex(random, 40)
+                };
+                let cmd = if random.below(4) == 0 {
+                    "pkparamgen"
+                } else {
+                    "pkgen"
+                };
+                writeln!(out, "{cmd} {s} {} {key}", random.pick(NAMES))?;
+            }
+            7 | 8 => {
+                let mut line = format!(
+                    "pkfrom {s} {} {}",
+                    random.pick(NAMES),
+                    random.pick(SELECTIONS)
+                );
+                for _ in 0..random.below(4) {
+                    match random.below(5) {
+                        0 | 1 => line.push_str(&format!(" priv={}", pkey_hex(random, 40))),
+                        2 => line.push_str(&format!(" cipher={}", random.pick(CIPHERS))),
+                        3 => line.push_str(&format!(
+                            " properties={}",
+                            random.pick(&["provider=default", "provider=base", "x", "?fips=yes"])
+                        )),
+                        _ => line.push_str(" privstr=abc"),
+                    }
+                }
+                writeln!(out, "{line}")?;
+            }
+            9 => {
+                let key = random.pick(&["priv", "bits", "cipher", "encoded-pub-key"]);
+                writeln!(out, "pkset {s} {key} {}", pkey_hex(random, 40))?;
+            }
+            10 => {
+                let key = random.pick(&["priv", "cipher", "properties"]);
+                writeln!(out, "pksetstr {s} {key} {}", random.pick(CIPHERS))?;
+            }
+            11 => writeln!(out, "pkeq {s} {}", slot(random))?,
+            12 => {
+                let cmd = random.pick(&["pkcopy", "pkdup"]);
+                writeln!(out, "{cmd} {s} {}", slot(random))?;
+            }
+            13 => {
+                if random.below(2) == 0 {
+                    writeln!(out, "pktype {s} {}", random.pick(TYPES))?;
+                } else {
+                    let len = random.pick(&["-1", "1", "2", "3"]);
+                    writeln!(out, "pktypestr {s} {} {len}", random.pick(TYPE_NAMES))?;
+                }
+            }
+            14 => writeln!(out, "pkcheck {s}")?,
+            _ => writeln!(out, "pkshow {s}")?,
+        }
+        if random.below(10) == 0 {
+            writeln!(out, "pkfree {}", slot(random))?;
+        }
+    }
+    for s in 0..8 {
+        writeln!(out, "pkfree {s}")?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
