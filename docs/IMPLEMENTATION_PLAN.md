@@ -2560,6 +2560,56 @@ chunking) is clean.
     `EVP_PKEY_asn1_*` custom-method APIs
   - `PEM_bytes_read_bio`/`_secmem` and `PEM_ASN1_read`/`_bio` (from 2.6), whose matching of
     `ANY PRIVATE KEY` and `PARAMETERS` names consults the ASN.1 methods
+
+  The key types themselves (RSA, EC, ...) come with 4.3 onwards; 4.2 builds the framework
+  over the default provider's MAC and KDF key types, and its tests use only those. Split:
+  - [x] **4.2a Keys and key management:** `evp/keymgmt.rs`, `evp/pkey.rs` (with `ameth.rs`,
+    `params.rs`, `raw.rs`), `evp/pkey_ctx.rs`, and `provider/keymgmt.rs`: 117 exports;
+    libcrypto now 1,637 of 5,876.
+    - `EVP_KEYMGMT`, made from a provider's algorithm as `keymgmt_from_algorithm` checks it
+      (the function pairs, one constructor, `has`), fetched, and introspected; the internal
+      wrappers keep OpenSSL's defaults for missing functions.
+    - The provider-backed `EVP_PKEY`: its key data is shared (`Arc`) with the operation
+      cache of its exports to other key managers, which setting parameters invalidates; the
+      bits, security bits, and size are asked of the key manager when data is assigned;
+      `eq`/`parameters_eq` (-1 for other types, -2 when they can't compare), `copy_parameters`,
+      `dup` (with ex_data), parameters and their typed helpers, `fromdata`/`todata`/`export`,
+      raw keys, MAC and CMAC keys.
+    - Typing by the built-in ASN.1 methods (`EVP_PKEY_set_type`, `_str`, `_by_keymgmt`,
+      `EVP_PKEY_type`): a table of each method's type, alias, flags, PEM name, description,
+      and which of its functions exist, taken from the reference. A key typed without data
+      behaves as OpenSSL's where its method lacks a function; where OpenSSL would call one
+      (on data that can't exist yet), it aborts until the key types come (rule 10).
+    - `EVP_PKEY_CTX` by id, name, and key (`int_ctx_new`'s choice of key type and key
+      manager), the getters, parameters, key and parameter generation (with the callback and
+      `keygen_info`), `EVP_PKEY_new_mac_key`, `EVP_PKEY_Q_keygen` (variadic), `fromdata`, and
+      the checks.
+    - The default provider's key managers for HMAC, SIPHASH, POLY1305, CMAC
+      (`mac_legacy_kmgmt.c`, keys in `CRYPTO_secure_malloc` memory as there) and TLS1-PRF,
+      HKDF, SCRYPT (`kdf_legacy_kmgmt.c`), in `deflt_keymgmt`'s order. The name map is
+      pre-filled with the ASN.1 methods' key type names after the ciphers' and digests'.
+    - Quirks kept: a raw MAC key's type is `EVP_PKEY_KEYMGMT` but a generated one gets the
+      context's id (855 for `EVP_PKEY_new_mac_key`), and generation sets the type even when it
+      fails; MAC keys compare equal whatever their keys (`eq` selects the public key, which
+      `mac_match` doesn't compare); a key typed by name keeps its type when typed by name
+      again; `EVP_PKEY_is_a(blank, "foo")` is 1; `EVP_PKEY_fromdata_settable` ends the
+      context's operation; a zero-length MAC key can be imported but not generated;
+      `EVP_PKEY_get0_hmac` always fails (the MAC types have no legacy form).
+    - New deviations: NULL key managers, keys, and contexts are refused; `keygen_info` past
+      the end gives 0; engines are refused; key data for a key typed by name is refused.
+    - `tests/c/evp_pkey.c`, 68 checks and about 420 printed lines.
+    - The probe's `pk*` commands (corpus `pkey.txt`, random sessions); the `pkey` fuzz target
+      checks keys made from fuzzed parameters round-trip through raw keys, copies,
+      parameters, and generation.
+  - [ ] **4.2b Signatures:** `EVP_SIGNATURE`; sign, verify, verify-recover, and message
+    signing; `EVP_DigestSign*`/`EVP_DigestVerify*`; `EVP_PKEY_can_sign`; the MAC signatures
+    (`mac_legacy_sig.c`).
+  - [ ] **4.2c Derivation, encryption, and KEMs:** `EVP_KEYEXCH` and derive with the KDF
+    exchanges (`kdf_exch.c`); `EVP_ASYM_CIPHER`; `EVP_KEM`; `EVP_PKEY_CTX_ctrl`/`ctrl_str` and
+    the ctrl-to-parameter translation (`ctrl_params_translate.c`) with the typed setters.
+  - [ ] **4.2d Legacy and printing:** `EVP_PKEY_print_*`, `EVP_PKEY_assign` and the `get1_*`
+    family, the `EVP_PKEY_meth_*` and `EVP_PKEY_asn1_*` custom-method APIs, attributes, and
+    `PEM_bytes_read_bio`.
 - [ ] **4.3 RSA:**
   - keygen (multi-prime)
   - PKCS#1 v1.5 signatures
