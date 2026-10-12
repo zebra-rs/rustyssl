@@ -2275,9 +2275,26 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's `k*` commands (corpus `kdf.txt`, random KDF sessions, `PKCS5_PBKDF2_HMAC`).
     - The `evp_kdf` fuzz target: each KDF through the C ABI against the backend, and copies
       against their originals.
-  - [ ] **3.6b The rest:** scrypt and `EVP_PBE_scrypt(_ex)`, X942KDF-ASN1, KBKDF, SSHKDF
-    (the C test of its NULL-digest deviation), PKCS12KDF, KRB5KDF, Argon2i/d/id, and
-    HMAC-DRBG-KDF.
+  - [x] **3.6b scrypt, X942KDF-ASN1, KBKDF, and SSHKDF:** with `EVP_PBE_scrypt` and
+    `EVP_PBE_scrypt_ex` (2 exports; libcrypto now 1,252 of 5,876). Decisions and findings:
+    - scrypt makes the reference's checks (raising `EVP_R_MEMORY_LIMIT_EXCEEDED`), then
+      computes over the backend; with no output buffer it checks only, as `EVP_PBE_scrypt`
+      with a NULL key does. X9.42's DER `OtherInfo` is the backend's (now public), its hashing
+      over `EVP_MD_CTX`, and the key-wrap OIDs come from the object table. KBKDF runs over
+      `EVP_MAC_CTX` and SSHKDF over `EVP_MD_CTX`, as the reference's do.
+    - Quirks kept: KBKDF's `mode` matches a prefix (an empty one is "counter"), a failed
+      derivation wipes the output, the IV outlives a change of MAC; X9.42's `properties` make
+      the CEK name the cipher's property query; scrypt's `get_ctx_params` returns -2 when the
+      size isn't asked for.
+    - The SSHKDF-over-NULL deviation is pinned by a unit test, not a C test: the reference
+      would loop forever in one. New deviations: a KBKDF copy without a MAC (the reference
+      copies through NULL); KBKDF's `mode` with NULL data; scrypt outputs past `INT_MAX`.
+    - `tests/c/evp_kdf_others.c`, 72 checks: the RFC 7914 vectors, every name and parameter
+      list, each KDF's modes, errors, and quirks, copies, and resets.
+    - The probe's KDF commands take the new parameters, capping scrypt's memory at 4 MiB and
+      guarding the reference's KBKDF copy crash and SSHKDF-over-NULL loop; the `evp_kdf` fuzz
+      target checks the four against the backend too.
+  - [ ] **3.6c The rest:** PKCS12KDF, KRB5KDF, Argon2i/d/id, and HMAC-DRBG-KDF.
 - [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
   generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.)
   - `EVP_RAND`: CTR-, HASH-, and HMAC-DRBG, SEED-SRC, TEST-RAND
