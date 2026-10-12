@@ -9617,40 +9617,6 @@ pub extern "C" fn EVP_PBE_get(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_scrypt(
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: u64,
-    _: u64,
-    _: u64,
-    _: u64,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_scrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_scrypt_ex(
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: u64,
-    _: u64,
-    _: u64,
-    _: u64,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_scrypt_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKCS82PKEY(_: *const PKCS8_PRIV_KEY_INFO) -> *mut EVP_PKEY {
     crate::stub::unimplemented("EVP_PKCS82PKEY")
 }

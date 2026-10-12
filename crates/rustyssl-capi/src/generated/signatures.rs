@@ -2216,6 +2216,32 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
 const _: unsafe extern "C" fn(*mut EVP_MD) -> core::ffi::c_int = crate::evp::digest::EVP_MD_up_ref;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int = crate::evp::md_ctx::EVP_MD_xof;
 const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    u64,
+    u64,
+    u64,
+    u64,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::kdf::EVP_PBE_scrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    u64,
+    u64,
+    u64,
+    u64,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::kdf::EVP_PBE_scrypt_ex;
+const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
     *const core::ffi::c_char,

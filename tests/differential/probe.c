@@ -3246,6 +3246,7 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
         *eq = '\0';
         if (strcmp(tok, "digest") == 0 || strcmp(tok, "cipher") == 0
             || strcmp(tok, "properties") == 0 || strcmp(tok, "mac") == 0
+            || strcmp(tok, "cekalg") == 0 || strcmp(tok, "type") == 0
             || (strcmp(tok, "mode") == 0 && (eq[1] < '0' || eq[1] > '9'))) {
             snprintf(strs[n], 64, "%s", eq + 1);
             params[n] = OSSL_PARAM_construct_utf8_string(tok, strs[n], 0);
@@ -3256,14 +3257,19 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
                    || strcmp(tok, "info") == 0 || strcmp(tok, "secret") == 0
                    || strcmp(tok, "seed") == 0 || strcmp(tok, "pass") == 0
                    || strcmp(tok, "prefix") == 0 || strcmp(tok, "label") == 0
-                   || strcmp(tok, "data") == 0) {
+                   || strcmp(tok, "data") == 0 || strcmp(tok, "xcghash") == 0
+                   || strcmp(tok, "session_id") == 0 || strcmp(tok, "ukm") == 0
+                   || strcmp(tok, "acvp-info") == 0 || strcmp(tok, "partyu-info") == 0
+                   || strcmp(tok, "partyv-info") == 0 || strcmp(tok, "supp-pubinfo") == 0
+                   || strcmp(tok, "supp-privinfo") == 0) {
             size_t len = strtoul(eq + 1, NULL, 10) % 200;
 
             params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
             off = (off + len + 5) % 1024;
             *has_iv |= strcmp(tok, "iv") == 0;
             mac_has_key |= strcmp(tok, "key") == 0;
-        } else if (strcmp(tok, "iter") == 0) {
+        } else if (strcmp(tok, "iter") == 0 || strcmp(tok, "n") == 0 || strcmp(tok, "p") == 0
+                   || strcmp(tok, "maxmem_bytes") == 0) {
             mac_u64s[n] = strtoull(eq + 1, NULL, 10);
             params[n] = OSSL_PARAM_construct_uint64(tok, &mac_u64s[n]);
         } else if (strcmp(tok, "c-rounds") == 0 || strcmp(tok, "d-rounds") == 0) {
@@ -3271,7 +3277,9 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
             params[n] = OSSL_PARAM_construct_uint(tok, &mac_uints[n]);
         } else if (strcmp(tok, "xof") == 0 || strcmp(tok, "digest-noinit") == 0
                    || strcmp(tok, "digest-oneshot") == 0 || strcmp(tok, "pkcs5") == 0
-                   || strcmp(tok, "mode") == 0) {
+                   || strcmp(tok, "mode") == 0 || strcmp(tok, "r") == 0
+                   || strcmp(tok, "use-l") == 0 || strcmp(tok, "use-separator") == 0
+                   || strcmp(tok, "use-keybits") == 0) {
             ints[n] = atoi(eq + 1);
             params[n] = OSSL_PARAM_construct_int(tok, &ints[n]);
         } else {
@@ -3506,14 +3514,32 @@ static int mac_command(const char *command, const char *line)
  */
 static EVP_KDF_CTX *kdf_ctx[2];
 static int kdf_current;
+/*
+ * What OpenSSL can't be given (docs/DEVIATIONS.md, and scrypt's cost): each context's kind,
+ * whether a KBKDF has a MAC (its copy crashes without one), and whether an SSHKDF's digest may
+ * be NULL (it then loops forever). scrypt derivations get a memory limit of 4 MiB.
+ */
+static int kdf_scrypt[2], kdf_kbkdf[2], kdf_kb_mac[2], kdf_ssh[2], kdf_ssh_null[2];
+static uint64_t kdf_maxmem = 4 << 20;
+
+/* Notes what a parameter call did to the context's guarded state. */
+static void kdf_note(const char *line, int r)
+{
+    if (strstr(line, " mac=") != NULL)
+        kdf_kb_mac[kdf_current] = r == 1;
+    if (strstr(line, " digest=NULL") != NULL)
+        kdf_ssh_null[kdf_current] = 1;
+    else if (strstr(line, " digest=") != NULL && r == 1)
+        kdf_ssh_null[kdf_current] = 0;
+}
 
 static int kdf_command(const char *command, const char *line)
 {
     EVP_KDF_CTX *ctx;
-    OSSL_PARAM params[8];
-    size_t sizes[8], sz;
-    int ints[8], has_cipher = 0, has_iv = 0, r = 0;
-    char strs[8][64], a[64] = "";
+    OSSL_PARAM params[10];
+    size_t sizes[10], sz;
+    int ints[10], has_cipher = 0, has_iv = 0, r = 0;
+    char strs[10][64], a[64] = "";
     unsigned char out[1100];
     unsigned long n = 0;
 
@@ -3544,6 +3570,10 @@ static int kdf_command(const char *command, const char *line)
         EVP_KDF_CTX_free(ctx);
         kdf = EVP_KDF_fetch(NULL, a, NULL);
         kdf_ctx[kdf_current] = EVP_KDF_CTX_new(kdf);
+        kdf_scrypt[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "SCRYPT");
+        kdf_kbkdf[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "KBKDF");
+        kdf_ssh[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "SSHKDF");
+        kdf_kb_mac[kdf_current] = kdf_ssh_null[kdf_current] = 0;
         if (kdf != NULL)
             printf(" %s %s", EVP_KDF_get0_name(kdf), kdf_ctx[kdf_current] != NULL ? "ok" : "failed");
         else
@@ -3576,15 +3606,31 @@ static int kdf_command(const char *command, const char *line)
         return 1;
     } else if (strcmp(command, "kset") == 0) {
         mac_params(line, 0, params, sizes, ints, strs, &has_cipher, &has_iv);
-        printf(" %d", EVP_KDF_CTX_set_params(ctx, params));
+        r = EVP_KDF_CTX_set_params(ctx, params);
+        printf(" %d", r);
         mac_params_free(params);
+        kdf_note(line, r);
     } else if (strcmp(command, "kderive") == 0) {
         sscanf(line, "%*s %lu", &n);
         if (n > 1024)
             n = 1024;
-        mac_params(line, 1, params, sizes, ints, strs, &has_cipher, &has_iv);
+        if (kdf_ssh[kdf_current] && n > 0
+            && (kdf_ssh_null[kdf_current] || strstr(line, " digest=NULL") != NULL)) {
+            printf(" skipped: SSHKDF over NULL\n");
+            return 1;
+        }
+        {
+            int np = mac_params(line, 1, params, sizes, ints, strs, &has_cipher, &has_iv);
+
+            if (kdf_scrypt[kdf_current]) {
+                params[np] = OSSL_PARAM_construct_uint64("maxmem_bytes", &kdf_maxmem);
+                params[np].key = OPENSSL_strdup(params[np].key);
+                params[np + 1] = OSSL_PARAM_construct_end();
+            }
+        }
         r = EVP_KDF_derive(ctx, out, n, params[0].key == NULL ? NULL : params);
         mac_params_free(params);
+        kdf_note(line, r);
         printf(" %d ", r);
         for (sz = 0; sz < (r == 1 ? n : 0) && sz < 256; sz++)
             printf("%02x", out[sz]);
@@ -3601,15 +3647,26 @@ static int kdf_command(const char *command, const char *line)
         r = EVP_KDF_CTX_get_params(ctx, params);
         printf(" %d %zu %zu", r, size, params[1].return_size);
     } else if (strcmp(command, "kdup") == 0) {
-        EVP_KDF_CTX *dup = EVP_KDF_CTX_dup(ctx);
+        EVP_KDF_CTX *dup;
 
+        if (kdf_kbkdf[kdf_current] && !kdf_kb_mac[kdf_current]) {
+            printf(" skipped: KBKDF without a MAC\n");
+            return 1;
+        }
+        dup = EVP_KDF_CTX_dup(ctx);
         printf(" %s", dup == NULL ? "NULL" : "ok");
         if (dup != NULL) {
             EVP_KDF_CTX_free(kdf_ctx[!kdf_current]);
             kdf_ctx[!kdf_current] = dup;
+            kdf_scrypt[!kdf_current] = kdf_scrypt[kdf_current];
+            kdf_kbkdf[!kdf_current] = kdf_kbkdf[kdf_current];
+            kdf_kb_mac[!kdf_current] = kdf_kb_mac[kdf_current];
+            kdf_ssh[!kdf_current] = kdf_ssh[kdf_current];
+            kdf_ssh_null[!kdf_current] = kdf_ssh_null[kdf_current];
         }
     } else if (strcmp(command, "kreset") == 0) {
         EVP_KDF_CTX_reset(ctx);
+        kdf_kb_mac[kdf_current] = kdf_ssh_null[kdf_current] = 0;
     } else {
         EVP_KDF_CTX_free(ctx);
         kdf_ctx[kdf_current] = NULL;

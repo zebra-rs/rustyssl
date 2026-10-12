@@ -1196,6 +1196,12 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
         "X963KDF",
         "X942KDF-CONCAT",
         "hkdf",
+        "SCRYPT",
+        "id-scrypt",
+        "SSHKDF",
+        "KBKDF",
+        "X942KDF-ASN1",
+        "X942KDF",
         "NO-SUCH-KDF",
     ];
     const DIGESTS: &[&str] = &[
@@ -1226,7 +1232,7 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
     let params = |random: &mut Random| -> String {
         let mut text = String::new();
         for _ in 0..random.below(4) {
-            let param = match random.below(12) {
+            let param = match random.below(17) {
                 0 | 1 => format!("digest={}", random.pick(DIGESTS)),
                 2 => format!(
                     "mac={}",
@@ -1257,6 +1263,47 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
                     random.pick(&["0", "1", "2", "999", "1000", "2048", "3"])
                 ),
                 10 => format!("pkcs5={}", random.below(2)),
+                // scrypt's (small: the probe caps memory), KBKDF's, SSHKDF's, X9.42's.
+                12 => format!(
+                    "{}={}",
+                    random.pick(&["n", "r", "p"]),
+                    random.pick(&["0", "1", "2", "8", "15", "16", "64", "1024"])
+                ),
+                13 => format!(
+                    "{}={}",
+                    random.pick(&["use-l", "use-separator", "use-keybits", "r"]),
+                    random.pick(&["0", "1", "8", "12", "16", "24", "32"])
+                ),
+                14 => format!(
+                    "{}={}",
+                    random.pick(&[
+                        "xcghash",
+                        "session_id",
+                        "ukm",
+                        "acvp-info",
+                        "partyu-info",
+                        "partyv-info",
+                        "supp-pubinfo",
+                        "supp-privinfo"
+                    ]),
+                    octets(random)
+                ),
+                15 => format!("type={}", random.pick(&["A", "C", "F", "G", "AB", "a"])),
+                16 => random
+                    .pick(&[
+                        "cekalg=AES-128-WRAP",
+                        "cekalg=AES-256-WRAP",
+                        "cekalg=DES3-WRAP",
+                        "cekalg=AES-128-CBC",
+                        "mode=counter",
+                        "mode=FEEDBACK",
+                        "mode=co",
+                        "mode=pipeline",
+                        "mac=CMAC cipher=AES-128-CBC",
+                        "mac=HMAC digest=SHA256",
+                        "maxmem_bytes=1024",
+                    ])
+                    .to_owned(),
                 _ => format!(
                     "{}={}",
                     random.pick(&["mac-size", "properties"]),
