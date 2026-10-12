@@ -19,8 +19,10 @@ pub(crate) mod arith;
 pub(crate) mod blind;
 pub(crate) mod conv;
 pub(crate) mod ctx;
+pub(crate) mod gf2m;
 pub(crate) mod modular;
 pub(crate) mod mont;
+pub(crate) mod prime;
 pub(crate) mod rand;
 
 use core::cmp::Ordering;

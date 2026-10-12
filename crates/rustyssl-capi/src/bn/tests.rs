@@ -229,3 +229,53 @@ fn aliased_results_are_the_arithmetics() {
         unsafe { BN_free(n) };
     }
 }
+
+/// docs/DEVIATIONS.md: a `BN_GENCB` never set stops (OpenSSL reads uninitialized memory), and a
+/// NULL new-style callback goes on (OpenSSL calls NULL).
+#[test]
+fn unset_callbacks_are_safe() {
+    // SAFETY: no preconditions.
+    let cb = unsafe { prime::BN_GENCB_new() };
+    // SAFETY: the holder made here, here and below.
+    assert_eq!(unsafe { prime::BN_GENCB_call(cb, 0, 0) }, 0);
+    // SAFETY: as above.
+    unsafe { prime::BN_GENCB_set(cb, None, ptr::null_mut()) };
+    // SAFETY: as above.
+    assert_eq!(unsafe { prime::BN_GENCB_call(cb, 0, 0) }, 1);
+    // SAFETY: ours to free.
+    unsafe { prime::BN_GENCB_free(cb) };
+}
+
+/// docs/DEVIATIONS.md: `BN_generate_prime` leaves the caller's number to the caller when it
+/// fails (OpenSSL frees it).
+#[test]
+fn a_failed_deprecated_generation_keeps_the_callers_number() {
+    let r = num(5);
+    // SAFETY: the number made here; one bit fails at once.
+    let got = unsafe {
+        prime::BN_generate_prime(r, 1, 0, ptr::null(), ptr::null(), None, ptr::null_mut())
+    };
+    assert!(got.is_null());
+    // SAFETY: still live.
+    assert_eq!(unsafe { BN_get_word(r) }, 5);
+    // SAFETY: ours to free.
+    unsafe { BN_free(r) };
+    crate::err::take_all();
+}
+
+/// docs/DEVIATIONS.md: an array without its constant term reduces by the polynomial it lists
+/// (OpenSSL reads past it).
+#[test]
+fn arrays_without_a_constant_term_reduce_by_what_they_list() {
+    // x^4 + x, as an array with no 0: x^5 = x^2 modulo it.
+    let p: [c_int; 3] = [4, 1, -1];
+    let (a, r) = (num(1 << 5), num(0));
+    // SAFETY: the numbers made here; the array ends with -1.
+    assert_eq!(unsafe { gf2m::BN_GF2m_mod_arr(r, a, p.as_ptr()) }, 1);
+    // SAFETY: as above.
+    assert_eq!(unsafe { BN_get_word(r) }, 1 << 2);
+    for n in [a, r] {
+        // SAFETY: ours to free.
+        unsafe { BN_free(n) };
+    }
+}
