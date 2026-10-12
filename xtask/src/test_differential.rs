@@ -1604,8 +1604,9 @@ fn bn_hex(random: &mut Random) -> String {
 
 /// A random session of big-number commands on the probe's four registers: text in and out,
 /// the arithmetic (aliasing results with operands), words, bits, octets either way round and
-/// signed, MPIs, ASN.1 integers, parameters, and random numbers, from a known generator in a
-/// third of the sessions.
+/// signed, MPIs, ASN.1 integers, parameters, random numbers (from a known generator in a third
+/// of the sessions), and the modular arithmetic: each exponentiation, inverses, gcds, square
+/// roots, the Montgomery and reciprocal contexts, and the NIST and RFC primes.
 fn bn_session(random: &mut Random, out: &mut String) -> Result {
     const OPS: &[&str] = &[
         "add", "sub", "uadd", "usub", "mul", "sqr", "nnmod", "exp", "cmp", "copy", "swap",
@@ -1633,7 +1634,7 @@ fn bn_session(random: &mut Random, out: &mut String) -> Result {
     }
     let reg = |random: &mut Random| random.below(4);
     for _ in 0..random.below(30) + 1 {
-        match random.below(22) {
+        match random.below(39) {
             0 => writeln!(out, "bnset {} {}", reg(random), bn_hex(random))?,
             1 => {
                 let kind = random.pick(&["dec", "hex", "asc"]);
@@ -1770,13 +1771,93 @@ fn bn_session(random: &mut Random, out: &mut String) -> Result {
                 random.below(2)
             )?,
             19 => writeln!(out, "bnasn1 {}", reg(random))?,
-            _ => writeln!(
+            20 => writeln!(
                 out,
                 "bnparam {} {} {}",
                 reg(random),
                 random.pick(&["u", "s"]),
                 random.below(40)
             )?,
+            21..=24 => writeln!(
+                out,
+                "bnmod {} {} {} {} {}",
+                random.pick(&[
+                    "add", "sub", "mul", "sqr", "lshift1", "addq", "subq", "lshift1q"
+                ]),
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random)
+            )?,
+            25 => writeln!(
+                out,
+                "bnmshift {} {} {} {} {}",
+                random.pick(&["q", "n"]),
+                reg(random),
+                reg(random),
+                random.offset(-2, 200),
+                reg(random)
+            )?,
+            26..=29 => writeln!(
+                out,
+                "bnexp {} {} {} {} {}",
+                random.pick(&["exp", "mont", "ct", "recp", "simple", "word"]),
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random)
+            )?,
+            30 => writeln!(
+                out,
+                "bnexp2 {} {} {} {} {} {}",
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random)
+            )?,
+            31 | 32 => {
+                let target = if random.below(3) == 0 {
+                    "-".to_owned()
+                } else {
+                    reg(random).to_string()
+                };
+                writeln!(out, "bninv {target} {} {}", reg(random), reg(random))?;
+            }
+            33 => writeln!(
+                out,
+                "{} {} {}",
+                random.pick(&["bngcd 0", "bngcd 3", "bnkron", "bncoprime"]),
+                reg(random),
+                reg(random)
+            )?,
+            34 => {
+                let target = if random.below(2) == 0 {
+                    "-".to_owned()
+                } else {
+                    reg(random).to_string()
+                };
+                writeln!(out, "bnsqrt {target} {} {}", reg(random), reg(random))?;
+            }
+            35 | 36 => writeln!(
+                out,
+                "{} {} {} {} {} {}",
+                random.pick(&["bnmont", "bnrecp"]),
+                random.pick(&["mul", "to", "from", "div", "recip"]),
+                reg(random),
+                reg(random),
+                reg(random),
+                reg(random)
+            )?,
+            37 => writeln!(
+                out,
+                "bnnist {} {} {}",
+                random.pick(&["192", "224", "256", "384", "521"]),
+                reg(random),
+                reg(random)
+            )?,
+            _ => writeln!(out, "bnprime {} {}", random.below(8), reg(random))?,
         }
     }
     if known {

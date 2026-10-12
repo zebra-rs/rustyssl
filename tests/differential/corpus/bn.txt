@@ -187,3 +187,73 @@ rfree
 rctx 1
 rfree
 rctx 0
+# Modular arithmetic.
+bnset 0 123456789ABCDEF0123456789
+bnset 1 -FEDCBA9876543210
+bnset 2 E3A5C1F7B9D3E5A7C9B1D3F5E7A9C1B3D5E7F9A1B3C5D7E9F1A3B5C7D9E1F3A5
+bnset 3 -9
+bnmod add 0 0 1 2
+bnmod sub 0 0 1 3
+bnmod mul 0 0 1 2
+bnmod mul 2 0 1 2
+bnset 2 E3A5C1F7B9D3E5A7C9B1D3F5E7A9C1B3D5E7F9A1B3C5D7E9F1A3B5C7D9E1F3A5
+bnmod sqr 3 1 3
+bnmod lshift1 0 1 2
+bnmod addq 0 0 1 2
+bnmod subq 0 0 1 2
+bnmod subq 2 0 1 2
+bnmod lshift1q 0 0 2
+bnset 0 -5
+bnset 3 7
+bnmshift q 1 0 5 3
+bnmshift n 1 0 5 3
+bnmshift q 1 0 -2 3
+bnset 0 3
+bnset 1 10001
+bnexp exp 0 0 1 2
+bnexp mont 0 0 1 2
+bnexp ct 0 0 1 2
+bnexp recp 0 0 1 2
+bnexp simple 0 0 1 2
+bnexp word 0 0 1 2
+bnset 3 100
+bnexp exp 0 0 1 3
+bnexp mont 0 0 1 3
+bnexp word 0 0 1 3
+bnset 3 0
+bnexp recp 0 0 1 3
+bnexp simple 0 0 1 3
+bnset 3 -7
+bnexp exp2 0 0 1 3 1 2
+bnexp2 0 3 1 0 1 2
+bnset 0 10001
+bnset 1 D8E2B2C3A1F4B9C8E7D6A5B4C3D2E1F00123456789ABCDEF0123456789ABCDE0
+bninv - 0 1
+bninv 2 0 1
+bninv - 1 0
+bngcd 3 0 1
+bnkron 0 2
+bnkron 3 2
+bncoprime 0 1
+bnset 0 2
+bnset 1 7
+bnsqrt - 0 1
+bnset 0 3
+bnsqrt 2 0 1
+bnset 1 11
+bnsqrt - 0 1
+bnmont mul 0 2 2 1
+bnmont to 0 2 0 1
+bnmont from 0 2 0 1
+bnset 1 FFFFFFFFFFFFFFC5
+bnmont mul 0 2 2 1
+bnrecp div 0 2 0 1
+bnrecp mul 0 2 2 1
+bnrecp recip 0 2 2 1
+bnset 1 -123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+bnnist 192 0 1
+bnnist 521 0 1
+bnnist 256 0 2
+bnprime 0 0
+bnprime 7 3
+bnnist 384 1 3
