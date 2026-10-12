@@ -410,7 +410,11 @@ static void gf2m(void)
         show("left", r);
         codes();
         check(BN_GF2m_poly2arr(even, arr, 16) == 0 && BN_GF2m_poly2arr(six, arr, 16) == 0, "poly2arr refuses");
-        printf("  poly2arr short: %d %d %d\n", BN_GF2m_poly2arr(many, arr, 2), arr[0], arr[1]);
+        {
+            int n = BN_GF2m_poly2arr(many, arr, 2);
+
+            printf("  poly2arr short: %d %d %d\n", n, arr[0], arr[1]);
+        }
         {
             static const int bad[] = {5, -3, 0, -1};
 
