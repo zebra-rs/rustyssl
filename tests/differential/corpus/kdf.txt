@@ -143,3 +143,80 @@ knew SSKDF
 kset info=0
 kdup
 kfree
+# SCRYPT (derivations capped at 4 MiB by the probe), SSHKDF, KBKDF, X942KDF-ASN1
+knew SCRYPT
+kderive 16
+kderive 16 pass=8
+kderive 16 salt=4
+kderive 40 n=16 r=1 p=1
+kdup
+kderive 40 n=1024 r=8 p=1
+kderive 40 n=2048 r=8 p=1
+kset n=15
+kset n=1
+kset r=0
+kset p=0
+kset maxmem_bytes=0
+kset properties=provider=nonesuch
+kset properties=provider=default
+kderive 0 n=16
+kctx 1
+kderive 40
+kreset
+kderive 40
+kctx 0
+kpbkdf2 SHA256 1 1 1 1
+knew SSHKDF
+kderive 16
+kderive 16 digest=SHA256
+kderive 16 key=32
+kderive 16 xcghash=32
+kderive 16 session_id=32
+kset type=G
+kset type=AB
+kderive 100 type=C
+kdup
+kderive 41 digest=SHA1 type=F
+kderive 0
+kderive 16 digest=NULL
+kderive 0
+kset key=0
+kdup
+knew KBKDF
+kderive 16
+kderive 16 key=32
+kdup
+kderive 50 mac=KMAC128 salt=5 info=7 key=32
+kderive 100 mac=HMAC digest=SHA256 key=32
+kdup
+kctx 1
+kderive 100
+kctx 0
+kderive 64 r=8 use-l=0 use-separator=0
+kderive 1024
+kset r=12
+kderive 64 mode=FEEDBACK seed=16
+kderive 64 seed=32
+kset mode=co
+kset mode=pipeline
+kderive 40 mac=CMAC cipher=AES-128-CBC key=16
+kderive 40 seed=0
+kset mac=GMAC
+kderive 16 mac=HMAC digest=SHA256
+knew X942KDF-ASN1
+ksize
+kderive 16
+kderive 16 secret=20
+kderive 16 digest=SHA1
+kset cekalg=AES-128-CBC
+kderive 16 cekalg=AES-128-WRAP
+ksize
+kdup
+kderive 100 cekalg=DES3-WRAP ukm=20 partyv-info=1 supp-privinfo=4
+kderive 24 supp-pubinfo=3
+kderive 24 use-keybits=1
+kderive 24 use-keybits=0 acvp-info=3
+kset cekalg=AES-256-WRAP properties=provider=default
+kreset
+kderive 16
+kfree

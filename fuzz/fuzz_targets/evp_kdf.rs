@@ -1,8 +1,9 @@
 //! Fuzzes the default provider's KDFs through the C ABI (`EVP_KDF`), against the KDF backend
 //! of `rustyssl_crypto::kdf` as the oracle: the first octets pick the KDF, the digest, and the
 //! output length, and the rest splits into the key (or password, or secret), salt, and info (or
-//! seed). HKDF (each mode), TLS1-PRF, PBKDF2, SSKDF, and X963KDF must derive what the backend
-//! does; a copy of the context must derive the same again. Nothing may panic or go out of
+//! seed). HKDF (each mode), TLS1-PRF, PBKDF2, SSKDF, X963KDF, scrypt (small costs), SSHKDF,
+//! KBKDF over HMAC (both modes), and X942KDF-ASN1 must derive what the backend does; a copy of
+//! the context must derive the same again. Nothing may panic or go out of
 //! bounds (ASan).
 
 #![no_main]
@@ -101,7 +102,11 @@ fuzz_target!(|input: &[u8]| {
         // SAFETY: no preconditions.
         unsafe { OSSL_PARAM_construct_end() }
     };
-    match which % 7 {
+    let utf8 = |key: &CStr, value: &CStr| {
+        // SAFETY: static keys and strings.
+        unsafe { OSSL_PARAM_construct_utf8_string(key.as_ptr(), value.as_ptr().cast_mut(), 0) }
+    };
+    match which % 12 {
         // HKDF in each mode.
         m @ 0..=2 => {
             let mut mode = c_int::from(m);
@@ -148,6 +153,70 @@ fuzz_target!(|input: &[u8]| {
             let mut want = vec![0u8; len];
             if let Some(got) = got {
                 assert!(kdf::pbkdf2(alg, a, b, iter, &mut want).is_ok());
+                assert_eq!(got, want);
+            }
+        }
+        // scrypt with small costs.
+        7 => {
+            let (mut n, mut r, mut p) = (2u64 << (*l % 6), 1 + u64::from(*d % 4), 1 + u64::from(*l % 3));
+            // SAFETY: static keys; the locals outlive the parameters' use.
+            let costs = unsafe {
+                [
+                    OSSL_PARAM_construct_uint64(c"n".as_ptr(), &raw mut n),
+                    OSSL_PARAM_construct_uint64(c"r".as_ptr(), &raw mut r),
+                    OSSL_PARAM_construct_uint64(c"p".as_ptr(), &raw mut p),
+                ]
+            };
+            let params = [octets(c"pass", a), octets(c"salt", b), costs[0], costs[1], costs[2], end()];
+            let got = derive(c"SCRYPT", &params, len);
+            let mut want = vec![0u8; len];
+            if let Some(got) = got {
+                assert!(kdf::scrypt(a, b, n, r, p, 1 << 30, &mut want).is_ok());
+                assert_eq!(got, want);
+            }
+        }
+        // SSHKDF.
+        8 => {
+            let kind = [c"A", c"B", c"C", c"D", c"E", c"F"][usize::from(*l) % 6];
+            let params = [digest(), octets(c"key", a), octets(c"xcghash", b), octets(c"session_id", c), utf8(c"type", kind), end()];
+            let got = derive(c"SSHKDF", &params, len);
+            let mut want = vec![0u8; len];
+            if let Some(got) = got {
+                let t = kind.to_bytes().first().copied().unwrap_or(b'A');
+                assert!(kdf::sshkdf(alg, a, b, t, c, &mut want).is_ok());
+                assert_eq!(got, want);
+            }
+        }
+        // KBKDF over HMAC, counter or feedback mode.
+        9 | 10 => {
+            let feedback = which % 12 == 10;
+            let mode = if feedback { c"FEEDBACK" } else { c"COUNTER" };
+            let iv: Vec<u8> = if feedback && *l % 2 == 0 { vec![0x5a; size] } else { Vec::new() };
+            let params = [utf8(c"mac", c"HMAC"), digest(), utf8(c"mode", mode), octets(c"key", a), octets(c"salt", b), octets(c"info", c), octets(c"seed", &iv), end()];
+            let got = derive(c"KBKDF", &params, len);
+            let mut want = vec![0u8; len];
+            if let Some(got) = got {
+                let m = rustyssl_crypto::mac::hmac(alg, a).unwrap();
+                let mode = if feedback { kdf::KbkdfMode::Feedback(&iv) } else { kdf::KbkdfMode::Counter };
+                assert!(kdf::kbkdf(&*m, mode, 32, b, c, true, true, &mut want).is_ok());
+                assert_eq!(got, want);
+            }
+        }
+        // X942KDF-ASN1 with AES-128-WRAP's key bits.
+        11 => {
+            let params = [digest(), octets(c"secret", a), utf8(c"cekalg", c"AES-128-WRAP"), octets(c"ukm", b), end()];
+            let got = derive(c"X942KDF-ASN1", &params, len);
+            let mut want = vec![0u8; len];
+            if let Some(got) = got {
+                // id-aes128-wrap (2.16.840.1.101.3.4.1.5).
+                let oid = [0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x05];
+                let info = kdf::X942Info {
+                    cek_oid: &oid,
+                    kek_length: 16,
+                    party_u: (!b.is_empty()).then_some(b),
+                    ..kdf::X942Info::default()
+                };
+                assert!(kdf::x942(alg, a, &info, &mut want).is_ok());
                 assert_eq!(got, want);
             }
         }
