@@ -225,3 +225,9 @@ name = "evp_rand"
 path = "fuzz_targets/evp_rand.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "bn"
+path = "fuzz_targets/bn.rs"
+test = false
+doc = false

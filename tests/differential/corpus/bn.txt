@@ -1,0 +1,189 @@
+# BIGNUM: text, arithmetic, conversions, and random numbers from a known generator.
+bnset 0 0
+bnset 1 -0
+bnshow 1
+bnset 1 123456789ABCDEF0123456789ABCDEF
+bnset 2 -FFFFFFFFFFFFFFFF
+bnset 3 10000000000000000
+bnshow 0
+bnshow 1
+bnshow 2
+bnshow 3
+bntext 0 dec -123456789012345678901234567890xyz
+bntext 0 dec 0000000000000000000000000000000000000042
+bntext 0 hex -fF00zz
+bntext 0 asc 0x10
+bntext 0 asc -0X10
+bntext 0 asc --7
+bntext 0 asc -0x-7
+bntext 0 asc x
+bntext 0 dec -
+bntext 0 hex -
+bnop add 0 1 2
+bnop sub 0 1 2
+bnop uadd 0 1 2
+bnop usub 0 1 2
+bnop usub 0 2 1
+bnop usub 0 2 3
+bnop usub 0 3 2
+bnop mul 0 1 2
+bnop sqr 0 2 0
+bnop nnmod 0 1 2
+bnop nnmod 0 2 1
+bnop nnmod 1 2 1
+bnop nnmod 2 2 1
+bnop cmp 0 1 2
+bnop cmp 0 2 3
+bnop cmp 0 3 1
+bnop cmp 0 1 1
+bndiv 0 - 1 2
+bndiv - 0 1 2
+bndiv 0 0 1 2
+bndiv 0 1 1 2
+bndiv - - 1 2
+bnset 3 0
+bndiv 0 1 1 3
+bnop nnmod 0 1 3
+bnset 3 3
+bnop exp 0 2 3
+bnset 3 -3
+bnop exp 0 2 3
+bnset 3 FFFFF
+bnop exp 0 2 3
+bnflag 3
+bnop exp 0 2 3
+bnop cmp 0 3 1
+bnop swap 0 3 2
+bnop cmp 0 3 1
+bnshift lshift 0 1 67
+bnshift lshift 0 1 -1
+bnshift rshift 0 1 200
+bnshift rshift 0 1 -5
+bnshift lshift1 0 2 0
+bnshift rshift1 0 2 0
+bnshift rshift 0 0 0
+bnword add 2 18446744073709551615
+bnword sub 2 1
+bnword mul 2 4294967297
+bnword div 2 7
+bnword div 2 0
+bnword mod 2 0
+bnword mod 2 1000000007
+bnset 0 0
+bnword sub 0 5
+bnword add 0 5
+bnword mul 1 0
+bnbit set 0 130
+bnbit isset 0 130
+bnbit isset 0 -1
+bnbit clear 0 200
+bnbit clear 0 130
+bnset 0 -FFFFFFFFFFFFFFFFFF
+bnbit mask 0 128
+bnbit mask 0 70
+bnbit mask 0 64
+bnbit mask 0 0
+bnbit set 0 -1
+# Octets.
+bnset 0 -81
+bnto 0 bin 0
+bnto 0 sbin -1
+bnto 0 sbin 1
+bnto 0 sbin 2
+bnto 0 slebin 3
+bnto 0 snative 4
+bnto 0 binpad 3
+bnto 0 lebin 3
+bnto 0 native 0
+bnto 0 mpi 0
+bnset 0 -80
+bnto 0 sbin -1
+bnto 0 sbin 1
+bnset 0 80
+bnto 0 sbin -1
+bnto 0 sbin 1
+bnto 0 mpi 0
+bnset 0 0
+bnto 0 sbin -1
+bnto 0 binpad 0
+bnto 0 mpi 0
+bnfrom 0 sbin ff7f
+bnfrom 0 sbin ffffff
+bnfrom 0 sbin 80
+bnfrom 0 sbin 0080
+bnfrom 0 slebin 7fff
+bnfrom 0 snative 80ff
+bnfrom 0 bin 000102
+bnfrom 0 lebin 000102
+bnfrom 0 native 000102
+bnfrom 0 bin -
+bnfrom 0 mpi 0000000280ff
+bnfrom 0 mpi 0000000180
+bnfrom 0 mpi 00000002ff
+bnfrom 0 mpi 800000
+bnfrom 0 mpi -
+bnfrom 0 mpi 00000000
+# ASN.1 and parameters.
+bnset 0 -0102030405060708090A
+bnasn1 0
+bnset 0 1234
+bnasn1 0
+bnset 0 -80
+bnasn1 0
+bnset 0 0
+bnasn1 0
+bnset 0 FFFFFFFFFFFFFFFFFF
+bnasn1 0
+bnset 0 -0102
+bnparam 0 u 16
+bnparam 0 s 16
+bnparam 0 s 2
+bnparam 0 s 0
+bnset 0 -8081
+bnparam 0 s 3
+bnset 0 0
+bnparam 0 u 1
+bnparam 0 s 1
+bnparam 0 u 0
+# Random numbers from a known generator.
+rctx 0
+rnew TEST-RAND
+rset strength=256 test_entropy=64 test_nonce=32
+rinst 0 0
+rctx 1
+rnew HASH-DRBG child
+rset digest=SHA256
+rinst 0 0
+rsetpub
+rsetpriv
+bnrand 0 1 -1 0 0
+bnrand 0 1 0 1 0
+bnrand 0 1 1 0 0
+bnrand 0 2 1 0 0
+bnrand 0 9 1 1 1
+bnrand 0 64 0 0 0
+bnrand 0 65 -1 1 2
+bnrand 0 0 -1 0 0
+bnrand 0 0 0 0 0
+bnrand 0 -1 -1 0 0
+bnrand 0 200 1 1 2
+bnset 1 1000000000000000
+bnrange 0 1 0
+bnrange 0 1 1
+bnset 1 1FFFFFFFFFFFFFFF
+bnrange 0 1 0
+bnset 1 1
+bnrange 0 1 0
+bnset 1 0
+bnrange 0 1 0
+bnset 1 -5
+bnrange 0 1 1
+rreset
+bnrand 0 100 0 0 0
+bnset 1 FFFFFFFFFF
+bnrange 0 1 1
+rctx 0
+rfree
+rctx 1
+rfree
+rctx 0
