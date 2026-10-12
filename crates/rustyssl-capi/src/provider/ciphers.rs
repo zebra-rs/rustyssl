@@ -30,7 +30,7 @@ use rustyssl_abi::{
     OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
     OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
     OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
-    OSSL_FUNC_CIPHER_UPDATE, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_PTR,
+    OSSL_FUNC_CIPHER_UPDATE, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_PTR,
     OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, PROV_R_BAD_DECRYPT,
     PROV_R_CIPHER_OPERATION_FAILED, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_FAILED_TO_GET_PARAMETER,
     PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_AAD, PROV_R_INVALID_DATA,
@@ -59,6 +59,8 @@ use crate::params::{
 pub(crate) struct AlgCtx {
     pub(crate) core: Ctx,
     pub(crate) tlsmac: *const u8,
+    /// The context the provider was loaded into, whose generators give random keys and IVs.
+    pub(crate) libctx: *mut OSSL_LIB_CTX,
 }
 
 /// The algorithm context behind `vctx`, or `None` for NULL.
@@ -80,11 +82,23 @@ pub(crate) unsafe fn is_empty(params: *const OSSL_PARAM) -> bool {
     unsafe { params.as_ref() }.is_none_or(|p| p.key.is_null())
 }
 
-/// `newctx` for `kind`.
-pub(crate) fn new_context(kind: Kind) -> *mut c_void {
+/// `newctx` for `kind`, drawing random IVs from the provider's context's generators.
+///
+/// # Safety
+/// `provctx` is NULL or the provider's context.
+pub(crate) unsafe fn new_context(kind: Kind, provctx: *mut c_void) -> *mut c_void {
+    let libctx = if provctx.is_null() {
+        ptr::null_mut()
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { super::builtin::libctx_of(provctx) }
+    };
+    let mut core = Ctx::new(kind);
+    core.set_random(crate::rand_lib::random_source(libctx, false));
     Box::into_raw(Box::new(AlgCtx {
-        core: Ctx::new(kind),
+        core,
         tlsmac: ptr::null(),
+        libctx,
     }))
     .cast()
 }
@@ -229,7 +243,7 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return ptr::null_mut() };
-        Box::into_raw(Box::new(AlgCtx { core: ctx.core.clone(), tlsmac: ctx.tlsmac })).cast()
+        Box::into_raw(Box::new(AlgCtx { core: ctx.core.clone(), tlsmac: ctx.tlsmac, libctx: ctx.libctx })).cast()
     }
 }
 
@@ -242,7 +256,8 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn null_dupctx(_vctx: *mut c_void) -> *mut c_void
     where failure = ptr::null_mut(), library = ERR_LIB_PROV
     {
-        new_context(Kind::Null)
+        // SAFETY: no provider context, which the NULL cipher has no use for.
+        unsafe { new_context(Kind::Null, ptr::null_mut()) }
     }
 }
 
@@ -665,7 +680,7 @@ ffi_callback! {
         const F: &str = "ossl_cipher_generic_get_ctx_params";
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
-        let tlsmac = ctx.tlsmac;
+        let (tlsmac, libctx) = (ctx.tlsmac, ctx.libctx);
         let Some(g) = ctx.core.generic_mut() else { return 0 };
         let (ivlen, pad, num, keylen, macsize) =
             (g.iv_len(), g.padding(), g.num(), g.key_len(), g.tls_mac_size());
@@ -718,8 +733,8 @@ ffi_callback! {
         } else {
             // SAFETY: the caller's guarantee: room for the key.
             let key = unsafe { core::slice::from_raw_parts_mut(p.data.cast::<u8>(), n) };
-            // From the operating system until the private generator of 3.7.
-            g.random_key(key, |k| rustyssl_crypto::rand::os_entropy(k).is_ok())
+            // `RAND_priv_bytes_ex` of the provider's context, as the reference's.
+            g.random_key(key, |k| crate::rand_lib::random_source(libctx, true)(k))
         };
         if result.is_err() {
             err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GENERATE_KEY, "ossl_tdes_get_ctx_params");
@@ -1100,10 +1115,11 @@ macro_rules! cipher {
                 ///
                 /// # Safety
                 /// No preconditions.
-                pub(crate) unsafe extern "C" fn newctx(_provctx: *mut c_void) -> *mut c_void
+                pub(crate) unsafe extern "C" fn newctx(provctx: *mut c_void) -> *mut c_void
                 where failure = ptr::null_mut(), library = ERR_LIB_PROV
                 {
-                    new_context($kind)
+                    // SAFETY: the provider's context.
+                    unsafe { new_context($kind, provctx) }
                 }
             }
 

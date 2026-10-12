@@ -71,6 +71,19 @@ fn new_context(a: Aead) -> *mut c_void {
     Box::into_raw(Box::new(a)).cast()
 }
 
+/// `newctx`: GCM drawing its random IVs from the provider's context's generators.
+///
+/// # Safety
+/// `provctx` is the provider's context.
+unsafe fn new_provided(mut a: Aead, provctx: *mut c_void) -> *mut c_void {
+    if let Aead::Gcm(g) = &mut a {
+        // SAFETY: the caller's guarantee.
+        let libctx = unsafe { super::builtin::libctx_of(provctx) };
+        g.set_random(crate::rand_lib::random_source(libctx, false));
+    }
+    new_context(a)
+}
+
 /// Raises what a provider function raised.
 #[track_caller]
 fn raise_all(r: Raised, function: &str) {
@@ -1350,10 +1363,11 @@ macro_rules! aead {
                 ///
                 /// # Safety
                 /// No preconditions.
-                pub(crate) unsafe extern "C" fn newctx(_provctx: *mut c_void) -> *mut c_void
+                pub(crate) unsafe extern "C" fn newctx(provctx: *mut c_void) -> *mut c_void
                 where failure = ptr::null_mut(), library = ERR_LIB_PROV
                 {
-                    new_context($make)
+                    // SAFETY: the provider's context.
+                    unsafe { new_provided($make, provctx) }
                 }
             }
 

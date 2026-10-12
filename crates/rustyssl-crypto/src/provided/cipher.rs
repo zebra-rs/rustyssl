@@ -451,6 +451,8 @@ pub struct Generic {
     hmac: Option<Box<composite::Hmac>>,
     cipher: Option<Box<dyn BlockCipher>>,
     chacha: Option<ChaCha>,
+    /// Where DES3 key wrap's random IVs come from (the operating system without one).
+    rng: Option<crate::rand::Random>,
 }
 
 impl Clone for Generic {
@@ -479,6 +481,7 @@ impl Clone for Generic {
             hmac: self.hmac.clone(),
             cipher: self.cipher.as_ref().map(|c| c.clone_box()),
             chacha: self.chacha.clone(),
+            rng: self.rng.clone(),
         }
     }
 }
@@ -546,7 +549,16 @@ impl Ctx {
                 .then(|| Box::new(composite::Hmac::new(kind.composite_sha256()))),
             cipher: None,
             chacha: (kind == Kind::ChaCha20).then(ChaCha::new),
+            rng: None,
         }))
+    }
+
+    /// Draws DES3 key wrap's random IVs from `rng` (the library's generators, as the
+    /// reference's `RAND_bytes_ex` with the context's library context).
+    pub fn set_random(&mut self, rng: crate::rand::Random) {
+        if let Self::Generic(g) = self {
+            g.rng = Some(rng);
+        }
     }
 
     /// The cipher.

@@ -619,3 +619,15 @@ impl Drbg for HmacDrbg {
 pub fn os_entropy(out: &mut [u8]) -> Result<(), Error> {
     getrandom::fill(out).map_err(|_| Error::Entropy)
 }
+
+/// A source of random octets a context draws on (the library's generators, `RAND_bytes_ex`,
+/// in the C layer): fills its argument, false if it can't.
+pub type Random = std::sync::Arc<dyn Fn(&mut [u8]) -> bool + Send + Sync>;
+
+/// Fills `out` from `source`, or from the operating system without one.
+pub fn fill(source: Option<&Random>, out: &mut [u8]) -> bool {
+    match source {
+        Some(r) => r(out),
+        None => os_entropy(out).is_ok(),
+    }
+}

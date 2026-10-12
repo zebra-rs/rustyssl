@@ -395,7 +395,7 @@ impl Generic {
             .ok_or(Error::Internal)?
             .copy_from_slice(digest.get(..8).ok_or(Error::Internal)?);
         let mut iv = [0u8; 8];
-        if crate::rand::os_entropy(&mut iv).is_err() {
+        if !crate::rand::fill(self.rng.as_ref(), &mut iv) {
             return Err(Error::Silent);
         }
         self.iv
