@@ -53,6 +53,7 @@ mod kdfs_more;
 pub(crate) mod macs;
 pub(crate) mod modes;
 mod module;
+pub(crate) mod rands;
 pub(crate) mod tables;
 pub(crate) mod upcalls;
 

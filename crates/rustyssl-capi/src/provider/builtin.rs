@@ -14,8 +14,8 @@ use rustyssl_abi::{
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX, OSSL_OP_CIPHER,
-    OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_MAC, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
-    OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
+    OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_PARAM, OSSL_PARAM_INTEGER,
+    OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
     OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
 };
 
@@ -159,7 +159,27 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `base_query` and `null_query` until their algorithms arrive: none, cacheable.
+    /// `base_query`: the base provider's seed source for `OSSL_OP_RAND` (its encoders and
+    /// decoders come with their steps), cacheable.
+    ///
+    /// # Safety
+    /// `no_cache` is NULL or valid for a write.
+    pub(crate) unsafe extern "C" fn base_query(_provctx: *mut c_void, operation_id: c_int, no_cache: *mut c_int) -> *const OSSL_ALGORITHM
+    where failure = ptr::null(), library = ERR_LIB_CRYPTO
+    {
+        if !no_cache.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { no_cache.write(0) };
+        }
+        match operation_id {
+            OSSL_OP_RAND => super::rands::base_rands(),
+            _ => ptr::null(),
+        }
+    }
+}
+
+ffi_callback! {
+    /// `null_query`: none, cacheable.
     ///
     /// # Safety
     /// `no_cache` is NULL or valid for a write.
@@ -192,6 +212,7 @@ ffi_callback! {
             OSSL_OP_CIPHER => super::ciphers::default_ciphers(),
             OSSL_OP_MAC => super::macs::default_macs(),
             OSSL_OP_KDF => super::kdfs::default_kdfs(),
+            OSSL_OP_RAND => super::rands::default_rands(),
             _ => ptr::null(),
         }
     }
@@ -258,7 +279,7 @@ static BASE_DISPATCH: [OSSL_DISPATCH; 5] = [
         Gettable_
     ),
     entry!(OSSL_FUNC_PROVIDER_GET_PARAMS, base_get_params, GetParamsFn),
-    entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, query_operation, QueryFn),
+    entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, base_query, QueryFn),
     END,
 ];
 

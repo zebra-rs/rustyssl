@@ -13,26 +13,26 @@ use core::ptr;
 use std::ffi::CString;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, ERR_R_EVP_LIB, EVP_CIPHER, EVP_CIPHER_CTX, EVP_MAC, EVP_MAC_CTX,
-    EVP_MAX_BLOCK_LENGTH, EVP_MAX_KEY_LENGTH, EVP_MD, NID_des_ede3_cbc, OSSL_ALG_PARAM_DIGEST,
-    OSSL_FUNC_KDF_DERIVE, OSSL_FUNC_KDF_DUPCTX, OSSL_FUNC_KDF_FREECTX,
-    OSSL_FUNC_KDF_GET_CTX_PARAMS, OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, OSSL_FUNC_KDF_NEWCTX,
-    OSSL_FUNC_KDF_RESET, OSSL_FUNC_KDF_SET_CTX_PARAMS, OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
-    OSSL_KDF_PARAM_ARGON2_AD, OSSL_KDF_PARAM_ARGON2_LANES, OSSL_KDF_PARAM_ARGON2_MEMCOST,
-    OSSL_KDF_PARAM_ARGON2_VERSION, OSSL_KDF_PARAM_CIPHER, OSSL_KDF_PARAM_CONSTANT,
-    OSSL_KDF_PARAM_DIGEST, OSSL_KDF_PARAM_EARLY_CLEAN, OSSL_KDF_PARAM_HMACDRBG_ENTROPY,
-    OSSL_KDF_PARAM_HMACDRBG_NONCE, OSSL_KDF_PARAM_ITER, OSSL_KDF_PARAM_KEY, OSSL_KDF_PARAM_MAC,
-    OSSL_KDF_PARAM_PASSWORD, OSSL_KDF_PARAM_PKCS12_ID, OSSL_KDF_PARAM_PROPERTIES,
-    OSSL_KDF_PARAM_SALT, OSSL_KDF_PARAM_SECRET, OSSL_KDF_PARAM_SIZE, OSSL_KDF_PARAM_THREADS,
-    OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING,
-    OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING, PROV_R_FAILED_TO_GENERATE_KEY,
-    PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_CONSTANT_LENGTH, PROV_R_INVALID_DIGEST_SIZE,
-    PROV_R_INVALID_ITERATION_COUNT, PROV_R_INVALID_MEMORY_SIZE, PROV_R_INVALID_MODE,
-    PROV_R_INVALID_OUTPUT_LENGTH, PROV_R_INVALID_SALT_LENGTH, PROV_R_INVALID_THREAD_POOL_SIZE,
-    PROV_R_MISSING_CIPHER, PROV_R_MISSING_CONSTANT, PROV_R_MISSING_KEY, PROV_R_MISSING_MAC,
-    PROV_R_MISSING_MESSAGE_DIGEST, PROV_R_MISSING_PASS, PROV_R_MISSING_SALT,
-    PROV_R_OUTPUT_BUFFER_TOO_SMALL, PROV_R_WRONG_FINAL_BLOCK_LENGTH,
-    PROV_R_WRONG_OUTPUT_BUFFER_SIZE, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
+    ERR_LIB_PROV, ERR_R_EVP_LIB, EVP_CIPHER, EVP_CIPHER_CTX, EVP_MAC, EVP_MAX_BLOCK_LENGTH,
+    EVP_MAX_KEY_LENGTH, EVP_MD, NID_des_ede3_cbc, OSSL_ALG_PARAM_DIGEST, OSSL_FUNC_KDF_DERIVE,
+    OSSL_FUNC_KDF_DUPCTX, OSSL_FUNC_KDF_FREECTX, OSSL_FUNC_KDF_GET_CTX_PARAMS,
+    OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, OSSL_FUNC_KDF_NEWCTX, OSSL_FUNC_KDF_RESET,
+    OSSL_FUNC_KDF_SET_CTX_PARAMS, OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, OSSL_KDF_PARAM_ARGON2_AD,
+    OSSL_KDF_PARAM_ARGON2_LANES, OSSL_KDF_PARAM_ARGON2_MEMCOST, OSSL_KDF_PARAM_ARGON2_VERSION,
+    OSSL_KDF_PARAM_CIPHER, OSSL_KDF_PARAM_CONSTANT, OSSL_KDF_PARAM_DIGEST,
+    OSSL_KDF_PARAM_EARLY_CLEAN, OSSL_KDF_PARAM_HMACDRBG_ENTROPY, OSSL_KDF_PARAM_HMACDRBG_NONCE,
+    OSSL_KDF_PARAM_ITER, OSSL_KDF_PARAM_KEY, OSSL_KDF_PARAM_MAC, OSSL_KDF_PARAM_PASSWORD,
+    OSSL_KDF_PARAM_PKCS12_ID, OSSL_KDF_PARAM_PROPERTIES, OSSL_KDF_PARAM_SALT,
+    OSSL_KDF_PARAM_SECRET, OSSL_KDF_PARAM_SIZE, OSSL_KDF_PARAM_THREADS, OSSL_LIB_CTX, OSSL_PARAM,
+    OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER,
+    OSSL_PARAM_UTF8_STRING, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_FAILED_TO_SET_PARAMETER,
+    PROV_R_INVALID_CONSTANT_LENGTH, PROV_R_INVALID_DIGEST_SIZE, PROV_R_INVALID_ITERATION_COUNT,
+    PROV_R_INVALID_MEMORY_SIZE, PROV_R_INVALID_MODE, PROV_R_INVALID_OUTPUT_LENGTH,
+    PROV_R_INVALID_SALT_LENGTH, PROV_R_INVALID_THREAD_POOL_SIZE, PROV_R_MISSING_CIPHER,
+    PROV_R_MISSING_CONSTANT, PROV_R_MISSING_KEY, PROV_R_MISSING_MAC, PROV_R_MISSING_MESSAGE_DIGEST,
+    PROV_R_MISSING_PASS, PROV_R_MISSING_SALT, PROV_R_OUTPUT_BUFFER_TOO_SMALL,
+    PROV_R_WRONG_FINAL_BLOCK_LENGTH, PROV_R_WRONG_OUTPUT_BUFFER_SIZE,
+    PROV_R_XOF_DIGESTS_NOT_ALLOWED,
 };
 use rustyssl_crypto::kdf;
 
@@ -42,7 +42,8 @@ use super::kdfs::{
     Secret, SetCtxParamsFn, get_octets, macctx_load, md_size, memdup, raise, set_membuf,
     size_only_gettable, size_or_unasked_get_ctx_params, utf8,
 };
-use super::macs::{Prov, boxed, context, is_empty, locate, unbox, wipe};
+use super::macs::{Prov, boxed, context, is_empty, locate, unbox};
+use super::rands::HmacState;
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::err;
 use crate::evp::cipher::{EVP_CIPHER_get_key_length, EVP_CIPHER_get_nid};
@@ -55,8 +56,7 @@ use crate::evp::digest::{
     EVP_MD_fetch, EVP_MD_free, EVP_MD_get_block_size, EVP_MD_get_size, EVP_MD_get0_name,
 };
 use crate::evp::mac::{
-    EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_get0_mac, EVP_MAC_fetch, EVP_MAC_final,
-    EVP_MAC_free, EVP_MAC_get0_name, EVP_MAC_init, EVP_MAC_update,
+    EVP_MAC_CTX_dup, EVP_MAC_CTX_get0_mac, EVP_MAC_fetch, EVP_MAC_free, EVP_MAC_get0_name,
 };
 use crate::evp::md_ctx::{
     EVP_DigestFinal_ex, EVP_DigestInit_ex, EVP_DigestUpdate, EVP_MD_CTX_free, EVP_MD_CTX_new,
@@ -797,15 +797,11 @@ pub(super) static KRB5_FUNCTIONS: Dispatch<10> = Dispatch([
 // -------------------------------------------------------------------------------------------
 // HMAC-DRBG-KDF
 
-/// `KDF_HMAC_DRBG` with its `PROV_DRBG_HMAC`: the HMAC context, digest, K and V (of
-/// `blocklen` octets), the entropy and nonce, and whether it's instantiated.
+/// `KDF_HMAC_DRBG`: the DRBG's `PROV_DRBG_HMAC` (the HMAC context, digest, K and V), the
+/// entropy and nonce, and whether it's instantiated.
 struct HmacDrbg {
     provctx: Ptr,
-    ctx: *mut EVP_MAC_CTX,
-    digest: Prov<EVP_MD>,
-    k: [u8; MAX_MD],
-    v: [u8; MAX_MD],
-    blocklen: usize,
+    s: HmacState,
     entropy: Option<Secret>,
     nonce: Option<Secret>,
     init: bool,
@@ -815,135 +811,11 @@ impl HmacDrbg {
     fn new(provctx: Ptr) -> Self {
         Self {
             provctx,
-            ctx: ptr::null_mut(),
-            digest: Prov::NONE,
-            k: [0; MAX_MD],
-            v: [0; MAX_MD],
-            blocklen: 0,
+            s: HmacState::new(),
             entropy: None,
             nonce: None,
             init: false,
         }
-    }
-
-    /// `do_hmac`: K = HMAC(K, V || inbyte || inputs), then V = HMAC(K, V).
-    ///
-    /// # Safety
-    /// The context is live.
-    unsafe fn do_hmac(&mut self, inbyte: u8, inputs: &[&[u8]]) -> bool {
-        let n = self.blocklen.min(MAX_MD);
-        let byte = [inbyte];
-        // SAFETY: the context; K and V of at least `n` octets.
-        let mut ok = unsafe { EVP_MAC_init(self.ctx, self.k.as_ptr(), n, ptr::null()) } != 0
-            // SAFETY: as above.
-            && unsafe { EVP_MAC_update(self.ctx, self.v.as_ptr(), n) } != 0
-            // SAFETY: as above; one octet.
-            && unsafe { EVP_MAC_update(self.ctx, byte.as_ptr(), 1) } != 0;
-        for input in inputs.iter().filter(|i| !i.is_empty()) {
-            // SAFETY: as above; the input's octets.
-            ok = ok && unsafe { EVP_MAC_update(self.ctx, input.as_ptr(), input.len()) } != 0;
-        }
-        // SAFETY: as above; room for any digest.
-        ok = ok
-            && unsafe { EVP_MAC_final(self.ctx, self.k.as_mut_ptr(), ptr::null_mut(), MAX_MD) }
-                != 0;
-        // SAFETY: as above.
-        ok && unsafe { EVP_MAC_init(self.ctx, self.k.as_ptr(), n, ptr::null()) } != 0
-            // SAFETY: as above.
-            && unsafe { EVP_MAC_update(self.ctx, self.v.as_ptr(), n) } != 0
-            // SAFETY: as above.
-            && unsafe { EVP_MAC_final(self.ctx, self.v.as_mut_ptr(), ptr::null_mut(), MAX_MD) } != 0
-    }
-
-    /// `drbg_hmac_update`: one round of `do_hmac` with 0, and another with 1 if there's input.
-    ///
-    /// # Safety
-    /// The context is live.
-    unsafe fn update(&mut self, inputs: &[&[u8]]) -> bool {
-        // SAFETY: the caller's guarantee.
-        if !unsafe { self.do_hmac(0, inputs) } {
-            return false;
-        }
-        if inputs.iter().all(|i| i.is_empty()) {
-            return true;
-        }
-        // SAFETY: as above.
-        unsafe { self.do_hmac(1, inputs) }
-    }
-
-    /// `ossl_drbg_hmac_init` with no personalization string.
-    fn instantiate(&mut self, entropy: &[u8], nonce: &[u8]) -> bool {
-        if self.ctx.is_null() {
-            raise(PROV_R_MISSING_MAC, "ossl_drbg_hmac_init");
-            return false;
-        }
-        let n = self.blocklen.min(MAX_MD);
-        self.k.iter_mut().take(n).for_each(|b| *b = 0);
-        self.v.iter_mut().take(n).for_each(|b| *b = 1);
-        // SAFETY: the live context.
-        unsafe { self.update(&[entropy, nonce]) }
-    }
-
-    /// `ossl_drbg_hmac_generate` with no additional input: V = HMAC(K, V) blocks, the ones
-    /// before the last chained through the output (V itself only takes the last).
-    fn generate(&mut self, out: &mut [u8]) -> bool {
-        if self.ctx.is_null() {
-            return false;
-        }
-        let n = self.blocklen.min(MAX_MD);
-        let mut pos = 0usize;
-        let mut prev: Option<usize> = None;
-        loop {
-            let temp = match prev {
-                Some(at) => out.get(at..at + n).map_or(ptr::null(), <[u8]>::as_ptr),
-                None => self.v.as_ptr(),
-            };
-            // SAFETY: the live context; K of `n` octets; `temp` of `n` octets (V, or the
-            // output block before).
-            if unsafe { EVP_MAC_init(self.ctx, self.k.as_ptr(), n, ptr::null()) } == 0
-                || temp.is_null()
-                // SAFETY: as above.
-                || unsafe { EVP_MAC_update(self.ctx, temp, n) } == 0
-            {
-                return false;
-            }
-            let rest = out.len() - pos;
-            if rest > n {
-                let Some(dst) = out.get_mut(pos..) else {
-                    return false;
-                };
-                // SAFETY: as above; room for `rest` octets, more than a block.
-                if unsafe { EVP_MAC_final(self.ctx, dst.as_mut_ptr(), ptr::null_mut(), rest) } == 0
-                {
-                    return false;
-                }
-                prev = Some(pos);
-            } else {
-                // SAFETY: as above; room for any digest.
-                if unsafe { EVP_MAC_final(self.ctx, self.v.as_mut_ptr(), ptr::null_mut(), MAX_MD) }
-                    == 0
-                {
-                    return false;
-                }
-                let (Some(dst), Some(src)) = (out.get_mut(pos..), self.v.get(..rest)) else {
-                    return false;
-                };
-                dst.copy_from_slice(src);
-                break;
-            }
-            pos += n;
-        }
-        // SAFETY: the live context.
-        unsafe { self.update(&[]) }
-    }
-}
-
-impl Drop for HmacDrbg {
-    fn drop(&mut self) {
-        // SAFETY: the context this owns, or NULL.
-        unsafe { EVP_MAC_CTX_free(self.ctx) };
-        wipe(&mut self.k);
-        wipe(&mut self.v);
     }
 }
 
@@ -998,16 +870,16 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(src) = (unsafe { context::<HmacDrbg>(vctx) }) else { return ptr::null_mut() };
         let mut dst = HmacDrbg::new(src.provctx);
-        if !src.ctx.is_null() {
+        if !src.s.ctx.is_null() {
             // SAFETY: the source's live context.
-            dst.ctx = unsafe { EVP_MAC_CTX_dup(src.ctx) };
-            if dst.ctx.is_null() {
+            dst.s.ctx = unsafe { EVP_MAC_CTX_dup(src.s.ctx) };
+            if dst.s.ctx.is_null() {
                 return ptr::null_mut();
             }
         }
-        let Some(digest) = src.digest.copy() else { return ptr::null_mut() };
-        dst.digest = digest;
-        (dst.k, dst.v, dst.blocklen) = (src.k, src.v, src.blocklen);
+        let Some(digest) = src.s.digest.copy() else { return ptr::null_mut() };
+        dst.s.digest = digest;
+        (dst.s.k, dst.s.v, dst.s.blocklen) = (src.s.k, src.s.v, src.s.blocklen);
         let (Some(entropy), Some(nonce)) = (memdup(&src.entropy), memdup(&src.nonce)) else {
             return ptr::null_mut();
         };
@@ -1047,10 +919,10 @@ ffi_callback! {
         // SAFETY: the context's provider.
         let libctx = unsafe { libctx_of(c.provctx.0) };
         // SAFETY: the caller's array.
-        if !unsafe { c.digest.load(params, OSSL_ALG_PARAM_DIGEST, libctx) } {
+        if !unsafe { c.s.digest.load(params, OSSL_ALG_PARAM_DIGEST, libctx) } {
             return 0;
         }
-        let md = c.digest.method;
+        let md = c.s.digest.method;
         if !md.is_null() {
             // SAFETY: the digest just fetched.
             if unsafe { EVP_MD_xof(md) } != 0 {
@@ -1059,10 +931,10 @@ ffi_callback! {
             }
             // SAFETY: as above.
             let Some(size) = (unsafe { md_size(md) }) else { return 0 };
-            c.blocklen = size;
+            c.s.blocklen = size;
         }
         // SAFETY: the context's MAC context; the caller's array; a static name.
-        c_int::from(unsafe { macctx_load(&mut c.ctx, params, c"HMAC".as_ptr(), ptr::null(), ptr::null(), libctx) })
+        c_int::from(unsafe { macctx_load(&mut c.s.ctx, params, c"HMAC".as_ptr(), ptr::null(), ptr::null(), libctx) })
     }
 }
 
@@ -1084,14 +956,14 @@ ffi_callback! {
         let Some(c) = (unsafe { context::<HmacDrbg>(vctx) }) else { return 0 };
         if !c.init {
             let (entropy, nonce) = (Secret(bytes(c.entropy.as_ref()).to_vec()), Secret(bytes(c.nonce.as_ref()).to_vec()));
-            if entropy.len() == 0 || nonce.len() == 0 || !c.instantiate(&entropy.0, &nonce.0) {
+            if entropy.len() == 0 || nonce.len() == 0 || !c.s.init(&entropy.0, &nonce.0, &[]) {
                 return 0;
             }
             c.init = true;
         }
         // SAFETY: the caller's room.
         let Some(out) = (unsafe { out_slice(key, keylen) }) else { return 0 };
-        c_int::from(c.generate(out))
+        c_int::from(c.s.generate(out, &[]))
     }
 }
 
@@ -1109,11 +981,11 @@ ffi_callback! {
         // SAFETY: as above.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_MAC.as_ptr()) };
         if !p.is_null() {
-            if c.ctx.is_null() {
+            if c.s.ctx.is_null() {
                 return 0;
             }
             // SAFETY: the live context.
-            let mac = unsafe { EVP_MAC_CTX_get0_mac(c.ctx) };
+            let mac = unsafe { EVP_MAC_CTX_get0_mac(c.s.ctx) };
             // SAFETY: its method.
             let name = unsafe { EVP_MAC_get0_name(mac) };
             // SAFETY: a parameter of the caller's array; the method's name.
@@ -1124,7 +996,7 @@ ffi_callback! {
         // SAFETY: as above.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_DIGEST.as_ptr()) };
         if !p.is_null() {
-            let md = c.digest.method;
+            let md = c.s.digest.method;
             if md.is_null() {
                 return 0;
             }
