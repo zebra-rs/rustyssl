@@ -10,6 +10,8 @@
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
 #define _POSIX_C_SOURCE 200809L
+/* mkdtemp, which macOS declares only with its own extensions. */
+#define _DARWIN_C_SOURCE
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <pthread.h>
