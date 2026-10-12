@@ -382,8 +382,13 @@ unsafe fn write_bio_internal(
                 (kstr, klen)
             };
             let n = usize::try_from(ivlen).unwrap_or(0);
-            // The salt and IV (until the library's generators, 3.7).
-            if rustyssl_crypto::rand::os_entropy(iv.get_mut(..n).unwrap_or_default()).is_err() {
+            // The salt and IV, from `RAND_bytes`.
+            let iv_part = iv.get_mut(..n).unwrap_or_default();
+            // SAFETY: room for the IV's octets.
+            if unsafe {
+                crate::rand_lib::RAND_bytes(iv_part.as_mut_ptr(), c_int::try_from(n).unwrap_or(0))
+            } <= 0
+            {
                 break 'out;
             }
             // SAFETY: no preconditions.

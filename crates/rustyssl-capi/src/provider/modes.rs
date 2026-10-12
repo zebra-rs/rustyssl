@@ -171,10 +171,11 @@ macro_rules! cipher_mod {
                 ///
                 /// # Safety
                 /// No preconditions.
-                pub(crate) unsafe extern "C" fn newctx(_provctx: *mut c_void) -> *mut c_void
+                pub(crate) unsafe extern "C" fn newctx(provctx: *mut c_void) -> *mut c_void
                 where failure = ptr::null_mut(), library = ERR_LIB_PROV
                 {
-                    new_context($kind)
+                    // SAFETY: the provider's context.
+                    unsafe { new_context($kind, provctx) }
                 }
             }
 

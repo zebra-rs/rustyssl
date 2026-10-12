@@ -122,11 +122,6 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     d == 0
 }
 
-/// Random octets from the operating system (until the library's generators, 3.7).
-fn random(out: &mut [u8]) -> bool {
-    crate::rand::os_entropy(out).is_ok()
-}
-
 /// `IV_STATE_*`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IvState {
@@ -365,6 +360,8 @@ pub struct Gcm {
     buf: Zeroizing<[u8; 16]>,
     key: Option<Key>,
     gcm: Option<Gcm128>,
+    /// Where random IVs come from (the operating system without one).
+    rng: Option<crate::rand::Random>,
 }
 
 impl Gcm {
@@ -387,7 +384,14 @@ impl Gcm {
             buf: Zeroizing::new([0; 16]),
             key: None,
             gcm: None,
+            rng: None,
         }
+    }
+
+    /// Draws random IVs from `rng` (the library's generators, as the reference's
+    /// `RAND_bytes_ex` with the context's library context).
+    pub fn set_random(&mut self, rng: crate::rand::Random) {
+        self.rng = Some(rng);
     }
 
     /// `gcm_init` before the parameters.
@@ -437,7 +441,7 @@ impl Gcm {
         let Some(r) = self.iv.get_mut(offset..self.ivlen) else {
             return false;
         };
-        if !random(r) {
+        if !crate::rand::fill(self.rng.as_ref(), r) {
             return false;
         }
         self.iv_state = IvState::Buffered;
@@ -612,7 +616,7 @@ impl Gcm {
             let Some(r) = self.iv.get_mut(len..self.ivlen) else {
                 return Err(Error::Silent);
             };
-            if !random(r) {
+            if !crate::rand::fill(self.rng.as_ref(), r) {
                 return Err(Error::Silent);
             }
             self.iv_gen_rand = true;

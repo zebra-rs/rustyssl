@@ -457,9 +457,10 @@ ffi_export! {
     }
 }
 
-/// Frees the calling thread's library state, as `OPENSSL_thread_stop` does: so far, its error
-/// queue.
+/// Frees the calling thread's library state, as `OPENSSL_thread_stop` does: its random
+/// generators (of every context) and its error queue.
 pub(crate) fn stop_thread() {
+    crate::rand_lib::stop_thread(None);
     err::stop_thread();
 }
 
@@ -476,15 +477,18 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Frees the calling thread's state for `ctx` (null for the default context). No state is
-    /// kept per thread and context yet; the random generators bring some in step 3.7.
+    /// Frees the calling thread's state for `ctx` (null for the default context): its public
+    /// and private random generators.
     ///
     /// # Safety
-    /// `ctx` is null or a library context; it's only compared.
+    /// `ctx` is null or a live library context.
     pub unsafe extern "C" fn OPENSSL_thread_stop_ex(ctx: *mut OSSL_LIB_CTX)
     where failure = (), library = ERR_LIB_CRYPTO
     {
-        let _ = ctx;
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { crate::libctx::resolve(ctx) } {
+            crate::rand_lib::stop_thread(Some(crate::rand_lib::id_of(&c)));
+        }
     }
 }
 

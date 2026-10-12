@@ -1389,8 +1389,12 @@ ffi_export! {
         }
         // SAFETY: the caller's guarantee.
         let k = unsafe { core::slice::from_raw_parts_mut(key, kl) };
-        // From the operating system until the private generator of 3.7.
-        c_int::from(rustyssl_crypto::rand::os_entropy(k).is_ok())
+        // `RAND_priv_bytes_ex` of the cipher's provider's context, as the reference's.
+        let libctx = m.prov.0.is_null().then(ptr::null_mut).unwrap_or_else(|| {
+            // SAFETY: the method holds a reference to its live provider.
+            unsafe { crate::provider::libctx_of(m.prov.0) }
+        });
+        c_int::from(crate::rand_lib::random_source(libctx, true)(k))
     }
 }
 

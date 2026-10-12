@@ -2322,7 +2322,7 @@ have run for at least 24 CPU-hours with no findings.
       KDFs), deriving with KRB5KDF only over ciphers known to make output a block at a time;
       the `evp_kdf` fuzz target checks PKCS12KDF, KRB5KDF over AES, and Argon2 against the
       backend, and HMAC-DRBG-KDF copies against their originals.
-- [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
+- [x] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
   generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.) Split in two:
   - [x] **3.7a `EVP_RAND` and the default provider's generators:** the methods and contexts
     (`evp_rand.c`: 30 exports; libcrypto now 1,282 of 5,876), and CTR-, HASH-, and HMAC-DRBG,
@@ -2363,18 +2363,47 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's `r*` commands (corpus `rand.txt`, random sessions), printing output only
       where it's deterministic and guarding the reference's two crashes; the `evp_rand` fuzz
       target checks the DRBGs under TEST-RAND against the backend mechanisms.
-  - [ ] **3.7b The RAND layer:**
-    - the primary/public/private DRBG hierarchy, per thread, with reseed policy and fork
-      safety, the seed source (`RAND_set_seed_source_type`), and the core's entropy and nonces
-      drawing on it
-    - `RAND_bytes(_ex)`, `RAND_priv_bytes(_ex)`, `RAND_seed`, `RAND_add`, `RAND_status`,
-      `RAND_poll`, `RAND_load_file`, `RAND_write_file`, `RAND_set_DRBG_type`,
-      `RAND_get0_primary`/`public`/`private`, `RAND_set0_*`, `RAND_set1_random_provider`
-    - `BIO_f_nbio_test` (moved from 1.6c: it picks its short reads and writes with
-      `RAND_priv_bytes`)
-    - legacy `RAND_METHOD`, the EGD functions
-    - the probe then runs DRBGs that were never set up too: without a parent, the reference
-      seeds them from the seed source once the RAND layer made it (3.7a's probe skips them)
+  - [x] **3.7b The RAND layer:** `rand_lib.rs` (`rand_lib.c`, `rand_meth.c`), `rand_file.rs`
+    (`randfile.c`), and `bio/nbio.rs` (`bf_nbio.c`): 26 exports; libcrypto now 1,308 of
+    5,876. The EGD functions aren't in the default build (`OPENSSL_NO_EGD`), and `RAND_event`
+    and `RAND_screen` are Windows-only. Decisions and findings:
+    - Each library context's hierarchy is the reference's: the seed source (SEED-SRC, or
+      `RAND_set_seed_source_type`'s), the primary DRBG over it (CTR-DRBG over AES-256-CTR, or
+      `RAND_set_DRBG_type`'s; every 256 requests and hour), and per thread a public and a
+      private DRBG under it (every 65536 requests and 7 minutes); a seed source that can't be
+      made leaves the primary to seed itself, its errors popped. Once made, the seed source
+      also gives the entropy and nonces of DRBGs without a parent (the core's
+      `get_user_entropy`/`get_user_nonce`), as in the reference.
+    - A thread's DRBGs live in thread-local storage keyed by a per-context number (never an
+      address), freed at thread exit, and by `OPENSSL_thread_stop`, `OPENSSL_thread_stop_ex`,
+      and `OSSL_LIB_CTX_free` only if the reference would have registered their cleanup (one
+      made by `RAND_get0_*` while the other was unset): DRBGs only ever set with `RAND_set0_*`
+      survive a stop, as there (found by the probe, which stops the thread after each command).
+    - The legacy `RAND_METHOD`: the library's (`RAND_OpenSSL`, writable as the reference's) and
+      an application's, which `RAND_bytes`, `RAND_status`, `RAND_poll` (the operating system's
+      entropy through its `add`), and the rest defer to. The random provider
+      (`RAND_set1_random_provider`, or a loaded provider named as the context's, `fips` by
+      default, offering `random_bytes`) serves `RAND_bytes` and `RAND_priv_bytes`; the provider
+      core now keeps a provider's `random_bytes`. No ENGINEs: `RAND_set_rand_engine` takes NULL.
+    - **Decision:** the library's own randomness now comes from the generators as the
+      reference's does: PEM IVs from `RAND_bytes`, DES and TDES random keys and
+      `EVP_CIPHER_CTX_rand_key` from `RAND_priv_bytes_ex`, and GCM's and the DES3 key wrap's
+      random IVs from `RAND_bytes_ex`, with the provider's context (the backend's GCM and generic
+      cipher contexts take a random source, the operating system by default). So an
+      application's `RAND_METHOD` or random provider is honored, and the seed source is made
+      when the reference makes it.
+    - `RAND_keep_random_devices_open` does nothing: the entropy comes from the system call, not
+      a device. The `random` configuration module comes with the configuration (3.12).
+    - New deviations: `RAND_pseudo_bytes` with a negative count; an application's method given
+      a length past `INT_MAX`; NULL file names and buffers.
+    - `tests/c/rand.c`, 67 checks: the hierarchy (types, parameters, per thread, after a
+      thread's stop), new contexts with each DRBG type and failed settings, DRBGs under
+      TEST-RAND as the thread's (so `RAND_bytes` can be compared) and the nbio test filter's
+      short reads and writes over them, an application's `RAND_METHOD`, a random provider
+      without `random_bytes`, seed files and their names.
+    - The probe's RAND-layer commands (a context made the thread's public or private DRBG,
+      `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`), printing output only from
+      DRBGs that are deterministic, in the corpus and the random sessions.
 - [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x):
   - `SHA*_`, `MD4_`, `MD5_`, `RIPEMD160_`
   - `AES_*` (including `AES_wrap_key` and IGE)

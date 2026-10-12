@@ -93,7 +93,7 @@ use crate::params::{
     OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_set_int, OSSL_PARAM_set_size_t,
     OSSL_PARAM_set_time_t, OSSL_PARAM_set_uint, OSSL_PARAM_set_utf8_string, end,
 };
-use crate::rand::{Pool, Seed, get_entropy, get_nonce};
+use crate::rand::{Pool, Seed, UserEntropy, user_entropy, user_nonce};
 use crate::secure::{CRYPTO_secure_clear_free, CRYPTO_secure_malloc};
 
 /// `DRBG_MAX_LENGTH`.
@@ -306,7 +306,8 @@ impl Parent {
 /// back with its `clear_seed`).
 enum Entropy {
     None,
-    Owned(Seed),
+    /// The core's (given back when dropped).
+    Core(UserEntropy),
     Lent(*mut c_uchar, usize),
 }
 
@@ -314,7 +315,7 @@ impl Entropy {
     fn len(&self) -> usize {
         match self {
             Self::None => 0,
-            Self::Owned(s) => s.0.len(),
+            Self::Core(e) => e.len(),
             Self::Lent(_, n) => *n,
         }
     }
@@ -323,7 +324,7 @@ impl Entropy {
     fn octets(&self) -> Option<&[u8]> {
         match self {
             Self::None => None,
-            Self::Owned(s) => Some(&s.0),
+            Self::Core(e) => e.octets(),
             // SAFETY: the parent's seed, of `n` octets, until it's given back.
             Self::Lent(p, n) => unsafe { input(*p, *n) },
         }
@@ -1241,7 +1242,9 @@ impl DrbgCtx {
     ) -> Entropy {
         let bits = c_int::try_from(entropy).unwrap_or(c_int::MAX);
         if !d.parent.present() {
-            return get_entropy(bits, min_len, max_len).map_or(Entropy::None, Entropy::Owned);
+            // SAFETY: the DRBG's provider context.
+            let libctx = unsafe { libctx_of(d.provctx) };
+            return Entropy::Core(user_entropy(libctx, bits, min_len, max_len));
         }
         let Some(get_seed) = d.parent.get_seed else {
             raise(PROV_R_PARENT_CANNOT_SUPPLY_ENTROPY_SEED, "get_entropy");
@@ -1315,7 +1318,9 @@ impl DrbgCtx {
         if let Some(b) = b.get_mut(..4) {
             b.copy_from_slice(&count.to_ne_bytes());
         }
-        get_nonce(d.min_noncelen, d.max_noncelen, &salt)
+        // SAFETY: the DRBG's provider context.
+        let libctx = unsafe { libctx_of(d.provctx) };
+        user_nonce(libctx, d.min_noncelen, d.max_noncelen, &salt)
     }
 
     /// `ossl_prov_drbg_instantiate`.
