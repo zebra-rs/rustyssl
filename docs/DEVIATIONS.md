@@ -136,6 +136,8 @@ OpenSSL never depends on them.
 | `EVP_KDF_CTX_dup` of a KBKDF context without a MAC | copies the MAC context through NULL, and crashes | returns NULL | `provider::kdfs::tests::kbkdf_without_a_mac` |
 | KBKDF's `mode` parameter with NULL data of a nonzero length | compares a string through NULL | fails | `provider::kdfs::tests::kbkdf_without_a_mac` |
 | scrypt with an output longer than `INT_MAX` octets | converts the length to `int` for its final PBKDF2, failing (or deriving fewer octets past 4 GiB) | derives the length asked for | none: it needs buffers of 2 GiB |
+| PKCS12KDF, KRB5KDF, and HMAC-DRBG-KDF derivations (`EVP_KDF_derive`) into a NULL output with a nonzero length | write through NULL and crash | fail (an output of no length succeeds, as there) | `provider::kdfs_more::tests::null_outputs_are_refused` |
+| Argon2 (ARGON2I/D/ID) with an output length past 32 bits | truncates the length to its low 32 bits, and derives that many octets (or fails for fewer than 4) | fails (`PROV_R_INVALID_OUTPUT_LENGTH`) | `provider::kdfs_more::tests::argon2_lengths_past_32_bits_are_refused` |
 
 ## Notes
 

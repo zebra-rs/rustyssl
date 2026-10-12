@@ -3261,7 +3261,9 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
                    || strcmp(tok, "session_id") == 0 || strcmp(tok, "ukm") == 0
                    || strcmp(tok, "acvp-info") == 0 || strcmp(tok, "partyu-info") == 0
                    || strcmp(tok, "partyv-info") == 0 || strcmp(tok, "supp-pubinfo") == 0
-                   || strcmp(tok, "supp-privinfo") == 0) {
+                   || strcmp(tok, "supp-privinfo") == 0 || strcmp(tok, "constant") == 0
+                   || strcmp(tok, "entropy") == 0 || strcmp(tok, "nonce") == 0
+                   || strcmp(tok, "ad") == 0) {
             size_t len = strtoul(eq + 1, NULL, 10) % 200;
 
             params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
@@ -3508,25 +3510,49 @@ static int mac_command(const char *command, const char *line)
 
 /*
  * KDFs (EVP_KDF(3)): two contexts, each made by name, given parameters as the MAC commands
- * write them (with the KDFs' names: secret, seed, info, pass, prefix, label, and data as
- * octets of the data; iter as a uint64; pkcs5 and a numeric mode as ints; mac and a named mode
- * as strings), and derived from into buffers of the lengths asked for.
+ * write them (with the KDFs' names: secret, seed, info, pass, prefix, label, data, constant,
+ * entropy, nonce, and ad as octets of the data; iter as a uint64; pkcs5 and a numeric mode as
+ * ints; mac and a named mode as strings; Argon2's numbers and pkcs12-id as size_t), and
+ * derived from into buffers of the lengths asked for.
  */
 static EVP_KDF_CTX *kdf_ctx[2];
 static int kdf_current;
 /*
  * What OpenSSL can't be given (docs/DEVIATIONS.md, and scrypt's cost): each context's kind,
- * whether a KBKDF has a MAC (its copy crashes without one), and whether an SSHKDF's digest may
- * be NULL (it then loops forever). scrypt derivations get a memory limit of 4 MiB.
+ * whether a KBKDF has a MAC (its copy crashes without one), whether an SSHKDF's digest may be
+ * NULL (it then loops forever), and whether a KRB5KDF's cipher is one known to make output a
+ * block at a time (one that makes none would loop forever). scrypt derivations get a memory
+ * limit of 4 MiB.
  */
 static int kdf_scrypt[2], kdf_kbkdf[2], kdf_kb_mac[2], kdf_ssh[2], kdf_ssh_null[2];
+static int kdf_krb5[2], kdf_krb5_safe[2];
 static uint64_t kdf_maxmem = 4 << 20;
+
+/* Whether the line's cipher (if it names one) is one KRB5KDF may derive with. */
+static int kdf_krb5_cipher_ok(const char *line, int otherwise)
+{
+    static const char *safe[] = { "AES-128-CBC", "AES-256-CBC", "AES-192-ECB", "DES-EDE3-CBC",
+                                  "CAMELLIA-256-CBC", "AES-128-CTR", "ARIA-128-CBC", "SM4-CBC",
+                                  "AES-128-WRAP", "nonesuch", NULL };
+    const char *c = strstr(line, " cipher=");
+    size_t i, n;
+
+    if (c == NULL)
+        return otherwise;
+    c += 8;
+    n = strcspn(c, " ");
+    for (i = 0; safe[i] != NULL; i++)
+        if (strlen(safe[i]) == n && strncmp(c, safe[i], n) == 0)
+            return 1;
+    return 0;
+}
 
 /* Notes what a parameter call did to the context's guarded state. */
 static void kdf_note(const char *line, int r)
 {
     if (strstr(line, " mac=") != NULL)
         kdf_kb_mac[kdf_current] = r == 1;
+    kdf_krb5_safe[kdf_current] = kdf_krb5_cipher_ok(line, kdf_krb5_safe[kdf_current]);
     if (strstr(line, " digest=NULL") != NULL)
         kdf_ssh_null[kdf_current] = 1;
     else if (strstr(line, " digest=") != NULL && r == 1)
@@ -3573,7 +3599,9 @@ static int kdf_command(const char *command, const char *line)
         kdf_scrypt[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "SCRYPT");
         kdf_kbkdf[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "KBKDF");
         kdf_ssh[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "SSHKDF");
+        kdf_krb5[kdf_current] = kdf != NULL && EVP_KDF_is_a(kdf, "KRB5KDF");
         kdf_kb_mac[kdf_current] = kdf_ssh_null[kdf_current] = 0;
+        kdf_krb5_safe[kdf_current] = 1;
         if (kdf != NULL)
             printf(" %s %s", EVP_KDF_get0_name(kdf), kdf_ctx[kdf_current] != NULL ? "ok" : "failed");
         else
@@ -3617,6 +3645,10 @@ static int kdf_command(const char *command, const char *line)
         if (kdf_ssh[kdf_current] && n > 0
             && (kdf_ssh_null[kdf_current] || strstr(line, " digest=NULL") != NULL)) {
             printf(" skipped: SSHKDF over NULL\n");
+            return 1;
+        }
+        if (kdf_krb5[kdf_current] && !kdf_krb5_cipher_ok(line, kdf_krb5_safe[kdf_current])) {
+            printf(" skipped: KRB5KDF over an unknown cipher\n");
             return 1;
         }
         {
@@ -3663,10 +3695,13 @@ static int kdf_command(const char *command, const char *line)
             kdf_kb_mac[!kdf_current] = kdf_kb_mac[kdf_current];
             kdf_ssh[!kdf_current] = kdf_ssh[kdf_current];
             kdf_ssh_null[!kdf_current] = kdf_ssh_null[kdf_current];
+            kdf_krb5[!kdf_current] = kdf_krb5[kdf_current];
+            kdf_krb5_safe[!kdf_current] = kdf_krb5_safe[kdf_current];
         }
     } else if (strcmp(command, "kreset") == 0) {
         EVP_KDF_CTX_reset(ctx);
         kdf_kb_mac[kdf_current] = kdf_ssh_null[kdf_current] = 0;
+        kdf_krb5_safe[kdf_current] = 1;
     } else {
         EVP_KDF_CTX_free(ctx);
         kdf_ctx[kdf_current] = NULL;

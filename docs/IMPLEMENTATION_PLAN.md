@@ -2242,12 +2242,12 @@ have run for at least 24 CPU-hours with no findings.
       against HMAC.
 
   *Step 3.5 done:* 49 exports; the default provider offers every MAC the reference's does.
-- [ ] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
+- [x] **3.6 EVP_KDF:** HKDF, TLS13-KDF, PBKDF1, PBKDF2, scrypt, SSKDF, X963KDF, X942KDF,
   KBKDF, TLS1-PRF, SSHKDF, PKCS12KDF, KRB5KDF, Argon2i/d/id, HMAC-DRBG-KDF, and the legacy
   provider's PVKKDF; `PKCS5_PBKDF2_HMAC*`, `EVP_PBE_scrypt`, `EVP_BytesToKey`. Over the
   backend of 3.2d; a C test pins the SSHKDF-over-NULL deviation (docs/DEVIATIONS.md).
   PBKDF1 and PVKKDF are the legacy provider's, so they come with it (9.1); `EVP_BytesToKey`
-  came with 3.4e. Split in two:
+  came with 3.4e. Split in three:
   - [x] **3.6a The KDF layer and the hash-based KDFs:** `EVP_KDF` methods and contexts
     (`kdf_meth.c`, `kdf_lib.c`), `PKCS5_PBKDF2_HMAC` and `_SHA1`, and the default provider's
     HKDF, TLS13-KDF, PBKDF2, TLS1-PRF, SSKDF, and X963KDF (`provider/kdfs.rs`). 26 exports;
@@ -2294,7 +2294,34 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's KDF commands take the new parameters, capping scrypt's memory at 4 MiB and
       guarding the reference's KBKDF copy crash and SSHKDF-over-NULL loop; the `evp_kdf` fuzz
       target checks the four against the backend too.
-  - [ ] **3.6c The rest:** PKCS12KDF, KRB5KDF, Argon2i/d/id, and HMAC-DRBG-KDF.
+  - [x] **3.6c The rest:** PKCS12KDF, KRB5KDF, HMAC-DRBG-KDF, and ARGON2I/D/ID
+    (`provider/kdfs_more.rs`), completing the default provider's `deflt_kdfs` table in the
+    reference's order. No exports (the KDFs are reached through `EVP_KDF`). Decisions and
+    findings:
+    - PKCS12KDF runs over `EVP_MD_CTX`, KRB5KDF over `EVP_CIPHER_CTX` (with the backend's
+      n-fold and triple DES fixup, now public), and HMAC-DRBG-KDF over `EVP_MAC_CTX`, as the
+      reference's do. Argon2 fetches `blake2bmac` and `blake2b512` with its property query as
+      the reference does (failing the same way), then computes over the backend.
+    - Quirks kept: PKCS12KDF takes any digest (an XOF fails on its size) and fails silently
+      with neither password nor salt (`malloc(0)`); KRB5KDF reinitializes the cipher for each
+      block (so CTR repeats itself) and gives triple DES's 21 raw octets unfixed;
+      HMAC-DRBG-KDF keeps K and V across a change of digest, reports size 0, and fails
+      silently without entropy or a nonce; Argon2 has no copy, takes the output length as the
+      context's unless `size` is passed with the derivation, refuses threads beyond
+      `OSSL_set_max_threads` (its error data printing the limit's low 32 bits), wipes the
+      password and secret after an early-clean derivation, and with a NULL output computes
+      and writes nothing.
+    - New deviations: PKCS12KDF, KRB5KDF, and HMAC-DRBG-KDF into a NULL output with a length
+      (the reference writes through NULL); Argon2 output lengths past 32 bits (the reference
+      truncates them). A KRB5KDF cipher that made no output would loop forever in the
+      reference; ours fails, but no cipher of the default provider does that.
+    - `tests/c/evp_kdf_more.c`, 119 checks: the RFC 7292, 3961, 9106, and SP 800-90A vectors,
+      every name and parameter list, each KDF's errors with their data, quirks, copies,
+      resets, and two-thread Argon2 against one.
+    - The probe takes the new parameters (corpus `kdf_more.txt`, random sessions over all the
+      KDFs), deriving with KRB5KDF only over ciphers known to make output a block at a time;
+      the `evp_kdf` fuzz target checks PKCS12KDF, KRB5KDF over AES, and Argon2 against the
+      backend, and HMAC-DRBG-KDF copies against their originals.
 - [ ] **3.7 RAND and DRBG:** (`OPENSSL_thread_stop_ex(ctx)` must then free the thread's
   generators for `ctx`, as OpenSSL's `rand_delete_thread_state` does; see 1.3.)
   - `EVP_RAND`: CTR-, HASH-, and HMAC-DRBG, SEED-SRC, TEST-RAND

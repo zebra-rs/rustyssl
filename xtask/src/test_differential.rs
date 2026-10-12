@@ -1181,10 +1181,11 @@ fn mac_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
-/// A random session of KDF commands on the probe's two contexts: HKDF, TLS13-KDF, PBKDF2,
-/// TLS1-PRF, SSKDF, and X963KDF made by name, given random digests, MACs, modes, keys, salts,
-/// secrets, seeds, info, labels, iterations (kept small), and sizes, and derived from into
-/// lengths around the digests' sizes; sizes, copies, resets, and `PKCS5_PBKDF2_HMAC`.
+/// A random session of KDF commands on the probe's two contexts: each of the default
+/// provider's KDFs made by name, given random digests, MACs, ciphers, modes, keys, salts,
+/// secrets, seeds, info, labels, constants, entropy, nonces, iterations and costs (kept small),
+/// and sizes, and derived from into lengths around the digests' sizes; sizes, copies, resets,
+/// and `PKCS5_PBKDF2_HMAC`.
 fn kdf_session(random: &mut Random, out: &mut String) -> Result {
     const KDFS: &[&str] = &[
         "HKDF",
@@ -1202,6 +1203,13 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
         "KBKDF",
         "X942KDF-ASN1",
         "X942KDF",
+        "PKCS12KDF",
+        "KRB5KDF",
+        "HMAC-DRBG-KDF",
+        "ARGON2I",
+        "ARGON2D",
+        "ARGON2ID",
+        "argon2id",
         "NO-SUCH-KDF",
     ];
     const DIGESTS: &[&str] = &[
@@ -1232,7 +1240,7 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
     let params = |random: &mut Random| -> String {
         let mut text = String::new();
         for _ in 0..random.below(4) {
-            let param = match random.below(17) {
+            let param = match random.below(21) {
                 0 | 1 => format!("digest={}", random.pick(DIGESTS)),
                 2 => format!(
                     "mac={}",
@@ -1304,6 +1312,38 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
                         "maxmem_bytes=1024",
                     ])
                     .to_owned(),
+                // PKCS12KDF's, KRB5KDF's, HMAC-DRBG-KDF's (the probe skips ciphers it doesn't
+                // know to finish), and Argon2's (small costs).
+                17 => format!(
+                    "{}={}",
+                    random.pick(&["constant", "entropy", "nonce", "ad", "secret", "salt"]),
+                    octets(random)
+                ),
+                18 => format!(
+                    "cipher={}",
+                    random.pick(&[
+                        "AES-128-CBC",
+                        "AES-256-CBC",
+                        "AES-192-ECB",
+                        "DES-EDE3-CBC",
+                        "CAMELLIA-256-CBC",
+                        "AES-128-CTR",
+                        "ARIA-128-CBC",
+                        "SM4-CBC",
+                        "AES-128-WRAP",
+                        "nonesuch"
+                    ])
+                ),
+                19 => format!(
+                    "{}={}",
+                    random.pick(&["lanes", "memcost", "threads", "version", "size"]),
+                    random.pick(&["0", "1", "2", "3", "4", "7", "8", "16", "19", "21", "64"])
+                ),
+                20 => format!(
+                    "{}={}",
+                    random.pick(&["pkcs12-id", "early_clean"]),
+                    random.pick(&["0", "1", "2", "3", "255", "256"])
+                ),
                 _ => format!(
                     "{}={}",
                     random.pick(&["mac-size", "properties"]),
