@@ -721,6 +721,7 @@ const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::base64::BIO_f_base64;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_linebuffer;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::nbio::BIO_f_nbio_test;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_null;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::prefix::BIO_f_prefix;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_readbuffer;
@@ -3412,6 +3413,67 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::evp::kdf::PKCS5_PBKDF2_HMAC_SHA1;
+const _: unsafe extern "C" fn() -> *mut RAND_METHOD = crate::rand_lib::RAND_OpenSSL;
+const _: unsafe extern "C" fn(*const core::ffi::c_void, core::ffi::c_int, f64) =
+    crate::rand_lib::RAND_add;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, core::ffi::c_int) -> core::ffi::c_int =
+    crate::rand_lib::RAND_bytes;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::rand_lib::RAND_bytes_ex;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char, usize) -> *const core::ffi::c_char =
+    crate::rand_file::RAND_file_name;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut EVP_RAND_CTX =
+    crate::rand_lib::RAND_get0_primary;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut EVP_RAND_CTX =
+    crate::rand_lib::RAND_get0_private;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut EVP_RAND_CTX =
+    crate::rand_lib::RAND_get0_public;
+const _: unsafe extern "C" fn() -> *const RAND_METHOD = crate::rand_lib::RAND_get_rand_method;
+const _: unsafe extern "C" fn(core::ffi::c_int) = crate::rand_lib::RAND_keep_random_devices_open;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_long) -> core::ffi::c_int =
+    crate::rand_file::RAND_load_file;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::rand_lib::RAND_poll;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, core::ffi::c_int) -> core::ffi::c_int =
+    crate::rand_lib::RAND_priv_bytes;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::rand_lib::RAND_priv_bytes_ex;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, core::ffi::c_int) -> core::ffi::c_int =
+    crate::rand_lib::RAND_pseudo_bytes;
+const _: unsafe extern "C" fn(*const core::ffi::c_void, core::ffi::c_int) =
+    crate::rand_lib::RAND_seed;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::rand_lib::RAND_set0_private;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut EVP_RAND_CTX) -> core::ffi::c_int =
+    crate::rand_lib::RAND_set0_public;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_PROVIDER) -> core::ffi::c_int =
+    crate::rand_lib::RAND_set1_random_provider;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::rand_lib::RAND_set_DRBG_type;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::rand_lib::RAND_set_rand_engine;
+const _: unsafe extern "C" fn(*const RAND_METHOD) -> core::ffi::c_int =
+    crate::rand_lib::RAND_set_rand_method;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::rand_lib::RAND_set_seed_source_type;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::rand_lib::RAND_status;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::rand_file::RAND_write_file;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn(

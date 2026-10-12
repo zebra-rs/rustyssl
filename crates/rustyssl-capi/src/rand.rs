@@ -67,6 +67,11 @@ impl Pool {
         self.buffer.0.len()
     }
 
+    /// The entropy gathered, in bits.
+    pub(crate) fn entropy(&self) -> usize {
+        self.entropy
+    }
+
     /// `ossl_rand_pool_entropy_available`: the entropy, once there's enough of it and of the
     /// octets; else 0.
     pub(crate) fn entropy_available(&self) -> usize {
@@ -219,4 +224,118 @@ pub(crate) fn get_nonce(min_len: usize, max_len: usize, salt: &[u8]) -> Option<S
         return None;
     }
     Some(pool.into_seed())
+}
+
+/// Entropy the core gives a DRBG without a parent (`ossl_rand_get_user_entropy`): the
+/// operating system's, or, once its context made a seed source that gives seeds, the seed
+/// source's (given back with its `clear_seed`).
+pub(crate) enum UserEntropy {
+    Os(Option<Seed>),
+    Seeded {
+        /// The seed source, with a reference.
+        seed: *mut rustyssl_abi::EVP_RAND_CTX,
+        buf: *mut u8,
+        len: usize,
+    },
+}
+
+impl UserEntropy {
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            Self::Os(s) => s.as_ref().map_or(0, |s| s.0.len()),
+            Self::Seeded { len, .. } => *len,
+        }
+    }
+
+    /// The octets, `None` for none (a NULL buffer).
+    pub(crate) fn octets(&self) -> Option<&[u8]> {
+        match self {
+            Self::Os(s) => s.as_ref().map(|s| &s.0[..]),
+            Self::Seeded { buf, len, .. } => {
+                // SAFETY: the seed source's seed, of `len` octets, until it's given back.
+                (!buf.is_null()).then(|| unsafe { core::slice::from_raw_parts(*buf, *len) })
+            }
+        }
+    }
+}
+
+impl Drop for UserEntropy {
+    /// `ossl_rand_cleanup_user_entropy`.
+    fn drop(&mut self) {
+        if let Self::Seeded { seed, buf, len } = *self {
+            // SAFETY: the seed source and its own seed.
+            unsafe { crate::evp::rand::clear_seed(seed, buf, len) };
+            // SAFETY: the reference taken for it.
+            unsafe { crate::evp::rand::EVP_RAND_CTX_free(seed) };
+        }
+    }
+}
+
+/// `ossl_rand_get_user_entropy` for the context a provider was loaded into.
+pub(crate) fn user_entropy(
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    entropy: c_int,
+    min_len: usize,
+    max_len: usize,
+) -> UserEntropy {
+    let seed = crate::rand_lib::seed_of(libctx);
+    if !seed.is_null() {
+        // SAFETY: the seed source, held.
+        if unsafe { crate::evp::rand::can_seed(seed) } {
+            let mut buf: *mut u8 = core::ptr::null_mut();
+            // SAFETY: as above; a local for the seed.
+            let len = unsafe {
+                crate::evp::rand::get_seed(
+                    seed,
+                    &raw mut buf,
+                    entropy,
+                    min_len,
+                    max_len,
+                    core::ptr::null(),
+                    0,
+                )
+            };
+            return UserEntropy::Seeded { seed, buf, len };
+        }
+        // SAFETY: the reference taken for it.
+        unsafe { crate::evp::rand::EVP_RAND_CTX_free(seed) };
+    }
+    UserEntropy::Os(get_entropy(entropy, min_len, max_len))
+}
+
+/// `ossl_rand_get_user_nonce` for the context a provider was loaded into: the core's nonce, or,
+/// once the context made a seed source, `min_len` octets of it with the salt as additional
+/// input.
+pub(crate) fn user_nonce(
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    min_len: usize,
+    max_len: usize,
+    salt: &[u8],
+) -> Option<Seed> {
+    let seed = crate::rand_lib::seed_of(libctx);
+    if seed.is_null() {
+        return get_nonce(min_len, max_len, salt);
+    }
+    // The reference's `OPENSSL_malloc(0)` is NULL: no nonce.
+    let mut out = (min_len > 0).then(|| Seed(vec![0u8; min_len]));
+    if let Some(o) = out.as_mut() {
+        // SAFETY: the seed source; room for `min_len` octets; the salt.
+        if unsafe {
+            crate::evp::rand::EVP_RAND_generate(
+                seed,
+                o.0.as_mut_ptr(),
+                min_len,
+                0,
+                0,
+                salt.as_ptr(),
+                salt.len(),
+            )
+        } == 0
+        {
+            out = None;
+        }
+    }
+    // SAFETY: the reference taken for it.
+    unsafe { crate::evp::rand::EVP_RAND_CTX_free(seed) };
+    out
 }

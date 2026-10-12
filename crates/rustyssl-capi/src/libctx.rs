@@ -37,6 +37,8 @@ pub(crate) struct LibCtx {
     pub(crate) providers: provider::Store,
     /// The algorithm names and EVP methods fetched in this context.
     pub(crate) evp: crate::evp::fetch::Store,
+    /// Its random generators and their settings.
+    pub(crate) rand: crate::rand_lib::Global,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
@@ -120,6 +122,11 @@ ffi_export! {
     {
         if ctx.is_null() || ctx == current() || ctx == global() {
             return;
+        }
+        // `ossl_ctx_thread_stop`: the calling thread's generators of the context go first.
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { OSSL_LIB_CTX::get(ctx) } {
+            crate::rand_lib::stop_thread(Some(crate::rand_lib::id_of(c)));
         }
         // SAFETY: the caller's guarantee.
         unsafe { OSSL_LIB_CTX::free(ctx) };

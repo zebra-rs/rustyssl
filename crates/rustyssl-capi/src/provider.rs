@@ -24,7 +24,7 @@
 //! No lock is held while a provider's functions (init, teardown, parameters, self-test) or a
 //! `do_all` callback run.
 
-use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_uint, c_void};
 use core::ptr;
 use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -33,7 +33,8 @@ use rustyssl_abi::{
     ERR_LIB_CRYPTO, ERR_R_INIT_FAIL, ERR_R_PASSED_NULL_PARAMETER, OPENSSL_INIT_LOAD_CONFIG,
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_PROVIDER_GET_CAPABILITIES,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
-    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_SELF_TEST, OSSL_FUNC_PROVIDER_TEARDOWN,
+    OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_RANDOM_BYTES,
+    OSSL_FUNC_PROVIDER_SELF_TEST, OSSL_FUNC_PROVIDER_TEARDOWN,
     OSSL_FUNC_PROVIDER_UNQUERY_OPERATION, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PROVIDER,
     OSSL_provider_init_fn,
 };
@@ -81,6 +82,7 @@ type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type SelfTestFn = unsafe extern "C" fn(*mut c_void) -> c_int;
 type QueryFn = unsafe extern "C" fn(*mut c_void, c_int, *mut c_int) -> *const OSSL_ALGORITHM;
 type UnqueryFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_ALGORITHM);
+type RandomBytesFn = unsafe extern "C" fn(*mut c_void, c_int, *mut c_void, usize, c_uint) -> c_int;
 
 /// The provider functions the core calls, from its dispatch table.
 #[derive(Default, Clone, Copy)]
@@ -91,6 +93,7 @@ struct Functions {
     self_test: Option<SelfTestFn>,
     query_operation: Option<QueryFn>,
     unquery_operation: Option<UnqueryFn>,
+    random_bytes: Option<RandomBytesFn>,
 }
 
 /// What changes as a provider is initialized and activated.
@@ -457,6 +460,8 @@ impl Functions {
                 // SAFETY: as above.
                 self.unquery_operation = Some(unsafe { cast(f) });
             }
+            // SAFETY: as above.
+            OSSL_FUNC_PROVIDER_RANDOM_BYTES => self.random_bytes = Some(unsafe { cast(f) }),
             // Capabilities come with the TLS groups and signature algorithms they describe.
             OSSL_FUNC_PROVIDER_GET_CAPABILITIES => {}
             _ => {}
@@ -479,6 +484,11 @@ unsafe fn activate(handle: *mut OSSL_PROVIDER) -> bool {
         !s.in_store && !s.initialized
     };
     if needs_init && !provider_init(handle, prov) {
+        return false;
+    }
+    if prov.functions().1.random_bytes.is_some()
+        && !crate::rand_lib::check_random_provider_on_load(prov.libctx(), handle)
+    {
         return false;
     }
     let first = {
@@ -504,6 +514,9 @@ unsafe fn deactivate(handle: *mut OSSL_PROVIDER) -> bool {
     let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
         return false;
     };
+    if prov.functions().1.random_bytes.is_some() {
+        crate::rand_lib::check_random_provider_on_unload(prov.libctx(), handle);
+    }
     let count = count_deactivation(prov);
     if count == 0 {
         // `provider_remove_store_methods`: its algorithms go from the method store.
@@ -915,6 +928,30 @@ pub(crate) fn release(held: Vec<*mut OSSL_PROVIDER>) {
 ///
 /// # Safety
 /// `prov` is a live provider.
+/// `ossl_provider_random_bytes`: `n` random octets into `buf` from the provider's
+/// `random_bytes` (public or private ones, at `strength`); 0 if it has none.
+///
+/// # Safety
+/// `prov` is NULL or a live provider; `buf` has room for `n` octets.
+pub(crate) unsafe fn random_bytes(
+    prov: *const OSSL_PROVIDER,
+    which: c_int,
+    buf: *mut c_void,
+    n: usize,
+    strength: c_uint,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(p) = (unsafe { provider(prov) }) else {
+        return 0;
+    };
+    let (provctx, f) = p.functions();
+    match f.random_bytes {
+        // SAFETY: the provider's function with its context and the caller's buffer.
+        Some(random) => unsafe { random(provctx, which, buf, n, strength) },
+        None => 0,
+    }
+}
+
 pub(crate) unsafe fn query_operation(
     prov: *const OSSL_PROVIDER,
     operation: c_int,
