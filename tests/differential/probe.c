@@ -282,6 +282,17 @@
  *                              neighbour), mul, recip (BN_reciprocal of m by b's bits)
  *   bnnist <bits> <r> <a>      BN_nist_mod_<bits>, and BN_nist_mod_func's answer for a
  *   bnprime <n> <r>            the RFC prime n (0-7), into the register
+ *   bnisprime <r> <kind> <checks>   BN_check_prime, BN_is_prime_ex, BN_is_prime_fasttest_ex
+ *                              (check, ex, fast) of the register (skipped past 1024 bits)
+ *   bngen <r> <bits> <safe> <add> <rem>   BN_generate_prime_ex2 (add and rem as decimal
+ *                              words, 0 for none; at most 160 bits, 64 for a safe prime): the
+ *                              prime only from deterministic generators, else its length
+ *   bngf2m <op> <r> <a> <b> <field>   over field 0 (x^163+x^7+x^6+x^3+1), 1 (x^233+x^74+1),
+ *                              2 (x^4+x+1), 3 (x^10+x^3+1), 4 (x^8+x^4+x^3+x^2+x^6+x+1: seven
+ *                              terms), 5 (an even one): mod, add, mul, sqr, inv, div, exp, sqrt,
+ *                              solve, and the array forms modarr, mularr, sqrarr, invarr,
+ *                              divarr, exparr, sqrtarr, solvearr (results that depend on random
+ *                              numbers printed only from a deterministic generator)
  *
  *   # ...              comment, echoed
  */
@@ -4073,7 +4084,9 @@ static int bn_command(const char *command, const char *line)
             && strcmp(command, "bngcd") != 0 && strcmp(command, "bnkron") != 0
             && strcmp(command, "bncoprime") != 0 && strcmp(command, "bnsqrt") != 0
             && strcmp(command, "bnmont") != 0 && strcmp(command, "bnrecp") != 0
-            && strcmp(command, "bnnist") != 0 && strcmp(command, "bnprime") != 0))
+            && strcmp(command, "bnnist") != 0 && strcmp(command, "bnprime") != 0
+            && strcmp(command, "bnisprime") != 0 && strcmp(command, "bngen") != 0
+            && strcmp(command, "bngf2m") != 0))
         return 0;
     printf("%s:", line);
     if (strcmp(command, "bnset") == 0) {
@@ -4630,6 +4643,131 @@ static int bn_command(const char *command, const char *line)
         sscanf(line, "%*s %ld %lu", &n, &r);
         x = bn_at(r);
         printf(" %d bits %d", rfc[n & 7](x) == x, BN_num_bits(x));
+    } else if (strcmp(command, "bnisprime") == 0) {
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %lu %15s %ld", &r, op, &n);
+        x = bn_at(r);
+        if (BN_num_bits(x) > 1024) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (strcmp(op, "check") == 0)
+            ret = BN_check_prime(x, ctx, NULL);
+        else if (strcmp(op, "ex") == 0)
+            ret = BN_is_prime_ex(x, (int)n, ctx, NULL);
+        else
+            ret = BN_is_prime_fasttest_ex(x, (int)n, ctx, 1, NULL);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+    } else if (strcmp(command, "bngen") == 0) {
+        unsigned long safe = 0, addw = 0, remw = 0;
+        BIGNUM *add = NULL, *rem = NULL;
+        BN_CTX *ctx = BN_CTX_new();
+
+        sscanf(line, "%*s %lu %ld %lu %lu %lu", &r, &n, &safe, &addw, &remw);
+        x = bn_at(r);
+        if (n > (safe ? 64 : 160)) {
+            printf(" skipped: too large\n");
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (addw != 0) {
+            add = BN_new();
+            BN_set_word(add, addw);
+        }
+        if (remw != 0) {
+            rem = BN_new();
+            BN_set_word(rem, remw);
+        }
+        ret = BN_generate_prime_ex2(x, (int)n, (int)safe, add, rem, NULL, ctx);
+        BN_CTX_free(ctx);
+        BN_free(add);
+        BN_free(rem);
+        printf(" %d", ret);
+        if (rand_pub_det && rand_priv_det) {
+            bn_print_value("r", x);
+        } else {
+            /* With add, a prime can run a bit longer than asked. */
+            printf(" (random) bits %d", ret == 1 && addw == 0 ? BN_num_bits(x) : -1);
+            BN_zero(x);
+        }
+    } else if (strcmp(command, "bngf2m") == 0) {
+        static const int f163[] = {163, 7, 6, 3, 0, -1}, f233[] = {233, 74, 0, -1};
+        static const int f4[] = {4, 1, 0, -1}, f10[] = {10, 3, 0, -1};
+        static const int f8[] = {8, 6, 4, 3, 2, 1, 0, -1}, f9[] = {9, 1, -1};
+        static const int *const arrays[] = {f163, f233, f4, f10, f8, f9};
+        unsigned long fi = 0;
+        BIGNUM *f = BN_new();
+        BN_CTX *ctx = BN_CTX_new();
+        const int *p;
+        int random = 0;
+
+        sscanf(line, "%*s %15s %lu %lu %lu %lu", op, &r, &a, &b, &fi);
+        x = bn_at(r);
+        p = arrays[fi % 6];
+        if (fi % 6 == 5) {
+            BN_set_bit(f, 9);
+            BN_set_bit(f, 1);
+        } else {
+            BN_GF2m_arr2poly(p, f);
+        }
+        if (BN_num_bits(bn_at(a)) > 4096 || BN_num_bits(bn_at(b)) > 64) {
+            printf(" skipped: too large\n");
+            BN_free(f);
+            BN_CTX_free(ctx);
+            return 1;
+        }
+        if (strcmp(op, "mod") == 0)
+            ret = BN_GF2m_mod(x, bn_at(a), f);
+        else if (strcmp(op, "add") == 0)
+            ret = BN_GF2m_add(x, bn_at(a), bn_at(b));
+        else if (strcmp(op, "mul") == 0)
+            ret = BN_GF2m_mod_mul(x, bn_at(a), bn_at(b), f, ctx);
+        else if (strcmp(op, "sqr") == 0)
+            ret = BN_GF2m_mod_sqr(x, bn_at(a), f, ctx);
+        else if (strcmp(op, "inv") == 0)
+            random = !(ret = BN_GF2m_mod_inv(x, bn_at(a), f, ctx));
+        else if (strcmp(op, "div") == 0)
+            ret = BN_GF2m_mod_div(x, bn_at(b), bn_at(a), f, ctx);
+        else if (strcmp(op, "exp") == 0)
+            ret = BN_GF2m_mod_exp(x, bn_at(a), bn_at(b), f, ctx);
+        else if (strcmp(op, "sqrt") == 0)
+            ret = BN_GF2m_mod_sqrt(x, bn_at(a), f, ctx);
+        else if (strcmp(op, "solve") == 0)
+            random = (ret = BN_GF2m_mod_solve_quad(x, bn_at(a), f, ctx)) == 1 && fi % 6 != 0
+                     && fi % 6 != 1;
+        else if (fi % 6 == 5)
+            ret = -9; /* the array forms need an array ending with 0 */
+        else if (strcmp(op, "modarr") == 0)
+            ret = BN_GF2m_mod_arr(x, bn_at(a), p);
+        else if (strcmp(op, "mularr") == 0)
+            ret = BN_GF2m_mod_mul_arr(x, bn_at(a), bn_at(b), p, ctx);
+        else if (strcmp(op, "sqrarr") == 0)
+            ret = BN_GF2m_mod_sqr_arr(x, bn_at(a), p, ctx);
+        else if (strcmp(op, "invarr") == 0)
+            random = !(ret = BN_GF2m_mod_inv_arr(x, bn_at(a), p, ctx));
+        else if (strcmp(op, "divarr") == 0)
+            ret = BN_GF2m_mod_div_arr(x, bn_at(b), bn_at(a), p, ctx);
+        else if (strcmp(op, "exparr") == 0)
+            ret = BN_GF2m_mod_exp_arr(x, bn_at(a), bn_at(b), p, ctx);
+        else if (strcmp(op, "sqrtarr") == 0)
+            ret = BN_GF2m_mod_sqrt_arr(x, bn_at(a), p, ctx);
+        else
+            random = (ret = BN_GF2m_mod_solve_quad_arr(x, bn_at(a), p, ctx)) == 1 && fi % 6 != 0
+                     && fi % 6 != 1;
+        BN_free(f);
+        BN_CTX_free(ctx);
+        printf(" %d", ret);
+        /* A failed inverse leaves a blinded product, and an even degree's solution depends on
+         * a random start (where it exists, its other root differs by one). */
+        if (random && !rand_priv_det) {
+            printf(" (random)");
+            BN_zero(x);
+        } else {
+            bn_print_value("r", x);
+        }
     } else {
         unsigned char buf[64];
         char kind[4] = "u";
