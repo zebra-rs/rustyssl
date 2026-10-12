@@ -55,6 +55,21 @@ pub(crate) const fn alg<const N: usize>(
     }
 }
 
+/// One of the default provider's algorithms with a description (`{ names, "provider=default",
+/// functions, description }`).
+pub(crate) const fn alg_desc<const N: usize>(
+    names: &'static CStr,
+    table: &'static Dispatch<N>,
+    description: &'static CStr,
+) -> OSSL_ALGORITHM {
+    OSSL_ALGORITHM {
+        algorithm_names: names.as_ptr(),
+        property_definition: DEFAULT_PROPERTIES,
+        implementation: table.0.as_ptr(),
+        algorithm_description: description.as_ptr(),
+    }
+}
+
 /// One of the base provider's algorithms (`{ names, "provider=base", functions }` in
 /// `baseprov.c`).
 pub(crate) const fn base_alg<const N: usize>(

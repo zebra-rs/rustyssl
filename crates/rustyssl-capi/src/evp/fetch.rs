@@ -541,8 +541,8 @@ pub(crate) unsafe fn all(libctx: *mut OSSL_LIB_CTX, kind: &'static Kind) -> Vec<
 
 /// `ossl_namemap_stored`'s pre-filling: an empty name map starts with the legacy ciphers' and
 /// then digests' names (each type's short and long names and its OID), as OpenSSL's does after
-/// `OPENSSL_INIT_ADD_ALL_CIPHERS` and `_DIGESTS`. (OpenSSL adds the key types' after; they
-/// come with Phase 4.)
+/// `OPENSSL_INIT_ADD_ALL_CIPHERS` and `_DIGESTS`, then the key types' of the built-in ASN.1
+/// methods (an alias's base type's names first, and the PEM name last).
 pub(crate) fn prefill(ctx: &libctx::LibCtx) {
     if !ctx.evp.lock().names.is_empty() {
         return;
@@ -556,18 +556,40 @@ pub(crate) fn prefill(ctx: &libctx::LibCtx) {
         return;
     }
     for nid in nids {
-        let Some(obj) = rustyssl_asn1::objects::object(nid).filter(|_| nid != 0) else {
-            continue;
-        };
-        let mut num = state.names.add_name(0, obj.short_name.as_bytes());
-        num = state.names.add_name(num, obj.long_name.as_bytes());
+        add_legacy_names(&mut state.names, 0, 0, nid, None);
+    }
+    for (base, nid, pem) in super::pkey::ameth::prefill_entries() {
+        add_legacy_names(&mut state.names, 0, base, nid, pem);
+    }
+}
+
+/// `get_legacy_evp_names`: adds the names of `base` (short and long) and of `nid` (short, long,
+/// and its OID), then `pem`, as one algorithm starting from number `num`. Returns the number.
+fn add_legacy_names(
+    names: &mut Namemap,
+    mut num: u32,
+    base: c_int,
+    nid: c_int,
+    pem: Option<&[u8]>,
+) -> u32 {
+    if let Some(obj) = rustyssl_asn1::objects::object(base).filter(|_| base != 0) {
+        num = names.add_name(num, obj.short_name.as_bytes());
+        num = names.add_name(num, obj.long_name.as_bytes());
+    }
+    if let Some(obj) = rustyssl_asn1::objects::object(nid).filter(|_| nid != 0) {
+        num = names.add_name(num, obj.short_name.as_bytes());
+        num = names.add_name(num, obj.long_name.as_bytes());
         if !obj.der.is_empty() {
             let text = rustyssl_asn1::oid::decode_text(obj.der);
             if text.complete && !text.text.is_empty() {
-                state.names.add_name(num, &text.text);
+                num = names.add_name(num, &text.text);
             }
         }
     }
+    if let Some(p) = pem {
+        num = names.add_name(num, p);
+    }
+    num
 }
 
 /// The names of `name_id` in `prov`'s context, in the order they were added.

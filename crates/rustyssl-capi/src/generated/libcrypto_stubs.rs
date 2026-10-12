@@ -7571,90 +7571,6 @@ pub extern "C" fn EVP_KEYEXCH_up_ref(_: *mut EVP_KEYEXCH) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_do_all_provided(
-    _: *mut OSSL_LIB_CTX,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(keymgmt: *mut EVP_KEYMGMT, arg: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("EVP_KEYMGMT_do_all_provided")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_fetch(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_KEYMGMT {
-    crate::stub::unimplemented("EVP_KEYMGMT_fetch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_free(_: *mut EVP_KEYMGMT) {
-    crate::stub::unimplemented("EVP_KEYMGMT_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_gen_gettable_params(_: *const EVP_KEYMGMT) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_KEYMGMT_gen_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_gen_settable_params(_: *const EVP_KEYMGMT) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_KEYMGMT_gen_settable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_get0_description(_: *const EVP_KEYMGMT) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_KEYMGMT_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_get0_name(_: *const EVP_KEYMGMT) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_KEYMGMT_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_get0_provider(_: *const EVP_KEYMGMT) -> *const OSSL_PROVIDER {
-    crate::stub::unimplemented("EVP_KEYMGMT_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_gettable_params(_: *const EVP_KEYMGMT) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_KEYMGMT_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_is_a(
-    _: *const EVP_KEYMGMT,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_KEYMGMT_is_a")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_names_do_all(
-    _: *const EVP_KEYMGMT,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_KEYMGMT_names_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_settable_params(_: *const EVP_KEYMGMT) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_KEYMGMT_settable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_KEYMGMT_up_ref(_: *mut EVP_KEYMGMT) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_KEYMGMT_up_ref")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_MAC_init_SKEY(
     _: *mut EVP_MAC_CTX,
     _: *mut EVP_SKEY,
@@ -8036,16 +7952,6 @@ pub extern "C" fn EVP_PKEY_CTX_ctrl_uint64(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_dup(_: *const EVP_PKEY_CTX) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_free(_: *mut EVP_PKEY_CTX) {
-    crate::stub::unimplemented("EVP_PKEY_CTX_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_get0_dh_kdf_oid(
     _: *mut EVP_PKEY_CTX,
     _: *mut *mut ASN1_OBJECT,
@@ -8067,31 +7973,6 @@ pub extern "C" fn EVP_PKEY_CTX_get0_ecdh_kdf_ukm(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_get0_ecdh_kdf_ukm")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get0_libctx(_: *mut EVP_PKEY_CTX) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get0_libctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get0_peerkey(_: *mut EVP_PKEY_CTX) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get0_peerkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get0_pkey(_: *mut EVP_PKEY_CTX) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get0_pkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get0_propq(_: *const EVP_PKEY_CTX) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get0_propq")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get0_provider(_: *const EVP_PKEY_CTX) -> *const OSSL_PROVIDER {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get0_provider")
 }
 
 #[unsafe(no_mangle)]
@@ -8132,21 +8013,6 @@ pub extern "C" fn EVP_PKEY_CTX_get_algor_params(
     _: *mut X509_ALGOR,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_get_algor_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_app_data(_: *mut EVP_PKEY_CTX) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_app_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_cb(_: *mut EVP_PKEY_CTX) -> EVP_PKEY_gen_cb {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_data(_: *const EVP_PKEY_CTX) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_data")
 }
 
 #[unsafe(no_mangle)]
@@ -8203,27 +8069,6 @@ pub extern "C" fn EVP_PKEY_CTX_get_group_name(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_get_group_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_keygen_info(
-    _: *mut EVP_PKEY_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_keygen_info")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_operation(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_operation")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_params(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_params")
 }
 
 #[unsafe(no_mangle)]
@@ -8285,25 +8130,12 @@ pub extern "C" fn EVP_PKEY_CTX_get_signature_md(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_gettable_params(_: *const EVP_PKEY_CTX) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_PKEY_CTX_gettable_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_hex2ctrl(
     _: *mut EVP_PKEY_CTX,
     _: core::ffi::c_int,
     _: *const core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_hex2ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_is_a(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_is_a")
 }
 
 #[unsafe(no_mangle)]
@@ -8314,34 +8146,6 @@ pub extern "C" fn EVP_PKEY_CTX_md(
     _: *const core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_md")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_new(_: *mut EVP_PKEY, _: *mut ENGINE) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_new_from_name(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_new_from_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_new_from_pkey(
-    _: *mut OSSL_LIB_CTX,
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_new_from_pkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_new_id(_: core::ffi::c_int, _: *mut ENGINE) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_PKEY_CTX_new_id")
 }
 
 #[unsafe(no_mangle)]
@@ -8368,15 +8172,6 @@ pub extern "C" fn EVP_PKEY_CTX_set0_ecdh_kdf_ukm(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_set0_ecdh_kdf_ukm")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set0_keygen_info(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set0_keygen_info")
 }
 
 #[unsafe(no_mangle)]
@@ -8456,21 +8251,6 @@ pub extern "C" fn EVP_PKEY_CTX_set_algor_params(
     _: *const X509_ALGOR,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_set_algor_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_app_data(_: *mut EVP_PKEY_CTX, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_app_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_cb(_: *mut EVP_PKEY_CTX, _: EVP_PKEY_gen_cb) {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_data(_: *mut EVP_PKEY_CTX, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_data")
 }
 
 #[unsafe(no_mangle)]
@@ -8717,23 +8497,6 @@ pub extern "C" fn EVP_PKEY_CTX_set_kem_op(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_mac_key(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_mac_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_params(
-    _: *mut EVP_PKEY_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_set_rsa_keygen_bits(
     _: *mut EVP_PKEY_CTX,
     _: core::ffi::c_int,
@@ -8897,27 +8660,12 @@ pub extern "C" fn EVP_PKEY_CTX_set_tls1_prf_md(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_settable_params(_: *const EVP_PKEY_CTX) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_PKEY_CTX_settable_params")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_str2ctrl(
     _: *mut EVP_PKEY_CTX,
     _: core::ffi::c_int,
     _: *const core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_CTX_str2ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn EVP_PKEY_Q_keygen(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: ...
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_Q_keygen")
 }
 
 #[unsafe(no_mangle)]
@@ -9300,32 +9048,6 @@ pub extern "C" fn EVP_PKEY_can_sign(_: *const EVP_PKEY) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_check(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_cmp(_: *const EVP_PKEY, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_cmp_parameters(
-    _: *const EVP_PKEY,
-    _: *const EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_cmp_parameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_copy_parameters(
-    _: *mut EVP_PKEY,
-    _: *const EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_copy_parameters")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_decapsulate(
     _: *mut EVP_PKEY_CTX,
     _: *mut core::ffi::c_uchar,
@@ -9436,11 +9158,6 @@ pub extern "C" fn EVP_PKEY_digestsign_supports_digest(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_dup(_: *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_dup")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_encapsulate(
     _: *mut EVP_PKEY_CTX,
     _: *mut core::ffi::c_uchar,
@@ -9494,62 +9211,6 @@ pub extern "C" fn EVP_PKEY_encrypt_old(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_eq(_: *const EVP_PKEY, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_eq")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_export(
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: OSSL_CALLBACK,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_export")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_free(_: *mut EVP_PKEY) {
-    crate::stub::unimplemented("EVP_PKEY_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_fromdata(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut *mut EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_fromdata")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_fromdata_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_fromdata_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_fromdata_settable(
-    _: *mut EVP_PKEY_CTX,
-    _: core::ffi::c_int,
-) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_PKEY_fromdata_settable")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_generate(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_generate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0(_: *const EVP_PKEY) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("EVP_PKEY_get0")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get0_DH(_: *const EVP_PKEY) -> *const dh_st {
     crate::stub::unimplemented("EVP_PKEY_get0_DH")
 }
@@ -9575,50 +9236,6 @@ pub extern "C" fn EVP_PKEY_get0_asn1(_: *const EVP_PKEY) -> *const EVP_PKEY_ASN1
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_description(_: *const EVP_PKEY) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_PKEY_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_engine(_: *const EVP_PKEY) -> *mut ENGINE {
-    crate::stub::unimplemented("EVP_PKEY_get0_engine")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_hmac(
-    _: *const EVP_PKEY,
-    _: *mut usize,
-) -> *const core::ffi::c_uchar {
-    crate::stub::unimplemented("EVP_PKEY_get0_hmac")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_poly1305(
-    _: *const EVP_PKEY,
-    _: *mut usize,
-) -> *const core::ffi::c_uchar {
-    crate::stub::unimplemented("EVP_PKEY_get0_poly1305")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_provider(_: *const EVP_PKEY) -> *const OSSL_PROVIDER {
-    crate::stub::unimplemented("EVP_PKEY_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_siphash(
-    _: *const EVP_PKEY,
-    _: *mut usize,
-) -> *const core::ffi::c_uchar {
-    crate::stub::unimplemented("EVP_PKEY_get0_siphash")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_type_name(_: *const EVP_PKEY) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_PKEY_get0_type_name")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get1_DH(_: *mut EVP_PKEY) -> *mut dh_st {
     crate::stub::unimplemented("EVP_PKEY_get1_DH")
 }
@@ -9636,14 +9253,6 @@ pub extern "C" fn EVP_PKEY_get1_EC_KEY(_: *mut EVP_PKEY) -> *mut ec_key_st {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get1_RSA(_: *mut EVP_PKEY) -> *mut rsa_st {
     crate::stub::unimplemented("EVP_PKEY_get1_RSA")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get1_encoded_public_key(
-    _: *mut EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> usize {
-    crate::stub::unimplemented("EVP_PKEY_get1_encoded_public_key")
 }
 
 #[unsafe(no_mangle)]
@@ -9678,168 +9287,13 @@ pub extern "C" fn EVP_PKEY_get_attr_count(_: *const EVP_PKEY) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_base_id(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_base_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_bits(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_bits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_bn_param(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *mut *mut BIGNUM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_bn_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_default_digest_name(
-    _: *mut EVP_PKEY,
-    _: *mut core::ffi::c_char,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_default_digest_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_default_digest_nid(
-    _: *mut EVP_PKEY,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_default_digest_nid")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get_ec_point_conv_form(_: *const EVP_PKEY) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_get_ec_point_conv_form")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_ex_data(
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("EVP_PKEY_get_ex_data")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get_field_type(_: *const EVP_PKEY) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_get_field_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_group_name(
-    _: *const EVP_PKEY,
-    _: *mut core::ffi::c_char,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_group_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_id(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_int_param(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_int_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_octet_string_param(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_octet_string_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_params(_: *const EVP_PKEY, _: *mut OSSL_PARAM) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_raw_private_key(
-    _: *const EVP_PKEY,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_raw_private_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_raw_public_key(
-    _: *const EVP_PKEY,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_raw_public_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_security_bits(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_security_bits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_size(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_size")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_size_t_param(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_size_t_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_utf8_string_param(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_char,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_utf8_string_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_gettable_params(_: *const EVP_PKEY) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_PKEY_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_is_a(
-    _: *const EVP_PKEY,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_is_a")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_keygen(_: *mut EVP_PKEY_CTX, _: *mut *mut EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_keygen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_keygen_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_keygen_init")
 }
 
 #[unsafe(no_mangle)]
@@ -10457,114 +9911,6 @@ pub extern "C" fn EVP_PKEY_meth_set_verifyctx(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_missing_parameters(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_missing_parameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new() -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_CMAC_key(
-    _: *mut ENGINE,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const EVP_CIPHER,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_CMAC_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_mac_key(
-    _: core::ffi::c_int,
-    _: *mut ENGINE,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_mac_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_raw_private_key(
-    _: core::ffi::c_int,
-    _: *mut ENGINE,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_raw_private_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_raw_private_key_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_raw_private_key_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_raw_public_key(
-    _: core::ffi::c_int,
-    _: *mut ENGINE,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_raw_public_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_new_raw_public_key_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKEY_new_raw_public_key_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_pairwise_check(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_pairwise_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_param_check(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_param_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_param_check_quick(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_param_check_quick")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_parameters_eq(
-    _: *const EVP_PKEY,
-    _: *const EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_parameters_eq")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_paramgen(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_paramgen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_paramgen_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_paramgen_init")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_print_params(
     _: *mut BIO,
     _: *const EVP_PKEY,
@@ -10625,29 +9971,6 @@ pub extern "C" fn EVP_PKEY_print_public_fp(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_private_check(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_private_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_public_check(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_public_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_public_check_quick(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_public_check_quick")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_save_parameters(
-    _: *mut EVP_PKEY,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_save_parameters")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_set1_DH(_: *mut EVP_PKEY, _: *mut dh_st) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_set1_DH")
 }
@@ -10665,107 +9988,6 @@ pub extern "C" fn EVP_PKEY_set1_EC_KEY(_: *mut EVP_PKEY, _: *mut ec_key_st) -> c
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_set1_RSA(_: *mut EVP_PKEY, _: *mut rsa_st) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_set1_RSA")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set1_encoded_public_key(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set1_encoded_public_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set1_engine(_: *mut EVP_PKEY, _: *mut ENGINE) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set1_engine")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_bn_param(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *const BIGNUM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_bn_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_ex_data(
-    _: *mut EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_int_param(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_int_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_octet_string_param(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_octet_string_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_params(_: *mut EVP_PKEY, _: *mut OSSL_PARAM) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_size_t_param(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_size_t_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_type(_: *mut EVP_PKEY, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_type_by_keymgmt(
-    _: *mut EVP_PKEY,
-    _: *mut EVP_KEYMGMT,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_type_by_keymgmt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_type_str(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_type_str")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set_utf8_string_param(
-    _: *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set_utf8_string_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_settable_params(_: *const EVP_PKEY) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_PKEY_settable_params")
 }
 
 #[unsafe(no_mangle)]
@@ -10826,36 +10048,6 @@ pub extern "C" fn EVP_PKEY_sign_message_update(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_sign_message_update")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_todata(
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_todata")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_type(_: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_type_names_do_all(
-    _: *const EVP_PKEY,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_type_names_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_up_ref(_: *mut EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_up_ref")
 }
 
 #[unsafe(no_mangle)]
