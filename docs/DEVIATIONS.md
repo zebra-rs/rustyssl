@@ -166,6 +166,9 @@ OpenSSL never depends on them.
 | `EVP_PKEY_CTX_get_keygen_info` with the index equal to the count, or after generation or `EVP_PKEY_CTX_set0_keygen_info` left no array | reads past the array, or through NULL | returns 0 | `evp::pkey::tests::keygen_info_past_the_end_is_zero` |
 | An `ENGINE` given to `EVP_PKEY_new_raw_private_key`/`_public_key`, `EVP_PKEY_new_mac_key`, `EVP_PKEY_new_CMAC_key`, `EVP_PKEY_CTX_new`, `EVP_PKEY_CTX_new_id`, or `EVP_PKEY_set1_engine` | initializes the engine and uses its methods | fails with `ERR_R_ENGINE_LIB`, as there are no engines (their API can't make one) | `evp::pkey::tests::engines_are_refused` |
 | `EVP_PKEY_keygen`, `EVP_PKEY_paramgen`, `EVP_PKEY_generate`, `EVP_PKEY_fromdata` into a key typed by name (`EVP_PKEY_set_type_str`) | the key keeps its type when retyped, so gets no key manager, and its new data is used through the NULL key manager, which crashes | fails with `ERR_R_INTERNAL_ERROR`, leaving the key without data | `evp::pkey::tests::keys_typed_by_name_take_no_data` |
+| `EVP_SIGNATURE_up_ref`, `EVP_SIGNATURE_get0_name` and the other accessors, and `EVP_SIGNATURE_names_do_all` with a NULL algorithm | dereference NULL and crash | fail (0, NULL) | `evp::signature::tests::null_methods_are_refused` |
+| `EVP_PKEY_sign_message_update`/`_final` and `EVP_PKEY_verify_message_update`/`_final` after an init that left the operation without an algorithm (one given of another key type) | read the missing algorithm and crash | fail with -2 and `EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE`, as `EVP_PKEY_sign` does there | `evp::signature::tests::message_functions_without_an_algorithm_fail` |
+| `EVP_DigestSignInit`, `EVP_DigestSign*`/`EVP_DigestVerify*`, and `EVP_MD_CTX_get_pkey_ctx`/`_set_pkey_ctx` with a NULL digest context; `EVP_PKEY_can_sign` with a NULL key | dereference NULL and crash | fail (0, -1 for `EVP_DigestVerify`, NULL) or do nothing | `evp::sigver::tests::null_contexts_are_refused` |
 
 ## Notes
 
