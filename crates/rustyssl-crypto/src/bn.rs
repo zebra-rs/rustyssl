@@ -13,8 +13,10 @@
 mod conv;
 pub mod ct;
 mod div;
+pub mod gf2m;
 pub mod modular;
 pub mod mont;
+pub mod prime;
 pub mod rfc_primes;
 
 use core::cmp::Ordering;
