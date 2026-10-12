@@ -3,7 +3,7 @@
 //!
 //! Both are `ASN1_STRING`s holding a value's magnitude, big-endian, with `V_ASN1_NEG` in the
 //! type for a negative one. The magnitude is used as stored: leading zero octets count toward
-//! the 8 a 64-bit value allows, as in OpenSSL. The `BIGNUM` conversions come with `BIGNUM`.
+//! the 8 a 64-bit value allows, as in OpenSSL. The `BIGNUM` conversions are in `bn::conv`.
 
 use core::ffi::{c_char, c_int, c_long};
 use core::ptr;

@@ -29,6 +29,7 @@ use crate::err;
 use crate::ffi::ffi_export;
 use crate::mem;
 
+pub(crate) mod bn;
 pub(crate) mod build;
 pub(crate) mod dup;
 

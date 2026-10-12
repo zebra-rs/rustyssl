@@ -58,6 +58,8 @@ const _: unsafe extern "C" fn(*mut ASN1_ENUMERATED, core::ffi::c_long) -> core::
     crate::asn1::integer::ASN1_ENUMERATED_set;
 const _: unsafe extern "C" fn(*mut ASN1_ENUMERATED, i64) -> core::ffi::c_int =
     crate::asn1::integer::ASN1_ENUMERATED_set_int64;
+const _: unsafe extern "C" fn(*const ASN1_ENUMERATED, *mut BIGNUM) -> *mut BIGNUM =
+    crate::bn::conv::ASN1_ENUMERATED_to_BN;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_FBOOLEAN_it;
 const _: unsafe extern "C" fn(
     *mut ASN1_GENERALIZEDTIME,
@@ -111,6 +113,8 @@ const _: unsafe extern "C" fn(*mut ASN1_INTEGER, i64) -> core::ffi::c_int =
     crate::asn1::integer::ASN1_INTEGER_set_int64;
 const _: unsafe extern "C" fn(*mut ASN1_INTEGER, u64) -> core::ffi::c_int =
     crate::asn1::integer::ASN1_INTEGER_set_uint64;
+const _: unsafe extern "C" fn(*const ASN1_INTEGER, *mut BIGNUM) -> *mut BIGNUM =
+    crate::bn::conv::ASN1_INTEGER_to_BN;
 const _: unsafe extern "C" fn(*mut ASN1_NULL) = crate::asn1::tpl::items::ASN1_NULL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_NULL_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_NULL = crate::asn1::tpl::items::ASN1_NULL_new;
@@ -368,6 +372,13 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::asn1::tpl::items::ASN1_VISIBLESTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_VISIBLESTRING =
     crate::asn1::string::ASN1_VISIBLESTRING_new;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::ASN1_bn_print;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_uchar,
@@ -1204,6 +1215,263 @@ const _: unsafe extern "C" fn(
     usize,
     *mut usize,
 ) -> core::ffi::c_int = crate::bio::BIO_write_ex;
+const _: unsafe extern "C" fn(*mut BN_CTX) = crate::bn::ctx::BN_CTX_end;
+const _: unsafe extern "C" fn(*mut BN_CTX) = crate::bn::ctx::BN_CTX_free;
+const _: unsafe extern "C" fn(*mut BN_CTX) -> *mut BIGNUM = crate::bn::ctx::BN_CTX_get;
+const _: unsafe extern "C" fn() -> *mut BN_CTX = crate::bn::ctx::BN_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut BN_CTX = crate::bn::ctx::BN_CTX_new_ex;
+const _: unsafe extern "C" fn() -> *mut BN_CTX = crate::bn::ctx::BN_CTX_secure_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut BN_CTX =
+    crate::bn::ctx::BN_CTX_secure_new_ex;
+const _: unsafe extern "C" fn(*mut BN_CTX) = crate::bn::ctx::BN_CTX_start;
+const _: unsafe extern "C" fn(*const BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::BN_abs_is_word;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_add;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::arith::BN_add_word;
+const _: unsafe extern "C" fn(*mut *mut BIGNUM, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::bn::conv::BN_asc2bn;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_bin2bn;
+const _: unsafe extern "C" fn(*const BIGNUM, *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::bn::conv::BN_bn2bin;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_bn2binpad;
+const _: unsafe extern "C" fn(*const BIGNUM) -> *mut core::ffi::c_char = crate::bn::conv::BN_bn2dec;
+const _: unsafe extern "C" fn(*const BIGNUM) -> *mut core::ffi::c_char = crate::bn::conv::BN_bn2hex;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_bn2lebinpad;
+const _: unsafe extern "C" fn(*const BIGNUM, *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::bn::conv::BN_bn2mpi;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_bn2nativepad;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::rand::BN_bntest_rand;
+const _: unsafe extern "C" fn(*mut BIGNUM) = crate::bn::BN_clear;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_clear_bit;
+const _: unsafe extern "C" fn(*mut BIGNUM) = crate::bn::BN_clear_free;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM) -> core::ffi::c_int = crate::bn::BN_cmp;
+const _: unsafe extern "C" fn(core::ffi::c_ulong, *mut BIGNUM, *mut BIGNUM, core::ffi::c_int) =
+    crate::bn::BN_consttime_swap;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> *mut BIGNUM = crate::bn::BN_copy;
+const _: unsafe extern "C" fn(*mut *mut BIGNUM, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::bn::conv::BN_dec2bn;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::arith::BN_div;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_ulong) -> core::ffi::c_ulong =
+    crate::bn::arith::BN_div_word;
+const _: unsafe extern "C" fn(*const BIGNUM) -> *mut BIGNUM = crate::bn::BN_dup;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::arith::BN_exp;
+const _: unsafe extern "C" fn(*mut BIGNUM) = crate::bn::BN_free;
+const _: unsafe extern "C" fn(*const BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_get_flags;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int = crate::bn::BN_get_params;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_ulong = crate::bn::BN_get_word;
+const _: unsafe extern "C" fn(*mut *mut BIGNUM, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::bn::conv::BN_hex2bn;
+const _: unsafe extern "C" fn(*const BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_is_bit_set;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_int = crate::bn::BN_is_negative;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_int = crate::bn::BN_is_odd;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_int = crate::bn::BN_is_one;
+const _: unsafe extern "C" fn(*const BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::BN_is_word;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_int = crate::bn::BN_is_zero;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_lebin2bn;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::arith::BN_lshift;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_lshift1;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_mask_bits;
+const _: unsafe extern "C" fn(*const BIGNUM, core::ffi::c_ulong) -> core::ffi::c_ulong =
+    crate::bn::arith::BN_mod_word;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_mpi2bn;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::arith::BN_mul;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::arith::BN_mul_word;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_native2bn;
+const _: unsafe extern "C" fn() -> *mut BIGNUM = crate::bn::BN_new;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::arith::BN_nnmod;
+const _: unsafe extern "C" fn(*const BIGNUM) -> core::ffi::c_int = crate::bn::BN_num_bits;
+const _: unsafe extern "C" fn(core::ffi::c_ulong) -> core::ffi::c_int = crate::bn::BN_num_bits_word;
+const _: unsafe extern "C" fn() -> *mut core::ffi::c_char = crate::bn::BN_options;
+const _: unsafe extern "C" fn(*mut BIO, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::conv::BN_print;
+const _: unsafe extern "C" fn(*mut FILE, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::conv::BN_print_fp;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::rand::BN_priv_rand;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_uint,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::rand::BN_priv_rand_ex;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::rand::BN_priv_rand_range;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *const BIGNUM,
+    core::ffi::c_uint,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::rand::BN_priv_rand_range_ex;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::rand::BN_pseudo_rand;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::rand::BN_pseudo_rand_range;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::rand::BN_rand;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_uint,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::rand::BN_rand_ex;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::rand::BN_rand_range;
+const _: unsafe extern "C" fn(
+    *mut BIGNUM,
+    *const BIGNUM,
+    core::ffi::c_uint,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::bn::rand::BN_rand_range_ex;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::arith::BN_rshift;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_rshift1;
+const _: unsafe extern "C" fn() -> *mut BIGNUM = crate::bn::BN_secure_new;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_security_bits;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::bn::BN_set_bit;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_int) = crate::bn::BN_set_flags;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_int) = crate::bn::BN_set_negative;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::bn::BN_set_params;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::BN_set_word;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_signed_bin2bn;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_signed_bn2bin;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_signed_bn2lebin;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bn::conv::BN_signed_bn2native;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_signed_lebin2bn;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut BIGNUM,
+) -> *mut BIGNUM = crate::bn::conv::BN_signed_native2bn;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, *mut BN_CTX) -> core::ffi::c_int =
+    crate::bn::arith::BN_sqr;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_sub;
+const _: unsafe extern "C" fn(*mut BIGNUM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::bn::arith::BN_sub_word;
+const _: unsafe extern "C" fn(*mut BIGNUM, *mut BIGNUM) = crate::bn::BN_swap;
+const _: unsafe extern "C" fn(*const BIGNUM, *mut ASN1_ENUMERATED) -> *mut ASN1_ENUMERATED =
+    crate::bn::conv::BN_to_ASN1_ENUMERATED;
+const _: unsafe extern "C" fn(*const BIGNUM, *mut ASN1_INTEGER) -> *mut ASN1_INTEGER =
+    crate::bn::conv::BN_to_ASN1_INTEGER;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_uadd;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::BN_ucmp;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::bn::arith::BN_usub;
+const _: unsafe extern "C" fn() -> *const BIGNUM = crate::bn::BN_value_one;
+const _: unsafe extern "C" fn(*mut BIGNUM, *const BIGNUM, core::ffi::c_int) =
+    crate::bn::BN_with_flags;
+const _: unsafe extern "C" fn(*mut BIGNUM) = crate::bn::BN_zero_ex;
 const _: unsafe extern "C" fn(*mut BUF_MEM) = crate::buffer::BUF_MEM_free;
 const _: unsafe extern "C" fn(*mut BUF_MEM, usize) -> usize = crate::buffer::BUF_MEM_grow;
 const _: unsafe extern "C" fn(*mut BUF_MEM, usize) -> usize = crate::buffer::BUF_MEM_grow_clean;
@@ -2971,6 +3239,17 @@ const _: unsafe extern "C" fn() -> *mut OSSL_PARAM_BLD = crate::params::build::O
 const _: unsafe extern "C" fn(
     *mut OSSL_PARAM_BLD,
     *const core::ffi::c_char,
+    *const BIGNUM,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_BN;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
+    *const BIGNUM,
+    usize,
+) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_BN_pad;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM_BLD,
+    *const core::ffi::c_char,
     f64,
 ) -> core::ffi::c_int = crate::params::build::OSSL_PARAM_BLD_push_double;
 const _: unsafe extern "C" fn(
@@ -3050,6 +3329,14 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut OSSL_PARAM_BLD) -> *mut OSSL_PARAM =
     crate::params::build::OSSL_PARAM_BLD_to_param;
 const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM,
+    *const OSSL_PARAM,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    usize,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::params::bn::OSSL_PARAM_allocate_from_text;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *mut core::ffi::c_uchar,
     usize,
@@ -3100,6 +3387,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const OSSL_PARAM) -> *mut OSSL_PARAM =
     crate::params::dup::OSSL_PARAM_dup;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM) = crate::params::dup::OSSL_PARAM_free;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut *mut BIGNUM) -> core::ffi::c_int =
+    crate::params::bn::OSSL_PARAM_get_BN;
 const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut f64) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_get_double;
 const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut core::ffi::c_int) -> core::ffi::c_int =
@@ -3159,6 +3448,10 @@ const _: unsafe extern "C" fn(*const OSSL_PARAM, *const OSSL_PARAM) -> *mut OSSL
     crate::params::dup::OSSL_PARAM_merge;
 const _: unsafe extern "C" fn(*const OSSL_PARAM) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_modified;
+const _: unsafe extern "C" fn(*const OSSL_PARAM, *mut BIO, core::ffi::c_int) -> core::ffi::c_int =
+    crate::params::bn::OSSL_PARAM_print_to_bio;
+const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const BIGNUM) -> core::ffi::c_int =
+    crate::params::bn::OSSL_PARAM_set_BN;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM) = crate::params::OSSL_PARAM_set_all_unmodified;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, f64) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_double;
