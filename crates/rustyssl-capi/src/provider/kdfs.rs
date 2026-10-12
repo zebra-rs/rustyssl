@@ -1,44 +1,63 @@
 //! The default provider's KDFs (`deflt_kdfs` in `providers/defltprov.c`), so far HKDF and
-//! TLS13-KDF (`hkdf.c`), PBKDF2 (`pbkdf2.c`), TLS1-PRF (`tls1_prf.c`), and SSKDF and X963KDF
-//! (`sskdf.c`).
+//! TLS13-KDF (`hkdf.c`), PBKDF2 (`pbkdf2.c`), TLS1-PRF (`tls1_prf.c`), SSKDF and X963KDF
+//! (`sskdf.c`), SSHKDF (`sshkdf.c`), KBKDF (`kbkdf.c`), X942KDF-ASN1 (`x942kdf.c`), and scrypt
+//! (`scrypt.c`).
 //!
 //! Like the reference's, they run over the EVP layer: HMAC through `EVP_Q_mac` and the legacy
 //! `HMAC_*` functions, digests through `EVP_MD_CTX`, and MACs through `EVP_MAC_CTX`, with the
 //! digests and MACs fetched from the provider's library context by name (and `properties`).
 //! So any provider's digest works, and what the inner calls raise is what the reference's raise.
 //! Their parameters, defaults, and checks are the reference's, quirks included (a TLS13-KDF
-//! parameter call clears its `data`; an SSKDF derivation keeps the default salt it made).
+//! parameter call clears its `data`; an SSKDF derivation keeps the default salt it made;
+//! KBKDF's `mode` matches a prefix). scrypt's computation is the KDF backend's
+//! (`rustyssl_crypto::kdf::scrypt`), after the reference's checks, as is X9.42's DER
+//! `OtherInfo`; X9.42's hashing is over `EVP_MD_CTX`.
 
-use core::ffi::{CStr, c_char, c_int, c_uchar, c_void};
+use core::ffi::{CStr, c_char, c_int, c_uchar, c_uint, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, EVP_KDF_HKDF_MODE_EXPAND_ONLY, EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND,
-    EVP_KDF_HKDF_MODE_EXTRACT_ONLY, EVP_MAC_CTX, EVP_MAX_MD_SIZE, EVP_MD, OSSL_ALG_PARAM_CIPHER,
-    OSSL_ALG_PARAM_DIGEST, OSSL_ALG_PARAM_ENGINE, OSSL_ALG_PARAM_MAC, OSSL_ALG_PARAM_PROPERTIES,
-    OSSL_ALGORITHM, OSSL_FUNC_KDF_DERIVE, OSSL_FUNC_KDF_DUPCTX, OSSL_FUNC_KDF_FREECTX,
+    ERR_LIB_EVP, ERR_LIB_PROV, EVP_KDF_HKDF_MODE_EXPAND_ONLY, EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND,
+    EVP_KDF_HKDF_MODE_EXTRACT_ONLY, EVP_MAC_CTX, EVP_MAX_MD_SIZE, EVP_MD,
+    EVP_R_MEMORY_LIMIT_EXCEEDED, EVP_R_PBKDF2_ERROR, NID_id_aes128_wrap, NID_id_aes192_wrap,
+    NID_id_aes256_wrap, NID_id_smime_alg_CMS3DESwrap, OSSL_ALG_PARAM_CIPHER, OSSL_ALG_PARAM_DIGEST,
+    OSSL_ALG_PARAM_ENGINE, OSSL_ALG_PARAM_MAC, OSSL_ALG_PARAM_PROPERTIES, OSSL_ALGORITHM,
+    OSSL_FUNC_KDF_DERIVE, OSSL_FUNC_KDF_DUPCTX, OSSL_FUNC_KDF_FREECTX,
     OSSL_FUNC_KDF_GET_CTX_PARAMS, OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, OSSL_FUNC_KDF_NEWCTX,
     OSSL_FUNC_KDF_RESET, OSSL_FUNC_KDF_SET_CTX_PARAMS, OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
-    OSSL_KDF_PARAM_DATA, OSSL_KDF_PARAM_DIGEST, OSSL_KDF_PARAM_INFO, OSSL_KDF_PARAM_ITER,
-    OSSL_KDF_PARAM_KEY, OSSL_KDF_PARAM_LABEL, OSSL_KDF_PARAM_MAC, OSSL_KDF_PARAM_MAC_SIZE,
-    OSSL_KDF_PARAM_MODE, OSSL_KDF_PARAM_PASSWORD, OSSL_KDF_PARAM_PKCS5, OSSL_KDF_PARAM_PREFIX,
-    OSSL_KDF_PARAM_PROPERTIES, OSSL_KDF_PARAM_SALT, OSSL_KDF_PARAM_SECRET, OSSL_KDF_PARAM_SEED,
-    OSSL_KDF_PARAM_SIZE, OSSL_LIB_CTX, OSSL_MAC_PARAM_CIPHER, OSSL_MAC_PARAM_CUSTOM,
-    OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES, OSSL_MAC_PARAM_SIZE, OSSL_PARAM,
-    OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER,
-    OSSL_PARAM_UTF8_STRING, PKCS5_DEFAULT_ITER, PROV_R_INVALID_ITERATION_COUNT,
-    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_MODE, PROV_R_INVALID_SALT_LENGTH,
-    PROV_R_KEY_SIZE_TOO_SMALL, PROV_R_MISSING_KEY, PROV_R_MISSING_MESSAGE_DIGEST,
-    PROV_R_MISSING_PASS, PROV_R_MISSING_SALT, PROV_R_MISSING_SECRET, PROV_R_MISSING_SEED,
-    PROV_R_NOT_SUPPORTED, PROV_R_UNSUPPORTED_MAC_TYPE, PROV_R_WRONG_OUTPUT_BUFFER_SIZE,
-    PROV_R_XOF_DIGESTS_NOT_ALLOWED,
+    OSSL_KDF_PARAM_CEK_ALG, OSSL_KDF_PARAM_CIPHER, OSSL_KDF_PARAM_DATA, OSSL_KDF_PARAM_DIGEST,
+    OSSL_KDF_PARAM_INFO, OSSL_KDF_PARAM_ITER, OSSL_KDF_PARAM_KBKDF_R, OSSL_KDF_PARAM_KBKDF_USE_L,
+    OSSL_KDF_PARAM_KBKDF_USE_SEPARATOR, OSSL_KDF_PARAM_KEY, OSSL_KDF_PARAM_LABEL,
+    OSSL_KDF_PARAM_MAC, OSSL_KDF_PARAM_MAC_SIZE, OSSL_KDF_PARAM_MODE, OSSL_KDF_PARAM_PASSWORD,
+    OSSL_KDF_PARAM_PKCS5, OSSL_KDF_PARAM_PREFIX, OSSL_KDF_PARAM_PROPERTIES, OSSL_KDF_PARAM_SALT,
+    OSSL_KDF_PARAM_SCRYPT_MAXMEM, OSSL_KDF_PARAM_SCRYPT_N, OSSL_KDF_PARAM_SCRYPT_P,
+    OSSL_KDF_PARAM_SCRYPT_R, OSSL_KDF_PARAM_SECRET, OSSL_KDF_PARAM_SEED, OSSL_KDF_PARAM_SIZE,
+    OSSL_KDF_PARAM_SSHKDF_SESSION_ID, OSSL_KDF_PARAM_SSHKDF_TYPE, OSSL_KDF_PARAM_SSHKDF_XCGHASH,
+    OSSL_KDF_PARAM_UKM, OSSL_KDF_PARAM_X942_ACVPINFO, OSSL_KDF_PARAM_X942_PARTYUINFO,
+    OSSL_KDF_PARAM_X942_PARTYVINFO, OSSL_KDF_PARAM_X942_SUPP_PRIVINFO,
+    OSSL_KDF_PARAM_X942_SUPP_PUBINFO, OSSL_KDF_PARAM_X942_USE_KEYBITS, OSSL_LIB_CTX,
+    OSSL_MAC_PARAM_CIPHER, OSSL_MAC_PARAM_CUSTOM, OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES,
+    OSSL_MAC_PARAM_SIZE, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING,
+    OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING, PKCS5_DEFAULT_ITER, PROV_R_BAD_ENCODING,
+    PROV_R_BAD_LENGTH, PROV_R_INVALID_DATA, PROV_R_INVALID_ITERATION_COUNT,
+    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_MAC, PROV_R_INVALID_MODE, PROV_R_INVALID_PUBINFO,
+    PROV_R_INVALID_SALT_LENGTH, PROV_R_INVALID_SEED_LENGTH, PROV_R_INVALID_UKM_LENGTH,
+    PROV_R_KEY_SIZE_TOO_SMALL, PROV_R_MISSING_CEK_ALG, PROV_R_MISSING_KEY, PROV_R_MISSING_MAC,
+    PROV_R_MISSING_MESSAGE_DIGEST, PROV_R_MISSING_PASS, PROV_R_MISSING_SALT, PROV_R_MISSING_SECRET,
+    PROV_R_MISSING_SEED, PROV_R_MISSING_SESSION_ID, PROV_R_MISSING_TYPE, PROV_R_MISSING_XCGHASH,
+    PROV_R_NO_KEY_SET, PROV_R_NOT_SUPPORTED, PROV_R_UNABLE_TO_LOAD_SHA256,
+    PROV_R_UNSUPPORTED_CEK_ALG, PROV_R_UNSUPPORTED_MAC_TYPE, PROV_R_VALUE_ERROR,
+    PROV_R_WRONG_OUTPUT_BUFFER_SIZE, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
 };
 
 use super::builtin::libctx_of;
 use super::macs::{Prov, SIZE_T, boxed, context, is_empty, locate, unbox, wipe};
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry};
 use crate::err;
-use crate::evp::digest::{EVP_MD_get_size, EVP_MD_get0_name};
+use crate::evp::cipher::{EVP_CIPHER_fetch, EVP_CIPHER_free, EVP_CIPHER_is_a};
+use crate::evp::digest::{
+    EVP_MD_fetch, EVP_MD_free, EVP_MD_get_size, EVP_MD_get0_name, EVP_MD_up_ref,
+};
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_get_mac_size, EVP_MAC_CTX_get0_mac,
     EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch, EVP_MAC_final, EVP_MAC_free,
@@ -53,12 +72,13 @@ use crate::hmac::{
     HMAC_CTX_copy, HMAC_CTX_free, HMAC_CTX_new, HMAC_Final, HMAC_Init_ex, HMAC_Update,
 };
 use crate::mem;
+use crate::objects::{OBJ_get0_data, OBJ_length, OBJ_nid2obj};
 use crate::params::{
     OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_size_t,
     OSSL_PARAM_construct_utf8_string, OSSL_PARAM_get_int, OSSL_PARAM_get_octet_string,
     OSSL_PARAM_get_octet_string_ptr, OSSL_PARAM_get_size_t, OSSL_PARAM_get_uint64,
-    OSSL_PARAM_locate, OSSL_PARAM_locate_const, OSSL_PARAM_set_octet_string, OSSL_PARAM_set_size_t,
-    end,
+    OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
+    OSSL_PARAM_set_octet_string, OSSL_PARAM_set_size_t, end,
 };
 
 type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -2525,14 +2545,1617 @@ macro_rules! sskdf_table {
 static SSKDF_FUNCTIONS: Dispatch<10> = sskdf_table!(sskdf_derive);
 static X963KDF_FUNCTIONS: Dispatch<10> = sskdf_table!(x963kdf_derive);
 
-/// `deflt_kdfs` so far (the rest come with step 3.6b), in the reference's order.
-static DEFAULT_KDFS: Algorithms<7> = Algorithms([
+// -------------------------------------------------------------------------------------------
+// SSHKDF
+
+/// `KDF_SSHKDF`.
+#[derive(Default)]
+struct Sshkdf {
+    provctx: Ptr,
+    digest: Prov<EVP_MD>,
+    key: Option<Secret>,
+    xcghash: Option<Secret>,
+    session_id: Option<Secret>,
+    kind: u8,
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_new`.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn sshkdf_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        boxed(Sshkdf { provctx: Ptr(provctx), ..Sshkdf::default() })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_free`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or an SSHKDF context, not used afterwards.
+    pub(crate) unsafe extern "C" fn sshkdf_free(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<Sshkdf>(vctx) };
+    }
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_reset`.
+    ///
+    /// # Safety
+    /// `vctx` is a live SSHKDF context.
+    pub(crate) unsafe extern "C" fn sshkdf_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { context::<Sshkdf>(vctx) } {
+            *c = Sshkdf { provctx: c.provctx, ..Sshkdf::default() };
+        }
+    }
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_dup`.
+    ///
+    /// # Safety
+    /// `vctx` is a live SSHKDF context.
+    pub(crate) unsafe extern "C" fn sshkdf_dup(vctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(src) = (unsafe { context::<Sshkdf>(vctx) }) else { return ptr::null_mut() };
+        let (Some(key), Some(xcghash), Some(session_id)) = (memdup(&src.key), memdup(&src.xcghash), memdup(&src.session_id)) else {
+            return ptr::null_mut();
+        };
+        let Some(digest) = src.digest.copy() else { return ptr::null_mut() };
+        boxed(Sshkdf { provctx: src.provctx, digest, key, xcghash, session_id, kind: src.kind })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_set_ctx_params`: the digest, K, H, the session id, and the type (A to F).
+    ///
+    /// # Safety
+    /// `vctx` is a live SSHKDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn sshkdf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: as above.
+        let Some(c) = (unsafe { context::<Sshkdf>(vctx) }) else { return 0 };
+        // SAFETY: as above; the context's provider.
+        if !unsafe { load_digest(&mut c.digest, params, c.provctx.0) } {
+            return 0;
+        }
+        for (name, slot) in [
+            (OSSL_KDF_PARAM_KEY, &mut c.key),
+            (OSSL_KDF_PARAM_SSHKDF_XCGHASH, &mut c.xcghash),
+            (OSSL_KDF_PARAM_SSHKDF_SESSION_ID, &mut c.session_id),
+        ] {
+            // SAFETY: as above.
+            if let Some(p) = unsafe { locate(params, name) } {
+                *slot = None;
+                // SAFETY: a parameter of the caller's array.
+                let Some(v) = (unsafe { get_octets(p) }) else { return 0 };
+                *slot = Some(v);
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_SSHKDF_TYPE) } {
+            let mut text: *const c_char = ptr::null();
+            // SAFETY: a parameter of the caller's array; a local.
+            if unsafe { OSSL_PARAM_get_utf8_string_ptr(p, &raw mut text) } == 0 || text.is_null() || p.data_size != 1 {
+                return 0;
+            }
+            // SAFETY: the parameter's one octet.
+            let t = unsafe { text.cast::<u8>().read() };
+            if !(b'A'..=b'F').contains(&t) {
+                raise(PROV_R_VALUE_ERROR, "kdf_sshkdf_set_ctx_params");
+                return 0;
+            }
+            c.kind = t;
+        }
+        1
+    }
+}
+
+/// `SSHKDF`: K1 = HASH(K || H || type || session_id), then K(n) = HASH(K || H || K1..K(n-1)).
+/// Over a digest of no size the reference loops forever; it fails here (docs/DEVIATIONS.md).
+///
+/// # Safety
+/// `md` is a live digest; `okey` has room for `okey_len` octets.
+unsafe fn sshkdf_compute(
+    md: *const EVP_MD,
+    key: &[u8],
+    xcghash: &[u8],
+    kind: u8,
+    session_id: &[u8],
+    okey: *mut u8,
+    okey_len: usize,
+) -> bool {
+    // SAFETY: no preconditions.
+    let mctx = unsafe { EVP_MD_CTX_new() };
+    if mctx.is_null() {
+        return false;
+    }
+    let mut digest = [0u8; MAX_MD];
+    let mut dsize: c_uint = 0;
+    let t = [kind];
+    // SAFETY: the context made here; the caller's digest and octets; room for any digest.
+    let mut ok = unsafe { EVP_DigestInit_ex(mctx, md, ptr::null_mut()) } != 0
+        // SAFETY: as above.
+        && unsafe { EVP_DigestUpdate(mctx, key.as_ptr().cast(), key.len()) } != 0
+        // SAFETY: as above.
+        && unsafe { EVP_DigestUpdate(mctx, xcghash.as_ptr().cast(), xcghash.len()) } != 0
+        // SAFETY: as above.
+        && unsafe { EVP_DigestUpdate(mctx, t.as_ptr().cast(), 1) } != 0
+        // SAFETY: as above.
+        && unsafe { EVP_DigestUpdate(mctx, session_id.as_ptr().cast(), session_id.len()) } != 0
+        // SAFETY: as above.
+        && unsafe { EVP_DigestFinal_ex(mctx, digest.as_mut_ptr(), &raw mut dsize) } != 0;
+    let mut d = dsize as usize;
+    if ok && okey_len > 0 && d == 0 {
+        ok = false;
+    }
+    if ok {
+        let n = okey_len.min(d);
+        // SAFETY: the caller's room.
+        unsafe { ptr::copy_nonoverlapping(digest.as_ptr(), okey, n) };
+        let mut cursize = n;
+        while ok && cursize < okey_len {
+            // SAFETY: as above; the octets written so far.
+            ok = unsafe { EVP_DigestInit_ex(mctx, md, ptr::null_mut()) } != 0
+                // SAFETY: as above.
+                && unsafe { EVP_DigestUpdate(mctx, key.as_ptr().cast(), key.len()) } != 0
+                // SAFETY: as above.
+                && unsafe { EVP_DigestUpdate(mctx, xcghash.as_ptr().cast(), xcghash.len()) } != 0
+                // SAFETY: as above.
+                && unsafe { EVP_DigestUpdate(mctx, okey.cast_const().cast(), cursize) } != 0
+                // SAFETY: as above.
+                && unsafe { EVP_DigestFinal_ex(mctx, digest.as_mut_ptr(), &raw mut dsize) } != 0;
+            d = dsize as usize;
+            if ok && d == 0 {
+                ok = false;
+            }
+            if ok {
+                let n = (okey_len - cursize).min(d);
+                // SAFETY: the caller's room for `n` more octets.
+                unsafe { ptr::copy_nonoverlapping(digest.as_ptr(), okey.wrapping_add(cursize), n) };
+                cursize += n;
+            }
+        }
+    }
+    // SAFETY: the context made here.
+    unsafe { EVP_MD_CTX_free(mctx) };
+    wipe(&mut digest);
+    ok
+}
+
+ffi_callback! {
+    /// `kdf_sshkdf_derive`.
+    ///
+    /// # Safety
+    /// `vctx` is a live SSHKDF context; `key` has room for `keylen` octets; `params` is NULL
+    /// or a parameter array.
+    pub(crate) unsafe extern "C" fn sshkdf_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { sshkdf_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(c) = (unsafe { context::<Sshkdf>(vctx) }) else { return 0 };
+        let md = c.digest.method;
+        let missing = if md.is_null() {
+            Some(PROV_R_MISSING_MESSAGE_DIGEST)
+        } else if c.key.is_none() {
+            Some(PROV_R_MISSING_KEY)
+        } else if c.xcghash.is_none() {
+            Some(PROV_R_MISSING_XCGHASH)
+        } else if c.session_id.is_none() {
+            Some(PROV_R_MISSING_SESSION_ID)
+        } else if c.kind == 0 {
+            Some(PROV_R_MISSING_TYPE)
+        } else {
+            None
+        };
+        if let Some(r) = missing {
+            raise(r, "kdf_sshkdf_derive");
+            return 0;
+        }
+        let bytes = |s: &Option<Secret>| s.as_ref().map(|x| x.0.clone()).unwrap_or_default();
+        let (k, h, sid) = (Secret(bytes(&c.key)), Secret(bytes(&c.xcghash)), Secret(bytes(&c.session_id)));
+        // SAFETY: the context's digest; the caller's room.
+        c_int::from(unsafe { sshkdf_compute(md, &k.0, &h.0, c.kind, &sid.0, key, keylen) })
+    }
+}
+
+static SSHKDF_SETTABLE: Params<7> = Params([
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_KEY, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_SSHKDF_XCGHASH,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_SSHKDF_SESSION_ID,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_SSHKDF_TYPE,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `kdf_sshkdf_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn sshkdf_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        SSHKDF_SETTABLE.0.as_ptr()
+    }
+}
+
+static SSHKDF_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, sshkdf_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, sshkdf_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, sshkdf_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, sshkdf_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, sshkdf_derive, DeriveFn),
+    entry!(
+        OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+        sshkdf_settable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        sshkdf_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        any_size_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+// -------------------------------------------------------------------------------------------
+// KBKDF
+
+/// `KBKDF`.
+struct Kbkdf {
+    provctx: Ptr,
+    feedback: bool,
+    ctx_init: *mut EVP_MAC_CTX,
+    r: c_int,
+    ki: Option<Secret>,
+    label: Option<Secret>,
+    context: Option<Secret>,
+    iv: Option<Secret>,
+    use_l: c_int,
+    is_kmac: bool,
+    use_separator: c_int,
+}
+
+impl Kbkdf {
+    fn new(provctx: Ptr) -> Self {
+        Self {
+            provctx,
+            feedback: false,
+            ctx_init: ptr::null_mut(),
+            r: 32,
+            ki: None,
+            label: None,
+            context: None,
+            iv: None,
+            use_l: 1,
+            is_kmac: false,
+            use_separator: 1,
+        }
+    }
+}
+
+impl Drop for Kbkdf {
+    fn drop(&mut self) {
+        // SAFETY: the context this owns, or NULL.
+        unsafe { EVP_MAC_CTX_free(self.ctx_init) };
+    }
+}
+
+ffi_callback! {
+    /// `kbkdf_new`.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn kbkdf_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        boxed(Kbkdf::new(Ptr(provctx)))
+    }
+}
+
+ffi_callback! {
+    /// `kbkdf_free`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a KBKDF context, not used afterwards.
+    pub(crate) unsafe extern "C" fn kbkdf_free(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<Kbkdf>(vctx) };
+    }
+}
+
+ffi_callback! {
+    /// `kbkdf_reset`.
+    ///
+    /// # Safety
+    /// `vctx` is a live KBKDF context.
+    pub(crate) unsafe extern "C" fn kbkdf_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(k) = unsafe { context::<Kbkdf>(vctx) } {
+            *k = Kbkdf::new(k.provctx);
+        }
+    }
+}
+
+ffi_callback! {
+    /// `kbkdf_dup`: fails for a context without a MAC, as the reference's does.
+    ///
+    /// # Safety
+    /// `vctx` is a live KBKDF context.
+    pub(crate) unsafe extern "C" fn kbkdf_dup(vctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(src) = (unsafe { context::<Kbkdf>(vctx) }) else { return ptr::null_mut() };
+        let mut dst = Kbkdf::new(src.provctx);
+        // SAFETY: the source's context, or NULL.
+        dst.ctx_init = unsafe { EVP_MAC_CTX_dup(src.ctx_init) };
+        if dst.ctx_init.is_null() {
+            return ptr::null_mut();
+        }
+        let (Some(ki), Some(label), Some(context), Some(iv)) = (memdup(&src.ki), memdup(&src.label), memdup(&src.context), memdup(&src.iv)) else {
+            return ptr::null_mut();
+        };
+        dst.ki = ki;
+        dst.label = label;
+        dst.context = context;
+        dst.iv = iv;
+        dst.feedback = src.feedback;
+        dst.r = src.r;
+        dst.use_l = src.use_l;
+        dst.use_separator = src.use_separator;
+        dst.is_kmac = src.is_kmac;
+        boxed(dst)
+    }
+}
+
+/// `OPENSSL_strncasecmp(word, data, n)` as the reference calls it on the `mode` parameter:
+/// a match of the data's first `n` octets (to a NUL in either) against `word`.
+///
+/// # Safety
+/// `data` is NULL (for 0) or holds `n` octets.
+unsafe fn strncasecmp_eq(word: &[u8], data: *const u8, n: usize) -> bool {
+    for i in 0..n {
+        let a = word.get(i).copied().unwrap_or(0);
+        // SAFETY: the caller's guarantee: `n` octets.
+        let b = unsafe { data.wrapping_add(i).read() };
+        if !a.eq_ignore_ascii_case(&b) {
+            return false;
+        }
+        if a == 0 {
+            return true;
+        }
+    }
+    true
+}
+
+/// `kmac_init` for KBKDF: the label as KMAC's customization.
+///
+/// # Safety
+/// `ctx` is a live MAC context.
+unsafe fn kbkdf_kmac_init(ctx: *mut EVP_MAC_CTX, custom: Option<&Secret>) -> bool {
+    let Some(c) = custom.filter(|c| c.len() > 0) else {
+        return true;
+    };
+    let params = [
+        // SAFETY: a static key; the octets outlive the call.
+        unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_MAC_PARAM_CUSTOM.as_ptr(),
+                c.ptr().cast_mut().cast(),
+                c.len(),
+            )
+        },
+        end(),
+    ];
+    // SAFETY: the caller's context; the array above.
+    let r = unsafe { EVP_MAC_CTX_set_params(ctx, params.as_ptr()) };
+    r > 0
+}
+
+ffi_callback! {
+    /// `kbkdf_set_ctx_params`: the MAC (HMAC, CMAC, or KMAC), the mode, the key, label (the
+    /// salt), context (the info), and IV (the seed), the switches, and r; then the MAC keyed.
+    ///
+    /// # Safety
+    /// `vctx` is a live KBKDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn kbkdf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: as above.
+        let Some(k) = (unsafe { context::<Kbkdf>(vctx) }) else { return 0 };
+        // SAFETY: the provider's context.
+        let libctx = unsafe { libctx_of(k.provctx.0) };
+        // SAFETY: the context's MAC context; the caller's array.
+        if !unsafe { macctx_load(&mut k.ctx_init, params, ptr::null(), ptr::null(), ptr::null(), libctx) } {
+            return 0;
+        }
+        if !k.ctx_init.is_null() {
+            k.is_kmac = false;
+            // SAFETY: the live MAC context.
+            let mac = unsafe { EVP_MAC_CTX_get0_mac(k.ctx_init) };
+            // SAFETY: its method; static names, here and below.
+            let is = |name: &CStr| unsafe { EVP_MAC_is_a(mac, name.as_ptr()) } != 0;
+            if is(c"KMAC-128") || is(c"KMAC-256") {
+                k.is_kmac = true;
+            } else if !is(c"HMAC") && !is(c"CMAC") {
+                raise(PROV_R_INVALID_MAC, "kbkdf_set_ctx_params");
+                return 0;
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_MODE) } {
+            let data = p.data.cast_const().cast::<u8>();
+            if data.is_null() && p.data_size > 0 {
+                // The reference compares through NULL (docs/DEVIATIONS.md).
+                return 0;
+            }
+            // SAFETY: the parameter's octets.
+            if unsafe { strncasecmp_eq(b"counter", data, p.data_size) } {
+                k.feedback = false;
+            // SAFETY: as above.
+            } else if unsafe { strncasecmp_eq(b"feedback", data, p.data_size) } {
+                k.feedback = true;
+            } else {
+                raise(PROV_R_INVALID_MODE, "kbkdf_set_ctx_params");
+                return 0;
+            }
+        }
+        // SAFETY: as above, here and below.
+        if unsafe { get1_octets(params, OSSL_KDF_PARAM_KEY, &mut k.ki) } == 0
+            // SAFETY: as above.
+            || unsafe { get1_octets(params, OSSL_KDF_PARAM_SALT, &mut k.label) } == 0
+            // SAFETY: as above.
+            || unsafe { concat_octets(params, OSSL_KDF_PARAM_INFO, &mut k.context, 0) } == 0
+            // SAFETY: as above.
+            || unsafe { get1_octets(params, OSSL_KDF_PARAM_SEED, &mut k.iv) } == 0
+        {
+            return 0;
+        }
+        for (name, slot) in [(OSSL_KDF_PARAM_KBKDF_USE_L, &mut k.use_l), (OSSL_KDF_PARAM_KBKDF_USE_SEPARATOR, &mut k.use_separator)] {
+            // SAFETY: as above.
+            if let Some(p) = unsafe { locate(params, name) } {
+                // SAFETY: a parameter of the caller's array.
+                if unsafe { OSSL_PARAM_get_int(p, slot) } == 0 {
+                    return 0;
+                }
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_KBKDF_R) } {
+            let mut r = 0;
+            // SAFETY: a parameter of the caller's array.
+            if unsafe { OSSL_PARAM_get_int(p, &raw mut r) } == 0 || ![8, 16, 24, 32].contains(&r) {
+                return 0;
+            }
+            k.r = r;
+        }
+        if !k.ctx_init.is_null() && let Some(ki) = k.ki.as_ref().filter(|x| x.len() > 0) {
+            // SAFETY: the live MAC context; the context's octets.
+            if (k.is_kmac && !unsafe { kbkdf_kmac_init(k.ctx_init, k.label.as_ref()) })
+                // SAFETY: as above.
+                || unsafe { EVP_MAC_init(k.ctx_init, ki.ptr(), ki.len(), ptr::null()) } == 0
+            {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+ffi_callback! {
+    /// `kbkdf_derive`: KMAC's own output, or counter or feedback mode over HMAC or CMAC. A
+    /// failure wipes the output, as the reference does.
+    ///
+    /// # Safety
+    /// `vctx` is a live KBKDF context; `key` has room for `keylen` octets; `params` is NULL or
+    /// a parameter array.
+    pub(crate) unsafe extern "C" fn kbkdf_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { kbkdf_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(k) = (unsafe { context::<Kbkdf>(vctx) }) else { return 0 };
+        if k.ctx_init.is_null() {
+            let reason = if k.ki.as_ref().is_none_or(|x| x.len() == 0) { PROV_R_NO_KEY_SET } else { PROV_R_MISSING_MAC };
+            raise(reason, "kbkdf_derive");
+            return 0;
+        }
+        if keylen == 0 {
+            raise(PROV_R_INVALID_KEY_LENGTH, "kbkdf_derive");
+            return 0;
+        }
+        // SAFETY: the context's MAC; the caller's room.
+        let ok = unsafe { kbkdf_compute(k, key, keylen) };
+        if !ok && !key.is_null() {
+            // SAFETY: the caller's room for `keylen` octets.
+            unsafe { mem::OPENSSL_cleanse(key.cast(), keylen) };
+        }
+        c_int::from(ok)
+    }
+}
+
+/// The derivation behind `kbkdf_derive`.
+///
+/// # Safety
+/// The context's MAC context is live; `key` has room for `keylen` octets.
+unsafe fn kbkdf_compute(k: &Kbkdf, key: *mut u8, keylen: usize) -> bool {
+    let context = k.context.as_ref().map(|c| &c.0[..]).unwrap_or_default();
+    if k.is_kmac {
+        let mut outlen = keylen;
+        let params = [
+            // SAFETY: a static key; the local length.
+            unsafe { OSSL_PARAM_construct_size_t(OSSL_MAC_PARAM_SIZE.as_ptr(), &raw mut outlen) },
+            end(),
+        ];
+        // SAFETY: the context's MAC; the array above; the caller's room.
+        return unsafe { EVP_MAC_CTX_set_params(k.ctx_init, params.as_ptr()) } > 0
+            // SAFETY: as above.
+            && unsafe { EVP_MAC_update(k.ctx_init, context.as_ptr(), context.len()) } != 0
+            // SAFETY: as above.
+            && unsafe { EVP_MAC_final(k.ctx_init, key, ptr::null_mut(), keylen) } != 0;
+    }
+    // SAFETY: the context's MAC.
+    let h = unsafe { EVP_MAC_CTX_get_mac_size(k.ctx_init) };
+    if h == 0 {
+        return false;
+    }
+    let iv = k.iv.as_ref().map(|c| &c.0[..]).unwrap_or_default();
+    if !iv.is_empty() && iv.len() != h {
+        raise(PROV_R_INVALID_SEED_LENGTH, "kbkdf_derive");
+        return false;
+    }
+    let r = u32::try_from(k.r).unwrap_or(32);
+    if !k.feedback && u64::try_from(keylen / h).unwrap_or(u64::MAX) >= 1u64 << r {
+        raise(PROV_R_INVALID_KEY_LENGTH, "kbkdf_derive");
+        return false;
+    }
+    let l = if k.use_l != 0 {
+        Some(
+            u32::try_from((keylen.wrapping_mul(8)) & 0xffff_ffff)
+                .unwrap_or(0)
+                .to_be_bytes(),
+        )
+    } else {
+        None
+    };
+    let label = k.label.as_ref().map(|c| &c.0[..]).unwrap_or_default();
+    let mut k_i = Secret(vec![0u8; h]);
+    if let Some(d) = k_i.0.get_mut(..iv.len()) {
+        d.copy_from_slice(iv);
+    }
+    let mut k_i_len = iv.len();
+    let ctr_len = usize::try_from(r / 8).unwrap_or(4);
+    let mut written = 0usize;
+    let mut counter: u32 = 1;
+    while written < keylen {
+        let i = counter.to_be_bytes();
+        // SAFETY: the context's MAC.
+        let ctx = unsafe { EVP_MAC_CTX_dup(k.ctx_init) };
+        let zero = [0u8];
+        let ok = !ctx.is_null()
+            // SAFETY: the copy; the octets above.
+            && (!k.feedback || unsafe { EVP_MAC_update(ctx, k_i.ptr(), k_i_len) } != 0)
+            // SAFETY: as above.
+            && unsafe { EVP_MAC_update(ctx, i.as_ptr().wrapping_add(4 - ctr_len), ctr_len) } != 0
+            // SAFETY: as above.
+            && unsafe { EVP_MAC_update(ctx, label.as_ptr(), label.len()) } != 0
+            // SAFETY: as above.
+            && (k.use_separator == 0 || unsafe { EVP_MAC_update(ctx, zero.as_ptr(), 1) } != 0)
+            // SAFETY: as above.
+            && unsafe { EVP_MAC_update(ctx, context.as_ptr(), context.len()) } != 0
+            // SAFETY: as above.
+            && l.is_none_or(|l| unsafe { EVP_MAC_update(ctx, l.as_ptr(), 4) } != 0)
+            // SAFETY: as above; room for the MAC.
+            && unsafe { EVP_MAC_final(ctx, k_i.0.as_mut_ptr(), ptr::null_mut(), h) } != 0;
+        // SAFETY: the copy made here, or NULL.
+        unsafe { EVP_MAC_CTX_free(ctx) };
+        if !ok {
+            return false;
+        }
+        let n = (keylen - written).min(h);
+        // SAFETY: the caller's room for `n` more octets.
+        unsafe { ptr::copy_nonoverlapping(k_i.ptr(), key.wrapping_add(written), n) };
+        written = written.saturating_add(h);
+        k_i_len = h;
+        counter = counter.wrapping_add(1);
+    }
+    true
+}
+
+static KBKDF_SETTABLE: Params<13> = Params([
+    defn(OSSL_KDF_PARAM_INFO, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_KEY, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SEED, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_CIPHER, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_MAC, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_MODE, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_KBKDF_USE_L,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_KBKDF_USE_SEPARATOR,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_KBKDF_R,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `kbkdf_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn kbkdf_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        KBKDF_SETTABLE.0.as_ptr()
+    }
+}
+
+static KBKDF_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, kbkdf_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, kbkdf_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, kbkdf_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, kbkdf_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, kbkdf_derive, DeriveFn),
+    entry!(
+        OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+        kbkdf_settable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        kbkdf_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        any_size_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+// -------------------------------------------------------------------------------------------
+// X942KDF-ASN1
+
+/// `kek_algs`: the key-wrapping algorithms X9.42's `OtherInfo` can name, with their key sizes.
+const KEK_ALGS: [(&CStr, c_int, usize); 4] = [
+    (c"AES-128-WRAP", NID_id_aes128_wrap, 16),
+    (c"AES-192-WRAP", NID_id_aes192_wrap, 24),
+    (c"AES-256-WRAP", NID_id_aes256_wrap, 32),
+    (c"DES3-WRAP", NID_id_smime_alg_CMS3DESwrap, 24),
+];
+
+/// A NID's OBJECT IDENTIFIER, DER-encoded (from the object table).
+fn oid_der(nid: c_int) -> Option<Vec<u8>> {
+    // SAFETY: a built-in NID.
+    let obj = unsafe { OBJ_nid2obj(nid) };
+    if obj.is_null() {
+        return None;
+    }
+    // SAFETY: the static object.
+    let len = unsafe { OBJ_length(obj) };
+    // SAFETY: as above.
+    let data = unsafe { OBJ_get0_data(obj) };
+    if data.is_null() || len >= 0x80 {
+        return None;
+    }
+    let mut der = vec![0x06, u8::try_from(len).ok()?];
+    // SAFETY: the object's `len` content octets.
+    der.extend_from_slice(unsafe { core::slice::from_raw_parts(data, len) });
+    Some(der)
+}
+
+/// `KDF_X942`.
+struct X942 {
+    provctx: Ptr,
+    digest: Prov<EVP_MD>,
+    secret: Option<Secret>,
+    acvpinfo: Option<Secret>,
+    partyuinfo: Option<Secret>,
+    partyvinfo: Option<Secret>,
+    supp_pubinfo: Option<Secret>,
+    supp_privinfo: Option<Secret>,
+    dkm_len: usize,
+    /// The key-wrapping algorithm's index in [`KEK_ALGS`].
+    cek: Option<usize>,
+    use_keybits: c_int,
+}
+
+impl X942 {
+    fn new(provctx: Ptr) -> Self {
+        Self {
+            provctx,
+            digest: Prov::NONE,
+            secret: None,
+            acvpinfo: None,
+            partyuinfo: None,
+            partyvinfo: None,
+            supp_pubinfo: None,
+            supp_privinfo: None,
+            dkm_len: 0,
+            cek: None,
+            use_keybits: 1,
+        }
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_new`.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn x942_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        boxed(X942::new(Ptr(provctx)))
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_free`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or an X942KDF context, not used afterwards.
+    pub(crate) unsafe extern "C" fn x942_free(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<X942>(vctx) };
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_reset`.
+    ///
+    /// # Safety
+    /// `vctx` is a live X942KDF context.
+    pub(crate) unsafe extern "C" fn x942_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(x) = unsafe { context::<X942>(vctx) } {
+            *x = X942::new(x.provctx);
+        }
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_dup`.
+    ///
+    /// # Safety
+    /// `vctx` is a live X942KDF context.
+    pub(crate) unsafe extern "C" fn x942_dup(vctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(src) = (unsafe { context::<X942>(vctx) }) else { return ptr::null_mut() };
+        let mut dst = X942::new(src.provctx);
+        let (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f)) = (
+            memdup(&src.secret),
+            memdup(&src.acvpinfo),
+            memdup(&src.partyuinfo),
+            memdup(&src.partyvinfo),
+            memdup(&src.supp_pubinfo),
+            memdup(&src.supp_privinfo),
+        ) else {
+            return ptr::null_mut();
+        };
+        let Some(digest) = src.digest.copy() else { return ptr::null_mut() };
+        (dst.secret, dst.acvpinfo, dst.partyuinfo, dst.partyvinfo, dst.supp_pubinfo, dst.supp_privinfo) = (a, b, c, d, e, f);
+        dst.digest = digest;
+        dst.cek = src.cek;
+        dst.dkm_len = src.dkm_len;
+        dst.use_keybits = src.use_keybits;
+        boxed(dst)
+    }
+}
+
+/// `x942kdf_set_buffer`: nothing for no data, else the octets.
+///
+/// # Safety
+/// `p`'s data is NULL or holds `data_size` octets.
+unsafe fn x942_set_buffer(slot: &mut Option<Secret>, p: &OSSL_PARAM) -> bool {
+    if p.data_size == 0 || p.data.is_null() {
+        return true;
+    }
+    *slot = None;
+    // SAFETY: the caller's guarantee.
+    match unsafe { get_octets(p) } {
+        Some(v) => {
+            *slot = Some(v);
+            true
+        }
+        None => false,
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_set_ctx_params`.
+    ///
+    /// # Safety
+    /// `vctx` is a live X942KDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn x942_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: as above.
+        let Some(x) = (unsafe { context::<X942>(vctx) }) else { return 0 };
+        // SAFETY: as above; the context's provider.
+        if !unsafe { load_digest(&mut x.digest, params, x.provctx.0) } {
+            return 0;
+        }
+        // The first of each pair that's there.
+        let first = |a: &CStr, b: Option<&CStr>| {
+            // SAFETY: as above.
+            unsafe { locate(params, a) }.or_else(|| b.and_then(|b| unsafe { locate(params, b) }))
+        };
+        for (p, slot) in [
+            (first(OSSL_KDF_PARAM_SECRET, Some(OSSL_KDF_PARAM_KEY)), &mut x.secret),
+            (first(OSSL_KDF_PARAM_X942_ACVPINFO, None), &mut x.acvpinfo),
+            (first(OSSL_KDF_PARAM_X942_PARTYUINFO, Some(OSSL_KDF_PARAM_UKM)), &mut x.partyuinfo),
+            (first(OSSL_KDF_PARAM_X942_PARTYVINFO, None), &mut x.partyvinfo),
+        ] {
+            // SAFETY: a parameter of the caller's array.
+            if let Some(p) = p && !unsafe { x942_set_buffer(slot, p) } {
+                return 0;
+            }
+        }
+        if let Some(p) = first(OSSL_KDF_PARAM_X942_USE_KEYBITS, None) {
+            // SAFETY: a parameter of the caller's array.
+            if unsafe { OSSL_PARAM_get_int(p, &raw mut x.use_keybits) } == 0 {
+                return 0;
+            }
+        }
+        if let Some(p) = first(OSSL_KDF_PARAM_X942_SUPP_PUBINFO, None) {
+            // SAFETY: as above.
+            if !unsafe { x942_set_buffer(&mut x.supp_pubinfo, p) } {
+                return 0;
+            }
+            x.use_keybits = 0;
+        }
+        if let Some(p) = first(OSSL_KDF_PARAM_X942_SUPP_PRIVINFO, None) {
+            // SAFETY: as above.
+            if !unsafe { x942_set_buffer(&mut x.supp_privinfo, p) } {
+                return 0;
+            }
+        }
+        if let Some(p) = first(OSSL_KDF_PARAM_CEK_ALG, None) {
+            let Some(name) = utf8(p) else { return 0 };
+            // The reference passes the algorithm's name as the property query when there are
+            // properties at all.
+            let propq = if first(OSSL_ALG_PARAM_PROPERTIES, None).is_some() { name } else { ptr::null() };
+            // SAFETY: the provider's context.
+            let libctx = unsafe { libctx_of(x.provctx.0) };
+            // SAFETY: the parameter's string; the query.
+            let cipher = unsafe { EVP_CIPHER_fetch(libctx, name, propq) };
+            let id = if cipher.is_null() {
+                None
+            } else {
+                // SAFETY: the cipher just fetched; static names.
+                KEK_ALGS.iter().position(|(n, _, _)| unsafe { EVP_CIPHER_is_a(cipher, n.as_ptr()) } != 0)
+            };
+            // SAFETY: the cipher fetched here, or NULL.
+            unsafe { EVP_CIPHER_free(cipher) };
+            let Some(id) = id else {
+                raise(PROV_R_UNSUPPORTED_CEK_ALG, "find_alg_id");
+                return 0;
+            };
+            x.cek = Some(id);
+            x.dkm_len = KEK_ALGS.get(id).map_or(0, |a| a.2);
+        }
+        1
+    }
+}
+
+ffi_callback! {
+    /// `x942kdf_derive`: Hash(Z || OtherInfo) with the counter in `OtherInfo`.
+    ///
+    /// # Safety
+    /// `vctx` is a live X942KDF context; `key` has room for `keylen` octets; `params` is NULL
+    /// or a parameter array.
+    pub(crate) unsafe extern "C" fn x942_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { x942_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(x) = (unsafe { context::<X942>(vctx) }) else { return 0 };
+        const F: &str = "x942kdf_derive";
+        if x.use_keybits != 0 && x.supp_pubinfo.is_some() {
+            raise(PROV_R_INVALID_PUBINFO, F);
+            return 0;
+        }
+        if x.acvpinfo.is_some() && (x.partyuinfo.is_some() || x.partyvinfo.is_some() || x.supp_pubinfo.is_some() || x.supp_privinfo.is_some()) {
+            raise(PROV_R_INVALID_DATA, F);
+            return 0;
+        }
+        let Some(z) = x.secret.as_ref() else {
+            raise(PROV_R_MISSING_SECRET, F);
+            return 0;
+        };
+        let md = x.digest.method;
+        if md.is_null() {
+            raise(PROV_R_MISSING_MESSAGE_DIGEST, F);
+            return 0;
+        }
+        let Some(cek) = x.cek.and_then(|i| KEK_ALGS.get(i)).and_then(|a| oid_der(a.1)) else {
+            raise(PROV_R_MISSING_CEK_ALG, F);
+            return 0;
+        };
+        if x.partyuinfo.as_ref().is_some_and(|u| u.len() >= 1 << 30) {
+            raise(PROV_R_INVALID_UKM_LENGTH, F);
+            return 0;
+        }
+        fn bytes(s: &Option<Secret>) -> Option<&[u8]> {
+            s.as_ref().map(|v| &v.0[..])
+        }
+        let info = rustyssl_crypto::kdf::X942Info {
+            cek_oid: &cek,
+            kek_length: if x.use_keybits != 0 { x.dkm_len } else { 0 },
+            acvp: bytes(&x.acvpinfo),
+            party_u: bytes(&x.partyuinfo),
+            party_v: bytes(&x.partyvinfo),
+            supp_pub: bytes(&x.supp_pubinfo),
+            supp_priv: bytes(&x.supp_privinfo),
+        };
+        let Ok((mut other, at)) = rustyssl_crypto::kdf::x942_other_info(&info) else {
+            raise(PROV_R_BAD_ENCODING, F);
+            return 0;
+        };
+        // SAFETY: the context's digest; the caller's room.
+        let ok = unsafe { x942_hash_kdm(md, &z.0, &mut other, at, key, keylen) };
+        wipe(&mut other);
+        c_int::from(ok)
+    }
+}
+
+/// `x942kdf_hash_kdm`: Hash(Z || OtherInfo) for counters from 1, patched in at `at`.
+///
+/// # Safety
+/// `md` is a live digest; `out` has room for `len` octets.
+unsafe fn x942_hash_kdm(
+    md: *const EVP_MD,
+    z: &[u8],
+    other: &mut [u8],
+    at: usize,
+    out: *mut u8,
+    len: usize,
+) -> bool {
+    const MAX: usize = 1 << 30;
+    if z.len() > MAX || other.len() > MAX || len > MAX || len == 0 {
+        raise(PROV_R_BAD_LENGTH, "x942kdf_hash_kdm");
+        return false;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(hlen) = (unsafe { md_size(md) }) else {
+        return false;
+    };
+    // SAFETY: no preconditions.
+    let ctx = unsafe { EVP_MD_CTX_new() };
+    // SAFETY: as above.
+    let init = unsafe { EVP_MD_CTX_new() };
+    let mut mac = [0u8; MAX_MD];
+    let (mut out, mut len) = (out, len);
+    // SAFETY: the contexts made here, or NULL; the caller's digest.
+    let mut ok = !ctx.is_null() && !init.is_null() && unsafe { EVP_DigestInit(init, md) } != 0;
+    let mut counter: u32 = 1;
+    while ok {
+        if let Some(c) = other.get_mut(at..at.saturating_add(4)) {
+            c.copy_from_slice(&counter.to_be_bytes());
+        }
+        // SAFETY: the contexts made here; the octets.
+        ok = unsafe { EVP_MD_CTX_copy_ex(ctx, init) } != 0
+            // SAFETY: as above.
+            && unsafe { EVP_DigestUpdate(ctx, z.as_ptr().cast(), z.len()) } != 0
+            // SAFETY: as above.
+            && unsafe { EVP_DigestUpdate(ctx, other.as_ptr().cast(), other.len()) } != 0;
+        if !ok {
+            break;
+        }
+        if len >= hlen {
+            // SAFETY: the caller's room for a block.
+            ok = unsafe { EVP_DigestFinal_ex(ctx, out, ptr::null_mut()) } != 0;
+            out = out.wrapping_add(hlen);
+            len -= hlen;
+            if len == 0 {
+                break;
+            }
+        } else {
+            // SAFETY: room for any digest; the caller's for the rest.
+            ok = unsafe { EVP_DigestFinal_ex(ctx, mac.as_mut_ptr(), ptr::null_mut()) } != 0;
+            if ok {
+                // SAFETY: as above.
+                unsafe { ptr::copy_nonoverlapping(mac.as_ptr(), out, len) };
+            }
+            break;
+        }
+        counter = counter.wrapping_add(1);
+    }
+    // SAFETY: the contexts made here.
+    unsafe { EVP_MD_CTX_free(ctx) };
+    // SAFETY: as above.
+    unsafe { EVP_MD_CTX_free(init) };
+    wipe(&mut mac);
+    ok
+}
+
+ffi_callback! {
+    /// `x942kdf_get_ctx_params`: the size (the digest's).
+    ///
+    /// # Safety
+    /// `vctx` is a live X942KDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn x942_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { context::<X942>(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE.as_ptr()) };
+        if p.is_null() {
+            return 1;
+        }
+        let sz = if x.digest.method.is_null() {
+            raise(PROV_R_MISSING_MESSAGE_DIGEST, "x942kdf_size");
+            0
+        } else {
+            // SAFETY: the context's digest.
+            unsafe { md_size(x.digest.method) }.unwrap_or(0)
+        };
+        // SAFETY: a parameter of the caller's array.
+        c_int::from(unsafe { OSSL_PARAM_set_size_t(p, sz) } != 0)
+    }
+}
+
+static X942_SETTABLE: Params<13> = Params([
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SECRET, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_KEY, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_UKM, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_X942_ACVPINFO,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_X942_PARTYUINFO,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_X942_PARTYVINFO,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_X942_SUPP_PUBINFO,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_X942_SUPP_PRIVINFO,
+        OSSL_PARAM_OCTET_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_KDF_PARAM_X942_USE_KEYBITS,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    defn(OSSL_KDF_PARAM_CEK_ALG, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `x942kdf_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn x942_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        X942_SETTABLE.0.as_ptr()
+    }
+}
+
+static X942_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, x942_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, x942_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, x942_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, x942_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, x942_derive, DeriveFn),
+    entry!(
+        OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+        x942_settable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        x942_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        x942_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+// -------------------------------------------------------------------------------------------
+// SCRYPT
+
+/// `KDF_SCRYPT`.
+struct Scrypt {
+    libctx: *mut OSSL_LIB_CTX,
+    propq: Option<std::ffi::CString>,
+    pass: Option<Secret>,
+    salt: Option<Secret>,
+    n: u64,
+    r: u64,
+    p: u64,
+    maxmem: u64,
+    /// SHA-256, fetched with the property query, with a reference (NULL until needed).
+    sha256: *mut EVP_MD,
+}
+
+impl Scrypt {
+    fn new(libctx: *mut OSSL_LIB_CTX) -> Self {
+        let mut s = Self {
+            libctx,
+            propq: None,
+            pass: None,
+            salt: None,
+            n: 0,
+            r: 0,
+            p: 0,
+            maxmem: 0,
+            sha256: ptr::null_mut(),
+        };
+        s.init();
+        s
+    }
+
+    /// `kdf_scrypt_init`: the paper's most conservative parameters (about 1 GiB).
+    fn init(&mut self) {
+        self.n = 1 << 20;
+        self.r = 8;
+        self.p = 1;
+        self.maxmem = 1025 * 1024 * 1024;
+    }
+
+    /// `set_digest`: SHA-256 fetched again with the query.
+    fn set_digest(&mut self) -> bool {
+        // SAFETY: the reference this holds, or NULL.
+        unsafe { EVP_MD_free(self.sha256) };
+        let propq = self.propq.as_ref().map_or(ptr::null(), |q| q.as_ptr());
+        // SAFETY: the context's library context; a static name; the query.
+        self.sha256 = unsafe { EVP_MD_fetch(self.libctx, c"sha256".as_ptr(), propq) };
+        if self.sha256.is_null() {
+            raise(PROV_R_UNABLE_TO_LOAD_SHA256, "set_digest");
+            return false;
+        }
+        true
+    }
+}
+
+impl Drop for Scrypt {
+    fn drop(&mut self) {
+        // SAFETY: the reference this holds, or NULL.
+        unsafe { EVP_MD_free(self.sha256) };
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_new`.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn scrypt_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        boxed(Scrypt::new(unsafe { libctx_of(provctx) }))
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_free`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a scrypt context, not used afterwards.
+    pub(crate) unsafe extern "C" fn scrypt_free(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<Scrypt>(vctx) };
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_reset`: the password and salt gone, the parameters back to the defaults
+    /// (the property query and digest kept).
+    ///
+    /// # Safety
+    /// `vctx` is a live scrypt context.
+    pub(crate) unsafe extern "C" fn scrypt_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(s) = unsafe { context::<Scrypt>(vctx) } {
+            s.salt = None;
+            s.pass = None;
+            s.init();
+        }
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_dup`.
+    ///
+    /// # Safety
+    /// `vctx` is a live scrypt context.
+    pub(crate) unsafe extern "C" fn scrypt_dup(vctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(src) = (unsafe { context::<Scrypt>(vctx) }) else { return ptr::null_mut() };
+        let mut dst = Scrypt::new(src.libctx);
+        // SAFETY: the source's digest, or NULL.
+        if !src.sha256.is_null() && unsafe { EVP_MD_up_ref(src.sha256) } == 0 {
+            return ptr::null_mut();
+        }
+        dst.sha256 = src.sha256;
+        dst.propq = src.propq.clone();
+        let (Some(salt), Some(pass)) = (memdup(&src.salt), memdup(&src.pass)) else { return ptr::null_mut() };
+        (dst.salt, dst.pass) = (salt, pass);
+        (dst.n, dst.r, dst.p, dst.maxmem) = (src.n, src.r, src.p, src.maxmem);
+        boxed(dst)
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_set_ctx_params`: the password, salt, N (a power of two from 2), r, p, the
+    /// memory limit (from 1), and the property query (which fetches SHA-256 again).
+    ///
+    /// # Safety
+    /// `vctx` is a live scrypt context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn scrypt_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: as above.
+        let Some(s) = (unsafe { context::<Scrypt>(vctx) }) else { return 0 };
+        for (name, slot) in [(OSSL_KDF_PARAM_PASSWORD, &mut s.pass), (OSSL_KDF_PARAM_SALT, &mut s.salt)] {
+            // SAFETY: as above.
+            if let Some(p) = unsafe { locate(params, name) } {
+                // SAFETY: a parameter of the caller's array.
+                if !unsafe { set_membuf(slot, p) } {
+                    return 0;
+                }
+            }
+        }
+        type Check<'a> = (&'a CStr, fn(u64) -> bool, &'a mut u64);
+        let checks: [Check<'_>; 4] = [
+            (OSSL_KDF_PARAM_SCRYPT_N, |v| v > 1 && v.is_power_of_two(), &mut s.n),
+            (OSSL_KDF_PARAM_SCRYPT_R, |v| v >= 1, &mut s.r),
+            (OSSL_KDF_PARAM_SCRYPT_P, |v| v >= 1, &mut s.p),
+            (OSSL_KDF_PARAM_SCRYPT_MAXMEM, |v| v >= 1, &mut s.maxmem),
+        ];
+        for (name, valid, slot) in checks {
+            // SAFETY: as above.
+            if let Some(p) = unsafe { locate(params, name) } {
+                let mut v = 0u64;
+                // SAFETY: a parameter of the caller's array.
+                if unsafe { OSSL_PARAM_get_uint64(p, &raw mut v) } == 0 || !valid(v) {
+                    return 0;
+                }
+                *slot = v;
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_PROPERTIES) } {
+            let Some(text) = utf8(p) else { return 0 };
+            s.propq = if text.is_null() {
+                None
+            } else {
+                // SAFETY: a UTF-8 string parameter's data: a C string.
+                Some(unsafe { CStr::from_ptr(text) }.to_owned())
+            };
+            if !s.set_digest() {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+/// `scrypt_alg`'s checks, then (for an output) scrypt over the backend. NULL `key` checks only.
+///
+/// # Safety
+/// `key` is NULL or has room for `keylen` octets.
+unsafe fn scrypt_compute(s: &Scrypt, key: *mut u8, keylen: usize) -> bool {
+    const PR_MAX: u64 = (1 << 30) - 1;
+    let (n, r, p) = (s.n, s.r, s.p);
+    if r == 0 || p == 0 || n < 2 || !n.is_power_of_two() {
+        return false;
+    }
+    let limit = |why: &str| {
+        err::raise(ERR_LIB_EVP, EVP_R_MEMORY_LIMIT_EXCEEDED, why);
+        false
+    };
+    if p > PR_MAX / r {
+        return limit("scrypt_alg");
+    }
+    let bits = r.wrapping_mul(16);
+    if bits <= 63 && n >= 1u64 << bits {
+        return limit("scrypt_alg");
+    }
+    let b_len = p.wrapping_mul(128).wrapping_mul(r);
+    if b_len > i32::MAX.unsigned_abs().into() {
+        return limit("scrypt_alg");
+    }
+    if n + 2 > (u64::MAX / 128) / r {
+        return limit("scrypt_alg");
+    }
+    let v_len = r.wrapping_mul(128).wrapping_mul(n + 2);
+    if b_len > u64::MAX - v_len {
+        return limit("scrypt_alg");
+    }
+    let maxmem = s.maxmem.min(u64::try_from(usize::MAX).unwrap_or(u64::MAX));
+    if b_len + v_len > maxmem {
+        return limit("scrypt_alg");
+    }
+    if key.is_null() {
+        return true;
+    }
+    let pass = s.pass.as_ref().map(|x| &x.0[..]).unwrap_or_default();
+    let salt = s.salt.as_ref().map(|x| &x.0[..]).unwrap_or_default();
+    let mut out = Secret(vec![0u8; keylen]);
+    if rustyssl_crypto::kdf::scrypt(pass, salt, n, r, p, s.maxmem, &mut out.0).is_err() {
+        err::raise(ERR_LIB_EVP, EVP_R_PBKDF2_ERROR, "scrypt_alg");
+        return false;
+    }
+    // SAFETY: the caller's room.
+    unsafe { ptr::copy_nonoverlapping(out.ptr(), key, keylen) };
+    true
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_derive`.
+    ///
+    /// # Safety
+    /// `vctx` is a live scrypt context; `key` is NULL (to check the parameters) or has room for
+    /// `keylen` octets; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn scrypt_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { scrypt_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(s) = (unsafe { context::<Scrypt>(vctx) }) else { return 0 };
+        if s.pass.is_none() {
+            raise(PROV_R_MISSING_PASS, "kdf_scrypt_derive");
+            return 0;
+        }
+        if s.salt.is_none() {
+            raise(PROV_R_MISSING_SALT, "kdf_scrypt_derive");
+            return 0;
+        }
+        if s.sha256.is_null() && !s.set_digest() {
+            return 0;
+        }
+        // SAFETY: the caller's room.
+        c_int::from(unsafe { scrypt_compute(s, key, keylen) })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_scrypt_get_ctx_params`: the size, any; -2 when it isn't asked for, as the
+    /// reference returns.
+    ///
+    /// # Safety
+    /// `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn scrypt_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE.as_ptr()) };
+        if p.is_null() {
+            return -2;
+        }
+        // SAFETY: a parameter of the caller's array.
+        unsafe { OSSL_PARAM_set_size_t(p, usize::MAX) }
+    }
+}
+
+static SCRYPT_SETTABLE: Params<8> = Params([
+    defn(OSSL_KDF_PARAM_PASSWORD, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_SCRYPT_N,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<u64>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_SCRYPT_R,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<u32>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_SCRYPT_P,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<u32>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_SCRYPT_MAXMEM,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<u64>(),
+    ),
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `kdf_scrypt_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn scrypt_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        SCRYPT_SETTABLE.0.as_ptr()
+    }
+}
+
+static SCRYPT_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, scrypt_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, scrypt_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, scrypt_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, scrypt_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, scrypt_derive, DeriveFn),
+    entry!(
+        OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+        scrypt_settable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        scrypt_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        scrypt_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+/// `deflt_kdfs` so far (the rest come with step 3.6c), in the reference's order.
+static DEFAULT_KDFS: Algorithms<11> = Algorithms([
     alg(c"HKDF", &HKDF_FUNCTIONS),
     alg(c"TLS13-KDF", &TLS13_FUNCTIONS),
     alg(c"SSKDF", &SSKDF_FUNCTIONS),
     alg(c"PBKDF2:1.2.840.113549.1.5.12", &PBKDF2_FUNCTIONS),
+    alg(c"SSHKDF", &SSHKDF_FUNCTIONS),
     alg(c"X963KDF:X942KDF-CONCAT", &X963KDF_FUNCTIONS),
     alg(c"TLS1-PRF", &TLS1_PRF_FUNCTIONS),
+    alg(c"KBKDF", &KBKDF_FUNCTIONS),
+    alg(c"X942KDF-ASN1:X942KDF", &X942_FUNCTIONS),
+    alg(
+        c"SCRYPT:id-scrypt:1.3.6.1.4.1.11591.4.11",
+        &SCRYPT_FUNCTIONS,
+    ),
     ALG_END,
 ]);
 
@@ -2568,6 +4191,81 @@ mod tests {
         ];
         // SAFETY: the context; the parameters above.
         assert_eq!(unsafe { EVP_KDF_CTX_set_params(ctx, params.as_ptr()) }, 0);
+        // SAFETY: the test's context.
+        unsafe { EVP_KDF_CTX_free(ctx) };
+    }
+
+    /// A context of the KDF `name`.
+    fn kdf_context(name: &CStr) -> *mut rustyssl_abi::EVP_KDF_CTX {
+        // SAFETY: a static name.
+        let kdf = unsafe { EVP_KDF_fetch(ptr::null_mut(), name.as_ptr(), ptr::null()) };
+        // SAFETY: the method just fetched.
+        let ctx = unsafe { EVP_KDF_CTX_new(kdf) };
+        // SAFETY: as above.
+        unsafe { EVP_KDF_free(kdf) };
+        ctx
+    }
+
+    /// docs/DEVIATIONS.md: a KBKDF context without a MAC doesn't copy (the reference copies
+    /// the MAC context through NULL), and its `mode` with NULL data is refused.
+    #[test]
+    #[cfg_attr(miri, ignore = "fetches, which loads the configuration")]
+    fn kbkdf_without_a_mac() {
+        let ctx = kdf_context(c"KBKDF");
+        // SAFETY: the context.
+        assert!(unsafe { crate::evp::kdf::EVP_KDF_CTX_dup(ctx) }.is_null());
+        // SAFETY: a static key; NULL data with a length is the case under test.
+        let params = [
+            unsafe {
+                OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MODE.as_ptr(), ptr::null_mut(), 0)
+            },
+            end(),
+        ];
+        let mut params = params;
+        params[0].data_size = 7;
+        // SAFETY: the context; the parameters above.
+        assert_eq!(unsafe { EVP_KDF_CTX_set_params(ctx, params.as_ptr()) }, 0);
+        // SAFETY: the test's context.
+        unsafe { EVP_KDF_CTX_free(ctx) };
+    }
+
+    /// docs/DEVIATIONS.md: SSHKDF over the NULL digest fails (the reference loops forever),
+    /// but derives nothing as it does.
+    #[test]
+    #[cfg_attr(miri, ignore = "fetches, which loads the configuration")]
+    fn sshkdf_over_null_fails() {
+        let ctx = kdf_context(c"SSHKDF");
+        let octets = [7u8; 8];
+        let o = |key: &CStr| {
+            // SAFETY: a static key; the octets outlive the parameters.
+            unsafe {
+                OSSL_PARAM_construct_octet_string(
+                    key.as_ptr(),
+                    octets.as_ptr().cast_mut().cast(),
+                    8,
+                )
+            }
+        };
+        let u = |key: &CStr, value: &CStr| {
+            // SAFETY: static keys and strings.
+            unsafe { OSSL_PARAM_construct_utf8_string(key.as_ptr(), value.as_ptr().cast_mut(), 0) }
+        };
+        let params = [
+            u(OSSL_KDF_PARAM_DIGEST, c"NULL"),
+            o(OSSL_KDF_PARAM_KEY),
+            o(OSSL_KDF_PARAM_SSHKDF_XCGHASH),
+            o(OSSL_KDF_PARAM_SSHKDF_SESSION_ID),
+            u(OSSL_KDF_PARAM_SSHKDF_TYPE, c"A"),
+            end(),
+        ];
+        let mut out = [0u8; 16];
+        // SAFETY: the context; the buffer; the parameters above.
+        let r =
+            unsafe { crate::evp::kdf::EVP_KDF_derive(ctx, out.as_mut_ptr(), 16, params.as_ptr()) };
+        assert_eq!(r, 0);
+        // SAFETY: as above, of nothing.
+        let r = unsafe { crate::evp::kdf::EVP_KDF_derive(ctx, out.as_mut_ptr(), 0, ptr::null()) };
+        assert_eq!(r, 1);
         // SAFETY: the test's context.
         unsafe { EVP_KDF_CTX_free(ctx) };
     }

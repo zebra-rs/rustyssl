@@ -450,7 +450,7 @@ fn tagged_octets(n: u8, content: &[u8]) -> Vec<u8> {
 }
 
 /// The DER `OtherInfo` with a counter of 1, and the counter's offset in it.
-fn x942_other_info(info: &X942Info<'_>) -> Result<(Vec<u8>, usize), Error> {
+pub fn x942_other_info(info: &X942Info<'_>) -> Result<(Vec<u8>, usize), Error> {
     let kek_bits = u32::try_from(info.kek_length)
         .ok()
         .filter(|&n| n <= 0xff_ffff)
