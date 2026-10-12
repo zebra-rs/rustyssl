@@ -215,6 +215,7 @@ mod tests {
     /// docs/DEVIATIONS.md: NULL file names and buffers fail (the reference opens, or copies
     /// into, NULL).
     #[test]
+    #[cfg_attr(miri, ignore = "reads the environment, which checks the process's privileges")]
     fn null_names_and_buffers_fail() {
         // SAFETY: NULL is the case under test.
         assert_eq!(unsafe { RAND_load_file(ptr::null(), -1) }, -1);

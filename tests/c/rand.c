@@ -9,6 +9,7 @@
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
+#define _POSIX_C_SOURCE 200809L
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <pthread.h>
