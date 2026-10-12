@@ -1405,7 +1405,8 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
 /// TEST-RAND's entropy, nonce, strength, request limit, and mode, the DRBGs' ciphers, digests,
 /// MACs, derivation function, and reseed requests (the reseed interval kept at its hour, so
 /// timing never decides), instantiated, generated from, reseeded, asked for nonces, states,
-/// and parameters.
+/// and parameters; and the RAND layer over them (a context made the thread's public or private
+/// DRBG, `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`).
 fn rand_session(random: &mut Random, out: &mut String) -> Result {
     const RANDS: &[&str] = &[
         "TEST-RAND",
@@ -1500,7 +1501,7 @@ fn rand_session(random: &mut Random, out: &mut String) -> Result {
         }
     };
     for _ in 0..random.below(30) + 1 {
-        match random.below(16) {
+        match random.below(18) {
             0 | 1 => {
                 let child = if random.below(3) == 0 { "" } else { " child" };
                 writeln!(out, "rnew {}{child}", random.pick(RANDS))?;
@@ -1530,6 +1531,22 @@ fn rand_session(random: &mut Random, out: &mut String) -> Result {
             )?,
             11 => writeln!(out, "rnonce {}", length(random))?,
             12 => writeln!(out, "rctx {}", random.below(2))?,
+            13 | 14 => writeln!(
+                out,
+                "{}",
+                random.pick(&[
+                    "rsetpub",
+                    "rsetpriv",
+                    "rbytes 32 0",
+                    "rbytes 48 256",
+                    "rprivbytes 16 0",
+                    "rprivbytes 100 128",
+                    "rbytes 8 257",
+                    "rstatus",
+                    "rpoll",
+                    "rreset"
+                ])
+            )?,
             _ => writeln!(
                 out,
                 "{}",
@@ -1537,6 +1554,7 @@ fn rand_session(random: &mut Random, out: &mut String) -> Result {
             )?,
         }
     }
+    writeln!(out, "rreset")?;
     writeln!(out, "rctx 0")?;
     writeln!(out, "rfree")?;
     writeln!(out, "rctx 1")?;

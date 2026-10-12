@@ -104,3 +104,33 @@ rnonce 16
 rfree
 rctx 1
 rfree
+# The RAND layer over a DRBG under TEST-RAND
+rctx 0
+rstatus
+rpoll
+rbytes 16 0
+rprivbytes 16 0
+rbytes 16 257
+rnew TEST-RAND
+rset strength=256 test_entropy=64 test_nonce=32
+rinst 0 0
+rctx 1
+rnew HASH-DRBG child
+rsetpub
+rset digest=SHA256
+rinst 0 0
+rsetpub
+rbytes 40 0
+rbytes 40 256
+rbytes 40 257
+rsetpriv
+rprivbytes 20 0
+rctx 0
+rsetpriv
+rprivbytes 20 0
+rprivbytes 200 0
+rreset
+rbytes 16 0
+rfree
+rctx 1
+rfree

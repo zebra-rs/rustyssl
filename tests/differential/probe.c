@@ -266,6 +266,7 @@
 #include <openssl/objects.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
+#include <openssl/rand.h>
 #include <openssl/core_names.h>
 #include <openssl/core_dispatch.h>
 #include <ctype.h>
@@ -3736,6 +3737,8 @@ static int rand_current;
 enum { R_OTHER, R_CTR, R_HASH, R_HMAC, R_SEED, R_TEST };
 static int rand_kind[2], rand_parent[2], rand_det[2], rand_ctr_ok[2], rand_gen[2], rand_child[2];
 static int rand_digest_ok[2], rand_digest_tried[2];
+/* Whether the thread's public and private DRBGs were set to deterministic ones. */
+static int rand_pub_det, rand_priv_det;
 
 static int rand_kind_of(const EVP_RAND *r)
 {
@@ -3767,7 +3770,11 @@ static int rand_command(const char *command, const char *line)
             && strcmp(command, "rgen") != 0 && strcmp(command, "rreseed") != 0
             && strcmp(command, "rnonce") != 0 && strcmp(command, "runinst") != 0
             && strcmp(command, "rget") != 0 && strcmp(command, "rlock") != 0
-            && strcmp(command, "rzero") != 0 && strcmp(command, "rfree") != 0))
+            && strcmp(command, "rzero") != 0 && strcmp(command, "rfree") != 0
+            && strcmp(command, "rsetpub") != 0 && strcmp(command, "rsetpriv") != 0
+            && strcmp(command, "rbytes") != 0 && strcmp(command, "rprivbytes") != 0
+            && strcmp(command, "rstatus") != 0 && strcmp(command, "rpoll") != 0
+            && strcmp(command, "rreset") != 0))
         return 0;
     if (mac_data[1] == 0) {
         size_t i;
@@ -3784,6 +3791,27 @@ static int rand_command(const char *command, const char *line)
         rand_current = n != 0;
         printf("\n");
         return 1;
+    } else if (strcmp(command, "rbytes") == 0 || strcmp(command, "rprivbytes") == 0) {
+        int priv = command[1] == 'p';
+
+        sscanf(line, "%*s %lu %lu", &n, &m);
+        if (n > 1024)
+            n = 1024;
+        r = priv ? RAND_priv_bytes_ex(NULL, out, n, (unsigned int)m)
+                 : RAND_bytes_ex(NULL, out, n, (unsigned int)m);
+        printf(" %d ", r);
+        if (!(priv ? rand_priv_det : rand_pub_det))
+            printf("(%s)", r == 1 ? "random" : "-");
+        else
+            for (sz = 0; sz < (r == 1 ? n : 0) && sz < 256; sz++)
+                printf("%02x", out[sz]);
+    } else if (strcmp(command, "rstatus") == 0) {
+        printf(" %d", RAND_status());
+    } else if (strcmp(command, "rpoll") == 0) {
+        printf(" %d", RAND_poll());
+    } else if (strcmp(command, "rreset") == 0) {
+        printf(" %d %d", RAND_set0_public(NULL, NULL), RAND_set0_private(NULL, NULL));
+        rand_pub_det = rand_priv_det = 0;
     } else if (strcmp(command, "rnew") == 0) {
         EVP_RAND *rand;
         EVP_RAND_CTX *parent = NULL;
@@ -3814,6 +3842,23 @@ static int rand_command(const char *command, const char *line)
     } else if (ctx == NULL) {
         printf(" no context\n");
         return 1;
+    } else if (strcmp(command, "rsetpub") == 0 || strcmp(command, "rsetpriv") == 0) {
+        int priv = command[4] == 'p' && command[5] == 'r';
+
+        /* The thread takes a reference; the slot keeps its own. A DRBG not set up isn't put
+         * where RAND_bytes would run it (see above). */
+        if (((rand_kind[c] == R_CTR && !rand_ctr_ok[c])
+             || ((rand_kind[c] == R_HASH || rand_kind[c] == R_HMAC) && !rand_digest_ok[c]))) {
+            printf(" skipped: a DRBG not set up\n");
+            return 1;
+        }
+        EVP_RAND_CTX_up_ref(ctx);
+        r = priv ? RAND_set0_private(NULL, ctx) : RAND_set0_public(NULL, ctx);
+        printf(" %d", r);
+        if (priv)
+            rand_priv_det = rand_det[c];
+        else
+            rand_pub_det = rand_det[c];
     } else if (strcmp(command, "rset") == 0) {
         unsigned long g = 0;
         const char *gp = strstr(line, " generate=");
