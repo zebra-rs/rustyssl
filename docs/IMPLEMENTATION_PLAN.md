@@ -2469,11 +2469,51 @@ chunking) is clean.
     - The probe's `bn*` commands (four registers; corpus `bn.txt`, random sessions with and
       without a known generator); the `bn` fuzz target checks the parsers, the arithmetic
       against `i128` and its identities, and the conversions' round trips.
-  - [ ] **4.1b Modular arithmetic:** the `BN_mod_*` functions, the `BN_mod_exp*` family
-    (constant-time for `BN_FLG_CONSTTIME`), `BN_MONT_CTX`, `BN_RECP_CTX`, `BN_mod_inverse`,
-    `BN_gcd`, `BN_are_coprime`, `BN_kronecker`, `BN_mod_sqrt` (with the CVE-2022-0778 loop
-    bound), `BN_BLINDING`, the NIST and RFC 2409/3526 primes and the NIST reductions,
-    `BN_generate_dsa_nonce`.
+  - [x] **4.1b Modular arithmetic:** `bn/modular.rs`, `bn/mont.rs`, and `bn/blind.rs` in capi
+    (`bn_mod.c`, `bn_exp.c`, `bn_exp2.c`, `bn_mont.c`, `bn_recp.c`, `bn_gcd.c`, `bn_kron.c`,
+    `bn_sqrt.c`, `bn_blind.c`, `bn_nist.c`, `bn_const.c`, `bn_rand.c`'s DSA nonce) over
+    `rustyssl_crypto::bn::{modular, mont, ct}`: 71 exports; libcrypto now 1,484 of 5,876.
+    Decisions and findings:
+    - **Decision:** the constant-time arithmetic is our own, on fixed-length limb strings
+      with every step masked, instead of crypto-bigint (no new dependency to vet, and the
+      operations OpenSSL exposes run on its variable lengths): Montgomery exponentiation with a
+      fixed window and a full-table read per window, the gcd by OpenSSL's own division steps
+      (Bernstein and Yang's), and inverses by the binary algorithm (an even modulus through
+      the operand's inverse of it and an exact division by a 2-adic inverse). Every
+      `BN_mod_exp*` computes its value with them (square and multiply for an even modulus);
+      `BN_mod_inverse` and `BN_gcd` are always constant time.
+    - **Decision:** the functions OpenSSL composes are composed the same way (`BN_mod_add` is
+      `BN_add` then `BN_nnmod`), so their aliasing rules and errors are its; the Montgomery
+      primitives use OpenSSL's word-by-word reduction, which subtracts the modulus at most
+      once, so unreduced operands give its results.
+    - Quirks kept: `BN_mod_lshift_quick` fails partway (a negative number outgrows the
+      modulus) leaving what the shifts came to; `BN_mod_add_quick` works over the modulus's
+      words; `BN_mod_exp2_mont` reduces with `BN_mod` (a negative base gives a negative
+      result for an odd power), answers 1 for two zero powers and 0 for a zero base before
+      anything else; `BN_mod_exp_recp` with a zero modulus fails without an error;
+      `BN_mod_exp_mont_word` reduces its word only for a one-word modulus; `BN_gcd`'s swaps
+      move the result's `BN_FLG_CONSTTIME` to a temporary, so whether it keeps it depends on
+      the steps (tracked); `BN_are_coprime` flags its operand constant-time;
+      `BN_div_recp` keeps OpenSSL's cached shift, so zero by an unset divisor fails with
+      `BN_R_BAD_RECIPROCAL` (quotient 3) the first time and `BN_R_DIV_BY_ZERO` after; a
+      failed `BN_BLINDING_update` recreation still succeeds, and `BN_BLINDING_create_param`
+      returns the blinding it was given even on failure; `BN_mod_sqrt` leaves its candidate
+      in the result when the final check fails; the NIST reductions' fast path (between `p`
+      and `p^2`) leaves the result's sign as it was, so a negative result object gives a
+      negative residue.
+    - New deviations: a failed `BN_MONT_CTX_set` changes nothing (OpenSSL leaves a context
+      whose results depend on its assembly); results aliasing operands that OpenSSL still
+      reads get the arithmetic's answer.
+    - `tests/c/bn_mod.c`, 92 checks and about 3,000 printed values: each operation over signed values
+      and moduli (aliasing and errors), every exponentiation method with flags and contexts,
+      Montgomery and reciprocal contexts with unreduced operands and unset ones, inverses,
+      gcds, Kronecker symbols, square roots (each case of the algorithm, composites), the
+      NIST and RFC primes, blinding (with an application's exponentiation and a Montgomery
+      context) and DSA nonces from a known DRBG.
+    - The probe's modular commands (corpus `bn.txt`, random sessions); the `bn_mod` fuzz
+      target checks the exponentiations against each other and repeated multiplication,
+      inverses, gcds against Euclid's, Montgomery round trips, the quick forms, and square
+      roots.
   - [ ] **4.1c Primes and GF(2^m):** `BN_GENCB`, `BN_generate_prime_ex(2)`, `BN_check_prime`,
     `BN_is_prime*`, the X9.31 functions, and `BN_GF2m_*`.
 - [ ] **4.2 EVP_PKEY framework:**
