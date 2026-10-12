@@ -13,12 +13,14 @@ use std::ffi::CString;
 
 use rustyssl_abi::{
     ERR_LIB_EVP, ERR_R_EVP_LIB, EVP_KDF, EVP_KDF_CTX, EVP_MD, EVP_R_INVALID_PROVIDER_FUNCTIONS,
-    OSSL_ALGORITHM, OSSL_FUNC_KDF_DERIVE, OSSL_FUNC_KDF_DUPCTX, OSSL_FUNC_KDF_FREECTX,
-    OSSL_FUNC_KDF_GET_CTX_PARAMS, OSSL_FUNC_KDF_GET_PARAMS, OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
-    OSSL_FUNC_KDF_GETTABLE_PARAMS, OSSL_FUNC_KDF_NEWCTX, OSSL_FUNC_KDF_RESET,
-    OSSL_FUNC_KDF_SET_CTX_PARAMS, OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, OSSL_KDF_PARAM_DIGEST,
-    OSSL_KDF_PARAM_ITER, OSSL_KDF_PARAM_PASSWORD, OSSL_KDF_PARAM_PKCS5, OSSL_KDF_PARAM_SALT,
-    OSSL_KDF_PARAM_SIZE, OSSL_LIB_CTX, OSSL_OP_KDF, OSSL_PARAM, OSSL_PROVIDER,
+    EVP_R_PARAMETER_TOO_LARGE, OSSL_ALGORITHM, OSSL_FUNC_KDF_DERIVE, OSSL_FUNC_KDF_DUPCTX,
+    OSSL_FUNC_KDF_FREECTX, OSSL_FUNC_KDF_GET_CTX_PARAMS, OSSL_FUNC_KDF_GET_PARAMS,
+    OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, OSSL_FUNC_KDF_GETTABLE_PARAMS, OSSL_FUNC_KDF_NEWCTX,
+    OSSL_FUNC_KDF_RESET, OSSL_FUNC_KDF_SET_CTX_PARAMS, OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+    OSSL_KDF_PARAM_DIGEST, OSSL_KDF_PARAM_ITER, OSSL_KDF_PARAM_PASSWORD, OSSL_KDF_PARAM_PKCS5,
+    OSSL_KDF_PARAM_SALT, OSSL_KDF_PARAM_SCRYPT_MAXMEM, OSSL_KDF_PARAM_SCRYPT_N,
+    OSSL_KDF_PARAM_SCRYPT_P, OSSL_KDF_PARAM_SCRYPT_R, OSSL_KDF_PARAM_SIZE, OSSL_LIB_CTX,
+    OSSL_OP_KDF, OSSL_PARAM, OSSL_PROVIDER,
 };
 
 use super::fetch::{self, Kind};
@@ -26,8 +28,8 @@ use crate::err;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
 use crate::params::{
-    OSSL_PARAM_construct_int, OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_utf8_string,
-    construct, end,
+    OSSL_PARAM_construct_int, OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_uint64,
+    OSSL_PARAM_construct_utf8_string, construct, end,
 };
 use crate::provider::Ptr;
 
@@ -842,6 +844,78 @@ ffi_export! {
         // SAFETY: the digest fetched here, or NULL.
         unsafe { super::digest::EVP_MD_free(digest) };
         r
+    }
+}
+
+// -------------------------------------------------------------------------------------------
+// EVP_PBE_scrypt (`pbe_scrypt.c`)
+
+/// `SCRYPT_MAX_MEM`: the memory limit when the caller gives none (32 MiB).
+const SCRYPT_MAX_MEM: u64 = 1024 * 1024 * 32;
+
+ffi_export! {
+    /// scrypt through the SCRYPT KDF of `ctx` (with `propq`): `keylen` octets into `key` from
+    /// the password and salt (empty for NULL), with cost `n`, block size `r`, parallelism `p`,
+    /// and at most `maxmem` octets of memory (32 MiB for 0). With NULL `key`, checks the
+    /// parameters only. Returns 1, or 0.
+    ///
+    /// # Safety
+    /// `pass` and `salt` are NULL or hold their lengths; `key` is NULL or has room for `keylen`
+    /// octets; `ctx` is NULL or a live library context; `propq` is NULL or a string.
+    pub unsafe extern "C" fn EVP_PBE_scrypt_ex(pass: *const c_char, passlen: usize, salt: *const c_uchar, saltlen: usize, n: u64, r: u64, p: u64, maxmem: u64, key: *mut c_uchar, keylen: usize, ctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        if r > u64::from(u32::MAX) || p > u64::from(u32::MAX) {
+            err::raise(ERR_LIB_EVP, EVP_R_PARAMETER_TOO_LARGE, "EVP_PBE_scrypt_ex");
+            return 0;
+        }
+        let empty = c"";
+        let (pass, passlen) = if pass.is_null() { (empty.as_ptr(), 0) } else { (pass, passlen) };
+        let (salt, saltlen) = if salt.is_null() { (empty.as_ptr().cast(), 0) } else { (salt, saltlen) };
+        let mut maxmem = if maxmem == 0 { SCRYPT_MAX_MEM } else { maxmem };
+        let (mut n, mut r, mut p) = (n, r, p);
+        // SAFETY: the caller's library context and query; a static name.
+        let kdf = unsafe { EVP_KDF_fetch(ctx, c"SCRYPT".as_ptr(), propq) };
+        // SAFETY: the method just fetched, or NULL.
+        let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
+        // SAFETY: as above; the context holds its own reference.
+        unsafe { EVP_KDF_free(kdf) };
+        if kctx.is_null() {
+            return 0;
+        }
+        let params = [
+            // SAFETY: the caller's buffers and locals, which outlive the derivation.
+            unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD.as_ptr(), pass.cast_mut().cast(), passlen) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT.as_ptr(), salt.cast_mut().cast(), saltlen) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_uint64(OSSL_KDF_PARAM_SCRYPT_N.as_ptr(), &raw mut n) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_uint64(OSSL_KDF_PARAM_SCRYPT_R.as_ptr(), &raw mut r) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_uint64(OSSL_KDF_PARAM_SCRYPT_P.as_ptr(), &raw mut p) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_uint64(OSSL_KDF_PARAM_SCRYPT_MAXMEM.as_ptr(), &raw mut maxmem) },
+            end(),
+        ];
+        // SAFETY: the context made here; the caller's room; the array above.
+        let rv = c_int::from(unsafe { EVP_KDF_derive(kctx, key, keylen, params.as_ptr()) } == 1);
+        // SAFETY: the context made here.
+        unsafe { EVP_KDF_CTX_free(kctx) };
+        rv
+    }
+}
+
+ffi_export! {
+    /// `EVP_PBE_scrypt_ex` in the default library context.
+    ///
+    /// # Safety
+    /// As for `EVP_PBE_scrypt_ex`.
+    pub unsafe extern "C" fn EVP_PBE_scrypt(pass: *const c_char, passlen: usize, salt: *const c_uchar, saltlen: usize, n: u64, r: u64, p: u64, maxmem: u64, key: *mut c_uchar, keylen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { EVP_PBE_scrypt_ex(pass, passlen, salt, saltlen, n, r, p, maxmem, key, keylen, ptr::null_mut(), ptr::null()) }
     }
 }
 
