@@ -3185,7 +3185,8 @@ fn pkey_hex(random: &mut Random, max: u64) -> String {
 /// A random session of key commands (`EVP_PKEY`) on the probe's eight slots: raw keys by name
 /// and id, MAC and CMAC keys, generation and parameter generation (with and without a key),
 /// keys from parameters (with every selection, wrong types, and ciphers), parameters, copies,
-/// comparisons, typing, and checks, over the MAC and KDF key types and some that don't exist.
+/// comparisons, typing, checks, and signing (through digest contexts and the `EVP_PKEY_sign`
+/// family), over the MAC and KDF key types and some that don't exist.
 fn pkey_session(random: &mut Random, out: &mut String) -> Result {
     const NAMES: &[&str] = &[
         "HMAC",
@@ -3318,6 +3319,35 @@ fn pkey_session(random: &mut Random, out: &mut String) -> Result {
                 }
             }
             14 => writeln!(out, "pkcheck {s}")?,
+            15 | 16 => {
+                const DIGESTS: &[&str] = &[
+                    "-",
+                    "SHA256",
+                    "SHA2-512",
+                    "SHA1",
+                    "MD5",
+                    "SHA3-256",
+                    "SHAKE128",
+                    "NOPE",
+                    "SM3",
+                    "BLAKE2B-512",
+                ];
+                let cmd = random.pick(&["pkdsign", "pkdsign", "pkdsignone"]);
+                let mut line = format!("{cmd} {s} {} {}", random.pick(DIGESTS), random.below(2));
+                for _ in 0..random.below(4) {
+                    line.push(' ');
+                    line.push_str(&pkey_hex(random, 60));
+                }
+                writeln!(out, "{line}")?;
+            }
+            17 => {
+                // The message operations aren't run after an init with an algorithm of
+                // another key type: the reference crashes there (docs/DEVIATIONS.md).
+                let op = random.pick(&["sign", "verify", "recover", "signmsg", "verifymsg"]);
+                let alg = random.pick(&["-", "HMAC", "SIPHASH", "POLY1305", "CMAC", "NOPE"]);
+                writeln!(out, "pksiginit {s} {op} {alg}")?;
+            }
+            18 => writeln!(out, "pkcansign {s}")?,
             _ => writeln!(out, "pkshow {s}")?,
         }
         if random.below(10) == 0 {

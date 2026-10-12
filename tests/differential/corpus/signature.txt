@@ -1,0 +1,59 @@
+# Signing through digest contexts with the default provider's MAC signatures (HMAC, SIPHASH,
+# POLY1305, CMAC): digests by name and by default, updates in pieces, finals that leave the
+# context usable or finalize it, one-shot signing, the EVP_PKEY_sign family's inits, and
+# EVP_PKEY_can_sign.
+pkraw 0 HMAC 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+pkdsign 0 SHA256 0 4869 205468657265
+pkdsign 0 SHA2-512 0 616263
+pkdsign 0 SHA1 1 616263
+pkdsign 0 SHA3-256 0 -
+pkdsign 0 MD5 0 616263 646566
+pkdsign 0 - 0 616263
+pkdsign 0 NOPE 0 616263
+pkdsign 0 SHAKE128 0 616263
+pkdsignone 0 SHA256 0 4869205468657265
+pkdsignone 0 SHA384 1 -
+pkraw 1 SIPHASH 000102030405060708090a0b0c0d0e0f
+pkdsign 1 - 0 000102030405060708090a0b0c0d0e
+pkdsign 1 SHA256 0 00
+pkdsignone 1 - 0 0001020304050607
+pkraw 2 POLY1305 85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b
+pkdsign 2 - 0 43727970746f6772617068696320466f72756d2052657365617263682047726f7570
+pkcmac 3 AES-128-CBC 2b7e151628aed2a6abf7158809cf4f3c
+pkdsign 3 - 0 6bc1bee22e409f96e93d7e117393172a
+pkdsign 3 - 1 -
+pkcmac 4 AES-256-CBC 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+pkdsign 4 - 0 6bc1bee22e409f96e93d7e117393172a ae2d8a57
+pkraw 5 HMAC -
+pkdsign 5 SHA256 0 616263
+pkparamgen 6 SIPHASH none
+pkdsign 6 - 0 616263
+pksiginit 0 sign
+pksiginit 0 verify
+pksiginit 0 recover
+pksiginit 0 signmsg
+pksiginit 0 verifymsg
+pksiginit 0 sign HMAC
+pksiginit 0 sign SIPHASH
+pksiginit 0 verify SIPHASH
+pksiginit 0 recover CMAC
+pksiginit 0 signmsg SIPHASH
+pksiginit 1 sign POLY1305
+pkcansign 0
+pkcansign 1
+pkcansign 3
+pktype 7 6
+pkcansign 7
+pktype 7 28
+pkcansign 7
+pktype 7 1087
+pkcansign 7
+pkdsign 7 SHA256 0 00
+pkfree 0
+pkfree 1
+pkfree 2
+pkfree 3
+pkfree 4
+pkfree 5
+pkfree 6
+pkfree 7

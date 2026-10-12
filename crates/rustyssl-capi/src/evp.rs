@@ -18,3 +18,5 @@ pub(crate) mod md_ctx;
 pub(crate) mod pkey;
 pub(crate) mod pkey_ctx;
 pub(crate) mod rand;
+pub(crate) mod signature;
+pub(crate) mod sigver;

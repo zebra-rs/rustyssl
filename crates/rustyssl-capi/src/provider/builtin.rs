@@ -14,9 +14,9 @@ use rustyssl_abi::{
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX, OSSL_OP_CIPHER,
-    OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_PARAM,
-    OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME,
-    OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
+    OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_OP_SIGNATURE,
+    OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO,
+    OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
 };
 
 use crate::ffi::ffi_callback;
@@ -213,6 +213,7 @@ ffi_callback! {
             OSSL_OP_MAC => super::macs::default_macs(),
             OSSL_OP_KDF => super::kdfs::default_kdfs(),
             OSSL_OP_KEYMGMT => super::keymgmt::default_keymgmt(),
+            OSSL_OP_SIGNATURE => super::signatures::default_signatures(),
             OSSL_OP_RAND => super::rands::default_rands(),
             _ => ptr::null(),
         }

@@ -2601,9 +2601,47 @@ chunking) is clean.
     - The probe's `pk*` commands (corpus `pkey.txt`, random sessions); the `pkey` fuzz target
       checks keys made from fuzzed parameters round-trip through raw keys, copies,
       parameters, and generation.
-  - [ ] **4.2b Signatures:** `EVP_SIGNATURE`; sign, verify, verify-recover, and message
-    signing; `EVP_DigestSign*`/`EVP_DigestVerify*`; `EVP_PKEY_can_sign`; the MAC signatures
-    (`mac_legacy_sig.c`).
+  - [x] **4.2b Signatures:** `evp/signature.rs`, `evp/sigver.rs`, and
+    `provider/signatures.rs`: 50 exports; libcrypto now 1,687 of 5,876.
+    - `EVP_SIGNATURE`, made from a provider's algorithm with `evp_signature_from_algorithm`'s
+      checks (and its texts), fetched, and introspected; fetching from one provider
+      (`evp_*_fetch_from_prov`) for signatures and key managers.
+    - The `EVP_PKEY_sign`/`verify`/`verify_recover` family and message signing: the init finds
+      the algorithm the key manager names for signing (from the context's library context,
+      then the key manager's provider) and exports the key to that provider's key manager; a
+      given algorithm must suit the key's type. `EVP_PKEY_CTX_set_signature`,
+      `EVP_PKEY_CTX_set_signature_md`/`get_signature_md`, `EVP_PKEY_can_sign`.
+    - `EVP_DigestSign*`/`EVP_DigestVerify*` (`m_sigver.c`): the digest context holds the key
+      context, which `EVP_DigestInit` and `EVP_DigestUpdate` redirect to, and whose algorithm
+      takes the digest context's parameters; finals sign a copy unless
+      `EVP_MD_CTX_FLAG_FINALISE`; restarting without a key; the default digest; copies;
+      `EVP_MD_CTX_set_pkey_ctx`/`get_pkey_ctx`; `EVP_SignFinal`/`EVP_VerifyFinal`;
+      `EVP_PKEY_digestsign_supports_digest`. Key contexts copy a signature operation.
+    - The default provider's MAC signatures for HMAC, SIPHASH, POLY1305, and CMAC.
+    - **Decision:** the default provider's key manager and signature tables list every
+      algorithm of the reference's, in its order; those of later steps are *pending*: fetching
+      registers their names (as OpenSSL does when it builds the method store) but makes no
+      method. Names thus get OpenSSL's numbers, which errors print ("Algorithm (X : N)"), and
+      which differed by the missing algorithms' names before (found by a random differential
+      session on Linux x86_64). Chasing it found two older numbering differences, now fixed:
+      the name map's pre-fill walked the cipher names before the digests were added (the
+      walk's order depends on the whole table), and the default provider's cipher table
+      wasn't in `deflt_ciphers`' order.
+    - The legacy paths (an `EVP_PKEY_METHOD`, none of which can exist before 4.2d) fail as
+      OpenSSL's do without one; a digest init on the legacy path tells a key context without
+      a signature operation, as `EVP_PKEY_CTRL_DIGESTINIT` does there.
+    - Quirks kept: an init with an algorithm of another key type (or a key it can't take)
+      leaves the operation set without an algorithm, so the operations then fail as legacy
+      ones; a digest given by type isn't the digest context's digest (`EVP_MD_CTX_get0_md`
+      gives it, the digest's parameters don't); HMAC has no default digest; MAC signatures
+      don't verify.
+    - New deviations: NULL algorithms and digest contexts are refused; the message functions
+      after an init that left no algorithm fail.
+    - `tests/c/evp_signature.c`, 19 checks and about 150 printed lines (RFC 4231's HMAC
+      vector among them).
+    - The probe's `pkdsign`, `pkdsignone`, `pksiginit`, and `pkcansign` commands (corpus
+      `signature.txt`, random key sessions); the `signature` fuzz target checks signatures
+      against `EVP_Q_mac` and against each other (in pieces, at once, again, copied).
   - [ ] **4.2c Derivation, encryption, and KEMs:** `EVP_KEYEXCH` and derive with the KDF
     exchanges (`kdf_exch.c`); `EVP_ASYM_CIPHER`; `EVP_KEM`; `EVP_PKEY_CTX_ctrl`/`ctrl_str` and
     the ctrl-to-parameter translation (`ctrl_params_translate.c`) with the typed setters.

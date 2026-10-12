@@ -4925,7 +4925,9 @@ static int pkey_command(const char *command, const char *line)
             && strcmp(command, "pkeq") != 0 && strcmp(command, "pkcopy") != 0
             && strcmp(command, "pkdup") != 0 && strcmp(command, "pktype") != 0
             && strcmp(command, "pktypestr") != 0 && strcmp(command, "pkshow") != 0
-            && strcmp(command, "pkcheck") != 0 && strcmp(command, "pkfree") != 0))
+            && strcmp(command, "pkcheck") != 0 && strcmp(command, "pkfree") != 0
+            && strcmp(command, "pkdsign") != 0 && strcmp(command, "pkdsignone") != 0
+            && strcmp(command, "pksiginit") != 0 && strcmp(command, "pkcansign") != 0))
         return 0;
     printf("%s:", line);
     sscanf(line, "%*s %63s %63s %599s", a, b, c);
@@ -5070,6 +5072,100 @@ static int pkey_command(const char *command, const char *line)
                        EVP_PKEY_param_check(ctx), EVP_PKEY_private_check(ctx));
             EVP_PKEY_CTX_free(ctx);
         }
+    } else if (strcmp(command, "pkdsign") == 0 || strcmp(command, "pkdsignone") == 0) {
+        /* pkdsign SLOT MDNAME|- FINALISE CHUNK... : sign through a digest context. */
+        EVP_MD_CTX *md;
+        const char *rest = line;
+        char chunk[600];
+        unsigned char out[128];
+        size_t outlen;
+        int fin = 0;
+
+        if (pk_typed(s) || pkeys[s] == NULL) {
+            printf(" skipped: no key");
+            print_digest_errors();
+            return 1;
+        }
+        sscanf(line, "%*s %*s %*s %d", &fin);
+        md = EVP_MD_CTX_new();
+        if (fin)
+            EVP_MD_CTX_set_flags(md, EVP_MD_CTX_FLAG_FINALISE);
+        printf(" init %d", EVP_DigestSignInit_ex(md, NULL, strcmp(b, "-") == 0 ? NULL : b,
+                                                 NULL, NULL, pkeys[s], NULL));
+        for (t = 0; t < 4 && rest != NULL; t++) {
+            rest = strchr(rest, ' ');
+            if (rest != NULL)
+                rest++;
+        }
+        if (strcmp(command, "pkdsignone") == 0) {
+            len = rest != NULL && sscanf(rest, "%599s", chunk) == 1 ? pk_hex(chunk, key, sizeof(key)) : 0;
+            outlen = 0;
+            r = EVP_DigestSign(md, NULL, &outlen, key, len);
+            printf(" size %d %zu", r, outlen);
+            outlen = sizeof(out);
+            r = EVP_DigestSign(md, out, &outlen, key, len);
+            printf(" sign %d", r);
+            if (r == 1)
+                print_hex_inline("sig", out, outlen);
+            outlen = sizeof(out);
+            printf(" again %d", EVP_DigestSign(md, out, &outlen, key, len));
+        } else {
+            while (rest != NULL && sscanf(rest, "%599s", chunk) == 1) {
+                len = pk_hex(chunk, key, sizeof(key));
+                printf(" up %d", EVP_DigestSignUpdate(md, key, len));
+                rest = strchr(rest, ' ');
+                if (rest != NULL)
+                    rest++;
+            }
+            for (t = 0; t < 2; t++) {
+                outlen = 0;
+                r = EVP_DigestSignFinal(md, NULL, &outlen);
+                printf(" size %d %zu", r, outlen);
+                outlen = sizeof(out);
+                r = EVP_DigestSignFinal(md, out, &outlen);
+                printf(" final %d", r);
+                if (r == 1)
+                    print_hex_inline("sig", out, outlen);
+            }
+        }
+        EVP_MD_CTX_free(md);
+    } else if (strcmp(command, "pksiginit") == 0) {
+        /* pksiginit SLOT OP [ALG]: the EVP_PKEY_sign family's inits and operations. */
+        EVP_PKEY_CTX *ctx;
+        EVP_SIGNATURE *alg = NULL;
+        unsigned char out[64];
+        size_t outlen = sizeof(out);
+
+        if (pk_typed(s) || pkeys[s] == NULL) {
+            printf(" skipped: no key");
+            print_digest_errors();
+            return 1;
+        }
+        ctx = EVP_PKEY_CTX_new(pkeys[s], NULL);
+        if (c[0] != '\0' && strcmp(c, "-") != 0)
+            alg = EVP_SIGNATURE_fetch(NULL, c, NULL);
+        if (strcmp(b, "sign") == 0)
+            r = EVP_PKEY_sign_init_ex2(ctx, alg, NULL);
+        else if (strcmp(b, "verify") == 0)
+            r = EVP_PKEY_verify_init_ex2(ctx, alg, NULL);
+        else if (strcmp(b, "recover") == 0)
+            r = EVP_PKEY_verify_recover_init_ex2(ctx, alg, NULL);
+        else if (strcmp(b, "signmsg") == 0)
+            r = EVP_PKEY_sign_message_init(ctx, alg, NULL);
+        else
+            r = EVP_PKEY_verify_message_init(ctx, alg, NULL);
+        printf(" init %d op %d", r, EVP_PKEY_CTX_get_operation(ctx));
+        if (strcmp(b, "sign") == 0)
+            printf(" sign %d", EVP_PKEY_sign(ctx, out, &outlen, key, 4));
+        else if (strcmp(b, "verify") == 0)
+            printf(" verify %d", EVP_PKEY_verify(ctx, out, 4, key, 4));
+        else if (strcmp(b, "recover") == 0)
+            printf(" recover %d", EVP_PKEY_verify_recover(ctx, out, &outlen, key, 4));
+        EVP_SIGNATURE_free(alg);
+        EVP_PKEY_CTX_free(ctx);
+    } else if (strcmp(command, "pkcansign") == 0) {
+        if (pkeys[s] != NULL && (!pk_typed(s) || EVP_PKEY_get_base_id(pkeys[s]) != EVP_PKEY_EC))
+            printf(" %d", EVP_PKEY_can_sign(pkeys[s]));
     } else {
         EVP_PKEY_free(pkeys[s]);
         pkeys[s] = NULL;

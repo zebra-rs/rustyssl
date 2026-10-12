@@ -7320,112 +7320,6 @@ pub extern "C" fn EVP_CipherPipelineUpdate(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSign(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSignFinal(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSignFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSignInit(
-    _: *mut EVP_MD_CTX,
-    _: *mut *mut EVP_PKEY_CTX,
-    _: *const EVP_MD,
-    _: *mut ENGINE,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSignInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSignInit_ex(
-    _: *mut EVP_MD_CTX,
-    _: *mut *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut EVP_PKEY,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSignInit_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestSignUpdate(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_void,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestSignUpdate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestVerify(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestVerify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestVerifyFinal(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestVerifyFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestVerifyInit(
-    _: *mut EVP_MD_CTX,
-    _: *mut *mut EVP_PKEY_CTX,
-    _: *const EVP_MD,
-    _: *mut ENGINE,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestVerifyInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestVerifyInit_ex(
-    _: *mut EVP_MD_CTX,
-    _: *mut *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut EVP_PKEY,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestVerifyInit_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_DigestVerifyUpdate(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_void,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_DigestVerifyUpdate")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_KEM_do_all_provided(
     _: *mut OSSL_LIB_CTX,
     _: ::core::option::Option<
@@ -7577,16 +7471,6 @@ pub extern "C" fn EVP_MAC_init_SKEY(
     _: *const OSSL_PARAM,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_MAC_init_SKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_get_pkey_ctx(_: *const EVP_MD_CTX) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("EVP_MD_CTX_get_pkey_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_MD_CTX_set_pkey_ctx(_: *mut EVP_MD_CTX, _: *mut EVP_PKEY_CTX) {
-    crate::stub::unimplemented("EVP_MD_CTX_set_pkey_ctx")
 }
 
 #[unsafe(no_mangle)]
@@ -8122,14 +8006,6 @@ pub extern "C" fn EVP_PKEY_CTX_get_rsa_pss_saltlen(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_get_signature_md(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_get_signature_md")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_hex2ctrl(
     _: *mut EVP_PKEY_CTX,
     _: core::ffi::c_int,
@@ -8635,23 +8511,6 @@ pub extern "C" fn EVP_PKEY_CTX_set_scrypt_r(_: *mut EVP_PKEY_CTX, _: u64) -> cor
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_signature(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_signature")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_CTX_set_signature_md(
-    _: *mut EVP_PKEY_CTX,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_CTX_set_signature_md")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_CTX_set_tls1_prf_md(
     _: *mut EVP_PKEY_CTX,
     _: *const EVP_MD,
@@ -9043,11 +8902,6 @@ pub extern "C" fn EVP_PKEY_auth_encapsulate_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_can_sign(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_can_sign")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_decapsulate(
     _: *mut EVP_PKEY_CTX,
     _: *mut core::ffi::c_uchar,
@@ -9145,16 +8999,6 @@ pub extern "C" fn EVP_PKEY_derive_set_peer_ex(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_derive_set_peer_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_digestsign_supports_digest(
-    _: *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_digestsign_supports_digest")
 }
 
 #[unsafe(no_mangle)]
@@ -9991,231 +9835,6 @@ pub extern "C" fn EVP_PKEY_set1_RSA(_: *mut EVP_PKEY, _: *mut rsa_st) -> core::f
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_init_ex(
-    _: *mut EVP_PKEY_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_init_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_init_ex2(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut EVP_SIGNATURE,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_init_ex2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_message_final(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_message_final")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_message_init(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut EVP_SIGNATURE,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_message_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_sign_message_update(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_sign_message_update")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_init_ex(
-    _: *mut EVP_PKEY_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_init_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_init_ex2(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut EVP_SIGNATURE,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_init_ex2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_message_final(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_message_final")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_message_init(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut EVP_SIGNATURE,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_message_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_message_update(
-    _: *mut EVP_PKEY_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_message_update")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_recover(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_recover")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_recover_init(_: *mut EVP_PKEY_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_recover_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_recover_init_ex(
-    _: *mut EVP_PKEY_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_recover_init_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_verify_recover_init_ex2(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut EVP_SIGNATURE,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_verify_recover_init_ex2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_do_all_provided(
-    _: *mut OSSL_LIB_CTX,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(signature: *mut EVP_SIGNATURE, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("EVP_SIGNATURE_do_all_provided")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_fetch(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_SIGNATURE {
-    crate::stub::unimplemented("EVP_SIGNATURE_fetch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_free(_: *mut EVP_SIGNATURE) {
-    crate::stub::unimplemented("EVP_SIGNATURE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_get0_description(
-    _: *const EVP_SIGNATURE,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_SIGNATURE_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_get0_name(_: *const EVP_SIGNATURE) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("EVP_SIGNATURE_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_get0_provider(_: *const EVP_SIGNATURE) -> *mut OSSL_PROVIDER {
-    crate::stub::unimplemented("EVP_SIGNATURE_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_gettable_ctx_params(_: *const EVP_SIGNATURE) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_SIGNATURE_gettable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_is_a(
-    _: *const EVP_SIGNATURE,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SIGNATURE_is_a")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_names_do_all(
-    _: *const EVP_SIGNATURE,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SIGNATURE_names_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_settable_ctx_params(_: *const EVP_SIGNATURE) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("EVP_SIGNATURE_settable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SIGNATURE_up_ref(_: *mut EVP_SIGNATURE) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SIGNATURE_up_ref")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_SKEYMGMT_do_all_provided(
     _: *mut OSSL_LIB_CTX,
     _: ::core::option::Option<
@@ -10409,50 +10028,6 @@ pub extern "C" fn EVP_SealInit(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_SealInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SignFinal(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SignFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SignFinal_ex(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SignFinal_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_VerifyFinal(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_VerifyFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_VerifyFinal_ex(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-    _: *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_VerifyFinal_ex")
 }
 
 #[unsafe(no_mangle)]
