@@ -219,3 +219,9 @@ path = "fuzz_targets/evp_kdf.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "evp_rand"
+path = "fuzz_targets/evp_rand.rs"
+test = false
+doc = false

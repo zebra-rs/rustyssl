@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(27) {
+        match random.below(28) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -175,6 +175,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             23 => cipher_session(&mut random, &mut out)?,
             24 => mac_session(&mut random, &mut out)?,
             25 => kdf_session(&mut random, &mut out)?,
+            26 => rand_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -1396,6 +1397,151 @@ fn kdf_session(random: &mut Random, out: &mut String) -> Result {
     writeln!(out, "kctx 1")?;
     writeln!(out, "kfree")?;
     writeln!(out, "kctx 0")?;
+    Ok(())
+}
+
+/// A random session of random-generator commands on the probe's two contexts: each of the
+/// default provider's generators made by name (a context often under the other), given
+/// TEST-RAND's entropy, nonce, strength, request limit, and mode, the DRBGs' ciphers, digests,
+/// MACs, derivation function, and reseed requests (the reseed interval kept at its hour, so
+/// timing never decides), instantiated, generated from, reseeded, asked for nonces, states,
+/// and parameters.
+fn rand_session(random: &mut Random, out: &mut String) -> Result {
+    const RANDS: &[&str] = &[
+        "TEST-RAND",
+        "TEST-RAND",
+        "CTR-DRBG",
+        "HASH-DRBG",
+        "HMAC-DRBG",
+        "SEED-SRC",
+        "hash-drbg",
+        "NO-SUCH-RAND",
+    ];
+    let params = |random: &mut Random| -> String {
+        let mut text = String::new();
+        for _ in 0..random.below(3) + 1 {
+            let param = match random.below(10) {
+                0 | 1 => format!(
+                    "{}={}",
+                    random.pick(&["test_entropy", "test_nonce"]),
+                    random.pick(&["0", "8", "16", "24", "32", "40", "48", "64", "100", "199"])
+                ),
+                2 => format!(
+                    "strength={}",
+                    random.pick(&["0", "112", "128", "192", "256", "257"])
+                ),
+                3 => format!("generate={}", random.below(2)),
+                4 => format!(
+                    "max_request={}",
+                    random.pick(&["0", "1", "5", "16", "1000", "65536"])
+                ),
+                5 => format!(
+                    "cipher={}",
+                    random.pick(&[
+                        "AES-128-CTR",
+                        "AES-192-CTR",
+                        "AES-256-CTR",
+                        "aria-128-ctr",
+                        "CAMELLIA-256-CTR",
+                        "SM4-CTR",
+                        "AES-128-CBC",
+                        "NOPE-CTR"
+                    ])
+                ),
+                6 => format!(
+                    "digest={}",
+                    random.pick(&[
+                        "SHA1",
+                        "SHA256",
+                        "SHA512",
+                        "SHA3-256",
+                        "SHA512-224",
+                        "SM3",
+                        "MD5",
+                        "SHAKE128",
+                        "NULL",
+                        "nonesuch"
+                    ])
+                ),
+                7 => random
+                    .pick(&[
+                        "mac=HMAC",
+                        "mac=KMAC128",
+                        "mac=CMAC",
+                        "mac=nonesuch",
+                        "properties=provider=default",
+                        "properties=provider=nonesuch",
+                    ])
+                    .to_owned(),
+                8 => format!("use_derivation_function={}", random.below(2)),
+                _ if random.below(2) == 0 => format!(
+                    "reseed_requests={}",
+                    random.pick(&["0", "1", "2", "3", "256"])
+                ),
+                // Never a short interval: whether time reseeds would decide the output.
+                _ => format!(
+                    "reseed_time_interval={}",
+                    random.pick(&["0", "3600", "86400"])
+                ),
+            };
+            text.push(' ');
+            text.push_str(&param);
+        }
+        text
+    };
+    let strength = |random: &mut Random| random.pick(&["0", "0", "112", "128", "256", "257"]);
+    let length = |random: &mut Random| -> u64 {
+        match random.below(3) {
+            0 => random
+                .pick(&["0", "1", "15", "16", "17", "32", "64", "128", "129"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(400),
+        }
+    };
+    for _ in 0..random.below(30) + 1 {
+        match random.below(16) {
+            0 | 1 => {
+                let child = if random.below(3) == 0 { "" } else { " child" };
+                writeln!(out, "rnew {}{child}", random.pick(RANDS))?;
+            }
+            2..=4 => writeln!(out, "rset{}", params(random))?,
+            5 | 6 => writeln!(
+                out,
+                "rinst {} {} {}",
+                strength(random),
+                random.below(2),
+                random.pick(&["0", "0", "8", "48", "49", "199"])
+            )?,
+            7..=9 => writeln!(
+                out,
+                "rgen {} {} {} {}",
+                length(random),
+                strength(random),
+                u64::from(random.below(4) == 0),
+                random.pick(&["0", "0", "1", "16", "48", "49", "299"])
+            )?,
+            10 => writeln!(
+                out,
+                "rreseed {} {} {}",
+                u64::from(random.below(3) == 0),
+                random.pick(&["0", "0", "5", "16", "32", "48", "100"]),
+                random.pick(&["0", "7", "49"])
+            )?,
+            11 => writeln!(out, "rnonce {}", length(random))?,
+            12 => writeln!(out, "rctx {}", random.below(2))?,
+            _ => writeln!(
+                out,
+                "{}",
+                random.pick(&["rget", "runinst", "rzero", "rlock", "rfree"])
+            )?,
+        }
+    }
+    writeln!(out, "rctx 0")?;
+    writeln!(out, "rfree")?;
+    writeln!(out, "rctx 1")?;
+    writeln!(out, "rfree")?;
+    writeln!(out, "rctx 0")?;
     Ok(())
 }
 

@@ -3263,7 +3263,8 @@ static int mac_params(const char *line, int skip, OSSL_PARAM *params, size_t *si
                    || strcmp(tok, "partyv-info") == 0 || strcmp(tok, "supp-pubinfo") == 0
                    || strcmp(tok, "supp-privinfo") == 0 || strcmp(tok, "constant") == 0
                    || strcmp(tok, "entropy") == 0 || strcmp(tok, "nonce") == 0
-                   || strcmp(tok, "ad") == 0) {
+                   || strcmp(tok, "ad") == 0 || strcmp(tok, "test_entropy") == 0
+                   || strcmp(tok, "test_nonce") == 0) {
             size_t len = strtoul(eq + 1, NULL, 10) % 200;
 
             params[n] = OSSL_PARAM_construct_octet_string(tok, mac_data + off, len);
@@ -3712,6 +3713,221 @@ static int kdf_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Random generators (EVP_RAND(3)): two contexts, each made by name (with "child", under the
+ * other as its parent), given parameters as the MAC commands write them (test_entropy and
+ * test_nonce as octets of the data, the numbers as size_t), instantiated, generated from (into
+ * buffers of the lengths asked for, with additional input of the data), reseeded, asked for
+ * nonces, states, and parameters. Output is printed only where it's deterministic: from
+ * TEST-RAND, or from a DRBG directly under one (anything seeded by the operating system, or by
+ * a DRBG, which mixes in its address, isn't).
+ */
+static EVP_RAND_CTX *rand_slot[2];
+static int rand_current;
+/*
+ * What each context is, and what OpenSSL can't be given (docs/DEVIATIONS.md). A DRBG never
+ * set up (no cipher, or digest, taken) isn't run: OpenSSL crashes instantiating a CTR-DRBG
+ * without a cipher under a parent, loops forever on a HASH- or HMAC-DRBG that kept a digest it
+ * refused, and seeds one of strength 0 without a parent from its RAND layer's seed source once
+ * that exists (step 3.7b). A DRBG under a TEST-RAND in generating mode crashes asking for a
+ * nonce's length, so no child is made under one, nor is a TEST-RAND with children put in that
+ * mode.
+ */
+enum { R_OTHER, R_CTR, R_HASH, R_HMAC, R_SEED, R_TEST };
+static int rand_kind[2], rand_parent[2], rand_det[2], rand_ctr_ok[2], rand_gen[2], rand_child[2];
+static int rand_digest_ok[2], rand_digest_tried[2];
+
+static int rand_kind_of(const EVP_RAND *r)
+{
+    if (r == NULL)
+        return R_OTHER;
+    if (EVP_RAND_is_a(r, "CTR-DRBG"))
+        return R_CTR;
+    if (EVP_RAND_is_a(r, "HASH-DRBG"))
+        return R_HASH;
+    if (EVP_RAND_is_a(r, "HMAC-DRBG"))
+        return R_HMAC;
+    if (EVP_RAND_is_a(r, "SEED-SRC"))
+        return R_SEED;
+    return EVP_RAND_is_a(r, "TEST-RAND") ? R_TEST : R_OTHER;
+}
+
+static int rand_command(const char *command, const char *line)
+{
+    EVP_RAND_CTX *ctx;
+    OSSL_PARAM params[10];
+    size_t sizes[10], sz;
+    int ints[10], has_cipher = 0, has_iv = 0, r = 0, c;
+    char strs[10][64], a[64] = "", b[64] = "";
+    unsigned char out[1100];
+    unsigned long n = 0, m = 0, k = 0, pr = 0;
+
+    if (command[0] != 'r' || (strcmp(command, "rctx") != 0 && strcmp(command, "rnew") != 0
+            && strcmp(command, "rset") != 0 && strcmp(command, "rinst") != 0
+            && strcmp(command, "rgen") != 0 && strcmp(command, "rreseed") != 0
+            && strcmp(command, "rnonce") != 0 && strcmp(command, "runinst") != 0
+            && strcmp(command, "rget") != 0 && strcmp(command, "rlock") != 0
+            && strcmp(command, "rzero") != 0 && strcmp(command, "rfree") != 0))
+        return 0;
+    if (mac_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(mac_data); i++)
+            mac_data[i] = (unsigned char)(i * 11 + 5);
+    }
+    c = rand_current;
+    ctx = rand_slot[c];
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "rctx") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        rand_current = n != 0;
+        printf("\n");
+        return 1;
+    } else if (strcmp(command, "rnew") == 0) {
+        EVP_RAND *rand;
+        EVP_RAND_CTX *parent = NULL;
+
+        sscanf(line, "%*s %63s %63s", a, b);
+        if (strcmp(b, "child") == 0) {
+            parent = rand_slot[!c];
+            if (parent != NULL && rand_kind[!c] == R_TEST && rand_gen[!c]) {
+                printf(" skipped: a child of TEST-RAND in generating mode\n");
+                return 1;
+            }
+        }
+        rand = EVP_RAND_fetch(NULL, a, NULL);
+        EVP_RAND_CTX_free(ctx);
+        rand_slot[c] = EVP_RAND_CTX_new(rand, parent);
+        rand_kind[c] = rand_kind_of(rand);
+        rand_parent[c] = parent != NULL;
+        rand_ctr_ok[c] = rand_gen[c] = rand_child[c] = rand_digest_ok[c] = rand_digest_tried[c] = 0;
+        rand_det[c] = rand_kind[c] == R_TEST
+                      || (parent != NULL && rand_kind[!c] == R_TEST && rand_kind[c] != R_SEED);
+        if (rand_slot[c] != NULL && parent != NULL)
+            rand_child[!c] = 1;
+        if (rand != NULL)
+            printf(" %s %s", EVP_RAND_get0_name(rand), rand_slot[c] != NULL ? "ok" : "failed");
+        else
+            printf(" fetch failed");
+        EVP_RAND_free(rand);
+    } else if (ctx == NULL) {
+        printf(" no context\n");
+        return 1;
+    } else if (strcmp(command, "rset") == 0) {
+        unsigned long g = 0;
+        const char *gp = strstr(line, " generate=");
+
+        if (gp != NULL)
+            g = strtoul(gp + 10, NULL, 10);
+        if (rand_kind[c] == R_TEST && g != 0 && rand_child[c]) {
+            printf(" skipped: generating mode with children\n");
+            return 1;
+        }
+        mac_params(line, 0, params, sizes, ints, strs, &has_cipher, &has_iv);
+        r = EVP_RAND_CTX_set_params(ctx, params);
+        printf(" %d", r);
+        mac_params_free(params);
+        if (has_cipher && r == 1)
+            rand_ctr_ok[c] = 1;
+        if (strstr(line, " digest=") != NULL) {
+            rand_digest_tried[c] = 1;
+            rand_digest_ok[c] |= r == 1;
+        }
+        if (gp != NULL && r == 1 && rand_kind[c] == R_TEST)
+            rand_gen[c] = g != 0;
+    } else if (((rand_kind[c] == R_CTR && !rand_ctr_ok[c])
+                || ((rand_kind[c] == R_HASH || rand_kind[c] == R_HMAC) && !rand_digest_ok[c]))
+               && (strcmp(command, "rinst") == 0 || strcmp(command, "rgen") == 0
+                   || strcmp(command, "rreseed") == 0 || strcmp(command, "rnonce") == 0)) {
+        printf(" skipped: a DRBG not set up\n");
+        return 1;
+    } else if (strcmp(command, "rinst") == 0) {
+        sscanf(line, "%*s %lu %lu %lu", &n, &pr, &m);
+        r = EVP_RAND_instantiate(ctx, (unsigned int)n, (int)pr, m > 0 ? mac_data + 300 : NULL,
+                                 m % 200, NULL);
+        printf(" %d state %d", r, EVP_RAND_get_state(ctx));
+    } else if (strcmp(command, "rgen") == 0) {
+        sscanf(line, "%*s %lu %lu %lu %lu", &n, &m, &pr, &k);
+        if (n > 1024)
+            n = 1024;
+        r = EVP_RAND_generate(ctx, out, n, (unsigned int)m, (int)pr, k > 0 ? mac_data + 600 : NULL,
+                              k % 300);
+        printf(" %d ", r);
+        if (!rand_det[c])
+            printf("(%s)", r == 1 ? "random" : "-");
+        else
+            for (sz = 0; sz < (r == 1 ? n : 0) && sz < 256; sz++)
+                printf("%02x", out[sz]);
+    } else if (strcmp(command, "rreseed") == 0) {
+        sscanf(line, "%*s %lu %lu %lu", &pr, &m, &k);
+        r = EVP_RAND_reseed(ctx, (int)pr, m > 0 ? mac_data + 900 : NULL, m % 200,
+                            k > 0 ? mac_data + 1200 : NULL, k % 200);
+        printf(" %d state %d", r, EVP_RAND_get_state(ctx));
+    } else if (strcmp(command, "rnonce") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 1024)
+            n = 1024;
+        r = EVP_RAND_nonce(ctx, out, n);
+        printf(" %d ", r);
+        if (!rand_det[c])
+            printf("(%s)", r == 1 ? "random" : "-");
+        else
+            for (sz = 0; sz < (r == 1 ? n : 0) && sz < 256; sz++)
+                printf("%02x", out[sz]);
+    } else if (strcmp(command, "runinst") == 0) {
+        r = EVP_RAND_uninstantiate(ctx);
+        printf(" %d state %d zero %d", r, EVP_RAND_get_state(ctx), EVP_RAND_verify_zeroization(ctx));
+    } else if (strcmp(command, "rget") == 0) {
+        int state = -9, use_df = -9;
+        unsigned int strength = 9, counter = 9, requests = 9, gen = 9;
+        size_t max = 9, min_e = 9, max_e = 9, min_n = 9, max_n = 9, max_p = 9, max_a = 9;
+        char name[32] = "-";
+
+        params[0] = OSSL_PARAM_construct_int("state", &state);
+        params[1] = OSSL_PARAM_construct_uint("strength", &strength);
+        params[2] = OSSL_PARAM_construct_size_t("max_request", &max);
+        params[3] = OSSL_PARAM_construct_size_t("min_entropylen", &min_e);
+        params[4] = OSSL_PARAM_construct_size_t("max_entropylen", &max_e);
+        params[5] = OSSL_PARAM_construct_size_t("min_noncelen", &min_n);
+        params[6] = OSSL_PARAM_construct_size_t("max_noncelen", &max_n);
+        params[7] = OSSL_PARAM_construct_size_t("max_perslen", &max_p);
+        params[8] = OSSL_PARAM_construct_size_t("max_adinlen", &max_a);
+        params[9] = OSSL_PARAM_construct_end();
+        r = EVP_RAND_CTX_get_params(ctx, params);
+        printf(" %d: %d %u %zu %zu-%zu %zu-%zu %zu %zu", r, state, strength, max, min_e, max_e,
+               min_n, max_n, max_p, max_a);
+        params[0] = OSSL_PARAM_construct_uint("reseed_counter", &counter);
+        params[1] = OSSL_PARAM_construct_uint("reseed_requests", &requests);
+        params[2] = OSSL_PARAM_construct_uint("generate", &gen);
+        params[3] = OSSL_PARAM_construct_int("use_derivation_function", &use_df);
+        params[4] = OSSL_PARAM_construct_end();
+        r = EVP_RAND_CTX_get_params(ctx, params);
+        printf(" | %d: %u %u %u %d", r, counter, requests, gen, use_df);
+        for (k = 0; k < 3; k++) {
+            static const char *keys[] = { "cipher", "digest", "mac" };
+
+            strcpy(name, "-");
+            params[0] = OSSL_PARAM_construct_utf8_string(keys[k], name, sizeof(name));
+            params[1] = OSSL_PARAM_construct_end();
+            r = EVP_RAND_CTX_get_params(ctx, params);
+            printf(" | %d %s", r, name);
+        }
+        printf(" | strength %u", EVP_RAND_get_strength(ctx));
+    } else if (strcmp(command, "rlock") == 0) {
+        printf(" %d", EVP_RAND_enable_locking(ctx));
+    } else if (strcmp(command, "rzero") == 0) {
+        printf(" %d", EVP_RAND_verify_zeroization(ctx));
+    } else {
+        EVP_RAND_CTX_free(ctx);
+        rand_slot[c] = NULL;
+    }
+    print_digest_errors();
+    /* A failed fetch's error text has the name's number: drop the buffers it sized. */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -3738,7 +3954,7 @@ int main(void)
             || prop_command(command, line) || prov_command(command, line)
             || fetch_command(command, line) || digest_command(command, line)
             || cipher_command(command, line) || mac_command(command, line)
-            || kdf_command(command, line)) {
+            || kdf_command(command, line) || rand_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
