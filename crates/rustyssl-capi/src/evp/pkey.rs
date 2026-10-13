@@ -57,6 +57,7 @@ use crate::provider::Ptr;
 
 pub(crate) mod ameth;
 pub(crate) mod params;
+pub(crate) mod print;
 pub(crate) mod raw;
 
 /// `OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS`, which `p_lib.c` calls `SELECT_PARAMETERS`.

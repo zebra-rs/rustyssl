@@ -4502,6 +4502,42 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ff
     crate::evp::pkey_ctx::EVP_PKEY_paramgen;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
     crate::evp::pkey_ctx::EVP_PKEY_paramgen_init;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_params;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_params_fp;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_private;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_private_fp;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_public;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *mut ASN1_PCTX,
+) -> core::ffi::c_int = crate::evp::pkey::print::EVP_PKEY_print_public_fp;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
     crate::evp::pkey_ctx::EVP_PKEY_private_check;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
@@ -5794,6 +5830,22 @@ const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
 const _: unsafe extern "C" fn(
+    d2i_of_void,
+    *const core::ffi::c_char,
+    *mut FILE,
+    *mut *mut core::ffi::c_void,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::pem_read::PEM_ASN1_read;
+const _: unsafe extern "C" fn(
+    d2i_of_void,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *mut *mut core::ffi::c_void,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut core::ffi::c_void = crate::pem_read::PEM_ASN1_read_bio;
+const _: unsafe extern "C" fn(
     i2d_of_void,
     *const core::ffi::c_char,
     *mut FILE,
@@ -5827,6 +5879,24 @@ const _: unsafe extern "C" fn(
     pem_password_cb,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_int = crate::pem_cipher::PEM_ASN1_write_bio_ctx;
+const _: unsafe extern "C" fn(
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+    *mut *mut core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut BIO,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_read::PEM_bytes_read_bio;
+const _: unsafe extern "C" fn(
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_long,
+    *mut *mut core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut BIO,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_read::PEM_bytes_read_bio_secmem;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     core::ffi::c_int,

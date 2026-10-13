@@ -5616,6 +5616,98 @@ static int meth_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Printing keys and reading PEM blocks by name (step 4.2e).
+ *
+ *   pkprint SLOT PART INDENT      EVP_PKEY_print_PART (public, private, params) of the slot's key
+ *                                  (a provided or blank one: a built-in key type's legacy print
+ *                                  functions read data such keys don't have) to a memory BIO,
+ *                                  or through a prefix BIO already indenting by 3 (PART ending
+ *                                  in "+"); the output with "|" for each newline
+ *   pembytes WANTED NAMES          PEM_bytes_read_bio for WANTED over blocks named NAMES
+ *                                  (comma-separated, "_" for a space; the i-th block holds the
+ *                                  INTEGER i), until it fails: each block's name and integer
+ */
+static int print_command(const char *command, const char *line)
+{
+    char a[64] = "", b[64] = "", c[600] = "";
+
+    if (strcmp(command, "pkprint") != 0 && strcmp(command, "pembytes") != 0)
+        return 0;
+    printf("%s:", line);
+    sscanf(line, "%*s %63s %63s %599s", a, b, c);
+    if (strcmp(command, "pkprint") == 0) {
+        EVP_PKEY *k = pkeys[pk_slot(a)];
+        BIO *mem = BIO_new(BIO_s_mem()), *out = mem;
+        int r = -9, plus = b[0] != '\0' && b[strlen(b) - 1] == '+';
+        char *p = NULL;
+        long n, i;
+
+        if (plus) {
+            out = BIO_push(BIO_new(BIO_f_prefix()), mem);
+            BIO_set_indent(out, 3);
+        }
+        if (k != NULL && (EVP_PKEY_get0_provider(k) != NULL || EVP_PKEY_get_id(k) == EVP_PKEY_NONE)) {
+            if (strncmp(b, "public", 6) == 0)
+                r = EVP_PKEY_print_public(out, k, atoi(c), NULL);
+            else if (strncmp(b, "private", 7) == 0)
+                r = EVP_PKEY_print_private(out, k, atoi(c), NULL);
+            else
+                r = EVP_PKEY_print_params(out, k, atoi(c), NULL);
+        }
+        if (plus)
+            printf(" indent %ld", (long)BIO_get_indent(out));
+        n = BIO_get_mem_data(mem, &p);
+        printf(" -> %d '", r);
+        for (i = 0; i < n; i++)
+            putchar(p[i] == '\n' ? '|' : p[i]);
+        printf("'");
+        if (plus)
+            BIO_pop(out), BIO_free(out);
+        BIO_free(mem);
+    } else {
+        char text[8000] = "", name[80], *wanted = a, *q;
+        unsigned char der[3] = { 0x02, 0x01, 0 };
+        unsigned char b64[8];
+        int i = 0, r;
+        BIO *bio;
+
+        sscanf(line, "%*s %63s %599s", a, c);
+        for (q = wanted; *q != '\0'; q++)
+            if (*q == '_')
+                *q = ' ';
+        for (q = strtok(c, ","); q != NULL && strlen(text) < sizeof(text) - 200; q = strtok(NULL, ",")) {
+            char *u;
+
+            snprintf(name, sizeof(name), "%.60s", q);
+            for (u = name; *u != '\0'; u++)
+                if (*u == '_')
+                    *u = ' ';
+            der[2] = (unsigned char)++i;
+            EVP_EncodeBlock(b64, der, 3);
+            snprintf(text + strlen(text), sizeof(text) - strlen(text),
+                     "-----BEGIN %s-----\n%s\n-----END %s-----\n", name, (char *)b64, name);
+        }
+        bio = BIO_new_mem_buf(text, -1);
+        for (;;) {
+            unsigned char *d = NULL;
+            char *nm = NULL;
+            long len = 0;
+
+            r = PEM_bytes_read_bio(&d, &len, &nm, wanted, bio, NULL, NULL);
+            if (r != 1)
+                break;
+            printf(" [%s %ld %d]", nm, len, len > 0 ? d[len - 1] : -1);
+            OPENSSL_free(d);
+            OPENSSL_free(nm);
+        }
+        printf(" end %d", r);
+        BIO_free(bio);
+    }
+    print_digest_errors();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -5644,7 +5736,8 @@ int main(void)
             || cipher_command(command, line) || mac_command(command, line)
             || kdf_command(command, line) || rand_command(command, line)
             || bn_command(command, line) || pkey_command(command, line)
-            || derive_command(command, line) || meth_command(command, line)) {
+            || derive_command(command, line) || meth_command(command, line)
+            || print_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

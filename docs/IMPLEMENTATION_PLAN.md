@@ -2546,7 +2546,7 @@ chunking) is clean.
       sessions); the `bn_gf2m` fuzz target checks field identities and primality against
       trial division.
 
-- [ ] **4.2 EVP_PKEY framework:**
+- [x] **4.2 EVP_PKEY framework:**
   - EVP_PKEY lifecycle and keymgmt (import and export through `OSSL_PARAM`, `fromdata` /
     `todata`, get/set params)
   - `EVP_PKEY_CTX` for keygen, paramgen, sign, verify, verify_recover, encrypt, decrypt,
@@ -2734,10 +2734,27 @@ chunking) is clean.
       `meth.txt`, random `meth` sessions): a logging method added for one command, for each
       key type the translations name; the `meth` fuzz target checks the tables' counts, PEM
       name lookups, and that the method's ctrl gets the parameters' octets.
-  - [ ] **4.2e Printing and PEM:** `EVP_PKEY_print_public`/`_private`/`_params` and their
-    `_fp` forms (a provided key without text encoders prints OpenSSL's "unsupported" line; a
-    key with encoders waits for the encoders, 4.7; a legacy key goes to its ASN.1 method's
-    print functions), `PEM_bytes_read_bio`/`_secmem`, and `PEM_ASN1_read`/`_bio`.
+  - [x] **4.2e Printing and PEM:** `evp/pkey/print.rs` and `pem_read.rs`: 10 exports;
+    libcrypto now 1,916 of 5,876.
+    - `EVP_PKEY_print_public`/`_private`/`_params` and their `_fp` forms: a provided key goes
+      to its providers' text encoders if any is for its type (aborting until the encoders,
+      4.7; the default provider has none for the MAC and KDF keys there are), a key typed by
+      an ASN.1 method to the method's print function, and otherwise OpenSSL's line saying the
+      algorithm is unsupported. Indentation through the BIO's own or a pushed prefix BIO.
+    - `PEM_bytes_read_bio`/`_secmem` and `PEM_ASN1_read`/`_bio`: the first block whose name
+      stands for the one asked for (`check_pem`, with "ANY PRIVATE KEY" and "PARAMETERS"
+      consulting the ASN.1 methods, for which the built-in methods now list
+      `old_priv_decode`, `param_decode`, and their print functions), decrypted, decoded.
+    - Quirks kept: the unsupported line says "Public Key" for the private key and parameters
+      too, and names a type without a long name `<NULL>` with `OBJ_R_UNKNOWN_NID`; a key
+      without data queues the encoder's "must be assigned a key" error; printing without
+      indentation sets the BIO's indentation to 0; PEM names find ASN.1 methods ignoring case
+      ("rsa PRIVATE KEY" is a private key).
+    - New deviations: printing a NULL key; `PEM_ASN1_read_bio` without a decoder.
+    - `tests/c/evp_pkey_print.c` (4 checks, with the output of every print and read); the
+      probe's `pkprint` and `pembytes` (corpus `print.txt`, random key sessions, which now also
+      reach `pkshow`, an arm a draw one too small had left out); the `pem` fuzz target reads
+      by name against a model of `check_pem`.
   - Moved from 4.2: the attribute functions (`EVP_PKEY_add1_attr*`, `get_attr*`,
     `delete_attr`, `get_attr_count`) to the X.509 attributes; the typed `get0`/`get1`/`set1`
     of RSA, DH, DSA, and EC, `EVP_PKEY_get_ec_point_conv_form`, `EVP_PKEY_get_field_type`, the
@@ -2772,7 +2789,9 @@ chunking) is clean.
   - DSA: keygen and FIPS 186-4 paramgen, signatures (including deterministic DSA)
   - the legacy `DH_*`/`DSA_*` APIs and their methods
 - [ ] **4.7 Key encoders and decoders:**
-  - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations
+  - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
+    including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider
+    has a text encoder for the key until then)
   - formats: DER and PEM, PKCS#8 (plain, and encrypted with PBES2/scrypt or legacy PBES1),
     SPKI, PKCS#1, SEC1, "traditional" PEM with DEK-Info, MSBLOB/PVK, text
   - `PEM_{read,write}_bio_{PrivateKey,PUBKEY,RSAPrivateKey,…}`,

@@ -7688,66 +7688,6 @@ pub extern "C" fn EVP_PKEY_get_field_type(_: *const EVP_PKEY) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_params(
-    _: *mut BIO,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_params_fp(
-    _: *mut FILE,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_params_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_private(
-    _: *mut BIO,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_private")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_private_fp(
-    _: *mut FILE,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_private_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_public(
-    _: *mut BIO,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_public")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_print_public_fp(
-    _: *mut FILE,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *mut ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_print_public_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_set1_DH(_: *mut EVP_PKEY, _: *mut dh_st) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_set1_DH")
 }
@@ -13736,30 +13676,6 @@ pub extern "C" fn PBMAC1_get1_pbkdf2_param(_: *const X509_ALGOR) -> *mut PBKDF2P
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_ASN1_read(
-    _: d2i_of_void,
-    _: *const core::ffi::c_char,
-    _: *mut FILE,
-    _: *mut *mut core::ffi::c_void,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("PEM_ASN1_read")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_ASN1_read_bio(
-    _: d2i_of_void,
-    _: *const core::ffi::c_char,
-    _: *mut BIO,
-    _: *mut *mut core::ffi::c_void,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("PEM_ASN1_read_bio")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_SignFinal(
     _: *mut EVP_MD_CTX,
     _: *mut core::ffi::c_uchar,
@@ -13838,32 +13754,6 @@ pub extern "C" fn PEM_X509_INFO_write_bio(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_X509_INFO_write_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_bytes_read_bio(
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-    _: *mut *mut core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *mut BIO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_bytes_read_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_bytes_read_bio_secmem(
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_long,
-    _: *mut *mut core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *mut BIO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_bytes_read_bio_secmem")
 }
 
 #[unsafe(no_mangle)]

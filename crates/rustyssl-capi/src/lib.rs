@@ -36,6 +36,7 @@ mod objects;
 mod params;
 mod pem;
 mod pem_cipher;
+mod pem_read;
 mod property;
 mod provider;
 mod rand;

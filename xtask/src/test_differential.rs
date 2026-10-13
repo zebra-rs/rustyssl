@@ -3528,7 +3528,7 @@ fn pkey_session(random: &mut Random, out: &mut String) -> Result {
     let slot = |random: &mut Random| random.below(8);
     for _ in 0..random.below(25) + 1 {
         let s = slot(random);
-        match random.below(23) {
+        match random.below(26) {
             0 | 1 => writeln!(
                 out,
                 "pkraw {s} {} {}",
@@ -3675,6 +3675,53 @@ fn pkey_session(random: &mut Random, out: &mut String) -> Result {
                 "pkcrypt {s} {}",
                 random.pick(&["encrypt", "decrypt", "encap", "decap", "derive"])
             )?,
+            23 => {
+                let part = random.pick(&["public", "private", "params", "public+", "params+"]);
+                let indent = random.pick(&["0", "1", "4", "-3", "130"]);
+                writeln!(out, "pkprint {s} {part} {indent}")?;
+            }
+            24 => {
+                const PEM_NAMES: &[&str] = &[
+                    "RSA_PRIVATE_KEY",
+                    "rsa_PRIVATE_KEY",
+                    "DSA_PRIVATE_KEY",
+                    "EC_PRIVATE_KEY",
+                    "DH_PRIVATE_KEY",
+                    "PRIVATE_KEY",
+                    "ENCRYPTED_PRIVATE_KEY",
+                    "_PRIVATE_KEY",
+                    "DH_PARAMETERS",
+                    "X9.42_DH_PARAMETERS",
+                    "x9.42_dh_PARAMETERS",
+                    "EC_PARAMETERS",
+                    "RSA_PARAMETERS",
+                    "PARAMETERS",
+                    "CERTIFICATE",
+                    "X509_CERTIFICATE",
+                    "TRUSTED_CERTIFICATE",
+                    "NEW_CERTIFICATE_REQUEST",
+                    "CERTIFICATE_REQUEST",
+                    "PKCS7",
+                    "PKCS_#7_SIGNED_DATA",
+                    "CMS",
+                    "X",
+                ];
+                let wanted = random.pick(&[
+                    "ANY_PRIVATE_KEY",
+                    "PARAMETERS",
+                    "DH_PARAMETERS",
+                    "CERTIFICATE",
+                    "TRUSTED_CERTIFICATE",
+                    "CERTIFICATE_REQUEST",
+                    "PKCS7",
+                    "CMS",
+                    "X",
+                ]);
+                let names: Vec<&str> = (0..1 + random.below(6))
+                    .map(|_| random.pick(PEM_NAMES))
+                    .collect();
+                writeln!(out, "pembytes {wanted} {}", names.join(","))?;
+            }
             _ => writeln!(out, "pkshow {s}")?,
         }
         if random.below(10) == 0 {
