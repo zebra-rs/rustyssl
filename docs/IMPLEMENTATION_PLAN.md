@@ -2432,7 +2432,8 @@ have run for at least 24 CPU-hours with no findings.
       first octet's low-order bits, and `WHIRLPOOL_Final` zeroes the context only when given
       somewhere to write; the bit counts wrap as OpenSSL's.
     - New deviations: null contexts, inputs, and outputs; a count past the buffer;
-      `WHIRLPOOL_BitUpdate`'s last step past the block (OpenSSL writes past its buffer).
+      Whirlpool's last bit-by-bit step past the block, from `WHIRLPOOL_BitUpdate` or from
+      `WHIRLPOOL_Update` after bits that end inside an octet (OpenSSL writes past its buffer).
     - `tests/c/lowlevel_hash.c` (46 checks: every hash's digests in pieces, its context after
       each call, transforms, counts, digest lengths, MDC2's paddings, Whirlpool's bit
       splits, the static buffers, and the SHA one-shots without a SHA provider); the probe's

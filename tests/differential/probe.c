@@ -5720,9 +5720,11 @@ static int print_command(const char *command, const char *line)
  * md4, md5, rmd160, mdc2, or wp; each command prints its result and then the whole context:
  *   llinit ALG                     ALG_Init
  *   llupdate ALG N                 ALG_Update with the next N octets (at most 1024)
- *   llbits N                       WHIRLPOOL_BitUpdate with N bits (at most 8192), skipped where
- *                                  the reference's last step would run past its block (it then
- *                                  writes past the buffer: docs/DEVIATIONS.md)
+ *   llbits N                       WHIRLPOOL_BitUpdate with N bits (at most 8192)
+ *                                  (Whirlpool's updates are skipped where the reference's last
+ *                                  step would run past its block, as an update of whole octets
+ *                                  does after bits that end inside an octet: it then writes past
+ *                                  the buffer, docs/DEVIATIONS.md)
  *   llfinal ALG                    ALG_Final, and the digest
  *   lltransform ALG OFF            ALG_Transform of the data at offset OFF (not sha224, sha384,
  *                                  mdc2, or wp, which have none)
@@ -5831,6 +5833,10 @@ static int lowlevel_command(const char *command, const char *line)
         } else {
             if (n > 1024)
                 n = 1024;
+            if (alg == 9 && ll_wp_overruns(ll_ctx[9].wp.bitoff, n * 8)) {
+                printf(" skipped\n");
+                return 1;
+            }
             switch (alg) {
             case 0: r = SHA1_Update(c, d, n); break;
             case 1: r = SHA224_Update(c, d, n); break;

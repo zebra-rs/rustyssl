@@ -1313,4 +1313,50 @@ mod tests {
         assert_eq!(unsafe { WHIRLPOOL_Final(two.as_mut_ptr(), &raw mut w) }, 1);
         assert_eq!(one, two);
     }
+
+    /// docs/DEVIATIONS.md: 4 bits, then 64 whole octets: OpenSSL takes them bit by bit and its
+    /// last step runs past the block, as above; here the digest is the bits' (with 4 more, so
+    /// they make whole octets to check against).
+    #[test]
+    fn whirlpool_octets_after_bits_cross_blocks() {
+        let msg: Vec<u8> = (0..70u8)
+            .map(|i| i.wrapping_mul(7).wrapping_add(3))
+            .collect();
+        let mut one = [0u8; 64];
+        let mut two = [0u8; 64];
+        let mut w: WHIRLPOOL_CTX = zeroed();
+        // SAFETY: a context, buffers, and input of the right sizes, for each call below.
+        assert_eq!(unsafe { WHIRLPOOL_Init(&raw mut w) }, 1);
+        // SAFETY: as above.
+        unsafe { WHIRLPOOL_BitUpdate(&raw mut w, msg.as_ptr().cast(), 4) };
+        // SAFETY: as above.
+        assert_eq!(
+            // SAFETY: as above.
+            unsafe { WHIRLPOOL_Update(&raw mut w, msg[1..].as_ptr().cast(), 64) },
+            1
+        );
+        assert_eq!((w.bitoff, w.bitlen[0]), (4, 516));
+        // SAFETY: as above.
+        unsafe { WHIRLPOOL_BitUpdate(&raw mut w, msg[65..].as_ptr().cast(), 4) };
+        // SAFETY: as above.
+        assert_eq!(unsafe { WHIRLPOOL_Final(one.as_mut_ptr(), &raw mut w) }, 1);
+
+        // The same 520 bits as whole octets: msg[0]'s low 4 bits, msg[1..65], msg[65]'s low 4.
+        let mut bits = vec![msg[0] << 4 | msg[1] >> 4];
+        for pair in msg[1..65].windows(2) {
+            bits.push(pair[0] << 4 | pair[1] >> 4);
+        }
+        bits.push(msg[64] << 4 | (msg[65] & 0x0f));
+        // SAFETY: as above.
+        assert_eq!(unsafe { WHIRLPOOL_Init(&raw mut w) }, 1);
+        // SAFETY: as above.
+        assert_eq!(
+            // SAFETY: as above.
+            unsafe { WHIRLPOOL_Update(&raw mut w, bits.as_ptr().cast(), bits.len()) },
+            1
+        );
+        // SAFETY: as above.
+        assert_eq!(unsafe { WHIRLPOOL_Final(two.as_mut_ptr(), &raw mut w) }, 1);
+        assert_eq!(one, two);
+    }
 }
