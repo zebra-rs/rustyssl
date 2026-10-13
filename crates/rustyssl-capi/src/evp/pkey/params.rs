@@ -3,12 +3,12 @@
 //! and the group name and encoded public key built on them. Setting parameters marks the key
 //! changed, so its exports to other key managers are made again.
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_long};
 use core::ptr;
 
 use rustyssl_abi::{
-    BIGNUM, ERR_LIB_EVP, EVP_PKEY, EVP_R_INVALID_KEY, OSSL_PARAM,
-    OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME,
+    ASN1_PKEY_CTRL_GET1_TLS_ENCPT, ASN1_PKEY_CTRL_SET1_TLS_ENCPT, BIGNUM, ERR_LIB_EVP, EVP_PKEY,
+    EVP_R_INVALID_KEY, OSSL_PARAM, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME,
 };
 
 use super::pkey;
@@ -423,15 +423,14 @@ ffi_export! {
             // SAFETY: the caller's guarantee.
             return unsafe { EVP_PKEY_set_octet_string_param(pkey, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY.as_ptr(), pub_, publen) };
         }
-        if c_int::try_from(publen).is_err() {
-            return 0;
+        let Ok(len) = c_int::try_from(publen) else { return 0 };
+        // Historically `EVP_PKEY_set1_tls_encodedpoint`.
+        // SAFETY: the caller's octets.
+        match unsafe { super::asn1_ctrl(k, ASN1_PKEY_CTRL_SET1_TLS_ENCPT, c_long::from(len), pub_.cast_mut().cast()) } {
+            Some(rv) => c_int::from(rv > 0),
+            // A blank key: `legacy_asn1_ctrl_to_param` finds no key manager.
+            None => 0,
         }
-        if k.lock().ameth_has(super::ameth::F_CTRL) {
-            // The ASN.1 methods' ctrl comes with the key types.
-            crate::stub::unimplemented("EVP_PKEY_set1_encoded_public_key of a key typed by an ASN.1 method");
-        }
-        // A blank key: `legacy_asn1_ctrl_to_param` finds no key manager.
-        0
     }
 }
 
@@ -471,10 +470,10 @@ ffi_export! {
             }
             return return_size;
         }
-        if k.lock().ameth_has(super::ameth::F_CTRL) {
-            // The ASN.1 methods' ctrl comes with the key types.
-            crate::stub::unimplemented("EVP_PKEY_get1_encoded_public_key of a key typed by an ASN.1 method");
+        // SAFETY: the caller's room for the pointer.
+        match unsafe { super::asn1_ctrl(k, ASN1_PKEY_CTRL_GET1_TLS_ENCPT, 0, ppub.cast()) } {
+            Some(rv) => usize::try_from(rv).unwrap_or(0),
+            None => 0,
         }
-        0
     }
 }

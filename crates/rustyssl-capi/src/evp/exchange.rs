@@ -9,22 +9,25 @@
 //!   then from the key manager's provider) and exports the key to that provider's key manager.
 //!   A context without a key (a KDF's) gets a blank key of its key manager's type, with empty
 //!   data.
-//! - Where no exchange takes the key, the init (and the operations) go to the legacy path,
-//!   which without an `EVP_PKEY_METHOD` (an application's, 4.2d) isn't supported: -2 with
+//! - Where no exchange takes the key, the init (and the operations) go to the legacy path: a
+//!   legacy context's `EVP_PKEY_METHOD` derives (its `derive_init`, `derive`, and the
+//!   `EVP_PKEY_CTRL_PEER_KEY` ctrl before and after the peer's checks); without one, -2 with
 //!   `EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE`, leaving the operation set.
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYEXCH, EVP_PKEY, EVP_PKEY_CTX,
-    EVP_PKEY_OP_DERIVE, EVP_PKEY_OP_UNDEFINED, EVP_R_INITIALIZATION_ERROR,
-    EVP_R_OPERATION_NOT_INITIALIZED, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-    OSSL_FUNC_KEYEXCH_DERIVE, OSSL_FUNC_KEYEXCH_DUPCTX, OSSL_FUNC_KEYEXCH_FREECTX,
-    OSSL_FUNC_KEYEXCH_GET_CTX_PARAMS, OSSL_FUNC_KEYEXCH_GETTABLE_CTX_PARAMS,
-    OSSL_FUNC_KEYEXCH_INIT, OSSL_FUNC_KEYEXCH_NEWCTX, OSSL_FUNC_KEYEXCH_SET_CTX_PARAMS,
-    OSSL_FUNC_KEYEXCH_SET_PEER, OSSL_FUNC_KEYEXCH_SETTABLE_CTX_PARAMS, OSSL_LIB_CTX,
-    OSSL_OP_KEYEXCH, OSSL_PARAM, OSSL_PROVIDER,
+    ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYEXCH, EVP_PKEY, EVP_PKEY_CTRL_PEER_KEY,
+    EVP_PKEY_CTX, EVP_PKEY_OP_DECRYPT, EVP_PKEY_OP_DERIVE, EVP_PKEY_OP_ENCRYPT,
+    EVP_PKEY_OP_UNDEFINED, EVP_R_DIFFERENT_KEY_TYPES, EVP_R_DIFFERENT_PARAMETERS,
+    EVP_R_INITIALIZATION_ERROR, EVP_R_NO_KEY_SET, EVP_R_OPERATION_NOT_INITIALIZED,
+    EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, OSSL_FUNC_KEYEXCH_DERIVE,
+    OSSL_FUNC_KEYEXCH_DUPCTX, OSSL_FUNC_KEYEXCH_FREECTX, OSSL_FUNC_KEYEXCH_GET_CTX_PARAMS,
+    OSSL_FUNC_KEYEXCH_GETTABLE_CTX_PARAMS, OSSL_FUNC_KEYEXCH_INIT, OSSL_FUNC_KEYEXCH_NEWCTX,
+    OSSL_FUNC_KEYEXCH_SET_CTX_PARAMS, OSSL_FUNC_KEYEXCH_SET_PEER,
+    OSSL_FUNC_KEYEXCH_SETTABLE_CTX_PARAMS, OSSL_LIB_CTX, OSSL_OP_KEYEXCH, OSSL_PARAM,
+    OSSL_PROVIDER,
 };
 
 use super::fetch::Kind;
@@ -32,6 +35,7 @@ use super::keymgmt;
 use super::opmeth::{self, AnyFn, Common, NotFound, OpMethod, Table, keep, method_exports};
 use super::pkey::{self, KeyData, PkeyRef};
 use super::pkey_ctx::{self, EVP_PKEY_CTX_free, EVP_PKEY_CTX_new_from_pkey, EVP_PKEY_public_check};
+use super::pmeth;
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::ffi_export;
 use crate::handle::handle_type;
@@ -146,8 +150,25 @@ unsafe fn derive_init(ctx: *mut EVP_PKEY_CTX, params: *const OSSL_PARAM) -> c_in
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
     let Some(km) = keymgmt else {
-        // A legacy context: its EVP_PKEY_METHOD derives (4.2d).
-        crate::stub::unimplemented("deriving with a legacy context");
+        // A legacy context: its method derives.
+        // SAFETY: the mark set above.
+        unsafe { ERR_pop_to_mark() };
+        let f = c.lock().pmeth_funcs().filter(|f| f.derive.is_some());
+        let Some(f) = f else {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                F,
+            );
+            return -2;
+        };
+        let Some(init) = f.derive_init else { return 1 };
+        // SAFETY: the method's function with the caller's context.
+        let ret = unsafe { init(ctx) };
+        if ret <= 0 {
+            c.lock().operation = EVP_PKEY_OP_UNDEFINED;
+        }
+        return ret;
     };
     let pkey = match pkey {
         Some(k) => k,
@@ -268,11 +289,8 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
             return -1;
         };
-        let legacy = || {
-            // Without an EVP_PKEY_METHOD (4.2d), not supported.
-            err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
-            -2
-        };
+        // SAFETY: the caller's guarantee.
+        let legacy = || unsafe { legacy_set_peer(ctx, c, peer) };
         let Some((m, algctx)) = provider_op(c) else { return legacy() };
         let Some(set_peer) = m.get().funcs.set_peer else {
             err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
@@ -317,6 +335,73 @@ ffi_export! {
     }
 }
 
+/// `EVP_PKEY_derive_set_peer_ex`'s `legacy`: the method's `EVP_PKEY_CTRL_PEER_KEY` ctrl with
+/// 0, then (unless it answered 2) the peer's type and parameters checked against the key, then
+/// the ctrl with 1. A NULL peer fails (the reference reads it; docs/DEVIATIONS.md).
+///
+/// # Safety
+/// `ctx` is the live context behind `c`; `peer` is NULL or a live key.
+unsafe fn legacy_set_peer(
+    ctx: *mut EVP_PKEY_CTX,
+    c: &pkey_ctx::PkeyCtx,
+    peer: *mut EVP_PKEY,
+) -> c_int {
+    const F: &str = "EVP_PKEY_derive_set_peer_ex";
+    let (f, op, pkey) = {
+        let s = c.lock();
+        (s.pmeth_funcs(), s.operation, s.pkey.clone())
+    };
+    let ctrl = f
+        .filter(|f| f.derive.is_some() || f.encrypt.is_some() || f.decrypt.is_some())
+        .and_then(|f| f.ctrl);
+    let Some(ctrl) = ctrl else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            F,
+        );
+        return -2;
+    };
+    if op != EVP_PKEY_OP_DERIVE && op != EVP_PKEY_OP_ENCRYPT && op != EVP_PKEY_OP_DECRYPT {
+        err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED, F);
+        return -1;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(peer_ref) = (unsafe { PkeyRef::new(peer) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+        return -1;
+    };
+    // SAFETY: the method's function with the caller's context and key.
+    let ret = unsafe { ctrl(ctx, EVP_PKEY_CTRL_PEER_KEY, 0, peer.cast()) };
+    if ret <= 0 {
+        return ret;
+    }
+    if ret != 2 {
+        let Some(k) = pkey else {
+            err::raise(ERR_LIB_EVP, EVP_R_NO_KEY_SET, F);
+            return -1;
+        };
+        let p = peer_ref.get();
+        if k.get().type_() != p.type_() {
+            err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_KEY_TYPES, F);
+            return -1;
+        }
+        // Parameters the peer has must match (-2, can't compare, is fine).
+        if !pkey::missing_parameters(p) && pkey::parameters_eq(k.get(), p) == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_PARAMETERS, F);
+            return -1;
+        }
+        // SAFETY: as above.
+        let ret = unsafe { ctrl(ctx, EVP_PKEY_CTRL_PEER_KEY, 1, peer.cast()) };
+        if ret <= 0 {
+            return ret;
+        }
+    }
+    let old = c.lock().peerkey.replace(peer_ref);
+    drop(old);
+    1
+}
+
 ffi_export! {
     /// `EVP_PKEY_derive_set_peer_ex` checking the peer's key.
     ///
@@ -352,9 +437,20 @@ ffi_export! {
             return -1;
         }
         let Some((m, algctx)) = provider_op(c) else {
-            // Without an EVP_PKEY_METHOD (4.2d), not supported.
-            err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
-            return -2;
+            // A legacy context: its method derives.
+            let pmeth = c.lock().pmeth.clone();
+            let (Some(pm), Some(derive)) = (pmeth.as_ref(), pmeth.as_ref().and_then(|m| m.get().funcs().derive)) else {
+                err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
+                return -2;
+            };
+            // SAFETY: the caller's context.
+            let pkey = unsafe { pkey_ctx::EVP_PKEY_CTX_get0_pkey(ctx) };
+            // SAFETY: the context's key, or NULL; the caller's room for the size.
+            if let Some(r) = unsafe { pmeth::check_autoarg(pm.get(), pkey, key.is_null(), pkeylen, F) } {
+                return r;
+            }
+            // SAFETY: the method's function with the caller's context and buffers.
+            return unsafe { derive(ctx, key, pkeylen) };
         };
         let Some(derive) = m.get().funcs.derive else { return 0 };
         let size = if key.is_null() {

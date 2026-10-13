@@ -13,9 +13,13 @@
 //! - The operations fail with `EVP_R_PROVIDER_SIGNATURE_NOT_SUPPORTED` where the algorithm lacks
 //!   the function, and `EVP_R_PROVIDER_SIGNATURE_FAILURE` where it fails.
 //!
-//! A context without a provider operation would use an application's `EVP_PKEY_METHOD`, which
-//! comes with 4.2d; those paths abort until then (AGENTS.md rule 10). Functions given a NULL
-//! method fail here where the reference would crash (docs/DEVIATIONS.md).
+//! - A legacy context (an application's `EVP_PKEY_METHOD`) signs, verifies, and recovers with
+//!   its method's functions, after its `*_init`; a method that sizes outputs itself
+//!   (`EVP_PKEY_FLAG_AUTOARGLEN`) answers size queries and refuses short buffers with the key's
+//!   size.
+//!
+//! Functions given a NULL method, and an algorithm given with a legacy context, fail here where
+//! the reference would crash (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
@@ -52,7 +56,8 @@ use rustyssl_abi::{
 use super::fetch::{self, Kind};
 use super::keymgmt;
 use super::pkey::{self, KeyData, PkeyRef};
-use super::pkey_ctx::{self, EVP_PKEY_CTX_get_params, EVP_PKEY_CTX_set_params};
+use super::pkey_ctx::{self, EVP_PKEY_CTX_get_params, EVP_PKEY_CTX_set_params, PkeyCtx};
+use super::pmeth;
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
@@ -702,8 +707,14 @@ unsafe fn signature_init(
             return fail(0);
         };
         let Some(ctx_km) = keymgmt else {
-            // A legacy context: its EVP_PKEY_METHOD signs (4.2d).
-            crate::stub::unimplemented("a signature algorithm with a legacy context");
+            // A legacy context can't take an algorithm (the reference reads the missing key
+            // manager's name; docs/DEVIATIONS.md).
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                F,
+            );
+            return fail(-2);
         };
         let prov = sig.get().prov();
         // SAFETY: the algorithm's live provider.
@@ -765,8 +776,10 @@ unsafe fn signature_init(
         // SAFETY: no preconditions.
         unsafe { ERR_set_mark() };
         let Some(ctx_km) = keymgmt else {
-            // A legacy context: its EVP_PKEY_METHOD signs (4.2d).
-            crate::stub::unimplemented("signing with a legacy context");
+            // SAFETY: the mark set above.
+            unsafe { ERR_pop_to_mark() };
+            // SAFETY: the caller's live context.
+            return unsafe { legacy_init(ctx, c, operation) };
         };
         let Some(pkey) = pkey else {
             // SAFETY: the mark set above.
@@ -837,11 +850,129 @@ unsafe fn signature_init(
     unsafe { super::ctrl::use_cached_data(ctx) }
 }
 
-/// The context's signature operation, if `operation` is one of `ops` and it has a provider
-/// side: the algorithm and its context. Otherwise the C function's error and return value:
-/// without a provider side, OpenSSL's legacy path, which without an `EVP_PKEY_METHOD` (none can
-/// exist before 4.2d) isn't supported. (The message functions read the missing algorithm
-/// there, and crash; they fail the same way here, docs/DEVIATIONS.md.)
+/// `evp_pkey_signature_init`'s `legacy`: the context's method starts the operation (its
+/// `*_init`, if it has one, then the kept distinguishing ID). -2 with an error without the
+/// operation's function.
+///
+/// # Safety
+/// `ctx` is the live context behind `c`.
+unsafe fn legacy_init(ctx: *mut EVP_PKEY_CTX, c: &PkeyCtx, operation: c_int) -> c_int {
+    const F: &str = "evp_pkey_signature_init";
+    let f = c.lock().pmeth_funcs().filter(|f| match operation {
+        EVP_PKEY_OP_SIGN => f.sign.is_some(),
+        EVP_PKEY_OP_VERIFY => f.verify.is_some(),
+        EVP_PKEY_OP_VERIFYRECOVER => f.verify_recover.is_some(),
+        _ => true,
+    });
+    let Some(f) = f else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            F,
+        );
+        // OpenSSL returns here without restoring the context.
+        return -2;
+    };
+    let fail = |ret: c_int| {
+        let mut s = c.lock();
+        s.free_old_ops();
+        s.operation = EVP_PKEY_OP_UNDEFINED;
+        ret
+    };
+    let init = match operation {
+        EVP_PKEY_OP_SIGN => f.sign_init,
+        EVP_PKEY_OP_VERIFY => f.verify_init,
+        EVP_PKEY_OP_VERIFYRECOVER => f.verify_recover_init,
+        // The message operations have no legacy form.
+        _ => {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return fail(0);
+        }
+    };
+    // Without one, OpenSSL returns before giving the operation the kept ID.
+    let Some(init) = init else { return 1 };
+    // SAFETY: the method's function with the caller's context.
+    let ret = unsafe { init(ctx) };
+    if ret <= 0 {
+        return fail(ret);
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { super::ctrl::use_cached_data(ctx) }
+}
+
+/// A signature operation: a provider's algorithm and its context, or a legacy context's
+/// method.
+enum Op {
+    Provided(Ref, *mut c_void),
+    Legacy(pmeth::Ref),
+}
+
+/// The context's signature operation, if `operation` is one of `ops`: the algorithm and its
+/// context, or a legacy context's method. Otherwise the C function's error and return value:
+/// -2 without either. (The message functions, which have no legacy form, read the missing
+/// algorithm there and crash; they fail the same way here, docs/DEVIATIONS.md.)
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+unsafe fn sig_op(ctx: *mut EVP_PKEY_CTX, ops: &[c_int], function: &str) -> Result<Op, c_int> {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { pkey_ctx::context(ctx) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, function);
+        return Err(-1);
+    };
+    let s = c.lock();
+    if !ops.contains(&s.operation) {
+        err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED, function);
+        return Err(-1);
+    }
+    match (&s.signature, s.sigctx.0, &s.pmeth) {
+        (Some(sig), algctx, _) if !algctx.is_null() => Ok(Op::Provided(sig.clone(), algctx)),
+        (_, _, Some(m)) => Ok(Op::Legacy(m.clone())),
+        _ => {
+            drop(s);
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                function,
+            );
+            Err(-2)
+        }
+    }
+}
+
+/// A legacy context's method's function `f` (-2 with an error without it), after
+/// `M_check_autoarg` for an output of `outlen` (if there is one).
+///
+/// # Safety
+/// `ctx` is a live context; `outlen` is NULL or room for a size.
+unsafe fn legacy_op(
+    ctx: *mut EVP_PKEY_CTX,
+    m: &pmeth::Ref,
+    f: Option<impl FnOnce() -> c_int>,
+    out: Option<(bool, *mut usize)>,
+    function: &str,
+) -> c_int {
+    let Some(f) = f else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            function,
+        );
+        return -2;
+    };
+    if let Some((null, len)) = out {
+        // SAFETY: the caller's guarantee.
+        let pkey = unsafe { pkey_ctx::EVP_PKEY_CTX_get0_pkey(ctx) };
+        // SAFETY: the context's key, or NULL; the caller's guarantee.
+        if let Some(r) = unsafe { pmeth::check_autoarg(m.get(), pkey, null, len, function) } {
+            return r;
+        }
+    }
+    f()
+}
+
+/// The context's signature operation with a provider side, if `operation` is one of `ops`:
+/// the algorithm and its context. Otherwise the C function's error and return value.
 ///
 /// # Safety
 /// `ctx` is NULL or a live context.
@@ -1013,9 +1144,17 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_sign(ctx: *mut EVP_PKEY_CTX, sig: *mut u8, siglen: *mut usize, tbs: *const u8, tbslen: usize) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
+        const F: &str = "EVP_PKEY_sign";
         // SAFETY: the caller's guarantee.
-        let (s, algctx) = match unsafe { op_of(ctx, &[EVP_PKEY_OP_SIGN, EVP_PKEY_OP_SIGNMSG], "EVP_PKEY_sign") } {
-            Ok(v) => v,
+        let (s, algctx) = match unsafe { sig_op(ctx, &[EVP_PKEY_OP_SIGN, EVP_PKEY_OP_SIGNMSG], F) } {
+            Ok(Op::Provided(s, algctx)) => (s, algctx),
+            Ok(Op::Legacy(m)) => {
+                let f = m.get().funcs().sign;
+                // SAFETY: the method's function with the caller's context and buffers.
+                let call = f.map(|f| move || unsafe { f(ctx, sig, siglen, tbs, tbslen) });
+                // SAFETY: the caller's guarantee.
+                return unsafe { legacy_op(ctx, &m, call, Some((sig.is_null(), siglen)), F) };
+            }
             Err(r) => return r,
         };
         let m = s.get();
@@ -1078,9 +1217,17 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_verify(ctx: *mut EVP_PKEY_CTX, sig: *const u8, siglen: usize, tbs: *const u8, tbslen: usize) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
+        const F: &str = "EVP_PKEY_verify";
         // SAFETY: the caller's guarantee.
-        let (s, algctx) = match unsafe { op_of(ctx, &[EVP_PKEY_OP_VERIFY, EVP_PKEY_OP_VERIFYMSG], "EVP_PKEY_verify") } {
-            Ok(v) => v,
+        let (s, algctx) = match unsafe { sig_op(ctx, &[EVP_PKEY_OP_VERIFY, EVP_PKEY_OP_VERIFYMSG], F) } {
+            Ok(Op::Provided(s, algctx)) => (s, algctx),
+            Ok(Op::Legacy(m)) => {
+                let f = m.get().funcs().verify;
+                // SAFETY: the method's function with the caller's context and buffers.
+                let call = f.map(|f| move || unsafe { f(ctx, sig, siglen, tbs, tbslen) });
+                // SAFETY: the caller's guarantee.
+                return unsafe { legacy_op(ctx, &m, call, None, F) };
+            }
             Err(r) => return r,
         };
         let m = s.get();
@@ -1142,8 +1289,15 @@ ffi_export! {
     {
         const F: &str = "EVP_PKEY_verify_recover";
         // SAFETY: the caller's guarantee.
-        let (s, algctx) = match unsafe { op_of(ctx, &[EVP_PKEY_OP_VERIFYRECOVER], F) } {
-            Ok(v) => v,
+        let (s, algctx) = match unsafe { sig_op(ctx, &[EVP_PKEY_OP_VERIFYRECOVER], F) } {
+            Ok(Op::Provided(s, algctx)) => (s, algctx),
+            Ok(Op::Legacy(m)) => {
+                let f = m.get().funcs().verify_recover;
+                // SAFETY: the method's function with the caller's context and buffers.
+                let call = f.map(|f| move || unsafe { f(ctx, rout, routlen, sig, siglen) });
+                // SAFETY: the caller's guarantee.
+                return unsafe { legacy_op(ctx, &m, call, Some((rout.is_null(), routlen)), F) };
+            }
             Err(r) => return r,
         };
         let m = s.get();

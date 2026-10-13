@@ -12,8 +12,16 @@
 //! - `EVP_SignFinal` and `EVP_VerifyFinal` digest, then sign or verify the digest with a key
 //!   context of their own.
 //!
-//! Without a provider operation, OpenSSL's legacy path would use an `EVP_PKEY_METHOD`, of which
-//! none can exist before 4.2d; those paths fail as OpenSSL's do without one.
+//! - A legacy key context (an application's `EVP_PKEY_METHOD`) signs and verifies through its
+//!   method: `signctx`/`verifyctx` if it has them (after their `*_init`), its one-shot
+//!   `digestsign`/`digestverify` (then updates fail with `EVP_R_ONLY_ONESHOT_SUPPORTED` unless
+//!   the digest is a provider's), or else the digest of the data, signed or verified with
+//!   `EVP_PKEY_sign`/`EVP_PKEY_verify`. Its `digest_custom` runs before the first update. A method
+//!   with `EVP_PKEY_FLAG_SIGCTX_CUSTOM` needs no digest and signs the digest context itself.
+//!
+//! A method with `EVP_PKEY_FLAG_SIGCTX_CUSTOM` but no `signctx`, and verifying a signature longer
+//! than `INT_MAX` through `verifyctx`, fail here where the reference crashes or truncates
+//! (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_uint, c_void};
 use core::ptr;
@@ -21,10 +29,11 @@ use std::ffi::CString;
 
 use rustyssl_abi::{
     ENGINE, ERR_LIB_EVP, ERR_R_EVP_LIB, EVP_MAX_MD_SIZE, EVP_MD, EVP_MD_CTX,
-    EVP_MD_CTX_FLAG_FINALISE, EVP_PKEY, EVP_PKEY_CTX, EVP_PKEY_OP_SIGNCTX, EVP_PKEY_OP_TYPE_SIG,
-    EVP_PKEY_OP_UNDEFINED, EVP_PKEY_OP_VERIFYCTX, EVP_R_COMMAND_NOT_SUPPORTED, EVP_R_FINAL_ERROR,
-    EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_OPERATION, EVP_R_NO_DEFAULT_DIGEST, EVP_R_NO_KEY_SET,
-    EVP_R_NO_OPERATION_SET, EVP_R_PROVIDER_SIGNATURE_FAILURE,
+    EVP_MD_CTX_FLAG_FINALISE, EVP_PKEY, EVP_PKEY_CTX, EVP_PKEY_FLAG_SIGCTX_CUSTOM,
+    EVP_PKEY_OP_SIGN, EVP_PKEY_OP_SIGNCTX, EVP_PKEY_OP_TYPE_SIG, EVP_PKEY_OP_UNDEFINED,
+    EVP_PKEY_OP_VERIFY, EVP_PKEY_OP_VERIFYCTX, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
+    EVP_R_NO_DEFAULT_DIGEST, EVP_R_NO_KEY_SET, EVP_R_ONLY_ONESHOT_SUPPORTED,
+    EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, EVP_R_PROVIDER_SIGNATURE_FAILURE,
     EVP_R_PROVIDER_SIGNATURE_NOT_SUPPORTED, EVP_R_UPDATE_ERROR, OSSL_LIB_CTX, OSSL_OP_SIGNATURE,
     OSSL_PARAM,
 };
@@ -86,35 +95,188 @@ pub(crate) unsafe fn sig_ctx(pctx: *mut EVP_PKEY_CTX) -> Option<(signature::Ref,
 }
 
 /// The `EVP_PKEY_CTRL_DIGESTINIT` a legacy digest init sends a key context that isn't signing
-/// through a provider (`EVP_PKEY_CTX_ctrl`): without an `EVP_PKEY_METHOD` (none can exist
-/// before 4.2d) it fails for a context without a signature operation and is unsupported (which
-/// the init ignores) otherwise. False if the init fails.
+/// through a provider (`EVP_PKEY_CTX_ctrl`, with the digest context): an unsupported command
+/// (-2) is fine. False if the init fails.
 ///
 /// # Safety
-/// `pctx` is NULL or a live key context.
-pub(crate) unsafe fn digest_init_ctrl(pctx: *mut EVP_PKEY_CTX) -> bool {
-    const F: &str = "evp_pkey_ctx_ctrl_int";
+/// `pctx` is NULL or a live key context; `mdctx` is the digest context that holds it.
+pub(crate) unsafe fn digest_init_ctrl(pctx: *mut EVP_PKEY_CTX, mdctx: *mut EVP_MD_CTX) -> bool {
     // SAFETY: the caller's guarantee.
     let Some(c) = (unsafe { pkey_ctx::context(pctx) }) else {
         return true;
     };
-    let (operation, has_sig) = {
+    let has_sig = {
         let s = c.lock();
-        (s.operation, s.is_sig_op() && s.signature.is_some())
+        s.is_sig_op() && s.signature.is_some()
     };
     if has_sig {
         return true;
     }
-    if operation == EVP_PKEY_OP_UNDEFINED {
-        err::raise(ERR_LIB_EVP, EVP_R_NO_OPERATION_SET, F);
+    // SAFETY: the caller's guarantee: the command takes the digest context.
+    let r = unsafe {
+        super::ctrl::ctrl(
+            pctx,
+            -1,
+            EVP_PKEY_OP_TYPE_SIG,
+            rustyssl_abi::EVP_PKEY_CTRL_DIGESTINIT,
+            0,
+            mdctx.cast(),
+        )
+    };
+    r > 0 || r == -2
+}
+
+/// The update function a one-shot method (`digestsign`, `digestverify`) gives the digest
+/// context: updates fail.
+extern "C" fn oneshot_update(_: *mut EVP_MD_CTX, _: *const c_void, _: usize) -> c_int {
+    err::raise(ERR_LIB_EVP, EVP_R_ONLY_ONESHOT_SUPPORTED, "update");
+    0
+}
+
+/// `flag_call_digest_custom`: a legacy key context's method's `digest_custom`, once, before the
+/// first update (or the final). False if it fails (returns 0).
+///
+/// # Safety
+/// `pctx` is NULL or a live key context; `ctx` is the digest context that holds it.
+unsafe fn call_digest_custom(ctx: *mut EVP_MD_CTX, pctx: *mut EVP_PKEY_CTX) -> bool {
+    // SAFETY: the caller's guarantee.
+    let Some(lc) = (unsafe { pkey_ctx::context(pctx) }) else {
+        return true;
+    };
+    let (flag, f) = {
+        let s = lc.lock();
+        (
+            s.call_digest_custom,
+            s.pmeth_funcs().and_then(|f| f.digest_custom),
+        )
+    };
+    if flag
+        && let Some(f) = f
+        // SAFETY: the method's function with the key and digest contexts.
+        && unsafe { f(pctx, ctx) } == 0
+    {
         return false;
     }
-    if operation & EVP_PKEY_OP_TYPE_SIG == 0 {
-        err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
-        return false;
-    }
-    err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
+    lc.lock().call_digest_custom = false;
     true
+}
+
+/// `do_sigver_init`'s `legacy`: a legacy key context's method takes the operation (see the
+/// module's notes). 1, or 0 with an error.
+///
+/// # Safety
+/// As for [`do_sigver_init`]; `locpctx` is the digest context's live key context.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "do_sigver_init's state at its label"
+)]
+unsafe fn legacy_sigver_init(
+    ctx: *mut EVP_MD_CTX,
+    pctx: *mut *mut EVP_PKEY_CTX,
+    mut type_: *const EVP_MD,
+    mdname: Option<CString>,
+    e: *mut ENGINE,
+    pkey: *mut EVP_PKEY,
+    ver: bool,
+    locpctx: *mut EVP_PKEY_CTX,
+) -> c_int {
+    const F: &str = "do_sigver_init";
+    // SAFETY: the caller's guarantee.
+    let Some(lc) = (unsafe { pkey_ctx::context(locpctx) }) else {
+        return 0;
+    };
+    let (pm, libctx) = {
+        let s = lc.lock();
+        (s.pmeth.clone(), s.libctx.0)
+    };
+    if type_.is_null()
+        && let Some(n) = &mdname
+    {
+        // SAFETY: the key context's library context; the name.
+        type_ = unsafe { super::legacy_md::get_digestbyname_ex(libctx, n.as_ptr()) };
+    }
+    let Some(pm) = pm else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            F,
+        );
+        return 0;
+    };
+    let f = pm.get().funcs();
+    let custom = pm.get().flags & EVP_PKEY_FLAG_SIGCTX_CUSTOM != 0;
+    if !custom {
+        if type_.is_null() {
+            let mut nid = 0;
+            // SAFETY: the caller's key, or NULL; the local.
+            if unsafe { super::pkey::EVP_PKEY_get_default_digest_nid(pkey, &raw mut nid) } > 0 {
+                // SAFETY: a number.
+                let sn = unsafe { crate::objects::OBJ_nid2sn(nid) };
+                // SAFETY: NULL or a static name.
+                type_ = unsafe { EVP_get_digestbyname(sn) };
+            }
+        }
+        if type_.is_null() {
+            err::raise(ERR_LIB_EVP, EVP_R_NO_DEFAULT_DIGEST, F);
+            return 0;
+        }
+    }
+    let (ctx_init, oneshot, op) = if ver {
+        (
+            f.verifyctx_init,
+            f.digestverify.is_some(),
+            EVP_PKEY_OP_VERIFYCTX,
+        )
+    } else {
+        (f.signctx_init, f.digestsign.is_some(), EVP_PKEY_OP_SIGNCTX)
+    };
+    if let Some(init) = ctx_init {
+        // SAFETY: the method's function with the key and digest contexts.
+        if unsafe { init(locpctx, ctx) } <= 0 {
+            return 0;
+        }
+        lc.lock().operation = op;
+    } else if oneshot {
+        lc.lock().operation = if ver {
+            EVP_PKEY_OP_VERIFY
+        } else {
+            EVP_PKEY_OP_SIGN
+        };
+        // SAFETY: the caller's live digest context.
+        if let Some(c) = unsafe { md_ctx::context(ctx) } {
+            c.update = Some(oneshot_update);
+        }
+    } else {
+        let r = if ver {
+            // SAFETY: the key context.
+            unsafe { EVP_PKEY_verify_init(locpctx) }
+        } else {
+            // SAFETY: as above.
+            unsafe { EVP_PKEY_sign_init(locpctx) }
+        };
+        if r <= 0 {
+            return 0;
+        }
+    }
+    // SAFETY: the key context; the digest, or NULL.
+    if unsafe { EVP_PKEY_CTX_set_signature_md(locpctx, type_) } <= 0 {
+        return 0;
+    }
+    if !pctx.is_null() {
+        // SAFETY: the caller's guarantee.
+        unsafe { pctx.write(locpctx) };
+    }
+    if custom {
+        return 1;
+    }
+    // SAFETY: the caller's digest context; the digest.
+    if unsafe { md_ctx::EVP_DigestInit_ex(ctx, type_, e) } == 0 {
+        return 0;
+    }
+    lc.lock().call_digest_custom = f.digest_custom.is_some();
+    // SAFETY: the key context.
+    let ret = unsafe { super::ctrl::use_cached_data(locpctx) };
+    c_int::from(ret > 0)
 }
 
 /// `canon_mdname`: `UNDEF` is no digest.
@@ -211,8 +373,13 @@ unsafe fn do_sigver_init(
         )
     };
     let Some(ctx_km) = ctx_km else {
-        // A legacy key context: its EVP_PKEY_METHOD signs (4.2d).
-        crate::stub::unimplemented("EVP_DigestSignInit with a legacy key context");
+        // A legacy key context: its method signs.
+        // SAFETY: the mark set above.
+        unsafe { ERR_pop_to_mark() };
+        // SAFETY: the caller's guarantee.
+        let mdname = unsafe { owned(mdname) };
+        // SAFETY: as above; the digest context's key context.
+        return unsafe { legacy_sigver_init(ctx, pctx, type_, mdname, e, pkey, ver, locpctx) };
     };
     let wanted = if ver {
         EVP_PKEY_OP_VERIFYCTX
@@ -518,7 +685,12 @@ unsafe fn sigver_update(
     };
     // SAFETY: the context's key context, NULL or live.
     let Some((sig, algctx)) = (unsafe { provided(c, op) }) else {
-        // `legacy`: an ordinary digest update.
+        // `legacy`: an ordinary digest update, after a legacy method's `digest_custom`.
+        let pctx = c.pctx;
+        // SAFETY: the context's key context, NULL or live.
+        if !unsafe { call_digest_custom(ctx, pctx) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         return unsafe { md_ctx::EVP_DigestUpdate(ctx, data, dsize) };
     };
@@ -601,9 +773,9 @@ ffi_export! {
         }
         // SAFETY: the context's key context, NULL or live.
         let Some((sig, mut algctx)) = (unsafe { provided(c, EVP_PKEY_OP_SIGNCTX) }) else {
-            // `legacy`: without an EVP_PKEY_METHOD (none can exist before 4.2d).
-            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
-            return 0;
+            let (pctx, flags) = (c.pctx, c.flags);
+            // SAFETY: the caller's guarantee; the context's key context, NULL or live.
+            return unsafe { legacy_sign_final(ctx, pctx, flags, sigret, siglen) };
         };
         let m = sig.get();
         let Some(f) = m.funcs.digest_sign_final else {
@@ -668,6 +840,12 @@ ffi_export! {
             // SAFETY: the provider's function with its context and the caller's buffers.
             return guarded(sig.get(), F, "digest_sign", |r| r <= 0, || unsafe { f(algctx, sigret, siglen, size, tbs, tbslen) });
         }
+        // A legacy method's one-shot signing.
+        // SAFETY: the context's live key context.
+        if let Some(f) = unsafe { legacy_funcs(c.pctx) }.and_then(|f| f.digestsign) {
+            // SAFETY: the method's function with the caller's digest context and buffers.
+            return unsafe { f(ctx, sigret, siglen, tbs, tbslen) };
+        }
         // SAFETY: the caller's guarantee.
         if !sigret.is_null() && unsafe { EVP_DigestSignUpdate(ctx, tbs.cast(), tbslen) } <= 0 {
             return 0;
@@ -695,9 +873,9 @@ ffi_export! {
         }
         // SAFETY: the context's key context, NULL or live.
         let Some((s, mut algctx)) = (unsafe { provided(c, EVP_PKEY_OP_VERIFYCTX) }) else {
-            // `legacy`: without an EVP_PKEY_METHOD (none can exist before 4.2d).
-            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
-            return 0;
+            let (pctx, flags) = (c.pctx, c.flags);
+            // SAFETY: the caller's guarantee; the context's key context, NULL or live.
+            return unsafe { legacy_verify_final(ctx, pctx, flags, sig, siglen) };
         };
         let m = s.get();
         let Some(f) = m.funcs.digest_verify_final else {
@@ -756,6 +934,12 @@ ffi_export! {
             // SAFETY: the provider's function with its context and the caller's buffers.
             return guarded(sig.get(), F, "digest_verify", |r| r <= 0, || unsafe { f(algctx, sigret, siglen, tbs, tbslen) });
         }
+        // A legacy method's one-shot verification.
+        // SAFETY: the context's live key context.
+        if let Some(f) = unsafe { legacy_funcs(c.pctx) }.and_then(|f| f.digestverify) {
+            // SAFETY: the method's function with the caller's digest context and buffers.
+            return unsafe { f(ctx, sigret, siglen, tbs, tbslen) };
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { EVP_DigestVerifyUpdate(ctx, tbs.cast(), tbslen) } <= 0 {
             return -1;
@@ -763,6 +947,235 @@ ffi_export! {
         // SAFETY: as above.
         unsafe { EVP_DigestVerifyFinal(ctx, sigret, siglen) }
     }
+}
+
+/// The functions of a key context's method, for an operation without a provider side (the
+/// one-shot functions' `else`).
+///
+/// # Safety
+/// `pctx` is NULL or a live key context.
+unsafe fn legacy_funcs(pctx: *mut EVP_PKEY_CTX) -> Option<super::pmeth::Funcs> {
+    // SAFETY: the caller's guarantee.
+    let lc = unsafe { pkey_ctx::context(pctx) }?;
+    let s = lc.lock();
+    let provided = (s.operation == EVP_PKEY_OP_SIGNCTX || s.operation == EVP_PKEY_OP_VERIFYCTX)
+        && !s.sigctx.0.is_null()
+        && s.signature.is_some();
+    if provided {
+        return None;
+    }
+    s.pmeth_funcs()
+}
+
+/// The digest of a copy of `ctx` (the key context copied by its method's `copy`), or with `f`
+/// the method's function of the copy; `None` if the copy can't be made.
+///
+/// # Safety
+/// `ctx` is a live digest context.
+unsafe fn on_copy(
+    ctx: *mut EVP_MD_CTX,
+    f: impl FnOnce(*mut EVP_MD_CTX, *mut EVP_PKEY_CTX) -> c_int,
+) -> Option<c_int> {
+    // SAFETY: no preconditions.
+    let tmp = unsafe { EVP_MD_CTX_new() };
+    if tmp.is_null() {
+        return None;
+    }
+    // SAFETY: the new context; the caller's.
+    if unsafe { EVP_MD_CTX_copy_ex(tmp, ctx) } == 0 {
+        // SAFETY: made above.
+        unsafe { EVP_MD_CTX_free(tmp) };
+        return None;
+    }
+    // SAFETY: the copy.
+    let tmp_pctx = unsafe { md_ctx::context(tmp) }.map_or(ptr::null_mut(), |c| c.pctx);
+    let r = f(tmp, tmp_pctx);
+    // SAFETY: made above.
+    unsafe { EVP_MD_CTX_free(tmp) };
+    Some(r)
+}
+
+/// Marks the digest context finalised.
+///
+/// # Safety
+/// `ctx` is a live digest context.
+unsafe fn set_finalised(ctx: *mut EVP_MD_CTX) {
+    // SAFETY: the caller's guarantee.
+    if let Some(c) = unsafe { md_ctx::context(ctx) } {
+        c.flags |= FLAG_FINALISED;
+    }
+}
+
+/// `EVP_DigestSignFinal`'s `legacy`.
+///
+/// # Safety
+/// `ctx` is a live digest context whose key context is `pctx` (NULL or live) and flags
+/// `flags`; `sigret` is NULL or has room for `*siglen` octets; `siglen` is room for a size.
+unsafe fn legacy_sign_final(
+    ctx: *mut EVP_MD_CTX,
+    pctx: *mut EVP_PKEY_CTX,
+    flags: u64,
+    sigret: *mut u8,
+    siglen: *mut usize,
+) -> c_int {
+    const F: &str = "EVP_DigestSignFinal";
+    // SAFETY: the caller's guarantee.
+    let pm = unsafe { pkey_ctx::context(pctx) }.and_then(|lc| lc.lock().pmeth.clone());
+    let Some(pm) = pm else {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    };
+    // SAFETY: as above.
+    if !unsafe { call_digest_custom(ctx, pctx) } {
+        return 0;
+    }
+    let f = pm.get().funcs();
+    if pm.get().flags & EVP_PKEY_FLAG_SIGCTX_CUSTOM != 0 {
+        let Some(signctx) = f.signctx else {
+            // The reference calls through NULL (docs/DEVIATIONS.md).
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                F,
+            );
+            return 0;
+        };
+        if sigret.is_null() {
+            // SAFETY: the method's function with the contexts and the caller's size.
+            return unsafe { signctx(pctx, sigret, siglen, ctx) };
+        }
+        if flags & FINALISE != 0 {
+            // SAFETY: as above, with the caller's buffer.
+            let r = unsafe { signctx(pctx, sigret, siglen, ctx) };
+            // SAFETY: the caller's guarantee.
+            unsafe { set_finalised(ctx) };
+            return r;
+        }
+        // SAFETY: the key context.
+        let dctx = unsafe { EVP_PKEY_CTX_dup(pctx) };
+        if dctx.is_null() {
+            return 0;
+        }
+        // SAFETY: as above, with the copy.
+        let r = unsafe { signctx(dctx, sigret, siglen, ctx) };
+        // SAFETY: made above.
+        unsafe { EVP_PKEY_CTX_free(dctx) };
+        return r;
+    }
+    if !sigret.is_null() {
+        let mut md = [0u8; EVP_MAX_MD_SIZE as usize];
+        let mut mdlen: c_uint = 0;
+        let md_ptr = md.as_mut_ptr();
+        let r = if flags & FINALISE != 0 {
+            match f.signctx {
+                // SAFETY: the method's function with the contexts and the caller's buffers.
+                Some(sc) => unsafe { sc(pctx, sigret, siglen, ctx) },
+                // SAFETY: the caller's context; the buffer above.
+                None => unsafe { EVP_DigestFinal_ex(ctx, md_ptr, &raw mut mdlen) },
+            }
+        } else {
+            let mdlen_ptr = &raw mut mdlen;
+            let op = |tmp: *mut EVP_MD_CTX, tmp_pctx: *mut EVP_PKEY_CTX| match f.signctx {
+                // SAFETY: the method's function with the copies and the caller's buffers.
+                Some(sc) => unsafe { sc(tmp_pctx, sigret, siglen, tmp) },
+                // SAFETY: the copy; the buffer above.
+                None => unsafe { EVP_DigestFinal_ex(tmp, md_ptr, mdlen_ptr) },
+            };
+            // SAFETY: the caller's context.
+            let r = unsafe { on_copy(ctx, op) };
+            let Some(r) = r else { return 0 };
+            r
+        };
+        if f.signctx.is_some() || r == 0 {
+            return r;
+        }
+        let len = usize::try_from(mdlen).unwrap_or(0);
+        // SAFETY: the key context; the caller's buffers; the digest.
+        if unsafe { EVP_PKEY_sign(pctx, sigret, siglen, md.as_ptr(), len) } <= 0 {
+            return 0;
+        }
+    } else if let Some(sc) = f.signctx {
+        // SAFETY: the method's function with the contexts and the caller's size.
+        if unsafe { sc(pctx, sigret, siglen, ctx) } <= 0 {
+            return 0;
+        }
+    } else {
+        // SAFETY: the caller's context.
+        let md = unsafe { ctx_md(ctx) };
+        // SAFETY: its digest, or NULL.
+        let size = unsafe { super::digest::EVP_MD_get_size(md) };
+        let Ok(size) = usize::try_from(size) else {
+            return 0;
+        };
+        // SAFETY: the key context; the caller's size.
+        if size == 0 || unsafe { EVP_PKEY_sign(pctx, sigret, siglen, ptr::null(), size) } <= 0 {
+            return 0;
+        }
+    }
+    1
+}
+
+/// `EVP_DigestVerifyFinal`'s `legacy`.
+///
+/// # Safety
+/// As for [`legacy_sign_final`]; `sig` holds `siglen` octets.
+unsafe fn legacy_verify_final(
+    ctx: *mut EVP_MD_CTX,
+    pctx: *mut EVP_PKEY_CTX,
+    flags: u64,
+    sig: *const u8,
+    siglen: usize,
+) -> c_int {
+    const F: &str = "EVP_DigestVerifyFinal";
+    // SAFETY: the caller's guarantee.
+    let pm = unsafe { pkey_ctx::context(pctx) }.and_then(|lc| lc.lock().pmeth.clone());
+    let Some(pm) = pm else {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    };
+    // SAFETY: as above.
+    if !unsafe { call_digest_custom(ctx, pctx) } {
+        return 0;
+    }
+    let vc = pm.get().funcs().verifyctx;
+    // `verifyctx` takes the length as an `int` (the reference truncates; docs/DEVIATIONS.md).
+    let Ok(len) = c_int::try_from(siglen) else {
+        return 0;
+    };
+    let mut md = [0u8; EVP_MAX_MD_SIZE as usize];
+    let mut mdlen: c_uint = 0;
+    let md_ptr = md.as_mut_ptr();
+    let r = if flags & FINALISE != 0 {
+        match vc {
+            Some(vc) => {
+                // SAFETY: the method's function with the contexts and the caller's signature.
+                let r = unsafe { vc(pctx, sig, len, ctx) };
+                // SAFETY: the caller's guarantee.
+                unsafe { set_finalised(ctx) };
+                r
+            }
+            // SAFETY: the caller's context; the buffer above.
+            None => unsafe { EVP_DigestFinal_ex(ctx, md_ptr, &raw mut mdlen) },
+        }
+    } else {
+        let mdlen_ptr = &raw mut mdlen;
+        let op = |tmp: *mut EVP_MD_CTX, tmp_pctx: *mut EVP_PKEY_CTX| match vc {
+            // SAFETY: the method's function with the copies and the caller's signature.
+            Some(vc) => unsafe { vc(tmp_pctx, sig, len, tmp) },
+            // SAFETY: the copy; the buffer above.
+            None => unsafe { EVP_DigestFinal_ex(tmp, md_ptr, mdlen_ptr) },
+        };
+        // SAFETY: the caller's context.
+        let r = unsafe { on_copy(ctx, op) };
+        let Some(r) = r else { return -1 };
+        r
+    };
+    if vc.is_some() || r == 0 {
+        return r;
+    }
+    let mlen = usize::try_from(mdlen).unwrap_or(0);
+    // SAFETY: the key context; the caller's signature; the digest.
+    unsafe { EVP_PKEY_verify(pctx, sig, siglen, md.as_ptr(), mlen) }
 }
 
 /// `EVP_SignFinal_ex`'s and `EVP_VerifyFinal_ex`'s digest: of a copy of `ctx` unless

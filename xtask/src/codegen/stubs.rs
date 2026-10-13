@@ -358,7 +358,8 @@ fn render_signatures_file(
          headers. Do not edit.\n//\n\
          // Each function rustyssl-capi implements by hand is assigned to a function pointer of its \
          C\n// prototype's type, so it doesn't compile unless the signatures match exactly \
-         (TEST_PLAN.md, L3 item 3).\n\n"
+         (TEST_PLAN.md, L3 item 3).\n\n\
+         #![allow(clippy::type_complexity)]\n\n"
     );
     out.push_str(&imports(&assertions)?);
     out.push_str(&assertions);

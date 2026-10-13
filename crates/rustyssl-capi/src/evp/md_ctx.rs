@@ -315,7 +315,7 @@ unsafe fn init_internal(
         c.digest = type_;
         // The key context of a legacy context is told of the init (`EVP_PKEY_CTRL_DIGESTINIT`).
         // SAFETY: the context's key context, or NULL.
-        if !unsafe { super::sigver::digest_init_ctrl(c.pctx) } {
+        if !unsafe { super::sigver::digest_init_ctrl(c.pctx, ctx) } {
             return 0;
         }
         return 1;

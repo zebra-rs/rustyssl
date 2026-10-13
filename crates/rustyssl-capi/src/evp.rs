@@ -22,6 +22,7 @@ pub(crate) mod md_ctx;
 pub(crate) mod opmeth;
 pub(crate) mod pkey;
 pub(crate) mod pkey_ctx;
+pub(crate) mod pmeth;
 pub(crate) mod rand;
 pub(crate) mod setters;
 pub(crate) mod signature;
