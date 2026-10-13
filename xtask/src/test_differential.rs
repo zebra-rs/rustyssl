@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(32) {
+        match random.below(33) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -180,6 +180,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             28 => pkey_session(&mut random, &mut out)?,
             29 => meth_session(&mut random, &mut out)?,
             30 => lowlevel_hash_session(&mut random, &mut out)?,
+            31 => lowlevel_aes_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -239,6 +240,80 @@ fn lowlevel_hash_session(random: &mut Random, out: &mut String) -> Result {
     }
     for alg in algs {
         writeln!(out, "llfinal {alg}")?;
+    }
+    Ok(())
+}
+
+/// A random session of the deprecated AES functions and the block-mode helpers: keys of each
+/// size (and refused ones), IVs (some a few blocks before the 32-bit counter wraps), positions,
+/// single blocks, the modes in pieces around the block size, the key wraps, ciphertext
+/// stealing, and CTR both ways.
+fn lowlevel_aes_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&["15", "16", "17", "31", "32", "33", "48"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(200),
+        }
+    };
+    let bits = random.pick(&["128", "192", "256"]);
+    writeln!(out, "aeskey {bits}")?;
+    writeln!(out, "aesiv")?;
+    for _ in 0..random.below(20) + 1 {
+        match random.below(12) {
+            0 => writeln!(
+                out,
+                "aeskey {}",
+                random.pick(&["128", "192", "256", "0", "64", "255"])
+            )?,
+            1 => {
+                if random.below(2) == 0 {
+                    writeln!(out, "aesiv")?;
+                } else {
+                    writeln!(out, "aesiv {}", 1 + random.below(4))?;
+                }
+            }
+            2 => writeln!(out, "aesnum {}", random.offset(-3, 19))?,
+            3 => writeln!(
+                out,
+                "aesblock {}",
+                random.pick(&["enc", "dec", "ecb0", "ecb1", "ecb9"])
+            )?,
+            4..=6 => {
+                let mode = random.pick(&["cbc", "cfb128", "cfb8", "cfb1", "ofb", "ige", "biige"]);
+                let enc = random.below(2);
+                let len = if mode == "cfb1" {
+                    random.below(70)
+                } else {
+                    length(random)
+                };
+                writeln!(out, "aesmode {mode} {enc} {len}")?;
+            }
+            7 => {
+                let form = random.pick(&["wrap", "wrap_pad", "aes"]);
+                let len = match random.below(3) {
+                    0 => random.below(30),
+                    1 => 8 * random.below(8),
+                    _ => random.below(120),
+                };
+                writeln!(out, "aeswrap {form} {} {len}", random.below(2))?;
+            }
+            8 | 9 => writeln!(
+                out,
+                "cts {} {}",
+                random.pick(&["cts", "nistcts"]),
+                length(random)
+            )?,
+            _ => writeln!(
+                out,
+                "ctr {} {}",
+                random.pick(&["block", "ctr32"]),
+                length(random)
+            )?,
+        }
     }
     Ok(())
 }

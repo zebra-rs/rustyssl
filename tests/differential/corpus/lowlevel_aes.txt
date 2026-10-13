@@ -1,0 +1,72 @@
+# The deprecated AES functions and the modes.h block-mode helpers (step 3.8b).
+aeskey 128
+aeskey 192
+aeskey 0
+aeskey 256
+aeskey 129
+aeskey 128
+aesiv
+aesblock enc
+aesblock dec
+aesblock ecb1
+aesblock ecb0
+aesblock ecb7
+aesmode cbc 1 0
+aesmode cbc 1 20
+aesmode cbc 0 20
+aesiv
+aesmode cbc 1 48
+aesmode cbc 0 47
+aesiv
+aesmode cfb128 1 7
+aesmode cfb128 1 20
+aesmode cfb128 0 13
+aesnum -3
+aesmode cfb128 1 5
+aesmode ofb 1 5
+aesiv
+aesmode ofb 1 33
+aesmode cfb8 1 9
+aesmode cfb8 0 9
+aesmode cfb1 1 13
+aesmode cfb1 0 27
+aesiv
+aesmode ige 1 48
+aesmode ige 0 32
+aesmode ige 1 0
+aesmode biige 1 48
+aesmode biige 0 48
+aesmode biige 1 0
+aeswrap wrap 0 16
+aeswrap wrap 1 24
+aeswrap wrap 0 20
+aeswrap wrap 0 8
+aeswrap wrap_pad 0 1
+aeswrap wrap_pad 1 7
+aeswrap wrap_pad 0 8
+aeswrap wrap_pad 0 9
+aeswrap wrap_pad 1 20
+aeswrap wrap_pad 0 0
+aeswrap aes 0 32
+aeswrap aes 1 16
+aeswrap aes 0 12
+cts cts 16
+cts cts 17
+cts cts 20
+cts cts 32
+cts cts 33
+cts cts 100
+cts nistcts 15
+cts nistcts 16
+cts nistcts 17
+cts nistcts 32
+cts nistcts 47
+aesiv
+ctr block 5
+ctr block 30
+ctr block 0
+ctr ctr32 5
+ctr ctr32 70
+ctr ctr32 3
+aesnum 15
+ctr block 2

@@ -310,6 +310,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <openssl/aes.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/bio.h>
@@ -323,6 +324,7 @@
 #include <openssl/md4.h>
 #include <openssl/md5.h>
 #include <openssl/mdc2.h>
+#include <openssl/modes.h>
 #include <openssl/objects.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
@@ -5933,6 +5935,273 @@ static int lowlevel_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the deprecated AES functions and the modes.h helpers, over one encryption and
+ * one decryption key, an IV (64 octets, for bi-IGE), a keystream block, and a position, all
+ * kept between commands, and the digest commands' data:
+ *   aeskey BITS                    AES_set_encrypt_key and AES_set_decrypt_key of BITS bits;
+ *                                  the results and both keys whole
+ *   aesiv [N]                      sets the IV from the data (with N, its last 32 bits to 2^32 - N,
+ *                                  N blocks before the counter wraps), clears the keystream
+ *                                  block, and sets the position to 0
+ *   aesnum N                       sets the position (-5 to 15: past the block is a deviation)
+ *   aesblock enc|dec|ecbN          AES_encrypt, AES_decrypt, or AES_ecb_encrypt with enc N
+ *   aesmode MODE ENC LEN           MODE of LEN octets (at most 1000; bits for cfb1) with enc ENC: cbc, cfb128,
+ *                                  cfb8, cfb1, ofb, ige, biige (whole blocks only); the output,
+ *                                  the IV, and the position
+ *   aeswrap FORM IV LEN            FORM wrap, wrap_pad, or aes (AES_wrap_key) of LEN octets,
+ *                                  with the IV from the data (1) or the default (0); then the
+ *                                  unwrap, and the unwrap of it with its last octet flipped
+ *   cts FORM LEN                   cts or nistcts of LEN octets both ways, with the block and the
+ *                                  CBC functions: the results, outputs, and IVs
+ *   ctr FORM LEN                   CRYPTO_ctr128_encrypt (block) or _ctr32 (ctr32) of LEN
+ *                                  octets on the IV, keystream block, and position
+ */
+static AES_KEY probe_ek, probe_dk;
+static unsigned char probe_aes_iv[64], probe_ecount[16];
+static int probe_num;
+
+static void probe_enc_block(const unsigned char in[16], unsigned char out[16], const void *key)
+{
+    AES_encrypt(in, out, key);
+}
+
+static void probe_dec_block(const unsigned char in[16], unsigned char out[16], const void *key)
+{
+    AES_decrypt(in, out, key);
+}
+
+static void probe_cbc(const unsigned char *in, unsigned char *out, size_t len, const void *key,
+                      unsigned char ivec[16], int enc)
+{
+    (void)key;
+    AES_cbc_encrypt(in, out, len, enc ? &probe_ek : &probe_dk, ivec, enc);
+}
+
+static void probe_ctr32(const unsigned char *in, unsigned char *out, size_t blocks,
+                        const void *key, const unsigned char ivec[16])
+{
+    unsigned char counter[16], k[16];
+    size_t i, n;
+
+    memcpy(counter, ivec, 16);
+    for (i = 0; i < blocks; i++) {
+        unsigned int c;
+
+        AES_encrypt(counter, k, key);
+        for (n = 0; n < 16; n++)
+            out[16 * i + n] = in[16 * i + n] ^ k[n];
+        c = ((unsigned int)counter[12] << 24 | (unsigned int)counter[13] << 16
+             | (unsigned int)counter[14] << 8 | counter[15]) + 1;
+        counter[12] = (unsigned char)(c >> 24);
+        counter[13] = (unsigned char)(c >> 16);
+        counter[14] = (unsigned char)(c >> 8);
+        counter[15] = (unsigned char)c;
+    }
+}
+
+static void probe_bytes(const char *label, const void *p, size_t n)
+{
+    const unsigned char *b = p;
+    size_t i;
+
+    printf(" %s ", label);
+    for (i = 0; i < n; i++)
+        printf("%02x", b[i]);
+}
+
+static int aes_command(const char *command, const char *line)
+{
+    char a[16] = "";
+    long n = 0, m = 0;
+    static unsigned char out[1100], back[1100];
+    const unsigned char *d;
+
+    if (strcmp(command, "aeskey") != 0 && strcmp(command, "aesiv") != 0
+        && strcmp(command, "aesnum") != 0 && strcmp(command, "aesblock") != 0
+        && strcmp(command, "aesmode") != 0 && strcmp(command, "aeswrap") != 0
+        && strcmp(command, "cts") != 0 && strcmp(command, "ctr") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data + digest_offset;
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    memset(back, 0xee, sizeof(back));
+    if (strcmp(command, "aeskey") == 0) {
+        int r;
+
+        sscanf(line, "%*s %ld", &n);
+        memset(&probe_ek, 0xa5, sizeof(probe_ek));
+        memset(&probe_dk, 0xa5, sizeof(probe_dk));
+        r = AES_set_encrypt_key(d, (int)n, &probe_ek);
+        printf(" %d %d", r, AES_set_decrypt_key(d, (int)n, &probe_dk));
+        probe_bytes("enc", &probe_ek, sizeof(probe_ek));
+        probe_bytes("dec", &probe_dk, sizeof(probe_dk));
+        digest_offset = (digest_offset + 37) % 1024;
+        if (r != 0) {
+            /* Keep usable keys for the commands that follow. */
+            AES_set_encrypt_key(digest_data, 128, &probe_ek);
+            AES_set_decrypt_key(digest_data, 128, &probe_dk);
+        }
+    } else if (strcmp(command, "aesiv") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        memcpy(probe_aes_iv, d, 64);
+        if (n > 0) {
+            unsigned int c = 0u - (unsigned int)n;
+
+            probe_aes_iv[12] = (unsigned char)(c >> 24);
+            probe_aes_iv[13] = (unsigned char)(c >> 16);
+            probe_aes_iv[14] = (unsigned char)(c >> 8);
+            probe_aes_iv[15] = (unsigned char)c;
+        }
+        memset(probe_ecount, 0, 16);
+        probe_num = 0;
+        digest_offset = (digest_offset + 11) % 1024;
+    } else if (strcmp(command, "aesnum") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (n >= -5 && n <= 15)
+            probe_num = (int)n;
+        printf(" %d", probe_num);
+    } else if (strcmp(command, "aesblock") == 0) {
+        sscanf(line, "%*s %15s", a);
+        if (strcmp(a, "enc") == 0)
+            AES_encrypt(d, out, &probe_ek);
+        else if (strcmp(a, "dec") == 0)
+            AES_decrypt(d, out, &probe_dk);
+        else
+            AES_ecb_encrypt(d, out, atoi(a + 3) == AES_ENCRYPT ? &probe_ek : &probe_dk, atoi(a + 3));
+        probe_bytes("out", out, 16);
+        digest_offset = (digest_offset + 5) % 1024;
+    } else if (strcmp(command, "aesmode") == 0) {
+        int enc;
+        size_t len, octets;
+
+        sscanf(line, "%*s %15s %ld %ld", a, &m, &n);
+        enc = (int)m;
+        len = n < 0 ? 0 : (size_t)n > 1000 ? 1000 : (size_t)n;
+        octets = len;
+        if (strcmp(a, "cbc") == 0) {
+            AES_cbc_encrypt(d, out, len, enc ? &probe_ek : &probe_dk, probe_aes_iv, enc);
+            octets = (len + 15) / 16 * 16;
+        } else if (strcmp(a, "cfb128") == 0) {
+            AES_cfb128_encrypt(d, out, len, &probe_ek, probe_aes_iv, &probe_num, enc);
+        } else if (strcmp(a, "cfb8") == 0) {
+            AES_cfb8_encrypt(d, out, len, &probe_ek, probe_aes_iv, &probe_num, enc);
+        } else if (strcmp(a, "cfb1") == 0) {
+            AES_cfb1_encrypt(d, out, len, &probe_ek, probe_aes_iv, &probe_num, enc);
+            octets = (len + 7) / 8;
+        } else if (strcmp(a, "ofb") == 0) {
+            AES_ofb128_encrypt(d, out, len, &probe_ek, probe_aes_iv, &probe_num);
+        } else if (strcmp(a, "ige") == 0) {
+            len -= len % 16;
+            octets = len;
+            AES_ige_encrypt(d, out, len, enc == AES_ENCRYPT ? &probe_ek : &probe_dk, probe_aes_iv,
+                            enc == AES_ENCRYPT ? AES_ENCRYPT : AES_DECRYPT);
+        } else if (strcmp(a, "biige") == 0) {
+            len -= len % 16;
+            octets = len;
+            AES_bi_ige_encrypt(d, out, len, enc == AES_ENCRYPT ? &probe_ek : &probe_dk, NULL,
+                               probe_aes_iv, enc == AES_ENCRYPT ? AES_ENCRYPT : AES_DECRYPT);
+        } else {
+            printf(" unknown\n");
+            return 1;
+        }
+        probe_bytes("out", out, octets + 1);
+        probe_bytes("iv", probe_aes_iv, 32);
+        printf(" num %d", probe_num);
+        digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    } else if (strcmp(command, "aeswrap") == 0) {
+        size_t w = 0, u, len;
+        const unsigned char *iv;
+
+        sscanf(line, "%*s %15s %ld %ld", a, &m, &n);
+        len = n < 0 ? 0 : (size_t)n > 512 ? 512 : (size_t)n;
+        iv = m ? digest_data + 900 : NULL;
+        if (strcmp(a, "wrap") == 0)
+            w = CRYPTO_128_wrap(&probe_ek, iv, out, d, len, probe_enc_block);
+        else if (strcmp(a, "wrap_pad") == 0)
+            w = CRYPTO_128_wrap_pad(&probe_ek, iv, out, d, len, probe_enc_block);
+        else
+            w = (size_t)AES_wrap_key(&probe_ek, iv, out, d, (unsigned int)len);
+        printf(" %zu", w);
+        probe_bytes("wrapped", out, w + 1);
+        if (w >= 16) {
+            if (strcmp(a, "wrap_pad") == 0)
+                u = CRYPTO_128_unwrap_pad(&probe_dk, iv, back, out, w, probe_dec_block);
+            else if (strcmp(a, "wrap") == 0)
+                u = CRYPTO_128_unwrap(&probe_dk, iv, back, out, w, probe_dec_block);
+            else
+                u = (size_t)AES_unwrap_key(&probe_dk, iv, back, out, (unsigned int)w);
+            printf(" unwrap %zu %d", u, memcmp(back, d, u) == 0);
+            out[w - 1] ^= 1;
+            memset(back, 0xee, w);
+            if (strcmp(a, "wrap_pad") == 0)
+                u = CRYPTO_128_unwrap_pad(&probe_dk, iv, back, out, w, probe_dec_block);
+            else
+                u = CRYPTO_128_unwrap(&probe_dk, iv, back, out, w, probe_dec_block);
+            printf(" tampered %zu", u);
+            probe_bytes("zeroed", back, w - 8);
+        }
+        digest_offset = (digest_offset + len + 3) % 1024;
+    } else if (strcmp(command, "cts") == 0) {
+        static unsigned char c[1100], e[1100];
+        unsigned char iv1[16], iv2[16];
+        size_t len, r1, r2, r3, r4;
+        int nist;
+
+        sscanf(line, "%*s %15s %ld", a, &n);
+        len = n < 0 ? 0 : (size_t)n > 1000 ? 1000 : (size_t)n;
+        nist = strcmp(a, "nistcts") == 0;
+        memset(c, 0xee, sizeof(c));
+        memset(e, 0xee, sizeof(e));
+        memcpy(iv1, probe_aes_iv, 16);
+        memcpy(iv2, probe_aes_iv, 16);
+        r1 = nist ? CRYPTO_nistcts128_encrypt_block(d, out, len, &probe_ek, iv1, probe_enc_block)
+                  : CRYPTO_cts128_encrypt_block(d, out, len, &probe_ek, iv1, probe_enc_block);
+        r2 = nist ? CRYPTO_nistcts128_encrypt(d, c, len, &probe_ek, iv2, probe_cbc)
+                  : CRYPTO_cts128_encrypt(d, c, len, &probe_ek, iv2, probe_cbc);
+        printf(" %zu %zu same %d", r1, r2, memcmp(out, c, sizeof(c)) == 0 && memcmp(iv1, iv2, 16) == 0);
+        probe_bytes("out", out, len + 1);
+        probe_bytes("iv", iv1, 16);
+        memcpy(iv1, probe_aes_iv, 16);
+        memcpy(iv2, probe_aes_iv, 16);
+        r3 = nist ? CRYPTO_nistcts128_decrypt_block(out, back, len, &probe_dk, iv1, probe_dec_block)
+                  : CRYPTO_cts128_decrypt_block(out, back, len, &probe_dk, iv1, probe_dec_block);
+        r4 = nist ? CRYPTO_nistcts128_decrypt(c, e, len, &probe_dk, iv2, probe_cbc)
+                  : CRYPTO_cts128_decrypt(c, e, len, &probe_dk, iv2, probe_cbc);
+        printf(" back %zu %zu same %d", r3, r4, memcmp(back, e, sizeof(e)) == 0);
+        probe_bytes("back", back, len + 1);
+        probe_bytes("iv", iv1, 16);
+        probe_bytes("iv2", iv2, 16);
+        digest_offset = (digest_offset + len + 7) % 1024;
+    } else {
+        unsigned int unum = (unsigned int)(probe_num < 0 ? 0 : probe_num);
+        size_t len;
+
+        sscanf(line, "%*s %15s %ld", a, &n);
+        len = n < 0 ? 0 : (size_t)n > 1000 ? 1000 : (size_t)n;
+        if (strcmp(a, "ctr32") == 0)
+            CRYPTO_ctr128_encrypt_ctr32(d, out, len, &probe_ek, probe_aes_iv, probe_ecount, &unum,
+                                        probe_ctr32);
+        else
+            CRYPTO_ctr128_encrypt(d, out, len, &probe_ek, probe_aes_iv, probe_ecount, &unum,
+                                  probe_enc_block);
+        probe_num = (int)unum;
+        probe_bytes("out", out, len + 1);
+        probe_bytes("iv", probe_aes_iv, 16);
+        probe_bytes("ecount", probe_ecount, 16);
+        printf(" num %d", probe_num);
+        digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    }
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -5962,7 +6231,8 @@ int main(void)
             || kdf_command(command, line) || rand_command(command, line)
             || bn_command(command, line) || pkey_command(command, line)
             || derive_command(command, line) || meth_command(command, line)
-            || print_command(command, line) || lowlevel_command(command, line)) {
+            || print_command(command, line) || lowlevel_command(command, line)
+            || aes_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
