@@ -326,6 +326,25 @@ impl<C: Handle> Ref<C> {
         (!m.is_null()).then_some(Self(Ptr(m)))
     }
 
+    /// A new reference to `m`; `None` for NULL or a handle of another type.
+    ///
+    /// # Safety
+    /// `m` is NULL or a live handle.
+    pub(crate) unsafe fn new(m: *const C) -> Option<Self> {
+        // SAFETY: the caller's guarantee.
+        unsafe { C::up_ref(m) }.then(|| Self(Ptr(m.cast_mut())))
+    }
+
+    /// The handle (no reference is taken).
+    pub(crate) fn as_ptr(&self) -> *mut C {
+        self.0.0
+    }
+
+    /// Whether this is a reference to `m`.
+    pub(crate) fn is(&self, m: *const C) -> bool {
+        self.0.0.cast_const() == m
+    }
+
     /// The algorithm.
     pub(crate) fn get(&self) -> &C::Object {
         // SAFETY: this holds a reference to a live algorithm (checked when made).

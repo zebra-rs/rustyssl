@@ -1,6 +1,6 @@
 //! Keys (`EVP_PKEY(3)`, `EVP_PKEY_new(3)`, `EVP_PKEY_is_a(3)`, ...; `p_lib.c`, `keymgmt_lib.c`):
-//! an `EVP_PKEY` holding a provider's key data through its key manager, or typed by one of the
-//! built-in ASN.1 methods without data (`EVP_PKEY_set_type`).
+//! an `EVP_PKEY` holding a provider's key data through its key manager, or typed by an ASN.1
+//! method (`EVP_PKEY_set_type`) and holding the method's legacy data (`EVP_PKEY_assign`).
 //!
 //! As in OpenSSL:
 //! - A provided key's type is the ASN.1 method's that one of its key manager's names is the PEM
@@ -11,21 +11,26 @@
 //!   kept in the key's operation cache until the key's parameters are set.
 //! - Comparisons give 1 (equal), 0 (different), -1 (different types), or -2 (can't compare).
 //!
-//! Keys with legacy data (`EVP_PKEY_assign`) come with 4.2d and the key types; a path that would
-//! need the key types' ASN.1 methods' functions aborts until then (AGENTS.md rule 10). Functions
-//! given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
+//! - A key typed by an ASN.1 method asks the method (an application's, `EVP_PKEY_asn1_new(3)`)
+//!   for its sizes, comparisons, parameters, raw keys, and default digest, and the method's
+//!   `pkey_free` frees its data, whenever the key is cleared, retyped, or freed.
+//!
+//! The built-in key types' legacy data comes with the key types (4.3 onwards): until then a
+//! key can't be given it, and the built-in methods' functions abort (AGENTS.md rule 10).
+//! Functions given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
 
-use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_long, c_void};
 use core::ptr;
 use core::sync::atomic::{AtomicI32, Ordering};
 use std::cell::UnsafeCell;
 use std::ffi::CString;
+use std::sync::atomic::AtomicPtr;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    CRYPTO_EX_DATA, CRYPTO_EX_INDEX_EVP_PKEY, ENGINE, ERR_LIB_EVP, ERR_R_EVP_LIB,
-    ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYMGMT, EVP_PKEY, EVP_PKEY_DSA,
-    EVP_PKEY_EC, EVP_PKEY_KEYMGMT, EVP_PKEY_NONE, EVP_R_DIFFERENT_KEY_TYPES,
+    ASN1_PKEY_CTRL_DEFAULT_MD_NID, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_EVP_PKEY, ENGINE, ERR_LIB_EVP,
+    ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYMGMT, EVP_PKEY,
+    EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_KEYMGMT, EVP_PKEY_NONE, EVP_R_DIFFERENT_KEY_TYPES,
     EVP_R_DIFFERENT_PARAMETERS, EVP_R_EXPECTING_A_POLY1305_KEY, EVP_R_EXPECTING_A_SIPHASH_KEY,
     EVP_R_EXPECTING_AN_HMAC_KEY, EVP_R_MISSING_PARAMETERS, EVP_R_UNKNOWN_BITS,
     EVP_R_UNKNOWN_MAX_SIZE, EVP_R_UNKNOWN_SECURITY_BITS, EVP_R_UNSUPPORTED_ALGORITHM,
@@ -53,8 +58,6 @@ use crate::provider::Ptr;
 pub(crate) mod ameth;
 pub(crate) mod params;
 pub(crate) mod raw;
-
-use ameth::Ameth;
 
 /// `OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS`, which `p_lib.c` calls `SELECT_PARAMETERS`.
 const SELECT_PARAMETERS: c_int = OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS as c_int;
@@ -101,6 +104,8 @@ pub(crate) struct Pkey {
     references: AtomicI32,
     state: Mutex<State>,
     ex_data: ExData,
+    /// The key's own handle, which the ASN.1 method's functions are given.
+    this: AtomicPtr<EVP_PKEY>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -117,7 +122,9 @@ pub(crate) struct State {
     pub(crate) type_: c_int,
     save_type: c_int,
     /// The ASN.1 method of a key typed without a key manager.
-    pub(crate) ameth: Option<&'static Ameth>,
+    pub(crate) ameth: Option<ameth::Ref>,
+    /// The method's data (`pkey.ptr`), which its `pkey_free` frees.
+    legacy: Ptr<c_void>,
     pub(crate) keymgmt: Option<keymgmt::Ref>,
     pub(crate) keydata: Option<Arc<KeyData>>,
     /// `cache`: bits, security bits, and maximum size.
@@ -165,17 +172,43 @@ impl Pkey {
     pub(crate) fn type_(&self) -> c_int {
         self.lock().type_
     }
+
+    /// The key's handle.
+    pub(crate) fn handle(&self) -> *mut EVP_PKEY {
+        self.this.load(Ordering::Relaxed)
+    }
+
+    /// The functions of the key's ASN.1 method, if it has one.
+    pub(crate) fn ameth_funcs(&self) -> Option<ameth::Funcs> {
+        let m = self.lock().ameth.clone();
+        m.map(|m| m.get().funcs())
+    }
+}
+
+/// `evp_pkey_free_legacy`: has the key's ASN.1 method free its data (the method's `pkey_free`
+/// runs whenever the key has a method, data or not, without the key's lock).
+fn free_legacy(k: &Pkey) {
+    let Some(f) = k.ameth_funcs() else {
+        return;
+    };
+    if let Some(free) = f.pkey_free {
+        // SAFETY: the method's function with the key's handle.
+        unsafe { free(k.handle()) };
+    }
+    k.lock().legacy = Ptr(ptr::null_mut());
+}
+
+/// `evp_pkey_free_it`: frees the key's data (legacy and provided) and untypes it.
+fn clear(k: &Pkey) {
+    free_legacy(k);
+    let dropped = k.lock().free_it();
+    drop(dropped);
 }
 
 impl State {
-    /// Whether the key's ASN.1 method has the function `f` (an `ameth::F_*`).
-    pub(crate) fn ameth_has(&self, f: u32) -> bool {
-        self.ameth.is_some_and(|m| m.has(f))
-    }
-
-    /// `evp_pkey_is_assigned` (there's no legacy data before 4.2d).
+    /// `evp_pkey_is_assigned`.
     pub(crate) fn is_assigned(&self) -> bool {
-        self.keydata.is_some()
+        self.keydata.is_some() || !self.legacy.0.is_null()
     }
 
     /// `evp_pkey_is_blank`.
@@ -231,6 +264,7 @@ pub(crate) fn new() -> *mut EVP_PKEY {
             type_: EVP_PKEY_NONE,
             save_type: EVP_PKEY_NONE,
             ameth: None,
+            legacy: Ptr(ptr::null_mut()),
             keymgmt: None,
             keydata: None,
             bits: 0,
@@ -245,11 +279,13 @@ pub(crate) fn new() -> *mut EVP_PKEY {
             ctx: ptr::null_mut(),
             sk: ptr::null_mut(),
         })),
+        this: AtomicPtr::new(ptr::null_mut()),
     });
     // SAFETY: just made.
     let Some(k) = (unsafe { pkey(p) }) else {
         return ptr::null_mut();
     };
+    k.this.store(p, Ordering::Relaxed);
     // SAFETY: the key's own ex_data.
     if unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, p.cast(), k.ex_data()) } == 0 {
         err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_CRYPTO_LIB, "EVP_PKEY_new");
@@ -272,8 +308,7 @@ pub(crate) unsafe fn free(p: *mut EVP_PKEY) {
     if held.references.fetch_sub(1, Ordering::AcqRel) > 1 {
         return;
     }
-    let dropped = held.lock().free_it();
-    drop(dropped);
+    clear(&held);
     // SAFETY: the key's own ex_data; its last reference.
     unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, p.cast(), held.ex_data()) };
     // SAFETY: the last reference; the hold keeps the object until this returns.
@@ -349,21 +384,24 @@ pub(crate) fn set_type(
     name: Option<&[u8]>,
     keymgmt: Option<&keymgmt::Ref>,
 ) -> bool {
-    let mut dropped = Dropped::default();
     if let Some(k) = pkey {
-        let mut s = k.lock();
-        if s.keydata.is_some() {
-            dropped = s.free_it();
+        let assigned = k.lock().is_assigned();
+        if assigned {
+            clear(k);
         }
         // Retyping to the type it was given keeps a key as it is.
+        let s = k.lock();
         if s.type_ != EVP_PKEY_NONE && type_ == s.save_type && s.ameth.is_some() {
             return true;
         }
     }
-    drop(dropped);
     let found = match name {
         Some(n) => ameth::find_str(n),
-        None if type_ != EVP_PKEY_NONE => ameth::find(type_),
+        None if type_ != EVP_PKEY_NONE => {
+            let m = ameth::find(type_);
+            ameth::engine_lookup();
+            m
+        }
         None => None,
     };
     if found.is_none() && keymgmt.is_none() {
@@ -375,16 +413,19 @@ pub(crate) fn set_type(
         let old = core::mem::replace(&mut s.keymgmt, keymgmt.cloned());
         s.save_type = type_;
         s.type_ = type_;
-        if keymgmt.is_none() {
-            s.ameth = found;
-        }
-        match found {
-            Some(m) if type_ == EVP_PKEY_NONE => s.type_ = m.pkey_id,
+        match &found {
+            Some(m) if type_ == EVP_PKEY_NONE => s.type_ = m.get().pkey_id,
             Some(_) => {}
             None => s.type_ = EVP_PKEY_KEYMGMT,
         }
+        let old_ameth = if keymgmt.is_none() {
+            core::mem::replace(&mut s.ameth, found)
+        } else {
+            None
+        };
         drop(s);
         drop(old);
+        drop(old_ameth);
     }
     true
 }
@@ -933,7 +974,8 @@ ffi_export! {
             // The key manager outlives the key's reference to it.
             return km.get().name().as_ptr();
         }
-        s.ameth.and_then(|m| m.pem_str).map_or(ptr::null(), CStr::as_ptr)
+        // The method outlives the key's reference to it.
+        s.ameth.as_ref().and_then(|m| m.get().pem_str.as_deref()).map_or(ptr::null(), CStr::as_ptr)
     }
 }
 
@@ -957,7 +999,8 @@ ffi_export! {
                 return d;
             }
         }
-        s.ameth.and_then(|m| m.info).map_or(ptr::null(), CStr::as_ptr)
+        // The method outlives the key's reference to it.
+        s.ameth.as_ref().and_then(|m| m.get().info.as_deref()).map_or(ptr::null(), CStr::as_ptr)
     }
 }
 
@@ -1051,15 +1094,23 @@ enum Info {
 unsafe fn info(pkey: *const EVP_PKEY, which: Info, reason: c_int, function: &str) -> c_int {
     // SAFETY: the caller's guarantee.
     let size = unsafe { self::pkey(pkey) }.map_or(0, |k| {
-        let s = k.lock();
-        if s.ameth_has(ameth::F_SIZES) {
-            // The ASN.1 methods' functions come with the key types.
-            crate::stub::unimplemented("the size of a key typed by an ASN.1 method");
-        }
-        match which {
-            Info::Bits => s.bits,
-            Info::SecurityBits => s.security_bits,
-            Info::Size => s.size,
+        let cached = {
+            let s = k.lock();
+            match which {
+                Info::Bits => s.bits,
+                Info::SecurityBits => s.security_bits,
+                Info::Size => s.size,
+            }
+        };
+        let f = k.ameth_funcs().and_then(|f| match which {
+            Info::Bits => f.pkey_bits,
+            Info::SecurityBits => f.pkey_security_bits,
+            Info::Size => f.pkey_size,
+        });
+        match f {
+            // SAFETY: the method's function with the key's handle.
+            Some(f) => unsafe { f(k.handle()) },
+            None => cached,
         }
     });
     if size <= 0 {
@@ -1267,19 +1318,19 @@ ffi_export! {
 }
 
 /// `EVP_PKEY_missing_parameters`.
-fn missing_parameters(k: &Pkey) -> bool {
+pub(crate) fn missing_parameters(k: &Pkey) -> bool {
     if k.is_provided() {
         return !has(k, SELECT_PARAMETERS);
     }
-    if k.lock().ameth_has(ameth::F_PARAM_MISSING) {
-        // The ASN.1 methods' functions come with the key types.
-        crate::stub::unimplemented("the parameters of a key typed by an ASN.1 method");
+    match k.ameth_funcs().and_then(|f| f.param_missing) {
+        // SAFETY: the method's function with the key's handle.
+        Some(f) => (unsafe { f(k.handle()) }) != 0,
+        None => false,
     }
-    false
 }
 
 /// `EVP_PKEY_parameters_eq`.
-fn parameters_eq(a: &Pkey, b: &Pkey) -> c_int {
+pub(crate) fn parameters_eq(a: &Pkey, b: &Pkey) -> c_int {
     if a.is_provided() || b.is_provided() {
         return cmp_any(a, b, SELECT_PARAMETERS);
     }
@@ -1287,11 +1338,11 @@ fn parameters_eq(a: &Pkey, b: &Pkey) -> c_int {
     if ta != tb {
         return -1;
     }
-    if a.lock().ameth_has(ameth::F_PARAM_CMP) {
-        // The ASN.1 methods' functions come with the key types.
-        crate::stub::unimplemented("comparing keys typed by an ASN.1 method");
+    match a.ameth_funcs().and_then(|f| f.param_cmp) {
+        // SAFETY: the method's function with the keys' handles.
+        Some(f) => unsafe { f(a.handle(), b.handle()) },
+        None => -2,
     }
-    -2
 }
 
 ffi_export! {
@@ -1348,12 +1399,19 @@ ffi_export! {
         if x.type_() != y.type_() {
             return -1;
         }
-        let s = x.lock();
-        if s.ameth_has(ameth::F_PARAM_CMP) || s.ameth_has(ameth::F_PUB_CMP) {
-            // The ASN.1 methods' functions come with the key types.
-            crate::stub::unimplemented("comparing keys typed by an ASN.1 method");
+        let Some(f) = x.ameth_funcs() else { return -2 };
+        if let Some(cmp) = f.param_cmp {
+            // SAFETY: the method's function with the keys' handles.
+            let ret = unsafe { cmp(x.handle(), y.handle()) };
+            if ret <= 0 {
+                return ret;
+            }
         }
-        -2
+        match f.pub_cmp {
+            // SAFETY: as above.
+            Some(cmp) => unsafe { cmp(x.handle(), y.handle()) },
+            None => -2,
+        }
     }
 }
 
@@ -1438,11 +1496,11 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, EVP_R_DIFFERENT_KEY_TYPES, F);
             return 0;
         }
-        if f.lock().ameth_has(ameth::F_PARAM_COPY) {
-            // The ASN.1 methods' functions come with the key types.
-            crate::stub::unimplemented("copying parameters of a key typed by an ASN.1 method");
+        match f.ameth_funcs().and_then(|m| m.param_copy) {
+            // SAFETY: the method's function with the keys' handles.
+            Some(copy) => unsafe { copy(t.handle(), f.handle()) },
+            None => 0,
         }
-        0
     }
 }
 
@@ -1472,18 +1530,23 @@ ffi_export! {
                     return ptr::null_mut();
                 }
             } else {
-                let (copy, type_) = {
+                let (type_, empty) = {
                     let s = k.lock();
-                    (s.ameth_has(ameth::F_COPY), s.type_)
+                    (s.type_, s.legacy.0.is_null())
                 };
-                if copy {
-                    // The ASN.1 methods' functions come with the key types.
-                    crate::stub::unimplemented("EVP_PKEY_dup of a key typed by an ASN.1 method");
-                }
-                // A typed key without data and a copy function: typed alike.
-                if !set_type(Some(dup.get()), type_, None, None) {
-                    err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_KEY_TYPE, "EVP_PKEY_dup");
-                    return ptr::null_mut();
+                match k.ameth_funcs().and_then(|f| f.copy) {
+                    Some(copy) => {
+                        // SAFETY: the method's function with the keys' handles.
+                        if unsafe { copy(dup.as_ptr(), k.handle()) } == 0 {
+                            return ptr::null_mut();
+                        }
+                    }
+                    // A key without data, without a copy function: typed alike.
+                    None if empty && set_type(Some(dup.get()), type_, None, None) => {}
+                    None => {
+                        err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_KEY_TYPE, "EVP_PKEY_dup");
+                        return ptr::null_mut();
+                    }
                 }
             }
         }
@@ -1509,8 +1572,14 @@ ffi_export! {
             return 0;
         };
         if k.lock().is_legacy() {
-            // A typed key's ASN.1 method exports it.
-            crate::stub::unimplemented("EVP_PKEY_export of a key typed by an ASN.1 method");
+            let builtin = k.lock().ameth.as_ref().is_some_and(|m| !m.get().is_dynamic());
+            if builtin {
+                // A built-in key type's ASN.1 method exports it (4.3 onwards).
+                crate::stub::unimplemented("EVP_PKEY_export of a key typed by an ASN.1 method");
+            }
+            // An application's method has no `export_to` (the reference calls through NULL;
+            // docs/DEVIATIONS.md).
+            return 0;
         }
         // SAFETY: the caller's guarantee.
         unsafe { export(k, selection, export_cb, export_cbarg) }
@@ -1597,15 +1666,43 @@ pub(crate) unsafe fn default_digest_name(
     } else {
         return -2;
     };
-    // `OPENSSL_strlcpy`.
-    if mdname_sz > 0 && !mdname.is_null() {
-        let n = result.len().min(mdname_sz - 1);
-        // SAFETY: the caller's buffer has room for `mdname_sz` characters.
-        unsafe { ptr::copy_nonoverlapping(result.as_ptr().cast(), mdname, n) };
-        // SAFETY: as above: `n` is below `mdname_sz`.
-        unsafe { mdname.wrapping_add(n).write(0) };
-    }
+    // SAFETY: the caller's guarantee.
+    unsafe { strlcpy(mdname, mdname_sz, &result) };
     rv
+}
+
+/// `OPENSSL_strlcpy` of `src` into `dst`, which has room for `size` characters (nothing for
+/// NULL).
+///
+/// # Safety
+/// `dst` is NULL or has room for `size` characters.
+unsafe fn strlcpy(dst: *mut c_char, size: usize, src: &[u8]) {
+    if size > 0 && !dst.is_null() {
+        let n = src.len().min(size - 1);
+        // SAFETY: the caller's buffer has room for `size` characters.
+        unsafe { ptr::copy_nonoverlapping(src.as_ptr().cast(), dst, n) };
+        // SAFETY: as above: `n` is below `size`.
+        unsafe { dst.wrapping_add(n).write(0) };
+    }
+}
+
+/// `evp_pkey_asn1_ctrl` of a key with an ASN.1 method: its ctrl's answer, -2 without one;
+/// `None` for a key without a method.
+///
+/// # Safety
+/// `arg2` is what the command needs.
+pub(crate) unsafe fn asn1_ctrl(
+    k: &Pkey,
+    op: c_int,
+    arg1: c_long,
+    arg2: *mut c_void,
+) -> Option<c_int> {
+    let f = k.ameth_funcs()?;
+    Some(match f.pkey_ctrl {
+        // SAFETY: the method's function with the key's handle; the caller's guarantee.
+        Some(ctrl) => unsafe { ctrl(k.handle(), op, arg1, arg2) },
+        None => -2,
+    })
 }
 
 ffi_export! {
@@ -1619,17 +1716,18 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
-        let (typed, ctrl) = {
-            let s = k.lock();
-            (s.ameth.is_some(), s.ameth_has(ameth::F_CTRL))
-        };
-        if ctrl {
-            // The ASN.1 methods' functions come with the key types.
-            crate::stub::unimplemented("the default digest of a key typed by an ASN.1 method");
-        }
-        if typed {
-            // Its method has no ctrl to ask.
-            return -2;
+        let mut nid = NID_undef;
+        // SAFETY: room for the NID.
+        if let Some(rv) = unsafe { asn1_ctrl(k, ASN1_PKEY_CTRL_DEFAULT_MD_NID, 0, (&raw mut nid).cast()) } {
+            if rv > 0 {
+                // SAFETY: a number.
+                let sn = unsafe { OBJ_nid2sn(nid) };
+                // SAFETY: NULL or a static name.
+                let name = unsafe { text(sn) }.map_or(&b""[..], CStr::to_bytes);
+                // SAFETY: the caller's buffer.
+                unsafe { strlcpy(mdname, mdname_sz, name) };
+            }
+            return rv;
         }
         let (Some(km), kd) = k.provided() else {
             // OpenSSL calls through a NULL key manager.
@@ -1652,17 +1750,9 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
-        let (typed, ctrl) = {
-            let s = k.lock();
-            (s.ameth.is_some(), s.ameth_has(ameth::F_CTRL))
-        };
-        if ctrl {
-            // The ASN.1 methods' functions come with the key types.
-            crate::stub::unimplemented("the default digest of a key typed by an ASN.1 method");
-        }
-        if typed {
-            // Its method has no ctrl to ask.
-            return -2;
+        // SAFETY: the caller's guarantee: room for the NID.
+        if let Some(rv) = unsafe { asn1_ctrl(k, ASN1_PKEY_CTRL_DEFAULT_MD_NID, 0, pnid.cast()) } {
+            return rv;
         }
         if !k.is_provided() {
             return 0;
@@ -1718,15 +1808,44 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's legacy data: NULL for a provided or typed key (there's no legacy data yet).
+    /// The key's legacy data (what `EVP_PKEY_assign` gave it); NULL for a provided key.
     ///
     /// # Safety
     /// `pkey` is NULL or a live key.
     pub unsafe extern "C" fn EVP_PKEY_get0(pkey: *const EVP_PKEY) -> *mut c_void
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
-        let _ = pkey;
-        ptr::null_mut()
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return ptr::null_mut() };
+        let s = k.lock();
+        if s.keymgmt.is_some() {
+            return ptr::null_mut();
+        }
+        s.legacy.0
+    }
+}
+
+ffi_export! {
+    /// Types the key by `type_` (freeing its data) and gives it `key`, the legacy data of the
+    /// type's ASN.1 method, which then owns it. 1, or 0 if there's no method for the type or
+    /// `key` is NULL (the key is typed all the same).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key; `key` is NULL or the data the type's method expects.
+    pub unsafe extern "C" fn EVP_PKEY_assign(pkey: *mut EVP_PKEY, type_: c_int, key: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
+        if !key.is_null() && ameth::find(type_).is_some_and(|m| !m.get().is_dynamic()) {
+            // The built-in key types' data (and the EC group check) come with the key types.
+            crate::stub::unimplemented("EVP_PKEY_assign of a built-in key type's data");
+        }
+        if !set_type(Some(k), type_, None, None) {
+            return 0;
+        }
+        k.lock().legacy = Ptr(key);
+        c_int::from(!key.is_null())
     }
 }
 

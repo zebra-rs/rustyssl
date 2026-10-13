@@ -476,20 +476,42 @@ ffi_export! {
 // -------------------------------------------------------------------------------------------
 // DH (dh_ctrl.c)
 
-/// `dh_paramgen_check` (and `dsa_paramgen_check`): a generation operation.
-fn gen_check(ctx: *mut EVP_PKEY_CTX, function: &str) -> c_int {
+/// The key DH's checks accept.
+const DH_TYPES: &[c_int] = &[EVP_PKEY_DH, EVP_PKEY_DHX];
+
+/// The key type of a legacy context's method, if it has one.
+fn pmeth_id(ctx: *mut EVP_PKEY_CTX) -> Option<c_int> {
+    // SAFETY: the callers' guarantee: NULL or a live context.
+    let c = unsafe { pkey_ctx::context(ctx) }?;
+    let s = c.lock();
+    s.pmeth.as_ref().map(|m| m.get().pkey_id)
+}
+
+/// The type check of the typed setters: -1 for a legacy context whose method's key type isn't
+/// one of `types` (none: no check), else 1.
+fn type_check(ctx: *mut EVP_PKEY_CTX, types: &[c_int]) -> c_int {
+    match pmeth_id(ctx) {
+        Some(id) if !types.is_empty() && !types.contains(&id) => -1,
+        _ => 1,
+    }
+}
+
+/// `dh_paramgen_check` (and `dsa_paramgen_check`): a generation operation, and a legacy
+/// context's method of one of `types`.
+fn gen_check(ctx: *mut EVP_PKEY_CTX, function: &str, types: &[c_int]) -> c_int {
     if op_of(ctx).is_none_or(|s| s.0 & EVP_PKEY_OP_TYPE_GEN == 0) {
         return not_supported(function);
     }
-    1
+    type_check(ctx, types)
 }
 
-/// `dh_param_derive_check` (and EC's): a derivation.
-fn derive_check(ctx: *mut EVP_PKEY_CTX, function: &str) -> c_int {
+/// `dh_param_derive_check` (and EC's): a derivation, and a legacy context's method of one of
+/// `types`.
+fn derive_check(ctx: *mut EVP_PKEY_CTX, function: &str, types: &[c_int]) -> c_int {
     if op_of(ctx).is_none_or(|s| s.0 & EVP_PKEY_OP_DERIVE == 0) {
         return not_supported(function);
     }
-    1
+    type_check(ctx, types)
 }
 
 ffi_export! {
@@ -500,7 +522,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dh_paramgen_gindex(ctx: *mut EVP_PKEY_CTX, gindex: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dh_paramgen_check");
+        let ret = gen_check(ctx, "dh_paramgen_check", DH_TYPES);
         if ret <= 0 {
             return ret;
         }
@@ -520,7 +542,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dh_paramgen_seed(ctx: *mut EVP_PKEY_CTX, seed: *const u8, seedlen: usize) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dh_paramgen_check");
+        let ret = gen_check(ctx, "dh_paramgen_check", DH_TYPES);
         if ret <= 0 {
             return ret;
         }
@@ -554,7 +576,7 @@ macro_rules! size_setter {
             pub unsafe extern "C" fn $name(ctx: *mut EVP_PKEY_CTX, $arg: c_int) -> c_int
             where failure = 0, library = ERR_LIB_EVP
             {
-                let ret = gen_check(ctx, $check);
+                let ret = gen_check(ctx, $check, DH_TYPES);
                 if ret <= 0 {
                     return ret;
                 }
@@ -586,7 +608,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dh_paramgen_generator(ctx: *mut EVP_PKEY_CTX, generator: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dh_paramgen_check");
+        let ret = gen_check(ctx, "dh_paramgen_check", DH_TYPES);
         if ret <= 0 {
             return ret;
         }
@@ -645,7 +667,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dh_pad(ctx: *mut EVP_PKEY_CTX, pad: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, "EVP_PKEY_CTX_set_dh_pad");
+        let ret = derive_check(ctx, "EVP_PKEY_CTX_set_dh_pad", &[]);
         if ret <= 0 {
             return ret;
         }
@@ -751,7 +773,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dh_kdf_outlen(ctx: *mut EVP_PKEY_CTX, outlen: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, "dh_param_derive_check");
+        let ret = derive_check(ctx, "dh_param_derive_check", DH_TYPES);
         if ret != 1 {
             return ret;
         }
@@ -769,7 +791,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get_dh_kdf_outlen(ctx: *mut EVP_PKEY_CTX, plen: *mut c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, "dh_param_derive_check");
+        let ret = derive_check(ctx, "dh_param_derive_check", DH_TYPES);
         if ret != 1 {
             return ret;
         }
@@ -836,7 +858,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         let Ok(n) = usize::try_from(len) else { return -1 };
-        let ret = derive_check(ctx, "dh_param_derive_check");
+        let ret = derive_check(ctx, "dh_param_derive_check", DH_TYPES);
         if ret != 1 {
             return ret;
         }
@@ -853,7 +875,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get0_dh_kdf_ukm(ctx: *mut EVP_PKEY_CTX, pukm: *mut *mut u8) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, "dh_param_derive_check");
+        let ret = derive_check(ctx, "dh_param_derive_check", DH_TYPES);
         if ret != 1 {
             return ret;
         }
@@ -877,7 +899,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dsa_paramgen_type(ctx: *mut EVP_PKEY_CTX, name: *const c_char) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dsa_paramgen_check");
+        let ret = gen_check(ctx, "dsa_paramgen_check", &[EVP_PKEY_DSA]);
         if ret <= 0 {
             return ret;
         }
@@ -896,7 +918,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dsa_paramgen_gindex(ctx: *mut EVP_PKEY_CTX, gindex: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dsa_paramgen_check");
+        let ret = gen_check(ctx, "dsa_paramgen_check", &[EVP_PKEY_DSA]);
         if ret <= 0 {
             return ret;
         }
@@ -916,7 +938,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dsa_paramgen_seed(ctx: *mut EVP_PKEY_CTX, seed: *const u8, seedlen: usize) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dsa_paramgen_check");
+        let ret = gen_check(ctx, "dsa_paramgen_check", &[EVP_PKEY_DSA]);
         if ret <= 0 {
             return ret;
         }
@@ -937,7 +959,7 @@ macro_rules! dsa_size_setter {
             pub unsafe extern "C" fn $name(ctx: *mut EVP_PKEY_CTX, $arg: c_int) -> c_int
             where failure = 0, library = ERR_LIB_EVP
             {
-                let ret = gen_check(ctx, "dsa_paramgen_check");
+                let ret = gen_check(ctx, "dsa_paramgen_check", &[EVP_PKEY_DSA]);
                 if ret <= 0 {
                     return ret;
                 }
@@ -969,7 +991,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_dsa_paramgen_md_props(ctx: *mut EVP_PKEY_CTX, md_name: *const c_char, md_properties: *const c_char) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "dsa_paramgen_check");
+        let ret = gen_check(ctx, "dsa_paramgen_check", &[EVP_PKEY_DSA]);
         if ret <= 0 {
             return ret;
         }
@@ -1005,7 +1027,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_ecdh_cofactor_mode(ctx: *mut EVP_PKEY_CTX, cofactor_mode: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1032,7 +1054,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get_ecdh_cofactor_mode(ctx: *mut EVP_PKEY_CTX) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1079,7 +1101,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_ecdh_kdf_outlen(ctx: *mut EVP_PKEY_CTX, outlen: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1097,7 +1119,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get_ecdh_kdf_outlen(ctx: *mut EVP_PKEY_CTX, plen: *mut c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1128,7 +1150,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set0_ecdh_kdf_ukm(ctx: *mut EVP_PKEY_CTX, ukm: *mut u8, len: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1145,7 +1167,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get0_ecdh_kdf_ukm(ctx: *mut EVP_PKEY_CTX, pukm: *mut *mut u8) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = derive_check(ctx, ECDH_CHECK);
+        let ret = derive_check(ctx, ECDH_CHECK, &[EVP_PKEY_EC]);
         if ret != 1 {
             return ret;
         }
@@ -1180,7 +1202,8 @@ ctrl_fn! {
 // -------------------------------------------------------------------------------------------
 // RSA (rsa_lib.c)
 
-/// `RSA_pkey_ctx_ctrl`: a ctrl of any key type (an `EVP_PKEY_METHOD`'s type would be checked).
+/// `RSA_pkey_ctx_ctrl`: a ctrl, but -1 for a legacy context whose method isn't RSA's or
+/// RSA-PSS's.
 ///
 /// # Safety
 /// `ctx` is NULL or a live context; `p2` is what the command takes.
@@ -1191,6 +1214,9 @@ unsafe fn rsa_ctrl(
     p1: c_int,
     p2: *mut c_void,
 ) -> c_int {
+    if type_check(ctx, &[EVP_PKEY_RSA, EVP_PKEY_RSA_PSS]) != 1 {
+        return -1;
+    }
     // SAFETY: the caller's guarantee.
     unsafe { ctrl::ctrl(ctx, -1, optype, cmd, p1, p2) }
 }
@@ -1541,7 +1567,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen(ctx: *mut EVP_PKEY_CTX, saltlen: c_int) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen");
+        let ret = gen_check(ctx, "EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen", &[]);
         if ret <= 0 {
             return ret;
         }
@@ -1566,7 +1592,7 @@ unsafe fn rsa_keygen_size(
     param: &'static CStr,
     function: &str,
 ) -> c_int {
-    let ret = gen_check(ctx, function);
+    let ret = gen_check(ctx, function, &[]);
     if ret <= 0 {
         return ret;
     }
@@ -1647,7 +1673,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_set_group_name(ctx: *mut EVP_PKEY_CTX, name: *const c_char) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "EVP_PKEY_CTX_set_group_name");
+        let ret = gen_check(ctx, "EVP_PKEY_CTX_set_group_name", &[]);
         if ret <= 0 {
             return ret;
         }
@@ -1669,7 +1695,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_PKEY_CTX_get_group_name(ctx: *mut EVP_PKEY_CTX, name: *mut c_char, namelen: usize) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
-        let ret = gen_check(ctx, "EVP_PKEY_CTX_get_group_name");
+        let ret = gen_check(ctx, "EVP_PKEY_CTX_get_group_name", &[]);
         if ret <= 0 {
             return ret;
         }

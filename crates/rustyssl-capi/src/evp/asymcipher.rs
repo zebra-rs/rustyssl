@@ -8,8 +8,10 @@
 //!   `encrypt`) and (`decrypt_init`, `decrypt`), each whole or absent; its parameter getters and
 //!   setters come in pairs.
 //! - The init finds the cipher the key manager names and exports the key to its provider's key
-//!   manager; where none takes the key, the legacy path without an `EVP_PKEY_METHOD` (4.2d)
-//!   isn't supported, and leaves the operation set.
+//!   manager; where none takes the key, the legacy path: a legacy context's `EVP_PKEY_METHOD`
+//!   encrypts and decrypts (its init, though, wants `encrypt` for either), and a method that
+//!   sizes outputs itself answers size queries with the key's size. Without one, the operation
+//!   isn't supported, and stays set.
 //! - A provider function that fails without an error gets `EVP_R_PROVIDER_ASYM_CIPHER_FAILURE`
 //!   naming the cipher and the function.
 //!
@@ -37,6 +39,7 @@ use super::fetch::Kind;
 use super::opmeth::{self, AnyFn, Common, OpMethod, Table, keep, method_exports};
 use super::pkey;
 use super::pkey_ctx;
+use super::pmeth;
 use crate::err::{self, ERR_clear_last_mark, ERR_count_to_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::ffi_export;
 use crate::handle::handle_type;
@@ -168,8 +171,28 @@ unsafe fn cipher_init(
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
     let Some(km) = keymgmt else {
-        // A legacy context: its EVP_PKEY_METHOD encrypts (4.2d).
-        crate::stub::unimplemented("encrypting with a legacy context");
+        // A legacy context: its method's init.
+        // SAFETY: the mark set above.
+        unsafe { ERR_pop_to_mark() };
+        // OpenSSL wants `encrypt` for either operation.
+        let f = c.lock().pmeth_funcs().filter(|f| f.encrypt.is_some());
+        let Some(f) = f else {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                F,
+            );
+            return -2;
+        };
+        let init = if operation == EVP_PKEY_OP_ENCRYPT {
+            f.encrypt_init
+        } else {
+            f.decrypt_init
+        };
+        let Some(init) = init else { return 1 };
+        // SAFETY: the method's function with the caller's context.
+        let ret = unsafe { init(ctx) };
+        return if ret <= 0 { fail(ret) } else { ret };
     };
     let Some(pkey) = pkey else {
         // SAFETY: the mark set above.
@@ -192,7 +215,7 @@ unsafe fn cipher_init(
     // SAFETY: the mark set above.
     unsafe { ERR_pop_to_mark() };
     let Ok(found) = found else {
-        // `legacy`: without an EVP_PKEY_METHOD, not supported.
+        // `legacy`: a context with a key manager has no method, so it isn't supported.
         err::raise(
             ERR_LIB_EVP,
             EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
@@ -312,22 +335,40 @@ unsafe fn crypt(
         );
         return -2;
     };
-    let (op, m, algctx) = {
+    let (op, m, algctx, pmeth) = {
         let s = c.lock();
-        (s.operation, s.cipher.clone(), s.ciphctx.0)
+        (s.operation, s.cipher.clone(), s.ciphctx.0, s.pmeth.clone())
     };
     if op != operation {
         err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED, f);
         return -1;
     }
     let (Some(m), false) = (m, algctx.is_null()) else {
-        // Without an EVP_PKEY_METHOD (4.2d), not supported.
-        err::raise(
-            ERR_LIB_EVP,
-            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-            f,
-        );
-        return -2;
+        // `legacy`: a legacy context's method.
+        let func = pmeth.as_ref().and_then(|m| {
+            let funcs = m.get().funcs();
+            if operation == EVP_PKEY_OP_ENCRYPT {
+                funcs.encrypt
+            } else {
+                funcs.decrypt
+            }
+        });
+        let (Some(pm), Some(func)) = (pmeth, func) else {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                f,
+            );
+            return -2;
+        };
+        // SAFETY: the caller's context.
+        let pkey = unsafe { pkey_ctx::EVP_PKEY_CTX_get0_pkey(ctx) };
+        // SAFETY: the context's key, or NULL; the caller's room for the size.
+        if let Some(r) = unsafe { pmeth::check_autoarg(pm.get(), pkey, out.is_null(), outlen, f) } {
+            return r;
+        }
+        // SAFETY: the method's function with the caller's context and buffers.
+        return unsafe { func(ctx, out, outlen, in_, inlen) };
     };
     let func = if operation == EVP_PKEY_OP_ENCRYPT {
         m.get().funcs.encrypt

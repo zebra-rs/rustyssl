@@ -8,8 +8,10 @@
 //!   from a provided key, with the key manager's key type, if it has one.
 //! - Generation runs in the key manager's generation context; its callback reaches the
 //!   application's `EVP_PKEY_gen_cb` with the progress in `EVP_PKEY_CTX_get_keygen_info`.
-//! - Operations that would need a legacy `EVP_PKEY_METHOD` (an application's, 4.2d) or the
-//!   ctrl translation (4.2c) abort until then (AGENTS.md rule 10).
+//! - A key type with an application's `EVP_PKEY_METHOD` (`EVP_PKEY_meth_add0`) gets a context
+//!   with that method and no key manager (a "legacy" context): the method's `init`, `copy`, and
+//!   `cleanup` run when the context is made, copied, and freed, and its functions generate,
+//!   check keys, and take the parameters (as ctrls).
 //!
 //! No lock is held while a provider or application function runs. Functions given a NULL
 //! context fail here where the reference would crash (docs/DEVIATIONS.md).
@@ -24,17 +26,19 @@ use rustyssl_abi::{
     EVP_PKEY_CTRL_SET_MAC_KEY, EVP_PKEY_CTX, EVP_PKEY_KEYPAIR, EVP_PKEY_OP_FROMDATA,
     EVP_PKEY_OP_KEYGEN, EVP_PKEY_OP_PARAMGEN, EVP_PKEY_OP_TYPE_CRYPT, EVP_PKEY_OP_TYPE_DERIVE,
     EVP_PKEY_OP_TYPE_GEN, EVP_PKEY_OP_TYPE_KEM, EVP_PKEY_OP_TYPE_SIG, EVP_PKEY_OP_UNDEFINED,
-    EVP_PKEY_gen_cb, EVP_R_COMMAND_NOT_SUPPORTED, EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_LENGTH,
-    EVP_R_NO_KEY_SET, EVP_R_OPERATION_NOT_INITIALIZED,
-    EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, EVP_R_UNSUPPORTED_ALGORITHM, NID_undef,
-    OSSL_GEN_PARAM_ITERATION, OSSL_GEN_PARAM_POTENTIAL, OSSL_KEYMGMT_SELECT_ALL_PARAMETERS,
-    OSSL_KEYMGMT_SELECT_KEYPAIR, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+    EVP_PKEY_gen_cb, EVP_R_COMMAND_NOT_SUPPORTED, EVP_R_INACCESSIBLE_DOMAIN_PARAMETERS,
+    EVP_R_INITIALIZATION_ERROR, EVP_R_INVALID_LENGTH, EVP_R_NO_KEY_SET,
+    EVP_R_OPERATION_NOT_INITIALIZED, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+    EVP_R_UNSUPPORTED_ALGORITHM, NID_undef, OSSL_GEN_PARAM_ITERATION, OSSL_GEN_PARAM_POTENTIAL,
+    OSSL_KEYMGMT_SELECT_ALL_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
+    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
     OSSL_KEYMGMT_VALIDATE_FULL_CHECK, OSSL_KEYMGMT_VALIDATE_QUICK_CHECK, OSSL_LIB_CTX, OSSL_PARAM,
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PROVIDER,
 };
 
 use super::keymgmt;
 use super::pkey::{self, KeyData, PkeyRef};
+use super::pmeth;
 use super::{asymcipher, ctrl, exchange, kem, signature};
 use crate::err;
 use crate::ffi::ffi_export;
@@ -67,6 +71,11 @@ pub(crate) struct State {
     /// The key type's name the key manager was fetched by.
     keytype: Option<CString>,
     pub(crate) keymgmt: Option<keymgmt::Ref>,
+    /// The application's method of a legacy context.
+    pub(crate) pmeth: Option<pmeth::Ref>,
+    /// `flag_call_digest_custom`: the method's `digest_custom` runs before the digest context's
+    /// next update (or its final).
+    pub(crate) call_digest_custom: bool,
     legacy_keytype: c_int,
     pub(crate) operation: c_int,
     /// The key manager's generation context, during a generation operation.
@@ -121,6 +130,8 @@ impl State {
             propquery,
             keytype,
             keymgmt,
+            pmeth: None,
+            call_digest_custom: false,
             legacy_keytype,
             operation: EVP_PKEY_OP_UNDEFINED,
             genctx: Ptr(ptr::null_mut()),
@@ -176,6 +187,11 @@ impl State {
     /// `EVP_PKEY_CTX_IS_SIGNATURE_OP`.
     pub(crate) fn is_sig_op(&self) -> bool {
         self.operation & EVP_PKEY_OP_TYPE_SIG != 0
+    }
+
+    /// The functions of the context's method (a legacy context's), if it has one.
+    pub(crate) fn pmeth_funcs(&self) -> Option<pmeth::Funcs> {
+        self.pmeth.as_ref().map(|m| m.get().funcs())
     }
 
     /// `evp_pkey_ctx_free_old_ops`: ends the operation's provider side.
@@ -407,10 +423,11 @@ unsafe fn text<'a>(s: *const c_char) -> Option<&'a CStr> {
     (!s.is_null()).then(|| unsafe { CStr::from_ptr(s) })
 }
 
-/// What `int_ctx_new` decides: the key manager and the key type.
+/// What `int_ctx_new` decides: the key manager (or the application's method) and the key type.
 struct Resolved {
     keytype: Option<CString>,
     keymgmt: Option<keymgmt::Ref>,
+    pmeth: Option<pmeth::Ref>,
     id: c_int,
 }
 
@@ -428,6 +445,7 @@ unsafe fn resolve(
 ) -> Option<Resolved> {
     const F: &str = "int_ctx_new";
     let mut keytype = keytype.map(CStr::to_owned);
+    let mut app_pmeth = None;
     if id == -1 {
         match pkey {
             Some(k) if !k.get().is_provided() => id = k.get().type_(),
@@ -456,15 +474,18 @@ unsafe fn resolve(
             err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
             return None;
         }
-        // No key is foreign (its methods an application's) before 4.2d.
+        // No key is foreign (its low-level key an engine's or an application method's): the
+        // built-in key types' data, which could be, comes with the key types.
         // SAFETY: a type number.
         let sn = unsafe { OBJ_nid2sn(id) };
         // SAFETY: NULL or a static string.
         keytype = unsafe { text(sn) }.map(CStr::to_owned);
-        // An application's EVP_PKEY_METHOD for the type comes with 4.2d.
+        // OpenSSL searches for an engine implementing the type first.
+        pkey::ameth::engine_lookup();
+        app_pmeth = pmeth::find_app(id);
     }
     let mut keymgmt = None;
-    if let Some(t) = &keytype {
+    if let Some(t) = keytype.as_ref().filter(|_| app_pmeth.is_none()) {
         let km = match pkey.and_then(|k| k.get().provided().0) {
             Some(m) => Some(m),
             // SAFETY: the caller's guarantee.
@@ -483,13 +504,14 @@ unsafe fn resolve(
         }
         keymgmt = Some(km);
     }
-    if keymgmt.is_none() {
+    if keymgmt.is_none() && app_pmeth.is_none() {
         err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_ALGORITHM, F);
         return None;
     }
     Some(Resolved {
         keytype,
         keymgmt,
+        pmeth: app_pmeth,
         id,
     })
 }
@@ -518,9 +540,25 @@ unsafe fn int_ctx_new(
         r.id,
     );
     state.pkey = pkey;
-    EVP_PKEY_CTX::new_handle(PkeyCtx {
+    let init = r.pmeth.as_ref().and_then(|m| m.get().funcs().init);
+    state.pmeth = r.pmeth;
+    let ctx = EVP_PKEY_CTX::new_handle(PkeyCtx {
         state: Mutex::new(state),
-    })
+    });
+    if let Some(init) = init {
+        // SAFETY: the method's function with the new context.
+        if unsafe { init(ctx) } <= 0 {
+            // SAFETY: the context made above.
+            if let Some(c) = unsafe { context(ctx) } {
+                // Its cleanup doesn't run.
+                c.lock().pmeth = None;
+            }
+            // SAFETY: as above.
+            unsafe { EVP_PKEY_CTX_free(ctx) };
+            return ptr::null_mut();
+        }
+    }
+    ctx
 }
 
 /// The key manager a context for `pkey` would have (as `evp_pkey_export_to_provider` takes it
@@ -604,13 +642,20 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Frees the context, ending its operation; NULL does nothing.
+    /// Frees the context (its method's `cleanup` first), ending its operation; NULL does
+    /// nothing.
     ///
     /// # Safety
     /// `ctx` is NULL or a context the caller owns, not used afterwards.
     pub unsafe extern "C" fn EVP_PKEY_CTX_free(ctx: *mut EVP_PKEY_CTX)
     where failure = (), library = ERR_LIB_EVP
     {
+        // SAFETY: the caller's guarantee.
+        let cleanup = unsafe { context(ctx) }.and_then(|c| c.lock().pmeth_funcs()).and_then(|f| f.cleanup);
+        if let Some(cleanup) = cleanup {
+            // SAFETY: the method's function with the caller's context.
+            unsafe { cleanup(ctx) };
+        }
         // SAFETY: the caller's guarantee.
         unsafe { EVP_PKEY_CTX::free(ctx) };
     }
@@ -687,12 +732,35 @@ ffi_export! {
             new.kemctx = Ptr(dup);
             return EVP_PKEY_CTX::new_handle(PkeyCtx { state: Mutex::new(new) });
         }
-        // Without an EVP_PKEY_METHOD (none can exist before 4.2d), an operation without a
-        // provider context can't be copied.
-        if s.operation != EVP_PKEY_OP_UNDEFINED {
+        // A generation can't be copied (it would need the key manager's `gen_dupctx`).
+        if s.is_gen_op() {
             return ptr::null_mut();
         }
         new.peerkey = s.peerkey.clone();
+        if let Some(m) = s.pmeth.clone() {
+            drop(s);
+            // A legacy context: its method copies its part. Without a `copy` (which the
+            // reference calls through NULL; docs/DEVIATIONS.md) it can't be copied.
+            let Some(copy) = m.get().funcs().copy else { return ptr::null_mut() };
+            new.pmeth = Some(m);
+            let rctx = EVP_PKEY_CTX::new_handle(PkeyCtx { state: Mutex::new(new) });
+            // SAFETY: the method's function with the new context and the caller's.
+            if unsafe { copy(rctx, pctx) } > 0 {
+                return rctx;
+            }
+            // SAFETY: made above.
+            if let Some(r) = unsafe { context(rctx) } {
+                // Its cleanup doesn't run.
+                r.lock().pmeth = None;
+            }
+            // SAFETY: as above.
+            unsafe { EVP_PKEY_CTX_free(rctx) };
+            return ptr::null_mut();
+        }
+        // Without a method, an operation without a provider context can't be copied.
+        if s.operation != EVP_PKEY_OP_UNDEFINED {
+            return ptr::null_mut();
+        }
         let (libctx, propq) = (s.libctx.0, s.propquery.clone());
         drop(s);
         if let Some(k) = new.pkey.clone() {
@@ -719,8 +787,16 @@ ffi_export! {
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         // SAFETY: as above.
         let n = unsafe { text(keytype) }.map_or(&b""[..], CStr::to_bytes);
-        let km = c.lock().keymgmt.clone();
-        km.map_or(0, |m| c_int::from(m.get().is_a(n)))
+        let (km, pm) = {
+            let s = c.lock();
+            (s.keymgmt.clone(), s.pmeth.clone())
+        };
+        match (km, pm) {
+            (Some(m), _) => c_int::from(m.get().is_a(n)),
+            // A legacy context: its method's key type.
+            (None, Some(m)) => c_int::from(m.get().pkey_id == pkey::ameth::name2type(n)),
+            (None, None) => 0,
+        }
     }
 }
 
@@ -975,8 +1051,10 @@ ffi_export! {
         if s.operation == EVP_PKEY_OP_UNDEFINED || s.keymgmt.is_some() {
             return 0;
         }
-        // A legacy context: through the ctrls of its EVP_PKEY_METHOD (4.2d).
-        crate::stub::unimplemented("EVP_PKEY_CTX_set_params with a legacy context");
+        drop(s);
+        // A legacy context: through the ctrls of its method.
+        // SAFETY: the caller's guarantee.
+        unsafe { ctrl::params_to_ctrl(ctx, params.cast_mut(), true) }
     }
 }
 
@@ -1001,8 +1079,10 @@ ffi_export! {
         if s.operation == EVP_PKEY_OP_UNDEFINED || s.keymgmt.is_some() {
             return 0;
         }
-        // A legacy context: through the ctrls of its EVP_PKEY_METHOD (4.2d).
-        crate::stub::unimplemented("EVP_PKEY_CTX_get_params with a legacy context");
+        drop(s);
+        // A legacy context: through the ctrls of its method.
+        // SAFETY: the caller's guarantee.
+        unsafe { ctrl::params_to_ctrl(ctx, params, false) }
     }
 }
 
@@ -1056,24 +1136,44 @@ unsafe fn gen_init(ctx: *mut EVP_PKEY_CTX, operation: c_int) -> c_int {
         );
         return -2;
     };
-    let km = {
+    let (km, pm) = {
         let mut s = c.lock();
         s.free_old_ops();
         s.operation = operation;
-        s.keymgmt.clone()
+        (s.keymgmt.clone(), s.pmeth_funcs())
+    };
+    let end = |ret: c_int| {
+        if ret <= 0 {
+            let mut s = c.lock();
+            s.free_old_ops();
+            s.operation = EVP_PKEY_OP_UNDEFINED;
+        }
+        ret
     };
     let Some(km) = km.filter(|m| m.get().has_gen_init()) else {
-        // An application's EVP_PKEY_METHOD would generate (4.2d).
-        let mut s = c.lock();
-        s.free_old_ops();
-        s.operation = EVP_PKEY_OP_UNDEFINED;
-        drop(s);
-        err::raise(
-            ERR_LIB_EVP,
-            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-            "gen_init",
-        );
-        return -2;
+        // A legacy context: its method generates.
+        let f = pm.filter(|f| {
+            if operation == EVP_PKEY_OP_PARAMGEN {
+                f.paramgen.is_some()
+            } else {
+                f.keygen.is_some()
+            }
+        });
+        let Some(f) = f else {
+            err::raise(
+                ERR_LIB_EVP,
+                EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+                "gen_init",
+            );
+            return end(-2);
+        };
+        let init = if operation == EVP_PKEY_OP_PARAMGEN {
+            f.paramgen_init
+        } else {
+            f.keygen_init
+        };
+        // SAFETY: the method's function with the caller's context.
+        return end(init.map_or(1, |i| unsafe { i(ctx) }));
     };
     let selection = if operation == EVP_PKEY_OP_PARAMGEN {
         OSSL_KEYMGMT_SELECT_ALL_PARAMETERS
@@ -1169,9 +1269,9 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
             return -2;
         };
-        let (operation, km, genctx, template, libctx, propq, legacy_keytype) = {
+        let (operation, km, genctx, template, libctx, propq, legacy_keytype, pm) = {
             let s = c.lock();
-            (s.operation, s.keymgmt.clone(), s.genctx.0, s.pkey.clone(), s.libctx.0, s.propquery.clone(), s.legacy_keytype)
+            (s.operation, s.keymgmt.clone(), s.genctx.0, s.pkey.clone(), s.libctx.0, s.propquery.clone(), s.legacy_keytype, s.pmeth_funcs())
         };
         if operation & EVP_PKEY_OP_TYPE_GEN == 0 {
             err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED, F);
@@ -1192,8 +1292,32 @@ ffi_export! {
             allocated = unsafe { PkeyRef::adopt(target) };
         }
         let (Some(km), false) = (km, genctx.is_null()) else {
-            // An application's EVP_PKEY_METHOD would generate (4.2d).
-            crate::stub::unimplemented("EVP_PKEY_generate without a provider operation");
+            // A legacy context: its method generates.
+            let ret = if template.as_ref().is_some_and(|t| t.get().is_provided()) {
+                err::raise(ERR_LIB_EVP, EVP_R_INACCESSIBLE_DOMAIN_PARAMETERS, F);
+                -1
+            } else {
+                let generate = pm.and_then(|f| if operation == EVP_PKEY_OP_PARAMGEN { f.paramgen } else { f.keygen });
+                match generate {
+                    // SAFETY: the method's function with the caller's context and the key.
+                    Some(generate) => unsafe { generate(ctx, target) },
+                    None => {
+                        err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, F);
+                        -2
+                    }
+                }
+            };
+            if ret <= 0 {
+                if let Some(a) = allocated {
+                    // SAFETY: the caller's guarantee.
+                    unsafe { ppkey.write(ptr::null_mut()) };
+                    drop(a);
+                }
+            } else if let Some(a) = allocated {
+                // The caller has the reference.
+                a.into_raw();
+            }
+            return ret;
         };
         c.lock().keygen_info = KeygenInfo::Own([0, 0]);
         let mut ret = 1;
@@ -1550,16 +1674,19 @@ ffi_export! {
 // Checks (pmeth_check.c)
 
 /// `try_provided_check`: the key manager's validation of the context's key (exported to the
-/// context's key manager), or 0 with `EVP_R_INITIALIZATION_ERROR` if it can't be exported.
-fn provided_check(c: &PkeyCtx, pkey: &PkeyRef, selection: c_int, checktype: c_int) -> c_int {
+/// context's key manager), or 0 with `EVP_R_INITIALIZATION_ERROR` if it can't be exported;
+/// `None` for a legacy context.
+fn provided_check(
+    c: &PkeyCtx,
+    pkey: &PkeyRef,
+    selection: c_int,
+    checktype: c_int,
+) -> Option<c_int> {
     let (km, libctx, propq) = {
         let s = c.lock();
         (s.keymgmt.clone(), s.libctx.0, s.propquery.clone())
     };
-    if km.is_none() {
-        // A legacy context: its EVP_PKEY_METHOD checks (4.2d).
-        crate::stub::unimplemented("checking a key with a legacy context");
-    }
+    km.as_ref()?;
     // SAFETY: the context's library context.
     let Some((km, kd)) = (unsafe { pkey::export_to_any(pkey, libctx, km, propq.as_deref()) })
     else {
@@ -1568,10 +1695,46 @@ fn provided_check(c: &PkeyCtx, pkey: &PkeyRef, selection: c_int, checktype: c_in
             EVP_R_INITIALIZATION_ERROR,
             "try_provided_check",
         );
-        return 0;
+        return Some(0);
     };
     // SAFETY: the key manager's data.
-    unsafe { km.get().validate(kd.ptr(), selection, checktype) }
+    Some(unsafe { km.get().validate(kd.ptr(), selection, checktype) })
+}
+
+/// A legacy context's check of its key: the method's check, else the key's ASN.1 method's;
+/// -2 with an error without either (and always for the private key, which they can't check).
+fn legacy_check(c: &PkeyCtx, pkey: &PkeyRef, selection: c_int, function: &str) -> c_int {
+    let k = pkey.get();
+    let pm = c.lock().pmeth_funcs();
+    let am = k.ameth_funcs();
+    let (own, key): (Option<pmeth::Check>, Option<pkey::ameth::KeyFn>) = match selection {
+        OSSL_KEYMGMT_SELECT_KEYPAIR => (pm.and_then(|f| f.check), am.and_then(|f| f.pkey_check)),
+        OSSL_KEYMGMT_SELECT_PUBLIC_KEY => (
+            pm.and_then(|f| f.public_check),
+            am.and_then(|f| f.pkey_public_check),
+        ),
+        OSSL_KEYMGMT_SELECT_ALL_PARAMETERS => (
+            pm.and_then(|f| f.param_check),
+            am.and_then(|f| f.pkey_param_check),
+        ),
+        _ => (None, None),
+    };
+    if k.type_() != rustyssl_abi::EVP_PKEY_NONE {
+        if let Some(f) = own {
+            // SAFETY: the method's function with the context's key.
+            return unsafe { f(pkey.as_ptr()) };
+        }
+        if let Some(f) = key {
+            // SAFETY: the key's method's function with the key.
+            return unsafe { f(pkey.as_ptr()) };
+        }
+    }
+    err::raise(
+        ERR_LIB_EVP,
+        EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+        function,
+    );
+    -2
 }
 
 /// The checks' common part: 0 with `EVP_R_NO_KEY_SET` without a key.
@@ -1593,6 +1756,7 @@ unsafe fn check(
         return 0;
     };
     provided_check(c, &k, selection, checktype)
+        .unwrap_or_else(|| legacy_check(c, &k, selection, function))
 }
 
 ffi_export! {

@@ -5366,6 +5366,256 @@ static int derive_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Applications' methods (step 4.2d).
+ *
+ *   methfind ID                    EVP_PKEY_asn1_find, EVP_PKEY_type, and EVP_PKEY_meth_find of ID
+ *   methstr STR LEN                EVP_PKEY_asn1_find_str of LEN characters of STR (- empty)
+ *   methparam TYPE OP DIR KEY PTYPE VALUE RET
+ *                                  with a logging EVP_PKEY_METHOD added for TYPE (a name below)
+ *                                  for the command, a context initialized for OP (sign, verify,
+ *                                  verifyrecover, encrypt, decrypt, derive, keygen, paramgen,
+ *                                  none, custom: none with a digest_custom), then
+ *                                  EVP_PKEY_CTX_set_params (DIR set) or _get_params (get) of
+ *                                  one parameter KEY of PTYPE (int, uint, utf8, octets, octptr)
+ *                                  with VALUE; the method's ctrl answers RET
+ *   methctrl TYPE OP KEYTYPE OPTYPE CMD P1 RET
+ *                                  EVP_PKEY_CTX_ctrl (no pointer) on such a context
+ *   methctrlstr TYPE OP NAME VALUE RET
+ *                                  EVP_PKEY_CTX_ctrl_str on such a context; the method's
+ *                                  ctrl_str sends VALUE to its ctrl with EVP_PKEY_CTX_str2ctrl
+ *                                  (hex2ctrl for a NAME starting with "hex")
+ *
+ * The method's ctrl prints its command, p1, and whether p2 is NULL, never reading p2.
+ */
+static int meth_ret;
+
+static int meth_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
+{
+    (void)ctx;
+    printf(" [ctrl %d %d %d]", type, p1, p2 != NULL);
+    return meth_ret;
+}
+
+static int meth_ctrl_str(EVP_PKEY_CTX *ctx, const char *type, const char *value)
+{
+    printf(" [ctrl_str %s]", type);
+    if (strncmp(type, "hex", 3) == 0)
+        return EVP_PKEY_CTX_hex2ctrl(ctx, EVP_PKEY_ALG_CTRL + 1, value);
+    return EVP_PKEY_CTX_str2ctrl(ctx, EVP_PKEY_ALG_CTRL + 1, value);
+}
+
+static int meth_transform(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *outlen,
+                          const unsigned char *in, size_t inlen)
+{
+    (void)ctx, (void)out, (void)outlen, (void)in, (void)inlen;
+    return 0;
+}
+
+static int meth_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen,
+                       const unsigned char *tbs, size_t tbslen)
+{
+    (void)ctx, (void)sig, (void)siglen, (void)tbs, (void)tbslen;
+    return 0;
+}
+
+static int meth_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+{
+    (void)ctx, (void)key, (void)keylen;
+    return 0;
+}
+
+static int meth_gen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
+{
+    (void)ctx, (void)pkey;
+    return 0;
+}
+
+static int meth_custom(EVP_PKEY_CTX *ctx, EVP_MD_CTX *mctx)
+{
+    (void)ctx;
+    (void)mctx;
+    return 1;
+}
+
+static int meth_type(const char *name)
+{
+    static const struct {
+        const char *name;
+        int id;
+    } types[] = {
+        { "RSA", EVP_PKEY_RSA }, { "RSA-PSS", EVP_PKEY_RSA_PSS }, { "EC", EVP_PKEY_EC },
+        { "SM2", EVP_PKEY_SM2 }, { "DH", EVP_PKEY_DH }, { "DHX", EVP_PKEY_DHX },
+        { "DSA", EVP_PKEY_DSA }, { "X25519", EVP_PKEY_X25519 }, { "X448", EVP_PKEY_X448 },
+        { "ED25519", EVP_PKEY_ED25519 }, { "HMAC", EVP_PKEY_HMAC },
+    };
+    static int toy = NID_undef;
+    size_t i;
+
+    for (i = 0; i < sizeof(types) / sizeof(types[0]); i++)
+        if (strcmp(name, types[i].name) == 0)
+            return types[i].id;
+    if (toy == NID_undef)
+        toy = OBJ_create("1.3.6.1.4.1.99999.9", "PROBETOY", "probe toy");
+    return toy;
+}
+
+/* A context for TYPE with the logging method, initialized for OP; NULL if it can't be made. */
+static EVP_PKEY_CTX *meth_ctx(EVP_PKEY_METHOD **pm, const char *type, const char *op)
+{
+    EVP_PKEY_CTX *ctx;
+    int r = 1;
+
+    *pm = EVP_PKEY_meth_new(meth_type(type), 0);
+    EVP_PKEY_meth_set_ctrl(*pm, meth_ctrl, meth_ctrl_str);
+    /* The operations are there only to be started. */
+    EVP_PKEY_meth_set_sign(*pm, NULL, meth_transform);
+    EVP_PKEY_meth_set_verify(*pm, NULL, meth_verify);
+    EVP_PKEY_meth_set_verify_recover(*pm, NULL, meth_transform);
+    EVP_PKEY_meth_set_encrypt(*pm, NULL, meth_transform);
+    EVP_PKEY_meth_set_decrypt(*pm, NULL, meth_transform);
+    EVP_PKEY_meth_set_derive(*pm, NULL, meth_derive);
+    EVP_PKEY_meth_set_keygen(*pm, NULL, meth_gen);
+    EVP_PKEY_meth_set_paramgen(*pm, NULL, meth_gen);
+    if (strcmp(op, "custom") == 0)
+        EVP_PKEY_meth_set_digest_custom(*pm, meth_custom);
+    EVP_PKEY_meth_add0(*pm);
+    ctx = EVP_PKEY_CTX_new_id(meth_type(type), NULL);
+    if (ctx == NULL)
+        return NULL;
+    if (strcmp(op, "sign") == 0)
+        r = EVP_PKEY_sign_init(ctx);
+    else if (strcmp(op, "verify") == 0)
+        r = EVP_PKEY_verify_init(ctx);
+    else if (strcmp(op, "verifyrecover") == 0)
+        r = EVP_PKEY_verify_recover_init(ctx);
+    else if (strcmp(op, "encrypt") == 0)
+        r = EVP_PKEY_encrypt_init(ctx);
+    else if (strcmp(op, "decrypt") == 0)
+        r = EVP_PKEY_decrypt_init(ctx);
+    else if (strcmp(op, "derive") == 0)
+        r = EVP_PKEY_derive_init(ctx);
+    else if (strcmp(op, "keygen") == 0)
+        r = EVP_PKEY_keygen_init(ctx);
+    else if (strcmp(op, "paramgen") == 0)
+        r = EVP_PKEY_paramgen_init(ctx);
+    printf(" init %d op %d", r, EVP_PKEY_CTX_get_operation(ctx));
+    return ctx;
+}
+
+static void meth_done(EVP_PKEY_METHOD *pm, EVP_PKEY_CTX *ctx)
+{
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_meth_remove(pm);
+    EVP_PKEY_meth_free(pm);
+}
+
+static void meth_info(const EVP_PKEY_ASN1_METHOD *a)
+{
+    int id = 0, base = 0, flags = 0;
+    const char *info = NULL, *pem = NULL;
+
+    if (EVP_PKEY_asn1_get0_info(&id, &base, &flags, &info, &pem, a) == 0) {
+        printf(" none");
+        return;
+    }
+    printf(" %d %d %#x %s %s", id, base, flags, or_dash(pem), or_dash(info));
+}
+
+static int meth_command(const char *command, const char *line)
+{
+    char a[64] = "", b[64] = "", c[64] = "", d[64] = "", e[64] = "", f[300] = "", g[32] = "";
+    EVP_PKEY_METHOD *pm = NULL;
+    EVP_PKEY_CTX *ctx;
+    int r;
+
+    if (strncmp(command, "meth", 4) != 0)
+        return 0;
+    printf("%s:", line);
+    if (strcmp(command, "methfind") == 0) {
+        const EVP_PKEY_METHOD *m;
+        int id = 0, flags = 0;
+
+        sscanf(line, "%*s %63s", a);
+        meth_info(EVP_PKEY_asn1_find(NULL, atoi(a)));
+        m = EVP_PKEY_meth_find(atoi(a));
+        if (m != NULL)
+            EVP_PKEY_meth_get0_info(&id, &flags, m);
+        printf(" type %d meth %d %d %#x", EVP_PKEY_type(atoi(a)), m != NULL, id, flags);
+    } else if (strcmp(command, "methstr") == 0) {
+        sscanf(line, "%*s %63s %63s", a, b);
+        meth_info(EVP_PKEY_asn1_find_str(NULL, strcmp(a, "-") == 0 ? "" : a, atoi(b)));
+    } else if (strcmp(command, "methparam") == 0) {
+        OSSL_PARAM params[2] = { OSSL_PARAM_END, OSSL_PARAM_END };
+        int iv = 0;
+        unsigned int uv = 0;
+        char sv[64] = "";
+        unsigned char ov[64];
+        size_t olen = 0;
+        void *pv = NULL;
+
+        sscanf(line, "%*s %63s %63s %63s %63s %63s %299s %31s", a, b, c, d, e, f, g);
+        meth_ret = atoi(g);
+        ctx = meth_ctx(&pm, a, b);
+        if (strcmp(e, "int") == 0) {
+            iv = atoi(f);
+            params[0] = OSSL_PARAM_construct_int(d, &iv);
+        } else if (strcmp(e, "uint") == 0) {
+            uv = (unsigned int)strtoul(f, NULL, 0);
+            params[0] = OSSL_PARAM_construct_uint(d, &uv);
+        } else if (strcmp(e, "utf8") == 0) {
+            if (strcmp(c, "set") == 0)
+                snprintf(sv, sizeof(sv), "%.63s", f);
+            params[0] = OSSL_PARAM_construct_utf8_string(d, sv, strcmp(c, "set") == 0 ? 0 : sizeof(sv));
+        } else if (strcmp(e, "octets") == 0) {
+            olen = pk_hex(f, ov, sizeof(ov));
+            params[0] = OSSL_PARAM_construct_octet_string(d, ov, strcmp(c, "set") == 0 ? olen : sizeof(ov));
+        } else {
+            params[0] = OSSL_PARAM_construct_octet_ptr(d, &pv, 0);
+        }
+        if (ctx != NULL) {
+            r = strcmp(c, "set") == 0 ? EVP_PKEY_CTX_set_params(ctx, params)
+                                       : EVP_PKEY_CTX_get_params(ctx, params);
+            printf(" -> %d size %zu", r, params[0].return_size);
+            if (strcmp(c, "get") == 0) {
+                if (strcmp(e, "int") == 0)
+                    printf(" %d", iv);
+                else if (strcmp(e, "uint") == 0)
+                    printf(" %u", uv);
+                else if (strcmp(e, "utf8") == 0)
+                    printf(" '%s'", sv);
+                else if (strcmp(e, "octptr") == 0)
+                    printf(" ptr %d", pv != NULL);
+            }
+        }
+        meth_done(pm, ctx);
+    } else if (strcmp(command, "methctrl") == 0) {
+        char h[32] = "";
+
+        sscanf(line, "%*s %63s %63s %63s %63s %63s %299s %31s", a, b, c, d, e, f, h);
+        meth_ret = atoi(h);
+        ctx = meth_ctx(&pm, a, b);
+        if (ctx != NULL) {
+            r = EVP_PKEY_CTX_ctrl(ctx, atoi(c), atoi(d), atoi(e), atoi(f), NULL);
+            printf(" -> %d", r);
+        }
+        meth_done(pm, ctx);
+    } else if (strcmp(command, "methctrlstr") == 0) {
+        sscanf(line, "%*s %63s %63s %63s %299s %31s", a, b, c, f, g);
+        meth_ret = atoi(g);
+        ctx = meth_ctx(&pm, a, b);
+        if (ctx != NULL) {
+            r = EVP_PKEY_CTX_ctrl_str(ctx, c, f);
+            printf(" -> %d", r);
+        }
+        meth_done(pm, ctx);
+    } else {
+        printf(" unknown");
+    }
+    print_digest_errors();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -5394,7 +5644,7 @@ int main(void)
             || cipher_command(command, line) || mac_command(command, line)
             || kdf_command(command, line) || rand_command(command, line)
             || bn_command(command, line) || pkey_command(command, line)
-            || derive_command(command, line)) {
+            || derive_command(command, line) || meth_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

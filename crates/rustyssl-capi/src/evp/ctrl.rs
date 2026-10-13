@@ -16,11 +16,14 @@
 //!   gettable) gives -2 without an error; ctrl strings without a translation are taken as
 //!   parameter names (with "hex" for hexadecimal values).
 //!
-//! The other directions (parameters to the ctrls of an application's `EVP_PKEY_METHOD`, and the
-//! legacy keys' parameters) come with 4.2d. Where the reference reads memory it shouldn't, this
-//! fails instead (docs/DEVIATIONS.md): a padding mode without a name, a digest or cipher NID
-//! without a name, NULL names and values, and the scrypt commands' `uint64_t` arguments, which
-//! it reads as BIGNUMs.
+//! - A legacy context (an application's `EVP_PKEY_METHOD`) takes the ctrls and ctrl strings
+//!   itself ("digest" goes to its ctrl), and parameters as ctrls (`to_ctrl`); a method with
+//!   `digest_custom` takes ctrls before its operation starts.
+//!
+//! The legacy keys' parameters come with the key types (4.3 onwards). Where the reference reads
+//! memory it shouldn't, this fails instead (docs/DEVIATIONS.md): a padding mode without a name,
+//! a digest or cipher NID without a name, NULL names and values, the scrypt commands' `uint64_t`
+//! arguments, which it reads as BIGNUMs, and `EVP_PKEY_CTX_str2ctrl` without a method's ctrl.
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
@@ -304,6 +307,8 @@ enum By<'a> {
     Ctrl(c_int),
     /// A ctrl string, matched against both names, never against getters.
     Str(&'a [u8]),
+    /// A parameter's key, for getting or setting it.
+    Param(&'a [u8], Action),
 }
 
 /// `lookup_translation`: the first entry for the key type, operation type, and command or
@@ -338,6 +343,14 @@ fn lookup(keytype: c_int, optype: c_int, by: &By<'_>) -> Option<(&'static Transl
                     .is_some_and(|s| s.as_bytes().eq_ignore_ascii_case(name))
                 {
                     return Some((item, true));
+                }
+            }
+            By::Param(key, action) => {
+                if item.action != Action::None && *action != item.action {
+                    continue;
+                }
+                if item.param_key.to_bytes().eq_ignore_ascii_case(key) {
+                    return Some((item, false));
                 }
             }
         }
@@ -1131,16 +1144,37 @@ unsafe fn fix_rsa_pss_saltlen(state: State, tr: &Translation, c: &mut Tctx<'_>) 
     ret
 }
 
+/// The HKDF modes' names.
+const HKDF_MODES: [(c_int, &CStr); 3] = [
+    (
+        rustyssl_abi::EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND,
+        c"EXTRACT_AND_EXPAND",
+    ),
+    (
+        rustyssl_abi::EVP_KDF_HKDF_MODE_EXTRACT_ONLY,
+        c"EXTRACT_ONLY",
+    ),
+    (rustyssl_abi::EVP_KDF_HKDF_MODE_EXPAND_ONLY, c"EXPAND_ONLY"),
+];
+
+/// The DH KDF types' names.
+const DH_KDF_TYPES: [(c_int, &CStr); 2] = [
+    (EVP_PKEY_DH_KDF_NONE, c""),
+    (EVP_PKEY_DH_KDF_X9_42, OSSL_KDF_NAME_X942KDF_ASN1),
+];
+
+/// The ECDH KDF types' names.
+const EC_KDF_TYPES: [(c_int, &CStr); 2] = [
+    (EVP_PKEY_ECDH_KDF_NONE, c""),
+    (EVP_PKEY_ECDH_KDF_X9_63, OSSL_KDF_NAME_X963KDF),
+];
+
 /// `fix_hkdf_mode`.
 ///
 /// # Safety
 /// As for [`default_fixup`].
 unsafe fn fix_hkdf_mode(state: State, tr: &Translation, c: &mut Tctx<'_>) -> c_int {
-    const MODES: [(c_int, &CStr); 3] = [
-        (0, c"EXTRACT_AND_EXPAND"),
-        (1, c"EXTRACT_ONLY"),
-        (2, c"EXPAND_ONLY"),
-    ];
+    const MODES: [(c_int, &CStr); 3] = HKDF_MODES;
     let ret = default_check(state, Some(tr));
     if ret <= 0 {
         return ret;
@@ -1179,29 +1213,9 @@ unsafe fn fixup(state: State, tr: Option<&Translation>, c: &mut Tctx<'_>) -> c_i
         // SAFETY: the caller's guarantee.
         X::DistidLen => unsafe { fix_distid_len(state, tr, c) },
         // SAFETY: the caller's guarantee.
-        X::DhKdfType => unsafe {
-            fix_kdf_type(
-                state,
-                tr,
-                c,
-                &[
-                    (EVP_PKEY_DH_KDF_NONE, c""),
-                    (EVP_PKEY_DH_KDF_X9_42, OSSL_KDF_NAME_X942KDF_ASN1),
-                ],
-            )
-        },
+        X::DhKdfType => unsafe { fix_kdf_type(state, tr, c, &DH_KDF_TYPES) },
         // SAFETY: the caller's guarantee.
-        X::EcKdfType => unsafe {
-            fix_kdf_type(
-                state,
-                tr,
-                c,
-                &[
-                    (EVP_PKEY_ECDH_KDF_NONE, c""),
-                    (EVP_PKEY_ECDH_KDF_X9_63, OSSL_KDF_NAME_X963KDF),
-                ],
-            )
-        },
+        X::EcKdfType => unsafe { fix_kdf_type(state, tr, c, &EC_KDF_TYPES) },
         // SAFETY: the caller's guarantee.
         X::Oid => unsafe { fix_oid(state, tr, c) },
         // SAFETY: the caller's guarantee.
@@ -1218,7 +1232,7 @@ unsafe fn fixup(state: State, tr: Option<&Translation>, c: &mut Tctx<'_>) -> c_i
         X::RsaPssSaltlen => unsafe { fix_rsa_pss_saltlen(state, tr, c) },
         // SAFETY: the caller's guarantee.
         X::HkdfMode => unsafe { fix_hkdf_mode(state, tr, c) },
-        // Only for parameters to ctrls (4.2d).
+        // Only for parameters to ctrls (`to_ctrl`).
         X::GroupEcx => 0,
     }
 }
@@ -1450,17 +1464,25 @@ unsafe fn store_cached(
     }
     let mut s = c.lock();
     if keytype != -1 {
-        if !s.provider_state() || s.keymgmt.is_none() {
-            // Without an operation's provider side, an EVP_PKEY_METHOD (4.2d) would say.
-            drop(s);
-            err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
-            return -2;
-        }
-        let name = super::pkey::ameth::type2name(keytype);
-        if !s.keymgmt.as_ref().is_some_and(|m| m.get().is_a(&name)) {
-            drop(s);
-            err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
-            return -1;
+        if s.provider_state() {
+            let name = super::pkey::ameth::type2name(keytype);
+            if !s.keymgmt.as_ref().is_some_and(|m| m.get().is_a(&name)) {
+                drop(s);
+                err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
+                return -1;
+            }
+        } else {
+            // A legacy context: its method's key type.
+            let Some(id) = s.pmeth.as_ref().map(|m| m.get().pkey_id) else {
+                drop(s);
+                err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
+                return -2;
+            };
+            if super::pkey::ameth::pkey_type(id) != super::pkey::ameth::pkey_type(keytype) {
+                drop(s);
+                err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
+                return -1;
+            }
         }
     }
     if optype != -1 && s.operation & optype == 0 {
@@ -1496,26 +1518,52 @@ unsafe fn ctrl_int(
     p2: P2,
 ) -> c_int {
     const F: &str = "evp_pkey_ctx_ctrl_int";
-    let (op, provider) = {
+    let (op, provider, pmeth) = {
         let s = c.lock();
-        (s.operation, s.provider_state())
+        (s.operation, s.provider_state(), s.pmeth.clone())
     };
-    if op == EVP_PKEY_OP_UNDEFINED {
-        err::raise(ERR_LIB_EVP, EVP_R_NO_OPERATION_SET, F);
-        return -1;
-    }
-    if optype != -1 && op & optype == 0 {
-        err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
-        return -1;
+    let funcs = pmeth.as_ref().map(|m| m.get().funcs());
+    // A method with `digest_custom` takes ctrls before its operation starts.
+    if funcs.is_none_or(|f| f.digest_custom.is_none()) {
+        if op == EVP_PKEY_OP_UNDEFINED {
+            err::raise(ERR_LIB_EVP, EVP_R_NO_OPERATION_SET, F);
+            return -1;
+        }
+        if optype != -1 && op & optype == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, F);
+            return -1;
+        }
     }
     if provider {
         // SAFETY: the caller's guarantee.
         return unsafe { ctrl_to_param(ctx, c, keytype, optype, cmd, p1, p2) };
     }
-    // Without a provider side, the context's EVP_PKEY_METHOD (an application's, 4.2d) would
-    // take it; contexts with key managers have none.
-    err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
-    -2
+    // A legacy context: its method's ctrl.
+    let (Some(m), Some(ctrl)) = (pmeth, funcs.and_then(|f| f.ctrl)) else {
+        err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
+        return -2;
+    };
+    if keytype != -1 && m.get().pkey_id != keytype {
+        return -1;
+    }
+    let mut value = 0u64;
+    let p = match p2 {
+        P2::Ptr(p) => p,
+        // `EVP_PKEY_CTX_ctrl_uint64` passes the value's address.
+        P2::U64(v) => {
+            value = v;
+            (&raw mut value).cast()
+        }
+        P2::NameBuf => ptr::null_mut(),
+    };
+    // SAFETY: the method's function with the caller's context; the caller's argument (or the
+    // value above).
+    let ret = unsafe { ctrl(ctx, cmd, p1, p) };
+    let _ = value;
+    if ret == -2 {
+        err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, F);
+    }
+    ret
 }
 
 /// `EVP_PKEY_CTX_ctrl` with the argument as given.
@@ -1584,21 +1632,50 @@ unsafe fn ctrl_arg(
 /// # Safety
 /// `ctx` is a live context.
 unsafe fn ctrl_str_int(ctx: *mut EVP_PKEY_CTX, c: &PkeyCtx, name: &CStr, value: &CStr) -> c_int {
-    let (op, provider) = {
+    let (op, provider, funcs) = {
         let s = c.lock();
-        (s.operation, s.provider_state())
+        (s.operation, s.provider_state(), s.pmeth_funcs())
     };
     if op != EVP_PKEY_OP_UNDEFINED && provider {
         // SAFETY: the caller's guarantee.
         return unsafe { ctrl_str_to_param(ctx, c, name, value) };
     }
-    // Without a provider side, the context's EVP_PKEY_METHOD (4.2d) would take it.
-    err::raise(
-        ERR_LIB_EVP,
-        EVP_R_COMMAND_NOT_SUPPORTED,
-        "evp_pkey_ctx_ctrl_str_int",
-    );
-    -2
+    // A legacy context: its method's ctrl_str, but for the digest, which goes to its ctrl.
+    let Some(ctrl_str) = funcs.and_then(|f| f.ctrl_str) else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_COMMAND_NOT_SUPPORTED,
+            "evp_pkey_ctx_ctrl_str_int",
+        );
+        return -2;
+    };
+    if name.to_bytes() == b"digest" {
+        // SAFETY: the caller's context; the value's string.
+        return unsafe {
+            EVP_PKEY_CTX_md(
+                ctx,
+                EVP_PKEY_OP_TYPE_SIG | EVP_PKEY_OP_TYPE_CRYPT,
+                EVP_PKEY_CTRL_MD,
+                value.as_ptr(),
+            )
+        };
+    }
+    // SAFETY: the method's function with the caller's context and strings.
+    unsafe { ctrl_str(ctx, name.as_ptr(), value.as_ptr()) }
+}
+
+/// The ctrl of a legacy context's method, or `None` with `EVP_R_COMMAND_NOT_SUPPORTED` (the
+/// reference calls through NULL; docs/DEVIATIONS.md).
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+unsafe fn method_ctrl(ctx: *mut EVP_PKEY_CTX, function: &str) -> Option<super::pmeth::Ctrl> {
+    // SAFETY: the caller's guarantee.
+    let f = unsafe { pkey_ctx::context(ctx) }.and_then(|c| c.lock().pmeth_funcs()?.ctrl);
+    if f.is_none() {
+        err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, function);
+    }
+    f
 }
 
 /// `evp_pkey_ctx_use_cached_data`: gives the operation just started the kept distinguishing
@@ -1708,6 +1785,57 @@ ffi_export! {
 }
 
 ffi_export! {
+    /// Sends the string `str_` (its length as `p1`) to the method's ctrl as `cmd`, for an
+    /// `EVP_PKEY_METHOD`'s `ctrl_str`; -1 for a string longer than `INT_MAX`. A context without
+    /// a method's ctrl, or a NULL string, gives -2 (the reference crashes; docs/DEVIATIONS.md).
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live context; `str_` is NULL or a string.
+    pub unsafe extern "C" fn EVP_PKEY_CTX_str2ctrl(ctx: *mut EVP_PKEY_CTX, cmd: c_int, str_: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(ctrl) = (unsafe { method_ctrl(ctx, "EVP_PKEY_CTX_str2ctrl") }) else { return -2 };
+        // SAFETY: as above.
+        let Some(s) = (unsafe { super::opmeth::text(str_) }) else { return -2 };
+        let Ok(len) = c_int::try_from(s.to_bytes().len()) else { return -1 };
+        // SAFETY: the method's function with the caller's context and string.
+        unsafe { ctrl(ctx, cmd, len, str_.cast_mut().cast()) }
+    }
+}
+
+ffi_export! {
+    /// Sends the octets the hexadecimal string `hex` stands for (their length as `p1`) to the
+    /// method's ctrl as `cmd`; 0 if it isn't hexadecimal. As `EVP_PKEY_CTX_str2ctrl` otherwise.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live context; `hex` is NULL or a string.
+    pub unsafe extern "C" fn EVP_PKEY_CTX_hex2ctrl(ctx: *mut EVP_PKEY_CTX, cmd: c_int, hex: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(ctrl) = (unsafe { method_ctrl(ctx, "EVP_PKEY_CTX_hex2ctrl") }) else { return -2 };
+        if hex.is_null() {
+            return -2;
+        }
+        let mut binlen: core::ffi::c_long = 0;
+        // SAFETY: the caller's string; room for the length.
+        let bin = unsafe { crate::string::OPENSSL_hexstr2buf(hex, &raw mut binlen) };
+        if bin.is_null() {
+            return 0;
+        }
+        let rv = match c_int::try_from(binlen) {
+            // SAFETY: the method's function with the caller's context and the octets.
+            Ok(len) => unsafe { ctrl(ctx, cmd, len, bin.cast()) },
+            Err(_) => -1,
+        };
+        // SAFETY: allocated above.
+        unsafe { crate::mem::free(bin.cast(), ptr::null(), 0) };
+        rv
+    }
+}
+
+ffi_export! {
     /// Sends `cmd` with the digest named `md`: 0 with `EVP_R_INVALID_DIGEST` if there's none.
     ///
     /// # Safety
@@ -1729,6 +1857,9 @@ ffi_export! {
         unsafe { ctrl(ctx, -1, optype, cmd, 0, m.cast_mut().cast()) }
     }
 }
+
+mod to_ctrl;
+pub(crate) use to_ctrl::params_to_ctrl;
 
 #[cfg(test)]
 mod tests {

@@ -3,6 +3,8 @@
 // Each function rustyssl-capi implements by hand is assigned to a function pointer of its C
 // prototype's type, so it doesn't compile unless the signatures match exactly (TEST_PLAN.md, L3 item 3).
 
+#![allow(clippy::type_complexity)]
+
 use libc::{FILE, time_t, tm};
 use rustyssl_abi::*;
 
@@ -3393,6 +3395,11 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *const EVP_MD) -> core::ff
     crate::evp::signature::EVP_PKEY_CTX_get_signature_md;
 const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const OSSL_PARAM =
     crate::evp::pkey_ctx::EVP_PKEY_CTX_gettable_params;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::ctrl::EVP_PKEY_CTX_hex2ctrl;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::evp::pkey_ctx::EVP_PKEY_CTX_is_a;
 const _: unsafe extern "C" fn(
@@ -3607,11 +3614,231 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *const EVP_MD) -> core::ffi::c_
 const _: unsafe extern "C" fn(*const EVP_PKEY_CTX) -> *const OSSL_PARAM =
     crate::evp::pkey_ctx::EVP_PKEY_CTX_settable_params;
 const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::ctrl::EVP_PKEY_CTX_str2ctrl;
+const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
     *const core::ffi::c_char,
     ...
 ) -> *mut EVP_PKEY = crate::evp::pkey_ctx::EVP_PKEY_Q_keygen;
+const _: unsafe extern "C" fn(*const EVP_PKEY_ASN1_METHOD) -> core::ffi::c_int =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_add0;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_add_alias;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_ASN1_METHOD, *const EVP_PKEY_ASN1_METHOD) =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_copy;
+const _: unsafe extern "C" fn(*mut *mut ENGINE, core::ffi::c_int) -> *const EVP_PKEY_ASN1_METHOD =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_find;
+const _: unsafe extern "C" fn(
+    *mut *mut ENGINE,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *const EVP_PKEY_ASN1_METHOD = crate::evp::pkey::ameth::EVP_PKEY_asn1_find_str;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_ASN1_METHOD) =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_free;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const EVP_PKEY_ASN1_METHOD =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_get0;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+    *mut *const core::ffi::c_char,
+    *const EVP_PKEY_ASN1_METHOD,
+) -> core::ffi::c_int = crate::evp::pkey::ameth::EVP_PKEY_asn1_get0_info;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::evp::pkey::ameth::EVP_PKEY_asn1_get_count;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY_ASN1_METHOD = crate::evp::pkey::ameth::EVP_PKEY_asn1_new;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pkey: *mut EVP_PKEY,
+            op: core::ffi::c_int,
+            arg1: core::ffi::c_long,
+            arg2: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_ctrl;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY)>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_free;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pk: *const EVP_PKEY,
+            priv_: *mut core::ffi::c_uchar,
+            len: *mut usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_get_priv_key;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pk: *const EVP_PKEY,
+            pub_: *mut core::ffi::c_uchar,
+            len: *mut usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_get_pub_key;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            it: *const ASN1_ITEM,
+            data: *const core::ffi::c_void,
+            a: *const X509_ALGOR,
+            sig: *const ASN1_BIT_STRING,
+            pkey: *mut EVP_PKEY,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            it: *const ASN1_ITEM,
+            data: *const core::ffi::c_void,
+            alg1: *mut X509_ALGOR,
+            alg2: *mut X509_ALGOR,
+            sig: *mut ASN1_BIT_STRING,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_item;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pkey: *mut EVP_PKEY,
+            pder: *mut *const core::ffi::c_uchar,
+            derlen: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pkey: *const EVP_PKEY,
+            pder: *mut *mut core::ffi::c_uchar,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(to: *mut EVP_PKEY, from: *const EVP_PKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(a: *const EVP_PKEY, b: *const EVP_PKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            out: *mut BIO,
+            pkey: *const EVP_PKEY,
+            indent: core::ffi::c_int,
+            pctx: *mut ASN1_PCTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_param;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_param_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pk: *mut EVP_PKEY,
+            p8inf: *const PKCS8_PRIV_KEY_INFO,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(p8: *mut PKCS8_PRIV_KEY_INFO, pk: *const EVP_PKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            out: *mut BIO,
+            pkey: *const EVP_PKEY,
+            indent: core::ffi::c_int,
+            pctx: *mut ASN1_PCTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_private;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(pk: *mut EVP_PKEY, pub_: *const X509_PUBKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(pub_: *mut X509_PUBKEY, pk: *const EVP_PKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(a: *const EVP_PKEY, b: *const EVP_PKEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            out: *mut BIO,
+            pkey: *const EVP_PKEY,
+            indent: core::ffi::c_int,
+            pctx: *mut ASN1_PCTX,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_public;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_public_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pk: *const EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_security_bits;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pk: *mut EVP_PKEY,
+            priv_: *const core::ffi::c_uchar,
+            len: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_set_priv_key;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            pk: *mut EVP_PKEY,
+            pub_: *const core::ffi::c_uchar,
+            len: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_set_pub_key;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_ASN1_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            siginf: *mut X509_SIG_INFO,
+            alg: *const X509_ALGOR,
+            sig: *const ASN1_STRING,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pkey::ameth::EVP_PKEY_asn1_set_siginf;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::pkey::EVP_PKEY_assign;
 const _: unsafe extern "C" fn(
     *mut EVP_PKEY_CTX,
     *mut EVP_PKEY,
@@ -3730,6 +3957,8 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ff
     crate::evp::pkey_ctx::EVP_PKEY_generate;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut core::ffi::c_void =
     crate::evp::pkey::EVP_PKEY_get0;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const EVP_PKEY_ASN1_METHOD =
+    crate::evp::pkey::ameth::EVP_PKEY_get0_asn1;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
     crate::evp::pkey::EVP_PKEY_get0_description;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut ENGINE =
@@ -3817,6 +4046,409 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ff
     crate::evp::pkey_ctx::EVP_PKEY_keygen;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
     crate::evp::pkey_ctx::EVP_PKEY_keygen_init;
+const _: unsafe extern "C" fn(*const EVP_PKEY_METHOD) -> core::ffi::c_int =
+    crate::evp::pmeth::EVP_PKEY_meth_add0;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_METHOD, *const EVP_PKEY_METHOD) =
+    crate::evp::pmeth::EVP_PKEY_meth_copy;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const EVP_PKEY_METHOD =
+    crate::evp::pmeth::EVP_PKEY_meth_find;
+const _: unsafe extern "C" fn(*mut EVP_PKEY_METHOD) = crate::evp::pmeth::EVP_PKEY_meth_free;
+const _: unsafe extern "C" fn(usize) -> *const EVP_PKEY_METHOD =
+    crate::evp::pmeth::EVP_PKEY_meth_get0;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *const EVP_PKEY_METHOD,
+) = crate::evp::pmeth::EVP_PKEY_meth_get0_info;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_check;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX)>,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_cleanup;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(dst: *mut EVP_PKEY_CTX, src: *const EVP_PKEY_CTX) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_copy;
+const _: unsafe extern "C" fn() -> usize = crate::evp::pmeth::EVP_PKEY_meth_get_count;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            type_: core::ffi::c_int,
+            p1: core::ffi::c_int,
+            p2: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            type_: *const core::ffi::c_char,
+            value: *const core::ffi::c_char,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_ctrl;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            out: *mut core::ffi::c_uchar,
+            outlen: *mut usize,
+            in_: *const core::ffi::c_uchar,
+            inlen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_decrypt;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            key: *mut core::ffi::c_uchar,
+            keylen: *mut usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_derive;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_digest_custom;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_digestsign;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_digestverify;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            out: *mut core::ffi::c_uchar,
+            outlen: *mut usize,
+            in_: *const core::ffi::c_uchar,
+            inlen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_encrypt;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_init;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, pkey: *mut EVP_PKEY) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_keygen;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_param_check;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, pkey: *mut EVP_PKEY) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_paramgen;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_public_check;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_sign;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            mctx: *mut EVP_MD_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_signctx;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_verify;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_verify_recover;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: core::ffi::c_int,
+            mctx: *mut EVP_MD_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_get_verifyctx;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> *mut EVP_PKEY_METHOD =
+    crate::evp::pmeth::EVP_PKEY_meth_new;
+const _: unsafe extern "C" fn(*const EVP_PKEY_METHOD) -> core::ffi::c_int =
+    crate::evp::pmeth::EVP_PKEY_meth_remove;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX)>,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_cleanup;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(dst: *mut EVP_PKEY_CTX, src: *const EVP_PKEY_CTX) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_copy;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            type_: core::ffi::c_int,
+            p1: core::ffi::c_int,
+            p2: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            type_: *const core::ffi::c_char,
+            value: *const core::ffi::c_char,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_ctrl;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            out: *mut core::ffi::c_uchar,
+            outlen: *mut usize,
+            in_: *const core::ffi::c_uchar,
+            inlen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_decrypt;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            key: *mut core::ffi::c_uchar,
+            keylen: *mut usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_derive;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_digest_custom;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_digestsign;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_digestverify;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            out: *mut core::ffi::c_uchar,
+            outlen: *mut usize,
+            in_: *const core::ffi::c_uchar,
+            inlen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_encrypt;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_init;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, pkey: *mut EVP_PKEY) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_keygen;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_param_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, pkey: *mut EVP_PKEY) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_paramgen;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(pkey: *mut EVP_PKEY) -> core::ffi::c_int>,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_public_check;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_sign;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            mctx: *mut EVP_MD_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_signctx;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_verify;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX) -> core::ffi::c_int>,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut usize,
+            tbs: *const core::ffi::c_uchar,
+            tbslen: usize,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_verify_recover;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_PKEY_CTX, mctx: *mut EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_PKEY_CTX,
+            sig: *const core::ffi::c_uchar,
+            siglen: core::ffi::c_int,
+            mctx: *mut EVP_MD_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::evp::pmeth::EVP_PKEY_meth_set_verifyctx;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_missing_parameters;
 const _: unsafe extern "C" fn() -> *mut EVP_PKEY = crate::evp::pkey::EVP_PKEY_new;

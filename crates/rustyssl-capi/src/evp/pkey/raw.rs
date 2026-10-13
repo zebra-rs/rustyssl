@@ -1,26 +1,27 @@
 //! Raw keys (`EVP_PKEY_new_raw_private_key(3)`, `EVP_PKEY_get_raw_private_key(3)`,
 //! `EVP_PKEY_new_CMAC_key(3)`; `p_lib.c`): keys made from their raw octets through the key
-//! manager's import (`EVP_PKEY_fromdata` with `priv` or `pub`), and their raw octets exported
-//! back.
+//! manager's import (`EVP_PKEY_fromdata` with `priv` or `pub`), or else by the key type's ASN.1
+//! method (an application's), and their raw octets exported back.
 //!
 //! There are no engines, so an engine argument fails with `ERR_R_ENGINE_LIB` where OpenSSL would
 //! initialize it (docs/DEVIATIONS.md).
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ENGINE, ERR_LIB_EVP, ERR_R_ENGINE_LIB, EVP_CIPHER, EVP_PKEY, EVP_PKEY_NONE,
-    EVP_R_KEY_SETUP_FAILED, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM,
-    OSSL_PKEY_PARAM_CIPHER, OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
+    ENGINE, ERR_LIB_EVP, ERR_R_ENGINE_LIB, ERR_R_EVP_LIB, EVP_CIPHER, EVP_PKEY, EVP_PKEY_NONE,
+    EVP_R_GET_RAW_KEY_FAILED, EVP_R_KEY_SETUP_FAILED,
+    EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_CIPHER,
+    OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
 };
 
 use super::super::pkey_ctx::{
     EVP_PKEY_CTX_free, EVP_PKEY_CTX_new_from_name, EVP_PKEY_fromdata, EVP_PKEY_fromdata_init,
     KEYPAIR,
 };
-use super::pkey;
+use super::{PkeyRef, pkey};
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::evp::cipher::EVP_CIPHER_get0_name;
 use crate::ffi::ffi_export;
@@ -56,7 +57,7 @@ unsafe fn new_raw_key(
         err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
         return ptr::null_mut();
     }
-    // Without engines, no ASN.1 method sets raw keys: the key manager makes it.
+    // Without engines, a key manager makes the key if it can, else the type's ASN.1 method.
     let name = if strtype.is_null() {
         // SAFETY: a type number.
         unsafe { OBJ_nid2sn(nidtype) }
@@ -94,11 +95,58 @@ unsafe fn new_raw_key(
     }
     // SAFETY: as above.
     unsafe { ERR_pop_to_mark() };
+    // The type's ASN.1 method sets the key (the context is freed after).
+    // SAFETY: the caller's guarantee.
+    let k = unsafe { legacy_raw_key(strtype, nidtype, key, len, is_priv) };
     // SAFETY: made above.
     unsafe { EVP_PKEY_CTX_free(ctx) };
-    // A context without `fromdata` would leave the key to the type's ASN.1 method, which can't
-    // set raw keys without one of the key types (4.3 onwards).
-    crate::stub::unimplemented("a raw key through an ASN.1 method");
+    k
+}
+
+/// `new_raw_key_int`'s legacy path: a key typed by the ASN.1 method of `strtype` (or `nidtype`)
+/// given its raw key by the method, or NULL with an error.
+///
+/// # Safety
+/// `strtype` is NULL or a string; `key` holds `len` octets.
+unsafe fn legacy_raw_key(
+    strtype: *const c_char,
+    nidtype: c_int,
+    key: *const u8,
+    len: usize,
+    is_priv: bool,
+) -> *mut EVP_PKEY {
+    const F: &str = "new_raw_key_int";
+    // SAFETY: just made, with its reference.
+    let Some(k) = (unsafe { PkeyRef::adopt(super::new()) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_EVP_LIB, F);
+        return ptr::null_mut();
+    };
+    // SAFETY: the caller's guarantee.
+    let name = unsafe { super::text(strtype) }.map(CStr::to_bytes);
+    if !super::set_type(Some(k.get()), nidtype, name, None) {
+        return ptr::null_mut();
+    }
+    let Some(f) = k.get().ameth_funcs() else {
+        return ptr::null_mut();
+    };
+    let Some(set) = (if is_priv {
+        f.set_priv_key
+    } else {
+        f.set_pub_key
+    }) else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            F,
+        );
+        return ptr::null_mut();
+    };
+    // SAFETY: the method's function with the key's handle and the caller's octets.
+    if unsafe { set(k.as_ptr(), key, len) } == 0 {
+        err::raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED, F);
+        return ptr::null_mut();
+    }
+    k.into_raw()
 }
 
 ffi_export! {
@@ -205,10 +253,7 @@ unsafe fn get_raw(pkey: *const EVP_PKEY, buf: *mut u8, len: *mut usize, selectio
     let Some(k) = (unsafe { self::pkey(pkey) }) else {
         return 0;
     };
-    let (provided, typed) = {
-        let s = k.lock();
-        (s.keymgmt.is_some(), s.ameth_has(super::ameth::F_GET_RAW))
-    };
+    let provided = k.is_provided();
     if provided {
         let mut b = buf.cast::<c_void>();
         let mut raw = RawKey {
@@ -230,21 +275,33 @@ unsafe fn get_raw(pkey: *const EVP_PKEY, buf: *mut u8, len: *mut usize, selectio
             )
         };
     }
-    if typed {
-        // The ASN.1 methods' raw key functions come with the key types.
-        crate::stub::unimplemented("the raw key of a key typed by an ASN.1 method");
-    }
-    let f = if selection == OSSL_KEYMGMT_SELECT_PRIVATE_KEY {
+    let is_priv = selection == OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
+    let f = if is_priv {
         "EVP_PKEY_get_raw_private_key"
     } else {
         "EVP_PKEY_get_raw_public_key"
     };
-    err::raise(
-        ERR_LIB_EVP,
-        EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
-        f,
-    );
-    0
+    let get = k.ameth_funcs().and_then(|m| {
+        if is_priv {
+            m.get_priv_key
+        } else {
+            m.get_pub_key
+        }
+    });
+    let Some(get) = get else {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+            f,
+        );
+        return 0;
+    };
+    // SAFETY: the method's function with the key's handle; the caller's buffer and size.
+    if unsafe { get(k.handle(), buf, len) } == 0 {
+        err::raise(ERR_LIB_EVP, EVP_R_GET_RAW_KEY_FAILED, f);
+        return 0;
+    }
+    1
 }
 
 ffi_export! {
