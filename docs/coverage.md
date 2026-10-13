@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 1916 | 3960 | 32.6% |
+| libcrypto | 5876 | 1963 | 3913 | 33.4% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **1917** | **4562** | **29.6%** |
+| **Total** | **6479** | **1964** | **4515** | **30.3%** |
 
 ## By header
 
@@ -61,9 +61,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/indicator.h` | libcrypto | 2 | 0 | 0.0% |
 | `openssl/kdf.h` | libcrypto | 38 | 38 | 100.0% |
 | `openssl/lhash.h` | libcrypto | 21 | 21 | 100.0% |
-| `openssl/md4.h` | libcrypto | 5 | 0 | 0.0% |
-| `openssl/md5.h` | libcrypto | 5 | 0 | 0.0% |
-| `openssl/mdc2.h` | libcrypto | 4 | 0 | 0.0% |
+| `openssl/md4.h` | libcrypto | 5 | 5 | 100.0% |
+| `openssl/md5.h` | libcrypto | 5 | 5 | 100.0% |
+| `openssl/mdc2.h` | libcrypto | 4 | 4 | 100.0% |
 | `openssl/modes.h` | libcrypto | 50 | 0 | 0.0% |
 | `openssl/objects.h` | libcrypto | 31 | 31 | 100.0% |
 | `openssl/ocsp.h` | libcrypto | 169 | 0 | 0.0% |
@@ -77,11 +77,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/rand.h` | libcrypto | 25 | 25 | 100.0% |
 | `openssl/rc2.h` | libcrypto | 7 | 0 | 0.0% |
 | `openssl/rc4.h` | libcrypto | 3 | 0 | 0.0% |
-| `openssl/ripemd.h` | libcrypto | 5 | 0 | 0.0% |
+| `openssl/ripemd.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/rsa.h` | libcrypto | 154 | 23 | 14.9% |
 | `openssl/seed.h` | libcrypto | 7 | 0 | 0.0% |
 | `openssl/self_test.h` | libcrypto | 7 | 0 | 0.0% |
-| `openssl/sha.h` | libcrypto | 23 | 0 | 0.0% |
+| `openssl/sha.h` | libcrypto | 23 | 23 | 100.0% |
 | `openssl/srp.h` | libcrypto | 29 | 0 | 0.0% |
 | `openssl/srtp.h` | libssl | 4 | 0 | 0.0% |
 | `openssl/ssl.h` | libssl | 582 | 0 | 0.0% |
@@ -94,7 +94,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/ts.h` | libcrypto | 184 | 0 | 0.0% |
 | `openssl/txt_db.h` | libcrypto | 6 | 0 | 0.0% |
 | `openssl/ui.h` | libcrypto | 62 | 0 | 0.0% |
-| `openssl/whrlpool.h` | libcrypto | 5 | 0 | 0.0% |
+| `openssl/whrlpool.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/x509.h` | libcrypto | 547 | 5 | 0.9% |
 | `openssl/x509_acert.h` | libcrypto | 103 | 0 | 0.0% |
 | `openssl/x509_vfy.h` | libcrypto | 240 | 0 | 0.0% |
@@ -773,7 +773,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `ex_data`, `objects`, `pem_crypt`, `rand`, `stack` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `rand`, `stack` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `crypto_secure_heap`, `err_queue`, `evp_kdf_more`, `evp_pkey_print`, `evp_rand`, `fetch`, `params`, `pem`, `properties`, `provider`, `rand`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -1654,6 +1654,20 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `INT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
 | `INT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `LONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
+| `MD4` | libcrypto | `openssl/md4.h` | `lowlevel_hash` |
+| `MD4_Final` | libcrypto | `openssl/md4.h` | `lowlevel_hash` |
+| `MD4_Init` | libcrypto | `openssl/md4.h` | `lowlevel_hash` |
+| `MD4_Transform` | libcrypto | `openssl/md4.h` | `lowlevel_hash` |
+| `MD4_Update` | libcrypto | `openssl/md4.h` | `lowlevel_hash` |
+| `MD5` | libcrypto | `openssl/md5.h` | `lowlevel_hash` |
+| `MD5_Final` | libcrypto | `openssl/md5.h` | `lowlevel_hash` |
+| `MD5_Init` | libcrypto | `openssl/md5.h` | `lowlevel_hash` |
+| `MD5_Transform` | libcrypto | `openssl/md5.h` | `lowlevel_hash` |
+| `MD5_Update` | libcrypto | `openssl/md5.h` | `lowlevel_hash` |
+| `MDC2` | libcrypto | `openssl/mdc2.h` | `lowlevel_hash` |
+| `MDC2_Final` | libcrypto | `openssl/mdc2.h` | `lowlevel_hash` |
+| `MDC2_Init` | libcrypto | `openssl/mdc2.h` | `lowlevel_hash` |
+| `MDC2_Update` | libcrypto | `openssl/mdc2.h` | `lowlevel_hash` |
 | `OBJ_NAME_add` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_NAME_cleanup` | libcrypto | `openssl/objects.h` | `objects` |
 | `OBJ_NAME_do_all` | libcrypto | `openssl/objects.h` | `objects` |
@@ -1776,11 +1790,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_ERR_STATE_restore` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save` | libcrypto | `openssl/err.h` | `err_queue` |
 | `OSSL_ERR_STATE_save_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
-| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `fetch`, `lib_ctx`, `properties`, `provider`, `rand` |
+| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `fetch`, `lib_ctx`, `lowlevel_hash`, `properties`, `provider`, `rand` |
 | `OSSL_LIB_CTX_get0_global_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
 | `OSSL_LIB_CTX_get_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
-| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `fetch`, `lib_ctx`, `properties`, `provider`, `rand` |
-| `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `properties` |
+| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `fetch`, `lib_ctx`, `lowlevel_hash`, `properties`, `provider`, `rand` |
+| `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `lowlevel_hash`, `properties` |
 | `OSSL_LIB_CTX_set_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
 | `OSSL_PARAM_BLD_free` | libcrypto | `openssl/param_build.h` | `bn`, `params` |
 | `OSSL_PARAM_BLD_new` | libcrypto | `openssl/param_build.h` | `bn`, `params` |
@@ -1874,14 +1888,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PROVIDER_get_conf_parameters` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get_params` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_gettable_params` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_load` | libcrypto | `openssl/provider.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `evp_rand`, `fetch`, `provider`, `rand` |
+| `OSSL_PROVIDER_load` | libcrypto | `openssl/provider.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `evp_rand`, `fetch`, `lowlevel_hash`, `provider`, `rand` |
 | `OSSL_PROVIDER_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_query_operation` | libcrypto | `openssl/provider.h` | `fetch` |
 | `OSSL_PROVIDER_self_test` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_set_default_search_path` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_try_load` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_try_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_unload` | libcrypto | `openssl/provider.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `evp_rand`, `fetch`, `provider`, `rand` |
+| `OSSL_PROVIDER_unload` | libcrypto | `openssl/provider.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `evp_rand`, `fetch`, `lowlevel_hash`, `provider`, `rand` |
 | `OSSL_PROVIDER_unquery_operation` | libcrypto | `openssl/provider.h` | `fetch` |
 | `OSSL_get_max_threads` | libcrypto | `openssl/thread.h` | `crypto_threads`, `lib_ctx` |
 | `OSSL_get_thread_support_flags` | libcrypto | `openssl/thread.h` | `crypto_threads` |
@@ -1943,10 +1957,43 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RAND_set_seed_source_type` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_status` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_write_file` | libcrypto | `openssl/rand.h` | `rand` |
+| `RIPEMD160` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `RIPEMD160_Final` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `RIPEMD160_Init` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `RIPEMD160_Transform` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `RIPEMD160_Update` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `SHA1` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA1_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA1_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA1_Transform` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA1_Update` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA224` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA224_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA224_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA224_Update` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA256` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA256_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA256_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA256_Transform` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA256_Update` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA384` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA384_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA384_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA384_Update` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA512` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA512_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA512_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA512_Transform` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
+| `SHA512_Update` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
 | `UINT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `UINT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
 | `UTF8_getc` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `UTF8_putc` | libcrypto | `openssl/asn1.h` | `asn1_text` |
+| `WHIRLPOOL` | libcrypto | `openssl/whrlpool.h` | `lowlevel_hash` |
+| `WHIRLPOOL_BitUpdate` | libcrypto | `openssl/whrlpool.h` | `lowlevel_hash` |
+| `WHIRLPOOL_Final` | libcrypto | `openssl/whrlpool.h` | `lowlevel_hash` |
+| `WHIRLPOOL_Init` | libcrypto | `openssl/whrlpool.h` | `lowlevel_hash` |
+| `WHIRLPOOL_Update` | libcrypto | `openssl/whrlpool.h` | `lowlevel_hash` |
 | `X509_ALGOR_free` | libcrypto | `openssl/x509.h` | `evp_cipher_asn1`, `evp_derive`, `evp_pkey_ops` |
 | `X509_ALGOR_it` | libcrypto | `openssl/x509.h` | `evp_cipher_asn1` |
 | `X509_ALGOR_new` | libcrypto | `openssl/x509.h` | `evp_cipher_asn1`, `evp_pkey_ops` |

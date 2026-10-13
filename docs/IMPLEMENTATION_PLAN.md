@@ -2404,15 +2404,48 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's RAND-layer commands (a context made the thread's public or private DRBG,
       `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`), printing output only from
       DRBGs that are deterministic, in the corpus and the random sessions.
-- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x):
-  - `SHA*_`, `MD4_`, `MD5_`, `RIPEMD160_`
-  - `AES_*` (including `AES_wrap_key` and IGE)
-  - the `DES_*` family, `BF_*`, `CAST_*`, `RC2_*`, `RC4*`, `IDEA_*`, `SEED_*`, `Camellia_*`
-  - the `CRYPTO_{gcm,ccm,xts,ocb}128_*` and `CRYPTO_{cbc,ctr,cfb}128_*` mode helpers
+- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in four sub-steps,
+  each its own PR (195 exports):
 
   ⚠ Their contexts (`SHA256_CTX`, `AES_KEY`, `DES_key_schedule`, …) are **public-layout**
   and often live on the application's stack, so all state must live *inside* the C struct.
   No hidden heap pointers.
+
+  - [x] **3.8a The hashes:** `SHA1_*`, `SHA224_*`, `SHA256_*`, `SHA384_*`, `SHA512_*`, `MD4_*`,
+    `MD5_*`, `RIPEMD160_*`, `MDC2_*`, `WHIRLPOOL_*`, and their one-shots:
+    `rustyssl_crypto::lowlevel::hash` and `lowlevel/hash.rs` in capi: 47 exports; libcrypto
+    now 1,963 of 5,876.
+    - **Decision:** each context struct has a mirror in `rustyssl-crypto` (`Md32`, `Sha512`,
+      `Mdc2`, `Whirlpool`), field for field; every call copies the struct in, runs, and copies
+      it back, field by field (keeping the struct's padding), so nothing lives outside the
+      struct. The framing is OpenSSL's, so every field holds what OpenSSL leaves there, which
+      the C test checks octet for octet. The compression functions are the RustCrypto crates'
+      (`compress256`, `compress512`, SHA-1's and MD5's; MD4's, RIPEMD-160's, and Whirlpool's
+      through their block-level cores' serialized state); MDC2's is two DES encryptions.
+    - Quirks kept: the SHA one-shots go through `EVP_Q_digest` with the default library
+      context (so they fail without a SHA provider), the others don't use providers; every
+      one-shot has its own static buffer for a NULL `md`; `SHA256_Final` writes `md_len / 4`
+      whole words, or fails past 32 after finishing; `SHA512_Final` writes 28, 32, 48, or 64
+      octets, failing for others (and a NULL `md`) after finishing, and keeps its buffer and
+      `num`; `SHA512_Init` and `MDC2_Init` keep the buffer's octets; `MDC2_Final` keeps
+      `num`, and pads with `0x80` only for `pad_type` 2; `WHIRLPOOL_BitUpdate` takes a partial
+      first octet's low-order bits, and `WHIRLPOOL_Final` zeroes the context only when given
+      somewhere to write; the bit counts wrap as OpenSSL's.
+    - New deviations: null contexts, inputs, and outputs; a count past the buffer;
+      `WHIRLPOOL_BitUpdate`'s last step past the block (OpenSSL writes past its buffer).
+    - `tests/c/lowlevel_hash.c` (46 checks: every hash's digests in pieces, its context after
+      each call, transforms, counts, digest lengths, MDC2's paddings, Whirlpool's bit
+      splits, the static buffers, and the SHA one-shots without a SHA provider); the probe's
+      `llinit`, `llupdate`, `llbits`, `llfinal`, `lltransform`, `llset`, and `llone`, printing
+      the whole context (corpus `lowlevel_hash.txt`, random `lowlevel_hash` sessions; the
+      probe skips the bit updates the reference overruns); the `lowlevel_hash` fuzz target
+      runs operation scripts that also overwrite fields, against the EVP digests.
+  - [ ] **3.8b AES and the mode helpers:** `AES_*` (including `AES_wrap_key` and IGE) and the
+    `CRYPTO_{cbc,ctr,cfb,ofb,cts,nistcts,gcm,ccm,ocb,xts}128_*` and `CRYPTO_128_wrap*`
+    helpers, which call back into a block function the caller passes (65 exports).
+  - [ ] **3.8c DES:** the `DES_*` family, `DES_crypt` and `DES_fcrypt` included (33 exports).
+  - [ ] **3.8d The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
+    `Camellia_*`, and `RC4*` (50 exports).
 - [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
 - [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
