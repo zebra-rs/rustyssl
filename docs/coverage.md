@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 1963 | 3913 | 33.4% |
+| libcrypto | 5876 | 1998 | 3878 | 34.0% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **1964** | **4515** | **30.3%** |
+| **Total** | **6479** | **1999** | **4480** | **30.9%** |
 
 ## By header
 
@@ -24,7 +24,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/err.h` | libcrypto | 1 | 1 | 100.0% |
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
-| `openssl/aes.h` | libcrypto | 15 | 0 | 0.0% |
+| `openssl/aes.h` | libcrypto | 15 | 15 | 100.0% |
 | `openssl/asn1.h` | libcrypto | 291 | 265 | 91.1% |
 | `openssl/asn1t.h` | libcrypto | 20 | 18 | 90.0% |
 | `openssl/async.h` | libcrypto | 22 | 0 | 0.0% |
@@ -64,7 +64,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/md4.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/md5.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/mdc2.h` | libcrypto | 4 | 4 | 100.0% |
-| `openssl/modes.h` | libcrypto | 50 | 0 | 0.0% |
+| `openssl/modes.h` | libcrypto | 50 | 20 | 40.0% |
 | `openssl/objects.h` | libcrypto | 31 | 31 | 100.0% |
 | `openssl/ocsp.h` | libcrypto | 169 | 0 | 0.0% |
 | `openssl/param_build.h` | libcrypto | 20 | 20 | 100.0% |
@@ -104,6 +104,21 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 
 | Export | Library | Header | Called by |
 |---|---|---|---|
+| `AES_bi_ige_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_cbc_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_cfb128_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_cfb1_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_cfb8_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_decrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_ecb_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_ige_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_ofb128_encrypt` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_options` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_set_decrypt_key` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_set_encrypt_key` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_unwrap_key` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
+| `AES_wrap_key` | libcrypto | `openssl/aes.h` | `lowlevel_aes` |
 | `ASN1_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_print`, `asn1_template` |
 | `ASN1_BIT_STRING_check` | libcrypto | `openssl/asn1.h` | `asn1_bit_string` |
 | `ASN1_BIT_STRING_free` | libcrypto | `openssl/asn1.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_string`, `asn1_template` |
@@ -707,6 +722,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CMAC_Init` | libcrypto | `openssl/cmac.h` | `evp_mac` |
 | `CMAC_Update` | libcrypto | `openssl/cmac.h` | `evp_mac` |
 | `CMAC_resume` | libcrypto | `openssl/cmac.h` | `evp_mac` |
+| `CRYPTO_128_unwrap` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_128_unwrap_pad` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_128_wrap` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_128_wrap_pad` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_THREAD_cleanup_local` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_THREAD_compare_id` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_THREAD_get_current_id` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
@@ -728,8 +747,19 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_atomic_load_int` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_atomic_or` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
 | `CRYPTO_atomic_store` | libcrypto | `openssl/crypto.h` | `crypto_threads` |
+| `CRYPTO_cbc128_decrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cbc128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cfb128_1_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cfb128_8_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cfb128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_clear_free` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_clear_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
+| `CRYPTO_ctr128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_ctr128_encrypt_ctr32` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cts128_decrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cts128_decrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_cts128_encrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_header`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_sock`, `bn`, `bn_mod`, `bn_prime`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `evp_cipher_asn1`, `evp_derive`, `evp_mac`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `params`, `pem`, `pem_crypt`, `properties` |
 | `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
@@ -741,6 +771,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_memcmp` | libcrypto | `openssl/crypto.h` | `crypto_mem` |
 | `CRYPTO_memdup` | libcrypto | `openssl/crypto.h` | `crypto_str`, `evp_pkey_meth`, `evp_pkey_ops` |
 | `CRYPTO_new_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
+| `CRYPTO_nistcts128_decrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_nistcts128_decrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_nistcts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_nistcts128_encrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
+| `CRYPTO_ofb128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_realloc` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
 | `CRYPTO_secure_actual_size` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_secure_allocated` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap`, `params` |

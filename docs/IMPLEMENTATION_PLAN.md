@@ -2404,7 +2404,7 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's RAND-layer commands (a context made the thread's public or private DRBG,
       `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`), printing output only from
       DRBGs that are deterministic, in the corpus and the random sessions.
-- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in four sub-steps,
+- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in five sub-steps,
   each its own PR (195 exports):
 
   ⚠ Their contexts (`SHA256_CTX`, `AES_KEY`, `DES_key_schedule`, …) are **public-layout**
@@ -2441,11 +2441,43 @@ have run for at least 24 CPU-hours with no findings.
       the whole context (corpus `lowlevel_hash.txt`, random `lowlevel_hash` sessions; the
       probe skips the bit updates the reference overruns); the `lowlevel_hash` fuzz target
       runs operation scripts that also overwrite fields, against the EVP digests.
-  - [ ] **3.8b AES and the mode helpers:** `AES_*` (including `AES_wrap_key` and IGE) and the
-    `CRYPTO_{cbc,ctr,cfb,ofb,cts,nistcts,gcm,ccm,ocb,xts}128_*` and `CRYPTO_128_wrap*`
-    helpers, which call back into a block function the caller passes (65 exports).
-  - [ ] **3.8c DES:** the `DES_*` family, `DES_crypt` and `DES_fcrypt` included (33 exports).
-  - [ ] **3.8d The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
+  - [x] **3.8b AES and the block modes:** the `AES_*` functions (key schedules, blocks, ECB,
+    CBC, CFB-128/8/1, OFB, IGE, bi-IGE, and the RFC 3394 wraps) and the `modes.h` block-mode
+    helpers (`CRYPTO_{cbc,ctr,ofb,cfb}128_*`, `CRYPTO_{cts,nistcts}128_*`, `CRYPTO_128_wrap*`):
+    `rustyssl_crypto::lowlevel::{aes, modes}` and `lowlevel/{aes, modes}.rs` in capi: 35
+    exports; libcrypto now 1,998 of 5,876.
+    - **Decision:** an `AES_KEY` holds the expanded schedule, so the block functions run from
+      the schedule with the `aes` crate's constant-time round functions (its `hazmat` feature:
+      AES-NI, the ARMv8 instructions, or its fixsliced software AES), the key expansion's
+      S-box through them too. The schedule's words are laid out as the reference's code for
+      the platform leaves them: its x86_64 assembly keeps each round key's octets as they are,
+      its C code (aarch64, everywhere else) big-endian words; only the schedule's words and
+      `rounds` are written.
+    - **Decision:** the modes are generic over block, CBC, and CTR function traits; the FFI
+      layer implements them over the C function pointers the caller passes, so the helpers
+      call them in OpenSSL's order with its lengths and IVs (the C test logs every call). An
+      input that overlaps the output is copied first.
+    - Quirks kept: a partial last CBC block is written whole on encryption and read whole on
+      decryption; the CTR-with-ctr32 form leaves the keystream buffer alone for whole blocks;
+      `CRYPTO_cts128_decrypt_block` and `CRYPTO_nistcts128_decrypt_block` return the length
+      plus 16 (OpenSSL adds the block size to the residue before adding it in); a negative
+      OFB or CFB position becomes -1 and nothing else happens; CFB-1 keeps the other bits of
+      the last octet; `AES_ecb_encrypt` decrypts for any `enc` but `AES_ENCRYPT`;
+      `AES_bi_ige_encrypt` uses only its first key; the IGE functions abort on a bad argument,
+      as OpenSSL's assertions do; `AES_options` says "aes(partial)".
+    - New deviations: null keys, buffers, IVs, positions, and functions; an `AES_KEY` with
+      rounds AES doesn't have; a position past the block; a failed RFC 5649 unwrap zeroing
+      past its output.
+    - `tests/c/lowlevel_aes.c` (122 checks: the keys each size makes on the platform, every
+      mode in pieces, IGE, the wraps, and the helpers over logging block, CBC, and CTR
+      functions); the probe's `aeskey`, `aesiv`, `aesnum`, `aesblock`, `aesmode`, `aeswrap`,
+      `cts`, and `ctr` (corpus `lowlevel_aes.txt`, random `lowlevel_aes` sessions); the
+      `lowlevel_modes` fuzz target checks the inverses, the forms' agreement, and chunking.
+  - [ ] **3.8c The AEAD helpers:** `CRYPTO_gcm128_*`, `CRYPTO_ccm128_*`, `CRYPTO_ocb128_*`,
+    and `CRYPTO_xts128_encrypt` (30 exports). The CCM and XTS contexts have no constructor:
+    applications can only lay them out as OpenSSL's `modes_local.h` does.
+  - [ ] **3.8d DES:** the `DES_*` family, `DES_crypt` and `DES_fcrypt` included (33 exports).
+  - [ ] **3.8e The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
     `Camellia_*`, and `RC4*` (50 exports).
 - [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
 - [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).

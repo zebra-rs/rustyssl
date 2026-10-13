@@ -273,3 +273,9 @@ name = "lowlevel_hash"
 path = "fuzz_targets/lowlevel_hash.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "lowlevel_modes"
+path = "fuzz_targets/lowlevel_modes.rs"
+test = false
+doc = false
