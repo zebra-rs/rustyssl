@@ -80,6 +80,10 @@ pub(crate) type SetRaw = unsafe extern "C" fn(*mut EVP_PKEY, *const c_uchar, usi
 pub(crate) type GetRaw = unsafe extern "C" fn(*const EVP_PKEY, *mut c_uchar, *mut usize) -> c_int;
 /// The built-in methods' `copy` (`EVP_PKEY_dup`), which applications can't set.
 pub(crate) type Copy = unsafe extern "C" fn(*mut EVP_PKEY, *mut EVP_PKEY) -> c_int;
+/// The built-in methods' `old_priv_decode` (the traditional private key formats, `RSA PRIVATE
+/// KEY` ...), which applications can't set.
+pub(crate) type OldPrivDecode =
+    unsafe extern "C" fn(*mut EVP_PKEY, *mut *const c_uchar, c_int) -> c_int;
 
 /// A method's functions (those of `struct evp_pkey_asn1_method_st` the API reaches).
 #[derive(Clone, core::marker::Copy, Default)]
@@ -113,6 +117,7 @@ pub(crate) struct Funcs {
     pub(crate) get_priv_key: Option<GetRaw>,
     pub(crate) get_pub_key: Option<GetRaw>,
     pub(crate) copy: Option<Copy>,
+    pub(crate) old_priv_decode: Option<OldPrivDecode>,
 }
 
 /// What `EVP_PKEY_ASN1_METHOD` handles point to.
@@ -201,6 +206,18 @@ extern "C" fn builtin_copy(_: *mut EVP_PKEY, _: *mut EVP_PKEY) -> c_int {
     crate::stub::unimplemented("copying a key through a built-in ASN.1 method")
 }
 
+extern "C" fn builtin_old_priv_decode(_: *mut EVP_PKEY, _: *mut *const c_uchar, _: c_int) -> c_int {
+    crate::stub::unimplemented("decoding a traditional private key through a built-in ASN.1 method")
+}
+
+extern "C" fn builtin_print(_: *mut BIO, _: *const EVP_PKEY, _: c_int, _: *mut ASN1_PCTX) -> c_int {
+    crate::stub::unimplemented("printing a key through a built-in ASN.1 method")
+}
+
+extern "C" fn builtin_param_decode(_: *mut EVP_PKEY, _: *mut *const c_uchar, _: c_int) -> c_int {
+    crate::stub::unimplemented("decoding parameters through a built-in ASN.1 method")
+}
+
 ffi_callback! {
     /// The built-in methods' `pkey_free`: there's nothing to free for a key typed without data
     /// (data needs the key types, 4.3 onwards).
@@ -218,8 +235,11 @@ ffi_callback! {
 #[derive(Clone, core::marker::Copy)]
 enum Kind {
     Rsa,
-    /// DH, DHX, DSA, and EC.
-    Params,
+    RsaPss,
+    /// DH and DHX.
+    Dh,
+    /// DSA and EC.
+    DsaEc,
     Ecx,
     Alias,
 }
@@ -237,10 +257,14 @@ impl Kind {
             pkey_free: Some(builtin_free),
             pkey_ctrl: Some(builtin_ctrl),
             copy: Some(builtin_copy),
+            pub_print: Some(builtin_print),
+            priv_print: Some(builtin_print),
             ..Funcs::default()
         };
         match self {
-            Self::Params => {
+            Self::Dh | Self::DsaEc => {
+                f.param_decode = Some(builtin_param_decode);
+                f.param_print = Some(builtin_print);
                 f.param_missing = Some(builtin_key);
                 f.param_copy = Some(builtin_param_copy);
                 f.param_cmp = Some(builtin_cmp);
@@ -250,7 +274,10 @@ impl Kind {
                 f.get_priv_key = Some(builtin_get_raw);
                 f.get_pub_key = Some(builtin_get_raw);
             }
-            Self::Rsa | Self::Alias => {}
+            Self::Rsa | Self::RsaPss | Self::Alias => {}
+        }
+        if matches!(self, Self::Rsa | Self::DsaEc) {
+            f.old_priv_decode = Some(builtin_old_priv_decode);
         }
         f
     }
@@ -304,31 +331,25 @@ static STANDARD_TABLE: [Std; 15] = [
         Kind::Rsa,
     ),
     alias(EVP_PKEY_RSA2, EVP_PKEY_RSA),
-    entry(
-        EVP_PKEY_DH,
-        0,
-        c"DH",
-        c"OpenSSL PKCS#3 DH method",
-        Kind::Params,
-    ),
+    entry(EVP_PKEY_DH, 0, c"DH", c"OpenSSL PKCS#3 DH method", Kind::Dh),
     alias(EVP_PKEY_DSA1, EVP_PKEY_DSA),
     alias(EVP_PKEY_DSA4, EVP_PKEY_DSA2),
     alias(EVP_PKEY_DSA3, EVP_PKEY_DSA2),
-    entry(EVP_PKEY_DSA, 0, c"DSA", c"OpenSSL DSA method", Kind::Params),
-    entry(EVP_PKEY_EC, 0, c"EC", c"OpenSSL EC algorithm", Kind::Params),
+    entry(EVP_PKEY_DSA, 0, c"DSA", c"OpenSSL DSA method", Kind::DsaEc),
+    entry(EVP_PKEY_EC, 0, c"EC", c"OpenSSL EC algorithm", Kind::DsaEc),
     entry(
         EVP_PKEY_RSA_PSS,
         ASN1_PKEY_SIGPARAM_NULL,
         c"RSA-PSS",
         c"OpenSSL RSA-PSS method",
-        Kind::Rsa,
+        Kind::RsaPss,
     ),
     entry(
         EVP_PKEY_DHX,
         0,
         c"X9.42 DH",
         c"OpenSSL X9.42 DH method",
-        Kind::Params,
+        Kind::Dh,
     ),
     entry(
         EVP_PKEY_X25519,
