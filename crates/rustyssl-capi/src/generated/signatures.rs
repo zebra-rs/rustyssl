@@ -5117,6 +5117,40 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::IN
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;
 const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::MD4;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut MD4_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::MD4_Final;
+const _: unsafe extern "C" fn(*mut MD4_CTX) -> core::ffi::c_int = crate::lowlevel::hash::MD4_Init;
+const _: unsafe extern "C" fn(*mut MD4_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::MD4_Transform;
+const _: unsafe extern "C" fn(*mut MD4_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
+    crate::lowlevel::hash::MD4_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::MD5;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut MD5_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::MD5_Final;
+const _: unsafe extern "C" fn(*mut MD5_CTX) -> core::ffi::c_int = crate::lowlevel::hash::MD5_Init;
+const _: unsafe extern "C" fn(*mut MD5_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::MD5_Transform;
+const _: unsafe extern "C" fn(*mut MD5_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
+    crate::lowlevel::hash::MD5_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::MDC2;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut MDC2_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::MDC2_Final;
+const _: unsafe extern "C" fn(*mut MDC2_CTX) -> core::ffi::c_int = crate::lowlevel::hash::MDC2_Init;
+const _: unsafe extern "C" fn(*mut MDC2_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::lowlevel::hash::MDC2_Update;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
     *const core::ffi::c_char,
@@ -6035,6 +6069,94 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::rand_lib::RAND_status;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
     crate::rand_file::RAND_write_file;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::RIPEMD160;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut RIPEMD160_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::RIPEMD160_Final;
+const _: unsafe extern "C" fn(*mut RIPEMD160_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::RIPEMD160_Init;
+const _: unsafe extern "C" fn(*mut RIPEMD160_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::RIPEMD160_Transform;
+const _: unsafe extern "C" fn(
+    *mut RIPEMD160_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::RIPEMD160_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::SHA1;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut SHA_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA1_Final;
+const _: unsafe extern "C" fn(*mut SHA_CTX) -> core::ffi::c_int = crate::lowlevel::hash::SHA1_Init;
+const _: unsafe extern "C" fn(*mut SHA_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::SHA1_Transform;
+const _: unsafe extern "C" fn(*mut SHA_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA1_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::SHA224;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut SHA256_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA224_Final;
+const _: unsafe extern "C" fn(*mut SHA256_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA224_Init;
+const _: unsafe extern "C" fn(
+    *mut SHA256_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::SHA224_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::SHA256;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut SHA256_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA256_Final;
+const _: unsafe extern "C" fn(*mut SHA256_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA256_Init;
+const _: unsafe extern "C" fn(*mut SHA256_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::SHA256_Transform;
+const _: unsafe extern "C" fn(
+    *mut SHA256_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::SHA256_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::SHA384;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut SHA512_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA384_Final;
+const _: unsafe extern "C" fn(*mut SHA512_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA384_Init;
+const _: unsafe extern "C" fn(
+    *mut SHA512_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::SHA384_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::SHA512;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut SHA512_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA512_Final;
+const _: unsafe extern "C" fn(*mut SHA512_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::SHA512_Init;
+const _: unsafe extern "C" fn(*mut SHA512_CTX, *const core::ffi::c_uchar) =
+    crate::lowlevel::hash::SHA512_Transform;
+const _: unsafe extern "C" fn(
+    *mut SHA512_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::SHA512_Update;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn(
@@ -6047,6 +6169,22 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_ulong,
 ) -> core::ffi::c_int = crate::asn1::text::UTF8_putc;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_void,
+    usize,
+    *mut core::ffi::c_uchar,
+) -> *mut core::ffi::c_uchar = crate::lowlevel::hash::WHIRLPOOL;
+const _: unsafe extern "C" fn(*mut WHIRLPOOL_CTX, *const core::ffi::c_void, usize) =
+    crate::lowlevel::hash::WHIRLPOOL_BitUpdate;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut WHIRLPOOL_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::WHIRLPOOL_Final;
+const _: unsafe extern "C" fn(*mut WHIRLPOOL_CTX) -> core::ffi::c_int =
+    crate::lowlevel::hash::WHIRLPOOL_Init;
+const _: unsafe extern "C" fn(
+    *mut WHIRLPOOL_CTX,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::hash::WHIRLPOOL_Update;
 const _: unsafe extern "C" fn(*mut X509_ALGOR) = crate::asn1::tpl::items::X509_ALGOR_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::X509_ALGOR_it;
 const _: unsafe extern "C" fn() -> *mut X509_ALGOR = crate::asn1::tpl::items::X509_ALGOR_new;
