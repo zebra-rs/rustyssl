@@ -320,10 +320,15 @@
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/lhash.h>
+#include <openssl/md4.h>
+#include <openssl/md5.h>
+#include <openssl/mdc2.h>
 #include <openssl/objects.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
 #include <openssl/rand.h>
+#include <openssl/ripemd.h>
+#include <openssl/sha.h>
 #include <openssl/core_names.h>
 #include <openssl/core_dispatch.h>
 #include <ctype.h>
@@ -331,6 +336,7 @@
 #include <openssl/stack.h>
 #include <openssl/thread.h>
 #include <openssl/trace.h>
+#include <openssl/whrlpool.h>
 #include <openssl/x509v3.h>
 
 static BUF_MEM *buffer = NULL;
@@ -5708,6 +5714,219 @@ static int print_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the deprecated low-level hashes, one context each (static, so zeroed until
+ * initialized), over the digest commands' data. ALG is sha1, sha224, sha256, sha384, sha512,
+ * md4, md5, rmd160, mdc2, or wp; each command prints its result and then the whole context:
+ *   llinit ALG                     ALG_Init
+ *   llupdate ALG N                 ALG_Update with the next N octets (at most 1024)
+ *   llbits N                       WHIRLPOOL_BitUpdate with N bits (at most 8192), skipped where
+ *                                  the reference's last step would run past its block (it then
+ *                                  writes past the buffer: docs/DEVIATIONS.md)
+ *   llfinal ALG                    ALG_Final, and the digest
+ *   lltransform ALG OFF            ALG_Transform of the data at offset OFF (not sha224, sha384,
+ *                                  mdc2, or wp, which have none)
+ *   llset ALG FIELD V              sets md_len (sha224 to sha512) or pad_type (mdc2) to V, or
+ *                                  Nl to V below 2^32 (or 2^64), to carry
+ *   llone ALG N                    the one-shot ALG() of the next N octets, and the digest
+ */
+static union {
+    SHA_CTX sha1;
+    SHA256_CTX sha256;
+    SHA512_CTX sha512;
+    MD4_CTX md4;
+    MD5_CTX md5;
+    RIPEMD160_CTX rmd160;
+    MDC2_CTX mdc2;
+    WHIRLPOOL_CTX wp;
+} ll_ctx[10];
+
+static const char *const ll_names[] = { "sha1", "sha224", "sha256", "sha384", "sha512", "md4",
+                                        "md5", "rmd160", "mdc2", "wp" };
+static const size_t ll_sizes[] = { sizeof(SHA_CTX), sizeof(SHA256_CTX), sizeof(SHA256_CTX),
+                                   sizeof(SHA512_CTX), sizeof(SHA512_CTX), sizeof(MD4_CTX),
+                                   sizeof(MD5_CTX), sizeof(RIPEMD160_CTX), sizeof(MDC2_CTX),
+                                   sizeof(WHIRLPOOL_CTX) };
+static const int ll_md_sizes[] = { 20, 28, 32, 48, 64, 16, 16, 20, 16, 64 };
+
+/* Whether the reference's WHIRLPOOL_BitUpdate of `bits` bits would run its last step past the
+ * block: bit by bit (the buffered bits and the input not both whole octets, and not aligning
+ * at the first step), the last few bits starting less than 8 bits before the block's end and
+ * crossing it. */
+static int ll_wp_overruns(unsigned int bitoff, size_t bits)
+{
+    size_t bitrem = bitoff % 8, inpgap = (8 - bits % 8) & 7, steps, last, before;
+
+    if (bits == 0 || bitrem == 0 || bitrem == inpgap)
+        return 0;
+    steps = (bits - 1) / 8;
+    last = bits - 8 * steps;
+    before = (bitoff + 8 * steps) % 512;
+    return before + last > 512;
+}
+
+static int lowlevel_command(const char *command, const char *line)
+{
+    char a[16] = "", b[16] = "";
+    unsigned long n = 0, v = 0;
+    unsigned char md[64];
+    int alg, r = -9;
+    void *c;
+
+    if (strncmp(command, "ll", 2) != 0)
+        return 0;
+    if (strcmp(command, "llinit") != 0 && strcmp(command, "llupdate") != 0
+        && strcmp(command, "llbits") != 0 && strcmp(command, "llfinal") != 0
+        && strcmp(command, "lltransform") != 0 && strcmp(command, "llset") != 0
+        && strcmp(command, "llone") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    printf("%s:", line);
+    if (strcmp(command, "llbits") == 0) {
+        sscanf(line, "%*s %lu", &n);
+        if (n > 8192)
+            n = 8192;
+        strcpy(a, "wp");
+    } else {
+        sscanf(line, "%*s %15s %15s %lu", a, b, &v);
+        n = strtoul(b, NULL, 10);
+    }
+    for (alg = 0; alg < 10 && strcmp(a, ll_names[alg]) != 0; alg++)
+        continue;
+    if (alg == 10) {
+        printf(" unknown\n");
+        return 1;
+    }
+    c = &ll_ctx[alg];
+    memset(md, 0xee, sizeof(md));
+    if (strcmp(command, "llinit") == 0) {
+        switch (alg) {
+        case 0: r = SHA1_Init(c); break;
+        case 1: r = SHA224_Init(c); break;
+        case 2: r = SHA256_Init(c); break;
+        case 3: r = SHA384_Init(c); break;
+        case 4: r = SHA512_Init(c); break;
+        case 5: r = MD4_Init(c); break;
+        case 6: r = MD5_Init(c); break;
+        case 7: r = RIPEMD160_Init(c); break;
+        case 8: r = MDC2_Init(c); break;
+        default: r = WHIRLPOOL_Init(c); break;
+        }
+        printf(" %d", r);
+    } else if (strcmp(command, "llupdate") == 0 || strcmp(command, "llbits") == 0) {
+        const unsigned char *d = digest_data + digest_offset;
+
+        if (strcmp(command, "llbits") == 0) {
+            if (ll_wp_overruns(ll_ctx[9].wp.bitoff, n)) {
+                printf(" skipped\n");
+                return 1;
+            }
+            WHIRLPOOL_BitUpdate(c, d, n);
+            n = (n + 7) / 8;
+        } else {
+            if (n > 1024)
+                n = 1024;
+            switch (alg) {
+            case 0: r = SHA1_Update(c, d, n); break;
+            case 1: r = SHA224_Update(c, d, n); break;
+            case 2: r = SHA256_Update(c, d, n); break;
+            case 3: r = SHA384_Update(c, d, n); break;
+            case 4: r = SHA512_Update(c, d, n); break;
+            case 5: r = MD4_Update(c, d, n); break;
+            case 6: r = MD5_Update(c, d, n); break;
+            case 7: r = RIPEMD160_Update(c, d, n); break;
+            case 8: r = MDC2_Update(c, d, n); break;
+            default: r = WHIRLPOOL_Update(c, d, n); break;
+            }
+            printf(" %d", r);
+        }
+        digest_offset = (digest_offset + n * 3 + 1) % 1024;
+    } else if (strcmp(command, "llfinal") == 0) {
+        switch (alg) {
+        case 0: r = SHA1_Final(md, c); break;
+        case 1: r = SHA224_Final(md, c); break;
+        case 2: r = SHA256_Final(md, c); break;
+        case 3: r = SHA384_Final(md, c); break;
+        case 4: r = SHA512_Final(md, c); break;
+        case 5: r = MD4_Final(md, c); break;
+        case 6: r = MD5_Final(md, c); break;
+        case 7: r = RIPEMD160_Final(md, c); break;
+        case 8: r = MDC2_Final(md, c); break;
+        default: r = WHIRLPOOL_Final(md, c); break;
+        }
+        printf(" %d ", r);
+        for (n = 0; n < sizeof(md); n++)
+            printf("%02x", md[n]);
+    } else if (strcmp(command, "lltransform") == 0) {
+        const unsigned char *d = digest_data + n % 1024;
+
+        switch (alg) {
+        case 0: SHA1_Transform(c, d); break;
+        case 2: SHA256_Transform(c, d); break;
+        case 4: SHA512_Transform(c, d); break;
+        case 5: MD4_Transform(c, d); break;
+        case 6: MD5_Transform(c, d); break;
+        case 7: RIPEMD160_Transform(c, d); break;
+        default: printf(" none"); break;
+        }
+    } else if (strcmp(command, "llset") == 0) {
+        if (strcmp(b, "md_len") == 0 && (alg == 1 || alg == 2))
+            ll_ctx[alg].sha256.md_len = (unsigned int)v;
+        else if (strcmp(b, "md_len") == 0 && (alg == 3 || alg == 4))
+            ll_ctx[alg].sha512.md_len = (unsigned int)v;
+        else if (strcmp(b, "pad_type") == 0 && alg == 8)
+            ll_ctx[alg].mdc2.pad_type = (unsigned int)v;
+        else if (strcmp(b, "Nl") == 0 && (alg == 3 || alg == 4))
+            ll_ctx[alg].sha512.Nl = (SHA_LONG64)0 - v;
+        else if (strcmp(b, "Nl") == 0 && alg == 0)
+            ll_ctx[alg].sha1.Nl = 0u - (unsigned int)v;
+        else if (strcmp(b, "Nl") == 0 && (alg == 1 || alg == 2))
+            ll_ctx[alg].sha256.Nl = 0u - (unsigned int)v;
+        else if (strcmp(b, "Nl") == 0 && alg == 5)
+            ll_ctx[alg].md4.Nl = 0u - (unsigned int)v;
+        else if (strcmp(b, "Nl") == 0 && alg == 6)
+            ll_ctx[alg].md5.Nl = 0u - (unsigned int)v;
+        else if (strcmp(b, "Nl") == 0 && alg == 7)
+            ll_ctx[alg].rmd160.Nl = 0u - (unsigned int)v;
+        else
+            printf(" no such field");
+    } else {
+        const unsigned char *d = digest_data + digest_offset;
+        unsigned char *p = NULL;
+
+        if (n > 1024)
+            n = 1024;
+        switch (alg) {
+        case 0: p = SHA1(d, n, md); break;
+        case 1: p = SHA224(d, n, md); break;
+        case 2: p = SHA256(d, n, md); break;
+        case 3: p = SHA384(d, n, md); break;
+        case 4: p = SHA512(d, n, md); break;
+        case 5: p = MD4(d, n, md); break;
+        case 6: p = MD5(d, n, md); break;
+        case 7: p = RIPEMD160(d, n, md); break;
+        case 8: p = MDC2(d, n, md); break;
+        default: p = WHIRLPOOL(d, n, md); break;
+        }
+        digest_offset = (digest_offset + n * 3 + 1) % 1024;
+        printf(" %s ", p == md ? "md" : "NULL");
+        for (n = 0; n < (unsigned long)ll_md_sizes[alg]; n++)
+            printf("%02x", md[n]);
+        printf("\n");
+        return 1;
+    }
+    printf(" |");
+    for (n = 0; n < ll_sizes[alg]; n++)
+        printf("%02x", ((unsigned char *)c)[n]);
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -5737,7 +5956,7 @@ int main(void)
             || kdf_command(command, line) || rand_command(command, line)
             || bn_command(command, line) || pkey_command(command, line)
             || derive_command(command, line) || meth_command(command, line)
-            || print_command(command, line)) {
+            || print_command(command, line) || lowlevel_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

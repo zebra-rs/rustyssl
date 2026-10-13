@@ -267,3 +267,9 @@ name = "meth"
 path = "fuzz_targets/meth.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "lowlevel_hash"
+path = "fuzz_targets/lowlevel_hash.rs"
+test = false
+doc = false
