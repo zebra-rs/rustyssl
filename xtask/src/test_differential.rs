@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(30) {
+        match random.below(31) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -178,6 +178,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             26 => rand_session(&mut random, &mut out)?,
             27 => bn_session(&mut random, &mut out)?,
             28 => pkey_session(&mut random, &mut out)?,
+            29 => meth_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -3216,6 +3217,200 @@ const PK_CTRLS: &[&str] = &[
     "dh_pad",
     "unknown",
 ];
+
+/// The key types the `meth*` commands add a method for.
+const METH_TYPES: &[&str] = &[
+    "RSA", "RSA-PSS", "EC", "SM2", "DH", "DHX", "DSA", "X25519", "X448", "ED25519", "HMAC", "toy",
+];
+
+/// The operations a `meth*` command's context is initialized for.
+const METH_OPS: &[&str] = &[
+    "sign",
+    "verify",
+    "verifyrecover",
+    "encrypt",
+    "decrypt",
+    "derive",
+    "keygen",
+    "paramgen",
+    "none",
+    "custom",
+];
+
+/// The parameter keys of the ctrl translations, and some that aren't.
+const METH_KEYS: &[&str] = &[
+    "distid",
+    "kdf-type",
+    "kdf-digest",
+    "kdf-digest-props",
+    "kdf-outlen",
+    "kdf-ukm",
+    "cekalg",
+    "type",
+    "pbits",
+    "qbits",
+    "group",
+    "safeprime-generator",
+    "pad",
+    "digest",
+    "encoding",
+    "ecdh-cofactor-mode",
+    "pad-mode",
+    "mgf1-digest",
+    "saltlen",
+    "oaep-label",
+    "implicit-rejection",
+    "bits",
+    "e",
+    "primes",
+    "size",
+    "secret",
+    "seed",
+    "salt",
+    "key",
+    "info",
+    "mode",
+    "pass",
+    "n",
+    "r",
+    "p",
+    "maxmem_bytes",
+    "cipher",
+    "priv",
+    "nope",
+];
+
+/// A session of applications' methods: lookups in the method tables, and contexts with a
+/// logging method taking parameters (as ctrls), ctrls, and ctrl strings.
+fn meth_session(random: &mut Random, out: &mut String) -> Result {
+    let ret = |random: &mut Random| random.pick(&["1", "1", "0", "-1", "-2", "2", "3", "16"]);
+    for _ in 0..1 + random.below(12) {
+        match random.below(6) {
+            0 => {
+                let id = match random.below(3) {
+                    0 => random.below(1200).to_string(),
+                    _ => random
+                        .pick(&[
+                            "6", "19", "28", "67", "116", "408", "912", "920", "1034", "1087",
+                            "1172", "855", "0", "-1",
+                        ])
+                        .to_owned(),
+                };
+                writeln!(out, "methfind {id}")?;
+            }
+            1 => {
+                let name = random.pick(&[
+                    "RSA", "rsa", "RSA-PSS", "x9.42", "X9.42 DH", "DHX", "EC", "ec", "ED448", "x",
+                    "-",
+                ]);
+                let len = random.pick(&["-1", "-1", "0", "1", "2", "3", "7", "-2"]);
+                writeln!(out, "methstr {name} {len}")?;
+            }
+            2 | 3 => {
+                let op = random.pick(METH_OPS);
+                let dir = random.pick(&["set", "get"]);
+                let key = random.pick(METH_KEYS);
+                // Setting the HKDF mode makes the reference compare a NULL name
+                // (docs/DEVIATIONS.md).
+                if dir == "set" && key == "mode" && op == "derive" {
+                    continue;
+                }
+                let ptype = random.pick(&["int", "uint", "utf8", "octets", "octptr"]);
+                let value = match ptype {
+                    "int" | "uint" => random
+                        .pick(&["0", "1", "2", "3", "6", "16", "-1", "-2", "65537"])
+                        .to_owned(),
+                    "utf8" => random
+                        .pick(&[
+                            "SHA256",
+                            "NOPE",
+                            "pkcs1",
+                            "pss",
+                            "oaep",
+                            "none",
+                            "x931",
+                            "auto",
+                            "max",
+                            "digest",
+                            "20",
+                            "X942KDF-ASN1",
+                            "X963KDF",
+                            "P-256",
+                            "prime256v1",
+                            "explicit",
+                            "named_curve",
+                            "X25519",
+                            "x448",
+                            "EXTRACT_ONLY",
+                            "1.2.3.4",
+                            "ffdhe2048",
+                            "-",
+                        ])
+                        .to_owned(),
+                    "octets" => pkey_hex(random, 12),
+                    _ => "-".to_owned(),
+                };
+                let ret = ret(random);
+                writeln!(
+                    out,
+                    "methparam {} {op} {dir} {key} {ptype} {value} {ret}",
+                    random.pick(METH_TYPES)
+                )?;
+            }
+            4 => {
+                let cmd = random
+                    .pick(&[
+                        "1", "2", "3", "7", "13", "14", "15", "16", "17", "4097", "4098", "4099",
+                        "4100", "4101", "4102", "4103", "4104", "4105", "4106", "4107", "4108",
+                        "4109", "4110", "9999",
+                    ])
+                    .to_owned();
+                // A distinguishing ID with a length but no pointer is copied from NULL by the
+                // reference.
+                let p1 = if cmd == "15" {
+                    "0".to_owned()
+                } else {
+                    random.pick(&["0", "1", "-1", "-2", "8", "2048"]).to_owned()
+                };
+                let ret = ret(random);
+                writeln!(
+                    out,
+                    "methctrl {} {} {} {} {cmd} {p1} {ret}",
+                    random.pick(METH_TYPES),
+                    random.pick(METH_OPS),
+                    random.pick(&["-1", "-1", "6", "408", "28", "920", "1034", "855"]),
+                    random.pick(&["-1", "-1", "0", "8", "16", "248", "1024", "4", "2048"]),
+                )?;
+            }
+            _ => {
+                let name = random.pick(&[
+                    "digest",
+                    "md",
+                    "distid",
+                    "hexdistid",
+                    "key",
+                    "hexkey",
+                    "salt",
+                    "hexsalt",
+                    "dh_pad",
+                    "nope",
+                ]);
+                let value = match name {
+                    "digest" | "md" => random.pick(&["SHA256", "sha1", "NOPE"]).to_owned(),
+                    _ => pkey_hex(random, 8),
+                };
+                let ret = ret(random);
+                writeln!(
+                    out,
+                    "methctrlstr {} {} {name} {value} {ret}",
+                    random.pick(METH_TYPES),
+                    random.pick(METH_OPS)
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
 
 /// A `pkderive` line: a KDF context (scrypt's with small costs first: its defaults take a
 /// GiB) and ctrl strings, known and not.

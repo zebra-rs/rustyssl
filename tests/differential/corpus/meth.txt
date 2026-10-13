@@ -1,0 +1,66 @@
+# Applications' methods (step 4.2d): the method tables, and a logging EVP_PKEY_METHOD's
+# context taking parameters (as ctrls), ctrls, and ctrl strings.
+methfind 6
+methfind 19
+methfind 116
+methfind 1172
+methfind 855
+methfind 3
+methstr RSA -1
+methstr rsa-pss -1
+methstr RSA-PSS 3
+methstr x9.42 -1
+methstr DHX -1
+methstr - 0
+# Setting a string parameter fails without a ctrl (the reference has no room for it); getting
+# one passes the ctrl no pointer.
+methparam toy sign set digest utf8 SHA256 1
+methparam toy sign get digest utf8 - 1
+methparam toy sign set size uint 16 1
+methparam toy sign set distid octets 78797a 1
+methparam toy sign get distid octptr - 3
+methparam toy sign set nope int 1 1
+methparam toy none set size uint 16 1
+methparam EC paramgen set group utf8 P-256 1
+methparam EC paramgen set group utf8 prime256v1 1
+methparam EC derive get ecdh-cofactor-mode int 0 0
+methparam EC derive get ecdh-cofactor-mode int 0 1
+methparam EC derive set ecdh-cofactor-mode int 1 1
+methparam EC derive get kdf-type utf8 - 1
+methparam EC derive get kdf-type utf8 - 2
+methparam DHX derive get kdf-type utf8 - 2
+methparam DHX derive get cekalg utf8 - 1
+methparam DH derive set pad uint 1 1
+methparam RSA sign get pad-mode utf8 - 1
+methparam RSA sign get pad-mode utf8 - 6
+methparam RSA sign get pad-mode int 3 1
+methparam RSA sign get pad-mode utf8 - 5
+methparam RSA sign get saltlen utf8 - -1
+methparam RSA sign get saltlen utf8 - 20
+methparam RSA keygen set bits uint 2048 1
+methparam RSA-PSS keygen set bits uint 2048 1
+methparam toy derive get mode int 0 1
+methparam toy derive get mode int 0 7
+methparam toy derive set salt octets 0102 1
+methparam toy derive set secret octets - 1
+methparam X25519 keygen set group utf8 X25519 1
+methparam X25519 keygen set group utf8 x448 1
+methparam X25519 keygen set group octets 01 1
+methparam X25519 sign set group utf8 X25519 1
+methctrl toy sign -1 -1 14 8 1
+methctrl toy sign -1 -1 14 8 -2
+methctrl toy sign 6 -1 14 8 1
+methctrl toy sign -1 4 14 8 1
+methctrl toy none -1 -1 14 8 1
+methctrl toy custom -1 -1 14 8 1
+methctrl RSA sign 6 -1 4097 1 1
+methctrl RSA sign 912 -1 4097 1 1
+methctrl toy keygen -1 -1 15 0 1
+methctrlstr toy sign digest SHA256 1
+methctrlstr toy sign digest NOPE 1
+methctrlstr toy sign md sha1 1
+methctrlstr toy sign hexkey 616263 1
+methctrlstr toy sign hexkey zz 1
+methctrlstr toy sign distid 6964 1
+methctrlstr toy none distid 6964 1
+methctrlstr toy none key 6964 1

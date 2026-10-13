@@ -261,3 +261,9 @@ name = "derive"
 path = "fuzz_targets/derive.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "meth"
+path = "fuzz_targets/meth.rs"
+test = false
+doc = false
