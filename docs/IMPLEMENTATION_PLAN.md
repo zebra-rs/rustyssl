@@ -2686,10 +2686,63 @@ chunking) is clean.
       sessions; the random sessions now also reach `pksiginit` and `pkcansign`, which an off-by-
       range draw had left out); the `derive` fuzz target checks derivation through key contexts
       (typed setters, ctrls, and ctrl strings) against `EVP_KDF_derive`.
-  - [ ] **4.2d Legacy and printing:** `EVP_PKEY_print_*`, `EVP_PKEY_assign` and the `get1_*`
-    family, the `EVP_PKEY_meth_*` and `EVP_PKEY_asn1_*` custom-method APIs (with
-    `EVP_PKEY_CTX_str2ctrl`/`hex2ctrl` and the parameters-to-ctrls translation they need),
-    the legacy keys' parameters, attributes, and `PEM_bytes_read_bio`.
+  - [x] **4.2d Applications' methods:** `evp/pmeth.rs`, `evp/pkey/ameth.rs` (now the method
+    tables), `evp/ctrl/to_ctrl.rs`, and the legacy paths of `pkey.rs`, `pkey_ctx.rs`,
+    `ctrl.rs`, `signature.rs`, `sigver.rs`, `exchange.rs`, `asymcipher.rs`, `kem.rs`, and
+    `setters.rs`: 78 exports; libcrypto now 1,906 of 5,876.
+    - `EVP_PKEY_asn1_*` and `EVP_PKEY_meth_*`: the built-in tables (15 ASN.1 methods, 10 key
+      methods, their functions present as in OpenSSL's) and the application's, sorted by key
+      type after them; an application's method takes the place of the built-in one; adding,
+      aliasing, removing, copying (functions only), freeing (only methods made by `*_new`),
+      and every setter and getter.
+    - Keys typed by an application's ASN.1 method: `EVP_PKEY_assign`, `EVP_PKEY_get0`,
+      `EVP_PKEY_get0_asn1`, and the method's functions behind the sizes, `eq`,
+      `parameters_eq`, `missing_parameters`, `copy_parameters`, raw keys (getting and making,
+      when no key manager can), the default digest, the encoded public key, the checks, and
+      `pkey_free` whenever the key's data goes.
+    - Legacy contexts (a key type with an application's `EVP_PKEY_METHOD`): no key manager;
+      the method's `init`, `copy`, `cleanup`; generation, signing, verifying, recovery,
+      encryption, decryption, derivation (with `EVP_PKEY_CTRL_PEER_KEY` around the peer's
+      checks), the checks, and `M_check_autoarg`; `EVP_DigestSign*`/`EVP_DigestVerify*`
+      through `signctx`/`verifyctx`, the one-shot `digestsign`/`digestverify`, or a digest
+      signed with `EVP_PKEY_sign`, with `digest_custom` and `EVP_PKEY_FLAG_SIGCTX_CUSTOM`;
+      ctrls (relaxed for a method with `digest_custom`), ctrl strings ("digest" to the ctrl),
+      `EVP_PKEY_CTX_str2ctrl`/`hex2ctrl`, the typed setters' key-type checks, and parameters
+      as ctrls: the translations' other direction (`PRE`/`POST_PARAMS_TO_CTRL` of every
+      fixup). A KEM with a legacy context fails as OpenSSL's does.
+    - Quirks kept: setting a string parameter fails without a ctrl (OpenSSL has no room for
+      it) except the EC curve, and getting one passes the ctrl no pointer; getting the HKDF
+      mode gives the length of its name; the encryption init wants `encrypt` for decryption
+      too; an init without the method's `*_init` doesn't send the kept distinguishing ID; the
+      octets a parameter sets are never freed (the method may keep them); where OpenSSL
+      searches for an engine implementing a key type (`EVP_PKEY_type`, typing a key by type,
+      a context for a key type), the configuration file is loaded, as its engine table
+      does (a random differential session found the error ring's data buffers differing).
+    - New deviations: built-in methods aren't changed (OpenSSL's are read-only); NULL methods;
+      methods freed while used; a legacy context copied without `copy`, given an algorithm,
+      given no length or peer, or the HKDF mode as a parameter; `SIGCTX_CUSTOM` without
+      `signctx`; a `verifyctx` signature over `INT_MAX`; exporting an application's key type;
+      aliases in a cycle.
+    - **Decision:** the methods are reference-counted handles (the tables, contexts, and keys
+      hold references), so an application's free can't pull one out from under them; the
+      built-in methods' functions abort until the key types bring their data (4.3 onwards).
+    - `tests/c/evp_pkey_meth.c` (25 checks): both tables, then a key type of the test's own
+      whose ASN.1 method and key method log every call, through the key functions, every
+      context operation, the digest-signing variants, parameters as ctrls, and an HMAC method
+      taking the provider's place.
+    - The probe's `methfind`, `methstr`, `methparam`, `methctrl`, and `methctrlstr` (corpus
+      `meth.txt`, random `meth` sessions): a logging method added for one command, for each
+      key type the translations name; the `meth` fuzz target checks the tables' counts, PEM
+      name lookups, and that the method's ctrl gets the parameters' octets.
+  - [ ] **4.2e Printing and PEM:** `EVP_PKEY_print_public`/`_private`/`_params` and their
+    `_fp` forms (a provided key without text encoders prints OpenSSL's "unsupported" line; a
+    key with encoders waits for the encoders, 4.7; a legacy key goes to its ASN.1 method's
+    print functions), `PEM_bytes_read_bio`/`_secmem`, and `PEM_ASN1_read`/`_bio`.
+  - Moved from 4.2: the attribute functions (`EVP_PKEY_add1_attr*`, `get_attr*`,
+    `delete_attr`, `get_attr_count`) to the X.509 attributes; the typed `get0`/`get1`/`set1`
+    of RSA, DH, DSA, and EC, `EVP_PKEY_get_ec_point_conv_form`, `EVP_PKEY_get_field_type`, the
+    built-in key types' legacy data (`EVP_PKEY_assign` of an `RSA *`, ...), and the legacy
+    keys' parameters (`EVP_PKEY_get_params` of a key with legacy data) to 4.3–4.6.
 - [ ] **4.3 RSA:**
   - keygen (multi-prime)
   - PKCS#1 v1.5 signatures
