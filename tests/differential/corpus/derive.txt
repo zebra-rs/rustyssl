@@ -1,0 +1,74 @@
+# Derivation through key contexts with the default provider's KDF exchanges (TLS1-PRF, HKDF,
+# SCRYPT): the ctrl strings and their translations to the KDFs' parameters (hexadecimal
+# values, parameter names given directly, unknown names and values), the numbered ctrls
+# (digests, octets, numbers, and commands of other key types), and the asymmetric cipher, KEM,
+# and exchange operations on keys without them.
+pkderive HKDF 42 md=SHA256 hexsalt=000102030405060708090a0b0c hexkey=0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b hexinfo=f0f1f2f3f4f5f6f7f8f9
+pkderive HKDF 0 md=SHA256 key=secret
+pkderive HKDF 32 md=SHA256 key=secret mode=EXTRACT_ONLY
+pkderive HKDF 16 md=SHA256 key=secret mode=EXPAND_ONLY info=abc
+pkderive HKDF 16 md=SHA256 key=secret mode=SIDEWAYS
+pkderive HKDF 16 digest=SHA1 key=secret properties=
+pkderive HKDF 16 md=NOPE key=secret
+pkderive HKDF 16 md=SHA256 hexkey=zz
+pkderive HKDF 16 md=SHA256
+pkderive HKDF 16 foo=bar md=SHA256 key=k
+pkderive HKDF 16 N=16 md=SHA256 key=k
+pkderive HKDF 16 distid=abc md=SHA256 key=k
+pkderive HKDF 16 MD=SHA512 KEY=k INFO=x SALT=y
+pkderive 1036 20 md=SHA1 key=k
+pkderive TLS1-PRF 24 md=SHA256 secret=0123456789abcdef seed=labelseed
+pkderive TLS1-PRF 24 md=SHA256 hexsecret=30313233343536373839616263646566 hexseed=6c6162656c73656564
+pkderive TLS1-PRF 0 md=SHA256 secret=s seed=t
+pkderive TLS1-PRF 24 secret=s seed=t
+pkderive TLS1-PRF 24 md=MD5-SHA1 secret=s seed=t
+pkderive SCRYPT 64 pass= salt= N=16 r=1 p=1
+pkderive SCRYPT 16 pass=password salt=NaCl N=16 r=1 p=1 maxmem_bytes=1048576
+pkderive SCRYPT 16 hexpass=70617373776f7264 hexsalt=4e61436c N=16 r=1 p=1
+pkderive SCRYPT 16 pass=password salt=NaCl N=3 r=1 p=1
+pkderive SCRYPT 16 pass=password salt=NaCl N=sixteen
+pkderive SCRYPT 0 pass=p salt=s
+pkderive 973 16 pass=p salt=s N=16 r=1 p=1
+pkderive HMAC 16 key=k
+pkderive NOPE 16 key=k
+pkctrl HKDF derive 2048 hkdf_md SHA256
+pkctrl HKDF derive 2048 hkdf_salt 000102
+pkctrl HKDF derive 2048 hkdf_key 0b0b0b0b
+pkctrl HKDF derive 2048 hkdf_info f0f1
+pkctrl HKDF derive 2048 hkdf_mode 1
+pkctrl HKDF derive 2048 hkdf_mode 2
+pkctrl HKDF derive 2048 hkdf_mode 9
+pkctrl HKDF derive -1 tls_md SHA1
+pkctrl HKDF derive 16 hkdf_md SHA256
+pkctrl HKDF none -1 hkdf_md SHA256
+pkctrl HKDF derive -1 set1_id 696421
+pkctrl HKDF none -1 set1_id 696421
+pkctrl HKDF derive -1 md SHA256
+pkctrl HKDF derive -1 dh_pad 1
+pkctrl HKDF derive -1 unknown 0
+pkctrl HKDF derive -1 scrypt_n 16
+pkctrl SCRYPT derive -1 scrypt_n 16
+pkctrl SCRYPT derive -1 pass 70617373
+pkctrl SCRYPT derive -1 scrypt_maxmem 1048576
+pkctrl TLS1-PRF derive -1 tls_secret 30313233
+pkctrl TLS1-PRF derive -1 tls_seed 7365
+pkctrl TLS1-PRF derive -1 tls_md SHA384
+pkctrl HMAC keygen -1 mac_key 6b6579
+pkctrl HMAC keygen -1 cipher AES-128-CBC
+pkctrl HMAC keygen 4 digest_size 8
+pkctrl HMAC keygen -1 md SHA256
+pkctrl HMAC paramgen -1 mac_key 6b6579
+pkctrl CMAC keygen -1 cipher AES-256-CBC
+pkctrl CMAC keygen -1 cipher NOPE
+pkraw 0 HMAC 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+pkcrypt 0 encrypt
+pkcrypt 0 decrypt
+pkcrypt 0 encap
+pkcrypt 0 decap
+pkcrypt 0 derive
+pkcmac 1 AES-128-CBC 2b7e151628aed2a6abf7158809cf4f3c
+pkcrypt 1 derive
+pkcrypt 1 encrypt
+pkcrypt 7 encrypt
+pkfree 0
+pkfree 1

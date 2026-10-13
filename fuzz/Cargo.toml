@@ -255,3 +255,9 @@ name = "signature"
 path = "fuzz_targets/signature.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "derive"
+path = "fuzz_targets/derive.rs"
+test = false
+doc = false
