@@ -886,8 +886,17 @@ static CMAC_LEGACY_KEYMGMT: Dispatch<18> = Dispatch([
 
 /// A KDF's key data (`KDF_DATA`): nothing but the context, shared by reference.
 pub(crate) struct KdfData {
-    #[expect(dead_code, reason = "the KDF exchanges (4.2c) use it")]
+    #[expect(dead_code, reason = "OpenSSL's KDF_DATA keeps it; nothing reads it")]
     libctx: Ptr<OSSL_LIB_CTX>,
+}
+
+/// `ossl_kdf_data_up_ref`: adds a reference to a KDF's key data.
+///
+/// # Safety
+/// `kdfdata` is live data from `kdf_newdata`.
+pub(crate) unsafe fn kdf_data_up_ref(kdfdata: *mut c_void) {
+    // SAFETY: the caller's guarantee: a live `Arc`.
+    unsafe { Arc::increment_strong_count(kdfdata.cast::<KdfData>().cast_const()) };
 }
 
 ffi_callback! {

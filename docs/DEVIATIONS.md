@@ -169,8 +169,22 @@ OpenSSL never depends on them.
 | `EVP_SIGNATURE_up_ref`, `EVP_SIGNATURE_get0_name` and the other accessors, and `EVP_SIGNATURE_names_do_all` with a NULL algorithm | dereference NULL and crash | fail (0, NULL) | `evp::signature::tests::null_methods_are_refused` |
 | `EVP_PKEY_sign_message_update`/`_final` and `EVP_PKEY_verify_message_update`/`_final` after an init that left the operation without an algorithm (one given of another key type) | read the missing algorithm and crash | fail with -2 and `EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE`, as `EVP_PKEY_sign` does there | `evp::signature::tests::message_functions_without_an_algorithm_fail` |
 | `EVP_DigestSignInit`, `EVP_DigestSign*`/`EVP_DigestVerify*`, and `EVP_MD_CTX_get_pkey_ctx`/`_set_pkey_ctx` with a NULL digest context; `EVP_PKEY_can_sign` with a NULL key | dereference NULL and crash | fail (0, -1 for `EVP_DigestVerify`, NULL) or do nothing | `evp::sigver::tests::null_contexts_are_refused` |
+| `EVP_KEYEXCH_*`, `EVP_ASYM_CIPHER_*`, and `EVP_KEM_*` accessors (`up_ref`, `get0_name`, `get0_provider`, `is_a`, `names_do_all`, the parameter lists) with a NULL algorithm | dereference NULL and crash (`EVP_KEYEXCH_is_a` excepted) | fail (0, NULL) | `evp::exchange::tests::null_methods_are_refused`, `evp::asymcipher::tests::null_methods_are_refused`, `evp::kem::tests::null_methods_are_refused` |
+| `EVP_PKEY_encapsulate`/`EVP_PKEY_decapsulate` with a KEM whose functions are the two inits without the encapsulation (or decapsulation) itself, which OpenSSL accepts as a whole | calls the missing function and crashes | fails with -2 and `EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE` | `evp::kem::tests::missing_functions_are_refused` |
+| `EVP_PKEY_encrypt_old`/`EVP_PKEY_decrypt_old` with a NULL key | dereference NULL and crash | fail (0, -1) with `EVP_R_PUBLIC_KEY_NOT_RSA` | `evp::asymcipher::tests::null_methods_are_refused` |
+| `EVP_PKEY_CTX_ctrl` (and the setters that use it) with a digest or cipher given by a NID without a name | takes the length of the missing name and crashes | returns 0 | `evp::ctrl::tests::nameless_digests_are_refused` |
+| `EVP_PKEY_CTX_ctrl_str` with a NULL name or value, or a NULL context with `distid`/`hexdistid` | dereference NULL and crash | fail with -2 and `EVP_R_COMMAND_NOT_SUPPORTED` | `evp::ctrl::tests::null_strings_are_refused` |
+| `EVP_PKEY_CTX_ctrl_uint64`, and `EVP_PKEY_CTX_ctrl` with the scrypt commands (`EVP_PKEY_CTRL_SCRYPT_N`, `_R`, `_P`, `_MAXMEM_BYTES`) and a value pointer, on a provider operation | read the `uint64_t`'s address as a BIGNUM (out of bounds) | pass the value, as the commands' legacy definition says | `evp::ctrl::tests::scrypt_arguments_are_64_bit` |
+| `EVP_PKEY_CTX_get_rsa_padding` (`EVP_PKEY_CTRL_GET_RSA_PADDING`) when the operation reports a padding name that isn't one of the modes' | compares it with the TLS mode's missing name and crashes | fails with -2 and `RSA_R_UNKNOWN_PADDING_TYPE` | `evp::ctrl::tests::unknown_padding_names_fail` |
+| The typed setters and getters (`EVP_PKEY_CTX_set_hkdf_md`, `set1_hkdf_salt`, `set_scrypt_N`, `set_dh_pad`, `set_rsa_padding`, ...) with a NULL context; `EVP_PKEY_CTX_set_algor_params` with a NULL algorithm | dereference NULL and crash | fail as for a context without the operation (-2), or -1 | `evp::setters::tests::null_contexts_are_refused` |
 
 ## Notes
+
+- **Getting an object identifier by ctrl (`EVP_PKEY_CTX_get0_dh_kdf_oid`).** The translation
+  gives the provider no room for the name, so no provider can return one, and the ctrl never
+  returns the object. When a provider reports an empty name anyway, OpenSSL then reads the
+  caller's `ASN1_OBJECT *` as a string to make an object it never returns; rustyssl skips
+  that. The results are the same, 0 or the length 0 (`tests/c/evp_pkey_ops.c`).
 
 - **The version text.** This is the one entry not about memory safety: it's about knowing what
   runs. A vulnerability scanner or an administrator reading `OpenSSL 3.5.9` would apply

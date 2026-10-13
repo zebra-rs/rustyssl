@@ -3187,6 +3187,111 @@ fn pkey_hex(random: &mut Random, max: u64) -> String {
 /// keys from parameters (with every selection, wrong types, and ciphers), parameters, copies,
 /// comparisons, typing, checks, and signing (through digest contexts and the `EVP_PKEY_sign`
 /// family), over the MAC and KDF key types and some that don't exist.
+/// The digests the derivation commands name.
+const KDF_DIGESTS: &[&str] = &[
+    "SHA256", "SHA1", "SHA512", "SHA3-256", "MD5", "MD5-SHA1", "SHAKE128", "NOPE",
+];
+
+/// The named ctrls of `pkctrl`.
+const PK_CTRLS: &[&str] = &[
+    "tls_md",
+    "tls_secret",
+    "tls_seed",
+    "hkdf_md",
+    "hkdf_salt",
+    "hkdf_key",
+    "hkdf_info",
+    "hkdf_mode",
+    "pass",
+    "scrypt_salt",
+    "scrypt_n",
+    "scrypt_r",
+    "scrypt_p",
+    "scrypt_maxmem",
+    "mac_key",
+    "digest_size",
+    "set1_id",
+    "cipher",
+    "md",
+    "dh_pad",
+    "unknown",
+];
+
+/// A `pkderive` line: a KDF context (scrypt's with small costs first: its defaults take a
+/// GiB) and ctrl strings, known and not.
+fn derive_line(random: &mut Random, out: &mut String) -> Result {
+    let kdf = random.pick(&[
+        "HKDF", "TLS1-PRF", "SCRYPT", "1036", "1021", "973", "HMAC", "NOPE",
+    ]);
+    let len = random.pick(&["0", "16", "20", "32", "42", "64", "100"]);
+    let mut line = format!("pkderive {kdf} {len}");
+    if matches!(kdf, "SCRYPT" | "973") {
+        line.push_str(" N=16 r=1 p=1");
+    }
+    for _ in 0..random.below(7) {
+        let name = random.pick(&[
+            "md",
+            "digest",
+            "salt",
+            "hexsalt",
+            "key",
+            "hexkey",
+            "info",
+            "hexinfo",
+            "mode",
+            "secret",
+            "hexsecret",
+            "seed",
+            "hexseed",
+            "pass",
+            "hexpass",
+            "N",
+            "r",
+            "p",
+            "maxmem_bytes",
+            "properties",
+            "distid",
+            "hexdistid",
+            "foo",
+            "MD",
+            "n",
+            "size",
+        ]);
+        let value = match name {
+            "md" | "digest" | "MD" => random.pick(KDF_DIGESTS).to_owned(),
+            "mode" => random
+                .pick(&[
+                    "EXTRACT_AND_EXPAND",
+                    "EXTRACT_ONLY",
+                    "EXPAND_ONLY",
+                    "x",
+                    "1",
+                ])
+                .to_owned(),
+            "N" | "n" => random
+                .pick(&["1", "2", "4", "8", "16", "3", "0", "x"])
+                .to_owned(),
+            "r" | "p" => random.pick(&["1", "2", "0", "x"]).to_owned(),
+            "maxmem_bytes" => random.pick(&["1048576", "0", "1", "x"]).to_owned(),
+            "properties" => random.pick(&["", "provider=default", "x"]).to_owned(),
+            n if n.starts_with("hex") => {
+                if random.below(5) == 0 {
+                    random.pick(&["z", "abc", "0g"]).to_owned()
+                } else {
+                    let h = pkey_hex(random, 20);
+                    if h == "-" { String::new() } else { h }
+                }
+            }
+            _ => random
+                .pick(&["", "abc", "secret", "0123456789abcdef", "x=y"])
+                .to_owned(),
+        };
+        line.push_str(&format!(" {name}={value}"));
+    }
+    writeln!(out, "{line}")?;
+    Ok(())
+}
+
 fn pkey_session(random: &mut Random, out: &mut String) -> Result {
     const NAMES: &[&str] = &[
         "HMAC",
@@ -3228,7 +3333,7 @@ fn pkey_session(random: &mut Random, out: &mut String) -> Result {
     let slot = |random: &mut Random| random.below(8);
     for _ in 0..random.below(25) + 1 {
         let s = slot(random);
-        match random.below(16) {
+        match random.below(23) {
             0 | 1 => writeln!(
                 out,
                 "pkraw {s} {} {}",
@@ -3348,6 +3453,33 @@ fn pkey_session(random: &mut Random, out: &mut String) -> Result {
                 writeln!(out, "pksiginit {s} {op} {alg}")?;
             }
             18 => writeln!(out, "pkcansign {s}")?,
+            19 | 20 => derive_line(random, out)?,
+            21 => {
+                let cmd = random.pick(PK_CTRLS);
+                let arg = match cmd {
+                    "tls_md" | "hkdf_md" | "md" => random.pick(KDF_DIGESTS).to_owned(),
+                    "cipher" => random.pick(CIPHERS).to_owned(),
+                    "hkdf_mode" | "scrypt_n" | "scrypt_r" | "scrypt_p" | "scrypt_maxmem"
+                    | "digest_size" | "dh_pad" | "unknown" => random
+                        .pick(&["0", "1", "2", "3", "8", "16", "-1", "1048576"])
+                        .to_owned(),
+                    _ => pkey_hex(random, 20),
+                };
+                writeln!(
+                    out,
+                    "pkctrl {} {} {} {cmd} {arg}",
+                    random.pick(&[
+                        "HKDF", "TLS1-PRF", "SCRYPT", "HMAC", "CMAC", "SIPHASH", "1036"
+                    ]),
+                    random.pick(&["derive", "keygen", "paramgen", "none"]),
+                    random.pick(&["-1", "2048", "4", "2", "16", "0", "6"]),
+                )?;
+            }
+            22 => writeln!(
+                out,
+                "pkcrypt {s} {}",
+                random.pick(&["encrypt", "decrypt", "encap", "decap", "derive"])
+            )?,
             _ => writeln!(out, "pkshow {s}")?,
         }
         if random.below(10) == 0 {

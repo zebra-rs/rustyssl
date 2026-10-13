@@ -2642,12 +2642,54 @@ chunking) is clean.
     - The probe's `pkdsign`, `pkdsignone`, `pksiginit`, and `pkcansign` commands (corpus
       `signature.txt`, random key sessions); the `signature` fuzz target checks signatures
       against `EVP_Q_mac` and against each other (in pieces, at once, again, copied).
-  - [ ] **4.2c Derivation, encryption, and KEMs:** `EVP_KEYEXCH` and derive with the KDF
-    exchanges (`kdf_exch.c`); `EVP_ASYM_CIPHER`; `EVP_KEM`; `EVP_PKEY_CTX_ctrl`/`ctrl_str` and
-    the ctrl-to-parameter translation (`ctrl_params_translate.c`) with the typed setters.
+  - [x] **4.2c Derivation, encryption, and KEMs:** `evp/opmeth.rs`, `evp/exchange.rs`,
+    `evp/asymcipher.rs`, `evp/kem.rs`, `evp/ctrl.rs`, `evp/setters.rs`, and
+    `provider/exchanges.rs`: 141 exports; libcrypto now 1,828 of 5,876.
+    - `EVP_KEYEXCH`, `EVP_ASYM_CIPHER`, and `EVP_KEM`, made from a provider's algorithm with
+      OpenSSL's checks of which functions make a whole, fetched, and introspected (one generic
+      method type and one set of introspection exports for the three).
+    - `EVP_PKEY_derive_init`/`_ex`, `EVP_PKEY_derive_set_peer`/`_ex` (checking the peer with
+      `EVP_PKEY_public_check`), and `EVP_PKEY_derive`: a context without a key (a KDF's) gets a
+      blank key of its key manager's type. The encryption and decryption inits and operations,
+      `EVP_PKEY_encrypt_old`/`decrypt_old` (RSA keys only; one with data comes with 4.3), and
+      the KEM's inits (with and without an authentication key) and operations. Key contexts
+      copy, and give their parameters to, each operation's algorithm.
+    - The default provider's KDF exchanges for TLS1-PRF, HKDF, and SCRYPT (`kdf_exch.c`),
+      over the KDFs; the exchanges, ciphers, and KEMs of the key types are pending entries in
+      `deflt_keyexch`/`deflt_asym_cipher`/`deflt_asym_kem` order.
+    - `EVP_PKEY_CTX_ctrl`, `_ctrl_uint64`, `_ctrl_str`, and `EVP_PKEY_CTX_md`: OpenSSL's
+      translation table (all 86 entries, in order) and fixups from ctrls and ctrl strings to
+      the operation's parameters, strict where OpenSSL's is; the distinguishing ID kept before
+      an operation and given to the signature operations as they start.
+    - The typed setters and getters of HKDF, TLS1-PRF, scrypt, DH, DSA, EC, RSA, groups,
+      algorithm identifiers, KEM operations, and the distinguishing ID, each with its checks of
+      the operation and key type.
+    - Quirks kept: command numbers are shared between key types (RSA's padding command is
+      TLS1-PRF's secret, whose entry is for any key type); the HKDF mode's ctrl passes the
+      length of the mode's name; `EVP_PKEY_CTX_set_dh_paramgen_type` passes a NULL string as
+      long as the type number; the "get" ctrls return the length of what they got; getting the
+      ID's length gives 0 and getting the ID writes a pointer into the caller's buffer;
+      `EVP_PKEY_CTX_get_algor(ctx, NULL)` gives -1; an encryption init that finds no cipher
+      leaves the operation set, a KEM init resets it, with the fetches' errors queued.
+    - New deviations: NULL algorithms, contexts, keys, and strings are refused; a KEM missing
+      its encapsulation function; a digest given by a nameless NID; an unknown padding name read
+      back; the scrypt commands' `uint64_t` arguments.
+    - **Decision:** a translation's argument is read as the type its matched entry says, not by
+      command number: numbers collide across key types (DH's `KDF_OID` is scrypt's
+      `MAXMEM_BYTES`), which the toy provider's DH key found.
+    - `tests/c/evp_derive.c` (16 checks, the RFC 5869 and RFC 7914 vectors) and
+      `tests/c/evp_pkey_ops.c` (28 checks): the latter registers a provider of its own whose
+      key type (as TOY, RSA, RSA-PSS, DH, DHX, DSA, EC, SM2), cipher, KEM, exchange, and
+      signature log and echo every parameter, so the output shows what each ctrl, ctrl string,
+      and typed setter turns into.
+    - The probe's `pkderive`, `pkctrl`, and `pkcrypt` commands (corpus `derive.txt`, random key
+      sessions; the random sessions now also reach `pksiginit` and `pkcansign`, which an off-by-
+      range draw had left out); the `derive` fuzz target checks derivation through key contexts
+      (typed setters, ctrls, and ctrl strings) against `EVP_KDF_derive`.
   - [ ] **4.2d Legacy and printing:** `EVP_PKEY_print_*`, `EVP_PKEY_assign` and the `get1_*`
-    family, the `EVP_PKEY_meth_*` and `EVP_PKEY_asn1_*` custom-method APIs, attributes, and
-    `PEM_bytes_read_bio`.
+    family, the `EVP_PKEY_meth_*` and `EVP_PKEY_asn1_*` custom-method APIs (with
+    `EVP_PKEY_CTX_str2ctrl`/`hex2ctrl` and the parameters-to-ctrls translation they need),
+    the legacy keys' parameters, attributes, and `PEM_bytes_read_bio`.
 - [ ] **4.3 RSA:**
   - keygen (multi-prime)
   - PKCS#1 v1.5 signatures

@@ -5174,6 +5174,198 @@ static int pkey_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Key derivation and the ctrls (step 4.2c).
+ *
+ *   pkderive TYPE LEN [NAME=VALUE ...]   a derivation of LEN octets (0: the size) with a context
+ *                                         for the key type TYPE (a name or number), after the
+ *                                         ctrl strings
+ *   pkctrl TYPE OP OPTYPE CMD ARG         one ctrl (CMD from the table below) on a context for
+ *                                         TYPE initialized for OP (derive, keygen, paramgen,
+ *                                         none), with OPTYPE as given
+ *   pkcrypt SLOT OP                       an operation's init (encrypt, decrypt, encap, decap,
+ *                                         derive) and its call on the slot's key
+ *
+ * The ctrls are named, not numbered: some read their pointer argument as a digest, a cipher,
+ * or a BIGNUM, and some write through it, which the probe can only give where it's safe.
+ */
+enum pk_arg { PK_INT, PK_OCTETS, PK_MD, PK_CIPHER };
+
+static const struct {
+    const char *name;
+    int cmd;
+    enum pk_arg arg;
+} pk_ctrls[] = {
+    { "tls_md", EVP_PKEY_CTRL_TLS_MD, PK_MD },
+    { "tls_secret", EVP_PKEY_CTRL_TLS_SECRET, PK_OCTETS },
+    { "tls_seed", EVP_PKEY_CTRL_TLS_SEED, PK_OCTETS },
+    { "hkdf_md", EVP_PKEY_CTRL_HKDF_MD, PK_MD },
+    { "hkdf_salt", EVP_PKEY_CTRL_HKDF_SALT, PK_OCTETS },
+    { "hkdf_key", EVP_PKEY_CTRL_HKDF_KEY, PK_OCTETS },
+    { "hkdf_info", EVP_PKEY_CTRL_HKDF_INFO, PK_OCTETS },
+    { "hkdf_mode", EVP_PKEY_CTRL_HKDF_MODE, PK_INT },
+    { "pass", EVP_PKEY_CTRL_PASS, PK_OCTETS },
+    { "scrypt_salt", EVP_PKEY_CTRL_SCRYPT_SALT, PK_OCTETS },
+    { "scrypt_n", EVP_PKEY_CTRL_SCRYPT_N, PK_INT },
+    { "scrypt_r", EVP_PKEY_CTRL_SCRYPT_R, PK_INT },
+    { "scrypt_p", EVP_PKEY_CTRL_SCRYPT_P, PK_INT },
+    { "scrypt_maxmem", EVP_PKEY_CTRL_SCRYPT_MAXMEM_BYTES, PK_INT },
+    { "mac_key", EVP_PKEY_CTRL_SET_MAC_KEY, PK_OCTETS },
+    { "digest_size", EVP_PKEY_CTRL_SET_DIGEST_SIZE, PK_INT },
+    { "set1_id", EVP_PKEY_CTRL_SET1_ID, PK_OCTETS },
+    { "cipher", EVP_PKEY_CTRL_CIPHER, PK_CIPHER },
+    { "md", EVP_PKEY_CTRL_MD, PK_MD },
+    { "dh_pad", EVP_PKEY_CTRL_DH_PAD, PK_INT },
+    { "unknown", 9999, PK_INT },
+};
+
+static void pk_derive_out(EVP_PKEY_CTX *ctx, size_t want)
+{
+    unsigned char out[256];
+    size_t len = want < sizeof(out) ? want : sizeof(out);
+    int r;
+
+    if (want == 0) {
+        r = EVP_PKEY_derive(ctx, NULL, &len);
+        printf(" size %d %zu", r, len);
+        return;
+    }
+    r = EVP_PKEY_derive(ctx, out, &len);
+    printf(" derive %d", r);
+    if (r > 0) {
+        printf(" ");
+        for (size_t i = 0; i < len; i++)
+            printf("%02x", out[i]);
+    }
+}
+
+static int derive_command(const char *command, const char *line)
+{
+    char type[64] = "", b[64] = "", c[64] = "", d[64] = "", e[600] = "";
+    EVP_PKEY_CTX *ctx;
+    int r, s;
+
+    if (strcmp(command, "pkderive") != 0 && strcmp(command, "pkctrl") != 0
+        && strcmp(command, "pkcrypt") != 0)
+        return 0;
+    printf("%s:", line);
+    sscanf(line, "%*s %63s %63s %63s %63s %599s", type, b, c, d, e);
+    if (strcmp(command, "pkderive") == 0) {
+        const char *p = line;
+        int field = 0;
+
+        ctx = pk_ctx(type);
+        r = EVP_PKEY_derive_init(ctx);
+        printf(" init %d", r);
+        /*
+         * The NAME=VALUE fields after TYPE and LEN (none without a context: the reference
+         * keeps a distinguishing ID in it before looking).
+         */
+        while (ctx != NULL && *p != '\0') {
+            char tok[600], *eq;
+            int n = 0;
+
+            while (*p == ' ')
+                p++;
+            if (*p == '\0' || sscanf(p, "%599s%n", tok, &n) != 1)
+                break;
+            p += n;
+            if (field++ < 3)
+                continue;
+            eq = strchr(tok, '=');
+            if (eq == NULL)
+                continue;
+            *eq = '\0';
+            printf(" %s=%d", tok, EVP_PKEY_CTX_ctrl_str(ctx, tok, eq + 1));
+        }
+        if (ctx != NULL)
+            pk_derive_out(ctx, strtoul(b, NULL, 10));
+        EVP_PKEY_CTX_free(ctx);
+    } else if (strcmp(command, "pkctrl") == 0) {
+        unsigned char oct[300];
+        size_t i, n = 0;
+        void *p2 = NULL;
+        int p1 = 0, optype = (int)strtol(c, NULL, 10);
+
+        for (i = 0; i < sizeof(pk_ctrls) / sizeof(pk_ctrls[0]); i++)
+            if (strcmp(pk_ctrls[i].name, d) == 0)
+                break;
+        if (i == sizeof(pk_ctrls) / sizeof(pk_ctrls[0])) {
+            printf(" unknown\n");
+            return 1;
+        }
+        switch (pk_ctrls[i].arg) {
+        case PK_INT:
+            p1 = (int)strtol(e, NULL, 10);
+            break;
+        case PK_OCTETS:
+            n = pk_hex(e, oct, sizeof(oct));
+            p1 = (int)n;
+            p2 = oct;
+            break;
+        case PK_MD:
+            p2 = (void *)EVP_get_digestbyname(e);
+            break;
+        case PK_CIPHER:
+            p2 = (void *)EVP_get_cipherbyname(e);
+            break;
+        }
+        if ((pk_ctrls[i].arg == PK_MD || pk_ctrls[i].arg == PK_CIPHER) && p2 == NULL) {
+            printf(" no such algorithm\n");
+            return 1;
+        }
+        ctx = pk_ctx(type);
+        if (strcmp(b, "derive") == 0)
+            r = EVP_PKEY_derive_init(ctx);
+        else if (strcmp(b, "keygen") == 0)
+            r = EVP_PKEY_keygen_init(ctx);
+        else if (strcmp(b, "paramgen") == 0)
+            r = EVP_PKEY_paramgen_init(ctx);
+        else
+            r = 0;
+        printf(" init %d ctrl %d", r,
+               EVP_PKEY_CTX_ctrl(ctx, -1, optype, pk_ctrls[i].cmd, p1, p2));
+        if (ctx != NULL && strcmp(b, "derive") == 0)
+            pk_derive_out(ctx, 16);
+        EVP_PKEY_CTX_free(ctx);
+    } else {
+        unsigned char out[64], sec[64];
+        size_t outlen = sizeof(out), seclen = sizeof(sec);
+
+        s = pk_slot(type);
+        if (pk_typed(s) || pkeys[s] == NULL) {
+            printf(" skipped: no key");
+            print_digest_errors();
+            return 1;
+        }
+        ctx = EVP_PKEY_CTX_new(pkeys[s], NULL);
+        if (strcmp(b, "encrypt") == 0) {
+            r = EVP_PKEY_encrypt_init(ctx);
+            printf(" init %d op %d encrypt %d", r, EVP_PKEY_CTX_get_operation(ctx),
+                   EVP_PKEY_encrypt(ctx, out, &outlen, (const unsigned char *)"data", 4));
+        } else if (strcmp(b, "decrypt") == 0) {
+            r = EVP_PKEY_decrypt_init(ctx);
+            printf(" init %d op %d decrypt %d", r, EVP_PKEY_CTX_get_operation(ctx),
+                   EVP_PKEY_decrypt(ctx, out, &outlen, (const unsigned char *)"data", 4));
+        } else if (strcmp(b, "encap") == 0) {
+            r = EVP_PKEY_encapsulate_init(ctx, NULL);
+            printf(" init %d op %d encap %d", r, EVP_PKEY_CTX_get_operation(ctx),
+                   EVP_PKEY_encapsulate(ctx, out, &outlen, sec, &seclen));
+        } else if (strcmp(b, "decap") == 0) {
+            r = EVP_PKEY_decapsulate_init(ctx, NULL);
+            printf(" init %d op %d decap %d", r, EVP_PKEY_CTX_get_operation(ctx),
+                   EVP_PKEY_decapsulate(ctx, sec, &seclen, (const unsigned char *)"data", 4));
+        } else {
+            r = EVP_PKEY_derive_init(ctx);
+            printf(" init %d op %d derive %d peer %d", r, EVP_PKEY_CTX_get_operation(ctx),
+                   EVP_PKEY_derive(ctx, out, &outlen), EVP_PKEY_derive_set_peer(ctx, pkeys[s]));
+        }
+        EVP_PKEY_CTX_free(ctx);
+    }
+    print_digest_errors();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -5201,7 +5393,8 @@ int main(void)
             || fetch_command(command, line) || digest_command(command, line)
             || cipher_command(command, line) || mac_command(command, line)
             || kdf_command(command, line) || rand_command(command, line)
-            || bn_command(command, line) || pkey_command(command, line)) {
+            || bn_command(command, line) || pkey_command(command, line)
+            || derive_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

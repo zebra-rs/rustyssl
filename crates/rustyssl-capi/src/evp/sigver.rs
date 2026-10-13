@@ -373,7 +373,13 @@ unsafe fn do_sigver_init(
     // the caller's array.
     let ret = unsafe { init(algctx, md, key, params) };
     if ret > 0 || mdname.is_some() {
-        // `end`.
+        // `end`: the distinguishing ID kept for the operation goes to it.
+        let ret = if ret > 0 {
+            // SAFETY: the context's live key context.
+            unsafe { super::ctrl::use_cached_data(locpctx) }
+        } else {
+            ret
+        };
         return c_int::from(ret > 0);
     }
     if type_.is_null() {

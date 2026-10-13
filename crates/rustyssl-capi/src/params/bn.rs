@@ -297,8 +297,19 @@ unsafe fn construct(
                 }
             }
             UTF8_STRING => {
-                // SAFETY: the room for the string and its NUL, which `size` counted.
-                unsafe { libc::strncpy(buf.cast(), value, size) };
+                // `strncpy`: the string up to its NUL, then NULs, `size` octets in all.
+                let mut ended = false;
+                for i in 0..size {
+                    let c = if ended {
+                        0
+                    } else {
+                        // SAFETY: the caller's string, read up to its NUL or `size` octets.
+                        unsafe { value.wrapping_add(i).cast::<u8>().read() }
+                    };
+                    ended |= c == 0;
+                    // SAFETY: the room for the string and its NUL, which `size` counted.
+                    unsafe { buf.wrapping_add(i).write(c) };
+                }
                 size -= 1;
             }
             OCTET_STRING => {
