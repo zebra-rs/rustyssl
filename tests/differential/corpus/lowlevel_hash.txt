@@ -1,0 +1,86 @@
+# The deprecated low-level hashes (step 3.8a): contexts printed whole after each call.
+llfinal sha1
+llinit sha1
+llupdate sha1 3
+llupdate sha1 0
+llupdate sha1 61
+llupdate sha1 200
+lltransform sha1 5
+llfinal sha1
+llfinal sha1
+llupdate sha1 10
+llfinal sha1
+llinit sha224
+llupdate sha224 100
+llfinal sha224
+llinit sha256
+llset sha256 Nl 16
+llupdate sha256 3
+llset sha256 md_len 20
+llfinal sha256
+llinit sha256
+llset sha256 md_len 33
+llfinal sha256
+llinit sha256
+llset sha256 md_len 3
+llfinal sha256
+llinit sha384
+llupdate sha384 129
+llfinal sha384
+llfinal sha384
+llinit sha512
+llset sha512 Nl 8
+llupdate sha512 2
+lltransform sha512 3
+llset sha512 md_len 28
+llfinal sha512
+llinit sha512
+llset sha512 md_len 20
+llfinal sha512
+llinit md4
+llupdate md4 55
+llupdate md4 1
+llfinal md4
+llinit md5
+llset md5 Nl 1
+llupdate md5 1
+llfinal md5
+lltransform md5 1
+llinit rmd160
+llupdate rmd160 64
+llfinal rmd160
+llinit mdc2
+llupdate mdc2 5
+llfinal mdc2
+llfinal mdc2
+llinit mdc2
+llset mdc2 pad_type 2
+llupdate mdc2 16
+llfinal mdc2
+llinit wp
+llbits 3
+llbits 5
+llbits 1000
+llbits 505
+llbits 7
+llupdate wp 70
+llfinal wp
+llinit wp
+llbits 505
+llbits 8
+llbits 3
+llbits 4
+llfinal wp
+llone sha1 0
+llone sha224 3
+llone sha256 64
+llone sha384 200
+llone sha512 1000
+llone md4 5
+llone md5 5
+llone rmd160 5
+llone mdc2 9
+llone wp 9
+llinit nonesuch
+lltransform mdc2 0
+llset md4 md_len 3

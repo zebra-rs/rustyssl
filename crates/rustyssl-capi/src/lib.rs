@@ -31,6 +31,7 @@ mod hmac;
 mod init;
 mod lhash;
 mod libctx;
+mod lowlevel;
 mod mem;
 mod objects;
 mod params;

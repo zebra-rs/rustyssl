@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(31) {
+        match random.below(32) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -179,10 +179,68 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             27 => bn_session(&mut random, &mut out)?,
             28 => pkey_session(&mut random, &mut out)?,
             29 => meth_session(&mut random, &mut out)?,
+            30 => lowlevel_hash_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
     Ok(out)
+}
+
+/// A random session of the deprecated low-level hashes: one or two algorithms' contexts
+/// initialized, updated around their block sizes, transformed, given other digest lengths,
+/// paddings, and bit counts near a carry, and finalized (also twice, and before an init);
+/// Whirlpool also by bits; and the one-shots.
+fn lowlevel_hash_session(random: &mut Random, out: &mut String) -> Result {
+    const ALGS: &[&str] = &[
+        "sha1", "sha224", "sha256", "sha384", "sha512", "md4", "md5", "rmd160", "mdc2", "wp",
+    ];
+    let algs = [random.pick(ALGS), random.pick(ALGS)];
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(9),
+            1 => random
+                .pick(&[
+                    "55", "56", "63", "64", "65", "111", "112", "119", "120", "127", "128",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(400),
+        }
+    };
+    for alg in algs {
+        if random.below(8) != 0 {
+            writeln!(out, "llinit {alg}")?;
+        }
+    }
+    for _ in 0..random.below(20) + 1 {
+        let [first, second] = algs;
+        let alg = if random.below(2) == 0 { first } else { second };
+        match random.below(14) {
+            0..=4 => writeln!(out, "llupdate {alg} {}", length(random))?,
+            5 => {
+                let bits = match random.below(3) {
+                    0 => random.below(17),
+                    1 => random.below(1100),
+                    _ => 8 * random.below(70),
+                };
+                writeln!(out, "llbits {bits}")?;
+            }
+            6 => writeln!(out, "lltransform {alg} {}", random.below(1024))?,
+            7 => {
+                let len = random.pick(&["0", "3", "20", "23", "28", "32", "33", "48", "64", "65"]);
+                writeln!(out, "llset {alg} md_len {len}")?;
+            }
+            8 => writeln!(out, "llset {alg} pad_type {}", random.below(4))?,
+            9 => writeln!(out, "llset {alg} Nl {}", 1 + random.below(2000))?,
+            10 => writeln!(out, "llone {alg} {}", length(random))?,
+            11 => writeln!(out, "llinit {alg}")?,
+            _ => writeln!(out, "llfinal {alg}")?,
+        }
+    }
+    for alg in algs {
+        writeln!(out, "llfinal {alg}")?;
+    }
+    Ok(())
 }
 
 /// A random session of object commands: dotted texts (mostly well formed, around known OIDs,
