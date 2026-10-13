@@ -234,6 +234,21 @@ pub(crate) fn name2type(name: &[u8]) -> c_int {
     pkey_type(unsafe { OBJ_ln2nid(c.as_ptr()) })
 }
 
+/// `evp_pkey_type2name`: the first standard name of a key type, else its object's short name
+/// (empty if it has none).
+pub(crate) fn type2name(type_: c_int) -> Vec<u8> {
+    if let Some((_, n)) = NAME2TYPE.iter().find(|(t, _)| *t == type_) {
+        return n.to_vec();
+    }
+    // SAFETY: a number.
+    let sn = unsafe { crate::objects::OBJ_nid2sn(type_) };
+    if sn.is_null() {
+        return Vec::new();
+    }
+    // SAFETY: a static string.
+    unsafe { core::ffi::CStr::from_ptr(sn) }.to_bytes().to_vec()
+}
+
 /// The pre-filled names of the key types (`get_legacy_pkey_meth_names`), in table order: for
 /// each method, the base type (aliases other than SM2) and the type, as numbers, with the PEM
 /// name, and DHX's extra name.

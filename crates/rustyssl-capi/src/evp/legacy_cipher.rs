@@ -52,7 +52,7 @@ use rustyssl_abi::{
     NID_rc4, NID_rc4_40, NID_rc4_hmac_md5, NID_seed_cbc, NID_seed_cfb128, NID_seed_ecb,
     NID_seed_ofb128, NID_sm4_cbc, NID_sm4_cfb128, NID_sm4_ctr, NID_sm4_ecb, NID_sm4_ofb128,
     NID_undef, OBJ_NAME, OBJ_NAME_ALIAS, OBJ_NAME_TYPE_CIPHER_METH, OPENSSL_INIT_ADD_ALL_CIPHERS,
-    SN_aes_128_cbc, SN_aes_192_cbc, SN_aes_256_cbc, SN_aria_128_cbc, SN_aria_192_cbc,
+    OSSL_LIB_CTX, SN_aes_128_cbc, SN_aes_192_cbc, SN_aes_256_cbc, SN_aria_128_cbc, SN_aria_192_cbc,
     SN_aria_256_cbc, SN_bf_cbc, SN_camellia_128_cbc, SN_camellia_192_cbc, SN_camellia_256_cbc,
     SN_cast5_cbc, SN_des_cbc, SN_des_ede_ecb, SN_des_ede3_cbc, SN_des_ede3_ecb, SN_desx_cbc,
     SN_id_aes128_wrap, SN_id_aes128_wrap_pad, SN_id_aes192_wrap, SN_id_aes192_wrap_pad,
@@ -2314,10 +2314,14 @@ pub(crate) fn cipher_types() -> Vec<c_int> {
     types
 }
 
-/// `ossl_namemap_doall_names` with `cipher_from_name`: the first of a number's names that's
-/// a cipher name.
-fn cipher_from_names(id: u32) -> *const EVP_CIPHER {
-    for n in fetch::names_of(ptr::null(), id) {
+/// `ossl_namemap_doall_names` with `cipher_from_name`: the first of a number's names (in
+/// `libctx`'s name map) that's a cipher name.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+unsafe fn cipher_from_names(libctx: *mut OSSL_LIB_CTX, id: u32) -> *const EVP_CIPHER {
+    // SAFETY: the caller's guarantee.
+    for n in unsafe { fetch::names_in_libctx(libctx, id) } {
         let Ok(c) = std::ffi::CString::new(n) else {
             continue;
         };
@@ -2330,6 +2334,52 @@ fn cipher_from_names(id: u32) -> *const EVP_CIPHER {
     ptr::null()
 }
 
+/// `evp_get_cipherbyname_ex`: the cipher named `name`: a cipher name's, or else the first
+/// cipher name among the names `name` shares a number with in `libctx`'s name map (fetching
+/// once to learn the name if it's new). NULL if there's none.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context; `name` is NULL or a string.
+pub(crate) unsafe fn get_cipherbyname_ex(
+    libctx: *mut OSSL_LIB_CTX,
+    name: *const c_char,
+) -> *const EVP_CIPHER {
+    if init_ciphers() == 0 {
+        return ptr::null();
+    }
+    // SAFETY: the caller's guarantee.
+    let cp = unsafe { OBJ_NAME_get(name, OBJ_NAME_TYPE_CIPHER_METH) };
+    if !cp.is_null() {
+        return cp.cast();
+    }
+    let bytes = if name.is_null() {
+        &b""[..]
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { core::ffi::CStr::from_ptr(name) }.to_bytes()
+    };
+    // SAFETY: the caller's guarantee.
+    let mut id = unsafe { fetch::number_in_libctx(libctx, bytes) };
+    if id == 0 {
+        // The name may not be known yet: a fetch teaches the context its names.
+        // SAFETY: no preconditions.
+        unsafe { ERR_set_mark() };
+        // SAFETY: the caller's context and name.
+        let fetched = unsafe { EVP_CIPHER_fetch(libctx, name, ptr::null()) };
+        // SAFETY: the fetched reference, or NULL.
+        unsafe { EVP_CIPHER_free(fetched) };
+        // SAFETY: no preconditions.
+        unsafe { ERR_pop_to_mark() };
+        // SAFETY: as above.
+        id = unsafe { fetch::number_in_libctx(libctx, bytes) };
+        if id == 0 {
+            return ptr::null();
+        }
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { cipher_from_names(libctx, id) }
+}
+
 ffi_export! {
     /// The cipher named `name`: a cipher name's, or else the first cipher name among the
     /// names `name` shares a number with in the default context's name map (fetching once to
@@ -2340,37 +2390,8 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_get_cipherbyname(name: *const c_char) -> *const EVP_CIPHER
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        if init_ciphers() == 0 {
-            return ptr::null();
-        }
-        // SAFETY: the caller's guarantee.
-        let cp = unsafe { OBJ_NAME_get(name, OBJ_NAME_TYPE_CIPHER_METH) };
-        if !cp.is_null() {
-            return cp.cast();
-        }
-        let bytes = if name.is_null() {
-            &b""[..]
-        } else {
-            // SAFETY: the caller's guarantee.
-            unsafe { core::ffi::CStr::from_ptr(name) }.to_bytes()
-        };
-        let mut id = fetch::number_in(ptr::null(), bytes);
-        if id == 0 {
-            // The name may not be known yet: a fetch teaches the context its names.
-            // SAFETY: no preconditions.
-            unsafe { ERR_set_mark() };
-            // SAFETY: the default context and the caller's name.
-            let fetched = unsafe { EVP_CIPHER_fetch(ptr::null_mut(), name, ptr::null()) };
-            // SAFETY: the fetched reference, or NULL.
-            unsafe { EVP_CIPHER_free(fetched) };
-            // SAFETY: no preconditions.
-            unsafe { ERR_pop_to_mark() };
-            id = fetch::number_in(ptr::null(), bytes);
-            if id == 0 {
-                return ptr::null();
-            }
-        }
-        cipher_from_names(id)
+        // SAFETY: the default context; the caller's guarantee.
+        unsafe { get_cipherbyname_ex(ptr::null_mut(), name) }
     }
 }
 

@@ -419,6 +419,13 @@ pub(crate) fn set_type_by_keymgmt(k: &Pkey, keymgmt: &keymgmt::Ref) -> bool {
     )
 }
 
+/// Gives a key typed by its key manager that key manager's new data (`pkey->keydata =
+/// evp_keymgmt_newdata(...)`, as `EVP_PKEY_derive_init` does for key types without keys).
+pub(crate) fn set_keydata(k: &Pkey, keydata: Arc<KeyData>) {
+    let old = k.lock().keydata.replace(keydata);
+    drop(old);
+}
+
 /// `evp_keymgmt_util_cache_keyinfo`: asks the key manager for the key's bits, security bits,
 /// and maximum size, and caches them.
 pub(crate) fn cache_keyinfo(k: &Pkey) {

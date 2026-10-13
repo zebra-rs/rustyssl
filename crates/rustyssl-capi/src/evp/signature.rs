@@ -832,7 +832,9 @@ unsafe fn signature_init(
     }
     // The key data stays alive with the key (or its operation cache), as in OpenSSL.
     drop(chosen.keymgmt);
-    ret
+    // `end`: the distinguishing ID kept for the operation goes to it.
+    // SAFETY: the caller's live context.
+    unsafe { super::ctrl::use_cached_data(ctx) }
 }
 
 /// The context's signature operation, if `operation` is one of `ops` and it has a provider
@@ -1191,10 +1193,8 @@ ffi_export! {
             return -2;
         };
         if fallback {
-            // `EVP_PKEY_CTX_ctrl`: without a provider operation, the context's EVP_PKEY_METHOD
-            // would take it, and none can exist before 4.2d.
-            err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, "evp_pkey_ctx_ctrl_int");
-            return -2;
+            // SAFETY: the caller's guarantee.
+            return unsafe { super::ctrl::ctrl(ctx, -1, EVP_PKEY_OP_TYPE_SIG, rustyssl_abi::EVP_PKEY_CTRL_MD, 0, md.cast_mut().cast()) };
         }
         let name = if md.is_null() {
             c"".as_ptr()
@@ -1230,10 +1230,8 @@ ffi_export! {
             return -2;
         };
         if fallback {
-            // `EVP_PKEY_CTX_ctrl`: without a provider operation, the context's EVP_PKEY_METHOD
-            // would report it, and none can exist before 4.2d.
-            err::raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED, "evp_pkey_ctx_ctrl_int");
-            return -2;
+            // SAFETY: the caller's guarantee.
+            return unsafe { super::ctrl::ctrl(ctx, -1, EVP_PKEY_OP_TYPE_SIG, rustyssl_abi::EVP_PKEY_CTRL_GET_MD, 0, md.cast()) };
         }
         let mut name = [0 as c_char; 80];
         // SAFETY: a static key; the local buffer.
