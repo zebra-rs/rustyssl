@@ -8,6 +8,7 @@
 
 pub mod bn;
 pub mod kdf;
+pub mod lowlevel;
 pub mod mac;
 pub mod md;
 pub mod method_store;
