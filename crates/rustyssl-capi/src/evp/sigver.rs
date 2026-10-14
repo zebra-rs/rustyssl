@@ -488,7 +488,11 @@ unsafe fn do_sigver_init(
         }
         if let Some(name) = &mdname {
             // SAFETY: the context's own fields.
-            unsafe { md_ctx::clear_digest(c, true, false) };
+            unsafe { md_ctx::clear_digest(ctx, true, false) };
+            // SAFETY: the context, still live (the clean-up may have used it).
+            let Some(c) = (unsafe { md_ctx::context(ctx) }) else {
+                return fail(lc);
+            };
             // SAFETY: no preconditions.
             unsafe { ERR_set_mark() };
             // SAFETY: the key context's library context; the name and query.

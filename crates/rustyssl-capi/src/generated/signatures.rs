@@ -4018,6 +4018,106 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
     crate::evp::digest::EVP_MD_gettable_params;
 const _: unsafe extern "C" fn(*const EVP_MD, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::evp::digest::EVP_MD_is_a;
+const _: unsafe extern "C" fn(*const EVP_MD) -> *mut EVP_MD = crate::evp::md_meth::EVP_MD_meth_dup;
+const _: unsafe extern "C" fn(*mut EVP_MD) = crate::evp::md_meth::EVP_MD_meth_free;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_get_app_datasize;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(md: *mut EVP_MD_CTX) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_cleanup;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(md: *mut EVP_MD_CTX, arg1: *const EVP_MD_CTX) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_copy;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        md: *mut EVP_MD_CTX,
+        arg1: core::ffi::c_int,
+        arg2: core::ffi::c_int,
+        arg3: *mut core::ffi::c_void,
+    ) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_ctrl;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(md: *mut EVP_MD_CTX, arg1: *mut core::ffi::c_uchar) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_final;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_ulong =
+    crate::evp::md_meth::EVP_MD_meth_get_flags;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(md: *mut EVP_MD_CTX) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_init;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_get_input_blocksize;
+const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_get_result_size;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        md: *mut EVP_MD_CTX,
+        arg1: *const core::ffi::c_void,
+        arg2: usize,
+    ) -> core::ffi::c_int,
+> = crate::evp::md_meth::EVP_MD_meth_get_update;
+const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> *mut EVP_MD =
+    crate::evp::md_meth::EVP_MD_meth_new;
+const _: unsafe extern "C" fn(*mut EVP_MD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_set_app_datasize;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_MD_CTX) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_cleanup;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<
+        unsafe extern "C" fn(to: *mut EVP_MD_CTX, from: *const EVP_MD_CTX) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_copy;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            cmd: core::ffi::c_int,
+            p1: core::ffi::c_int,
+            p2: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_ctrl;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ctx: *mut EVP_MD_CTX, md: *mut core::ffi::c_uchar) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_final;
+const _: unsafe extern "C" fn(*mut EVP_MD, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_set_flags;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut EVP_MD_CTX) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_init;
+const _: unsafe extern "C" fn(*mut EVP_MD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_set_input_blocksize;
+const _: unsafe extern "C" fn(*mut EVP_MD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::md_meth::EVP_MD_meth_set_result_size;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_MD_CTX,
+            data: *const core::ffi::c_void,
+            count: usize,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::md_meth::EVP_MD_meth_set_update;
 const _: unsafe extern "C" fn(
     *const EVP_MD,
     ::core::option::Option<
