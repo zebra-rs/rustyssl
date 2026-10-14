@@ -3359,10 +3359,27 @@ chunking) is clean.
         cached Montgomery contexts freed but in place (the built-in `finish` frees them), so
         its next built-in operation reads freed memory; rustyssl's works. The test sets
         methods on fresh keys.
-    - [ ] **4.3d2** The operations' helpers and the rest of the API: the padding functions,
-      `RSA_sign`/`verify` (and the ASN.1 OCTET STRING forms), PSS, X9.31, key generation and
-      checks; the providers' operations through the key's method when an application
-      replaced it.
+    - [x] **4.3d2 The operations' helpers** (`rsa_ops.rs`; 29 exports):
+      - The padding functions (PKCS #1 v1.5 types 1 and 2, OAEP with its digests and label,
+        none, X9.31) and PSS's add and verify.
+      - `RSA_sign`/`RSA_verify` and their OCTET STRING forms, through the method's
+        `rsa_sign`/`rsa_verify` or its private encryption/public decryption, as OpenSSL's go.
+        The core's sign and verify split into the DigestInfo's encoding and the check of what
+        was decrypted, so the RSA step between is the method's.
+      - X9.31: the hash identifiers, `RSA_X931_generate_key_ex`, and `RSA_X931_derive_ex`
+        (compositions of the BN X9.31 functions, as in OpenSSL).
+      - `RSA_generate_key_ex`, `RSA_generate_multi_prime_key`, and the deprecated
+        `RSA_generate_key`, through the method's key generation when it has one; the
+        generator now takes a missing exponent as OpenSSL's does (65537 for FIPS 186-4,
+        `RSA_R_BAD_E_VALUE` for the older generator). `RSA_check_key`/`_ex`.
+      - The providers' operations (cipher, signatures, KEM) now go through the key's method,
+        as OpenSSL's do (`rsa_ops::method_op`, into a buffer of the key's size), so an
+        application's default method sees EVP's operations.
+      - Fixed: the MDC2 OCTET STRING signature used a one-octet length (wrong for 128 to 255
+        octets); the provider drew PSS's salt from the private generator, where OpenSSL draws
+        it from the public one.
+      - New deviation: negative lengths and NULL buffers in the padding functions.
+      - `tests/c/rsa_ops.c` (67 checks), with known generators.
     - [ ] **4.3d3** RSA in `EVP_PKEY`: the legacy key data (`EVP_PKEY_assign`, `set1_RSA`,
       `get0_RSA`, `get1_RSA`), its ASN.1 method, and moving keys between their legacy and
       provided forms.
