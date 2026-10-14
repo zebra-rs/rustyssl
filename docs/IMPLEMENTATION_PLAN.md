@@ -3258,7 +3258,47 @@ chunking) is clean.
   - X9.31, `RSA_NO_PADDING`, blinding
   - the legacy `RSA_*` and `RSA_meth_*` APIs
 
-  Private-key operations are constant-time.
+  Private-key operations are constant-time. In sub-steps:
+  - [x] **4.3a The provider's RSA:** the operations, paddings, and signatures in
+    `rustyssl-crypto` (`rsa/`), and the default provider's RSA and RSA-PSS key management,
+    asymmetric cipher, and signatures in `rustyssl-capi` (`rsa.rs`, `provider/rsa_*.rs`). No
+    new exports: EVP reaches it all through the provider.
+    - The core is our own, over the crate's BIGNUM, not RustCrypto's `rsa` (RUSTSEC-2023-0071):
+      private-key operations run on fixed-width, constant-time Montgomery arithmetic with
+      blinding, CRT with OpenSSL's fault check (verifying the result with the public key), and
+      PKCS #1 v1.5 decryption with implicit rejection (the synthetic message from the
+      key-derivation key, chosen without branching on the padding). Paddings: PKCS #1 v1.5
+      (types 1 and 2), OAEP, PSS (every special salt length), X9.31, none, and the TLS
+      premaster check. DigestInfo prefixes are built from the objects table, with OpenSSL's
+      MD4 and SM3 quirks kept.
+    - Key management: import and export (the numbers, extra primes, and an RSA-PSS key's
+      restrictions), `has`, `match`, `dup`, the key's parameters (bits, security bits, size,
+      default digest), and RSA-PSS's operation name. Generation, validation, and `load` come
+      with 4.3b.
+    - The asymmetric cipher: every padding, OAEP's digests and label, implicit rejection on or
+      off, and the TLS premaster mode with its random replacement.
+    - Signatures: `RSA` (sign, verify, and recover a digest with any padding; digest-sign and
+      -verify a message; a restricted RSA-PSS key's digests and minimum salt length) and the 13
+      composite algorithms (`RSA-SHA256` and the others, over a digest or a message), with
+      OpenSSL's order of checking and committing parameters, its error texts, and the
+      algorithm identifiers the contexts report.
+    - `tests/c/evp_rsa.c` (281 checks, every error with its text): OpenSSL's RSA-2048-2 key and
+      its implicit-rejection vectors, and signatures, verification, and recovery over every
+      digest and padding. The KATs in `rsa/kat.txt` were generated with the reference.
+    - Wycheproof's RSA files (70 more, 9,395 tests: OAEP and PKCS #1 v1.5 decryption, two- and
+      three-prime keys, PKCS #1 v1.5 and PSS verification, PKCS #1 v1.5 signing) agree on both
+      libraries, implicit rejection's synthetic messages included, and the reference agrees
+      with Wycheproof on every one; 20,391 tests in all. RSA-PSS's files with parameters in
+      the key wait for key decoding (4.7); its SHAKE files test an MGF OpenSSL doesn't offer.
+    - The `rsa_padding` fuzz target holds every padding check to a plain model of its
+      encoding (24.9 million runs clean). It found two blocks X9.31's padding makes that
+      OpenSSL's check rejects (an empty message's, and `6B BA` before a message `num - 3`
+      octets long); rustyssl keeps both.
+  - [ ] **4.3b** Key generation (multi-prime, FIPS 186-5 primes) and validation.
+  - [ ] **4.3c** The RSA KEM (RSASVE).
+  - [ ] **4.3d** The legacy `RSA_*` and `RSA_meth_*` APIs, over the same key object.
+  - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
+    `RSA_OAEP_PARAMS`).
 - [ ] **4.4 EC:**
   - `EC_GROUP`: every named curve in the default build (NIST, secp*k1, brainpool, SM2,
     binary curves), explicit parameters, `check`, conversion forms
