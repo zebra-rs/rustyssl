@@ -532,6 +532,69 @@ static void copies(void)
     }
 }
 
+/*
+ * A CCM context whose key was never set: an init whose IV length EVP refuses before the
+ * cipher's init runs leaves the CCM state as allocated, so the tag length it reads (from the
+ * nonce's first octet) is 2, whatever the context's own tag length says.
+ */
+static void ccm_unkeyed(void)
+{
+    EVP_CIPHER *c = EVP_CIPHER_fetch(NULL, "AES-128-CCM", NULL);
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    unsigned char tag[16];
+    size_t len = 16;
+    OSSL_PARAM params[2];
+
+    params[0] = OSSL_PARAM_construct_size_t(OSSL_CIPHER_PARAM_IVLEN, &len);
+    params[1] = OSSL_PARAM_construct_end();
+    check(!EVP_CipherInit_ex2(ctx, c, key, iv, 1, params), "CCM: an IV length of 16 refused");
+    errors();
+    memset(tag, 0x5a, sizeof(tag));
+    check(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG, 12, tag) == 1,
+          "a tag set (the init didn't run, so not encrypting)");
+    check(EVP_CipherInit_ex2(ctx, NULL, NULL, NULL, 1, NULL) == 1, "encrypting, no key");
+    check(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG, 16, NULL) == 1, "a tag length of 16");
+    check(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 12, tag) == 0,
+          "no 12-octet tag: the unkeyed state's M is 2");
+    errors();
+    memset(tag, 0x5a, sizeof(tag));
+    printf("  2-octet tag: %d\n", EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 2, tag));
+    hex("tag", tag, 4);
+    errors();
+    EVP_CIPHER_CTX_free(ctx);
+    EVP_CIPHER_free(c);
+}
+
+/*
+ * A GCM decryption whose tag check fails leaves the context in use, and GHASH goes on from the
+ * tag it computed: a second final fails too. (The stale tag here is the one an empty message's
+ * encryption left, which is the encrypted first counter block: a GHASH that restarted from
+ * zero would match it.)
+ */
+static void gcm_final_again(void)
+{
+    EVP_CIPHER *c = EVP_CIPHER_fetch(NULL, "AES-128-GCM", NULL);
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    unsigned char out[64];
+    int n = -7;
+
+    check(EVP_CipherInit_ex2(ctx, c, key, iv, 1, NULL) == 1
+          && EVP_CipherFinal_ex(ctx, out, &n) == 1 && n == 0,
+          "GCM: an empty message encrypted");
+    check(EVP_CipherInit_ex(ctx, NULL, NULL, key, iv, 0) == 1, "decrypting, no tag set");
+    check(EVP_CipherUpdate(ctx, out, &n, data, 10) == 1 && n == 10, "ten octets");
+    check(EVP_CipherFinal_ex(ctx, out, &n) == 0, "final: the stale tag doesn't match");
+    errors();
+    check(EVP_CipherFinal_ex(ctx, out, &n) == 0, "final again: still no match");
+    errors();
+    check(EVP_CipherUpdate(ctx, out, &n, data, 20) == 1 && n == 20, "more data after it");
+    hex("more", out, 20);
+    check(EVP_CipherFinal_ex(ctx, out, &n) == 0, "and its final");
+    errors();
+    EVP_CIPHER_CTX_free(ctx);
+    EVP_CIPHER_free(c);
+}
+
 int main(void)
 {
     size_t i;
@@ -552,6 +615,8 @@ int main(void)
     tls_chacha();
     one_shot();
     copies();
+    ccm_unkeyed();
+    gcm_final_again();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }
