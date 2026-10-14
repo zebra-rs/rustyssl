@@ -7,6 +7,7 @@
 
 pub mod aead;
 pub mod aes;
+pub mod des;
 pub mod hash;
 pub mod modes;
 

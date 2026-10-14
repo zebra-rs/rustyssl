@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 2028 | 3848 | 34.5% |
+| libcrypto | 5876 | 2061 | 3815 | 35.1% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **2029** | **4450** | **31.3%** |
+| **Total** | **6479** | **2062** | **4417** | **31.8%** |
 
 ## By header
 
@@ -45,7 +45,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/cryptoerr_legacy.h` | libcrypto | 29 | 29 | 100.0% |
 | `openssl/ct.h` | libcrypto | 60 | 0 | 0.0% |
 | `openssl/decoder.h` | libcrypto | 41 | 0 | 0.0% |
-| `openssl/des.h` | libcrypto | 33 | 0 | 0.0% |
+| `openssl/des.h` | libcrypto | 33 | 33 | 100.0% |
 | `openssl/dh.h` | libcrypto | 94 | 20 | 21.3% |
 | `openssl/dsa.h` | libcrypto | 87 | 7 | 8.0% |
 | `openssl/ec.h` | libcrypto | 202 | 12 | 5.9% |
@@ -822,6 +822,39 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_strndup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `CRYPTO_xts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aead` |
 | `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `asn1_print`, `asn1_type`, `crypto_mem`, `crypto_mem_hooks`, `err_queue`, `evp_pkey_meth`, `evp_pkey_ops` |
+| `DES_cbc_cksum` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_cbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_cfb64_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_cfb_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_check_key_parity` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_crypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_decrypt3` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ecb3_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ecb_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ede3_cbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ede3_cfb64_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ede3_cfb_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ede3_ofb64_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_encrypt1` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_encrypt2` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_encrypt3` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_fcrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_is_weak_key` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_key_sched` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ncbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ofb64_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_ofb_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_options` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_pcbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_quad_cksum` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_random_key` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_set_key` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_set_key_checked` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_set_key_unchecked` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_set_odd_parity` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_string_to_2keys` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_string_to_key` | libcrypto | `openssl/des.h` | `lowlevel_des` |
+| `DES_xcbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
 | `DIRECTORYSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `DIRECTORYSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
 | `DIRECTORYSTRING_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |

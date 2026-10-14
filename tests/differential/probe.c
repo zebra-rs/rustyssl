@@ -317,6 +317,7 @@
 #include <openssl/bn.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
+#include <openssl/des.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
@@ -6459,6 +6460,172 @@ static int aead_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the deprecated DES functions over three schedules, an IV, and a position, kept
+ * between commands, and the digest commands' data:
+ *   deskey                         DES_set_key, DES_set_key_checked (into a junk schedule), and
+ *                                  DES_set_key_unchecked of three keys from the data: the
+ *                                  results and the first schedule
+ *   desiv, desnum N                the IV from the data (and the position 0); the position
+ *   desmode MODE ENC LEN [BITS]    MODE (ecb, ecb3, cbc, ncbc, xcbc, pcbc, ede3cbc, cfb, ede3cfb,
+ *                                  ofb (LEN steps), cfb64, ede3cfb64, ofb64, ede3ofb64) of LEN
+ *                                  (at most 500) octets with BITS bits a step (1 to 64 for the
+ *                                  bit modes, 65 and up for cfb): the output, IV, and position
+ *   descksum LEN COUNT             DES_cbc_cksum and DES_quad_cksum of LEN octets
+ *   desstr LEN                     DES_string_to_key and _2keys of the data's first LEN octets
+ *   descrypt LEN S0 S1             DES_fcrypt of the data's first LEN octets with salt octets
+ */
+static DES_key_schedule probe_ks1, probe_ks2, probe_ks3;
+static DES_cblock probe_des_iv;
+static int probe_des_num;
+
+static int des_command(const char *command, const char *line)
+{
+    char a[16] = "";
+    long n = 0, m = 0, k = 0;
+    static unsigned char out[600], txt[600];
+    const unsigned char *d;
+    size_t len = 0;
+
+    if (strncmp(command, "des", 3) != 0
+        || (strcmp(command, "desiv") != 0 && strcmp(command, "desnum") != 0
+            && strcmp(command, "deskey") != 0 && strcmp(command, "desmode") != 0
+            && strcmp(command, "descksum") != 0 && strcmp(command, "desstr") != 0
+            && strcmp(command, "descrypt") != 0))
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data + digest_offset;
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "deskey") == 0) {
+        DES_cblock k1, k2, k3;
+        DES_key_schedule junk;
+
+        memcpy(k1, d, 8);
+        memcpy(k2, d + 8, 8);
+        memcpy(k3, d + 16, 8);
+        memset(&junk, 0xa5, sizeof(junk));
+        printf(" %d %d %d", DES_set_key(&k1, &probe_ks1), DES_set_key_checked(&k2, &junk),
+               DES_check_key_parity(&k3));
+        DES_set_key_unchecked(&k2, &probe_ks2);
+        DES_set_key_unchecked(&k3, &probe_ks3);
+        probe_bytes("ks1", &probe_ks1, sizeof(probe_ks1));
+        probe_bytes("junk", &junk, 16);
+        digest_offset = (digest_offset + 29) % 1024;
+    } else if (strcmp(command, "desiv") == 0) {
+        memcpy(probe_des_iv, d, 8);
+        probe_des_num = 0;
+        digest_offset = (digest_offset + 13) % 1024;
+    } else if (strcmp(command, "desnum") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        probe_des_num = (int)n;
+        printf(" %d", probe_des_num);
+    } else if (strcmp(command, "desmode") == 0) {
+        int enc;
+        size_t octets;
+
+        sscanf(line, "%*s %15s %ld %ld %ld", a, &m, &n, &k);
+        enc = (int)m;
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        octets = len;
+        if (strcmp(a, "ecb") == 0) {
+            DES_ecb_encrypt((const_DES_cblock *)d, (DES_cblock *)out, &probe_ks1, enc);
+            octets = 8;
+        } else if (strcmp(a, "ecb3") == 0) {
+            DES_ecb3_encrypt((const_DES_cblock *)d, (DES_cblock *)out, &probe_ks1, &probe_ks2, &probe_ks3, enc);
+            octets = 8;
+        } else if (strcmp(a, "cbc") == 0) {
+            DES_cbc_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(a, "ncbc") == 0) {
+            DES_ncbc_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(a, "xcbc") == 0) {
+            DES_xcbc_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, (const_DES_cblock *)(digest_data + 1100),
+                             (const_DES_cblock *)(digest_data + 1108), enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(a, "pcbc") == 0) {
+            DES_pcbc_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(a, "ede3cbc") == 0) {
+            DES_ede3_cbc_encrypt(d, out, (long)len, &probe_ks1, &probe_ks2, &probe_ks3, &probe_des_iv, enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(a, "cfb") == 0) {
+            DES_cfb_encrypt(d, out, (int)k, (long)len, &probe_ks1, &probe_des_iv, enc);
+        } else if (strcmp(a, "ede3cfb") == 0 && k > 0) {
+            DES_ede3_cfb_encrypt(d, out, (int)k, (long)len, &probe_ks1, &probe_ks2, &probe_ks3, &probe_des_iv, enc);
+        } else if (strcmp(a, "ofb") == 0 && k > 0) {
+            if (len > 60)
+                len = 60;
+            DES_ofb_encrypt(d, out, (int)k, (long)len, &probe_ks1, &probe_des_iv);
+            octets = len * 8;
+        } else if (strcmp(a, "cfb64") == 0) {
+            DES_cfb64_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, &probe_des_num, enc);
+        } else if (strcmp(a, "ede3cfb64") == 0) {
+            DES_ede3_cfb64_encrypt(d, out, (long)len, &probe_ks1, &probe_ks2, &probe_ks3, &probe_des_iv, &probe_des_num, enc);
+        } else if (strcmp(a, "ofb64") == 0) {
+            DES_ofb64_encrypt(d, out, (long)len, &probe_ks1, &probe_des_iv, &probe_des_num);
+        } else if (strcmp(a, "ede3ofb64") == 0) {
+            DES_ede3_ofb64_encrypt(d, out, (long)len, &probe_ks1, &probe_ks2, &probe_ks3, &probe_des_iv, &probe_des_num);
+        } else {
+            printf(" skipped\n");
+            return 1;
+        }
+        probe_bytes("out", out, octets + 1);
+        probe_bytes("iv", probe_des_iv, 8);
+        printf(" num %d", probe_des_num);
+    } else if (strcmp(command, "descksum") == 0) {
+        DES_cblock quad[4];
+        DES_LONG r;
+
+        sscanf(line, "%*s %ld %ld", &n, &m);
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        r = DES_cbc_cksum(d, (DES_cblock *)out, (long)len, &probe_ks1, &probe_des_iv);
+        printf(" %08x", (unsigned)r);
+        probe_bytes("mac", out, 8);
+        memset(quad, 0xee, sizeof(quad));
+        r = DES_quad_cksum(d, quad, (long)len, (int)m, &probe_des_iv);
+        printf(" %08x", (unsigned)r);
+        probe_bytes("quad", quad, sizeof(quad));
+    } else if (strcmp(command, "desstr") == 0) {
+        DES_cblock k1, k2;
+
+        sscanf(line, "%*s %ld", &n);
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        memcpy(txt, d, len);
+        txt[len] = '\0';
+        DES_string_to_key((const char *)txt, &k1);
+        probe_bytes("key", k1, 8);
+        DES_string_to_2keys((const char *)txt, &k1, &k2);
+        probe_bytes("keys", k1, 8);
+        probe_bytes("", k2, 8);
+    } else {
+        char salt[3], ret[16];
+        char *r;
+
+        sscanf(line, "%*s %ld %ld %ld", &n, &m, &k);
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        memcpy(txt, d, len);
+        txt[len] = '\0';
+        salt[0] = (char)m;
+        salt[1] = (char)k;
+        salt[2] = '\0';
+        memset(ret, '#', sizeof(ret));
+        ret[15] = '\0';
+        r = DES_fcrypt((const char *)txt, salt, ret);
+        printf(" %s", r == NULL ? "NULL" : "ret");
+        probe_bytes("out", ret, 16);
+    }
+    digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -6489,7 +6656,8 @@ int main(void)
             || bn_command(command, line) || pkey_command(command, line)
             || derive_command(command, line) || meth_command(command, line)
             || print_command(command, line) || lowlevel_command(command, line)
-            || aes_command(command, line) || aead_command(command, line)) {
+            || aes_command(command, line) || aead_command(command, line)
+            || des_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

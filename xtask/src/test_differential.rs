@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(34) {
+        match random.below(35) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -182,6 +182,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             30 => lowlevel_hash_session(&mut random, &mut out)?,
             31 => lowlevel_aes_session(&mut random, &mut out)?,
             32 => lowlevel_aead_session(&mut random, &mut out)?,
+            33 => lowlevel_des_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -402,6 +403,81 @@ fn lowlevel_aead_session(random: &mut Random, out: &mut String) -> Result {
         _ => {
             for _ in 0..random.below(5) + 1 {
                 writeln!(out, "xts {} {}", random.below(2), length(random))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of the deprecated DES functions: keys (checked, unchecked, weak and with
+/// parity errors as they come), IVs, positions, every mode around the block size and bit
+/// widths (CFB widths out of range included; triple-DES CFB and OFB only in range, since
+/// OpenSSL loops without end or shifts by too much otherwise), the checksums, the string to
+/// key functions, and crypt(3) with salts good and bad.
+fn lowlevel_des_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&["7", "8", "9", "15", "16", "17", "24"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(120),
+        }
+    };
+    writeln!(out, "deskey")?;
+    writeln!(out, "desiv")?;
+    for _ in 0..random.below(15) + 1 {
+        match random.below(12) {
+            0 => writeln!(out, "deskey")?,
+            1 => writeln!(out, "desiv")?,
+            2 => writeln!(out, "desnum {}", random.offset(-20, 40))?,
+            3..=6 => {
+                let mode = random.pick(&[
+                    "ecb",
+                    "ecb3",
+                    "cbc",
+                    "ncbc",
+                    "xcbc",
+                    "pcbc",
+                    "ede3cbc",
+                    "cfb",
+                    "ede3cfb",
+                    "ofb",
+                    "cfb64",
+                    "ede3cfb64",
+                    "ofb64",
+                    "ede3ofb64",
+                ]);
+                let bits = match mode {
+                    "cfb" => random.offset(-2, 70),
+                    "ede3cfb" | "ofb" => random.offset(1, 64),
+                    _ => 0,
+                };
+                let len = if mode == "ofb" {
+                    random.below(12)
+                } else {
+                    length(random)
+                };
+                writeln!(out, "desmode {mode} {} {len} {bits}", random.below(2))?;
+            }
+            7 => writeln!(out, "descksum {} {}", length(random), random.offset(-1, 7))?,
+            8 => writeln!(out, "desstr {}", random.below(50))?,
+            _ => {
+                let salt = |random: &mut Random| match random.below(5) {
+                    0 => random.below(256),
+                    _ => random
+                        .pick(&["97", "122", "65", "90", "48", "57", "46", "47"])
+                        .parse()
+                        .unwrap_or(97),
+                };
+                writeln!(
+                    out,
+                    "descrypt {} {} {}",
+                    random.below(12),
+                    salt(random),
+                    salt(random)
+                )?;
             }
         }
     }

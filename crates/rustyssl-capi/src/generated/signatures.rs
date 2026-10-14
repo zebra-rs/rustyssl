@@ -2660,6 +2660,189 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut DES_cblock,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut const_DES_cblock,
+) -> DES_LONG = crate::lowlevel::des::DES_cbc_cksum;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_cfb64_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_cfb_encrypt;
+const _: unsafe extern "C" fn(*mut const_DES_cblock) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_check_key_parity;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::lowlevel::des::DES_crypt;
+const _: unsafe extern "C" fn(
+    *mut DES_LONG,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+) = crate::lowlevel::des::DES_decrypt3;
+const _: unsafe extern "C" fn(
+    *mut const_DES_cblock,
+    *mut DES_cblock,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ecb3_encrypt;
+const _: unsafe extern "C" fn(
+    *mut const_DES_cblock,
+    *mut DES_cblock,
+    *mut DES_key_schedule,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ecb_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ede3_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ede3_cfb64_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ede3_cfb_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::des::DES_ede3_ofb64_encrypt;
+const _: unsafe extern "C" fn(*mut DES_LONG, *mut DES_key_schedule, core::ffi::c_int) =
+    crate::lowlevel::des::DES_encrypt1;
+const _: unsafe extern "C" fn(*mut DES_LONG, *mut DES_key_schedule, core::ffi::c_int) =
+    crate::lowlevel::des::DES_encrypt2;
+const _: unsafe extern "C" fn(
+    *mut DES_LONG,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+    *mut DES_key_schedule,
+) = crate::lowlevel::des::DES_encrypt3;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::lowlevel::des::DES_fcrypt;
+const _: unsafe extern "C" fn(*mut const_DES_cblock) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_is_weak_key;
+const _: unsafe extern "C" fn(*mut const_DES_cblock, *mut DES_key_schedule) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_key_sched;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_ncbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::des::DES_ofb64_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+) = crate::lowlevel::des::DES_ofb_encrypt;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char = crate::lowlevel::des::DES_options;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_pcbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut DES_cblock,
+    core::ffi::c_long,
+    core::ffi::c_int,
+    *mut DES_cblock,
+) -> DES_LONG = crate::lowlevel::des::DES_quad_cksum;
+const _: unsafe extern "C" fn(*mut DES_cblock) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_random_key;
+const _: unsafe extern "C" fn(*mut const_DES_cblock, *mut DES_key_schedule) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_set_key;
+const _: unsafe extern "C" fn(*mut const_DES_cblock, *mut DES_key_schedule) -> core::ffi::c_int =
+    crate::lowlevel::des::DES_set_key_checked;
+const _: unsafe extern "C" fn(*mut const_DES_cblock, *mut DES_key_schedule) =
+    crate::lowlevel::des::DES_set_key_unchecked;
+const _: unsafe extern "C" fn(*mut DES_cblock) = crate::lowlevel::des::DES_set_odd_parity;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut DES_cblock, *mut DES_cblock) =
+    crate::lowlevel::des::DES_string_to_2keys;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut DES_cblock) =
+    crate::lowlevel::des::DES_string_to_key;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut DES_key_schedule,
+    *mut DES_cblock,
+    *mut const_DES_cblock,
+    *mut const_DES_cblock,
+    core::ffi::c_int,
+) = crate::lowlevel::des::DES_xcbc_encrypt;
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DIRECTORYSTRING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DIRECTORYSTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DIRECTORYSTRING_new;

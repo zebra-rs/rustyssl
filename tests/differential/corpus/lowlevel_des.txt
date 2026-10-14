@@ -1,0 +1,58 @@
+# The deprecated DES functions (step 3.8d).
+deskey
+desiv
+desmode ecb 1 8
+desmode ecb 0 8
+desmode ecb3 1 8
+desmode ecb3 0 8
+desmode cbc 1 0
+desmode cbc 1 13
+desmode cbc 0 16
+desmode ncbc 1 13
+desmode ncbc 0 13
+desiv
+desmode xcbc 1 23
+desmode xcbc 0 24
+desmode pcbc 1 17
+desmode pcbc 0 17
+desmode ede3cbc 1 31
+desmode ede3cbc 0 32
+desiv
+desmode cfb 1 30 1
+desmode cfb 0 30 7
+desmode cfb 1 30 8
+desmode cfb 1 30 12
+desmode cfb 1 30 32
+desmode cfb 1 30 40
+desmode cfb 1 30 64
+desmode cfb 1 30 0
+desmode cfb 1 30 65
+desmode ede3cfb 1 30 9
+desmode ede3cfb 0 30 64
+desmode ofb 1 5 1
+desmode ofb 1 5 33
+desmode ofb 1 5 64
+desmode ofb 1 5 70
+desiv
+desnum 3
+desmode cfb64 1 9
+desmode cfb64 0 9
+desmode ede3cfb64 1 20
+desnum 12
+desmode ofb64 1 5
+desmode ede3ofb64 1 17
+descksum 0 1
+descksum 9 0
+descksum 31 4
+descksum 100 6
+desstr 0
+desstr 5
+desstr 17
+desstr 40
+descrypt 8 97 98
+descrypt 3 46 47
+descrypt 12 65 57
+descrypt 4 0 97
+descrypt 4 97 0
+descrypt 4 200 97
+descrypt 4 97 127

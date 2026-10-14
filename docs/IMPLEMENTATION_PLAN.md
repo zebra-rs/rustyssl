@@ -2501,7 +2501,35 @@ have run for at least 24 CPU-hours with no findings.
       `ocb*`, and `xts` commands (corpus `lowlevel_aead.txt`, random `lowlevel_aead`
       sessions); the `lowlevel_aead` fuzz target checks chunking, the forms' agreement, the
       inverses, and arbitrary call scripts.
-  - [ ] **3.8d DES:** the `DES_*` family, `DES_crypt` and `DES_fcrypt` included (33 exports).
+  - [x] **3.8d DES:** the `DES_*` family: `rustyssl_crypto::lowlevel::des` and
+    `lowlevel/des.rs` in capi: 33 exports; libcrypto now 2,061 of 5,876.
+    - **Decision:** a `DES_key_schedule` holds OpenSSL's own form of the round keys (two
+      rotated words a round), which applications can see, so the key schedule and the rounds
+      are OpenSSL's, over its tables (the S-boxes merged with P, PC-2 by key bits, and the
+      `crypt(3)` alphabets), extracted from its sources by a script into
+      `lowlevel/des/tables.rs` rather than typed. Every table read scans the whole table and
+      keeps the entry by a mask, so no key or data bit picks an address (OpenSSL's, and the
+      `des` crate's, index directly).
+    - Quirks kept: `DES_cbc_encrypt` leaves the IV (and doesn't chain a partial last block on
+      decryption) while `DES_ncbc_encrypt` updates it; XCBC's decryption takes the last block
+      in its tail; PCBC leaves the IV; `DES_ofb_encrypt`'s length counts steps, not octets;
+      CFB and OFB by octets use only `num`'s low three bits, and OFB-64 writes the IV back
+      only after making a keystream block; `DES_set_key` sets the schedule whatever the key
+      (returning -1 or -2), `DES_set_key_checked` only for a good one; `DES_is_weak_key`
+      compares the parity bits too; `DES_cbc_cksum` returns the second word byte-swapped and
+      writes nothing for a null output, `DES_quad_cksum` runs at least one and at most four
+      rounds; `DES_fcrypt` writes the salt's characters before rejecting a bad one;
+      `DES_crypt` has one static buffer; `DES_options` says "des(int)".
+    - New deviations: null keys, schedules, buffers, IVs, and positions; negative lengths
+      (OpenSSL writes a block or reads until it crashes); triple-DES CFB with a bit width of
+      0 or less (OpenSSL loops without end) and OFB with one (undefined shifts).
+    - `tests/c/lowlevel_des.c` (44 checks: parity for every octet, the weak keys, the three
+      key setters' schedules, every mode around the block and bit widths, in pieces and in
+      place, the checksums, the string to key functions, and crypt(3) with good and bad
+      salts); the probe's `deskey`, `desiv`, `desnum`, `desmode`, `descksum`, `desstr`, and
+      `descrypt` (corpus `lowlevel_des.txt`, random `lowlevel_des` sessions); the
+      `lowlevel_des` fuzz target checks blocks against the cipher backend, the inverses, and
+      chunking.
   - [ ] **3.8e The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
     `Camellia_*`, and `RC4*` (50 exports).
 - [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
