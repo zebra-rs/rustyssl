@@ -2657,7 +2657,47 @@ have run for at least 24 CPU-hours with no findings.
     without `export`); the probe's `symkey` and `symkeyenc` (corpus `symkey.txt`, random `skey`
     sessions); the `skey` fuzz target checks raw keys, moves, and ciphers against raw keys.
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
-  application-defined algorithms implemented in C that we call back into.
+  application-defined algorithms implemented in C that we call back into. In two sub-steps:
+  - [x] **3.11a Application-defined digests:** `evp/md_meth.rs`, `evp/legacy_md_fns.rs`, and
+    the legacy paths of `evp/md_ctx.rs` in capi: the `EVP_MD_meth_*` functions (23 exports);
+    libcrypto now 2,163 of 5,876.
+    - **Decision:** a digest made by `EVP_MD_meth_new` or `EVP_MD_meth_dup` is a method with
+      no provider (OpenSSL's `EVP_ORIG_METH`): its sizes and flags are atomics and its C
+      functions and state size sit behind a lock, so the setters (each sets once, as
+      OpenSSL's) can run after it's made. Its references aren't counted, as OpenSSL's.
+    - **Decision:** a context with such a digest (or `EVP_MD_CTX_FLAG_NO_INIT`) takes
+      OpenSSL's legacy paths: init allocates the state (`md_data`, zeroed, of the digest's
+      size) and sets the update function only when the digest changes and has a state size,
+      then runs `init`; update runs the context's update function; final runs `final`, writes
+      the digest's size, runs `cleanup` (marking the context cleaned) and clears the state
+      (an update or final after it still runs, as in OpenSSL); the XOF final asks the
+      digest's `ctrl` for the length first; copy copies the fields and the state (into the
+      destination's old state when the digests match) and then runs `copy`; reset and init
+      with another digest run `cleanup` and free the state; `EVP_MD_CTX_ctrl` runs the
+      digest's `ctrl`. The application's functions may use the context, so no borrow of it is
+      held across their calls.
+    - **Decision:** the static digests carry OpenSSL's C functions too, as `EVP_MD_meth_get_*`
+      reports them and a copy given its state's size runs them: for the digests whose state
+      is a public structure (MD4, MD5, SHA-1 with its SSLv3 `ctrl`, SHA-2 with SHA-512/224 and
+      /256 started from their initial values, extracted from the reference by a script,
+      RIPEMD-160, MDC2, Whirlpool, and MD5+SHA-1 with its `ctrl`), over the 3.8a low-level
+      functions; and the null digest's, which do nothing.
+    - New deviations: the setters change only an application's digest (OpenSSL writes into
+      static digests and crashes, or into a fetched one every user shares); SHA-3, SHAKE,
+      BLAKE2, and SM3 report no C functions (their state is a structure OpenSSL doesn't
+      publish, which no application can size).
+    - `tests/c/evp_md_meth.c` (27 checks, and every call of the test digest's functions
+      logged and compared: the setters and getters, digesting in pieces, finals, copies,
+      resets, ctrl, an XOF, the update function, `NO_INIT`, a digest without state, and a
+      copy of each static digest with a public state against its own function, with the
+      SSLv3 `ctrl`s); the probe's `mdcopy` (corpus `md_meth.txt`, random `md_meth`
+      sessions). No fuzz target: nothing here parses input.
+    - Not yet: `BIO_f_reliable` with an application's digest (which has the legacy state its
+      protocol needs) still fails where OpenSSL's crashes with a provided one.
+  - [ ] **3.11b Application-defined ciphers:** the `EVP_CIPHER_meth_*` functions (18) and
+    `EVP_CIPHER_impl_ctx_size`, with the cipher context's legacy paths (OpenSSL's block
+    buffering, padding, IVs, `ctrl`, copy, and clean-up around the application's functions)
+    and the static ciphers' own functions.
 - [ ] **3.12 Config subset:** enough of `openssl.cnf` (see 6.1) to activate providers and set
   `default_properties`. Distro crypto policies depend on it. Includes
   `OSSL_LIB_CTX_load_config` (from 3.1b).
