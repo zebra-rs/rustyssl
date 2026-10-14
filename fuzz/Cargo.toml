@@ -327,3 +327,9 @@ name = "pkcs12_text"
 path = "fuzz_targets/pkcs12_text.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "rsa_padding"
+path = "fuzz_targets/rsa_padding.rs"
+test = false
+doc = false
