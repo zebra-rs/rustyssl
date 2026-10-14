@@ -10,8 +10,9 @@
 //! `freectx`.
 //!
 //! What the reference would crash on (an input pointer of NULL with a length, an output of
-//! NULL where it writes) fails here instead, without an error (docs/DEVIATIONS.md). The SKEY
-//! init functions come with `EVP_SKEY` (3.10). The AEADs' tables are in `aeads`, the other
+//! NULL where it writes) fails here instead, without an error (docs/DEVIATIONS.md). The tables
+//! have no SKEY init functions: `EVP_CipherInit_SKEY` gives these ciphers the key's raw octets,
+//! as OpenSSL does for its own ciphers without them, with the same results. The AEADs' tables are in `aeads`, the other
 //! modes' (CTS, XTS, the key wraps, the composites) in `modes`; all are listed here.
 
 use core::ffi::{c_int, c_uint, c_void};

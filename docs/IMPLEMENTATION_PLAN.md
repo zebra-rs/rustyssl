@@ -2026,7 +2026,7 @@ have run for at least 24 CPU-hours with no findings.
       `EVP_Cipher` on a partial ECB or CBC block (platform-dependent in OpenSSL) processes the
       whole blocks; ECB and CBC turned around without a key use the key in the new direction.
     - **Not yet:** TLS record padding (`tls-version`, set by libssl) fails until Phase 7; the
-      SKEY inits with 3.10; the pipeline functions later; the AlgorithmIdentifier functions
+      pipeline functions later; the AlgorithmIdentifier functions
       (`EVP_CIPHER_param_to_asn1` and the `EVP_CIPHER_CTX_*_algor*` ones) with 3.4d;
       `EVP_CIPHER_impl_ctx_size` with 3.11. Parameter lists of the digests that the reference
       writes with `OSSL_PARAM_*` macros now carry their sizes and `OSSL_PARAM_UNMODIFIED`.
@@ -2627,7 +2627,35 @@ have run for at least 24 CPU-hours with no findings.
     controls); the probe's `bmd`, `bmdread`, `benc`, and `bdec` (corpus `bio_evp.txt`, random
     `bio_evp` sessions); the `bio_evp` fuzz target checks both filters against EVP at once
     with arbitrary pieces, corruption, and truncation.
-- [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).
+- [x] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys): `evp/skeymgmt.rs`,
+  `evp/skey.rs`, and `provider/skeymgmt.rs` in capi, `EVP_CipherInit_SKEY` and
+  `EVP_MAC_init_SKEY`: 25 exports; libcrypto now 2,140 of 5,876.
+  - **Decision:** symmetric key managers are a method type like the others (`OSSL_OP_SKEYMGMT`
+    through the generic fetch): an algorithm must offer `free`, `import`, and `export`, and may
+    offer `generate`, `get_key_id`, and its two settable lists. An `EVP_SKEY` holds its key
+    manager and the key data that made, freed with the last reference. A key type no provider
+    manages falls back to `GENERIC-SECRET`, as in OpenSSL.
+  - **Decision:** the default provider's key managers are OpenSSL's two: `GENERIC-SECRET` (any
+    non-empty octets) and `AES` (16, 24, or 32), neither generating; the key data is a copy
+    of the octets, cleared when freed, and its export hands out their address, which
+    `EVP_SKEY_get0_raw_key` returns.
+  - **Decision:** the built-in ciphers don't declare OpenSSL's SKEY init functions, so
+    `EVP_CipherInit_SKEY` gives them the key's raw octets, the path OpenSSL takes for its own
+    ciphers without them; the results are the same, and a NULL key sets the IV alone where
+    OpenSSL's AES-CBC (and the other ciphers that take key objects) crashes. Ciphers and MACs
+    of other providers that take key objects get the key's data. No default MAC takes them, so
+    `EVP_MAC_init_SKEY` is unsupported there, as in OpenSSL.
+  - Quirks kept: the key's provider must be the cipher's (`EVP_R_INITIALIZATION_ERROR`);
+    `EVP_CipherInit_SKEY` passes its IV length to the cipher, which checks it; names join the
+    numbers they already have, so a provider's `ALIAS-SECRET:AES` is an AES key manager too.
+  - New deviations: `EVP_SKEY_to_provider` to the key's own provider keeps the reference counts
+    right (OpenSSL drops one it never took); a NULL key to `EVP_CipherInit_SKEY` (and to
+    `EVP_MAC_init_SKEY` for a MAC that takes key objects) doesn't crash.
+  - `tests/c/evp_skey.c` (11 checks and every result printed: the key managers, keys of each
+    type and size, imports, exports, moves, ciphers keyed both ways, and a provider of the
+    test's own with generation, key ids, settable lists, an alias of AES, and a key manager
+    without `export`); the probe's `symkey` and `symkeyenc` (corpus `symkey.txt`, random `skey`
+    sessions); the `skey` fuzz target checks raw keys, moves, and ciphers against raw keys.
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
   application-defined algorithms implemented in C that we call back into.
 - [ ] **3.12 Config subset:** enough of `openssl.cnf` (see 6.1) to activate providers and set

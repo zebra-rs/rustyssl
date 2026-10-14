@@ -58,6 +58,7 @@ pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
 pub(crate) mod signatures;
+pub(crate) mod skeymgmt;
 pub(crate) mod tables;
 pub(crate) mod upcalls;
 

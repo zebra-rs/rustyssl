@@ -23,8 +23,9 @@
 //! for `EVP_CIPHER_CTX_set_key_length`) is refused here instead (docs/DEVIATIONS.md). There
 //! are no engines, so an `ENGINE` argument fails initialization. Random keys come from the
 //! operating system until the private generator of 3.7. The `EVP_CIPHER_meth_*` ciphers come
-//! with 3.11, `EVP_SKEY` with 3.10, the pipeline functions and the AlgorithmIdentifier ones
-//! later.
+//! with 3.11, the pipeline functions and the AlgorithmIdentifier ones later.
+//! `EVP_CipherInit_SKEY` keys a cipher with an opaque key of its provider's: its data for a
+//! cipher that takes key objects, else its raw octets.
 
 use core::ffi::{CStr, c_int, c_uint, c_ulong, c_void};
 use core::ptr;
@@ -587,6 +588,142 @@ unsafe fn init_internal(
     };
     // SAFETY: the provider's function with its context and the caller's key, IV, and array.
     unsafe { init(c.algctx, key, keylen, iv, ivlen, params) }
+}
+
+/// `evp_cipher_init_skey_internal`: as [`init_internal`] without engines, the key an opaque
+/// key of the cipher's provider (or none). A cipher that takes key objects gets the key's data
+/// (or NULL); one that doesn't gets its raw octets.
+///
+/// # Safety
+/// `ctx` is a live cipher context; `cipher` is NULL or a live cipher method; `skey` is NULL or
+/// a live key; `iv` is NULL or holds `iv_len` octets; `params` is NULL or a parameter array.
+unsafe fn init_skey_internal(
+    ctx: *mut EVP_CIPHER_CTX,
+    cipher: *const EVP_CIPHER,
+    skey: *const rustyssl_abi::EVP_SKEY,
+    (iv, iv_len): (*const u8, usize),
+    enc: c_int,
+    params: *const OSSL_PARAM,
+) -> c_int {
+    const F: &str = "evp_cipher_init_skey_internal";
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+        return 0;
+    };
+    let enc = if enc == -1 {
+        c.encrypt
+    } else {
+        let e = c_int::from(enc != 0);
+        c.encrypt = e;
+        e
+    };
+    if cipher.is_null() && c.cipher.is_null() {
+        err::raise(ERR_LIB_EVP, EVP_R_NO_CIPHER_SET, F);
+        return 0;
+    }
+    if !cipher.is_null() && !c.cipher.is_null() {
+        // SAFETY: memory the application gave the context to free.
+        unsafe { mem::release(c.cipher_data) };
+        c.cipher_data = ptr::null_mut();
+        let flags = c.flags;
+        reset(c);
+        c.encrypt = enc;
+        c.flags = flags;
+    }
+    let cipher = if cipher.is_null() { c.cipher } else { cipher };
+    // SAFETY: the caller's live method, or the context's.
+    let from_provider = unsafe { method(cipher) }.is_some_and(|m| !m.prov.0.is_null());
+    if !from_provider {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    }
+    if cipher != c.fetched_cipher.cast_const() {
+        // SAFETY: a live method; the context takes the reference.
+        if unsafe { EVP_CIPHER_up_ref(cipher.cast_mut()) } == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return 0;
+        }
+        // SAFETY: the context's own reference.
+        unsafe { EVP_CIPHER_free(c.fetched_cipher) };
+        c.fetched_cipher = cipher.cast_mut();
+    }
+    c.cipher = cipher;
+    let Some(m) = c.cipher() else {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    };
+    if c.algctx.is_null() {
+        let Some(newctx) = m.funcs.newctx else {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return 0;
+        };
+        // SAFETY: the provider's function with its context.
+        c.algctx = unsafe { newctx(m.provider_ctx()) };
+        if c.algctx.is_null() {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return 0;
+        }
+    }
+    // SAFETY: the caller's guarantee.
+    let key = unsafe { super::skey::key(skey) };
+    if key.is_some_and(|k| k.skeymgmt.get().prov.0 != m.prov.0) {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    }
+    if c.flags & flag(EVP_CIPH_NO_PADDING) != 0 && set_padding(c, 0) == 0 {
+        return 0;
+    }
+    let iv_len = if iv.is_null() { 0 } else { iv_len };
+    let f = &m.funcs;
+    let (init, init_skey) = if enc != 0 {
+        (f.einit, f.einit_skey)
+    } else {
+        (f.dinit, f.dinit_skey)
+    };
+    if let Some(init_skey) = init_skey {
+        let keydata = key.map_or(ptr::null_mut(), |k| k.keydata.0);
+        // SAFETY: the provider's function with its context, the key's data (its own
+        // provider's), and the caller's IV and array.
+        return unsafe { init_skey(c.algctx, keydata, iv, iv_len, params) };
+    }
+    // A provider that doesn't take key objects gets the raw key.
+    let (mut keydata, mut keylen): (*const u8, usize) = (ptr::null(), 0);
+    if key.is_some() {
+        // SAFETY: the caller's live key; places for its address and length.
+        let got =
+            unsafe { super::skey::EVP_SKEY_get0_raw_key(skey, &raw mut keydata, &raw mut keylen) };
+        if got == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return 0;
+        }
+    }
+    let Some(init) = init else {
+        // OpenSSL calls the missing function and crashes.
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    };
+    // SAFETY: the provider's function with its context, the key's octets (valid while it
+    // lives), and the caller's IV and array.
+    unsafe { init(c.algctx, keydata, keylen, iv, iv_len, params) }
+}
+
+ffi_export! {
+    /// Sets the cipher (keeping the context's for NULL), the opaque key `skey` (which must be
+    /// the cipher's provider's; NULL keeps the key, to set the IV alone), and the `iv_len`
+    /// octets of IV for the direction `enc` (1 to encrypt, 0 to decrypt, -1 for the
+    /// context's), then `params`. Returns 1, or 0 with an error.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context; `cipher` is NULL or a live cipher method; `skey` is
+    /// NULL or a live key; `iv` is NULL or holds `iv_len` octets; `params` is NULL or a
+    /// parameter array.
+    pub unsafe extern "C" fn EVP_CipherInit_SKEY(ctx: *mut EVP_CIPHER_CTX, cipher: *const EVP_CIPHER, skey: *mut rustyssl_abi::EVP_SKEY, iv: *const u8, iv_len: usize, enc: c_int, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { init_skey_internal(ctx, cipher, skey, (iv, iv_len), enc, params) }
+    }
 }
 
 ffi_export! {

@@ -3413,6 +3413,15 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
     *const EVP_CIPHER,
+    *mut EVP_SKEY,
+    *const core::ffi::c_uchar,
+    usize,
+    core::ffi::c_int,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit_SKEY;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
     *mut ENGINE,
     *const core::ffi::c_uchar,
     *const core::ffi::c_uchar,
@@ -3867,6 +3876,11 @@ const _: unsafe extern "C" fn(
     usize,
     *const OSSL_PARAM,
 ) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_init;
+const _: unsafe extern "C" fn(
+    *mut EVP_MAC_CTX,
+    *mut EVP_SKEY,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::evp::mac::EVP_MAC_init_SKEY;
 const _: unsafe extern "C" fn(*const EVP_MAC, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::evp::mac::EVP_MAC_is_a;
 const _: unsafe extern "C" fn(
@@ -5588,6 +5602,88 @@ const _: unsafe extern "C" fn(*const EVP_SIGNATURE) -> *const OSSL_PARAM =
     crate::evp::signature::EVP_SIGNATURE_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut EVP_SIGNATURE) -> core::ffi::c_int =
     crate::evp::signature::EVP_SIGNATURE_up_ref;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(keymgmt: *mut EVP_SKEYMGMT, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::evp::skeymgmt::EVP_SKEYMGMT_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut EVP_SKEYMGMT = crate::evp::skeymgmt::EVP_SKEYMGMT_fetch;
+const _: unsafe extern "C" fn(*mut EVP_SKEYMGMT) = crate::evp::skeymgmt::EVP_SKEYMGMT_free;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT) -> *const core::ffi::c_char =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_get0_description;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_get0_gen_settable_params;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT) -> *const OSSL_PARAM =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_get0_imp_settable_params;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT) -> *const core::ffi::c_char =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_get0_name;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT) -> *const OSSL_PROVIDER =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_get0_provider;
+const _: unsafe extern "C" fn(*const EVP_SKEYMGMT, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_is_a;
+const _: unsafe extern "C" fn(
+    *const EVP_SKEYMGMT,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::skeymgmt::EVP_SKEYMGMT_names_do_all;
+const _: unsafe extern "C" fn(*mut EVP_SKEYMGMT) -> core::ffi::c_int =
+    crate::evp::skeymgmt::EVP_SKEYMGMT_up_ref;
+const _: unsafe extern "C" fn(
+    *const EVP_SKEY,
+    core::ffi::c_int,
+    OSSL_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::evp::skey::EVP_SKEY_export;
+const _: unsafe extern "C" fn(*mut EVP_SKEY) = crate::evp::skey::EVP_SKEY_free;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const OSSL_PARAM,
+) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_generate;
+const _: unsafe extern "C" fn(*const EVP_SKEY) -> *const core::ffi::c_char =
+    crate::evp::skey::EVP_SKEY_get0_key_id;
+const _: unsafe extern "C" fn(*const EVP_SKEY) -> *const core::ffi::c_char =
+    crate::evp::skey::EVP_SKEY_get0_provider_name;
+const _: unsafe extern "C" fn(
+    *const EVP_SKEY,
+    *mut *const core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::evp::skey::EVP_SKEY_get0_raw_key;
+const _: unsafe extern "C" fn(*const EVP_SKEY) -> *const core::ffi::c_char =
+    crate::evp::skey::EVP_SKEY_get0_skeymgmt_name;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const OSSL_PARAM,
+) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_import;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_char,
+) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_import_raw_key;
+const _: unsafe extern "C" fn(*const EVP_SKEY, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::evp::skey::EVP_SKEY_is_a;
+const _: unsafe extern "C" fn(
+    *mut EVP_SKEY,
+    *mut OSSL_LIB_CTX,
+    *mut OSSL_PROVIDER,
+    *const core::ffi::c_char,
+) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_to_provider;
+const _: unsafe extern "C" fn(*mut EVP_SKEY) -> core::ffi::c_int =
+    crate::evp::skey::EVP_SKEY_up_ref;
 const _: unsafe extern "C" fn(
     *mut EVP_MD_CTX,
     *mut core::ffi::c_uchar,

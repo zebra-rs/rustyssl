@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(38) {
+        match random.below(39) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -186,6 +186,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             34 => lowlevel_legacy_session(&mut random, &mut out)?,
             35 => lowlevel_ciphers_session(&mut random, &mut out)?,
             36 => bio_evp_session(&mut random, &mut out)?,
+            37 => skey_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -673,6 +674,52 @@ fn bio_evp_session(random: &mut Random, out: &mut String) -> Result {
                     )?;
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of opaque symmetric keys: each key type (and unknown ones) at lengths
+/// around AES's, imported and used with ciphers that take key objects or raw keys, with IVs of
+/// right and wrong lengths.
+fn skey_session(random: &mut Random, out: &mut String) -> Result {
+    let types = ["AES", "GENERIC-SECRET", "aes", "HMAC", "NO-SUCH"];
+    let ciphers = [
+        "AES-128-CBC",
+        "AES-256-CBC",
+        "AES-192-ECB",
+        "AES-128-CTR",
+        "AES-128-GCM",
+        "AES-256-OFB",
+        "ARIA-128-CBC",
+        "CAMELLIA-256-CFB",
+        "CHACHA20",
+        "DES-EDE3-CBC",
+        "NO-SUCH",
+    ];
+    let length = |random: &mut Random| -> u64 {
+        match random.below(3) {
+            0 => random.pick(&["16", "24", "32"]).parse().unwrap_or(16),
+            1 => random.below(65),
+            _ => random
+                .pick(&["0", "1", "15", "17", "31", "33", "64"])
+                .parse()
+                .unwrap_or(0),
+        }
+    };
+    for _ in 0..random.below(8) + 1 {
+        let kind = random.pick(&types);
+        if random.below(3) == 0 {
+            writeln!(out, "symkey {kind} {}", length(random))?;
+        } else {
+            let cipher = random.pick(&ciphers);
+            let ivlen = random.pick(&["0", "8", "12", "16", "16", "16", "7"]);
+            writeln!(
+                out,
+                "symkeyenc {cipher} {kind} {} {ivlen} {}",
+                length(random),
+                random.below(2)
+            )?;
         }
     }
     Ok(())

@@ -664,6 +664,47 @@ ffi_export! {
     }
 }
 
+/// A MAC's `init_skey`: its context, the key's data, and parameters.
+type InitSkeyFn = unsafe extern "C" fn(*mut c_void, *mut c_void, *const OSSL_PARAM) -> c_int;
+
+ffi_export! {
+    /// Initializes the MAC with the opaque key `skey`, which must be the MAC's provider's, and
+    /// `params`. Returns the algorithm's result, or 0 (with `ERR_R_UNSUPPORTED`) if the MAC
+    /// doesn't take key objects (none of the default provider's do) or the key is another
+    /// provider's.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live MAC context; `skey` is NULL or a live key; `params` is NULL or a
+    /// parameter array.
+    pub unsafe extern "C" fn EVP_MAC_init_SKEY(ctx: *mut EVP_MAC_CTX, skey: *mut rustyssl_abi::EVP_SKEY, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_MAC_init_SKEY";
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { context(ctx) }) else { return 0 };
+        let Some(m) = c.mac() else { return 0 };
+        let Some(init_skey) = m.funcs.init_skey else {
+            err::raise(ERR_R_EVP_LIB, ERR_R_UNSUPPORTED, F);
+            return 0;
+        };
+        // SAFETY: the caller's guarantee.
+        let Some(key) = (unsafe { super::skey::key(skey) }) else {
+            // OpenSSL reads through the NULL key and crashes.
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+            return 0;
+        };
+        if key.skeymgmt.get().prov.0 != m.prov.0 {
+            err::raise(ERR_R_EVP_LIB, ERR_R_UNSUPPORTED, F);
+            return 0;
+        }
+        // SAFETY: the provider's guarantee of the function type for `OSSL_FUNC_MAC_INIT_SKEY`.
+        let init_skey: InitSkeyFn = unsafe { core::mem::transmute(init_skey) };
+        // SAFETY: the provider's function with its context, the key's data (its own
+        // provider's), and the caller's array.
+        unsafe { init_skey(c.algctx.0, key.keydata.0, params) }
+    }
+}
+
 ffi_export! {
     /// Adds `datalen` octets of `data` to the MAC. Returns the algorithm's result.
     ///

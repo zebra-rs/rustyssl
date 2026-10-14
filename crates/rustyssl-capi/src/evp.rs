@@ -27,3 +27,5 @@ pub(crate) mod rand;
 pub(crate) mod setters;
 pub(crate) mod signature;
 pub(crate) mod sigver;
+pub(crate) mod skey;
+pub(crate) mod skeymgmt;
