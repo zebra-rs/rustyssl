@@ -28,7 +28,10 @@ pub use pad::{
     check_none, check_oaep, check_pkcs1_type1, check_pkcs1_type2, check_pkcs1_type2_implicit,
     check_pkcs1_type2_tls, check_x931, mgf1, prf, verify_pss, x931_hash_id,
 };
-pub use sign::{sign, sign_octet_string, verify};
+pub use sign::{
+    check_decrypted, octet_string_der, octet_string_encoding, sign, sign_encoding,
+    sign_octet_string, verify,
+};
 pub use strength::ifc_ffc_security_bits;
 
 /// `OPENSSL_RSA_MAX_MODULUS_BITS`.
