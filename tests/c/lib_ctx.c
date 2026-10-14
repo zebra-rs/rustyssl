@@ -3,7 +3,8 @@
  * format: making and freeing contexts, the global default, each thread's default
  * (OSSL_LIB_CTX_set0_default) and what NULL means under it, freeing a default (which does
  * nothing), the configuration diagnostics flag and the thread limit kept per context, and the
- * application-data registry, which is the thread's default context's.
+ * application-data registry, which is the thread's default context's, and the FIPS indicator
+ * callback each context keeps (OSSL_INDICATOR_set_callback(3)).
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
@@ -17,6 +18,7 @@
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/indicator.h>
 #include <openssl/thread.h>
 
 static int failures = 0;
@@ -149,10 +151,48 @@ static void ex_data(void)
     ERR_clear_error();
 }
 
+static int indicator_a(const char *type, const char *desc, const OSSL_PARAM params[])
+{
+    (void)type, (void)desc, (void)params;
+    return 1;
+}
+
+static int indicator_b(const char *type, const char *desc, const OSSL_PARAM params[])
+{
+    (void)type, (void)desc, (void)params;
+    return 0;
+}
+
+/* The indicator callback: per context, NULL for the default one, none at first. */
+static void indicator(void)
+{
+    OSSL_LIB_CTX *ctx = OSSL_LIB_CTX_new();
+    OSSL_INDICATOR_CALLBACK *cb = indicator_b;
+
+    OSSL_INDICATOR_get_callback(ctx, &cb);
+    check(cb == NULL, "indicator: none at first");
+    OSSL_INDICATOR_set_callback(ctx, indicator_a);
+    OSSL_INDICATOR_set_callback(NULL, indicator_b);
+    OSSL_INDICATOR_get_callback(ctx, &cb);
+    check(cb == indicator_a, "indicator: the context's");
+    OSSL_INDICATOR_get_callback(NULL, &cb);
+    check(cb == indicator_b, "indicator: the default context's");
+    OSSL_INDICATOR_get_callback(OSSL_LIB_CTX_get0_global_default(), &cb);
+    check(cb == indicator_b, "indicator: NULL is the global default");
+    OSSL_INDICATOR_get_callback(ctx, NULL);
+    check(1, "indicator: NULL for the result is ignored");
+    OSSL_INDICATOR_set_callback(ctx, NULL);
+    OSSL_INDICATOR_get_callback(ctx, &cb);
+    check(cb == NULL, "indicator: cleared");
+    OSSL_INDICATOR_set_callback(NULL, NULL);
+    OSSL_LIB_CTX_free(ctx);
+}
+
 int main(void)
 {
     defaults();
     ex_data();
+    indicator();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }
