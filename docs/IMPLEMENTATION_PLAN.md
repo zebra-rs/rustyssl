@@ -2656,7 +2656,7 @@ have run for at least 24 CPU-hours with no findings.
     test's own with generation, key ids, settable lists, an alias of AES, and a key manager
     without `export`); the probe's `symkey` and `symkeyenc` (corpus `symkey.txt`, random `skey`
     sessions); the `skey` fuzz target checks raw keys, moves, and ciphers against raw keys.
-- [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
+- [x] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
   application-defined algorithms implemented in C that we call back into. In two sub-steps:
   - [x] **3.11a Application-defined digests:** `evp/md_meth.rs`, `evp/legacy_md_fns.rs`, and
     the legacy paths of `evp/md_ctx.rs` in capi: the `EVP_MD_meth_*` functions (23 exports);
@@ -2694,10 +2694,39 @@ have run for at least 24 CPU-hours with no findings.
       sessions). No fuzz target: nothing here parses input.
     - Not yet: `BIO_f_reliable` with an application's digest (which has the legacy state its
       protocol needs) still fails where OpenSSL's crashes with a provided one.
-  - [ ] **3.11b Application-defined ciphers:** the `EVP_CIPHER_meth_*` functions (18) and
-    `EVP_CIPHER_impl_ctx_size`, with the cipher context's legacy paths (OpenSSL's block
-    buffering, padding, IVs, `ctrl`, copy, and clean-up around the application's functions)
-    and the static ciphers' own functions.
+  - [x] **3.11b Application-defined ciphers:** `evp/cipher_meth.rs` and
+    `evp/cipher_ctx/legacy.rs` in capi: the `EVP_CIPHER_meth_*` functions (18) and
+    `EVP_CIPHER_impl_ctx_size` (19 exports); libcrypto now 2,182 of 5,876.
+    - **Decision:** as 3.11a's digests, a cipher made by `EVP_CIPHER_meth_new` or
+      `EVP_CIPHER_meth_dup` is a method with no provider (`EVP_ORIG_METH`): its block size,
+      key and IV lengths, and flags are atomics; its C functions and state size sit behind a
+      lock; each setter sets once.
+    - **Decision:** a context with such a cipher takes OpenSSL's legacy paths, in a child
+      module of the context's: init clears the context (running the old cipher's `cleanup`),
+      allocates the state (`cipher_data`, zeroed, of the cipher's size), takes the key length,
+      runs `EVP_CTRL_INIT` for a cipher that asks, keeps the IV by the mode (unless
+      `EVP_CIPH_CUSTOM_IV`; the IV length from `ctrl` with `EVP_CIPH_CUSTOM_IV_LENGTH`), and
+      runs `init` when there's a key (or always, with `EVP_CIPH_ALWAYS_CALL_INIT`); update
+      buffers partial blocks and holds back the last block when decrypting with padding, or
+      hands everything to a cipher with `EVP_CIPH_FLAG_CUSTOM_CIPHER`; final pads, or checks
+      and removes the padding; `EVP_Cipher` runs `do_cipher` itself; `ctrl`, the key length,
+      copy (then `EVP_CTRL_COPY` with `EVP_CIPH_CUSTOM_COPY`), reset, and the ASN.1 parameter
+      functions run the cipher's. No borrow of the context is held across the application's
+      functions, which may use it.
+    - **Decision:** the padding a decrypting final removes is checked in constant time
+      (OpenSSL compares it octet by octet, a padding oracle); the results and errors are
+      OpenSSL's.
+    - New deviations: the setters change only an application's cipher; the static ciphers
+      report no C functions and no state size (their state is a structure OpenSSL doesn't
+      publish); a copy of a context whose cipher has no state size but was given state
+      doesn't share it (OpenSSL's copy shares the pointer, and both contexts free it). A
+      missing `init` or `do_cipher` fails where OpenSSL calls NULL.
+    - `tests/c/evp_cipher_meth.c` (16 checks, and every call of the test cipher's functions
+      logged and compared: the setters and getters, `EVP_CIPHER_meth_dup`, a block cipher
+      with and without padding over pieces, whole blocks and nothing, a bad padding, a stream
+      cipher, a custom cipher, CTR with `ALWAYS_CALL_INIT`, and copies); the probe's `cmeth`
+      (a toy cipher of each mode, block size, and flag; corpus `cipher_meth.txt`, random
+      `cipher_meth` sessions). No fuzz target: nothing here parses input.
 - [ ] **3.12 Config subset:** enough of `openssl.cnf` (see 6.1) to activate providers and set
   `default_properties`. Distro crypto policies depend on it. Includes
   `OSSL_LIB_CTX_load_config` (from 3.1b).
