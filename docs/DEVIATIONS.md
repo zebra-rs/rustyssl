@@ -197,6 +197,9 @@ OpenSSL never depends on them.
 | `CRYPTO_ctr128_encrypt`(`_ctr32`), `CRYPTO_ofb128_encrypt`, `CRYPTO_cfb128_encrypt`, and the AES ones over them, with a position (`*num`) of 16 or more | read past the keystream block or IV | refused: nothing changes | `lowlevel::modes::tests::positions_past_the_block_are_refused` |
 | `CRYPTO_128_unwrap_pad` failing a check | zeroes `inlen` octets of output, 8 past the `inlen - 8` it writes | zeroes the `inlen - 8` | `lowlevel::modes::tests::failed_padded_unwraps_zero_only_their_output` |
 | The AEAD helpers (`CRYPTO_gcm128_*`, `CRYPTO_ccm128_*`, `CRYPTO_ocb128_*`, `CRYPTO_xts128_encrypt`) with a null context, buffer, IV, tag, or function (a CCM or XTS context without its block functions included) | dereference null or call through it, and crash | return -1 or 0 (null from `CRYPTO_gcm128_new` and `CRYPTO_ocb128_new`), or do nothing | `lowlevel::aead::tests::nulls_fail` |
+| The deprecated DES functions (`DES_set_key*`, `DES_ecb_encrypt`, the modes, the checksums, `DES_fcrypt`, ...) with a null key, schedule, buffer, IV, or position | dereference null and crash | do nothing, or return 0 (-2 from the key setters, null from `DES_fcrypt`) | `lowlevel::des::tests::nulls_do_nothing` |
+| The DES modes with a negative length | the CBC family (`DES_cbc_encrypt`, `DES_ncbc_encrypt`, `DES_xcbc_encrypt`, `DES_ede3_cbc_encrypt`) encrypts and writes a block; CFB and OFB by octets and CFB by bits read until they crash | do nothing | `lowlevel::des::tests::negative_lengths_do_nothing` |
+| `DES_ede3_cfb_encrypt` with a bit width of 0 or less, `DES_ofb_encrypt` with one | loops without end (the width rounds to 0 octets a step); shifts a word by its width or more (undefined) | do nothing | `lowlevel::des::tests::bad_bit_widths_do_nothing` |
 
 ## Notes
 
