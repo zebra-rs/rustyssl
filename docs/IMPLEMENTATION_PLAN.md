@@ -3329,7 +3329,43 @@ chunking) is clean.
       generators, the size queries, forty decapsulations across the blinding's renewal, the
       errors for short buffers, wrong lengths, and ciphertexts at and around the range's ends,
       keys that can't be used, and the parameter lists.
-  - [ ] **4.3d** The legacy `RSA_*` and `RSA_meth_*` APIs, over the same key object.
+  - The legacy `RSA_*` and `RSA_meth_*` APIs, over the same key object, in three parts:
+    - [x] **4.3d1 The object and its methods** (`rsa.rs`, `rsa_lib.rs`, `rsa_meth.rs`; 64
+      exports):
+      - `RSA_new`/`free`/`up_ref` with OpenSSL's own count: the method's `finish` and the
+        ex_data's free run at the last reference.
+      - The numbers' `set0` and `get0`, multi-prime ones included. The `BIGNUM`s the
+        application gives or sees become the key's own (`rsa::Numbers`), so a `get0` pointer
+        is the one `set0` took, stays valid while the key lives, and reads (and writes) the
+        key's number. Private numbers get `BN_FLG_CONSTTIME`, as OpenSSL's do.
+      - Size, bits, security bits, version, and flags. The type bits are the key's kind;
+        `RSA_FLAG_NO_BLINDING` stops its blinding, and `RSA_blinding_off`/`_on` drop or remake
+        it.
+      - ex_data, `RSA_setup_blinding`, and `RSA_pkey_ctx_ctrl`.
+      - `RSA_METHOD`: new, copy, free, name, flags, application data, and every function's
+        getter and setter. The default method (set or reset), `RSA_set_method` (the old
+        method's `finish`, the new one's `init`), and `RSA_PKCS1_OpenSSL`, whose functions are
+        real (the four operations, `rsa_mod_exp`, `BN_mod_exp_mont`, `init`, `finish`) so an
+        application's method can hand calls to them.
+      - The four operations go through the key's method. The built-in ones running for a
+        method that replaced `rsa_mod_exp` or `bn_mod_exp` abort for now (fail closed).
+      - Quirks kept: `RSA_flags` returns the method's flags; `RSA_set0_multi_prime_params`
+        makes all its primes extra ones; `RSA_get0_multi_prime_factors` gives only those.
+      - New deviations: `RSA_size`/`RSA_bits`/`RSA_security_bits` of a key without a modulus,
+        `RSA_up_ref(NULL)`, `RSA_set0_multi_prime_params` without p and q, and `RSA_new`
+        after `RSA_set_default_method(NULL)`.
+      - `tests/c/rsa_lib.c` (61 checks), with known generators.
+      - Found in the reference: `RSA_set_method` on a key that has been used leaves its
+        cached Montgomery contexts freed but in place (the built-in `finish` frees them), so
+        its next built-in operation reads freed memory; rustyssl's works. The test sets
+        methods on fresh keys.
+    - [ ] **4.3d2** The operations' helpers and the rest of the API: the padding functions,
+      `RSA_sign`/`verify` (and the ASN.1 OCTET STRING forms), PSS, X9.31, key generation and
+      checks; the providers' operations through the key's method when an application
+      replaced it.
+    - [ ] **4.3d3** RSA in `EVP_PKEY`: the legacy key data (`EVP_PKEY_assign`, `set1_RSA`,
+      `get0_RSA`, `get1_RSA`), its ASN.1 method, and moving keys between their legacy and
+      provided forms.
   - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
     `RSA_OAEP_PARAMS`).
 - [ ] **4.4 EC:**
