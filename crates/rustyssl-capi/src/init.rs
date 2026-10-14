@@ -320,6 +320,16 @@ pub(crate) fn safe_getenv(name: &CStr) -> Option<CString> {
     Some(unsafe { CStr::from_ptr(value) }.to_owned())
 }
 
+/// `ossl_safe_getenv` as OpenSSL returns it: the environment's own string (valid until the
+/// environment changes), or null.
+pub(crate) fn safe_getenv_ptr(name: &CStr) -> *const c_char {
+    if issetugid() != 0 {
+        return core::ptr::null();
+    }
+    // SAFETY: getenv with a NUL-terminated name.
+    unsafe { libc::getenv(name.as_ptr()) }.cast_const()
+}
+
 /// `OPENSSL_issetugid`: whether the process runs with privileges it didn't start with, so the
 /// environment can't be trusted. glibc's `AT_SECURE` on glibc; elsewhere, OpenSSL compares the
 /// real and effective IDs.

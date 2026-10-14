@@ -83,6 +83,7 @@ abi/openssl-3.5/      vendored headers (+ config/<target>/), *.num, objects, err
 crates/
   rustyssl-abi/       generated per target from abi/: types, layouts, enums, every macro constant. No logic.
   rustyssl-asn1/      DER/BER reader and writer, ASN.1 universal types, OID/NID registry, base64, PEM framing
+  rustyssl-conf/      the configuration-file language (openssl.cnf): lines, sections, values, variables, pragmas, includes
   rustyssl-crypto/    algorithm facade + backend traits, DRBG/RNG, BIGNUM, built-in provider algorithms
   rustyssl-pki/       X.509/CRL/CSR, path validation, PKCS#7/#8/#12, CMS, OCSP, TS, CT
   rustyssl-tls/       sans-IO TLS 1.0–1.3 + DTLS: record layer, handshake state machines, cipher-string parser

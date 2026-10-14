@@ -411,6 +411,18 @@ unsafe fn doall(handle: *const OPENSSL_LHASH, mut callback: impl FnMut(Element))
     }
 }
 
+/// The table's items in `OPENSSL_LH_doall`'s order (for tables rustyssl keeps itself, such as a
+/// configuration's).
+///
+/// # Safety
+/// `handle` is null or a live table handle.
+pub(crate) unsafe fn items(handle: *const OPENSSL_LHASH) -> Vec<*mut c_void> {
+    let mut out = Vec::new();
+    // SAFETY: the caller's guarantee.
+    unsafe { doall(handle, |item| out.push(item.0.cast_mut())) };
+    out
+}
+
 ffi_export! {
     /// Returns a new table with the hash function `h` and comparison `c`; null ones mean
     /// strings (`OPENSSL_LH_strhash` and `strcmp`).

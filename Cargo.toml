@@ -15,6 +15,7 @@ publish = false
 [workspace.dependencies]
 rustyssl-abi = { path = "crates/rustyssl-abi" }
 rustyssl-asn1 = { path = "crates/rustyssl-asn1" }
+rustyssl-conf = { path = "crates/rustyssl-conf" }
 rustyssl-crypto = { path = "crates/rustyssl-crypto" }
 rustyssl-pki = { path = "crates/rustyssl-pki" }
 rustyssl-tls = { path = "crates/rustyssl-tls" }

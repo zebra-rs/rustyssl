@@ -2245,6 +2245,58 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut CMAC_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
     crate::cmac::CMAC_Update;
 const _: unsafe extern "C" fn(*mut CMAC_CTX) -> core::ffi::c_int = crate::cmac::CMAC_resume;
+const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut BIO) -> core::ffi::c_int =
+    crate::conf::CONF_dump_bio;
+const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut FILE) -> core::ffi::c_int =
+    crate::conf::CONF_dump_fp;
+const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE) = crate::conf::CONF_free;
+const _: unsafe extern "C" fn() -> *mut core::ffi::c_char =
+    crate::conf::CONF_get1_default_config_file;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_long = crate::conf::CONF_get_number;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *const core::ffi::c_char,
+) -> *mut stack_st_CONF_VALUE = crate::conf::CONF_get_section;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::conf::CONF_get_string;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_long,
+) -> *mut lhash_st_CONF_VALUE = crate::conf::CONF_load;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut BIO,
+    *mut core::ffi::c_long,
+) -> *mut lhash_st_CONF_VALUE = crate::conf::CONF_load_bio;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut FILE,
+    *mut core::ffi::c_long,
+) -> *mut lhash_st_CONF_VALUE = crate::conf::CONF_load_fp;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            elem: *const core::ffi::c_char,
+            len: core::ffi::c_int,
+            usr: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::conf::CONF_parse_list;
+const _: unsafe extern "C" fn(*mut CONF_METHOD) -> core::ffi::c_int =
+    crate::conf::CONF_set_default_method;
+const _: unsafe extern "C" fn(*mut CONF, *mut lhash_st_CONF_VALUE) = crate::conf::CONF_set_nconf;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
     *const core::ffi::c_uchar,
@@ -6252,6 +6304,42 @@ const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut MDC2_CTX) -> core::f
 const _: unsafe extern "C" fn(*mut MDC2_CTX) -> core::ffi::c_int = crate::lowlevel::hash::MDC2_Init;
 const _: unsafe extern "C" fn(*mut MDC2_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
     crate::lowlevel::hash::MDC2_Update;
+const _: unsafe extern "C" fn() -> *mut CONF_METHOD = crate::conf::NCONF_WIN32;
+const _: unsafe extern "C" fn() -> *mut CONF_METHOD = crate::conf::NCONF_default;
+const _: unsafe extern "C" fn(*const CONF, *mut BIO) -> core::ffi::c_int =
+    crate::conf::NCONF_dump_bio;
+const _: unsafe extern "C" fn(*const CONF, *mut FILE) -> core::ffi::c_int =
+    crate::conf::NCONF_dump_fp;
+const _: unsafe extern "C" fn(*mut CONF) = crate::conf::NCONF_free;
+const _: unsafe extern "C" fn(*mut CONF) = crate::conf::NCONF_free_data;
+const _: unsafe extern "C" fn(*const CONF) -> *mut OSSL_LIB_CTX = crate::conf::NCONF_get0_libctx;
+const _: unsafe extern "C" fn(
+    *const CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_long,
+) -> core::ffi::c_int = crate::conf::NCONF_get_number_e;
+const _: unsafe extern "C" fn(*const CONF, *const core::ffi::c_char) -> *mut stack_st_CONF_VALUE =
+    crate::conf::NCONF_get_section;
+const _: unsafe extern "C" fn(*const CONF) -> *mut stack_st_OPENSSL_CSTRING =
+    crate::conf::NCONF_get_section_names;
+const _: unsafe extern "C" fn(
+    *const CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::conf::NCONF_get_string;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_long,
+) -> core::ffi::c_int = crate::conf::NCONF_load;
+const _: unsafe extern "C" fn(*mut CONF, *mut BIO, *mut core::ffi::c_long) -> core::ffi::c_int =
+    crate::conf::NCONF_load_bio;
+const _: unsafe extern "C" fn(*mut CONF, *mut FILE, *mut core::ffi::c_long) -> core::ffi::c_int =
+    crate::conf::NCONF_load_fp;
+const _: unsafe extern "C" fn(*mut CONF_METHOD) -> *mut CONF = crate::conf::NCONF_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut CONF_METHOD) -> *mut CONF =
+    crate::conf::NCONF_new_ex;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
