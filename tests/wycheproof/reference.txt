@@ -1,0 +1,14 @@
+# Wycheproof tests where the reference OpenSSL disagrees with Wycheproof's verdict, and
+# rustyssl, matching the reference, does too (`cargo xtask test-wycheproof`). Each line:
+#   <file> <tcId>[,<tcId>...] <reason>
+# A listed test that agrees with Wycheproof fails the run, so the list stays exact.
+
+# GCM with an IV over 128 octets (these are 257): OpenSSL caps GCM IVs at 128 octets
+# (GCM_IV_MAX_SIZE) and refuses longer ones with PROV_R_INVALID_IV_LENGTH.
+aes_gcm 268,272,276 IV longer than OpenSSL's 128-octet GCM maximum
+aria_gcm 261,265,269 IV longer than OpenSSL's 128-octet GCM maximum
+sm4_gcm 90 IV longer than OpenSSL's 128-octet GCM maximum
+
+# Wrapping an empty key: EVP_CipherUpdate passes no input to the cipher and EVP_CipherFinal_ex
+# has nothing to finish, so the empty key "wraps" to nothing, successfully.
+aes_wrap 22,64,119 EVP passes an empty input to no cipher, so an empty key wraps to nothing
