@@ -9,6 +9,7 @@
 
 pub(crate) mod aead;
 pub(crate) mod aes;
+pub(crate) mod ciphers;
 pub(crate) mod des;
 pub(crate) mod hash;
 pub(crate) mod legacy;
