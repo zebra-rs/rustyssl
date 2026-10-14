@@ -12,6 +12,7 @@ publish.workspace = true
 libc.workspace = true
 rustyssl-abi.workspace = true
 rustyssl-asn1.workspace = true
+rustyssl-conf.workspace = true
 rustyssl-crypto.workspace = true
 rustyssl-pki.workspace = true
 rustyssl-tls.workspace = true

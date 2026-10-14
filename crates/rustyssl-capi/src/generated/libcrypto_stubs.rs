@@ -1883,52 +1883,6 @@ pub extern "C" fn COMP_zstd_oneshot() -> *mut COMP_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CONF_dump_bio(_: *mut lhash_st_CONF_VALUE, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_dump_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_dump_fp(_: *mut lhash_st_CONF_VALUE, _: *mut FILE) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_dump_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_free(_: *mut lhash_st_CONF_VALUE) {
-    crate::stub::unimplemented("CONF_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_get1_default_config_file() -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("CONF_get1_default_config_file")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_get_number(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_long {
-    crate::stub::unimplemented("CONF_get_number")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_get_section(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *const core::ffi::c_char,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("CONF_get_section")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_get_string(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("CONF_get_string")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CONF_imodule_get_flags(_: *const CONF_IMODULE) -> core::ffi::c_ulong {
     crate::stub::unimplemented("CONF_imodule_get_flags")
 }
@@ -1961,33 +1915,6 @@ pub extern "C" fn CONF_imodule_set_flags(_: *mut CONF_IMODULE, _: core::ffi::c_u
 #[unsafe(no_mangle)]
 pub extern "C" fn CONF_imodule_set_usr_data(_: *mut CONF_IMODULE, _: *mut core::ffi::c_void) {
     crate::stub::unimplemented("CONF_imodule_set_usr_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_load(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_long,
-) -> *mut lhash_st_CONF_VALUE {
-    crate::stub::unimplemented("CONF_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_load_bio(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *mut BIO,
-    _: *mut core::ffi::c_long,
-) -> *mut lhash_st_CONF_VALUE {
-    crate::stub::unimplemented("CONF_load_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_load_fp(
-    _: *mut lhash_st_CONF_VALUE,
-    _: *mut FILE,
-    _: *mut core::ffi::c_long,
-) -> *mut lhash_st_CONF_VALUE {
-    crate::stub::unimplemented("CONF_load_fp")
 }
 
 #[unsafe(no_mangle)]
@@ -2045,33 +1972,6 @@ pub extern "C" fn CONF_modules_load_file_ex(
 #[unsafe(no_mangle)]
 pub extern "C" fn CONF_modules_unload(_: core::ffi::c_int) {
     crate::stub::unimplemented("CONF_modules_unload")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_parse_list(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            elem: *const core::ffi::c_char,
-            len: core::ffi::c_int,
-            usr: *mut core::ffi::c_void,
-        ) -> core::ffi::c_int,
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_parse_list")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_set_default_method(_: *mut CONF_METHOD) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_set_default_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_set_nconf(_: *mut CONF, _: *mut lhash_st_CONF_VALUE) {
-    crate::stub::unimplemented("CONF_set_nconf")
 }
 
 #[unsafe(no_mangle)]
@@ -6376,110 +6276,6 @@ pub extern "C" fn NAMING_AUTHORITY_set0_authorityURL(
     _: *mut ASN1_IA5STRING,
 ) {
     crate::stub::unimplemented("NAMING_AUTHORITY_set0_authorityURL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_WIN32() -> *mut CONF_METHOD {
-    crate::stub::unimplemented("NCONF_WIN32")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_default() -> *mut CONF_METHOD {
-    crate::stub::unimplemented("NCONF_default")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_dump_bio(_: *const CONF, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_dump_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_dump_fp(_: *const CONF, _: *mut FILE) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_dump_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_free(_: *mut CONF) {
-    crate::stub::unimplemented("NCONF_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_free_data(_: *mut CONF) {
-    crate::stub::unimplemented("NCONF_free_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_get0_libctx(_: *const CONF) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("NCONF_get0_libctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_get_number_e(
-    _: *const CONF,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_get_number_e")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_get_section(
-    _: *const CONF,
-    _: *const core::ffi::c_char,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("NCONF_get_section")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_get_section_names(_: *const CONF) -> *mut stack_st_OPENSSL_CSTRING {
-    crate::stub::unimplemented("NCONF_get_section_names")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_get_string(
-    _: *const CONF,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("NCONF_get_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_load(
-    _: *mut CONF,
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_load_bio(
-    _: *mut CONF,
-    _: *mut BIO,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_load_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_load_fp(
-    _: *mut CONF,
-    _: *mut FILE,
-    _: *mut core::ffi::c_long,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NCONF_load_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_new(_: *mut CONF_METHOD) -> *mut CONF {
-    crate::stub::unimplemented("NCONF_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NCONF_new_ex(_: *mut OSSL_LIB_CTX, _: *mut CONF_METHOD) -> *mut CONF {
-    crate::stub::unimplemented("NCONF_new_ex")
 }
 
 #[unsafe(no_mangle)]

@@ -1,0 +1,12 @@
+[package]
+name = "rustyssl-conf"
+description = "The configuration-file language (openssl.cnf): lines, sections, values, variables, pragmas, and includes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

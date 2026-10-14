@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(41) {
+        match random.below(42) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -189,6 +189,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             37 => skey_session(&mut random, &mut out)?,
             38 => md_meth_session(&mut random, &mut out)?,
             39 => cipher_meth_session(&mut random, &mut out)?,
+            40 => conf_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -796,6 +797,101 @@ fn cipher_meth_session(random: &mut Random, out: &mut String) -> Result {
             random.pick(&["stream", "ecb", "cbc", "cfb", "ofb", "ctr"]),
             1 + random.below(40),
             random.below(2),
+        )?;
+    }
+    Ok(())
+}
+
+/// A random session of configuration files: texts of lines picked from the grammar's pieces
+/// (sections, names, quotes, escapes, references, pragmas, includes of missing files, and
+/// malformed lines), joined with LF, CR LF, or continuations, with stray octets, read with
+/// either method.
+fn conf_session(random: &mut Random, out: &mut String) -> Result {
+    const NAMES: &[&str] = &["a", "b", "x_1", "s.t", "c$", "k-v", "ENV", "default", ""];
+    const VALUES: &[&str] = &[
+        "1",
+        "v w",
+        "'q # q'",
+        "\"d\"\"e\"",
+        "\\n\\t\\x\\\\",
+        "$a",
+        "${a}",
+        "$(b)",
+        "$s::a",
+        "${s::x_1}",
+        "$ENV::RUSTYSSL_PROBE_NONE",
+        "${a",
+        "$",
+        "$a$b",
+        "# comment",
+        "; semi",
+        "'open",
+        "\"open",
+        "tail\\",
+        "\u{e9}",
+    ];
+    for _ in 0..random.below(6) + 1 {
+        let mut text: Vec<u8> = Vec::new();
+        if random.below(10) == 0 {
+            text.extend_from_slice(b"\xef\xbb\xbf");
+        }
+        for _ in 0..random.below(10) + 1 {
+            let name = random.pick(NAMES);
+            let line = match random.below(14) {
+                0 => format!(
+                    "[{}]",
+                    random.pick(&["s", " s ", "a b", "", "t", "s", "ENV"])
+                ),
+                1 => format!("[{}", random.pick(&["s", "a b c", ""])),
+                2 => format!("# {}", random.pick(VALUES)),
+                3 => format!(
+                    ".pragma {}",
+                    random.pick(&[
+                        "dollarid:on",
+                        "dollarid:off",
+                        "= dollarid : TRUE",
+                        "abspath:on",
+                        "includedir:/nonexistent",
+                        "dollarid",
+                        ":on",
+                        "unknown:1",
+                    ])
+                ),
+                4 => format!(
+                    ".include {}",
+                    random.pick(&["/nonexistent/x.cnf", "missing.cnf", "= $a", ""])
+                ),
+                5 => format!("s::{name} = {}", random.pick(VALUES)),
+                6 => format!("{name} {}", random.pick(VALUES)),
+                7 => String::new(),
+                _ => format!(
+                    "{}{name}{}={}{}",
+                    random.pick(&["", " ", "\t"]),
+                    random.pick(&["", " "]),
+                    random.pick(&["", " "]),
+                    random.pick(VALUES)
+                ),
+            };
+            text.extend_from_slice(line.as_bytes());
+            if random.below(20) == 0 {
+                text.push(pick_octet(random, &[0, 0x80, b'\r', b'\\']));
+            }
+            text.extend_from_slice(
+                random
+                    .pick(&["\n", "\n", "\n", "\r\n", "\\\n", ""])
+                    .as_bytes(),
+            );
+        }
+        text.truncate(500);
+        let hex: String = if text.is_empty() {
+            "-".to_owned()
+        } else {
+            text.iter().map(|b| format!("{b:02x}")).collect()
+        };
+        writeln!(
+            out,
+            "cnf {} {hex}",
+            if random.below(5) == 0 { "w" } else { "d" }
         )?;
     }
     Ok(())

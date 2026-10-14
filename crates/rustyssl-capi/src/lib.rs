@@ -19,6 +19,7 @@ mod bio;
 mod bn;
 mod buffer;
 mod cmac;
+mod conf;
 mod dir;
 mod err;
 mod errno;

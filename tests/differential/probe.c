@@ -317,6 +317,7 @@
 #include <openssl/blowfish.h>
 #include <openssl/bn.h>
 #include <openssl/cast.h>
+#include <openssl/conf.h>
 #include <openssl/buffer.h>
 #include <openssl/camellia.h>
 #include <openssl/crypto.h>
@@ -7408,6 +7409,90 @@ static int cipher_meth_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for configuration files, over the text given in hex:
+ *   cnf METHOD HEX                  NCONF_load_bio of the octets HEX (at most 500; - for none)
+ *                                   with the default (d) or WIN32 (w) method: the result, line,
+ *                                   and errors; the dump, in the hash table's order; the
+ *                                   section names; and each section's values in order
+ */
+static int conf_command(const char *command, const char *line)
+{
+    char method[4] = "", hex[1001] = "";
+    unsigned char text[501];
+    size_t n = 0, i;
+    CONF *conf;
+    BIO *b, *out;
+    long eline = -7;
+    int r, k, j;
+    unsigned long code;
+    const char *data;
+    int flags;
+    char *p;
+    long len;
+    STACK_OF(OPENSSL_CSTRING) *names;
+
+    if (strcmp(command, "cnf") != 0)
+        return 0;
+    sscanf(line, "%*s %3s %1000s", method, hex);
+    if (strcmp(hex, "-") != 0) {
+        size_t h = strlen(hex);
+
+        if (h % 2 != 0 || h / 2 > 500) {
+            printf("%s: skipped\n", line);
+            return 1;
+        }
+        for (i = 0; i < h / 2; i++) {
+            unsigned int byte;
+
+            if (sscanf(hex + 2 * i, "%2x", &byte) != 1) {
+                printf("%s: skipped\n", line);
+                return 1;
+            }
+            text[n++] = (unsigned char)byte;
+        }
+    }
+    conf = NCONF_new(strcmp(method, "w") == 0 ? NCONF_WIN32() : NCONF_default());
+    b = BIO_new_mem_buf(text, (int)n);
+    r = NCONF_load_bio(conf, b, &eline);
+    printf("%s: load %d line %ld errors:", line, r, eline);
+    while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        if ((flags & ERR_TXT_STRING) != 0 && data[0] != '\0')
+            print_quoted(data);
+    }
+    out = BIO_new(BIO_s_mem());
+    NCONF_dump_bio(conf, out);
+    (void)BIO_write(out, "", 1);
+    len = BIO_get_mem_data(out, &p);
+    printf(" dump");
+    if (len > 0)
+        print_quoted(p);
+    BIO_free(out);
+    names = NCONF_get_section_names(conf);
+    printf(" sections");
+    for (k = 0; k < sk_OPENSSL_CSTRING_num(names); k++) {
+        const char *name = sk_OPENSSL_CSTRING_value(names, k);
+        STACK_OF(CONF_VALUE) *sk = NCONF_get_section(conf, name);
+
+        print_quoted(name);
+        printf(" {");
+        for (j = 0; j < sk_CONF_VALUE_num(sk); j++) {
+            CONF_VALUE *v = sk_CONF_VALUE_value(sk, j);
+
+            print_quoted(v->name);
+            print_quoted(v->value);
+        }
+        printf(" }");
+    }
+    printf("\n");
+    sk_OPENSSL_CSTRING_free(names);
+    BIO_free(b);
+    NCONF_free(conf);
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -7442,7 +7527,7 @@ int main(void)
             || des_command(command, line) || legacy_command(command, line)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
             || skey_command(command, line) || md_meth_command(command, line)
-            || cipher_meth_command(command, line)) {
+            || cipher_meth_command(command, line) || conf_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

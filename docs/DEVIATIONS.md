@@ -213,6 +213,9 @@ OpenSSL never depends on them.
 | `EVP_CIPHER_meth_get_*` and `EVP_CIPHER_impl_ctx_size` of the static ciphers (and copies by `EVP_CIPHER_meth_dup`) | the static cipher's functions and state size, over structures OpenSSL doesn't publish (`EVP_AES_KEY`, ...) | no functions (NULL) and a size of 0: an application can't use that state | `evp::cipher_meth::tests::static_ciphers_have_no_functions` |
 | `EVP_CIPHER_CTX_copy` of a context whose application cipher has no state size but was given state (`EVP_CIPHER_CTX_set_cipher_data`) | the copy shares the pointer, and both contexts free it | the copy has no state | `evp::cipher_ctx::legacy::tests::copy_does_not_share_unsized_state` |
 | The padding check of `EVP_DecryptFinal_ex` with an application's cipher | compares the padding octet by octet (a padding oracle where the ciphertext isn't authenticated) | the same results and errors, checked in constant time | `evp::cipher_ctx::legacy::tests::padding_check_matches_openssl` |
+| `NCONF_free_data` (and `CONF_free` of a table through it) | frees the table and include directory and leaves them in the `CONF`, so a later load, lookup, or `NCONF_free` reads (or frees) them again | clears them: the configuration is empty and usable | `conf::tests::free_data_leaves_an_empty_configuration` |
+| A second `NCONF_load`/`NCONF_load_bio` into a configuration, or `CONF_load_bio` into an existing table (both fail with `CONF_R_UNABLE_TO_CREATE_NEW_SECTION`: the `default` section exists) | puts the new `default` section in the table, then frees it there, so later lookups read freed memory | the same failure; the table keeps its own `default` section | `conf::tests::a_second_load_keeps_the_first` |
+| `CONF_parse_list` with a NUL separator | gives the list, then reads on past its end | gives the list as one item and stops | `rustyssl_conf` `list::tests::a_nul_separator_splits_nowhere` |
 
 ## Notes
 

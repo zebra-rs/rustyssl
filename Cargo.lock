@@ -336,11 +336,16 @@ dependencies = [
  "libc",
  "rustyssl-abi",
  "rustyssl-asn1",
+ "rustyssl-conf",
  "rustyssl-crypto",
  "rustyssl-pki",
  "rustyssl-tls",
  "subtle",
 ]
+
+[[package]]
+name = "rustyssl-conf"
+version = "0.1.0"
 
 [[package]]
 name = "rustyssl-crypto"
