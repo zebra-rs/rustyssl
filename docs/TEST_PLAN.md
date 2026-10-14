@@ -164,6 +164,12 @@ rustyssl itself**. You can only regenerate golden files with
 - Configure the pinned upstream tree and build it normally (internal-API tests need upstream's
   own static libraries). Then **relink** the public-API test programs and `apps/` against
   our libraries and run the `test/recipes/*.t` harness.
+- **Today** (step 3.13b), `evp_test` alone: built once from the reference's source, configured
+  as the reference is, and run on each library by pointing the dynamic loader at it (the
+  programs link the shared libraries, so they need no relinking). The data files it runs are
+  listed in `tests/openssl-suite/evp_test.txt`; both runs must succeed with the same
+  "Completed N tests with E errors and S skipped" counts, so a file whose tests rustyssl skips
+  (a key it can't load yet) fails.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
   - **(a) Public API** → must pass.
   - **(b) Needs internal symbols or headers** → excluded, with the reason.
@@ -359,6 +365,9 @@ arm64 (Tier 2). Windows comes later.
 Linux x86_64:
 - fmt, clippy, and the Rust tests;
 - L4 dual runs (`test-c`) and L5 with 1,000 random sessions;
+- the reference's `openssl` tool on rustyssl (`test-apps`), and the L6 subset implemented so
+  far: upstream `evp_test` on the data files in `tests/openssl-suite/evp_test.txt`
+  (`test-openssl-suite`);
 - Miri, `cargo deny`, and `cargo vet`;
 - a codegen job that fails if regenerating from `abi/` or `cargo xtask coverage` changes any
   committed file, or if an export is defined without a `tests/c` program that calls it;

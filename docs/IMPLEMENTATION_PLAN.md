@@ -2833,8 +2833,36 @@ have run for at least 24 CPU-hours with no findings.
       reference uses assembly).
     - `tests/c/app_startup.c` (28 checks) and `tests/c/evp_names_kept.c` (9: the names kept,
       the methods freed, and other methods fetched before they're read).
-  - [ ] **3.13b Upstream `evp_test`:** built from the reference's tree and run on the symmetric
-    data files (digests, ciphers, MACs, KDFs, encodings, RAND) against our libraries.
+  - [x] **3.13b Upstream `evp_test`:** `cargo xtask test-openssl-suite` (the first part of
+    TEST_PLAN.md's L6) builds `test/evp_test` once from the reference's source, configured as
+    the reference is (`target/ref-suite/`, kept by a stamp and cached in CI), and runs it on the
+    data files of `tests/openssl-suite/evp_test.txt` with each library by the dynamic loader's
+    path. Both runs must succeed with the same "Completed N tests with E errors and S skipped"
+    counts. 70 files: every symmetric one (`evpciph_*`, `evpmd_*`, `evpmac_*`, `evpkdf_*`,
+    `evppbe_*`, `evpencod`, `evprand`) but `evpciph_aes_stitched` (the AES-CBC-HMAC
+    composites on x86_64 need TLS record mode, `tls-version`, which comes in Phase 7), the KDFs through `EVP_PKEY` (`evppkey_kdf_*`), and the
+    ML-KEM, ML-DSA, SLH-DSA, and hybrid key generation files. The other key-pair files need
+    key parsing (`PEM_read_bio_PrivateKey_ex`, Phase 5), and ML-DSA's and SLH-DSA's signing
+    files skip every test on rustyssl (their keys come from data, as the KEMs' encapsulation
+    files' do); they're added as those land. In CI's test job; a run takes seconds, the build
+    under a minute. The legacy provider isn't loaded (`test/default.cnf`), so its tests are
+    skipped on both.
+    - Found and fixed: AES-GCM-SIV refused a tag parameter without data while encrypting (as
+      `EVP_CTRL_AEAD_SET_TAG` with NULL sets only the length); OpenSSL checks only its type and
+      size then, and reads it only when decrypting.
+    - Pulled forward: `OSSL_INDICATOR_set_callback`/`_get_callback` (a callback each library
+      context keeps; only a FIPS provider calls it), and from 6.5 the PKCS #12 password
+      strings (`OPENSSL_asc2uni`, `_utf82uni`, `_uni2asc`, `_uni2utf8`, over
+      `rustyssl_asn1::text`, with OpenSSL's fallbacks for input that isn't UTF-8 or UTF-16)
+      and `PKCS12_key_gen_uni`/`_asc`/`_utf8` (and `_ex`) over the PKCS12KDF. The converted
+      passwords are wiped when dropped (`zeroize`, now also a `rustyssl-asn1` dependency).
+      12 exports; libcrypto now 2,291 of 5,876.
+    - New deviation: the string conversions and `PKCS12_key_gen_uni` fail where the reference
+      reads out of bounds (a NULL string with a length, negative lengths).
+    - `tests/c/pkcs12_key.c` (38 checks: the conversions both ways and the key derivation
+      against `evppbe_pkcs12.txt`'s answer); `lib_ctx.c` checks the indicator callback and
+      `evp_modes.c` the tag length alone; the fuzz target `pkcs12_text` (round trips, and
+      UTF-16 as the standard library encodes it).
   - [ ] **3.13c Wycheproof:** the symmetric vector files, vendored at a pinned revision with
     checksums, and a runner (AES-GCM/CCM/SIV/GCM-SIV/key wrap, ChaCha20-Poly1305 and
     XChaCha20-Poly1305, AES-CMAC, HMAC, HKDF, PBKDF2).
