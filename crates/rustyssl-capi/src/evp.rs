@@ -6,6 +6,7 @@ pub(crate) mod asymcipher;
 pub(crate) mod cipher;
 pub(crate) mod cipher_asn1;
 pub(crate) mod cipher_ctx;
+pub(crate) mod cipher_meth;
 pub(crate) mod ctrl;
 pub(crate) mod digest;
 pub(crate) mod encode;

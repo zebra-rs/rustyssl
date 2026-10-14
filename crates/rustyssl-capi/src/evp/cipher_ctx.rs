@@ -40,10 +40,10 @@ use rustyssl_abi::{
     EVP_CTRL_SET_SPEED, EVP_CTRL_TLS1_1_MULTIBLOCK_AAD, EVP_CTRL_TLS1_1_MULTIBLOCK_ENCRYPT,
     EVP_CTRL_TLS1_1_MULTIBLOCK_MAX_BUFSIZE, EVP_CTRL_TLS1_1_MULTIBLOCK_PARAM, EVP_MAX_BLOCK_LENGTH,
     EVP_MAX_IV_LENGTH, EVP_R_CANNOT_GET_PARAMETERS, EVP_R_CANNOT_SET_PARAMETERS,
-    EVP_R_CTRL_NOT_IMPLEMENTED, EVP_R_CTRL_OPERATION_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR,
-    EVP_R_INITIALIZATION_ERROR, EVP_R_INPUT_NOT_INITIALIZED, EVP_R_INVALID_KEY_LENGTH,
-    EVP_R_INVALID_LENGTH, EVP_R_INVALID_OPERATION, EVP_R_NO_CIPHER_SET, EVP_R_NOT_ABLE_TO_COPY_CTX,
-    EVP_R_UPDATE_ERROR, NID_undef, OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TAG,
+    EVP_R_CTRL_OPERATION_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
+    EVP_R_INPUT_NOT_INITIALIZED, EVP_R_INVALID_KEY_LENGTH, EVP_R_INVALID_LENGTH,
+    EVP_R_INVALID_OPERATION, EVP_R_NO_CIPHER_SET, EVP_R_NOT_ABLE_TO_COPY_CTX, EVP_R_UPDATE_ERROR,
+    NID_undef, OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TAG,
     OSSL_CIPHER_PARAM_AEAD_TAGLEN, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD,
     OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN,
     OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV,
@@ -63,6 +63,10 @@ use crate::err;
 use crate::ffi::ffi_export;
 use crate::mem;
 use crate::objects::OBJ_nid2sn;
+mod legacy;
+
+pub(crate) use legacy::asn1_fn as legacy_asn1_fn;
+
 use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_locate_const, OSSL_PARAM_modified, OSSL_PARAM_set_int,
     construct, end,
@@ -300,7 +304,12 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_CIPHER_CTX_reset(ctx: *mut EVP_CIPHER_CTX) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
+        // An application's cipher's `cleanup` first; its failure fails the reset.
         // SAFETY: the caller's guarantee.
+        if !unsafe { legacy::release(ctx) } {
+            return 0;
+        }
+        // SAFETY: as above.
         if let Some(c) = unsafe { context(ctx) } {
             reset(c);
         }
@@ -357,7 +366,7 @@ fn key_length(c: &mut CipherCtx) -> c_int {
 fn iv_length(c: &mut CipherCtx) -> c_int {
     let Some(cipher) = c.cipher() else { return 0 };
     if c.iv_len < 0 {
-        let mut len = cipher.iv_len;
+        let mut len = cipher.iv_len();
         if cipher.funcs.get_ctx_params.is_some() {
             let mut v: usize = to_size(len);
             let mut params = [
@@ -446,6 +455,30 @@ fn provider_len(n: c_int) -> usize {
     to_size(n)
 }
 
+/// Clears a context for a new cipher, keeping its direction (`enc`) and flags: as
+/// `EVP_CIPHER_CTX_reset`, which also frees what `EVP_CIPHER_CTX_set_cipher_data` set. An
+/// application's cipher whose `cleanup` fails leaves the context as it is, as in OpenSSL.
+///
+/// # Safety
+/// `ctx` is a live cipher context.
+unsafe fn clear_for(ctx: *mut EVP_CIPHER_CTX, enc: c_int) {
+    // SAFETY: the caller's guarantee.
+    let released = unsafe { legacy::release(ctx) };
+    // SAFETY: as above (the cipher's `cleanup` may have used the context).
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return;
+    };
+    let flags = c.flags;
+    if released {
+        // SAFETY: memory the application gave the context to free.
+        unsafe { mem::release(c.cipher_data) };
+        c.cipher_data = ptr::null_mut();
+        reset(c);
+    }
+    c.encrypt = enc;
+    c.flags = flags;
+}
+
 /// `evp_cipher_init_internal`.
 ///
 /// # Safety
@@ -482,14 +515,23 @@ unsafe fn init_internal(
         return 0;
     }
     if !cipher.is_null() && !c.cipher.is_null() {
-        // The legacy clean-up, which frees what `EVP_CIPHER_CTX_set_cipher_data` set.
-        // SAFETY: memory the application gave the context to free.
-        unsafe { mem::release(c.cipher_data) };
-        c.cipher_data = ptr::null_mut();
-        let flags = c.flags;
-        reset(c);
-        c.encrypt = enc;
-        c.flags = flags;
+        // SAFETY: the caller's guarantee.
+        unsafe { clear_for(ctx, enc) };
+    }
+    // SAFETY: as above (an application's `cleanup` may have used the context).
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
+    // SAFETY: the caller's guarantee.
+    if unsafe { legacy::is_application(ctx, cipher) } {
+        if c.cipher == c.fetched_cipher.cast_const() {
+            c.cipher = ptr::null();
+        }
+        // SAFETY: the context's own reference.
+        unsafe { EVP_CIPHER_free(c.fetched_cipher) };
+        c.fetched_cipher = ptr::null_mut();
+        // SAFETY: the caller's guarantee.
+        return unsafe { legacy::init(ctx, cipher, key, iv, enc) };
     }
     let mut cipher = if cipher.is_null() { c.cipher } else { cipher };
     // SAFETY: the caller's live method, or the context's.
@@ -623,14 +665,13 @@ unsafe fn init_skey_internal(
         return 0;
     }
     if !cipher.is_null() && !c.cipher.is_null() {
-        // SAFETY: memory the application gave the context to free.
-        unsafe { mem::release(c.cipher_data) };
-        c.cipher_data = ptr::null_mut();
-        let flags = c.flags;
-        reset(c);
-        c.encrypt = enc;
-        c.flags = flags;
+        // SAFETY: the caller's guarantee.
+        unsafe { clear_for(ctx, enc) };
     }
+    // SAFETY: as above (an application's `cleanup` may have used the context).
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
     let cipher = if cipher.is_null() { c.cipher } else { cipher };
     // SAFETY: the caller's live method, or the context's.
     let from_provider = unsafe { method(cipher) }.is_some_and(|m| !m.prov.0.is_null());
@@ -907,7 +948,11 @@ unsafe fn update(
         err::raise(ERR_LIB_EVP, EVP_R_NO_CIPHER_SET, f);
         return 0;
     };
-    let bs = m.block_size;
+    if m.prov.0.is_null() {
+        // SAFETY: the caller's guarantee (an application's cipher).
+        return unsafe { legacy::update(ctx, out, outl, in_, inl, encrypting) };
+    }
+    let bs = m.block_size();
     let (Some(cupdate), Ok(b)) = (m.funcs.cupdate, usize::try_from(bs)) else {
         err::raise(ERR_LIB_EVP, EVP_R_UPDATE_ERROR, f);
         return 0;
@@ -966,7 +1011,11 @@ unsafe fn finalize(
         err::raise(ERR_LIB_EVP, EVP_R_NO_CIPHER_SET, f);
         return 0;
     };
-    let (Some(cfinal), Ok(b)) = (m.funcs.cfinal, usize::try_from(m.block_size)) else {
+    if m.prov.0.is_null() {
+        // SAFETY: the caller's guarantee (an application's cipher).
+        return unsafe { legacy::finalize(ctx, out, outl, encrypting) };
+    }
+    let (Some(cfinal), Ok(b)) = (m.funcs.cfinal, usize::try_from(m.block_size())) else {
         err::raise(ERR_LIB_EVP, EVP_R_FINAL_ERROR, f);
         return 0;
     };
@@ -1145,9 +1194,11 @@ ffi_export! {
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         let Some(m) = c.cipher() else { return 0 };
         if m.prov.0.is_null() {
-            return 0;
+            let Ok(n) = usize::try_from(inl) else { return 0 };
+            // SAFETY: the caller's guarantee (an application's cipher).
+            return unsafe { legacy::cipher(ctx, out, in_, n) };
         }
-        let Ok(bs) = usize::try_from(m.block_size) else { return 0 };
+        let Ok(bs) = usize::try_from(m.block_size()) else { return 0 };
         if bs == 0 {
             return 0;
         }
@@ -1183,12 +1234,8 @@ ffi_export! {
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         let Some(m) = c.cipher() else { return 0 };
         if m.prov.0.is_null() {
-            // The legacy path: no static cipher has a variable key length.
-            if m.key_len == keylen {
-                return 1;
-            }
-            err::raise(ERR_LIB_EVP, EVP_R_INVALID_KEY_LENGTH, "EVP_CIPHER_CTX_set_key_length");
-            return 0;
+            // SAFETY: the caller's guarantee (an application's cipher).
+            return unsafe { legacy::set_key_length(ctx, keylen) };
         }
         if key_length(c) == keylen {
             return 1;
@@ -1276,9 +1323,8 @@ ffi_export! {
             return 0;
         };
         if m.prov.0.is_null() {
-            // The legacy path: the static ciphers have no `ctrl`.
-            err::raise(ERR_LIB_EVP, EVP_R_CTRL_NOT_IMPLEMENTED, F);
-            return 0;
+            // SAFETY: the caller's guarantee (an application's cipher).
+            return unsafe { legacy::ctrl(ctx, type_, arg, ptr) };
         }
         let mut sz: usize = to_size(arg);
         let mut i: c_uint = arg.cast_unsigned();
@@ -1516,7 +1562,7 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         let Some(m) = c.cipher() else { return 0 };
-        if m.flags & flag(EVP_CIPH_RAND_KEY) != 0 {
+        if m.flags() & flag(EVP_CIPH_RAND_KEY) != 0 {
             // SAFETY: the caller's guarantee.
             return unsafe { EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_RAND_KEY, 0, key.cast()) };
         }
@@ -1550,6 +1596,15 @@ unsafe fn copy(out: *mut EVP_CIPHER_CTX, in_: *const EVP_CIPHER_CTX) -> c_int {
         err::raise(ERR_LIB_EVP, EVP_R_INPUT_NOT_INITIALIZED, F);
         return 0;
     };
+    if m.prov.0.is_null() {
+        if out.cast_const() == in_ {
+            // The reference resets the context and then copies its freed state.
+            err::raise(ERR_LIB_EVP, EVP_R_NOT_ABLE_TO_COPY_CTX, F);
+            return 0;
+        }
+        // SAFETY: the caller's guarantee (an application's cipher), two contexts.
+        return unsafe { legacy::copy(out, in_) };
+    }
     let (Some(dup), false) = (m.funcs.dupctx, m.prov.0.is_null()) else {
         err::raise(ERR_LIB_EVP, EVP_R_NOT_ABLE_TO_COPY_CTX, F);
         return 0;
@@ -1753,6 +1808,11 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
+        if c.cipher().is_some_and(|m| m.prov.0.is_null()) {
+            // SAFETY: the caller's guarantee (an application's cipher, whose `ctrl` may give
+            // the length).
+            return unsafe { legacy::iv_length(ctx.cast_mut()) };
+        }
         iv_length(c)
     }
 }
@@ -1796,7 +1856,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
-        c.cipher().map_or(0, |m| m.block_size)
+        c.cipher().map_or(0, |m| m.block_size())
     }
 }
 ffi_export! {

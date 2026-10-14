@@ -3370,8 +3370,118 @@ const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
     crate::evp::cipher::EVP_CIPHER_gettable_ctx_params;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *const OSSL_PARAM =
     crate::evp::cipher::EVP_CIPHER_gettable_params;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
+    crate::evp::cipher_meth::EVP_CIPHER_impl_ctx_size;
 const _: unsafe extern "C" fn(*const EVP_CIPHER, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::evp::cipher::EVP_CIPHER_is_a;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *mut EVP_CIPHER =
+    crate::evp::cipher_meth::EVP_CIPHER_meth_dup;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER) = crate::evp::cipher_meth::EVP_CIPHER_meth_free;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(cipher: *mut EVP_CIPHER_CTX) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_cleanup;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        cipher: *mut EVP_CIPHER_CTX,
+        arg1: core::ffi::c_int,
+        arg2: core::ffi::c_int,
+        arg3: *mut core::ffi::c_void,
+    ) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_ctrl;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        cipher: *mut EVP_CIPHER_CTX,
+        arg1: *mut core::ffi::c_uchar,
+        arg2: *const core::ffi::c_uchar,
+        arg3: usize,
+    ) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_do_cipher;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(cipher: *mut EVP_CIPHER_CTX, arg1: *mut ASN1_TYPE) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_get_asn1_params;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        cipher: *mut EVP_CIPHER_CTX,
+        arg1: *const core::ffi::c_uchar,
+        arg2: *const core::ffi::c_uchar,
+        arg3: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_init;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(cipher: *mut EVP_CIPHER_CTX, arg1: *mut ASN1_TYPE) -> core::ffi::c_int,
+> = crate::evp::cipher_meth::EVP_CIPHER_meth_get_set_asn1_params;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut EVP_CIPHER = crate::evp::cipher_meth::EVP_CIPHER_meth_new;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut EVP_CIPHER_CTX) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_cleanup;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut EVP_CIPHER_CTX,
+            type_: core::ffi::c_int,
+            arg: core::ffi::c_int,
+            ptr: *mut core::ffi::c_void,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_ctrl;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_CIPHER_CTX,
+            out: *mut core::ffi::c_uchar,
+            in_: *const core::ffi::c_uchar,
+            inl: usize,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_do_cipher;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::evp::cipher_meth::EVP_CIPHER_meth_set_flags;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(arg1: *mut EVP_CIPHER_CTX, arg2: *mut ASN1_TYPE) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_get_asn1_params;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_meth::EVP_CIPHER_meth_set_impl_ctx_size;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ctx: *mut EVP_CIPHER_CTX,
+            key: *const core::ffi::c_uchar,
+            iv: *const core::ffi::c_uchar,
+            enc: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_init;
+const _: unsafe extern "C" fn(*mut EVP_CIPHER, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::cipher_meth::EVP_CIPHER_meth_set_iv_length;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER,
+    ::core::option::Option<
+        unsafe extern "C" fn(arg1: *mut EVP_CIPHER_CTX, arg2: *mut ASN1_TYPE) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::evp::cipher_meth::EVP_CIPHER_meth_set_set_asn1_params;
 const _: unsafe extern "C" fn(
     *const EVP_CIPHER,
     ::core::option::Option<

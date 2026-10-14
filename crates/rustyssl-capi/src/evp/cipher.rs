@@ -9,11 +9,15 @@
 //! from its parameters when it's made, and its NID from the legacy cipher its names map to
 //! (`set_legacy_nid`). The static legacy ciphers (`EVP_aes_128_cbc()`, `legacy_cipher.rs`)
 //! are methods too, without a provider and with references that aren't counted, as OpenSSL's
-//! `EVP_ORIG_GLOBAL` ones.
+//! `EVP_ORIG_GLOBAL` ones, and so are the ciphers applications make (`EVP_CIPHER_meth_new(3)`,
+//! `cipher_meth.rs`; `EVP_ORIG_METH`), whose lengths, flags, and C functions are set after
+//! they're made.
 
 use core::ffi::{CStr, c_char, c_int, c_ulong, c_void};
 use core::ptr;
+use core::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 use std::ffi::CString;
+use std::sync::{Mutex, PoisonError};
 
 use rustyssl_abi::{
     ERR_LIB_EVP, ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, EVP_CIPH_CUSTOM_IV,
@@ -101,6 +105,44 @@ pub(crate) enum Origin {
     Dynamic,
     /// One of the static legacy ciphers (`EVP_aes_128_cbc()`): references aren't counted.
     Global,
+    /// Made by an application (`EVP_CIPHER_meth_new`): references aren't counted, and
+    /// `EVP_CIPHER_meth_free` frees it.
+    Meth,
+}
+
+/// A legacy cipher's `init`: the context, key, IV, and direction.
+pub(crate) type LegacyInitFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_CIPHER_CTX, *const u8, *const u8, c_int) -> c_int;
+/// A legacy cipher's `do_cipher`.
+pub(crate) type LegacyDoCipherFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_CIPHER_CTX, *mut u8, *const u8, usize) -> c_int;
+/// A legacy cipher's `cleanup`.
+pub(crate) type LegacyCleanupFn = unsafe extern "C" fn(*mut rustyssl_abi::EVP_CIPHER_CTX) -> c_int;
+/// A legacy cipher's `set_asn1_parameters` and `get_asn1_parameters`.
+pub(crate) type LegacyAsn1Fn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_CIPHER_CTX, *mut rustyssl_abi::ASN1_TYPE) -> c_int;
+/// A legacy cipher's `ctrl`.
+pub(crate) type LegacyCtrlFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_CIPHER_CTX, c_int, c_int, *mut c_void) -> c_int;
+
+/// A cipher's C functions and the size of their state (`cipher_data`), as OpenSSL's
+/// `EVP_CIPHER` holds them.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct Legacy {
+    pub(crate) ctx_size: c_int,
+    pub(crate) init: Option<LegacyInitFn>,
+    pub(crate) do_cipher: Option<LegacyDoCipherFn>,
+    pub(crate) cleanup: Option<LegacyCleanupFn>,
+    pub(crate) set_asn1: Option<LegacyAsn1Fn>,
+    pub(crate) get_asn1: Option<LegacyAsn1Fn>,
+    pub(crate) ctrl: Option<LegacyCtrlFn>,
+}
+
+/// The lengths and flags `EVP_CIPHER_meth_set_*` set once.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Field {
+    IvLen,
+    Flags,
 }
 
 /// A cipher method (`EVP_CIPHER`): made from a provider's algorithm, or a static legacy one.
@@ -114,10 +156,12 @@ pub(crate) struct Cipher {
     /// The provider, with a reference.
     pub(crate) prov: Ptr<OSSL_PROVIDER>,
     pub(crate) nid: c_int,
-    pub(crate) block_size: c_int,
-    pub(crate) key_len: c_int,
-    pub(crate) iv_len: c_int,
-    pub(crate) flags: c_ulong,
+    block_size: AtomicI32,
+    key_len: AtomicI32,
+    iv_len: AtomicI32,
+    flags: AtomicU64,
+    /// The C functions (`EVP_CIPHER_meth_set_*` sets an application's).
+    legacy: Mutex<Legacy>,
     get_params: Option<GetParamsFn>,
     gettable_params: Option<GettableParamsFn>,
     /// The context functions.
@@ -141,13 +185,76 @@ impl Cipher {
             description: Ptr(ptr::null_mut()),
             prov: Ptr(ptr::null_mut()),
             nid,
-            block_size,
-            key_len,
-            iv_len,
-            flags,
+            block_size: AtomicI32::new(block_size),
+            key_len: AtomicI32::new(key_len),
+            iv_len: AtomicI32::new(iv_len),
+            flags: AtomicU64::new(flags),
+            legacy: Mutex::new(Legacy::default()),
             get_params: None,
             gettable_params: None,
             funcs: Funcs::default(),
+        }
+    }
+
+    /// An application's cipher (`EVP_CIPHER_meth_new`), or a copy of `from`
+    /// (`EVP_CIPHER_meth_dup`).
+    pub(crate) fn meth(nid: c_int, block_size: c_int, key_len: c_int, from: Option<&Self>) -> Self {
+        let mut c = Self::legacy(nid, block_size, key_len, 0, 0);
+        c.origin = Origin::Meth;
+        if let Some(f) = from {
+            c.iv_len = AtomicI32::new(f.iv_len());
+            c.flags = AtomicU64::new(f.flags());
+            c.legacy = Mutex::new(f.legacy_fns());
+            c.description = Ptr(f.description.0);
+        }
+        c
+    }
+
+    /// The block size.
+    pub(crate) fn block_size(&self) -> c_int {
+        self.block_size.load(Ordering::Relaxed)
+    }
+
+    /// The key length.
+    pub(crate) fn key_len(&self) -> c_int {
+        self.key_len.load(Ordering::Relaxed)
+    }
+
+    /// The IV length.
+    pub(crate) fn iv_len(&self) -> c_int {
+        self.iv_len.load(Ordering::Relaxed)
+    }
+
+    /// The flags (mode included).
+    pub(crate) fn flags(&self) -> c_ulong {
+        self.flags.load(Ordering::Relaxed)
+    }
+
+    /// The C functions, as they are now.
+    pub(crate) fn legacy_fns(&self) -> Legacy {
+        *self.legacy.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Changes the C functions (an application's cipher only).
+    pub(crate) fn set_legacy(&self, change: impl FnOnce(&mut Legacy) -> bool) -> bool {
+        change(&mut self.legacy.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// `EVP_CIPHER_meth_set_iv_length` or `_set_flags`: sets `field` if it is still 0.
+    pub(crate) fn set_once(&self, field: Field, value: u64) -> bool {
+        match field {
+            Field::IvLen => {
+                let Ok(v) = c_int::try_from(i64::from_ne_bytes(value.to_ne_bytes())) else {
+                    return false;
+                };
+                self.iv_len
+                    .compare_exchange(0, v, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+            }
+            Field::Flags => self
+                .flags
+                .compare_exchange(0, value, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok(),
         }
     }
 
@@ -251,10 +358,10 @@ fn cache_constants(c: &mut Cipher) -> bool {
     ) else {
         return false;
     };
-    c.block_size = b;
-    c.iv_len = i;
-    c.key_len = k;
-    c.flags = c_ulong::from(mode);
+    c.block_size = AtomicI32::new(b);
+    c.iv_len = AtomicI32::new(i);
+    c.key_len = AtomicI32::new(k);
+    let mut flags = c_ulong::from(mode);
     for (on, f) in [
         (aead != 0, EVP_CIPH_FLAG_AEAD_CIPHER),
         (custom_iv != 0, EVP_CIPH_CUSTOM_IV),
@@ -264,7 +371,7 @@ fn cache_constants(c: &mut Cipher) -> bool {
         (randkey != 0, EVP_CIPH_RAND_KEY),
     ] {
         if on {
-            c.flags |= flag(f);
+            flags |= flag(f);
         }
     }
     if let Some(list) = c.funcs.gettable_ctx_params {
@@ -273,9 +380,10 @@ fn cache_constants(c: &mut Cipher) -> bool {
         let key = OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS.as_ptr();
         // SAFETY: the provider's list, or NULL.
         if !unsafe { OSSL_PARAM_locate_const(gettable, key) }.is_null() {
-            c.flags |= flag(EVP_CIPH_FLAG_CUSTOM_ASN1);
+            flags |= flag(EVP_CIPH_FLAG_CUSTOM_ASN1);
         }
     }
+    c.flags = AtomicU64::new(flags);
     true
 }
 
@@ -433,10 +541,11 @@ unsafe fn from_algorithm(
         description: Ptr(algo.algorithm_description.cast_mut()),
         prov: Ptr(prov),
         nid,
-        block_size: 0,
-        key_len: 0,
-        iv_len: 0,
-        flags: 0,
+        block_size: AtomicI32::new(0),
+        key_len: AtomicI32::new(0),
+        iv_len: AtomicI32::new(0),
+        flags: AtomicU64::new(0),
+        legacy: Mutex::new(Legacy::default()),
         get_params: get_params_fn,
         gettable_params,
         funcs,
@@ -795,7 +904,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(cipher) }.map_or(0, |m| m.block_size)
+        unsafe { method(cipher) }.map_or(0, Cipher::block_size)
     }
 }
 
@@ -809,7 +918,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(cipher) }.map_or(0, |m| m.key_len)
+        unsafe { method(cipher) }.map_or(0, Cipher::key_len)
     }
 }
 
@@ -822,7 +931,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(cipher) }.map_or(0, |m| m.iv_len)
+        unsafe { method(cipher) }.map_or(0, Cipher::iv_len)
     }
 }
 
@@ -835,7 +944,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(cipher) }.map_or(0, |m| m.flags)
+        unsafe { method(cipher) }.map_or(0, Cipher::flags)
     }
 }
 
