@@ -7,8 +7,9 @@
 //! reference is, into `target/ref-suite/openssl-<version>/`, and reused until their inputs
 //! change. They link the reference's shared libraries, so instead of relinking them, each data
 //! file runs twice, on the reference libraries and on rustyssl's, by pointing the dynamic loader
-//! at each. Both runs must succeed,
-//! with the same "Completed N tests with E errors and S skipped" lines.
+//! at each. Both runs must succeed, with the same "Completed N tests with E errors and S skipped"
+//! lines and the same number of `ERROR` lines: `evp_test` counts some tests that fail to start
+//! (a key generation whose algorithm can't be fetched) as passed, saying so only in one.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -104,7 +105,7 @@ fn ensure(root: &Path, version: &str, reference: &Path) -> Result<PathBuf> {
 }
 
 /// One run of `evp_test` on `file` with the libraries in `lib`: whether it succeeded, its
-/// "Completed ..." lines, and its output.
+/// "Completed ..." lines with the number of `ERROR` lines, and its output.
 fn run_evp_test(
     program: &Path,
     config: &Path,
@@ -122,12 +123,14 @@ fn run_evp_test(
         .map_err(|e| format!("cannot run {}: {e}", program.display()))?;
     let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&out.stderr));
-    let completed = text
+    let mut completed: Vec<String> = text
         .lines()
         .map(str::trim)
         .filter(|l| l.starts_with("# Completed "))
         .map(str::to_owned)
         .collect();
+    let errors = text.lines().filter(|l| l.contains("ERROR")).count();
+    completed.push(format!("{errors} ERROR line(s)"));
     Ok((out.status.success(), completed, text))
 }
 
@@ -187,7 +190,7 @@ pub fn run(args: &[String]) -> Result {
                 theirs.join("; "),
                 ours.join("; ")
             ))
-        } else if ours.is_empty() {
+        } else if ours.len() < 2 {
             Err("no tests completed".to_owned())
         } else {
             Ok(ours.join("; "))

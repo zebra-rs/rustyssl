@@ -2838,15 +2838,19 @@ have run for at least 24 CPU-hours with no findings.
     the reference is (`target/ref-suite/`, kept by a stamp and cached in CI), and runs it on the
     data files of `tests/openssl-suite/evp_test.txt` with each library by the dynamic loader's
     path. Both runs must succeed with the same "Completed N tests with E errors and S skipped"
-    counts. 70 files: every symmetric one (`evpciph_*`, `evpmd_*`, `evpmac_*`, `evpkdf_*`,
-    `evppbe_*`, `evpencod`, `evprand`) but `evpciph_aes_stitched` (the AES-CBC-HMAC
-    composites on x86_64 need TLS record mode, `tls-version`, which comes in Phase 7), the KDFs through `EVP_PKEY` (`evppkey_kdf_*`), and the
-    ML-KEM, ML-DSA, SLH-DSA, and hybrid key generation files. The other key-pair files need
-    key parsing (`PEM_read_bio_PrivateKey_ex`, Phase 5), and ML-DSA's and SLH-DSA's signing
-    files skip every test on rustyssl (their keys come from data, as the KEMs' encapsulation
-    files' do); they're added as those land. In CI's test job; a run takes seconds, the build
-    under a minute. The legacy provider isn't loaded (`test/default.cnf`), so its tests are
-    skipped on both.
+    counts and the same number of `ERROR` lines. 62 files: every symmetric one (`evpciph_*`,
+    `evpmd_*`, `evpmac_*`, `evpkdf_*`, `evppbe_*`, `evpencod`, `evprand`) but
+    `evpciph_aes_stitched` (the AES-CBC-HMAC composites on x86_64 need TLS record mode,
+    `tls-version`, which comes in Phase 7), and the KDFs through `EVP_PKEY`
+    (`evppkey_kdf_*`). The key-pair files need their key types (Phase 4) and key parsing
+    (`PEM_read_bio_PrivateKey_ex`); they're added as those land. In CI's test job; a run takes
+    seconds, the build under a minute. The legacy provider isn't loaded (`test/default.cnf`),
+    so its tests are skipped on both.
+    - Corrected later (step 4.3): the list first held 70 files, eight of them the ML-KEM,
+      ML-DSA, SLH-DSA, and hybrid-KEM key generation files, which tested nothing on rustyssl:
+      `evp_test` counts a key generation whose algorithm can't be fetched as passed, printing
+      only an `ERROR` line. The runs' `ERROR` lines are now compared too, and those files left
+      the list until their key types land.
     - Found and fixed: AES-GCM-SIV refused a tag parameter without data while encrypting (as
       `EVP_CTRL_AEAD_SET_TAG` with NULL sets only the length); OpenSSL checks only its type and
       size then, and reads it only when decrypting.
