@@ -64,6 +64,13 @@ jobs:
         run: cargo xtask test-apps
       - name: Upstream OpenSSL's evp_test on rustyssl
         run: cargo xtask test-openssl-suite
+      - name: Cache the Wycheproof test vectors
+        uses: actions/cache@v6
+        with:
+          path: target/testdata
+          key: wycheproof-${{ hashFiles('tests/wycheproof/files.txt') }}
+      - name: Wycheproof's vectors on the reference and rustyssl
+        run: cargo xtask test-wycheproof
       - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking)
         run: cargo xtask abi-check
 

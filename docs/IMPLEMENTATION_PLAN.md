@@ -2863,9 +2863,26 @@ have run for at least 24 CPU-hours with no findings.
       against `evppbe_pkcs12.txt`'s answer); `lib_ctx.c` checks the indicator callback and
       `evp_modes.c` the tag length alone; the fuzz target `pkcs12_text` (round trips, and
       UTF-16 as the standard library encodes it).
-  - [ ] **3.13c Wycheproof:** the symmetric vector files, vendored at a pinned revision with
-    checksums, and a runner (AES-GCM/CCM/SIV/GCM-SIV/key wrap, ChaCha20-Poly1305 and
-    XChaCha20-Poly1305, AES-CMAC, HMAC, HKDF, PBKDF2).
+  - [x] **3.13c Wycheproof:** `cargo xtask test-wycheproof` fetches 63 symmetric files from
+    C2SP/wycheproof at a pinned commit into `target/testdata/`, checked against the SHA-256
+    checksums in `tests/wycheproof/files.txt` (TEST_PLAN.md keeps large external suites out of
+    the repository), and cached in CI. Each test becomes a line for
+    `tests/wycheproof/runner.c` (AEAD, cipher, MAC, HKDF, PBKDF2, and PBES2 commands), which
+    prints what the library computes; each file runs once on each library. rustyssl must print
+    exactly what the reference prints, failures' error codes included, and the result must
+    agree with Wycheproof's verdict. The files: AES-GCM, -CCM, -GCM-SIV, -SIV (deterministic
+    and nonce-based), GMAC, CBC-PKCS5, XTS, key wrap with and without padding; ARIA's and
+    Camellia's CBC and CMAC, ARIA-GCM/CCM, SM4-GCM/CCM; ChaCha20-Poly1305; AES-CMAC; HMAC over
+    the SHA-1, SHA-2, SHA-3, and SM3 digests; KMAC128/256; SipHash-1-3, -2-4, -4-8 and their
+    128-bit forms; HKDF; PBKDF2; and PBES2 with AES-CBC. 10,996 tests, all the same on both
+    libraries; AES-192-XTS's 41 are skipped (OpenSSL has no such cipher). Not used: AEGIS,
+    Ascon, EAX, FF1, MORUS, VMAC, XChaCha20-Poly1305, SEED (legacy provider), and the JOSE
+    files, which OpenSSL doesn't offer. In CI's test job; a run takes about 35 seconds.
+    - The reference departs from Wycheproof in 10 tests, listed with reasons in
+      `tests/wycheproof/reference.txt`: GCM IVs over OpenSSL's 128-octet maximum (7), and an
+      empty key "wrapped" to nothing because EVP passes no empty input to the cipher (3).
+    - Nothing to fix: rustyssl gave the reference's results everywhere.
+    - xtask gained a small JSON reader (`xtask/src/json.rs`) rather than a dependency.
   - [ ] **3.13d A long EVP differential fuzzing run** (24 hours, per TEST_PLAN.md's M1 gate).
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
