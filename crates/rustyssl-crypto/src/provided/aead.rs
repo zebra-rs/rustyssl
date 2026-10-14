@@ -138,235 +138,59 @@ pub enum IvState {
 // -------------------------------------------------------------------------------------------
 // GCM
 
-/// `GCM128_CONTEXT` without the key: the counter, the encrypted first counter, the key
-/// stream's partial block, GHASH with its pending partial block, and the lengths.
-#[derive(Clone)]
-struct Gcm128 {
-    h: Zeroizing<[u8; 16]>,
-    yi: [u8; 16],
-    ek0: Zeroizing<[u8; 16]>,
-    eki: Zeroizing<[u8; 16]>,
-    hash: Option<Hash>,
-    /// Where the last tag left GHASH, to fold into the next block hashed: OpenSSL's GHASH
-    /// goes on from the tag it computed (a failed check leaves the context in use).
-    carry: Option<Zeroizing<[u8; 16]>>,
-    /// The partial block of AAD (`ares` octets) or ciphertext (`mres`) not yet hashed.
-    pend: Zeroizing<[u8; 16]>,
-    ares: usize,
-    mres: usize,
-    alen: u64,
-    mlen: u64,
+/// The key as the low-level code's block function.
+struct KeyBlock<'a>(&'a Key);
+
+impl crate::lowlevel::modes::Block128 for KeyBlock<'_> {
+    fn block(&self, input: &[u8; 16]) -> [u8; 16] {
+        let mut b = *input;
+        // AES and the other 128-bit block ciphers don't fail on a block.
+        let _ = self.0.encrypt(&mut b);
+        b
+    }
 }
 
+/// `GCM128_CONTEXT` without the key: `CRYPTO_gcm128_*` as `lowlevel::aead` ports them, with
+/// OpenSSL's GHASH buffering (`Xn`), so a context used after a failed check, or finished twice,
+/// hashes on exactly as the reference's does.
+#[derive(Clone)]
+struct Gcm128(crate::lowlevel::aead::Gcm);
+
 impl Gcm128 {
-    /// `CRYPTO_gcm128_init`: H from the key, and everything else zero, the hash too (so a
-    /// context re-keyed without a new IV hashes from zero, as OpenSSL's does).
+    /// `CRYPTO_gcm128_init`.
     fn new(key: &Key) -> Result<Self, Error> {
-        let mut h = Zeroizing::new([0u8; 16]);
-        key.encrypt(&mut h)?;
-        let hash = sym::universal_hash(HashAlgorithm::Ghash, &h[..])
-            .map(Hash)
-            .map_err(|_| Error::Internal)?;
-        Ok(Self {
-            h,
-            yi: [0; 16],
-            ek0: Zeroizing::new([0; 16]),
-            eki: Zeroizing::new([0; 16]),
-            hash: Some(hash),
-            carry: None,
-            pend: Zeroizing::new([0; 16]),
-            ares: 0,
-            mres: 0,
-            alen: 0,
-            mlen: 0,
-        })
-    }
-
-    fn ghash(&self) -> Result<Hash, Error> {
-        sym::universal_hash(HashAlgorithm::Ghash, &self.h[..])
-            .map(Hash)
-            .map_err(|_| Error::Internal)
-    }
-
-    /// Hashes `data`, padded to whole blocks, with the carry folded into its first block.
-    fn absorb(&mut self, data: &[u8]) {
-        let Some(h) = self.hash.as_mut() else {
-            return;
-        };
-        let mut data = data;
-        if !data.is_empty()
-            && let Some(carry) = self.carry.take()
-        {
-            let (first, rest) = data.split_at(data.len().min(16));
-            let mut block = *carry;
-            for (b, x) in block.iter_mut().zip(first) {
-                *b ^= x;
-            }
-            h.0.update_padded(&block);
-            data = rest;
-        }
-        h.0.update_padded(data);
-    }
-
-    /// `GCM_MUL` of the pending partial block.
-    fn flush(&mut self, n: usize) {
-        let pend = Zeroizing::new(*self.pend);
-        if let Some(p) = pend.get(..n) {
-            self.absorb(p);
-        }
-        self.pend.fill(0);
-    }
-
-    fn counter(&self) -> u32 {
-        let [.., a, b, c, d] = self.yi;
-        u32::from_be_bytes([a, b, c, d])
-    }
-
-    fn set_counter(&mut self, ctr: u32) {
-        if let Some(t) = self.yi.get_mut(12..) {
-            t.copy_from_slice(&ctr.to_be_bytes());
-        }
+        Ok(Self(crate::lowlevel::aead::Gcm::new(&KeyBlock(key))))
     }
 
     /// `CRYPTO_gcm128_setiv`.
     fn setiv(&mut self, key: &Key, iv: &[u8]) -> Result<(), Error> {
-        self.alen = 0;
-        self.mlen = 0;
-        self.ares = 0;
-        self.mres = 0;
-        self.pend.fill(0);
-        if iv.len() == 12 {
-            self.yi = [0; 16];
-            if let Some(y) = self.yi.get_mut(..12) {
-                y.copy_from_slice(iv);
-            }
-            self.set_counter(1);
-        } else {
-            let mut j = self.ghash()?;
-            j.0.update_padded(iv);
-            let bits = u64::try_from(iv.len())
-                .map_err(|_| Error::Internal)?
-                .wrapping_shl(3);
-            let mut last = [0u8; 16];
-            if let Some(l) = last.get_mut(8..) {
-                l.copy_from_slice(&bits.to_be_bytes());
-            }
-            self.yi = j.0.finalize(&last);
-        }
-        self.hash = Some(self.ghash()?);
-        self.carry = None;
-        let mut ek0 = self.yi;
-        key.encrypt(&mut ek0)?;
-        *self.ek0 = ek0;
-        let ctr = self.counter().wrapping_add(1);
-        self.set_counter(ctr);
+        self.0.setiv(iv, &KeyBlock(key));
         Ok(())
     }
 
     /// `CRYPTO_gcm128_aad`: -2 after data, -1 past the limit.
     fn aad(&mut self, aad: &[u8]) -> Result<(), i32> {
-        if self.mlen != 0 {
-            return Err(-2);
+        match self.0.aad(aad) {
+            0 => Ok(()),
+            r => Err(r),
         }
-        let len = u64::try_from(aad.len()).map_err(|_| -1)?;
-        let alen = self.alen.checked_add(len).ok_or(-1)?;
-        if alen > 1u64 << 61 {
-            return Err(-1);
-        }
-        self.alen = alen;
-        let mut data = aad;
-        let mut n = self.ares;
-        if n > 0 {
-            while n > 0 {
-                let Some((&b, rest)) = data.split_first() else {
-                    break;
-                };
-                if let Some(p) = self.pend.get_mut(n) {
-                    *p = b;
-                }
-                data = rest;
-                n = n.wrapping_add(1) & 15;
-            }
-            if n == 0 {
-                self.flush(16);
-            } else {
-                self.ares = n;
-                return Ok(());
-            }
-        }
-        let whole = data.len() & !15;
-        let (blocks, rest) = data.split_at(whole);
-        self.absorb(blocks);
-        if let Some(p) = self.pend.get_mut(..rest.len()) {
-            p.copy_from_slice(rest);
-        }
-        self.ares = rest.len();
-        Ok(())
     }
 
     /// `CRYPTO_gcm128_encrypt`/`_decrypt` in place: -1 past the limit.
     fn crypt(&mut self, key: &Key, data: &mut [u8], enc: bool) -> Result<(), i32> {
-        let len = u64::try_from(data.len()).map_err(|_| -1)?;
-        let mlen = self.mlen.checked_add(len).ok_or(-1)?;
-        if mlen > (1u64 << 36) - 32 {
-            return Err(-1);
-        }
-        self.mlen = mlen;
-        if self.ares > 0 {
-            // The first call to encrypt finishes hashing the AAD.
-            self.flush(self.ares);
-            self.ares = 0;
-            if data.is_empty() {
-                return Ok(());
-            }
-        }
-        let mut n = self.mres % 16;
-        for b in data.iter_mut() {
-            if n == 0 {
-                let mut ks = self.yi;
-                key.encrypt(&mut ks).map_err(|_| -1)?;
-                *self.eki = ks;
-                let ctr = self.counter().wrapping_add(1);
-                self.set_counter(ctr);
-            }
-            let k = self.eki.get(n).copied().unwrap_or(0);
-            let c = if enc { *b ^ k } else { *b };
-            *b ^= k;
-            if let Some(p) = self.pend.get_mut(n) {
-                *p = c;
-            }
-            n = n.wrapping_add(1) & 15;
-            if n == 0 {
-                self.flush(16);
-            }
-        }
-        self.mres = n;
-        Ok(())
+        let input = Zeroizing::new(data.to_vec());
+        let r = if enc {
+            self.0.encrypt(&input, data, &KeyBlock(key))
+        } else {
+            self.0.decrypt(&input, data, &KeyBlock(key))
+        };
+        if r == 0 { Ok(()) } else { Err(r) }
     }
 
-    /// `CRYPTO_gcm128_finish`'s tag.
+    /// `CRYPTO_gcm128_finish`'s tag (`CRYPTO_gcm128_tag`).
     fn tag(&mut self) -> [u8; 16] {
-        if self.mres > 0 || self.ares > 0 {
-            self.flush(self.mres.max(self.ares));
-        }
-        let mut last = [0u8; 16];
-        let (a, c) = last.split_at_mut(8);
-        a.copy_from_slice(&self.alen.wrapping_shl(3).to_be_bytes());
-        c.copy_from_slice(&self.mlen.wrapping_shl(3).to_be_bytes());
-        if let Some(carry) = self.carry.take() {
-            xor16(&mut last, &carry);
-        }
-        let mut t = match self.hash.take() {
-            Some(mut h) => h.0.finalize(&last),
-            None => [0; 16],
-        };
-        xor16(&mut t, &self.ek0);
-        // GHASH goes on from the tag, as OpenSSL's does: data or a final after a failed check
-        // hashes on from here.
-        self.hash = self.ghash().ok();
-        self.carry = Some(Zeroizing::new(t));
-        // The partial block's position stays: data after a failed check goes on with the key
-        // stream, as in OpenSSL.
+        let mut t = [0u8; 16];
+        self.0.tag(&mut t);
         t
     }
 }
