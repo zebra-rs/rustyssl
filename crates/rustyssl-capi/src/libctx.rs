@@ -39,6 +39,8 @@ pub(crate) struct LibCtx {
     pub(crate) evp: crate::evp::fetch::Store,
     /// Its random generators and their settings.
     pub(crate) rand: crate::rand_lib::Global,
+    /// `OSSL_INDICATOR_set_callback`'s callback (only a FIPS provider calls it; there's none).
+    indicator: std::sync::Mutex<rustyssl_abi::OSSL_INDICATOR_CALLBACK>,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
@@ -263,5 +265,40 @@ mod tests {
         unsafe { OSSL_LIB_CTX_free(global()) };
         // SAFETY: no longer a default, so freed now.
         unsafe { OSSL_LIB_CTX_free(ctx) };
+    }
+}
+
+ffi_export! {
+    /// Sets the FIPS indicator callback of `libctx` (the thread's default for NULL). Only a
+    /// FIPS provider calls it, and rustyssl has none.
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `cb` is NULL or of the documented type.
+    pub unsafe extern "C" fn OSSL_INDICATOR_set_callback(libctx: *mut OSSL_LIB_CTX, cb: rustyssl_abi::OSSL_INDICATOR_CALLBACK)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { resolve(libctx) } {
+            *c.indicator.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = cb;
+        }
+    }
+}
+
+ffi_export! {
+    /// The FIPS indicator callback of `libctx` (the thread's default for NULL) in `*cb`.
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `cb` is NULL or valid for a write.
+    pub unsafe extern "C" fn OSSL_INDICATOR_get_callback(libctx: *mut OSSL_LIB_CTX, cb: *mut rustyssl_abi::OSSL_INDICATOR_CALLBACK)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        if cb.is_null() {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
+        let current = unsafe { resolve(libctx) }
+            .and_then(|c| *c.indicator.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
+        // SAFETY: the caller's guarantee.
+        unsafe { cb.write(current) };
     }
 }

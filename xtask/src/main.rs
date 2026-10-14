@@ -17,6 +17,7 @@ mod targets;
 mod test_apps;
 mod test_c;
 mod test_differential;
+mod test_openssl_suite;
 mod usage_scan;
 mod util;
 mod vendor;
@@ -59,6 +60,7 @@ fn main() -> ExitCode {
         Some("test-apps") => report("test-apps", test_apps::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
+        Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {

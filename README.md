@@ -191,7 +191,8 @@ generator. Don't paste the number.
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
-`test-apps`, `test-differential`, `coverage`, and `usage-scan`.
+`test-apps`, `test-differential`, `test-openssl-suite` (so far `evp_test`), `coverage`, and
+`usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -205,6 +206,8 @@ Tools each command needs:
   (only the per-package results are kept, under `target/`).
 - **`dist`, `test-c`, `test-apps`, and `test-differential`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
+- **`test-openssl-suite`:** what `dist` and `ref-openssl` need (it builds upstream's test
+  programs from the reference's source).
 - **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
   (from the Xcode command-line tools).
 
@@ -245,7 +248,7 @@ cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-apps                        # the reference's openssl tool (tests/apps/commands.txt) on both libraries; output must match
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
-cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
+cargo xtask test-openssl-suite [file...]     # upstream evp_test on the data files in tests/openssl-suite/evp_test.txt, both libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
 cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri (and its doctests)
 cargo +nightly fuzz run <target>             # fuzzing (fuzz/ is its own workspace; `cargo +nightly fuzz list`)

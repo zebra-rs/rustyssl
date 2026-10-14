@@ -7230,42 +7230,6 @@ pub extern "C" fn OCSP_url_svcloc_new(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_asc2uni(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("OPENSSL_asc2uni")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_uni2asc(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_uni2asc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_uni2utf8(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("OPENSSL_uni2utf8")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_utf82uni(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("OPENSSL_utf82uni")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_AA_DIST_POINT_free(_: *mut OSSL_AA_DIST_POINT) {
     crate::stub::unimplemented("OSSL_AA_DIST_POINT_free")
 }
@@ -10219,19 +10183,6 @@ pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_INDICATOR_get_callback(
-    _: *mut OSSL_LIB_CTX,
-    _: *mut OSSL_INDICATOR_CALLBACK,
-) {
-    crate::stub::unimplemented("OSSL_INDICATOR_get_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_INDICATOR_set_callback(_: *mut OSSL_LIB_CTX, _: OSSL_INDICATOR_CALLBACK) {
-    crate::stub::unimplemented("OSSL_INDICATOR_set_callback")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_INFO_SYNTAX_POINTER_free(_: *mut OSSL_INFO_SYNTAX_POINTER) {
     crate::stub::unimplemented("OSSL_INFO_SYNTAX_POINTER_free")
 }
@@ -12856,102 +12807,6 @@ pub extern "C" fn PKCS12_item_pack_safebag(
     _: core::ffi::c_int,
 ) -> *mut PKCS12_SAFEBAG {
     crate::stub::unimplemented("PKCS12_item_pack_safebag")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_asc(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_asc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_asc_ex(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_asc_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_uni(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_uni")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_uni_ex(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_uni_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_utf8(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_utf8")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_key_gen_utf8_ex(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *const EVP_MD,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_key_gen_utf8_ex")
 }
 
 #[unsafe(no_mangle)]

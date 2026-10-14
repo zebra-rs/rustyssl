@@ -428,6 +428,9 @@ static void sivs(const char *name, int gcm)
     check(EVP_CIPHER_CTX_get_params(copy, params) && taglen == 16, "the tag's length");
     check(set_tag(copy, tag2, 16), "setting a tag encrypting");
     errors();
+    /* Only a length, as evp_test sets it: encrypting, the data isn't read. */
+    check(EVP_CIPHER_CTX_ctrl(copy, EVP_CTRL_AEAD_SET_TAG, 16, NULL) == 1,
+          "a tag's length alone, encrypting");
     check(set_speed(copy, 1), "speed");
     check(EVP_EncryptUpdate(copy, back, &n, data + 20, 30), "then another message");
     check(EVP_EncryptFinal_ex(copy, back, &n), "and its final");

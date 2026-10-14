@@ -6586,6 +6586,12 @@ const _: unsafe extern "C" fn(*const OPENSSL_LHASH, *mut FILE) = crate::lhash::O
 const _: unsafe extern "C" fn(*const OPENSSL_LHASH, *mut BIO) = crate::lhash::OPENSSL_LH_stats_bio;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_ulong =
     crate::lhash::OPENSSL_LH_strhash;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_uchar = crate::pkcs12::OPENSSL_asc2uni;
 const _: unsafe extern "C" fn(::core::option::Option<unsafe extern "C" fn()>) -> core::ffi::c_int =
     crate::init::OPENSSL_atexit;
 const _: unsafe extern "C" fn(
@@ -6727,6 +6733,20 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::string::OPENSSL_strtoul;
 const _: unsafe extern "C" fn() = crate::threads::OPENSSL_thread_stop;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) = crate::threads::OPENSSL_thread_stop_ex;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_char = crate::pkcs12::OPENSSL_uni2asc;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_char = crate::pkcs12::OPENSSL_uni2utf8;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_uchar = crate::pkcs12::OPENSSL_utf82uni;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_build_metadata;
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_major;
@@ -6739,6 +6759,10 @@ const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_n
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
+    crate::libctx::OSSL_INDICATOR_get_callback;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =
+    crate::libctx::OSSL_INDICATOR_set_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) = crate::libctx::OSSL_LIB_CTX_free;
 const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_get0_global_default;
@@ -7269,6 +7293,78 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_write_bio;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_asc;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_asc_ex;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_uni;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_uni_ex;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_utf8;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *const EVP_MD,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_utf8_ex;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,

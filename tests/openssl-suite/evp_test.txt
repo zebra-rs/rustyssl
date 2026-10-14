@@ -1,0 +1,78 @@
+# The data files of upstream OpenSSL's `evp_test` (test/recipes/30-test_evp_data/) that
+# `cargo xtask test-openssl-suite` runs with the reference's `evp_test` program on the reference
+# libraries and on rustyssl's. Both runs must succeed with the same "Completed N tests with E
+# errors and S skipped" lines. A file is added once its algorithms and the functions the
+# program uses on them are implemented: the key-pair files need key parsing (PEM_read_bio_*),
+# for instance; evpciph_aes_stitched.txt (the AES-CBC-HMAC composites, offered on x86_64 with
+# AES-NI) needs TLS record mode (`tls-version`), which arrives with libssl in Phase 7. The
+# legacy provider isn't loaded (test/default.cnf), so its tests are skipped.
+evpciph_aes_ccm_cavs.txt
+evpciph_aes_common.txt
+evpciph_aes_cts.txt
+evpciph_aes_gcm_siv.txt
+evpciph_aes_ocb.txt
+evpciph_aes_siv.txt
+evpciph_aes_wrap.txt
+evpciph_aria.txt
+evpciph_bf.txt
+evpciph_camellia_cts.txt
+evpciph_camellia.txt
+evpciph_cast5.txt
+evpciph_chacha.txt
+evpciph_des.txt
+evpciph_des3_common.txt
+evpciph_idea.txt
+evpciph_rc2.txt
+evpciph_rc4_stitched.txt
+evpciph_rc4.txt
+evpciph_rc5.txt
+evpciph_seed.txt
+evpciph_sm4.txt
+evpencod.txt
+evpkdf_argon2.txt
+evpkdf_hkdf.txt
+evpkdf_hmac_drbg.txt
+evpkdf_kbkdf_counter.txt
+evpkdf_kbkdf_kmac.txt
+evpkdf_krb5.txt
+evpkdf_pbkdf1.txt
+evpkdf_pbkdf2.txt
+evpkdf_pvkkdf.txt
+evpkdf_scrypt.txt
+evpkdf_ss.txt
+evpkdf_ssh.txt
+evpkdf_tls11_prf.txt
+evpkdf_tls12_prf.txt
+evpkdf_tls13_kdf.txt
+evpkdf_x942_des.txt
+evpkdf_x942.txt
+evpkdf_x963.txt
+evpmac_blake.txt
+evpmac_cmac_des.txt
+evpmac_common.txt
+evpmac_poly1305.txt
+evpmac_siphash.txt
+evpmac_sm3.txt
+evpmd_blake.txt
+evpmd_md.txt
+evpmd_mdc2.txt
+evpmd_ripemd.txt
+evpmd_sha.txt
+evpmd_sm3.txt
+evpmd_whirlpool.txt
+evppbe_pbkdf2.txt
+evppbe_pkcs12.txt
+evppbe_scrypt.txt
+evppkey_kdf_hkdf.txt
+evppkey_kdf_scrypt.txt
+evppkey_kdf_tls1_prf_fips.txt
+evppkey_kdf_tls1_prf.txt
+evppkey_ml_dsa_keygen.txt
+evppkey_ml_kem_1024_keygen.txt
+evppkey_ml_kem_512_keygen.txt
+evppkey_ml_kem_768_keygen.txt
+evppkey_ml_kem_keygen.txt
+evppkey_mlx_kem_ec.txt
+evppkey_mlx_kem_ecx.txt
+evppkey_slh_dsa_keygen.txt
+evprand.txt

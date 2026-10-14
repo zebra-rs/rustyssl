@@ -1111,15 +1111,20 @@ unsafe fn gcm_siv_set(g: &mut GcmSiv, params: *const OSSL_PARAM) -> c_int {
     const F: &str = "ossl_aes_gcm_siv_set_ctx_params";
     // SAFETY: the caller's array.
     if let Some((_, q)) = unsafe { find(params.cast_mut(), OSSL_CIPHER_PARAM_AEAD_TAG) } {
-        let tag = if is_octets(q) {
-            // SAFETY: the caller's guarantee.
-            unsafe { data_of(q) }
-        } else {
-            None
-        };
-        if !tag.is_some_and(|t| g.set_tag(t).is_ok()) {
+        // Only the type and size are checked; encrypting, the data isn't read (an application
+        // setting the tag's length passes none, as `EVP_CTRL_AEAD_SET_TAG` with NULL does).
+        if !is_octets(q) || q.data_size != 16 {
             err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
             return 0;
+        }
+        if !g.encrypting() {
+            // SAFETY: the caller's guarantee.
+            let tag = unsafe { data_of(q) };
+            if !tag.is_some_and(|t| g.set_tag(t).is_ok()) {
+                // OpenSSL copies from the data, NULL included (and crashes).
+                err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
+                return 0;
+            }
         }
     }
     // SAFETY: the caller's array.

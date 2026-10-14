@@ -22,6 +22,8 @@ use rustyssl_abi::{
     V_ASN1_SET, V_ASN1_T61STRING, V_ASN1_UNDEF, V_ASN1_UNIVERSALSTRING, V_ASN1_UTF8STRING,
 };
 
+use zeroize::Zeroizing;
+
 use crate::der;
 
 /// The first code point past Unicode.
@@ -122,6 +124,108 @@ pub fn utf8_put(value: u64) -> Result<Vec<u8>, i32> {
     } else {
         Err(-2)
     }
+}
+
+/// A big-endian UTF-16 unit.
+fn bmp_unit(value: u32) -> [u8; 2] {
+    u16::try_from(value & 0xffff).unwrap_or(0).to_be_bytes()
+}
+
+/// Room for the UTF-16 of `n` octets and a zero unit, so the buffer never moves (and leaves
+/// no copy of a password behind).
+fn bmp_buffer(n: usize) -> Zeroizing<Vec<u8>> {
+    Zeroizing::new(Vec::with_capacity(n.saturating_mul(2).saturating_add(2)))
+}
+
+/// `OPENSSL_asc2uni`: each octet of `asc` as a big-endian UTF-16 unit, undecoded, then a zero
+/// unit (PKCS #12 passwords). Wiped when dropped.
+pub fn asc_to_bmp(asc: &[u8]) -> Zeroizing<Vec<u8>> {
+    let mut out = bmp_buffer(asc.len());
+    for &c in asc {
+        out.extend_from_slice(&[0, c]);
+    }
+    out.extend_from_slice(&[0, 0]);
+    out
+}
+
+/// `OPENSSL_utf82uni`: `utf8` as big-endian UTF-16 (surrogate pairs past the BMP), then a zero
+/// unit; input that isn't UTF-8 is taken as `asc_to_bmp` takes it, as OpenSSL does for
+/// passwords set by its older versions. Wiped when dropped.
+pub fn utf8_to_bmp(utf8: &[u8]) -> Zeroizing<Vec<u8>> {
+    // Each character's UTF-16 takes at most twice its UTF-8 octets.
+    let mut out = bmp_buffer(utf8.len());
+    let mut rest = utf8;
+    while !rest.is_empty() {
+        let Ok(Some((value, length))) = utf8_get(rest) else {
+            return asc_to_bmp(utf8);
+        };
+        match value.checked_sub(0x1_0000) {
+            Some(v) => {
+                out.extend_from_slice(&bmp_unit(0xd800 | (v >> 10)));
+                out.extend_from_slice(&bmp_unit(0xdc00 | (v & 0x3ff)));
+            }
+            None => out.extend_from_slice(&bmp_unit(value)),
+        }
+        rest = rest.get(length..).unwrap_or_default();
+    }
+    out.extend_from_slice(&[0, 0]);
+    out
+}
+
+/// `OPENSSL_uni2asc`: the low octet of each big-endian UTF-16 unit of `bmp`, ending in a zero
+/// octet (the last unit's when it's zero), or `None` for an odd length.
+pub fn bmp_to_asc(bmp: &[u8]) -> Option<Vec<u8>> {
+    if !bmp.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out: Vec<u8> = bmp.as_chunks::<2>().0.iter().map(|&[_, low]| low).collect();
+    if bmp.last().is_some_and(|&b| b == 0) {
+        if let Some(last) = out.last_mut() {
+            *last = 0;
+        }
+    } else {
+        out.push(0);
+    }
+    Some(out)
+}
+
+/// `OPENSSL_uni2utf8`: big-endian UTF-16 `bmp` as UTF-8, ending in a zero octet unless its
+/// last unit is zero (which converts to one), or `None` for an odd length. Input that isn't
+/// UTF-16 (a lone surrogate) is taken as `bmp_to_asc` takes it.
+pub fn bmp_to_utf8(bmp: &[u8]) -> Option<Vec<u8>> {
+    if !bmp.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::new();
+    let mut rest = bmp;
+    while let [a, b, tail @ ..] = rest {
+        let unit = (u32::from(*a) << 8) | u32::from(*b);
+        // As in OpenSSL, a low surrogate first is taken as a pair's start, which then makes a
+        // value past Unicode.
+        let (value, tail) = if (0xd800..0xe000).contains(&unit) {
+            let [c, d, tail @ ..] = tail else {
+                return bmp_to_asc(bmp);
+            };
+            let low = (u32::from(*c) << 8) | u32::from(*d);
+            if !(0xdc00..0xe000).contains(&low) {
+                return bmp_to_asc(bmp);
+            }
+            // At most 0x1f_ffff + 0x1_0000: no wrap.
+            let value = (((unit & 0x7ff) << 10) | (low & 0x3ff)).wrapping_add(0x1_0000);
+            (value, tail)
+        } else {
+            (unit, tail)
+        };
+        match utf8_put(u64::from(value)) {
+            Ok(encoded) => out.extend_from_slice(&encoded),
+            Err(_) => return bmp_to_asc(bmp),
+        }
+        rest = tail;
+    }
+    if !matches!(bmp, [.., 0, 0]) {
+        out.push(0);
+    }
+    Some(out)
 }
 
 /// A multibyte form (`MBSTRING_ASC`, `_BMP`, `_UNIV`, `_UTF8`).
@@ -867,6 +971,33 @@ mod tests {
         assert_eq!(utf8_get(&[0xed, 0xa0, 0x80]), Err(-2));
         assert_eq!(utf8_get(&[0xff]), Err(-2));
         assert_eq!(utf8_get(&[]), Ok(None));
+    }
+
+    #[test]
+    fn bmp_passwords() {
+        assert_eq!(*asc_to_bmp(b"a\xe9"), [0, b'a', 0, 0xe9, 0, 0]);
+        assert_eq!(*asc_to_bmp(b""), [0, 0]);
+        // U+00E9 and U+1F600 (a surrogate pair).
+        let utf8 = "\u{e9}\u{1f600}".as_bytes();
+        let bmp = [0x00, 0xe9, 0xd8, 0x3d, 0xde, 0x00, 0, 0];
+        assert_eq!(*utf8_to_bmp(utf8), bmp);
+        assert_eq!(bmp_to_utf8(&bmp).unwrap(), [utf8, &[0]].concat());
+        // Not UTF-8: each octet as it is.
+        assert_eq!(utf8_to_bmp(b"\xe9a"), asc_to_bmp(b"\xe9a"));
+        // No terminating unit: a zero octet is added.
+        assert_eq!(bmp_to_utf8(&[0, b'a']).unwrap(), b"a\0");
+        assert_eq!(bmp_to_utf8(&[]).unwrap(), b"\0");
+        assert_eq!(bmp_to_asc(&[0, b'a', 0, 0]).unwrap(), b"a\0");
+        assert_eq!(bmp_to_asc(&[0, b'a']).unwrap(), b"a\0");
+        assert_eq!(bmp_to_asc(&[]).unwrap(), b"\0");
+        assert_eq!(bmp_to_asc(&[0]), None);
+        assert_eq!(bmp_to_utf8(&[0]), None);
+        // A lone surrogate, high or low: the low octets.
+        assert_eq!(
+            bmp_to_utf8(&[0xd8, 0x3d, 0, b'a']).unwrap(),
+            [0x3d, b'a', 0]
+        );
+        assert_eq!(bmp_to_utf8(&[0xdc, 0x00, 0xdc, 0x00]).unwrap(), [0, 0]);
     }
 
     #[test]
