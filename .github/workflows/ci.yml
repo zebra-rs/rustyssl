@@ -63,8 +63,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal --component miri,rust-src
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.148
       - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly miri test -p rustyssl-capi
+      # Each test in its own Miri process, run in parallel on the runner's cores: Miri
+      # interprets one thread at a time, so `cargo miri test` ran every test on one core.
+      # nextest doesn't run doctests, so they run after.
+      - run: cargo +nightly miri nextest run -p rustyssl-capi
+      - run: cargo +nightly miri test -p rustyssl-capi --doc
 
   codegen:
     name: generated files are up to date

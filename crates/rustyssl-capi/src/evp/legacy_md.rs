@@ -33,8 +33,9 @@ use rustyssl_abi::{
 };
 use rustyssl_crypto::provided::digest::Kind;
 
-use super::digest::{EVP_MD_fetch, EVP_MD_free, Md, method};
+use super::digest::{EVP_MD_fetch, EVP_MD_free, Legacy, Md, method};
 use super::fetch;
+use super::legacy_md_fns as fns;
 use crate::err::{ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::{ffi_callback, ffi_export};
 use crate::handle::Handle;
@@ -76,6 +77,8 @@ struct Static {
     md_size: c_int,
     flags: c_ulong,
     block_size: c_int,
+    /// Its C functions (`EVP_MD_meth_get_*`).
+    legacy: Legacy,
     handle: OnceLock<Ptr<EVP_MD>>,
 }
 
@@ -86,6 +89,7 @@ impl Static {
         md_size: c_int,
         flags: c_ulong,
         block_size: c_int,
+        legacy: Legacy,
     ) -> Self {
         Self {
             nid,
@@ -93,6 +97,7 @@ impl Static {
             md_size,
             flags,
             block_size,
+            legacy,
             handle: OnceLock::new(),
         }
     }
@@ -106,6 +111,7 @@ impl Static {
                     self.md_size,
                     self.flags,
                     self.block_size,
+                    self.legacy,
                 );
                 Ptr(EVP_MD::new_handle(md))
             })
@@ -122,7 +128,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_md4() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_md4, NID_md4WithRSAEncryption, MD4_DIGEST_LENGTH, 0, MD4_CBLOCK);
+        static DIGEST: Static = Static::new(NID_md4, NID_md4WithRSAEncryption, MD4_DIGEST_LENGTH, 0, MD4_CBLOCK, fns::MD4);
         DIGEST.get()
     }
 }
@@ -135,7 +141,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_md5() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_md5, NID_md5WithRSAEncryption, MD5_DIGEST_LENGTH, 0, MD5_CBLOCK);
+        static DIGEST: Static = Static::new(NID_md5, NID_md5WithRSAEncryption, MD5_DIGEST_LENGTH, 0, MD5_CBLOCK, fns::MD5);
         DIGEST.get()
     }
 }
@@ -148,7 +154,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_md5_sha1() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_md5_sha1, NID_md5_sha1, size(Kind::Md5Sha1), 0, block(Kind::Md5Sha1));
+        static DIGEST: Static = Static::new(NID_md5_sha1, NID_md5_sha1, size(Kind::Md5Sha1), 0, block(Kind::Md5Sha1), fns::MD5_SHA1);
         DIGEST.get()
     }
 }
@@ -161,7 +167,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha1() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha1, NID_sha1WithRSAEncryption, SHA_DIGEST_LENGTH, ABSENT, SHA_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha1, NID_sha1WithRSAEncryption, SHA_DIGEST_LENGTH, ABSENT, SHA_CBLOCK, fns::SHA1);
         DIGEST.get()
     }
 }
@@ -174,7 +180,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_mdc2() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_mdc2, NID_mdc2WithRSA, MDC2_DIGEST_LENGTH, 0, MDC2_BLOCK);
+        static DIGEST: Static = Static::new(NID_mdc2, NID_mdc2WithRSA, MDC2_DIGEST_LENGTH, 0, MDC2_BLOCK, fns::MDC2);
         DIGEST.get()
     }
 }
@@ -187,7 +193,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_ripemd160() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_ripemd160, NID_ripemd160WithRSA, RIPEMD160_DIGEST_LENGTH, 0, RIPEMD160_CBLOCK);
+        static DIGEST: Static = Static::new(NID_ripemd160, NID_ripemd160WithRSA, RIPEMD160_DIGEST_LENGTH, 0, RIPEMD160_CBLOCK, fns::RIPEMD160);
         DIGEST.get()
     }
 }
@@ -200,7 +206,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha224() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha224, NID_sha224WithRSAEncryption, SHA224_DIGEST_LENGTH, ABSENT, SHA256_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha224, NID_sha224WithRSAEncryption, SHA224_DIGEST_LENGTH, ABSENT, SHA256_CBLOCK, fns::SHA224);
         DIGEST.get()
     }
 }
@@ -213,7 +219,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha256, NID_sha256WithRSAEncryption, SHA256_DIGEST_LENGTH, ABSENT, SHA256_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha256, NID_sha256WithRSAEncryption, SHA256_DIGEST_LENGTH, ABSENT, SHA256_CBLOCK, fns::SHA256);
         DIGEST.get()
     }
 }
@@ -226,7 +232,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha384() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha384, NID_sha384WithRSAEncryption, SHA384_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha384, NID_sha384WithRSAEncryption, SHA384_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK, fns::SHA384);
         DIGEST.get()
     }
 }
@@ -239,7 +245,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha512() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha512, NID_sha512WithRSAEncryption, SHA512_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha512, NID_sha512WithRSAEncryption, SHA512_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK, fns::SHA512);
         DIGEST.get()
     }
 }
@@ -252,7 +258,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha512_224() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha512_224, NID_sha512_224WithRSAEncryption, SHA224_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha512_224, NID_sha512_224WithRSAEncryption, SHA224_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK, fns::SHA512_224);
         DIGEST.get()
     }
 }
@@ -265,7 +271,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha512_256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha512_256, NID_sha512_256WithRSAEncryption, SHA256_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK);
+        static DIGEST: Static = Static::new(NID_sha512_256, NID_sha512_256WithRSAEncryption, SHA256_DIGEST_LENGTH, ABSENT, SHA512_CBLOCK, fns::SHA512_256);
         DIGEST.get()
     }
 }
@@ -278,7 +284,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_whirlpool() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_whirlpool, 0, WHIRLPOOL_DIGEST_LENGTH, 0, WHIRLPOOL_BBLOCK / 8);
+        static DIGEST: Static = Static::new(NID_whirlpool, 0, WHIRLPOOL_DIGEST_LENGTH, 0, WHIRLPOOL_BBLOCK / 8, fns::WHIRLPOOL);
         DIGEST.get()
     }
 }
@@ -291,7 +297,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sm3() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sm3, NID_sm3WithRSAEncryption, size(Kind::Sm3), 0, block(Kind::Sm3));
+        static DIGEST: Static = Static::new(NID_sm3, NID_sm3WithRSAEncryption, size(Kind::Sm3), 0, block(Kind::Sm3), fns::NONE);
         DIGEST.get()
     }
 }
@@ -304,7 +310,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_blake2b512() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_blake2b512, 0, size(Kind::Blake2b512), 0, block(Kind::Blake2b512));
+        static DIGEST: Static = Static::new(NID_blake2b512, 0, size(Kind::Blake2b512), 0, block(Kind::Blake2b512), fns::NONE);
         DIGEST.get()
     }
 }
@@ -317,7 +323,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_blake2s256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_blake2s256, 0, size(Kind::Blake2s256), 0, block(Kind::Blake2s256));
+        static DIGEST: Static = Static::new(NID_blake2s256, 0, size(Kind::Blake2s256), 0, block(Kind::Blake2s256), fns::NONE);
         DIGEST.get()
     }
 }
@@ -330,7 +336,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha3_224() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha3_224, NID_RSA_SHA3_224, size(Kind::Sha3_224), ABSENT, block(Kind::Sha3_224));
+        static DIGEST: Static = Static::new(NID_sha3_224, NID_RSA_SHA3_224, size(Kind::Sha3_224), ABSENT, block(Kind::Sha3_224), fns::NONE);
         DIGEST.get()
     }
 }
@@ -343,7 +349,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha3_256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha3_256, NID_RSA_SHA3_256, size(Kind::Sha3_256), ABSENT, block(Kind::Sha3_256));
+        static DIGEST: Static = Static::new(NID_sha3_256, NID_RSA_SHA3_256, size(Kind::Sha3_256), ABSENT, block(Kind::Sha3_256), fns::NONE);
         DIGEST.get()
     }
 }
@@ -356,7 +362,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha3_384() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha3_384, NID_RSA_SHA3_384, size(Kind::Sha3_384), ABSENT, block(Kind::Sha3_384));
+        static DIGEST: Static = Static::new(NID_sha3_384, NID_RSA_SHA3_384, size(Kind::Sha3_384), ABSENT, block(Kind::Sha3_384), fns::NONE);
         DIGEST.get()
     }
 }
@@ -369,7 +375,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_sha3_512() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_sha3_512, NID_RSA_SHA3_512, size(Kind::Sha3_512), ABSENT, block(Kind::Sha3_512));
+        static DIGEST: Static = Static::new(NID_sha3_512, NID_RSA_SHA3_512, size(Kind::Sha3_512), ABSENT, block(Kind::Sha3_512), fns::NONE);
         DIGEST.get()
     }
 }
@@ -382,7 +388,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_shake128() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_shake128, 0, 128 / 8, XOF | ABSENT, block(Kind::Shake128));
+        static DIGEST: Static = Static::new(NID_shake128, 0, 128 / 8, XOF | ABSENT, block(Kind::Shake128), fns::NONE);
         DIGEST.get()
     }
 }
@@ -395,7 +401,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_shake256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_shake256, 0, 256 / 8, XOF | ABSENT, block(Kind::Shake256));
+        static DIGEST: Static = Static::new(NID_shake256, 0, 256 / 8, XOF | ABSENT, block(Kind::Shake256), fns::NONE);
         DIGEST.get()
     }
 }
@@ -408,7 +414,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_md_null() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_undef, NID_undef, 0, 0, 0);
+        static DIGEST: Static = Static::new(NID_undef, NID_undef, 0, 0, 0, fns::NULL_MD);
         DIGEST.get()
     }
 }

@@ -28,16 +28,16 @@ use core::ptr;
 use rustyssl_abi::{
     ENGINE, ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, EVP_CTRL_SSL3_MASTER_SECRET, EVP_MD,
     EVP_MD_CTRL_MICALG, EVP_MD_CTRL_XOF_LEN, EVP_MD_CTX, EVP_MD_CTX_FLAG_CLEANED,
-    EVP_MD_CTX_FLAG_NO_INIT, EVP_MD_CTX_FLAG_ONESHOT, EVP_MD_FLAG_XOF, EVP_PKEY_CTX,
-    EVP_R_CTRL_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
+    EVP_MD_CTX_FLAG_NO_INIT, EVP_MD_CTX_FLAG_ONESHOT, EVP_MD_CTX_FLAG_REUSE, EVP_MD_FLAG_XOF,
+    EVP_PKEY_CTX, EVP_R_CTRL_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
     EVP_R_INVALID_NULL_ALGORITHM, EVP_R_METHOD_NOT_SUPPORTED, EVP_R_NO_DIGEST_SET,
-    EVP_R_NOT_ABLE_TO_COPY_CTX, EVP_R_UPDATE_ERROR, NID_undef, OSSL_DIGEST_PARAM_MICALG,
-    OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOFLEN, OSSL_LIB_CTX,
-    OSSL_PARAM,
+    EVP_R_NOT_ABLE_TO_COPY_CTX, EVP_R_NOT_XOF_OR_INVALID_LENGTH, EVP_R_UPDATE_ERROR, NID_undef,
+    OSSL_DIGEST_PARAM_MICALG, OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS,
+    OSSL_DIGEST_PARAM_XOFLEN, OSSL_LIB_CTX, OSSL_PARAM,
 };
 
 use super::digest::{
-    EVP_MD_fetch, EVP_MD_free, EVP_MD_get_flags, EVP_MD_get_size, EVP_MD_up_ref, Md, method,
+    EVP_MD_fetch, EVP_MD_free, EVP_MD_get_flags, EVP_MD_get_size, EVP_MD_up_ref, Md, Origin, method,
 };
 use super::pkey_ctx::{EVP_PKEY_CTX_dup, EVP_PKEY_CTX_free};
 use crate::err;
@@ -118,12 +118,51 @@ pub(crate) unsafe fn free_algctx(c: &mut MdCtx) -> bool {
     true
 }
 
+/// `cleanup_old_md_data`: a legacy digest's `cleanup` (unless the context is already
+/// cleaned), then its state freed (unless the context is to reuse it, or `force`).
+///
+/// The `cleanup` is the application's (or a static digest's), which may use the context: no
+/// borrow of it is held across the call.
+///
+/// # Safety
+/// `ctx` is NULL or a live digest context whose digest is NULL or live.
+pub(crate) unsafe fn cleanup_old_md_data(ctx: *mut EVP_MD_CTX, force: bool) {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return;
+    };
+    // SAFETY: as above.
+    let Some(md) = (unsafe { digest_of(c) }) else {
+        return;
+    };
+    let legacy = md.legacy_fns();
+    if let Some(cleanup) = legacy.cleanup
+        && c.flags & flag(EVP_MD_CTX_FLAG_CLEANED) == 0
+    {
+        // SAFETY: the digest's function with the caller's context.
+        unsafe { cleanup(ctx) };
+    }
+    // SAFETY: as above (the call may have used the context).
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return;
+    };
+    let size = usize::try_from(legacy.ctx_size).unwrap_or(0);
+    if !c.md_data.is_null() && size > 0 && (c.flags & flag(EVP_MD_CTX_FLAG_REUSE) == 0 || force) {
+        // SAFETY: the state this context allocated, of the digest's size.
+        unsafe { mem::release_clean(c.md_data, size) };
+        c.md_data = ptr::null_mut();
+    }
+}
+
 /// `evp_md_ctx_clear_digest`.
 ///
 /// # Safety
-/// As for [`free_algctx`].
-pub(crate) unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool) {
-    if !c.algctx.is_null() {
+/// `ctx` is NULL or a live digest context whose fields are its own.
+pub(crate) unsafe fn clear_digest(ctx: *mut EVP_MD_CTX, force: bool, keep_fetched: bool) {
+    // SAFETY: the caller's guarantee.
+    if let Some(c) = unsafe { context(ctx) }
+        && !c.algctx.is_null()
+    {
         // SAFETY: the caller's guarantee.
         if let Some(free) = unsafe { digest_of(c) }.and_then(|m| m.funcs.freectx) {
             // SAFETY: the context's algorithm context, freed once.
@@ -132,6 +171,12 @@ pub(crate) unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool
         c.algctx = ptr::null_mut();
         c.flags |= flag(EVP_MD_CTX_FLAG_CLEANED);
     }
+    // SAFETY: the caller's guarantee.
+    unsafe { cleanup_old_md_data(ctx, force) };
+    // SAFETY: as above.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return;
+    };
     if force {
         c.digest = ptr::null();
     }
@@ -147,17 +192,30 @@ pub(crate) unsafe fn clear_digest(c: &mut MdCtx, force: bool, keep_fetched: bool
 /// it whole.
 ///
 /// # Safety
-/// As for [`free_algctx`].
-unsafe fn reset_ex(c: &mut MdCtx, keep_fetched: bool) {
-    if c.flags & FLAG_KEEP_PKEY_CTX == 0 {
+/// `ctx` is NULL or a live digest context whose fields are its own.
+unsafe fn reset_ex(ctx: *mut EVP_MD_CTX, keep_fetched: bool) {
+    // SAFETY: the caller's guarantee.
+    if let Some(c) = unsafe { context(ctx) }
+        && c.flags & FLAG_KEEP_PKEY_CTX == 0
+    {
         // SAFETY: the context's own key context, or NULL.
         unsafe { EVP_PKEY_CTX_free(c.pctx) };
         c.pctx = ptr::null_mut();
     }
     // SAFETY: the caller's guarantee.
-    unsafe { clear_digest(c, false, keep_fetched) };
+    unsafe { clear_digest(ctx, false, keep_fetched) };
     if !keep_fetched {
-        let zero = MdCtx {
+        // SAFETY: as above.
+        if let Some(c) = unsafe { context(ctx) } {
+            *c = MdCtx::zeroed();
+        }
+    }
+}
+
+impl MdCtx {
+    /// An empty context (all fields zero, as `OPENSSL_cleanse` leaves it).
+    fn zeroed() -> Self {
+        Self {
             reqdigest: ptr::null(),
             digest: ptr::null(),
             fetched_digest: ptr::null_mut(),
@@ -166,8 +224,7 @@ unsafe fn reset_ex(c: &mut MdCtx, keep_fetched: bool) {
             pctx: ptr::null_mut(),
             update: None,
             algctx: ptr::null_mut(),
-        };
-        *c = zero;
+        }
     }
 }
 
@@ -197,10 +254,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        if let Some(c) = unsafe { context(ctx) } {
-            // SAFETY: the context's own fields.
-            unsafe { reset_ex(c, false) };
-        }
+        unsafe { reset_ex(ctx, false) };
         1
     }
 }
@@ -293,9 +347,11 @@ unsafe fn init_internal(
         );
         return 0;
     }
-    if c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0 {
-        // The legacy path: a provided digest drops its algorithm context, and there's
-        // nothing to initialize.
+    // SAFETY: the caller's live method.
+    let application = unsafe { method(type_) }.is_some_and(|m| m.origin == Origin::Meth);
+    if c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0 || application {
+        // The legacy path: a provided digest drops its algorithm context; the digest's C
+        // functions do the work, on state of its size.
         // SAFETY: the context's own fields.
         if !unsafe { free_algctx(c) } {
             return 0;
@@ -306,20 +362,92 @@ unsafe fn init_internal(
         // SAFETY: the context's own reference.
         unsafe { EVP_MD_free(c.fetched_digest) };
         c.fetched_digest = ptr::null_mut();
-        // The reference keeps no reference to the digest here; the context keeps one, so the
-        // digest it points to can't be freed under it.
+        // SAFETY: the caller's guarantee.
+        unsafe { init_legacy(ctx, type_) }
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { init_provided(ctx, type_, params) }
+    }
+}
+
+/// The legacy part of `evp_md_init_internal`: the digest's state (when it changes), the key
+/// context told, and the digest's `init`.
+///
+/// # Safety
+/// `ctx` is a live digest context; `type_` is a live digest method.
+unsafe fn init_legacy(ctx: *mut EVP_MD_CTX, type_: *const EVP_MD) -> c_int {
+    const F: &str = "evp_md_init_internal";
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
+    if c.digest != type_ {
+        // SAFETY: the context's own fields.
+        unsafe { cleanup_old_md_data(ctx, true) };
+        // SAFETY: as above.
+        let Some(c) = (unsafe { context(ctx) }) else {
+            return 0;
+        };
+        c.digest = type_;
+        // The reference keeps no reference to the digest here; the context keeps one (none
+        // is counted for a static or application's digest), so a fetched digest it points to
+        // can't be freed under it.
         // SAFETY: the caller's live method.
         if unsafe { EVP_MD_up_ref(type_.cast_mut()) } != 0 {
             c.fetched_digest = type_.cast_mut();
         }
-        c.digest = type_;
-        // The key context of a legacy context is told of the init (`EVP_PKEY_CTRL_DIGESTINIT`).
-        // SAFETY: the context's key context, or NULL.
-        if !unsafe { super::sigver::digest_init_ctrl(c.pctx, ctx) } {
-            return 0;
+        // SAFETY: the caller's live method.
+        let legacy = unsafe { method(type_) }
+            .map(Md::legacy_fns)
+            .unwrap_or_default();
+        let size = usize::try_from(legacy.ctx_size).unwrap_or(0);
+        if c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) == 0 && size > 0 {
+            c.update = legacy.update;
+            c.md_data = mem::alloc_zeroed(size);
+            if c.md_data.is_null() {
+                return 0;
+            }
         }
+    }
+    // SAFETY: as above.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
+    // The key context of a legacy context is told of the init (`EVP_PKEY_CTRL_DIGESTINIT`).
+    // SAFETY: the context's key context, or NULL.
+    if !unsafe { super::sigver::digest_init_ctrl(c.pctx, ctx) } {
+        return 0;
+    }
+    if c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0 {
         return 1;
     }
+    // SAFETY: the context's digest.
+    let Some(init) = unsafe { digest_of(c) }.and_then(|m| m.legacy_fns().init) else {
+        // OpenSSL calls the missing function and crashes.
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        return 0;
+    };
+    // SAFETY: the digest's function with the caller's context.
+    unsafe { init(ctx) }
+}
+
+/// The provided part of `evp_md_init_internal`: the digest's old state cleaned up, the
+/// provider's digest (fetched for a static one), its algorithm context, and its `init`.
+///
+/// # Safety
+/// `ctx` is a live digest context; `type_` is a live digest method; `params` is NULL or a
+/// parameter array.
+unsafe fn init_provided(
+    ctx: *mut EVP_MD_CTX,
+    type_: *const EVP_MD,
+    params: *const OSSL_PARAM,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe { cleanup_old_md_data(ctx, true) };
+    // SAFETY: as above.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
     if c.digest != type_ {
         // SAFETY: the context's own fields.
         if !unsafe { free_algctx(c) } {
@@ -490,7 +618,8 @@ ffi_export! {
         }
         // SAFETY: the context's digest.
         let md = unsafe { digest_of(c) };
-        let Some(md) = md.filter(|_| c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) == 0) else {
+        let provided = |m: &&Md| !m.prov.0.is_null() && c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) == 0;
+        let Some(md) = md.filter(provided) else {
             // The legacy path: the context's update function, if it has one.
             let Some(update) = c.update else { return 0 };
             // SAFETY: the caller's function with the caller's context and data.
@@ -528,6 +657,13 @@ ffi_export! {
         // SAFETY: as above.
         let Some(c) = (unsafe { context(ctx) }) else { return 0 };
         // SAFETY: the context's digest.
+        if let Some(m) = unsafe { digest_of(c) }
+            && m.prov.0.is_null()
+        {
+            // SAFETY: the caller's guarantee.
+            return unsafe { final_legacy(ctx, m, md, size, mdsize) };
+        }
+        // SAFETY: the context's digest.
         let Some(final_) = unsafe { digest_of(c) }.and_then(|m| m.funcs.final_) else {
             err::raise(ERR_LIB_EVP, EVP_R_FINAL_ERROR, "EVP_DigestFinal_ex");
             return 0;
@@ -553,6 +689,98 @@ ffi_export! {
         }
         ret
     }
+}
+
+/// After a legacy final: the digest's `cleanup` (and the context marked cleaned), then the
+/// state cleared.
+///
+/// # Safety
+/// `ctx` is a live digest context whose digest is `m`.
+unsafe fn after_legacy_final(ctx: *mut EVP_MD_CTX, m: &Md) {
+    let legacy = m.legacy_fns();
+    if let Some(cleanup) = legacy.cleanup {
+        // SAFETY: the digest's function with the caller's context.
+        unsafe { cleanup(ctx) };
+        // SAFETY: the caller's guarantee (the call may have used the context).
+        if let Some(c) = unsafe { context(ctx) } {
+            c.flags |= flag(EVP_MD_CTX_FLAG_CLEANED);
+        }
+    }
+    // SAFETY: as above.
+    if let Some(c) = unsafe { context(ctx) }
+        && !c.md_data.is_null()
+    {
+        // SAFETY: the context's state, of the digest's size.
+        unsafe { mem::cleanse(c.md_data, usize::try_from(legacy.ctx_size).unwrap_or(0)) };
+    }
+}
+
+/// The legacy part of `EVP_DigestFinal_ex`: the digest's `final` into `md`, the length (the
+/// digest's size, whatever `final` returned) through `size`, then the clean-up.
+///
+/// # Safety
+/// As for `EVP_DigestFinal_ex`; the context's digest is `m`.
+unsafe fn final_legacy(
+    ctx: *mut EVP_MD_CTX,
+    m: &Md,
+    md: *mut u8,
+    size: *mut c_uint,
+    mdsize: usize,
+) -> c_int {
+    if mdsize > 64 {
+        // `OPENSSL_assert(mdsize <= EVP_MAX_MD_SIZE)`.
+        crate::ffi::die("mdsize <= EVP_MAX_MD_SIZE");
+    }
+    let Some(final_) = m.legacy_fns().final_ else {
+        // OpenSSL calls the missing function and crashes.
+        err::raise(ERR_LIB_EVP, EVP_R_FINAL_ERROR, "EVP_DigestFinal_ex");
+        return 0;
+    };
+    // SAFETY: the digest's function with the caller's context and room for the digest.
+    let ret = unsafe { final_(ctx, md) };
+    if !size.is_null() {
+        // SAFETY: the caller's guarantee; the size is at most 64.
+        unsafe { size.write(c_uint::try_from(mdsize).unwrap_or(0)) };
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { after_legacy_final(ctx, m) };
+    ret
+}
+
+/// The legacy part of `EVP_DigestFinalXOF`: an XOF digest's `ctrl` sets the length, then its
+/// `final`; anything else fails with `EVP_R_NOT_XOF_OR_INVALID_LENGTH`.
+///
+/// # Safety
+/// As for `EVP_DigestFinalXOF`; the context's digest is `m`.
+unsafe fn final_xof_legacy(ctx: *mut EVP_MD_CTX, m: &Md, md: *mut u8, size: usize) -> c_int {
+    let legacy = m.legacy_fns();
+    let xof = m.flags() & c_ulong::try_from(EVP_MD_FLAG_XOF).unwrap_or(0) != 0;
+    let length = c_int::try_from(size).ok();
+    let set = match (xof, length, legacy.ctrl) {
+        (true, Some(n), Some(ctrl)) => {
+            // SAFETY: the digest's function with the caller's context.
+            let r = unsafe { ctrl(ctx, EVP_MD_CTRL_XOF_LEN, n, ptr::null_mut()) };
+            r != 0
+        }
+        _ => false,
+    };
+    if !set {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_NOT_XOF_OR_INVALID_LENGTH,
+            "EVP_DigestFinalXOF",
+        );
+        return 0;
+    }
+    let Some(final_) = legacy.final_ else {
+        err::raise(ERR_LIB_EVP, EVP_R_FINAL_ERROR, "EVP_DigestFinalXOF");
+        return 0;
+    };
+    // SAFETY: the digest's function with the caller's context and room for `size` octets.
+    let ret = unsafe { final_(ctx, md) };
+    // SAFETY: the caller's guarantee.
+    unsafe { after_legacy_final(ctx, m) };
+    ret
 }
 
 ffi_export! {
@@ -587,6 +815,10 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, EVP_R_INVALID_NULL_ALGORITHM, "EVP_DigestFinalXOF");
             return 0;
         };
+        if m.prov.0.is_null() {
+            // SAFETY: the caller's guarantee.
+            return unsafe { final_xof_legacy(ctx, m, md, size) };
+        }
         let Some(final_) = m.funcs.final_ else {
             err::raise(ERR_LIB_EVP, EVP_R_FINAL_ERROR, "EVP_DigestFinalXOF");
             return 0;
@@ -650,6 +882,76 @@ ffi_export! {
     }
 }
 
+/// The legacy part of `EVP_MD_CTX_copy_ex`: `out` becomes a field-by-field copy of `src` (the
+/// source's fields) with its own copy of the state (in `out`'s old state when the digests are
+/// the same) and key context, then the digest's `copy` runs.
+///
+/// # Safety
+/// `out` and `in_` are live digest contexts; `src` is `in_`'s fields; `md` is its digest.
+unsafe fn copy_legacy(out: *mut EVP_MD_CTX, in_: *const EVP_MD_CTX, src: &MdCtx, md: &Md) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(dst) = (unsafe { context(out) }) else {
+        return 0;
+    };
+    let tmp_buf = if dst.digest == src.digest {
+        dst.flags |= flag(EVP_MD_CTX_FLAG_REUSE);
+        dst.md_data
+    } else {
+        ptr::null_mut()
+    };
+    // SAFETY: the destination's own fields.
+    unsafe { reset_ex(out, false) };
+    // SAFETY: as above (the clean-up may have used it).
+    let Some(dst) = (unsafe { context(out) }) else {
+        return 0;
+    };
+    *dst = MdCtx { ..*src };
+    dst.flags &= !FLAG_KEEP_PKEY_CTX;
+    dst.md_data = ptr::null_mut();
+    dst.pctx = ptr::null_mut();
+    // A legacy context has no algorithm context to share.
+    dst.algctx = ptr::null_mut();
+    if !dst.fetched_digest.is_null() {
+        // SAFETY: the source's live method; the copy holds its own reference.
+        unsafe { EVP_MD_up_ref(dst.fetched_digest) };
+    }
+    let legacy = md.legacy_fns();
+    let size = usize::try_from(legacy.ctx_size).unwrap_or(0);
+    if !src.md_data.is_null() && size > 0 {
+        let data = if tmp_buf.is_null() {
+            mem::alloc(size)
+        } else {
+            tmp_buf
+        };
+        if data.is_null() {
+            return 0;
+        }
+        // SAFETY: both states hold the digest's state size; they are different allocations.
+        unsafe { ptr::copy_nonoverlapping(src.md_data.cast::<u8>(), data.cast::<u8>(), size) };
+        dst.md_data = data;
+    } else if !tmp_buf.is_null() {
+        // OpenSSL loses the old state here; it is freed.
+        // SAFETY: the destination's old state, of the digest's size.
+        unsafe { mem::release_clean(tmp_buf, size) };
+    }
+    dst.update = src.update;
+    if !src.pctx.is_null() {
+        // SAFETY: the source's live key context.
+        let p = unsafe { EVP_PKEY_CTX_dup(src.pctx) };
+        if p.is_null() {
+            // SAFETY: the destination.
+            unsafe { EVP_MD_CTX_reset(out) };
+            return 0;
+        }
+        dst.pctx = p;
+    }
+    if let Some(copy) = legacy.copy {
+        // SAFETY: the digest's function with both contexts.
+        return unsafe { copy(out, in_) };
+    }
+    1
+}
+
 ffi_export! {
     /// Makes `out` a copy of `in_`. Returns 1, or 0 with an error.
     ///
@@ -671,53 +973,66 @@ ffi_export! {
             return 1;
         }
         // SAFETY: the caller's guarantee.
-        let Some(dst) = (unsafe { context(out) }) else {
+        if unsafe { context(out) }.is_none() {
             err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, "EVP_MD_CTX_copy_ex");
             return 0;
-        };
+        }
         // SAFETY: the source's digest.
         let md = unsafe { method(src.digest) };
         match md {
             None => {
                 // Copying an uninitialized context.
                 // SAFETY: the destination's own fields.
-                unsafe { reset_ex(dst, false) };
+                unsafe { reset_ex(out, false) };
+                // SAFETY: as above.
+                let Some(dst) = (unsafe { context(out) }) else { return 0 };
                 *dst = MdCtx { ..src };
                 if !dst.fetched_digest.is_null() {
                     // SAFETY: the source's live method; the copy holds its own reference.
                     unsafe { EVP_MD_up_ref(dst.fetched_digest) };
                 }
             }
+            Some(md) if md.prov.0.is_null() || src.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0 => {
+                // SAFETY: the caller's guarantee.
+                return unsafe { copy_legacy(out, in_, &src, md) };
+            }
             Some(md) => {
                 let Some(dupctx) = md.funcs.dupctx else {
                     err::raise(ERR_LIB_EVP, EVP_R_NOT_ABLE_TO_COPY_CTX, "EVP_MD_CTX_copy_ex");
                     return 0;
                 };
-                let legacy = src.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0;
+                // SAFETY: as above.
+                let Some(dst) = (unsafe { context(out) }) else { return 0 };
                 match md.funcs.copyctx {
-                    Some(copyctx)
-                        if !legacy && dst.digest == src.digest && !dst.algctx.is_null() =>
-                    {
+                    Some(copyctx) if dst.digest == src.digest && !dst.algctx.is_null() => {
                         let (to, from) = (dst.algctx, src.algctx);
                         // SAFETY: the provider's function with two of its contexts.
                         unsafe { copyctx(to, from) };
                         // SAFETY: the destination's own key context, or NULL.
                         unsafe { EVP_PKEY_CTX_free(dst.pctx) };
                         dst.pctx = ptr::null_mut();
+                        // SAFETY: the destination's own fields (a provided digest's state
+                        // is in its algorithm context; there is no legacy clean-up to run).
+                        unsafe { cleanup_old_md_data(out, false) };
+                        // SAFETY: as above.
+                        let Some(dst) = (unsafe { context(out) }) else { return 0 };
                         dst.flags = src.flags;
                         dst.update = src.update;
                     }
                     _ => {
+                        let fetched = dst.fetched_digest;
                         // SAFETY: the destination's own fields.
-                        unsafe { reset_ex(dst, true) };
-                        if dst.fetched_digest != src.fetched_digest {
+                        unsafe { reset_ex(out, true) };
+                        if fetched != src.fetched_digest {
                             if !src.fetched_digest.is_null() {
                                 // SAFETY: the source's live method.
                                 unsafe { EVP_MD_up_ref(src.fetched_digest) };
                             }
                             // SAFETY: the destination's own reference.
-                            unsafe { EVP_MD_free(dst.fetched_digest) };
+                            unsafe { EVP_MD_free(fetched) };
                         }
+                        // SAFETY: as above.
+                        let Some(dst) = (unsafe { context(out) }) else { return 0 };
                         *dst = MdCtx { ..src };
                         dst.pctx = ptr::null_mut();
                         dst.algctx = ptr::null_mut();
@@ -734,6 +1049,8 @@ ffi_export! {
                 }
             }
         }
+        // SAFETY: as above.
+        let Some(dst) = (unsafe { context(out) }) else { return 0 };
         dst.flags &= !FLAG_KEEP_PKEY_CTX;
         // The copy gets a copy of the key context (`clone_pkey`).
         dst.pctx = ptr::null_mut();
@@ -746,10 +1063,7 @@ ffi_export! {
                 unsafe { EVP_MD_CTX_reset(out) };
                 return 0;
             }
-            // SAFETY: as above.
-            if let Some(dst) = unsafe { context(out) } {
-                dst.pctx = p;
-            }
+            dst.pctx = p;
         }
         1
     }
@@ -1180,9 +1494,16 @@ ffi_export! {
             return 0;
         };
         // SAFETY: the context's digest.
-        if !c.digest.is_null() && unsafe { digest_of(c) }.is_none() {
-            err::raise(ERR_LIB_EVP, EVP_R_CTRL_NOT_IMPLEMENTED, "EVP_MD_CTX_ctrl");
-            return 0;
+        let digest = unsafe { digest_of(c) };
+        if !c.digest.is_null() && digest.is_none_or(|m| m.prov.0.is_null()) {
+            // The legacy path: the digest's own `ctrl`.
+            let Some(f) = digest.and_then(|m| m.legacy_fns().ctrl) else {
+                err::raise(ERR_LIB_EVP, EVP_R_CTRL_NOT_IMPLEMENTED, "EVP_MD_CTX_ctrl");
+                return 0;
+            };
+            // SAFETY: the digest's function with the caller's context and arguments.
+            let ret = unsafe { f(ctx, cmd, p1, p2) };
+            return if ret <= 0 { 0 } else { ret };
         }
         // `size_t` of an `int`, sign-extended, as C converts it.
         let mut size = usize::from_ne_bytes(isize::try_from(p1).unwrap_or(0).to_ne_bytes());

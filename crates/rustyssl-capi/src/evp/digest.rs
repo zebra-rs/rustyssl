@@ -8,11 +8,17 @@
 //! size, size, and XOF and absent-AlgorithmIdentifier flags are read from its parameters when
 //! it's made, and its NID from the legacy digest its names map to (`set_legacy_nid`). The
 //! static legacy digests (`EVP_sha256()`, `legacy_md.rs`) are methods too, without a provider
-//! and with references that aren't counted, as OpenSSL's `EVP_ORIG_GLOBAL` ones.
+//! and with references that aren't counted, as OpenSSL's `EVP_ORIG_GLOBAL` ones, and so are
+//! the digests applications make (`EVP_MD_meth_new(3)`, `md_meth.rs`; `EVP_ORIG_METH`), whose
+//! sizes, flags, and C functions are set after they're made. A digest's C functions (the
+//! legacy ones, which a context runs on its `md_data`) are kept with it: the static digests'
+//! own, an application's, or none for a fetched one.
 
 use core::ffi::{CStr, c_char, c_int, c_ulong, c_void};
 use core::ptr;
+use core::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 use std::ffi::CString;
+use std::sync::{Mutex, PoisonError};
 
 use rustyssl_abi::{
     ERR_LIB_EVP, ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, EVP_MD, EVP_MD_FLAG_DIGALGID_ABSENT,
@@ -74,6 +80,45 @@ pub(crate) enum Origin {
     Dynamic,
     /// One of the static legacy digests (`EVP_sha256()`): references aren't counted.
     Global,
+    /// Made by an application (`EVP_MD_meth_new`): references aren't counted, and
+    /// `EVP_MD_meth_free` frees it.
+    Meth,
+}
+
+/// A legacy digest's `init` (and `cleanup`): the context.
+pub(crate) type LegacyInitFn = unsafe extern "C" fn(*mut rustyssl_abi::EVP_MD_CTX) -> c_int;
+/// A legacy digest's `update`.
+pub(crate) type LegacyUpdateFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_MD_CTX, *const c_void, usize) -> c_int;
+/// A legacy digest's `final`.
+pub(crate) type LegacyFinalFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_MD_CTX, *mut u8) -> c_int;
+/// A legacy digest's `copy`.
+pub(crate) type LegacyCopyFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_MD_CTX, *const rustyssl_abi::EVP_MD_CTX) -> c_int;
+/// A legacy digest's `md_ctrl`.
+pub(crate) type LegacyCtrlFn =
+    unsafe extern "C" fn(*mut rustyssl_abi::EVP_MD_CTX, c_int, c_int, *mut c_void) -> c_int;
+
+/// A digest's C functions and the size of their state (`md_data`), as OpenSSL's `EVP_MD`
+/// holds them.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct Legacy {
+    pub(crate) ctx_size: c_int,
+    pub(crate) init: Option<LegacyInitFn>,
+    pub(crate) update: Option<LegacyUpdateFn>,
+    pub(crate) final_: Option<LegacyFinalFn>,
+    pub(crate) copy: Option<LegacyCopyFn>,
+    pub(crate) cleanup: Option<LegacyInitFn>,
+    pub(crate) ctrl: Option<LegacyCtrlFn>,
+}
+
+/// The sizes and flags `EVP_MD_meth_set_*` set once.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Field {
+    BlockSize,
+    MdSize,
+    Flags,
 }
 
 /// A digest method (`EVP_MD`): made from a provider's algorithm, or a static legacy one.
@@ -88,9 +133,11 @@ pub(crate) struct Md {
     /// The provider, with a reference.
     pub(crate) prov: Ptr<OSSL_PROVIDER>,
     pub(crate) nid: c_int,
-    block_size: c_int,
-    md_size: c_int,
-    flags: c_ulong,
+    block_size: AtomicI32,
+    md_size: AtomicI32,
+    flags: AtomicU64,
+    /// The C functions (`EVP_MD_meth_set_*` sets an application's).
+    legacy: Mutex<Legacy>,
     get_params: Option<GetParamsFn>,
     gettable_params: Option<GettableParamsFn>,
     /// The context functions.
@@ -106,6 +153,7 @@ impl Md {
         md_size: c_int,
         flags: c_ulong,
         block_size: c_int,
+        legacy: Legacy,
     ) -> Self {
         Self {
             origin: Origin::Global,
@@ -115,13 +163,78 @@ impl Md {
             description: Ptr(ptr::null_mut()),
             prov: Ptr(ptr::null_mut()),
             nid,
-            block_size,
-            md_size,
-            flags,
+            block_size: AtomicI32::new(block_size),
+            md_size: AtomicI32::new(md_size),
+            flags: AtomicU64::new(flags),
+            legacy: Mutex::new(legacy),
             get_params: None,
             gettable_params: None,
             funcs: Funcs::default(),
         }
+    }
+
+    /// The digest's size (`md_size`).
+    pub(crate) fn md_size(&self) -> c_int {
+        self.md_size.load(Ordering::Relaxed)
+    }
+
+    /// The digest's block size.
+    pub(crate) fn block_size(&self) -> c_int {
+        self.block_size.load(Ordering::Relaxed)
+    }
+
+    /// The digest's flags.
+    pub(crate) fn flags(&self) -> c_ulong {
+        self.flags.load(Ordering::Relaxed)
+    }
+
+    /// The digest's C functions, as they are now.
+    pub(crate) fn legacy_fns(&self) -> Legacy {
+        *self.legacy.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Changes the C functions (an application's digest only).
+    pub(crate) fn set_legacy(&self, change: impl FnOnce(&mut Legacy) -> bool) -> bool {
+        change(&mut self.legacy.lock().unwrap_or_else(PoisonError::into_inner))
+    }
+
+    /// `EVP_MD_meth_set_*` of a size or the flags: sets `field` if it is still 0.
+    pub(crate) fn set_once(&self, field: Field, value: i64) -> bool {
+        match field {
+            Field::BlockSize | Field::MdSize => {
+                let target = if field == Field::BlockSize {
+                    &self.block_size
+                } else {
+                    &self.md_size
+                };
+                let Ok(v) = c_int::try_from(value) else {
+                    return false;
+                };
+                target
+                    .compare_exchange(0, v, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+            }
+            Field::Flags => {
+                let v = u64::from_ne_bytes(value.to_ne_bytes());
+                self.flags
+                    .compare_exchange(0, v, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+            }
+        }
+    }
+
+    /// An application's digest (`EVP_MD_meth_new`), or a copy of `from` (`EVP_MD_meth_dup`).
+    pub(crate) fn meth(nid: c_int, pkey_type: c_int, from: Option<&Self>) -> Self {
+        let mut md = Self::legacy(nid, pkey_type, 0, 0, 0, Legacy::default());
+        md.origin = Origin::Meth;
+        if let Some(f) = from {
+            md.block_size = AtomicI32::new(f.block_size());
+            md.md_size = AtomicI32::new(f.md_size());
+            md.flags = AtomicU64::new(f.flags());
+            md.legacy = Mutex::new(f.legacy_fns());
+            md.description = Ptr(f.description.0);
+        }
+        md
     }
 
     /// The provider's context, which the parameter-list functions take.
@@ -202,14 +315,16 @@ fn cache_constants(md: &mut Md) -> bool {
     if !ok {
         return false;
     }
-    md.block_size = block;
-    md.md_size = size;
+    md.block_size = AtomicI32::new(block);
+    md.md_size = AtomicI32::new(size);
+    let mut flags = 0u64;
     if xof != 0 {
-        md.flags |= c_ulong::try_from(EVP_MD_FLAG_XOF).unwrap_or(0);
+        flags |= u64::try_from(EVP_MD_FLAG_XOF).unwrap_or(0);
     }
     if absent != 0 {
-        md.flags |= c_ulong::try_from(EVP_MD_FLAG_DIGALGID_ABSENT).unwrap_or(0);
+        flags |= u64::try_from(EVP_MD_FLAG_DIGALGID_ABSENT).unwrap_or(0);
     }
+    md.flags = AtomicU64::new(flags);
     true
 }
 
@@ -336,9 +451,10 @@ unsafe fn from_algorithm(
         description: Ptr(algo.algorithm_description.cast_mut()),
         prov: Ptr(prov),
         nid,
-        block_size: 0,
-        md_size: 0,
-        flags: 0,
+        block_size: AtomicI32::new(0),
+        md_size: AtomicI32::new(0),
+        flags: AtomicU64::new(0),
+        legacy: Mutex::new(Legacy::default()),
         get_params: get_params_fn,
         gettable_params,
         funcs,
@@ -493,8 +609,8 @@ ffi_export! {
         let Some(m) = (unsafe { method(md) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         let n = unsafe { text(name) }.map_or(&b""[..], CStr::to_bytes);
-        if m.origin == Origin::Global {
-            // A static digest compares its name's number with `name`'s in the default
+        if m.prov.0.is_null() {
+            // A static or application's digest compares its name's number with `name`'s in the default
             // context (so two unknown names are "equal", as in OpenSSL).
             // SAFETY: the caller's live method.
             let own_name = unsafe { EVP_MD_get0_name(md) };
@@ -520,8 +636,8 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { method(md) }) else { return 0 };
-        if m.origin == Origin::Global {
-            // A static digest has no names of its own to list.
+        if m.prov.0.is_null() {
+            // A static or application's digest has no names of its own to list.
             return 1;
         }
         let names = fetch::names_of(m.prov.0, m.name_id);
@@ -651,7 +767,7 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, EVP_R_MESSAGE_DIGEST_IS_NULL, "EVP_MD_get_size");
             return -1;
         };
-        m.md_size
+        m.md_size()
     }
 }
 
@@ -668,7 +784,7 @@ ffi_export! {
             err::raise(ERR_LIB_EVP, EVP_R_MESSAGE_DIGEST_IS_NULL, "EVP_MD_get_block_size");
             return -1;
         };
-        m.block_size
+        m.block_size()
     }
 }
 
@@ -681,7 +797,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { method(md) }.map_or(0, |m| m.flags)
+        unsafe { method(md) }.map_or(0, Md::flags)
     }
 }
 

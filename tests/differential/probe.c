@@ -7157,6 +7157,70 @@ static int skey_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for application-defined digests, over the digest commands' data:
+ *   mdcopy NAME LEN PIECE           EVP_MD_meth_dup of the static digest NAME given its public
+ *                                   state's size, over LEN octets (at most 1000) in pieces of
+ *                                   PIECE: the digest, and whether it matches the static one's
+ */
+static int md_meth_command(const char *command, const char *line)
+{
+    static const struct {
+        const char *name;
+        int size;
+    } sizes[] = {
+        { "MD4", sizeof(MD4_CTX) }, { "MD5", sizeof(MD5_CTX) }, { "SHA1", sizeof(SHA_CTX) },
+        { "SHA224", sizeof(SHA256_CTX) }, { "SHA256", sizeof(SHA256_CTX) },
+        { "SHA384", sizeof(SHA512_CTX) }, { "SHA512", sizeof(SHA512_CTX) },
+        { "SHA512-224", sizeof(SHA512_CTX) }, { "SHA512-256", sizeof(SHA512_CTX) },
+        { "RIPEMD160", sizeof(RIPEMD160_CTX) }, { "MDC2", sizeof(MDC2_CTX) },
+        { "WHIRLPOOL", sizeof(WHIRLPOOL_CTX) }, { "MD5-SHA1", sizeof(MD5_CTX) + sizeof(SHA_CTX) },
+    };
+    char name[32] = "";
+    long len = 0, piece = 1;
+    const EVP_MD *from;
+    EVP_MD *md;
+    EVP_MD_CTX *ctx;
+    unsigned char out[64], want[64];
+    unsigned int n = 0, w = 0;
+    size_t i;
+    int size = -1, r;
+
+    if (strcmp(command, "mdcopy") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    sscanf(line, "%*s %31s %ld %ld", name, &len, &piece);
+    for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++)
+        if (strcmp(sizes[i].name, name) == 0)
+            size = sizes[i].size;
+    from = EVP_get_digestbyname(name);
+    if (size < 0 || from == NULL || len < 0 || len > 1000 || piece < 1) {
+        printf("%s: skipped\n", line);
+        return 1;
+    }
+    md = EVP_MD_meth_dup(from);
+    EVP_MD_meth_set_app_datasize(md, size);
+    ctx = EVP_MD_CTX_new();
+    r = EVP_DigestInit_ex(ctx, md, NULL);
+    for (i = 0; r && i < (size_t)len; i += (size_t)piece)
+        r = EVP_DigestUpdate(ctx, digest_data + i, (size_t)len - i < (size_t)piece ? (size_t)len - i : (size_t)piece);
+    r = r && EVP_DigestFinal_ex(ctx, out, &n);
+    printf("%s: %d", line, r);
+    if (r)
+        probe_bytes("md", out, n);
+    /* The static digest as the default provider runs it (MD4 and MDC2 need the legacy one). */
+    if (EVP_Digest(digest_data, (size_t)len, want, &w, from, NULL))
+        printf(" %s", r && n == w && memcmp(out, want, n) == 0 ? "same" : "differ");
+    printf("\n");
+    EVP_MD_CTX_free(ctx);
+    EVP_MD_meth_free(md);
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -7190,7 +7254,7 @@ int main(void)
             || aes_command(command, line) || aead_command(command, line)
             || des_command(command, line) || legacy_command(command, line)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
-            || skey_command(command, line)) {
+            || skey_command(command, line) || md_meth_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
