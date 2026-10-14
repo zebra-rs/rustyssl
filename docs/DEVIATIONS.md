@@ -204,6 +204,7 @@ OpenSSL never depends on them.
 | `RC2_set_key` with a length of 0 or less; `RC4_set_key` with one | RC2 expands from the octet before the key (and for a negative length writes before it); RC4 reads 256 octets past the key | RC2 expands from a zero; RC4 does nothing | `lowlevel::legacy::tests::empty_rc2_and_rc4_keys` |
 | The deprecated IDEA, SEED, and Camellia functions with a null key, buffer, IV, or position, or (IDEA's CBC, CFB-64, and OFB-64) a negative length | dereference null and crash; IDEA's CBC writes a block for a negative length, its CFB-64 and OFB-64 read until they crash | do nothing (a negative IDEA position still becomes -1, as in OpenSSL) | `lowlevel::ciphers::tests::nulls_and_negative_lengths_do_nothing` |
 | A `CAMELLIA_KEY` whose `grand_rounds` isn't 1 to 4 (key setters leave 3 or 4) | reads the key table past the key (5 or more), or loops reading until it crashes (0 or less) | refused: nothing is written | `lowlevel::ciphers::tests::camellia_bad_grand_rounds_do_nothing` |
+| `BIO_f_reliable` with a digest set: a write, a read once the seed has come in, or a flush | writes or reads its seed through the provided digest's NULL legacy state and crashes; a flush digests from a length that underflows, or loops without end | the write, read, or flush fails (returns 0); nothing is written to the next BIO | `bio::evp::tests::reliable_writes_fail`, `bio::evp::tests::reliable_reads_and_flushes_fail` |
 
 ## Notes
 

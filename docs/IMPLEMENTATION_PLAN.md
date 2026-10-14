@@ -2597,7 +2597,36 @@ have run for at least 24 CPU-hours with no findings.
       `lowlevel_ciphers.txt`, random `lowlevel_ciphers` sessions); the `lowlevel_ciphers`
       fuzz target checks IDEA and Camellia against the cipher backend, the inverses, and the
       modes' chunking.
-- [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
+- [x] **3.9 EVP filter BIOs:** `bio/evp.rs` in capi: `BIO_f_md`, `BIO_f_cipher`,
+  `BIO_set_cipher`, and `BIO_f_reliable` (`crypto/evp`'s `bio_ok.c`, the same family): 4
+  exports; libcrypto now 2,115 of 5,876.
+  - **Decision:** the filters are ports of `bio_md.c`, `bio_enc.c`, and `bio_ok.c` over the EVP
+    exports, on an `EVP_MD_CTX` or `EVP_CIPHER_CTX` handle the filter owns: applications get
+    it (`BIO_get_md_ctx`, `BIO_get_cipher_ctx`) and may set it up themselves, so the filters
+    call the same functions on it that OpenSSL's do. Their steps are OpenSSL's, down to its
+    `int` offsets (which can leave the offset past the length) and the 4 KiB reads and 256-octet
+    decryption chunks, so the next BIO sees the same calls. Where the cipher filter decrypts
+    straight into the caller's buffer, here it decrypts into its own and copies what fits.
+  - Quirks kept: `BIO_set_md_ctx` gives the filter the context, which it frees, and keeps the
+    old one (the application may hold it); `BIO_CTRL_DUP` marks the digest filter itself
+    initialized, not the copy; `BIO_gets` refuses a buffer shorter than the digest (0) and
+    finishes it; `BIO_reset` of the cipher filter starts the cipher again but keeps its
+    end-of-input state; `BIO_set_cipher` calls the BIO's callback before and after, as a
+    `BIO_CTRL_SET` control; the reliable filter isn't initialized until `BIO_set_md`.
+  - **Decision:** OpenSSL 3's reliable filter can't work with a provided digest: it writes its
+    random seed into the digest's legacy state (`EVP_MD_CTX_get0_md_data`), which is NULL, and
+    crashes on the first write, or once a read has brought the seed in. Here those fail
+    instead, as does a flush (which OpenSSL starts with a length that underflows, or ends in a
+    loop without end); its controls are OpenSSL's. Application-defined digests (3.11) have
+    legacy state; the protocol could go on then.
+  - New deviation: the reliable filter's writes, reads, and flushes with a digest.
+  - `tests/c/bio_evp.c` (32 checks: the digest filter written and read, chained, with a short
+    `BIO_gets` buffer, a set context, a next BIO that takes part of a write, and copies; the
+    cipher filter written, flushed, reset, and read in chunks around its block sizes, with bad
+    padding, a stream cipher, the callback, a copy, and no cipher; the reliable filter's
+    controls); the probe's `bmd`, `bmdread`, `benc`, and `bdec` (corpus `bio_evp.txt`, random
+    `bio_evp` sessions); the `bio_evp` fuzz target checks both filters against EVP at once
+    with arbitrary pieces, corruption, and truncation.
 - [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are
   application-defined algorithms implemented in C that we call back into.
