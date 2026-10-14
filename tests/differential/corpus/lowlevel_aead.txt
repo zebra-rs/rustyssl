@@ -1,0 +1,98 @@
+# The AEAD helpers of modes.h (step 3.8c): GCM, CCM, OCB, and XTS.
+gcmiv 12
+gcminit
+gcmiv 12
+gcmaad 20
+gcmaad 13
+gcmenc 5
+gcmaad 1
+gcmenc 40
+gcmenc 0
+gcmtag 16
+gcmfinish 16
+gcmfinish 17
+gcmfinish 0
+gcmtag 16
+gcmiv 12
+gcmaad 20
+gcmdec 45 ctr
+gcmtag 10
+gcmiv 60
+gcmenc 3300 ctr
+gcmtag 16
+gcmiv 0
+gcmtag 16
+gcmiv 1
+gcmaad 7
+gcmdec 0
+gcmtag 16
+gcminit
+gcmiv 16
+gcmenc 32 ctr
+gcmenc 17
+gcmtag 16
+ccmenc 5
+ccminit 8 2
+ccmiv 13 20
+ccmaad 3
+ccmenc 20
+ccmtag 8
+ccmtag 7
+ccmiv 13 20
+ccmdec 20
+ccmtag 8
+ccmiv 13 20
+ccmenc 21
+ccmdec 21
+ccminit 16 8
+ccmiv 7 37
+ccmaad 300
+ccmenc 37 stream
+ccmtag 16
+ccmiv 7 37
+ccmaad 300
+ccmdec 37 stream
+ccmtag 16
+ccminit 4 3
+ccmiv 11 0
+ccmenc 0
+ccmtag 4
+ccmiv 10 5
+ccminit 3 0
+ccmiv 14 4
+ccmenc 4
+ocbiv 12 16
+ocbinit 0
+ocbiv 12 16
+ocbaad 32
+ocbaad 5
+ocbenc 48
+ocbcopy
+ocbenc 20
+ocbtag 16
+ocbfinish 16
+ocbiv 15 8
+ocbenc 592
+ocbtag 8
+ocbiv 1 1
+ocbtag 1
+ocbiv 0 16
+ocbiv 12 17
+ocbtag 0
+ocbtag 17
+ocbinit 1
+ocbiv 12 16
+ocbaad 37
+ocbenc 160
+ocbenc 3
+ocbtag 16
+ocbiv 12 16
+ocbdec 163
+ocbtag 16
+xts 1 15
+xts 1 16
+xts 1 17
+xts 0 17
+xts 1 33
+xts 0 64
+xts 0 70
