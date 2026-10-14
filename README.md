@@ -211,6 +211,9 @@ Building for a distribution: the directories rustyssl reports and reads from def
 OpenSSL's default build for the target (`OPENSSLDIR` `/usr/local/ssl` and so on, from
 `abi/openssl-3.5/config/<target>/build.toml`). Override them at build time with the
 environment variables `RUSTYSSL_OPENSSLDIR`, `RUSTYSSL_ENGINESDIR`, and `RUSTYSSL_MODULESDIR`.
+- **Miri:** `cargo install --locked cargo-nextest@0.9.148` (the version CI pins), which runs
+  each test in its own Miri process, in parallel; plain `cargo miri test` runs them all on one
+  core, since Miri interprets one thread at a time.
 - **The supply-chain and fuzzing gates:** `cargo install --locked cargo-deny@0.20.2
   cargo-vet@0.10.2 cargo-fuzz`. Use these exact versions, the ones CI pins: another
   cargo-vet formats `supply-chain/` differently, and CI then fails.
@@ -242,7 +245,8 @@ cargo xtask test-c                           # tests/c/*.c, each run on the refe
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-openssl-suite               # upstream OpenSSL test suite against our libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
-cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri
+cargo +nightly miri nextest run -p rustyssl-capi  # the unsafe FFI layer under Miri, a process per test
+cargo +nightly miri test -p rustyssl-capi --doc   # and its doctests
 cargo +nightly fuzz run <target>             # fuzzing (fuzz/ is its own workspace; `cargo +nightly fuzz list`)
 ```
 
