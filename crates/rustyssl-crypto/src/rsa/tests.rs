@@ -79,13 +79,16 @@ fn key() -> Key {
     k
 }
 
-/// A deterministic "random" source.
+/// A deterministic "random" source (xorshift64: a long period, so OpenSSL's rejection
+/// sampling of blinding values ends).
 fn rng() -> impl FnMut(&mut [u8]) -> bool {
-    let mut x: u8 = 7;
+    let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
     move |buf: &mut [u8]| {
         for b in buf.iter_mut() {
-            x = x.wrapping_mul(31).wrapping_add(11);
-            *b = x;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            *b = (x >> 56) as u8;
         }
         true
     }
@@ -419,4 +422,36 @@ fn rsa_sign_and_verify() {
         rc(&sign(&k, rustyssl_abi::NID_undef, &h, &mut sig, &mut rng()).1),
         [(Reason::UnknownAlgorithmType, 0)]
     );
+}
+
+#[test]
+fn blinding_is_kept_and_made_again_at_the_33rd_use() {
+    let k = key();
+    let copy = k.clone();
+    let mut sig = vec![0; 256];
+    let digest = [0x5au8; 32];
+    // Octets drawn by one private operation (raw signing draws nothing else).
+    let drawn = |k: &Key| {
+        let mut count = 0usize;
+        let mut inner = rng();
+        let mut counting = |buf: &mut [u8]| {
+            count += buf.len();
+            inner(buf)
+        };
+        let (r, _) = k.private_encrypt(&digest, &mut sig.clone(), Padding::Pkcs1, &mut counting);
+        assert_eq!(r, Ok(256));
+        count
+    };
+    assert!(drawn(&k) > 0, "the first use makes the blinding");
+    for _ in 1..32 {
+        assert_eq!(drawn(&copy), 0, "the next 31 square it, through any copy");
+    }
+    assert!(drawn(&k) > 0, "the 33rd makes it again");
+    assert_eq!(drawn(&k), 0);
+    let mut fresh = Key::new();
+    fresh.n = k.n.clone();
+    fresh.e = k.e.clone();
+    fresh.d = k.d.clone();
+    assert!(drawn(&fresh) > 0, "another key has its own");
+    sig.clear();
 }
