@@ -183,6 +183,42 @@ impl Key {
         Err(())
     }
 
+    /// `RSA_blinding_on`'s `RSA_setup_blinding`: a fresh blinding now, drawn as the first
+    /// private operation would draw it; false if it can't be made (no public exponent, or
+    /// no invertible number).
+    pub fn new_blinding(&self, rng: &mut Random<'_>) -> bool {
+        let (Some(n), Some(e)) = (self.n.as_ref(), self.blinding_exponent()) else {
+            return false;
+        };
+        let Ok((a, ai)) = Self::make_blinding(n, &e, rng) else {
+            return false;
+        };
+        *self
+            .blinding_state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(Blind { a, ai, counter: -1 });
+        true
+    }
+
+    /// Whether the key has made its blinding (`rsa->blinding != NULL`).
+    pub fn has_blinding(&self) -> bool {
+        self.blinding_state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
+    }
+
+    /// `RSA_blinding_off`: the blinding is dropped (made again if blinding is turned on).
+    pub fn drop_blinding(&self) {
+        *self
+            .blinding_state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = None;
+    }
+
     /// `rsa_get_blinding` and `BN_BLINDING_convert_ex`'s update: the blinding for this
     /// operation, made at the first, squared for the next 31, made again at the 33rd.
     fn next_blinding(
@@ -245,6 +281,17 @@ impl Key {
         let phi = bn::mul(&p1, &q1).ok()?;
         let dr = BigNum::from_limbs(false, reduce(d.limbs(), phi.limbs())).ok()?;
         bn::ct::inverse(&dr, &phi)
+    }
+
+    /// The method's `rsa_mod_exp` (`rsa_ossl_mod_exp`): `i^d mod n`, through the CRT when the
+    /// key has its numbers, else with `d`; `None` when it can't be computed.
+    pub fn mod_exp(&self, i: &BigNum) -> Option<BigNum> {
+        if self.uses_crt() {
+            return self.crt(i);
+        }
+        let (n, d) = (self.n.as_ref()?, self.d.as_ref()?);
+        let i = BigNum::from_limbs(false, reduce(i.limbs(), n.limbs())).ok()?;
+        Some(Montgomery::new(n).ok()?.exp_consttime(&i, d.limbs()))
     }
 
     /// `rsa_ossl_mod_exp`: `i^d mod n` through the CRT, checked with the public exponent; `None`

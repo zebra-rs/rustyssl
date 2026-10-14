@@ -7511,6 +7511,386 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::RIPEMD160_Update;
+const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_PKCS1_OpenSSL;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_bits;
+const _: unsafe extern "C" fn(*mut RSA) = crate::rsa_lib::RSA_blinding_off;
+const _: unsafe extern "C" fn(*mut RSA, *mut BN_CTX) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_blinding_on;
+const _: unsafe extern "C" fn(*mut RSA, core::ffi::c_int) = crate::rsa_lib::RSA_clear_flags;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_flags;
+const _: unsafe extern "C" fn(*mut RSA) = crate::rsa_lib::RSA_free;
+const _: unsafe extern "C" fn(
+    *const RSA,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+) = crate::rsa_lib::RSA_get0_crt_params;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_d;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_dmp1;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_dmq1;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_e;
+const _: unsafe extern "C" fn(*const RSA) -> *mut ENGINE = crate::rsa_lib::RSA_get0_engine;
+const _: unsafe extern "C" fn(*const RSA, *mut *const BIGNUM, *mut *const BIGNUM) =
+    crate::rsa_lib::RSA_get0_factors;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_iqmp;
+const _: unsafe extern "C" fn(
+    *const RSA,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+) = crate::rsa_lib::RSA_get0_key;
+const _: unsafe extern "C" fn(
+    *const RSA,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_get0_multi_prime_crt_params;
+const _: unsafe extern "C" fn(*const RSA, *mut *const BIGNUM) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_get0_multi_prime_factors;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_n;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_p;
+const _: unsafe extern "C" fn(*const RSA) -> *const RSA_PSS_PARAMS =
+    crate::rsa_lib::RSA_get0_pss_params;
+const _: unsafe extern "C" fn(*const RSA) -> *const BIGNUM = crate::rsa_lib::RSA_get0_q;
+const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_get_default_method;
+const _: unsafe extern "C" fn(*const RSA, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::rsa_lib::RSA_get_ex_data;
+const _: unsafe extern "C" fn(*const RSA) -> *const RSA_METHOD = crate::rsa_lib::RSA_get_method;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_get_multi_prime_extra_count;
+const _: unsafe extern "C" fn(*mut RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_get_version;
+const _: unsafe extern "C" fn(*const RSA_METHOD) -> *mut RSA_METHOD = crate::rsa_meth::RSA_meth_dup;
+const _: unsafe extern "C" fn(*mut RSA_METHOD) = crate::rsa_meth::RSA_meth_free;
+const _: unsafe extern "C" fn(*const RSA_METHOD) -> *mut core::ffi::c_void =
+    crate::rsa_meth::RSA_meth_get0_app_data;
+const _: unsafe extern "C" fn(*const RSA_METHOD) -> *const core::ffi::c_char =
+    crate::rsa_meth::RSA_meth_get0_name;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: *mut BIGNUM,
+        arg1: *const BIGNUM,
+        arg2: *const BIGNUM,
+        arg3: *const BIGNUM,
+        arg4: *mut BN_CTX,
+        arg5: *mut BN_MONT_CTX,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(meth: *mut RSA) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_finish;
+const _: unsafe extern "C" fn(*const RSA_METHOD) -> core::ffi::c_int =
+    crate::rsa_meth::RSA_meth_get_flags;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(meth: *mut RSA) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_init;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: *mut RSA,
+        arg1: core::ffi::c_int,
+        arg2: *mut BIGNUM,
+        arg3: *mut BN_GENCB,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_keygen;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: *mut BIGNUM,
+        arg1: *const BIGNUM,
+        arg2: *mut RSA,
+        arg3: *mut BN_CTX,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_mod_exp;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: *mut RSA,
+        arg1: core::ffi::c_int,
+        arg2: core::ffi::c_int,
+        arg3: *mut BIGNUM,
+        arg4: *mut BN_GENCB,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_multi_prime_keygen;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: *mut core::ffi::c_uchar,
+        arg3: *mut RSA,
+        arg4: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_priv_dec;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: *mut core::ffi::c_uchar,
+        arg3: *mut RSA,
+        arg4: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_priv_enc;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: *mut core::ffi::c_uchar,
+        arg3: *mut RSA,
+        arg4: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_pub_dec;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: *mut core::ffi::c_uchar,
+        arg3: *mut RSA,
+        arg4: core::ffi::c_int,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_pub_enc;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: core::ffi::c_uint,
+        arg3: *mut core::ffi::c_uchar,
+        arg4: *mut core::ffi::c_uint,
+        arg5: *const RSA,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_sign;
+const _: unsafe extern "C" fn(
+    *const RSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        meth: core::ffi::c_int,
+        arg1: *const core::ffi::c_uchar,
+        arg2: core::ffi::c_uint,
+        arg3: *const core::ffi::c_uchar,
+        arg4: core::ffi::c_uint,
+        arg5: *const RSA,
+    ) -> core::ffi::c_int,
+> = crate::rsa_meth::RSA_meth_get_verify;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> *mut RSA_METHOD =
+    crate::rsa_meth::RSA_meth_new;
+const _: unsafe extern "C" fn(*mut RSA_METHOD, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::rsa_meth::RSA_meth_set0_app_data;
+const _: unsafe extern "C" fn(*mut RSA_METHOD, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::rsa_meth::RSA_meth_set1_name;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            r: *mut BIGNUM,
+            a: *const BIGNUM,
+            p: *const BIGNUM,
+            m: *const BIGNUM,
+            ctx: *mut BN_CTX,
+            m_ctx: *mut BN_MONT_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(rsa: *mut RSA) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_finish;
+const _: unsafe extern "C" fn(*mut RSA_METHOD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::rsa_meth::RSA_meth_set_flags;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(rsa: *mut RSA) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_init;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            rsa: *mut RSA,
+            bits: core::ffi::c_int,
+            e: *mut BIGNUM,
+            cb: *mut BN_GENCB,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_keygen;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            r0: *mut BIGNUM,
+            i: *const BIGNUM,
+            rsa: *mut RSA,
+            ctx: *mut BN_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_mod_exp;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            rsa: *mut RSA,
+            bits: core::ffi::c_int,
+            primes: core::ffi::c_int,
+            e: *mut BIGNUM,
+            cb: *mut BN_GENCB,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_multi_prime_keygen;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            flen: core::ffi::c_int,
+            from: *const core::ffi::c_uchar,
+            to: *mut core::ffi::c_uchar,
+            rsa: *mut RSA,
+            padding: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_priv_dec;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            flen: core::ffi::c_int,
+            from: *const core::ffi::c_uchar,
+            to: *mut core::ffi::c_uchar,
+            rsa: *mut RSA,
+            padding: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_priv_enc;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            flen: core::ffi::c_int,
+            from: *const core::ffi::c_uchar,
+            to: *mut core::ffi::c_uchar,
+            rsa: *mut RSA,
+            padding: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_pub_dec;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            flen: core::ffi::c_int,
+            from: *const core::ffi::c_uchar,
+            to: *mut core::ffi::c_uchar,
+            rsa: *mut RSA,
+            padding: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_pub_enc;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            type_: core::ffi::c_int,
+            m: *const core::ffi::c_uchar,
+            m_length: core::ffi::c_uint,
+            sigret: *mut core::ffi::c_uchar,
+            siglen: *mut core::ffi::c_uint,
+            rsa: *const RSA,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_sign;
+const _: unsafe extern "C" fn(
+    *mut RSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            dtype: core::ffi::c_int,
+            m: *const core::ffi::c_uchar,
+            m_length: core::ffi::c_uint,
+            sigbuf: *const core::ffi::c_uchar,
+            siglen: core::ffi::c_uint,
+            rsa: *const RSA,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::rsa_meth::RSA_meth_set_verify;
+const _: unsafe extern "C" fn() -> *mut RSA = crate::rsa_lib::RSA_new;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut RSA = crate::rsa_lib::RSA_new_method;
+const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_null_method;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_pkey_ctx_ctrl;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut RSA,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_private_decrypt;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut RSA,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_private_encrypt;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut RSA,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_public_decrypt;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut RSA,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_public_encrypt;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_security_bits;
+const _: unsafe extern "C" fn(*mut RSA, *mut BIGNUM, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_set0_crt_params;
+const _: unsafe extern "C" fn(*mut RSA, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_set0_factors;
+const _: unsafe extern "C" fn(*mut RSA, *mut BIGNUM, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_set0_key;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_set0_multi_prime_params;
+const _: unsafe extern "C" fn(*const RSA_METHOD) = crate::rsa_meth::RSA_set_default_method;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::rsa_lib::RSA_set_ex_data;
+const _: unsafe extern "C" fn(*mut RSA, core::ffi::c_int) = crate::rsa_lib::RSA_set_flags;
+const _: unsafe extern "C" fn(*mut RSA, *const RSA_METHOD) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_set_method;
+const _: unsafe extern "C" fn(*mut RSA, *mut BN_CTX) -> *mut BN_BLINDING =
+    crate::rsa_lib::RSA_setup_blinding;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_size;
+const _: unsafe extern "C" fn(*const RSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::rsa_lib::RSA_test_flags;
+const _: unsafe extern "C" fn(*mut RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_up_ref;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,

@@ -4,10 +4,17 @@
 //! `rustyssl_crypto::rsa`'s; this module gives them OpenSSL's digests (fetched with a library
 //! context and properties), random octets, and error queue.
 
+use core::cell::UnsafeCell;
 use core::ffi::{CStr, c_char, c_int, c_uint};
 use core::ptr;
+use core::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use rustyssl_abi::{
+    BIGNUM, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_RSA, ERR_R_INIT_FAIL, RSA_FLAG_NO_BLINDING,
+    RSA_FLAG_NON_FIPS_ALLOW, RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA, RSA_FLAG_TYPE_RSASSAPSS,
+    RSA_METHOD,
+};
 use rustyssl_abi::{
     ERR_LIB_RSA, ERR_R_BN_LIB, ERR_R_FETCH_FAILED, ERR_R_INTERNAL_ERROR, EVP_MD, EVP_MD_CTX,
     OSSL_LIB_CTX, RSA, RSA_R_BAD_E_VALUE, RSA_R_BAD_FIXED_HEADER_DECRYPT, RSA_R_BAD_PAD_BYTE_COUNT,
@@ -23,7 +30,11 @@ use rustyssl_abi::{
     RSA_R_THE_ASN1_OBJECT_IDENTIFIER_IS_NOT_KNOWN_FOR_THIS_MD, RSA_R_UNKNOWN_ALGORITHM_TYPE,
     RSA_R_UNKNOWN_PADDING_TYPE, RSA_R_WRONG_SIGNATURE_LENGTH,
 };
+use rustyssl_crypto::bn::BigNum;
 use rustyssl_crypto::rsa::{Entry, Hash, Key, Reason};
+
+use crate::bn::{BN_clear_free, value};
+use crate::ex_data::{CRYPTO_free_ex_data, CRYPTO_new_ex_data};
 
 use crate::err;
 use crate::evp::digest::{
@@ -69,25 +80,204 @@ pub(crate) struct RsaState {
     pub(crate) pss: Pss30,
 }
 
+/// The `BIGNUM`s the application has seen (`RSA_get0_*`) or given (`RSA_set0_*`): from then
+/// on they hold the key's numbers, as an OpenSSL `RSA`'s own `BIGNUM`s do, so a `get0`
+/// pointer stays valid and reads the key, and a number written through it is the key's.
+/// Replaced ones are kept until the key is freed, so no `get0` pointer dangles.
+#[derive(Default)]
+pub(crate) struct Numbers {
+    pub(crate) n: Ptr<BIGNUM>,
+    pub(crate) e: Ptr<BIGNUM>,
+    pub(crate) d: Ptr<BIGNUM>,
+    pub(crate) p: Ptr<BIGNUM>,
+    pub(crate) q: Ptr<BIGNUM>,
+    pub(crate) dmp1: Ptr<BIGNUM>,
+    pub(crate) dmq1: Ptr<BIGNUM>,
+    pub(crate) iqmp: Ptr<BIGNUM>,
+    /// Each extra prime's `r`, `d`, and `t`.
+    pub(crate) extra: Vec<[Ptr<BIGNUM>; 3]>,
+    retired: Vec<Ptr<BIGNUM>>,
+}
+
+/// One of an RSA key's numbers.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Field {
+    N,
+    E,
+    D,
+    P,
+    Q,
+    Dmp1,
+    Dmq1,
+    Iqmp,
+    /// An extra prime's `r` (0), `d` (1), or `t` (2).
+    Extra(usize, usize),
+}
+
+impl Field {
+    /// Whether OpenSSL keeps the number with `BN_FLG_CONSTTIME`: every private one.
+    pub(crate) fn secret(self) -> bool {
+        !matches!(self, Field::N | Field::E)
+    }
+}
+
+/// The key's own number `f`.
+pub(crate) fn key_field(key: &mut Key, f: Field) -> Option<&mut Option<BigNum>> {
+    Some(match f {
+        Field::N => &mut key.n,
+        Field::E => &mut key.e,
+        Field::D => &mut key.d,
+        Field::P => &mut key.p,
+        Field::Q => &mut key.q,
+        Field::Dmp1 => &mut key.dmp1,
+        Field::Dmq1 => &mut key.dmq1,
+        Field::Iqmp => &mut key.iqmp,
+        Field::Extra(..) => return None,
+    })
+}
+
+impl Numbers {
+    /// The handle slot of `f`, if it has one.
+    pub(crate) fn slot(&mut self, f: Field) -> Option<&mut Ptr<BIGNUM>> {
+        Some(match f {
+            Field::N => &mut self.n,
+            Field::E => &mut self.e,
+            Field::D => &mut self.d,
+            Field::P => &mut self.p,
+            Field::Q => &mut self.q,
+            Field::Dmp1 => &mut self.dmp1,
+            Field::Dmq1 => &mut self.dmq1,
+            Field::Iqmp => &mut self.iqmp,
+            Field::Extra(i, j) => self.extra.get_mut(i)?.get_mut(j)?,
+        })
+    }
+
+    /// Keeps `old` (if any) until the key is freed.
+    pub(crate) fn retire(&mut self, old: Ptr<BIGNUM>) {
+        if !old.0.is_null() {
+            self.retired.push(old);
+        }
+    }
+
+    /// Every handle, for freeing.
+    fn all(&mut self) -> Vec<Ptr<BIGNUM>> {
+        let mut v: Vec<Ptr<BIGNUM>> = core::mem::take(&mut self.retired);
+        v.extend([
+            self.n, self.e, self.d, self.p, self.q, self.dmp1, self.dmq1, self.iqmp,
+        ]);
+        for x in self.extra.drain(..) {
+            v.extend(x);
+        }
+        v.retain(|p| !p.0.is_null());
+        v
+    }
+}
+
+/// The parts of an `RSA` the legacy functions see: its method, flags (`RSA_FLAG_*`, the type
+/// bits aside, which the state's kind holds), and the numbers' handles.
+pub(crate) struct Legacy {
+    pub(crate) meth: Ptr<RSA_METHOD>,
+    pub(crate) flags: c_int,
+    pub(crate) numbers: Numbers,
+}
+
+/// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
+struct ExData(UnsafeCell<CRYPTO_EX_DATA>);
+
+// SAFETY: the ex_data functions are the only users, and OpenSSL leaves serializing them to the
+// application.
+unsafe impl Send for ExData {}
+// SAFETY: as above.
+unsafe impl Sync for ExData {}
+
 /// An RSA key (`RSA`), shared by reference.
 pub(crate) struct Rsa {
     pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    /// `*_up_ref` and `RSA_free`'s count: the method's `finish` and the ex_data's free run
+    /// when it reaches zero, with the handle still live.
+    references: AtomicI32,
     state: Mutex<RsaState>,
+    legacy: Mutex<Legacy>,
+    ex_data: ExData,
 }
 
 handle_type!(RSA => Rsa);
 
+impl Drop for Rsa {
+    fn drop(&mut self) {
+        let numbers = self
+            .legacy
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner)
+            .numbers
+            .all();
+        for b in numbers {
+            // SAFETY: the key's own numbers, freed once.
+            unsafe { BN_clear_free(b.0) };
+        }
+    }
+}
+
+/// `RSA_FLAG_TYPE_*`'s bits for a kind.
+fn kind_flags(kind: Kind) -> c_int {
+    match kind {
+        Kind::Rsa => RSA_FLAG_TYPE_RSA,
+        Kind::RsaPss => RSA_FLAG_TYPE_RSASSAPSS,
+    }
+}
+
 impl Rsa {
-    /// `ossl_rsa_new_with_ctx`: an empty key of `kind` in `libctx`.
+    /// `rsa_new_intern`: an empty key of `kind` in `libctx` with the default method (whose
+    /// `init` it runs), or NULL with the error raised.
     pub(crate) fn new_handle_in(libctx: *mut OSSL_LIB_CTX, kind: Kind) -> *mut RSA {
-        RSA::new_handle(Rsa {
+        let meth = crate::rsa_meth::default_method();
+        // SAFETY: the default method is live (built in, or the application's).
+        let mflags = unsafe { crate::rsa_meth::flags(meth) };
+        let h = RSA::new_handle(Rsa {
             libctx: Ptr(libctx),
+            references: AtomicI32::new(1),
             state: Mutex::new(RsaState {
                 key: Key::new(),
                 kind,
                 pss: Pss30::default(),
             }),
-        })
+            legacy: Mutex::new(Legacy {
+                meth: Ptr(meth.cast_mut()),
+                flags: mflags & !RSA_FLAG_NON_FIPS_ALLOW,
+                numbers: Numbers::default(),
+            }),
+            ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
+                ctx: ptr::null_mut(),
+                sk: ptr::null_mut(),
+            })),
+        });
+        // SAFETY: just made.
+        let Some(r) = (unsafe { rsa(h) }) else {
+            return ptr::null_mut();
+        };
+        r.sync_flags();
+        // SAFETY: the key's own ex_data.
+        if unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_RSA, h.cast(), r.ex_data()) } == 0 {
+            // SAFETY: the only reference.
+            unsafe { free(h) };
+            return ptr::null_mut();
+        }
+        // SAFETY: the method is live; no lock is held while it runs.
+        if let Some(init) = unsafe { crate::rsa_meth::init_fn(meth) }
+            // SAFETY: the method's function takes the key.
+            && unsafe { init(h) } == 0
+        {
+            err::raise(ERR_LIB_RSA, ERR_R_INIT_FAIL, "rsa_new_intern");
+            // SAFETY: as above.
+            unsafe { free(h) };
+            return ptr::null_mut();
+        }
+        h
+    }
+
+    /// The key's application data.
+    pub(crate) fn ex_data(&self) -> *mut CRYPTO_EX_DATA {
+        self.ex_data.0.get()
     }
 
     /// The key's state, locked.
@@ -95,9 +285,78 @@ impl Rsa {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// A copy of the key's state, so an operation runs without holding the lock.
+    /// The legacy parts, locked (after the state, when both are).
+    pub(crate) fn legacy(&self) -> MutexGuard<'_, Legacy> {
+        self.legacy.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// A copy of the key's state, so an operation runs without holding the lock; the
+    /// numbers the application holds as `BIGNUM`s are read from them.
     pub(crate) fn snapshot(&self) -> RsaState {
-        self.lock().clone()
+        let mut st = self.lock().clone();
+        let mut lg = self.legacy();
+        read_numbers(&mut lg.numbers, &mut st.key);
+        st
+    }
+
+    /// The flags (`RSA_flags`), the type bits from the kind.
+    pub(crate) fn flags(&self) -> c_int {
+        let kind = self.lock().kind;
+        (self.legacy().flags & !RSA_FLAG_TYPE_MASK) | kind_flags(kind)
+    }
+
+    /// Sets the flags, the kind and whether to blind following them.
+    pub(crate) fn set_flags_to(&self, flags: c_int) {
+        let mut st = self.lock();
+        st.kind = if flags & RSA_FLAG_TYPE_MASK == RSA_FLAG_TYPE_RSASSAPSS {
+            Kind::RsaPss
+        } else {
+            Kind::Rsa
+        };
+        st.key.blinding = flags & RSA_FLAG_NO_BLINDING == 0;
+        self.legacy().flags = flags & !RSA_FLAG_TYPE_MASK;
+    }
+
+    /// Makes the state follow the flags.
+    fn sync_flags(&self) {
+        let f = self.flags();
+        self.set_flags_to(f);
+    }
+
+    /// The method.
+    pub(crate) fn meth(&self) -> *const RSA_METHOD {
+        self.legacy().meth.0
+    }
+}
+
+/// Reads the numbers the application holds into `key`.
+pub(crate) fn read_numbers(numbers: &mut Numbers, key: &mut Key) {
+    let read = |h: Ptr<BIGNUM>| {
+        // SAFETY: the key's own number, live until the key is freed.
+        (!h.0.is_null()).then(|| unsafe { value(h.0) }).flatten()
+    };
+    for f in [
+        Field::N,
+        Field::E,
+        Field::D,
+        Field::P,
+        Field::Q,
+        Field::Dmp1,
+        Field::Dmq1,
+        Field::Iqmp,
+    ] {
+        if let (Some(slot), Some(dst)) = (numbers.slot(f), key_field(key, f))
+            && !slot.0.is_null()
+        {
+            *dst = read(*slot);
+        }
+    }
+    for (x, h) in key.extra.iter_mut().zip(&numbers.extra) {
+        for (dst, h) in [&mut x.r, &mut x.d, &mut x.t].into_iter().zip(h) {
+            if let Some(v) = read(*h) {
+                *dst = v;
+            }
+        }
     }
 }
 
@@ -108,6 +367,49 @@ impl Rsa {
 pub(crate) unsafe fn rsa<'a>(rsa: *const RSA) -> Option<&'a Rsa> {
     // SAFETY: the caller's guarantee.
     unsafe { RSA::get(rsa) }
+}
+
+/// `RSA_free`: drops a reference; at the last, runs the method's `finish` and frees the
+/// ex_data, then the key. NULL does nothing.
+///
+/// # Safety
+/// `r` is NULL or a live key whose reference the caller gives up.
+pub(crate) unsafe fn free(r: *mut RSA) {
+    // SAFETY: the caller's guarantee.
+    let Some(held) = (unsafe { RSA::hold(r) }) else {
+        return;
+    };
+    let left = held
+        .references
+        .fetch_sub(1, Ordering::AcqRel)
+        .saturating_sub(1);
+    if left != 0 {
+        return;
+    }
+    let meth = held.meth();
+    // SAFETY: the key's method, live; no lock is held while it runs.
+    if let Some(finish) = unsafe { crate::rsa_meth::finish_fn(meth) } {
+        // SAFETY: the method's function takes the key.
+        unsafe { finish(r) };
+    }
+    // SAFETY: the key's own ex_data; its last reference.
+    unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_RSA, r.cast(), held.ex_data()) };
+    // SAFETY: the last reference; the hold keeps the key until this returns.
+    unsafe { RSA::free(r) };
+}
+
+/// `RSA_up_ref`: adds a reference; false for NULL or another type.
+///
+/// # Safety
+/// `r` is NULL or a live key.
+pub(crate) unsafe fn up_ref(r: *const RSA) -> bool {
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { rsa(r) }) else {
+        return false;
+    };
+    k.references.fetch_add(1, Ordering::AcqRel);
+    // SAFETY: as above: a live key.
+    unsafe { RSA::up_ref(r) }
 }
 
 /// The `RSA_R_*` (or `ERR_R_*`) code of a reason.
