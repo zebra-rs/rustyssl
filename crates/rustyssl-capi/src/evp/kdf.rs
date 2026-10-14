@@ -338,12 +338,11 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { method(kdf) }) else { return 0 };
-        let names = fetch::names_of(m.prov.0, m.name_id);
-        for n in &names {
-            let Ok(c) = CString::new(n.clone()) else { continue };
+        let names = fetch::c_names_of(m.prov.0, m.name_id);
+        for &n in &names {
             if let Some(f) = fn_ {
-                // SAFETY: the caller's callback with a string and its data.
-                unsafe { f(c.as_ptr(), data) };
+                // SAFETY: the caller's callback with a string the context keeps, and its data.
+                unsafe { f(n, data) };
             }
         }
         c_int::from(!names.is_empty())

@@ -10,8 +10,8 @@
 //!   `OPENSSL_init_crypto` fails.
 //!
 //! Flags whose subsystem rustyssl doesn't have yet abort, as an unimplemented export does
-//! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS` (step 3.4), `OPENSSL_INIT_ASYNC`,
-//! and the `OPENSSL_INIT_ENGINE_*` flags. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
+//! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS` (step 3.4) and `OPENSSL_INIT_ASYNC`.
+//! The `OPENSSL_INIT_ENGINE_*` flags load no engines: rustyssl has none. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
 //! file into the default library context and runs its modules ([`crate::conf::modules`]).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
@@ -22,13 +22,10 @@ use std::sync::{Mutex, OnceLock};
 use rustyssl_abi::{
     CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE, CONF_MFLAGS_IGNORE_RETURN_CODES,
     ERR_LIB_CRYPTO, ERR_R_INIT_FAIL, OPENSSL_INIT_ADD_ALL_CIPHERS, OPENSSL_INIT_ADD_ALL_DIGESTS,
-    OPENSSL_INIT_ASYNC, OPENSSL_INIT_ENGINE_AFALG, OPENSSL_INIT_ENGINE_ALL_BUILTIN,
-    OPENSSL_INIT_ENGINE_CAPI, OPENSSL_INIT_ENGINE_CRYPTODEV, OPENSSL_INIT_ENGINE_DYNAMIC,
-    OPENSSL_INIT_ENGINE_OPENSSL, OPENSSL_INIT_ENGINE_PADLOCK, OPENSSL_INIT_ENGINE_RDRAND,
-    OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_LOAD_SSL_STRINGS,
-    OPENSSL_INIT_NO_ADD_ALL_CIPHERS, OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT,
-    OPENSSL_INIT_NO_LOAD_CONFIG, OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS,
-    OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
+    OPENSSL_INIT_ASYNC, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS,
+    OPENSSL_INIT_LOAD_SSL_STRINGS, OPENSSL_INIT_NO_ADD_ALL_CIPHERS,
+    OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT, OPENSSL_INIT_NO_LOAD_CONFIG,
+    OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
 };
 
 use crate::err;
@@ -39,22 +36,6 @@ use crate::{mem, stub};
 /// The flags `OPENSSL_init_crypto` takes, as `u64`.
 fn flag(value: c_long) -> u64 {
     value.cast_unsigned()
-}
-
-/// Every `OPENSSL_INIT_ENGINE_*` flag.
-fn engine_flags() -> u64 {
-    [
-        OPENSSL_INIT_ENGINE_RDRAND,
-        OPENSSL_INIT_ENGINE_DYNAMIC,
-        OPENSSL_INIT_ENGINE_OPENSSL,
-        OPENSSL_INIT_ENGINE_CRYPTODEV,
-        OPENSSL_INIT_ENGINE_CAPI,
-        OPENSSL_INIT_ENGINE_PADLOCK,
-        OPENSSL_INIT_ENGINE_AFALG,
-        OPENSSL_INIT_ENGINE_ALL_BUILTIN,
-    ]
-    .into_iter()
-    .fold(0, |all, f| all | flag(f))
 }
 
 /// `OPENSSL_cleanup` has run.
@@ -224,9 +205,8 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
     if opts & flag(OPENSSL_INIT_ASYNC) != 0 {
         unavailable("OPENSSL_INIT_ASYNC");
     }
-    if opts & engine_flags() != 0 {
-        unavailable("OPENSSL_INIT_ENGINE_*");
-    }
+    // The `OPENSSL_INIT_ENGINE_*` flags load OpenSSL's built-in engines; rustyssl has none
+    // (docs/DEVIATIONS.md), so they load none. The ENGINE functions themselves still abort.
     Some(done)
 }
 

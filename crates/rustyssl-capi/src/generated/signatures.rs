@@ -3107,6 +3107,12 @@ const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPL
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
 const _: unsafe extern "C" fn() = crate::conf::builtin::ENGINE_add_conf_module;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_finish;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_free;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
+    crate::engine::ENGINE_get_cipher_engine;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
+    crate::engine::ENGINE_get_digest_engine;
 const _: unsafe extern "C" fn(core::ffi::c_int, ...) = crate::err::ERR_add_error_data;
 const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut BIO) =
     crate::err::strings::ERR_add_error_mem_bio;
@@ -7072,6 +7078,37 @@ const _: unsafe extern "C" fn(*mut OSSL_PROVIDER) -> core::ffi::c_int =
     crate::provider::OSSL_PROVIDER_unload;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER, core::ffi::c_int, *const OSSL_ALGORITHM) =
     crate::provider::OSSL_PROVIDER_unquery_operation;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) = crate::store::OSSL_STORE_LOADER_free;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const ENGINE =
+    crate::store::OSSL_STORE_LOADER_get0_engine;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const core::ffi::c_char =
+    crate::store::OSSL_STORE_LOADER_get0_scheme;
+const _: unsafe extern "C" fn(*mut ENGINE, *const core::ffi::c_char) -> *mut OSSL_STORE_LOADER =
+    crate::store::OSSL_STORE_LOADER_new;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_attach_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_attach;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_close_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_close;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_ctrl_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_ctrl;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_eof_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_eof;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_error_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_error;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_expect_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_expect;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_find_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_find;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_load_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_load;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_open;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_ex_fn) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_LOADER_set_open_ex;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) -> core::ffi::c_int =
+    crate::store::OSSL_STORE_register_loader;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut OSSL_STORE_LOADER =
+    crate::store::OSSL_STORE_unregister_loader;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
@@ -7495,6 +7532,106 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::lowlevel::hash::SHA512_Update;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
+const _: unsafe extern "C" fn() -> *mut UI_METHOD = crate::ui::UI_OpenSSL;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut UI_METHOD =
+    crate::ui::UI_create_method;
+const _: unsafe extern "C" fn(*mut UI_METHOD) = crate::ui::UI_destroy_method;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int,
+> = crate::ui::UI_method_get_closer;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI, arg1: *mut core::ffi::c_void),
+> = crate::ui::UI_method_get_data_destructor;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI, arg1: *mut core::ffi::c_void) -> *mut core::ffi::c_void,
+> = crate::ui::UI_method_get_data_duplicator;
+const _: unsafe extern "C" fn(*const UI_METHOD, core::ffi::c_int) -> *const core::ffi::c_void =
+    crate::ui::UI_method_get_ex_data;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int,
+> = crate::ui::UI_method_get_flusher;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int,
+> = crate::ui::UI_method_get_opener;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *mut UI,
+        arg1: *const core::ffi::c_char,
+        arg2: *const core::ffi::c_char,
+    ) -> *mut core::ffi::c_char,
+> = crate::ui::UI_method_get_prompt_constructor;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI, arg1: *mut UI_STRING) -> core::ffi::c_int,
+> = crate::ui::UI_method_get_reader;
+const _: unsafe extern "C" fn(
+    *const UI_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut UI, arg1: *mut UI_STRING) -> core::ffi::c_int,
+> = crate::ui::UI_method_get_writer;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::ui::UI_method_set_closer;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ui: *mut UI,
+            ui_data: *mut core::ffi::c_void,
+        ) -> *mut core::ffi::c_void,
+    >,
+    ::core::option::Option<unsafe extern "C" fn(ui: *mut UI, ui_data: *mut core::ffi::c_void)>,
+) -> core::ffi::c_int = crate::ui::UI_method_set_data_duplicator;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ui::UI_method_set_ex_data;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::ui::UI_method_set_flusher;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::ui::UI_method_set_opener;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            ui: *mut UI,
+            phrase_desc: *const core::ffi::c_char,
+            object_name: *const core::ffi::c_char,
+        ) -> *mut core::ffi::c_char,
+    >,
+) -> core::ffi::c_int = crate::ui::UI_method_set_prompt_constructor;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ui: *mut UI, uis: *mut UI_STRING) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::ui::UI_method_set_reader;
+const _: unsafe extern "C" fn(
+    *mut UI_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(ui: *mut UI, uis: *mut UI_STRING) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::ui::UI_method_set_writer;
+const _: unsafe extern "C" fn() -> *const UI_METHOD = crate::ui::UI_null;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
@@ -7817,3 +7954,5 @@ const _: unsafe extern "C" fn(
 ) -> *mut ASN1_OCTET_STRING = crate::x509v3::s2i_ASN1_OCTET_STRING;
 const _: unsafe extern "C" fn() -> core::ffi::c_int =
     crate::err::strings::rustyssl_private_ERR_load_SSL_strings;
+const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c_int =
+    crate::ssl::rustyssl_private_OPENSSL_init_ssl;
