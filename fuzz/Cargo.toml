@@ -321,3 +321,9 @@ name = "conf"
 path = "fuzz_targets/conf.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "pkcs12_text"
+path = "fuzz_targets/pkcs12_text.rs"
+test = false
+doc = false
