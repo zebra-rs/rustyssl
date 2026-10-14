@@ -250,6 +250,7 @@ cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-apps                        # the reference's openssl tool (tests/apps/commands.txt) on both libraries; output must match
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
+cargo xtask test-differential --only evp --duration 24h  # a campaign: rounds of random EVP sessions on every core
 cargo xtask test-openssl-suite [file...]     # upstream evp_test on the data files in tests/openssl-suite/evp_test.txt, both libraries
 cargo xtask test-wycheproof [file...]        # Wycheproof's symmetric vectors (tests/wycheproof/files.txt) on both libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries

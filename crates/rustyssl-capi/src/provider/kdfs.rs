@@ -59,6 +59,7 @@ use crate::evp::cipher::{EVP_CIPHER_fetch, EVP_CIPHER_free, EVP_CIPHER_is_a};
 use crate::evp::digest::{
     EVP_MD_fetch, EVP_MD_free, EVP_MD_get_size, EVP_MD_get0_name, EVP_MD_up_ref,
 };
+use crate::evp::kdf::{EVP_KDF_fetch, EVP_KDF_free};
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_get_mac_size, EVP_MAC_CTX_get0_mac,
     EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch, EVP_MAC_final, EVP_MAC_free,
@@ -4009,6 +4010,18 @@ unsafe fn scrypt_compute(s: &Scrypt, key: *mut u8, keylen: usize) -> bool {
     if key.is_null() {
         return true;
     }
+    // The reference runs PBKDF2 as a KDF fetched with the context's query
+    // (`ossl_pkcs5_pbkdf2_hmac_ex`), twice, the second time from the fetch cache: a query that
+    // doesn't parse leaves its error here, and one that finds no PBKDF2 fails the derivation.
+    let propq = s.propq.as_ref().map_or(ptr::null(), |q| q.as_ptr());
+    // SAFETY: the context's library context; a static name; the query or NULL.
+    let pbkdf2 = unsafe { EVP_KDF_fetch(s.libctx, c"PBKDF2".as_ptr(), propq) };
+    if pbkdf2.is_null() {
+        err::raise(ERR_LIB_EVP, EVP_R_PBKDF2_ERROR, "scrypt_alg");
+        return false;
+    }
+    // SAFETY: the method just fetched.
+    unsafe { EVP_KDF_free(pbkdf2) };
     let pass = s.pass.as_ref().map(|x| &x.0[..]).unwrap_or_default();
     let salt = s.salt.as_ref().map(|x| &x.0[..]).unwrap_or_default();
     let mut out = Secret(vec![0u8; keylen]);

@@ -1101,12 +1101,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_up_ref` | libcrypto | `openssl/evp.h` | `evp_cipher_meth`, `evp_cipher_names` |
 | `EVP_Cipher` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_CipherFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CipherFinal_ex` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
+| `EVP_CipherFinal_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
 | `EVP_CipherInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CipherInit_SKEY` | libcrypto | `openssl/evp.h` | `evp_skey` |
-| `EVP_CipherInit_ex` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CipherInit_ex2` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes`, `evp_skey` |
-| `EVP_CipherUpdate` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
+| `EVP_CipherInit_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
+| `EVP_CipherInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes`, `evp_skey` |
+| `EVP_CipherUpdate` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
 | `EVP_DecodeBlock` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeFinal` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |

@@ -201,6 +201,21 @@ static void scrypt(void)
     errors();
     params[0] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_PROPERTIES, "provider=default", 0);
     check(EVP_KDF_CTX_set_params(ctx, params) == 1, "SHA-256 from the default provider");
+    /*
+     * A query that doesn't parse leaves an error where each fetch first meets it, then works as
+     * no query: fetching SHA-256 when it's set, and PBKDF2 when deriving (scrypt runs PBKDF2
+     * as a fetched KDF); a second derivation finds both fetched.
+     */
+    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_PROPERTIES, "7scrypt", 0);
+    maxmem = 1 << 20;
+    params[1] = OSSL_PARAM_construct_uint64(OSSL_KDF_PARAM_SCRYPT_MAXMEM, &maxmem);
+    params[2] = OSSL_PARAM_construct_end();
+    check(EVP_KDF_CTX_set_params(ctx, params) == 1, "a query that doesn't parse");
+    errors();
+    check(EVP_KDF_derive(ctx, out, 16, NULL) == 1, "derives with it");
+    errors();
+    check(EVP_KDF_derive(ctx, out, 16, NULL) == 1, "and again");
+    errors();
     {
         size_t size = 0;
 

@@ -147,6 +147,9 @@ struct Gcm128 {
     ek0: Zeroizing<[u8; 16]>,
     eki: Zeroizing<[u8; 16]>,
     hash: Option<Hash>,
+    /// Where the last tag left GHASH, to fold into the next block hashed: OpenSSL's GHASH
+    /// goes on from the tag it computed (a failed check leaves the context in use).
+    carry: Option<Zeroizing<[u8; 16]>>,
     /// The partial block of AAD (`ares` octets) or ciphertext (`mres`) not yet hashed.
     pend: Zeroizing<[u8; 16]>,
     ares: usize,
@@ -170,6 +173,7 @@ impl Gcm128 {
             ek0: Zeroizing::new([0; 16]),
             eki: Zeroizing::new([0; 16]),
             hash: Some(hash),
+            carry: None,
             pend: Zeroizing::new([0; 16]),
             ares: 0,
             mres: 0,
@@ -184,10 +188,31 @@ impl Gcm128 {
             .map_err(|_| Error::Internal)
     }
 
+    /// Hashes `data`, padded to whole blocks, with the carry folded into its first block.
+    fn absorb(&mut self, data: &[u8]) {
+        let Some(h) = self.hash.as_mut() else {
+            return;
+        };
+        let mut data = data;
+        if !data.is_empty()
+            && let Some(carry) = self.carry.take()
+        {
+            let (first, rest) = data.split_at(data.len().min(16));
+            let mut block = *carry;
+            for (b, x) in block.iter_mut().zip(first) {
+                *b ^= x;
+            }
+            h.0.update_padded(&block);
+            data = rest;
+        }
+        h.0.update_padded(data);
+    }
+
     /// `GCM_MUL` of the pending partial block.
     fn flush(&mut self, n: usize) {
-        if let (Some(h), Some(p)) = (self.hash.as_mut(), self.pend.get(..n)) {
-            h.0.update_padded(p);
+        let pend = Zeroizing::new(*self.pend);
+        if let Some(p) = pend.get(..n) {
+            self.absorb(p);
         }
         self.pend.fill(0);
     }
@@ -229,6 +254,7 @@ impl Gcm128 {
             self.yi = j.0.finalize(&last);
         }
         self.hash = Some(self.ghash()?);
+        self.carry = None;
         let mut ek0 = self.yi;
         key.encrypt(&mut ek0)?;
         *self.ek0 = ek0;
@@ -270,9 +296,7 @@ impl Gcm128 {
         }
         let whole = data.len() & !15;
         let (blocks, rest) = data.split_at(whole);
-        if let Some(h) = self.hash.as_mut() {
-            h.0.update_padded(blocks);
-        }
+        self.absorb(blocks);
         if let Some(p) = self.pend.get_mut(..rest.len()) {
             p.copy_from_slice(rest);
         }
@@ -329,11 +353,18 @@ impl Gcm128 {
         let (a, c) = last.split_at_mut(8);
         a.copy_from_slice(&self.alen.wrapping_shl(3).to_be_bytes());
         c.copy_from_slice(&self.mlen.wrapping_shl(3).to_be_bytes());
+        if let Some(carry) = self.carry.take() {
+            xor16(&mut last, &carry);
+        }
         let mut t = match self.hash.take() {
             Some(mut h) => h.0.finalize(&last),
             None => [0; 16],
         };
         xor16(&mut t, &self.ek0);
+        // GHASH goes on from the tag, as OpenSSL's does: data or a final after a failed check
+        // hashes on from here.
+        self.hash = self.ghash().ok();
+        self.carry = Some(Zeroizing::new(t));
         // The partial block's position stays: data after a failed check goes on with the key
         // stream, as in OpenSSL.
         t
@@ -827,6 +858,16 @@ struct Ccm128 {
 }
 
 impl Ccm128 {
+    /// A context before `CRYPTO_ccm128_init`: all zeros, as the reference allocates it, so
+    /// until a key is set its first octet says M is 2 and L is 1.
+    fn zeroed() -> Self {
+        Self {
+            nonce: Zeroizing::new([0; 16]),
+            cmac: Zeroizing::new([0; 16]),
+            blocks: 0,
+        }
+    }
+
     /// `CRYPTO_ccm128_init`: the tag and length sizes go into the first octet.
     fn new(m: usize, l: usize) -> Self {
         let lbits = u8::try_from(l.wrapping_sub(1) & 7).unwrap_or(0);
@@ -1070,7 +1111,7 @@ impl Ccm {
             iv: Zeroizing::new([0; 16]),
             buf: Zeroizing::new([0; 16]),
             key: None,
-            ccm: Ccm128::new(12, 8),
+            ccm: Ccm128::zeroed(),
         }
     }
 
