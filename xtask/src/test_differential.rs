@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(37) {
+        match random.below(38) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -185,6 +185,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             33 => lowlevel_des_session(&mut random, &mut out)?,
             34 => lowlevel_legacy_session(&mut random, &mut out)?,
             35 => lowlevel_ciphers_session(&mut random, &mut out)?,
+            36 => bio_evp_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -587,6 +588,90 @@ fn lowlevel_ciphers_session(random: &mut Random, out: &mut String) -> Result {
                     random.below(2),
                     length(random)
                 )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of the EVP filter BIOs: digests and ciphers (block, stream, and AEAD) over
+/// lengths around their blocks, written and read in pieces of every size, some ciphertexts
+/// corrupted.
+fn bio_evp_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&[
+                    "15", "16", "17", "31", "32", "33", "255", "256", "257", "1024",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(2001),
+        }
+    };
+    let piece = |random: &mut Random| -> u64 {
+        match random.below(3) {
+            0 => 1 + random.below(16),
+            1 => random
+                .pick(&["255", "256", "257", "288", "300", "4096", "4097", "4999"])
+                .parse()
+                .unwrap_or(1),
+            _ => 1 + random.below(2000),
+        }
+    };
+    for _ in 0..random.below(8) + 1 {
+        match random.below(4) {
+            0 | 1 => {
+                let digest = random.pick(&[
+                    "sha256",
+                    "sha1",
+                    "md5",
+                    "sha512",
+                    "sha3-256",
+                    "sha224",
+                    "sha512-256",
+                    "blake2b512",
+                    "sm3",
+                    "shake128",
+                ]);
+                let command = if random.below(2) == 0 {
+                    "bmd"
+                } else {
+                    "bmdread"
+                };
+                writeln!(
+                    out,
+                    "{command} {digest} {} {}",
+                    length(random),
+                    piece(random)
+                )?;
+            }
+            _ => {
+                let cipher = random.pick(&[
+                    "aes-128-cbc",
+                    "aes-256-cbc",
+                    "aes-128-ecb",
+                    "aes-256-ctr",
+                    "aes-128-cfb8",
+                    "aes-192-ofb",
+                    "des-ede3-cbc",
+                    "chacha20",
+                    "camellia-128-cbc",
+                    "aes-128-gcm",
+                    "aria-256-cbc",
+                ]);
+                if random.below(2) == 0 {
+                    writeln!(out, "benc {cipher} {} {}", length(random), piece(random))?;
+                } else {
+                    writeln!(
+                        out,
+                        "bdec {cipher} {} {} {}",
+                        length(random),
+                        piece(random),
+                        u64::from(random.below(5) == 0)
+                    )?;
+                }
             }
         }
     }

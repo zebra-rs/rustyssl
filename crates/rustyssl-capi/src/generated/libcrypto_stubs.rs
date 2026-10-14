@@ -638,21 +638,6 @@ pub extern "C" fn BIO_f_brotli() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_cipher() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_cipher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_md() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_md")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_reliable() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_reliable")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_zlib() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_zlib")
 }
@@ -690,17 +675,6 @@ pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_log")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_set_cipher(
-    _: *mut BIO,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_set_cipher")
 }
 
 #[unsafe(no_mangle)]
