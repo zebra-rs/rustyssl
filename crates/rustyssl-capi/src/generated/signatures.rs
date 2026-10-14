@@ -680,6 +680,44 @@ const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_ulong =
     crate::asn1::text::ASN1_tag2bit;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::asn1::text::ASN1_tag2str;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const BF_KEY,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::BF_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const BF_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::BF_cfb64_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uint, *const BF_KEY) =
+    crate::lowlevel::legacy::BF_decrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const BF_KEY,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::BF_ecb_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uint, *const BF_KEY) =
+    crate::lowlevel::legacy::BF_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const BF_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::legacy::BF_ofb64_encrypt;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char = crate::lowlevel::legacy::BF_options;
+const _: unsafe extern "C" fn(*mut BF_KEY, core::ffi::c_int, *const core::ffi::c_uchar) =
+    crate::lowlevel::legacy::BF_set_key;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDR =
     crate::bio::addr::BIO_ADDRINFO_address;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
@@ -2138,6 +2176,43 @@ const _: unsafe extern "C" fn() -> *mut BUF_MEM = crate::buffer::BUF_MEM_new;
 const _: unsafe extern "C" fn(core::ffi::c_ulong) -> *mut BUF_MEM = crate::buffer::BUF_MEM_new_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const core::ffi::c_uchar, usize) =
     crate::buffer::BUF_reverse;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const CAST_KEY,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::CAST_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const CAST_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::CAST_cfb64_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uint, *const CAST_KEY) =
+    crate::lowlevel::legacy::CAST_decrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const CAST_KEY,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::CAST_ecb_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uint, *const CAST_KEY) =
+    crate::lowlevel::legacy::CAST_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const CAST_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::legacy::CAST_ofb64_encrypt;
+const _: unsafe extern "C" fn(*mut CAST_KEY, core::ffi::c_int, *const core::ffi::c_uchar) =
+    crate::lowlevel::legacy::CAST_set_key;
 const _: unsafe extern "C" fn(*mut CMAC_CTX) = crate::cmac::CMAC_CTX_cleanup;
 const _: unsafe extern "C" fn(*mut CMAC_CTX, *const CMAC_CTX) -> core::ffi::c_int =
     crate::cmac::CMAC_CTX_copy;
@@ -6669,6 +6744,56 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::rand_lib::RAND_status;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
     crate::rand_file::RAND_write_file;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut RC2_KEY,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::RC2_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut RC2_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::RC2_cfb64_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_ulong, *mut RC2_KEY) =
+    crate::lowlevel::legacy::RC2_decrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut RC2_KEY,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::RC2_ecb_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_ulong, *mut RC2_KEY) =
+    crate::lowlevel::legacy::RC2_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut RC2_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::legacy::RC2_ofb64_encrypt;
+const _: unsafe extern "C" fn(
+    *mut RC2_KEY,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::legacy::RC2_set_key;
+const _: unsafe extern "C" fn(
+    *mut RC4_KEY,
+    usize,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+) = crate::lowlevel::legacy::RC4;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char = crate::lowlevel::legacy::RC4_options;
+const _: unsafe extern "C" fn(*mut RC4_KEY, core::ffi::c_int, *const core::ffi::c_uchar) =
+    crate::lowlevel::legacy::RC4_set_key;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     usize,
