@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(42) {
+        match random.below(43) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -190,6 +190,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             38 => md_meth_session(&mut random, &mut out)?,
             39 => cipher_meth_session(&mut random, &mut out)?,
             40 => conf_session(&mut random, &mut out)?,
+            41 => conf_modules_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -893,6 +894,146 @@ fn conf_session(random: &mut Random, out: &mut String) -> Result {
             "cnf {} {hex}",
             if random.below(5) == 0 { "w" } else { "d" }
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of configuration modules: an `openssl_conf` section of modules picked
+/// from the built-in ones (and unknown ones), each with a section of settings, good and bad,
+/// loaded into a new library context with random `CONF_MFLAGS_*`.
+fn conf_modules_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4) + 1 {
+        let mut text = String::new();
+        if random.below(6) == 0 {
+            writeln!(text, "config_diagnostics = {}", random.below(2))?;
+        }
+        text.push_str("openssl_conf = init\n");
+        let mut modules = String::from("[init]\n");
+        let mut sections = String::new();
+        for i in 0..random.below(4) + 1 {
+            let section = format!("s{i}");
+            match random.below(9) {
+                0 | 1 => {
+                    writeln!(modules, "providers = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    for j in 0..random.below(3) + 1 {
+                        let name = random.pick(&["default", "base", "null", "nope", "x.base"]);
+                        writeln!(sections, "{name} = {section}p{j}")?;
+                        writeln!(sections, "[{section}p{j}]")?;
+                        writeln!(
+                            sections,
+                            "activate = {}",
+                            random.pick(&["1", "0", "yes", "maybe", "TRUE", "off"])
+                        )?;
+                        if random.below(3) == 0 {
+                            writeln!(sections, "soft_load = {}", random.pick(&["1", "no"]))?;
+                        }
+                        if random.below(4) == 0 {
+                            writeln!(
+                                sections,
+                                "identity = {}",
+                                random.pick(&["base", "null", "nope"])
+                            )?;
+                        }
+                        if random.below(4) == 0 {
+                            writeln!(sections, "param = value")?;
+                        }
+                        writeln!(sections, "[{section}]")?;
+                    }
+                }
+                2 => {
+                    writeln!(modules, "alg_section = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    writeln!(
+                        sections,
+                        "{}",
+                        random.pick(&[
+                            "default_properties = ?provider=base",
+                            "default_properties = provider=default",
+                            "default_properties = ?",
+                            "default_properties = -fips",
+                            "fips_mode = yes",
+                            "fips_mode = n",
+                            "fips_mode = maybe",
+                            "foo = bar",
+                        ])
+                    )?;
+                }
+                3 => {
+                    writeln!(modules, "ssl_conf = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    if random.below(4) != 0 {
+                        writeln!(sections, "sys = {section}c")?;
+                        writeln!(sections, "[{section}c]")?;
+                        if random.below(4) != 0 {
+                            writeln!(sections, "CipherString = DEFAULT\n.MinProtocol = TLSv1.2")?;
+                        }
+                    }
+                }
+                4 => {
+                    writeln!(modules, "random = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    writeln!(
+                        sections,
+                        "{}",
+                        random.pick(&[
+                            "random = CTR-DRBG",
+                            "cipher = AES-128-CTR",
+                            "digest = SHA256",
+                            "seed = SEED-SRC",
+                            "SEED_PROPERTIES = x",
+                            "random_provider = nosuch",
+                            "foo = bar",
+                        ])
+                    )?;
+                }
+                5 => {
+                    writeln!(modules, "stbl_section = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    writeln!(
+                        sections,
+                        "{} = {}",
+                        random.pick(&["commonName", "CN", "nosuchobject"]),
+                        random.pick(&[
+                            "min:1, max:64",
+                            "mask:UTF8|PRINTABLE",
+                            "flags:nomask",
+                            "flags:none, min:0x2",
+                            "max: 8 ",
+                            "size:1",
+                            "mask:foo",
+                        ])
+                    )?;
+                }
+                6 => {
+                    writeln!(modules, "engines = {section}")?;
+                    writeln!(sections, "[{section}]")?;
+                    writeln!(sections, "e = {section}e")?;
+                    writeln!(sections, "[{section}e]")?;
+                    writeln!(
+                        sections,
+                        "{}",
+                        random.pick(&[
+                            "engine_id = foo",
+                            "engine_id = foo\ninit = 0",
+                            "soft_load = 1\nx = y",
+                            "x = y",
+                        ])
+                    )?;
+                }
+                7 => writeln!(
+                    modules,
+                    "{} = {section}",
+                    random.pick(&["nosuch", "providers", "random"])
+                )?,
+                _ => writeln!(modules, "alg_section = nosuch")?,
+            }
+        }
+        text.push_str(&modules);
+        text.push_str(&sections);
+        let hex: String = text.bytes().take(500).map(|b| format!("{b:02x}")).collect();
+        let flags = random.pick(&["0", "1", "4", "8", "9", "c", "2", "20"]);
+        writeln!(out, "cmod {flags} {hex}")?;
     }
     Ok(())
 }
@@ -4452,9 +4593,9 @@ mod tests {
 
     #[test]
     fn a_seed_replays_the_same_sessions() {
-        let first = random_sessions(42, 300).unwrap();
-        assert_eq!(first, random_sessions(42, 300).unwrap());
-        assert_ne!(first, random_sessions(43, 300).unwrap());
+        let first = random_sessions(42, 500).unwrap();
+        assert_eq!(first, random_sessions(42, 500).unwrap());
+        assert_ne!(first, random_sessions(43, 500).unwrap());
         // Every kind of session.
         for start in [
             "\nnew ",

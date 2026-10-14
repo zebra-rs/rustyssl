@@ -7493,6 +7493,73 @@ static int conf_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ *   cmod FLAGS HEX                  the configuration of the octets HEX (at most 500) loaded into
+ *                                   a new library context and its modules run with the
+ *                                   CONF_MFLAGS_* FLAGS (hex): the result, the providers, the
+ *                                   default properties, and the errors (not the DSO library's
+ *                                   data, which names the platform's loader messages); the
+ *                                   thread's error state is freed afterwards, likewise
+ */
+static int conf_modules_command(const char *command, const char *line)
+{
+    char hex[1001] = "";
+    unsigned long flags = 0, code;
+    unsigned char text[501];
+    size_t n = 0, i, h;
+    OSSL_LIB_CTX *ctx;
+    CONF *conf;
+    BIO *b;
+    char *props;
+    const char *data;
+    int r, eflags;
+
+    if (strcmp(command, "cmod") != 0)
+        return 0;
+    sscanf(line, "%*s %lx %1000s", &flags, hex);
+    h = strlen(hex);
+    if (h % 2 != 0 || h / 2 > 500) {
+        printf("%s: skipped\n", line);
+        return 1;
+    }
+    for (i = 0; i < h / 2; i++) {
+        unsigned int byte;
+
+        if (sscanf(hex + 2 * i, "%2x", &byte) != 1) {
+            printf("%s: skipped\n", line);
+            return 1;
+        }
+        text[n++] = (unsigned char)byte;
+    }
+    ctx = OSSL_LIB_CTX_new();
+    conf = NCONF_new_ex(ctx, NULL);
+    b = BIO_new_mem_buf(text, (int)n);
+    r = NCONF_load_bio(conf, b, NULL);
+    printf("%s: load %d", line, r);
+    if (r > 0) {
+        r = CONF_modules_load(conf, NULL, flags);
+        props = EVP_get1_default_properties(ctx);
+        printf(" modules %d providers %d%d%d properties", r, OSSL_PROVIDER_available(ctx, "default"),
+            OSSL_PROVIDER_available(ctx, "base"), OSSL_PROVIDER_available(ctx, "null"));
+        print_quoted(props != NULL ? props : "(null)");
+        OPENSSL_free(props);
+    }
+    printf(" errors:");
+    while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &eflags)) != 0) {
+        printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+        if ((eflags & ERR_TXT_STRING) != 0 && data[0] != '\0' && ERR_GET_LIB(code) != ERR_LIB_DSO)
+            print_quoted(data);
+    }
+    printf("\n");
+    BIO_free(b);
+    NCONF_free(conf);
+    OSSL_LIB_CTX_free(ctx);
+    ERR_clear_error();
+    /* No error slot keeps a buffer sized by a DSO message, which differs between libraries. */
+    OPENSSL_thread_stop();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -7527,7 +7594,8 @@ int main(void)
             || des_command(command, line) || legacy_command(command, line)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
             || skey_command(command, line) || md_meth_command(command, line)
-            || cipher_meth_command(command, line) || conf_command(command, line)) {
+            || cipher_meth_command(command, line) || conf_command(command, line)
+            || conf_modules_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

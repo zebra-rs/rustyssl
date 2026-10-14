@@ -1,6 +1,8 @@
 //! Fuzzes configuration files through `NCONF_load_bio` with either method: whatever loads,
 //! every value in each section's stack must be what `NCONF_get_string` finds for its name,
 //! the dump must succeed, and freeing must be clean. Includes are renamed so no file is read.
+//! The same text goes through `X509V3_parse_list` (every item must have a name, and freeing
+//! must be clean) and `ASN1_str2mask`.
 
 #![no_main]
 
@@ -30,6 +32,14 @@ unsafe extern "C" {
     fn BIO_s_mem() -> *const BIO_METHOD;
     fn BIO_free(b: *mut BIO) -> c_int;
     fn ERR_clear_error();
+    fn X509V3_parse_list(line: *const c_char) -> *mut OPENSSL_STACK;
+    fn X509V3_conf_free(conf: *mut CONF_VALUE);
+    fn ASN1_str2mask(s: *const c_char, mask: *mut core::ffi::c_ulong) -> c_int;
+    fn OPENSSL_sk_pop_free(st: *mut OPENSSL_STACK, f: Option<unsafe extern "C" fn(*mut c_void)>);
+}
+
+unsafe extern "C" fn free_value(v: *mut c_void) {
+    unsafe { X509V3_conf_free(v.cast()) };
 }
 
 fuzz_target!(|data: &[u8]| {
@@ -67,6 +77,16 @@ fuzz_target!(|data: &[u8]| {
         BIO_free(out);
         BIO_free(b);
         NCONF_free(conf);
+        let mut line = text.clone();
+        line.push(0);
+        let list = X509V3_parse_list(line.as_ptr().cast());
+        for i in 0..OPENSSL_sk_num(list) {
+            let v = &*OPENSSL_sk_value(list, i).cast::<CONF_VALUE>();
+            assert!(!v.name.is_null());
+        }
+        OPENSSL_sk_pop_free(list, Some(free_value));
+        let mut mask: core::ffi::c_ulong = 0;
+        ASN1_str2mask(line.as_ptr().cast(), &raw mut mask);
         ERR_clear_error();
     }
 });
