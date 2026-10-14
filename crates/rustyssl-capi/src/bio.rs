@@ -27,6 +27,7 @@ pub(crate) mod debug;
 pub(crate) mod dgram;
 pub(crate) mod dgram_pair;
 pub(crate) mod dump;
+pub(crate) mod evp;
 pub(crate) mod fd;
 pub(crate) mod file;
 pub(crate) mod mem;

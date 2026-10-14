@@ -866,11 +866,14 @@ const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
     crate::bio::dgram::BIO_err_is_non_fatal;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::base64::BIO_f_base64;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_cipher;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_linebuffer;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_md;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::nbio::BIO_f_nbio_test;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_null;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::prefix::BIO_f_prefix;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_readbuffer;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_reliable;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::fd::BIO_fd_non_fatal_error;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
@@ -1276,6 +1279,13 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut BIO, BIO_callback_fn) = crate::bio::BIO_set_callback;
 const _: unsafe extern "C" fn(*mut BIO, *mut core::ffi::c_char) = crate::bio::BIO_set_callback_arg;
 const _: unsafe extern "C" fn(*mut BIO, BIO_callback_fn_ex) = crate::bio::BIO_set_callback_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::bio::evp::BIO_set_cipher;
 const _: unsafe extern "C" fn(*mut BIO, *mut core::ffi::c_void) = crate::bio::BIO_set_data;
 const _: unsafe extern "C" fn(
     *mut BIO,
