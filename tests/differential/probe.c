@@ -6202,6 +6202,263 @@ static int aes_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the AEAD helpers of modes.h over the AES commands' keys (AES-128 from the data
+ * until an aeskey), one context each, and the digest commands' data; each prints its results:
+ *   gcminit                        CRYPTO_gcm128_init (CRYPTO_gcm128_new the first time)
+ *   gcmiv LEN                      CRYPTO_gcm128_setiv with LEN (at most 100) octets
+ *   gcmaad LEN                     CRYPTO_gcm128_aad
+ *   gcmenc|gcmdec LEN [ctr]        CRYPTO_gcm128_encrypt/decrypt (with ctr, the _ctr32 forms over
+ *                                  a CTR function) of LEN (at most 1000) octets, and the output
+ *   gcmfinish LEN                  CRYPTO_gcm128_finish against LEN octets of the last tag read
+ *   gcmtag LEN                     CRYPTO_gcm128_tag of LEN octets
+ *   ccminit M L                    CRYPTO_ccm128_init over the context as modes_local.h lays it out
+ *   ccmiv NLEN MLEN                CRYPTO_ccm128_setiv
+ *   ccmaad LEN                     CRYPTO_ccm128_aad
+ *   ccmenc|ccmdec LEN [stream]     CRYPTO_ccm128_encrypt/decrypt (with stream, the _ccm64 forms)
+ *   ccmtag LEN                     CRYPTO_ccm128_tag; each CCM command prints the nonce block,
+ *                                  the CBC-MAC, and the block count
+ *   ocbinit STREAM                 CRYPTO_ocb128_init (CRYPTO_ocb128_new the first time), with a
+ *                                  bulk function if STREAM is 1
+ *   ocbiv LEN TAGLEN, ocbaad LEN, ocbenc LEN, ocbdec LEN, ocbtag LEN, ocbfinish LEN, ocbcopy
+ *                                  the OCB functions (ocbcopy copies the context into a second
+ *                                  one and swaps them)
+ *   xts ENC LEN                    CRYPTO_xts128_encrypt of LEN (at most 1000) octets
+ */
+struct ccm128_context {
+    union {
+        uint64_t u[2];
+        unsigned char c[16];
+    } nonce, cmac;
+    uint64_t blocks;
+    block128_f block;
+    void *key;
+};
+
+struct xts128_context {
+    void *key1, *key2;
+    block128_f block1, block2;
+};
+
+static GCM128_CONTEXT *probe_gcm;
+static struct ccm128_context probe_ccm;
+static OCB128_CONTEXT *probe_ocb, *probe_ocb2;
+static unsigned char probe_tag[16];
+
+static void probe_ccm_fn(const unsigned char *in, unsigned char *out, size_t blocks,
+                         const void *key, const unsigned char ivec[16], unsigned char cmac[16],
+                         int enc)
+{
+    unsigned char counter[16], k[16];
+    size_t i, n;
+
+    memcpy(counter, ivec, 16);
+    for (i = 0; i < blocks; i++) {
+        AES_encrypt(counter, k, key);
+        for (n = 0; n < 16; n++) {
+            unsigned char x = in[16 * i + n], y = x ^ k[n];
+
+            out[16 * i + n] = y;
+            cmac[n] ^= enc ? x : y;
+        }
+        AES_encrypt(cmac, cmac, key);
+        for (n = 15; n >= 8; n--)
+            if (++counter[n] != 0)
+                break;
+    }
+}
+
+static void probe_ccm_enc(const unsigned char *in, unsigned char *out, size_t blocks,
+                          const void *key, const unsigned char ivec[16], unsigned char cmac[16])
+{
+    probe_ccm_fn(in, out, blocks, key, ivec, cmac, 1);
+}
+
+static void probe_ccm_dec(const unsigned char *in, unsigned char *out, size_t blocks,
+                          const void *key, const unsigned char ivec[16], unsigned char cmac[16])
+{
+    probe_ccm_fn(in, out, blocks, key, ivec, cmac, 0);
+}
+
+static void probe_ocb_fn(const unsigned char *in, unsigned char *out, size_t blocks,
+                         const void *key, size_t start, unsigned char offset[16],
+                         const unsigned char L[][16], unsigned char checksum[16])
+{
+    int dec = key == &probe_dk;
+    size_t i, n;
+
+    for (i = 0; i < blocks; i++) {
+        unsigned char t[16];
+        size_t idx = start + i;
+        unsigned int z = 0;
+
+        while (!(idx & 1)) {
+            idx >>= 1;
+            z++;
+        }
+        for (n = 0; n < 16; n++) {
+            offset[n] ^= L[z][n];
+            t[n] = in[16 * i + n] ^ offset[n];
+        }
+        if (dec)
+            AES_decrypt(t, t, key);
+        else
+            AES_encrypt(t, t, key);
+        for (n = 0; n < 16; n++) {
+            out[16 * i + n] = t[n] ^ offset[n];
+            checksum[n] ^= dec ? out[16 * i + n] : in[16 * i + n];
+        }
+    }
+}
+
+static int aead_command(const char *command, const char *line)
+{
+    char a[16] = "", b[16] = "";
+    long n = 0, m = 0;
+    static unsigned char out[1100];
+    const unsigned char *d;
+    size_t len;
+    int r = -9;
+
+    if (strncmp(command, "gcm", 3) != 0 && strncmp(command, "ccm", 3) != 0
+        && strncmp(command, "ocb", 3) != 0 && strcmp(command, "xts") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    if (probe_ek.rounds == 0) {
+        AES_set_encrypt_key(digest_data, 128, &probe_ek);
+        AES_set_decrypt_key(digest_data, 128, &probe_dk);
+    }
+    d = digest_data + digest_offset;
+    sscanf(line, "%15s %ld %ld %15s", a, &n, &m, b);
+    if (strcmp(command, "ccmenc") == 0 || strcmp(command, "ccmdec") == 0
+        || strcmp(command, "gcmenc") == 0 || strcmp(command, "gcmdec") == 0)
+        sscanf(line, "%*s %ld %15s", &n, b);
+    len = n < 0 ? 0 : (size_t)n > 1000 ? 1000 : (size_t)n;
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "gcminit") == 0) {
+        if (probe_gcm == NULL)
+            probe_gcm = CRYPTO_gcm128_new(&probe_ek, probe_enc_block);
+        else
+            CRYPTO_gcm128_init(probe_gcm, &probe_ek, probe_enc_block);
+        printf(" %s\n", probe_gcm != NULL ? "ok" : "failed");
+        return 1;
+    }
+    if (strncmp(command, "gcm", 3) == 0 && probe_gcm == NULL) {
+        printf(" no context\n");
+        return 1;
+    }
+    if (strcmp(command, "gcmiv") == 0) {
+        CRYPTO_gcm128_setiv(probe_gcm, d, len > 100 ? 100 : len);
+    } else if (strcmp(command, "gcmaad") == 0) {
+        r = CRYPTO_gcm128_aad(probe_gcm, d, len);
+        printf(" %d", r);
+    } else if (strcmp(command, "gcmenc") == 0 || strcmp(command, "gcmdec") == 0) {
+        int enc = command[3] == 'e', ctr = strcmp(b, "ctr") == 0;
+
+        if (ctr)
+            r = enc ? CRYPTO_gcm128_encrypt_ctr32(probe_gcm, d, out, len, probe_ctr32)
+                    : CRYPTO_gcm128_decrypt_ctr32(probe_gcm, d, out, len, probe_ctr32);
+        else
+            r = enc ? CRYPTO_gcm128_encrypt(probe_gcm, d, out, len)
+                    : CRYPTO_gcm128_decrypt(probe_gcm, d, out, len);
+        printf(" %d", r);
+        probe_bytes("out", out, len + 1);
+    } else if (strcmp(command, "gcmfinish") == 0) {
+        printf(" %d", CRYPTO_gcm128_finish(probe_gcm, probe_tag, len));
+    } else if (strcmp(command, "gcmtag") == 0) {
+        memset(probe_tag, 0xee, 16);
+        CRYPTO_gcm128_tag(probe_gcm, probe_tag, len);
+        probe_bytes("tag", probe_tag, 16);
+    } else if (strcmp(command, "ccminit") == 0) {
+        CRYPTO_ccm128_init(&probe_ccm, (unsigned int)n, (unsigned int)m, &probe_ek, probe_enc_block);
+    } else if (strcmp(command, "ccmiv") == 0) {
+        size_t mlen = m < 0 ? 0 : (size_t)m;
+
+        printf(" %d", CRYPTO_ccm128_setiv(&probe_ccm, d, len > 16 ? 16 : len, mlen));
+    } else if (strcmp(command, "ccmaad") == 0) {
+        CRYPTO_ccm128_aad(&probe_ccm, d, len);
+    } else if (strcmp(command, "ccmenc") == 0 || strcmp(command, "ccmdec") == 0) {
+        int enc = command[3] == 'e', stream = strcmp(b, "stream") == 0;
+
+        if (probe_ccm.block == NULL) {
+            printf(" no context\n");
+            return 1;
+        }
+        if (stream)
+            r = enc ? CRYPTO_ccm128_encrypt_ccm64(&probe_ccm, d, out, len, probe_ccm_enc)
+                    : CRYPTO_ccm128_decrypt_ccm64(&probe_ccm, d, out, len, probe_ccm_dec);
+        else
+            r = enc ? CRYPTO_ccm128_encrypt(&probe_ccm, d, out, len)
+                    : CRYPTO_ccm128_decrypt(&probe_ccm, d, out, len);
+        printf(" %d", r);
+        probe_bytes("out", out, len + 1);
+    } else if (strcmp(command, "ccmtag") == 0) {
+        memset(probe_tag, 0xee, 16);
+        printf(" %zu", CRYPTO_ccm128_tag(&probe_ccm, probe_tag, len > 16 ? 17 : len));
+        probe_bytes("tag", probe_tag, 16);
+    } else if (strcmp(command, "ocbinit") == 0) {
+        ocb128_f f = n == 1 ? probe_ocb_fn : NULL;
+
+        if (probe_ocb == NULL) {
+            probe_ocb = CRYPTO_ocb128_new(&probe_ek, &probe_dk, probe_enc_block, probe_dec_block, f);
+            probe_ocb2 = CRYPTO_ocb128_new(&probe_ek, &probe_dk, probe_enc_block, probe_dec_block, f);
+            r = probe_ocb != NULL && probe_ocb2 != NULL;
+        } else {
+            r = CRYPTO_ocb128_init(probe_ocb, &probe_ek, &probe_dk, probe_enc_block, probe_dec_block, f);
+        }
+        printf(" %d\n", r);
+        return 1;
+    } else if (strncmp(command, "ocb", 3) == 0 && probe_ocb == NULL) {
+        printf(" no context\n");
+        return 1;
+    } else if (strcmp(command, "ocbiv") == 0) {
+        printf(" %d", CRYPTO_ocb128_setiv(probe_ocb, d, len > 20 ? 20 : len, (size_t)(m < 0 ? 0 : m)));
+    } else if (strcmp(command, "ocbaad") == 0) {
+        printf(" %d", CRYPTO_ocb128_aad(probe_ocb, d, len));
+    } else if (strcmp(command, "ocbenc") == 0 || strcmp(command, "ocbdec") == 0) {
+        r = command[3] == 'e' ? CRYPTO_ocb128_encrypt(probe_ocb, d, out, len)
+                              : CRYPTO_ocb128_decrypt(probe_ocb, d, out, len);
+        printf(" %d", r);
+        probe_bytes("out", out, len + 1);
+    } else if (strcmp(command, "ocbtag") == 0) {
+        memset(probe_tag, 0xee, 16);
+        printf(" %d", CRYPTO_ocb128_tag(probe_ocb, probe_tag, len > 16 ? 17 : len));
+        probe_bytes("tag", probe_tag, 16);
+    } else if (strcmp(command, "ocbfinish") == 0) {
+        printf(" %d", CRYPTO_ocb128_finish(probe_ocb, probe_tag, len > 16 ? 17 : len));
+    } else if (strcmp(command, "ocbcopy") == 0) {
+        OCB128_CONTEXT *t;
+
+        printf(" %d", CRYPTO_ocb128_copy_ctx(probe_ocb2, probe_ocb, NULL, NULL));
+        t = probe_ocb;
+        probe_ocb = probe_ocb2;
+        probe_ocb2 = t;
+    } else {
+        struct xts128_context x = { &probe_ek, &probe_ek, probe_enc_block, probe_enc_block };
+        struct xts128_context y = { &probe_dk, &probe_ek, probe_dec_block, probe_enc_block };
+
+        sscanf(line, "%*s %ld %ld", &m, &n);
+        len = n < 0 ? 0 : (size_t)n > 1000 ? 1000 : (size_t)n;
+        r = CRYPTO_xts128_encrypt(m ? &x : &y, digest_data + 1500, d, out, len, (int)m);
+        printf(" %d", r);
+        probe_bytes("out", out, len + 1);
+    }
+    if (strncmp(command, "ccm", 3) == 0) {
+        probe_bytes("nonce", probe_ccm.nonce.c, 16);
+        probe_bytes("cmac", probe_ccm.cmac.c, 16);
+        printf(" blocks %llu", (unsigned long long)probe_ccm.blocks);
+    }
+    digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -6232,7 +6489,7 @@ int main(void)
             || bn_command(command, line) || pkey_command(command, line)
             || derive_command(command, line) || meth_command(command, line)
             || print_command(command, line) || lowlevel_command(command, line)
-            || aes_command(command, line)) {
+            || aes_command(command, line) || aead_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

@@ -5,6 +5,7 @@
 //! copy their fields, so the whole state is the C struct's. These types mirror each struct field
 //! by field: the FFI layer copies a struct in, calls a method, and copies it back.
 
+pub mod aead;
 pub mod aes;
 pub mod hash;
 pub mod modes;

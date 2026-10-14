@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(33) {
+        match random.below(34) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -181,6 +181,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             29 => meth_session(&mut random, &mut out)?,
             30 => lowlevel_hash_session(&mut random, &mut out)?,
             31 => lowlevel_aes_session(&mut random, &mut out)?,
+            32 => lowlevel_aead_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -313,6 +314,95 @@ fn lowlevel_aes_session(random: &mut Random, out: &mut String) -> Result {
                 random.pick(&["block", "ctr32"]),
                 length(random)
             )?,
+        }
+    }
+    Ok(())
+}
+
+/// A random session of the AEAD helpers: GCM (IVs of any length, AAD and data in pieces
+/// through the block and the CTR function, AAD after data, tags read and checked, finishes
+/// repeated), CCM (tag and length field sizes, nonces, matching and mismatched lengths, both
+/// functions), OCB (with and without a bulk function, copies, bad nonce and tag lengths), and
+/// XTS.
+fn lowlevel_aead_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&["15", "16", "17", "31", "32", "33", "48"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(200),
+        }
+    };
+    match random.below(4) {
+        0 => {
+            writeln!(out, "gcminit")?;
+            writeln!(
+                out,
+                "gcmiv {}",
+                random.pick(&["12", "12", "1", "16", "60", "0"])
+            )?;
+            for _ in 0..random.below(15) + 1 {
+                let ctr = if random.below(2) == 0 { "" } else { " ctr" };
+                match random.below(9) {
+                    0 | 1 => writeln!(out, "gcmaad {}", length(random))?,
+                    2..=4 => writeln!(out, "gcmenc {}{ctr}", length(random))?,
+                    5 => writeln!(out, "gcmdec {}{ctr}", length(random))?,
+                    6 => writeln!(out, "gcmtag {}", random.below(18))?,
+                    7 => writeln!(out, "gcmfinish {}", random.below(18))?,
+                    _ => writeln!(out, "gcmiv {}", random.below(40))?,
+                }
+            }
+            writeln!(out, "gcmtag 16")?;
+        }
+        1 => {
+            let m = random.pick(&["4", "6", "8", "10", "12", "14", "16", "3", "0"]);
+            let l = random.pick(&["2", "3", "4", "8", "1", "0"]);
+            writeln!(out, "ccminit {m} {l}")?;
+            for _ in 0..random.below(4) + 1 {
+                let len = length(random);
+                let mlen = if random.below(5) == 0 {
+                    length(random)
+                } else {
+                    len
+                };
+                writeln!(out, "ccmiv {} {mlen}", 6 + random.below(11))?;
+                if random.below(2) == 0 {
+                    writeln!(out, "ccmaad {}", random.below(300))?;
+                }
+                let stream = if random.below(2) == 0 { "" } else { " stream" };
+                writeln!(out, "ccm{} {len}{stream}", random.pick(&["enc", "dec"]))?;
+                writeln!(out, "ccmtag {}", random.below(18))?;
+            }
+        }
+        2 => {
+            writeln!(out, "ocbinit {}", random.below(2))?;
+            writeln!(out, "ocbiv {} {}", random.below(17), random.below(18))?;
+            for _ in 0..random.below(10) + 1 {
+                // Whole blocks until the last call.
+                let len = 16 * random.below(12);
+                match random.below(7) {
+                    0 => writeln!(out, "ocbaad {len}")?,
+                    1 | 2 => writeln!(out, "ocbenc {len}")?,
+                    3 => writeln!(out, "ocbdec {len}")?,
+                    4 => writeln!(out, "ocbcopy")?,
+                    5 => writeln!(out, "ocbtag {}", random.below(18))?,
+                    _ => writeln!(out, "ocbfinish {}", random.below(18))?,
+                }
+            }
+            writeln!(
+                out,
+                "ocb{} {}",
+                random.pick(&["enc", "dec", "aad"]),
+                random.below(20)
+            )?;
+            writeln!(out, "ocbtag 16")?;
+        }
+        _ => {
+            for _ in 0..random.below(5) + 1 {
+                writeln!(out, "xts {} {}", random.below(2), length(random))?;
+            }
         }
     }
     Ok(())
