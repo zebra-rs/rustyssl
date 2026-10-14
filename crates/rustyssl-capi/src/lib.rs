@@ -46,6 +46,7 @@ mod provider;
 mod rand;
 mod rand_file;
 mod rand_lib;
+mod rsa;
 mod secure;
 mod sleep;
 mod ssl;

@@ -23,6 +23,7 @@ use rustyssl_abi::{
 
 use super::builtin::libctx_of;
 use super::keymgmt::{mac_free, mac_key, mac_key_up_ref};
+use super::rsa_sig;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, entry, pending};
 use crate::err;
 use crate::evp::mac::{
@@ -427,20 +428,62 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
     pending(c"DSA-SHA3-256:dsa_with_SHA3-256:id-dsa-with-sha3-256:2.16.840.1.101.3.4.3.6"),
     pending(c"DSA-SHA3-384:dsa_with_SHA3-384:id-dsa-with-sha3-384:2.16.840.1.101.3.4.3.7"),
     pending(c"DSA-SHA3-512:dsa_with_SHA3-512:id-dsa-with-sha3-512:2.16.840.1.101.3.4.3.8"),
-    pending(c"RSA:rsaEncryption:1.2.840.113549.1.1.1"),
-    pending(c"RSA-RIPEMD160:ripemd160WithRSA:1.3.36.3.3.1.2"),
-    pending(c"RSA-SHA1:RSA-SHA-1:sha1WithRSAEncryption:1.2.840.113549.1.1.5"),
-    pending(c"RSA-SHA2-224:RSA-SHA224:sha224WithRSAEncryption:1.2.840.113549.1.1.14"),
-    pending(c"RSA-SHA2-256:RSA-SHA256:sha256WithRSAEncryption:1.2.840.113549.1.1.11"),
-    pending(c"RSA-SHA2-384:RSA-SHA384:sha384WithRSAEncryption:1.2.840.113549.1.1.12"),
-    pending(c"RSA-SHA2-512:RSA-SHA512:sha512WithRSAEncryption:1.2.840.113549.1.1.13"),
-    pending(c"RSA-SHA2-512/224:RSA-SHA512-224:sha512-224WithRSAEncryption:1.2.840.113549.1.1.15"),
-    pending(c"RSA-SHA2-512/256:RSA-SHA512-256:sha512-256WithRSAEncryption:1.2.840.113549.1.1.16"),
-    pending(c"RSA-SHA3-224:id-rsassa-pkcs1-v1_5-with-sha3-224:2.16.840.1.101.3.4.3.13"),
-    pending(c"RSA-SHA3-256:id-rsassa-pkcs1-v1_5-with-sha3-256:2.16.840.1.101.3.4.3.14"),
-    pending(c"RSA-SHA3-384:id-rsassa-pkcs1-v1_5-with-sha3-384:2.16.840.1.101.3.4.3.15"),
-    pending(c"RSA-SHA3-512:id-rsassa-pkcs1-v1_5-with-sha3-512:2.16.840.1.101.3.4.3.16"),
-    pending(c"RSA-SM3:sm3WithRSAEncryption:1.2.156.10197.1.504"),
+    alg(
+        c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
+        &rsa_sig::RSA_SIGNATURE,
+    ),
+    alg(
+        c"RSA-RIPEMD160:ripemd160WithRSA:1.3.36.3.3.1.2",
+        &rsa_sig::RSA_RIPEMD160_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA1:RSA-SHA-1:sha1WithRSAEncryption:1.2.840.113549.1.1.5",
+        &rsa_sig::RSA_SHA1_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-224:RSA-SHA224:sha224WithRSAEncryption:1.2.840.113549.1.1.14",
+        &rsa_sig::RSA_SHA224_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-256:RSA-SHA256:sha256WithRSAEncryption:1.2.840.113549.1.1.11",
+        &rsa_sig::RSA_SHA256_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-384:RSA-SHA384:sha384WithRSAEncryption:1.2.840.113549.1.1.12",
+        &rsa_sig::RSA_SHA384_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-512:RSA-SHA512:sha512WithRSAEncryption:1.2.840.113549.1.1.13",
+        &rsa_sig::RSA_SHA512_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-512/224:RSA-SHA512-224:sha512-224WithRSAEncryption:1.2.840.113549.1.1.15",
+        &rsa_sig::RSA_SHA512_224_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA2-512/256:RSA-SHA512-256:sha512-256WithRSAEncryption:1.2.840.113549.1.1.16",
+        &rsa_sig::RSA_SHA512_256_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA3-224:id-rsassa-pkcs1-v1_5-with-sha3-224:2.16.840.1.101.3.4.3.13",
+        &rsa_sig::RSA_SHA3_224_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA3-256:id-rsassa-pkcs1-v1_5-with-sha3-256:2.16.840.1.101.3.4.3.14",
+        &rsa_sig::RSA_SHA3_256_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA3-384:id-rsassa-pkcs1-v1_5-with-sha3-384:2.16.840.1.101.3.4.3.15",
+        &rsa_sig::RSA_SHA3_384_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SHA3-512:id-rsassa-pkcs1-v1_5-with-sha3-512:2.16.840.1.101.3.4.3.16",
+        &rsa_sig::RSA_SHA3_512_SIGNATURE,
+    ),
+    alg(
+        c"RSA-SM3:sm3WithRSAEncryption:1.2.156.10197.1.504",
+        &rsa_sig::RSA_SM3_SIGNATURE,
+    ),
     pending(c"ED25519:1.3.101.112"),
     pending(c"ED25519ph"),
     pending(c"ED25519ctx"),

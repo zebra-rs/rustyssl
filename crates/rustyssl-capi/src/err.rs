@@ -449,6 +449,22 @@ pub(crate) fn raise(library: c_int, reason: c_int, function: &str) {
     );
 }
 
+/// `err_clear_last_constant_time`: marks the newest error cleared (`ERR_FLAG_CLEAR`) when
+/// `clear` is 1, without a branch on it, so the getters skip it but `ERR_count_to_mark` still
+/// counts it. For results of secret data (a padding check's), whose errors are raised either
+/// way.
+pub(crate) fn clear_last_constant_time(clear: u8) {
+    if let Some(state) = state() {
+        // SAFETY: this thread's state; it stays live during these calls.
+        let (top, _) = unsafe { ends(state) };
+        // SAFETY: as above.
+        let mut entry = unsafe { load(state, top) };
+        entry.flags |= c_int::from(clear & 1).wrapping_neg() & ERR_FLAG_CLEAR;
+        // SAFETY: as above.
+        unsafe { store(state, top, entry) };
+    }
+}
+
 /// Raises an error with the given origin: `ERR_new`, `ERR_set_debug`, and `ERR_set_error`
 /// without data.
 pub(crate) fn raise_from(
