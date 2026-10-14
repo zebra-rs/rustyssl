@@ -1,0 +1,17 @@
+# Application-defined digests (step 3.11a).
+mdcopy MD4 3 1
+mdcopy MD5 1000 7
+mdcopy SHA1 0 1
+mdcopy SHA1 64 64
+mdcopy SHA224 55 1
+mdcopy SHA256 56 200
+mdcopy SHA384 111 13
+mdcopy SHA512 112 112
+mdcopy SHA512-224 128 3
+mdcopy SHA512-256 129 50
+mdcopy RIPEMD160 500 33
+mdcopy MDC2 17 4
+mdcopy WHIRLPOOL 300 100
+mdcopy MD5-SHA1 65 1
+mdcopy SHA3-256 10 1
+mdcopy NO-SUCH 10 1

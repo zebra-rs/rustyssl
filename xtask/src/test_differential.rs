@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(39) {
+        match random.below(40) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -187,6 +187,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             35 => lowlevel_ciphers_session(&mut random, &mut out)?,
             36 => bio_evp_session(&mut random, &mut out)?,
             37 => skey_session(&mut random, &mut out)?,
+            38 => md_meth_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -721,6 +722,44 @@ fn skey_session(random: &mut Random, out: &mut String) -> Result {
                 random.below(2)
             )?;
         }
+    }
+    Ok(())
+}
+
+/// A random session of application-defined digests: copies of the static digests given their
+/// state's size, over lengths around their blocks, in pieces of every size.
+fn md_meth_session(random: &mut Random, out: &mut String) -> Result {
+    let names = [
+        "MD4",
+        "MD5",
+        "SHA1",
+        "SHA224",
+        "SHA256",
+        "SHA384",
+        "SHA512",
+        "SHA512-224",
+        "SHA512-256",
+        "RIPEMD160",
+        "MDC2",
+        "WHIRLPOOL",
+        "MD5-SHA1",
+    ];
+    for _ in 0..random.below(8) + 1 {
+        let len = match random.below(3) {
+            0 => random
+                .pick(&[
+                    "0", "1", "55", "56", "63", "64", "65", "111", "112", "127", "128", "129",
+                ])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(1001),
+        };
+        writeln!(
+            out,
+            "mdcopy {} {len} {}",
+            random.pick(&names),
+            1 + random.below(200)
+        )?;
     }
     Ok(())
 }
