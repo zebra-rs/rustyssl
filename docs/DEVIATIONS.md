@@ -220,6 +220,9 @@ OpenSSL never depends on them.
 | An `engines` section that needs an engine, built-in ones (`dynamic`) included; `OPENSSL_INIT_ENGINE_*` (`ENGINE_load_builtin_engines`); `ENGINE_get_digest_engine`/`ENGINE_get_cipher_engine` | finds the built-in engines and loads others with the dynamic engine | there are no engines: the init flags load none, the getters find none, and a section that needs one fails as `ENGINE_by_id` of an engine that can't be loaded does (`ENGINE_R_NO_SUCH_ENGINE`, `ENGINE_R_ENGINE_CONFIGURATION_ERROR`); sections that only name an engine, or load it softly, succeed as in OpenSSL | `conf::builtin::tests::engines_are_never_found`, `engine::tests::there_are_no_engines` |
 | `UI_destroy_method` of `UI_null()` or `UI_OpenSSL()` | frees the library's static method (and crashes) | does nothing; the method stays usable | `ui::tests::destroying_a_builtin_method_does_nothing` |
 | `OPENSSL_asc2uni`, `OPENSSL_utf82uni`, `OPENSSL_uni2asc`, and `OPENSSL_uni2utf8` given a NULL string with a length (-1 included); `PKCS12_key_gen_uni` and `_uni_ex` with a negative password or salt length, or a NULL one with a length | read from NULL, or as far as the huge `size_t`s negative lengths convert to | fail (NULL, or 0) | `pkcs12::tests::out_of_bounds_lengths_fail` |
+| `RSA_size`, `RSA_bits`, `RSA_security_bits` of a key without a modulus (or NULL); `RSA_up_ref(NULL)` | dereference NULL | return 0 | `rsa_lib::tests::a_key_without_numbers_or_a_null_key_is_safe` |
+| `RSA_set0_multi_prime_params` on a key without p and q | multiplies NULL numbers and crashes | returns 0, taking none of the numbers | `rsa_lib::tests::a_key_without_numbers_or_a_null_key_is_safe` |
+| `RSA_new` (and every key a provider makes) after `RSA_set_default_method(NULL)` | dereferences the NULL method | the key gets the built-in method; `RSA_get_default_method` still returns NULL | `rsa_lib::tests::a_null_default_method_gives_new_keys_the_built_in_one` |
 
 ## Notes
 

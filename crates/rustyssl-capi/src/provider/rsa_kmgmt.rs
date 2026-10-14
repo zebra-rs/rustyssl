@@ -57,7 +57,6 @@ use crate::bn::{BN_clear_free, new_bignum, value};
 use crate::err;
 use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free, EVP_MD_is_a};
 use crate::ffi::ffi_callback;
-use crate::handle::Handle;
 use crate::params::bn::{OSSL_PARAM_get_BN, OSSL_PARAM_set_BN};
 use crate::params::build::{
     OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_BN, OSSL_PARAM_BLD_push_int,
@@ -659,7 +658,7 @@ ffi_callback! {
     where failure = (), library = ERR_LIB_RSA
     {
         // SAFETY: the caller's guarantee.
-        unsafe { RSA::free(keydata.cast()) };
+        unsafe { crate::rsa::free(keydata.cast()) };
     }
 }
 

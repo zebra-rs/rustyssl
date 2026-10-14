@@ -76,7 +76,6 @@ use crate::evp::md_ctx::{
     EVP_MD_settable_ctx_params, EVP_MD_xof,
 };
 use crate::ffi::{bytes, ffi_callback};
-use crate::handle::Handle;
 use crate::mem;
 use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_get_octet_string, OSSL_PARAM_get_utf8_string, OSSL_PARAM_locate,
@@ -188,7 +187,7 @@ impl Drop for SigCtx {
         // SAFETY: the context this holds, or NULL.
         unsafe { EVP_MD_CTX_free(self.mdctx) };
         // SAFETY: the reference this holds, or NULL.
-        unsafe { RSA::free(self.rsa) };
+        unsafe { crate::rsa::free(self.rsa) };
     }
 }
 
@@ -709,11 +708,11 @@ unsafe fn signverify_init(
     }
     if !vrsa.is_null() {
         // SAFETY: the caller's live key data.
-        if unsafe { rsa(vrsa.cast()) }.is_none() || !unsafe { RSA::up_ref(vrsa.cast()) } {
+        if unsafe { rsa(vrsa.cast()) }.is_none() || !unsafe { crate::rsa::up_ref(vrsa.cast()) } {
             return 0;
         }
         // SAFETY: the reference the context held, or NULL.
-        unsafe { RSA::free(c.rsa) };
+        unsafe { crate::rsa::free(c.rsa) };
         c.rsa = vrsa.cast();
     }
     let Some(st) = c.key() else { return 0 };
@@ -1523,7 +1522,7 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return ptr::null_mut() };
         // SAFETY: the context's key, or NULL.
-        if !c.rsa.is_null() && !unsafe { RSA::up_ref(c.rsa) } {
+        if !c.rsa.is_null() && !unsafe { crate::rsa::up_ref(c.rsa) } {
             return ptr::null_mut();
         }
         let mut copy = SigCtx {

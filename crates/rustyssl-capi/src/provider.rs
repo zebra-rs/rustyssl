@@ -79,6 +79,13 @@ impl<T> Clone for Ptr<T> {
 
 impl<T> Copy for Ptr<T> {}
 
+impl<T> Default for Ptr<T> {
+    /// NULL.
+    fn default() -> Self {
+        Ptr(core::ptr::null_mut())
+    }
+}
+
 // SAFETY: the pointers are the application's or the provider's, used as OpenSSL uses them: passed
 // back to the provider's functions (which OpenSSL may call from any thread) or compared.
 unsafe impl<T> Send for Ptr<T> {}

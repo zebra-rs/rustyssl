@@ -27,7 +27,6 @@ use super::rsa_sig::key_op_allowed;
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::err;
 use crate::ffi::{bytes, ffi_callback};
-use crate::handle::Handle;
 use crate::rsa::{RsaState, private_random, public_random, raise_all, rsa};
 use crate::rsa_gen::Env;
 
@@ -49,7 +48,7 @@ struct KemCtx {
 impl Drop for KemCtx {
     fn drop(&mut self) {
         // SAFETY: the reference this holds, or NULL.
-        unsafe { RSA::free(self.rsa) };
+        unsafe { crate::rsa::free(self.rsa) };
     }
 }
 
@@ -140,11 +139,11 @@ unsafe fn init(
         return 0;
     }
     // SAFETY: the caller's live key data.
-    if !unsafe { RSA::up_ref(vrsa.cast()) } {
+    if !unsafe { crate::rsa::up_ref(vrsa.cast()) } {
         return 0;
     }
     // SAFETY: the reference the context held, or NULL.
-    unsafe { RSA::free(c.rsa) };
+    unsafe { crate::rsa::free(c.rsa) };
     c.rsa = vrsa.cast();
     let e_ok = r
         .lock()
