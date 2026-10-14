@@ -3315,7 +3315,20 @@ chunking) is clean.
       3072 bits, the older generator at 512 and 1024 bits, e = 3, three primes, five primes at
       8192 bits, RSA-PSS with restrictions), callback events and a callback that stops each
       generator, the parameters' errors, and twenty broken keys through all five checks.
-  - [ ] **4.3c** The RSA KEM (RSASVE).
+  - [x] **4.3c The RSA KEM:** `provider/rsa_kem.rs`, RSASVE (SP 800-56B 7.2.1): a random
+    1 < z < n - 1 drawn as OpenSSL draws it, sent with the public key and no padding, and
+    recovered after the ciphertext's range check. The operation is named in any case; an
+    unknown name fails. As OpenSSL's, a copied context is empty (its `rsakem_dupctx` copies
+    nothing), and RSA-PSS keys can't encapsulate.
+    - The private operations now keep a key's blinding as OpenSSL keeps an `RSA`'s: made at
+      the first use (its random number drawn by `bnrand_range`'s rules), squared for the next
+      31, made again at the 33rd, and shared by the key's snapshots. A fresh blinding per
+      operation left the private generator elsewhere than the reference's, which a later
+      secret showed; it also cost an exponentiation per operation.
+    - `tests/c/evp_rsa_kem.c` (28 checks): the secret and its encapsulation from known
+      generators, the size queries, forty decapsulations across the blinding's renewal, the
+      errors for short buffers, wrong lengths, and ciphertexts at and around the range's ends,
+      keys that can't be used, and the parameter lists.
   - [ ] **4.3d** The legacy `RSA_*` and `RSA_meth_*` APIs, over the same key object.
   - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
     `RSA_OAEP_PARAMS`).

@@ -649,7 +649,7 @@ ffi_callback! {
 }
 
 /// `ossl_rsa_key_op_get_protect`: RSA-PSS keys can't recover, encrypt, or decrypt.
-fn key_op_allowed(kind: Kind, operation: c_int) -> bool {
+pub(crate) fn key_op_allowed(kind: Kind, operation: c_int) -> bool {
     const F: &str = "ossl_rsa_key_op_get_protect";
     match operation {
         EVP_PKEY_OP_SIGN | EVP_PKEY_OP_SIGNMSG | EVP_PKEY_OP_VERIFY | EVP_PKEY_OP_VERIFYMSG => true,

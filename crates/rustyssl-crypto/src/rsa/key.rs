@@ -11,6 +11,7 @@ use super::{
 use crate::bn::modular::exp_mod;
 use crate::bn::mont::{Montgomery, mul_fixed};
 use crate::bn::{self, BigNum, Endian, Limb, Zeroizing};
+use std::sync::{Arc, Mutex, PoisonError};
 
 /// `RSA_MAX_PRIME_NUM`: a private operation fails on a multi-prime key of more primes.
 pub const MAX_PRIMES: usize = 5;
@@ -22,6 +23,68 @@ pub struct ExtraPrime {
     pub r: BigNum,
     pub d: BigNum,
     pub t: BigNum,
+}
+
+/// `BN_BLINDING_COUNTER`: a blinding is used this many times (squared between uses), then
+/// made again.
+const BLINDING_COUNTER: i32 = 32;
+
+/// A key's blinding (`BN_BLINDING`): `a = r^e` and `ai = r^-1` for a random `r`, and how many
+/// times they've been used (-1 when fresh).
+struct Blind {
+    a: BigNum,
+    ai: BigNum,
+    counter: i32,
+}
+
+/// A key's blinding, made at its first private operation and kept, as OpenSSL keeps an
+/// `RSA`'s: shared by the key's copies (the snapshots of one key object), new for a new key.
+#[derive(Clone, Default)]
+pub struct Blinding(Arc<Mutex<Option<Blind>>>);
+
+/// `bnrand_range` over the private generator: a random number in `[0, range)`, drawn as
+/// OpenSSL draws it (so a known generator gives OpenSSL's number and leaves it where
+/// OpenSSL's does), or `None`.
+fn rand_range(range: &BigNum, rng: &mut Random<'_>) -> Option<BigNum> {
+    if range.is_zero() || range.is_negative() {
+        return None;
+    }
+    let n = range.num_bits();
+    if n == 1 {
+        return Some(BigNum::zero());
+    }
+    // A range of 100...: draw a bit more and reduce by up to twice the range.
+    let three = !range.is_bit_set(n.wrapping_sub(2)) && !range.is_bit_set(n.wrapping_sub(3));
+    let bits = if three { n.saturating_add(1) } else { n };
+    let bytes = bits.div_ceil(8);
+    let top_bit = bits.saturating_sub(1) % 8;
+    // OpenSSL draws up to 100 times and gives up on the 100th, unchecked.
+    for attempt in 0..100 {
+        let mut buf = Zeroizing::new(vec![0u8; bytes]);
+        if !rng(&mut buf) {
+            return None;
+        }
+        if let Some(b) = buf.first_mut() {
+            *b &= !0xffu8
+                .checked_shl(u32::try_from(top_bit).ok()?.saturating_add(1))
+                .unwrap_or(0);
+        }
+        let mut v = BigNum::from_bin(&buf, Endian::Big, false).ok()?;
+        if three {
+            for _ in 0..2 {
+                if bn::cmp(&v, range).is_ge() {
+                    v = bn::sub(&v, range).ok()?;
+                }
+            }
+        }
+        if attempt == 99 {
+            return None;
+        }
+        if bn::cmp(&v, range).is_lt() {
+            return Some(v);
+        }
+    }
+    None
 }
 
 /// An RSA key: the modulus, the public exponent, and as much of the private key as it has.
@@ -42,6 +105,8 @@ pub struct Key {
     pub multi: bool,
     /// Whether private operations are blinded (`RSA_FLAG_NO_BLINDING` clear).
     pub blinding: bool,
+    /// The blinding private operations use, once made.
+    pub blinding_state: Blinding,
 }
 
 /// The number in `from`, big-endian.
@@ -105,21 +170,61 @@ impl Key {
         exp_mod(f, e, n).ok()
     }
 
-    /// A random number in `[1, n)`, from the caller's random octets.
-    fn random_below(n: &BigNum, rng: &mut Random<'_>) -> Option<BigNum> {
-        let nl = n.top();
-        for _ in 0..32 {
-            let mut buf = Zeroizing::new(vec![0u8; nl.saturating_mul(8).saturating_add(8)]);
-            if !rng(&mut buf) {
-                return None;
-            }
-            let x = BigNum::from_bin(&buf, Endian::Big, false).ok()?;
-            let r = BigNum::from_limbs(false, reduce(x.limbs(), n.limbs())).ok()?;
-            if !r.is_zero() {
-                return Some(r);
+    /// `BN_BLINDING_create_param`: a random invertible `r` (32 tries after the first), and
+    /// `(r^e, r^-1)`.
+    fn make_blinding(n: &BigNum, e: &BigNum, rng: &mut Random<'_>) -> Result<(BigNum, BigNum), ()> {
+        for _ in 0..=32 {
+            let r = rand_range(n, rng).ok_or(())?;
+            if let Some(ri) = bn::ct::inverse(&r, n) {
+                let a = exp_mod(&r, e, n).map_err(|_| ())?;
+                return Ok((a, ri));
             }
         }
-        None
+        Err(())
+    }
+
+    /// `rsa_get_blinding` and `BN_BLINDING_convert_ex`'s update: the blinding for this
+    /// operation, made at the first, squared for the next 31, made again at the 33rd.
+    fn next_blinding(
+        &self,
+        n: &BigNum,
+        e: &BigNum,
+        rng: &mut Random<'_>,
+    ) -> Result<(BigNum, BigNum), ()> {
+        let mut state = self
+            .blinding_state
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let Some(b) = state.as_mut() else {
+            let (a, ai) = Self::make_blinding(n, e, rng)?;
+            *state = Some(Blind {
+                a: a.clone(),
+                ai: ai.clone(),
+                counter: 0,
+            });
+            return Ok((a, ai));
+        };
+        if b.counter == -1 {
+            b.counter = 0;
+        } else {
+            b.counter = b.counter.saturating_add(1);
+            if b.counter == BLINDING_COUNTER {
+                b.counter = 0;
+                let (a, ai) = Self::make_blinding(n, e, rng)?;
+                b.a = a;
+                b.ai = ai;
+            } else {
+                let nl = n.limbs();
+                let sq = |x: &BigNum| {
+                    let xf = fixed(x, nl.len());
+                    BigNum::from_limbs(false, Self::mul_mod(&xf, &xf, nl))
+                };
+                b.a = sq(&b.a).map_err(|_| ())?;
+                b.ai = sq(&b.ai).map_err(|_| ())?;
+            }
+        }
+        Ok((b.a.clone(), b.ai.clone()))
     }
 
     /// `(a * b) mod m` over fixed lengths, in constant time.
@@ -225,26 +330,15 @@ impl Key {
                     Entry::raised(func, Reason::Internal),
                 ]);
             };
-            let mut found = None;
-            for _ in 0..32 {
-                let Some(r) = Self::random_below(n, rng) else {
+            match self.next_blinding(n, &e, rng) {
+                Ok(found) => Some(found),
+                Err(()) => {
                     return Err(vec![
                         Entry::raised(func, Reason::BnLib),
                         Entry::raised(func, Reason::Internal),
                     ]);
-                };
-                if let Some(ri) = bn::ct::inverse(&r, n) {
-                    let Ok(a) = exp_mod(&r, &e, n) else {
-                        return Err(vec![Entry::raised(func, Reason::BnLib)]);
-                    };
-                    found = Some((a, ri));
-                    break;
                 }
             }
-            let Some(found) = found else {
-                return Err(vec![Entry::raised(func, Reason::BnLib)]);
-            };
-            Some(found)
         } else {
             None
         };

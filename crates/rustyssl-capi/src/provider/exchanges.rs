@@ -373,9 +373,12 @@ static DEFAULT_ASYM_CIPHERS: Algorithms<3> = Algorithms([
     ALG_END,
 ]);
 
-/// The default provider's KEMs (`deflt_asym_kem`), all of later steps.
+/// The default provider's KEMs (`deflt_asym_kem`); those of later steps are pending.
 static DEFAULT_KEMS: Algorithms<12> = Algorithms([
-    pending(c"RSA:rsaEncryption:1.2.840.113549.1.1.1"),
+    alg(
+        c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
+        &super::rsa_kem::RSA_KEM,
+    ),
     pending(c"X25519:1.3.101.110"),
     pending(c"X448:1.3.101.111"),
     pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
