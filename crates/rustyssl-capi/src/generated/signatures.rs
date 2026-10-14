@@ -2737,6 +2737,79 @@ const _: unsafe extern "C" fn(
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_cfb128_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_cfb1_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_cfb8_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) = crate::lowlevel::ciphers::Camellia_ctr128_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const CAMELLIA_KEY,
+) = crate::lowlevel::ciphers::Camellia_decrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const CAMELLIA_KEY,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_ecb_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const CAMELLIA_KEY,
+) = crate::lowlevel::ciphers::Camellia_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const CAMELLIA_KEY,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::ciphers::Camellia_ofb128_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut CAMELLIA_KEY,
+) -> core::ffi::c_int = crate::lowlevel::ciphers::Camellia_set_key;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
     *mut DES_cblock,
     core::ffi::c_long,
     *mut DES_key_schedule,
@@ -5788,6 +5861,44 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut HMAC_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
     crate::hmac::HMAC_Update;
 const _: unsafe extern "C" fn(*const HMAC_CTX) -> usize = crate::hmac::HMAC_size;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut IDEA_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::IDEA_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut IDEA_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::IDEA_cfb64_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *mut IDEA_KEY_SCHEDULE,
+) = crate::lowlevel::ciphers::IDEA_ecb_encrypt;
+const _: unsafe extern "C" fn(*mut core::ffi::c_ulong, *mut IDEA_KEY_SCHEDULE) =
+    crate::lowlevel::ciphers::IDEA_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut IDEA_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::ciphers::IDEA_ofb64_encrypt;
+const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
+    crate::lowlevel::ciphers::IDEA_options;
+const _: unsafe extern "C" fn(*mut IDEA_KEY_SCHEDULE, *mut IDEA_KEY_SCHEDULE) =
+    crate::lowlevel::ciphers::IDEA_set_decrypt_key;
+const _: unsafe extern "C" fn(*const core::ffi::c_uchar, *mut IDEA_KEY_SCHEDULE) =
+    crate::lowlevel::ciphers::IDEA_set_encrypt_key;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::INT64_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::LONG_it;
@@ -6810,6 +6921,49 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::RIPEMD160_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const SEED_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::SEED_cbc_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const SEED_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::SEED_cfb128_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const SEED_KEY_SCHEDULE,
+) = crate::lowlevel::ciphers::SEED_decrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const SEED_KEY_SCHEDULE,
+    core::ffi::c_int,
+) = crate::lowlevel::ciphers::SEED_ecb_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const SEED_KEY_SCHEDULE,
+) = crate::lowlevel::ciphers::SEED_encrypt;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const SEED_KEY_SCHEDULE,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) = crate::lowlevel::ciphers::SEED_ofb128_encrypt;
+const _: unsafe extern "C" fn(*const core::ffi::c_uchar, *mut SEED_KEY_SCHEDULE) =
+    crate::lowlevel::ciphers::SEED_set_key;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     usize,

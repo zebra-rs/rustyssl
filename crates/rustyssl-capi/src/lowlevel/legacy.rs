@@ -37,7 +37,7 @@ fn nonneg(len: c_long) -> Option<usize> {
 ///
 /// # Safety
 /// The buffers hold their lengths; `ivec` is null or holds 8 octets.
-unsafe fn cbc(
+pub(super) unsafe fn cbc(
     input: *const c_uchar,
     out: *mut c_uchar,
     length: c_long,
@@ -65,7 +65,7 @@ unsafe fn cbc(
 ///
 /// # Safety
 /// The buffers hold `length` octets; `ivec` is null or holds 8; `num` is null or valid.
-unsafe fn by_octets(
+pub(super) unsafe fn by_octets(
     input: *const c_uchar,
     out: *mut c_uchar,
     length: c_long,
@@ -97,7 +97,12 @@ unsafe fn by_octets(
 ///
 /// # Safety
 /// `input` and `out` are null or hold 8 octets.
-unsafe fn one_block(input: *const c_uchar, out: *mut c_uchar, c: &impl Block64, enc: bool) {
+pub(super) unsafe fn one_block(
+    input: *const c_uchar,
+    out: *mut c_uchar,
+    c: &impl Block64,
+    enc: bool,
+) {
     // SAFETY: the caller's guarantee.
     let Some(x) = (unsafe { read_array::<8>(input) }) else {
         return;
@@ -421,7 +426,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `data` is null or holds two `unsigned long`s.
-unsafe fn long_words(data: *mut c_ulong, f: impl FnOnce(&mut [u32; 2])) {
+pub(super) unsafe fn long_words(data: *mut c_ulong, f: impl FnOnce(&mut [u32; 2])) {
     if data.is_null() {
         return;
     }

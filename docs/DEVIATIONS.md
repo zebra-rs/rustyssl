@@ -202,6 +202,8 @@ OpenSSL never depends on them.
 | `DES_ede3_cfb_encrypt` with a bit width of 0 or less, `DES_ofb_encrypt` with one | loops without end (the width rounds to 0 octets a step); shifts a word by its width or more (undefined) | do nothing | `lowlevel::des::tests::bad_bit_widths_do_nothing` |
 | The deprecated Blowfish, CAST, RC2, and RC4 functions with a null key, buffer, IV, or position, or (the CBC, CFB-64, and OFB-64 ones) a negative length | dereference null and crash; CBC writes a block for a negative length, CFB-64 and OFB-64 read until they crash | do nothing | `lowlevel::legacy::tests::nulls_and_negative_lengths_do_nothing` |
 | `RC2_set_key` with a length of 0 or less; `RC4_set_key` with one | RC2 expands from the octet before the key (and for a negative length writes before it); RC4 reads 256 octets past the key | RC2 expands from a zero; RC4 does nothing | `lowlevel::legacy::tests::empty_rc2_and_rc4_keys` |
+| The deprecated IDEA, SEED, and Camellia functions with a null key, buffer, IV, or position, or (IDEA's CBC, CFB-64, and OFB-64) a negative length | dereference null and crash; IDEA's CBC writes a block for a negative length, its CFB-64 and OFB-64 read until they crash | do nothing (a negative IDEA position still becomes -1, as in OpenSSL) | `lowlevel::ciphers::tests::nulls_and_negative_lengths_do_nothing` |
+| A `CAMELLIA_KEY` whose `grand_rounds` isn't 1 to 4 (key setters leave 3 or 4) | reads the key table past the key (5 or more), or loops reading until it crashes (0 or less) | refused: nothing is written | `lowlevel::ciphers::tests::camellia_bad_grand_rounds_do_nothing` |
 
 ## Notes
 

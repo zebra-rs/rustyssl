@@ -318,10 +318,12 @@
 #include <openssl/bn.h>
 #include <openssl/cast.h>
 #include <openssl/buffer.h>
+#include <openssl/camellia.h>
 #include <openssl/crypto.h>
 #include <openssl/des.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/idea.h>
 #include <openssl/kdf.h>
 #include <openssl/lhash.h>
 #include <openssl/md4.h>
@@ -335,6 +337,7 @@
 #include <openssl/rc2.h>
 #include <openssl/rc4.h>
 #include <openssl/ripemd.h>
+#include <openssl/seed.h>
 #include <openssl/sha.h>
 #include <openssl/core_names.h>
 #include <openssl/core_dispatch.h>
@@ -6760,6 +6763,185 @@ static int legacy_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the deprecated IDEA, SEED, and Camellia functions over one key each, an IV, a
+ * position, and a CTR keystream block, kept between commands, and the digest commands' data:
+ *   ckey idea                      IDEA_set_encrypt_key and IDEA_set_decrypt_key: both schedules
+ *   ckey idea-odd                  an encryption schedule of 32-bit words from the data, and
+ *                                  IDEA_set_decrypt_key of it (through IDEA's inverse)
+ *   ckey idea-inplace              IDEA_set_decrypt_key with the same schedule for both
+ *   ckey seed                      SEED_set_key: the round keys
+ *   ckey camellia BITS             Camellia_set_key: its result, grand rounds, and words
+ *   civ, cnum N                    the IV from the data (and the positions 0, the keystream
+ *                                  block zeros); the position (-5 to 15)
+ *   cmode CIPHER MODE ENC LEN      MODE of LEN (at most 500) octets (bits for cfb1): ecb,
+ *                                  cbc, cfb64 and ofb64 (IDEA), cfb128 and ofb128 (SEED,
+ *                                  Camellia), cfb1, cfb8, and ctr (Camellia): the output, IV,
+ *                                  and position
+ *   cwords                         IDEA_encrypt on two unsigned longs from the data
+ */
+static IDEA_KEY_SCHEDULE probe_idea_ek, probe_idea_dk;
+static SEED_KEY_SCHEDULE probe_seed;
+static CAMELLIA_KEY probe_cmll;
+static unsigned char probe_c_iv[16], probe_c_ecount[16];
+static int probe_c_num;
+static unsigned int probe_c_unum;
+
+static int idea_seed_camellia_command(const char *command, const char *line)
+{
+    char a[16] = "", b[16] = "";
+    long n = 0, m = 0;
+    static unsigned char out[600];
+    const unsigned char *d;
+    size_t len = 0;
+
+    if (strcmp(command, "ckey") != 0 && strcmp(command, "civ") != 0 && strcmp(command, "cnum") != 0
+        && strcmp(command, "cmode") != 0 && strcmp(command, "cwords") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data + digest_offset;
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "ckey") == 0) {
+        sscanf(line, "%*s %15s %ld", a, &n);
+        if (strcmp(a, "idea") == 0) {
+            IDEA_set_encrypt_key(d, &probe_idea_ek);
+            IDEA_set_decrypt_key(&probe_idea_ek, &probe_idea_dk);
+            probe_bytes("ek", &probe_idea_ek, sizeof(probe_idea_ek));
+            probe_bytes("dk", &probe_idea_dk, sizeof(probe_idea_dk));
+            len = 16;
+        } else if (strcmp(a, "idea-odd") == 0) {
+            IDEA_KEY_SCHEDULE k;
+            size_t i;
+
+            for (i = 0; i < 54; i++) {
+                const unsigned char *w = d + i * 4;
+
+                (&k.data[0][0])[i] = (IDEA_INT)w[0] << 24 | (IDEA_INT)w[1] << 16 | (IDEA_INT)w[2] << 8 | w[3];
+                /* mostly small words, some near the modulus */
+                if (w[0] & 1)
+                    (&k.data[0][0])[i] &= w[0] & 2 ? 0x1ffff : 0xffff;
+            }
+            IDEA_set_decrypt_key(&k, &probe_idea_dk);
+            probe_bytes("dk", &probe_idea_dk, 52 * sizeof(IDEA_INT));
+            len = 70;
+        } else if (strcmp(a, "idea-inplace") == 0) {
+            IDEA_set_decrypt_key(&probe_idea_ek, &probe_idea_ek);
+            probe_bytes("ek", &probe_idea_ek, sizeof(probe_idea_ek));
+        } else if (strcmp(a, "seed") == 0) {
+            SEED_set_key(d, &probe_seed);
+            probe_bytes("ks", &probe_seed, sizeof(probe_seed));
+            len = 16;
+        } else if (strcmp(a, "camellia") == 0) {
+            CAMELLIA_KEY k = probe_cmll;
+            int r = Camellia_set_key(d, (int)n, &k);
+
+            printf(" %d", r);
+            if (r == 0) {
+                probe_cmll = k;
+                printf(" grand %d", probe_cmll.grand_rounds);
+                probe_bytes("words", probe_cmll.u.rd_key, sizeof(probe_cmll.u.rd_key));
+            }
+            len = 32;
+        } else {
+            printf(" skipped\n");
+            return 1;
+        }
+    } else if (strcmp(command, "civ") == 0) {
+        memcpy(probe_c_iv, d, 16);
+        memset(probe_c_ecount, 0, sizeof(probe_c_ecount));
+        probe_c_num = 0;
+        probe_c_unum = 0;
+        len = 5;
+    } else if (strcmp(command, "cnum") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (n < -5 || n > 15) {
+            printf(" skipped\n");
+            return 1;
+        }
+        probe_c_num = (int)n;
+        probe_c_unum = n < 0 ? 0 : (unsigned int)n;
+        printf(" %d", probe_c_num);
+    } else if (strcmp(command, "cwords") == 0) {
+        unsigned long w[2];
+
+        memcpy(w, d, sizeof(w));
+        IDEA_encrypt(w, &probe_idea_ek);
+        printf(" %08lx %08lx", w[0], w[1]);
+        len = 16;
+    } else {
+        int enc;
+        size_t octets;
+        int idea = 0, seed = 0;
+
+        sscanf(line, "%*s %15s %15s %ld %ld", a, b, &m, &n);
+        enc = (int)m;
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        octets = len;
+        idea = strcmp(a, "idea") == 0;
+        seed = strcmp(a, "seed") == 0;
+        if (!idea && !seed && probe_cmll.grand_rounds == 0) {
+            /* no Camellia key yet: OpenSSL would read past it */
+            printf(" skipped\n");
+            return 1;
+        }
+        if (strcmp(b, "ecb") == 0) {
+            if (idea)
+                IDEA_ecb_encrypt(d, out, enc ? &probe_idea_ek : &probe_idea_dk);
+            else if (seed)
+                SEED_ecb_encrypt(d, out, &probe_seed, enc);
+            else
+                Camellia_ecb_encrypt(d, out, &probe_cmll, enc);
+            octets = idea ? 8 : 16;
+        } else if (strcmp(b, "cbc") == 0) {
+            if (idea) {
+                IDEA_cbc_encrypt(d, out, (long)len, enc ? &probe_idea_ek : &probe_idea_dk, probe_c_iv, enc);
+                octets = (len + 7) / 8 * 8;
+            } else {
+                if (seed)
+                    SEED_cbc_encrypt(d, out, len, &probe_seed, probe_c_iv, enc);
+                else
+                    Camellia_cbc_encrypt(d, out, len, &probe_cmll, probe_c_iv, enc);
+                octets = (len + 15) / 16 * 16;
+            }
+        } else if (strcmp(b, "cfb64") == 0) {
+            IDEA_cfb64_encrypt(d, out, (long)len, &probe_idea_ek, probe_c_iv, &probe_c_num, enc);
+        } else if (strcmp(b, "ofb64") == 0) {
+            IDEA_ofb64_encrypt(d, out, (long)len, &probe_idea_ek, probe_c_iv, &probe_c_num);
+        } else if (strcmp(b, "cfb128") == 0) {
+            if (seed)
+                SEED_cfb128_encrypt(d, out, len, &probe_seed, probe_c_iv, &probe_c_num, enc);
+            else
+                Camellia_cfb128_encrypt(d, out, len, &probe_cmll, probe_c_iv, &probe_c_num, enc);
+        } else if (strcmp(b, "ofb128") == 0) {
+            if (seed)
+                SEED_ofb128_encrypt(d, out, len, &probe_seed, probe_c_iv, &probe_c_num);
+            else
+                Camellia_ofb128_encrypt(d, out, len, &probe_cmll, probe_c_iv, &probe_c_num);
+        } else if (strcmp(b, "cfb1") == 0) {
+            Camellia_cfb1_encrypt(d, out, len, &probe_cmll, probe_c_iv, &probe_c_num, enc);
+            octets = (len + 7) / 8;
+        } else if (strcmp(b, "cfb8") == 0) {
+            Camellia_cfb8_encrypt(d, out, len, &probe_cmll, probe_c_iv, &probe_c_num, enc);
+        } else {
+            Camellia_ctr128_encrypt(d, out, len, &probe_cmll, probe_c_iv, probe_c_ecount, &probe_c_unum);
+            probe_bytes("ecount", probe_c_ecount, 16);
+            printf(" unum %u", probe_c_unum);
+        }
+        probe_bytes("out", out, octets + 1);
+        probe_bytes("iv", probe_c_iv, 16);
+        printf(" num %d", probe_c_num);
+    }
+    digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -6791,7 +6973,8 @@ int main(void)
             || derive_command(command, line) || meth_command(command, line)
             || print_command(command, line) || lowlevel_command(command, line)
             || aes_command(command, line) || aead_command(command, line)
-            || des_command(command, line) || legacy_command(command, line)) {
+            || des_command(command, line) || legacy_command(command, line)
+            || idea_seed_camellia_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

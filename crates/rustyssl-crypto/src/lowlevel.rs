@@ -7,10 +7,12 @@
 
 pub mod aead;
 pub mod aes;
+pub mod camellia;
 pub mod des;
 pub mod hash;
 pub mod legacy;
 pub mod modes;
+pub mod seed;
 
 /// Copies `src` into `buf` from octet `at` on, as far as `buf` reaches.
 fn put(buf: &mut [u8], at: usize, src: &[u8]) {

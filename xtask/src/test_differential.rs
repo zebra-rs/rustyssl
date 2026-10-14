@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(36) {
+        match random.below(37) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -184,6 +184,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             32 => lowlevel_aead_session(&mut random, &mut out)?,
             33 => lowlevel_des_session(&mut random, &mut out)?,
             34 => lowlevel_legacy_session(&mut random, &mut out)?,
+            35 => lowlevel_ciphers_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -531,6 +532,62 @@ fn lowlevel_legacy_session(random: &mut Random, out: &mut String) -> Result {
             }
             7 => writeln!(out, "rc4key {}", 1 + random.below(300))?,
             _ => writeln!(out, "rc4 {}", length(random))?,
+        }
+    }
+    Ok(())
+}
+
+/// A random session of the deprecated IDEA, SEED, and Camellia functions: keys of each size
+/// (Camellia's refused ones too), IDEA decryption schedules from arbitrary words and in place,
+/// IVs, positions, and every mode around the block sizes.
+fn lowlevel_ciphers_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&["7", "8", "9", "15", "16", "17", "31", "32", "33"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(100),
+        }
+    };
+    let bits = |random: &mut Random| -> String {
+        if random.below(8) == 0 {
+            random.offset(-10, 300).to_string()
+        } else {
+            random.pick(&["128", "192", "256"]).to_string()
+        }
+    };
+    writeln!(out, "ckey idea")?;
+    writeln!(out, "ckey seed")?;
+    writeln!(out, "ckey camellia {}", random.pick(&["128", "192", "256"]))?;
+    writeln!(out, "civ")?;
+    for _ in 0..random.below(15) + 1 {
+        match random.below(12) {
+            0 => {
+                let which = random.pick(&["idea", "idea-odd", "idea-inplace", "seed"]);
+                writeln!(out, "ckey {which}")?;
+            }
+            1 => writeln!(out, "ckey camellia {}", bits(random))?,
+            2 => writeln!(out, "civ")?,
+            3 => writeln!(out, "cnum {}", random.offset(-5, 21))?,
+            4 => writeln!(out, "cwords")?,
+            _ => {
+                let (cipher, mode) = match random.below(3) {
+                    0 => ("idea", random.pick(&["ecb", "cbc", "cfb64", "ofb64"])),
+                    1 => ("seed", random.pick(&["ecb", "cbc", "cfb128", "ofb128"])),
+                    _ => (
+                        "camellia",
+                        random.pick(&["ecb", "cbc", "cfb128", "ofb128", "cfb1", "cfb8", "ctr"]),
+                    ),
+                };
+                writeln!(
+                    out,
+                    "cmode {cipher} {mode} {} {}",
+                    random.below(2),
+                    length(random)
+                )?;
+            }
         }
     }
     Ok(())

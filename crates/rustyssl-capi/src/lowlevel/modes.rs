@@ -141,7 +141,7 @@ ffi_export! {
 /// # Safety
 /// `input` holds and `out` has room for `len` octets; `ivec` and `ecount_buf` hold 16; `num`
 /// is null or valid for reads and writes.
-unsafe fn ctr(
+pub(crate) unsafe fn ctr(
     input: *const c_uchar,
     out: *mut c_uchar,
     len: usize,
