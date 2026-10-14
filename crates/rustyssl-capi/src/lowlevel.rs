@@ -7,6 +7,7 @@
 //! overlaps the output is copied first (which is what OpenSSL computes for one buffer), and
 //! the block, CBC, and CTR functions the caller passes run through traits the core modes call.
 
+pub(crate) mod aead;
 pub(crate) mod aes;
 pub(crate) mod hash;
 pub(crate) mod modes;

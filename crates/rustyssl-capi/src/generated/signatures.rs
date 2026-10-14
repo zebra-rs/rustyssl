@@ -2269,6 +2269,49 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     block128_f,
 ) = crate::lowlevel::modes::CRYPTO_cbc128_encrypt;
+const _: unsafe extern "C" fn(*mut CCM128_CONTEXT, *const core::ffi::c_uchar, usize) =
+    crate::lowlevel::aead::CRYPTO_ccm128_aad;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ccm128_decrypt;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    ccm128_f,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ccm128_decrypt_ccm64;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ccm128_encrypt;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    ccm128_f,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ccm128_encrypt_ccm64;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    core::ffi::c_uint,
+    core::ffi::c_uint,
+    *mut core::ffi::c_void,
+    block128_f,
+) = crate::lowlevel::aead::CRYPTO_ccm128_init;
+const _: unsafe extern "C" fn(
+    *mut CCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ccm128_setiv;
+const _: unsafe extern "C" fn(*mut CCM128_CONTEXT, *mut core::ffi::c_uchar, usize) -> usize =
+    crate::lowlevel::aead::CRYPTO_ccm128_tag;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -2375,6 +2418,51 @@ const _: unsafe extern "C" fn(core::ffi::c_int, *mut core::ffi::c_void, *mut CRY
     crate::ex_data::CRYPTO_free_ex_data;
 const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
     crate::ex_data::CRYPTO_free_ex_index;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_aad;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_decrypt;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    ctr128_f,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_decrypt_ctr32;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_encrypt;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    ctr128_f,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_encrypt_ctr32;
+const _: unsafe extern "C" fn(
+    *mut GCM128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_gcm128_finish;
+const _: unsafe extern "C" fn(*mut GCM128_CONTEXT, *mut core::ffi::c_void, block128_f) =
+    crate::lowlevel::aead::CRYPTO_gcm128_init;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, block128_f) -> *mut GCM128_CONTEXT =
+    crate::lowlevel::aead::CRYPTO_gcm128_new;
+const _: unsafe extern "C" fn(*mut GCM128_CONTEXT) = crate::lowlevel::aead::CRYPTO_gcm128_release;
+const _: unsafe extern "C" fn(*mut GCM128_CONTEXT, *const core::ffi::c_uchar, usize) =
+    crate::lowlevel::aead::CRYPTO_gcm128_setiv;
+const _: unsafe extern "C" fn(*mut GCM128_CONTEXT, *mut core::ffi::c_uchar, usize) =
+    crate::lowlevel::aead::CRYPTO_gcm128_tag;
 const _: unsafe extern "C" fn(*const CRYPTO_EX_DATA, core::ffi::c_int) -> *mut core::ffi::c_void =
     crate::ex_data::CRYPTO_get_ex_data;
 const _: unsafe extern "C" fn(
@@ -2441,6 +2529,61 @@ const _: unsafe extern "C" fn(
     block128_f,
 ) -> usize = crate::lowlevel::modes::CRYPTO_nistcts128_encrypt_block;
 const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_aad;
+const _: unsafe extern "C" fn(*mut OCB128_CONTEXT) = crate::lowlevel::aead::CRYPTO_ocb128_cleanup;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *mut OCB128_CONTEXT,
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_copy_ctx;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_decrypt;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_encrypt;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_finish;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_void,
+    block128_f,
+    block128_f,
+    ocb128_f,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_init;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_void,
+    block128_f,
+    block128_f,
+    ocb128_f,
+) -> *mut OCB128_CONTEXT = crate::lowlevel::aead::CRYPTO_ocb128_new;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_setiv;
+const _: unsafe extern "C" fn(
+    *mut OCB128_CONTEXT,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_ocb128_tag;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
     usize,
@@ -2504,6 +2647,14 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_char = crate::string::CRYPTO_strndup;
+const _: unsafe extern "C" fn(
+    *const XTS128_CONTEXT,
+    *const core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    usize,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::lowlevel::aead::CRYPTO_xts128_encrypt;
 const _: unsafe extern "C" fn(
     usize,
     *const core::ffi::c_char,
