@@ -549,7 +549,7 @@ Everything else depends on this phase.
     - `OPENSSL_INIT_ADD_ALL_CIPHERS`/`_DIGESTS` (the name tables, 3.3 and 3.4);
     - `OPENSSL_INIT_ASYNC` (6.11);
     - `OPENSSL_INIT_ENGINE_*` (9.3);
-    - loading a configuration file (3.12 and 6.1).
+    - loading a configuration file (3.12b).
 
     `OPENSSL_INIT_BASE_ONLY` lives in an internal header, so applications can't name it,
     and it isn't supported. `OPENSSL_thread_stop` waits for 1.3, and ERR's per-thread state
@@ -2727,9 +2727,51 @@ have run for at least 24 CPU-hours with no findings.
       cipher, a custom cipher, CTR with `ALWAYS_CALL_INIT`, and copies); the probe's `cmeth`
       (a toy cipher of each mode, block size, and flag; corpus `cipher_meth.txt`, random
       `cipher_meth` sessions). No fuzz target: nothing here parses input.
-- [ ] **3.12 Config subset:** enough of `openssl.cnf` (see 6.1) to activate providers and set
+- [ ] **3.12 Configuration files:** `openssl.cnf`, to activate providers and set
   `default_properties`. Distro crypto policies depend on it. Includes
   `OSSL_LIB_CTX_load_config` (from 3.1b).
+  - **Decision:** the whole file format and the `CONF`/`NCONF` interface, and the
+    configuration modules, move here from 6.1. Distributions' files use `.include`,
+    variables, and sections a subset would misread, and loading one is what every
+    application does at start-up. 6.1 keeps `ASN1_generate_nconf`/`ASN1_generate_v3`.
+  - [x] **3.12a The file format and the `CONF`/`NCONF` interface:** a new crate,
+    `rustyssl-conf` (safe, sans-IO: logical lines from OpenSSL's 512-octet reads, and what
+    each line is, with the variable expansion bounded at 64 KiB as OpenSSL bounds it), and
+    `conf.rs` and `conf/load.rs` in capi (`conf_lib.c`, `conf_api.c`, `conf_def.c`, and
+    `CONF_parse_list` and `CONF_get1_default_config_file`): 29 exports; libcrypto now 2,211 of
+    5,876.
+    - **Decision:** a `CONF` holds what it loads as OpenSSL does, in its public structures:
+      a hash table (the 1.4 one) of `CONF_VALUE`s, one per value and one per section, whose
+      value is the section's stack of values in order; the dump follows the table's order.
+      Every `NCONF_*` call goes through the configuration's method table, which applications
+      may make (`conftypes.h`); the default and WIN32 methods' character classes are
+      OpenSSL's tables, extracted from the reference's `conf_def.h` by a script.
+    - **Decision:** the loader keeps OpenSSL's include handling: a stack of BIOs, one
+      directory read at a time (whose next `.cnf` or `.conf` file comes in whenever any file
+      ends), a missing include not fatal, `OPENSSL_CONF_INCLUDE` over the `includedir`
+      pragma, and the line count across files; and its quirks, among them that a second load
+      into a configuration fails (its `default` section exists) and that a NUL in a line
+      joins it to the next.
+    - New deviations: `NCONF_free_data` clears what it frees (OpenSSL leaves the freed table,
+      which a later use or `NCONF_free` reads again); a failed second load keeps the table as
+      it was (OpenSSL leaves its freed section in it); `CONF_parse_list` with a NUL separator
+      gives the list as one item (OpenSSL reads past its end). A method without its functions
+      or character classes, a NULL configuration to `NCONF_get0_libctx` or
+      `NCONF_get_section_names`, and a NULL callback to `CONF_parse_list` fail where OpenSSL
+      crashes.
+    - `tests/c/conf.c` (14 checks: the grammar, lookups, numbers, errors with their lines and
+      data, pragmas, long and odd lines, includes of files and directories, files, `FILE`s,
+      the classic functions, the WIN32 method, a method of the test's own, `CONF_parse_list`);
+      the probe's `cnf` (corpus `conf.txt`, random `conf` sessions); the `conf` fuzz target
+      (every value in a section's stack is what `NCONF_get_string` finds; includes renamed so
+      no file is read).
+  - [ ] **3.12b The configuration modules:** `CONF_modules_load_file(_ex)`,
+    `CONF_modules_load`, `CONF_module_add` and the `CONF_imodule_*` accessors,
+    `CONF_modules_unload`/`_finish`, `OPENSSL_load_builtin_modules`, `OPENSSL_config`,
+    `OSSL_LIB_CTX_load_config`, and loading at `OPENSSL_INIT_LOAD_CONFIG`; the built-in
+    modules: `providers` (activation, `soft_load`, `identity`, parameters), `alg_section`
+    (`default_properties`), `random`, `ssl_conf` (kept for libssl), `oid_section`,
+    `stbl_section`, and `engines`.
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random
@@ -3175,12 +3217,8 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
 
 ## Phase 6: PKI containers, config, misc libcrypto
 
-- [ ] **6.1 CONF/NCONF and the config modules:**
-  - the full `openssl.cnf` grammar: `.include`, `.pragma` (dollarid, abspath, includedir),
-    `$var` and `ENV::` expansion
-  - `CONF_modules_load_file`, `OPENSSL_config`, `OPENSSL_INIT_LOAD_CONFIG`
-  - modules: providers, `alg_section`, random, `ssl_conf` (handed to libssl), engines
-    (compatible no-op), `oid_section`, `stbl_section`
+- [ ] **6.1 Config-driven ASN.1** (the file format, the `CONF`/`NCONF` interface, and the
+  configuration modules moved to 3.12):
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language
 - [ ] **6.2 UI:** `UI_*` (including `UI_OpenSSL` reading the tty), `UI_UTIL_read_pw`,
   `PEM_def_callback` (from 2.6), `EVP_read_pw_string`.
