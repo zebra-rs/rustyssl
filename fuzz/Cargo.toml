@@ -285,3 +285,9 @@ name = "lowlevel_aead"
 path = "fuzz_targets/lowlevel_aead.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "lowlevel_des"
+path = "fuzz_targets/lowlevel_des.rs"
+test = false
+doc = false
