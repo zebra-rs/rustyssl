@@ -13,13 +13,14 @@
 //! are the same for each cipher but for how a block's octets become words; they act on
 //! octets here, through [`Block64`].
 
+pub mod idea;
 mod tables;
 
 use tables::{BF_P, BF_S, CAST_S, RC2_PITABLE};
 use zeroize::Zeroize;
 
 /// The entry at `idx`, reading every entry and keeping the one at `idx` by a mask.
-fn ct_get(table: &[u32], idx: usize) -> u32 {
+pub(super) fn ct_get(table: &[u32], idx: usize) -> u32 {
     let mut r = 0u32;
     for (i, v) in table.iter().enumerate() {
         let d = i ^ idx;
@@ -40,7 +41,7 @@ fn ct_set(table: &mut [u32], idx: usize, value: u32) {
 }
 
 /// The octet table entry at `idx`, by a scan.
-fn ct_get8(table: &[u8], idx: usize) -> u8 {
+pub(super) fn ct_get8(table: &[u8], idx: usize) -> u8 {
     let mut r = 0u8;
     for (i, v) in table.iter().enumerate() {
         let d = i ^ idx;
