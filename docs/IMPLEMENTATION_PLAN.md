@@ -2473,9 +2473,34 @@ have run for at least 24 CPU-hours with no findings.
       functions); the probe's `aeskey`, `aesiv`, `aesnum`, `aesblock`, `aesmode`, `aeswrap`,
       `cts`, and `ctr` (corpus `lowlevel_aes.txt`, random `lowlevel_aes` sessions); the
       `lowlevel_modes` fuzz target checks the inverses, the forms' agreement, and chunking.
-  - [ ] **3.8c The AEAD helpers:** `CRYPTO_gcm128_*`, `CRYPTO_ccm128_*`, `CRYPTO_ocb128_*`,
-    and `CRYPTO_xts128_encrypt` (30 exports). The CCM and XTS contexts have no constructor:
-    applications can only lay them out as OpenSSL's `modes_local.h` does.
+  - [x] **3.8c The AEAD helpers:** `CRYPTO_gcm128_*`, `CRYPTO_ccm128_*`, `CRYPTO_ocb128_*`,
+    and `CRYPTO_xts128_encrypt`: `rustyssl_crypto::lowlevel::aead` and `lowlevel/aead.rs` in
+    capi: 30 exports; libcrypto now 2,028 of 5,876.
+    - **Decision:** a GCM or OCB context comes only from its `_new` (the types are opaque), so
+      its layout is ours: the functions and keys, then the state, in one block from the
+      OpenSSL allocator with nothing allocated beside it (an application frees an OCB context
+      with `OPENSSL_free` after `CRYPTO_ocb128_cleanup`; the `L_i` table is inline, all 64 an
+      OCB message can need). CCM and XTS contexts have no constructor, so an application can
+      only lay them out as OpenSSL's `modes_local.h` does: capi mirrors those two layouts
+      (they aren't in the public headers, so codegen can't produce them; the C test and the
+      probe lay them out the same way).
+    - **Decision:** GHASH is the `ghash` crate's (constant time), resumed from OpenSSL's
+      running hash by folding it into the first block; the steps around it are OpenSSL's,
+      including its buffer of not-yet-hashed ciphertext.
+    - Quirks kept: GCM's `finish` resets nothing, so a second `finish`, or a `tag` after one,
+      hashes the buffered octets again; a tag of no octets matches; `finish` returns
+      `CRYPTO_memcmp`'s 0 or 1, or -1; AAD after data fails with -2; the CTR-function forms
+      stream in 3 KiB strides; CCM's operations with the wrong length fail with -1 leaving
+      the nonce block half reset, and only encryption counts blocks against the 2^61 limit;
+      odd tag and length-field sizes go into the flags as OpenSSL computes them; OCB allows a
+      partial block only in the last call; XTS decryption of a partial last block steals
+      from the block before.
+    - New deviation: null contexts, buffers, tags, and functions.
+    - `tests/c/lowlevel_aead.c` (131 checks: every mode over logging block and bulk
+      functions, in pieces, both ways, with the states above); the probe's `gcm*`, `ccm*`,
+      `ocb*`, and `xts` commands (corpus `lowlevel_aead.txt`, random `lowlevel_aead`
+      sessions); the `lowlevel_aead` fuzz target checks chunking, the forms' agreement, the
+      inverses, and arbitrary call scripts.
   - [ ] **3.8d DES:** the `DES_*` family, `DES_crypt` and `DES_fcrypt` included (33 exports).
   - [ ] **3.8e The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
     `Camellia_*`, and `RC4*` (50 exports).

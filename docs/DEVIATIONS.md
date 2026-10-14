@@ -196,6 +196,7 @@ OpenSSL never depends on them.
 | An `AES_KEY` whose `rounds` isn't 10, 12, or 14 (never set, or overwritten) | reads round keys past the schedule | refused: the functions do nothing | `lowlevel::aes::tests::nulls_and_bad_keys_do_nothing` |
 | `CRYPTO_ctr128_encrypt`(`_ctr32`), `CRYPTO_ofb128_encrypt`, `CRYPTO_cfb128_encrypt`, and the AES ones over them, with a position (`*num`) of 16 or more | read past the keystream block or IV | refused: nothing changes | `lowlevel::modes::tests::positions_past_the_block_are_refused` |
 | `CRYPTO_128_unwrap_pad` failing a check | zeroes `inlen` octets of output, 8 past the `inlen - 8` it writes | zeroes the `inlen - 8` | `lowlevel::modes::tests::failed_padded_unwraps_zero_only_their_output` |
+| The AEAD helpers (`CRYPTO_gcm128_*`, `CRYPTO_ccm128_*`, `CRYPTO_ocb128_*`, `CRYPTO_xts128_encrypt`) with a null context, buffer, IV, tag, or function (a CCM or XTS context without its block functions included) | dereference null or call through it, and crash | return -1 or 0 (null from `CRYPTO_gcm128_new` and `CRYPTO_ocb128_new`), or do nothing | `lowlevel::aead::tests::nulls_fail` |
 
 ## Notes
 
