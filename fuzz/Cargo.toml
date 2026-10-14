@@ -315,3 +315,9 @@ name = "skey"
 path = "fuzz_targets/skey.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "conf"
+path = "fuzz_targets/conf.rs"
+test = false
+doc = false
