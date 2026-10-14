@@ -309,3 +309,9 @@ name = "bio_evp"
 path = "fuzz_targets/bio_evp.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "skey"
+path = "fuzz_targets/skey.rs"
+test = false
+doc = false

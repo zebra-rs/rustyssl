@@ -1,0 +1,29 @@
+# Opaque symmetric keys (step 3.10).
+symkey AES 16
+symkey AES 24
+symkey AES 32
+symkey AES 15
+symkey AES 0
+symkey GENERIC-SECRET 1
+symkey GENERIC-SECRET 64
+symkey GENERIC-SECRET 0
+symkey HMAC 20
+symkey aes 16
+symkeyenc AES-128-CBC AES 16 16 1
+symkeyenc AES-128-CBC AES 16 16 0
+symkeyenc AES-128-CBC GENERIC-SECRET 16 16 1
+symkeyenc AES-128-CBC AES 32 16 1
+symkeyenc AES-128-CBC AES 16 12 1
+symkeyenc AES-256-CBC AES 32 16 1
+symkeyenc AES-192-ECB AES 24 0 1
+symkeyenc AES-128-CTR AES 16 16 1
+symkeyenc AES-128-GCM AES 16 12 1
+symkeyenc AES-128-GCM AES 16 16 1
+symkeyenc AES-128-GCM GENERIC-SECRET 24 12 1
+symkeyenc ARIA-128-CBC GENERIC-SECRET 16 16 1
+symkeyenc CAMELLIA-256-CFB GENERIC-SECRET 32 16 0
+symkeyenc CHACHA20 GENERIC-SECRET 32 16 1
+symkeyenc DES-EDE3-CBC GENERIC-SECRET 24 8 1
+symkeyenc NO-SUCH AES 16 16 1
+symkeyenc AES-128-CBC NO-SUCH 16 16 1
+symkeyenc AES-128-CBC AES 0 16 1

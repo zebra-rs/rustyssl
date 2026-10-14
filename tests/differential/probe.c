@@ -7078,6 +7078,85 @@ static int bio_evp_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for opaque symmetric keys, over the digest commands' data:
+ *   symkey TYPE LEN                 EVP_SKEY_import_raw_key of LEN octets (at most 64) as TYPE:
+ *                                   its type, provider, and raw key, or NULL
+ *   symkeyenc CIPHER TYPE LEN IVLEN ENC
+ *                                   a key as above through EVP_CipherInit_SKEY of CIPHER, with
+ *                                   IVLEN octets of IV, for ENC, then 40 octets through it: the
+ *                                   results, and whether they match the raw key's
+ */
+static int skey_command(const char *command, const char *line)
+{
+    char type[32] = "", cipher[32] = "";
+    long len = 0, ivlen = 0, enc = 1;
+    EVP_SKEY *k = NULL;
+    const unsigned char *d;
+
+    if (strcmp(command, "symkey") != 0 && strcmp(command, "symkeyenc") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data + 100;
+    if (strcmp(command, "symkey") == 0)
+        sscanf(line, "%*s %31s %ld", type, &len);
+    else
+        sscanf(line, "%*s %31s %31s %ld %ld %ld", cipher, type, &len, &ivlen, &enc);
+    if (len < 0 || len > 64 || ivlen < 0 || ivlen > 32) {
+        printf("%s: skipped\n", line);
+        return 1;
+    }
+    printf("%s:", line);
+    k = EVP_SKEY_import_raw_key(NULL, type, (unsigned char *)d, (size_t)len, NULL);
+    if (k == NULL) {
+        printf(" NULL");
+    } else {
+        const unsigned char *raw = NULL;
+        size_t rawlen = 0;
+
+        printf(" %s/%s", EVP_SKEY_get0_skeymgmt_name(k), EVP_SKEY_get0_provider_name(k));
+        if (EVP_SKEY_get0_raw_key(k, &raw, &rawlen) == 1)
+            probe_bytes("raw", raw, rawlen);
+    }
+    if (strcmp(command, "symkeyenc") == 0 && k == NULL) {
+        /* OpenSSL's ciphers that take key objects read through a NULL one and crash. */
+        printf(" no key");
+    } else if (strcmp(command, "symkeyenc") == 0) {
+        EVP_CIPHER *c = EVP_CIPHER_fetch(NULL, cipher, NULL);
+        EVP_CIPHER_CTX *a = EVP_CIPHER_CTX_new(), *b = EVP_CIPHER_CTX_new();
+        unsigned char out1[128], out2[128];
+        int r1, r2, n1 = 0, n2 = 0, f1 = 0, f2 = 0;
+
+        r1 = EVP_CipherInit_SKEY(a, c, k, d + 200, (size_t)ivlen, (int)enc, NULL);
+        printf(" init %d", r1);
+        if (r1 == 1) {
+            r1 = EVP_CipherUpdate(a, out1, &n1, d + 300, 40) && EVP_CipherFinal_ex(a, out1 + n1, &f1);
+            printf(" run %d", r1);
+            if (r1 == 1)
+                probe_bytes("out", out1, (size_t)(n1 + f1));
+            /* The same cipher keyed with the raw octets, when their length is the cipher's. */
+            if (c != NULL && len == EVP_CIPHER_get_key_length(c) && (ivlen == EVP_CIPHER_get_iv_length(c))) {
+                r2 = EVP_CipherInit_ex2(b, c, d, d + 200, (int)enc, NULL)
+                    && EVP_CipherUpdate(b, out2, &n2, d + 300, 40) && EVP_CipherFinal_ex(b, out2 + n2, &f2);
+                printf(" %s", r1 == r2 && n1 + f1 == n2 + f2 && memcmp(out1, out2, (size_t)(n1 + f1)) == 0
+                        ? "same" : "differ");
+            }
+        }
+        EVP_CIPHER_CTX_free(a);
+        EVP_CIPHER_CTX_free(b);
+        EVP_CIPHER_free(c);
+    }
+    printf("\n");
+    EVP_SKEY_free(k);
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -7110,7 +7189,8 @@ int main(void)
             || print_command(command, line) || lowlevel_command(command, line)
             || aes_command(command, line) || aead_command(command, line)
             || des_command(command, line) || legacy_command(command, line)
-            || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)) {
+            || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
+            || skey_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
