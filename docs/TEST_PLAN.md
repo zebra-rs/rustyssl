@@ -71,10 +71,11 @@ rustyssl itself**. You can only regenerate golden files with
   AES-KW/KWP, HMAC, CMAC, HKDF, PBKDF2, RSA (PKCS#1 sign, verify, encrypt, decrypt; OAEP;
   PSS), ECDSA (every curve, DER and P1363 encodings), ECDH (including invalid-curve points),
   X25519, X448, Ed25519, Ed448, DSA, ML-KEM, ML-DSA, primality.
-  **Today** (step 3.13c), `cargo xtask test-wycheproof` runs the symmetric files the default
+  **Today** (steps 3.13c and 4.3a), `cargo xtask test-wycheproof` runs the files the default
   provider implements (`tests/wycheproof/files.txt`: AEADs, CBC, XTS, key wrap, CMAC, GMAC,
-  HMAC, KMAC, SipHash, HKDF, PBKDF2, PBES2) through `tests/wycheproof/runner.c` on the
-  reference and on rustyssl. rustyssl must print what the reference prints, error codes
+  HMAC, KMAC, SipHash, HKDF, PBKDF2, PBES2; RSA's OAEP and PKCS #1 v1.5 decryption, the
+  latter with implicit rejection off and on, PKCS #1 v1.5 and PSS verification, and PKCS #1
+  v1.5 signing) through `tests/wycheproof/runner.c` on the reference and on rustyssl. rustyssl must print what the reference prints, error codes
   included, and agree with Wycheproof's verdict; where the reference itself departs from it,
   the test is listed with the reason in `tests/wycheproof/reference.txt`.
 - **NIST CAVP/ACVP:** SHA-1/2/3, SHAKE, the AES modes, the DRBGs, the SP 800-108 and 800-56C
@@ -375,7 +376,7 @@ Linux x86_64:
 - the reference's `openssl` tool on rustyssl (`test-apps`), and the L6 subset implemented so
   far: upstream `evp_test` on the data files in `tests/openssl-suite/evp_test.txt`
   (`test-openssl-suite`);
-- Wycheproof's symmetric vectors on both libraries (`test-wycheproof`, layer L2);
+- Wycheproof's symmetric and RSA vectors on both libraries (`test-wycheproof`, layer L2);
 - Miri, `cargo deny`, and `cargo vet`;
 - a codegen job that fails if regenerating from `abi/` or `cargo xtask coverage` changes any
   committed file, or if an export is defined without a `tests/c` program that calls it;

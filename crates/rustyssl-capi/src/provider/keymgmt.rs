@@ -957,8 +957,16 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
     pending(c"DH:dhKeyAgreement:1.2.840.113549.1.3.1"),
     pending(c"DHX:X9.42 DH:dhpublicnumber:1.2.840.10046.2.1"),
     pending(c"DSA:dsaEncryption:1.2.840.10040.4.1"),
-    pending(c"RSA:rsaEncryption:1.2.840.113549.1.1.1"),
-    pending(c"RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10"),
+    alg_desc(
+        c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
+        &super::rsa_kmgmt::RSA_KEYMGMT,
+        c"OpenSSL RSA implementation",
+    ),
+    alg_desc(
+        c"RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10",
+        &super::rsa_kmgmt::RSAPSS_KEYMGMT,
+        c"OpenSSL RSA-PSS implementation",
+    ),
     pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
     pending(c"X25519:1.3.101.110"),
     pending(c"X448:1.3.101.111"),

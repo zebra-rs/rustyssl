@@ -26,6 +26,19 @@
  *       PKCS5_PBKDF2_HMAC. Prints `K:<dk>` or `K:fail`.
  *   pbes2 <digest> <cipher> <password> <salt> <iter> <iv> <msg> <ct>
  *       PBKDF2 for the cipher's key, then as `cipher`. Prints as `cipher`.
+ *   rsadec <padding> <digest> <mgf1> <key> <label> <ct>
+ *       Decrypts ct with the RSA key (see below), `oaep` (with the digest, MGF1 digest, and
+ *       label) or `pkcs1`. Prints `D:<msg>` or `D:fail`; for `pkcs1`, that with implicit
+ *       rejection off, then `I:<msg>` or `I:fail` with it on (the default).
+ *   rsaver <padding> <digest> <mgf1> <saltlen> <key> <msg> <sig>
+ *       EVP_DigestVerify of sig over msg, `pkcs1` or `pss` (with the MGF1 digest and the salt
+ *       length). Prints `V:ok` or `V:fail`.
+ *   rsasign <digest> <key> <msg>
+ *       EVP_DigestSign with PKCS #1 v1.5 padding. Prints `S:<sig>` or `S:fail`.
+ *
+ * An RSA key is its numbers in hex, comma-separated: n and e (a public key), then d, then
+ * optionally the primes, their exponents, and the coefficients, as OpenSSL's parameters
+ * rsa-factor1..k, rsa-exponent1..k, rsa-coefficient1..k-1 name them.
  *
  * A failure is printed with the library and reason of the error it left, `fail(<lib>/<r>)`.
  */
@@ -36,10 +49,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <openssl/bn.h>
 #include <openssl/core_names.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
+#include <openssl/param_build.h>
+#include <openssl/rsa.h>
 
 struct buf {
     unsigned char *p;
@@ -376,6 +392,143 @@ static void pbes2(char **w)
     free(key.p), free(pass.p), free(salt.p), free(iv.p), free(msg.p), free(ct.p);
 }
 
+/* An RSA key from its numbers (see above), or NULL. */
+static EVP_PKEY *rsa_key(const char *numbers)
+{
+    /* The builder keeps the names, so they're static. */
+    static const char *const names[3][10] = {
+        { "rsa-factor1", "rsa-factor2", "rsa-factor3", "rsa-factor4", "rsa-factor5",
+          "rsa-factor6", "rsa-factor7", "rsa-factor8", "rsa-factor9", "rsa-factor10" },
+        { "rsa-exponent1", "rsa-exponent2", "rsa-exponent3", "rsa-exponent4", "rsa-exponent5",
+          "rsa-exponent6", "rsa-exponent7", "rsa-exponent8", "rsa-exponent9",
+          "rsa-exponent10" },
+        { "rsa-coefficient1", "rsa-coefficient2", "rsa-coefficient3", "rsa-coefficient4",
+          "rsa-coefficient5", "rsa-coefficient6", "rsa-coefficient7", "rsa-coefficient8",
+          "rsa-coefficient9", NULL }
+    };
+    char *copy = strdup(numbers), *item, *save = NULL;
+    BIGNUM *nums[32];
+    size_t count = 0, i, k;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *params = NULL;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    EVP_PKEY *pkey = NULL;
+
+    for (item = strtok_r(copy, ",", &save); item != NULL && count < 32;
+         item = strtok_r(NULL, ",", &save)) {
+        nums[count] = NULL;
+        BN_hex2bn(&nums[count], item);
+        count++;
+    }
+    OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, nums[0]);
+    OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, nums[1]);
+    if (count > 2)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D, nums[2]);
+    /* The primes, then their exponents, then the coefficients: k, k, and k - 1 numbers. */
+    k = count > 3 ? (count - 3 + 1) / 3 : 0;
+    for (i = 3; i < count && k <= 10; i++) {
+        size_t j = i - 3, which = j < k ? 0 : j < 2 * k ? 1 : 2;
+
+        OSSL_PARAM_BLD_push_BN(bld, names[which][j - which * k], nums[i]);
+    }
+    params = OSSL_PARAM_BLD_to_param(bld);
+    if (ctx == NULL || EVP_PKEY_fromdata_init(ctx) <= 0
+        || EVP_PKEY_fromdata(ctx, &pkey, count > 2 ? EVP_PKEY_KEYPAIR : EVP_PKEY_PUBLIC_KEY,
+                             params) <= 0)
+        pkey = NULL;
+    EVP_PKEY_CTX_free(ctx);
+    OSSL_PARAM_free(params);
+    OSSL_PARAM_BLD_free(bld);
+    for (i = 0; i < count; i++)
+        BN_free(nums[i]);
+    free(copy);
+    return pkey;
+}
+
+/* One decryption of ct; `implicit` is the PKCS #1 v1.5 implicit-rejection setting. */
+static void rsa_decrypt_one(const char *what, EVP_PKEY *key, char **w, struct buf *label,
+                            struct buf *ct, int implicit)
+{
+    EVP_PKEY_CTX *ctx = key == NULL ? NULL : EVP_PKEY_CTX_new(key, NULL);
+    unsigned char *out = malloc(ct->n + 1);
+    size_t n = ct->n;
+    int oaep = strcmp(w[0], "oaep") == 0;
+    int ok = ctx != NULL && EVP_PKEY_decrypt_init(ctx) > 0
+        && EVP_PKEY_CTX_set_rsa_padding(ctx, oaep ? RSA_PKCS1_OAEP_PADDING
+                                                  : RSA_PKCS1_PADDING) > 0;
+
+    if (ok && oaep) {
+        ok = EVP_PKEY_CTX_set_rsa_oaep_md_name(ctx, w[1], NULL) > 0
+            && EVP_PKEY_CTX_set_rsa_mgf1_md_name(ctx, w[2], NULL) > 0;
+        /* An empty label is no label (setting a NULL one fails). */
+        if (ok && label->n > 0) {
+            unsigned char *l = OPENSSL_memdup(label->p, label->n);
+
+            ok = EVP_PKEY_CTX_set0_rsa_oaep_label(ctx, l, (int)label->n) > 0;
+            if (!ok)
+                OPENSSL_free(l);
+        }
+    }
+    if (ok && !oaep)
+        ok = EVP_PKEY_CTX_ctrl_str(ctx, "rsa_pkcs1_implicit_rejection",
+                                   implicit ? "1" : "0") > 0;
+    ok = ok && EVP_PKEY_decrypt(ctx, out, &n, ct->p, ct->n) > 0;
+    field(what, ok, out, n);
+    EVP_PKEY_CTX_free(ctx);
+    free(out);
+}
+
+static void rsa_decrypt(char **w)
+{
+    EVP_PKEY *key = rsa_key(w[3]);
+    struct buf label = hex(w[4]), ct = hex(w[5]);
+
+    rsa_decrypt_one("D", key, w, &label, &ct, 0);
+    if (strcmp(w[0], "pkcs1") == 0)
+        rsa_decrypt_one("I", key, w, &label, &ct, 1);
+    EVP_PKEY_free(key);
+    free(label.p), free(ct.p);
+}
+
+static void rsa_verify(char **w)
+{
+    EVP_PKEY *key = rsa_key(w[4]);
+    EVP_MD_CTX *md = EVP_MD_CTX_new();
+    EVP_PKEY_CTX *pctx = NULL;
+    struct buf msg = hex(w[5]), sig = hex(w[6]);
+    int ok = key != NULL && EVP_DigestVerifyInit_ex(md, &pctx, w[1], NULL, NULL, key, NULL) > 0;
+
+    if (ok && strcmp(w[0], "pss") == 0)
+        ok = EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING) > 0
+            && EVP_PKEY_CTX_set_rsa_mgf1_md_name(pctx, w[2], NULL) > 0
+            && EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, atoi(w[3])) > 0;
+    ok = ok && EVP_DigestVerify(md, sig.p, sig.n, msg.p, msg.n) == 1;
+    printf(" V:");
+    if (ok)
+        printf("ok");
+    else
+        print_fail();
+    EVP_MD_CTX_free(md);
+    EVP_PKEY_free(key);
+    free(msg.p), free(sig.p);
+}
+
+static void rsa_sign(char **w)
+{
+    EVP_PKEY *key = rsa_key(w[1]);
+    EVP_MD_CTX *md = EVP_MD_CTX_new();
+    struct buf msg = hex(w[2]);
+    unsigned char sig[2048];
+    size_t n = sizeof(sig);
+    int ok = key != NULL && EVP_DigestSignInit_ex(md, NULL, w[0], NULL, NULL, key, NULL) > 0
+        && EVP_DigestSign(md, sig, &n, msg.p, msg.n) > 0;
+
+    field("S", ok, sig, n);
+    EVP_MD_CTX_free(md);
+    EVP_PKEY_free(key);
+    free(msg.p);
+}
+
 int main(void)
 {
     char *line = NULL, *w[16];
@@ -399,6 +552,12 @@ int main(void)
             pbkdf2(w + 2);
         else if (strcmp(w[1], "pbes2") == 0 && n == 10)
             pbes2(w + 2);
+        else if (strcmp(w[1], "rsadec") == 0 && n == 8)
+            rsa_decrypt(w + 2);
+        else if (strcmp(w[1], "rsaver") == 0 && n == 9)
+            rsa_verify(w + 2);
+        else if (strcmp(w[1], "rsasign") == 0 && n == 5)
+            rsa_sign(w + 2);
         else {
             fprintf(stderr, "bad command: %s\n", w[1]);
             return 2;

@@ -49,11 +49,19 @@ enum Kind {
     Pbkdf2,
     /// PBES2: PBKDF2, then AES-CBC with padding (`PbeTest`).
     Pbes2,
+    /// RSA decryption (`RsaesOaepDecrypt`, `RsaesPkcs1Decrypt`), the padding the template.
+    RsaDecrypt,
+    /// RSA verification (`RsassaPkcs1Verify`, `RsassaPssVerify`), the padding the template.
+    RsaVerify,
+    /// PKCS #1 v1.5 signing (`RsassaPkcs1Generate`).
+    RsaSign,
 }
 
 /// Each file's kind and its algorithm, as the runner names it: `{k}` stands for the key's
 /// bits, `{h}` for half of them, and `{t}` for the tag's octets. For MACs, the MAC's name and
-/// its parameters; for PBES2, the digest and the cipher.
+/// its parameters; for PBES2, the digest and the cipher; for RSA, the padding (the digests come
+/// from each group). RSA-PSS's files with parameters in the key wait for key decoding (4.7),
+/// and its SHAKE files test an MGF OpenSSL doesn't offer.
 #[rustfmt::skip]
 const FILES: &[(&str, Kind, &str)] = &[
     ("aead_aes_siv_cmac", Kind::AeadSiv, "AES-{h}-SIV"),
@@ -112,6 +120,76 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("pbkdf2_hmacsha256", Kind::Pbkdf2, "SHA2-256"),
     ("pbkdf2_hmacsha384", Kind::Pbkdf2, "SHA2-384"),
     ("pbkdf2_hmacsha512", Kind::Pbkdf2, "SHA2-512"),
+    ("rsa_oaep_2048_sha1_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha224_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha224_mgf1sha224", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha256_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha256_mgf1sha256", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha384_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha384_mgf1sha384", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha512_224_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha512_224_mgf1sha512_224", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha512_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_2048_sha512_mgf1sha512", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha256_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha256_mgf1sha256", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha512_256_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha512_256_mgf1sha512_256", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha512_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_3072_sha512_mgf1sha512", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_4096_sha256_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_4096_sha256_mgf1sha256", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_4096_sha512_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_4096_sha512_mgf1sha512", Kind::RsaDecrypt, "oaep"),
+    ("rsa_oaep_misc", Kind::RsaDecrypt, "oaep"),
+    ("rsa_pkcs1_2048", Kind::RsaDecrypt, "pkcs1"),
+    ("rsa_pkcs1_3072", Kind::RsaDecrypt, "pkcs1"),
+    ("rsa_pkcs1_4096", Kind::RsaDecrypt, "pkcs1"),
+    ("rsa_pkcs1_1024_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_1536_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_2048_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_3072_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_4096_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pss_2048_sha1_mgf1_20", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha256_mgf1_0", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha256_mgf1_32", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha256_mgf1sha1_20", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha384_mgf1_48", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha512_224_mgf1_28", Kind::RsaVerify, "pss"),
+    ("rsa_pss_2048_sha512_256_mgf1_32", Kind::RsaVerify, "pss"),
+    ("rsa_pss_3072_sha256_mgf1_32", Kind::RsaVerify, "pss"),
+    ("rsa_pss_4096_sha256_mgf1_32", Kind::RsaVerify, "pss"),
+    ("rsa_pss_4096_sha384_mgf1_48", Kind::RsaVerify, "pss"),
+    ("rsa_pss_4096_sha512_mgf1_32", Kind::RsaVerify, "pss"),
+    ("rsa_pss_4096_sha512_mgf1_64", Kind::RsaVerify, "pss"),
+    ("rsa_pss_misc", Kind::RsaVerify, "pss"),
+    ("rsa_signature_2048_sha224", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha3_224", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha3_256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha3_384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha3_512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha512_224", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha512_256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha3_256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha3_384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha3_512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha512_256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_4096_sha256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_4096_sha384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_4096_sha512_256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_4096_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_8192_sha256", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_8192_sha384", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_8192_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_three_primes_oaep_2048_sha1_mgf1sha1", Kind::RsaDecrypt, "oaep"),
+    ("rsa_three_primes_oaep_3072_sha224_mgf1sha224", Kind::RsaDecrypt, "oaep"),
+    ("rsa_three_primes_oaep_4096_sha256_mgf1sha256", Kind::RsaDecrypt, "oaep"),
     ("siphash_1_3", Kind::Mac, "SIPHASH size=8,c-rounds=1,d-rounds=3"),
     ("siphash_2_4", Kind::Mac, "SIPHASH size=8,c-rounds=2,d-rounds=4"),
     ("siphash_4_8", Kind::Mac, "SIPHASH size=8,c-rounds=4,d-rounds=8"),
@@ -158,6 +236,52 @@ fn number(v: &Value, key: &str) -> Result<u64> {
         .ok_or_else(|| format!("no number `{key}`").into())
 }
 
+/// An RSA key as the runner takes it: the group's `privateKey` (n, e, d, the primes, their
+/// exponents, the coefficients, other primes last in each) or its `publicKey` (n, e).
+fn rsa_key(group: &Value) -> Result<String> {
+    if let Some(k) = group.get("privateKey") {
+        let mut numbers = vec![
+            text(k, "modulus")?,
+            text(k, "publicExponent")?,
+            text(k, "privateExponent")?,
+        ];
+        if k.get("prime1").is_some() {
+            let others = k
+                .get("otherPrimeInfos")
+                .and_then(Value::as_array)
+                .unwrap_or_default();
+            let other = |i: usize| -> Result<Vec<&str>> {
+                others
+                    .iter()
+                    .map(|o| {
+                        o.as_array()
+                            .and_then(|a| a.get(i))
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| "bad otherPrimeInfos".into())
+                    })
+                    .collect()
+            };
+            numbers.extend([text(k, "prime1")?, text(k, "prime2")?]);
+            numbers.extend(other(0)?);
+            numbers.extend([text(k, "exponent1")?, text(k, "exponent2")?]);
+            numbers.extend(other(1)?);
+            numbers.push(text(k, "coefficient")?);
+            numbers.extend(other(2)?);
+        }
+        return Ok(numbers.join(",").to_ascii_lowercase());
+    }
+    let k = group.get("publicKey").ok_or("no key")?;
+    Ok(format!("{},{}", text(k, "modulus")?, text(k, "publicExponent")?).to_ascii_lowercase())
+}
+
+/// A group's digest field as the runner takes it: `-` when there's none.
+fn digest(group: &Value, key: &str) -> String {
+    match group.get(key).and_then(Value::as_str) {
+        Some(d) if !d.is_empty() => d.to_owned(),
+        _ => "-".to_owned(),
+    }
+}
+
 /// The algorithm template filled in for a group.
 fn fill(template: &str, group: &Value) -> String {
     let bits = group.get("keySize").and_then(Value::as_u64).unwrap_or(0);
@@ -187,6 +311,11 @@ fn cases(kind: Kind, template: &str, doc: &Value) -> Result<(Vec<Case>, usize)> 
             continue;
         }
         let taglen = group.get("tagSize").and_then(Value::as_u64).unwrap_or(0) / 8;
+        let key = match kind {
+            Kind::RsaDecrypt | Kind::RsaVerify | Kind::RsaSign => rsa_key(group)?,
+            _ => String::new(),
+        };
+        let (md, mgf1) = (digest(group, "sha"), digest(group, "mgfSha"));
         for t in tests {
             let s = |key: &str| text(t, key).map(field);
             let (command, expected, tag) = match kind {
@@ -303,6 +432,44 @@ fn cases(kind: Kind, template: &str, doc: &Value) -> Result<(Vec<Case>, usize)> 
                     vec![format!("E:{}", s("ct")?), format!("D:{}", s("msg")?)],
                     None,
                 ),
+                Kind::RsaDecrypt => {
+                    let oaep = algorithm == "oaep";
+                    let (md, mgf1, label) = if oaep {
+                        (md.as_str(), mgf1.as_str(), s("label")?)
+                    } else {
+                        ("-", "-", "-".to_owned())
+                    };
+                    let mut expected = vec![format!("D:{}", s("msg")?)];
+                    if !oaep {
+                        expected.push(format!("I:{}", s("msg")?));
+                    }
+                    (
+                        format!("rsadec {algorithm} {md} {mgf1} {key} {label} {}", s("ct")?),
+                        expected,
+                        None,
+                    )
+                }
+                Kind::RsaVerify => {
+                    let (mgf1, saltlen) = if algorithm == "pss" {
+                        (mgf1.clone(), number(group, "sLen")?.to_string())
+                    } else {
+                        ("-".to_owned(), "-".to_owned())
+                    };
+                    (
+                        format!(
+                            "rsaver {algorithm} {md} {mgf1} {saltlen} {key} {} {}",
+                            s("msg")?,
+                            s("sig")?
+                        ),
+                        vec!["V:ok".to_owned()],
+                        None,
+                    )
+                }
+                Kind::RsaSign => (
+                    format!("rsasign {md} {key} {}", s("msg")?),
+                    vec![format!("S:{}", s("sig")?)],
+                    None,
+                ),
             };
             cases.push(Case {
                 tc_id: number(t, "tcId")?,
@@ -345,6 +512,8 @@ fn agrees(case: &Case, fields: &[&str]) -> bool {
                     .is_none_or(|t| t.starts_with("fail") || !t.starts_with(tag))
             }
             Kind::Hkdf | Kind::Pbkdf2 => failed("K:"),
+            Kind::RsaVerify => failed("V:"),
+            Kind::RsaSign => failed("S:"),
             // An invalid key to wrap comes with no ciphertext: wrapping it must fail.
             Kind::Wrap if case.expected.first().is_some_and(|e| e == "E:_") => failed("E:"),
             _ => failed("D:"),

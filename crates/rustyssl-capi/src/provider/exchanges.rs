@@ -365,7 +365,10 @@ static DEFAULT_KEYEXCH: Algorithms<8> = Algorithms([
 
 /// The default provider's asymmetric ciphers (`deflt_asym_cipher`), all of later steps.
 static DEFAULT_ASYM_CIPHERS: Algorithms<3> = Algorithms([
-    pending(c"RSA:rsaEncryption:1.2.840.113549.1.1.1"),
+    alg(
+        c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
+        &super::rsa_enc::RSA_ASYM_CIPHER,
+    ),
     pending(c"SM2:1.2.156.10197.1.301"),
     ALG_END,
 ]);
