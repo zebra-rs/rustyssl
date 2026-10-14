@@ -132,6 +132,12 @@ ffi_export! {
         if cipher.is_null() {
             return conclude(-1);
         }
+        // An application's cipher's own function first.
+        // SAFETY: the caller's guarantee.
+        if let Some(f) = unsafe { super::cipher_ctx::legacy_asn1_fn(c, true) } {
+            // SAFETY: the cipher's function with the caller's context and type.
+            return conclude(unsafe { f(c, type_) });
+        }
         // SAFETY: a live cipher.
         let flags = unsafe { EVP_CIPHER_get_flags(cipher) };
         let ret = if flags & EVP_CIPH_FLAG_CUSTOM_ASN1 as core::ffi::c_ulong == 0 {
@@ -175,6 +181,12 @@ ffi_export! {
         let cipher = unsafe { EVP_CIPHER_CTX_get0_cipher(c) };
         if cipher.is_null() {
             return conclude(-1);
+        }
+        // An application's cipher's own function first.
+        // SAFETY: the caller's guarantee.
+        if let Some(f) = unsafe { super::cipher_ctx::legacy_asn1_fn(c, false) } {
+            // SAFETY: the cipher's function with the caller's context and type.
+            return conclude(unsafe { f(c, type_) });
         }
         // SAFETY: a live cipher.
         let flags = unsafe { EVP_CIPHER_get_flags(cipher) };

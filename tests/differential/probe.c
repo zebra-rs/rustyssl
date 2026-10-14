@@ -7221,6 +7221,193 @@ static int md_meth_command(const char *command, const char *line)
     return 1;
 }
 
+/* The state of cmeth's toy cipher: its key and IV, the keystream position, and its calls. */
+struct toy_state {
+    unsigned char key[16], iv[16];
+    unsigned long pos;
+    int inits, ctrls;
+};
+
+static int toy_init(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv,
+    int enc)
+{
+    struct toy_state *s = EVP_CIPHER_CTX_get_cipher_data(ctx);
+
+    (void)enc;
+    s->inits++;
+    if (key != NULL)
+        memcpy(s->key, key, sizeof(s->key));
+    if (iv != NULL)
+        memcpy(s->iv, iv, sizeof(s->iv));
+    s->pos = 0;
+    return 1;
+}
+
+/* A keystream of the key, both IVs (the cipher's own and the context's), and the position. */
+static int toy_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in,
+    size_t inl)
+{
+    struct toy_state *s = EVP_CIPHER_CTX_get_cipher_data(ctx);
+    const unsigned char *iv = EVP_CIPHER_CTX_iv(ctx);
+    size_t i;
+
+    for (i = 0; i < inl; i++, s->pos++)
+        out[i] = in[i] ^ s->key[s->pos % 16] ^ s->iv[s->pos % 16] ^ iv[s->pos % 16]
+            ^ (unsigned char)(s->pos * 31 + 7);
+    return 1;
+}
+
+static int toy_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
+{
+    struct toy_state *s = EVP_CIPHER_CTX_get_cipher_data(ctx);
+
+    (void)arg;
+    s->ctrls++;
+    switch (type) {
+    case EVP_CTRL_INIT:
+    case EVP_CTRL_COPY:
+    case EVP_CTRL_SET_KEY_LENGTH:
+        return 1;
+    case EVP_CTRL_GET_IVLEN:
+        *(int *)ptr = 12;
+        return 1;
+    default:
+        return -1;
+    }
+}
+
+/*
+ * Commands for application-defined ciphers, over the digest commands' data:
+ *   cmeth MODE BS FLAGS LEN PIECE PAD TAMPER
+ *                                   a toy cipher (a keystream) of the mode (stream, ecb, cbc,
+ *                                   cfb, ofb, ctr), block size BS (1, 8, or 16), and the
+ *                                   EVP_CIPH_* FLAGS (hex; those the toy can take) encrypting
+ *                                   LEN octets (at most 512) in pieces of PIECE, padded or not
+ *                                   (PAD), the IV set again, then decrypting the ciphertext
+ *                                   (its octet TAMPER flipped, unless -1), copied half way:
+ *                                   the lengths, results, ciphertext, and the calls made
+ */
+static int cipher_meth_command(const char *command, const char *line)
+{
+    static const struct {
+        const char *name;
+        int mode;
+    } modes[] = {
+        { "stream", EVP_CIPH_STREAM_CIPHER }, { "ecb", EVP_CIPH_ECB_MODE },
+        { "cbc", EVP_CIPH_CBC_MODE }, { "cfb", EVP_CIPH_CFB_MODE },
+        { "ofb", EVP_CIPH_OFB_MODE }, { "ctr", EVP_CIPH_CTR_MODE },
+    };
+    const unsigned long allowed = EVP_CIPH_VARIABLE_LENGTH | EVP_CIPH_CUSTOM_IV
+        | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT | EVP_CIPH_CUSTOM_KEY_LENGTH
+        | EVP_CIPH_CUSTOM_COPY | EVP_CIPH_CUSTOM_IV_LENGTH;
+    static const unsigned char key[17] = "0123456789abcdef", iv[17] = "fedcba9876543210";
+    char name[16] = "";
+    long bs = 0, len = 0, piece = 1, pad = 1, tamper = -1;
+    unsigned long flags = 0;
+    EVP_CIPHER *c;
+    EVP_CIPHER_CTX *e, *d, *d2;
+    struct toy_state *s;
+    unsigned char ct[600], pt[600], pt2[600];
+    int r, n, total = 0, dtotal = 0, dtotal2 = 0, r2, mode = -1;
+    long i;
+    size_t m;
+
+    if (strcmp(command, "cmeth") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        for (m = 0; m < sizeof(digest_data); m++)
+            digest_data[m] = (unsigned char)(m * 7 + 3);
+    }
+    sscanf(line, "%*s %15s %ld %lx %ld %ld %ld %ld", name, &bs, &flags, &len, &piece, &pad,
+        &tamper);
+    for (m = 0; m < sizeof(modes) / sizeof(modes[0]); m++)
+        if (strcmp(modes[m].name, name) == 0)
+            mode = modes[m].mode;
+    if (mode < 0 || (bs != 1 && bs != 8 && bs != 16) || (flags & ~allowed) != 0 || len < 0
+        || len > 512 || piece < 1) {
+        printf("%s: skipped\n", line);
+        return 1;
+    }
+    c = EVP_CIPHER_meth_new(NID_undef, (int)bs, 16);
+    EVP_CIPHER_meth_set_iv_length(c, 16);
+    EVP_CIPHER_meth_set_flags(c, (unsigned long)mode | flags);
+    EVP_CIPHER_meth_set_impl_ctx_size(c, sizeof(struct toy_state));
+    EVP_CIPHER_meth_set_init(c, toy_init);
+    EVP_CIPHER_meth_set_do_cipher(c, toy_do_cipher);
+    EVP_CIPHER_meth_set_ctrl(c, toy_ctrl);
+    printf("%s:", line);
+
+    e = EVP_CIPHER_CTX_new();
+    r = EVP_EncryptInit_ex(e, c, NULL, key, iv);
+    printf(" init %d", r);
+    if (r) {
+        EVP_CIPHER_CTX_set_padding(e, (int)pad);
+        printf(" keylen %d/%d ivlen %d", EVP_CIPHER_CTX_set_key_length(e, 10),
+            EVP_CIPHER_CTX_get_key_length(e), EVP_CIPHER_CTX_get_iv_length(e));
+        r = EVP_EncryptInit_ex(e, NULL, NULL, NULL, iv);
+        for (i = 0; r && i < len; i += piece) {
+            r = EVP_EncryptUpdate(e, ct + total, &n, digest_data + i,
+                (int)(len - i < piece ? len - i : piece));
+            total += r ? n : 0;
+        }
+        r = r && EVP_EncryptFinal_ex(e, ct + total, &n);
+        total += r ? n : 0;
+        s = EVP_CIPHER_CTX_get_cipher_data(e);
+        printf(" enc %d %d inits %d ctrls %d", r, total, s->inits, s->ctrls);
+        if (r)
+            probe_bytes("ct", ct, (size_t)total);
+        printf(" err %d", ERR_GET_REASON(ERR_peek_error()));
+        ERR_clear_error();
+    }
+    if (tamper >= 0 && total > 0)
+        ct[tamper % total] ^= 1;
+
+    d = EVP_CIPHER_CTX_new();
+    d2 = EVP_CIPHER_CTX_new();
+    r = EVP_DecryptInit_ex(d, c, NULL, key, iv);
+    if (r) {
+        EVP_CIPHER_CTX_set_padding(d, (int)pad);
+        for (i = 0; r && i < total / 2; i += piece) {
+            r = EVP_DecryptUpdate(d, pt + dtotal, &n, ct + i,
+                (int)(total / 2 - i < piece ? total / 2 - i : piece));
+            dtotal += r ? n : 0;
+        }
+        r2 = r && EVP_CIPHER_CTX_copy(d2, d);
+        printf(" copy %d", r2);
+        if (r2)
+            memcpy(pt2, pt, (size_t)dtotal);
+        dtotal2 = dtotal;
+        n = 0;
+        r = r && EVP_DecryptUpdate(d, pt + dtotal, &n, ct + total / 2, total - total / 2);
+        dtotal += r ? n : 0;
+        r = r && EVP_DecryptFinal_ex(d, pt + dtotal, &n);
+        dtotal += r ? n : 0;
+        printf(" dec %d %d %s err %d", r, dtotal,
+            r && dtotal == len && memcmp(pt, digest_data, (size_t)len) == 0 ? "same" : "differ",
+            ERR_GET_REASON(ERR_peek_error()));
+        ERR_clear_error();
+        if (r2) {
+            n = 0;
+            r2 = EVP_DecryptUpdate(d2, pt2 + dtotal2, &n, ct + total / 2, total - total / 2);
+            dtotal2 += r2 ? n : 0;
+            r2 = r2 && EVP_DecryptFinal_ex(d2, pt2 + dtotal2, &n);
+            dtotal2 += r2 ? n : 0;
+            printf(" dec2 %d %d %s", r2, dtotal2,
+                r == r2 && dtotal == dtotal2 && memcmp(pt, pt2, (size_t)dtotal) == 0 ? "same"
+                                                                                       : "differ");
+        }
+    } else {
+        printf(" decinit 0");
+    }
+    printf("\n");
+    EVP_CIPHER_CTX_free(e);
+    EVP_CIPHER_CTX_free(d);
+    EVP_CIPHER_CTX_free(d2);
+    EVP_CIPHER_meth_free(c);
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -7254,7 +7441,8 @@ int main(void)
             || aes_command(command, line) || aead_command(command, line)
             || des_command(command, line) || legacy_command(command, line)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
-            || skey_command(command, line) || md_meth_command(command, line)) {
+            || skey_command(command, line) || md_meth_command(command, line)
+            || cipher_meth_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

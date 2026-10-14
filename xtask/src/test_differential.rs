@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(40) {
+        match random.below(41) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -188,6 +188,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             36 => bio_evp_session(&mut random, &mut out)?,
             37 => skey_session(&mut random, &mut out)?,
             38 => md_meth_session(&mut random, &mut out)?,
+            39 => cipher_meth_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -759,6 +760,42 @@ fn md_meth_session(random: &mut Random, out: &mut String) -> Result {
             "mdcopy {} {len} {}",
             random.pick(&names),
             1 + random.below(200)
+        )?;
+    }
+    Ok(())
+}
+
+/// A random session of application-defined ciphers: a toy cipher of each mode, block size,
+/// and combination of the flags it takes, over lengths around its blocks, in pieces of every
+/// size, padded or not, its ciphertext tampered with or not.
+fn cipher_meth_session(random: &mut Random, out: &mut String) -> Result {
+    let flags = [0x8u32, 0x10, 0x20, 0x40, 0x80, 0x400, 0x800];
+    for _ in 0..random.below(8) + 1 {
+        let mut f = 0;
+        for bit in flags {
+            if random.below(4) == 0 {
+                f |= bit;
+            }
+        }
+        let bs = random.pick(&["1", "8", "16"]);
+        let len = match random.below(3) {
+            0 => random
+                .pick(&["0", "1", "7", "8", "9", "15", "16", "17", "31", "32", "33"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(513),
+        };
+        let tamper = if random.below(3) == 0 {
+            random.below(600).to_string()
+        } else {
+            "-1".to_owned()
+        };
+        writeln!(
+            out,
+            "cmeth {} {bs} {f:x} {len} {} {} {tamper}",
+            random.pick(&["stream", "ecb", "cbc", "cfb", "ofb", "ctr"]),
+            1 + random.below(40),
+            random.below(2),
         )?;
     }
     Ok(())

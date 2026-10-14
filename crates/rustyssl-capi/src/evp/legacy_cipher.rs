@@ -2480,7 +2480,7 @@ mod tests {
         // SAFETY: as above.
         assert_eq!(unsafe { EVP_aes_128_cbc() }, c);
         // SAFETY: the live static cipher.
-        let m = unsafe { method(c) }.map(|m| (m.nid, m.block_size, m.key_len, m.iv_len));
+        let m = unsafe { method(c) }.map(|m| (m.nid, m.block_size(), m.key_len(), m.iv_len()));
         assert_eq!(m, Some((NID_aes_128_cbc, 16, 16, 16)));
         // SAFETY: no preconditions.
         assert_eq!(unsafe { EVP_des_ede() }, unsafe { EVP_des_ede_ecb() });

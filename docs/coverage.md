@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 2163 | 3713 | 36.8% |
+| libcrypto | 5876 | 2182 | 3694 | 37.1% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **2164** | **4315** | **33.4%** |
+| **Total** | **6479** | **2183** | **4296** | **33.7%** |
 
 ## By header
 
@@ -53,7 +53,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/engine.h` | libcrypto | 121 | 0 | 0.0% |
 | `openssl/err.h` | libcrypto | 51 | 51 | 100.0% |
 | `openssl/ess.h` | libcrypto | 30 | 0 | 0.0% |
-| `openssl/evp.h` | libcrypto | 828 | 756 | 91.3% |
+| `openssl/evp.h` | libcrypto | 828 | 775 | 93.6% |
 | `openssl/hmac.h` | libcrypto | 12 | 12 | 100.0% |
 | `openssl/hpke.h` | libcrypto | 20 | 0 | 0.0% |
 | `openssl/http.h` | libcrypto | 24 | 0 | 0.0% |
@@ -253,16 +253,16 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_TIME_to_generalizedtime` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_to_tm` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TYPE_cmp` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_type` |
-| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_print`, `asn1_template`, `evp_cipher_asn1` |
+| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_print`, `asn1_template`, `evp_cipher_asn1`, `evp_cipher_meth` |
 | `ASN1_TYPE_get` | libcrypto | `openssl/asn1.h` | `asn1_type`, `evp_cipher_asn1` |
 | `ASN1_TYPE_get_int_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
-| `ASN1_TYPE_get_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type` |
-| `ASN1_TYPE_new` | libcrypto | `openssl/asn1.h` | `asn1_print`, `asn1_template`, `evp_cipher_asn1` |
+| `ASN1_TYPE_get_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type`, `evp_cipher_meth` |
+| `ASN1_TYPE_new` | libcrypto | `openssl/asn1.h` | `asn1_print`, `asn1_template`, `evp_cipher_asn1`, `evp_cipher_meth` |
 | `ASN1_TYPE_pack_sequence` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_TYPE_set` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_print`, `asn1_template`, `asn1_type`, `evp_cipher_asn1` |
 | `ASN1_TYPE_set1` | libcrypto | `openssl/asn1.h` | `asn1_type` |
 | `ASN1_TYPE_set_int_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
-| `ASN1_TYPE_set_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type`, `evp_cipher_asn1` |
+| `ASN1_TYPE_set_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type`, `evp_cipher_asn1`, `evp_cipher_meth` |
 | `ASN1_TYPE_unpack_sequence` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_UNIVERSALSTRING_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_string` |
 | `ASN1_UNIVERSALSTRING_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
@@ -900,7 +900,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `rand`, `stack` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `rand`, `stack` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `crypto_secure_heap`, `err_queue`, `evp_kdf_more`, `evp_pkey_print`, `evp_rand`, `fetch`, `params`, `pem`, `properties`, `provider`, `rand`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -980,19 +980,19 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_CTX_buf_noconst` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_clear_flags` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_copy` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
-| `EVP_CIPHER_CTX_ctrl` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
+| `EVP_CIPHER_CTX_copy` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
+| `EVP_CIPHER_CTX_ctrl` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_CIPHER_CTX_dup` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
-| `EVP_CIPHER_CTX_free` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
-| `EVP_CIPHER_CTX_get0_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
+| `EVP_CIPHER_CTX_free` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_CIPHER_CTX_get0_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names` |
 | `EVP_CIPHER_CTX_get1_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_get_algor` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_CTX_get_algor_params` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_CTX_get_app_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_get_block_size` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_cipher` |
-| `EVP_CIPHER_CTX_get_cipher_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_modes` |
-| `EVP_CIPHER_CTX_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
+| `EVP_CIPHER_CTX_get_cipher_data` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
+| `EVP_CIPHER_CTX_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_modes` |
+| `EVP_CIPHER_CTX_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_get_nid` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_get_num` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_get_original_iv` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1` |
@@ -1000,51 +1000,70 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_CTX_get_tag_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
 | `EVP_CIPHER_CTX_get_updated_iv` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_gettable_params` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_is_encrypting` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_skey` |
-| `EVP_CIPHER_CTX_iv` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_iv_noconst` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_new` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
-| `EVP_CIPHER_CTX_original_iv` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_rand_key` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
-| `EVP_CIPHER_CTX_reset` | libcrypto | `openssl/evp.h` | `evp_cipher` |
+| `EVP_CIPHER_CTX_is_encrypting` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_skey` |
+| `EVP_CIPHER_CTX_iv` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
+| `EVP_CIPHER_CTX_iv_noconst` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
+| `EVP_CIPHER_CTX_new` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_CIPHER_CTX_original_iv` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
+| `EVP_CIPHER_CTX_rand_key` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
+| `EVP_CIPHER_CTX_reset` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_set_algor_params` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_CTX_set_app_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_set_cipher_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_set_flags` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_asn1` |
-| `EVP_CIPHER_CTX_set_key_length` | libcrypto | `openssl/evp.h` | `evp_cipher` |
+| `EVP_CIPHER_CTX_set_key_length` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_set_num` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_CTX_set_padding` | libcrypto | `openssl/evp.h` | `evp_cipher` |
+| `EVP_CIPHER_CTX_set_padding` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_test_flags` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_asn1_to_param` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
+| `EVP_CIPHER_asn1_to_param` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth` |
 | `EVP_CIPHER_can_pipeline` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
 | `EVP_CIPHER_do_all` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_CIPHER_do_all_provided` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_CIPHER_do_all_sorted` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_CIPHER_fetch` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_modes`, `evp_signature`, `evp_skey` |
-| `EVP_CIPHER_free` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_modes`, `evp_signature`, `evp_skey` |
+| `EVP_CIPHER_fetch` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_signature`, `evp_skey` |
+| `EVP_CIPHER_free` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_signature`, `evp_skey` |
 | `EVP_CIPHER_get0_description` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
-| `EVP_CIPHER_get0_name` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names`, `evp_modes`, `pem_crypt` |
-| `EVP_CIPHER_get0_provider` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
+| `EVP_CIPHER_get0_name` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `pem_crypt` |
+| `EVP_CIPHER_get0_provider` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names` |
 | `EVP_CIPHER_get_asn1_iv` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
-| `EVP_CIPHER_get_block_size` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_get_flags` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
-| `EVP_CIPHER_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes`, `pem_crypt` |
-| `EVP_CIPHER_get_mode` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_get_nid` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_get_block_size` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_get_flags` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_CIPHER_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `pem_crypt` |
+| `EVP_CIPHER_get_mode` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_get_nid` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
 | `EVP_CIPHER_get_params` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names`, `evp_modes` |
 | `EVP_CIPHER_get_type` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names` |
 | `EVP_CIPHER_gettable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_gettable_params` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_impl_ctx_size` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
 | `EVP_CIPHER_is_a` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
+| `EVP_CIPHER_meth_dup` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_free` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_cleanup` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_ctrl` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_do_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_get_asn1_params` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_init` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_get_set_asn1_params` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_new` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_cleanup` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_ctrl` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_do_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_flags` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_get_asn1_params` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_impl_ctx_size` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_init` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_iv_length` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
+| `EVP_CIPHER_meth_set_set_asn1_params` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
 | `EVP_CIPHER_names_do_all` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_CIPHER_param_to_asn1` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
+| `EVP_CIPHER_param_to_asn1` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth` |
 | `EVP_CIPHER_set_asn1_iv` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_settable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_up_ref` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_Cipher` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
+| `EVP_CIPHER_up_ref` | libcrypto | `openssl/evp.h` | `evp_cipher_meth`, `evp_cipher_names` |
+| `EVP_Cipher` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_CipherFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CipherFinal_ex` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
 | `EVP_CipherInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
@@ -1057,11 +1076,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_DecodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeUpdate` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecryptFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_DecryptFinal_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
+| `EVP_DecryptFinal_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_DecryptInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_DecryptInit_ex` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_asn1` |
+| `EVP_DecryptInit_ex` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth` |
 | `EVP_DecryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
-| `EVP_DecryptUpdate` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
+| `EVP_DecryptUpdate` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_Digest` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_digest`, `evp_md_meth`, `evp_md_names` |
 | `EVP_DigestFinal` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_DigestFinalXOF` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth` |
@@ -1090,11 +1109,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_EncodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_EncodeUpdate` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_EncryptFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_EncryptFinal_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_EncryptFinal_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
 | `EVP_EncryptInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_EncryptInit_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_names`, `pem_crypt` |
+| `EVP_EncryptInit_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `pem_crypt` |
 | `EVP_EncryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
-| `EVP_EncryptUpdate` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_EncryptUpdate` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
 | `EVP_KDF_CTX_dup` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
 | `EVP_KDF_CTX_free` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
 | `EVP_KDF_CTX_get_kdf_size` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
