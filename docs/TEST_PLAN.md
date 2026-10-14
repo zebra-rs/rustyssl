@@ -174,8 +174,9 @@ rustyssl itself**. You can only regenerate golden files with
   as the reference is, and run on each library by pointing the dynamic loader at it (the
   programs link the shared libraries, so they need no relinking). The data files it runs are
   listed in `tests/openssl-suite/evp_test.txt`; both runs must succeed with the same
-  "Completed N tests with E errors and S skipped" counts, so a file whose tests rustyssl skips
-  (a key it can't load yet) fails.
+  "Completed N tests with E errors and S skipped" counts and the same number of `ERROR` lines,
+  so a file whose tests rustyssl skips (a key it can't load yet) fails, and so does one whose
+  tests fail to start (`evp_test` counts a key generation it can't start as passed).
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
   - **(a) Public API** → must pass.
   - **(b) Needs internal symbols or headers** → excluded, with the reason.
