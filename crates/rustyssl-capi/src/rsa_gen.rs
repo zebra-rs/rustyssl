@@ -614,12 +614,16 @@ fn multiprime_generate(env: &Env, bits: usize, primes: usize, e: &BigNum) -> Opt
 }
 
 /// `rsa_multiprime_keygen`.
-fn multiprime_keygen(env: &Env, bits: usize, primes: usize, e: &BigNum) -> Option<Key> {
+fn multiprime_keygen(env: &Env, bits: usize, primes: usize, e: Option<&BigNum>) -> Option<Key> {
     const F: &str = "rsa_multiprime_keygen";
     if bits < MIN_MODULUS_BITS {
         err::raise(ERR_LIB_RSA, RSA_R_KEY_SIZE_TOO_SMALL, F);
         return None;
     }
+    let Some(e) = e else {
+        err::raise(ERR_LIB_RSA, RSA_R_BAD_E_VALUE, F);
+        return None;
+    };
     if !check_public_exponent(e) {
         err::raise(ERR_LIB_RSA, RSA_R_PUB_EXPONENT_OUT_OF_RANGE, F);
         return None;
@@ -637,7 +641,8 @@ fn multiprime_keygen(env: &Env, bits: usize, primes: usize, e: &BigNum) -> Optio
 }
 
 /// `rsa_keygen` (outside FIPS, without the pairwise test): a key of `bits` bits and `primes`
-/// primes with the public exponent `e`, or `None` with OpenSSL's errors raised.
+/// primes with the public exponent `e` (FIPS 186-4's generator takes 65537 for none; the older
+/// one refuses none), or `None` with OpenSSL's errors raised.
 ///
 /// # Safety
 /// `libctx` is NULL or a live library context; `cb` is NULL or a live `BN_GENCB`.
@@ -645,7 +650,7 @@ pub(crate) unsafe fn generate_key(
     libctx: *mut OSSL_LIB_CTX,
     bits: c_int,
     primes: c_int,
-    e: &BigNum,
+    e: Option<&BigNum>,
     cb: *mut BN_GENCB,
 ) -> Option<Key> {
     // SAFETY: the caller's guarantee.
@@ -653,9 +658,10 @@ pub(crate) unsafe fn generate_key(
     // Negative sizes and counts fail the generator's checks, as OpenSSL's ints do.
     let ubits = usize::try_from(bits).unwrap_or(0);
     let uprimes = usize::try_from(primes).unwrap_or(0);
-    if primes == 2 && ubits >= FIPS1864_MIN_KEYGEN_KEYSIZE && e.num_bits() > 16 {
+    if primes == 2 && ubits >= FIPS1864_MIN_KEYGEN_KEYSIZE && e.is_none_or(|e| e.num_bits() > 16) {
+        let f4 = BigNum::from_word(65537);
         // SAFETY: the caller's guarantee.
-        unsafe { sp800_56b_generate(&env, libctx, ubits, e) }
+        unsafe { sp800_56b_generate(&env, libctx, ubits, e.unwrap_or(&f4)) }
     } else {
         multiprime_keygen(&env, ubits, uprimes, e)
     }

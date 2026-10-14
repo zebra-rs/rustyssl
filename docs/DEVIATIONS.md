@@ -223,6 +223,7 @@ OpenSSL never depends on them.
 | `RSA_size`, `RSA_bits`, `RSA_security_bits` of a key without a modulus (or NULL); `RSA_up_ref(NULL)` | dereference NULL | return 0 | `rsa_lib::tests::a_key_without_numbers_or_a_null_key_is_safe` |
 | `RSA_set0_multi_prime_params` on a key without p and q | multiplies NULL numbers and crashes | returns 0, taking none of the numbers | `rsa_lib::tests::a_key_without_numbers_or_a_null_key_is_safe` |
 | `RSA_new` (and every key a provider makes) after `RSA_set_default_method(NULL)` | dereferences the NULL method | the key gets the built-in method; `RSA_get_default_method` still returns NULL | `rsa_lib::tests::a_null_default_method_gives_new_keys_the_built_in_one` |
+| The `RSA_padding_add_*` and `RSA_padding_check_*` functions with a negative length (`tlen`, `flen`, `num`, `plen`) or a NULL buffer that has a length | copy, fill, or read through the huge sizes negative lengths convert to, or through NULL | fail (0 for the add functions, -1 for the checks) and touch nothing | `rsa_ops::tests::negative_lengths_and_null_buffers_fail` |
 
 ## Notes
 

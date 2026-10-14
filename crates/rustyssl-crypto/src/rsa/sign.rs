@@ -5,8 +5,8 @@
 use rustyssl_abi::{NID_md5_sha1, NID_mdc2, NID_undef};
 
 use super::{
-    Entry, Key, Outcome, PKCS1_PADDING_SIZE, Padding, Random, Reason, digest_info, digest_size,
-    fail, silent,
+    Entry, Key, Outcome, PKCS1_PADDING_SIZE, Padding, Raised, Random, Reason, digest_info,
+    digest_size, fail, silent,
 };
 
 /// MD5-SHA1's "digest": the two digests, signed without a DigestInfo.
@@ -25,24 +25,62 @@ fn encode_pkcs1(nid: i32, m: &[u8]) -> Result<Vec<u8>, Entry> {
     Ok(out)
 }
 
-/// `RSA_sign`: the digest `m` of `nid` signed into `sig` (the key's size).
-pub fn sign(key: &Key, nid: i32, m: &[u8], sig: &mut [u8], rng: &mut Random<'_>) -> Outcome<usize> {
+/// `RSA_sign`'s block before padding: the digest `m` of `nid` in its DigestInfo (MD5-SHA1's
+/// bare), checked against the key's size `num`.
+pub fn sign_encoding(nid: i32, m: &[u8], num: usize) -> Result<Vec<u8>, Raised> {
     const F: &str = "RSA_sign";
     let encoded = if nid == NID_md5_sha1 {
         if m.len() != MD5_SHA1_LEN {
-            return fail(F, Reason::InvalidMessageLength);
+            return Err(vec![Entry::raised(F, Reason::InvalidMessageLength)]);
         }
         m.to_vec()
     } else {
-        match encode_pkcs1(nid, m) {
-            Ok(e) => e,
-            Err(e) => return (Err(()), vec![e]),
-        }
+        encode_pkcs1(nid, m).map_err(|e| vec![e])?
     };
-    if encoded.len().saturating_add(PKCS1_PADDING_SIZE) > key.size() {
-        return fail(F, Reason::DigestTooBigForRsaKey);
+    if encoded.len().saturating_add(PKCS1_PADDING_SIZE) > num {
+        return Err(vec![Entry::raised(F, Reason::DigestTooBigForRsaKey)]);
     }
-    key.private_encrypt(&encoded, sig, Padding::Pkcs1, rng)
+    Ok(encoded)
+}
+
+/// `RSA_sign`: the digest `m` of `nid` signed into `sig` (the key's size).
+pub fn sign(key: &Key, nid: i32, m: &[u8], sig: &mut [u8], rng: &mut Random<'_>) -> Outcome<usize> {
+    match sign_encoding(nid, m, key.size()) {
+        Ok(encoded) => key.private_encrypt(&encoded, sig, Padding::Pkcs1, rng),
+        Err(raised) => (Err(()), raised),
+    }
+}
+
+/// The DER encoding of an OCTET STRING holding `m` (`i2d_ASN1_OCTET_STRING`).
+pub fn octet_string_der(m: &[u8]) -> Vec<u8> {
+    let len = m.len();
+    let mut out = vec![0x04];
+    if len < 0x80 {
+        out.push(u8::try_from(len).unwrap_or(0));
+    } else {
+        let bytes: Vec<u8> = len
+            .to_be_bytes()
+            .into_iter()
+            .skip_while(|&b| b == 0)
+            .collect();
+        out.push(0x80 | u8::try_from(bytes.len()).unwrap_or(0));
+        out.extend(bytes);
+    }
+    out.extend_from_slice(m);
+    out
+}
+
+/// `RSA_sign_ASN1_OCTET_STRING`'s block before padding: `m` as a DER OCTET STRING, checked
+/// against the key's size `num`.
+pub fn octet_string_encoding(m: &[u8], num: usize) -> Result<Vec<u8>, Raised> {
+    let der = octet_string_der(m);
+    if der.len() > num.saturating_sub(PKCS1_PADDING_SIZE) {
+        return Err(vec![Entry::raised(
+            "RSA_sign_ASN1_OCTET_STRING",
+            Reason::DigestTooBigForRsaKey,
+        )]);
+    }
+    Ok(der)
 }
 
 /// `RSA_sign_ASN1_OCTET_STRING`: the digest as a DER OCTET STRING, signed with PKCS #1 v1.5
@@ -53,16 +91,10 @@ pub fn sign_octet_string(
     sig: &mut [u8],
     rng: &mut Random<'_>,
 ) -> Outcome<usize> {
-    const F: &str = "RSA_sign_ASN1_OCTET_STRING";
-    let Ok(len) = u8::try_from(m.len()) else {
-        return fail(F, Reason::DigestTooBigForRsaKey);
-    };
-    let mut der = vec![0x04, len];
-    der.extend_from_slice(m);
-    if der.len() > key.size().saturating_sub(PKCS1_PADDING_SIZE) {
-        return fail(F, Reason::DigestTooBigForRsaKey);
+    match octet_string_encoding(m, key.size()) {
+        Ok(der) => key.private_encrypt(&der, sig, Padding::Pkcs1, rng),
+        Err(raised) => (Err(()), raised),
     }
-    key.private_encrypt(&der, sig, Padding::Pkcs1, rng)
 }
 
 /// `ossl_rsa_verify`: whether `sig` signs the digest `m` of `nid`, or, with no `m`, the digest
@@ -77,10 +109,16 @@ pub fn verify(key: &Key, nid: i32, m: Option<&[u8]>, sig: &[u8]) -> Outcome<Vec<
     let (r, raised) = key.public_decrypt(sig, &mut buf, Padding::Pkcs1);
     let len = match r {
         Ok(n) if n > 0 => n,
-        Ok(_) => return (Err(()), raised),
-        Err(()) => return (Err(()), raised),
+        _ => return (Err(()), raised),
     };
-    let decrypted = buf.get(..len).unwrap_or_default();
+    check_decrypted(nid, m, buf.get(..len).unwrap_or_default())
+}
+
+/// `ossl_rsa_verify` after the public decryption: whether `decrypted` (the block's data)
+/// holds the digest `m` of `nid`, or, with no `m`, the digest it holds. Returns the digest.
+pub fn check_decrypted(nid: i32, m: Option<&[u8]>, decrypted: &[u8]) -> Outcome<Vec<u8>> {
+    const F: &str = "ossl_rsa_verify";
+    let len = decrypted.len();
     if nid == NID_md5_sha1 {
         if len != MD5_SHA1_LEN {
             return fail(F, Reason::BadSignature);

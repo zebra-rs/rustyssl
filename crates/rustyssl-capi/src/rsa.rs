@@ -33,7 +33,7 @@ use rustyssl_abi::{
 use rustyssl_crypto::bn::BigNum;
 use rustyssl_crypto::rsa::{Entry, Hash, Key, Reason};
 
-use crate::bn::{BN_clear_free, value};
+use crate::bn::{BN_clear_free, store, value};
 use crate::ex_data::{CRYPTO_free_ex_data, CRYPTO_new_ex_data};
 
 use crate::err;
@@ -360,6 +360,70 @@ pub(crate) fn read_numbers(numbers: &mut Numbers, key: &mut Key) {
     }
 }
 
+/// Stores `key`'s numbers in the handles the application holds, so they keep holding the
+/// key's (after a generation into the key); a handle whose number the key no longer has is
+/// retired.
+pub(crate) fn write_numbers(numbers: &mut Numbers, key: &Key) {
+    let fields = [
+        (Field::N, &key.n),
+        (Field::E, &key.e),
+        (Field::D, &key.d),
+        (Field::P, &key.p),
+        (Field::Q, &key.q),
+        (Field::Dmp1, &key.dmp1),
+        (Field::Dmq1, &key.dmq1),
+        (Field::Iqmp, &key.iqmp),
+    ];
+    for (f, v) in fields {
+        let Some(slot) = numbers.slot(f) else {
+            continue;
+        };
+        if slot.0.is_null() {
+            continue;
+        }
+        match v {
+            // SAFETY: the key's own number.
+            Some(v) => unsafe {
+                store(slot.0, v.clone());
+            },
+            None => {
+                let old = core::mem::take(slot);
+                numbers.retire(old);
+            }
+        }
+    }
+    let extra = core::mem::take(&mut numbers.extra);
+    for (i, h) in extra.into_iter().enumerate() {
+        match key.extra.get(i) {
+            Some(x) => {
+                for (h, v) in h.iter().zip([&x.r, &x.d, &x.t]) {
+                    if !h.0.is_null() {
+                        // SAFETY: the key's own number.
+                        unsafe { store(h.0, v.clone()) };
+                    }
+                }
+                numbers.extra.push(h);
+            }
+            None => {
+                for h in h {
+                    numbers.retire(h);
+                }
+            }
+        }
+    }
+}
+
+impl Rsa {
+    /// Changes the key's numbers with `f`, keeping the handles the application holds in step.
+    pub(crate) fn update_key(&self, f: impl FnOnce(&mut Key)) {
+        let mut st = self.lock();
+        let mut lg = self.legacy();
+        read_numbers(&mut lg.numbers, &mut st.key);
+        f(&mut st.key);
+        write_numbers(&mut lg.numbers, &st.key);
+    }
+}
+
 /// The key behind an `RSA` pointer (key data).
 ///
 /// # Safety
@@ -488,6 +552,15 @@ impl Md {
         // SAFETY: the caller's guarantee; a string.
         let md = unsafe { EVP_MD_fetch(libctx, name.as_ptr(), properties) };
         (!md.is_null()).then_some(Self(md))
+    }
+
+    /// Another reference to `md`, or `None` for NULL.
+    ///
+    /// # Safety
+    /// `md` is NULL or a live digest.
+    pub(crate) unsafe fn of(md: *const EVP_MD) -> Option<Self> {
+        // SAFETY: the caller's guarantee.
+        (!md.is_null() && unsafe { EVP_MD_up_ref(md.cast_mut()) } == 1).then(|| Self(md.cast_mut()))
     }
 
     /// The digest.

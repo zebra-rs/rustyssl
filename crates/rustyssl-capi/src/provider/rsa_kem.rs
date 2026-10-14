@@ -15,11 +15,10 @@ use rustyssl_abi::{
     OSSL_FUNC_KEM_GET_CTX_PARAMS, OSSL_FUNC_KEM_GETTABLE_CTX_PARAMS, OSSL_FUNC_KEM_NEWCTX,
     OSSL_FUNC_KEM_SET_CTX_PARAMS, OSSL_FUNC_KEM_SETTABLE_CTX_PARAMS, OSSL_KEM_PARAM_OPERATION,
     OSSL_KEM_PARAM_OPERATION_RSASVE, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_UTF8_STRING,
-    PROV_R_BAD_LENGTH, PROV_R_INVALID_KEY, PROV_R_INVALID_OUTPUT_LENGTH, RSA,
+    PROV_R_BAD_LENGTH, PROV_R_INVALID_KEY, PROV_R_INVALID_OUTPUT_LENGTH, RSA, RSA_NO_PADDING,
     RSA_R_DATA_TOO_LARGE_FOR_MODULUS, RSA_R_DATA_TOO_SMALL,
 };
 use rustyssl_crypto::bn::{self as core_bn, BigNum, Endian};
-use rustyssl_crypto::rsa::Padding;
 
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox};
@@ -27,8 +26,9 @@ use super::rsa_sig::key_op_allowed;
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::err;
 use crate::ffi::{bytes, ffi_callback};
-use crate::rsa::{RsaState, private_random, public_random, raise_all, rsa};
+use crate::rsa::{RsaState, rsa};
 use crate::rsa_gen::Env;
+use crate::rsa_ops::{Op, method_op};
 
 /// `KEM_OP_RSASVE`, the only operation.
 const OP_RSASVE: c_int = 0;
@@ -332,11 +332,8 @@ unsafe fn generate(
     });
     let Some(z) = z else { return 0 };
     secret_buf.copy_from_slice(&z);
-    let mut rng = public_random(libctx);
-    let (r, raised) = st
-        .key
-        .public_encrypt(secret_buf, out, Padding::None, None, &mut rng);
-    raise_all(&raised);
+    // SAFETY: the context's key.
+    let r = unsafe { method_op(c.rsa, Op::PublicEncrypt, secret_buf, out, RSA_NO_PADDING) };
     if r != Ok(nlen) {
         secret_buf.fill(0);
         return 0;
@@ -359,7 +356,7 @@ unsafe fn recover(
     inlen: usize,
 ) -> c_int {
     const F: &str = "rsasve_recover";
-    let Some((st, libctx)) = c.key() else {
+    let Some((st, _)) = c.key() else {
         return 0;
     };
     let nlen = key_size(&st);
@@ -407,11 +404,9 @@ unsafe fn recover(
     }
     // SAFETY: the caller's room for the key's size.
     let out = unsafe { core::slice::from_raw_parts_mut(out, nlen) };
-    let mut rng = private_random(libctx);
-    let (r, raised) = st
-        .key
-        .private_decrypt(input, out, Padding::None, None, None, &mut rng);
-    raise_all(&raised);
+    // SAFETY: the context's key.
+    let r =
+        unsafe { method_op(c.rsa, Op::PrivateDecrypt, input, out, RSA_NO_PADDING) }.unwrap_or(0);
     if r > 0 && !outlen.is_null() {
         // SAFETY: the caller's guarantee.
         unsafe { outlen.write(nlen) };

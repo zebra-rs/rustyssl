@@ -62,7 +62,7 @@ use rustyssl_abi::{
     PROV_R_XOF_DIGESTS_NOT_ALLOWED, RSA,
 };
 use rustyssl_asn1::objects;
-use rustyssl_crypto::rsa::{self as core_rsa, Hash, Padding, x931_hash_id};
+use rustyssl_crypto::rsa::{self as core_rsa, Hash, x931_hash_id};
 
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox};
@@ -81,7 +81,8 @@ use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_get_octet_string, OSSL_PARAM_get_utf8_string, OSSL_PARAM_locate,
     OSSL_PARAM_set_int, OSSL_PARAM_set_octet_string, OSSL_PARAM_set_utf8_string,
 };
-use crate::rsa::{Kind, Md, Pss30, RsaState, private_random, raise_all, rsa};
+use crate::rsa::{Kind, Md, Pss30, RsaState, public_random, raise_all, rsa};
+use crate::rsa_ops::{self, Op, method_op};
 
 /// `OSSL_MAX_NAME_SIZE` and `OSSL_MAX_PROPQUERY_SIZE` (`internal/sizes.h`).
 const MAX_NAME: usize = 50;
@@ -836,7 +837,8 @@ unsafe fn sign_directly(
     }
     // SAFETY: the caller's room for `sigsize` octets.
     let out = unsafe { core::slice::from_raw_parts_mut(sig, sigsize) };
-    let mut rng = private_random(c.key_libctx());
+    // PSS draws its salt from the public generator (`RAND_bytes_ex`), as OpenSSL's does.
+    let mut salt_rng = public_random(c.key_libctx());
     let outcome = if let (true, Some(md)) = (mdsize != 0, c.md.clone()) {
         if tbs.len() != mdsize {
             prov(PROV_R_INVALID_DIGEST_LENGTH, F);
@@ -852,8 +854,8 @@ unsafe fn sign_directly(
                 );
                 return 0;
             }
-            let (r, raised) = core_rsa::sign_octet_string(&st.key, tbs, out, &mut rng);
-            raise_all(&raised);
+            // SAFETY: the context's key; room for its size.
+            let r = unsafe { rsa_ops::sign_octet_string(c.rsa, tbs, out) }.ok_or(());
             if r.is_err() {
                 prov(ERR_R_RSA_LIB, F);
                 return 0;
@@ -875,11 +877,15 @@ unsafe fn sign_directly(
                     }
                     let mut tbuf = tbs.to_vec();
                     tbuf.push(u8::try_from(x931_hash_id(c.mdnid) & 0xff).unwrap_or(0));
-                    st.key.private_encrypt(&tbuf, out, Padding::X931, &mut rng)
+                    // SAFETY: as above.
+                    (
+                        unsafe { method_op(c.rsa, Op::PrivateEncrypt, &tbuf, out, X931) },
+                        Vec::new(),
+                    )
                 }
                 PKCS1 => {
-                    let (r, raised) = core_rsa::sign(&st.key, c.mdnid, tbs, out, &mut rng);
-                    raise_all(&raised);
+                    // SAFETY: as above.
+                    let r = unsafe { rsa_ops::sign(c.rsa, c.mdnid, tbs, out) }.ok_or(());
                     if r.is_err() {
                         prov(ERR_R_RSA_LIB, F);
                         return 0;
@@ -921,14 +927,18 @@ unsafe fn sign_directly(
                         &md,
                         &mgf1,
                         c.saltlen,
-                        &mut rng,
+                        &mut salt_rng,
                     );
                     raise_all(&raised);
                     if r.is_err() {
                         prov(ERR_R_RSA_LIB, F);
                         return 0;
                     }
-                    st.key.private_encrypt(&tbuf, out, Padding::None, &mut rng)
+                    // SAFETY: as above.
+                    (
+                        unsafe { method_op(c.rsa, Op::PrivateEncrypt, &tbuf, out, NONE) },
+                        Vec::new(),
+                    )
                 }
                 _ => {
                     prov_text(
@@ -941,8 +951,11 @@ unsafe fn sign_directly(
             }
         }
     } else {
-        st.key
-            .private_encrypt(tbs, out, Padding::from_number(c.pad_mode), &mut rng)
+        // SAFETY: the context's key; room for its size.
+        (
+            unsafe { method_op(c.rsa, Op::PrivateEncrypt, tbs, out, c.pad_mode) },
+            Vec::new(),
+        )
     };
     raise_all(&outcome.1);
     match outcome.0 {
@@ -1005,8 +1018,8 @@ fn recover(
         match c.pad_mode {
             X931 => {
                 let mut tbuf = vec![0u8; rsasize];
-                let (r, raised) = st.key.public_decrypt(sig, &mut tbuf, Padding::X931);
-                raise_all(&raised);
+                // SAFETY: the context's key.
+                let r = unsafe { method_op(c.rsa, Op::PublicDecrypt, sig, &mut tbuf, X931) };
                 let ret = match r {
                     Ok(n) if n > 0 => n - 1,
                     _ => {
@@ -1058,9 +1071,9 @@ fn recover(
                     );
                     return None;
                 }
-                let (r, raised) = core_rsa::verify(&st.key, c.mdnid, None, sig);
-                raise_all(&raised);
-                let Ok(m) = r else {
+                // SAFETY: the context's key.
+                let r = unsafe { rsa_ops::ossl_verify(c.rsa, c.mdnid, None, sig) };
+                let Some(m) = r else {
                     prov(ERR_R_RSA_LIB, F);
                     return None;
                 };
@@ -1089,10 +1102,8 @@ fn recover(
             return None;
         }
         let out = rout?;
-        let (r, raised) = st
-            .key
-            .public_decrypt(sig, out, Padding::from_number(c.pad_mode));
-        raise_all(&raised);
+        // SAFETY: the context's key.
+        let r = unsafe { method_op(c.rsa, Op::PublicDecrypt, sig, out, c.pad_mode) };
         match r {
             Ok(n) => Some(n),
             Err(()) => {
@@ -1143,9 +1154,8 @@ fn verify_directly(c: &SigCtx, sig: &[u8], tbs: &[u8]) -> c_int {
     let recovered: Vec<u8> = if let Some(md) = c.md.clone() {
         match c.pad_mode {
             PKCS1 => {
-                let (r, raised) = core_rsa::verify(&st.key, c.mdnid, Some(tbs), sig);
-                raise_all(&raised);
-                if r.is_err() {
+                // SAFETY: the context's key.
+                if unsafe { rsa_ops::verify(c.rsa, c.mdnid, tbs, sig) } <= 0 {
                     prov(ERR_R_RSA_LIB, F);
                     return 0;
                 }
@@ -1170,8 +1180,8 @@ fn verify_directly(c: &SigCtx, sig: &[u8], tbs: &[u8]) -> c_int {
                     return 0;
                 }
                 let mut tbuf = vec![0u8; rsasize];
-                let (r, raised) = st.key.public_decrypt(sig, &mut tbuf, Padding::None);
-                raise_all(&raised);
+                // SAFETY: the context's key.
+                let r = unsafe { method_op(c.rsa, Op::PublicDecrypt, sig, &mut tbuf, NONE) };
                 if !matches!(r, Ok(n) if n > 0) {
                     prov(ERR_R_RSA_LIB, F);
                     return 0;
@@ -1197,10 +1207,8 @@ fn verify_directly(c: &SigCtx, sig: &[u8], tbs: &[u8]) -> c_int {
         }
     } else {
         let mut tbuf = vec![0u8; rsasize];
-        let (r, raised) = st
-            .key
-            .public_decrypt(sig, &mut tbuf, Padding::from_number(c.pad_mode));
-        raise_all(&raised);
+        // SAFETY: the context's key.
+        let r = unsafe { method_op(c.rsa, Op::PublicDecrypt, sig, &mut tbuf, c.pad_mode) };
         let n = match r {
             Ok(n) if n > 0 => n,
             _ => {
