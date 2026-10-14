@@ -55,6 +55,8 @@ jobs:
         run: cargo xtask test-c
       - name: Differential tests (reference vs rustyssl)
         run: cargo xtask test-differential --random 1000
+      - name: The reference's openssl tool on rustyssl
+        run: cargo xtask test-apps
       - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking)
         run: cargo xtask abi-check
 

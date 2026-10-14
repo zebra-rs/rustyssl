@@ -4759,16 +4759,6 @@ pub extern "C" fn ENGINE_ctrl_cmd_string(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ENGINE_finish(_: *mut ENGINE) -> core::ffi::c_int {
-    crate::stub::unimplemented("ENGINE_finish")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ENGINE_free(_: *mut ENGINE) -> core::ffi::c_int {
-    crate::stub::unimplemented("ENGINE_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_get_DH(_: *const ENGINE) -> *const DH_METHOD {
     crate::stub::unimplemented("ENGINE_get_DH")
 }
@@ -4796,11 +4786,6 @@ pub extern "C" fn ENGINE_get_RSA(_: *const ENGINE) -> *const RSA_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_get_cipher(_: *mut ENGINE, _: core::ffi::c_int) -> *const EVP_CIPHER {
     crate::stub::unimplemented("ENGINE_get_cipher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ENGINE_get_cipher_engine(_: core::ffi::c_int) -> *mut ENGINE {
-    crate::stub::unimplemented("ENGINE_get_cipher_engine")
 }
 
 #[unsafe(no_mangle)]
@@ -4851,11 +4836,6 @@ pub extern "C" fn ENGINE_get_destroy_function(_: *const ENGINE) -> ENGINE_GEN_IN
 #[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_get_digest(_: *mut ENGINE, _: core::ffi::c_int) -> *const EVP_MD {
     crate::stub::unimplemented("ENGINE_get_digest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ENGINE_get_digest_engine(_: core::ffi::c_int) -> *mut ENGINE {
-    crate::stub::unimplemented("ENGINE_get_digest_engine")
 }
 
 #[unsafe(no_mangle)]
@@ -10680,20 +10660,10 @@ pub extern "C" fn OSSL_STORE_LOADER_fetch(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_free(_: *mut OSSL_STORE_LOADER) {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_STORE_LOADER_get0_description(
     _: *const OSSL_STORE_LOADER,
 ) -> *const core::ffi::c_char {
     crate::stub::unimplemented("OSSL_STORE_LOADER_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_get0_engine(_: *const OSSL_STORE_LOADER) -> *const ENGINE {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_get0_engine")
 }
 
 #[unsafe(no_mangle)]
@@ -10708,13 +10678,6 @@ pub extern "C" fn OSSL_STORE_LOADER_get0_provider(
     _: *const OSSL_STORE_LOADER,
 ) -> *const OSSL_PROVIDER {
     crate::stub::unimplemented("OSSL_STORE_LOADER_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_get0_scheme(
-    _: *const OSSL_STORE_LOADER,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_get0_scheme")
 }
 
 #[unsafe(no_mangle)]
@@ -10734,94 +10697,6 @@ pub extern "C" fn OSSL_STORE_LOADER_names_do_all(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_STORE_LOADER_names_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_new(
-    _: *mut ENGINE,
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_STORE_LOADER {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_attach(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_attach_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_attach")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_close(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_close_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_close")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_ctrl(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_ctrl_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_eof(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_eof_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_eof")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_error(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_error_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_error")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_expect(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_expect_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_expect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_find(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_find_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_find")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_load(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_load_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_open(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_open_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_open")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_set_open_ex(
-    _: *mut OSSL_STORE_LOADER,
-    _: OSSL_STORE_open_ex_fn,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_set_open_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -11008,23 +10883,11 @@ pub extern "C" fn OSSL_STORE_open_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_register_loader(_: *mut OSSL_STORE_LOADER) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_STORE_register_loader")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_STORE_supports_search(
     _: *mut OSSL_STORE_CTX,
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_STORE_supports_search")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_unregister_loader(
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_STORE_LOADER {
-    crate::stub::unimplemented("OSSL_STORE_unregister_loader")
 }
 
 #[unsafe(no_mangle)]
@@ -17265,11 +17128,6 @@ pub extern "C" fn TXT_DB_write(_: *mut BIO, _: *mut TXT_DB) -> core::ffi::c_long
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn UI_OpenSSL() -> *mut UI_METHOD {
-    crate::stub::unimplemented("UI_OpenSSL")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn UI_UTIL_read_pw(
     _: *mut core::ffi::c_char,
     _: *mut core::ffi::c_char,
@@ -17364,11 +17222,6 @@ pub extern "C" fn UI_construct_prompt(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn UI_create_method(_: *const core::ffi::c_char) -> *mut UI_METHOD {
-    crate::stub::unimplemented("UI_create_method")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn UI_ctrl(
     _: *mut UI,
     _: core::ffi::c_int,
@@ -17377,11 +17230,6 @@ pub extern "C" fn UI_ctrl(
     _: ::core::option::Option<unsafe extern "C" fn()>,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("UI_ctrl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_destroy_method(_: *mut UI_METHOD) {
-    crate::stub::unimplemented("UI_destroy_method")
 }
 
 #[unsafe(no_mangle)]
@@ -17518,163 +17366,6 @@ pub extern "C" fn UI_get_string_type(_: *mut UI_STRING) -> UI_string_types {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_closer(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int> {
-    crate::stub::unimplemented("UI_method_get_closer")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_data_destructor(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(method: *mut UI, arg1: *mut core::ffi::c_void)> {
-    crate::stub::unimplemented("UI_method_get_data_destructor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_data_duplicator(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(method: *mut UI, arg1: *mut core::ffi::c_void) -> *mut core::ffi::c_void,
-> {
-    crate::stub::unimplemented("UI_method_get_data_duplicator")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_ex_data(
-    _: *const UI_METHOD,
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_void {
-    crate::stub::unimplemented("UI_method_get_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_flusher(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int> {
-    crate::stub::unimplemented("UI_method_get_flusher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_opener(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<unsafe extern "C" fn(method: *mut UI) -> core::ffi::c_int> {
-    crate::stub::unimplemented("UI_method_get_opener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_prompt_constructor(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *mut UI,
-        arg1: *const core::ffi::c_char,
-        arg2: *const core::ffi::c_char,
-    ) -> *mut core::ffi::c_char,
-> {
-    crate::stub::unimplemented("UI_method_get_prompt_constructor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_reader(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(method: *mut UI, arg1: *mut UI_STRING) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("UI_method_get_reader")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_get_writer(
-    _: *const UI_METHOD,
-) -> ::core::option::Option<
-    unsafe extern "C" fn(method: *mut UI, arg1: *mut UI_STRING) -> core::ffi::c_int,
-> {
-    crate::stub::unimplemented("UI_method_get_writer")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_closer(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_closer")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_data_duplicator(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            ui: *mut UI,
-            ui_data: *mut core::ffi::c_void,
-        ) -> *mut core::ffi::c_void,
-    >,
-    _: ::core::option::Option<unsafe extern "C" fn(ui: *mut UI, ui_data: *mut core::ffi::c_void)>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_data_duplicator")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_ex_data(
-    _: *mut UI_METHOD,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_ex_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_flusher(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_flusher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_opener(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<unsafe extern "C" fn(ui: *mut UI) -> core::ffi::c_int>,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_opener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_prompt_constructor(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            ui: *mut UI,
-            phrase_desc: *const core::ffi::c_char,
-            object_name: *const core::ffi::c_char,
-        ) -> *mut core::ffi::c_char,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_prompt_constructor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_reader(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(ui: *mut UI, uis: *mut UI_STRING) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_reader")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_method_set_writer(
-    _: *mut UI_METHOD,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(ui: *mut UI, uis: *mut UI_STRING) -> core::ffi::c_int,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("UI_method_set_writer")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn UI_new() -> *mut UI {
     crate::stub::unimplemented("UI_new")
 }
@@ -17682,11 +17373,6 @@ pub extern "C" fn UI_new() -> *mut UI {
 #[unsafe(no_mangle)]
 pub extern "C" fn UI_new_method(_: *const UI_METHOD) -> *mut UI {
     crate::stub::unimplemented("UI_new_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn UI_null() -> *const UI_METHOD {
-    crate::stub::unimplemented("UI_null")
 }
 
 #[unsafe(no_mangle)]

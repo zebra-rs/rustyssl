@@ -115,14 +115,6 @@ pub extern "C" fn rustyssl_private_OPENSSL_cipher_name(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OPENSSL_init_ssl(
-    _: u64,
-    _: *const OPENSSL_INIT_SETTINGS,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OPENSSL_init_ssl")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD {
     crate::stub::unimplemented("OSSL_QUIC_client_method")
 }

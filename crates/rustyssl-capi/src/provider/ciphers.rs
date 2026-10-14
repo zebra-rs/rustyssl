@@ -133,6 +133,12 @@ pub(crate) fn raise(e: Error, function: &str) {
         Error::InvalidInputLength => PROV_R_INVALID_INPUT_LENGTH,
         Error::InvalidOutputLength => PROV_R_INVALID_OUTPUT_LENGTH,
     };
+    // OpenSSL raises a bad padding in `ossl_cipher_unpadblock`, under the final.
+    let function = if matches!(e, Error::BadDecrypt) {
+        "ossl_cipher_unpadblock"
+    } else {
+        function
+    };
     err::raise(ERR_LIB_PROV, reason, function);
 }
 
@@ -470,10 +476,12 @@ unsafe fn process(
             "ossl_cipher_generic_cipher",
         )
     } else {
-        (
-            ctx.core.update(data, inl, outsize),
-            "ossl_cipher_generic_update",
-        )
+        let function = if ctx.core.kind().block_size() > 1 {
+            "ossl_cipher_generic_block_update"
+        } else {
+            "ossl_cipher_generic_stream_update"
+        };
+        (ctx.core.update(data, inl, outsize), function)
     };
     // SAFETY: the caller's guarantee.
     unsafe { finish(result, out, outl, function) }
@@ -492,8 +500,14 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
         let result = ctx.core.process_final().unwrap_or_else(|| ctx.core.finalize(outsize));
+        // OpenSSL's block and stream ciphers have their own finals.
+        let function = if ctx.core.kind().block_size() > 1 {
+            "ossl_cipher_generic_block_final"
+        } else {
+            "ossl_cipher_generic_stream_final"
+        };
         // SAFETY: the caller's guarantee.
-        unsafe { finish(result, out, outl, "ossl_cipher_generic_final") }
+        unsafe { finish(result, out, outl, function) }
     }
 }
 

@@ -103,6 +103,9 @@ pub(crate) struct State {
     store: MethodStore<Method, ProvKey>,
     /// The providers of the stored methods, by key, for the choice's provider.
     providers: Vec<(ProvKey, Ptr<OSSL_PROVIDER>)>,
+    /// The names as C strings the `*_names_do_all` callbacks get, kept as long as the context
+    /// (as OpenSSL's name map keeps its strings), so a callback may keep the pointers.
+    c_names: std::collections::HashMap<Vec<u8>, Box<core::ffi::CStr>>,
 }
 
 /// A context's names and EVP method store, behind their lock.
@@ -631,6 +634,34 @@ pub(crate) fn names_of(prov: *const OSSL_PROVIDER, name_id: u32) -> Vec<Vec<u8>>
     unsafe { libctx::resolve(libctx) }.map_or_else(Vec::new, |ctx| {
         prefill(&ctx);
         ctx.evp.lock().names.names(name_id).to_vec()
+    })
+}
+
+/// The names of `name_id` in `prov`'s context as C strings that stay valid while the context
+/// lives (`ossl_namemap_doall_names`'s strings).
+pub(crate) fn c_names_of(
+    prov: *const OSSL_PROVIDER,
+    name_id: u32,
+) -> Vec<*const core::ffi::c_char> {
+    // SAFETY: a live provider's context.
+    let libctx = unsafe { provider::libctx_of(prov) };
+    // SAFETY: as above.
+    unsafe { libctx::resolve(libctx) }.map_or_else(Vec::new, |ctx| {
+        prefill(&ctx);
+        let mut state = ctx.evp.lock();
+        let names = state.names.names(name_id).to_vec();
+        names
+            .into_iter()
+            .filter_map(|n| {
+                if let Some(c) = state.c_names.get(&n) {
+                    return Some(c.as_ptr());
+                }
+                let c = std::ffi::CString::new(n.clone()).ok()?.into_boxed_c_str();
+                let p = c.as_ptr();
+                state.c_names.insert(n, c);
+                Some(p)
+            })
+            .collect()
     })
 }
 

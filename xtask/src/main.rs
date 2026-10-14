@@ -14,6 +14,7 @@ mod dist;
 mod elf;
 mod reference;
 mod targets;
+mod test_apps;
 mod test_c;
 mod test_differential;
 mod usage_scan;
@@ -33,6 +34,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("coverage", "report implemented exports per library and header into docs/coverage.md"),
     ("usage-scan", "rank exported functions by how many distro packages import them"),
     ("test-c", "run the C conformance tests against the reference and target/dist"),
+    ("test-apps", "run the reference's openssl tool on rustyssl and compare its output"),
     ("test-differential", "compare results against the reference OpenSSL"),
     ("test-openssl-suite", "run the upstream OpenSSL test suite against our libraries"),
     ("test-consumers", "run consumer test suites (curl, nginx, openssh, ...) on our libraries"),
@@ -54,6 +56,7 @@ fn main() -> ExitCode {
         Some("coverage") => report("coverage", coverage::run(&rest)),
         Some("dist") => report("dist", dist::run(&rest)),
         Some("ref-openssl") => report("ref-openssl", reference::run(&rest)),
+        Some("test-apps") => report("test-apps", test_apps::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),

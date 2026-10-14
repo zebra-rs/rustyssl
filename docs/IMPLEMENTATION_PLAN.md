@@ -2806,6 +2806,40 @@ have run for at least 24 CPU-hours with no findings.
       the probe's `cmod` (corpus `conf_modules.txt`, random `conf_modules` sessions); the
       `conf` fuzz target also runs `X509V3_parse_list` and `ASN1_str2mask`.
 
+- [ ] **3.13 The M1 check:** the milestone's criteria, run for real before Phase 4 builds on
+  Phase 3: the upstream `openssl` tool's `dgst`/`enc`/`rand`/`speed` on our libraries, upstream
+  `evp_test` on the symmetric data files, Wycheproof's symmetric vectors, and a long EVP
+  differential fuzzing run. Each part its own PR; what fails is fixed in it.
+  - [x] **3.13a The `openssl` tool:** `cargo xtask test-apps` runs the reference build's
+    `openssl` with the commands of `tests/apps/commands.txt` (`dgst`, `enc`, `rand`, `list`,
+    `kdf`, `mac`, `version`, and `speed`, 46 in all) on both libraries; the output must be the
+    same after masking the version's build metadata, the build directories, and errors'
+    `file:line`, and `speed` must run. In CI's test job. Getting there took, at start-up:
+    `OPENSSL_init_ssl` (the first libssl function: `OPENSSL_init_crypto` with its options),
+    the `OPENSSL_INIT_ENGINE_*` flags (which load no engines: there are none), the `UI_METHOD`
+    object functions with `UI_null` and `UI_OpenSSL` (from 6.2; the console functions abort
+    until then), the store-loader registration functions (from 6.9; opening a store is still
+    a stub), and `ENGINE_free`/`ENGINE_finish` of NULL and `ENGINE_get_digest_engine`/
+    `ENGINE_get_cipher_engine` (none). 41 exports; libcrypto now 2,279 of 5,876, libssl 2.
+    - Found and fixed: every `*_names_do_all` gave its callback names that were freed when it
+      returned (OpenSSL's point into the context's name map, and `openssl list` keeps them):
+      the names are now interned in the context. Two error reports named the wrong function
+      (the block and stream ciphers' updates and finals, and `ossl_cipher_unpadblock`).
+    - Quirk kept: an empty store-loader scheme passes OpenSSL's RFC 3986 check.
+    - New deviations: `UI_destroy_method` leaves the library's static methods alone (OpenSSL
+      frees them); the "no engines" deviation now covers the init flags and the engine getters.
+    - Measured, for later (performance is the third priority): `speed` at 16-octet blocks runs
+      SHA-256 at about 55% of the reference's rate and AES-128-CBC at about 35% (the
+      reference uses assembly).
+    - `tests/c/app_startup.c` (28 checks) and `tests/c/evp_names_kept.c` (9: the names kept,
+      the methods freed, and other methods fetched before they're read).
+  - [ ] **3.13b Upstream `evp_test`:** built from the reference's tree and run on the symmetric
+    data files (digests, ciphers, MACs, KDFs, encodings, RAND) against our libraries.
+  - [ ] **3.13c Wycheproof:** the symmetric vector files, vendored at a pinned revision with
+    checksums, and a runner (AES-GCM/CCM/SIV/GCM-SIV/key wrap, ChaCha20-Poly1305 and
+    XChaCha20-Poly1305, AES-CMAC, HMAC, HKDF, PBKDF2).
+  - [ ] **3.13d A long EVP differential fuzzing run** (24 hours, per TEST_PLAN.md's M1 gate).
+
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random
 chunking) is clean.

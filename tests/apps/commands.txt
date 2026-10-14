@@ -1,0 +1,51 @@
+# The reference OpenSSL's `openssl` tool, run on the reference libraries and on rustyssl's by
+# `cargo xtask test-apps`: each line is one command's arguments, and both runs must print the
+# same (after masking the library's version metadata and errors' file:line) and exit the same.
+# A line starting with `~` must succeed on both, its output not compared (timings).
+# {bin} is 100,000 octets of fixed data, {txt} a line of text, {dir} the work directory.
+version
+version -v -o -d -m
+dgst -sha256 {bin}
+dgst -sha3-512 {bin}
+dgst -shake256 -xoflen 40 {bin}
+dgst -blake2b512 -hmac key {bin}
+dgst -md5 -r {bin}
+dgst -sha1 -binary -out {dir}/sha1.bin {txt}
+dgst -sha512 -mac HMAC -macopt hexkey:00ff {bin}
+dgst -sm3 -c {txt}
+dgst -ripemd160 {txt}
+dgst -list
+enc -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {bin} -a
+enc -chacha20 -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00000000000000000000000000000000 -in {txt} -a
+enc -aes-128-ctr -pbkdf2 -k pw -S 0011223344556677 -in {txt} -a
+enc -des-ede3-cbc -k pw -S 0011223344556677 -md sha256 -in {txt} -a
+enc -aria-256-cfb -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -camellia-192-ofb -K 00112233445566778899aabbccddeeff0011223344556677 -iv 00112233445566778899aabbccddeeff -in {bin} -a
+enc -sm4-cbc -K 00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt} -a
+enc -aes-256-cbc -pbkdf2 -iter 2000 -k pw -S 0011223344556677 -p -in {txt}
+enc -base64 -in {bin}
+enc -d -aes-256-cbc -K 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff -iv 00112233445566778899aabbccddeeff -in {txt}
+enc -nosuchcipher -in {txt}
+enc -list
+rand -hex 0
+rand -base64 0
+rand -out {dir}/rand.bin 0
+list -digest-algorithms
+list -cipher-algorithms
+list -mac-algorithms
+list -kdf-algorithms
+list -random-generators
+list -providers
+list -digest-commands
+list -cipher-commands
+kdf -keylen 32 -kdfopt digest:SHA256 -kdfopt pass:pw -kdfopt salt:salt -kdfopt iter:1000 PBKDF2
+kdf -keylen 16 -kdfopt digest:SHA256 -kdfopt key:secret -kdfopt salt:s -kdfopt info:i HKDF
+kdf -keylen 64 -kdfopt pass:pw -kdfopt salt:NaCl -kdfopt n:1024 -kdfopt r:8 -kdfopt p:16 SCRYPT
+kdf -keylen 16 -kdfopt digest:SHA256 -kdfopt secret:s -kdfopt seed:x TLS1-PRF
+mac -digest SHA256 -macopt hexkey:00112233 -in {bin} HMAC
+mac -cipher AES-128-CBC -macopt hexkey:00112233445566778899aabbccddeeff -in {bin} CMAC
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f -in {txt} Poly1305
+mac -macopt hexkey:000102030405060708090a0b0c0d0e0f -in {txt} SipHash
+~speed -seconds 1 -bytes 1024 sha256
+~speed -seconds 1 -bytes 16 aes-128-cbc
+~speed -seconds 1 -evp chacha20-poly1305
