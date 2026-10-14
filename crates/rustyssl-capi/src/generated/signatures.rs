@@ -469,6 +469,8 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::asn1::tpl::items::ASN1_VISIBLESTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_VISIBLESTRING =
     crate::asn1::string::ASN1_VISIBLESTRING_new;
+const _: unsafe extern "C" fn() = crate::conf::builtin::ASN1_add_oid_module;
+const _: unsafe extern "C" fn() = crate::conf::builtin::ASN1_add_stable_module;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_char,
@@ -676,6 +678,10 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
 ) = crate::asn1::ASN1_put_object;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::asn1::text::ASN1_str2mask;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_ulong =
     crate::asn1::text::ASN1_tag2bit;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
@@ -2266,6 +2272,20 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *const core::ffi::c_char,
 ) -> *mut core::ffi::c_char = crate::conf::CONF_get_string;
+const _: unsafe extern "C" fn(*const CONF_IMODULE) -> core::ffi::c_ulong =
+    crate::conf::modules::CONF_imodule_get_flags;
+const _: unsafe extern "C" fn(*const CONF_IMODULE) -> *mut CONF_MODULE =
+    crate::conf::modules::CONF_imodule_get_module;
+const _: unsafe extern "C" fn(*const CONF_IMODULE) -> *const core::ffi::c_char =
+    crate::conf::modules::CONF_imodule_get_name;
+const _: unsafe extern "C" fn(*const CONF_IMODULE) -> *mut core::ffi::c_void =
+    crate::conf::modules::CONF_imodule_get_usr_data;
+const _: unsafe extern "C" fn(*const CONF_IMODULE) -> *const core::ffi::c_char =
+    crate::conf::modules::CONF_imodule_get_value;
+const _: unsafe extern "C" fn(*mut CONF_IMODULE, core::ffi::c_ulong) =
+    crate::conf::modules::CONF_imodule_set_flags;
+const _: unsafe extern "C" fn(*mut CONF_IMODULE, *mut core::ffi::c_void) =
+    crate::conf::modules::CONF_imodule_set_usr_data;
 const _: unsafe extern "C" fn(
     *mut lhash_st_CONF_VALUE,
     *const core::ffi::c_char,
@@ -2281,6 +2301,33 @@ const _: unsafe extern "C" fn(
     *mut FILE,
     *mut core::ffi::c_long,
 ) -> *mut lhash_st_CONF_VALUE = crate::conf::CONF_load_fp;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    conf_init_func,
+    conf_finish_func,
+) -> core::ffi::c_int = crate::conf::modules::CONF_module_add;
+const _: unsafe extern "C" fn(*mut CONF_MODULE) -> *mut core::ffi::c_void =
+    crate::conf::modules::CONF_module_get_usr_data;
+const _: unsafe extern "C" fn(*mut CONF_MODULE, *mut core::ffi::c_void) =
+    crate::conf::modules::CONF_module_set_usr_data;
+const _: unsafe extern "C" fn() = crate::conf::modules::CONF_modules_finish;
+const _: unsafe extern "C" fn(
+    *const CONF,
+    *const core::ffi::c_char,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::conf::modules::CONF_modules_load;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::conf::modules::CONF_modules_load_file;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::conf::modules::CONF_modules_load_file_ex;
+const _: unsafe extern "C" fn(core::ffi::c_int) = crate::conf::modules::CONF_modules_unload;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -3059,6 +3106,7 @@ const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::D
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPLAYTEXT_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
+const _: unsafe extern "C" fn() = crate::conf::builtin::ENGINE_add_conf_module;
 const _: unsafe extern "C" fn(core::ffi::c_int, ...) = crate::err::ERR_add_error_data;
 const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut BIO) =
     crate::err::strings::ERR_add_error_mem_bio;
@@ -5974,6 +6022,7 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::evp::sigver::EVP_VerifyFinal_ex;
+const _: unsafe extern "C" fn() = crate::conf::builtin::EVP_add_alg_module;
 const _: unsafe extern "C" fn(*const EVP_CIPHER) -> core::ffi::c_int =
     crate::evp::legacy_cipher::EVP_add_cipher;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int =
@@ -6547,6 +6596,7 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::string::OPENSSL_buf2hexstr_ex;
 const _: unsafe extern "C" fn(*mut core::ffi::c_void, usize) = crate::mem::OPENSSL_cleanse;
 const _: unsafe extern "C" fn() = crate::init::OPENSSL_cleanup;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) = crate::init::OPENSSL_config;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *const core::ffi::c_char,
@@ -6585,6 +6635,7 @@ const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c
     crate::init::OPENSSL_init_crypto;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_isservice;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::init::OPENSSL_issetugid;
+const _: unsafe extern "C" fn() = crate::conf::builtin::OPENSSL_load_builtin_modules;
 const _: unsafe extern "C" fn(
     *const OPENSSL_STACK,
     OPENSSL_sk_copyfunc,
@@ -6687,6 +6738,8 @@ const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_get0_global_default;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
     crate::libctx::OSSL_LIB_CTX_get_conf_diagnostics;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::conf::modules::OSSL_LIB_CTX_load_config;
 const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX = crate::libctx::OSSL_LIB_CTX_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_set0_default;
@@ -7468,6 +7521,16 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::WHIRLPOOL_Update;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut *mut stack_st_CONF_VALUE,
+) -> core::ffi::c_int = crate::x509v3::X509V3_add_value;
+const _: unsafe extern "C" fn(*mut CONF_VALUE) = crate::x509v3::X509V3_conf_free;
+const _: unsafe extern "C" fn(*const CONF_VALUE, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509v3::X509V3_get_value_bool;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut stack_st_CONF_VALUE =
+    crate::x509v3::X509V3_parse_list;
 const _: unsafe extern "C" fn(*mut X509_ALGOR) = crate::asn1::tpl::items::X509_ALGOR_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::X509_ALGOR_it;
 const _: unsafe extern "C" fn() -> *mut X509_ALGOR = crate::asn1::tpl::items::X509_ALGOR_new;

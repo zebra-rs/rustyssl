@@ -10,6 +10,7 @@
 pub mod base64;
 pub mod content;
 pub mod der;
+pub mod gen_tags;
 mod generated;
 pub mod number;
 pub mod objects;

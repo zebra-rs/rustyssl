@@ -48,6 +48,7 @@ use crate::{err, init, libctx};
 pub(crate) mod aeads;
 pub(crate) mod builtin;
 pub(crate) mod ciphers;
+pub(crate) mod conf;
 pub(crate) mod digests;
 pub(crate) mod exchanges;
 pub(crate) mod kdfs;
@@ -126,8 +127,8 @@ pub(crate) struct Provider {
     libctx: Ptr<OSSL_LIB_CTX>,
     /// The init function: a built-in's, or none for a module.
     init: OSSL_provider_init_fn,
-    /// The module's path, from configuration (none yet).
-    path: Option<CString>,
+    /// The module's path, from configuration (set once, before the provider is shared).
+    path: std::sync::OnceLock<CString>,
     /// The configuration parameters (`OSSL_PROVIDER_load_ex`'s UTF-8 strings and
     /// `OSSL_PROVIDER_add_conf_parameter`'s), in order. Never removed, so pointers to the values
     /// stay valid while the provider lives.
@@ -156,7 +157,7 @@ impl Provider {
 
     /// The module's path, for the core's `module-filename` parameter.
     pub(crate) fn module_path(&self) -> Option<&CStr> {
-        self.path.as_deref()
+        self.path.get().map(CString::as_c_str)
     }
 
     /// The name.
@@ -208,8 +209,21 @@ pub(crate) struct StoreState {
     /// Earlier search paths, kept so a pointer `OSSL_PROVIDER_get0_default_search_path`
     /// returned stays valid (OpenSSL frees it).
     old_paths: Vec<CString>,
-    /// The application's built-in providers (`OSSL_PROVIDER_add_builtin`), in order.
-    infos: Vec<(CString, OSSL_provider_init_fn)>,
+    /// The providers' information (`OSSL_PROVIDER_INFO`): the application's built-ins
+    /// (`OSSL_PROVIDER_add_builtin`) and the configuration's providers it didn't activate, in
+    /// order.
+    infos: Vec<Info>,
+    /// The providers the configuration activated, each with a reference (OpenSSL's
+    /// `PROVIDER_CONF_GLOBAL`).
+    conf_activated: Vec<Stored>,
+}
+
+/// What `ossl_provider_new` takes for a name that isn't predefined (`OSSL_PROVIDER_INFO`).
+pub(crate) struct Info {
+    name: CString,
+    init: OSSL_provider_init_fn,
+    path: Option<CString>,
+    parameters: Option<Vec<(CString, CString)>>,
 }
 
 impl Default for StoreState {
@@ -221,6 +235,7 @@ impl Default for StoreState {
             default_path: None,
             old_paths: Vec::new(),
             infos: Vec::new(),
+            conf_activated: Vec::new(),
         }
     }
 }
@@ -252,6 +267,11 @@ impl StoreState {
 impl Drop for StoreState {
     /// `provider_deactivate_free` for each provider, as the context goes.
     fn drop(&mut self) {
+        // `ossl_prov_conf_ctx_free`: the configuration's references.
+        for p in self.conf_activated.drain(..) {
+            // SAFETY: the configuration's reference, given up.
+            unsafe { OSSL_PROVIDER::free(p.0.0) };
+        }
         for p in self.providers.drain(..) {
             // The context is going, its method store with it: only the count changes.
             if let Some(prov) = p.get().filter(|p| p.state().activated) {
@@ -309,6 +329,15 @@ unsafe fn find(libctx: *mut OSSL_LIB_CTX, name: &CStr) -> Option<*mut OSSL_PROVI
     unsafe { OSSL_PROVIDER::up_ref(found) }.then_some(found)
 }
 
+/// `ossl_provider_find(libctx, name, 0)`, with a reference for the caller, or NULL.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn find_held(libctx: *mut OSSL_LIB_CTX, name: &CStr) -> *mut OSSL_PROVIDER {
+    // SAFETY: the caller's guarantee.
+    unsafe { find(libctx, name) }.unwrap_or(ptr::null_mut())
+}
+
 /// The built-in providers OpenSSL predefines, and whether each is a fallback.
 fn predefined(name: &CStr) -> Option<(OSSL_provider_init_fn, bool)> {
     builtin::PREDEFINED
@@ -330,7 +359,7 @@ fn provider_new(
         name: name.to_owned(),
         libctx: Ptr(libctx),
         init,
-        path: None,
+        path: std::sync::OnceLock::new(),
         parameters: Mutex::new(parameters),
         error_lib,
         state: Mutex::new(State::default()),
@@ -347,18 +376,28 @@ unsafe fn new(
     name: &CStr,
     params: *const OSSL_PARAM,
 ) -> *mut OSSL_PROVIDER {
-    // A predefined built-in, else the first the application registered under the name.
+    // A predefined built-in, else the first information under the name (an application's
+    // built-in, or the configuration's), whose parameters come too unless `params` are given.
+    let predefined = predefined(name).map(|(init, _)| init);
     // SAFETY: the caller's guarantee.
-    let registered = with_store(unsafe { context(libctx) }, |s| {
+    let info = with_store(unsafe { context(libctx) }, |s| {
         s.lock()
             .infos
             .iter()
-            .find(|(n, _)| n.as_c_str() == name)
-            .and_then(|(_, init)| *init)
+            .find(|i| i.name.as_c_str() == name)
+            .map(|i| (i.init, i.path.clone(), i.parameters.clone()))
     })
     .flatten();
-    let init = predefined(name).and_then(|(init, _)| init).or(registered);
-    let mut parameters = Vec::new();
+    let (init, path, mut parameters) = match (predefined, info) {
+        (Some(init), Some((_, _, params))) => (init, None, params),
+        (Some(init), None) => (init, None, None),
+        (None, Some((init, path, params))) => (init, path, params),
+        (None, None) => (None, None, None),
+    };
+    if !params.is_null() {
+        parameters = None;
+    }
+    let mut parameters = parameters.unwrap_or_default();
     let mut at = params;
     // SAFETY: the caller's guarantee: the array goes on to its end.
     while let Some(p) = unsafe { at.as_ref() } {
@@ -374,7 +413,23 @@ unsafe fn new(
         }
         at = at.wrapping_add(1);
     }
-    provider_new(libctx, name, init, parameters)
+    let handle = provider_new(libctx, name, init, parameters);
+    if let Some(path) = path {
+        // SAFETY: just made.
+        unsafe { set_module_path(handle, path) };
+    }
+    handle
+}
+
+/// `ossl_provider_set_module_path`.
+///
+/// # Safety
+/// `handle` is a live provider.
+unsafe fn set_module_path(handle: *mut OSSL_PROVIDER, path: CString) {
+    // SAFETY: the caller's guarantee.
+    if let Some(p) = unsafe { OSSL_PROVIDER::get(handle) } {
+        let _ = p.path.set(path);
+    }
 }
 
 /// `provider_init`: runs the init function (a module's, for one without, if it can be found),
@@ -1071,7 +1126,9 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let name = unsafe { CStr::from_ptr(name) }.to_owned();
         // SAFETY: the caller's guarantee.
-        let added = with_store(unsafe { context(libctx) }, |s| s.lock().infos.push((name, init_fn)));
+        let added = with_store(unsafe { context(libctx) }, |s| {
+            s.lock().infos.push(Info { name, init: init_fn, path: None, parameters: None });
+        });
         c_int::from(added.is_some())
     }
 }
