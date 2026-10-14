@@ -4,8 +4,9 @@
 //!
 //! The key structs are read and written field by field. `RC4_KEY`'s words are `unsigned int`
 //! or `unsigned char` by platform (as the generated layouts say), and `RC4_options` names the
-//! platform's: OpenSSL's x86_64 assembly says "rc4(16x,int)" (on the processors it checks for;
-//! older ones get its other layouts). Where OpenSSL dereferences a null key or buffer and
+//! platform's: OpenSSL's x86_64 assembly says "rc4(16x,int)" on Intel processors and
+//! "rc4(8x,int)" on others (the Pentium 4 alone gets its byte layout, not reproduced here).
+//! Where OpenSSL dereferences a null key or buffer and
 //! crashes, these do nothing; a negative length does nothing where OpenSSL writes a block or
 //! loops without end; an RC2 key of no octets expands from a zero where OpenSSL reads before
 //! the key, and an RC4 key of none does nothing where OpenSSL reads past it
@@ -525,12 +526,23 @@ ffi_export! {
     }
 }
 
-/// `RC4_options` for the platform: OpenSSL's x86_64 assembly's, else its C code's for the
-/// width of `RC4_INT`.
+/// `RC4_options` on x86_64: OpenSSL's assembly names its loop by the processor, "rc4(16x,int)"
+/// on Intel's and "rc4(8x,int)" on others (the vendor that `cpuid` reports).
+#[cfg(target_arch = "x86_64")]
 fn rc4_options() -> &'static core::ffi::CStr {
-    if cfg!(target_arch = "x86_64") {
+    let v = core::arch::x86_64::__cpuid(0);
+    let intel = [v.ebx, v.edx, v.ecx] == [*b"Genu", *b"ineI", *b"ntel"].map(u32::from_le_bytes);
+    if intel {
         c"rc4(16x,int)"
-    } else if size_of::<RC4_KEY>() < 256 * 4 {
+    } else {
+        c"rc4(8x,int)"
+    }
+}
+
+/// `RC4_options` elsewhere: OpenSSL's C code's, for the width of `RC4_INT`.
+#[cfg(not(target_arch = "x86_64"))]
+fn rc4_options() -> &'static core::ffi::CStr {
+    if size_of::<RC4_KEY>() < 256 * 4 {
         c"rc4(char)"
     } else {
         c"rc4(int)"

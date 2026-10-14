@@ -2548,8 +2548,13 @@ have run for at least 24 CPU-hours with no findings.
       fewer 12 rounds; `RC2_set_key` caps at 128 and takes any effective bit count (0 or less,
       or past 1024, is 1024); `RC2_encrypt` uses the low 32 bits of each `unsigned long`;
       `RC4_KEY`'s words are `unsigned int` or `unsigned char` by platform, and `RC4_options`
-      names the platform's ("rc4(16x,int)" for x86_64's assembly on the processors it checks
-      for, "rc4(char)" or "rc4(int)" for the C code); `BF_options` says "blowfish(ptr)".
+      names the platform's ("rc4(char)" or "rc4(int)" for the C code; on x86_64 the
+      assembly's, which it picks by the processor `cpuid` reports: "rc4(16x,int)" on Intel's,
+      "rc4(8x,int)" on others); `BF_options` says "blowfish(ptr)".
+    - Not reproduced: OpenSSL's x86_64 RC4 keeps a byte layout ("rc4(8x,char)") on the
+      Pentium 4 (Intel family 15) alone, and its `OPENSSL_ia32cap` environment variable can
+      steer either choice; rustyssl has no capability vector and keeps the `unsigned int`
+      layout and the vendor's name. CI's AMD runner caught the vendor dependence.
     - New deviations: null keys, buffers, IVs, and positions, and negative lengths; RC2 keys of
       no octets (OpenSSL reads before the key) and RC4 keys of none (OpenSSL reads past it).
     - `tests/c/lowlevel_legacy.c` (27 checks: the key structs for every special key length and
