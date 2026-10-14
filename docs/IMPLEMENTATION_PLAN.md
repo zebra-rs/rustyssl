@@ -2884,6 +2884,27 @@ have run for at least 24 CPU-hours with no findings.
     - Nothing to fix: rustyssl gave the reference's results everywhere.
     - xtask gained a small JSON reader (`xtask/src/json.rs`) rather than a dependency.
   - [ ] **3.13d A long EVP differential fuzzing run** (24 hours, per TEST_PLAN.md's M1 gate).
+    `cargo xtask test-differential` gained `--only` (the session generators to draw from, by
+    name; `evp` for the EVP family: fetching, digests, ciphers, MACs, KDFs, RAND, keys, the
+    method objects, the low-level functions, and the EVP BIOs), `--duration` (a campaign:
+    rounds of `--random` sessions from successive seeds on `--jobs` workers, every core by
+    default, until the time is up or a round differs, whose input is kept with its replay
+    command), and `--jobs`. The generators now sit in a named table; their order is kept, so
+    old seeds replay. Short campaigns first, until ten minutes ran clean (66,311 rounds,
+    13.3 million sessions), found:
+    - Fixed in rustyssl: scrypt runs PBKDF2 as a KDF fetched with its property query, as the
+      reference does, so a query that doesn't parse leaves its error there too; a CCM context
+      starts zeroed (the reference allocates it so), so before a key its tag length reads as 2;
+      and GCM's GHASH goes on from the tag it computed, as the reference's does: after a failed
+      check, a second final restarted from zero and returned the encrypted first counter block
+      as the tag, which matched a stale tag left by encrypting an empty message, so the final
+      passed. Each has a check in `tests/c/` (`evp_kdf_others.c`, `evp_aead.c`).
+    - The probe no longer makes the reference crash: a DRBG whose digest, MAC, or cipher set
+      failed counts as not set up (OpenSSL frees the old one first), also when it's the
+      thread's public or private generator; a KBKDF whose parameter call failed may have lost
+      its MAC, so it isn't copied. And an ECB or CBC context turned around by an init that
+      failed before setting its key skips data operations (docs/DEVIATIONS.md: the reference
+      runs the old direction's key schedule).
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random
