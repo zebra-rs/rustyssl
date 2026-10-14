@@ -2404,7 +2404,7 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's RAND-layer commands (a context made the thread's public or private DRBG,
       `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`), printing output only from
       DRBGs that are deterministic, in the corpus and the random sessions.
-- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in six sub-steps,
+- [x] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in six sub-steps,
   each its own PR (195 exports):
 
   ⚠ Their contexts (`SHA256_CTX`, `AES_KEY`, `DES_key_schedule`, …) are **public-layout**
@@ -2563,9 +2563,40 @@ have run for at least 24 CPU-hours with no findings.
       `rc4` (corpus `lowlevel_legacy.txt`, random `lowlevel_legacy` sessions); the
       `lowlevel_legacy` fuzz target checks blocks against the cipher backend, the modes, and
       RC4's chunking.
-  - [ ] **3.8f IDEA, SEED, and Camellia:** the `IDEA_*`, `SEED_*`, and `Camellia_*` functions
-    (25 exports). OpenSSL's x86_64 Camellia is assembly, so its key layout must be measured
-    per platform, as AES's was.
+  - [x] **3.8f IDEA, SEED, and Camellia:** `rustyssl_crypto::lowlevel::legacy::idea`,
+    `lowlevel::seed`, and `lowlevel::camellia`, and `lowlevel/ciphers.rs` in capi: the
+    `IDEA_*`, `SEED_*`, and `Camellia_*` functions (25 exports); libcrypto now 2,111 of 5,876.
+    - **Decision:** measured on all three targets, a `CAMELLIA_KEY`'s words are OpenSSL's C
+      key table (`Camellia_Ekeygen`) on macOS and Linux arm64, and the same with each pair of
+      words swapped on x86_64 (its assembly keeps each 64-bit half as one native word);
+      `grand_rounds` and the words a 128-bit key leaves (52 to 67) are the same everywhere.
+      The core keeps the C order and capi maps each word's slot per target, as for `AES_KEY`.
+    - **Decision:** SEED's G function is OpenSSL's small-footprint form, over the two 256-octet
+      S-boxes, and Camellia's rounds read its four spread S-boxes; both tables were extracted
+      from its sources by a script (`seed/tables.rs`, `camellia/tables.rs`). Every read at a
+      secret octet scans the table and keeps the entry by a mask.
+    - **Decision:** OpenSSL's IDEA computes on a schedule's words as `unsigned long`s, so a
+      schedule no key setter leaves (words past 16 bits) reaches its multiplication whole; the
+      rounds here compute in 64 bits, wrapping, and give its answers for any words. Its
+      multiplication branches on a zero product and its inverse is Euclid's algorithm on key
+      words: here both products are computed and one kept by a mask, and the inverse is a fixed
+      chain of multiplications (Fermat) with Euclid's answers for every 32-bit word (0 for 0
+      and multiples of 65537, but 1 for 65537 itself), checked against a port of it.
+      `IDEA_set_decrypt_key` with the same schedule for both computes in place, in OpenSSL's
+      order.
+    - Quirks kept: IDEA's CFB-64 and OFB-64 set a negative position to -1 and do nothing (the
+      other 64-bit ciphers mask it); `IDEA_encrypt` uses the low 32 bits of each `unsigned
+      long`; `IDEA_set_decrypt_key` leaves the schedule's last two words; `Camellia_set_key`
+      checks its pointers before the size; `IDEA_options` says "idea(int)".
+    - New deviations: null keys, buffers, IVs, and positions, and IDEA's negative lengths;
+      Camellia keys with grand rounds past 1 to 4 (OpenSSL reads past the key or loops; 1 and
+      2, which no key setter leaves, run fewer rounds there and here).
+    - `tests/c/lowlevel_ciphers.c` (55 checks: the key structs, IDEA decryption schedules of
+      out-of-range words, RFC 4269 and RFC 3713 vectors, every mode around the block, in
+      pieces, and in place); the probe's `ckey`, `civ`, `cnum`, `cmode`, and `cwords` (corpus
+      `lowlevel_ciphers.txt`, random `lowlevel_ciphers` sessions); the `lowlevel_ciphers`
+      fuzz target checks IDEA and Camellia against the cipher backend, the inverses, and the
+      modes' chunking.
 - [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
 - [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are

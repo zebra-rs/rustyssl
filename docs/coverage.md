@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 2086 | 3790 | 35.5% |
+| libcrypto | 5876 | 2111 | 3765 | 35.9% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **2087** | **4392** | **32.2%** |
+| **Total** | **6479** | **2112** | **4367** | **32.6%** |
 
 ## By header
 
@@ -32,7 +32,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/blowfish.h` | libcrypto | 8 | 8 | 100.0% |
 | `openssl/bn.h` | libcrypto | 201 | 201 | 100.0% |
 | `openssl/buffer.h` | libcrypto | 6 | 6 | 100.0% |
-| `openssl/camellia.h` | libcrypto | 10 | 0 | 0.0% |
+| `openssl/camellia.h` | libcrypto | 10 | 10 | 100.0% |
 | `openssl/cast.h` | libcrypto | 7 | 7 | 100.0% |
 | `openssl/cmac.h` | libcrypto | 9 | 9 | 100.0% |
 | `openssl/cmp.h` | libcrypto | 157 | 0 | 0.0% |
@@ -57,7 +57,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/hmac.h` | libcrypto | 12 | 12 | 100.0% |
 | `openssl/hpke.h` | libcrypto | 20 | 0 | 0.0% |
 | `openssl/http.h` | libcrypto | 24 | 0 | 0.0% |
-| `openssl/idea.h` | libcrypto | 8 | 0 | 0.0% |
+| `openssl/idea.h` | libcrypto | 8 | 8 | 100.0% |
 | `openssl/indicator.h` | libcrypto | 2 | 0 | 0.0% |
 | `openssl/kdf.h` | libcrypto | 38 | 38 | 100.0% |
 | `openssl/lhash.h` | libcrypto | 21 | 21 | 100.0% |
@@ -79,7 +79,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/rc4.h` | libcrypto | 3 | 3 | 100.0% |
 | `openssl/ripemd.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/rsa.h` | libcrypto | 154 | 23 | 14.9% |
-| `openssl/seed.h` | libcrypto | 7 | 0 | 0.0% |
+| `openssl/seed.h` | libcrypto | 7 | 7 | 100.0% |
 | `openssl/self_test.h` | libcrypto | 7 | 0 | 0.0% |
 | `openssl/sha.h` | libcrypto | 23 | 23 | 100.0% |
 | `openssl/srp.h` | libcrypto | 29 | 0 | 0.0% |
@@ -837,6 +837,16 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_strndup` | libcrypto | `openssl/crypto.h` | `crypto_str` |
 | `CRYPTO_xts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aead` |
 | `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `asn1_print`, `asn1_type`, `crypto_mem`, `crypto_mem_hooks`, `err_queue`, `evp_pkey_meth`, `evp_pkey_ops` |
+| `Camellia_cbc_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_cfb128_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_cfb1_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_cfb8_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_ctr128_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_decrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_ecb_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_ofb128_encrypt` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
+| `Camellia_set_key` | libcrypto | `openssl/camellia.h` | `lowlevel_ciphers` |
 | `DES_cbc_cksum` | libcrypto | `openssl/des.h` | `lowlevel_des` |
 | `DES_cbc_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
 | `DES_cfb64_encrypt` | libcrypto | `openssl/des.h` | `lowlevel_des` |
@@ -1764,6 +1774,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `HMAC_Init_ex` | libcrypto | `openssl/hmac.h` | `evp_mac` |
 | `HMAC_Update` | libcrypto | `openssl/hmac.h` | `evp_mac` |
 | `HMAC_size` | libcrypto | `openssl/hmac.h` | `evp_mac` |
+| `IDEA_cbc_encrypt` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_cfb64_encrypt` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_ecb_encrypt` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_encrypt` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_ofb64_encrypt` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_options` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_set_decrypt_key` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
+| `IDEA_set_encrypt_key` | libcrypto | `openssl/idea.h` | `lowlevel_ciphers` |
 | `INT32_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
 | `INT64_it` | libcrypto | `openssl/asn1t.h` | `asn1_template` |
 | `LONG_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_print`, `asn1_template` |
@@ -2085,6 +2103,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RIPEMD160_Init` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
 | `RIPEMD160_Transform` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
 | `RIPEMD160_Update` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
+| `SEED_cbc_encrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_cfb128_encrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_decrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_ecb_encrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_encrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_ofb128_encrypt` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
+| `SEED_set_key` | libcrypto | `openssl/seed.h` | `lowlevel_ciphers` |
 | `SHA1` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
 | `SHA1_Final` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
 | `SHA1_Init` | libcrypto | `openssl/sha.h` | `lowlevel_hash` |
