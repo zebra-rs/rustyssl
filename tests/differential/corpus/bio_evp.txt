@@ -1,0 +1,39 @@
+# The EVP filter BIOs (step 3.9).
+bmd sha256 1000 37
+bmd sha256 0 1
+bmd sha1 64 64
+bmd md5 2000 1
+bmd sha512 777 300
+bmd shake128 100 7
+bmd sha3-256 136 135
+bmd nosuchdigest 10 10
+bmdread sha256 1000 100
+bmdread sha1 2000 4096
+bmdread md5 5 1
+bmdread shake128 33 32
+benc aes-128-cbc 1000 333
+benc aes-128-cbc 0 1
+benc aes-128-cbc 16 16
+benc aes-256-cbc 2000 1
+benc aes-128-ecb 31 4096
+benc aes-256-ctr 1500 257
+benc aes-128-cfb8 17 3
+benc des-ede3-cbc 100 9
+benc chacha20 1024 1000
+benc aes-128-gcm 100 33
+benc nosuchcipher 10 10
+bdec aes-128-cbc 1000 1 0
+bdec aes-128-cbc 1000 7 0
+bdec aes-128-cbc 1000 255 0
+bdec aes-128-cbc 1000 256 0
+bdec aes-128-cbc 1000 257 0
+bdec aes-128-cbc 2000 4096 0
+bdec aes-128-cbc 2000 4999 0
+bdec aes-128-cbc 1000 300 1
+bdec aes-128-cbc 0 16 0
+bdec aes-128-cbc 16 300 0
+bdec aes-256-ctr 1500 513 0
+bdec des-ede3-cbc 100 300 1
+bdec chacha20 777 999 0
+bdec aes-128-gcm 100 300 0
+bdec camellia-128-cbc 333 288 0

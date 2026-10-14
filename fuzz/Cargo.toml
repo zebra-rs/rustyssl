@@ -303,3 +303,9 @@ name = "lowlevel_ciphers"
 path = "fuzz_targets/lowlevel_ciphers.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "bio_evp"
+path = "fuzz_targets/bio_evp.rs"
+test = false
+doc = false

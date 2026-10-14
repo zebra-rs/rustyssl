@@ -6942,6 +6942,142 @@ static int idea_seed_camellia_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the EVP filter BIOs, over the digest commands' data:
+ *   bmd DIGEST LEN PIECE            LEN octets written in pieces of PIECE through a digest
+ *                                   filter into a memory BIO: what went through, and BIO_gets
+ *   bmdread DIGEST LEN CHUNK        LEN octets read through a digest filter in chunks
+ *   benc CIPHER LEN PIECE           LEN octets written in pieces through an encrypting filter,
+ *                                   then BIO_flush: the output's length, ends, and digest, and
+ *                                   the status
+ *   bdec CIPHER LEN CHUNK CORRUPT   LEN octets encrypted at once (the last octet flipped for
+ *                                   CORRUPT 1), read back through a decrypting filter in chunks:
+ *                                   the count, last result, EOF, status, and whether it matched
+ */
+static void bio_evp_digest(const char *what, const unsigned char *p, long n)
+{
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int len = 0;
+
+    EVP_Digest(p, (size_t)n, md, &len, EVP_sha256(), NULL);
+    printf(" %s %ld", what, n);
+    probe_bytes("sha256", md, 8);
+    if (n > 0) {
+        probe_bytes("head", p, n < 16 ? (size_t)n : 16);
+        probe_bytes("tail", p + (n < 16 ? 0 : n - 16), n < 16 ? (size_t)n : 16);
+    }
+}
+
+static int bio_evp_command(const char *command, const char *line)
+{
+    char name[32] = "";
+    long len = 0, piece = 0, corrupt = 0;
+    static const unsigned char key[64] = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde";
+    static const unsigned char iv[32] = "fedcba9876543210fedcba987654321";
+    const unsigned char *d;
+
+    if (strcmp(command, "bmd") != 0 && strcmp(command, "bmdread") != 0 && strcmp(command, "benc") != 0
+        && strcmp(command, "bdec") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data;
+    sscanf(line, "%*s %31s %ld %ld %ld", name, &len, &piece, &corrupt);
+    if (len < 0 || len > 2000 || piece < 1 || piece > 5000) {
+        printf("%s: skipped\n", line);
+        return 1;
+    }
+    printf("%s:", line);
+    if (strcmp(command, "bmd") == 0 || strcmp(command, "bmdread") == 0) {
+        const EVP_MD *md = EVP_get_digestbyname(name);
+        BIO *b = BIO_new(BIO_f_md()), *mem;
+        unsigned char out[EVP_MAX_MD_SIZE], buf[5000];
+        long i, total = 0;
+        int r;
+
+        if (md == NULL || b == NULL) {
+            printf(" no digest\n");
+            BIO_free(b);
+            return 1;
+        }
+        printf(" set %ld", (long)BIO_set_md(b, md));
+        if (strcmp(command, "bmd") == 0) {
+            mem = BIO_new(BIO_s_mem());
+            BIO_push(b, mem);
+            for (i = 0; i < len; i += piece) {
+                r = BIO_write(b, d + i, (int)(len - i < piece ? len - i : piece));
+                total += r > 0 ? r : 0;
+            }
+        } else {
+            mem = BIO_new_mem_buf(d, (int)len);
+            BIO_push(b, mem);
+            while ((r = BIO_read(b, buf, (int)piece)) > 0)
+                total += r;
+            printf(" last %d", r);
+        }
+        r = BIO_gets(b, (char *)out, sizeof(out));
+        printf(" moved %ld gets %d", total, r);
+        if (r > 0)
+            probe_bytes("md", out, (size_t)r);
+        BIO_free_all(b);
+    } else {
+        const EVP_CIPHER *c = EVP_get_cipherbyname(name);
+        BIO *b = BIO_new(BIO_f_cipher()), *mem;
+        static unsigned char ct[2100], buf[5000];
+        long total = 0, i;
+        int r = 0, n = 0, f = 0;
+
+        if (c == NULL || b == NULL) {
+            printf(" no cipher\n");
+            BIO_free(b);
+            return 1;
+        }
+        if (strcmp(command, "benc") == 0) {
+            char *p = NULL;
+
+            printf(" set %d", BIO_set_cipher(b, c, key, iv, 1));
+            mem = BIO_new(BIO_s_mem());
+            BIO_push(b, mem);
+            for (i = 0; i < len; i += piece) {
+                r = BIO_write(b, d + i, (int)(len - i < piece ? len - i : piece));
+                total += r > 0 ? r : 0;
+            }
+            printf(" wrote %ld pending %ld flush %d status %ld", total, (long)BIO_wpending(b), BIO_flush(b),
+                BIO_get_cipher_status(b));
+            {
+                long m = BIO_get_mem_data(mem, &p);
+
+                bio_evp_digest("out", (unsigned char *)p, m);
+            }
+        } else {
+            EVP_CIPHER_CTX *e = EVP_CIPHER_CTX_new();
+
+            EVP_EncryptInit_ex(e, c, NULL, key, iv);
+            EVP_EncryptUpdate(e, ct, &n, d, (int)len);
+            EVP_EncryptFinal_ex(e, ct + n, &f);
+            n += f;
+            EVP_CIPHER_CTX_free(e);
+            if (corrupt && n > 0)
+                ct[n - 1] ^= 1;
+            printf(" set %d", BIO_set_cipher(b, c, key, iv, 0));
+            BIO_push(b, BIO_new_mem_buf(ct, n));
+            while (total < (long)sizeof(buf) - piece && (r = BIO_read(b, buf + total, (int)piece)) > 0)
+                total += r;
+            printf(" read %ld last %d eof %d status %ld", total, r, BIO_eof(b), BIO_get_cipher_status(b));
+            printf(" %s", total == len && memcmp(buf, d, (size_t)len) == 0 ? "match" : "differ");
+            bio_evp_digest("plain", buf, total);
+        }
+        BIO_free_all(b);
+    }
+    printf("\n");
+    ERR_clear_error();
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -6974,7 +7110,7 @@ int main(void)
             || print_command(command, line) || lowlevel_command(command, line)
             || aes_command(command, line) || aead_command(command, line)
             || des_command(command, line) || legacy_command(command, line)
-            || idea_seed_camellia_command(command, line)) {
+            || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
