@@ -314,7 +314,9 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/bio.h>
+#include <openssl/blowfish.h>
 #include <openssl/bn.h>
+#include <openssl/cast.h>
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
 #include <openssl/des.h>
@@ -330,6 +332,8 @@
 #include <openssl/params.h>
 #include <openssl/provider.h>
 #include <openssl/rand.h>
+#include <openssl/rc2.h>
+#include <openssl/rc4.h>
 #include <openssl/ripemd.h>
 #include <openssl/sha.h>
 #include <openssl/core_names.h>
@@ -6626,6 +6630,136 @@ static int des_command(const char *command, const char *line)
     return 1;
 }
 
+/*
+ * Commands for the deprecated Blowfish, CAST, RC2, and RC4 functions over one key each, an IV,
+ * and a position, kept between commands, and the digest commands' data:
+ *   lgkey bf|cast|rc2 LEN [BITS]   the key setter with LEN octets of the data (at most 300;
+ *                                  RC2 with BITS effective bits): the key struct (Blowfish's
+ *                                  P-array and S-box ends)
+ *   lgiv, lgnum N                  the IV from the data (and the position 0); the position
+ *   lgmode CIPHER MODE ENC LEN     MODE (ecb, cbc, cfb64, ofb64) of LEN (at most 500) octets:
+ *                                  the output, IV, and position
+ *   rc4key LEN                     RC4_set_key with LEN (1 to 300) octets: x, y, and the start
+ *   rc4 LEN                        RC4 of LEN (at most 500) octets, and x and y
+ */
+static BF_KEY probe_bf;
+static CAST_KEY probe_cast;
+static RC2_KEY probe_rc2;
+static RC4_KEY probe_rc4;
+static unsigned char probe_lg_iv[8];
+static int probe_lg_num;
+
+static int legacy_command(const char *command, const char *line)
+{
+    char a[16] = "", b[16] = "";
+    long n = 0, m = 0;
+    static unsigned char out[600];
+    const unsigned char *d;
+    size_t len = 0;
+
+    if (strcmp(command, "lgkey") != 0 && strcmp(command, "lgiv") != 0 && strcmp(command, "lgnum") != 0
+        && strcmp(command, "lgmode") != 0 && strcmp(command, "rc4key") != 0 && strcmp(command, "rc4") != 0)
+        return 0;
+    if (digest_data[1] == 0) {
+        size_t i;
+
+        for (i = 0; i < sizeof(digest_data); i++)
+            digest_data[i] = (unsigned char)(i * 7 + 3);
+    }
+    d = digest_data + digest_offset;
+    printf("%s:", line);
+    memset(out, 0xee, sizeof(out));
+    if (strcmp(command, "lgkey") == 0) {
+        sscanf(line, "%*s %15s %ld %ld", a, &n, &m);
+        n = n > 300 ? 300 : n;
+        if (strcmp(a, "bf") == 0) {
+            BF_set_key(&probe_bf, (int)n, d);
+            probe_bytes("P", probe_bf.P, sizeof(probe_bf.P));
+            probe_bytes("S", probe_bf.S, 16);
+            probe_bytes("", probe_bf.S + 1020, 16);
+        } else if (strcmp(a, "cast") == 0) {
+            CAST_set_key(&probe_cast, (int)n, d);
+            probe_bytes("key", &probe_cast, sizeof(probe_cast));
+        } else if (strcmp(a, "rc2") == 0 && n > 0) {
+            RC2_set_key(&probe_rc2, (int)n, d, (int)m);
+            probe_bytes("key", &probe_rc2, sizeof(probe_rc2));
+        } else {
+            printf(" skipped\n");
+            return 1;
+        }
+        len = n < 0 ? 0 : (size_t)n;
+    } else if (strcmp(command, "lgiv") == 0) {
+        memcpy(probe_lg_iv, d, 8);
+        probe_lg_num = 0;
+        len = 3;
+    } else if (strcmp(command, "lgnum") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        probe_lg_num = (int)n;
+        printf(" %d", probe_lg_num);
+    } else if (strcmp(command, "lgmode") == 0) {
+        int enc;
+        size_t octets;
+
+        sscanf(line, "%*s %15s %15s %ld %ld", a, b, &m, &n);
+        enc = (int)m;
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        octets = len;
+        if (strcmp(b, "ecb") == 0) {
+            if (strcmp(a, "bf") == 0)
+                BF_ecb_encrypt(d, out, &probe_bf, enc);
+            else if (strcmp(a, "cast") == 0)
+                CAST_ecb_encrypt(d, out, &probe_cast, enc);
+            else
+                RC2_ecb_encrypt(d, out, &probe_rc2, enc);
+            octets = 8;
+        } else if (strcmp(b, "cbc") == 0) {
+            if (strcmp(a, "bf") == 0)
+                BF_cbc_encrypt(d, out, (long)len, &probe_bf, probe_lg_iv, enc);
+            else if (strcmp(a, "cast") == 0)
+                CAST_cbc_encrypt(d, out, (long)len, &probe_cast, probe_lg_iv, enc);
+            else
+                RC2_cbc_encrypt(d, out, (long)len, &probe_rc2, probe_lg_iv, enc);
+            octets = (len + 7) / 8 * 8;
+        } else if (strcmp(b, "cfb64") == 0) {
+            if (strcmp(a, "bf") == 0)
+                BF_cfb64_encrypt(d, out, (long)len, &probe_bf, probe_lg_iv, &probe_lg_num, enc);
+            else if (strcmp(a, "cast") == 0)
+                CAST_cfb64_encrypt(d, out, (long)len, &probe_cast, probe_lg_iv, &probe_lg_num, enc);
+            else
+                RC2_cfb64_encrypt(d, out, (long)len, &probe_rc2, probe_lg_iv, &probe_lg_num, enc);
+        } else {
+            if (strcmp(a, "bf") == 0)
+                BF_ofb64_encrypt(d, out, (long)len, &probe_bf, probe_lg_iv, &probe_lg_num);
+            else if (strcmp(a, "cast") == 0)
+                CAST_ofb64_encrypt(d, out, (long)len, &probe_cast, probe_lg_iv, &probe_lg_num);
+            else
+                RC2_ofb64_encrypt(d, out, (long)len, &probe_rc2, probe_lg_iv, &probe_lg_num);
+        }
+        probe_bytes("out", out, octets + 1);
+        probe_bytes("iv", probe_lg_iv, 8);
+        printf(" num %d", probe_lg_num);
+    } else if (strcmp(command, "rc4key") == 0) {
+        sscanf(line, "%*s %ld", &n);
+        if (n < 1 || n > 300) {
+            printf(" skipped\n");
+            return 1;
+        }
+        RC4_set_key(&probe_rc4, (int)n, d);
+        printf(" x %u y %u", (unsigned)probe_rc4.x, (unsigned)probe_rc4.y);
+        probe_bytes("data", probe_rc4.data, 16);
+        len = (size_t)n;
+    } else {
+        sscanf(line, "%*s %ld", &n);
+        len = n < 0 ? 0 : (size_t)n > 500 ? 500 : (size_t)n;
+        RC4(&probe_rc4, len, d, out);
+        probe_bytes("out", out, len + 1);
+        printf(" x %u y %u", (unsigned)probe_rc4.x, (unsigned)probe_rc4.y);
+    }
+    digest_offset = (digest_offset + len * 3 + 1) % 1024;
+    printf("\n");
+    return 1;
+}
+
 int main(void)
 {
     for (int i = 0; i < 64; i++)
@@ -6657,7 +6791,7 @@ int main(void)
             || derive_command(command, line) || meth_command(command, line)
             || print_command(command, line) || lowlevel_command(command, line)
             || aes_command(command, line) || aead_command(command, line)
-            || des_command(command, line)) {
+            || des_command(command, line) || legacy_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

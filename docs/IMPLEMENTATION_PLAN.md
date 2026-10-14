@@ -2404,7 +2404,7 @@ have run for at least 24 CPU-hours with no findings.
     - The probe's RAND-layer commands (a context made the thread's public or private DRBG,
       `RAND_bytes`, `RAND_priv_bytes`, `RAND_status`, `RAND_poll`), printing output only from
       DRBGs that are deterministic, in the corpus and the random sessions.
-- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in five sub-steps,
+- [ ] **3.8 Deprecated low-level symmetric APIs** (still exported in 3.x), in six sub-steps,
   each its own PR (195 exports):
 
   ⚠ Their contexts (`SHA256_CTX`, `AES_KEY`, `DES_key_schedule`, …) are **public-layout**
@@ -2530,8 +2530,42 @@ have run for at least 24 CPU-hours with no findings.
       `descrypt` (corpus `lowlevel_des.txt`, random `lowlevel_des` sessions); the
       `lowlevel_des` fuzz target checks blocks against the cipher backend, the inverses, and
       chunking.
-  - [ ] **3.8e The other ciphers:** `BF_*`, `CAST_*`, `RC2_*`, `IDEA_*`, `SEED_*`,
-    `Camellia_*`, and `RC4*` (50 exports).
+  - [x] **3.8e Blowfish, CAST, RC2, and RC4:** the `BF_*`, `CAST_*`, `RC2_*`, and `RC4*`
+    functions: `rustyssl_crypto::lowlevel::legacy` and `lowlevel/legacy.rs` in capi: 25
+    exports; libcrypto now 2,086 of 5,876.
+    - **Decision:** the key structs are visible to applications, so the key schedules are
+      OpenSSL's, over its tables (Blowfish's initial P-array and S-boxes, CAST-128's S-boxes,
+      RC2's PITABLE), extracted from its sources by a script into `lowlevel/legacy/tables.rs`.
+      Every read (and, for Blowfish's key-dependent S-boxes during the key schedule and RC4's
+      permutation, every write) at a secret index scans the whole table and keeps or changes
+      the entry by a mask (OpenSSL's, and the RustCrypto crates', index directly). The scans
+      make `BF_set_key` slow (its 521 encryptions each scan the S-boxes), but these are
+      legacy ciphers.
+    - **Decision:** the 64-bit modes (ECB, CBC, CFB-64, OFB-64) are the same for each cipher
+      but for how octets become words, so they act on octets once, over a `Block64` trait.
+    - Quirks kept: `BF_set_key` with a length of 0 or less takes the first octet alone, as
+      OpenSSL reads it, and caps at 72; `CAST_set_key` caps at 16 and gives keys of 10 octets or
+      fewer 12 rounds; `RC2_set_key` caps at 128 and takes any effective bit count (0 or less,
+      or past 1024, is 1024); `RC2_encrypt` uses the low 32 bits of each `unsigned long`;
+      `RC4_KEY`'s words are `unsigned int` or `unsigned char` by platform, and `RC4_options`
+      names the platform's ("rc4(char)" or "rc4(int)" for the C code; on x86_64 the
+      assembly's, which it picks by the processor `cpuid` reports: "rc4(16x,int)" on Intel's,
+      "rc4(8x,int)" on others); `BF_options` says "blowfish(ptr)".
+    - Not reproduced: OpenSSL's x86_64 RC4 keeps a byte layout ("rc4(8x,char)") on the
+      Pentium 4 (Intel family 15) alone, and its `OPENSSL_ia32cap` environment variable can
+      steer either choice; rustyssl has no capability vector and keeps the `unsigned int`
+      layout and the vendor's name. CI's AMD runner caught the vendor dependence.
+    - New deviations: null keys, buffers, IVs, and positions, and negative lengths; RC2 keys of
+      no octets (OpenSSL reads before the key) and RC4 keys of none (OpenSSL reads past it).
+    - `tests/c/lowlevel_legacy.c` (27 checks: the key structs for every special key length and
+      bit count, the block functions, every mode around the block and in pieces, RC4 in
+      pieces and in place); the probe's `lgkey`, `lgiv`, `lgnum`, `lgmode`, `rc4key`, and
+      `rc4` (corpus `lowlevel_legacy.txt`, random `lowlevel_legacy` sessions); the
+      `lowlevel_legacy` fuzz target checks blocks against the cipher backend, the modes, and
+      RC4's chunking.
+  - [ ] **3.8f IDEA, SEED, and Camellia:** the `IDEA_*`, `SEED_*`, and `Camellia_*` functions
+    (25 exports). OpenSSL's x86_64 Camellia is assembly, so its key layout must be measured
+    per platform, as AES's was.
 - [ ] **3.9 EVP filter BIOs:** `BIO_f_md`, `BIO_f_cipher`.
 - [ ] **3.10 `EVP_SKEY` / `EVP_SKEYMGMT`** (3.5 opaque symmetric keys).
 - [ ] **3.11 Custom method APIs:** `EVP_MD_meth_*`, `EVP_CIPHER_meth_*`. These are

@@ -148,7 +148,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
     let mut out = String::new();
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(35) {
+        match random.below(36) {
             0 => err_session(&mut random, &mut out)?,
             1 => buf_mem_session(&mut random, &mut out)?,
             2 => stack_session(&mut random, &mut out)?,
@@ -183,6 +183,7 @@ fn random_sessions(seed: u64, count: usize) -> Result<String> {
             31 => lowlevel_aes_session(&mut random, &mut out)?,
             32 => lowlevel_aead_session(&mut random, &mut out)?,
             33 => lowlevel_des_session(&mut random, &mut out)?,
+            34 => lowlevel_legacy_session(&mut random, &mut out)?,
             _ => string_session(&mut random, &mut out)?,
         }
     }
@@ -479,6 +480,57 @@ fn lowlevel_des_session(random: &mut Random, out: &mut String) -> Result {
                     salt(random)
                 )?;
             }
+        }
+    }
+    Ok(())
+}
+
+/// A random session of the deprecated Blowfish, CAST, RC2, and RC4 functions: keys of every
+/// length the setters cap or treat specially (RC2 with any effective bit count), IVs,
+/// positions, the four block modes around the block size, and RC4 in pieces.
+fn lowlevel_legacy_session(random: &mut Random, out: &mut String) -> Result {
+    let length = |random: &mut Random| -> u64 {
+        match random.below(4) {
+            0 => random.below(4),
+            1 => random
+                .pick(&["7", "8", "9", "15", "16", "17"])
+                .parse()
+                .unwrap_or(0),
+            _ => random.below(100),
+        }
+    };
+    writeln!(out, "lgkey bf {}", 1 + random.below(80))?;
+    writeln!(out, "lgkey cast {}", random.below(20))?;
+    writeln!(
+        out,
+        "lgkey rc2 {} {}",
+        1 + random.below(140),
+        random.offset(-10, 1100)
+    )?;
+    writeln!(out, "lgiv")?;
+    writeln!(out, "rc4key {}", 1 + random.below(300))?;
+    for _ in 0..random.below(15) + 1 {
+        let cipher = random.pick(&["bf", "cast", "rc2"]);
+        match random.below(10) {
+            0 => writeln!(
+                out,
+                "lgkey {cipher} {} {}",
+                random.offset(-2, 140),
+                random.offset(-10, 1100)
+            )?,
+            1 => writeln!(out, "lgiv")?,
+            2 => writeln!(out, "lgnum {}", random.offset(-20, 40))?,
+            3..=6 => {
+                let mode = random.pick(&["ecb", "cbc", "cfb64", "ofb64"]);
+                writeln!(
+                    out,
+                    "lgmode {cipher} {mode} {} {}",
+                    random.below(2),
+                    length(random)
+                )?;
+            }
+            7 => writeln!(out, "rc4key {}", 1 + random.below(300))?,
+            _ => writeln!(out, "rc4 {}", length(random))?,
         }
     }
     Ok(())

@@ -9,6 +9,7 @@ pub mod aead;
 pub mod aes;
 pub mod des;
 pub mod hash;
+pub mod legacy;
 pub mod modes;
 
 /// Copies `src` into `buf` from octet `at` on, as far as `buf` reaches.

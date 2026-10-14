@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 2061 | 3815 | 35.1% |
+| libcrypto | 5876 | 2086 | 3790 | 35.5% |
 | libssl | 603 | 1 | 602 | 0.2% |
-| **Total** | **6479** | **2062** | **4417** | **31.8%** |
+| **Total** | **6479** | **2087** | **4392** | **32.2%** |
 
 ## By header
 
@@ -29,11 +29,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/asn1t.h` | libcrypto | 20 | 18 | 90.0% |
 | `openssl/async.h` | libcrypto | 22 | 0 | 0.0% |
 | `openssl/bio.h` | libcrypto | 184 | 177 | 96.2% |
-| `openssl/blowfish.h` | libcrypto | 8 | 0 | 0.0% |
+| `openssl/blowfish.h` | libcrypto | 8 | 8 | 100.0% |
 | `openssl/bn.h` | libcrypto | 201 | 201 | 100.0% |
 | `openssl/buffer.h` | libcrypto | 6 | 6 | 100.0% |
 | `openssl/camellia.h` | libcrypto | 10 | 0 | 0.0% |
-| `openssl/cast.h` | libcrypto | 7 | 0 | 0.0% |
+| `openssl/cast.h` | libcrypto | 7 | 7 | 100.0% |
 | `openssl/cmac.h` | libcrypto | 9 | 9 | 100.0% |
 | `openssl/cmp.h` | libcrypto | 157 | 0 | 0.0% |
 | `openssl/cmp_util.h` | libcrypto | 4 | 0 | 0.0% |
@@ -75,8 +75,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/provider.h` | libcrypto | 22 | 21 | 95.5% |
 | `openssl/quic.h` | libssl | 3 | 0 | 0.0% |
 | `openssl/rand.h` | libcrypto | 25 | 25 | 100.0% |
-| `openssl/rc2.h` | libcrypto | 7 | 0 | 0.0% |
-| `openssl/rc4.h` | libcrypto | 3 | 0 | 0.0% |
+| `openssl/rc2.h` | libcrypto | 7 | 7 | 100.0% |
+| `openssl/rc4.h` | libcrypto | 3 | 3 | 100.0% |
 | `openssl/ripemd.h` | libcrypto | 5 | 5 | 100.0% |
 | `openssl/rsa.h` | libcrypto | 154 | 23 | 14.9% |
 | `openssl/seed.h` | libcrypto | 7 | 0 | 0.0% |
@@ -326,6 +326,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_put_object` | libcrypto | `openssl/asn1.h` | `asn1_header` |
 | `ASN1_tag2bit` | libcrypto | `openssl/asn1.h` | `asn1_text` |
 | `ASN1_tag2str` | libcrypto | `openssl/asn1.h` | `asn1_text` |
+| `BF_cbc_encrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_cfb64_encrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_decrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_ecb_encrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_encrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_ofb64_encrypt` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_options` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
+| `BF_set_key` | libcrypto | `openssl/blowfish.h` | `lowlevel_legacy` |
 | `BIO_ADDRINFO_address` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_ADDRINFO_family` | libcrypto | `openssl/bio.h` | `bio_addr` |
 | `BIO_ADDRINFO_free` | libcrypto | `openssl/bio.h` | `bio_addr` |
@@ -713,6 +721,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BUF_MEM_new` | libcrypto | `openssl/buffer.h` | `bio_mem`, `buf_mem`, `crypto_mem_hooks`, `crypto_secure_heap` |
 | `BUF_MEM_new_ex` | libcrypto | `openssl/buffer.h` | `buf_mem`, `crypto_secure_heap` |
 | `BUF_reverse` | libcrypto | `openssl/buffer.h` | `buf_mem` |
+| `CAST_cbc_encrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_cfb64_encrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_decrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_ecb_encrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_encrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_ofb64_encrypt` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
+| `CAST_set_key` | libcrypto | `openssl/cast.h` | `lowlevel_legacy` |
 | `CMAC_CTX_cleanup` | libcrypto | `openssl/cmac.h` | `evp_mac` |
 | `CMAC_CTX_copy` | libcrypto | `openssl/cmac.h` | `evp_mac` |
 | `CMAC_CTX_free` | libcrypto | `openssl/cmac.h` | `evp_mac` |
@@ -2055,6 +2070,16 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RAND_set_seed_source_type` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_status` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_write_file` | libcrypto | `openssl/rand.h` | `rand` |
+| `RC2_cbc_encrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_cfb64_encrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_decrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_ecb_encrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_encrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_ofb64_encrypt` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC2_set_key` | libcrypto | `openssl/rc2.h` | `lowlevel_legacy` |
+| `RC4` | libcrypto | `openssl/rc4.h` | `lowlevel_legacy` |
+| `RC4_options` | libcrypto | `openssl/rc4.h` | `lowlevel_legacy` |
+| `RC4_set_key` | libcrypto | `openssl/rc4.h` | `lowlevel_legacy` |
 | `RIPEMD160` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
 | `RIPEMD160_Final` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
 | `RIPEMD160_Init` | libcrypto | `openssl/ripemd.h` | `lowlevel_hash` |
