@@ -1,0 +1,59 @@
+# The deprecated IDEA, SEED, and Camellia functions (step 3.8f).
+cmode camellia ecb 1 16
+ckey idea
+ckey idea-odd
+ckey idea-odd
+ckey idea-inplace
+ckey idea
+ckey seed
+ckey camellia 128
+ckey camellia 192
+ckey camellia 256
+ckey camellia 0
+ckey camellia 129
+ckey camellia -128
+ckey camellia 128
+cwords
+cwords
+civ
+cmode idea ecb 1 8
+cmode idea ecb 0 8
+cmode idea cbc 1 23
+cmode idea cbc 0 23
+cmode idea cbc 1 0
+cmode idea cfb64 1 13
+cmode idea cfb64 0 9
+cnum -3
+cmode idea cfb64 1 10
+cnum 12
+cmode idea ofb64 1 30
+civ
+cmode seed ecb 1 16
+cmode seed ecb 0 16
+cmode seed cbc 1 40
+cmode seed cbc 0 17
+cmode seed cfb128 1 21
+cmode seed cfb128 0 33
+cnum 15
+cmode seed ofb128 1 40
+cnum -1
+cmode seed ofb128 1 5
+civ
+cmode camellia ecb 1 16
+cmode camellia ecb 0 16
+cmode camellia cbc 1 33
+cmode camellia cbc 0 31
+cmode camellia cfb128 1 50
+cmode camellia ofb128 1 17
+cmode camellia cfb1 1 13
+cmode camellia cfb1 0 77
+cmode camellia cfb8 1 21
+cmode camellia cfb8 0 3
+cnum 9
+cmode camellia ctr 1 5
+cmode camellia ctr 1 40
+cmode camellia ctr 1 0
+cmode camellia ctr 1 100
+ckey camellia 256
+cmode camellia cbc 1 64
+cmode camellia ecb 0 16
