@@ -26,8 +26,9 @@ use rustyssl_abi::{
     OSSL_PKEY_RSA_PAD_MODE_OAEP, OSSL_PKEY_RSA_PAD_MODE_PKCSV15, PROV_R_BAD_LENGTH,
     PROV_R_BAD_TLS_CLIENT_VERSION, PROV_R_FAILED_TO_DECRYPT, PROV_R_INVALID_KEY,
     PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, PROV_R_OUTPUT_BUFFER_TOO_SMALL, RSA,
+    RSA_NO_PADDING,
 };
-use rustyssl_crypto::rsa::{self as core_rsa, Hash, Padding};
+use rustyssl_crypto::rsa as core_rsa;
 
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox};
@@ -42,6 +43,7 @@ use crate::params::{
     OSSL_PARAM_set_uint, OSSL_PARAM_set_utf8_string,
 };
 use crate::rsa::{Kind, Md, private_random, public_random, raise_all, rsa};
+use crate::rsa_ops::{Op, method_op};
 
 /// `OSSL_MAX_NAME_SIZE` and `OSSL_MAX_PROPQUERY_SIZE` (`internal/sizes.h`): the buffers the
 /// names and queries are read into.
@@ -239,9 +241,11 @@ ffi_callback! {
             if r.is_err() {
                 return 0;
             }
-            st.key.public_encrypt(&tbuf, output, Padding::None, None, &mut rng)
+            // SAFETY: the context's key.
+            (unsafe { method_op(c.rsa, Op::PublicEncrypt, &tbuf, output, RSA_NO_PADDING) }, Vec::new())
         } else {
-            st.key.public_encrypt(input, output, Padding::from_number(c.pad_mode), None, &mut rng)
+            // SAFETY: as above.
+            (unsafe { method_op(c.rsa, Op::PublicEncrypt, input, output, c.pad_mode) }, Vec::new())
         };
         raise_all(&outcome.1);
         match outcome.0 {
@@ -270,7 +274,6 @@ ffi_callback! {
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the context's key.
         let Some(r) = (unsafe { rsa(c.rsa) }) else { return 0 };
-        let key_libctx = r.libctx.0;
         let st = r.snapshot();
         let len = st.key.size();
         let tls = c.pad_mode == 7;
@@ -303,12 +306,11 @@ ffi_callback! {
         let Some(input) = (unsafe { crate::ffi::bytes(in_, inlen) }) else { return 0 };
         // SAFETY: the caller's room for `outsize` octets.
         let output = unsafe { core::slice::from_raw_parts_mut(out, outsize) };
-        let mut rng = private_random(key_libctx);
         let ret: isize = if c.pad_mode == 4 || tls {
             let mut tbuf = vec![0u8; len];
-            let (r, raised) = st.key.private_decrypt(input, &mut tbuf, Padding::None, None, None, &mut rng);
-            raise_all(&raised);
-            if usize::try_from(r).ok() != Some(len) {
+            // SAFETY: the context's key.
+            let r = unsafe { method_op(c.rsa, Op::PrivateDecrypt, input, &mut tbuf, RSA_NO_PADDING) };
+            if r != Ok(len) {
                 err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_DECRYPT, F);
                 return 0;
             }
@@ -336,18 +338,11 @@ ffi_callback! {
             }
         } else {
             let pad = if c.implicit_rejection == 0 && c.pad_mode == 1 { 8 } else { c.pad_mode };
-            let padding = Padding::from_number(pad);
-            // Implicit rejection's key derivation hashes with SHA-256 from the key's library
-            // context.
-            let sha256 = if padding == Padding::Pkcs1 {
-                // SAFETY: the key's library context; a static name.
-                unsafe { Md::fetch(key_libctx, c"sha256", ptr::null()) }
-            } else {
-                None
-            };
-            let (r, raised) = st.key.private_decrypt(input, output, padding, None, sha256.as_ref().map(|m| m as &dyn Hash), &mut rng);
-            raise_all(&raised);
-            r
+            // SAFETY: the context's key.
+            match unsafe { method_op(c.rsa, Op::PrivateDecrypt, input, output, pad) } {
+                Ok(n) => isize::try_from(n).unwrap_or(-1),
+                Err(()) => -1,
+            }
         };
         // The length, written only for a result (selected without a branch on it).
         let ok = usize::from(ret >= 0);

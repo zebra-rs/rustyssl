@@ -7512,13 +7512,64 @@ const _: unsafe extern "C" fn(
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::RIPEMD160_Update;
 const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_PKCS1_OpenSSL;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_X931_derive_ex;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    core::ffi::c_int,
+    *const BIGNUM,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_X931_generate_key_ex;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::rsa_ops::RSA_X931_hash_id;
 const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_bits;
 const _: unsafe extern "C" fn(*mut RSA) = crate::rsa_lib::RSA_blinding_off;
 const _: unsafe extern "C" fn(*mut RSA, *mut BN_CTX) -> core::ffi::c_int =
     crate::rsa_lib::RSA_blinding_on;
+const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_ops::RSA_check_key;
+const _: unsafe extern "C" fn(*const RSA, *mut BN_GENCB) -> core::ffi::c_int =
+    crate::rsa_ops::RSA_check_key_ex;
 const _: unsafe extern "C" fn(*mut RSA, core::ffi::c_int) = crate::rsa_lib::RSA_clear_flags;
 const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_flags;
 const _: unsafe extern "C" fn(*mut RSA) = crate::rsa_lib::RSA_free;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: core::ffi::c_int,
+            arg2: core::ffi::c_int,
+            arg3: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::rsa_ops::RSA_generate_key;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    core::ffi::c_int,
+    *mut BIGNUM,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_generate_key_ex;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut BIGNUM,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_generate_multi_prime_key;
 const _: unsafe extern "C" fn(
     *const RSA,
     *mut *const BIGNUM,
@@ -7828,6 +7879,111 @@ const _: unsafe extern "C" fn() -> *mut RSA = crate::rsa_lib::RSA_new;
 const _: unsafe extern "C" fn(*mut ENGINE) -> *mut RSA = crate::rsa_lib::RSA_new_method;
 const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_null_method;
 const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_OAEP;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const EVP_MD,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_OAEP_mgf1;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_PSS;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    *const EVP_MD,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_PSS_mgf1;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_type_1;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_PKCS1_type_2;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_X931;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_add_none;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_PKCS1_OAEP;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const EVP_MD,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_PKCS1_OAEP_mgf1;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_PKCS1_type_1;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_PKCS1_type_2;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_X931;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_padding_check_none;
+const _: unsafe extern "C" fn(
     *mut EVP_PKEY_CTX,
     core::ffi::c_int,
     core::ffi::c_int,
@@ -7887,10 +8043,57 @@ const _: unsafe extern "C" fn(*mut RSA, *const RSA_METHOD) -> core::ffi::c_int =
     crate::rsa_lib::RSA_set_method;
 const _: unsafe extern "C" fn(*mut RSA, *mut BN_CTX) -> *mut BN_BLINDING =
     crate::rsa_lib::RSA_setup_blinding;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *mut RSA,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_sign;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *mut RSA,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_sign_ASN1_OCTET_STRING;
 const _: unsafe extern "C" fn(*const RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_size;
 const _: unsafe extern "C" fn(*const RSA, core::ffi::c_int) -> core::ffi::c_int =
     crate::rsa_lib::RSA_test_flags;
 const _: unsafe extern "C" fn(*mut RSA) -> core::ffi::c_int = crate::rsa_lib::RSA_up_ref;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *mut RSA,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_verify;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *mut RSA,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_verify_ASN1_OCTET_STRING;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *const core::ffi::c_uchar,
+    *const EVP_MD,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_verify_PKCS1_PSS;
+const _: unsafe extern "C" fn(
+    *mut RSA,
+    *const core::ffi::c_uchar,
+    *const EVP_MD,
+    *const EVP_MD,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::rsa_ops::RSA_verify_PKCS1_PSS_mgf1;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,

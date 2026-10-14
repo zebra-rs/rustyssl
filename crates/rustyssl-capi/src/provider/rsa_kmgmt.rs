@@ -1472,7 +1472,7 @@ ffi_callback! {
             unsafe { BN_GENCB_set(gencb, Some(rsa_gencb), genctx) };
         }
         // SAFETY: the context's library context; the holder, or NULL.
-        let key = unsafe { generate_key(libctx, bits, primes, &e, gencb) };
+        let key = unsafe { generate_key(libctx, bits, primes, Some(&e), gencb) };
         // SAFETY: the holder made above, or NULL.
         unsafe { BN_GENCB_free(gencb) };
         let Some(key) = key else { return ptr::null_mut() };
