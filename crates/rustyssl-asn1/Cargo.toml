@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 rustyssl-abi.workspace = true
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true

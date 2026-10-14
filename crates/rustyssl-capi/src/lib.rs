@@ -40,6 +40,7 @@ mod params;
 mod pem;
 mod pem_cipher;
 mod pem_read;
+mod pkcs12;
 mod property;
 mod provider;
 mod rand;
