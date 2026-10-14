@@ -17,4 +17,5 @@ pub mod params;
 pub mod property;
 pub mod provided;
 pub mod rand;
+pub mod rsa;
 pub mod sym;

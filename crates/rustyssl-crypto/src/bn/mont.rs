@@ -82,6 +82,31 @@ impl Montgomery {
         })
     }
 
+    /// As [`Montgomery::new`], for a secret modulus: `RR` comes from a reduction whose time
+    /// depends on the modulus's length only (`BN_FLG_CONSTTIME` on the modulus in OpenSSL).
+    pub fn new_consttime(modulus: &BigNum) -> Result<Self, MontError> {
+        if modulus.is_zero() {
+            return Err(MontError::Zero);
+        }
+        let n = modulus.abs();
+        let low = n.limbs().first().copied().unwrap_or(0);
+        if low & 1 == 0 {
+            return Err(MontError::NoInverse);
+        }
+        let nl = n.top();
+        // R^2 = 2^(2 * 64 * nl): one limb past 2 nl limbs of zeros.
+        let mut r2 = vec![0; nl.saturating_mul(2)];
+        r2.push(1);
+        let rr = BigNum::from_limbs(false, super::ct::reduce_limbs(&r2, n.limbs()))
+            .map_err(MontError::Bn)?;
+        Ok(Self {
+            n0: neg_inverse(low),
+            n,
+            rr,
+            rr_top: nl,
+        })
+    }
+
     /// The modulus (non-negative).
     pub fn modulus(&self) -> &BigNum {
         &self.n
@@ -256,8 +281,9 @@ fn bits_at(e: &[Limb], pos: usize, n: usize) -> usize {
     v
 }
 
-/// The full product of two limb strings (no trimming, so lengths stay public).
-fn mul_fixed(a: &[Limb], b: &[Limb]) -> Vec<Limb> {
+/// The full product of two limb strings (no trimming, so lengths stay public): constant time
+/// for the lengths.
+pub fn mul_fixed(a: &[Limb], b: &[Limb]) -> Vec<Limb> {
     let mut r = vec![0; a.len().saturating_add(b.len())];
     for (i, &x) in a.iter().enumerate() {
         let Some(row) = r.get_mut(i..) else { break };

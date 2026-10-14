@@ -8,6 +8,50 @@
 
 use super::{BigNum, LIMB_BITS, Limb, hi, lo};
 
+/// `a - b` in place over equal lengths, returning the borrow (0 or 1).
+fn sub_borrow(a: &mut [Limb], b: &[Limb]) -> Limb {
+    let mut borrow: Limb = 0;
+    for (x, &y) in a.iter_mut().zip(b) {
+        let (d1, b1) = x.overflowing_sub(y);
+        let (d2, b2) = d1.overflowing_sub(borrow);
+        *x = d2;
+        borrow = Limb::from(b1 | b2);
+    }
+    borrow
+}
+
+/// `a mod m` for limbs `a` of any length and a nonzero modulus of `m.len()` limbs (its top
+/// limb nonzero): bit by bit from the top, doubling and subtracting `m` under a mask. The time
+/// depends on `a.len()` and `m.len()` only. `m.len()` limbs.
+pub fn reduce_limbs(a: &[Limb], m: &[Limb]) -> Vec<Limb> {
+    let k = m.len();
+    // One limb more than the modulus: the remainder doubled fits.
+    let mut r = vec![0; k.saturating_add(1)];
+    let mut mm = m.to_vec();
+    mm.push(0);
+    let mut t = vec![0; k.saturating_add(1)];
+    for &limb in a.iter().rev() {
+        for bit in (0..LIMB_BITS).rev() {
+            // r = 2r + bit
+            let mut carry = (limb >> bit) & 1;
+            for x in r.iter_mut() {
+                let top = *x >> (LIMB_BITS - 1);
+                *x = (*x << 1) | carry;
+                carry = top;
+            }
+            // r -= m unless that borrows.
+            t.copy_from_slice(&r);
+            let borrow = sub_borrow(&mut t, &mm);
+            let keep = borrow.wrapping_neg();
+            for (x, &y) in r.iter_mut().zip(&t) {
+                *x = (*x & keep) | (y & !keep);
+            }
+        }
+    }
+    r.truncate(k);
+    r
+}
+
 /// All ones if `c`, else zero.
 fn mask(c: Limb) -> Limb {
     c.wrapping_neg()
