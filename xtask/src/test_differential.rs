@@ -1,4 +1,5 @@
-//! `cargo xtask test-differential [--random N] [--seed S]`: differential testing
+//! `cargo xtask test-differential [--random N] [--seed S] [--only ...] [--duration T]`:
+//! differential testing
 //! (TEST_PLAN.md, layer L5).
 //!
 //! The probe (`tests/differential/probe.c`) reads commands on stdin and prints what the library
@@ -7,18 +8,24 @@
 //! conformance tests, nothing states the expected result: the reference is the oracle.
 //!
 //! Inputs are the files in `tests/differential/corpus/` plus `N` (default 200) random command
-//! sessions. The random seed is printed, and `--seed` replays a run.
+//! sessions. The random seed is printed, and `--seed` replays a run. `--only` draws the
+//! sessions from some generators (`evp`: the EVP family). `--duration` runs a campaign instead
+//! (milestone M1's long EVP run): rounds of `N` sessions from successive seeds on `--jobs`
+//! workers until the time is up or a round differs, whose input is kept and replay printed.
 
 use std::fmt::Write as _;
 use std::fs;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::test_c::{compile, execute_with_input, prepare};
 use crate::util::{Result, fresh_dir, target_dir, workspace_root};
 
 pub fn run(args: &[String]) -> Result {
-    let (sessions, seed) = parse_args(args)?;
+    let options = parse_args(args)?;
+    let only = resolve(&options.only)?;
     let root = workspace_root();
     let (reference, dist) = prepare(&root)?;
     let work = target_dir(&root).join("xtask/test-differential");
@@ -30,51 +37,40 @@ pub fn run(args: &[String]) -> Result {
         &dist,
         &reference,
     )?;
+    let libs = Libraries {
+        probe,
+        reference: reference.join("lib"),
+        ours: dist.join("lib"),
+    };
+    if let Some(duration) = options.duration {
+        return campaign(&libs, &work, &options, &only, duration);
+    }
 
     let mut inputs: Vec<PathBuf> = fs::read_dir(root.join("tests/differential/corpus"))?
         .map(|entry| entry.map(|e| e.path()))
         .collect::<std::io::Result<_>>()?;
     inputs.sort();
-    let random = work.join(format!("random-seed-{seed}.txt"));
-    fs::write(&random, random_sessions(seed, sessions)?)?;
+    let random = work.join(format!("random-seed-{}.txt", options.seed));
+    fs::write(
+        &random,
+        random_sessions(options.seed, options.sessions, &only)?,
+    )?;
     inputs.push(random);
-    println!("Random sessions: {sessions}, seed {seed} (replay with --seed {seed})");
+    println!(
+        "Random sessions: {}, seed {} (replay with --seed {})",
+        options.sessions, options.seed, options.seed
+    );
 
     let mut failures = 0;
     for input in &inputs {
-        let theirs = execute_with_input(&probe, &reference.join("lib"), &work, Some(input))?;
-        let ours = execute_with_input(&probe, &dist.join("lib"), &work, Some(input))?;
         let name = input
             .file_name()
             .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-        let lines = theirs.stdout.lines().count();
-        if !theirs.success {
-            failures += 1;
-            println!(
-                "FAIL {name}: the reference probe exits with {}",
-                theirs.status
-            );
-        } else if ours.stdout == theirs.stdout && ours.success {
-            println!("PASS {name}: {lines} lines identical");
-        } else {
-            failures += 1;
-            let mismatch = ours
-                .stdout
-                .lines()
-                .zip(theirs.stdout.lines())
-                .enumerate()
-                .find(|(_, (a, b))| a != b);
-            match mismatch {
-                Some((i, (a, b))) => println!(
-                    "FAIL {name}: line {}: reference `{b}`, rustyssl `{a}`",
-                    i + 1
-                ),
-                None => println!(
-                    "FAIL {name}: rustyssl stopped after {} of {lines} lines ({}): {}",
-                    ours.stdout.lines().count(),
-                    ours.status,
-                    ours.stderr.trim()
-                ),
+        match compare(&libs, input, &work)? {
+            Ok(lines) => println!("PASS {name}: {lines} lines identical"),
+            Err(problem) => {
+                failures += 1;
+                println!("FAIL {name}: {problem}");
             }
         }
     }
@@ -85,23 +81,224 @@ pub fn run(args: &[String]) -> Result {
     }
 }
 
-fn parse_args(args: &[String]) -> Result<(usize, u64)> {
-    let mut sessions = 200;
-    let mut seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(1, |d| d.as_secs());
+/// The probe and the two library directories it runs with.
+struct Libraries {
+    probe: PathBuf,
+    reference: PathBuf,
+    ours: PathBuf,
+}
+
+/// Runs `input` on both libraries (in `work`): the number of identical lines, or what differs.
+fn compare(
+    libs: &Libraries,
+    input: &Path,
+    work: &Path,
+) -> Result<std::result::Result<usize, String>> {
+    let theirs = execute_with_input(&libs.probe, &libs.reference, work, Some(input))?;
+    let ours = execute_with_input(&libs.probe, &libs.ours, work, Some(input))?;
+    let lines = theirs.stdout.lines().count();
+    if !theirs.success {
+        return Ok(Err(format!(
+            "the reference probe exits with {}",
+            theirs.status
+        )));
+    }
+    if ours.stdout == theirs.stdout && ours.success {
+        return Ok(Ok(lines));
+    }
+    let mismatch = ours
+        .stdout
+        .lines()
+        .zip(theirs.stdout.lines())
+        .enumerate()
+        .find(|(_, (a, b))| a != b);
+    Ok(Err(match mismatch {
+        Some((i, (a, b))) => format!("line {}: reference `{b}`, rustyssl `{a}`", i + 1),
+        None => format!(
+            "rustyssl stopped after {} of {lines} lines ({}): {}",
+            ours.stdout.lines().count(),
+            ours.status,
+            ours.stderr.trim()
+        ),
+    }))
+}
+
+/// `--duration`: rounds of `--random` sessions, each from the next seed, on every core until
+/// the time is up or an input differs. A differing input is kept, and its replay printed.
+fn campaign(
+    libs: &Libraries,
+    work: &Path,
+    options: &Options,
+    only: &[usize],
+    duration: Duration,
+) -> Result {
+    let started = Instant::now();
+    let deadline = started + duration;
+    let next = AtomicU64::new(0);
+    let rounds = AtomicU64::new(0);
+    let failure: Mutex<Option<String>> = Mutex::new(None);
+    let only_arg = if options.only.is_empty() {
+        String::new()
+    } else {
+        format!(" --only {}", options.only.join(","))
+    };
+    println!(
+        "Differential campaign: {duration:?} on {} worker(s), {} sessions a round from seed {}{only_arg}",
+        options.jobs, options.sessions, options.seed
+    );
+    let failed = || {
+        failure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
+    };
+    let fail = |message: String| {
+        let mut slot = failure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        slot.get_or_insert(message);
+    };
+    std::thread::scope(|scope| {
+        for worker in 0..options.jobs {
+            let (next, rounds, failed, fail, only_arg) =
+                (&next, &rounds, &failed, &fail, &only_arg);
+            scope.spawn(move || {
+                let dir = work.join(format!("worker-{worker}"));
+                if let Err(e) = fs::create_dir_all(&dir) {
+                    fail(format!("{}: {e}", dir.display()));
+                    return;
+                }
+                while Instant::now() < deadline && !failed() {
+                    let seed = options
+                        .seed
+                        .wrapping_add(next.fetch_add(1, Ordering::Relaxed));
+                    let input = dir.join(format!("random-seed-{seed}.txt"));
+                    let outcome = random_sessions(seed, options.sessions, only)
+                        .and_then(|text| Ok(fs::write(&input, text)?))
+                        .and_then(|()| compare(libs, &input, &dir));
+                    match outcome {
+                        Ok(Ok(_)) => {
+                            rounds.fetch_add(1, Ordering::Relaxed);
+                            let _ = fs::remove_file(&input);
+                        }
+                        Ok(Err(problem)) => fail(format!(
+                            "seed {seed}: {problem}\n  input kept: {}\n  replay: cargo xtask \
+                             test-differential --random {} --seed {seed}{only_arg}",
+                            input.display(),
+                            options.sessions
+                        )),
+                        Err(e) => fail(format!("seed {seed}: {e}")),
+                    }
+                }
+            });
+        }
+        // Progress, every ten minutes.
+        let mut reported = Instant::now();
+        while Instant::now() < deadline && !failed() {
+            std::thread::sleep(Duration::from_secs(1));
+            if reported.elapsed() >= Duration::from_secs(600) {
+                reported = Instant::now();
+                println!(
+                    "  {:?}: {} rounds identical",
+                    Duration::from_secs(started.elapsed().as_secs()),
+                    rounds.load(Ordering::Relaxed)
+                );
+            }
+        }
+    });
+    let rounds = rounds.load(Ordering::Relaxed);
+    let elapsed = Duration::from_secs(started.elapsed().as_secs());
+    match failure
+        .into_inner()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+    {
+        Some(message) => {
+            Err(format!("after {elapsed:?} and {rounds} identical rounds, {message}").into())
+        }
+        None => {
+            println!(
+                "{rounds} rounds ({} sessions) identical on both libraries in {elapsed:?}",
+                rounds.saturating_mul(u64::try_from(options.sessions).unwrap_or(0))
+            );
+            Ok(())
+        }
+    }
+}
+
+/// The command line's settings.
+#[derive(Debug, PartialEq)]
+struct Options {
+    /// Random sessions in a run (in each round, with `--duration`).
+    sessions: usize,
+    seed: u64,
+    /// Session generators to draw from (`evp` for [`EVP_SESSIONS`]); all when empty.
+    only: Vec<String>,
+    duration: Option<Duration>,
+    jobs: usize,
+}
+
+const USAGE: &str = "usage: cargo xtask test-differential [--random N] [--seed S] \
+                     [--only NAME,...|evp] [--duration 90s|30m|24h] [--jobs N]";
+
+fn parse_args(args: &[String]) -> Result<Options> {
+    let mut options = Options {
+        sessions: 200,
+        seed: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(1, |d| d.as_secs()),
+        only: Vec::new(),
+        duration: None,
+        jobs: std::thread::available_parallelism().map_or(4, std::num::NonZero::get),
+    };
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         let value = args.next().ok_or_else(|| format!("{arg} needs a value"))?;
         match arg.as_str() {
-            "--random" => sessions = value.parse()?,
-            "--seed" => seed = value.parse()?,
-            _ => {
-                return Err("usage: cargo xtask test-differential [--random N] [--seed S]".into());
+            "--random" => options.sessions = value.parse()?,
+            "--seed" => options.seed = value.parse()?,
+            "--only" => options.only = value.split(',').map(str::to_owned).collect(),
+            "--duration" => options.duration = Some(parse_duration(value)?),
+            "--jobs" => options.jobs = value.parse::<usize>()?.max(1),
+            _ => return Err(USAGE.into()),
+        }
+    }
+    Ok(options)
+}
+
+/// `90s`, `30m`, `24h`, or seconds.
+fn parse_duration(text: &str) -> Result<Duration> {
+    let (number, unit) = match text.char_indices().last() {
+        Some((at, 's')) => (text.get(..at), 1),
+        Some((at, 'm')) => (text.get(..at), 60),
+        Some((at, 'h')) => (text.get(..at), 3600),
+        _ => (Some(text), 1),
+    };
+    let n: u64 = number.unwrap_or_default().parse()?;
+    Ok(Duration::from_secs(
+        n.checked_mul(unit).ok_or("duration too long")?,
+    ))
+}
+
+/// The indexes in [`SESSIONS`] of the generators `names` picks.
+fn resolve(names: &[String]) -> Result<Vec<usize>> {
+    let mut indexes = Vec::new();
+    for name in names {
+        let wanted: Vec<&str> = if name == "evp" {
+            EVP_SESSIONS.to_vec()
+        } else {
+            vec![name.as_str()]
+        };
+        for w in wanted {
+            let i = SESSIONS
+                .iter()
+                .position(|(n, _)| *n == w)
+                .ok_or_else(|| format!("no session generator `{w}`"))?;
+            if !indexes.contains(&i) {
+                indexes.push(i);
             }
         }
     }
-    Ok((sessions, seed))
+    Ok(indexes)
 }
 
 /// A small deterministic generator (xorshift64*), so a seed always replays the same input.
@@ -142,57 +339,98 @@ impl Random {
     }
 }
 
-/// Random command sessions in the probe's language, for `BUF_MEM` and the error queue.
-fn random_sessions(seed: u64, count: usize) -> Result<String> {
+/// A session generator: appends one session's commands.
+type Session = fn(&mut Random, &mut String) -> Result;
+
+/// The session generators by name, in the order a seed picks them from (keep it: a seed
+/// replays only with the same table).
+const SESSIONS: &[(&str, Session)] = &[
+    ("err", err_session),
+    ("buf_mem", buf_mem_session),
+    ("stack", stack_session),
+    ("lhash", lhash_session),
+    ("bio", bio_session),
+    ("printf", printf_session),
+    ("addr", addr_session),
+    ("obj", obj_session),
+    ("asn", asn_session),
+    ("int", int_session),
+    ("text", text_session),
+    ("time", time_session),
+    ("any", any_session),
+    ("d2i", d2i_session),
+    ("s2i", s2i_session),
+    ("base64", base64_session),
+    ("pem", pem_session),
+    ("params", params_session),
+    ("ctx", ctx_session),
+    ("prop", prop_session),
+    ("prov", prov_session),
+    ("fetch", fetch_session),
+    ("digest", digest_session),
+    ("cipher", cipher_session),
+    ("mac", mac_session),
+    ("kdf", kdf_session),
+    ("rand", rand_session),
+    ("bn", bn_session),
+    ("pkey", pkey_session),
+    ("meth", meth_session),
+    ("lowlevel_hash", lowlevel_hash_session),
+    ("lowlevel_aes", lowlevel_aes_session),
+    ("lowlevel_aead", lowlevel_aead_session),
+    ("lowlevel_des", lowlevel_des_session),
+    ("lowlevel_legacy", lowlevel_legacy_session),
+    ("lowlevel_ciphers", lowlevel_ciphers_session),
+    ("bio_evp", bio_evp_session),
+    ("skey", skey_session),
+    ("md_meth", md_meth_session),
+    ("cipher_meth", cipher_meth_session),
+    ("conf", conf_session),
+    ("conf_modules", conf_modules_session),
+    ("string", string_session),
+];
+
+/// The sessions `--only evp` stands for: the EVP API, its methods, and the low-level
+/// functions over the same algorithms (TEST_PLAN.md, milestone M1).
+const EVP_SESSIONS: &[&str] = &[
+    "fetch",
+    "digest",
+    "cipher",
+    "mac",
+    "kdf",
+    "rand",
+    "pkey",
+    "meth",
+    "lowlevel_hash",
+    "lowlevel_aes",
+    "lowlevel_aead",
+    "lowlevel_des",
+    "lowlevel_legacy",
+    "lowlevel_ciphers",
+    "bio_evp",
+    "skey",
+    "md_meth",
+    "cipher_meth",
+];
+
+/// Random command sessions in the probe's language: `count` of them, from every generator,
+/// or only from those at the indexes in `only`.
+fn random_sessions(seed: u64, count: usize, only: &[usize]) -> Result<String> {
     let mut random = Random::new(seed);
     let mut out = String::new();
+    let all = u64::try_from(SESSIONS.len()).unwrap_or(1);
     for session in 0..count {
         writeln!(out, "# session {session}")?;
-        match random.below(43) {
-            0 => err_session(&mut random, &mut out)?,
-            1 => buf_mem_session(&mut random, &mut out)?,
-            2 => stack_session(&mut random, &mut out)?,
-            3 => lhash_session(&mut random, &mut out)?,
-            4 => bio_session(&mut random, &mut out)?,
-            5 => printf_session(&mut random, &mut out)?,
-            6 => addr_session(&mut random, &mut out)?,
-            7 => obj_session(&mut random, &mut out)?,
-            8 => asn_session(&mut random, &mut out)?,
-            9 => int_session(&mut random, &mut out)?,
-            10 => text_session(&mut random, &mut out)?,
-            11 => time_session(&mut random, &mut out)?,
-            12 => any_session(&mut random, &mut out)?,
-            14 => s2i_session(&mut random, &mut out)?,
-            15 => base64_session(&mut random, &mut out)?,
-            16 => pem_session(&mut random, &mut out)?,
-            13 => d2i_session(&mut random, &mut out)?,
-            17 => params_session(&mut random, &mut out)?,
-            18 => ctx_session(&mut random, &mut out)?,
-            19 => prop_session(&mut random, &mut out)?,
-            20 => prov_session(&mut random, &mut out)?,
-            21 => fetch_session(&mut random, &mut out)?,
-            22 => digest_session(&mut random, &mut out)?,
-            23 => cipher_session(&mut random, &mut out)?,
-            24 => mac_session(&mut random, &mut out)?,
-            25 => kdf_session(&mut random, &mut out)?,
-            26 => rand_session(&mut random, &mut out)?,
-            27 => bn_session(&mut random, &mut out)?,
-            28 => pkey_session(&mut random, &mut out)?,
-            29 => meth_session(&mut random, &mut out)?,
-            30 => lowlevel_hash_session(&mut random, &mut out)?,
-            31 => lowlevel_aes_session(&mut random, &mut out)?,
-            32 => lowlevel_aead_session(&mut random, &mut out)?,
-            33 => lowlevel_des_session(&mut random, &mut out)?,
-            34 => lowlevel_legacy_session(&mut random, &mut out)?,
-            35 => lowlevel_ciphers_session(&mut random, &mut out)?,
-            36 => bio_evp_session(&mut random, &mut out)?,
-            37 => skey_session(&mut random, &mut out)?,
-            38 => md_meth_session(&mut random, &mut out)?,
-            39 => cipher_meth_session(&mut random, &mut out)?,
-            40 => conf_session(&mut random, &mut out)?,
-            41 => conf_modules_session(&mut random, &mut out)?,
-            _ => string_session(&mut random, &mut out)?,
-        }
+        let index = if only.is_empty() {
+            usize::try_from(random.below(all)).unwrap_or(0)
+        } else {
+            let i = random.below(u64::try_from(only.len()).unwrap_or(1));
+            only.get(usize::try_from(i).unwrap_or(0))
+                .copied()
+                .unwrap_or(0)
+        };
+        let (_, generate) = SESSIONS.get(index).ok_or("no such session")?;
+        generate(&mut random, &mut out)?;
     }
     Ok(out)
 }
@@ -4593,9 +4831,9 @@ mod tests {
 
     #[test]
     fn a_seed_replays_the_same_sessions() {
-        let first = random_sessions(42, 500).unwrap();
-        assert_eq!(first, random_sessions(42, 500).unwrap());
-        assert_ne!(first, random_sessions(43, 500).unwrap());
+        let first = random_sessions(42, 500, &[]).unwrap();
+        assert_eq!(first, random_sessions(42, 500, &[]).unwrap());
+        assert_ne!(first, random_sessions(43, 500, &[]).unwrap());
         // Every kind of session.
         for start in [
             "\nnew ",
@@ -4628,11 +4866,41 @@ mod tests {
     #[test]
     fn arguments() {
         let args = |list: &[&str]| list.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
-        assert_eq!(
-            parse_args(&args(&["--random", "5", "--seed", "9"])).unwrap(),
-            (5, 9)
-        );
+        let o = parse_args(&args(&["--random", "5", "--seed", "9"])).unwrap();
+        assert_eq!((o.sessions, o.seed, o.duration), (5, 9, None));
+        let o = parse_args(&args(&[
+            "--only",
+            "evp,bn",
+            "--duration",
+            "24h",
+            "--jobs",
+            "3",
+        ]))
+        .unwrap();
+        assert_eq!(o.only, ["evp", "bn"]);
+        assert_eq!(o.duration, Some(Duration::from_secs(86_400)));
+        assert_eq!(o.jobs, 3);
+        assert_eq!(parse_duration("90").unwrap(), Duration::from_secs(90));
+        assert_eq!(parse_duration("30m").unwrap(), Duration::from_secs(1800));
+        assert!(parse_duration("h").is_err());
         assert!(parse_args(&args(&["--seed"])).is_err());
         assert!(parse_args(&args(&["--bogus", "1"])).is_err());
+    }
+
+    #[test]
+    fn only_draws_from_the_named_generators() {
+        let evp = resolve(&["evp".to_owned()]).unwrap();
+        assert_eq!(evp.len(), EVP_SESSIONS.len());
+        assert!(resolve(&["nosuch".to_owned()]).is_err());
+        let digest = resolve(&["digest".to_owned()]).unwrap();
+        let text = random_sessions(7, 50, &digest).unwrap();
+        let mut only = String::new();
+        let mut random = Random::new(7);
+        for session in 0..50 {
+            writeln!(only, "# session {session}").unwrap();
+            let _ = random.below(1);
+            digest_session(&mut random, &mut only).unwrap();
+        }
+        assert_eq!(text, only);
     }
 }

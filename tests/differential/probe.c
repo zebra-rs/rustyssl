@@ -220,7 +220,8 @@
  *   cctx <0|1>                 work on context 0 or 1
  *   cinit <name|-> <enc> <k> <i>   EVP_CipherInit_ex with the cipher fetched by name (`-`: NULL),
  *                              direction <enc> (1, 0, -1), and a key and IV if <k> and <i> are 1
- *                              (skipped when ECB or CBC turns around without a key)
+ *                              (skipped when ECB or CBC turns around without a key; data
+ *                              operations are skipped after an init failed turning it around)
  *   cinitp <name> <key> <n>    EVP_CipherInit_ex2 to encrypt with a key, an IV, and a size_t or
  *                              uint parameter (keylen, ivlen, padding, num, use-bits)
  *   cupdate <n>, cfinal        EVP_CipherUpdate of <n> octets; EVP_CipherFinal_ex
@@ -2566,6 +2567,12 @@ static int cipher_current;
 /* Whether each context's cipher has had a key, and an init that succeeded, since it was set. */
 static int cipher_keyed[2], cipher_ready[2];
 /*
+ * Whether each context was turned around by an init that failed before setting its key: ECB
+ * and CBC then run the old direction's key schedule the platform's way in OpenSSL
+ * (docs/DEVIATIONS.md), so data operations are skipped until a key is set.
+ */
+static int cipher_turned[2];
+/*
  * Whether each context is GCM given a key without an IV: what it then does with data is the
  * platform's in OpenSSL (docs/DEVIATIONS.md), so its data operations are skipped.
  */
@@ -2677,6 +2684,12 @@ static int cipher_command(const char *command, const char *line)
         printf(" skipped: GCM without an IV\n");
         return 1;
     }
+    if (cipher_turned[cipher_current]
+        && (strcmp(command, "cupdate") == 0 || strcmp(command, "ccipher") == 0
+            || strcmp(command, "cfinal") == 0)) {
+        printf(" skipped: turned around without a key\n");
+        return 1;
+    }
     if (strcmp(command, "cctx") == 0) {
         sscanf(line, "%*s %ld", &n);
         cipher_current = n != 0;
@@ -2684,14 +2697,16 @@ static int cipher_command(const char *command, const char *line)
         return 1;
     } else if (strcmp(command, "cinit") == 0) {
         EVP_CIPHER *ciph = NULL;
+        int turns, was = EVP_CIPHER_CTX_is_encrypting(ctx);
 
         sscanf(line, "%*s %63s %ld %ld %ld", a, &n, &m, &k);
-        if (strcmp(a, "-") == 0 && m == 0 && n != -1 && (n != 0) != EVP_CIPHER_CTX_is_encrypting(ctx)
-            && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
-            && EVP_CIPHER_CTX_get_block_size(ctx) > 1
-            && EVP_CIPHER_CTX_get_mode(ctx) != EVP_CIPH_WRAP_MODE
-            && (EVP_CIPHER_CTX_get_block_size(ctx) != 8
-                || strncmp(EVP_CIPHER_get0_name(EVP_CIPHER_CTX_get0_cipher(ctx)), "DES", 3) != 0)) {
+        turns = strcmp(a, "-") == 0 && n != -1 && (n != 0) != was
+                && EVP_CIPHER_CTX_get0_cipher(ctx) != NULL
+                && EVP_CIPHER_CTX_get_block_size(ctx) > 1
+                && EVP_CIPHER_CTX_get_mode(ctx) != EVP_CIPH_WRAP_MODE
+                && (EVP_CIPHER_CTX_get_block_size(ctx) != 8
+                    || strncmp(EVP_CIPHER_get0_name(EVP_CIPHER_CTX_get0_cipher(ctx)), "DES", 3) != 0);
+        if (turns && m == 0) {
             /*
              * ECB and CBC keep the old direction's key schedule in OpenSSL: turning around
              * without a key runs it the platform's way (docs/DEVIATIONS.md).
@@ -2706,6 +2721,10 @@ static int cipher_command(const char *command, const char *line)
         }
         r = EVP_CipherInit_ex(ctx, ciph, NULL, m ? cipher_key : NULL, k ? cipher_iv : NULL,
                               (int)n);
+        if ((m && r) || ciph != NULL)
+            cipher_turned[cipher_current] = 0;
+        else if (turns && !r && EVP_CIPHER_CTX_is_encrypting(ctx) != was)
+            cipher_turned[cipher_current] = 1;
         if (ciph != NULL) {
             cipher_keyed[cipher_current] = m && r;
             cipher_ready[cipher_current] = r;
@@ -2742,6 +2761,7 @@ static int cipher_command(const char *command, const char *line)
         if (r)
             cipher_gcm_noiv[cipher_current] = 0;
         cipher_keyed[cipher_current] = r;
+        cipher_turned[cipher_current] = 0;
         cipher_ready[cipher_current] = r;
         EVP_CIPHER_free(ciph);
         printf(" %d", r);
@@ -2974,6 +2994,7 @@ static int cipher_command(const char *command, const char *line)
         cipher_keyed[!cipher_current] = cipher_keyed[cipher_current];
         cipher_ready[!cipher_current] = cipher_ready[cipher_current];
         cipher_gcm_noiv[!cipher_current] = cipher_gcm_noiv[cipher_current];
+        cipher_turned[!cipher_current] = cipher_turned[cipher_current];
         r = EVP_CIPHER_CTX_copy(cipher_ctx[!cipher_current], ctx);
         printf(" %d", r);
         if (!r) {
@@ -2987,7 +3008,7 @@ static int cipher_command(const char *command, const char *line)
     } else {
         cipher_keyed[cipher_current] = 0;
         cipher_ready[cipher_current] = 0;
-        cipher_gcm_noiv[cipher_current] = 0;
+        cipher_gcm_noiv[cipher_current] = cipher_turned[cipher_current] = 0;
         printf(" %d", EVP_CIPHER_CTX_reset(ctx));
     }
     print_digest_errors();
@@ -3628,6 +3649,9 @@ static void kdf_note(const char *line, int r)
 {
     if (strstr(line, " mac=") != NULL)
         kdf_kb_mac[kdf_current] = r == 1;
+    /* A failed call may have dropped the MAC: OpenSSL frees it when a MAC parameter fails. */
+    if (r != 1)
+        kdf_kb_mac[kdf_current] = 0;
     kdf_krb5_safe[kdf_current] = kdf_krb5_cipher_ok(line, kdf_krb5_safe[kdf_current]);
     if (strstr(line, " digest=NULL") != NULL)
         kdf_ssh_null[kdf_current] = 1;
@@ -3813,6 +3837,13 @@ static int rand_kind[2], rand_parent[2], rand_det[2], rand_ctr_ok[2], rand_gen[2
 static int rand_digest_ok[2], rand_digest_tried[2];
 /* Whether the thread's public and private DRBGs were set to deterministic ones. */
 static int rand_pub_det, rand_priv_det;
+/*
+ * The contexts installed as the thread's public and private DRBGs, and whether each is still
+ * set up: a failed set can break one after it's installed (see rset), and RAND_bytes then
+ * crashes the reference running it.
+ */
+static EVP_RAND_CTX *rand_pub_ctx, *rand_priv_ctx;
+static int rand_pub_broken, rand_priv_broken;
 
 static int rand_kind_of(const EVP_RAND *r)
 {
@@ -3868,6 +3899,10 @@ static int rand_command(const char *command, const char *line)
     } else if (strcmp(command, "rbytes") == 0 || strcmp(command, "rprivbytes") == 0) {
         int priv = command[1] == 'p';
 
+        if (priv ? rand_priv_broken : rand_pub_broken) {
+            printf(" skipped: a DRBG not set up\n");
+            return 1;
+        }
         sscanf(line, "%*s %lu %lu", &n, &m);
         if (n > 1024)
             n = 1024;
@@ -3886,6 +3921,8 @@ static int rand_command(const char *command, const char *line)
     } else if (strcmp(command, "rreset") == 0) {
         printf(" %d %d", RAND_set0_public(NULL, NULL), RAND_set0_private(NULL, NULL));
         rand_pub_det = rand_priv_det = 0;
+        rand_pub_ctx = rand_priv_ctx = NULL;
+        rand_pub_broken = rand_priv_broken = 0;
     } else if (strcmp(command, "rnew") == 0) {
         EVP_RAND *rand;
         EVP_RAND_CTX *parent = NULL;
@@ -3929,10 +3966,15 @@ static int rand_command(const char *command, const char *line)
         EVP_RAND_CTX_up_ref(ctx);
         r = priv ? RAND_set0_private(NULL, ctx) : RAND_set0_public(NULL, ctx);
         printf(" %d", r);
-        if (priv)
+        if (priv) {
             rand_priv_det = rand_det[c];
-        else
+            rand_priv_ctx = ctx;
+            rand_priv_broken = 0;
+        } else {
             rand_pub_det = rand_det[c];
+            rand_pub_ctx = ctx;
+            rand_pub_broken = 0;
+        }
     } else if (strcmp(command, "rset") == 0) {
         unsigned long g = 0;
         const char *gp = strstr(line, " generate=");
@@ -3952,6 +3994,19 @@ static int rand_command(const char *command, const char *line)
         if (strstr(line, " digest=") != NULL) {
             rand_digest_tried[c] = 1;
             rand_digest_ok[c] |= r == 1;
+        }
+        /*
+         * A failed set may have dropped what the DRBG had: OpenSSL frees the old digest, MAC,
+         * or cipher before fetching the new one (and crashes using it after), so the DRBG
+         * isn't set up any more.
+         */
+        if (r != 1 && (has_cipher || strstr(line, " digest=") != NULL || strstr(line, " mac=") != NULL)) {
+            rand_ctr_ok[c] = 0;
+            rand_digest_ok[c] = 0;
+            if (rand_kind[c] == R_CTR || rand_kind[c] == R_HASH || rand_kind[c] == R_HMAC) {
+                rand_pub_broken |= ctx == rand_pub_ctx;
+                rand_priv_broken |= ctx == rand_priv_ctx;
+            }
         }
         if (gp != NULL && r == 1 && rand_kind[c] == R_TEST)
             rand_gen[c] = g != 0;
