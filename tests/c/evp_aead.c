@@ -591,6 +591,14 @@ static void gcm_final_again(void)
     hex("more", out, 20);
     check(EVP_CipherFinal_ex(ctx, out, &n) == 0, "and its final");
     errors();
+    /*
+     * Turned around to encrypt with no new key or IV: the final hashes on from where the failed
+     * checks left GHASH, its buffered octets included, as the reference's does.
+     */
+    check(EVP_CipherInit_ex(ctx, NULL, NULL, NULL, NULL, 1) == 1, "encrypting, no key or IV");
+    check(EVP_CipherFinal_ex(ctx, out, &n) == 1, "a final");
+    check(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, out) == 1, "its tag");
+    hex("tag", out, 16);
     EVP_CIPHER_CTX_free(ctx);
     EVP_CIPHER_free(c);
 }
