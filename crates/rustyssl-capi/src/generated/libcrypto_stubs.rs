@@ -206,16 +206,6 @@ pub extern "C" fn ASN1_SCTX_set_app_data(_: *mut ASN1_SCTX, _: *mut core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_add_oid_module() {
-    crate::stub::unimplemented("ASN1_add_oid_module")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_add_stable_module() {
-    crate::stub::unimplemented("ASN1_add_stable_module")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_digest(
     _: i2d_of_void,
     _: *const EVP_MD,
@@ -338,14 +328,6 @@ pub extern "C" fn ASN1_sign(
     _: *const EVP_MD,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("ASN1_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_str2mask(
-    _: *const core::ffi::c_char,
-    _: *mut core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ASN1_str2mask")
 }
 
 #[unsafe(no_mangle)]
@@ -1880,98 +1862,6 @@ pub extern "C" fn COMP_zstd() -> *mut COMP_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn COMP_zstd_oneshot() -> *mut COMP_METHOD {
     crate::stub::unimplemented("COMP_zstd_oneshot")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_get_flags(_: *const CONF_IMODULE) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("CONF_imodule_get_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_get_module(_: *const CONF_IMODULE) -> *mut CONF_MODULE {
-    crate::stub::unimplemented("CONF_imodule_get_module")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_get_name(_: *const CONF_IMODULE) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("CONF_imodule_get_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_get_usr_data(_: *const CONF_IMODULE) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CONF_imodule_get_usr_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_get_value(_: *const CONF_IMODULE) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("CONF_imodule_get_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_set_flags(_: *mut CONF_IMODULE, _: core::ffi::c_ulong) {
-    crate::stub::unimplemented("CONF_imodule_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_imodule_set_usr_data(_: *mut CONF_IMODULE, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("CONF_imodule_set_usr_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_module_add(
-    _: *const core::ffi::c_char,
-    _: conf_init_func,
-    _: conf_finish_func,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_module_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_module_get_usr_data(_: *mut CONF_MODULE) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CONF_module_get_usr_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_module_set_usr_data(_: *mut CONF_MODULE, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("CONF_module_set_usr_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_modules_finish() {
-    crate::stub::unimplemented("CONF_modules_finish")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_modules_load(
-    _: *const CONF,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_modules_load")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_modules_load_file(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_modules_load_file")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_modules_load_file_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CONF_modules_load_file_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CONF_modules_unload(_: core::ffi::c_int) {
-    crate::stub::unimplemented("CONF_modules_unload")
 }
 
 #[unsafe(no_mangle)]
@@ -4823,11 +4713,6 @@ pub extern "C" fn ENGINE_add(_: *mut ENGINE) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ENGINE_add_conf_module() {
-    crate::stub::unimplemented("ENGINE_add_conf_module")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_by_id(_: *const core::ffi::c_char) -> *mut ENGINE {
     crate::stub::unimplemented("ENGINE_by_id")
 }
@@ -5944,11 +5829,6 @@ pub extern "C" fn EVP_SealInit(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_SealInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_add_alg_module() {
-    crate::stub::unimplemented("EVP_add_alg_module")
 }
 
 #[unsafe(no_mangle)]
@@ -7377,16 +7257,6 @@ pub extern "C" fn OPENSSL_asc2uni(
     _: *mut core::ffi::c_int,
 ) -> *mut core::ffi::c_uchar {
     crate::stub::unimplemented("OPENSSL_asc2uni")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_config(_: *const core::ffi::c_char) {
-    crate::stub::unimplemented("OPENSSL_config")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_load_builtin_modules() {
-    crate::stub::unimplemented("OPENSSL_load_builtin_modules")
 }
 
 #[unsafe(no_mangle)]
@@ -10470,14 +10340,6 @@ pub extern "C" fn OSSL_LIB_CTX_get_data(
     _: core::ffi::c_int,
 ) -> *mut core::ffi::c_void {
     crate::stub::unimplemented("OSSL_LIB_CTX_get_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_load_config(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_LIB_CTX_load_config")
 }
 
 #[unsafe(no_mangle)]
@@ -18098,15 +17960,6 @@ pub extern "C" fn X509V3_add_standard_extensions() -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_value(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *mut *mut stack_st_CONF_VALUE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_value")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509V3_add_value_bool(
     _: *const core::ffi::c_char,
     _: core::ffi::c_int,
@@ -18140,11 +17993,6 @@ pub extern "C" fn X509V3_add_value_uchar(
     _: *mut *mut stack_st_CONF_VALUE,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509V3_add_value_uchar")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_conf_free(_: *mut CONF_VALUE) {
-    crate::stub::unimplemented("X509V3_conf_free")
 }
 
 #[unsafe(no_mangle)]
@@ -18186,24 +18034,11 @@ pub extern "C" fn X509V3_get_string(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_get_value_bool(
-    _: *const CONF_VALUE,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_get_value_bool")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509V3_get_value_int(
     _: *const CONF_VALUE,
     _: *mut *mut ASN1_INTEGER,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509V3_get_value_int")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_parse_list(_: *const core::ffi::c_char) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("X509V3_parse_list")
 }
 
 #[unsafe(no_mangle)]

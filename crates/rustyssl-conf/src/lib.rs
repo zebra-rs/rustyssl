@@ -19,7 +19,7 @@ mod list;
 mod parse;
 
 pub use line::{Lines, Next, READ_SIZE};
-pub use list::list_items;
+pub use list::{NameValue, NameValueError, list_items, name_value_list};
 pub use parse::{Error, Line, Lookup, MAX_VALUE_LENGTH, Options, Pragma, parse_line};
 
 /// A method's character classes: OpenSSL's `CONF_type_default` or `CONF_type_win32`, or what

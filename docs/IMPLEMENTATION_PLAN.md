@@ -540,7 +540,7 @@ Everything else depends on this phase.
     settings' file, else `$OPENSSL_CONF` unless set-user-ID, else
     `<OPENSSLDIR>/openssl.cnf`).
     - A missing file gives OpenSSL's result for the flags.
-    - An existing file aborts until 6.1.
+    - An existing file aborted until 3.12b, which loads it and runs its modules.
     - The dual-run test found an OpenSSL quirk, now reproduced. A thread's first load
       leaves a never-cleared "loading" mark (`in_init_config_local`). So later loads on that
       thread succeed even after a failed one, while other threads and
@@ -549,7 +549,7 @@ Everything else depends on this phase.
     - `OPENSSL_INIT_ADD_ALL_CIPHERS`/`_DIGESTS` (the name tables, 3.3 and 3.4);
     - `OPENSSL_INIT_ASYNC` (6.11);
     - `OPENSSL_INIT_ENGINE_*` (9.3);
-    - loading a configuration file (3.12b).
+    - loading a configuration file (done in 3.12b).
 
     `OPENSSL_INIT_BASE_ONLY` lives in an internal header, so applications can't name it,
     and it isn't supported. `OPENSSL_thread_stop` waits for 1.3, and ERR's per-thread state
@@ -2727,7 +2727,7 @@ have run for at least 24 CPU-hours with no findings.
       cipher, a custom cipher, CTR with `ALWAYS_CALL_INIT`, and copies); the probe's `cmeth`
       (a toy cipher of each mode, block size, and flag; corpus `cipher_meth.txt`, random
       `cipher_meth` sessions). No fuzz target: nothing here parses input.
-- [ ] **3.12 Configuration files:** `openssl.cnf`, to activate providers and set
+- [x] **3.12 Configuration files:** `openssl.cnf`, to activate providers and set
   `default_properties`. Distro crypto policies depend on it. Includes
   `OSSL_LIB_CTX_load_config` (from 3.1b).
   - **Decision:** the whole file format and the `CONF`/`NCONF` interface, and the
@@ -2765,13 +2765,46 @@ have run for at least 24 CPU-hours with no findings.
       the probe's `cnf` (corpus `conf.txt`, random `conf` sessions); the `conf` fuzz target
       (every value in a section's stack is what `NCONF_get_string` finds; includes renamed so
       no file is read).
-  - [ ] **3.12b The configuration modules:** `CONF_modules_load_file(_ex)`,
-    `CONF_modules_load`, `CONF_module_add` and the `CONF_imodule_*` accessors,
-    `CONF_modules_unload`/`_finish`, `OPENSSL_load_builtin_modules`, `OPENSSL_config`,
-    `OSSL_LIB_CTX_load_config`, and loading at `OPENSSL_INIT_LOAD_CONFIG`; the built-in
-    modules: `providers` (activation, `soft_load`, `identity`, parameters), `alg_section`
-    (`default_properties`), `random`, `ssl_conf` (kept for libssl), `oid_section`,
-    `stbl_section`, and `engines`.
+  - [x] **3.12b The configuration modules:** `conf/modules.rs`, `conf/builtin.rs`, and
+    `provider/conf.rs` in capi: `CONF_modules_load_file(_ex)`, `CONF_modules_load`,
+    `CONF_module_add` and the `CONF_imodule_*`/`CONF_module_*` accessors,
+    `CONF_modules_unload`/`_finish`, `OPENSSL_load_builtin_modules` and the modules' own add
+    functions, `OPENSSL_config`, `OSSL_LIB_CTX_load_config`, and loading at
+    `OPENSSL_INIT_LOAD_CONFIG` (and finishing at `OPENSSL_cleanup`, after the `atexit`
+    handlers); with the helpers the modules use, `X509V3_parse_list`, `X509V3_add_value`,
+    `X509V3_conf_free`, `X509V3_get_value_bool`, and `ASN1_str2mask` (over the
+    `ASN1_generate_nconf` tag names, extracted from the reference's `asn1_gen.c` by a script
+    into `rustyssl_asn1::gen_tags`): 27 exports; libcrypto now 2,238 of 5,876.
+    - **Decision:** modules and their initialized instances are kept as OpenSSL keeps them
+      (found by the name before the last `.`, which also lets a shorter name find a longer
+      module; instances finished newest first; the built-ins added once, at the first run,
+      and not again after `CONF_modules_unload(1)`), behind a lock never held while a
+      module's `init` or `finish` runs. Errors follow OpenSSL's marks, flags, and
+      `config_diagnostics`. An instance's flags start at 0 (OpenSSL's are uninitialized
+      memory until the module sets them; the dual run on Linux showed it).
+    - **Decision:** the built-in modules: `providers` (activation through the store with the
+      fallback disabled, `soft_load`, `identity`, `module`, parameters from nested sections
+      with OpenSSL's recursion check by value, and providers not activated recorded with
+      their path and parameters for a later load); `alg_section` (`default_properties`,
+      `fips_mode`) without loading the configuration again; `ssl_conf` (the named command
+      sets kept for libssl's `SSL_CTX_config`); `random` (the context's generator and seed
+      settings); `oid_section` (`OBJ_create`); `stbl_section` (`ASN1_STRING_TABLE_add`);
+      `engines` (see below). The provider store's information list now carries a module
+      path and parameters, as `OSSL_PROVIDER_INFO` does.
+    - New deviations: a module that isn't known isn't loaded from a shared library (OpenSSL
+      loads `lib<name>` and runs it); the load fails with OpenSSL's errors for a library that
+      can't be loaded. There are no engines, `dynamic` included: an `engines` section that
+      needs one fails as `ENGINE_by_id` of an engine that can't be loaded does (the dynamic
+      engine's ex_data index is still reserved, so applications' indexes match).
+    - Found by the dual run: there's no `legacy` provider yet (a later step), so a
+      configuration that activates it doesn't get it; the tests use `base` and `null`.
+    - `tests/c/conf_modules.c` (7 checks: the flags, diagnostics, every built-in module's
+      good and bad settings, a module of the test's own through init, finish, and the
+      accessors, `OSSL_LIB_CTX_load_config`, `CONF_modules_load` on a configuration, the
+      helpers, finish and unload) and `tests/c/crypto_init_config_file.c` (5 checks: loading
+      at init with an application's section, decided once, and the module finished at exit);
+      the probe's `cmod` (corpus `conf_modules.txt`, random `conf_modules` sessions); the
+      `conf` fuzz target also runs `X509V3_parse_list` and `ASN1_str2mask`.
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random

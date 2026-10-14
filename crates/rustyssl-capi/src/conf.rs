@@ -10,7 +10,9 @@
 //! `CONF` (so any later use, `NCONF_free` too, reads freed memory), here it clears them
 //! (docs/DEVIATIONS.md).
 
+pub(crate) mod builtin;
 mod load;
+pub(crate) mod modules;
 
 use core::cell::UnsafeCell;
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};

@@ -221,3 +221,194 @@ mod tests {
         unsafe { string::ASN1_STRING_free(e) };
     }
 }
+
+/// `x509v3_add_len_value`: a new `CONF_VALUE` of `name` and `value` (copied; no section)
+/// pushed onto `*extlist`, made if NULL (and freed again if this fails).
+///
+/// # Safety
+/// `extlist` is valid for reads and writes, holding NULL or a stack of `CONF_VALUE`s.
+unsafe fn add_value(
+    name: Option<&[u8]>,
+    value: Option<&[u8]>,
+    extlist: *mut *mut rustyssl_abi::stack_st_CONF_VALUE,
+) -> bool {
+    use crate::conf::c_dup;
+    use crate::stack::{OPENSSL_sk_free, OPENSSL_sk_new_null, OPENSSL_sk_push};
+    // SAFETY: the caller's guarantee.
+    let allocated = unsafe { extlist.read() }.is_null();
+    let n = name.map_or(ptr::null_mut(), c_dup);
+    let v = value.map_or(ptr::null_mut(), c_dup);
+    let entry =
+        crate::mem::alloc(size_of::<rustyssl_abi::CONF_VALUE>()).cast::<rustyssl_abi::CONF_VALUE>();
+    let failed = |sk_new: bool| {
+        if sk_new {
+            // SAFETY: the caller's guarantee.
+            let sk = unsafe { extlist.read() };
+            // SAFETY: the stack made here.
+            unsafe { OPENSSL_sk_free(sk.cast()) };
+            // SAFETY: as above.
+            unsafe { extlist.write(ptr::null_mut()) };
+        }
+        // SAFETY: what was made here.
+        unsafe { crate::mem::release(entry.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::mem::release(n.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::mem::release(v.cast()) };
+        false
+    };
+    if (name.is_some() && n.is_null()) || (value.is_some() && v.is_null()) || entry.is_null() {
+        return failed(false);
+    }
+    if allocated {
+        // SAFETY: no preconditions.
+        let sk = unsafe { OPENSSL_sk_new_null() };
+        if sk.is_null() {
+            err::raise(
+                ERR_LIB_X509V3,
+                rustyssl_abi::ERR_R_CRYPTO_LIB,
+                "x509v3_add_len_value",
+            );
+            return failed(false);
+        }
+        // SAFETY: the caller's guarantee.
+        unsafe { extlist.write(sk.cast()) };
+    }
+    // SAFETY: a new allocation of a CONF_VALUE.
+    unsafe {
+        entry.write(rustyssl_abi::CONF_VALUE {
+            section: ptr::null_mut(),
+            name: n,
+            value: v,
+        });
+    };
+    // SAFETY: the caller's guarantee.
+    let sk = unsafe { extlist.read() };
+    // SAFETY: the list, and the new entry it takes.
+    if unsafe { OPENSSL_sk_push(sk.cast(), entry.cast()) } == 0 {
+        return failed(allocated);
+    }
+    true
+}
+
+ffi_export! {
+    /// Pushes a new `CONF_VALUE` of `name` and `value` (either may be NULL; both copied) onto
+    /// `*extlist`, making the stack if it's NULL. Returns 1, or 0.
+    ///
+    /// # Safety
+    /// `name` and `value` are NULL or C strings; `extlist` is valid for reads and writes,
+    /// holding NULL or a stack of `CONF_VALUE`s.
+    pub unsafe extern "C" fn X509V3_add_value(name: *const c_char, value: *const c_char, extlist: *mut *mut rustyssl_abi::stack_st_CONF_VALUE) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        if extlist.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's strings.
+        let name = (!name.is_null()).then(|| unsafe { CStr::from_ptr(name) }.to_bytes());
+        // SAFETY: as above.
+        let value = (!value.is_null()).then(|| unsafe { CStr::from_ptr(value) }.to_bytes());
+        // SAFETY: the caller's guarantee.
+        c_int::from(unsafe { add_value(name, value, extlist) })
+    }
+}
+
+ffi_export! {
+    /// Frees a `CONF_VALUE` and its strings (its section too); NULL does nothing.
+    ///
+    /// # Safety
+    /// `conf` is NULL or a `CONF_VALUE` whose strings were allocated with `OPENSSL_malloc`.
+    pub unsafe extern "C" fn X509V3_conf_free(conf: *mut rustyssl_abi::CONF_VALUE)
+    where failure = (), library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { conf.as_ref() }) else { return };
+        // SAFETY: the entry's strings.
+        unsafe { crate::mem::release(c.name.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::mem::release(c.value.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::mem::release(c.section.cast()) };
+        // SAFETY: the entry.
+        unsafe { crate::mem::release(conf.cast()) };
+    }
+}
+
+/// `X509V3_conf_free` as a stack's free function.
+unsafe extern "C" fn conf_free_item(item: *mut core::ffi::c_void) {
+    // SAFETY: an item of a stack of CONF_VALUEs.
+    unsafe { X509V3_conf_free(item.cast()) };
+}
+
+ffi_export! {
+    /// The `name:value` items of `line` (separated by commas; a value may be absent) as a new
+    /// stack of `CONF_VALUE`s, or NULL with `X509V3_R_INVALID_EMPTY_NAME` or
+    /// `X509V3_R_INVALID_NULL_VALUE`.
+    ///
+    /// # Safety
+    /// `line` is NULL or a C string.
+    pub unsafe extern "C" fn X509V3_parse_list(line: *const c_char) -> *mut rustyssl_abi::stack_st_CONF_VALUE
+    where failure = ptr::null_mut(), library = ERR_LIB_X509V3
+    {
+        if line.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's string.
+        let text = unsafe { CStr::from_ptr(line) }.to_bytes();
+        let items = match rustyssl_conf::name_value_list(text) {
+            Ok(items) => items,
+            Err(e) => {
+                let reason = match e {
+                    rustyssl_conf::NameValueError::EmptyName => rustyssl_abi::X509V3_R_INVALID_EMPTY_NAME,
+                    rustyssl_conf::NameValueError::NullValue => X509V3_R_INVALID_NULL_VALUE,
+                };
+                err::raise(ERR_LIB_X509V3, reason, "X509V3_parse_list");
+                return ptr::null_mut();
+            }
+        };
+        let mut list: *mut rustyssl_abi::stack_st_CONF_VALUE = ptr::null_mut();
+        for (name, value) in &items {
+            // SAFETY: a local list.
+            if !unsafe { add_value(Some(name), value.as_deref(), &raw mut list) } {
+                // SAFETY: the list made here, with its entries.
+                unsafe { crate::stack::OPENSSL_sk_pop_free(list.cast(), Some(conf_free_item)) };
+                return ptr::null_mut();
+            }
+        }
+        list
+    }
+}
+
+ffi_export! {
+    /// The boolean `value->value` names: `TRUE`/`true`/`Y`/`y`/`YES`/`yes` give 0xff,
+    /// `FALSE`/`false`/`N`/`n`/`NO`/`no` give 0. Returns 1, or 0 with
+    /// `X509V3_R_INVALID_BOOLEAN_STRING` and the name and value as data.
+    ///
+    /// # Safety
+    /// `value` is a live `CONF_VALUE`; `asn1_bool` is valid for a write.
+    pub unsafe extern "C" fn X509V3_get_value_bool(value: *const rustyssl_abi::CONF_VALUE, asn1_bool: *mut c_int) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(v) = (unsafe { value.as_ref() }) else { return 0 };
+        // SAFETY: the value's strings.
+        let text = (!v.value.is_null()).then(|| unsafe { CStr::from_ptr(v.value) }.to_bytes());
+        let parsed = match text {
+            Some(b"TRUE" | b"true" | b"Y" | b"y" | b"YES" | b"yes") => Some(0xff),
+            Some(b"FALSE" | b"false" | b"N" | b"n" | b"NO" | b"no") => Some(0),
+            _ => None,
+        };
+        if let Some(b) = parsed {
+            if !asn1_bool.is_null() {
+                // SAFETY: the caller's guarantee.
+                unsafe { asn1_bool.write(b) };
+            }
+            return 1;
+        }
+        err::raise(ERR_LIB_X509V3, rustyssl_abi::X509V3_R_INVALID_BOOLEAN_STRING, "X509V3_get_value_bool");
+        // SAFETY: as above.
+        let name = (!v.name.is_null()).then(|| unsafe { CStr::from_ptr(v.name) }.to_bytes());
+        err::add_error_data([Some(&b"name="[..]), name, Some(b", value="), text]);
+        0
+    }
+}

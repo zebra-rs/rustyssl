@@ -121,6 +121,55 @@ fn set_parsed(ctx: &libctx::LibCtx, list: Option<List>, load: bool, function: &s
     true
 }
 
+/// `evp_set_default_properties_int(libctx, propq, 0, 0)`, for the configuration's
+/// `alg_section`: sets the default query without loading the configuration.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn set_default_from_conf(libctx: *mut OSSL_LIB_CTX, propq: &CStr) -> bool {
+    let name = "evp_set_default_properties_int";
+    // SAFETY: the caller's guarantee.
+    let Some(ctx) = (unsafe { context(libctx) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_INTERNAL_ERROR, name);
+        return false;
+    };
+    let Some(list) = parse_default(&ctx, propq.to_bytes(), name) else {
+        return false;
+    };
+    set_parsed(&ctx, Some(list), false, name)
+}
+
+/// `evp_default_properties_enable_fips_int(libctx, enable, 0)`, for the configuration's
+/// `fips_mode`: merges `fips=yes` (or `-fips`) into the default query without loading the
+/// configuration.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn enable_fips_from_conf(libctx: *mut OSSL_LIB_CTX, enable: bool) -> bool {
+    let query: &CStr = if enable { c"fips=yes" } else { c"-fips" };
+    // SAFETY: the caller's guarantee.
+    let Some(ctx) = (unsafe { context(libctx) }) else {
+        err::raise(
+            ERR_LIB_EVP,
+            ERR_R_INTERNAL_ERROR,
+            "evp_default_properties_merge",
+        );
+        return false;
+    };
+    if ctx.properties.lock().global.is_none() {
+        // SAFETY: the caller's guarantee.
+        return unsafe { set_default_from_conf(libctx, query) };
+    }
+    let Some(list) = parse_default(&ctx, query.to_bytes(), "evp_default_properties_merge") else {
+        return false;
+    };
+    let merged = match &ctx.properties.lock().global {
+        Some(current) => property::merge(&list, current),
+        None => list,
+    };
+    set_parsed(&ctx, Some(merged), false, "evp_default_properties_merge")
+}
+
 ffi_export! {
     /// Sets the default property query of `libctx` (the thread's default context for NULL),
     /// which every fetch adds to its own; NULL clears it. Returns 1, or 0 if the query doesn't

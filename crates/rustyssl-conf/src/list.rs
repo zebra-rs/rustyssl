@@ -48,6 +48,79 @@ pub fn list_items(list: &[u8], sep: u8, nospc: bool) -> Vec<Option<&[u8]>> {
     }
 }
 
+/// Why `X509V3_parse_list` fails.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NameValueError {
+    /// A name of spaces alone (`X509V3_R_INVALID_EMPTY_NAME`).
+    EmptyName,
+    /// A value of spaces alone (`X509V3_R_INVALID_NULL_VALUE`).
+    NullValue,
+}
+
+/// An item of [`name_value_list`]: its name, and its value if it has one.
+pub type NameValue = (Vec<u8>, Option<Vec<u8>>);
+
+/// `strip_spaces`: the token in `seg` without its surrounding spaces, or `None` if it's all
+/// spaces. As in OpenSSL, a token of one character keeps the spaces after it.
+fn strip_spaces(seg: &[u8]) -> Option<&[u8]> {
+    let start = seg.iter().position(|&c| !is_space(c))?;
+    let rest = seg.get(start..)?;
+    let mut end = rest.len().checked_sub(1)?;
+    while end != 0 && rest.get(end).is_some_and(|&c| is_space(c)) {
+        end = end.saturating_sub(1);
+    }
+    if end == 0 {
+        return Some(rest);
+    }
+    rest.get(..=end)
+}
+
+/// `X509V3_parse_list`: `name:value, name, ...` (up to the first NUL) as names and optional
+/// values. The scan stops at a CR or LF, but the last item runs on to the end, as OpenSSL's
+/// does.
+pub fn name_value_list(line: &[u8]) -> Result<Vec<NameValue>, NameValueError> {
+    let line = line.split(|&c| c == 0).next().unwrap_or_default();
+    let mut out = Vec::new();
+    let mut in_value = false;
+    let mut name: Vec<u8> = Vec::new();
+    let mut q = 0usize;
+    for (p, &c) in line.iter().enumerate() {
+        if c == b'\r' || c == b'\n' {
+            break;
+        }
+        let seg = line.get(q..p).unwrap_or_default();
+        if !in_value {
+            if c == b':' {
+                in_value = true;
+                name = strip_spaces(seg).ok_or(NameValueError::EmptyName)?.to_vec();
+                q = p.saturating_add(1);
+            } else if c == b',' {
+                let n = strip_spaces(seg).ok_or(NameValueError::EmptyName)?.to_vec();
+                q = p.saturating_add(1);
+                out.push((n, None));
+            }
+        } else if c == b',' {
+            in_value = false;
+            let v = strip_spaces(seg).ok_or(NameValueError::NullValue)?.to_vec();
+            out.push((core::mem::take(&mut name), Some(v)));
+            q = p.saturating_add(1);
+        }
+    }
+    let last = line.get(q..).unwrap_or_default();
+    if in_value {
+        let v = strip_spaces(last)
+            .ok_or(NameValueError::NullValue)?
+            .to_vec();
+        out.push((name, Some(v)));
+    } else {
+        let n = strip_spaces(last)
+            .ok_or(NameValueError::EmptyName)?
+            .to_vec();
+        out.push((n, None));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,6 +146,26 @@ mod tests {
             list_items(b"a,b\0,c", b',', false),
             [Some(&b"a"[..]), Some(b"b")]
         );
+    }
+
+    #[test]
+    fn name_values() {
+        let v = |n: &[u8], x: Option<&[u8]>| (n.to_vec(), x.map(<[u8]>::to_vec));
+        assert_eq!(
+            name_value_list(b" min:1, max : 8 ,flags:nomask"),
+            Ok(vec![
+                v(b"min", Some(b"1")),
+                v(b"max", Some(b"8 ")),
+                v(b"flags", Some(b"nomask"))
+            ])
+        );
+        assert_eq!(
+            name_value_list(b"a , bc ,d"),
+            Ok(vec![v(b"a ", None), v(b"bc", None), v(b"d", None)])
+        );
+        assert_eq!(name_value_list(b"x:"), Err(NameValueError::NullValue));
+        assert_eq!(name_value_list(b" ,a"), Err(NameValueError::EmptyName));
+        assert_eq!(name_value_list(b"a\nb, c"), Ok(vec![v(b"a\nb, c", None)]));
     }
 
     /// docs/DEVIATIONS.md: a NUL separator splits nowhere (OpenSSL's `strchr` finds the

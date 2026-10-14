@@ -11,9 +11,8 @@
 //!
 //! Flags whose subsystem rustyssl doesn't have yet abort, as an unimplemented export does
 //! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS` (step 3.4), `OPENSSL_INIT_ASYNC`,
-//! and the `OPENSSL_INIT_ENGINE_*` flags. `OPENSSL_INIT_LOAD_CONFIG` succeeds when there is no
-//! file to load, as OpenSSL's does by default, and aborts if there is one (configuration comes
-//! in Phase 6).
+//! and the `OPENSSL_INIT_ENGINE_*` flags. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
+//! file into the default library context and runs its modules ([`crate::conf::modules`]).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -21,22 +20,21 @@ use std::ffi::CString;
 use std::sync::{Mutex, OnceLock};
 
 use rustyssl_abi::{
-    BIO_R_NO_SUCH_FILE, CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE,
-    CONF_MFLAGS_IGNORE_RETURN_CODES, CONF_R_NO_SUCH_FILE, ERR_LIB_CONF, ERR_LIB_CRYPTO,
-    ERR_R_INIT_FAIL, ERR_R_SYS_LIB, ERR_REASON_MASK, OPENSSL_INIT_ADD_ALL_CIPHERS,
-    OPENSSL_INIT_ADD_ALL_DIGESTS, OPENSSL_INIT_ASYNC, OPENSSL_INIT_ENGINE_AFALG,
-    OPENSSL_INIT_ENGINE_ALL_BUILTIN, OPENSSL_INIT_ENGINE_CAPI, OPENSSL_INIT_ENGINE_CRYPTODEV,
-    OPENSSL_INIT_ENGINE_DYNAMIC, OPENSSL_INIT_ENGINE_OPENSSL, OPENSSL_INIT_ENGINE_PADLOCK,
-    OPENSSL_INIT_ENGINE_RDRAND, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS,
-    OPENSSL_INIT_LOAD_SSL_STRINGS, OPENSSL_INIT_NO_ADD_ALL_CIPHERS,
-    OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT, OPENSSL_INIT_NO_LOAD_CONFIG,
-    OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
+    CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE, CONF_MFLAGS_IGNORE_RETURN_CODES,
+    ERR_LIB_CRYPTO, ERR_R_INIT_FAIL, OPENSSL_INIT_ADD_ALL_CIPHERS, OPENSSL_INIT_ADD_ALL_DIGESTS,
+    OPENSSL_INIT_ASYNC, OPENSSL_INIT_ENGINE_AFALG, OPENSSL_INIT_ENGINE_ALL_BUILTIN,
+    OPENSSL_INIT_ENGINE_CAPI, OPENSSL_INIT_ENGINE_CRYPTODEV, OPENSSL_INIT_ENGINE_DYNAMIC,
+    OPENSSL_INIT_ENGINE_OPENSSL, OPENSSL_INIT_ENGINE_PADLOCK, OPENSSL_INIT_ENGINE_RDRAND,
+    OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_LOAD_SSL_STRINGS,
+    OPENSSL_INIT_NO_ADD_ALL_CIPHERS, OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT,
+    OPENSSL_INIT_NO_LOAD_CONFIG, OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS,
+    OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
 };
 
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
-use crate::{mem, stub, version};
+use crate::{mem, stub};
 
 /// The flags `OPENSSL_init_crypto` takes, as `u64`.
 fn flag(value: c_long) -> u64 {
@@ -232,69 +230,26 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
     Some(done)
 }
 
-/// Loads the configuration file, as OpenSSL's `CONF_modules_load_file_ex` does, as far as
-/// rustyssl can yet: the file is the one named in `settings`, else `$OPENSSL_CONF` (ignored in
-/// set-user-ID programs), else `<OPENSSLDIR>/openssl.cnf`. A missing file loads nothing, with
-/// the result OpenSSL gives for the settings' flags; an existing one aborts until configuration
-/// files are implemented (Phase 6).
+/// `ossl_config_int`: loads the configuration file named in `settings` (else the default
+/// one: `$OPENSSL_CONF` unless set-user-ID, else `<OPENSSLDIR>/openssl.cnf`) into the default
+/// library context and runs its modules, for the settings' application, with its flags.
 fn load_config(settings: *const OPENSSL_INIT_SETTINGS) -> c_int {
     // SAFETY: the caller passes null or a live handle from OPENSSL_INIT_new.
     let settings = unsafe { OPENSSL_INIT_SETTINGS::get(settings) };
     let flags = settings.map_or_else(default_flags, |s| s.flags.load(Ordering::Relaxed));
     let file = settings.and_then(|s| s.filename.lock().ok().and_then(|f| f.clone()));
-    let file = file.or_else(|| {
-        safe_getenv(c"OPENSSL_CONF").or_else(|| {
-            let dir = version::config_dir().to_bytes();
-            let mut path = dir.to_vec();
-            path.extend_from_slice(b"/openssl.cnf");
-            CString::new(path).ok()
-        })
-    });
-    // As CONF_modules_load_file_ex: errors from loading are dropped (back to a mark) when the
-    // load counts as a success, and kept otherwise.
+    let app = settings.and_then(|s| s.appname.lock().ok().and_then(|a| a.clone()));
     // SAFETY: no preconditions.
-    unsafe { err::ERR_set_mark() };
-    let ret = match file {
-        None => 0,
-        Some(file) if file.as_bytes().is_empty() => 1,
-        Some(file) => {
-            // SAFETY: NUL-terminated strings.
-            let bio = unsafe { crate::bio::file::BIO_new_file(file.as_ptr(), c"rb".as_ptr()) };
-            if !bio.is_null() {
-                // SAFETY: the BIO just made.
-                unsafe { crate::bio::BIO_free(bio) };
-                stub::unimplemented("OPENSSL_init_crypto loading a configuration file");
-            }
-            // As def_load reports a file BIO_new_file couldn't open.
-            // SAFETY: no preconditions.
-            let code = unsafe { err::ERR_peek_last_error() };
-            // ERR_GET_REASON of a non-system error.
-            let reason =
-                c_int::try_from(code & c_ulong::from(ERR_REASON_MASK.cast_unsigned())).unwrap_or(0);
-            if reason == BIO_R_NO_SUCH_FILE {
-                err::raise(ERR_LIB_CONF, CONF_R_NO_SUCH_FILE, "def_load");
-            } else {
-                err::raise(ERR_LIB_CONF, ERR_R_SYS_LIB, "def_load");
-            }
-            c_int::from(
-                flags & CONF_MFLAGS_IGNORE_MISSING_FILE.cast_unsigned() as c_ulong != 0
-                    && reason == BIO_R_NO_SUCH_FILE,
-            )
-        }
-    };
-    let ret = if flags & CONF_MFLAGS_IGNORE_RETURN_CODES.cast_unsigned() as c_ulong != 0 {
-        1
-    } else {
-        ret
-    };
-    if ret > 0 {
-        // SAFETY: no preconditions.
-        unsafe { err::ERR_pop_to_mark() };
-    } else {
-        // SAFETY: no preconditions.
-        unsafe { err::ERR_clear_last_mark() };
+    let global = unsafe { crate::libctx::OSSL_LIB_CTX_get0_global_default() };
+    // SAFETY: the global default context, and NULL or C strings.
+    unsafe {
+        crate::conf::modules::load_file(
+            global,
+            file.as_ref().map_or(core::ptr::null(), |f| f.as_ptr()),
+            app.as_ref().map_or(core::ptr::null(), |a| a.as_ptr()),
+            flags,
+        )
     }
-    ret
 }
 
 /// `DEFAULT_CONF_MFLAGS` from OpenSSL's `include/internal/conf.h`.
@@ -396,6 +351,8 @@ ffi_export! {
             // SAFETY: the application registered the handler to be called here.
             unsafe { handler() };
         }
+        // `ossl_config_modules_free`: every module instance finished, every module forgotten.
+        crate::conf::modules::free_all();
         // SAFETY: no preconditions; a heap still in use stays up, as in OpenSSL.
         unsafe { crate::secure::CRYPTO_secure_malloc_done() };
         BASE.store(false, Ordering::Release);
@@ -549,6 +506,30 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { OPENSSL_INIT_SETTINGS::free(settings) }
+    }
+}
+
+ffi_export! {
+    /// Loads the configuration for the application `config_name` (its section, else
+    /// `openssl_conf`), with the default flags, as `OPENSSL_init_crypto` with
+    /// `OPENSSL_INIT_LOAD_CONFIG` does: only if the configuration wasn't decided already.
+    ///
+    /// # Safety
+    /// `config_name` is NULL or a C string.
+    pub unsafe extern "C" fn OPENSSL_config(config_name: *const c_char)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: no preconditions.
+        let settings = unsafe { OPENSSL_INIT_new() };
+        if !config_name.is_null() {
+            // SAFETY: a new handle, and the caller's string.
+            unsafe { OPENSSL_INIT_set_config_appname(settings, config_name) };
+        }
+        let opts = flag(OPENSSL_INIT_LOAD_CONFIG);
+        // SAFETY: the handle made here.
+        unsafe { OPENSSL_init_crypto(opts, settings) };
+        // SAFETY: as above, freed once.
+        unsafe { OPENSSL_INIT_free(settings) };
     }
 }
 

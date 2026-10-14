@@ -599,6 +599,65 @@ unsafe fn owned(s: *const c_char) -> Option<CString> {
     (!s.is_null()).then(|| unsafe { CStr::from_ptr(s) }.to_owned())
 }
 
+/// A setting the configuration's `random` section names.
+#[derive(Clone, Copy)]
+pub(crate) enum ConfSetting {
+    /// `random`: the generator's name.
+    Random,
+    /// `cipher`.
+    Cipher,
+    /// `digest`.
+    Digest,
+    /// `properties`.
+    Properties,
+    /// `seed`: the seed source's name.
+    Seed,
+    /// `seed_properties`.
+    SeedProperties,
+    /// `random_provider`, for a provider not loaded.
+    RandomProviderName,
+}
+
+/// `random_set_string` (or `set_random_provider_name`) for the configuration: sets the
+/// context's setting to `value`, whether or not its generators exist yet. False without a
+/// context.
+///
+/// # Safety
+/// `ctx` is NULL or a live library context.
+pub(crate) unsafe fn set_from_conf(
+    ctx: *mut OSSL_LIB_CTX,
+    setting: ConfSetting,
+    value: &CStr,
+) -> bool {
+    let value = value.to_owned();
+    // SAFETY: the caller's guarantee.
+    unsafe {
+        with_global(ctx, false, |_, g| {
+            let mut s = g.lock();
+            let slot = match setting {
+                ConfSetting::Random => &mut s.rng_name,
+                ConfSetting::Cipher => &mut s.rng_cipher,
+                ConfSetting::Digest => &mut s.rng_digest,
+                ConfSetting::Properties => &mut s.rng_propq,
+                ConfSetting::Seed => &mut s.seed_name,
+                ConfSetting::SeedProperties => &mut s.seed_propq,
+                ConfSetting::RandomProviderName => {
+                    let same = s
+                        .random_provider_name
+                        .as_ref()
+                        .is_some_and(|n| n.as_bytes().eq_ignore_ascii_case(value.as_bytes()));
+                    if !same {
+                        s.random_provider_name = Some(value);
+                    }
+                    return true;
+                }
+            };
+            *slot = Some(value);
+            true
+        })
+    }
+}
+
 ffi_export! {
     /// Sets the DRBG type, query, cipher, and digest the context's DRBGs are made with: 0 with
     /// `RAND_R_ALREADY_INSTANTIATED` once its primary exists.

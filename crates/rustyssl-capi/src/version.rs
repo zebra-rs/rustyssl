@@ -62,7 +62,8 @@ fn openssldir() -> &'static CStr {
     )
 }
 
-fn enginesdir() -> &'static CStr {
+/// The directory engines are loaded from (`ENGINESDIR`).
+pub(crate) fn enginesdir() -> &'static CStr {
     directory(
         &ENGINESDIR,
         option_env!("RUSTYSSL_ENGINESDIR"),

@@ -17,22 +17,23 @@ use rustyssl_abi::{
     ASN1_R_ILLEGAL_CHARACTERS, ASN1_R_INVALID_BMPSTRING_LENGTH,
     ASN1_R_INVALID_UNIVERSALSTRING_LENGTH, ASN1_R_INVALID_UTF8STRING, ASN1_R_STRING_TOO_LONG,
     ASN1_R_STRING_TOO_SHORT, ASN1_R_UNKNOWN_FORMAT, ASN1_STRING, ASN1_STRING_TABLE,
-    ASN1_UNIVERSALSTRING, B_ASN1_BIT_STRING, B_ASN1_BMPSTRING, B_ASN1_GENERALIZEDTIME,
-    B_ASN1_GENERALSTRING, B_ASN1_GRAPHICSTRING, B_ASN1_IA5STRING, B_ASN1_ISO64STRING,
-    B_ASN1_NUMERICSTRING, B_ASN1_OCTET_STRING, B_ASN1_PRINTABLESTRING, B_ASN1_SEQUENCE,
-    B_ASN1_T61STRING, B_ASN1_UNIVERSALSTRING, B_ASN1_UNKNOWN, B_ASN1_UTCTIME, B_ASN1_UTF8STRING,
-    B_ASN1_VIDEOTEXSTRING, BIO, DIRSTRING_TYPE, ERR_LIB_ASN1, ERR_R_ASN1_LIB,
-    ERR_R_PASSED_INVALID_ARGUMENT, ERR_R_PASSED_NULL_PARAMETER, MBSTRING_FLAG, NID_INN, NID_OGRN,
-    NID_SNILS, NID_commonName, NID_countryCode3c, NID_countryCode3n, NID_countryName,
-    NID_dnQualifier, NID_dnsName, NID_domainComponent, NID_friendlyName, NID_givenName,
-    NID_id_on_SmtpUTF8Mailbox, NID_initials, NID_jurisdictionCountryName, NID_localityName,
-    NID_ms_csp_name, NID_name, NID_organizationName, NID_organizationalUnitName,
-    NID_pkcs9_challengePassword, NID_pkcs9_emailAddress, NID_pkcs9_unstructuredAddress,
-    NID_pkcs9_unstructuredName, NID_rfc822Mailbox, NID_serialNumber, NID_stateOrProvinceName,
-    NID_surname, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_STACK, PKCS9STRING_TYPE, STABLE_FLAGS_MALLOC,
-    STABLE_NO_MASK, V_ASN1_IA5STRING, V_ASN1_PRINTABLESTRING, V_ASN1_T61STRING,
-    V_ASN1_UNIVERSALSTRING, ub_common_name, ub_email_address, ub_locality_name, ub_name,
-    ub_organization_name, ub_organization_unit_name, ub_state_name,
+    ASN1_UNIVERSALSTRING, B_ASN1_BIT_STRING, B_ASN1_BMPSTRING, B_ASN1_DIRECTORYSTRING,
+    B_ASN1_GENERALIZEDTIME, B_ASN1_GENERALSTRING, B_ASN1_GRAPHICSTRING, B_ASN1_IA5STRING,
+    B_ASN1_ISO64STRING, B_ASN1_NUMERICSTRING, B_ASN1_OCTET_STRING, B_ASN1_PRINTABLESTRING,
+    B_ASN1_SEQUENCE, B_ASN1_T61STRING, B_ASN1_UNIVERSALSTRING, B_ASN1_UNKNOWN, B_ASN1_UTCTIME,
+    B_ASN1_UTF8STRING, B_ASN1_VIDEOTEXSTRING, BIO, CONF_R_LIST_CANNOT_BE_NULL, DIRSTRING_TYPE,
+    ERR_LIB_ASN1, ERR_LIB_CONF, ERR_R_ASN1_LIB, ERR_R_PASSED_INVALID_ARGUMENT,
+    ERR_R_PASSED_NULL_PARAMETER, MBSTRING_FLAG, NID_INN, NID_OGRN, NID_SNILS, NID_commonName,
+    NID_countryCode3c, NID_countryCode3n, NID_countryName, NID_dnQualifier, NID_dnsName,
+    NID_domainComponent, NID_friendlyName, NID_givenName, NID_id_on_SmtpUTF8Mailbox, NID_initials,
+    NID_jurisdictionCountryName, NID_localityName, NID_ms_csp_name, NID_name, NID_organizationName,
+    NID_organizationalUnitName, NID_pkcs9_challengePassword, NID_pkcs9_emailAddress,
+    NID_pkcs9_unstructuredAddress, NID_pkcs9_unstructuredName, NID_rfc822Mailbox, NID_serialNumber,
+    NID_stateOrProvinceName, NID_surname, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_STACK,
+    PKCS9STRING_TYPE, STABLE_FLAGS_MALLOC, STABLE_NO_MASK, V_ASN1_IA5STRING,
+    V_ASN1_PRINTABLESTRING, V_ASN1_T61STRING, V_ASN1_UNIVERSALSTRING, ub_common_name,
+    ub_email_address, ub_locality_name, ub_name, ub_organization_name, ub_organization_unit_name,
+    ub_state_name,
 };
 use rustyssl_asn1::text::{self, Form, MbError, PrintError};
 
@@ -802,6 +803,53 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_ASN1
     {
         tag_bit(tag)
+    }
+}
+
+ffi_export! {
+    /// The `B_ASN1_*` mask of `str`: names of string types separated by `|` (spaces around
+    /// them ignored), each a tag name of `ASN1_generate_nconf`'s (in any case) or `DIR` for
+    /// the directory strings, in `*pmask`. Returns 1, or 0 for an empty or unknown name.
+    ///
+    /// # Safety
+    /// `str` is NULL or a C string; `pmask` is valid for a write.
+    pub unsafe extern "C" fn ASN1_str2mask(str: *const c_char, pmask: *mut c_ulong) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        if pmask.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        unsafe { pmask.write(0) };
+        if str.is_null() {
+            err::raise(ERR_LIB_CONF, CONF_R_LIST_CANNOT_BE_NULL, "CONF_parse_list");
+            return 0;
+        }
+        // SAFETY: the caller's string.
+        let text = unsafe { CStr::from_ptr(str) }.to_bytes();
+        let mut mask: c_ulong = 0;
+        for item in rustyssl_conf::list_items(text, b'|', true) {
+            // `mask_cb`.
+            let Some(elem) = item else { return 0 };
+            if elem.len() == 3 && elem.starts_with(b"DIR") {
+                mask |= c_ulong::from(B_ASN1_DIRECTORYSTRING.cast_unsigned());
+                // SAFETY: as above.
+                unsafe { pmask.write(mask) };
+                continue;
+            }
+            let tag = rustyssl_asn1::gen_tags::str2tag(elem);
+            if tag == 0 || (tag != -1 && tag & rustyssl_asn1::gen_tags::GEN_FLAG != 0) {
+                return 0;
+            }
+            let bit = tag_bit(tag);
+            if bit == 0 {
+                return 0;
+            }
+            mask |= bit;
+            // SAFETY: as above (each item is reported as it's added).
+            unsafe { pmask.write(mask) };
+        }
+        1
     }
 }
 
