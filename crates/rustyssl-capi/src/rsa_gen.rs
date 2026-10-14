@@ -128,7 +128,7 @@ impl Env {
     }
 
     /// `BN_priv_rand_range_ex(range)`.
-    fn rand_range(&self, range: &BigNum) -> Option<BigNum> {
+    pub(crate) fn rand_range(&self, range: &BigNum) -> Option<BigNum> {
         let (r, range) = (Bn::zero(), Bn::new(range));
         // SAFETY: ours; this context.
         (unsafe { BN_priv_rand_range_ex(r.0, range.0, 0, self.ctx) } == 1).then(|| r.get())

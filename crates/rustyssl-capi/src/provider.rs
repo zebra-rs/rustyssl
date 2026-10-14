@@ -59,6 +59,7 @@ pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
 pub(crate) mod rsa_enc;
+pub(crate) mod rsa_kem;
 pub(crate) mod rsa_kmgmt;
 pub(crate) mod rsa_sig;
 pub(crate) mod signatures;
