@@ -1,0 +1,50 @@
+# The deprecated Blowfish, CAST, RC2, and RC4 functions (step 3.8e).
+lgkey bf 16
+lgkey bf 1
+lgkey bf 72
+lgkey bf 80
+lgkey bf 0
+lgkey cast 0
+lgkey cast 5
+lgkey cast 10
+lgkey cast 11
+lgkey cast 20
+lgkey rc2 1 0
+lgkey rc2 8 63
+lgkey rc2 16 128
+lgkey rc2 128 1024
+lgkey rc2 200 2000
+lgkey rc2 16 -5
+lgkey bf 16
+lgkey cast 16
+lgkey rc2 16 64
+lgiv
+lgmode bf ecb 1 8
+lgmode cast ecb 0 8
+lgmode rc2 ecb 1 8
+lgmode bf cbc 1 0
+lgmode bf cbc 1 9
+lgmode bf cbc 0 16
+lgmode cast cbc 1 23
+lgmode cast cbc 0 24
+lgmode rc2 cbc 1 13
+lgmode rc2 cbc 0 13
+lgiv
+lgnum 8
+lgmode bf cfb64 1 9
+lgmode cast cfb64 0 7
+lgmode rc2 cfb64 1 20
+lgnum -7
+lgmode bf ofb64 1 5
+lgmode cast ofb64 1 17
+lgmode rc2 ofb64 1 3
+rc4 4
+rc4key 1
+rc4 37
+rc4key 5
+rc4 0
+rc4 300
+rc4key 256
+rc4key 300
+rc4 9
+rc4key 0

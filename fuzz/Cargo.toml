@@ -291,3 +291,9 @@ name = "lowlevel_des"
 path = "fuzz_targets/lowlevel_des.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "lowlevel_legacy"
+path = "fuzz_targets/lowlevel_legacy.rs"
+test = false
+doc = false
