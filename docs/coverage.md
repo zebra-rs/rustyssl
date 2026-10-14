@@ -534,9 +534,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_BLINDING_unlock` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_BLINDING_update` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_CTX_end` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_CTX_free` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime` |
+| `BN_CTX_free` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa_gen` |
 | `BN_CTX_get` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_CTX_new` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime` |
+| `BN_CTX_new` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa_gen` |
 | `BN_CTX_new_ex` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_CTX_secure_new` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_CTX_secure_new_ex` | libcrypto | `openssl/bn.h` | `bn` |
@@ -586,7 +586,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_bn2bin` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_bn2binpad` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_bn2dec` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_bn2hex` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime` |
+| `BN_bn2hex` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa_gen` |
 | `BN_bn2lebinpad` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_bn2mpi` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_bn2nativepad` | libcrypto | `openssl/bn.h` | `bn` |
@@ -604,7 +604,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_div_word` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_dup` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_exp` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_free` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa` |
+| `BN_free` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen` |
 | `BN_from_montgomery` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_gcd` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_generate_dsa_nonce` | libcrypto | `openssl/bn.h` | `bn_mod` |
@@ -627,7 +627,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_get_rfc3526_prime_6144` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_get_rfc3526_prime_8192` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_get_word` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod` |
-| `BN_hex2bn` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa` |
+| `BN_hex2bn` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa`, `evp_rsa_gen` |
 | `BN_is_bit_set` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_is_negative` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod` |
 | `BN_is_odd` | libcrypto | `openssl/bn.h` | `bn` |
@@ -667,10 +667,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_mod_sub_quick` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_mod_word` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_mpi2bn` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_mul` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_mul_word` | libcrypto | `openssl/bn.h` | `bn` |
+| `BN_mul` | libcrypto | `openssl/bn.h` | `bn`, `evp_rsa_gen` |
+| `BN_mul_word` | libcrypto | `openssl/bn.h` | `bn`, `evp_rsa_gen` |
 | `BN_native2bn` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_new` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops` |
+| `BN_new` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `BN_nist_mod_192` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_nist_mod_224` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_nist_mod_256` | libcrypto | `openssl/bn.h` | `bn_mod` |
@@ -678,7 +678,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_nist_mod_521` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_nist_mod_func` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_nnmod` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_num_bits` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod` |
+| `BN_num_bits` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `evp_rsa_gen` |
 | `BN_num_bits_word` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_options` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_print` | libcrypto | `openssl/bn.h` | `bn` |
@@ -702,7 +702,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_set_flags` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod` |
 | `BN_set_negative` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime` |
 | `BN_set_params` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_set_word` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops` |
+| `BN_set_word` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `BN_signed_bin2bn` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_signed_bn2bin` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_signed_bn2lebin` | libcrypto | `openssl/bn.h` | `bn` |
@@ -819,7 +819,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_cts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_cts128_encrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_header`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_evp`, `bio_sock`, `bn`, `bn_mod`, `bn_prime`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `evp_cipher_asn1`, `evp_derive`, `evp_mac`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_skey`, `lowlevel_aead`, `params`, `pem`, `pem_crypt`, `pkcs12_key`, `properties` |
+| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_header`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_evp`, `bio_sock`, `bn`, `bn_mod`, `bn_prime`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `evp_cipher_asn1`, `evp_derive`, `evp_mac`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_rsa_gen`, `evp_skey`, `lowlevel_aead`, `params`, `pem`, `pem_crypt`, `pkcs12_key`, `properties` |
 | `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_gcm128_aad` | libcrypto | `openssl/modes.h` | `lowlevel_aead` |
@@ -930,14 +930,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `evp_cipher`, `evp_cipher_asn1`, `evp_digest`, `evp_kdf_more`, `evp_md_names`, `evp_modes`, `evp_rsa`, `evp_signature`, `ex_data`, `lib_ctx`, `objects`, `pem`, `pkcs12_key`, `stack`, `trace` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_secure_heap`, `crypto_str`, `err_bio`, `err_queue`, `evp_cipher`, `evp_cipher_asn1`, `evp_digest`, `evp_kdf_more`, `evp_md_names`, `evp_modes`, `evp_rsa`, `evp_rsa_gen`, `evp_signature`, `ex_data`, `lib_ctx`, `objects`, `pem`, `pkcs12_key`, `stack`, `trace` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `pkcs12_key`, `rand`, `stack` |
-| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `conf`, `conf_modules`, `crypto_secure_heap`, `err_queue`, `evp_kdf_more`, `evp_pkey_print`, `evp_rand`, `evp_rsa`, `fetch`, `params`, `pem`, `properties`, `provider`, `rand`, `stack` |
+| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_item_io`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `conf`, `conf_modules`, `crypto_secure_heap`, `err_queue`, `evp_kdf_more`, `evp_pkey_print`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `fetch`, `params`, `pem`, `properties`, `provider`, `rand`, `stack` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue`, `provider` |
@@ -1197,10 +1197,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_KEYEXCH_settable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_derive` |
 | `EVP_KEYEXCH_up_ref` | libcrypto | `openssl/evp.h` | `evp_derive` |
 | `EVP_KEYMGMT_do_all_provided` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_KEYMGMT_fetch` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_pkey` |
-| `EVP_KEYMGMT_free` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_pkey` |
+| `EVP_KEYMGMT_fetch` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_pkey`, `evp_rsa_gen` |
+| `EVP_KEYMGMT_free` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_pkey`, `evp_rsa_gen` |
 | `EVP_KEYMGMT_gen_gettable_params` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_KEYMGMT_gen_settable_params` | libcrypto | `openssl/evp.h` | `evp_pkey` |
+| `EVP_KEYMGMT_gen_settable_params` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_rsa_gen` |
 | `EVP_KEYMGMT_get0_description` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_KEYMGMT_get0_name` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_KEYMGMT_get0_provider` | libcrypto | `openssl/evp.h` | `evp_pkey` |
@@ -1312,7 +1312,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_ctrl_str` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa` |
 | `EVP_PKEY_CTX_ctrl_uint64` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth` |
 | `EVP_PKEY_CTX_dup` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_signature` |
-| `EVP_PKEY_CTX_free` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_signature` |
+| `EVP_PKEY_CTX_free` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_rsa_gen`, `evp_signature` |
 | `EVP_PKEY_CTX_get0_dh_kdf_oid` | libcrypto | `openssl/dh.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_get0_dh_kdf_ukm` | libcrypto | `openssl/dh.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_get0_ecdh_kdf_ukm` | libcrypto | `openssl/ec.h` | `evp_derive`, `evp_pkey_ops` |
@@ -1337,7 +1337,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_get_ecdh_kdf_outlen` | libcrypto | `openssl/ec.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_get_ecdh_kdf_type` | libcrypto | `openssl/ec.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_get_group_name` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
-| `EVP_PKEY_CTX_get_keygen_info` | libcrypto | `openssl/evp.h` | `evp_pkey` |
+| `EVP_PKEY_CTX_get_keygen_info` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_get_operation` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_signature` |
 | `EVP_PKEY_CTX_get_params` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_signature` |
 | `EVP_PKEY_CTX_get_rsa_mgf1_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
@@ -1351,8 +1351,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_hex2ctrl` | libcrypto | `openssl/evp.h` | `evp_pkey_meth` |
 | `EVP_PKEY_CTX_is_a` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_CTX_md` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth` |
-| `EVP_PKEY_CTX_new` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_rsa`, `evp_signature` |
-| `EVP_PKEY_CTX_new_from_name` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa`, `evp_signature` |
+| `EVP_PKEY_CTX_new` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_rsa`, `evp_rsa_gen`, `evp_signature` |
+| `EVP_PKEY_CTX_new_from_name` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen`, `evp_signature` |
 | `EVP_PKEY_CTX_new_from_pkey` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_ops`, `evp_signature` |
 | `EVP_PKEY_CTX_new_id` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_print` |
 | `EVP_PKEY_CTX_set0_dh_kdf_oid` | libcrypto | `openssl/dh.h` | `evp_derive`, `evp_pkey_ops` |
@@ -1364,12 +1364,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_set1_hkdf_salt` | libcrypto | `openssl/kdf.h` | `evp_derive` |
 | `EVP_PKEY_CTX_set1_id` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set1_pbe_pass` | libcrypto | `openssl/kdf.h` | `evp_derive` |
-| `EVP_PKEY_CTX_set1_rsa_keygen_pubexp` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
+| `EVP_PKEY_CTX_set1_rsa_keygen_pubexp` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_set1_scrypt_salt` | libcrypto | `openssl/kdf.h` | `evp_derive` |
 | `EVP_PKEY_CTX_set1_tls1_prf_secret` | libcrypto | `openssl/kdf.h` | `evp_derive` |
 | `EVP_PKEY_CTX_set_algor_params` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_app_data` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_PKEY_CTX_set_cb` | libcrypto | `openssl/evp.h` | `evp_pkey` |
+| `EVP_PKEY_CTX_set_cb` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_set_data` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_CTX_set_dh_kdf_md` | libcrypto | `openssl/dh.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_dh_kdf_outlen` | libcrypto | `openssl/dh.h` | `evp_derive`, `evp_pkey_ops` |
@@ -1403,19 +1403,19 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_set_kem_op` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_mac_key` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_print` |
 | `EVP_PKEY_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_rsa`, `evp_signature` |
-| `EVP_PKEY_CTX_set_rsa_keygen_bits` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops` |
-| `EVP_PKEY_CTX_set_rsa_keygen_primes` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
+| `EVP_PKEY_CTX_set_rsa_keygen_bits` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa_gen` |
+| `EVP_PKEY_CTX_set_rsa_keygen_primes` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_set_rsa_keygen_pubexp` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_mgf1_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_mgf1_md_name` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_oaep_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_oaep_md_name` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_padding` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops` |
-| `EVP_PKEY_CTX_set_rsa_pss_keygen_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
+| `EVP_PKEY_CTX_set_rsa_pss_keygen_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_set_rsa_pss_keygen_md_name` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_pss_keygen_mgf1_md` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_rsa_pss_keygen_mgf1_md_name` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
-| `EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
+| `EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops`, `evp_rsa_gen` |
 | `EVP_PKEY_CTX_set_rsa_pss_saltlen` | libcrypto | `openssl/rsa.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_CTX_set_scrypt_N` | libcrypto | `openssl/kdf.h` | `evp_derive` |
 | `EVP_PKEY_CTX_set_scrypt_maxmem_bytes` | libcrypto | `openssl/kdf.h` | `evp_derive` |
@@ -1456,7 +1456,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_auth_decapsulate_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_auth_encapsulate_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_can_sign` | libcrypto | `openssl/evp.h` | `evp_signature` |
-| `EVP_PKEY_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
+| `EVP_PKEY_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa_gen` |
 | `EVP_PKEY_cmp` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_cmp_parameters` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_copy_parameters` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
@@ -1481,9 +1481,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_encrypt_old` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_eq` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa` |
 | `EVP_PKEY_export` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_PKEY_free` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_names_kept`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_signature` |
-| `EVP_PKEY_fromdata` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_ops`, `evp_rsa` |
-| `EVP_PKEY_fromdata_init` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa` |
+| `EVP_PKEY_free` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_names_kept`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_rsa_gen`, `evp_signature` |
+| `EVP_PKEY_fromdata` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen` |
+| `EVP_PKEY_fromdata_init` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen` |
 | `EVP_PKEY_fromdata_settable` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_generate` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_get0` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_pkey_print` |
@@ -1498,7 +1498,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_get1_encoded_public_key` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_get_base_id` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_get_bits` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa` |
-| `EVP_PKEY_get_bn_param` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_rsa` |
+| `EVP_PKEY_get_bn_param` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_rsa`, `evp_rsa_gen` |
 | `EVP_PKEY_get_default_digest_name` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa` |
 | `EVP_PKEY_get_default_digest_nid` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_get_ex_data` | libcrypto | `openssl/evp.h` | `evp_pkey` |
@@ -1515,8 +1515,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_get_utf8_string_param` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_gettable_params` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_is_a` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa` |
-| `EVP_PKEY_keygen` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print` |
-| `EVP_PKEY_keygen_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_signature` |
+| `EVP_PKEY_keygen` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa_gen` |
+| `EVP_PKEY_keygen_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa_gen`, `evp_signature` |
 | `EVP_PKEY_meth_add0` | libcrypto | `openssl/evp.h` | `evp_pkey_meth` |
 | `EVP_PKEY_meth_copy` | libcrypto | `openssl/evp.h` | `evp_pkey_meth` |
 | `EVP_PKEY_meth_find` | libcrypto | `openssl/evp.h` | `evp_pkey_meth` |
@@ -1574,8 +1574,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_new_raw_private_key_ex` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_pkey_print` |
 | `EVP_PKEY_new_raw_public_key` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_new_raw_public_key_ex` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_PKEY_pairwise_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
-| `EVP_PKEY_param_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
+| `EVP_PKEY_pairwise_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa_gen` |
+| `EVP_PKEY_param_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa_gen` |
 | `EVP_PKEY_param_check_quick` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_parameters_eq` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_paramgen` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_signature` |
@@ -1586,8 +1586,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_print_private_fp` | libcrypto | `openssl/evp.h` | `evp_pkey_print` |
 | `EVP_PKEY_print_public` | libcrypto | `openssl/evp.h` | `evp_pkey_print` |
 | `EVP_PKEY_print_public_fp` | libcrypto | `openssl/evp.h` | `evp_pkey_print` |
-| `EVP_PKEY_private_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
-| `EVP_PKEY_public_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
+| `EVP_PKEY_private_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa_gen` |
+| `EVP_PKEY_public_check` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth`, `evp_rsa_gen` |
 | `EVP_PKEY_public_check_quick` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_save_parameters` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_set1_encoded_public_key` | libcrypto | `openssl/evp.h` | `evp_pkey`, `evp_pkey_meth` |
@@ -1627,18 +1627,18 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_verify_recover_init_ex2` | libcrypto | `openssl/evp.h` | `evp_rsa`, `evp_signature` |
 | `EVP_Q_digest` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_Q_mac` | libcrypto | `openssl/evp.h` | `evp_mac` |
-| `EVP_RAND_CTX_free` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `rand` |
+| `EVP_RAND_CTX_free` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `evp_rsa_gen`, `rand` |
 | `EVP_RAND_CTX_get0_rand` | libcrypto | `openssl/evp.h` | `evp_rand`, `rand` |
 | `EVP_RAND_CTX_get_params` | libcrypto | `openssl/evp.h` | `evp_rand`, `rand` |
 | `EVP_RAND_CTX_gettable_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
-| `EVP_RAND_CTX_new` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `rand` |
+| `EVP_RAND_CTX_new` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `evp_rsa_gen`, `rand` |
 | `EVP_RAND_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_CTX_up_ref` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_do_all_provided` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_enable_locking` | libcrypto | `openssl/evp.h` | `evp_rand` |
-| `EVP_RAND_fetch` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_names_kept`, `evp_rand`, `rand` |
-| `EVP_RAND_free` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_names_kept`, `evp_rand`, `rand` |
+| `EVP_RAND_fetch` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_names_kept`, `evp_rand`, `evp_rsa_gen`, `rand` |
+| `EVP_RAND_free` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_names_kept`, `evp_rand`, `evp_rsa_gen`, `rand` |
 | `EVP_RAND_generate` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_get0_description` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_get0_name` | libcrypto | `openssl/evp.h` | `evp_rand`, `rand` |
@@ -1648,7 +1648,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_RAND_get_strength` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_gettable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_gettable_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
-| `EVP_RAND_instantiate` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `rand` |
+| `EVP_RAND_instantiate` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rand`, `evp_rsa_gen`, `rand` |
 | `EVP_RAND_is_a` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_names_do_all` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_rand` |
 | `EVP_RAND_nonce` | libcrypto | `openssl/evp.h` | `evp_rand` |
@@ -1852,7 +1852,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_set_default_properties` | libcrypto | `openssl/evp.h` | `fetch`, `properties` |
 | `EVP_sha1` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_derive`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_ops`, `evp_rsa`, `evp_signature`, `pem_crypt` |
 | `EVP_sha224` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names` |
-| `EVP_sha256` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_derive`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_signature`, `pem_crypt`, `pkcs12_key` |
+| `EVP_sha256` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_derive`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen`, `evp_signature`, `pem_crypt`, `pkcs12_key` |
 | `EVP_sha384` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops` |
 | `EVP_sha3_224` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_sha3_256` | libcrypto | `openssl/evp.h` | `evp_md_names` |
@@ -2060,9 +2060,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `conf_modules`, `evp_cipher_asn1`, `evp_pkey_ops`, `evp_skey`, `fetch`, `lib_ctx`, `lowlevel_hash`, `properties`, `provider`, `rand` |
 | `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `lib_ctx`, `lowlevel_hash`, `properties` |
 | `OSSL_LIB_CTX_set_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
-| `OSSL_PARAM_BLD_free` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `params` |
-| `OSSL_PARAM_BLD_new` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `params` |
-| `OSSL_PARAM_BLD_push_BN` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa` |
+| `OSSL_PARAM_BLD_free` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `evp_rsa_gen`, `params` |
+| `OSSL_PARAM_BLD_new` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `evp_rsa_gen`, `params` |
+| `OSSL_PARAM_BLD_push_BN` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `evp_rsa_gen` |
 | `OSSL_PARAM_BLD_push_BN_pad` | libcrypto | `openssl/param_build.h` | `bn` |
 | `OSSL_PARAM_BLD_push_double` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_BLD_push_int` | libcrypto | `openssl/param_build.h` | `evp_rsa`, `params` |
@@ -2079,27 +2079,27 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PARAM_BLD_push_ulong` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_BLD_push_utf8_ptr` | libcrypto | `openssl/param_build.h` | `params` |
 | `OSSL_PARAM_BLD_push_utf8_string` | libcrypto | `openssl/param_build.h` | `evp_rsa`, `params` |
-| `OSSL_PARAM_BLD_to_param` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `params` |
+| `OSSL_PARAM_BLD_to_param` | libcrypto | `openssl/param_build.h` | `bn`, `evp_rsa`, `evp_rsa_gen`, `params` |
 | `OSSL_PARAM_allocate_from_text` | libcrypto | `openssl/params.h` | `bn` |
 | `OSSL_PARAM_construct_BN` | libcrypto | `openssl/params.h` | `bn`, `params` |
 | `OSSL_PARAM_construct_double` | libcrypto | `openssl/params.h` | `bn`, `params` |
-| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_aead`, `evp_cipher`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `evp_signature`, `evp_skey`, `fetch`, `params`, `provider`, `rand` |
+| `OSSL_PARAM_construct_end` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_aead`, `evp_cipher`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_signature`, `evp_skey`, `fetch`, `params`, `provider`, `rand` |
 | `OSSL_PARAM_construct_int` | libcrypto | `openssl/params.h` | `bn`, `evp_cipher`, `evp_derive`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac_others`, `evp_modes`, `evp_pkey`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `params`, `provider`, `rand` |
 | `OSSL_PARAM_construct_int32` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_int64` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_long` | libcrypto | `openssl/params.h` | `bn`, `params` |
 | `OSSL_PARAM_construct_octet_ptr` | libcrypto | `openssl/params.h` | `evp_cipher`, `evp_pkey_meth`, `params` |
-| `OSSL_PARAM_construct_octet_string` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `evp_skey`, `params`, `rand` |
+| `OSSL_PARAM_construct_octet_string` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_skey`, `params`, `rand` |
 | `OSSL_PARAM_construct_size_t` | libcrypto | `openssl/params.h` | `evp_aead`, `evp_cipher`, `evp_derive`, `evp_digest`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_names`, `evp_modes`, `evp_rand`, `evp_signature`, `evp_skey`, `fetch`, `params` |
 | `OSSL_PARAM_construct_time_t` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_construct_uint` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_aead`, `evp_cipher`, `evp_digest`, `evp_mac_others`, `evp_modes`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `params`, `rand` |
+| `OSSL_PARAM_construct_uint` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_aead`, `evp_cipher`, `evp_digest`, `evp_mac_others`, `evp_modes`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `params`, `rand` |
 | `OSSL_PARAM_construct_uint32` | libcrypto | `openssl/params.h` | `evp_kdf_more`, `params` |
 | `OSSL_PARAM_construct_uint64` | libcrypto | `openssl/params.h` | `bn`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_rand`, `params`, `rand` |
 | `OSSL_PARAM_construct_ulong` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_construct_utf8_ptr` | libcrypto | `openssl/params.h` | `params`, `provider` |
-| `OSSL_PARAM_construct_utf8_string` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_rand`, `evp_rsa`, `evp_skey`, `params`, `provider`, `rand` |
+| `OSSL_PARAM_construct_utf8_string` | libcrypto | `openssl/params.h` | `bn`, `bn_mod`, `bn_prime`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_skey`, `params`, `provider`, `rand` |
 | `OSSL_PARAM_dup` | libcrypto | `openssl/params.h` | `params` |
-| `OSSL_PARAM_free` | libcrypto | `openssl/params.h` | `bn`, `evp_pkey`, `evp_rsa`, `params` |
+| `OSSL_PARAM_free` | libcrypto | `openssl/params.h` | `bn`, `evp_pkey`, `evp_rsa`, `evp_rsa_gen`, `params` |
 | `OSSL_PARAM_get_BN` | libcrypto | `openssl/params.h` | `bn` |
 | `OSSL_PARAM_get_double` | libcrypto | `openssl/params.h` | `params` |
 | `OSSL_PARAM_get_int` | libcrypto | `openssl/params.h` | `params` |
@@ -2234,8 +2234,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `RAND_priv_bytes_ex` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_pseudo_bytes` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_seed` | libcrypto | `openssl/rand.h` | `rand` |
-| `RAND_set0_private` | libcrypto | `openssl/rand.h` | `bn`, `bn_mod`, `bn_prime`, `rand` |
-| `RAND_set0_public` | libcrypto | `openssl/rand.h` | `bn`, `bn_mod`, `bn_prime`, `rand` |
+| `RAND_set0_private` | libcrypto | `openssl/rand.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa_gen`, `rand` |
+| `RAND_set0_public` | libcrypto | `openssl/rand.h` | `bn`, `bn_mod`, `bn_prime`, `evp_rsa_gen`, `rand` |
 | `RAND_set1_random_provider` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_set_DRBG_type` | libcrypto | `openssl/rand.h` | `rand` |
 | `RAND_set_rand_engine` | libcrypto | `openssl/rand.h` | `rand` |
