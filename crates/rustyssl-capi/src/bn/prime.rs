@@ -52,7 +52,7 @@ handle_type!(BN_GENCB => Gencb);
 /// A callback to report to: an application's `BN_GENCB`, or an old-style one of a deprecated
 /// function.
 #[derive(Clone, Copy)]
-enum Callback {
+pub(crate) enum Callback {
     None,
     Gencb(*mut BN_GENCB),
     Old(Option<OldCb>, *mut c_void),
@@ -62,7 +62,7 @@ enum Callback {
 ///
 /// # Safety
 /// The callback's pointers are live.
-unsafe fn call(cb: Callback, a: c_int, b: c_int) -> c_int {
+pub(crate) unsafe fn call(cb: Callback, a: c_int, b: c_int) -> c_int {
     match cb {
         Callback::None => 1,
         Callback::Old(f, arg) => {
@@ -96,7 +96,7 @@ unsafe fn call(cb: Callback, a: c_int, b: c_int) -> c_int {
 }
 
 /// A `BN_GENCB *` as a callback.
-fn gencb(cb: *mut BN_GENCB) -> Callback {
+pub(crate) fn gencb(cb: *mut BN_GENCB) -> Callback {
     if cb.is_null() {
         Callback::None
     } else {
@@ -217,17 +217,30 @@ impl Drop for Temp {
     }
 }
 
-/// `ossl_bn_miller_rabin_is_prime` (not enhanced): `Some(true)` for probably prime,
-/// `Some(false)` for composite, `None` on a failure (or a callback that stopped it).
+/// What Miller-Rabin found (`BN_PRIMETEST_*`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Status {
+    ProbablyPrime,
+    Composite,
+    /// The enhanced test found a factor.
+    CompositeWithFactor,
+    /// The enhanced test's composite that isn't a prime's power.
+    CompositeNotPowerOfPrime,
+}
+
+/// `ossl_bn_miller_rabin_is_prime`: what `iterations` rounds (the minimum for the size if 0)
+/// with random bases from the private generator found, or `None` on a failure (or a callback
+/// that stopped it). The enhanced test (FIPS 186-5 B.3.1) also looks for a factor.
 ///
 /// # Safety
 /// `ctx` is NULL or a live `BN_CTX`; the callback's pointers are live.
-unsafe fn miller_rabin(
+pub(crate) unsafe fn miller_rabin_status(
     w: &BigNum,
     iterations: i32,
     ctx: *mut BN_CTX,
     cb: Callback,
-) -> Option<bool> {
+    enhanced: bool,
+) -> Option<Status> {
     if !w.is_odd() {
         return None;
     }
@@ -252,6 +265,8 @@ unsafe fn miller_rabin(
     let range = Temp::new();
     range.set(w3);
     let b = Temp::new();
+    // `gcd(v, w)` is one.
+    let coprime = |v: &BigNum| v.is_zero() || core_bn::ct::gcd(v, w).0.is_one();
     for i in 0..iterations {
         // SAFETY: ours; the caller's context.
         if unsafe { BN_priv_rand_range_ex(b.0, range.0, 0, ctx) } == 0 {
@@ -259,38 +274,73 @@ unsafe fn miller_rabin(
         }
         let mut bv = b.value();
         bv.add_word(2).ok()?;
+        if enhanced && !coprime(&bv) {
+            return Some(Status::CompositeWithFactor);
+        }
         let mut z = mont.exp_consttime(&bv, m.limbs());
-        let mut witness = true;
-        if z.is_one() || core_bn::cmp(&z, &w1).is_eq() {
-            witness = false;
-        } else {
+        // The witness's x when the round proves w composite.
+        let mut composite = None;
+        if !(z.is_one() || core_bn::cmp(&z, &w1).is_eq()) {
+            let mut passed = false;
             for _ in 1..a {
-                z = core_bn::modular::mod_mul(&z, &z, w).ok()?;
+                let x = z.clone();
+                z = core_bn::modular::mod_mul(&x, &x, w).ok()?;
                 if core_bn::cmp(&z, &w1).is_eq() {
-                    witness = false;
+                    passed = true;
                     break;
                 }
                 if z.is_one() {
+                    composite = Some(x);
                     break;
                 }
             }
+            if !passed && composite.is_none() {
+                let x = z.clone();
+                z = core_bn::modular::mod_mul(&x, &x, w).ok()?;
+                composite = Some(if z.is_one() { x } else { z });
+            }
         }
-        if witness {
-            return Some(false);
+        if let Some(mut x) = composite {
+            if !enhanced {
+                return Some(Status::Composite);
+            }
+            x.sub_word(1).ok()?;
+            let x = x.abs();
+            return Some(if coprime(&x) && !x.is_zero() {
+                Status::CompositeNotPowerOfPrime
+            } else {
+                Status::CompositeWithFactor
+            });
         }
         // SAFETY: the caller's guarantee.
         if unsafe { call(cb, 1, i) } == 0 {
             return None;
         }
     }
-    Some(true)
+    Some(Status::ProbablyPrime)
+}
+
+/// `ossl_bn_miller_rabin_is_prime` (not enhanced): `Some(true)` for probably prime,
+/// `Some(false)` for composite, `None` on a failure (or a callback that stopped it).
+///
+/// # Safety
+/// As for [`miller_rabin_status`].
+unsafe fn miller_rabin(
+    w: &BigNum,
+    iterations: i32,
+    ctx: *mut BN_CTX,
+    cb: Callback,
+) -> Option<bool> {
+    // SAFETY: the caller's guarantee.
+    unsafe { miller_rabin_status(w, iterations, ctx, cb, false) }
+        .map(|s| s == Status::ProbablyPrime)
 }
 
 /// `bn_is_prime_int`: 1 probably prime, 0 composite, -1 failure.
 ///
 /// # Safety
 /// As for [`miller_rabin`].
-unsafe fn is_prime_int(
+pub(crate) unsafe fn is_prime_int(
     w: &BigNum,
     checks: i32,
     ctx: *mut BN_CTX,
@@ -552,7 +602,7 @@ unsafe fn probable_prime_dh(
 /// # Safety
 /// `ret`, `add`, and `rem` are NULL or live `BIGNUM`s; `ctx` is NULL or a live `BN_CTX`; the
 /// callback's pointers are live.
-unsafe fn generate(
+pub(crate) unsafe fn generate(
     ret: *mut BIGNUM,
     bits: c_int,
     safe: bool,

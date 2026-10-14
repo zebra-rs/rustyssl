@@ -1,7 +1,7 @@
 //! The default provider's RSA and RSA-PSS key managers (`rsa_kmgmt.c`, with `rsa_backend.c`'s
 //! import and export): keys are `RSA` objects (`crate::rsa`), made empty, filled from
 //! parameters (`EVP_PKEY_fromdata`), described (`EVP_PKEY_get_params`), exported, compared,
-//! and copied. Key generation and validation come with step 4.3b.
+//! copied, generated (`crate::rsa_gen`), validated, and loaded from a reference.
 //!
 //! As in OpenSSL, the import takes the numbers as given: no primality or consistency checks,
 //! only that each is no longer than the modulus. The primes past the second are kept in the
@@ -12,41 +12,47 @@ use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    BIGNUM, ERR_LIB_RSA, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER, NID_mgf1, NID_sha1,
-    NID_sha224, NID_sha256, NID_sha384, NID_sha512, NID_sha512_224, NID_sha512_256, OSSL_CALLBACK,
-    OSSL_DIGEST_NAME_SHA1, OSSL_DIGEST_NAME_SHA2_224, OSSL_DIGEST_NAME_SHA2_256,
-    OSSL_DIGEST_NAME_SHA2_384, OSSL_DIGEST_NAME_SHA2_512, OSSL_DIGEST_NAME_SHA2_512_224,
-    OSSL_DIGEST_NAME_SHA2_512_256, OSSL_FUNC_KEYMGMT_DUP, OSSL_FUNC_KEYMGMT_EXPORT,
-    OSSL_FUNC_KEYMGMT_EXPORT_TYPES, OSSL_FUNC_KEYMGMT_FREE, OSSL_FUNC_KEYMGMT_GET_PARAMS,
-    OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS, OSSL_FUNC_KEYMGMT_IMPORT,
-    OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_MATCH, OSSL_FUNC_KEYMGMT_NEW,
-    OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME, OSSL_KEYMGMT_SELECT_KEYPAIR,
-    OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_PARAM, OSSL_PARAM_BLD, OSSL_PARAM_INTEGER,
-    OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_BITS,
-    OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE,
-    OSSL_PKEY_PARAM_RSA_COEFFICIENT1, OSSL_PKEY_PARAM_RSA_COEFFICIENT2,
-    OSSL_PKEY_PARAM_RSA_COEFFICIENT3, OSSL_PKEY_PARAM_RSA_COEFFICIENT4,
-    OSSL_PKEY_PARAM_RSA_COEFFICIENT5, OSSL_PKEY_PARAM_RSA_COEFFICIENT6,
-    OSSL_PKEY_PARAM_RSA_COEFFICIENT7, OSSL_PKEY_PARAM_RSA_COEFFICIENT8,
-    OSSL_PKEY_PARAM_RSA_COEFFICIENT9, OSSL_PKEY_PARAM_RSA_D, OSSL_PKEY_PARAM_RSA_DERIVE_FROM_PQ,
-    OSSL_PKEY_PARAM_RSA_DIGEST, OSSL_PKEY_PARAM_RSA_DIGEST_PROPS, OSSL_PKEY_PARAM_RSA_E,
-    OSSL_PKEY_PARAM_RSA_EXPONENT1, OSSL_PKEY_PARAM_RSA_EXPONENT2, OSSL_PKEY_PARAM_RSA_EXPONENT3,
-    OSSL_PKEY_PARAM_RSA_EXPONENT4, OSSL_PKEY_PARAM_RSA_EXPONENT5, OSSL_PKEY_PARAM_RSA_EXPONENT6,
-    OSSL_PKEY_PARAM_RSA_EXPONENT7, OSSL_PKEY_PARAM_RSA_EXPONENT8, OSSL_PKEY_PARAM_RSA_EXPONENT9,
-    OSSL_PKEY_PARAM_RSA_EXPONENT10, OSSL_PKEY_PARAM_RSA_FACTOR1, OSSL_PKEY_PARAM_RSA_FACTOR2,
-    OSSL_PKEY_PARAM_RSA_FACTOR3, OSSL_PKEY_PARAM_RSA_FACTOR4, OSSL_PKEY_PARAM_RSA_FACTOR5,
-    OSSL_PKEY_PARAM_RSA_FACTOR6, OSSL_PKEY_PARAM_RSA_FACTOR7, OSSL_PKEY_PARAM_RSA_FACTOR8,
-    OSSL_PKEY_PARAM_RSA_FACTOR9, OSSL_PKEY_PARAM_RSA_FACTOR10, OSSL_PKEY_PARAM_RSA_MASKGENFUNC,
-    OSSL_PKEY_PARAM_RSA_MGF1_DIGEST, OSSL_PKEY_PARAM_RSA_N, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN,
-    OSSL_PKEY_PARAM_SECURITY_BITS, RSA, RSA_R_INVALID_KEYPAIR, SN_mgf1,
+    BIGNUM, BN_GENCB, ERR_LIB_PROV, ERR_LIB_RSA, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER,
+    NID_mgf1, NID_sha1, NID_sha224, NID_sha256, NID_sha384, NID_sha512, NID_sha512_224,
+    NID_sha512_256, OSSL_CALLBACK, OSSL_DIGEST_NAME_SHA1, OSSL_DIGEST_NAME_SHA2_224,
+    OSSL_DIGEST_NAME_SHA2_256, OSSL_DIGEST_NAME_SHA2_384, OSSL_DIGEST_NAME_SHA2_512,
+    OSSL_DIGEST_NAME_SHA2_512_224, OSSL_DIGEST_NAME_SHA2_512_256, OSSL_FUNC_KEYMGMT_DUP,
+    OSSL_FUNC_KEYMGMT_EXPORT, OSSL_FUNC_KEYMGMT_EXPORT_TYPES, OSSL_FUNC_KEYMGMT_FREE,
+    OSSL_FUNC_KEYMGMT_GEN, OSSL_FUNC_KEYMGMT_GEN_CLEANUP, OSSL_FUNC_KEYMGMT_GEN_INIT,
+    OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+    OSSL_FUNC_KEYMGMT_GET_PARAMS, OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS,
+    OSSL_FUNC_KEYMGMT_IMPORT, OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_LOAD,
+    OSSL_FUNC_KEYMGMT_MATCH, OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME,
+    OSSL_FUNC_KEYMGMT_VALIDATE, OSSL_GEN_PARAM_ITERATION, OSSL_GEN_PARAM_POTENTIAL,
+    OSSL_KEYMGMT_SELECT_KEYPAIR, OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS,
+    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM,
+    OSSL_PARAM_BLD, OSSL_PARAM_INTEGER, OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING,
+    OSSL_PKEY_PARAM_BITS, OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PKEY_PARAM_MANDATORY_DIGEST,
+    OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_RSA_BITS, OSSL_PKEY_PARAM_RSA_COEFFICIENT1,
+    OSSL_PKEY_PARAM_RSA_COEFFICIENT2, OSSL_PKEY_PARAM_RSA_COEFFICIENT3,
+    OSSL_PKEY_PARAM_RSA_COEFFICIENT4, OSSL_PKEY_PARAM_RSA_COEFFICIENT5,
+    OSSL_PKEY_PARAM_RSA_COEFFICIENT6, OSSL_PKEY_PARAM_RSA_COEFFICIENT7,
+    OSSL_PKEY_PARAM_RSA_COEFFICIENT8, OSSL_PKEY_PARAM_RSA_COEFFICIENT9, OSSL_PKEY_PARAM_RSA_D,
+    OSSL_PKEY_PARAM_RSA_DERIVE_FROM_PQ, OSSL_PKEY_PARAM_RSA_DIGEST,
+    OSSL_PKEY_PARAM_RSA_DIGEST_PROPS, OSSL_PKEY_PARAM_RSA_E, OSSL_PKEY_PARAM_RSA_EXPONENT1,
+    OSSL_PKEY_PARAM_RSA_EXPONENT2, OSSL_PKEY_PARAM_RSA_EXPONENT3, OSSL_PKEY_PARAM_RSA_EXPONENT4,
+    OSSL_PKEY_PARAM_RSA_EXPONENT5, OSSL_PKEY_PARAM_RSA_EXPONENT6, OSSL_PKEY_PARAM_RSA_EXPONENT7,
+    OSSL_PKEY_PARAM_RSA_EXPONENT8, OSSL_PKEY_PARAM_RSA_EXPONENT9, OSSL_PKEY_PARAM_RSA_EXPONENT10,
+    OSSL_PKEY_PARAM_RSA_FACTOR1, OSSL_PKEY_PARAM_RSA_FACTOR2, OSSL_PKEY_PARAM_RSA_FACTOR3,
+    OSSL_PKEY_PARAM_RSA_FACTOR4, OSSL_PKEY_PARAM_RSA_FACTOR5, OSSL_PKEY_PARAM_RSA_FACTOR6,
+    OSSL_PKEY_PARAM_RSA_FACTOR7, OSSL_PKEY_PARAM_RSA_FACTOR8, OSSL_PKEY_PARAM_RSA_FACTOR9,
+    OSSL_PKEY_PARAM_RSA_FACTOR10, OSSL_PKEY_PARAM_RSA_MASKGENFUNC, OSSL_PKEY_PARAM_RSA_MGF1_DIGEST,
+    OSSL_PKEY_PARAM_RSA_N, OSSL_PKEY_PARAM_RSA_PRIMES, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN,
+    OSSL_PKEY_PARAM_SECURITY_BITS, PROV_R_KEY_SIZE_TOO_SMALL, RSA, RSA_DEFAULT_PRIME_NUM, RSA_F4,
+    RSA_R_INVALID_KEYPAIR, SN_mgf1,
 };
 use rustyssl_crypto::bn::{self, BigNum};
 use rustyssl_crypto::rsa::{ExtraPrime, Key, ifc_ffc_security_bits};
 
 use super::builtin::libctx_of;
-use super::macs::locate;
+use super::macs::{boxed, context, is_empty, locate, unbox};
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
+use crate::bn::prime::{BN_GENCB_free, BN_GENCB_get_arg, BN_GENCB_new, BN_GENCB_set};
 use crate::bn::{BN_clear_free, new_bignum, value};
 use crate::err;
 use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free, EVP_MD_is_a};
@@ -59,9 +65,14 @@ use crate::params::build::{
 };
 use crate::params::dup::OSSL_PARAM_free;
 use crate::params::{
-    OSSL_PARAM_get_int, OSSL_PARAM_locate, OSSL_PARAM_set_int, OSSL_PARAM_set_utf8_string,
+    OSSL_PARAM_construct_int, OSSL_PARAM_get_int, OSSL_PARAM_get_size_t, OSSL_PARAM_locate,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_utf8_string, end,
 };
 use crate::rsa::{Kind, Pss30, Rsa, RsaState, rsa};
+use crate::rsa_gen::{
+    MIN_MODULUS_BITS, derive_crt, generate_key, multip_cap, validate_keypair, validate_private,
+    validate_public,
+};
 
 /// `RSA_DEFAULT_MD` (`rsa_kmgmt.c`; no public header names it): the default digest's name.
 const RSA_DEFAULT_MD: &CStr = c"SHA256";
@@ -425,38 +436,6 @@ unsafe fn pss_fromdata(
     true
 }
 
-/// `ossl_rsa_multiprime_derive` and `ossl_rsa_sp800_56b_derive_params_from_pq`'s numbers: the
-/// exponents and coefficients for `factors` from `d` (and `e`, which the multi-prime case
-/// checks against `p - 1`).
-fn derive_from_pq(
-    e: &BigNum,
-    d: &BigNum,
-    factors: &[BigNum],
-) -> Option<(Vec<BigNum>, Vec<BigNum>)> {
-    let (p, q) = (factors.first()?, factors.get(1)?);
-    let minus_one = |x: &BigNum| {
-        let mut y = x.clone();
-        y.sub_word(1).ok()?;
-        Some(y)
-    };
-    if factors.len() > 2 {
-        // OpenSSL inverts p - 1 modulo e first, failing if it can't.
-        let p1 = minus_one(p)?;
-        bn::ct::inverse(&bn::nnmod(&p1, e).ok()?, e)?;
-    }
-    let mut exps = Vec::new();
-    for f in factors {
-        exps.push(bn::nnmod(d, &minus_one(f)?).ok()?);
-    }
-    let mut coeffs = vec![bn::ct::inverse(&bn::nnmod(q, p).ok()?, p)?];
-    let mut pp = bn::mul(p, q).ok()?;
-    for f in factors.get(2..)? {
-        coeffs.push(bn::ct::inverse(&bn::nnmod(&pp, f).ok()?, f)?);
-        pp = bn::mul(&pp, f).ok()?;
-    }
-    Some((exps, coeffs))
-}
-
 /// `ossl_rsa_fromdata`: the key's numbers from `params`. False on failure, with OpenSSL's
 /// errors raised; the key may keep what was set before the failure, as OpenSSL's does.
 ///
@@ -534,7 +513,7 @@ unsafe fn fromdata(st: &mut RsaState, params: *const OSSL_PARAM, include_private
             let (Some(e), Some(d)) = (st.key.e.clone(), st.key.d.clone()) else {
                 return null_param();
             };
-            let Some((x, c)) = derive_from_pq(&e, &d, &factors) else {
+            let Some((x, c)) = derive_crt(&e, &d, &factors) else {
                 err::raise(ERR_LIB_RSA, ERR_R_INTERNAL_ERROR, F);
                 return false;
             };
@@ -631,16 +610,6 @@ fn check_factors(k: &Key) -> bool {
         .chain(&exps)
         .chain(&coeffs)
         .all(|b| bits(*b) <= n)
-}
-
-/// `ossl_rsa_multip_cap`: the most primes a key of `bits` may have.
-fn multip_cap(bits: usize) -> usize {
-    match bits {
-        ..1024 => 2,
-        1024..4096 => 3,
-        4096..8192 => 4,
-        _ => 5,
-    }
 }
 
 /// `RSA_security_bits`.
@@ -1222,6 +1191,392 @@ ffi_callback! {
 type NewFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 type FreeFn = unsafe extern "C" fn(*mut c_void);
 type HasFn = unsafe extern "C" fn(*const c_void, c_int) -> c_int;
+/// `struct rsa_gen_ctx`.
+struct GenCtx {
+    libctx: *mut OSSL_LIB_CTX,
+    kind: Kind,
+    nbits: usize,
+    pub_exp: BigNum,
+    primes: usize,
+    pss: Pss30,
+    pss_defaults_set: bool,
+    cb: OSSL_CALLBACK,
+    cbarg: *mut c_void,
+}
+
+/// The generation context behind `genctx`.
+///
+/// # Safety
+/// `genctx` is NULL or a live context from `gen_init`.
+unsafe fn gen_ctx<'a>(genctx: *mut c_void) -> Option<&'a mut GenCtx> {
+    // SAFETY: the caller's guarantee.
+    unsafe { context::<GenCtx>(genctx) }
+}
+
+/// `gen_init`.
+///
+/// # Safety
+/// `provctx` is the default provider's context; `params` is NULL or an array.
+unsafe fn gen_init(
+    provctx: *mut c_void,
+    selection: c_int,
+    kind: Kind,
+    params: *const OSSL_PARAM,
+) -> *mut c_void {
+    if selection & KEYPAIR == 0 {
+        return ptr::null_mut();
+    }
+    let g = boxed(GenCtx {
+        // SAFETY: the caller's guarantee.
+        libctx: unsafe { libctx_of(provctx) },
+        kind,
+        nbits: 2048,
+        pub_exp: BigNum::from_word(RSA_F4.unsigned_abs()),
+        primes: usize::try_from(RSA_DEFAULT_PRIME_NUM).unwrap_or(2),
+        pss: Pss30::default(),
+        pss_defaults_set: false,
+        cb: None,
+        cbarg: ptr::null_mut(),
+    });
+    // SAFETY: the context just made; the caller's array.
+    if unsafe { rsa_gen_set_params(g, params) } != 1 {
+        // SAFETY: the context just made, freed once.
+        unsafe { unbox::<GenCtx>(g) };
+        return ptr::null_mut();
+    }
+    g
+}
+
+ffi_callback! {
+    /// `rsa_gen_init`.
+    ///
+    /// # Safety
+    /// As for `gen_init`.
+    pub(crate) unsafe extern "C" fn rsa_gen_init(provctx: *mut c_void, selection: c_int, params: *const OSSL_PARAM) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { gen_init(provctx, selection, Kind::Rsa, params) }
+    }
+}
+
+ffi_callback! {
+    /// `rsapss_gen_init`.
+    ///
+    /// # Safety
+    /// As for `gen_init`.
+    pub(crate) unsafe extern "C" fn rsapss_gen_init(provctx: *mut c_void, selection: c_int, params: *const OSSL_PARAM) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { gen_init(provctx, selection, Kind::RsaPss, params) }
+    }
+}
+
+ffi_callback! {
+    /// `rsa_gen_set_params`: the size, the number of primes, the public exponent, and (for
+    /// RSA-PSS) the restrictions, each committed as it's read.
+    ///
+    /// # Safety
+    /// `genctx` is NULL or a live generation context; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn rsa_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(g) = (unsafe { gen_ctx(genctx) }) else { return 0 };
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: the caller's array; a static name.
+        if let Some(p) = unsafe { locate(params, OSSL_PKEY_PARAM_RSA_BITS) } {
+            // SAFETY: a parameter of the array; the context's field.
+            if unsafe { OSSL_PARAM_get_size_t(p, &raw mut g.nbits) } != 1 {
+                return 0;
+            }
+            if g.nbits < MIN_MODULUS_BITS {
+                err::raise(ERR_LIB_PROV, PROV_R_KEY_SIZE_TOO_SMALL, "rsa_gen_set_params");
+                return 0;
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_PKEY_PARAM_RSA_PRIMES) } {
+            // SAFETY: as above.
+            if unsafe { OSSL_PARAM_get_size_t(p, &raw mut g.primes) } != 1 {
+                return 0;
+            }
+        }
+        // SAFETY: the caller's array.
+        match unsafe { get_bn(params, OSSL_PKEY_PARAM_RSA_E) } {
+            Ok(Some(e)) => g.pub_exp = e,
+            Ok(None) => {}
+            Err(()) => return 0,
+        }
+        if g.kind == Kind::RsaPss {
+            // SAFETY: the caller's array; the context's library context.
+            let ok = unsafe { pss_fromdata(&mut g.pss, &mut g.pss_defaults_set, params, g.libctx) };
+            if !ok {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+/// `rsa_gen_basic`, then (for RSA-PSS) `rsa_gen_pss`.
+static GEN_SETTABLE: Params<4> = Params([
+    defn(
+        OSSL_PKEY_PARAM_RSA_BITS,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<usize>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_PRIMES,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<usize>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_E,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        0,
+    ),
+    PARAM_END,
+]);
+static PSS_GEN_SETTABLE: Params<9> = Params([
+    defn(
+        OSSL_PKEY_PARAM_RSA_BITS,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<usize>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_PRIMES,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<usize>(),
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_E,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        0,
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_DIGEST,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_DIGEST_PROPS,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_MASKGENFUNC,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_MGF1_DIGEST,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(
+        OSSL_PKEY_PARAM_RSA_PSS_SALTLEN,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `rsa_gen_settable_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn rsa_gen_settable_params(_genctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_RSA
+    {
+        GEN_SETTABLE.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// `rsapss_gen_settable_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn rsapss_gen_settable_params(_genctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_RSA
+    {
+        PSS_GEN_SETTABLE.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// `rsa_gencb`: a progress event, passed to the generation's callback as `potential` and
+    /// `iteration`.
+    ///
+    /// # Safety
+    /// `cb` is a live `BN_GENCB` whose argument is a live generation context.
+    pub(crate) unsafe extern "C" fn rsa_gencb(p: c_int, n: c_int, cb: *mut BN_GENCB) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let arg = unsafe { BN_GENCB_get_arg(cb) };
+        // SAFETY: as above.
+        let Some(g) = (unsafe { gen_ctx(arg) }) else { return 0 };
+        let (mut p, mut n) = (p, n);
+        let params = [
+            // SAFETY: locals that outlive the call.
+            unsafe { OSSL_PARAM_construct_int(OSSL_GEN_PARAM_POTENTIAL.as_ptr(), &raw mut p) },
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_construct_int(OSSL_GEN_PARAM_ITERATION.as_ptr(), &raw mut n) },
+            end(),
+        ];
+        match g.cb {
+            // SAFETY: the application's callback and argument; no lock is held.
+            Some(f) => unsafe { f(params.as_ptr(), g.cbarg) },
+            // EVP always passes a callback; going on is all one can do without.
+            None => 1,
+        }
+    }
+}
+
+/// A `size_t` as the C's `int` cast: its low 32 bits, as `RSA_generate_multi_prime_key`'s
+/// arguments get them.
+fn c_int_cast(v: usize) -> c_int {
+    let low = u32::try_from(v & 0xffff_ffff).unwrap_or(0);
+    c_int::from_ne_bytes(low.to_ne_bytes())
+}
+
+ffi_callback! {
+    /// `rsa_gen`: a new key, or NULL with the generator's errors raised.
+    ///
+    /// # Safety
+    /// `genctx` is NULL or a live generation context; `cb` is NULL or a callback taking
+    /// `cbarg`.
+    pub(crate) unsafe extern "C" fn rsa_gen(genctx: *mut c_void, cb: OSSL_CALLBACK, cbarg: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(g) = (unsafe { gen_ctx(genctx) }) else { return ptr::null_mut() };
+        if g.kind == Kind::Rsa && g.pss.restricted() {
+            return ptr::null_mut();
+        }
+        g.cb = cb;
+        g.cbarg = cbarg;
+        let (libctx, bits, primes, e) =
+            (g.libctx, c_int_cast(g.nbits), c_int_cast(g.primes), g.pub_exp.clone());
+        let (kind, pss) = (g.kind, g.pss);
+        // SAFETY: no preconditions.
+        let gencb = unsafe { BN_GENCB_new() };
+        if !gencb.is_null() {
+            // SAFETY: the holder just made; the callback reads the context, live for the call.
+            unsafe { BN_GENCB_set(gencb, Some(rsa_gencb), genctx) };
+        }
+        // SAFETY: the context's library context; the holder, or NULL.
+        let key = unsafe { generate_key(libctx, bits, primes, &e, gencb) };
+        // SAFETY: the holder made above, or NULL.
+        unsafe { BN_GENCB_free(gencb) };
+        let Some(key) = key else { return ptr::null_mut() };
+        let h = Rsa::new_handle_in(libctx, kind);
+        // SAFETY: the handle just made.
+        let Some(r) = (unsafe { rsa(h) }) else { return ptr::null_mut() };
+        {
+            let mut st = r.lock();
+            st.key = key;
+            st.pss = pss;
+        }
+        h.cast()
+    }
+}
+
+ffi_callback! {
+    /// `rsa_gen_cleanup`.
+    ///
+    /// # Safety
+    /// `genctx` is NULL or a generation context the caller gives up.
+    pub(crate) unsafe extern "C" fn rsa_gen_cleanup(genctx: *mut c_void)
+    where failure = (), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<GenCtx>(genctx) };
+    }
+}
+
+/// `common_load`: the key the reference points to, if it's of `kind`; the caller's
+/// reference passes to the result.
+///
+/// # Safety
+/// `reference` is NULL or points to `reference_sz` octets holding a live key's pointer.
+unsafe fn common_load(reference: *const c_void, reference_sz: usize, kind: Kind) -> *mut c_void {
+    if reference.is_null() || reference_sz != size_of::<*mut RSA>() {
+        return ptr::null_mut();
+    }
+    // SAFETY: the caller's guarantee: a key's pointer.
+    let h = unsafe { reference.cast::<*mut RSA>().read_unaligned() };
+    // SAFETY: as above.
+    match unsafe { rsa(h) } {
+        Some(r) if r.lock().kind == kind => h.cast(),
+        _ => ptr::null_mut(),
+    }
+}
+
+ffi_callback! {
+    /// `rsa_load`.
+    ///
+    /// # Safety
+    /// As for `common_load`.
+    pub(crate) unsafe extern "C" fn rsa_load(reference: *const c_void, reference_sz: usize) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { common_load(reference, reference_sz, Kind::Rsa) }
+    }
+}
+
+ffi_callback! {
+    /// `rsapss_load`.
+    ///
+    /// # Safety
+    /// As for `common_load`.
+    pub(crate) unsafe extern "C" fn rsapss_load(reference: *const c_void, reference_sz: usize) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { common_load(reference, reference_sz, Kind::RsaPss) }
+    }
+}
+
+ffi_callback! {
+    /// `rsa_validate`: the whole key pairwise (`RSA_check_key`'s checks), or the private key's
+    /// range and the public key's SP 800-56B checks.
+    ///
+    /// # Safety
+    /// `keydata` is NULL or live key data.
+    pub(crate) unsafe extern "C" fn rsa_validate(keydata: *const c_void, selection: c_int, _checktype: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(r) = (unsafe { key(keydata) }) else { return 0 };
+        if selection & POSSIBLE == 0 {
+            return 1;
+        }
+        let st = r.snapshot();
+        if selection & KEYPAIR == KEYPAIR {
+            // SAFETY: the key's library context; no callback.
+            return c_int::from(unsafe { validate_keypair(r.libctx.0, &st.key, ptr::null_mut()) } > 0);
+        }
+        let mut ok = true;
+        if selection & PRIVATE != 0 {
+            ok = validate_private(&st.key);
+        }
+        if selection & PUBLIC != 0 {
+            // SAFETY: the key's library context.
+            ok = ok && unsafe { validate_public(r.libctx.0, &st.key) };
+        }
+        c_int::from(ok)
+    }
+}
+
 type MatchFn = unsafe extern "C" fn(*const c_void, *const c_void, c_int) -> c_int;
 type ImportFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_PARAM) -> c_int;
 type TypesFn = unsafe extern "C" fn(c_int) -> *const OSSL_PARAM;
@@ -1230,10 +1585,31 @@ type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type GettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
 type DupFn = unsafe extern "C" fn(*const c_void, c_int) -> *mut c_void;
 type QueryFn = unsafe extern "C" fn(c_int) -> *const c_char;
+type GenInitFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_PARAM) -> *mut c_void;
+type SetParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
+type GenListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
+type GenFn = unsafe extern "C" fn(*mut c_void, OSSL_CALLBACK, *mut c_void) -> *mut c_void;
+type LoadFn = unsafe extern "C" fn(*const c_void, usize) -> *mut c_void;
+type ValidateFn = unsafe extern "C" fn(*const c_void, c_int, c_int) -> c_int;
 
-/// `ossl_rsa_keymgmt_functions` (key generation and validation come with step 4.3b).
-pub(crate) static RSA_KEYMGMT: Dispatch<12> = Dispatch([
+/// `ossl_rsa_keymgmt_functions`.
+pub(crate) static RSA_KEYMGMT: Dispatch<19> = Dispatch([
     entry!(OSSL_FUNC_KEYMGMT_NEW, rsa_newdata, NewFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_INIT, rsa_gen_init, GenInitFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+        rsa_gen_set_params,
+        SetParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+        rsa_gen_settable_params,
+        GenListFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_GEN, rsa_gen, GenFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_CLEANUP, rsa_gen_cleanup, FreeFn),
+    entry!(OSSL_FUNC_KEYMGMT_LOAD, rsa_load, LoadFn),
+    entry!(OSSL_FUNC_KEYMGMT_VALIDATE, rsa_validate, ValidateFn),
     entry!(OSSL_FUNC_KEYMGMT_FREE, rsa_freedata, FreeFn),
     entry!(OSSL_FUNC_KEYMGMT_GET_PARAMS, rsa_get_params, GetParamsFn),
     entry!(
@@ -1252,8 +1628,23 @@ pub(crate) static RSA_KEYMGMT: Dispatch<12> = Dispatch([
 ]);
 
 /// `ossl_rsapss_keymgmt_functions`.
-pub(crate) static RSAPSS_KEYMGMT: Dispatch<13> = Dispatch([
+pub(crate) static RSAPSS_KEYMGMT: Dispatch<20> = Dispatch([
     entry!(OSSL_FUNC_KEYMGMT_NEW, rsapss_newdata, NewFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_INIT, rsapss_gen_init, GenInitFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+        rsa_gen_set_params,
+        SetParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+        rsapss_gen_settable_params,
+        GenListFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_GEN, rsa_gen, GenFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_CLEANUP, rsa_gen_cleanup, FreeFn),
+    entry!(OSSL_FUNC_KEYMGMT_LOAD, rsapss_load, LoadFn),
+    entry!(OSSL_FUNC_KEYMGMT_VALIDATE, rsa_validate, ValidateFn),
     entry!(OSSL_FUNC_KEYMGMT_FREE, rsa_freedata, FreeFn),
     entry!(OSSL_FUNC_KEYMGMT_GET_PARAMS, rsa_get_params, GetParamsFn),
     entry!(

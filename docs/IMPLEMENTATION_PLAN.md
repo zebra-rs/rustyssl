@@ -3294,7 +3294,27 @@ chunking) is clean.
       encoding (24.9 million runs clean). It found two blocks X9.31's padding makes that
       OpenSSL's check rejects (an empty message's, and `6B BA` before a message `num - 3`
       octets long); rustyssl keeps both.
-  - [ ] **4.3b** Key generation (multi-prime, FIPS 186-5 primes) and validation.
+  - [x] **4.3b Key generation and validation:** `rsa_gen.rs`, and the key managers' `gen`,
+    `validate`, and `load`.
+    - Two-prime keys of 2048 bits or more with a public exponent over 16 bits come from FIPS
+      186-4's probable primes with auxiliary primes (B.3.6, FIPS 186-5's rounds and sizes) and
+      SP 800-56B's derivation, with the pairwise test; the rest (smaller keys, small exponents,
+      three to five primes) from OpenSSL's older generator, which retries a prime until the
+      product's top four bits are 1001 to 1111. Every random number is drawn from the same
+      generator in the same order and size as OpenSSL's, and the progress callback sees the
+      same events, so a known generator gives the reference's key, bit for bit.
+    - Validation: the whole key as `RSA_check_key` (each problem raised in OpenSSL's order; a
+      division by zero or a missing inverse ends it with the BN error), the private key's
+      range, and SP 800-56B's public checks: an odd modulus, no factor up to 751 (the product
+      of those primes is computed, not pasted), and the enhanced Miller-Rabin test (FIPS 186-5
+      B.3.1, now in `bn/prime.rs`), which below 512 bits accepts a prime's power, as OpenSSL
+      does.
+    - Quirks kept: the generator takes the size and prime count as C ints (`size_t` cast); a
+      callback's answer is ignored where FIPS 186-4's search reports progress.
+    - `tests/c/evp_rsa_gen.c` (161 checks): keys from known generators (FIPS 186-4 at 2048 and
+      3072 bits, the older generator at 512 and 1024 bits, e = 3, three primes, five primes at
+      8192 bits, RSA-PSS with restrictions), callback events and a callback that stops each
+      generator, the parameters' errors, and twenty broken keys through all five checks.
   - [ ] **4.3c** The RSA KEM (RSASVE).
   - [ ] **4.3d** The legacy `RSA_*` and `RSA_meth_*` APIs, over the same key object.
   - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
