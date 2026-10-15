@@ -1194,8 +1194,10 @@ mod tests {
         let one = new_bignum(BigNum::one(), false);
         // SAFETY: a live key and number.
         assert_eq!(unsafe { EC_KEY_set_private_key(k, one) }, 1);
+        // SAFETY: a live key.
+        let group = unsafe { EC_KEY_get0_group(k) };
         // SAFETY: the key's group.
-        let g = unsafe { crate::ec::group::EC_GROUP_get0_generator(EC_KEY_get0_group(k)) };
+        let g = unsafe { crate::ec::group::EC_GROUP_get0_generator(group) };
         // SAFETY: a live key and point.
         assert_eq!(unsafe { EC_KEY_set_public_key(k, g) }, 1);
         // SAFETY: made above, freed once.
