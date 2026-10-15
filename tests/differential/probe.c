@@ -319,6 +319,10 @@
  *                              or ints with a leading #): the key's export, checks, parameters
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
+ *   ecdhx <curve> <priv> <peer's priv> <mode> <md|-> <outlen> <ukm|-> <room>  the ECDH
+ *                              provider: the shared secret into a buffer of room octets, with
+ *                              the cofactor mode (-1 the key's, or anything set), and X9.63's
+ *                              KDF for a digest (its output length and keying material)
  *   ecsig <curve> <priv> <md|-> <nonce-type> <alg|-> <msg> <sig|->  the ECDSA provider: with
  *                              no signature, the message signed through a digest context,
  *                              as a digest (EVP_PKEY_sign with the digest set), and with the
@@ -4453,6 +4457,90 @@ static void ec_dhkem_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
+/* An EC key on the curve from a private number, or NULL (its errors printed). */
+static EVP_PKEY *ec_fromdata(const char *curve, const char *priv)
+{
+    BIGNUM *d = NULL;
+    EC_GROUP *g = EC_GROUP_new_by_curve_name(OBJ_sn2nid(curve));
+    EC_POINT *q = g != NULL ? EC_POINT_new(g) : NULL;
+    unsigned char pub[300];
+    size_t publen = 0;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *ps;
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY *k = NULL;
+
+    if (BN_hex2bn(&d, priv) > 0 && q != NULL && EC_POINT_mul(g, q, d, NULL, NULL, NULL))
+        publen = EC_POINT_point2oct(g, q, POINT_CONVERSION_UNCOMPRESSED, pub, sizeof(pub), NULL);
+    OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curve, 0);
+    if (d != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, d);
+    if (publen > 0)
+        OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pub, publen);
+    ps = OSSL_PARAM_BLD_to_param(bld);
+    EVP_PKEY_fromdata_init(c);
+    printf(" %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, ps));
+    OSSL_PARAM_free(ps);
+    OSSL_PARAM_BLD_free(bld);
+    EC_POINT_free(q);
+    EC_GROUP_free(g);
+    BN_free(d);
+    EVP_PKEY_CTX_free(c);
+    return k;
+}
+
+/* ecdhx: a shared secret through the ECDH provider. */
+static void ec_exchange_command(const char *line)
+{
+    char curve[64] = "-", a[700] = "-", b[700] = "-", md[64] = "-", ukm[700] = "-";
+    int mode = -1;
+    size_t outlen = 0, room = 0, len, ul = 0;
+    unsigned char ub[300], out[600];
+    EVP_PKEY *ka, *kb;
+
+    sscanf(line, "%*s %63s %699s %699s %d %63s %zu %699s %zu", curve, a, b, &mode, md, &outlen,
+           ukm, &room);
+    if (room > sizeof(out) || (strcmp(ukm, "-") != 0 && !parse_hex(ukm, ub, &ul))) {
+        printf(" bad input\n");
+        return;
+    }
+    printf(" keys");
+    ka = ec_fromdata(curve, a);
+    kb = ec_fromdata(curve, b);
+    print_asn_errors();
+    if (ka != NULL && kb != NULL) {
+        EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, ka, NULL);
+        OSSL_PARAM ps[6], *p = ps;
+        int r;
+
+        *p++ = OSSL_PARAM_construct_int(OSSL_EXCHANGE_PARAM_EC_ECDH_COFACTOR_MODE, &mode);
+        if (strcmp(md, "-") != 0) {
+            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_EXCHANGE_PARAM_KDF_TYPE, "X963KDF", 0);
+            *p++ = OSSL_PARAM_construct_utf8_string(OSSL_EXCHANGE_PARAM_KDF_DIGEST, md, 0);
+            *p++ = OSSL_PARAM_construct_size_t(OSSL_EXCHANGE_PARAM_KDF_OUTLEN, &outlen);
+            if (ul > 0 || strcmp(ukm, "-") != 0)
+                *p++ = OSSL_PARAM_construct_octet_string(OSSL_EXCHANGE_PARAM_KDF_UKM, ub, ul);
+        }
+        *p = OSSL_PARAM_construct_end();
+        r = EVP_PKEY_derive_init_ex(c, ps);
+        r = r * 10 + EVP_PKEY_derive_set_peer(c, kb);
+        len = 0;
+        r = r * 10 + EVP_PKEY_derive(c, NULL, &len);
+        printf("  init/peer/size %d %zu", r, len);
+        print_asn_errors();
+        len = room;
+        r = EVP_PKEY_derive(c, out, &len);
+        printf("  derive %d", r);
+        if (r == 1)
+            print_hex("", out, len);
+        else
+            print_asn_errors();
+        EVP_PKEY_CTX_free(c);
+    }
+    EVP_PKEY_free(ka);
+    EVP_PKEY_free(kb);
+}
+
 /* ecsig: an EC key's signatures through the ECDSA provider. */
 static void ec_sig_command(const char *line)
 {
@@ -4588,9 +4676,13 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "ecsign") != 0 && strcmp(command, "ecsetup") != 0
         && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
-        && strcmp(command, "ecsig") != 0)
+        && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "ecdhx") == 0) {
+        ec_exchange_command(line);
+        return 1;
+    }
     if (strcmp(command, "ecsig") == 0) {
         ec_sig_command(line);
         return 1;

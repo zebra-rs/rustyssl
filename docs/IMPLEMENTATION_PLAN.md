@@ -3636,7 +3636,20 @@ chunking) is clean.
         `corpus/ecsig.txt` and random sessions (signatures of every nonce type compared whole,
         from deterministic generators); the `ecdsa_sig` fuzz target now also verifies and signs
         through the provider; a unit test of RFC 6979's A.2.5 nonce.
-    - [ ] **4.4d3 ECDH's key exchange:** the cofactor mode and the X9.63 KDF.
+    - [x] **4.4d3 ECDH's key exchange** (`rustyssl-capi/src/provider/ecdh_exch.rs`; no new
+      exports): the shared secret of a key and a peer's on the same group (cut short to a
+      smaller buffer; a peer on another group refused), the cofactor mode (the key's own flag,
+      or the context's `ecdh-cofactor-mode` over it, by a copy of the key), and X9.63's KDF
+      (`kdf-type`, digest and its properties, output length, keying material). The context
+      follows OpenSSL's: an init resets the cofactor mode and KDF type but keeps the rest; an
+      XOF digest stays set after it's refused, and one that can't be fetched leaves none (a
+      derivation then fails in the KDF, or silently). `ECDH_KDF_X9_62` and the exchange share
+      `ec::ecdsa::kdf_x9_63` (OpenSSL's `ossl_ecdh_kdf_X9_63`, with a library context).
+      - Tests: `tests/c/evp_ecdh.c` (15 checks: the algorithm's lists, secrets whole, sized,
+        and short, the peer checks, every cofactor mode with and without the key's flag on
+        sect163k1, X9.63 with each parameter and its errors, every context parameter, a copy,
+        a public key, legacy `EC_KEY`s); the probe's `ecdhx` with `corpus/ecdhx.txt` and
+        random sessions (300 pass).
     - [ ] **4.4d4 The legacy EC `EVP_PKEY_METHOD`.**
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
 - [ ] **4.5 ECX and post-quantum:**

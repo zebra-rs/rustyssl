@@ -46,7 +46,7 @@ use crate::evp::kdf::{
     EVP_KDF_CTX_free, EVP_KDF_CTX_new, EVP_KDF_CTX_set_params, EVP_KDF_derive, EVP_KDF_fetch,
     EVP_KDF_free,
 };
-use crate::ffi::{ffi_callback, ffi_export};
+use crate::ffi::{bytes, ffi_callback, ffi_export};
 use crate::mem;
 use crate::params::{
     OSSL_PARAM_construct_end, OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_utf8_string,
@@ -1343,6 +1343,66 @@ ffi_export! {
     }
 }
 
+/// `ossl_ecdh_kdf_X9_63`: X9.63's KDF of `z` and `sinfo` with `md`, the X963KDF of `libctx`,
+/// into `outlen` octets at `out`; `false` without a digest or if the KDF fails.
+///
+/// # Safety
+/// `out` has room for `outlen` octets; `md` is NULL or a live digest; `libctx` is NULL or a
+/// live library context.
+pub(crate) unsafe fn kdf_x9_63(
+    out: *mut c_uchar,
+    outlen: usize,
+    z: &[u8],
+    sinfo: &[u8],
+    md: *const EVP_MD,
+    libctx: *mut OSSL_LIB_CTX,
+) -> bool {
+    if md.is_null() {
+        return false;
+    }
+    // SAFETY: the caller's digest.
+    let mdname = unsafe { EVP_MD_get0_name(md) };
+    if mdname.is_null() {
+        return false;
+    }
+    // SAFETY: the caller's library context; a name.
+    let kdf = unsafe { EVP_KDF_fetch(libctx, c"X963KDF".as_ptr(), ptr::null()) };
+    // SAFETY: the KDF, or NULL.
+    let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
+    let mut ret = false;
+    if !kctx.is_null() {
+        // SAFETY: a static key; the digest's name, read only.
+        let p0 = unsafe {
+            OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST.as_ptr(), mdname.cast_mut(), 0)
+        };
+        // SAFETY: as above; the caller's octets, read only.
+        let p1 = unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_KDF_PARAM_KEY.as_ptr(),
+                z.as_ptr().cast_mut().cast(),
+                z.len(),
+            )
+        };
+        // SAFETY: as above.
+        let p2 = unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_KDF_PARAM_INFO.as_ptr(),
+                sinfo.as_ptr().cast_mut().cast(),
+                sinfo.len(),
+            )
+        };
+        // SAFETY: no preconditions.
+        let params = [p0, p1, p2, unsafe { OSSL_PARAM_construct_end() }];
+        // SAFETY: the context; the caller's room; the parameters.
+        ret = unsafe { EVP_KDF_derive(kctx, out, outlen, params.as_ptr()) } > 0;
+        // SAFETY: made above.
+        unsafe { EVP_KDF_CTX_free(kctx) };
+    }
+    // SAFETY: made above, or NULL.
+    unsafe { EVP_KDF_free(kdf) };
+    ret
+}
+
 ffi_export! {
     /// X9.63's KDF of `z` and `sinfo` with `md` (the X963KDF of the default library
     /// context). 1, or 0.
@@ -1353,33 +1413,12 @@ ffi_export! {
     pub unsafe extern "C" fn ECDH_KDF_X9_62(out: *mut c_uchar, outlen: usize, z: *const c_uchar, z_len: usize, sinfo: *const c_uchar, sinfolen: usize, md: *const EVP_MD) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        // SAFETY: the caller's digest.
-        let mdname = unsafe { EVP_MD_get0_name(md) };
-        if mdname.is_null() {
-            return 0;
-        }
-        // SAFETY: a name.
-        let kdf = unsafe { EVP_KDF_fetch(ptr::null_mut(), c"X963KDF".as_ptr(), ptr::null()) };
-        // SAFETY: the KDF, or NULL.
-        let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
-        let mut ret = 0;
-        if !kctx.is_null() {
-            // SAFETY: a static key; the digest's name, read only.
-            let p0 = unsafe { OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST.as_ptr(), mdname.cast_mut(), 0) };
-            // SAFETY: as above; the caller's octets, read only.
-            let p1 = unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY.as_ptr(), z.cast_mut().cast(), z_len) };
-            // SAFETY: as above.
-            let p2 = unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO.as_ptr(), sinfo.cast_mut().cast(), sinfolen) };
-            // SAFETY: no preconditions.
-            let params = [p0, p1, p2, unsafe { OSSL_PARAM_construct_end() }];
-            // SAFETY: the context; the caller's room; the parameters.
-            ret = c_int::from(unsafe { EVP_KDF_derive(kctx, out, outlen, params.as_ptr()) } > 0);
-            // SAFETY: made above.
-            unsafe { EVP_KDF_CTX_free(kctx) };
-        }
-        // SAFETY: made above, or NULL.
-        unsafe { EVP_KDF_free(kdf) };
-        ret
+        // SAFETY: the caller's guarantee; the default library context.
+        let Some(z) = (unsafe { bytes(z, z_len) }) else { return 0 };
+        // SAFETY: as above.
+        let Some(sinfo) = (unsafe { bytes(sinfo, sinfolen) }) else { return 0 };
+        // SAFETY: the caller's room and digest; the default library context.
+        c_int::from(unsafe { kdf_x9_63(out, outlen, z, sinfo, md, ptr::null_mut()) })
     }
 }
 

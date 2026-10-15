@@ -393,6 +393,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ecdsa", ecdsa_session),
     ("eckm", eckm_session),
     ("ecsig", ecsig_session),
+    ("ecdhx", ecdhx_session),
     ("string", string_session),
 ];
 
@@ -3006,6 +3007,40 @@ fn ecsig_session(random: &mut Random, out: &mut String) -> Result {
             _ => "-".to_owned(),
         };
         writeln!(out, "ecsig {curve} {d} {md} {nonce} {alg} {msg} {sig}")?;
+    }
+    Ok(())
+}
+
+/// A random session of the ECDH provider on one curve: keys of every size (some not below the
+/// order), cofactor modes valid and not, plain secrets into buffers of every size, and X9.63's
+/// KDF with digests good and bad, output lengths of every size, and keying material.
+fn ecdhx_session(random: &mut Random, out: &mut String) -> Result {
+    let i = usize::try_from(random.below(EC_CURVES.len() as u64)).unwrap_or(0);
+    let (curve, fl) = EC_CURVES.get(i).copied().unwrap_or(("prime256v1", 32));
+    let privkey = |random: &mut Random| match random.below(6) {
+        0 => format!("{:x}", random.below(1000)),
+        1 => "F".repeat(fl.saturating_mul(2)),
+        _ => random_hex(random, fl),
+    };
+    for _ in 0..random.below(6).saturating_add(1) {
+        let (a, b) = (privkey(random), privkey(random));
+        let mode = random.pick(&["-1", "-1", "0", "1", "2"]);
+        let md = random.pick(&[
+            "-", "-", "SHA256", "SHA1", "SHA3-512", "MD5", "SHAKE256", "nosuch",
+        ]);
+        let outlen = random.below(80);
+        let ukm = match random.below(3) {
+            0 => "-".to_owned(),
+            _ => {
+                let len = usize::try_from(random.below(40)).unwrap_or(0);
+                random_hex(random, len)
+            }
+        };
+        let room = random.pick(&["0", "1", "16", "32", "66", "80", "100"]);
+        writeln!(
+            out,
+            "ecdhx {curve} {a} {b} {mode} {md} {outlen} {ukm} {room}"
+        )?;
     }
     Ok(())
 }
