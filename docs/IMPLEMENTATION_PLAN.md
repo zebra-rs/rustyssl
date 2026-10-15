@@ -2909,6 +2909,9 @@ have run for at least 24 CPU-hours with no findings.
       its MAC, so it isn't copied. And an ECB or CBC context turned around by an init that
       failed before setting its key skips data operations (docs/DEVIATIONS.md: the reference
       runs the old direction's key schedule).
+    - A first long campaign (`--only evp --duration 24h --jobs 8`, from 2026-10-13) was
+      stopped by mistake after 5.5 hours: 1,287,841 rounds, every one identical. The full
+      24 hours is still to run.
 
 **Exit:** M1. All Wycheproof and CAVP/ACVP suites for these algorithms pass. Upstream
 `evp_test` passes the symmetric data files. Differential fuzzing of streaming EVP (random
