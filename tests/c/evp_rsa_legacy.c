@@ -302,9 +302,25 @@ static void test_sign(EVP_PKEY *pk)
     EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, 30);
     check(EVP_PKEY_verify(ctx, sig, siglen, tbs, 32) == 0, "verify: PSS, salt length 30");
     errors();
-    EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256());
-    EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, RSA_PSS_SALTLEN_AUTO);
-    check(EVP_PKEY_verify(ctx, sig, siglen, tbs, 32) == 0, "verify: PSS, another MGF1 digest");
+    /* With another MGF1 digest the block unmasks to noise, and which check that fails depends
+     * on it: signed without a salt, it's the same every run. */
+    {
+        EVP_PKEY_CTX *sctx = ctx_for(pk, EVP_PKEY_sign_init);
+        unsigned char sig0[128];
+        size_t sig0len = sizeof(sig0);
+
+        EVP_PKEY_CTX_set_rsa_padding(sctx, RSA_PKCS1_PSS_PADDING);
+        EVP_PKEY_CTX_set_signature_md(sctx, EVP_sha256());
+        EVP_PKEY_CTX_set_rsa_mgf1_md(sctx, EVP_sha384());
+        EVP_PKEY_CTX_set_rsa_pss_saltlen(sctx, 0);
+        check(EVP_PKEY_sign(sctx, sig0, &sig0len, tbs, 32) == 1, "sign: PSS without a salt");
+        hex("sig", sig0, sig0len);
+        EVP_PKEY_CTX_free(sctx);
+        EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256());
+        EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, RSA_PSS_SALTLEN_AUTO);
+        check(EVP_PKEY_verify(ctx, sig0, sig0len, tbs, 32) == 0,
+              "verify: PSS, another MGF1 digest");
+    }
     errors();
     EVP_PKEY_CTX_free(ctx);
 
