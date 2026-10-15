@@ -8010,6 +8010,10 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_int = crate::rsa_lib::RSA_pkey_ctx_ctrl;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::rsa::RSA_print;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::rsa::RSA_print_fp;
 const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *const core::ffi::c_uchar,

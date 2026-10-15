@@ -294,6 +294,8 @@ impl Kind {
                 f.pkey_bits = Some(r::rsa_bits);
                 f.pkey_security_bits = Some(r::rsa_security_bits);
                 f.pkey_free = Some(r::int_rsa_free);
+                f.pub_print = Some(r::rsa_pub_print);
+                f.priv_print = Some(r::rsa_priv_print);
                 f.pkey_ctrl = Some(r::rsa_pkey_ctrl);
                 f.pkey_check = Some(r::rsa_pkey_check);
                 f.copy = Some(r::rsa_pkey_copy);

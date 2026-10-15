@@ -3422,10 +3422,15 @@ chunking) is clean.
       flag, inside an application's SEQUENCE (implicitly tagged and SET OF). The probe's
       `asnd2i` takes the five new items, with RSA-shaped random input; 20,000 random sessions
       matched. The `asn1_d2i` fuzz target decodes with them.
-  - [ ] **4.3f RSA printing:** `RSA_print`, `RSA_print_fp`, and the ASN.1 method's public and
-    private print functions (OpenSSL's `pkey_rsa_print`), which `EVP_PKEY_print_*` uses for a
-    legacy key: byte-identical text, multi-prime keys, and RSA-PSS keys' parameter
-    restrictions.
+  - [x] **4.3f RSA printing** (`evp/pkey/rsa.rs`; 2 exports): `RSA_print` and `RSA_print_fp`
+    (through `EVP_PKEY_print_private`, as OpenSSL's), and the ASN.1 method's public and private
+    print functions (`pkey_rsa_print`), which `EVP_PKEY_print_*` uses for a legacy key. The
+    output matches OpenSSL's byte for byte: the size and prime count, each number through
+    `ASN1_bn_print`, the extra primes (`prime3:` ...), and an RSA-PSS key's line about its
+    parameter restrictions. A key's restrictions come only from decoding one (4.7), so until
+    then a legacy RSA-PSS key has none ("No PSS parameter restrictions"). `tests/c/rsa_print.c`
+    (15 checks): private and public keys, small and large numbers, a negative modulus,
+    missing numbers, three primes, indents, RSA-PSS, and a `FILE`.
   - [ ] **4.3g The legacy RSA `EVP_PKEY_METHOD`** (`rsa_pmeth.c`): EVP operations on a key whose
     `RSA` has an application's method, which stays a legacy key and so can't reach the
     providers (4.3d3 fails closed on it until then): sign, verify, verify-recover, encrypt,

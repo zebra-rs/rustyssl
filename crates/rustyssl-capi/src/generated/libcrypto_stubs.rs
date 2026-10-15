@@ -14123,20 +14123,6 @@ pub extern "C" fn PROXY_POLICY_new() -> *mut PROXY_POLICY {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn RSA_print(_: *mut BIO, _: *const RSA, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("RSA_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_print_fp(
-    _: *mut FILE,
-    _: *const RSA,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("RSA_print_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn SCRYPT_PARAMS_free(_: *mut SCRYPT_PARAMS) {
     crate::stub::unimplemented("SCRYPT_PARAMS_free")
 }
