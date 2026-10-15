@@ -7,12 +7,13 @@
 //! - Several, or the group's own order, go through wNAF with OpenSSL's window sizes, digits,
 //!   and coordinate blinding.
 //! - The curve-specific methods (`nistp*`, `nistz256`, `sm2p256`) have their own constant-time
-//!   multiplications in OpenSSL, which draw no random numbers. Here they run the ladder
-//!   without randomized coordinates and invert without blinding, so they draw none either,
-//!   and hand back a Jacobian point (Z = 2) as theirs do; its X and Y differ from theirs (the
-//!   affine point is the same).
+//!   multiplications in OpenSSL, which draw no random numbers. Here they run the same ladder
+//!   on constant-time field elements of the modulus's length ([`super::fe`]), without
+//!   randomized coordinates, so they draw none either, and hand back a Jacobian point (Z = 2)
+//!   as theirs do; its X and Y differ from theirs (the affine point is the same).
 
 use super::curves::Field;
+use super::fe::{Fe, Fp};
 use super::group::Group;
 use super::point::{self, Point};
 use super::{Error, Random, Reason, Result, gf2m, gfp};
@@ -127,12 +128,12 @@ fn gf2m_points_mul(
         return wnaf_mul(g, r, req, rng);
     }
     match (req.scalar, req.pairs) {
-        (Some(s), []) => ladder(g, r, s, None, rng, true),
-        (None, [(p, s)]) => ladder(g, r, s, Some(p), rng, true),
+        (Some(s), []) => ladder(g, r, s, None, rng),
+        (None, [(p, s)]) => ladder(g, r, s, Some(p), rng),
         (Some(s), [(p, ps)]) => {
             let mut t = Point::infinity();
-            ladder(g, &mut t, s, None, rng, true)?;
-            ladder(g, r, ps, Some(p), rng, true)?;
+            ladder(g, &mut t, s, None, rng)?;
+            ladder(g, r, ps, Some(p), rng)?;
             let rr = r.clone();
             point::add(g, r, &t, &rr, false, rng)
         }
@@ -153,15 +154,13 @@ fn cswap(c: bool, a: &mut Point, b: &mut Point, words: usize) -> Result<()> {
 
 /// `ossl_ec_scalar_mul_ladder`: `r = scalar * point` (the generator for `None`), the scalar
 /// padded with the cardinality so the ladder always runs over the same number of bits.
-/// `random` is whether the method randomizes the ladder's coordinates and blinds its
-/// inversion (the generic methods); the specialized ones neither.
+/// The method randomizes the ladder's coordinates and blinds its inversion.
 fn ladder(
     g: &Group,
     r: &mut Point,
     scalar: &BigNum,
     pt: Option<&Point>,
     rng: &mut Random<'_>,
-    random: bool,
 ) -> Result<()> {
     if pt.is_some_and(Point::is_at_infinity) {
         r.set_to_infinity();
@@ -202,17 +201,12 @@ fn ladder(
     let kbit = lambda.is_bit_set(card_bits);
     bn::consttime_swap(kbit, &mut k, &mut lambda, top.saturating_add(2));
     let words = g.field.top();
-    if !p.z_is_one && !random {
-        // The specialized methods' own multiplications (for which this stands in) take a
-        // point as it is, on the curve or not.
-        let (x, y) = gfp::get_affine(g, &p, rng)?;
-        gfp::set_jprojective(g, &mut p, Some(&x), Some(&y), Some(&BigNum::one()))?;
-    } else if !p.z_is_one {
+    if !p.z_is_one {
         point::make_affine(g, &mut p, rng)
             .map_err(|e| e.then(Reason::EcLib, "ossl_ec_scalar_mul_ladder"))?;
     }
     let mut s = Point::infinity();
-    pre(g, r, &mut s, &p, rng, random)
+    pre(g, r, &mut s, &p, rng)
         .map_err(|e| e.then(Reason::LadderPreFailure, "ossl_ec_scalar_mul_ladder"))?;
     let mut pbit = true;
     for i in (0..card_bits).rev() {
@@ -223,35 +217,15 @@ fn ladder(
         pbit ^= kbit;
     }
     cswap(pbit, r, &mut s, words)?;
-    post(g, r, &s, &p, rng, random)
+    post(g, r, &s, &p, rng)
         .map_err(|e| e.then(Reason::LadderPostFailure, "ossl_ec_scalar_mul_ladder"))
 }
 
-/// The method's `ladder_pre`; without randomness, the coordinates' factors are one.
-fn pre(
-    g: &Group,
-    r: &mut Point,
-    s: &mut Point,
-    p: &Point,
-    rng: &mut Random<'_>,
-    random: bool,
-) -> Result<()> {
-    if random {
-        return match g.meth.field() {
-            Field::Prime => gfp::ladder_pre(g, r, s, p, rng),
-            Field::Binary => gf2m::ladder_pre(g, r, s, p, rng),
-        };
-    }
-    let mut one = |buf: &mut [u8]| {
-        buf.fill(0);
-        if let Some(last) = buf.last_mut() {
-            *last = 1;
-        }
-        true
-    };
+/// The method's `ladder_pre`.
+fn pre(g: &Group, r: &mut Point, s: &mut Point, p: &Point, rng: &mut Random<'_>) -> Result<()> {
     match g.meth.field() {
-        Field::Prime => gfp::ladder_pre(g, r, s, p, &mut one),
-        Field::Binary => gf2m::ladder_pre(g, r, s, p, &mut one),
+        Field::Prime => gfp::ladder_pre(g, r, s, p, rng),
+        Field::Binary => gf2m::ladder_pre(g, r, s, p, rng),
     }
 }
 
@@ -263,25 +237,12 @@ fn step(g: &Group, r: &mut Point, s: &mut Point, p: &Point, _rng: &mut Random<'_
     }
 }
 
-/// The method's `ladder_post`; without randomness, inverting by Fermat's little theorem.
-fn post(
-    g: &Group,
-    r: &mut Point,
-    s: &Point,
-    p: &Point,
-    rng: &mut Random<'_>,
-    random: bool,
-) -> Result<()> {
-    if random {
-        return match g.meth.field() {
-            Field::Prime => gfp::ladder_post(g, r, s, p, rng),
-            Field::Binary => gf2m::ladder_post(g, r, s, p, rng),
-        };
+/// The method's `ladder_post`.
+fn post(g: &Group, r: &mut Point, s: &Point, p: &Point, rng: &mut Random<'_>) -> Result<()> {
+    match g.meth.field() {
+        Field::Prime => gfp::ladder_post(g, r, s, p, rng),
+        Field::Binary => gf2m::ladder_post(g, r, s, p, rng),
     }
-    let mut fermat = g.clone();
-    fermat.meth = super::Meth::Mont;
-    let mut none = |_: &mut [u8]| false;
-    gfp::ladder_post(&fermat, r, s, p, &mut none)
 }
 
 /// The curve-specific methods' multiplications: the ladder for each term, without random
@@ -314,7 +275,7 @@ fn specialized(g: &Group, r: &mut Point, req: &Request<'_>) -> Result<()> {
         .chain(req.pairs.iter().map(|(p, s)| (Some(*p), *s)));
     for (pt, s) in terms {
         let mut t = Point::infinity();
-        ladder(f, &mut t, s, pt, &mut none, false)?;
+        ladder_ct(f, &mut t, s, pt, &mut none)?;
         let t_affine = sm2 && !t.is_at_infinity() && sm2_term_affine(g, pt, s, sm2_table)?;
         acc = Some(match acc {
             None => {
@@ -383,6 +344,143 @@ fn sm2_term_affine(g: &Group, pt: Option<&Point>, s: &BigNum, table: bool) -> Re
         return Ok(k.is_one());
     }
     Ok(s.is_one())
+}
+
+/// A point in the constant-time ladder: x and z of OpenSSL's x-only formulas.
+struct CtPoint {
+    x: Fe,
+    z: Fe,
+}
+
+/// The curve-specific methods' Montgomery ladder: `ossl_ec_scalar_mul_ladder` without the
+/// coordinates' randomization (their own multiplications draw nothing), on [`Fe`] elements of
+/// the field's length, so neither its steps nor its arithmetic depend on the scalar. The
+/// scalar is padded with the cardinality as the generic ladder's is.
+fn ladder_ct(
+    g: &Group,
+    r: &mut Point,
+    scalar: &BigNum,
+    pt: Option<&Point>,
+    rng: &mut Random<'_>,
+) -> Result<()> {
+    const F: &str = "ossl_ec_scalar_mul_ladder";
+    if pt.is_some_and(Point::is_at_infinity) {
+        r.set_to_infinity();
+        return Ok(());
+    }
+    if g.order.is_zero() {
+        return Err(Error::new(Reason::UnknownOrder, F));
+    }
+    if g.cofactor.is_zero() {
+        return Err(Error::new(Reason::UnknownCofactor, F));
+    }
+    let mut p = match pt {
+        Some(p) => p.clone(),
+        None => g.generator.clone().ok_or(Error::new(Reason::EcLib, F))?,
+    };
+    let bnlib = |e: bn::Error| Error::from(e).then(Reason::BnLib, F);
+    let cardinality = bn::mul(&g.order, &g.cofactor).map_err(bnlib)?;
+    let card_bits = cardinality.num_bits();
+    let top = cardinality.top();
+    let mut k = scalar.clone();
+    if k.num_bits() > card_bits || k.is_negative() {
+        k = bn::nnmod(&k, &cardinality).map_err(bnlib)?;
+    }
+    let mut lambda = bn::add(&k, &cardinality).map_err(bnlib)?;
+    let mut k = bn::add(&lambda, &cardinality).map_err(bnlib)?;
+    let kbit = lambda.is_bit_set(card_bits);
+    bn::consttime_swap(kbit, &mut k, &mut lambda, top.saturating_add(2));
+    if !p.z_is_one {
+        // Taken as it is, on the curve or not, as the methods' own multiplications take it.
+        let (x, y) = gfp::get_affine(g, &p, rng)?;
+        gfp::set_jprojective(g, &mut p, Some(&x), Some(&y), Some(&BigNum::one()))?;
+    }
+    let fp = Fp::new(&g.field).ok_or(Error::new(Reason::InternalError, F))?;
+    let reduce = |v: &BigNum| bn::nnmod(v, &g.field).ok().and_then(|v| fp.from_bn(&v));
+    let elems = (reduce(&p.x), reduce(&p.y), reduce(&g.a), reduce(&g.b));
+    let (Some(px), Some(py), Some(a), Some(b)) = elems else {
+        return Err(Error::new(Reason::InternalError, F));
+    };
+    let b4 = fp.shl(&b, 2);
+    // ladder_pre, with both factors one.
+    let t3 = fp.sqr(&px);
+    let t4 = fp.sqr(&fp.sub(&t3, &a));
+    let t5 = fp.shl(&fp.mul(&px, &b), 3);
+    let t2 = fp.add(&b, &fp.mul(&px, &fp.add(&t3, &a)));
+    let mut rr = CtPoint {
+        x: fp.sub(&t4, &t5),
+        z: fp.shl(&t2, 2),
+    };
+    let mut ss = CtPoint {
+        x: px.clone(),
+        z: fp.one(),
+    };
+    let mut pbit = true;
+    for i in (0..card_bits).rev() {
+        let kbit = k.is_bit_set(i) ^ pbit;
+        Fp::cswap(kbit, &mut rr.x, &mut ss.x);
+        Fp::cswap(kbit, &mut rr.z, &mut ss.z);
+        ct_step(&fp, &mut rr, &mut ss, &px, &a, &b4);
+        pbit ^= kbit;
+    }
+    Fp::cswap(pbit, &mut rr.x, &mut ss.x);
+    Fp::cswap(pbit, &mut rr.z, &mut ss.z);
+    // ladder_post.
+    if fp.is_zero(&rr.z) {
+        r.set_to_infinity();
+        return Ok(());
+    }
+    if fp.is_zero(&ss.z) {
+        *r = p;
+        return gfp::invert(g, r);
+    }
+    let t4 = fp.dbl(&py);
+    let t6 = fp.mul(&ss.z, &fp.mul(&rr.x, &t4));
+    let t5 = fp.mul(&rr.z, &t6);
+    let t1 = fp.mul(&ss.z, &fp.dbl(&b));
+    let t3 = fp.sqr(&rr.z);
+    let t2 = fp.mul(&t3, &t1);
+    let t6 = fp.mul(&rr.z, &a);
+    let t1 = fp.mul(&ss.z, &fp.add(&fp.mul(&px, &rr.x), &t6));
+    let t0 = fp.mul(&px, &rr.z);
+    let t6 = fp.add(&fp.mul(&fp.add(&rr.x, &t0), &t1), &t2);
+    let t0 = fp.mul(&fp.sqr(&fp.sub(&t0, &rr.x)), &ss.x);
+    let t0 = fp.sub(&t6, &t0);
+    let t1 = fp.inv(&fp.mul(&t3, &fp.mul(&ss.z, &t4)));
+    *r = Point {
+        x: fp.to_bn(&fp.mul(&t5, &t1)),
+        y: fp.to_bn(&fp.mul(&t0, &t1)),
+        z: BigNum::one(),
+        z_is_one: true,
+    };
+    Ok(())
+}
+
+/// `ladder_step` on [`Fe`] elements: `r` doubled and `s` = `r + s` (whose difference is `p`).
+fn ct_step(fp: &Fp, r: &mut CtPoint, s: &mut CtPoint, px: &Fe, a: &Fe, b4: &Fe) {
+    let t6 = fp.mul(&r.x, &s.x);
+    let t0 = fp.mul(&r.z, &s.z);
+    let t4 = fp.mul(&r.x, &s.z);
+    let t3 = fp.mul(&r.z, &s.x);
+    let t5 = fp.add(&t6, &fp.mul(a, &t0));
+    let t6 = fp.add(&t3, &t4);
+    let t5 = fp.dbl(&fp.mul(&t6, &t5));
+    let t0 = fp.mul(b4, &fp.sqr(&t0));
+    let t3 = fp.sub(&t4, &t3);
+    s.z = fp.sqr(&t3);
+    let t4 = fp.mul(&s.z, px);
+    s.x = fp.sub(&fp.add(&t0, &t5), &t4);
+    let t4 = fp.sqr(&r.x);
+    let t5 = fp.sqr(&r.z);
+    let t6 = fp.mul(&t5, a);
+    let t1 = fp.sub(&fp.sub(&fp.sqr(&fp.add(&r.x, &r.z)), &t4), &t5);
+    let t3 = fp.sqr(&fp.sub(&t4, &t6));
+    let t0 = fp.mul(b4, &fp.mul(&t5, &t1));
+    r.x = fp.sub(&t3, &t0);
+    let t3 = fp.add(&t4, &t6);
+    let t4 = fp.mul(&fp.sqr(&t5), b4);
+    let t1 = fp.dbl(&fp.mul(&t1, &t3));
+    r.z = fp.add(&t4, &t1);
 }
 
 /// Whether the group's generator is its named curve's own, in affine coordinates
@@ -469,10 +567,10 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
         if let (Some(s), []) = (req.scalar, req.pairs)
             && !req.scalar_is_order
         {
-            return ladder(g, r, s, None, rng, true);
+            return ladder(g, r, s, None, rng);
         }
         if let (None, [(p, s)]) = (req.scalar, req.pairs) {
-            return ladder(g, r, s, Some(p), rng, true);
+            return ladder(g, r, s, Some(p), rng);
         }
     }
     let generator = match req.scalar {
