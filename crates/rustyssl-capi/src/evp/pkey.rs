@@ -30,12 +30,12 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use rustyssl_abi::{
     ASN1_PKEY_CTRL_DEFAULT_MD_NID, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_EVP_PKEY, ENGINE, ERR_LIB_EVP,
     ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER, EVP_KEYMGMT, EVP_PKEY,
-    EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_KEYMGMT, EVP_PKEY_NONE, EVP_R_DIFFERENT_KEY_TYPES,
-    EVP_R_DIFFERENT_PARAMETERS, EVP_R_EXPECTING_A_POLY1305_KEY, EVP_R_EXPECTING_A_SIPHASH_KEY,
-    EVP_R_EXPECTING_AN_HMAC_KEY, EVP_R_MISSING_PARAMETERS, EVP_R_UNKNOWN_BITS,
-    EVP_R_UNKNOWN_MAX_SIZE, EVP_R_UNKNOWN_SECURITY_BITS, EVP_R_UNSUPPORTED_ALGORITHM,
-    EVP_R_UNSUPPORTED_KEY_TYPE, NID_undef, OSSL_CALLBACK, OSSL_KEYMGMT_SELECT_ALL,
-    OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
+    EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_KEYMGMT, EVP_PKEY_NONE, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
+    EVP_R_DIFFERENT_KEY_TYPES, EVP_R_DIFFERENT_PARAMETERS, EVP_R_EXPECTING_A_POLY1305_KEY,
+    EVP_R_EXPECTING_A_SIPHASH_KEY, EVP_R_EXPECTING_AN_HMAC_KEY, EVP_R_MISSING_PARAMETERS,
+    EVP_R_UNKNOWN_BITS, EVP_R_UNKNOWN_MAX_SIZE, EVP_R_UNKNOWN_SECURITY_BITS,
+    EVP_R_UNSUPPORTED_ALGORITHM, EVP_R_UNSUPPORTED_KEY_TYPE, NID_undef, OSSL_CALLBACK,
+    OSSL_KEYMGMT_SELECT_ALL, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
     OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_BITS,
     OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE,
     OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PROVIDER, SN_undef,
@@ -59,6 +59,7 @@ pub(crate) mod ameth;
 pub(crate) mod params;
 pub(crate) mod print;
 pub(crate) mod raw;
+pub(crate) mod rsa;
 
 /// `OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS`, which `p_lib.c` calls `SELECT_PARAMETERS`.
 const SELECT_PARAMETERS: c_int = OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS as c_int;
@@ -126,6 +127,12 @@ pub(crate) struct State {
     pub(crate) ameth: Option<ameth::Ref>,
     /// The method's data (`pkey.ptr`), which its `pkey_free` frees.
     legacy: Ptr<c_void>,
+    /// `legacy_cache_pkey`: a provided key's data as its type's legacy data, made when asked for
+    /// (`EVP_PKEY_get0_RSA` ...) and freed with the key's data.
+    legacy_cache: Ptr<c_void>,
+    /// `foreign`: legacy data whose operations aren't OpenSSL's (an application's method), which
+    /// contexts then run through the type's built-in `EVP_PKEY_METHOD`.
+    pub(crate) foreign: bool,
     pub(crate) keymgmt: Option<keymgmt::Ref>,
     pub(crate) keydata: Option<Arc<KeyData>>,
     /// `cache`: bits, security bits, and maximum size.
@@ -189,14 +196,76 @@ impl Pkey {
 /// `evp_pkey_free_legacy`: has the key's ASN.1 method free its data (the method's `pkey_free`
 /// runs whenever the key has a method, data or not, without the key's lock).
 fn free_legacy(k: &Pkey) {
-    let Some(f) = k.ameth_funcs() else {
+    // A provided key has no ASN.1 method; its legacy copy is freed by its type's.
+    let (cache, type_) = {
+        let s = k.lock();
+        (s.legacy_cache, s.type_)
+    };
+    let funcs = k.ameth_funcs().or_else(|| {
+        (!cache.0.is_null())
+            .then(|| ameth::find(type_).map(|m| m.get().funcs()))
+            .flatten()
+    });
+    let Some(f) = funcs else {
         return;
     };
+    if !cache.0.is_null() {
+        // The cache freed as if it were the key's own legacy data.
+        let mut s = k.lock();
+        s.legacy = cache;
+        s.legacy_cache = Ptr(ptr::null_mut());
+    }
     if let Some(free) = f.pkey_free {
         // SAFETY: the method's function with the key's handle.
         unsafe { free(k.handle()) };
     }
-    k.lock().legacy = Ptr(ptr::null_mut());
+    let mut s = k.lock();
+    s.legacy = Ptr(ptr::null_mut());
+    s.foreign = false;
+}
+
+/// The key's legacy data as the method's functions see it (`pkey->pkey.ptr`, even for a
+/// provided key whose cache is being freed), or NULL.
+///
+/// # Safety
+/// `p` is NULL or a live key.
+pub(crate) unsafe fn legacy_data(p: *const EVP_PKEY) -> *mut c_void {
+    // SAFETY: the caller's guarantee.
+    unsafe { pkey(p) }.map_or(ptr::null_mut(), |k| k.lock().legacy.0)
+}
+
+/// `evp_pkey_get_legacy`: the key's legacy data; for a provided key, a copy made by its type's
+/// ASN.1 method's `import_from` and kept with the key. NULL for an unassigned key.
+pub(crate) fn get_legacy(k: &Pkey) -> *mut c_void {
+    let (assigned, provided, legacy, cache) = {
+        let s = k.lock();
+        (
+            s.is_assigned(),
+            s.keymgmt.is_some(),
+            s.legacy.0,
+            s.legacy_cache.0,
+        )
+    };
+    if !assigned {
+        return ptr::null_mut();
+    }
+    if !provided {
+        return legacy;
+    }
+    if !cache.is_null() {
+        return cache;
+    }
+    let Some(copy) = copy_downgraded(k) else {
+        return ptr::null_mut();
+    };
+    let mut s = k.lock();
+    if s.legacy_cache.0.is_null() {
+        // Steal the copy's legacy data.
+        let mut c = copy.get().lock();
+        s.legacy_cache = c.legacy;
+        c.legacy = Ptr(ptr::null_mut());
+    }
+    s.legacy_cache.0
 }
 
 /// `evp_pkey_free_it`: frees the key's data (legacy and provided) and untypes it.
@@ -266,6 +335,8 @@ pub(crate) fn new() -> *mut EVP_PKEY {
             save_type: EVP_PKEY_NONE,
             ameth: None,
             legacy: Ptr(ptr::null_mut()),
+            legacy_cache: Ptr(ptr::null_mut()),
+            foreign: false,
             keymgmt: None,
             keydata: None,
             bits: 0,
@@ -624,6 +695,13 @@ pub(crate) fn export_to_provider(
     km: &keymgmt::Ref,
     selection: c_int,
 ) -> Option<Arc<KeyData>> {
+    let legacy = {
+        let s = k.lock();
+        s.keymgmt.is_none() && !s.legacy.0.is_null()
+    };
+    if legacy {
+        return export_legacy(k, km, selection);
+    }
     let (Some(own), Some(kd)) = k.provided() else {
         return None;
     };
@@ -684,6 +762,70 @@ pub(crate) fn export_to_provider(
         selection,
     });
     s.dirty_cnt_copy = s.dirty_cnt;
+    Some(new)
+}
+
+/// `evp_pkey_export_to_provider` of a key with legacy data: a provider copy made through its
+/// ASN.1 method's `export_to`, cached until the data changes (its `dirty_cnt`).
+fn export_legacy(k: &Pkey, km: &keymgmt::Ref, selection: c_int) -> Option<Arc<KeyData>> {
+    let f = k.ameth_funcs()?;
+    let (dirty_cnt, export_to) = (f.dirty_cnt?, f.export_to?);
+    let h = k.handle();
+    // SAFETY: the method's function with the key's handle.
+    let cnt = u64::try_from(unsafe { dirty_cnt(h) }).unwrap_or(0);
+    let m = km.get();
+    {
+        let s = k.lock();
+        if cnt == s.dirty_cnt_copy
+            && let Some(op) = find_cache(&s, m, km, selection)
+        {
+            return Some(op.keydata.clone());
+        }
+    }
+    // The key manager must be for the legacy type.
+    // SAFETY: a type number.
+    let sn = unsafe { OBJ_nid2sn(k.type_()) };
+    // SAFETY: NULL or the table's string.
+    let sn = unsafe { text(sn) };
+    if !sn.is_some_and(|n| m.is_a(n.to_bytes())) {
+        return None;
+    }
+    let keydata = m.newdata();
+    if keydata.is_null() {
+        return None;
+    }
+    let mut importer = |sel: c_int, params: *const OSSL_PARAM| {
+        // SAFETY: the new key data; the method's parameters.
+        unsafe { m.import(keydata, sel, params) }
+    };
+    // SAFETY: the method's function with the key's handle; the importer.
+    if unsafe { export_to(h, &mut importer) } == 0 {
+        // SAFETY: made above.
+        unsafe { m.freedata(keydata) };
+        return None;
+    }
+    let new = KeyData::adopt(km.clone(), keydata)?;
+    // Read before the key's lock: the method's function takes it.
+    // SAFETY: as above.
+    let now = u64::try_from(unsafe { dirty_cnt(h) }).unwrap_or(0);
+    let mut s = k.lock();
+    let old = if now != s.dirty_cnt_copy {
+        core::mem::take(&mut s.operation_cache)
+    } else {
+        Vec::new()
+    };
+    if let Some(op) = find_cache(&s, m, km, selection) {
+        // Another thread got there first.
+        return Some(op.keydata.clone());
+    }
+    s.operation_cache.push(OpCache {
+        keymgmt: km.clone(),
+        keydata: new.clone(),
+        selection,
+    });
+    s.dirty_cnt_copy = now;
+    drop(s);
+    drop(old);
     Some(new)
 }
 
@@ -786,8 +928,7 @@ fn cmp_any(a: &Pkey, b: &Pkey, selection: c_int) -> c_int {
     if pa && pb {
         return keymgmt_match(a, b, selection);
     }
-    // One is a typed key without data: its type must be one of the other's key manager's
-    // names, and there's nothing of it to export.
+    // One is legacy: its type must be one of the other's key manager's names.
     let (legacy, provided) = if pa { (b, a) } else { (a, b) };
     let t = legacy.type_();
     if t == EVP_PKEY_NONE {
@@ -804,8 +945,33 @@ fn cmp_any(a: &Pkey, b: &Pkey, selection: c_int) -> c_int {
     if !km.get().is_a(name) {
         return -1;
     }
-    // The other's export to this key manager needs legacy data; a typed key has none.
-    -2
+    // Cross export: `a` to `b`'s key manager, else `b` to `a`'s, then compare there.
+    let all = OSSL_KEYMGMT_SELECT_ALL as c_int;
+    let ((mut km1, mut kd1), (mut km2, mut kd2)) = (a.provided(), b.provided());
+    let mut exported = false;
+    if let Some(y) = km2.clone().filter(|y| y.get().has_match())
+        && let Some(d) = export_to_provider(a, &y, all)
+    {
+        km1 = Some(y);
+        kd1 = Some(d);
+        exported = true;
+    }
+    if !exported
+        && let Some(x) = km1.clone().filter(|x| x.get().has_match())
+        && let Some(d) = export_to_provider(b, &x, all)
+    {
+        km2 = Some(x);
+        kd2 = Some(d);
+    }
+    match (km1, km2, kd1, kd2) {
+        (Some(x), Some(y), d1, d2) if x.same(&y) => {
+            let p1 = d1.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+            let p2 = d2.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+            // SAFETY: the key manager's data (or NULL).
+            unsafe { x.get().match_(p1, p2, selection) }
+        }
+        _ => -2,
+    }
 }
 
 /// `copy`'s helper `evp_keymgmt_util_copy`: copies the selection of `from`'s data into `to`.
@@ -864,22 +1030,89 @@ fn keymgmt_copy(to: &Pkey, from: &Pkey, selection: c_int) -> bool {
     true
 }
 
-/// `evp_pkey_copy_downgraded` of a provided key: a typed key of its type. Its data would need
-/// the key type's ASN.1 method, which comes with the key types.
+/// `evp_pkey_copy_downgraded` of a provided key: a new key of its type whose legacy data the
+/// type's ASN.1 method's `import_from` made from the provider's export (in the key manager's
+/// library context). `None` with OpenSSL's errors.
 fn copy_downgraded(src: &Pkey) -> Option<PkeyRef> {
-    let (type_, assigned) = {
+    const F: &str = "evp_pkey_copy_downgraded";
+    let (type_, assigned, keymgmt, keydata) = {
         let s = src.lock();
-        (s.type_, s.is_assigned() && s.keymgmt.is_some())
+        (
+            s.type_,
+            s.is_assigned(),
+            s.keymgmt.clone(),
+            s.keydata.clone(),
+        )
     };
-    if !assigned {
-        return None;
-    }
+    let km = keymgmt.filter(|_| assigned)?;
+    let keytype = if type_ == EVP_PKEY_KEYMGMT {
+        String::from_utf8_lossy(km.get().name().to_bytes()).into_owned()
+    } else {
+        // SAFETY: a type number.
+        let sn = unsafe { OBJ_nid2sn(type_) };
+        // SAFETY: NULL or the table's string.
+        unsafe { text(sn) }.map_or_else(String::new, |t| t.to_string_lossy().into_owned())
+    };
     // SAFETY: just made, with its reference.
     let dest = unsafe { PkeyRef::adopt(new()) }?;
     if !set_type(Some(dest.get()), type_, None, None) {
         return None;
     }
-    crate::stub::unimplemented("downgrading a provided key to its legacy form");
+    let Some(kd) = keydata else { return Some(dest) };
+    let Some(import_from) = dest.get().ameth_funcs().and_then(|f| f.import_from) else {
+        err::raise_with_text(
+            ERR_LIB_EVP,
+            rustyssl_abi::EVP_R_NO_IMPORT_FUNCTION,
+            F,
+            &format!("key type = {keytype}"),
+        );
+        return None;
+    };
+    // SAFETY: the key manager's live provider.
+    let libctx = unsafe { crate::provider::libctx_of(km.get().prov.0) };
+    struct Importing {
+        f: ameth::ImportFrom,
+        dest: *mut EVP_PKEY,
+        libctx: *mut OSSL_LIB_CTX,
+    }
+    unsafe extern "C" fn importing(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+        // SAFETY: `copy_downgraded`'s `Importing`, live for the call.
+        let Some(i) = (unsafe { arg.cast::<Importing>().as_ref() }) else {
+            return 0;
+        };
+        // SAFETY: the method's function; the new key; the context.
+        unsafe { (i.f)(params, i.dest, i.libctx) }
+    }
+    let mut imp = Importing {
+        f: import_from,
+        dest: dest.get().handle(),
+        libctx,
+    };
+    // SAFETY: the key manager's data; the callback takes `imp`, which outlives the call.
+    let ok = unsafe {
+        km.get().export(
+            kd.ptr(),
+            OSSL_KEYMGMT_SELECT_ALL as c_int,
+            Some(importing),
+            (&raw mut imp).cast(),
+        )
+    } != 0;
+    if ok {
+        // Synchronize the dirty count.
+        if let Some(dc) = dest.get().ameth_funcs().and_then(|f| f.dirty_cnt) {
+            // SAFETY: the method's function with the new key.
+            let n = unsafe { dc(dest.get().handle()) };
+            dest.get().lock().dirty_cnt_copy = u64::try_from(n).unwrap_or(0);
+        }
+        return Some(dest);
+    }
+    err::raise_with_text(
+        ERR_LIB_EVP,
+        rustyssl_abi::EVP_R_KEYMGMT_EXPORT_FAILURE,
+        F,
+        &format!("key type = {keytype}"),
+    );
+    None
 }
 
 ffi_export! {
@@ -1838,14 +2071,25 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
-        if !key.is_null() && ameth::find(type_).is_some_and(|m| !m.get().is_dynamic()) {
-            // The built-in key types' data (and the EC group check) come with the key types.
+        let base = ameth::find(type_).map(|m| (m.get().base_id, m.get().is_dynamic()));
+        let rsa = matches!(base, Some((EVP_PKEY_RSA | EVP_PKEY_RSA_PSS, false)));
+        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa {
+            // The other built-in key types' data (and the EC group check) come with them.
             crate::stub::unimplemented("EVP_PKEY_assign of a built-in key type's data");
         }
         if !set_type(Some(k), type_, None, None) {
             return 0;
         }
-        k.lock().legacy = Ptr(key);
+        // `detect_foreign_key`: an `RSA` whose method isn't OpenSSL's.
+        let foreign = rsa && {
+            // SAFETY: the caller's guarantee: an `RSA`.
+            let meth = unsafe { crate::rsa::rsa(key.cast()) }.map(crate::rsa::Rsa::meth);
+            // SAFETY: no preconditions.
+            meth.is_some_and(|m| m != unsafe { crate::rsa_meth::RSA_PKCS1_OpenSSL() })
+        };
+        let mut s = k.lock();
+        s.legacy = Ptr(key);
+        s.foreign = foreign;
         c_int::from(!key.is_null())
     }
 }

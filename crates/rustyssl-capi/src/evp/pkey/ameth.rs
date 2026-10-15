@@ -30,7 +30,7 @@ use rustyssl_abi::{
     EVP_PKEY_DSA1, EVP_PKEY_DSA2, EVP_PKEY_DSA3, EVP_PKEY_DSA4, EVP_PKEY_EC, EVP_PKEY_ED448,
     EVP_PKEY_ED25519, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS, EVP_PKEY_RSA2, EVP_PKEY_SM2, EVP_PKEY_X448,
     EVP_PKEY_X25519, EVP_R_PKEY_APPLICATION_ASN1_METHOD_ALREADY_REGISTERED, NID_undef,
-    PKCS8_PRIV_KEY_INFO, X509_ALGOR, X509_PUBKEY, X509_SIG_INFO,
+    OSSL_LIB_CTX, OSSL_PARAM, PKCS8_PRIV_KEY_INFO, X509_ALGOR, X509_PUBKEY, X509_SIG_INFO,
 };
 
 use crate::err;
@@ -85,6 +85,15 @@ pub(crate) type Copy = unsafe extern "C" fn(*mut EVP_PKEY, *mut EVP_PKEY) -> c_i
 pub(crate) type OldPrivDecode =
     unsafe extern "C" fn(*mut EVP_PKEY, *mut *const c_uchar, c_int) -> c_int;
 
+/// `dirty_cnt`: the legacy data's change count.
+pub(crate) type DirtyCnt = unsafe fn(*const EVP_PKEY) -> usize;
+/// `export_to`: the legacy data's parameters given to `importer(selection, params)`.
+pub(crate) type ExportTo =
+    unsafe fn(*const EVP_PKEY, &mut dyn FnMut(c_int, *const OSSL_PARAM) -> c_int) -> c_int;
+/// `import_from`: legacy data made from `params` (in a library context) and assigned to the key.
+pub(crate) type ImportFrom =
+    unsafe fn(*const OSSL_PARAM, *mut EVP_PKEY, *mut OSSL_LIB_CTX) -> c_int;
+
 /// A method's functions (those of `struct evp_pkey_asn1_method_st` the API reaches).
 #[derive(Clone, core::marker::Copy, Default)]
 pub(crate) struct Funcs {
@@ -118,6 +127,10 @@ pub(crate) struct Funcs {
     pub(crate) get_pub_key: Option<GetRaw>,
     pub(crate) copy: Option<Copy>,
     pub(crate) old_priv_decode: Option<OldPrivDecode>,
+    /// The built-in methods' bridge to the providers (applications' methods have none).
+    pub(crate) dirty_cnt: Option<DirtyCnt>,
+    pub(crate) export_to: Option<ExportTo>,
+    pub(crate) import_from: Option<ImportFrom>,
 }
 
 /// What `EVP_PKEY_ASN1_METHOD` handles point to.
@@ -274,7 +287,25 @@ impl Kind {
                 f.get_priv_key = Some(builtin_get_raw);
                 f.get_pub_key = Some(builtin_get_raw);
             }
-            Self::Rsa | Self::RsaPss | Self::Alias => {}
+            Self::Rsa | Self::RsaPss => {
+                use super::rsa as r;
+                f.pub_cmp = Some(r::rsa_pub_cmp);
+                f.pkey_size = Some(r::int_rsa_size);
+                f.pkey_bits = Some(r::rsa_bits);
+                f.pkey_security_bits = Some(r::rsa_security_bits);
+                f.pkey_free = Some(r::int_rsa_free);
+                f.pkey_ctrl = Some(r::rsa_pkey_ctrl);
+                f.pkey_check = Some(r::rsa_pkey_check);
+                f.copy = Some(r::rsa_pkey_copy);
+                f.dirty_cnt = Some(r::rsa_pkey_dirty_cnt);
+                f.export_to = Some(r::rsa_pkey_export_to);
+                f.import_from = Some(if matches!(self, Self::Rsa) {
+                    r::rsa_pkey_import_from
+                } else {
+                    r::rsa_pss_pkey_import_from
+                });
+            }
+            Self::Alias => {}
         }
         if matches!(self, Self::Rsa | Self::DsaEc) {
             f.old_priv_decode = Some(builtin_old_priv_decode);

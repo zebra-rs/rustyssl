@@ -41,8 +41,8 @@ ffi_export! {
                 return c_int::from(unsafe { km.get().get_params(ptr, params) } > 0);
             }
             if k.lock().is_legacy() {
-                // A typed key's parameters come through its ctrl translation (4.2c).
-                crate::stub::unimplemented("EVP_PKEY_get_params of a key typed by an ASN.1 method");
+                // SAFETY: the caller's guarantee.
+                return c_int::from(unsafe { legacy_get_params(pkey, params) } > 0);
             }
         }
         err::raise(ERR_LIB_EVP, EVP_R_INVALID_KEY, "EVP_PKEY_get_params");
@@ -476,4 +476,220 @@ ffi_export! {
             None => 0,
         }
     }
+}
+
+/// What the legacy payload table names (`evp_pkey_translations`).
+#[derive(Clone, Copy)]
+enum Payload {
+    GroupName,
+    PrivKey,
+    PubKey,
+    EcPubXy,
+    FfcP,
+    FfcQG,
+    EcDecoded,
+    RsaN,
+    RsaE,
+    RsaD,
+    /// rsa-factor1.. (0-based).
+    Factor(usize),
+    Exponent(usize),
+    Coefficient(usize),
+}
+
+/// The payload a parameter's key names (in any case), if any.
+fn payload(key: &[u8]) -> Option<Payload> {
+    use rustyssl_abi::{
+        OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS as DECODED, OSSL_PKEY_PARAM_EC_PUB_X,
+        OSSL_PKEY_PARAM_EC_PUB_Y, OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P,
+        OSSL_PKEY_PARAM_FFC_Q, OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
+        OSSL_PKEY_PARAM_RSA_D, OSSL_PKEY_PARAM_RSA_E, OSSL_PKEY_PARAM_RSA_N,
+    };
+    let is = |name: &core::ffi::CStr| key.eq_ignore_ascii_case(name.to_bytes());
+    let fixed = [
+        (OSSL_PKEY_PARAM_GROUP_NAME, Payload::GroupName),
+        (OSSL_PKEY_PARAM_PRIV_KEY, Payload::PrivKey),
+        (OSSL_PKEY_PARAM_PUB_KEY, Payload::PubKey),
+        (OSSL_PKEY_PARAM_EC_PUB_X, Payload::EcPubXy),
+        (OSSL_PKEY_PARAM_EC_PUB_Y, Payload::EcPubXy),
+        (OSSL_PKEY_PARAM_FFC_P, Payload::FfcP),
+        (OSSL_PKEY_PARAM_FFC_Q, Payload::FfcQG),
+        (OSSL_PKEY_PARAM_FFC_G, Payload::FfcQG),
+        (OSSL_PKEY_PARAM_RSA_N, Payload::RsaN),
+        (OSSL_PKEY_PARAM_RSA_E, Payload::RsaE),
+        (OSSL_PKEY_PARAM_RSA_D, Payload::RsaD),
+        (DECODED, Payload::EcDecoded),
+    ];
+    if let Some(&(_, p)) = fixed.iter().find(|(n, _)| is(n)) {
+        return Some(p);
+    }
+    // rsa-factor1..10, rsa-exponent1..10, rsa-coefficient1..9.
+    let lower = key.to_ascii_lowercase();
+    let numbered = |prefix: &[u8], max: usize| -> Option<usize> {
+        let digits = lower.strip_prefix(prefix)?;
+        let n: usize = core::str::from_utf8(digits).ok()?.parse().ok()?;
+        (digits.first() != Some(&b'0') && (1..=max).contains(&n)).then(|| n - 1)
+    };
+    numbered(b"rsa-factor", 10)
+        .map(Payload::Factor)
+        .or_else(|| numbered(b"rsa-exponent", 10).map(Payload::Exponent))
+        .or_else(|| numbered(b"rsa-coefficient", 9).map(Payload::Coefficient))
+}
+
+/// `get_payload_bn`: the number into the parameter (an unsigned integer one). 1, or 0.
+///
+/// # Safety
+/// `p` is a parameter; `bn` is NULL or a live number.
+unsafe fn put_bn(p: *mut OSSL_PARAM, bn: *const BIGNUM) -> c_int {
+    // SAFETY: the caller's parameter.
+    let ty = unsafe { (*p).data_type };
+    if bn.is_null() || ty != rustyssl_abi::OSSL_PARAM_UNSIGNED_INTEGER as u32 {
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { crate::params::bn::OSSL_PARAM_set_BN(p, bn) }
+}
+
+/// `evp_pkey_get_params_to_ctrl`: each parameter from the key's legacy data through the payload
+/// table: the last one's result, or -2 for a parameter it doesn't name (the rest unread).
+///
+/// # Safety
+/// `pkey` is a live key with legacy data; `params` is NULL or an array.
+unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c_int {
+    use crate::rsa_lib as r;
+    use rustyssl_abi::{
+        EVP_PKEY_DH, EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
+        EVP_R_EXPECTING_A_EC_KEY, EVP_R_UNSUPPORTED_KEY_TYPE,
+    };
+    const F: &str = "evp_pkey_setget_params_to_ctrl";
+    let unsupported = || {
+        err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_KEY_TYPE, F);
+        0
+    };
+    // SAFETY: the caller's guarantee.
+    let base = unsafe { super::EVP_PKEY_get_base_id(pkey) };
+    let is_rsa = base == EVP_PKEY_RSA || base == EVP_PKEY_RSA_PSS;
+    let mut ret = 1;
+    let mut p = params;
+    // SAFETY: the caller's array, up to its end.
+    while let Some(param) = unsafe { p.as_mut() } {
+        if param.key.is_null() {
+            break;
+        }
+        // SAFETY: a parameter's key is a string.
+        let key = unsafe { core::ffi::CStr::from_ptr(param.key) }.to_bytes();
+        let Some(which) = payload(key) else { return -2 };
+        // `EVP_PKEY_get0_RSA` raises for another type, as the numbered getters see it.
+        // SAFETY: the caller's key.
+        let rsa = || unsafe { super::rsa::get0_rsa(pkey) };
+        ret = match which {
+            Payload::GroupName | Payload::PubKey | Payload::EcDecoded => unsupported(),
+            Payload::PrivKey => {
+                if param.data_type == rustyssl_abi::OSSL_PARAM_UNSIGNED_INTEGER as u32 {
+                    unsupported()
+                } else {
+                    0
+                }
+            }
+            Payload::EcPubXy => {
+                if base != EVP_PKEY_EC {
+                    err::raise(
+                        ERR_LIB_EVP,
+                        EVP_R_EXPECTING_A_EC_KEY,
+                        "evp_pkey_get0_EC_KEY_int",
+                    );
+                }
+                unsupported()
+            }
+            Payload::FfcP => {
+                if base != EVP_PKEY_DH && base != EVP_PKEY_DSA {
+                    unsupported();
+                }
+                0
+            }
+            Payload::FfcQG => 0,
+            Payload::RsaN | Payload::RsaE | Payload::RsaD => {
+                if is_rsa {
+                    let k = rsa();
+                    let get: unsafe extern "C" fn(*const rustyssl_abi::RSA) -> *const BIGNUM =
+                        match which {
+                            Payload::RsaN => r::RSA_get0_n,
+                            Payload::RsaE => r::RSA_get0_e,
+                            _ => r::RSA_get0_d,
+                        };
+                    // SAFETY: the key's `RSA`.
+                    let bn = unsafe { get(k) };
+                    // SAFETY: the parameter; the key's number or NULL.
+                    unsafe { put_bn(param, bn) }
+                } else {
+                    0
+                }
+            }
+            Payload::Factor(i) | Payload::Exponent(i) | Payload::Coefficient(i) => {
+                let k = rsa();
+                // SAFETY: the key's `RSA`, or NULL.
+                let bn = unsafe { numbered(k, which, i) };
+                // SAFETY: the parameter; the number or NULL.
+                unsafe { put_bn(param, bn) }
+            }
+        };
+        // SAFETY: still within the array.
+        p = unsafe { p.add(1) };
+    }
+    ret
+}
+
+/// `get_rsa_payload_factor`/`_exponent`/`_coefficient`: the key's `i`th (0-based) prime, CRT
+/// exponent, or coefficient, the extra primes' after the first ones.
+///
+/// # Safety
+/// `k` is NULL or a live `RSA`.
+unsafe fn numbered(k: *mut rustyssl_abi::RSA, which: Payload, i: usize) -> *const BIGNUM {
+    use crate::rsa_lib as r;
+    if k.is_null() {
+        return ptr::null();
+    }
+    // SAFETY: the caller's key.
+    let extra = usize::try_from(unsafe { r::RSA_get_multi_prime_extra_count(k) }).unwrap_or(0);
+    let get: unsafe extern "C" fn(*const rustyssl_abi::RSA) -> *const BIGNUM = match (which, i) {
+        (Payload::Factor(_), 0) => r::RSA_get0_p,
+        (Payload::Factor(_), 1) => r::RSA_get0_q,
+        (Payload::Exponent(_), 0) => r::RSA_get0_dmp1,
+        (Payload::Exponent(_), 1) => r::RSA_get0_dmq1,
+        (Payload::Coefficient(_), 0) => r::RSA_get0_iqmp,
+        _ => {
+            // The extra primes': factors and exponents from the third, coefficients from the second.
+            let first = if matches!(which, Payload::Coefficient(_)) {
+                1
+            } else {
+                2
+            };
+            let Some(j) = i.checked_sub(first).filter(|&j| j < extra) else {
+                return ptr::null();
+            };
+            let mut arr: [*const BIGNUM; 10] = [ptr::null(); 10];
+            let mut arr2: [*const BIGNUM; 10] = [ptr::null(); 10];
+            let ok = if matches!(which, Payload::Factor(_)) {
+                // SAFETY: as above; room for every extra prime.
+                unsafe { r::RSA_get0_multi_prime_factors(k, arr.as_mut_ptr()) }
+            } else {
+                // SAFETY: as above.
+                unsafe {
+                    r::RSA_get0_multi_prime_crt_params(k, arr.as_mut_ptr(), arr2.as_mut_ptr())
+                }
+            };
+            let src = if matches!(which, Payload::Coefficient(_)) {
+                &arr2
+            } else {
+                &arr
+            };
+            return if ok != 0 {
+                src.get(j).copied().unwrap_or(ptr::null())
+            } else {
+                ptr::null()
+            };
+        }
+    };
+    // SAFETY: as above.
+    unsafe { get(k) }
 }

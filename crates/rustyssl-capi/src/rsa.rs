@@ -7,7 +7,7 @@
 use core::cell::UnsafeCell;
 use core::ffi::{CStr, c_char, c_int, c_uint};
 use core::ptr;
-use core::sync::atomic::{AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
@@ -196,6 +196,9 @@ pub(crate) struct Rsa {
     /// `*_up_ref` and `RSA_free`'s count: the method's `finish` and the ex_data's free run
     /// when it reaches zero, with the handle still live.
     references: AtomicI32,
+    /// `dirty_cnt`: bumped when the numbers change, so an `EVP_PKEY` holding the key as its
+    /// legacy data knows its provider copy is stale.
+    dirty: AtomicUsize,
     state: Mutex<RsaState>,
     legacy: Mutex<Legacy>,
     ex_data: ExData,
@@ -236,6 +239,7 @@ impl Rsa {
         let h = RSA::new_handle(Rsa {
             libctx: Ptr(libctx),
             references: AtomicI32::new(1),
+            dirty: AtomicUsize::new(0),
             state: Mutex::new(RsaState {
                 key: Key::new(),
                 kind,
@@ -421,6 +425,17 @@ impl Rsa {
         read_numbers(&mut lg.numbers, &mut st.key);
         f(&mut st.key);
         write_numbers(&mut lg.numbers, &st.key);
+        self.touch();
+    }
+
+    /// Marks the numbers changed (`dirty_cnt++`).
+    pub(crate) fn touch(&self) {
+        self.dirty.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// The dirty count.
+    pub(crate) fn dirty_cnt(&self) -> usize {
+        self.dirty.load(Ordering::Acquire)
     }
 }
 
