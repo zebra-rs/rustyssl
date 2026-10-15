@@ -3249,7 +3249,7 @@ chunking) is clean.
     of RSA, DH, DSA, and EC, `EVP_PKEY_get_ec_point_conv_form`, `EVP_PKEY_get_field_type`, the
     built-in key types' legacy data (`EVP_PKEY_assign` of an `RSA *`, ...), and the legacy
     keys' parameters (`EVP_PKEY_get_params` of a key with legacy data) to 4.3–4.6.
-- [ ] **4.3 RSA:**
+- [x] **4.3 RSA:**
   - keygen (multi-prime)
   - PKCS#1 v1.5 signatures
   - PKCS#1 v1.5 encryption with **implicit rejection** (the 3.2+ default)
@@ -3392,9 +3392,8 @@ chunking) is clean.
       - `EVP_PKEY_get_params` on a legacy key follows OpenSSL's payload table: keys in any
         case, -2 for an unknown key, and the last parameter's result is the answer.
       - An `RSA` with an application's method (a "foreign" key) isn't exported; its
-        operations would go through the legacy `EVP_PKEY_METHOD`, which isn't implemented
-        yet, so they abort as unimplemented (fail closed). The ASN.1-dependent parts (print,
-        the private key's decoding, `RSA_get0_pss_params`) come with 4.3e and 4.7.
+        operations go through the legacy `EVP_PKEY_METHOD` (4.3g). The ASN.1-dependent parts
+        (print, the private key's decoding) come with 4.3e, 4.3f, and 4.7.
       - `tests/c/evp_pkey_rsa.c` (38 checks).
   - [x] **4.3e RSA's ASN.1 items** (`rsa_asn1.rs`, `asn1/tpl/bignum.rs`,
     `asn1/tpl/shadow.rs`; 29 exports):
@@ -3431,10 +3430,27 @@ chunking) is clean.
     then a legacy RSA-PSS key has none ("No PSS parameter restrictions"). `tests/c/rsa_print.c`
     (15 checks): private and public keys, small and large numbers, a negative modulus,
     missing numbers, three primes, indents, RSA-PSS, and a `FILE`.
-  - [ ] **4.3g The legacy RSA `EVP_PKEY_METHOD`** (`rsa_pmeth.c`): EVP operations on a key whose
-    `RSA` has an application's method, which stays a legacy key and so can't reach the
-    providers (4.3d3 fails closed on it until then): sign, verify, verify-recover, encrypt,
-    decrypt, key generation, and the `ctrl`/`ctrl_str` padding, digest, and MGF1 settings.
+  - [x] **4.3g The legacy RSA `EVP_PKEY_METHOD`** (`rsa_pmeth.rs`; 1 export): the built-in
+    RSA and RSA-PSS methods' functions, which a key whose `RSA` has an application's method
+    uses (it stays a legacy key), as does an application that copies or wraps the built-in
+    methods. Each operation is made of the `RSA_*` functions, so it goes through the key's
+    method:
+    - Signing: raw, PKCS #1 (`RSA_sign`), MDC2's OCTET STRING, X9.31, and PSS through the
+      padding functions.
+    - Verifying and recovering (the digest out of the DigestInfo, or X9.31's checked hash
+      identifier).
+    - Encrypting and decrypting: OAEP through its padding functions with the context's label,
+      PKCS #1 with implicit rejection unless turned off, and none. The result and length are
+      chosen without branching on success, as OpenSSL's are.
+    - Key generation with the context's bits, primes, exponent, and callback.
+    - The `ctrl` and `ctrl_str` settings with OpenSSL's errors and return values.
+    - An RSA-PSS key generated with restrictions keeps them as OpenSSL's `rsa->pss` (an
+      `RSA_PSS_PARAMS`, with the decoded mask hash). `RSA_get0_pss_params` returns them,
+      `EVP_PKEY_print_*` prints them, and signing starts from and enforces them
+      (`pkey_pss_init`).
+    - `tests/c/evp_rsa_legacy.c` (120 checks), with an application's method that counts its
+      calls. OpenSSL's `EVP_PKEY_CTX_ctrl_str` crashes on a NULL value, so the test sends that
+      to the method's `ctrl_str` directly.
 - [ ] **4.4 EC:**
   - `EC_GROUP`: every named curve in the default build (NIST, secp*k1, brainpool, SM2,
     binary curves), explicit parameters, `check`, conversion forms
