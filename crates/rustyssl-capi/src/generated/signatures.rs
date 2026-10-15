@@ -724,6 +724,7 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char = crate::lowlevel::legacy::BF_options;
 const _: unsafe extern "C" fn(*mut BF_KEY, core::ffi::c_int, *const core::ffi::c_uchar) =
     crate::lowlevel::legacy::BF_set_key;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::bignum::BIGNUM_it;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> *const BIO_ADDR =
     crate::bio::addr::BIO_ADDRINFO_address;
 const _: unsafe extern "C" fn(*const BIO_ADDRINFO) -> core::ffi::c_int =
@@ -2229,6 +2230,7 @@ const _: unsafe extern "C" fn(
 ) = crate::lowlevel::legacy::CAST_ofb64_encrypt;
 const _: unsafe extern "C" fn(*mut CAST_KEY, core::ffi::c_int, *const core::ffi::c_uchar) =
     crate::lowlevel::legacy::CAST_set_key;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::bignum::CBIGNUM_it;
 const _: unsafe extern "C" fn(*mut CMAC_CTX) = crate::cmac::CMAC_CTX_cleanup;
 const _: unsafe extern "C" fn(*mut CMAC_CTX, *const CMAC_CTX) -> core::ffi::c_int =
     crate::cmac::CMAC_CTX_copy;
@@ -7517,7 +7519,19 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::RIPEMD160_Update;
+const _: unsafe extern "C" fn(*const RSA) -> *mut RSA = crate::rsa_asn1::RSAPrivateKey_dup;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::rsa_asn1::RSAPrivateKey_it;
+const _: unsafe extern "C" fn(*const RSA) -> *mut RSA = crate::rsa_asn1::RSAPublicKey_dup;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::rsa_asn1::RSAPublicKey_it;
+const _: unsafe extern "C" fn(*mut RSA_OAEP_PARAMS) = crate::rsa_asn1::RSA_OAEP_PARAMS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::rsa_asn1::RSA_OAEP_PARAMS_it;
+const _: unsafe extern "C" fn() -> *mut RSA_OAEP_PARAMS = crate::rsa_asn1::RSA_OAEP_PARAMS_new;
 const _: unsafe extern "C" fn() -> *const RSA_METHOD = crate::rsa_meth::RSA_PKCS1_OpenSSL;
+const _: unsafe extern "C" fn(*const RSA_PSS_PARAMS) -> *mut RSA_PSS_PARAMS =
+    crate::rsa_asn1::RSA_PSS_PARAMS_dup;
+const _: unsafe extern "C" fn(*mut RSA_PSS_PARAMS) = crate::rsa_asn1::RSA_PSS_PARAMS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::rsa_asn1::RSA_PSS_PARAMS_it;
+const _: unsafe extern "C" fn() -> *mut RSA_PSS_PARAMS = crate::rsa_asn1::RSA_PSS_PARAMS_new;
 const _: unsafe extern "C" fn(
     *mut RSA,
     *mut BIGNUM,
@@ -8506,6 +8520,34 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut *mut RSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut RSA = crate::rsa_asn1::d2i_RSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut RSA) -> *mut RSA =
+    crate::rsa_asn1::d2i_RSAPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut RSA) -> *mut RSA =
+    crate::rsa_asn1::d2i_RSAPrivateKey_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut RSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut RSA = crate::rsa_asn1::d2i_RSAPublicKey;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut RSA) -> *mut RSA =
+    crate::rsa_asn1::d2i_RSAPublicKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut RSA) -> *mut RSA =
+    crate::rsa_asn1::d2i_RSAPublicKey_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut RSA_OAEP_PARAMS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut RSA_OAEP_PARAMS = crate::rsa_asn1::d2i_RSA_OAEP_PARAMS;
+const _: unsafe extern "C" fn(
+    *mut *mut RSA_PSS_PARAMS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut RSA_PSS_PARAMS = crate::rsa_asn1::d2i_RSA_PSS_PARAMS;
+const _: unsafe extern "C" fn(
     *mut *mut X509_ALGOR,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -8605,6 +8647,26 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPrivateKey_fp;
+const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPublicKey;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPublicKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
+    crate::rsa_asn1::i2d_RSAPublicKey_fp;
+const _: unsafe extern "C" fn(
+    *const RSA_OAEP_PARAMS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::rsa_asn1::i2d_RSA_OAEP_PARAMS;
+const _: unsafe extern "C" fn(
+    *const RSA_PSS_PARAMS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::rsa_asn1::i2d_RSA_PSS_PARAMS;
 const _: unsafe extern "C" fn(*const X509_ALGOR, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::asn1::tpl::items::i2d_X509_ALGOR;
 const _: unsafe extern "C" fn(

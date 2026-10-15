@@ -163,6 +163,39 @@ impl Callback {
     }
 }
 
+/// Prints a shadowed item's handle as OpenSSL prints the SEQUENCE it describes: through a
+/// shadow lending the handle's fields.
+///
+/// # Safety
+/// As for [`item_print`], with `fld` holding a live handle of the shadowed item.
+#[expect(clippy::too_many_arguments, reason = "OpenSSL's signature")]
+unsafe fn shadow_print(
+    out: *mut BIO,
+    fld: Cpval,
+    indent: c_int,
+    sh: &super::shadow::Shadowed,
+    fname: *const c_char,
+    sname: *const c_char,
+    nohdr: bool,
+    pctx: &Pctx,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let h = unsafe { fld.read() };
+    // SAFETY: a live handle of the item.
+    let shadow = unsafe { (sh.lend)(h, super::shadow::Lend::Encode) };
+    if shadow.is_null() {
+        return 0;
+    }
+    let mut sv = shadow.cast_const();
+    // SAFETY: the item's own shadow item.
+    let sit = unsafe { (sh.item)() };
+    // SAFETY: the shadow, a value of the shadow item.
+    let r = unsafe { item_print(out, &raw mut sv, indent, sit, fname, sname, nohdr, pctx) };
+    // SAFETY: the shadow's own memory.
+    unsafe { (sh.release)(shadow) };
+    r
+}
+
 /// `asn1_item_print_ctx`.
 ///
 /// # Safety
@@ -213,6 +246,11 @@ unsafe fn item_print(
             }
         }
         ASN1_ITYPE_EXTERN => {
+            // SAFETY: as above.
+            if let Some(sh) = unsafe { super::shadow::shadowed(it) } {
+                // SAFETY: a live handle of the item.
+                return unsafe { shadow_print(out, fld, indent, sh, fname, sname, nohdr, pctx) };
+            }
             // SAFETY: as above.
             if !nohdr && unsafe { print_fsname(out, indent, fname, sname, pctx) } == 0 {
                 return 0;

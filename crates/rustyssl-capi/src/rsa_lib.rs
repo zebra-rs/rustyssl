@@ -202,7 +202,8 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's ASN.1 version: `RSA_ASN1_VERSION_MULTI` for a multi-prime key, else 0.
+    /// The key's ASN.1 version: `RSA_ASN1_VERSION_MULTI` for a multi-prime key, else the
+    /// version an `RSAPrivateKey` was decoded with (0 for other keys).
     ///
     /// # Safety
     /// `r` is NULL or a live key.
@@ -210,9 +211,15 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_RSA
     {
         // SAFETY: the caller's guarantee.
-        match unsafe { key(r) } {
-            Some(k) if k.lock().key.multi => RSA_ASN1_VERSION_MULTI,
-            _ => RSA_ASN1_VERSION_DEFAULT,
+        let Some(k) = (unsafe { key(r) }) else {
+            return RSA_ASN1_VERSION_DEFAULT;
+        };
+        if k.lock().key.multi {
+            return RSA_ASN1_VERSION_MULTI;
+        }
+        match k.legacy().version {
+            RSA_ASN1_VERSION_MULTI => RSA_ASN1_VERSION_DEFAULT,
+            v => v,
         }
     }
 }

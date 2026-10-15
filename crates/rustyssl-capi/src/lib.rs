@@ -47,6 +47,7 @@ mod rand;
 mod rand_file;
 mod rand_lib;
 mod rsa;
+mod rsa_asn1;
 mod rsa_gen;
 mod rsa_lib;
 mod rsa_meth;

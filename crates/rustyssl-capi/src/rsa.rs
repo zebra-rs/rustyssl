@@ -11,9 +11,9 @@ use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    BIGNUM, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_RSA, ERR_R_INIT_FAIL, RSA_FLAG_NO_BLINDING,
-    RSA_FLAG_NON_FIPS_ALLOW, RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA, RSA_FLAG_TYPE_RSASSAPSS,
-    RSA_METHOD,
+    BIGNUM, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_RSA, ERR_R_INIT_FAIL, RSA_ASN1_VERSION_MULTI,
+    RSA_FLAG_NO_BLINDING, RSA_FLAG_NON_FIPS_ALLOW, RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA,
+    RSA_FLAG_TYPE_RSASSAPSS, RSA_METHOD,
 };
 use rustyssl_abi::{
     ERR_LIB_RSA, ERR_R_BN_LIB, ERR_R_FETCH_FAILED, ERR_R_INTERNAL_ERROR, EVP_MD, EVP_MD_CTX,
@@ -31,7 +31,7 @@ use rustyssl_abi::{
     RSA_R_UNKNOWN_PADDING_TYPE, RSA_R_WRONG_SIGNATURE_LENGTH,
 };
 use rustyssl_crypto::bn::BigNum;
-use rustyssl_crypto::rsa::{Entry, Hash, Key, Reason};
+use rustyssl_crypto::rsa::{Entry, ExtraPrime, Hash, Key, Reason};
 
 use crate::bn::{BN_clear_free, store, value};
 use crate::ex_data::{CRYPTO_free_ex_data, CRYPTO_new_ex_data};
@@ -179,6 +179,12 @@ pub(crate) struct Legacy {
     pub(crate) meth: Ptr<RSA_METHOD>,
     pub(crate) flags: c_int,
     pub(crate) numbers: Numbers,
+    /// The ASN.1 version an `RSAPrivateKey` was decoded with, which OpenSSL keeps and encodes
+    /// again; a multi-prime key's is `RSA_ASN1_VERSION_MULTI` whatever this holds.
+    pub(crate) version: c_int,
+    /// Whether a decoded `RSAPrivateKey` listed the other primes (an empty list is encoded
+    /// again, as OpenSSL keeps its empty stack).
+    pub(crate) listed_primes: bool,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -249,6 +255,8 @@ impl Rsa {
                 meth: Ptr(meth.cast_mut()),
                 flags: mflags & !RSA_FLAG_NON_FIPS_ALLOW,
                 numbers: Numbers::default(),
+                version: 0,
+                listed_primes: false,
             }),
             ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
                 ctx: ptr::null_mut(),
@@ -425,6 +433,75 @@ impl Rsa {
         read_numbers(&mut lg.numbers, &mut st.key);
         f(&mut st.key);
         write_numbers(&mut lg.numbers, &st.key);
+        self.touch();
+    }
+
+    /// Takes the numbers a decode filled (`d2i_RSAPrivateKey`): each `BIGNUM` becomes the
+    /// key's number for its field (one that already is, decoded in place, has its new value
+    /// read); `extra` replaces the other primes when given, with whether the encoding listed
+    /// them; `version` is kept as decoded.
+    ///
+    /// # Safety
+    /// Each number is NULL or a live `BIGNUM` the key takes, or already holds.
+    pub(crate) unsafe fn adopt(
+        &self,
+        fields: &[(Field, *mut BIGNUM)],
+        extra: Option<(Vec<[*mut BIGNUM; 3]>, bool)>,
+        version: Option<c_int>,
+    ) {
+        let mut st = self.lock();
+        let mut lg = self.legacy();
+        read_numbers(&mut lg.numbers, &mut st.key);
+        for &(f, b) in fields {
+            if b.is_null() {
+                continue;
+            }
+            // SAFETY: the caller's guarantee.
+            let v = unsafe { value(b) };
+            if let Some(dst) = key_field(&mut st.key, f) {
+                *dst = v;
+            }
+            if let Some(slot) = lg.numbers.slot(f) {
+                let old = core::mem::replace(slot, Ptr(b));
+                if old.0 != b {
+                    lg.numbers.retire(old);
+                }
+            }
+        }
+        if let Some((list, listed)) = extra {
+            let mut primes = Vec::with_capacity(list.len());
+            let mut handles = Vec::with_capacity(list.len());
+            for [r, d, t] in list {
+                // SAFETY: as above.
+                let (Some(rv), Some(dv), Some(tv)) =
+                    (unsafe { value(r) }, unsafe { value(d) }, unsafe {
+                        value(t)
+                    })
+                else {
+                    continue;
+                };
+                primes.push(ExtraPrime {
+                    r: rv,
+                    d: dv,
+                    t: tv,
+                });
+                handles.push([Ptr(r), Ptr(d), Ptr(t)]);
+            }
+            st.key.extra = primes;
+            let old = core::mem::replace(&mut lg.numbers.extra, handles);
+            for h in old {
+                for b in h {
+                    lg.numbers.retire(b);
+                }
+            }
+            lg.listed_primes = listed;
+        }
+        if let Some(v) = version {
+            lg.version = v;
+            st.key.multi = v == RSA_ASN1_VERSION_MULTI;
+        }
+        drop(lg);
+        drop(st);
         self.touch();
     }
 
