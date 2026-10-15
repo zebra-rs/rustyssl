@@ -388,6 +388,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("conf", conf_session),
     ("conf_modules", conf_modules_session),
     ("ec", ec_session),
+    ("ecpk", ecpk_session),
     ("string", string_session),
 ];
 
@@ -2806,6 +2807,58 @@ fn random_hex(random: &mut Random, len: usize) -> String {
     (0..len)
         .map(|_| format!("{:02x}", random.below(256)))
         .collect()
+}
+
+/// Encodings of EC parameters for `ecpk` sessions to start from: explicit secp112r1 (with and
+/// without its seed, with a compressed base), sect113r1 with its trinomial and with a
+/// pentanomial, and prime256v1's name.
+const ECPK_SEEDS: &[&str] = &[
+    "3074020101301a06072a8648ce3d0101020f00db7c2abf62e35e668076bead208b3020040edb7c2abf62e35e668076bead2088040e659ef8ba043916eede8911702b22041d0409487239995a5ee76b55f9c2f098a89ce5af8724c0a23e0e0ff77500020f00db7c2abf62e35e7628dfac6561c5020101",
+    "3079020101301a06072a8648ce3d0101020f00db7c2abf62e35e668076bead208b3033040edb7c2abf62e35e668076bead2088040e659ef8ba043916eede8911702b2203110000f50b028e4d696e6768756151752904040f0209487239995a5ee76b55f9c2f098020f00db7c2abf62e35e7628dfac6561c5020101",
+    "307a020101301c06072a8648ce3d0102301102017106092a8648ce3d010203020201093022040f003088250ca6e7c7fe649ce85820f7040f00e8bee4d3e2260744188be0e9c723041f04009d73616f35f4ab1407d73562c10f00a52830277958ee84d1315ed31886020f0100000000000000d9ccec8a39e56f020102",
+    "308182020101302406072a8648ce3d0102301902017106092a8648ce3d0102030330090201020201040201093022040f003088250ca6e7c7fe649ce85820f7040f00e8bee4d3e2260744188be0e9c723041f04009d73616f35f4ab1407d73562c10f00a52830277958ee84d1315ed31886020f0100000000000000d9ccec8a39e56f020102",
+    "06082a8648ce3d030107",
+    "308187020101301a06072a8648ce3d0101020f00db7c2abf62e35e668076bead208b3033040edb7c2abf62e35e668076bead2088040e659ef8ba043916eede8911702b2203110000f50b028e4d696e6768756151752904041d0409487239995a5ee76b55f9c2f098a89ce5af8724c0a23e0e0ff77500020f00db7c2abf62e35e7628dfac6561c5020101",
+];
+
+/// A random session of `ecpk` commands: the seed encodings with octets changed, removed, or
+/// added, cut short, or whole.
+fn ecpk_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(6) + 1 {
+        let seed = random.pick(ECPK_SEEDS);
+        let mut der: Vec<u8> = (0..seed.len() / 2)
+            .filter_map(|i| seed.get(2 * i..2 * i + 2))
+            .filter_map(|h| u8::from_str_radix(h, 16).ok())
+            .collect();
+        for _ in 0..random.below(4) {
+            let len = der.len() as u64;
+            if len == 0 {
+                break;
+            }
+            let at = usize::try_from(random.below(len)).unwrap_or(0);
+            let v = u8::try_from(random.below(256)).unwrap_or(0);
+            match random.below(5) {
+                0 => {
+                    der.remove(at);
+                }
+                1 => der.insert(at, v),
+                2 => der.truncate(at),
+                _ => {
+                    if let Some(b) = der.get_mut(at) {
+                        *b = if random.below(2) == 0 {
+                            v
+                        } else {
+                            *b ^ (1 << random.below(8))
+                        };
+                    }
+                }
+            }
+        }
+        der.truncate(250);
+        let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
+        writeln!(out, "ecpk {hex}")?;
+    }
+    Ok(())
 }
 
 /// A random session of EC commands on one curve: encodings near valid ones (random x, which a

@@ -305,6 +305,8 @@
  *                              generator) in its Jacobian coordinates; with a point off
  *                              the curve on a specialized method, only "offcurve"
  *   ecadd <r> <a> <b>          EC_POINT_add of registers
+ *   ecpk <hex>                 d2i_ECPKParameters: what it consumes, and the group's state,
+ *                              encoding, check, and print
  *
  *   # ...              comment, echoed
  */
@@ -4211,9 +4213,47 @@ static int ec_command(const char *command, const char *line)
 
     if (strcmp(command, "ecgrp") != 0 && strcmp(command, "ecpt") != 0
         && strcmp(command, "eccomp") != 0 && strcmp(command, "ecmul") != 0
-        && strcmp(command, "ecadd") != 0)
+        && strcmp(command, "ecadd") != 0 && strcmp(command, "ecpk") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "ecpk") == 0) {
+        /* ecpk <hex>: d2i_ECPKParameters, and the group it makes. */
+        const unsigned char *p = buf;
+        EC_GROUP *g;
+
+        sscanf(line, "%*s %699s", a);
+        if (!parse_hex(a, buf, &len)) {
+            printf(" bad hex\n");
+            return 1;
+        }
+        g = d2i_ECPKParameters(NULL, &p, (long)len);
+        printf(" %s %ld", g != NULL ? "decoded" : "refused", (long)(p - buf));
+        if (g != NULL) {
+            unsigned char *der = NULL;
+            int n;
+            BIO *mem = BIO_new(BIO_s_mem());
+            char *text;
+            long tlen;
+
+            printf(" curve %d flag %d form %d seed %zu degree %d", EC_GROUP_get_curve_name(g),
+                   EC_GROUP_get_asn1_flag(g), (int)EC_GROUP_get_point_conversion_form(g),
+                   EC_GROUP_get0_seed(g) != NULL ? EC_GROUP_get_seed_len(g) : 0,
+                   EC_GROUP_get_degree(g));
+            n = i2d_ECPKParameters(g, &der);
+            print_hex(" der", der, n > 0 ? (size_t)n : 0);
+            OPENSSL_free(der);
+            printf(" check %d", EC_GROUP_check(g, NULL));
+            print_asn_errors();
+            printf(" print %d", ECPKParameters_print(mem, g, 2));
+            tlen = BIO_get_mem_data(mem, &text);
+            for (long i = 0; i < tlen; i++)
+                putchar(text[i] == '\n' ? '|' : text[i]);
+            BIO_free(mem);
+            EC_GROUP_free(g);
+        }
+        print_asn_errors();
+        return 1;
+    }
     if (strcmp(command, "ecgrp") == 0) {
         sscanf(line, "%*s %699s", a);
         for (int i = 0; i < 2; i++)

@@ -339,3 +339,9 @@ name = "ec_point"
 path = "fuzz_targets/ec_point.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ec_params"
+path = "fuzz_targets/ec_params.rs"
+test = false
+doc = false
