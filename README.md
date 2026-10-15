@@ -233,6 +233,7 @@ environment variables `RUSTYSSL_OPENSSLDIR`, `RUSTYSSL_ENGINESDIR`, and `RUSTYSS
 | `crates/rustyssl-capi/src/generated/<lib>_stubs.rs` | an aborting stub for every export that isn't implemented yet |
 | `crates/rustyssl-capi/src/generated/err_strings.rs` | the error-string tables, in OpenSSL's order and load order |
 | `crates/rustyssl-asn1/src/generated/objects.rs` | the NID/name/OID table and the signature-algorithm cross-reference |
+| `crates/rustyssl-crypto/src/generated/curves.rs` | the named curves' parameters, methods, comments, names, and NIST names |
 
 ```sh
 cargo build --workspace                      # build everything

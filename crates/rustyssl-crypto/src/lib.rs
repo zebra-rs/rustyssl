@@ -7,6 +7,8 @@
 #![deny(clippy::arithmetic_side_effects)]
 
 pub mod bn;
+pub mod ec;
+mod generated;
 pub mod kdf;
 pub mod lowlevel;
 pub mod mac;
