@@ -21,6 +21,7 @@ mod buffer;
 mod cmac;
 mod conf;
 mod dir;
+mod ec;
 mod engine;
 mod err;
 mod errno;
