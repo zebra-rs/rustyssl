@@ -3503,12 +3503,28 @@ chunking) is clean.
       sessions pass) and `corpus/ec.txt`; the `ec_point` fuzz target (decoding, re-encoding,
       and multiplying by the group's order); three deviations (crashes on a missing point,
       NULL arguments, and groups without generators).
-  - [ ] **4.4b Parameters:** `ECPARAMETERS`/`ECPKPARAMETERS` and their ASN.1
-    (`d2i_`/`i2d_ECPKParameters`, `EC_GROUP_new_from_ecparameters`, ...), the groups'
-    `OSSL_PARAM` forms (`EC_GROUP_new_from_params`, `EC_GROUP_to_params`), and
-    `ECPKParameters_print`.
+  - [x] **4.4b Parameters** (`rustyssl-capi/src/ec/asn1.rs`, `ec/params.rs`; 16 exports):
+    `ECPARAMETERS` and `ECPKPARAMETERS` with OpenSSL's private layouts and templates (and
+    `X9_62_FIELDID`, `X9_62_CHARACTERISTIC_TWO`, `X9_62_PENTANOMIAL`, `X9_62_CURVE`, with
+    their ANY DEFINED BY tables), so the engine decodes, encodes, and reports errors
+    (`Field=p.prime, Type=X9_62_FIELDID`) as OpenSSL does; `EC_GROUP_get_ec(pk)parameters`,
+    `EC_GROUP_new_from_ec(pk)parameters`, `d2i_`/`i2d_ECPKParameters`,
+    `ECPKParameters_print(_fp)`, and `EC_GROUP_to_params`/`EC_GROUP_new_from_params`.
+    - The conversions call the public group and point functions in OpenSSL's order, so their
+      error stacks are the reference's. Explicit parameters of a built-in curve give its
+      named group (secp224r1 for wtls12), with the explicit flag and no seed unless given.
+    - `ossl_ec_group_todata` takes a builder or an array to fill, for the key manager (4.4d).
+    - The ASN.1 building blocks (template, aux, CHOICE, and ADB tables) moved to
+      `asn1/tpl/statics.rs`, shared with RSA's items.
+    - Tests: `tests/c/ec_params.c` (255 checks: fourteen curves named and explicit in each
+      form, the structures, 34 malformed encodings, printing, and parameter arrays both
+      ways); the probe's `ecpk` with `corpus/ecpk.txt` and random mutations of seed
+      encodings; the `ec_params` fuzz target; three deviations where OpenSSL crashes or
+      corrupts memory (a NULL `ECPARAMETERS`, refilling an existing `ECPARAMETERS`, a failed
+      conversion into the caller's `ECPKPARAMETERS`).
   - [ ] **4.4c Keys and their primitives:** first, constant-time field arithmetic for the
     curve-specific methods' curves (4.4a); then `EC_KEY` and `EC_KEY_METHOD`, `ECDSA_SIG`,
+    `ECParameters_print(_fp)` (which takes a key),
     `ECDSA_*` and `ECDH_compute_key`, the key's ASN.1 (`ECPrivateKey`, `i2o`/`o2i`), and
     EC in `EVP_PKEY` (with printing).
   - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
