@@ -3108,6 +3108,16 @@ const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::D
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPLAYTEXT_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
+const _: unsafe extern "C" fn(*mut ECPARAMETERS) = crate::ec::asn1::ECPARAMETERS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ec::asn1::ECPARAMETERS_it;
+const _: unsafe extern "C" fn() -> *mut ECPARAMETERS = crate::ec::asn1::ECPARAMETERS_new;
+const _: unsafe extern "C" fn(*mut ECPKPARAMETERS) = crate::ec::asn1::ECPKPARAMETERS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ec::asn1::ECPKPARAMETERS_it;
+const _: unsafe extern "C" fn() -> *mut ECPKPARAMETERS = crate::ec::asn1::ECPKPARAMETERS_new;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_GROUP, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ec::asn1::ECPKParameters_print;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_GROUP, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ec::asn1::ECPKParameters_print_fp;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GF2m_simple_method;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_mont_method;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nist_method;
@@ -3169,6 +3179,10 @@ const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
     crate::ec::group::EC_GROUP_get_curve_name;
 const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
     crate::ec::group::EC_GROUP_get_degree;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut ECPARAMETERS) -> *mut ECPARAMETERS =
+    crate::ec::asn1::EC_GROUP_get_ecparameters;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut ECPKPARAMETERS) -> *mut ECPKPARAMETERS =
+    crate::ec::asn1::EC_GROUP_get_ecpkparameters;
 const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
     crate::ec::group::EC_GROUP_get_field_type;
 const _: unsafe extern "C" fn(*const EC_GROUP) -> *mut BN_MONT_CTX =
@@ -3210,6 +3224,15 @@ const _: unsafe extern "C" fn(
     *const BIGNUM,
     *mut BN_CTX,
 ) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_new_curve_GFp;
+const _: unsafe extern "C" fn(*const ECPARAMETERS) -> *mut EC_GROUP =
+    crate::ec::asn1::EC_GROUP_new_from_ecparameters;
+const _: unsafe extern "C" fn(*const ECPKPARAMETERS) -> *mut EC_GROUP =
+    crate::ec::asn1::EC_GROUP_new_from_ecpkparameters;
+const _: unsafe extern "C" fn(
+    *const OSSL_PARAM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EC_GROUP = crate::ec::params::EC_GROUP_new_from_params;
 const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
     crate::ec::group::EC_GROUP_order_bits;
 const _: unsafe extern "C" fn(*mut EC_GROUP, *mut BN_CTX) -> core::ffi::c_int =
@@ -3249,6 +3272,12 @@ const _: unsafe extern "C" fn(*mut EC_GROUP, point_conversion_form_t) =
     crate::ec::group::EC_GROUP_set_point_conversion_form;
 const _: unsafe extern "C" fn(*mut EC_GROUP, *const core::ffi::c_uchar, usize) -> usize =
     crate::ec::group::EC_GROUP_set_seed;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut BN_CTX,
+) -> *mut OSSL_PARAM = crate::ec::params::EC_GROUP_to_params;
 const _: unsafe extern "C" fn(*const EC_METHOD) -> core::ffi::c_int =
     crate::ec::EC_METHOD_get_field_type;
 const _: unsafe extern "C" fn(
@@ -8862,6 +8891,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut *mut EC_GROUP,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EC_GROUP = crate::ec::asn1::d2i_ECPKParameters;
+const _: unsafe extern "C" fn(
     *mut *mut RSA,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -8989,6 +9023,8 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ec::asn1::i2d_ECPKParameters;
 const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::rsa_asn1::i2d_RSAPrivateKey;
 const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =

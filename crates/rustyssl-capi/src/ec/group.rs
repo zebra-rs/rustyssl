@@ -192,6 +192,41 @@ fn set_seed_copy(s: &mut State, seed: Option<&[u8]>) -> bool {
     true
 }
 
+/// Marks the group as decoded from explicit parameters (`group->decoded_from_explicit_params`).
+///
+/// # Safety
+/// `g` is NULL or a live group.
+pub(crate) unsafe fn set_decoded_from_explicit(g: *const EC_GROUP, decoded: bool) {
+    // SAFETY: the caller's guarantee.
+    if let Some(grp) = unsafe { group(g) } {
+        update(grp, |c| c.decoded_from_explicit_params = decoded);
+    }
+}
+
+/// Whether the group was decoded from explicit parameters.
+///
+/// # Safety
+/// `g` is NULL or a live group.
+pub(crate) unsafe fn decoded_from_explicit(g: *const EC_GROUP) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { view(g) }.is_some_and(|v| v.core.decoded_from_explicit_params)
+}
+
+/// `ossl_ec_curve_nid_from_params`: the built-in curve with the group's parameters, `NID_undef`,
+/// or -1 when they can't be read (with the errors raised).
+///
+/// # Safety
+/// `g` is a live group; `ctx` is NULL or a live `BN_CTX`.
+pub(crate) unsafe fn curve_nid_from_params(g: *const EC_GROUP, ctx: *const BN_CTX) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(v) = (unsafe { view(g) }) else {
+        return -1;
+    };
+    // SAFETY: as above.
+    let mut rng = unsafe { random(ctx, v.libctx) };
+    nid_from_params(&v.core, &mut rng)
+}
+
 /// Changes the group's core with `f`; when `f` fails, the group stays as it was.
 fn update<T>(g: &EcGroup, f: impl FnOnce(&mut CoreGroup) -> T) -> T {
     let mut s = g.lock();

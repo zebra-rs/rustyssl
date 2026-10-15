@@ -227,6 +227,9 @@ OpenSSL never depends on them.
 | `EC_POINT_mul` with a point scalar but no point on a binary curve, or on SM2's `sm2p256` method (aarch64) | the binary method runs its ladder on the missing scalar and crashes; `sm2p256` returns uninitialized stack memory as the point | the point at infinity, and 1 | `ec::point::tests::a_point_scalar_without_a_point_on_a_binary_curve_gives_infinity` |
 | The `EC_POINT_*` and `EC_GROUP_*` functions given a NULL group or point (other than those OpenSSL documents as accepting NULL) | dereference NULL | fail as each fails (0, -1 for `EC_POINT_cmp`, NULL) | `ec::point::tests::a_null_group_or_point_fails` |
 | `EC_GROUP_cmp` of groups that have no generator | compares the missing generators and crashes | compares the rest (0 for groups that are otherwise the same) | `ec::point::tests::groups_without_generators_compare` |
+| `EC_GROUP_new_from_ecparameters(NULL)` | dereferences NULL | fails with `ERR_R_PASSED_NULL_PARAMETER` | `ec::asn1::tests::null_ecparameters_fail` |
+| `EC_GROUP_get_ecparameters` into an existing `ECPARAMETERS` | frees the old field parameters as an ASN.1 ANY whatever they are (a prime's INTEGER, a binary field's parameters), corrupting memory | frees them as the type their field type made them, then fills the structure | `ec::asn1::tests::existing_ecparameters_are_refilled` |
+| `EC_GROUP_get_ecpkparameters` into the caller's `ECPKPARAMETERS`, failing (a named curve without an OID) | frees the caller's structure, which the caller frees again | leaves it to the caller, emptied | `ec::asn1::tests::a_failed_ecpkparameters_leaves_the_callers` |
 
 ## Notes
 

@@ -3398,54 +3398,6 @@ pub extern "C" fn ECDSA_verify(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ECPARAMETERS_free(_: *mut ECPARAMETERS) {
-    crate::stub::unimplemented("ECPARAMETERS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPARAMETERS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ECPARAMETERS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPARAMETERS_new() -> *mut ECPARAMETERS {
-    crate::stub::unimplemented("ECPARAMETERS_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPKPARAMETERS_free(_: *mut ECPKPARAMETERS) {
-    crate::stub::unimplemented("ECPKPARAMETERS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPKPARAMETERS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ECPKPARAMETERS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPKPARAMETERS_new() -> *mut ECPKPARAMETERS {
-    crate::stub::unimplemented("ECPKPARAMETERS_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPKParameters_print(
-    _: *mut BIO,
-    _: *const EC_GROUP,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECPKParameters_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECPKParameters_print_fp(
-    _: *mut FILE,
-    _: *const EC_GROUP,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECPKParameters_print_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ECParameters_print(_: *mut BIO, _: *const EC_KEY) -> core::ffi::c_int {
     crate::stub::unimplemented("ECParameters_print")
 }
@@ -3453,51 +3405,6 @@ pub extern "C" fn ECParameters_print(_: *mut BIO, _: *const EC_KEY) -> core::ffi
 #[unsafe(no_mangle)]
 pub extern "C" fn ECParameters_print_fp(_: *mut FILE, _: *const EC_KEY) -> core::ffi::c_int {
     crate::stub::unimplemented("ECParameters_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_get_ecparameters(
-    _: *const EC_GROUP,
-    _: *mut ECPARAMETERS,
-) -> *mut ECPARAMETERS {
-    crate::stub::unimplemented("EC_GROUP_get_ecparameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_get_ecpkparameters(
-    _: *const EC_GROUP,
-    _: *mut ECPKPARAMETERS,
-) -> *mut ECPKPARAMETERS {
-    crate::stub::unimplemented("EC_GROUP_get_ecpkparameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_new_from_ecparameters(_: *const ECPARAMETERS) -> *mut EC_GROUP {
-    crate::stub::unimplemented("EC_GROUP_new_from_ecparameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_new_from_ecpkparameters(_: *const ECPKPARAMETERS) -> *mut EC_GROUP {
-    crate::stub::unimplemented("EC_GROUP_new_from_ecpkparameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_new_from_params(
-    _: *const OSSL_PARAM,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EC_GROUP {
-    crate::stub::unimplemented("EC_GROUP_new_from_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EC_GROUP_to_params(
-    _: *const EC_GROUP,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *mut BN_CTX,
-) -> *mut OSSL_PARAM {
-    crate::stub::unimplemented("EC_GROUP_to_params")
 }
 
 #[unsafe(no_mangle)]
@@ -20801,15 +20708,6 @@ pub extern "C" fn d2i_ECDSA_SIG(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_ECPKParameters(
-    _: *mut *mut EC_GROUP,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EC_GROUP {
-    crate::stub::unimplemented("d2i_ECPKParameters")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_ECParameters(
     _: *mut *mut EC_KEY,
     _: *mut *const core::ffi::c_uchar,
@@ -22699,14 +22597,6 @@ pub extern "C" fn i2d_ECDSA_SIG(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_ECDSA_SIG")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ECPKParameters(
-    _: *const EC_GROUP,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ECPKParameters")
 }
 
 #[unsafe(no_mangle)]

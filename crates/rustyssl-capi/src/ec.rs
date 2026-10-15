@@ -12,8 +12,10 @@
 //! The random numbers the operations draw come from the private generator of the `BN_CTX`'s
 //! library context, or the group's when there's no `BN_CTX`, as in OpenSSL.
 
+pub(crate) mod asn1;
 pub(crate) mod curves;
 pub(crate) mod group;
+pub(crate) mod params;
 pub(crate) mod point;
 
 use core::ffi::c_int;
