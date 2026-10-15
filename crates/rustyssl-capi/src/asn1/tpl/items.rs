@@ -4,7 +4,7 @@
 //! `X509_ALGOR` (`x_algor.c`), the AlgorithmIdentifier the EVP layer decodes. With them, their
 //! `new`, `free`, and `i2d_` functions, each through its item.
 
-use core::ffi::{c_int, c_long, c_uchar};
+use core::ffi::c_int;
 use core::ptr;
 
 use rustyssl_abi::{
@@ -21,12 +21,7 @@ use rustyssl_abi::{
     V_ASN1_UTCTIME, V_ASN1_UTF8STRING, V_ASN1_VISIBLESTRING, X509_ALGOR,
 };
 
-use super::decode::ASN1_item_d2i;
-use super::encode::ASN1_item_i2d;
-use super::free::ASN1_item_free;
-use super::new::ASN1_item_new;
 use super::{Item, Template, item, item_fns, size_of_long, template, template_at};
-use crate::ffi::ffi_export;
 
 /// A primitive item of type `utype`, with `size` (`IMPLEMENT_ASN1_TYPE_ex`).
 const fn primitive(utype: c_int, size: core::ffi::c_long, sname: &'static core::ffi::CStr) -> Item {
@@ -161,20 +156,22 @@ macro_rules! i2d {
         $(#[$attr:meta])*
         pub unsafe extern "C" fn $name:ident($ty:ty) = $it:ident;
     )*) => {$(
-        ffi_export! {
+        $crate::ffi::ffi_export! {
             $(#[$attr])*
             ///
             /// # Safety
             /// As for `ASN1_item_i2d`, with `a` a value of the type.
-            pub unsafe extern "C" fn $name(a: *const $ty, out: *mut *mut c_uchar) -> c_int
-            where failure = -1, library = ERR_LIB_ASN1
+            pub unsafe extern "C" fn $name(a: *const $ty, out: *mut *mut ::core::ffi::c_uchar) -> ::core::ffi::c_int
+            where failure = -1, library = ::rustyssl_abi::ERR_LIB_ASN1
             {
                 // SAFETY: the caller's guarantee; the item is the type's.
-                unsafe { ASN1_item_i2d(a.cast(), out, $it()) }
+                unsafe { $crate::asn1::tpl::encode::ASN1_item_i2d(a.cast(), out, $it()) }
             }
         }
     )*};
 }
+
+pub(crate) use i2d;
 
 i2d! {
     /// Encodes an OCTET STRING (`ASN1_item_i2d`).
@@ -231,20 +228,22 @@ macro_rules! d2i {
         $(#[$attr:meta])*
         pub unsafe extern "C" fn $name:ident($ty:ty) = $it:ident;
     )*) => {$(
-        ffi_export! {
+        $crate::ffi::ffi_export! {
             $(#[$attr])*
             ///
             /// # Safety
             /// As for `ASN1_item_d2i`, with `a` NULL or a slot for a value of the type.
-            pub unsafe extern "C" fn $name(a: *mut *mut $ty, in_: *mut *const c_uchar, len: c_long) -> *mut $ty
-            where failure = ptr::null_mut(), library = ERR_LIB_ASN1
+            pub unsafe extern "C" fn $name(a: *mut *mut $ty, in_: *mut *const ::core::ffi::c_uchar, len: ::core::ffi::c_long) -> *mut $ty
+            where failure = ::core::ptr::null_mut(), library = ::rustyssl_abi::ERR_LIB_ASN1
             {
                 // SAFETY: the caller's guarantee; the item is the type's.
-                unsafe { ASN1_item_d2i(a.cast(), in_, len, $it()) }.cast()
+                unsafe { $crate::asn1::tpl::decode::ASN1_item_d2i(a.cast(), in_, len, $it()) }.cast()
             }
         }
     )*};
 }
+
+pub(crate) use d2i;
 
 d2i! {
     /// Decodes an OCTET STRING (`ASN1_item_d2i`).
@@ -300,33 +299,35 @@ macro_rules! new_free {
     ($(
         pub unsafe extern "C" fn $new:ident, pub unsafe extern "C" fn $free:ident ($ty:ty) = $it:ident;
     )*) => {$(
-        ffi_export! {
+        $crate::ffi::ffi_export! {
             #[doc = concat!("A new value of `", stringify!($it), "` (`ASN1_item_new`).")]
             ///
             /// # Safety
             /// No preconditions.
             pub unsafe extern "C" fn $new() -> *mut $ty
-            where failure = ptr::null_mut(), library = ERR_LIB_ASN1
+            where failure = ::core::ptr::null_mut(), library = ::rustyssl_abi::ERR_LIB_ASN1
             {
                 // SAFETY: the type's item.
-                unsafe { ASN1_item_new($it()) }.cast()
+                unsafe { $crate::asn1::tpl::new::ASN1_item_new($it()) }.cast()
             }
         }
 
-        ffi_export! {
+        $crate::ffi::ffi_export! {
             #[doc = concat!("Frees a value of `", stringify!($it), "` (`ASN1_item_free`).")]
             ///
             /// # Safety
             /// `a` is NULL or a live value of the type.
             pub unsafe extern "C" fn $free(a: *mut $ty)
-            where failure = (), library = ERR_LIB_ASN1
+            where failure = (), library = ::rustyssl_abi::ERR_LIB_ASN1
             {
                 // SAFETY: the caller's guarantee.
-                unsafe { ASN1_item_free(a.cast(), $it()) }
+                unsafe { $crate::asn1::tpl::free::ASN1_item_free(a.cast(), $it()) }
             }
         }
     )*};
 }
+
+pub(crate) use new_free;
 
 new_free! {
     pub unsafe extern "C" fn ASN1_NULL_new, pub unsafe extern "C" fn ASN1_NULL_free(ASN1_NULL) = ASN1_NULL_it;

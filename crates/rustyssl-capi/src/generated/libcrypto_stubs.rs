@@ -569,11 +569,6 @@ pub extern "C" fn BASIC_CONSTRAINTS_new() -> *mut BASIC_CONSTRAINTS {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIGNUM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("BIGNUM_it")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_asn1_get_prefix(
     _: *mut BIO,
     _: *mut asn1_ps_func,
@@ -657,11 +652,6 @@ pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_log")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CBIGNUM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CBIGNUM_it")
 }
 
 #[unsafe(no_mangle)]
@@ -14133,61 +14123,6 @@ pub extern "C" fn PROXY_POLICY_new() -> *mut PROXY_POLICY {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn RSAPrivateKey_dup(_: *const RSA) -> *mut RSA {
-    crate::stub::unimplemented("RSAPrivateKey_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSAPrivateKey_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("RSAPrivateKey_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSAPublicKey_dup(_: *const RSA) -> *mut RSA {
-    crate::stub::unimplemented("RSAPublicKey_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSAPublicKey_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("RSAPublicKey_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_OAEP_PARAMS_free(_: *mut RSA_OAEP_PARAMS) {
-    crate::stub::unimplemented("RSA_OAEP_PARAMS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_OAEP_PARAMS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("RSA_OAEP_PARAMS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_OAEP_PARAMS_new() -> *mut RSA_OAEP_PARAMS {
-    crate::stub::unimplemented("RSA_OAEP_PARAMS_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_PSS_PARAMS_dup(_: *const RSA_PSS_PARAMS) -> *mut RSA_PSS_PARAMS {
-    crate::stub::unimplemented("RSA_PSS_PARAMS_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_PSS_PARAMS_free(_: *mut RSA_PSS_PARAMS) {
-    crate::stub::unimplemented("RSA_PSS_PARAMS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_PSS_PARAMS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("RSA_PSS_PARAMS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn RSA_PSS_PARAMS_new() -> *mut RSA_PSS_PARAMS {
-    crate::stub::unimplemented("RSA_PSS_PARAMS_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn RSA_print(_: *mut BIO, _: *const RSA, _: core::ffi::c_int) -> core::ffi::c_int {
     crate::stub::unimplemented("RSA_print")
 }
@@ -22832,62 +22767,6 @@ pub extern "C" fn d2i_PublicKey(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPrivateKey(
-    _: *mut *mut RSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPrivateKey_bio(_: *mut BIO, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPrivateKey_fp(_: *mut FILE, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPublicKey(
-    _: *mut *mut RSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPublicKey_bio(_: *mut BIO, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPublicKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSAPublicKey_fp(_: *mut FILE, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSAPublicKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSA_OAEP_PARAMS(
-    _: *mut *mut RSA_OAEP_PARAMS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut RSA_OAEP_PARAMS {
-    crate::stub::unimplemented("d2i_RSA_OAEP_PARAMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSA_PSS_PARAMS(
-    _: *mut *mut RSA_PSS_PARAMS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut RSA_PSS_PARAMS {
-    crate::stub::unimplemented("d2i_RSA_PSS_PARAMS")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_RSA_PUBKEY(
     _: *mut *mut RSA,
     _: *mut *const core::ffi::c_uchar,
@@ -24653,58 +24532,6 @@ pub extern "C" fn i2d_PublicKey(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_PublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPrivateKey(
-    _: *const RSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPrivateKey_bio(_: *mut BIO, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPrivateKey_fp(_: *mut FILE, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPublicKey(
-    _: *const RSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPublicKey_bio(_: *mut BIO, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPublicKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSAPublicKey_fp(_: *mut FILE, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSAPublicKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSA_OAEP_PARAMS(
-    _: *const RSA_OAEP_PARAMS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSA_OAEP_PARAMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSA_PSS_PARAMS(
-    _: *const RSA_PSS_PARAMS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSA_PSS_PARAMS")
 }
 
 #[unsafe(no_mangle)]

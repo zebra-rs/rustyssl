@@ -3396,8 +3396,40 @@ chunking) is clean.
         yet, so they abort as unimplemented (fail closed). The ASN.1-dependent parts (print,
         the private key's decoding, `RSA_get0_pss_params`) come with 4.3e and 4.7.
       - `tests/c/evp_pkey_rsa.c` (38 checks).
-  - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
-    `RSA_OAEP_PARAMS`).
+  - [x] **4.3e RSA's ASN.1 items** (`rsa_asn1.rs`, `asn1/tpl/bignum.rs`,
+    `asn1/tpl/shadow.rs`; 29 exports):
+    - `BIGNUM_it` and `CBIGNUM_it` (`x_bignum.c`): the magnitude, unsigned both ways;
+      `CBIGNUM`'s numbers are secure, constant-time, and cleared when freed.
+    - `RSAPublicKey` and `RSAPrivateKey` as *shadowed* extern items. They're extern because
+      the `RSA` handle has no C layout to put templates over. Each walks a private shadow
+      structure that has OpenSSL's fields, names, and items, so the engine produces OpenSSL's
+      encodings, errors, and printing. Behavior matches OpenSSL's:
+      - Decoding into a key reuses its `BIGNUM`s.
+      - The version is kept as decoded (any `int32`) and encoded again.
+      - The other primes are replaced by the list decoded, and dropped when it's absent. An
+        empty list is kept.
+      - A multi-prime version without primes fails (`ASN1_R_AUX_ERROR`).
+      - `RSAPublicKey` changes only n and e.
+      - Freeing a shadow after a failure leaves the key's own numbers alone.
+      - Recorded in `DEVIATIONS.md`'s notes: the items' `itype` is extern.
+    - `RSA_PSS_PARAMS` and `RSA_OAEP_PARAMS` with their callbacks (`maskHash` freed), and the
+      `d2i_`/`i2d_`/`_new`/`_free`/`_dup` functions, `RSAPublicKey_dup`/`RSAPrivateKey_dup`,
+      and the BIO and FILE functions. `d2i_RSA_PUBKEY` (SubjectPublicKeyInfo) and the PEM
+      functions come with the X.509 public key (Phase 5) and the PEM step.
+    - Fixed: `RSA_up_ref` also took an `Arc` reference that `RSA_free` never gave back, so
+      every key that was ever up-referenced (each provider operation does it) leaked.
+    - `tests/c/rsa_asn1.c` (70 checks): encodings, errors, keys decoded in place, every printing
+      flag, inside an application's SEQUENCE (implicitly tagged and SET OF). The probe's
+      `asnd2i` takes the five new items, with RSA-shaped random input; 20,000 random sessions
+      matched. The `asn1_d2i` fuzz target decodes with them.
+  - [ ] **4.3f RSA printing:** `RSA_print`, `RSA_print_fp`, and the ASN.1 method's public and
+    private print functions (OpenSSL's `pkey_rsa_print`), which `EVP_PKEY_print_*` uses for a
+    legacy key: byte-identical text, multi-prime keys, and RSA-PSS keys' parameter
+    restrictions.
+  - [ ] **4.3g The legacy RSA `EVP_PKEY_METHOD`** (`rsa_pmeth.c`): EVP operations on a key whose
+    `RSA` has an application's method, which stays a legacy key and so can't reach the
+    providers (4.3d3 fails closed on it until then): sign, verify, verify-recover, encrypt,
+    decrypt, key generation, and the `ctrl`/`ctrl_str` padding, digest, and MGF1 settings.
 - [ ] **4.4 EC:**
   - `EC_GROUP`: every named curve in the default build (NIST, secp*k1, brainpool, SM2,
     binary curves), explicit parameters, `check`, conversion forms

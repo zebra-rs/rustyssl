@@ -202,7 +202,8 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's ASN.1 version: `RSA_ASN1_VERSION_MULTI` for a multi-prime key, else 0.
+    /// The key's ASN.1 version: `RSA_ASN1_VERSION_MULTI` for a multi-prime key, else the
+    /// version an `RSAPrivateKey` was decoded with (0 for other keys).
     ///
     /// # Safety
     /// `r` is NULL or a live key.
@@ -210,9 +211,15 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_RSA
     {
         // SAFETY: the caller's guarantee.
-        match unsafe { key(r) } {
-            Some(k) if k.lock().key.multi => RSA_ASN1_VERSION_MULTI,
-            _ => RSA_ASN1_VERSION_DEFAULT,
+        let Some(k) = (unsafe { key(r) }) else {
+            return RSA_ASN1_VERSION_DEFAULT;
+        };
+        if k.lock().key.multi {
+            return RSA_ASN1_VERSION_MULTI;
+        }
+        match k.legacy().version {
+            RSA_ASN1_VERSION_MULTI => RSA_ASN1_VERSION_DEFAULT,
+            v => v,
         }
     }
 }
@@ -965,6 +972,22 @@ mod tests {
         }
         // SAFETY: the key made above.
         unsafe { RSA_free(r) };
+    }
+
+    /// Each reference `RSA_up_ref` adds is one `RSA_free` drops, and the last frees the key
+    /// (Miri reports the key leaked otherwise).
+    #[test]
+    fn references_balance() {
+        // SAFETY: no preconditions.
+        let r = unsafe { RSA_new() };
+        // SAFETY: a live key.
+        assert_eq!(unsafe { RSA_up_ref(r) }, 1);
+        // SAFETY: as above.
+        assert_eq!(unsafe { RSA_up_ref(r) }, 1);
+        for _ in 0..3 {
+            // SAFETY: one of the three references.
+            unsafe { RSA_free(r) };
+        }
     }
 
     /// docs/DEVIATIONS.md: OpenSSL's `RSA_new` dereferences a NULL default method.

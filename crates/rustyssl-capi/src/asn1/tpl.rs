@@ -14,6 +14,7 @@
 //! `tasn_typ.c`), and [`ints`] (the `INT32`..`ZUINT64` and `LONG` items, `x_int64.c` and
 //! `x_long.c`).
 
+pub(crate) mod bignum;
 pub(crate) mod decode;
 pub(crate) mod encode;
 pub(crate) mod free;
@@ -22,6 +23,7 @@ pub(crate) mod io;
 pub(crate) mod items;
 pub(crate) mod new;
 pub(crate) mod print;
+pub(crate) mod shadow;
 pub(crate) mod util;
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
