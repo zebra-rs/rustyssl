@@ -5704,11 +5704,6 @@ pub extern "C" fn EVP_PKEY_get0_EC_KEY(_: *const EVP_PKEY) -> *const ec_key_st {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_RSA(_: *const EVP_PKEY) -> *const rsa_st {
-    crate::stub::unimplemented("EVP_PKEY_get0_RSA")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get1_DH(_: *mut EVP_PKEY) -> *mut dh_st {
     crate::stub::unimplemented("EVP_PKEY_get1_DH")
 }
@@ -5721,11 +5716,6 @@ pub extern "C" fn EVP_PKEY_get1_DSA(_: *mut EVP_PKEY) -> *mut dsa_st {
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get1_EC_KEY(_: *mut EVP_PKEY) -> *mut ec_key_st {
     crate::stub::unimplemented("EVP_PKEY_get1_EC_KEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get1_RSA(_: *mut EVP_PKEY) -> *mut rsa_st {
-    crate::stub::unimplemented("EVP_PKEY_get1_RSA")
 }
 
 #[unsafe(no_mangle)]
@@ -5782,11 +5772,6 @@ pub extern "C" fn EVP_PKEY_set1_DSA(_: *mut EVP_PKEY, _: *mut dsa_st) -> core::f
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_set1_EC_KEY(_: *mut EVP_PKEY, _: *mut ec_key_st) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_set1_EC_KEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set1_RSA(_: *mut EVP_PKEY, _: *mut rsa_st) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set1_RSA")
 }
 
 #[unsafe(no_mangle)]

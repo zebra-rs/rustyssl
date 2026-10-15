@@ -753,6 +753,7 @@ ffi_callback! {
         if selection & POSSIBLE == 0 {
             return 0;
         }
+        r.touch();
         let mut st = r.lock();
         let mut ok = true;
         if selection & OTHER != 0 {

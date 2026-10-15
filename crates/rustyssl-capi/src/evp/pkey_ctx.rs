@@ -446,6 +446,7 @@ unsafe fn resolve(
     const F: &str = "int_ctx_new";
     let mut keytype = keytype.map(CStr::to_owned);
     let mut app_pmeth = None;
+    let mut builtin_pmeth = None;
     if id == -1 {
         match pkey {
             Some(k) if !k.get().is_provided() => id = k.get().type_(),
@@ -474,15 +475,22 @@ unsafe fn resolve(
             err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
             return None;
         }
-        // No key is foreign (its low-level key an engine's or an application method's): the
-        // built-in key types' data, which could be, comes with the key types.
-        // SAFETY: a type number.
-        let sn = unsafe { OBJ_nid2sn(id) };
-        // SAFETY: NULL or a static string.
-        keytype = unsafe { text(sn) }.map(CStr::to_owned);
+        // A foreign key (its legacy data an application method's) keeps to the type's
+        // `EVP_PKEY_METHOD`; any other key goes to the providers by its type's name.
+        let foreign = pkey.is_some_and(|k| k.get().lock().foreign);
+        if !foreign {
+            // SAFETY: a type number.
+            let sn = unsafe { OBJ_nid2sn(id) };
+            // SAFETY: NULL or a static string.
+            keytype = unsafe { text(sn) }.map(CStr::to_owned);
+        }
         // OpenSSL searches for an engine implementing the type first.
         pkey::ameth::engine_lookup();
-        app_pmeth = pmeth::find_app(id);
+        if foreign {
+            builtin_pmeth = pmeth::find(id);
+        } else {
+            app_pmeth = pmeth::find_app(id);
+        }
     }
     let mut keymgmt = None;
     if let Some(t) = keytype.as_ref().filter(|_| app_pmeth.is_none()) {
@@ -504,14 +512,15 @@ unsafe fn resolve(
         }
         keymgmt = Some(km);
     }
-    if keymgmt.is_none() && app_pmeth.is_none() {
+    let pmeth = app_pmeth.or(builtin_pmeth);
+    if keymgmt.is_none() && pmeth.is_none() {
         err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_ALGORITHM, F);
         return None;
     }
     Some(Resolved {
         keytype,
         keymgmt,
-        pmeth: app_pmeth,
+        pmeth,
         id,
     })
 }

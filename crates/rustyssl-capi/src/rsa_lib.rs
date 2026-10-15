@@ -354,6 +354,7 @@ unsafe fn set0(k: &Rsa, f: Field, b: *mut BIGNUM) {
             lg.numbers.retire(old);
         }
     }
+    k.touch();
 }
 
 /// Whether the key has the number `f`.
@@ -495,6 +496,7 @@ ffi_export! {
         read_numbers(&mut lg.numbers, &mut st.key);
         st.key.extra = extra;
         st.key.multi = true;
+        k.touch();
         let old = core::mem::replace(&mut lg.numbers.extra, handles);
         for h in old {
             for b in h {

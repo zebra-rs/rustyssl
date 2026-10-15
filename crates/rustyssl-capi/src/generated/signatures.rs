@@ -5045,6 +5045,8 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *mut *mut EVP_PKEY) -> core::ff
     crate::evp::pkey_ctx::EVP_PKEY_generate;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut core::ffi::c_void =
     crate::evp::pkey::EVP_PKEY_get0;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const rsa_st =
+    crate::evp::pkey::rsa::EVP_PKEY_get0_RSA;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const EVP_PKEY_ASN1_METHOD =
     crate::evp::pkey::ameth::EVP_PKEY_get0_asn1;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
@@ -5061,6 +5063,8 @@ const _: unsafe extern "C" fn(*const EVP_PKEY, *mut usize) -> *const core::ffi::
     crate::evp::pkey::EVP_PKEY_get0_siphash;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
     crate::evp::pkey::EVP_PKEY_get0_type_name;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut rsa_st =
+    crate::evp::pkey::rsa::EVP_PKEY_get1_RSA;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut *mut core::ffi::c_uchar) -> usize =
     crate::evp::pkey::params::EVP_PKEY_get1_encoded_public_key;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
@@ -5634,6 +5638,8 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
     crate::evp::pkey_ctx::EVP_PKEY_public_check_quick;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, core::ffi::c_int) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_save_parameters;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut rsa_st) -> core::ffi::c_int =
+    crate::evp::pkey::rsa::EVP_PKEY_set1_RSA;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
     crate::evp::pkey::params::EVP_PKEY_set1_encoded_public_key;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut ENGINE) -> core::ffi::c_int =

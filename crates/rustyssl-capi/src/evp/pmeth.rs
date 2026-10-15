@@ -394,7 +394,7 @@ pub(crate) unsafe fn check_autoarg(
 }
 
 /// `EVP_PKEY_meth_find`.
-fn find(type_: c_int) -> Option<Ref> {
+pub(crate) fn find(type_: c_int) -> Option<Ref> {
     find_app(type_).or_else(|| STANDARD.iter().find(|m| m.get().pkey_id == type_).cloned())
 }
 
