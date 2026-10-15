@@ -18,6 +18,7 @@ Each `openssl-<major>.<minor>/` directory contains:
 | `util/libcrypto.num`, `util/libssl.num` | Every exported symbol with its version and build conditions |
 | `crypto/objects/` | `objects.txt`, `obj_mac.num` (NIDs), and `obj_xref.txt` (signature-algorithm mapping) |
 | `crypto/err/openssl.txt` | Error reason codes and strings |
+| `crypto/ec/ec_curve.c`, `crypto/evp/ec_support.c` | The named curves' parameters, methods, and comments, and their names and NIST names (codegen's curve table) |
 | `crypto/**/*_err.c`, `crypto/err/err.c`, ... | The C error-string tables: the text OpenSSL actually prints (a few strings differ from `openssl.txt`), the library names, and the common reasons |
 | `doc/man3/`, `doc/man7/` | The API man pages (POD), our behavioral spec |
 | `LICENSE.txt` | OpenSSL's license (Apache-2.0) |

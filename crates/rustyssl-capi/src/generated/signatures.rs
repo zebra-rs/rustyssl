@@ -3108,6 +3108,342 @@ const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::D
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPLAYTEXT_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GF2m_simple_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_mont_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nist_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nistp224_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nistp256_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nistp521_method;
+const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_simple_method;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_check;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_check_discriminant;
+const _: unsafe extern "C" fn(*const EC_GROUP, core::ffi::c_int, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_check_named_curve;
+const _: unsafe extern "C" fn(*mut EC_GROUP) = crate::ec::group::EC_GROUP_clear_free;
+const _: unsafe extern "C" fn(*const EC_GROUP, *const EC_GROUP, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_cmp;
+const _: unsafe extern "C" fn(*mut EC_GROUP, *const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_copy;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_dup;
+const _: unsafe extern "C" fn(*mut EC_GROUP) = crate::ec::group::EC_GROUP_free;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *const BIGNUM =
+    crate::ec::group::EC_GROUP_get0_cofactor;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *const BIGNUM =
+    crate::ec::group::EC_GROUP_get0_field;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *const EC_POINT =
+    crate::ec::group::EC_GROUP_get0_generator;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *const BIGNUM =
+    crate::ec::group::EC_GROUP_get0_order;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *mut core::ffi::c_uchar =
+    crate::ec::group::EC_GROUP_get0_seed;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_asn1_flag;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_basis_type;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut BIGNUM, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_cofactor;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_get_curve;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_get_curve_GF2m;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_get_curve_GFp;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_curve_name;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_degree;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_field_type;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *mut BN_MONT_CTX =
+    crate::ec::group::EC_GROUP_get_mont_data;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut BIGNUM, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_order;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut core::ffi::c_uint,
+    *mut core::ffi::c_uint,
+    *mut core::ffi::c_uint,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_get_pentanomial_basis;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> point_conversion_form_t =
+    crate::ec::group::EC_GROUP_get_point_conversion_form;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> usize = crate::ec::group::EC_GROUP_get_seed_len;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut core::ffi::c_uint) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_get_trinomial_basis;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_have_precompute_mult;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *const EC_METHOD =
+    crate::ec::group::EC_GROUP_method_of;
+const _: unsafe extern "C" fn(*const EC_METHOD) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_new;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut EC_GROUP =
+    crate::ec::group::EC_GROUP_new_by_curve_name;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_new_by_curve_name_ex;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_new_curve_GF2m;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> *mut EC_GROUP = crate::ec::group::EC_GROUP_new_curve_GFp;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_order_bits;
+const _: unsafe extern "C" fn(*mut EC_GROUP, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::group::EC_GROUP_precompute_mult;
+const _: unsafe extern "C" fn(*mut EC_GROUP, core::ffi::c_int) =
+    crate::ec::group::EC_GROUP_set_asn1_flag;
+const _: unsafe extern "C" fn(
+    *mut EC_GROUP,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_set_curve;
+const _: unsafe extern "C" fn(
+    *mut EC_GROUP,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_set_curve_GF2m;
+const _: unsafe extern "C" fn(
+    *mut EC_GROUP,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_set_curve_GFp;
+const _: unsafe extern "C" fn(*mut EC_GROUP, core::ffi::c_int) =
+    crate::ec::group::EC_GROUP_set_curve_name;
+const _: unsafe extern "C" fn(
+    *mut EC_GROUP,
+    *const EC_POINT,
+    *const BIGNUM,
+    *const BIGNUM,
+) -> core::ffi::c_int = crate::ec::group::EC_GROUP_set_generator;
+const _: unsafe extern "C" fn(*mut EC_GROUP, point_conversion_form_t) =
+    crate::ec::group::EC_GROUP_set_point_conversion_form;
+const _: unsafe extern "C" fn(*mut EC_GROUP, *const core::ffi::c_uchar, usize) -> usize =
+    crate::ec::group::EC_GROUP_set_seed;
+const _: unsafe extern "C" fn(*const EC_METHOD) -> core::ffi::c_int =
+    crate::ec::EC_METHOD_get_field_type;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const EC_POINT,
+    *const EC_POINT,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_add;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const BIGNUM,
+    *mut EC_POINT,
+    *mut BN_CTX,
+) -> *mut EC_POINT = crate::ec::point::EC_POINT_bn2point;
+const _: unsafe extern "C" fn(*mut EC_POINT) = crate::ec::point::EC_POINT_clear_free;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    *const EC_POINT,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_cmp;
+const _: unsafe extern "C" fn(*mut EC_POINT, *const EC_POINT) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_copy;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const EC_POINT,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_dbl;
+const _: unsafe extern "C" fn(*const EC_POINT, *const EC_GROUP) -> *mut EC_POINT =
+    crate::ec::point::EC_POINT_dup;
+const _: unsafe extern "C" fn(*mut EC_POINT) = crate::ec::point::EC_POINT_free;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_get_Jprojective_coordinates_GFp;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_get_affine_coordinates;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_get_affine_coordinates_GF2m;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_get_affine_coordinates_GFp;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const core::ffi::c_char,
+    *mut EC_POINT,
+    *mut BN_CTX,
+) -> *mut EC_POINT = crate::ec::point::EC_POINT_hex2point;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut EC_POINT, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_invert;
+const _: unsafe extern "C" fn(*const EC_GROUP, *const EC_POINT) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_is_at_infinity;
+const _: unsafe extern "C" fn(*const EC_GROUP, *const EC_POINT, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_is_on_curve;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut EC_POINT, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_make_affine;
+const _: unsafe extern "C" fn(*const EC_POINT) -> *const EC_METHOD =
+    crate::ec::point::EC_POINT_method_of;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    *const EC_POINT,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_mul;
+const _: unsafe extern "C" fn(*const EC_GROUP) -> *mut EC_POINT = crate::ec::point::EC_POINT_new;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_oct2point;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    point_conversion_form_t,
+    *mut BIGNUM,
+    *mut BN_CTX,
+) -> *mut BIGNUM = crate::ec::point::EC_POINT_point2bn;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    point_conversion_form_t,
+    *mut *mut core::ffi::c_uchar,
+    *mut BN_CTX,
+) -> usize = crate::ec::point::EC_POINT_point2buf;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    point_conversion_form_t,
+    *mut BN_CTX,
+) -> *mut core::ffi::c_char = crate::ec::point::EC_POINT_point2hex;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *const EC_POINT,
+    point_conversion_form_t,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut BN_CTX,
+) -> usize = crate::ec::point::EC_POINT_point2oct;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_Jprojective_coordinates_GFp;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_affine_coordinates;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_affine_coordinates_GF2m;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_affine_coordinates_GFp;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    core::ffi::c_int,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_compressed_coordinates;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    core::ffi::c_int,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_compressed_coordinates_GF2m;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    core::ffi::c_int,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINT_set_compressed_coordinates_GFp;
+const _: unsafe extern "C" fn(*const EC_GROUP, *mut EC_POINT) -> core::ffi::c_int =
+    crate::ec::point::EC_POINT_set_to_infinity;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    usize,
+    *mut *mut EC_POINT,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINTs_make_affine;
+const _: unsafe extern "C" fn(
+    *const EC_GROUP,
+    *mut EC_POINT,
+    *const BIGNUM,
+    usize,
+    *mut *const EC_POINT,
+    *mut *const BIGNUM,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::point::EC_POINTs_mul;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ec::curves::EC_curve_nid2nist;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ec::curves::EC_curve_nist2nid;
+const _: unsafe extern "C" fn(*mut EC_builtin_curve, usize) -> usize =
+    crate::ec::curves::EC_get_builtin_curves;
 const _: unsafe extern "C" fn() = crate::conf::builtin::ENGINE_add_conf_module;
 const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_finish;
 const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_free;
@@ -6762,6 +7098,8 @@ const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_v
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ec::curves::OSSL_EC_curve_nid2name;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_free;
 const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_new;
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;

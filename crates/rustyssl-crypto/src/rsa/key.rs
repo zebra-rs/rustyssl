@@ -42,51 +42,6 @@ struct Blind {
 #[derive(Clone, Default)]
 pub struct Blinding(Arc<Mutex<Option<Blind>>>);
 
-/// `bnrand_range` over the private generator: a random number in `[0, range)`, drawn as
-/// OpenSSL draws it (so a known generator gives OpenSSL's number and leaves it where
-/// OpenSSL's does), or `None`.
-fn rand_range(range: &BigNum, rng: &mut Random<'_>) -> Option<BigNum> {
-    if range.is_zero() || range.is_negative() {
-        return None;
-    }
-    let n = range.num_bits();
-    if n == 1 {
-        return Some(BigNum::zero());
-    }
-    // A range of 100...: draw a bit more and reduce by up to twice the range.
-    let three = !range.is_bit_set(n.wrapping_sub(2)) && !range.is_bit_set(n.wrapping_sub(3));
-    let bits = if three { n.saturating_add(1) } else { n };
-    let bytes = bits.div_ceil(8);
-    let top_bit = bits.saturating_sub(1) % 8;
-    // OpenSSL draws up to 100 times and gives up on the 100th, unchecked.
-    for attempt in 0..100 {
-        let mut buf = Zeroizing::new(vec![0u8; bytes]);
-        if !rng(&mut buf) {
-            return None;
-        }
-        if let Some(b) = buf.first_mut() {
-            *b &= !0xffu8
-                .checked_shl(u32::try_from(top_bit).ok()?.saturating_add(1))
-                .unwrap_or(0);
-        }
-        let mut v = BigNum::from_bin(&buf, Endian::Big, false).ok()?;
-        if three {
-            for _ in 0..2 {
-                if bn::cmp(&v, range).is_ge() {
-                    v = bn::sub(&v, range).ok()?;
-                }
-            }
-        }
-        if attempt == 99 {
-            return None;
-        }
-        if bn::cmp(&v, range).is_lt() {
-            return Some(v);
-        }
-    }
-    None
-}
-
 /// An RSA key: the modulus, the public exponent, and as much of the private key as it has.
 /// Any part may be missing, as in OpenSSL's `RSA`; each operation checks what it needs.
 #[derive(Clone, Default)]
@@ -174,7 +129,7 @@ impl Key {
     /// `(r^e, r^-1)`.
     fn make_blinding(n: &BigNum, e: &BigNum, rng: &mut Random<'_>) -> Result<(BigNum, BigNum), ()> {
         for _ in 0..=32 {
-            let r = rand_range(n, rng).ok_or(())?;
+            let r = bn::rand::rand_range(n, rng).ok_or(())?;
             if let Some(ri) = bn::ct::inverse(&r, n) {
                 let a = exp_mod(&r, e, n).map_err(|_| ())?;
                 return Ok((a, ri));

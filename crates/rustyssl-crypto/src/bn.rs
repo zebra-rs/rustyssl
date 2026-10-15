@@ -17,6 +17,7 @@ pub mod gf2m;
 pub mod modular;
 pub mod mont;
 pub mod prime;
+pub mod rand;
 pub mod rfc_primes;
 
 use core::cmp::Ordering;

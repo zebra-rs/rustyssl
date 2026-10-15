@@ -54,6 +54,11 @@ const FILES: &[&str] = &[
     "crypto/err/openssl.txt",
     // The order in which OpenSSL loads libcrypto's error strings (`ossl_err_load_crypto_strings`).
     "crypto/err/err_all.c",
+    // The named curves' parameters, names, and comments (`EC_get_builtin_curves`), which
+    // codegen turns into rustyssl's curve table.
+    "crypto/ec/ec_curve.c",
+    // The curves' names and NIST names (`OSSL_EC_curve_nid2name`, `EC_curve_nid2nist`).
+    "crypto/evp/ec_support.c",
     // Internal headers that declare functions libcrypto exports all the same (DSO_*,
     // conf_ssl_*, OPENSSL_DIR_*, ...). Codegen fails if an export has no prototype.
     "include/internal/asn1.h",

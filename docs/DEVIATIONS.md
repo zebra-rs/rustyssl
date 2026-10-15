@@ -224,9 +224,20 @@ OpenSSL never depends on them.
 | `RSA_set0_multi_prime_params` on a key without p and q | multiplies NULL numbers and crashes | returns 0, taking none of the numbers | `rsa_lib::tests::a_key_without_numbers_or_a_null_key_is_safe` |
 | `RSA_new` (and every key a provider makes) after `RSA_set_default_method(NULL)` | dereferences the NULL method | the key gets the built-in method; `RSA_get_default_method` still returns NULL | `rsa_lib::tests::a_null_default_method_gives_new_keys_the_built_in_one` |
 | The `RSA_padding_add_*` and `RSA_padding_check_*` functions with a negative length (`tlen`, `flen`, `num`, `plen`) or a NULL buffer that has a length | copy, fill, or read through the huge sizes negative lengths convert to, or through NULL | fail (0 for the add functions, -1 for the checks) and touch nothing | `rsa_ops::tests::negative_lengths_and_null_buffers_fail` |
+| `EC_POINT_mul` with a point scalar but no point on a binary curve, or on SM2's `sm2p256` method (aarch64) | the binary method runs its ladder on the missing scalar and crashes; `sm2p256` returns uninitialized stack memory as the point | the point at infinity, and 1 | `ec::point::tests::a_point_scalar_without_a_point_on_a_binary_curve_gives_infinity` |
+| The `EC_POINT_*` and `EC_GROUP_*` functions given a NULL group or point (other than those OpenSSL documents as accepting NULL) | dereference NULL | fail as each fails (0, -1 for `EC_POINT_cmp`, NULL) | `ec::point::tests::a_null_group_or_point_fails` |
+| `EC_GROUP_cmp` of groups that have no generator | compares the missing generators and crashes | compares the rest (0 for groups that are otherwise the same) | `ec::point::tests::groups_without_generators_compare` |
 
 ## Notes
 
+- **EC multiplications on the curve-specific methods.** `nistp224`, `nistp256`, `nistp521`,
+  `nistz256`, and `sm2p256` multiply with their own tables and formulas; rustyssl runs one
+  Montgomery ladder per term with the same results in affine coordinates, and hands back the
+  Jacobian coordinates (Z = 2) where theirs are Jacobian, affine where theirs are (so the
+  random numbers converting them draws are the same). `EC_POINT_get_Jprojective_coordinates_GFp`
+  of such a result therefore differs. A point off the curve multiplied by one of these
+  methods gives a meaningless point that depends on the formulas, so it differs too (the
+  differential probe prints only `offcurve` there).
 - **Getting an object identifier by ctrl (`EVP_PKEY_CTX_get0_dh_kdf_oid`).** The translation
   gives the provider no room for the name, so no provider can return one, and the ctrl never
   returns the object. When a provider reports an empty name anyway, OpenSSL then reads the

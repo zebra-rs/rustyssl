@@ -387,6 +387,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("cipher_meth", cipher_meth_session),
     ("conf", conf_session),
     ("conf_modules", conf_modules_session),
+    ("ec", ec_session),
     ("string", string_session),
 ];
 
@@ -2779,6 +2780,118 @@ fn rand_session(random: &mut Random, out: &mut String) -> Result {
 
 /// A hex number for the big-number commands: zero, values around octet and word boundaries, or
 /// random digits with runs of 0 and F, of either sign.
+/// The curves `ec_session` uses, with their field elements' sizes in octets: NIST, Koblitz,
+/// brainpool, small SECG, SM2, and binary trinomial, pentanomial, and even-degree ones.
+const EC_CURVES: &[(&str, usize)] = &[
+    ("prime256v1", 32),
+    ("secp224r1", 28),
+    ("secp384r1", 48),
+    ("secp521r1", 66),
+    ("secp256k1", 32),
+    ("brainpoolP256r1", 32),
+    ("brainpoolP384t1", 48),
+    ("secp112r1", 14),
+    ("secp160r2", 20),
+    ("SM2", 32),
+    ("sect113r1", 15),
+    ("sect163k1", 21),
+    ("sect233r1", 30),
+    ("c2pnb176v1", 22),
+    ("c2tnb191v1", 24),
+    ("Oakley-EC2N-3", 20),
+];
+
+/// Random octets, as hex.
+fn random_hex(random: &mut Random, len: usize) -> String {
+    (0..len)
+        .map(|_| format!("{:02x}", random.below(256)))
+        .collect()
+}
+
+/// A random session of EC commands on one curve: encodings near valid ones (random x, which a
+/// compressed form decompresses about half the time; uncompressed and hybrid ones, mostly off
+/// the curve; lengths a little off; bad first octets), decompression, multiplication by scalars
+/// of every size and sign, and addition, sometimes from a known generator.
+fn ec_session(random: &mut Random, out: &mut String) -> Result {
+    if random.below(2) == 0 {
+        for line in [
+            "rctx 0",
+            "rnew TEST-RAND",
+            "rset strength=256 test_entropy=64 test_nonce=32",
+            "rinst 0 0",
+            "rctx 1",
+            "rnew HASH-DRBG child",
+            "rset digest=SHA256",
+            "rinst 0 0",
+            "rsetpub",
+            "rsetpriv",
+        ] {
+            writeln!(out, "{line}")?;
+        }
+    }
+    let i = usize::try_from(random.below(EC_CURVES.len() as u64)).unwrap_or(0);
+    let (curve, fl) = EC_CURVES.get(i).copied().unwrap_or(("prime256v1", 32));
+    writeln!(out, "ecgrp {curve}")?;
+    // Start with a known point: the generator times a small scalar.
+    writeln!(out, "ecmul 0 {:x} - -", random.below(1000) + 1)?;
+    for _ in 0..random.below(12) + 1 {
+        let r = random.below(2);
+        match random.below(6) {
+            0 | 1 => {
+                let first = random.pick(&["02", "03", "04", "06", "07", "00", "05", "08"]);
+                let mut len = match first {
+                    "02" | "03" => fl,
+                    "00" => 0,
+                    _ => fl * 2,
+                };
+                if random.below(8) == 0 {
+                    len = len.saturating_add(1);
+                } else if random.below(8) == 0 {
+                    len = len.saturating_sub(1);
+                }
+                writeln!(out, "ecpt {r} {first}{}", random_hex(random, len))?;
+            }
+            2 => {
+                let x = if random.below(6) == 0 {
+                    random.pick(&["0", "1", "2"]).to_owned()
+                } else {
+                    random_hex(random, fl)
+                };
+                writeln!(out, "eccomp {r} {x} {}", random.below(2))?;
+            }
+            3 | 4 => {
+                let scalar = |random: &mut Random| -> String {
+                    match random.below(6) {
+                        0 => "-".to_owned(),
+                        1 => format!("{:x}", random.below(100)),
+                        2 => format!("-{}", random_hex(random, fl)),
+                        3 => "F".repeat(fl * 2),
+                        _ => {
+                            let extra = usize::try_from(random.below(3)).unwrap_or(0);
+                            random_hex(random, fl + extra)
+                        }
+                    }
+                };
+                let k = scalar(random);
+                let mut p = random.pick(&["-", "0", "1"]);
+                let k2 = scalar(random);
+                // OpenSSL's binary curves crash on a point's scalar without a point or the
+                // generator's, and its sm2p256 (aarch64) returns uninitialized memory
+                // (docs/DEVIATIONS.md).
+                let odd = ["sect", "c2", "Oakley", "SM2"]
+                    .iter()
+                    .any(|b| curve.starts_with(b));
+                if odd && k == "-" && p == "-" && k2 != "-" {
+                    p = "0";
+                }
+                writeln!(out, "ecmul {r} {k} {p} {k2}")?;
+            }
+            _ => writeln!(out, "ecadd {r} {} {}", random.below(2), random.below(2))?,
+        }
+    }
+    Ok(())
+}
+
 fn bn_hex(random: &mut Random) -> String {
     let digits = if random.below(4) == 0 {
         random
