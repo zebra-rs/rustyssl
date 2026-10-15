@@ -425,13 +425,10 @@ unsafe fn pkey_rsa_print(bp: *mut BIO, p: *const EVP_PKEY, off: c_int, private: 
         }
     }
     if pss {
-        // `rsa_pss_param_print` for a key without restrictions: decoding a key's restrictions
-        // (`RSA_get0_pss_params`) comes with the key decoders.
-        // SAFETY: as above.
-        if !unsafe { indent(bp, off) }
-            // SAFETY: as above.
-            || unsafe { BIO_printf(bp, c"No PSS parameter restrictions\n".as_ptr()) } <= 0
-        {
+        // SAFETY: the key's `RSA`.
+        let params = unsafe { crate::rsa::rsa(r) }.map_or(ptr::null_mut(), |k| k.legacy().pss.0);
+        // SAFETY: the BIO; the key's restrictions or NULL.
+        if !unsafe { pss_param_print(bp, true, params, off) } {
             return false;
         }
     }
@@ -552,4 +549,139 @@ ffi_export! {
         unsafe { crate::bio::BIO_free(b) };
         ret
     }
+}
+
+/// `BIO_puts`, as a success.
+///
+/// # Safety
+/// `bp` is NULL or a live BIO.
+unsafe fn puts(bp: *mut BIO, text: &CStr) -> bool {
+    // SAFETY: the caller's guarantee.
+    (unsafe { crate::bio::BIO_puts(bp, text.as_ptr()) }) > 0
+}
+
+/// `rsa_pss_param_print`: a key's restrictions (`pss_key`) or a signature's parameters, each
+/// field or its default.
+///
+/// # Safety
+/// `bp` is NULL or a live BIO; `pss` is NULL or live parameters.
+pub(crate) unsafe fn pss_param_print(
+    bp: *mut BIO,
+    pss_key: bool,
+    pss: *const rustyssl_abi::RSA_PSS_PARAMS,
+    off: c_int,
+) -> bool {
+    use crate::asn1::integer::i2a_ASN1_INTEGER;
+    use crate::objects::i2a_ASN1_OBJECT;
+    // SAFETY: the caller's guarantee.
+    if !unsafe { indent(bp, off) } {
+        return false;
+    }
+    // SAFETY: as above.
+    let Some(p) = (unsafe { pss.as_ref() }) else {
+        let text = if pss_key {
+            c"No PSS parameter restrictions\n"
+        } else {
+            c"(INVALID PSS PARAMETERS)\n"
+        };
+        // SAFETY: as above.
+        return unsafe { puts(bp, text) };
+    };
+    // SAFETY: as above.
+    if pss_key && !unsafe { puts(bp, c"PSS parameter restrictions:") } {
+        return false;
+    }
+    // SAFETY: as above.
+    if !unsafe { puts(bp, c"\n") } {
+        return false;
+    }
+    let off = if pss_key { off.saturating_add(2) } else { off };
+    // SAFETY: as above.
+    if !unsafe { indent(bp, off) } || !unsafe { puts(bp, c"Hash Algorithm: ") } {
+        return false;
+    }
+    // SAFETY: the parameters' AlgorithmIdentifiers, objects, and INTEGERs, each live.
+    let ok = if let Some(h) = unsafe { p.hashAlgorithm.as_ref() } {
+        // SAFETY: as above.
+        (unsafe { i2a_ASN1_OBJECT(bp, h.algorithm) }) > 0
+    } else {
+        // SAFETY: as above.
+        unsafe { puts(bp, c"sha1 (default)") }
+    };
+    // SAFETY: as above.
+    if !ok || !unsafe { puts(bp, c"\n") } || !unsafe { indent(bp, off) } {
+        return false;
+    }
+    // SAFETY: as above.
+    if !unsafe { puts(bp, c"Mask Algorithm: ") } {
+        return false;
+    }
+    // SAFETY: as above.
+    let ok = if let Some(m) = unsafe { p.maskGenAlgorithm.as_ref() } {
+        // SAFETY: as above.
+        if unsafe { i2a_ASN1_OBJECT(bp, m.algorithm) } <= 0 || !unsafe { puts(bp, c" with ") } {
+            return false;
+        }
+        // SAFETY: as above.
+        let hash = unsafe { crate::rsa_pmeth::mgf1_decode(m) };
+        let ok = if hash.is_null() {
+            // SAFETY: as above.
+            unsafe { puts(bp, c"INVALID") }
+        } else {
+            // SAFETY: the decoded AlgorithmIdentifier.
+            let obj = unsafe { (*hash).algorithm };
+            // SAFETY: its object.
+            (unsafe { i2a_ASN1_OBJECT(bp, obj) }) > 0
+        };
+        // SAFETY: NULL or the decoded AlgorithmIdentifier.
+        unsafe { crate::asn1::tpl::items::X509_ALGOR_free(hash) };
+        ok
+    } else {
+        // SAFETY: as above.
+        unsafe { puts(bp, c"mgf1 with sha1 (default)") }
+    };
+    if !ok {
+        return false;
+    }
+    // OpenSSL doesn't check these newlines.
+    // SAFETY: as above.
+    unsafe { puts(bp, c"\n") };
+    // SAFETY: as above.
+    if !unsafe { indent(bp, off) } {
+        return false;
+    }
+    let what = if pss_key { c"Minimum" } else { c"" };
+    // SAFETY: as above; the format takes a string.
+    if unsafe { BIO_printf(bp, c"%s Salt Length: 0x".as_ptr(), what.as_ptr()) } <= 0 {
+        return false;
+    }
+    let ok = if p.saltLength.is_null() {
+        // SAFETY: as above.
+        unsafe { puts(bp, c"14 (default)") }
+    } else {
+        // SAFETY: as above.
+        (unsafe { i2a_ASN1_INTEGER(bp, p.saltLength) }) > 0
+    };
+    if !ok {
+        return false;
+    }
+    // SAFETY: as above.
+    unsafe { puts(bp, c"\n") };
+    // SAFETY: as above.
+    if !unsafe { indent(bp, off) } || !unsafe { puts(bp, c"Trailer Field: 0x") } {
+        return false;
+    }
+    let ok = if p.trailerField.is_null() {
+        // SAFETY: as above.
+        unsafe { puts(bp, c"01 (default)") }
+    } else {
+        // SAFETY: as above.
+        (unsafe { i2a_ASN1_INTEGER(bp, p.trailerField) }) > 0
+    };
+    if !ok {
+        return false;
+    }
+    // SAFETY: as above.
+    unsafe { puts(bp, c"\n") };
+    true
 }

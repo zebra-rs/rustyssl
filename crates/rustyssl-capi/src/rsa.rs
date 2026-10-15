@@ -185,6 +185,9 @@ pub(crate) struct Legacy {
     /// Whether a decoded `RSAPrivateKey` listed the other primes (an empty list is encoded
     /// again, as OpenSSL keeps its empty stack).
     pub(crate) listed_primes: bool,
+    /// An RSA-PSS key's restrictions as OpenSSL's `rsa->pss` holds them (owned), or NULL:
+    /// what `RSA_get0_pss_params` returns, prints, and limits legacy signing.
+    pub(crate) pss: Ptr<rustyssl_abi::RSA_PSS_PARAMS>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -214,12 +217,14 @@ handle_type!(RSA => Rsa);
 
 impl Drop for Rsa {
     fn drop(&mut self) {
-        let numbers = self
+        let lg = self
             .legacy
             .get_mut()
-            .unwrap_or_else(PoisonError::into_inner)
-            .numbers
-            .all();
+            .unwrap_or_else(PoisonError::into_inner);
+        let pss = core::mem::replace(&mut lg.pss, Ptr(ptr::null_mut()));
+        // SAFETY: the key's own parameters, or NULL, freed once.
+        unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss.0) };
+        let numbers = lg.numbers.all();
         for b in numbers {
             // SAFETY: the key's own numbers, freed once.
             unsafe { BN_clear_free(b.0) };
@@ -257,6 +262,7 @@ impl Rsa {
                 numbers: Numbers::default(),
                 version: 0,
                 listed_primes: false,
+                pss: Ptr(ptr::null_mut()),
             }),
             ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
                 ctx: ptr::null_mut(),
@@ -503,6 +509,13 @@ impl Rsa {
         drop(lg);
         drop(st);
         self.touch();
+    }
+
+    /// Gives the key the restrictions `pss` (which it takes), freeing any it had.
+    pub(crate) fn set_pss_params(&self, pss: *mut rustyssl_abi::RSA_PSS_PARAMS) {
+        let old = core::mem::replace(&mut self.legacy().pss, Ptr(pss));
+        // SAFETY: the key's own parameters, or NULL, no longer its.
+        unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(old.0) };
     }
 
     /// Marks the numbers changed (`dirty_cnt++`).

@@ -15,8 +15,9 @@
 //!   for its sizes, comparisons, parameters, raw keys, and default digest, and the method's
 //!   `pkey_free` frees its data, whenever the key is cleared, retyped, or freed.
 //!
-//! The built-in key types' legacy data comes with the key types (4.3 onwards): until then a
-//! key can't be given it, and the built-in methods' functions abort (AGENTS.md rule 10).
+//! The built-in key types' legacy data comes with the key types: RSA and RSA-PSS have it (an
+//! `RSA`); until the others do (4.4 onwards) a key can't be given theirs, and their built-in
+//! methods' functions abort (AGENTS.md rule 10).
 //! Functions given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
