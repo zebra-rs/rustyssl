@@ -3550,9 +3550,24 @@ chunking) is clean.
         application's method counting its calls, ex_data); the probe's `eckey` with
         `corpus/eckey.txt` and random mutations; the `ec_key` fuzz target; one deviation
         (NULL keys, which OpenSSL dereferences).
-    - [ ] **4.4c3 ECDSA and ECDH:** `ECDSA_SIG` and its ASN.1, `ECDSA_sign`/`verify` and their
-      `_ex` and setup forms, `ECDSA_size`, and `ECDH_compute_key` (cofactor mode, the X9.63
-      KDF).
+    - [x] **4.4c3 ECDSA and ECDH** (`rustyssl-crypto/src/ec/ecdsa.rs`,
+      `rustyssl-capi/src/ec/ecdsa.rs`; 18 exports): `ECDSA_SIG` and its DER (OpenSSL's own
+      reader and writer, with their leniencies: non-minimal lengths, and r kept from a read
+      that fails after it), `ECDSA_sign`/`verify` and their `_do_`, `_ex`, and setup forms
+      through the key's method, `ECDSA_size`, `ECDH_compute_key` (the cofactor mode, an
+      application's KDF), and `ECDH_KDF_X9_62`. The library method's entries are now these.
+      - Nonces are drawn as OpenSSL draws them (`BN_generate_dsa_nonce` over the private key,
+        the digest, and the private generator; the setup's own n+1-bit draw), so from a
+        deterministic generator the signatures are the reference's octet for octet. The
+        secret arithmetic (`k^-1` and `s = k^-1 (m + r d)`) runs on constant-time field
+        elements of the order's length, failing where OpenSSL's Montgomery arithmetic fails
+        (an operand longer than the order). RFC 6979's nonces come with the provider (4.4d).
+      - Tests: `tests/c/ecdsa.c` (209 checks: fixed-nonce signatures on eight curves with
+        digests of six lengths, random ones verified, out-of-range and non-DER signatures,
+        13 DER cases, ECDH on four curves with the cofactor and KDFs, X9.63, applications'
+        methods); the probe's `ecgen`, `ecsign`, `ecsetup`, `ecverify`, and `ecdh` from
+        deterministic generators, with `corpus/ecdsa.txt` and random sessions; the
+        `ecdsa_sig` fuzz target; deviations for NULL arguments and empty signatures.
     - [ ] **4.4c4 EC in `EVP_PKEY`:** `get0`/`get1`/`set1_EC_KEY`, the ASN.1 method (SPKI and
       PKCS #8, parameters, printing), and legacy keys.
   - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
