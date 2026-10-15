@@ -3583,7 +3583,7 @@ chunking) is clean.
         the EC key manager, and comes with 4.4d1.
       - Tests: `tests/c/evp_pkey_ec.c` (53 checks: five curves, SM2's types, other types,
         a foreign key); one deviation (`EVP_PKEY_set1_EC_KEY` of NULL).
-  - [ ] **4.4d The providers**, in sub-steps:
+  - [x] **4.4d The providers**, in sub-steps:
     - [x] **4.4d1 The EC key manager** (`rustyssl-capi/src/provider/ec_kmgmt.rs`,
       `ec/backend.rs`; 2 exports): keys made empty, from data (a named group or explicit
       parameters, which must be given, not SM2's curve; the public point and private number;
@@ -3650,7 +3650,25 @@ chunking) is clean.
         sect163k1, X9.63 with each parameter and its errors, every context parameter, a copy,
         a public key, legacy `EC_KEY`s); the probe's `ecdhx` with `corpus/ecdhx.txt` and
         random sessions (300 pass).
-    - [ ] **4.4d4 The legacy EC `EVP_PKEY_METHOD`.**
+    - [x] **4.4d4 The legacy EC `EVP_PKEY_METHOD`** (`rustyssl-capi/src/ec_pmeth.rs`; no new
+      exports): the built-in EC method's functions, which a key whose `EC_KEY` has an
+      application's method uses (it stays a legacy key), as does an application that copies or
+      wraps the built-in method. Each operation is made of the `EC_KEY` functions, so it goes
+      through the key's method:
+      - Signing and verifying with `ECDSA_sign`/`ECDSA_verify` and the digest's type (SHA-1's
+        without one), the digests a signature may name, `EVP_DigestSign` through it.
+      - Deriving: the shared secret cut to the buffer, the cofactor mode through a flagged copy
+        of the key (which a copied context keeps, though not the mode itself, as in OpenSSL),
+        and X9.63's KDF into exactly its length, fetched with the context's properties.
+      - Parameter generation from the context's curve (with its encoding), key generation from
+        it or from the context's key's parameters.
+      - The `ctrl` and `ctrl_str` settings with OpenSSL's errors and return values.
+      - `EVP_PKEY_can_sign` of a legacy EC key (`EC_KEY_can_sign`).
+      - Its ctrl answers or refuses where OpenSSL's writes through or reads NULL, and refuses
+        keying material of a negative length (docs/DEVIATIONS.md). OpenSSL's
+        `EVP_PKEY_CTX_get_ecdh_kdf_outlen` crashes on every legacy EC context; this one works.
+      - `tests/c/evp_ec_legacy.c` (15 checks), with an application's `EC_KEY_METHOD` that
+        counts its calls.
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
 - [ ] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)

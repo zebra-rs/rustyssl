@@ -22,6 +22,7 @@ mod cmac;
 mod conf;
 mod dir;
 mod ec;
+mod ec_pmeth;
 mod engine;
 mod err;
 mod errno;

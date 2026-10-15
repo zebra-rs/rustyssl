@@ -617,7 +617,17 @@ unsafe fn x963_derive(
         let secret_z = z.get(..zlen).unwrap_or(&z);
         // SAFETY: the caller's room (at least `kdf_outlen`); the digest, or NULL; the context's
         // library context.
-        ok = unsafe { kdf_x9_63(secret, c.kdf_outlen, secret_z, ukm, md, c.libctx) };
+        ok = unsafe {
+            kdf_x9_63(
+                secret,
+                c.kdf_outlen,
+                secret_z,
+                ukm,
+                md,
+                c.libctx,
+                ptr::null(),
+            )
+        };
         if ok {
             // SAFETY: the caller's guarantee.
             unsafe { psecretlen.write(c.kdf_outlen) };

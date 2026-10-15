@@ -1343,12 +1343,13 @@ ffi_export! {
     }
 }
 
-/// `ossl_ecdh_kdf_X9_63`: X9.63's KDF of `z` and `sinfo` with `md`, the X963KDF of `libctx`,
-/// into `outlen` octets at `out`; `false` without a digest or if the KDF fails.
+/// `ossl_ecdh_kdf_X9_63`: X9.63's KDF of `z` and `sinfo` with `md`, the X963KDF of `libctx`
+/// fetched with `propq`, into `outlen` octets at `out`; `false` without a digest or if the KDF
+/// fails.
 ///
 /// # Safety
 /// `out` has room for `outlen` octets; `md` is NULL or a live digest; `libctx` is NULL or a
-/// live library context.
+/// live library context; `propq` is NULL or a string.
 pub(crate) unsafe fn kdf_x9_63(
     out: *mut c_uchar,
     outlen: usize,
@@ -1356,6 +1357,7 @@ pub(crate) unsafe fn kdf_x9_63(
     sinfo: &[u8],
     md: *const EVP_MD,
     libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
 ) -> bool {
     if md.is_null() {
         return false;
@@ -1366,7 +1368,7 @@ pub(crate) unsafe fn kdf_x9_63(
         return false;
     }
     // SAFETY: the caller's library context; a name.
-    let kdf = unsafe { EVP_KDF_fetch(libctx, c"X963KDF".as_ptr(), ptr::null()) };
+    let kdf = unsafe { EVP_KDF_fetch(libctx, c"X963KDF".as_ptr(), propq) };
     // SAFETY: the KDF, or NULL.
     let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
     let mut ret = false;
@@ -1418,7 +1420,7 @@ ffi_export! {
         // SAFETY: as above.
         let Some(sinfo) = (unsafe { bytes(sinfo, sinfolen) }) else { return 0 };
         // SAFETY: the caller's room and digest; the default library context.
-        c_int::from(unsafe { kdf_x9_63(out, outlen, z, sinfo, md, ptr::null_mut()) })
+        c_int::from(unsafe { kdf_x9_63(out, outlen, z, sinfo, md, ptr::null_mut(), ptr::null()) })
     }
 }
 
