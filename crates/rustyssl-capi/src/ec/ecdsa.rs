@@ -6,24 +6,27 @@
 //!
 //! A signature's nonce comes as OpenSSL's does: from `BN_generate_dsa_nonce` (the private key,
 //! the digest, and the private generator through SHA-512) when signing, or as the order's bits
-//! plus one, cut down, for `ECDSA_sign_setup`. The secret arithmetic (`k^-1` and
+//! plus one, cut down, for `ECDSA_sign_setup`, or (for the provider's deterministic
+//! signatures) RFC 6979's, from HMAC-DRBG-KDF over the key and digest. The secret arithmetic (`k^-1` and
 //! `s = k^-1 (m + r d)`) runs in constant time (`rustyssl_crypto::ec::ecdsa`); verification,
 //! on public values, uses the ordinary functions.
 
-use core::ffi::{c_int, c_long, c_uchar, c_uint, c_void};
+use core::ffi::{CStr, c_char, c_int, c_long, c_uchar, c_uint, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
     BIGNUM, BN_CTX, BN_FLG_CONSTTIME, EC_FLAG_COFACTOR_ECDH, EC_KEY, EC_POINT, EC_R_BAD_SIGNATURE,
-    EC_R_CURVE_DOES_NOT_SUPPORT_SIGNING, EC_R_INVALID_OUTPUT_LENGTH, EC_R_MISSING_PARAMETERS,
-    EC_R_MISSING_PRIVATE_KEY, EC_R_NEED_NEW_SETUP_VALUES, EC_R_OPERATION_NOT_SUPPORTED,
-    EC_R_POINT_ARITHMETIC_FAILURE, EC_R_RANDOM_NUMBER_GENERATION_FAILED, EC_R_TOO_MANY_RETRIES,
-    ECDSA_SIG, ERR_LIB_EC, ERR_R_BN_LIB, ERR_R_EC_LIB, ERR_R_ECDSA_LIB, ERR_R_INTERNAL_ERROR,
-    ERR_R_PASSED_NULL_PARAMETER, EVP_MD, OSSL_KDF_PARAM_DIGEST, OSSL_KDF_PARAM_INFO,
-    OSSL_KDF_PARAM_KEY,
+    EC_R_CURVE_DOES_NOT_SUPPORT_SIGNING, EC_R_INVALID_DIGEST, EC_R_INVALID_OUTPUT_LENGTH,
+    EC_R_MISSING_PARAMETERS, EC_R_MISSING_PRIVATE_KEY, EC_R_NEED_NEW_SETUP_VALUES,
+    EC_R_OPERATION_NOT_SUPPORTED, EC_R_POINT_ARITHMETIC_FAILURE,
+    EC_R_RANDOM_NUMBER_GENERATION_FAILED, EC_R_TOO_MANY_RETRIES, ECDSA_SIG, ERR_LIB_EC,
+    ERR_R_BN_LIB, ERR_R_EC_LIB, ERR_R_ECDSA_LIB, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_NULL_PARAMETER,
+    EVP_KDF_CTX, EVP_MD, OSSL_KDF_PARAM_DIGEST, OSSL_KDF_PARAM_HMACDRBG_ENTROPY,
+    OSSL_KDF_PARAM_HMACDRBG_NONCE, OSSL_KDF_PARAM_INFO, OSSL_KDF_PARAM_KEY,
+    OSSL_KDF_PARAM_PROPERTIES, OSSL_LIB_CTX,
 };
 use rustyssl_crypto::bn::{BigNum, rand::rand_range_fixed_top};
-use rustyssl_crypto::ec::ecdsa::{self as ecdsa_core, Decoded, SignError};
+use rustyssl_crypto::ec::ecdsa::{self as ecdsa_core, Decoded, Rfc6979, SignError};
 
 use super::group::{EC_GROUP_get_cofactor, EC_GROUP_get_degree, EC_GROUP_get0_order};
 use super::key::{
@@ -40,7 +43,8 @@ use crate::bn::{BN_clear_free, BN_new, BN_secure_new, BN_set_flags, new_bignum, 
 use crate::err;
 use crate::evp::digest::EVP_MD_get0_name;
 use crate::evp::kdf::{
-    EVP_KDF_CTX_free, EVP_KDF_CTX_new, EVP_KDF_derive, EVP_KDF_fetch, EVP_KDF_free,
+    EVP_KDF_CTX_free, EVP_KDF_CTX_new, EVP_KDF_CTX_set_params, EVP_KDF_derive, EVP_KDF_fetch,
+    EVP_KDF_free,
 };
 use crate::ffi::{ffi_callback, ffi_export};
 use crate::mem;
@@ -333,8 +337,131 @@ unsafe fn replace(p: *mut *mut BIGNUM, v: *mut BIGNUM) {
     unsafe { *p = v };
 }
 
-/// `ecdsa_sign_setup`: a nonce (`BN_generate_dsa_nonce` over `dgst`, or the setup's own draw
-/// without one), `r = (kG).x mod n` (again while zero), and `k^-1`, into `*kinvp` and `*rp`.
+/// Where a signature's nonce comes from (`ecdsa_sign_setup`'s digest and nonce type).
+#[derive(Clone, Copy)]
+enum Nonce<'a> {
+    /// Drawn below the order: `ECDSA_sign_setup`'s.
+    Random,
+    /// `BN_generate_dsa_nonce` over the digest: a signature's.
+    Dsa(&'a [u8]),
+    /// RFC 6979's, from HMAC-DRBG-KDF with the digest named, fetched from `libctx` with
+    /// `propq` (NULL or a string).
+    Rfc6979 {
+        dgst: &'a [u8],
+        mdname: &'a CStr,
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+    },
+}
+
+/// RFC 6979's nonces for one signature (`ossl_gen_deterministic_nonce_rfc6979`): an
+/// HMAC-DRBG-KDF seeded with the private key and the digest, whose next candidate below the
+/// order (and above 1) is each nonce.
+///
+/// OpenSSL seeds a new KDF for each nonce, so a nonce whose `r` is zero comes again and its loop
+/// never ends; this one goes on to the DRBG's next candidate, as RFC 6979 (3.2 h.3) says
+/// (docs/DEVIATIONS.md).
+struct Deterministic {
+    kdf: *mut EVP_KDF_CTX,
+    rfc: Rfc6979,
+}
+
+impl Drop for Deterministic {
+    fn drop(&mut self) {
+        // SAFETY: the context this owns.
+        unsafe { EVP_KDF_CTX_free(self.kdf) };
+    }
+}
+
+impl Deterministic {
+    /// `kdf_setup` with the order's seed: `None` if the private key is longer than the order
+    /// or the KDF can't be made.
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+    unsafe fn new(
+        order: &BigNum,
+        x: &BigNum,
+        dgst: &[u8],
+        mdname: &CStr,
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+    ) -> Option<Self> {
+        let rfc = Rfc6979::new(order)?;
+        let (entropy, nonce) = rfc.seed(x, dgst)?;
+        // SAFETY: the caller's guarantee; a static name.
+        let kdf = unsafe { EVP_KDF_fetch(libctx, c"HMAC-DRBG-KDF".as_ptr(), propq) };
+        // SAFETY: the KDF, or NULL.
+        let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
+        // SAFETY: made above, or NULL (the context holds its own reference).
+        unsafe { EVP_KDF_free(kdf) };
+        let me = Self { kdf: kctx, rfc };
+        if kctx.is_null() {
+            return None;
+        }
+        let mut params = Vec::with_capacity(5);
+        // SAFETY: a static key; the caller's name, read only.
+        params.push(unsafe {
+            OSSL_PARAM_construct_utf8_string(
+                OSSL_KDF_PARAM_DIGEST.as_ptr(),
+                mdname.as_ptr().cast_mut(),
+                0,
+            )
+        });
+        if !propq.is_null() {
+            // SAFETY: as above; the caller's query.
+            params.push(unsafe {
+                OSSL_PARAM_construct_utf8_string(
+                    OSSL_KDF_PARAM_PROPERTIES.as_ptr(),
+                    propq.cast_mut(),
+                    0,
+                )
+            });
+        }
+        // SAFETY: a static key; the seed's octets, read only and live through the call.
+        params.push(unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_KDF_PARAM_HMACDRBG_ENTROPY.as_ptr(),
+                entropy.as_ptr().cast_mut().cast(),
+                entropy.len(),
+            )
+        });
+        // SAFETY: as above.
+        params.push(unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_KDF_PARAM_HMACDRBG_NONCE.as_ptr(),
+                nonce.as_ptr().cast_mut().cast(),
+                nonce.len(),
+            )
+        });
+        // SAFETY: no preconditions.
+        params.push(unsafe { OSSL_PARAM_construct_end() });
+        // SAFETY: the context; the parameters.
+        if unsafe { EVP_KDF_CTX_set_params(kctx, params.as_ptr()) } <= 0 {
+            return None;
+        }
+        Some(me)
+    }
+
+    /// The next nonce: the DRBG's candidates until one is above 1 and below the order.
+    fn next(&mut self) -> Option<BigNum> {
+        let mut t = vec![0u8; self.rfc.candidate_len()];
+        let k = loop {
+            // SAFETY: the context this owns; room for the candidate.
+            if unsafe { EVP_KDF_derive(self.kdf, t.as_mut_ptr(), t.len(), ptr::null()) } <= 0 {
+                break None;
+            }
+            if let Some(k) = self.rfc.candidate(&t) {
+                break Some(k);
+            }
+        };
+        crate::provider::macs::wipe(&mut t);
+        k
+    }
+}
+
+/// `ecdsa_sign_setup`: a nonce (`nonce`'s), `r = (kG).x mod n` (again while zero), and
+/// `k^-1`, into `*kinvp` and `*rp`.
 ///
 /// # Safety
 /// `eckey` is NULL or a live key; `ctx_in` is NULL or a live context; `kinvp` and `rp` are
@@ -344,7 +471,7 @@ unsafe fn sign_setup(
     ctx_in: *mut BN_CTX,
     kinvp: *mut *mut BIGNUM,
     rp: *mut *mut BIGNUM,
-    dgst: Option<&[u8]>,
+    nonce: Nonce<'_>,
 ) -> bool {
     const F: &str = "ecdsa_sign_setup";
     // SAFETY: the caller's guarantee.
@@ -411,17 +538,41 @@ unsafe fn sign_setup(
         }
         // SAFETY: the number.
         unsafe { BN_set_flags(k, BN_FLG_CONSTTIME) };
+        let mut deterministic = None;
+        if let Nonce::Rfc6979 {
+            dgst,
+            mdname,
+            libctx,
+            propq,
+        } = nonce
+        {
+            // SAFETY: the key's number.
+            let Some(x) = (unsafe { value(priv_key) }) else {
+                return false;
+            };
+            // SAFETY: the caller's library context and query.
+            deterministic = unsafe { Deterministic::new(&order, &x, dgst, mdname, libctx, propq) };
+            if deterministic.is_none() {
+                raise(EC_R_RANDOM_NUMBER_GENERATION_FAILED, F);
+                return false;
+            }
+        }
         let mut rv;
         loop {
             loop {
-                let drawn = match dgst {
-                    Some(d) => {
+                let drawn = match (nonce, deterministic.as_mut()) {
+                    (_, Some(d)) => match d.next() {
+                        // SAFETY: the number.
+                        Some(v) => unsafe { store(k, v) },
+                        None => false,
+                    },
+                    (Nonce::Dsa(d), None) => {
                         // SAFETY: live numbers; the digest; the context.
                         (unsafe {
                             BN_generate_dsa_nonce(k, order_p, priv_key, d.as_ptr(), d.len(), ctx)
                         }) != 0
                     }
-                    None => {
+                    _ => {
                         // SAFETY: the context.
                         let mut rng = unsafe { random(ctx, libctx) };
                         match rand_range_fixed_top(&order, &mut rng) {
@@ -531,7 +682,7 @@ ffi_callback! {
             return 0;
         }
         // SAFETY: the caller's guarantee.
-        c_int::from(unsafe { sign_setup(eckey, ctx_in, kinvp, rp, None) })
+        c_int::from(unsafe { sign_setup(eckey, ctx_in, kinvp, rp, Nonce::Random) })
     }
 }
 
@@ -609,7 +760,7 @@ ffi_callback! {
                     (kv, rv)
                 } else {
                     // SAFETY: the key; the signature's r and a local, each a number or NULL.
-                    if !unsafe { sign_setup(eckey, ptr::null_mut(), &raw mut kinv, &raw mut sg.r, Some(d)) } {
+                    if !unsafe { sign_setup(eckey, ptr::null_mut(), &raw mut kinv, &raw mut sg.r, Nonce::Dsa(d)) } {
                         raise(ERR_R_ECDSA_LIB, F);
                         return false;
                     }
@@ -690,6 +841,66 @@ ffi_callback! {
         unsafe { ECDSA_SIG_free(s) };
         1
     }
+}
+
+/// `ossl_ecdsa_deterministic_sign`: the DER signature of `dgst` into `sig`, its nonce RFC
+/// 6979's (`nonce_type` 1, from `mdname`'s HMAC-DRBG-KDF in `libctx` with `propq`) or
+/// `BN_generate_dsa_nonce`'s (any other type); its length, or `None` with the error raised.
+///
+/// # Safety
+/// `sig` is NULL or has room for `ECDSA_size(eckey)` octets; `eckey` is NULL or a live key;
+/// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+pub(crate) unsafe fn deterministic_sign(
+    dgst: &[u8],
+    sig: *mut c_uchar,
+    eckey: *mut EC_KEY,
+    nonce_type: c_uint,
+    mdname: Option<&CStr>,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> Option<c_uint> {
+    const F: &str = "ossl_ecdsa_deterministic_sign";
+    if sig.is_null() {
+        raise(ERR_R_PASSED_NULL_PARAMETER, F);
+        return None;
+    }
+    let Some(mdname) = mdname else {
+        raise(EC_R_INVALID_DIGEST, F);
+        return None;
+    };
+    let dlen = c_int::try_from(dgst.len()).ok()?;
+    let nonce = if nonce_type == 1 {
+        Nonce::Rfc6979 {
+            dgst,
+            mdname,
+            libctx,
+            propq,
+        }
+    } else {
+        Nonce::Dsa(dgst)
+    };
+    let mut kinv: *mut BIGNUM = ptr::null_mut();
+    let mut r: *mut BIGNUM = ptr::null_mut();
+    let mut out = None;
+    // SAFETY: the caller's key; two locals, each NULL or a number made here.
+    if unsafe { sign_setup(eckey, ptr::null_mut(), &raw mut kinv, &raw mut r, nonce) } {
+        // SAFETY: the caller's digest and key; the numbers just made.
+        let s = unsafe { ECDSA_do_sign_ex(dgst.as_ptr(), dlen, kinv, r, eckey) };
+        if !s.is_null() {
+            let mut p = sig;
+            // SAFETY: the signature; the caller's room for it.
+            let n = unsafe { i2d_ECDSA_SIG(s, &raw mut p) };
+            // SAFETY: made above, freed once.
+            unsafe { ECDSA_SIG_free(s) };
+            // OpenSSL stores the length (-1 too) as unsigned.
+            out = Some(n.cast_unsigned());
+        }
+    }
+    // SAFETY: NULL or made by the setup.
+    unsafe { BN_clear_free(kinv) };
+    // SAFETY: as above.
+    unsafe { BN_clear_free(r) };
+    out
 }
 
 ffi_callback! {
@@ -1180,6 +1391,147 @@ mod tests {
     use crate::ec::key::{
         EC_KEY_free, EC_KEY_new_by_curve_name, EC_KEY_set_private_key, EC_KEY_set_public_key,
     };
+
+    /// docs/DEVIATIONS.md: RFC 6979's nonce whose r is zero. The group's generator is made
+    /// `k^-1 P` for a point P whose x is 0 or the order, so the first deterministic nonce k
+    /// gives `r = x(kG) mod n = 0`; OpenSSL derives that k again forever, this goes on to the
+    /// DRBG's next candidate and signs.
+    #[test]
+    #[cfg_attr(miri, ignore = "fetches, which loads the configuration")]
+    fn a_deterministic_nonce_with_r_zero_moves_on() {
+        use rustyssl_abi::NID_secp256k1;
+        use rustyssl_crypto::bn::Endian;
+        use rustyssl_crypto::md::Algorithm;
+        use rustyssl_crypto::rand::{Drbg, HmacDrbg};
+
+        use crate::ec::group::{
+            EC_GROUP_dup, EC_GROUP_free, EC_GROUP_new_by_curve_name, EC_GROUP_set_curve_name,
+            EC_GROUP_set_generator,
+        };
+        use crate::ec::key::{EC_KEY_new, EC_KEY_set_group};
+        use crate::ec::point::EC_POINT_set_compressed_coordinates;
+
+        // SHA-256("sample"), and RFC 6979's P-256 key.
+        let h1 = BigNum::from_hex_digits(
+            b"AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
+        )
+        .unwrap_or_default()
+        .to_bin(Some(32), Endian::Big, false)
+        .unwrap_or_default();
+        let d = BigNum::from_hex_digits(
+            b"C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721",
+        )
+        .unwrap_or_default();
+        // A curve with a point whose x is 0 or the order.
+        let mut found = None;
+        for nid in [NID_X9_62_prime256v1, NID_secp256k1] {
+            // SAFETY: no preconditions.
+            let g = unsafe { EC_GROUP_new_by_curve_name(nid) };
+            // SAFETY: the group.
+            let order_p = unsafe { EC_GROUP_get0_order(g) };
+            // SAFETY: the group's number.
+            let order = unsafe { value(order_p) }.unwrap_or_default();
+            for x in [BigNum::zero(), order.clone()] {
+                // SAFETY: the group.
+                let p = unsafe { EC_POINT_new(g) };
+                let xb = new_bignum(x, false);
+                // SAFETY: the group, the point, and the number.
+                let ok =
+                    unsafe { EC_POINT_set_compressed_coordinates(g, p, xb, 0, ptr::null_mut()) };
+                // SAFETY: made above.
+                unsafe { BN_clear_free(xb) };
+                if ok == 1 && found.is_none() {
+                    found = Some((g, p, order.clone()));
+                } else {
+                    // SAFETY: made above.
+                    unsafe { EC_POINT_free(p) };
+                }
+            }
+            if found.as_ref().is_none_or(|(fg, _, _)| *fg != g) {
+                // SAFETY: made above, not kept.
+                unsafe { EC_GROUP_free(g) };
+            }
+        }
+        let Some((g, p, order)) = found else {
+            panic!("no curve with such a point")
+        };
+        // RFC 6979's first nonce for the key and digest.
+        let rfc = Rfc6979::new(&order).unwrap_or_else(|| panic!("an order"));
+        let (entropy, nonce) = rfc.seed(&d, &h1).unwrap_or_else(|| panic!("a seed"));
+        let mut drbg = HmacDrbg::new(Algorithm::Sha256).unwrap_or_else(|_| panic!("a DRBG"));
+        drbg.instantiate(&entropy, &nonce, &[]);
+        let mut t = vec![0u8; rfc.candidate_len()];
+        let k = loop {
+            drbg.generate(&mut t, &[])
+                .unwrap_or_else(|_| panic!("generates"));
+            if let Some(k) = rfc.candidate(&t) {
+                break k;
+            }
+        };
+        let kinv = new_bignum(
+            ecdsa_core::inverse_mod_order(&order, &k).unwrap_or_default(),
+            false,
+        );
+        // SAFETY: the group.
+        let g2 = unsafe { EC_GROUP_dup(g) };
+        // SAFETY: as above.
+        let gen2 = unsafe { EC_POINT_new(g2) };
+        // SAFETY: the group, the points, and the number.
+        let mul = unsafe { EC_POINT_mul(g2, gen2, ptr::null(), p, kinv, ptr::null_mut()) };
+        assert_eq!(mul, 1);
+        let n = new_bignum(order, false);
+        let one = new_bignum(BigNum::one(), false);
+        // SAFETY: the group, the new generator, and the numbers.
+        assert_eq!(unsafe { EC_GROUP_set_generator(g2, gen2, n, one) }, 1);
+        // SAFETY: the group.
+        unsafe { EC_GROUP_set_curve_name(g2, 0) };
+        // SAFETY: no preconditions.
+        let key = unsafe { EC_KEY_new() };
+        let db = new_bignum(d, false);
+        // SAFETY: the group.
+        let q = unsafe { EC_POINT_new(g2) };
+        // SAFETY: the key and group.
+        assert_eq!(unsafe { EC_KEY_set_group(key, g2) }, 1);
+        // SAFETY: the group, the point, and the number.
+        let mul = unsafe { EC_POINT_mul(g2, q, db, ptr::null(), ptr::null(), ptr::null_mut()) };
+        assert_eq!(mul, 1);
+        // SAFETY: the key and number.
+        assert_eq!(unsafe { EC_KEY_set_private_key(key, db) }, 1);
+        // SAFETY: the key and point.
+        assert_eq!(unsafe { EC_KEY_set_public_key(key, q) }, 1);
+        let mut sig = [0u8; 80];
+        // SAFETY: the digest, room for the signature, the key; the default library context.
+        let n_sig = unsafe {
+            deterministic_sign(
+                &h1,
+                sig.as_mut_ptr(),
+                key,
+                1,
+                Some(c"SHA256"),
+                ptr::null_mut(),
+                ptr::null(),
+            )
+        };
+        let len = n_sig.unwrap_or_else(|| panic!("signs"));
+        let len = c_int::try_from(len).unwrap_or_default();
+        // SAFETY: the digest, the signature, the key.
+        let v = unsafe { ECDSA_verify(0, h1.as_ptr(), 32, sig.as_ptr(), len, key) };
+        assert_eq!(v, 1);
+        // SAFETY: made above, freed once.
+        unsafe { EC_KEY_free(key) };
+        for pt in [q, gen2, p] {
+            // SAFETY: as above.
+            unsafe { EC_POINT_free(pt) };
+        }
+        for b in [db, n, one, kinv] {
+            // SAFETY: as above.
+            unsafe { BN_clear_free(b) };
+        }
+        for gr in [g2, g] {
+            // SAFETY: as above.
+            unsafe { EC_GROUP_free(gr) };
+        }
+    }
 
     /// docs/DEVIATIONS.md: OpenSSL's dereference NULL keys, signatures, and outputs, and the
     /// missing numbers of an empty signature.

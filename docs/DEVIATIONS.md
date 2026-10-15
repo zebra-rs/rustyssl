@@ -236,6 +236,7 @@ OpenSSL never depends on them.
 | `EVP_PKEY_set1_EC_KEY` with a NULL `EC_KEY` | takes a reference to it (dereferencing NULL) | returns 0 | `evp::pkey::ec::tests::set1_of_null_fails` |
 | `EVP_PKEY_export` with a NULL callback | calls it and crashes | returns 0 | `evp::pkey::ec::tests::export_without_a_callback_fails` |
 | The EC key manager's generation parameters given as UTF-8 strings (group name, field type, encoding, point format, check type) without a NUL within their size, or with NULL data | copies the string with `strdup`, reading on past its size to a NUL; crashes on NULL | takes the characters within its size; refuses NULL data | `provider::ec_kmgmt::tests::strings_are_read_within_their_size` |
+| A deterministic ECDSA signature (nonce type 1, RFC 6979) whose nonce gives `r = 0` (a key on explicit parameters whose generator is made for it) | derives the same nonce from a new HMAC-DRBG-KDF forever, so the signature never returns | goes on to the DRBG's next candidate, as RFC 6979 (3.2 h.3) says, and signs | `ec::ecdsa::tests::a_deterministic_nonce_with_r_zero_moves_on` |
 
 ## Notes
 

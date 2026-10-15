@@ -3611,8 +3611,31 @@ chunking) is clean.
         probe's `eckm` and `ecdhkem` with `corpus/eckm.txt` and random sessions (2,000
         pass); the `ec_kmgmt` fuzz target (keys from arbitrary parameters, exported and
         imported again).
-    - [ ] **4.4d2 ECDSA's signature provider:** random nonces and RFC 6979's, the digest
-      and message forms, the algorithm identifiers.
+    - [x] **4.4d2 ECDSA's signature provider** (`rustyssl-capi/src/provider/ecdsa_sig.rs`; no
+      new exports): `ECDSA` (signing and verifying a digest, or a message through a digest
+      context with any digest that isn't an XOF) and the nine composite algorithms
+      (`ECDSA-SHA1` to `ECDSA-SHA3-512`, over a digest or a message), with OpenSSL's context
+      rules: an init keeps the digest, a digest fixed mid-message, the digest's name and size
+      checks and their errors, the empty properties a digest named through parameters is
+      fetched with, a known-answer test's setup values (which a copy refuses), and a message
+      verification's signature. The algorithm identifier is ECDSA with the digest (SHA-1,
+      SHA-2 but SHA-512/224 and SHA-512/256, SHA-3); getting it without one fails, as
+      OpenSSL's does.
+      - Nonces: random (`ECDSA_sign_ex`), RFC 6979's for `nonce-type` 1, and the digest-seeded
+        one for any other type (`ossl_ecdsa_deterministic_sign`, which needs a digest named).
+        RFC 6979's seed and candidates are `rustyssl_crypto::ec::ecdsa::Rfc6979` (bits2int,
+        bits2octets, int2octets; candidates above 1 and below the order, as OpenSSL accepts
+        them), from OpenSSL's HMAC-DRBG-KDF fetched with the context's properties. A nonce
+        whose r is zero moves on to the DRBG's next candidate where OpenSSL loops forever
+        (docs/DEVIATIONS.md).
+      - Tests: `tests/c/evp_ecdsa_sig.c` (64 checks: the algorithms' names and parameter lists,
+        RFC 6979's signatures with 14 digests on P-256, P-384, and P-521, random and
+        digest-seeded nonces, signing digests with and without a digest set, sizes and
+        refusals, every context parameter and its errors, a copy mid-message, the composite
+        algorithms in each form, a public key, and a legacy `EC_KEY`); the probe's `ecsig` with
+        `corpus/ecsig.txt` and random sessions (signatures of every nonce type compared whole,
+        from deterministic generators); the `ecdsa_sig` fuzz target now also verifies and signs
+        through the provider; a unit test of RFC 6979's A.2.5 nonce.
     - [ ] **4.4d3 ECDH's key exchange:** the cofactor mode and the X9.63 KDF.
     - [ ] **4.4d4 The legacy EC `EVP_PKEY_METHOD`.**
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.

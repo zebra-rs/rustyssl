@@ -319,6 +319,11 @@
  *                              or ints with a leading #): the key's export, checks, parameters
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
+ *   ecsig <curve> <priv> <md|-> <nonce-type> <alg|-> <msg> <sig|->  the ECDSA provider: with
+ *                              no signature, the message signed through a digest context,
+ *                              as a digest (EVP_PKEY_sign with the digest set), and with the
+ *                              composite algorithm, each verified; with one, it's verified
+ *                              each way
  *
  *   # ...              comment, echoed
  */
@@ -4448,6 +4453,126 @@ static void ec_dhkem_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
+/* ecsig: an EC key's signatures through the ECDSA provider. */
+static void ec_sig_command(const char *line)
+{
+    char curve[64] = "-", priv[700] = "-", md[64] = "-", alg[64] = "-", msg[700] = "-";
+    char sighex[700] = "-";
+    unsigned int nonce = 0;
+    unsigned char mb[300], sb[300], sig[300], pub[300];
+    size_t ml = 0, sl = 0, len, publen;
+    const char *mdname;
+    BIGNUM *d = NULL;
+    EC_GROUP *g;
+    EC_POINT *q;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *ps;
+    OSSL_PARAM np[2];
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY *k = NULL;
+
+    sscanf(line, "%*s %63s %699s %63s %u %63s %699s %699s", curve, priv, md, &nonce, alg, msg,
+           sighex);
+    mdname = strcmp(md, "-") == 0 ? NULL : md;
+    if (!parse_hex(msg, mb, &ml) || BN_hex2bn(&d, priv) == 0
+        || (strcmp(sighex, "-") != 0 && !parse_hex(sighex, sb, &sl))) {
+        printf(" bad input\n");
+        BN_free(d);
+        OSSL_PARAM_BLD_free(bld);
+        EVP_PKEY_CTX_free(c);
+        return;
+    }
+    g = EC_GROUP_new_by_curve_name(OBJ_sn2nid(curve));
+    q = EC_POINT_new(g);
+    EC_POINT_mul(g, q, d, NULL, NULL, NULL);
+    publen = EC_POINT_point2oct(g, q, POINT_CONVERSION_UNCOMPRESSED, pub, sizeof(pub), NULL);
+    OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curve, 0);
+    OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, d);
+    OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pub, publen);
+    ps = OSSL_PARAM_BLD_to_param(bld);
+    EVP_PKEY_fromdata_init(c);
+    printf(" key %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, ps));
+    print_asn_errors();
+    np[0] = OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &nonce);
+    np[1] = OSSL_PARAM_construct_end();
+    if (k != NULL) {
+        EVP_MD_CTX *m = EVP_MD_CTX_new();
+        EVP_PKEY_CTX *pc = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+        EVP_SIGNATURE *s = strcmp(alg, "-") == 0 ? NULL : EVP_SIGNATURE_fetch(NULL, alg, NULL);
+        int r;
+
+        if (strcmp(sighex, "-") != 0) {
+            r = EVP_DigestVerifyInit_ex(m, NULL, mdname, NULL, NULL, k, NULL);
+            printf("  digest verify %d", r);
+            if (r == 1)
+                printf(" %d", EVP_DigestVerify(m, sb, sl, mb, ml));
+            print_asn_errors();
+            r = EVP_PKEY_verify_init(pc);
+            if (mdname != NULL)
+                r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+            printf("  verify %d %d", r, EVP_PKEY_verify(pc, sb, sl, mb, ml));
+            print_asn_errors();
+            if (s != NULL) {
+                r = EVP_PKEY_verify_message_init(pc, s, NULL);
+                r = r * 10 + EVP_PKEY_CTX_set_signature(pc, sb, sl);
+                r = r * 10 + EVP_PKEY_verify_message_update(pc, mb, ml);
+                printf("  %s verify %d %d", alg, r, EVP_PKEY_verify_message_final(pc));
+                print_asn_errors();
+            }
+        } else {
+            len = sizeof(sig);
+            r = EVP_DigestSignInit_ex(m, NULL, mdname, NULL, NULL, k, np);
+            r = r * 10 + EVP_DigestSign(m, sig, &len, mb, ml);
+            printf("  digest sign %d", r);
+            if (r == 11) {
+                print_hex("", sig, len);
+                printf("  verify %d", EVP_DigestVerifyInit_ex(m, NULL, mdname, NULL, NULL, k,
+                                                               NULL));
+                printf(" %d", EVP_DigestVerify(m, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            len = sizeof(sig);
+            r = EVP_PKEY_sign_init_ex(pc, np);
+            if (mdname != NULL)
+                r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+            r = r * 10 + EVP_PKEY_sign(pc, sig, &len, mb, ml);
+            printf("  sign %d", r);
+            if (r % 10 == 1) {
+                print_hex("", sig, len);
+                r = EVP_PKEY_verify_init(pc);
+                if (mdname != NULL)
+                    r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+                printf("  verify %d %d", r, EVP_PKEY_verify(pc, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            if (s != NULL) {
+                len = sizeof(sig);
+                r = EVP_PKEY_sign_message_init(pc, s, np);
+                r = r * 10 + EVP_PKEY_sign(pc, sig, &len, mb, ml);
+                printf("  %s sign %d", alg, r);
+                if (r == 11) {
+                    print_hex("", sig, len);
+                    r = EVP_PKEY_verify_message_init(pc, s, NULL);
+                    r = r * 10 + EVP_PKEY_CTX_set_signature(pc, sig, len);
+                    r = r * 10 + EVP_PKEY_verify_message_update(pc, mb, ml);
+                    printf("  verify %d %d", r, EVP_PKEY_verify_message_final(pc));
+                }
+                print_asn_errors();
+            }
+        }
+        EVP_SIGNATURE_free(s);
+        EVP_PKEY_CTX_free(pc);
+        EVP_MD_CTX_free(m);
+    }
+    OSSL_PARAM_free(ps);
+    OSSL_PARAM_BLD_free(bld);
+    EC_POINT_free(q);
+    EC_GROUP_free(g);
+    BN_free(d);
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -4462,9 +4587,14 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "eckey") != 0 && strcmp(command, "ecgen") != 0
         && strcmp(command, "ecsign") != 0 && strcmp(command, "ecsetup") != 0
         && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
-        && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0)
+        && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
+        && strcmp(command, "ecsig") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "ecsig") == 0) {
+        ec_sig_command(line);
+        return 1;
+    }
     if (strcmp(command, "eckm") == 0) {
         ec_keymgmt_command(line);
         return 1;
