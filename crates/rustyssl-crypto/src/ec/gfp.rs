@@ -1,7 +1,7 @@
 //! Points on a curve over GF(p) in Jacobian coordinates (`X/Z^2`, `Y/Z^3`): OpenSSL's
 //! `ecp_smpl.c` formulas, step for step, so the coordinates come out as the reference's.
 
-use super::group::Group;
+use super::group::{Group, Meth};
 use super::point::Point;
 use super::{Error, Random, Reason, Result};
 use crate::bn::{self, BigNum, modular};
@@ -254,7 +254,21 @@ pub fn get_affine(g: &Group, pt: &Point, rng: &mut Random<'_>) -> Result<(BigNum
     if pt.z.is_one() {
         return Ok((pt.x.clone(), pt.y.clone()));
     }
-    let z1 = g.field_inv(&pt.z, rng).map_err(|e| {
+    // The NIST methods convert with their own field inversion, which draws nothing.
+    let nist = matches!(
+        g.meth,
+        Meth::Nistp224 | Meth::Nistp256 | Meth::Nistp384 | Meth::Nistp521
+    );
+    let fermat;
+    let inv_group = if nist {
+        let mut f = g.clone();
+        f.meth = Meth::Mont;
+        fermat = f;
+        &fermat
+    } else {
+        g
+    };
+    let z1 = inv_group.field_inv(&pt.z, rng).map_err(|e| {
         e.then(
             Reason::BnLib,
             "ossl_ec_GFp_simple_point_get_affine_coordinates",

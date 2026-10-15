@@ -114,7 +114,7 @@ pub fn equal(g: &Group, a: &Point, b: &Point) -> Result<bool> {
     }
 }
 
-/// `EC_POINT_make_affine`.
+/// `EC_POINT_make_affine`. On failure `pt` may have changed, as OpenSSL's.
 pub fn make_affine(g: &Group, pt: &mut Point, rng: &mut Random<'_>) -> Result<()> {
     match g.meth.field() {
         Field::Prime => {
@@ -122,7 +122,15 @@ pub fn make_affine(g: &Group, pt: &mut Point, rng: &mut Random<'_>) -> Result<()
                 return Ok(());
             }
             let (x, y) = gfp::get_affine(g, pt, rng)?;
+            // As `EC_POINT_set_affine_coordinates`, which keeps the coordinates of a point
+            // that isn't on the curve but fails.
             gfp::set_jprojective(g, pt, Some(&x), Some(&y), Some(&BigNum::one()))?;
+            if !gfp::is_on_curve(g, pt)? {
+                return Err(Error::new(
+                    Reason::PointIsNotOnCurve,
+                    "EC_POINT_set_affine_coordinates",
+                ));
+            }
             if !pt.z_is_one {
                 return Err(Error::new(
                     Reason::InternalError,

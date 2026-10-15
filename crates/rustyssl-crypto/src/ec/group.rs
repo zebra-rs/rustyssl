@@ -99,6 +99,9 @@ impl Meth {
 /// `OPENSSL_EC_NAMED_CURVE`.
 pub const NAMED_CURVE: i32 = 1;
 
+/// `OPENSSL_EC_EXPLICIT_CURVE`.
+pub const EXPLICIT_CURVE: i32 = 0;
+
 /// `POINT_CONVERSION_UNCOMPRESSED`.
 pub const UNCOMPRESSED: u8 = 4;
 
@@ -125,11 +128,13 @@ pub struct Group {
     pub seed: Option<Vec<u8>>,
     /// Whether the group came from explicit parameters.
     pub decoded_from_explicit_params: bool,
+    /// The generator's precomputed multiples (`EC_GROUP_precompute_mult`), shared by copies.
+    pub pre_comp: Option<std::sync::Arc<super::mult::PreComp>>,
 }
 
 impl Group {
-    /// An empty group of `meth` (`EC_GROUP_new`): no curve, generator, order, or name; named
-    /// curve encoding, uncompressed points.
+    /// An empty group of `meth` (`EC_GROUP_new`): no curve, generator, order, or name;
+    /// explicit encoding, uncompressed points.
     #[must_use]
     pub fn new(meth: Meth) -> Self {
         Self {
@@ -143,10 +148,11 @@ impl Group {
             order: BigNum::zero(),
             cofactor: BigNum::zero(),
             curve_name: 0,
-            asn1_flag: NAMED_CURVE,
+            asn1_flag: EXPLICIT_CURVE,
             asn1_form: UNCOMPRESSED,
             seed: None,
             decoded_from_explicit_params: false,
+            pre_comp: None,
         }
     }
 
@@ -159,7 +165,7 @@ impl Group {
         let mut g = Self::new(Meth::for_curve(c));
         let (p, a, b) = (num(c.p)?, num(c.a)?, num(c.b)?);
         g.set_curve(&p, &a, &b).map_err(ec)?;
-        g.curve_name = c.nid;
+        g.set_curve_name(c.nid);
         let (x, y) = (num(c.x)?, num(c.y)?);
         let mut gen_pt = Point::infinity();
         if !super::point::set_affine(&g, &mut gen_pt, &x, &y).map_err(ec)? {
@@ -176,6 +182,16 @@ impl Group {
             g.seed = Some(c.seed.to_vec());
         }
         Ok(g)
+    }
+
+    /// `EC_GROUP_set_curve_name`: the name, and named or explicit encoding as there is one.
+    pub fn set_curve_name(&mut self, nid: i32) {
+        self.curve_name = nid;
+        self.asn1_flag = if nid != 0 {
+            NAMED_CURVE
+        } else {
+            EXPLICIT_CURVE
+        };
     }
 
     /// Whether the field is a prime field.

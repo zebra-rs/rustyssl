@@ -95,16 +95,23 @@ pub struct Request<'a> {
 }
 
 /// `EC_POINTs_mul`'s work after its checks: the method's `mul`, or wNAF.
+///
+/// With no terms at all (`EC_POINT_mul` with a point scalar but no point), wNAF fails without
+/// an error entry, as OpenSSL's does when its zero-length allocation fails; the binary method,
+/// whose ladder OpenSSL runs on the missing scalar and crashes, gives infinity.
 pub fn mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -> Result<()> {
-    if req.scalar.is_none() && req.pairs.is_empty() {
-        r.set_to_infinity();
-        return Ok(());
-    }
     if g.meth.specialized_mul() {
         return specialized(g, r, req);
     }
     if g.meth.field() == Field::Binary {
+        if req.scalar.is_none() && req.pairs.is_empty() {
+            r.set_to_infinity();
+            return Ok(());
+        }
         return gf2m_points_mul(g, r, req, rng);
+    }
+    if req.scalar.is_none() && req.pairs.is_empty() {
+        return Err(Error(Vec::new()));
     }
     wnaf_mul(g, r, req, rng)
 }
@@ -195,7 +202,12 @@ fn ladder(
     let kbit = lambda.is_bit_set(card_bits);
     bn::consttime_swap(kbit, &mut k, &mut lambda, top.saturating_add(2));
     let words = g.field.top();
-    if !p.z_is_one {
+    if !p.z_is_one && !random {
+        // The specialized methods' own multiplications (for which this stands in) take a
+        // point as it is, on the curve or not.
+        let (x, y) = gfp::get_affine(g, &p, rng)?;
+        gfp::set_jprojective(g, &mut p, Some(&x), Some(&y), Some(&BigNum::one()))?;
+    } else if !p.z_is_one {
         point::make_affine(g, &mut p, rng)
             .map_err(|e| e.then(Reason::EcLib, "ossl_ec_scalar_mul_ladder"))?;
     }
@@ -275,43 +287,73 @@ fn post(
 /// The curve-specific methods' multiplications: the ladder for each term, without random
 /// numbers, summed, and handed back in Jacobian coordinates (Z = 2) as theirs are.
 fn specialized(g: &Group, r: &mut Point, req: &Request<'_>) -> Result<()> {
+    // sm2p256 takes the generator's scalar's magnitude as a 256-bit field element (the
+    // points' it reduces modulo the order), and its table multiplies by that magnitude.
+    if g.meth == super::Meth::Sm2p256 && req.scalar.is_some_and(|s| s.num_bits() > 256) {
+        return Err(Error::new(
+            Reason::CoordinatesOutOfRange,
+            "ecp_sm2p256_points_mul",
+        ));
+    }
+    // Every inversion by Fermat's little theorem, so nothing random is drawn.
+    let mut fermat = g.clone();
+    fermat.meth = super::Meth::Mont;
+    let f = &fermat;
     let mut none = |_: &mut [u8]| false;
+    let sm2 = g.meth == super::Meth::Sm2p256;
+    let sm2_table = sm2 && standard_generator(g);
     let mut acc: Option<Point> = None;
-    let terms = req
-        .scalar
+    // Whether sm2p256's sum so far has Z = 1 (it copies a term into an infinite sum).
+    let mut sm2_affine = false;
+    let magnitude = req.scalar.filter(|_| sm2_table).map(BigNum::abs);
+    let terms = magnitude
+        .as_ref()
+        .or(req.scalar)
         .map(|s| (None, s))
         .into_iter()
         .chain(req.pairs.iter().map(|(p, s)| (Some(*p), *s)));
     for (pt, s) in terms {
         let mut t = Point::infinity();
-        if g.order.is_zero() || g.cofactor.is_zero() {
-            return Err(Error::new(
-                Reason::UnknownOrder,
-                "ossl_ec_scalar_mul_ladder",
-            ));
-        }
-        ladder(g, &mut t, s, pt, &mut none, false)?;
+        ladder(f, &mut t, s, pt, &mut none, false)?;
+        let t_affine = sm2 && !t.is_at_infinity() && sm2_term_affine(g, pt, s, sm2_table)?;
         acc = Some(match acc {
-            None => t,
+            None => {
+                sm2_affine = t_affine;
+                t
+            }
             Some(a) => {
+                if a.is_at_infinity() {
+                    sm2_affine = t_affine;
+                } else if !t.is_at_infinity() {
+                    sm2_affine = false;
+                }
                 let mut sum = Point::infinity();
-                gfp::add_points(g, &mut sum, &a, &t, false)?;
+                gfp::add_points(f, &mut sum, &a, &t, false)?;
                 sum
             }
         });
     }
     let mut out = acc.unwrap_or_default();
+    // nistz256 multiplies its standard generator alone with a table of affine points, and
+    // hands back an affine point; sm2p256 hands back a term as it made it when it's the only
+    // one that isn't infinity, which is affine in the cases `sm2_term_affine` names; every
+    // other result is Jacobian (and converting sm2p256's draws its blinded inversion's random
+    // numbers).
+    let affine = (g.meth == super::Meth::Nistz256 && req.pairs.is_empty() && standard_generator(g))
+        || sm2_affine;
     if !out.is_at_infinity() {
         if !out.z_is_one {
-            let mut fermat = g.clone();
-            fermat.meth = super::Meth::Mont;
-            let (x, y) = gfp::get_affine(&fermat, &out, &mut none)?;
+            let (x, y) = gfp::get_affine(f, &out, &mut none)?;
             out = Point {
                 x,
                 y,
                 z: BigNum::one(),
                 z_is_one: true,
             };
+        }
+        if affine {
+            *r = out;
+            return Ok(());
         }
         let two = BigNum::from_word(2);
         let four = g.field_sqr(&two)?;
@@ -325,8 +367,104 @@ fn specialized(g: &Group, r: &mut Point, req: &Request<'_>) -> Result<()> {
     Ok(())
 }
 
-/// `ossl_ec_wNAF_mul` (without a precomputed generator table).
+/// Whether sm2p256 makes a term `s * pt` (the generator for `None`), not infinity, with
+/// Z = 1: from its generator table, a scalar with one nonzero octet (one affine table entry);
+/// by its 4-bit window, a scalar (reduced modulo the order when negative or over 256 bits) of
+/// one, the point itself.
+fn sm2_term_affine(g: &Group, pt: Option<&Point>, s: &BigNum, table: bool) -> Result<bool> {
+    if pt.is_none() && table {
+        let octets = s
+            .to_bin(None, crate::bn::Endian::Big, false)
+            .unwrap_or_default();
+        return Ok(octets.iter().filter(|b| **b != 0).count() == 1);
+    }
+    if s.is_negative() || s.num_bits() > 256 {
+        let k = bn::nnmod(s, &g.order).map_err(Error::from)?;
+        return Ok(k.is_one());
+    }
+    Ok(s.is_one())
+}
+
+/// Whether the group's generator is its named curve's own, in affine coordinates
+/// (`ecp_nistz256_is_affine_G`, `ecp_sm2p256_is_affine_G`).
+fn standard_generator(g: &Group) -> bool {
+    let (Some(gen_pt), Some(c)) = (g.generator.as_ref(), super::curves::by_nid(g.curve_name))
+    else {
+        return false;
+    };
+    let num = |v: &[u8]| BigNum::from_bin(v, crate::bn::Endian::Big, false).ok();
+    gen_pt.z_is_one
+        && num(c.x).is_some_and(|x| bn::cmp(&x, &gen_pt.x).is_eq())
+        && num(c.y).is_some_and(|y| bn::cmp(&y, &gen_pt.y).is_eq())
+}
+
+/// `EC_PRE_COMP`: odd multiples of the generator and of `2^(blocksize*i)` times it, for wNAF
+/// to split the generator's scalar across, affine.
+#[derive(Debug)]
+pub struct PreComp {
+    pub blocksize: usize,
+    pub numblocks: usize,
+    pub w: usize,
+    pub points: Vec<Point>,
+}
+
+/// `ossl_ec_wNAF_precompute_mult`: the generator's table.
+pub fn precompute(g: &Group, rng: &mut Random<'_>) -> Result<PreComp> {
+    const F: &str = "ossl_ec_wNAF_precompute_mult";
+    let generator = g
+        .generator
+        .as_ref()
+        .ok_or(Error::new(Reason::UndefinedGenerator, F))?;
+    if g.order.is_zero() {
+        return Err(Error::new(Reason::UnknownOrder, F));
+    }
+    let bits = g.order.num_bits();
+    let blocksize = 8;
+    let w = window_bits(bits).max(4);
+    let numblocks = bits.div_ceil(blocksize);
+    let per_block = 1usize << w.saturating_sub(1);
+    let mut points: Vec<Point> = Vec::with_capacity(per_block.saturating_mul(numblocks));
+    let mut base = generator.clone();
+    for i in 0..numblocks {
+        let mut tmp = Point::infinity();
+        point::dbl(g, &mut tmp, &base, rng)?;
+        points.push(base.clone());
+        for _ in 1..per_block {
+            let prev = points.last().cloned().unwrap_or_default();
+            let mut next = Point::infinity();
+            point::add(g, &mut next, &tmp, &prev, false, rng)?;
+            points.push(next);
+        }
+        if i.saturating_add(1) < numblocks {
+            let mut b = Point::infinity();
+            point::dbl(g, &mut b, &tmp, rng)?;
+            for _ in 2..blocksize {
+                let bb = b.clone();
+                point::dbl(g, &mut b, &bb, rng)?;
+            }
+            base = b;
+        }
+    }
+    point::points_make_affine(g, &mut points, rng)?;
+    Ok(PreComp {
+        blocksize,
+        numblocks,
+        w,
+        points,
+    })
+}
+
+/// Where a wNAF term's odd multiples are: in this multiplication's own table, from an index,
+/// or in the group's precomputed one.
+#[derive(Clone, Copy)]
+enum Table {
+    Own(usize),
+    Pre(usize),
+}
+
+/// `ossl_ec_wNAF_mul`.
 fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -> Result<()> {
+    const F: &str = "ossl_ec_wNAF_mul";
     if !g.order.is_zero() && !g.cofactor.is_zero() {
         if let (Some(s), []) = (req.scalar, req.pairs)
             && !req.scalar_is_order
@@ -341,29 +479,83 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
         Some(_) => Some(
             g.generator
                 .as_ref()
-                .ok_or(Error::new(Reason::UndefinedGenerator, "ossl_ec_wNAF_mul"))?,
+                .ok_or(Error::new(Reason::UndefinedGenerator, F))?,
         ),
         None => None,
     };
-    let mut terms: Vec<(&Point, &BigNum)> = req.pairs.to_vec();
-    if let (Some(base), Some(s)) = (generator, req.scalar) {
-        terms.push((base, s));
+    // The group's table, when it was made for this generator.
+    let mut pre: Option<(&PreComp, usize)> = None;
+    if let (Some(gen_pt), Some(s)) = (generator, req.scalar)
+        && let Some(pc) = g.pre_comp.as_deref()
+        && pc.numblocks > 0
+        && pc
+            .points
+            .first()
+            .is_some_and(|p0| point::equal(g, gen_pt, p0).unwrap_or(false))
+    {
+        let per_block = 1usize << pc.w.saturating_sub(1);
+        if pc.points.len() != pc.numblocks.saturating_mul(per_block) {
+            return Err(Error::new(Reason::InternalError, F));
+        }
+        let numblocks = s
+            .num_bits()
+            .checked_div(pc.blocksize)
+            .unwrap_or(0)
+            .saturating_add(1)
+            .min(pc.numblocks);
+        pre = Some((pc, numblocks));
     }
-    let mut wsize = Vec::with_capacity(terms.len());
-    let mut wnaf = Vec::with_capacity(terms.len());
+    // The terms with tables of their own: the points, then the generator without a table.
+    let mut own: Vec<(&Point, &BigNum)> = req.pairs.to_vec();
+    if let (Some(base), Some(s), None) = (generator, req.scalar, pre) {
+        own.push((base, s));
+    }
+    let mut entries: Vec<(Vec<i8>, Table)> = Vec::new();
+    let mut wsize = Vec::with_capacity(own.len());
     let mut max_len = 0;
-    for (_, s) in &terms {
+    for (_, s) in &own {
         let w = window_bits(s.num_bits());
         let digits = compute_wnaf(s, w)?;
         max_len = max_len.max(digits.len());
         wsize.push(w);
-        wnaf.push(digits);
+        entries.push((digits, Table::Own(0)));
     }
-    // The precomputed odd multiples of each point: P, 3P, 5P, ...
+    if let (Some((pc, numblocks)), Some(s)) = (pre, req.scalar) {
+        let digits = compute_wnaf(s, pc.w)?;
+        let per_block = 1usize << pc.w.saturating_sub(1);
+        if digits.len() <= max_len {
+            entries.push((digits, Table::Pre(0)));
+        } else {
+            let mut numblocks = numblocks;
+            if digits.len() < numblocks.saturating_mul(pc.blocksize) {
+                numblocks = digits.len().div_ceil(pc.blocksize);
+                if numblocks > pc.numblocks {
+                    return Err(Error::new(Reason::InternalError, F));
+                }
+            }
+            let mut rest: &[i8] = &digits;
+            for i in 0..numblocks {
+                let len = if i.saturating_add(1) < numblocks {
+                    if rest.len() < pc.blocksize {
+                        return Err(Error::new(Reason::InternalError, F));
+                    }
+                    pc.blocksize
+                } else {
+                    rest.len()
+                };
+                let (block, tail) = rest.split_at(len);
+                max_len = max_len.max(block.len());
+                entries.push((block.to_vec(), Table::Pre(i.saturating_mul(per_block))));
+                rest = tail;
+            }
+        }
+    }
+    // The odd multiples of each term with its own table: P, 3P, 5P, ...
     let mut val: Vec<Point> = Vec::new();
-    let mut starts = Vec::with_capacity(terms.len());
-    for ((p, _), w) in terms.iter().zip(&wsize) {
-        starts.push(val.len());
+    for ((i, (p, _)), w) in own.iter().enumerate().zip(&wsize) {
+        if let Some(e) = entries.get_mut(i) {
+            e.1 = Table::Own(val.len());
+        }
         let count = 1usize << w.saturating_sub(1);
         let first = (*p).clone();
         val.push(first.clone());
@@ -380,6 +572,18 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
         }
     }
     point::points_make_affine(g, &mut val, rng)?;
+    let table = |t: Table, digit: usize| -> Option<&Point> {
+        match t {
+            Table::Own(start) => val.get(start.saturating_add(digit >> 1)),
+            Table::Pre(start) => {
+                pre.and_then(|(pc, _)| pc.points.get(start.saturating_add(digit >> 1)))
+            }
+        }
+    };
+    // The sum is made apart from `r`, which it replaces only at the end, as OpenSSL's.
+    let out = r;
+    let mut acc = Point::infinity();
+    let r = &mut acc;
     let mut at_infinity = true;
     let mut inverted = false;
     for k in (0..max_len).rev() {
@@ -387,7 +591,7 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
             let rr = r.clone();
             point::dbl(g, r, &rr, rng)?;
         }
-        for (i, digits) in wnaf.iter().enumerate() {
+        for (digits, t) in &entries {
             let Some(&d) = digits.get(k) else { continue };
             if d == 0 {
                 continue;
@@ -400,14 +604,7 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
                 }
                 inverted = !inverted;
             }
-            let idx = starts
-                .get(i)
-                .copied()
-                .unwrap_or(0)
-                .saturating_add(digit >> 1);
-            let v = val
-                .get(idx)
-                .ok_or(Error::new(Reason::InternalError, "ossl_ec_wNAF_mul"))?;
+            let v = table(*t, digit).ok_or(Error::new(Reason::InternalError, F))?;
             if at_infinity {
                 *r = v.clone();
                 if g.meth.field() == Field::Prime {
@@ -425,5 +622,6 @@ fn wnaf_mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -
     } else if inverted {
         point::invert(g, r)?;
     }
+    *out = acc;
     Ok(())
 }

@@ -33,7 +33,7 @@ pub fn set_affine(pt: &mut Point, x: &BigNum, y: &BigNum) {
 }
 
 /// `ossl_ec_GF2m_simple_add`: `r = a + b` (doubling for the same point), in affine
-/// coordinates.
+/// coordinates. On failure `r` may hold the sum anyway, as OpenSSL's.
 pub fn add_points(
     g: &Group,
     r: &mut Point,
@@ -82,7 +82,15 @@ pub fn add_points(
     let y2 = g.field_mul(&y2, &s)?;
     let y2 = gf2m::add(&y2, &x2);
     let y2 = gf2m::add(&y2, &y1);
+    // OpenSSL sets the result with `EC_POINT_set_affine_coordinates`, which keeps the
+    // coordinates of a sum that isn't on the curve (from points that weren't) but fails.
     set_affine(r, &x2, &y2);
+    if !is_on_curve(g, r)? {
+        return Err(Error::new(
+            Reason::PointIsNotOnCurve,
+            "EC_POINT_set_affine_coordinates",
+        ));
+    }
     Ok(())
 }
 

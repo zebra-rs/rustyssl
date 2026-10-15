@@ -69,6 +69,8 @@ pub enum Reason {
     UndefinedGenerator,
     /// `EC_R_DISCRIMINANT_IS_ZERO`.
     DiscriminantIsZero,
+    /// `EC_R_COORDINATES_OUT_OF_RANGE`.
+    CoordinatesOutOfRange,
     /// `ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED`.
     ShouldNotHaveBeenCalled,
     /// `ERR_R_BN_LIB`.
