@@ -297,6 +297,15 @@
  *                              divarr, exparr, sqrtarr, solvearr (results that depend on random
  *                              numbers printed only from a deterministic generator)
  *
+ *   ecgrp <sn>                 the curve's group becomes the EC commands' (two point registers)
+ *   ecpt <r> <hex>             EC_POINT_oct2point into register r
+ *   eccomp <r> <x> <bit>       EC_POINT_set_compressed_coordinates
+ *   ecmul <r> <k|-> <reg|-> <k2|->   EC_POINT_mul: each point printed affine, in its three
+ *                              encodings, and (for the generic prime method with a known
+ *                              generator) in its Jacobian coordinates; with a point off
+ *                              the curve on a specialized method, only "offcurve"
+ *   ecadd <r> <a> <b>          EC_POINT_add of registers
+ *
  *   # ...              comment, echoed
  */
 #define _POSIX_C_SOURCE 200809L
@@ -325,6 +334,7 @@
 #include <openssl/camellia.h>
 #include <openssl/crypto.h>
 #include <openssl/des.h>
+#include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/idea.h>
@@ -4142,6 +4152,164 @@ static void bn_print_bio(BIO *mem)
     printf("]");
 }
 
+/* The current group of the EC commands, and its point registers. */
+static EC_GROUP *ec_group = NULL;
+static EC_POINT *ec_points[2] = { NULL, NULL };
+
+/* A point's affine coordinates, its three encodings, and (when nothing random went into
+ * them, or the generator is known, for the methods whose computation is OpenSSL's generic
+ * one) its Jacobian coordinates. */
+static void ec_print_point(const EC_POINT *p)
+{
+    BIGNUM *x = BN_new(), *y = BN_new(), *z = BN_new();
+    static const point_conversion_form_t forms[] = {
+        POINT_CONVERSION_COMPRESSED, POINT_CONVERSION_UNCOMPRESSED, POINT_CONVERSION_HYBRID
+    };
+    const EC_METHOD *m = EC_GROUP_method_of(ec_group);
+    int generic = m == EC_GFp_mont_method() || m == EC_GF2m_simple_method();
+
+    if (EC_POINT_is_at_infinity(ec_group, p)) {
+        printf(" infinity");
+    } else if (EC_POINT_get_affine_coordinates(ec_group, p, x, y, NULL)) {
+        char *xs = BN_bn2hex(x), *ys = BN_bn2hex(y);
+
+        printf(" (%s,%s)", xs, ys);
+        OPENSSL_free(xs);
+        OPENSSL_free(ys);
+    } else {
+        printf(" noaffine");
+    }
+    for (size_t i = 0; i < 3; i++) {
+        unsigned char buf[300];
+        size_t len = EC_POINT_point2oct(ec_group, p, forms[i], buf, sizeof(buf), NULL);
+
+        printf(" ");
+        for (size_t j = 0; j < len; j++)
+            printf("%02x", buf[j]);
+    }
+    if (generic && rand_priv_det && m == EC_GFp_mont_method()
+        && EC_POINT_get_Jprojective_coordinates_GFp(ec_group, p, x, y, z, NULL)) {
+        char *xs = BN_bn2hex(x), *ys = BN_bn2hex(y), *zs = BN_bn2hex(z);
+
+        printf(" [%s:%s:%s]", xs, ys, zs);
+        OPENSSL_free(xs);
+        OPENSSL_free(ys);
+        OPENSSL_free(zs);
+    }
+    BN_free(x);
+    BN_free(y);
+    BN_free(z);
+}
+
+/* Runs an EC command; returns 0 if `command` isn't one. */
+static int ec_command(const char *command, const char *line)
+{
+    char a[700] = "-", b[700] = "-", c[700] = "-";
+    unsigned char buf[300];
+    size_t len = 0;
+    int ret;
+
+    if (strcmp(command, "ecgrp") != 0 && strcmp(command, "ecpt") != 0
+        && strcmp(command, "eccomp") != 0 && strcmp(command, "ecmul") != 0
+        && strcmp(command, "ecadd") != 0)
+        return 0;
+    printf("%s:", line);
+    if (strcmp(command, "ecgrp") == 0) {
+        sscanf(line, "%*s %699s", a);
+        for (int i = 0; i < 2; i++)
+            EC_POINT_free(ec_points[i]);
+        EC_GROUP_free(ec_group);
+        ec_group = EC_GROUP_new_by_curve_name(OBJ_sn2nid(a));
+        for (int i = 0; i < 2; i++)
+            ec_points[i] = ec_group == NULL ? NULL : EC_POINT_new(ec_group);
+        printf(" %s", ec_group == NULL ? "failed" : "ok");
+        print_asn_errors();
+        return 1;
+    }
+    if (ec_group == NULL) {
+        printf(" no group\n");
+        return 1;
+    }
+    if (strcmp(command, "ecpt") == 0) {
+        unsigned long r = 0;
+
+        sscanf(line, "%*s %lu %699s", &r, a);
+        r %= 2;
+        if (strcmp(a, "-") != 0 && !parse_hex(a, buf, &len)) {
+            printf(" bad hex\n");
+            return 1;
+        }
+        ret = EC_POINT_oct2point(ec_group, ec_points[r], buf, len, NULL);
+        printf(" %d", ret);
+        if (ret)
+            ec_print_point(ec_points[r]);
+        print_asn_errors();
+    } else if (strcmp(command, "eccomp") == 0) {
+        unsigned long r = 0;
+        int bit = 0;
+        BIGNUM *x = NULL;
+
+        sscanf(line, "%*s %lu %699s %d", &r, a, &bit);
+        r %= 2;
+        BN_hex2bn(&x, a);
+        ret = EC_POINT_set_compressed_coordinates(ec_group, ec_points[r], x, bit, NULL);
+        printf(" %d", ret);
+        if (ret)
+            ec_print_point(ec_points[r]);
+        print_asn_errors();
+        BN_free(x);
+    } else if (strcmp(command, "ecmul") == 0) {
+        /* ecmul <r> <g scalar or -> <point register or -> <its scalar or -> */
+        unsigned long r = 0;
+        BIGNUM *k = NULL, *k2 = NULL;
+        const EC_POINT *pt = NULL;
+        const EC_METHOD *m;
+        int offcurve;
+
+        sscanf(line, "%*s %lu %699s %699s %699s", &r, a, b, c);
+        r %= 2;
+        if (strcmp(a, "-") != 0)
+            BN_hex2bn(&k, a);
+        if (strcmp(b, "-") != 0)
+            pt = ec_points[strtoul(b, NULL, 10) % 2];
+        if (strcmp(c, "-") != 0)
+            BN_hex2bn(&k2, c);
+        /* A point off the curve multiplied by a specialized method (not the generic prime
+         * or binary ones) gives a meaningless result that depends on its formulas, so only
+         * that is printed, and the register becomes infinity on both libraries. */
+        m = EC_GROUP_method_of(ec_group);
+        ERR_set_mark();
+        offcurve = pt != NULL && k2 != NULL && m != EC_GFp_simple_method()
+            && m != EC_GFp_mont_method() && m != EC_GFp_nist_method()
+            && m != EC_GF2m_simple_method() && !EC_POINT_is_at_infinity(ec_group, pt)
+            && EC_POINT_is_on_curve(ec_group, pt, NULL) != 1;
+        ERR_pop_to_mark();
+        ret = EC_POINT_mul(ec_group, ec_points[r], k, pt, k2, NULL);
+        printf(" %d", ret);
+        if (ret && offcurve) {
+            printf(" offcurve");
+            EC_POINT_set_to_infinity(ec_group, ec_points[r]);
+        } else if (ret) {
+            ec_print_point(ec_points[r]);
+        }
+        print_asn_errors();
+        BN_free(k);
+        BN_free(k2);
+    } else {
+        /* ecadd <r> <a> <b>: EC_POINT_add, or with r = a = b, the same object. */
+        unsigned long r = 0, x = 0, y = 0;
+
+        sscanf(line, "%*s %lu %lu %lu", &r, &x, &y);
+        ret = EC_POINT_add(ec_group, ec_points[r % 2], ec_points[x % 2], ec_points[y % 2],
+                           NULL);
+        printf(" %d", ret);
+        if (ret)
+            ec_print_point(ec_points[r % 2]);
+        print_asn_errors();
+    }
+    return 1;
+}
+
 static int bn_command(const char *command, const char *line)
 {
     char op[16] = "", text[1000] = "";
@@ -7658,7 +7826,7 @@ int main(void)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
             || skey_command(command, line) || md_meth_command(command, line)
             || cipher_meth_command(command, line) || conf_command(command, line)
-            || conf_modules_command(command, line)) {
+            || conf_modules_command(command, line) || ec_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {
