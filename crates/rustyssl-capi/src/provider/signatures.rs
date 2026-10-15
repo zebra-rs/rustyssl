@@ -22,6 +22,7 @@ use rustyssl_abi::{
 };
 
 use super::builtin::libctx_of;
+use super::ecdsa_sig;
 use super::keymgmt::{mac_free, mac_key, mac_key_up_ref};
 use super::rsa_sig;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, entry, pending};
@@ -489,16 +490,43 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
     pending(c"ED25519ctx"),
     pending(c"ED448:1.3.101.113"),
     pending(c"ED448ph"),
-    pending(c"ECDSA"),
-    pending(c"ECDSA-SHA1:ECDSA-SHA-1:ecdsa-with-SHA1:1.2.840.10045.4.1"),
-    pending(c"ECDSA-SHA2-224:ECDSA-SHA224:ecdsa-with-SHA224:1.2.840.10045.4.3.1"),
-    pending(c"ECDSA-SHA2-256:ECDSA-SHA256:ecdsa-with-SHA256:1.2.840.10045.4.3.2"),
-    pending(c"ECDSA-SHA2-384:ECDSA-SHA384:ecdsa-with-SHA384:1.2.840.10045.4.3.3"),
-    pending(c"ECDSA-SHA2-512:ECDSA-SHA512:ecdsa-with-SHA512:1.2.840.10045.4.3.4"),
-    pending(c"ECDSA-SHA3-224:ecdsa_with_SHA3-224:id-ecdsa-with-sha3-224:2.16.840.1.101.3.4.3.9"),
-    pending(c"ECDSA-SHA3-256:ecdsa_with_SHA3-256:id-ecdsa-with-sha3-256:2.16.840.1.101.3.4.3.10"),
-    pending(c"ECDSA-SHA3-384:ecdsa_with_SHA3-384:id-ecdsa-with-sha3-384:2.16.840.1.101.3.4.3.11"),
-    pending(c"ECDSA-SHA3-512:ecdsa_with_SHA3-512:id-ecdsa-with-sha3-512:2.16.840.1.101.3.4.3.12"),
+    alg(c"ECDSA", &ecdsa_sig::ECDSA_SIGNATURE),
+    alg(
+        c"ECDSA-SHA1:ECDSA-SHA-1:ecdsa-with-SHA1:1.2.840.10045.4.1",
+        &ecdsa_sig::ECDSA_SHA1_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA2-224:ECDSA-SHA224:ecdsa-with-SHA224:1.2.840.10045.4.3.1",
+        &ecdsa_sig::ECDSA_SHA224_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA2-256:ECDSA-SHA256:ecdsa-with-SHA256:1.2.840.10045.4.3.2",
+        &ecdsa_sig::ECDSA_SHA256_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA2-384:ECDSA-SHA384:ecdsa-with-SHA384:1.2.840.10045.4.3.3",
+        &ecdsa_sig::ECDSA_SHA384_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA2-512:ECDSA-SHA512:ecdsa-with-SHA512:1.2.840.10045.4.3.4",
+        &ecdsa_sig::ECDSA_SHA512_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA3-224:ecdsa_with_SHA3-224:id-ecdsa-with-sha3-224:2.16.840.1.101.3.4.3.9",
+        &ecdsa_sig::ECDSA_SHA3_224_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA3-256:ecdsa_with_SHA3-256:id-ecdsa-with-sha3-256:2.16.840.1.101.3.4.3.10",
+        &ecdsa_sig::ECDSA_SHA3_256_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA3-384:ecdsa_with_SHA3-384:id-ecdsa-with-sha3-384:2.16.840.1.101.3.4.3.11",
+        &ecdsa_sig::ECDSA_SHA3_384_SIGNATURE,
+    ),
+    alg(
+        c"ECDSA-SHA3-512:ecdsa_with_SHA3-512:id-ecdsa-with-sha3-512:2.16.840.1.101.3.4.3.12",
+        &ecdsa_sig::ECDSA_SHA3_512_SIGNATURE,
+    ),
     pending(c"SM2:1.2.156.10197.1.301"),
     pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
     pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
