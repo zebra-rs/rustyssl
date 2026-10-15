@@ -3493,9 +3493,8 @@ chunking) is clean.
       length and constant-time swaps, so the steps don't depend on it. On the generic prime
       and binary methods (brainpool, secp*k1, the other secp and binary curves, explicit
       groups) the ladder's coordinates are also randomized, as OpenSSL's are. On P-224,
-      P-256, P-384, P-521, and (on aarch64) SM2 it isn't (their methods draw nothing), and the field
-      arithmetic is BIGNUM's, whose time can depend on the numbers' lengths: weaker than
-      OpenSSL's fixed-limb code there, to fix before 4.4c gives keys these groups. Sums of
+      P-256, P-384, P-521, and (on aarch64) SM2 it isn't (their methods draw nothing); since
+      4.4c1 their ladder runs on constant-time field elements of the modulus's length. Sums of
       several terms use wNAF, which isn't constant-time; OpenSSL uses them only with public
       scalars (verification).
     - Tests: `tests/c/ec_group_point.c` (277 checks); the differential probe's `ecgrp`,
@@ -3522,11 +3521,23 @@ chunking) is clean.
       encodings; the `ec_params` fuzz target; three deviations where OpenSSL crashes or
       corrupts memory (a NULL `ECPARAMETERS`, refilling an existing `ECPARAMETERS`, a failed
       conversion into the caller's `ECPKPARAMETERS`).
-  - [ ] **4.4c Keys and their primitives:** first, constant-time field arithmetic for the
-    curve-specific methods' curves (4.4a); then `EC_KEY` and `EC_KEY_METHOD`, `ECDSA_SIG`,
-    `ECParameters_print(_fp)` (which takes a key),
-    `ECDSA_*` and `ECDH_compute_key`, the key's ASN.1 (`ECPrivateKey`, `i2o`/`o2i`), and
-    EC in `EVP_PKEY` (with printing).
+  - [ ] **4.4c Keys and their primitives**, in sub-steps:
+    - [x] **4.4c1 Constant-time field arithmetic** (`rustyssl-crypto/src/ec/fe.rs`): elements of
+      the modulus's length in limbs, in Montgomery form (`mul_fixed` and `redc`), with masked
+      sums and differences, constant-time swaps, and Fermat inversion. The curve-specific
+      methods' ladder (P-224, P-256, P-384, P-521, and SM2 on aarch64) runs OpenSSL's x-only
+      formulas on them, so neither its steps nor its arithmetic depend on the scalar; their
+      results are unchanged (the C tests and 3,000 random EC sessions agree with the
+      reference). The generic ladder no longer has a non-random mode.
+    - [ ] **4.4c2 `EC_KEY`:** the object and `EC_KEY_METHOD`, key generation and checks, the
+      public key's and private key's encodings, the key's ASN.1 (`ECPrivateKey`,
+      `ECParameters`, `i2o`/`o2i_ECPublicKey`), and `EC_KEY_print(_fp)` and
+      `ECParameters_print(_fp)`.
+    - [ ] **4.4c3 ECDSA and ECDH:** `ECDSA_SIG` and its ASN.1, `ECDSA_sign`/`verify` and their
+      `_ex` and setup forms, `ECDSA_size`, and `ECDH_compute_key` (cofactor mode, the X9.63
+      KDF).
+    - [ ] **4.4c4 EC in `EVP_PKEY`:** `get0`/`get1`/`set1_EC_KEY`, the ASN.1 method (SPKI and
+      PKCS #8, parameters, printing), and legacy keys.
   - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
     ECDH (cofactor, X9.63 KDF), and the legacy EC `EVP_PKEY_METHOD`.
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
