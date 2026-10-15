@@ -46,6 +46,28 @@ fn draw_bits(bits: usize, top_one: bool, rng: &mut Random<'_>) -> Option<BigNum>
     BigNum::from_bin(&buf, Endian::Big, false).ok()
 }
 
+/// `ossl_bn_priv_rand_range_fixed_top`: a number in `[0, range)` drawn as `range`'s bits plus
+/// one with the top one set, then cut to `range`'s bits, until it's below `range` (at most 100
+/// draws), as OpenSSL draws ECDSA's nonce for `ECDSA_sign_setup`. `None` for an empty range, a
+/// failing generator, or too many draws.
+pub fn rand_range_fixed_top(range: &BigNum, rng: &mut Random<'_>) -> Option<BigNum> {
+    if range.is_negative() || range.is_zero() {
+        return None;
+    }
+    let n = range.num_bits();
+    if n == 1 {
+        return Some(BigNum::zero());
+    }
+    for _ in 0..99 {
+        let mut r = draw_bits(n.saturating_add(1), true, rng)?;
+        r.mask_bits(n);
+        if super::ucmp(&r, range).is_lt() {
+            return Some(r);
+        }
+    }
+    None
+}
+
 /// `bnrand_range` over the private generator: a random number in `[0, range)`, drawn as
 /// OpenSSL draws it (so a known generator gives OpenSSL's number and leaves it where
 /// OpenSSL's does), or `None`.

@@ -102,6 +102,18 @@ impl Fp {
         Some(Fe(self.redc_mul(&l, &self.rr)))
     }
 
+    /// An element of a non-negative `a` of at most the modulus's limbs, reduced: `a * R^2 / R`,
+    /// which Montgomery reduction brings below the modulus for any `a` below `R`. `None` for a
+    /// negative or longer `a`.
+    pub fn from_bn_unreduced(&self, a: &BigNum) -> Option<Fe> {
+        if a.is_negative() || a.top() > self.n() {
+            return None;
+        }
+        let mut l = a.limbs().to_vec();
+        l.resize(self.n(), 0);
+        Some(Fe(self.redc_mul(&l, &self.rr)))
+    }
+
     fn mont_modulus(&self) -> BigNum {
         self.mont.modulus().clone()
     }
