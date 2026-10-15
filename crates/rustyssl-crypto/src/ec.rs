@@ -2,7 +2,8 @@
 //! the named curves' table ([`curves`]), groups ([`group`]), points and their arithmetic
 //! ([`point`], with the formulas of OpenSSL's `ecp_smpl.c` and `ec2_smpl.c` in [`gfp`] and
 //! [`gf2m`]), scalar multiplication ([`mult`]: the constant-time ladder and wNAF), and the
-//! points' encodings ([`oct`]).
+//! points' encodings ([`oct`]), with ECDSA's arithmetic ([`ecdsa`]) and DHKEM's key derivation
+//! ([`dhkem`]).
 //!
 //! Everything here is a port of OpenSSL's behavior on the values the application can see: the
 //! affine coordinates and also the Jacobian ones (`EC_POINT_get_Jprojective_coordinates_GFp`),
@@ -12,6 +13,7 @@
 //! on plain residues here.
 
 pub mod curves;
+pub mod dhkem;
 pub mod ecdsa;
 pub mod fe;
 pub mod gf2m;

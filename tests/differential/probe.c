@@ -314,6 +314,11 @@
  *   ecsetup <curve> <priv>     ECDSA_sign_setup's kinv and r
  *   ecverify <curve> <priv> <digest> <sig>  ECDSA_verify of any octets
  *   ecdh <curve> <priv> <peer's priv> <0|1>  ECDH_compute_key, with the cofactor for 1
+ *   eckm <sel> <group|-> <priv|-> <pub|-> <k=v,...|->  EVP_PKEY_fromdata of an EC key (the
+ *                              selection in hex; the other parameters' values are strings,
+ *                              or ints with a leading #): the key's export, checks, parameters
+ *                              set back, and comparison with its copy
+ *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
  *
  *   # ...              comment, echoed
  */
@@ -354,6 +359,7 @@
 #include <openssl/mdc2.h>
 #include <openssl/modes.h>
 #include <openssl/objects.h>
+#include <openssl/param_build.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
 #include <openssl/rand.h>
@@ -4313,6 +4319,135 @@ static void ec_key_command(const char *command, const char *line)
     EC_KEY_free(k);
 }
 
+/* A parameter array on one line: each name and its value. */
+static void ec_print_params(const OSSL_PARAM *p)
+{
+    for (; p != NULL && p->key != NULL; p++) {
+        printf(" %s=", p->key);
+        if (p->data_type == OSSL_PARAM_INTEGER) {
+            int v = 0;
+
+            printf("%d", OSSL_PARAM_get_int(p, &v) ? v : -999);
+        } else if (p->data_type == OSSL_PARAM_UNSIGNED_INTEGER) {
+            BIGNUM *b = NULL;
+            char *h = OSSL_PARAM_get_BN(p, &b) ? BN_bn2hex(b) : NULL;
+
+            printf("%s/%zu", h != NULL ? h : "?", p->data_size);
+            OPENSSL_free(h);
+            BN_free(b);
+        } else if (p->data_type == OSSL_PARAM_UTF8_STRING) {
+            printf("%.*s", (int)p->data_size, (const char *)p->data);
+        } else {
+            for (size_t i = 0; i < p->data_size; i++)
+                printf("%02x", ((const unsigned char *)p->data)[i]);
+        }
+    }
+}
+
+/* eckm: an EC key from data, then what the key manager makes of it. */
+static void ec_keymgmt_command(const char *line)
+{
+    char group[64] = "-", priv[700] = "-", pub[700] = "-", other[300] = "-";
+    unsigned int sel = 0;
+    unsigned char pb[300];
+    size_t pl = 0;
+    BIGNUM *d = NULL;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *ps, *out = NULL;
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY *k = NULL;
+
+    sscanf(line, "%*s %x %63s %699s %699s %299s", &sel, group, priv, pub, other);
+    if (strcmp(group, "-") != 0)
+        OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, group, 0);
+    if (strcmp(priv, "-") != 0 && BN_hex2bn(&d, priv) > 0)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, d);
+    if (strcmp(pub, "-") != 0 && parse_hex(pub, pb, &pl))
+        OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pb, pl);
+    if (strcmp(other, "-") != 0) {
+        char *save = NULL;
+
+        for (char *kv = strtok_r(other, ",", &save); kv != NULL; kv = strtok_r(NULL, ",", &save)) {
+            char *eq = strchr(kv, '=');
+
+            if (eq == NULL)
+                continue;
+            *eq = '\0';
+            if (eq[1] == '#')
+                OSSL_PARAM_BLD_push_int(bld, kv, atoi(eq + 2));
+            else
+                OSSL_PARAM_BLD_push_utf8_string(bld, kv, eq + 1, 0);
+        }
+    }
+    ps = OSSL_PARAM_BLD_to_param(bld);
+    printf(" %d", EVP_PKEY_fromdata_init(c));
+    printf(" %d", EVP_PKEY_fromdata(c, &k, (int)sel, ps));
+    print_asn_errors();
+    if (k != NULL) {
+        EVP_PKEY_CTX *v = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+        EVP_PKEY *dup = EVP_PKEY_dup(k);
+        unsigned char *enc = NULL;
+        size_t elen;
+
+        printf("  todata %d", EVP_PKEY_todata(k, OSSL_KEYMGMT_SELECT_ALL, &out));
+        ec_print_params(out);
+        print_asn_errors();
+        printf("  check %d", EVP_PKEY_check(v));
+        printf(" public %d", EVP_PKEY_public_check(v));
+        printf(" quick %d", EVP_PKEY_public_check_quick(v));
+        printf(" private %d", EVP_PKEY_private_check(v));
+        printf(" params %d", EVP_PKEY_param_check(v));
+        print_asn_errors();
+        elen = EVP_PKEY_get1_encoded_public_key(k, &enc);
+        print_hex("  encoded", enc, elen);
+        print_asn_errors();
+        printf("  bits %d security %d size %d eq %d", EVP_PKEY_get_bits(k),
+               EVP_PKEY_get_security_bits(k), EVP_PKEY_get_size(k), EVP_PKEY_eq(k, dup));
+        printf(" set %d", EVP_PKEY_set_params(k, ps));
+        print_asn_errors();
+        OPENSSL_free(enc);
+        EVP_PKEY_free(dup);
+        EVP_PKEY_CTX_free(v);
+    }
+    OSSL_PARAM_free(out);
+    OSSL_PARAM_free(ps);
+    OSSL_PARAM_BLD_free(bld);
+    BN_free(d);
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+}
+
+/* ecdhkem: a key generated from input key material. */
+static void ec_dhkem_command(const char *line)
+{
+    char group[64] = "-", ikm[700] = "-";
+    unsigned char ib[300];
+    size_t il = 0;
+    OSSL_PARAM ps[3];
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY *k = NULL;
+    OSSL_PARAM *out = NULL;
+    int set;
+
+    sscanf(line, "%*s %63s %699s", group, ikm);
+    if (!parse_hex(ikm, ib, &il))
+        il = 0;
+    ps[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, group, 0);
+    ps[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_DHKEM_IKM, ib, il);
+    ps[2] = OSSL_PARAM_construct_end();
+    printf(" %d", EVP_PKEY_keygen_init(c));
+    set = EVP_PKEY_CTX_set_params(c, ps);
+    printf(" %d", set);
+    printf(" %d", EVP_PKEY_keygen(c, &k));
+    /* Without the input taken, the key is random. */
+    if (set == 1 && k != NULL && EVP_PKEY_todata(k, EVP_PKEY_KEYPAIR, &out))
+        ec_print_params(out);
+    print_asn_errors();
+    OSSL_PARAM_free(out);
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -4326,9 +4461,18 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "ecadd") != 0 && strcmp(command, "ecpk") != 0
         && strcmp(command, "eckey") != 0 && strcmp(command, "ecgen") != 0
         && strcmp(command, "ecsign") != 0 && strcmp(command, "ecsetup") != 0
-        && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0)
+        && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
+        && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "eckm") == 0) {
+        ec_keymgmt_command(line);
+        return 1;
+    }
+    if (strcmp(command, "ecdhkem") == 0) {
+        ec_dhkem_command(line);
+        return 1;
+    }
     if (strcmp(command, "ecgen") == 0 || strcmp(command, "ecsign") == 0
         || strcmp(command, "ecsetup") == 0 || strcmp(command, "ecverify") == 0
         || strcmp(command, "ecdh") == 0) {

@@ -309,6 +309,8 @@ impl Kind {
                 f.pkey_param_check = Some(e::ec_pkey_param_check);
                 f.dirty_cnt = Some(e::ec_pkey_dirty_cnt);
                 f.copy = Some(e::ec_pkey_copy);
+                f.export_to = Some(e::ec_pkey_export_to);
+                f.import_from = Some(e::ec_pkey_import_from);
             }
             Self::Rsa | Self::RsaPss => {
                 use super::rsa as r;

@@ -967,7 +967,11 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &super::rsa_kmgmt::RSAPSS_KEYMGMT,
         c"OpenSSL RSA-PSS implementation",
     ),
-    pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
+    alg_desc(
+        c"EC:id-ecPublicKey:1.2.840.10045.2.1",
+        &super::ec_kmgmt::EC_KEYMGMT,
+        c"OpenSSL EC implementation",
+    ),
     pending(c"X25519:1.3.101.110"),
     pending(c"X448:1.3.101.111"),
     pending(c"ED25519:1.3.101.112"),

@@ -50,6 +50,7 @@ pub(crate) mod builtin;
 pub(crate) mod ciphers;
 pub(crate) mod conf;
 pub(crate) mod digests;
+pub(crate) mod ec_kmgmt;
 pub(crate) mod exchanges;
 pub(crate) mod kdfs;
 mod kdfs_more;

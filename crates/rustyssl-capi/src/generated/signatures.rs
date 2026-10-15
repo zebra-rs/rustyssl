@@ -5798,8 +5798,12 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut core::ffi::c_char, usize) -> c
     crate::evp::pkey::EVP_PKEY_get_default_digest_name;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut core::ffi::c_int) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_get_default_digest_nid;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::ec::EVP_PKEY_get_ec_point_conv_form;
 const _: unsafe extern "C" fn(*const EVP_PKEY, core::ffi::c_int) -> *mut core::ffi::c_void =
     crate::evp::pkey::EVP_PKEY_get_ex_data;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::ec::EVP_PKEY_get_field_type;
 const _: unsafe extern "C" fn(
     *const EVP_PKEY,
     *mut core::ffi::c_char,

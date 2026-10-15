@@ -4293,16 +4293,6 @@ pub extern "C" fn EVP_PKEY_get_attr_count(_: *const EVP_PKEY) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_ec_point_conv_form(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_ec_point_conv_form")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_field_type(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_field_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_set1_DH(_: *mut EVP_PKEY, _: *mut dh_st) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_set1_DH")
 }

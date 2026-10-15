@@ -1,30 +1,31 @@
 //! A group as `OSSL_PARAM`s (`EC_GROUP_to_params`, `EC_GROUP_new_from_params`;
 //! `ec_backend.c`'s `ossl_ec_group_todata` and `ec_lib.c`): its point format, encoding, and
 //! curve name, or its explicit parameters, each way. The key manager reuses the conversion to
-//! fill a caller's array (4.4d).
+//! fill a caller's array.
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    BIGNUM, BN_CTX, EC_GROUP, EC_POINT, EC_R_FIELD_TOO_LARGE, EC_R_INVALID_A, EC_R_INVALID_B,
-    EC_R_INVALID_COFACTOR, EC_R_INVALID_CURVE, EC_R_INVALID_ENCODING, EC_R_INVALID_FIELD,
-    EC_R_INVALID_FORM, EC_R_INVALID_GENERATOR, EC_R_INVALID_GROUP_ORDER,
-    EC_R_INVALID_NAMED_GROUP_CONVERSION, EC_R_INVALID_P, EC_R_INVALID_SEED,
-    EC_R_PASSED_NULL_PARAMETER, EC_R_UNSUPPORTED_FIELD, EC_R_WRONG_CURVE_PARAMETERS, ERR_LIB_EC,
-    ERR_R_BN_LIB, ERR_R_CRYPTO_LIB, ERR_R_EC_LIB, NID_X9_62_characteristic_two_field,
-    NID_X9_62_prime_field, NID_secp224r1, NID_undef, NID_wap_wsg_idm_ecid_wtls12,
-    OPENSSL_EC_EXPLICIT_CURVE, OPENSSL_EC_NAMED_CURVE, OPENSSL_ECC_MAX_FIELD_BITS, OSSL_LIB_CTX,
-    OSSL_PARAM, OSSL_PARAM_BLD, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UTF8_PTR,
-    OSSL_PARAM_UTF8_STRING, OSSL_PKEY_EC_ENCODING_EXPLICIT, OSSL_PKEY_EC_ENCODING_GROUP,
-    OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_COMPRESSED, OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_HYBRID,
-    OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_UNCOMPRESSED, OSSL_PKEY_PARAM_EC_A, OSSL_PKEY_PARAM_EC_B,
-    OSSL_PKEY_PARAM_EC_COFACTOR, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS,
-    OSSL_PKEY_PARAM_EC_ENCODING, OSSL_PKEY_PARAM_EC_FIELD_TYPE, OSSL_PKEY_PARAM_EC_GENERATOR,
-    OSSL_PKEY_PARAM_EC_ORDER, OSSL_PKEY_PARAM_EC_P, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT,
-    OSSL_PKEY_PARAM_EC_SEED, OSSL_PKEY_PARAM_GROUP_NAME, POINT_CONVERSION_COMPRESSED,
-    POINT_CONVERSION_HYBRID, POINT_CONVERSION_UNCOMPRESSED, SN_X9_62_characteristic_two_field,
-    SN_X9_62_prime_field, point_conversion_form_t,
+    BIGNUM, BN_CTX, CRYPTO_R_TOO_SMALL_BUFFER, EC_GROUP, EC_POINT, EC_R_FIELD_TOO_LARGE,
+    EC_R_INVALID_A, EC_R_INVALID_B, EC_R_INVALID_COFACTOR, EC_R_INVALID_CURVE,
+    EC_R_INVALID_ENCODING, EC_R_INVALID_FIELD, EC_R_INVALID_FORM, EC_R_INVALID_GENERATOR,
+    EC_R_INVALID_GROUP_ORDER, EC_R_INVALID_NAMED_GROUP_CONVERSION, EC_R_INVALID_P,
+    EC_R_INVALID_SEED, EC_R_PASSED_NULL_PARAMETER, EC_R_UNSUPPORTED_FIELD,
+    EC_R_WRONG_CURVE_PARAMETERS, ERR_LIB_CRYPTO, ERR_LIB_EC, ERR_R_BN_LIB, ERR_R_CRYPTO_LIB,
+    ERR_R_EC_LIB, NID_X9_62_characteristic_two_field, NID_X9_62_prime_field, NID_secp224r1,
+    NID_undef, NID_wap_wsg_idm_ecid_wtls12, OPENSSL_EC_EXPLICIT_CURVE, OPENSSL_EC_NAMED_CURVE,
+    OPENSSL_ECC_MAX_FIELD_BITS, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_BLD, OSSL_PARAM_OCTET_STRING,
+    OSSL_PARAM_UTF8_PTR, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_EC_ENCODING_EXPLICIT,
+    OSSL_PKEY_EC_ENCODING_GROUP, OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_COMPRESSED,
+    OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_HYBRID, OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_UNCOMPRESSED,
+    OSSL_PKEY_PARAM_EC_A, OSSL_PKEY_PARAM_EC_B, OSSL_PKEY_PARAM_EC_COFACTOR,
+    OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS, OSSL_PKEY_PARAM_EC_ENCODING,
+    OSSL_PKEY_PARAM_EC_FIELD_TYPE, OSSL_PKEY_PARAM_EC_GENERATOR, OSSL_PKEY_PARAM_EC_ORDER,
+    OSSL_PKEY_PARAM_EC_P, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, OSSL_PKEY_PARAM_EC_SEED,
+    OSSL_PKEY_PARAM_GROUP_NAME, POINT_CONVERSION_COMPRESSED, POINT_CONVERSION_HYBRID,
+    POINT_CONVERSION_UNCOMPRESSED, SN_X9_62_characteristic_two_field, SN_X9_62_prime_field,
+    point_conversion_form_t,
 };
 use rustyssl_crypto::ec::curves::{self, Method};
 
@@ -45,8 +46,9 @@ use crate::err;
 use crate::ffi::ffi_export;
 use crate::params::bn::{OSSL_PARAM_get_BN, OSSL_PARAM_set_BN};
 use crate::params::build::{
-    OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_BN, OSSL_PARAM_BLD_push_int,
-    OSSL_PARAM_BLD_push_octet_string, OSSL_PARAM_BLD_push_utf8_string, OSSL_PARAM_BLD_to_param,
+    OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_BN, OSSL_PARAM_BLD_push_BN_pad,
+    OSSL_PARAM_BLD_push_int, OSSL_PARAM_BLD_push_octet_string, OSSL_PARAM_BLD_push_utf8_string,
+    OSSL_PARAM_BLD_to_param,
 };
 use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_get_utf8_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
@@ -117,6 +119,27 @@ pub(crate) unsafe fn text<'a>(p: *const OSSL_PARAM) -> Option<Option<&'a [u8]>> 
     }
 }
 
+/// `ossl_ec_encoding_name2id`: the ASN.1 flag an encoding's name (any case) stands for.
+pub(crate) fn encoding_name2id(name: &[u8]) -> Option<c_int> {
+    ENCODINGS
+        .iter()
+        .find(|(_, n)| n.to_bytes().eq_ignore_ascii_case(name))
+        .map(|(id, _)| *id)
+}
+
+/// `ossl_ec_pt_format_name2id`: the conversion form a format's name (any case) stands for.
+pub(crate) fn pt_format_name2id(name: &[u8]) -> Option<point_conversion_form_t> {
+    FORMATS
+        .iter()
+        .find(|(_, n)| n.to_bytes().eq_ignore_ascii_case(name))
+        .map(|(id, _)| *id)
+}
+
+/// `ossl_ec_pt_format_id2name`: a conversion form's name.
+pub(crate) fn format_name(form: point_conversion_form_t) -> Option<&'static CStr> {
+    FORMATS.iter().find(|(f, _)| *f == form).map(|(_, n)| *n)
+}
+
 /// `ossl_ec_encoding_param2id`: the ASN.1 flag a parameter names (the named-curve flag for no
 /// name), or `None`.
 ///
@@ -126,10 +149,7 @@ pub(crate) unsafe fn encoding_param2id(p: *const OSSL_PARAM) -> Option<c_int> {
     // SAFETY: the caller's guarantee.
     match unsafe { text(p) }? {
         None => Some(OPENSSL_EC_NAMED_CURVE),
-        Some(name) => ENCODINGS
-            .iter()
-            .find(|(_, n)| n.to_bytes().eq_ignore_ascii_case(name))
-            .map(|(id, _)| *id),
+        Some(name) => encoding_name2id(name),
     }
 }
 
@@ -142,10 +162,7 @@ pub(crate) unsafe fn pt_format_param2id(p: *const OSSL_PARAM) -> Option<point_co
     // SAFETY: the caller's guarantee.
     match unsafe { text(p) }? {
         None => Some(POINT_CONVERSION_UNCOMPRESSED),
-        Some(name) => FORMATS
-            .iter()
-            .find(|(_, n)| n.to_bytes().eq_ignore_ascii_case(name))
-            .map(|(id, _)| *id),
+        Some(name) => pt_format_name2id(name),
     }
 }
 
@@ -153,7 +170,6 @@ pub(crate) unsafe fn pt_format_param2id(p: *const OSSL_PARAM) -> Option<point_co
 #[derive(Clone, Copy)]
 pub(crate) enum Target {
     Builder(*mut OSSL_PARAM_BLD),
-    #[expect(dead_code, reason = "the key manager's get_params fills arrays (4.4d)")]
     Params(*mut OSSL_PARAM),
 }
 
@@ -166,7 +182,7 @@ impl Target {
     ///
     /// # Safety
     /// The target is live.
-    unsafe fn wants(self, key: &CStr) -> bool {
+    pub(crate) unsafe fn wants(self, key: &CStr) -> bool {
         match self {
             Self::Builder(_) => true,
             // SAFETY: the caller's guarantee.
@@ -187,7 +203,7 @@ impl Target {
     ///
     /// # Safety
     /// The target is live.
-    unsafe fn int(self, key: &CStr, v: c_int) -> bool {
+    pub(crate) unsafe fn int(self, key: &CStr, v: c_int) -> bool {
         match self {
             // SAFETY: the caller's guarantee; a static key.
             Self::Builder(b) => (unsafe { OSSL_PARAM_BLD_push_int(b, key.as_ptr(), v) }) != 0,
@@ -204,7 +220,7 @@ impl Target {
     ///
     /// # Safety
     /// The target is live.
-    unsafe fn utf8(self, key: &CStr, v: &'static CStr) -> bool {
+    pub(crate) unsafe fn utf8(self, key: &CStr, v: &'static CStr) -> bool {
         match self {
             Self::Builder(b) => {
                 // SAFETY: the caller's guarantee; static strings.
@@ -223,7 +239,7 @@ impl Target {
     ///
     /// # Safety
     /// The target is live; `v` lives until a builder makes its array.
-    unsafe fn octets(self, key: &CStr, v: &[u8]) -> bool {
+    pub(crate) unsafe fn octets(self, key: &CStr, v: &[u8]) -> bool {
         let (d, n) = (v.as_ptr().cast::<c_void>(), v.len());
         match self {
             Self::Builder(b) => {
@@ -243,7 +259,7 @@ impl Target {
     ///
     /// # Safety
     /// The target is live; `v` is a live number that lives until a builder makes its array.
-    unsafe fn bn(self, key: &CStr, v: *const BIGNUM) -> bool {
+    pub(crate) unsafe fn bn(self, key: &CStr, v: *const BIGNUM) -> bool {
         match self {
             // SAFETY: the caller's guarantee.
             Self::Builder(b) => (unsafe { OSSL_PARAM_BLD_push_BN(b, key.as_ptr(), v) }) != 0,
@@ -255,6 +271,44 @@ impl Target {
             }
         }
     }
+
+    /// `ossl_param_build_set_bn_pad`: `v` in `size` octets. An array's parameter without data
+    /// learns the size; one with room for it is cut to that size and set; one without room
+    /// fails with `CRYPTO_R_TOO_SMALL_BUFFER`.
+    ///
+    /// # Safety
+    /// The target is live; `v` is a live number that lives until a builder makes its array.
+    pub(crate) unsafe fn bn_pad(self, key: &CStr, v: *const BIGNUM, size: usize) -> bool {
+        match self {
+            Self::Builder(b) => {
+                // SAFETY: the caller's guarantee.
+                (unsafe { OSSL_PARAM_BLD_push_BN_pad(b, key.as_ptr(), v, size) }) != 0
+            }
+            Self::Params(p) => {
+                // SAFETY: as above.
+                let q = unsafe { Self::locate(p, key) };
+                // SAFETY: NULL or a parameter of the array.
+                let Some(prm) = (unsafe { q.as_mut() }) else {
+                    return true;
+                };
+                if prm.data.is_null() {
+                    prm.return_size = size;
+                    return true;
+                }
+                if size > prm.data_size {
+                    err::raise(
+                        ERR_LIB_CRYPTO,
+                        CRYPTO_R_TOO_SMALL_BUFFER,
+                        "ossl_param_build_set_bn_pad",
+                    );
+                    return false;
+                }
+                prm.data_size = size;
+                // SAFETY: the parameter; the number.
+                (unsafe { OSSL_PARAM_set_BN(q, v) }) != 0
+            }
+        }
+    }
 }
 
 /// What a builder reads when it makes its array: numbers and the generator's encoding.
@@ -262,11 +316,18 @@ impl Target {
 pub(crate) struct Kept {
     numbers: Vec<*mut BIGNUM>,
     generator: Option<Encoded>,
+    octets: Vec<Vec<u8>>,
 }
 
 impl Kept {
+    /// Octets kept until the array is made.
+    pub(crate) fn octets(&mut self, v: Vec<u8>) -> &[u8] {
+        self.octets.push(v);
+        self.octets.last().map_or(&[], Vec::as_slice)
+    }
+
     /// A new number kept until the array is made, or NULL.
-    fn number(&mut self) -> *mut BIGNUM {
+    pub(crate) fn number(&mut self) -> *mut BIGNUM {
         // SAFETY: no preconditions.
         let b = unsafe { BN_new() };
         if !b.is_null() {
@@ -407,7 +468,7 @@ pub(crate) unsafe fn group_todata(group: *const EC_GROUP, target: Target, kept: 
     }
     // SAFETY: the caller's guarantee, here and below.
     let form = unsafe { EC_GROUP_get_point_conversion_form(group) };
-    let format = FORMATS.iter().find(|(f, _)| *f == form).map(|(_, n)| *n);
+    let format = format_name(form);
     // SAFETY: as above.
     let set = format
         .is_some_and(|n| unsafe { target.utf8(OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, n) });

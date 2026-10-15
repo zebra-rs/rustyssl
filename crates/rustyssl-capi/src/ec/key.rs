@@ -19,11 +19,16 @@ use rustyssl_abi::{
     EC_GROUP, EC_KEY, EC_KEY_METHOD, EC_POINT, EC_R_COORDINATES_OUT_OF_RANGE,
     EC_R_INVALID_GROUP_ORDER, EC_R_INVALID_PRIVATE_KEY, EC_R_OPERATION_NOT_SUPPORTED,
     EC_R_POINT_AT_INFINITY, EC_R_POINT_IS_NOT_ON_CURVE, EC_R_WRONG_ORDER, ECDSA_SIG, ENGINE,
-    ERR_LIB_EC, ERR_R_BN_LIB, ERR_R_CRYPTO_LIB, ERR_R_EC_LIB, ERR_R_INIT_FAIL,
-    ERR_R_PASSED_NULL_PARAMETER, NID_X9_62_prime_field, NID_sm2, OSSL_LIB_CTX,
-    POINT_CONVERSION_UNCOMPRESSED, point_conversion_form_t,
+    ERR_LIB_EC, ERR_LIB_PROV, ERR_R_BN_LIB, ERR_R_CRYPTO_LIB, ERR_R_EC_LIB, ERR_R_INIT_FAIL,
+    ERR_R_PASSED_NULL_PARAMETER, NID_X9_62_prime_field, NID_sm2, OSSL_KEYMGMT_SELECT_ALL,
+    OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
+    OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, POINT_CONVERSION_UNCOMPRESSED,
+    PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_INVALID_CURVE, PROV_R_INVALID_INPUT_LENGTH,
+    point_conversion_form_t,
 };
 
+use super::curves::EC_curve_nid2nist;
 use super::group::{
     EC_GROUP_dup, EC_GROUP_free, EC_GROUP_get_curve_name, EC_GROUP_get_degree,
     EC_GROUP_get_field_type, EC_GROUP_get0_cofactor, EC_GROUP_get0_field, EC_GROUP_get0_order,
@@ -39,6 +44,7 @@ use crate::bn::arith::BN_sub;
 use crate::bn::conv::{BN_bin2bn, BN_bn2binpad};
 use crate::bn::ctx::{BN_CTX_free, BN_CTX_new_ex, BN_CTX_secure_new_ex};
 use crate::bn::rand::BN_priv_rand_range_ex;
+use crate::bn::value;
 use crate::bn::{
     BN_clear, BN_clear_free, BN_cmp, BN_copy, BN_dup, BN_free, BN_is_negative, BN_is_one,
     BN_is_zero, BN_new, BN_num_bits, BN_secure_new, BN_set_flags, BN_value_one,
@@ -52,6 +58,8 @@ use crate::ffi::{ffi_callback, ffi_export};
 use crate::handle::{Handle, handle_type};
 use crate::mem;
 use crate::provider::Ptr;
+use rustyssl_crypto::bn::Endian;
+use rustyssl_crypto::ec::dhkem;
 
 /// Raises an EC error from `func`.
 fn raise(reason: c_int, func: &'static str) {
@@ -592,9 +600,99 @@ ffi_export! {
     }
 }
 
+/// `ossl_ec_key_dup`: a new key (made with the default method, whose `init` runs) with the
+/// parts of `src` that `selection` names: its group (and method) for the domain parameters,
+/// its public and private keys (which need the group), its forms for the other parameters, and
+/// always its flags and ex_data. A method with a `copy` function needs the whole key pair
+/// selected, then runs it. NULL on failure.
+///
+/// # Safety
+/// `src` is NULL or a live key.
+pub(crate) unsafe fn dup(src: *const EC_KEY, selection: c_int) -> *mut EC_KEY {
+    // SAFETY: the caller's guarantee.
+    let Some(s) = (unsafe { key(src) }) else {
+        raise(ERR_R_PASSED_NULL_PARAMETER, "ossl_ec_key_dup");
+        return ptr::null_mut();
+    };
+    let sf = s.get();
+    // SAFETY: the source's context and query.
+    let ret = unsafe { new_key(sf.libctx.0, s.propq()) };
+    // SAFETY: just made.
+    let Some(d) = (unsafe { key(ret) }) else {
+        return ptr::null_mut();
+    };
+    let selected = |what: c_int| selection & what != 0;
+    let ok = (|| {
+        if !sf.group.0.is_null() && selected(OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) {
+            // SAFETY: the source's group.
+            let g = unsafe { EC_GROUP_dup(sf.group.0) };
+            if g.is_null() {
+                return false;
+            }
+            d.update(|f| {
+                f.group = Ptr(g);
+                if !sf.meth.0.is_null() {
+                    f.meth = sf.meth;
+                }
+            });
+        }
+        let g = d.get().group.0;
+        if !sf.pub_key.0.is_null() && selected(OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+            if g.is_null() {
+                return false;
+            }
+            // SAFETY: the group.
+            let p = unsafe { EC_POINT_new(g) };
+            d.update(|f| f.pub_key = Ptr(p));
+            // SAFETY: the point; the source's point.
+            if p.is_null() || unsafe { EC_POINT_copy(p, sf.pub_key.0) } == 0 {
+                return false;
+            }
+        }
+        if !sf.priv_key.0.is_null() && selected(OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
+            if g.is_null() {
+                return false;
+            }
+            // SAFETY: no preconditions.
+            let b = unsafe { BN_new() };
+            d.update(|f| f.priv_key = Ptr(b));
+            // SAFETY: live numbers.
+            if b.is_null() || unsafe { BN_copy(b, sf.priv_key.0) }.is_null() {
+                return false;
+            }
+        }
+        d.update(|f| {
+            if selected(OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) {
+                f.enc_flag = sf.enc_flag;
+                f.conv_form = sf.conv_form;
+            }
+            f.version = sf.version;
+            f.flags = sf.flags;
+        });
+        // SAFETY: the keys' own ex_data.
+        if unsafe { CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_EC_KEY, d.ex_data(), s.ex_data()) } == 0 {
+            return false;
+        }
+        // SAFETY: the key's method; no lock is held while its function runs.
+        if let Some(copy) = unsafe { method(d.get().meth.0) }.and_then(|m| m.copy) {
+            let keypair = OSSL_KEYMGMT_SELECT_KEYPAIR;
+            // SAFETY: the method's function takes the keys.
+            if selection & keypair != keypair || unsafe { copy(ret, src) } == 0 {
+                return false;
+            }
+        }
+        true
+    })();
+    if ok {
+        return ret;
+    }
+    // SAFETY: the key made above.
+    unsafe { free(ret) };
+    ptr::null_mut()
+}
+
 ffi_export! {
-    /// A new key with a copy of everything in `ec_key` (`ossl_ec_key_dup`): made with the
-    /// default method, whose `init` runs, then given the source's, whose `copy` runs.
+    /// A new key with a copy of everything in `ec_key` (`ossl_ec_key_dup` of all of it).
     ///
     /// # Safety
     /// `ec_key` is NULL or a live key.
@@ -602,79 +700,7 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_EC
     {
         // SAFETY: the caller's guarantee.
-        let Some(s) = (unsafe { key(ec_key) }) else {
-            raise(ERR_R_PASSED_NULL_PARAMETER, "ossl_ec_key_dup");
-            return ptr::null_mut();
-        };
-        let sf = s.get();
-        // SAFETY: the source's context and query.
-        let ret = unsafe { new_key(sf.libctx.0, s.propq()) };
-        // SAFETY: just made.
-        let Some(d) = (unsafe { key(ret) }) else { return ptr::null_mut() };
-        let ok = (|| {
-            if !sf.group.0.is_null() {
-                // SAFETY: the source's group.
-                let g = unsafe { EC_GROUP_dup(sf.group.0) };
-                if g.is_null() {
-                    return false;
-                }
-                d.update(|f| {
-                    f.group = Ptr(g);
-                    if !sf.meth.0.is_null() {
-                        f.meth = sf.meth;
-                    }
-                });
-            }
-            let g = d.get().group.0;
-            if !sf.pub_key.0.is_null() {
-                if g.is_null() {
-                    return false;
-                }
-                // SAFETY: the group.
-                let p = unsafe { EC_POINT_new(g) };
-                d.update(|f| f.pub_key = Ptr(p));
-                // SAFETY: the point; the source's point.
-                if p.is_null() || unsafe { EC_POINT_copy(p, sf.pub_key.0) } == 0 {
-                    return false;
-                }
-            }
-            if !sf.priv_key.0.is_null() {
-                if g.is_null() {
-                    return false;
-                }
-                // SAFETY: no preconditions.
-                let b = unsafe { BN_new() };
-                d.update(|f| f.priv_key = Ptr(b));
-                // SAFETY: live numbers.
-                if b.is_null() || unsafe { BN_copy(b, sf.priv_key.0) }.is_null() {
-                    return false;
-                }
-            }
-            d.update(|f| {
-                f.enc_flag = sf.enc_flag;
-                f.conv_form = sf.conv_form;
-                f.version = sf.version;
-                f.flags = sf.flags;
-            });
-            // SAFETY: the keys' own ex_data.
-            if unsafe { CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_EC_KEY, d.ex_data(), s.ex_data()) } == 0 {
-                return false;
-            }
-            // SAFETY: the key's method; no lock is held while its function runs.
-            if let Some(copy) = unsafe { method(d.get().meth.0) }.and_then(|m| m.copy)
-                // SAFETY: the method's function takes the keys.
-                && unsafe { copy(ret, ec_key) } == 0
-            {
-                return false;
-            }
-            true
-        })();
-        if ok {
-            return ret;
-        }
-        // SAFETY: the key made above.
-        unsafe { free(ret) };
-        ptr::null_mut()
+        unsafe { dup(ec_key, OSSL_KEYMGMT_SELECT_ALL) }
     }
 }
 
@@ -781,6 +807,118 @@ unsafe fn generate(h: *mut EC_KEY, k: &EcKey) -> bool {
     ok
 }
 
+/// `ossl_ec_dhkem_derive_private`: the private key RFC 9180's `DeriveKeyPair` derives from
+/// `ikm` for the KEM over the group's curve, or `None`, with an error raised unless the curve
+/// has no NIST name.
+///
+/// # Safety
+/// `group` is a live group.
+unsafe fn dhkem_private(group: *const EC_GROUP, ikm: &[u8]) -> Option<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    let nid = unsafe { EC_GROUP_get_curve_name(group) };
+    // SAFETY: no preconditions.
+    let name = unsafe { EC_curve_nid2nist(nid) };
+    if name.is_null() {
+        return None;
+    }
+    // SAFETY: a static name of the table.
+    let name = unsafe { CStr::from_ptr(name) };
+    let Some(kem) = dhkem::kem_by_curve(name.to_bytes()) else {
+        err::raise(
+            ERR_LIB_PROV,
+            PROV_R_INVALID_CURVE,
+            "ossl_HPKE_KEM_INFO_find_curve",
+        );
+        return None;
+    };
+    // SAFETY: the caller's group.
+    let order = unsafe { EC_GROUP_get0_order(group) };
+    // SAFETY: the group's order.
+    let order = unsafe { value(order) }?;
+    const F: &str = "ossl_ec_dhkem_derive_private";
+    match dhkem::derive_private(kem, &order, ikm) {
+        Ok(sk) => sk
+            .to_bin(Some(kem.private_len), Endian::Big, false)
+            .map(|z| z.to_vec()),
+        Err(dhkem::Error::ShortInput { len, min }) => {
+            let text = format!("ikm length is :{len}, should be at least {min}");
+            err::raise_with_text(ERR_LIB_PROV, PROV_R_INVALID_INPUT_LENGTH, F, &text);
+            None
+        }
+        Err(dhkem::Error::Exhausted) => {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GENERATE_KEY, F);
+            None
+        }
+        Err(dhkem::Error::Kdf(_)) => None,
+    }
+}
+
+/// `ossl_ec_generate_key_dhkem`: the private key derived from `ikm` and its public key, into
+/// the key's own objects; on failure the private key is freed and the public key set to
+/// infinity.
+///
+/// # Safety
+/// `h` is a live key with a group.
+pub(crate) unsafe fn generate_dhkem(h: *mut EC_KEY, ikm: &[u8]) -> bool {
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { key(h) }) else {
+        return false;
+    };
+    let group = k.get().group.0;
+    let ok = (|| {
+        let mut priv_key = k.get().priv_key.0;
+        if priv_key.is_null() {
+            // SAFETY: no preconditions.
+            priv_key = unsafe { BN_secure_new() };
+            if priv_key.is_null() {
+                return false;
+            }
+            k.update(|f| f.priv_key = Ptr(priv_key));
+        }
+        // SAFETY: the key's group.
+        let Some(sk) = (unsafe { dhkem_private(group, ikm) }) else {
+            return false;
+        };
+        let Ok(len) = c_int::try_from(sk.len()) else {
+            return false;
+        };
+        // SAFETY: the derived octets; the key's number.
+        if unsafe { BN_bin2bn(sk.as_ptr(), len, priv_key) }.is_null() {
+            return false;
+        }
+        let mut pub_key = k.get().pub_key.0;
+        if pub_key.is_null() {
+            // SAFETY: the key's group.
+            pub_key = unsafe { EC_POINT_new(group) };
+            if pub_key.is_null() {
+                return false;
+            }
+            k.update(|f| f.pub_key = Ptr(pub_key));
+        }
+        // SAFETY: the key's context.
+        let ctx = unsafe { BN_CTX_new_ex(k.get().libctx.0) };
+        // SAFETY: the group, the point, the number, and the context.
+        let ok = !ctx.is_null()
+            // SAFETY: as above.
+            && unsafe { EC_POINT_mul(group, pub_key, priv_key, ptr::null(), ptr::null(), ctx) } != 0;
+        // SAFETY: NULL or made above.
+        unsafe { BN_CTX_free(ctx) };
+        ok
+    })();
+    if !ok {
+        let old = k.update(|f| core::mem::replace(&mut f.priv_key, Ptr(ptr::null_mut())));
+        // SAFETY: the key's number, freed once.
+        unsafe { BN_clear_free(old.0) };
+        let pub_key = k.get().pub_key.0;
+        if !pub_key.is_null() {
+            // SAFETY: the key's group and point.
+            unsafe { EC_POINT_set_to_infinity(group, pub_key) };
+        }
+    }
+    k.touch();
+    ok
+}
+
 ffi_callback! {
     /// `ossl_ec_key_gen`, the library method's key generation: the group method's (each
     /// built-in one generates by `ec_generate_key`).
@@ -869,12 +1007,12 @@ unsafe fn public_range_check(
     ok
 }
 
-/// `ossl_ec_key_public_check`: the public key isn't infinity, is in range and on the curve,
-/// and (for a cofactor other than one) has the group's order.
+/// `ossl_ec_key_public_check_quick`: the public key isn't infinity, and is in range and on the
+/// curve.
 ///
 /// # Safety
-/// `f` holds a live group and point.
-pub(crate) unsafe fn public_check(f: &Fields, ctx: *mut BN_CTX) -> bool {
+/// `f` holds NULL or live objects.
+pub(crate) unsafe fn public_check_quick(f: &Fields, ctx: *mut BN_CTX) -> bool {
     let (group, pub_key) = (f.group.0.cast_const(), f.pub_key.0.cast_const());
     if group.is_null() || pub_key.is_null() {
         raise(
@@ -901,6 +1039,20 @@ pub(crate) unsafe fn public_check(f: &Fields, ctx: *mut BN_CTX) -> bool {
         raise(EC_R_POINT_IS_NOT_ON_CURVE, "ossl_ec_key_public_check_quick");
         return false;
     }
+    true
+}
+
+/// `ossl_ec_key_public_check`: the quick checks, then (for a cofactor other than one) that the
+/// public key has the group's order.
+///
+/// # Safety
+/// `f` holds NULL or live objects.
+pub(crate) unsafe fn public_check(f: &Fields, ctx: *mut BN_CTX) -> bool {
+    // SAFETY: the caller's guarantee.
+    if !unsafe { public_check_quick(f, ctx) } {
+        return false;
+    }
+    let (group, pub_key) = (f.group.0.cast_const(), f.pub_key.0.cast_const());
     // SAFETY: as above.
     let cofactor = unsafe { EC_GROUP_get0_cofactor(group) };
     // SAFETY: the group's number.

@@ -3515,7 +3515,7 @@ chunking) is clean.
     - The conversions call the public group and point functions in OpenSSL's order, so their
       error stacks are the reference's. Explicit parameters of a built-in curve give its
       named group (secp224r1 for wtls12), with the explicit flag and no seed unless given.
-    - `ossl_ec_group_todata` takes a builder or an array to fill, for the key manager (4.4d).
+    - `ossl_ec_group_todata` takes a builder or an array to fill, for the key manager (4.4d1).
     - The ASN.1 building blocks (template, aux, CHOICE, and ADB tables) moved to
       `asn1/tpl/statics.rs`, shared with RSA's items.
     - Tests: `tests/c/ec_params.c` (255 checks: fourteen curves named and explicit in each
@@ -3561,7 +3561,7 @@ chunking) is clean.
         deterministic generator the signatures are the reference's octet for octet. The
         secret arithmetic (`k^-1` and `s = k^-1 (m + r d)`) runs on constant-time field
         elements of the order's length, failing where OpenSSL's Montgomery arithmetic fails
-        (an operand longer than the order). RFC 6979's nonces come with the provider (4.4d).
+        (an operand longer than the order). RFC 6979's nonces come with the provider (4.4d2).
       - Tests: `tests/c/ecdsa.c` (209 checks: fixed-nonce signatures on eight curves with
         digests of six lengths, random ones verified, out-of-range and non-DER signatures,
         13 DER cases, ECDH on four curves with the cofactor and KDFs, X9.63, applications'
@@ -3580,11 +3580,41 @@ chunking) is clean.
       follows OpenSSL's payload table (the group name, the compressed public key, the
       private key, `qx` and `qy`, decoded-from-explicit).
       - Moving a key between its legacy and provided forms (`export_to`, `import_from`) needs
-        the EC key manager, and comes with 4.4d.
+        the EC key manager, and comes with 4.4d1.
       - Tests: `tests/c/evp_pkey_ec.c` (53 checks: five curves, SM2's types, other types,
         a foreign key); one deviation (`EVP_PKEY_set1_EC_KEY` of NULL).
-  - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
-    ECDH (cofactor, X9.63 KDF), and the legacy EC `EVP_PKEY_METHOD`.
+  - [ ] **4.4d The providers**, in sub-steps:
+    - [x] **4.4d1 The EC key manager** (`rustyssl-capi/src/provider/ec_kmgmt.rs`,
+      `ec/backend.rs`; 2 exports): keys made empty, from data (a named group or explicit
+      parameters, which must be given, not SM2's curve; the public point and private number;
+      the point format, encoding, seed, check type, cofactor mode, and whether encodings
+      carry the public key), described (sizes, strengths, the default digest, the
+      uncompressed public key, the group with its explicit parameters and a
+      characteristic-two basis, the key's parts and coordinates, the private key padded to
+      the order's length), changed, exported, compared, copied by selection
+      (`ossl_ec_key_dup`), validated (named-group checks, the quick and full public checks,
+      the private range, the pair), loaded, and generated from a group name, explicit
+      parameters, or a template, with the check type and cofactor mode. The EC ASN.1
+      method's `export_to` and `import_from`, so legacy and provided keys convert both ways,
+      and `EVP_PKEY_export` of a legacy key whose method exports. `EVP_PKEY_get_field_type`
+      (with OpenSSL's inverted check for a provided key: a characteristic-two key gives 0)
+      and `EVP_PKEY_get_ec_point_conv_form`.
+      - RFC 9180's DHKEM key derivation (`rustyssl-crypto/src/ec/dhkem.rs`: HPKE's labeled
+        HKDF over the KEM's suite, candidates until one is below the order) for generation
+        from `dhkem-ikm` on P-256, P-384, and P-521.
+      - `EC_GROUP_copy` (and so `EC_GROUP_dup`) lost a named group's seed unless it had been
+        asked for first; it now copies the group's own seed.
+      - Tests: `tests/c/evp_ec_kmgmt.c` (51 checks: the key manager's lists, keys from data of
+        each kind and nine refusals, every gettable parameter, exports of each selection,
+        parameters set, generation every way and from RFC 9180's input, comparison,
+        validation, copies, legacy keys both ways) and a check in `ec_group_point.c`; the
+        probe's `eckm` and `ecdhkem` with `corpus/eckm.txt` and random sessions (2,000
+        pass); the `ec_kmgmt` fuzz target (keys from arbitrary parameters, exported and
+        imported again).
+    - [ ] **4.4d2 ECDSA's signature provider:** random nonces and RFC 6979's, the digest
+      and message forms, the algorithm identifiers.
+    - [ ] **4.4d3 ECDH's key exchange:** the cofactor mode and the X9.63 KDF.
+    - [ ] **4.4d4 The legacy EC `EVP_PKEY_METHOD`.**
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
 - [ ] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)
