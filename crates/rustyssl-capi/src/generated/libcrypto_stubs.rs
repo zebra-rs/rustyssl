@@ -3246,158 +3246,6 @@ pub extern "C" fn DSO_up_ref(_: *mut DSO) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ECDH_KDF_X9_62(
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDH_KDF_X9_62")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDH_compute_key(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *const EC_POINT,
-    _: *const EC_KEY,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(
-            in_: *const core::ffi::c_void,
-            inlen: usize,
-            out: *mut core::ffi::c_void,
-            outlen: *mut usize,
-        ) -> *mut core::ffi::c_void,
-    >,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDH_compute_key")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_free(_: *mut ECDSA_SIG) {
-    crate::stub::unimplemented("ECDSA_SIG_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_get0(
-    _: *const ECDSA_SIG,
-    _: *mut *const BIGNUM,
-    _: *mut *const BIGNUM,
-) {
-    crate::stub::unimplemented("ECDSA_SIG_get0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_get0_r(_: *const ECDSA_SIG) -> *const BIGNUM {
-    crate::stub::unimplemented("ECDSA_SIG_get0_r")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_get0_s(_: *const ECDSA_SIG) -> *const BIGNUM {
-    crate::stub::unimplemented("ECDSA_SIG_get0_s")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_new() -> *mut ECDSA_SIG {
-    crate::stub::unimplemented("ECDSA_SIG_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_SIG_set0(
-    _: *mut ECDSA_SIG,
-    _: *mut BIGNUM,
-    _: *mut BIGNUM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_SIG_set0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_do_sign(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut EC_KEY,
-) -> *mut ECDSA_SIG {
-    crate::stub::unimplemented("ECDSA_do_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_do_sign_ex(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut EC_KEY,
-) -> *mut ECDSA_SIG {
-    crate::stub::unimplemented("ECDSA_do_sign_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_do_verify(
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const ECDSA_SIG,
-    _: *mut EC_KEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_do_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_sign(
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *mut EC_KEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_sign_ex(
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut EC_KEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_sign_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_sign_setup(
-    _: *mut EC_KEY,
-    _: *mut BN_CTX,
-    _: *mut *mut BIGNUM,
-    _: *mut *mut BIGNUM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_sign_setup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_size(_: *const EC_KEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_size")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ECDSA_verify(
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut EC_KEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("ECDSA_verify")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EDIPARTYNAME_free(_: *mut EDIPARTYNAME) {
     crate::stub::unimplemented("EDIPARTYNAME_free")
 }
@@ -20212,15 +20060,6 @@ pub extern "C" fn d2i_DSAparams(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_ECDSA_SIG(
-    _: *mut *mut ECDSA_SIG,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ECDSA_SIG {
-    crate::stub::unimplemented("d2i_ECDSA_SIG")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_EC_PUBKEY(
     _: *mut *mut EC_KEY,
     _: *mut *const core::ffi::c_uchar,
@@ -22074,14 +21913,6 @@ pub extern "C" fn i2d_DSAparams(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_DSAparams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ECDSA_SIG(
-    _: *const ECDSA_SIG,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ECDSA_SIG")
 }
 
 #[unsafe(no_mangle)]

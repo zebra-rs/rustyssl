@@ -3108,6 +3108,90 @@ const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::D
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPLAYTEXT_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDH_KDF_X9_62;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    *const EC_POINT,
+    *const EC_KEY,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            in_: *const core::ffi::c_void,
+            inlen: usize,
+            out: *mut core::ffi::c_void,
+            outlen: *mut usize,
+        ) -> *mut core::ffi::c_void,
+    >,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDH_compute_key;
+const _: unsafe extern "C" fn(*mut ECDSA_SIG) = crate::ec::ecdsa::ECDSA_SIG_free;
+const _: unsafe extern "C" fn(*const ECDSA_SIG, *mut *const BIGNUM, *mut *const BIGNUM) =
+    crate::ec::ecdsa::ECDSA_SIG_get0;
+const _: unsafe extern "C" fn(*const ECDSA_SIG) -> *const BIGNUM =
+    crate::ec::ecdsa::ECDSA_SIG_get0_r;
+const _: unsafe extern "C" fn(*const ECDSA_SIG) -> *const BIGNUM =
+    crate::ec::ecdsa::ECDSA_SIG_get0_s;
+const _: unsafe extern "C" fn() -> *mut ECDSA_SIG = crate::ec::ecdsa::ECDSA_SIG_new;
+const _: unsafe extern "C" fn(*mut ECDSA_SIG, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::ec::ecdsa::ECDSA_SIG_set0;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut EC_KEY,
+) -> *mut ECDSA_SIG = crate::ec::ecdsa::ECDSA_do_sign;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut EC_KEY,
+) -> *mut ECDSA_SIG = crate::ec::ecdsa::ECDSA_do_sign_ex;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const ECDSA_SIG,
+    *mut EC_KEY,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_do_verify;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *mut EC_KEY,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_sign;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut EC_KEY,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_sign_ex;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY,
+    *mut BN_CTX,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_sign_setup;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_size;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut EC_KEY,
+) -> core::ffi::c_int = crate::ec::ecdsa::ECDSA_verify;
 const _: unsafe extern "C" fn(*mut ECPARAMETERS) = crate::ec::asn1::ECPARAMETERS_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ec::asn1::ECPARAMETERS_it;
 const _: unsafe extern "C" fn() -> *mut ECPARAMETERS = crate::ec::asn1::ECPARAMETERS_new;
@@ -9154,6 +9238,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut *mut ECDSA_SIG,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ECDSA_SIG = crate::ec::ecdsa::d2i_ECDSA_SIG;
+const _: unsafe extern "C" fn(
     *mut *mut EC_GROUP,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -9300,6 +9389,8 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const ECDSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ec::ecdsa::i2d_ECDSA_SIG;
 const _: unsafe extern "C" fn(*const EC_GROUP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::ec::asn1::i2d_ECPKParameters;
 const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
