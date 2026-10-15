@@ -400,6 +400,16 @@ static void test_explicit_gfp(void)
     printf("  a name: cmp %d, name %d\n", EC_GROUP_cmp(g, d, NULL), EC_GROUP_get_curve_name(d));
     check(EC_GROUP_copy(d, g) == 1 && EC_GROUP_cmp(g, d, NULL) == 0, "EC_GROUP_copy");
     EC_GROUP_free(d);
+    {
+        /* A named group's seed, never asked for before the copy, goes with it. */
+        EC_GROUP *n = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+        EC_GROUP *nd = EC_GROUP_dup(n);
+
+        check(nd != NULL && EC_GROUP_get_seed_len(nd) == 20 && EC_GROUP_get0_seed(nd) != NULL,
+              "EC_GROUP_dup keeps a named group's seed");
+        EC_GROUP_free(nd);
+        EC_GROUP_free(n);
+    }
 
     EC_POINT_free(P);
     EC_POINT_free(Q);

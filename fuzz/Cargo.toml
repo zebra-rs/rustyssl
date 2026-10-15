@@ -357,3 +357,9 @@ name = "ecdsa_sig"
 path = "fuzz_targets/ecdsa_sig.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ec_kmgmt"
+path = "fuzz_targets/ec_kmgmt.rs"
+test = false
+doc = false

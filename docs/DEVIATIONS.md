@@ -234,6 +234,8 @@ OpenSSL never depends on them.
 | The `ECDSA_*` and `ECDH_compute_key` functions given a NULL key, signature, or output pointer (`ECDSA_sign_setup`'s `kinvp`/`rp`, `ECDSA_sign`'s `siglen`), and `ECDSA_SIG_get0*` of NULL | dereference NULL | fail as each fails (0, -1, NULL) | `ec::ecdsa::tests::null_and_empty_arguments_fail` |
 | `i2d_ECDSA_SIG` and `ECDSA_do_verify` of a signature without its numbers (`ECDSA_SIG_new` before `ECDSA_SIG_set0`) | dereference the missing numbers | -1 (as for a negative number), and 0 with `EC_R_BAD_SIGNATURE` | `ec::ecdsa::tests::null_and_empty_arguments_fail` |
 | `EVP_PKEY_set1_EC_KEY` with a NULL `EC_KEY` | takes a reference to it (dereferencing NULL) | returns 0 | `evp::pkey::ec::tests::set1_of_null_fails` |
+| `EVP_PKEY_export` with a NULL callback | calls it and crashes | returns 0 | `evp::pkey::ec::tests::export_without_a_callback_fails` |
+| The EC key manager's generation parameters given as UTF-8 strings (group name, field type, encoding, point format, check type) without a NUL within their size, or with NULL data | copies the string with `strdup`, reading on past its size to a NUL; crashes on NULL | takes the characters within its size; refuses NULL data | `provider::ec_kmgmt::tests::strings_are_read_within_their_size` |
 
 ## Notes
 

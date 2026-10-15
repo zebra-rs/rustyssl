@@ -13,6 +13,7 @@
 //! library context, or the group's when there's no `BN_CTX`, as in OpenSSL.
 
 pub(crate) mod asn1;
+pub(crate) mod backend;
 pub(crate) mod curves;
 pub(crate) mod ecdsa;
 pub(crate) mod group;

@@ -2,33 +2,47 @@
 //! EC ASN.1 method's functions for a key whose legacy data is an `EC_KEY` (SM2's type is an
 //! alias of it), and the `EC_KEY` of a key.
 //!
-//! Moving a key between its legacy and provided forms (`export_to`, `import_from`) needs the
-//! EC key manager, which comes with the providers (step 4.4d).
+//! A key moves between its legacy and provided forms (`export_to`, `import_from`) through the
+//! parameters the EC key manager takes (`crate::ec::backend`). `EVP_PKEY_get_field_type` and
+//! `EVP_PKEY_get_ec_point_conv_form` read either form.
 
-use core::ffi::{c_int, c_long, c_uchar, c_void};
+use core::ffi::{CStr, c_int, c_long, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
     ASN1_PCTX, ASN1_PKEY_CTRL_DEFAULT_MD_NID, ASN1_PKEY_CTRL_GET1_TLS_ENCPT,
-    ASN1_PKEY_CTRL_SET1_TLS_ENCPT, BIO, EC_KEY, EC_R_MISSING_PARAMETERS, EC_R_MISSING_PRIVATE_KEY,
-    ERR_LIB_EC, ERR_LIB_EVP, EVP_PKEY, EVP_PKEY_EC, EVP_PKEY_SM2, EVP_R_EXPECTING_A_EC_KEY,
-    NID_sha256, NID_sm3, POINT_CONVERSION_UNCOMPRESSED,
+    ASN1_PKEY_CTRL_SET1_TLS_ENCPT, BIO, EC_FLAG_COFACTOR_ECDH, EC_KEY, EC_R_MISSING_PARAMETERS,
+    EC_R_MISSING_PRIVATE_KEY, ERR_LIB_EC, ERR_LIB_EVP, ERR_R_EC_LIB, EVP_PKEY, EVP_PKEY_EC,
+    EVP_PKEY_SM2, EVP_R_EXPECTING_A_EC_KEY, NID_X9_62_characteristic_two_field,
+    NID_X9_62_prime_field, NID_sha256, NID_sm3, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
+    OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_EC_FIELD_TYPE,
+    OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH,
+    POINT_CONVERSION_COMPRESSED, POINT_CONVERSION_HYBRID, POINT_CONVERSION_UNCOMPRESSED,
+    SN_X9_62_characteristic_two_field, SN_X9_62_prime_field,
 };
 
+use super::params::EVP_PKEY_get_utf8_string_param;
 use super::{
     EVP_PKEY_assign, EVP_PKEY_get_base_id, EVP_PKEY_get_id, get_legacy, legacy_data, pkey,
 };
+use crate::ec::backend::{group_fromdata, key_fromdata, key_todata, otherparams_fromdata};
 use crate::ec::ecdsa::ECDSA_size;
-use crate::ec::group::{EC_GROUP_check, EC_GROUP_cmp, EC_GROUP_free, EC_GROUP_order_bits};
+use crate::ec::group::{
+    EC_GROUP_check, EC_GROUP_cmp, EC_GROUP_free, EC_GROUP_get_field_type, EC_GROUP_order_bits,
+};
 use crate::ec::key::{
-    EC_KEY_check_key, EC_KEY_dup, EC_KEY_free, EC_KEY_get0_group, EC_KEY_get0_private_key,
-    EC_KEY_get0_public_key, EC_KEY_key2buf, EC_KEY_new, EC_KEY_oct2key, EC_KEY_set_group,
-    EC_KEY_up_ref, key,
+    EC_KEY_check_key, EC_KEY_dup, EC_KEY_free, EC_KEY_get_conv_form, EC_KEY_get_flags,
+    EC_KEY_get0_group, EC_KEY_get0_private_key, EC_KEY_get0_public_key, EC_KEY_key2buf, EC_KEY_new,
+    EC_KEY_oct2key, EC_KEY_set_group, EC_KEY_up_ref, key, new_key,
 };
 use crate::ec::key_asn1::{Print, d2i_ECParameters, d2i_ECPrivateKey, i2d_ECParameters, print_key};
+use crate::ec::params::{Kept, Target, group_todata};
 use crate::ec::point::EC_POINT_cmp;
 use crate::err;
 use crate::ffi::ffi_export;
+use crate::params::build::{OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_to_param};
+use crate::params::dup::OSSL_PARAM_free;
 
 /// The key's legacy data as an `EC_KEY` (NULL without).
 ///
@@ -100,15 +114,7 @@ pub(crate) unsafe extern "C" fn ec_bits(p: *const EVP_PKEY) -> c_int {
 /// `ec_security_bits`: from the order's bits, by SP 800-57's steps.
 pub(crate) unsafe extern "C" fn ec_security_bits(p: *const EVP_PKEY) -> c_int {
     // SAFETY: the method's key.
-    let bits = unsafe { ec_bits(p) };
-    match bits {
-        512.. => 256,
-        384.. => 192,
-        256.. => 128,
-        224.. => 112,
-        160.. => 80,
-        _ => bits / 2,
-    }
+    crate::provider::ec_kmgmt::security_bits(unsafe { ec_bits(p) })
 }
 
 /// `ec_missing_parameters`: 1 without an `EC_KEY` or its group.
@@ -369,6 +375,103 @@ pub(crate) unsafe extern "C" fn ec_pkey_copy(to: *mut EVP_PKEY, from: *mut EVP_P
     ret
 }
 
+/// `ec_pkey_export_to`: the group, the public key (in the key's point format), and the
+/// private key (padded to the order's length) with the cofactor mode, to `importer`.
+///
+/// # Safety
+/// `from` is a live key with EC legacy data.
+pub(crate) unsafe fn ec_pkey_export_to(
+    from: *const EVP_PKEY,
+    importer: &mut dyn FnMut(c_int, *const OSSL_PARAM) -> c_int,
+) -> c_int {
+    // SAFETY: the method's key.
+    let ec = unsafe { data(from) };
+    let group = if ec.is_null() {
+        ptr::null()
+    } else {
+        // SAFETY: the key's `EC_KEY`.
+        unsafe { EC_KEY_get0_group(ec) }
+    };
+    if group.is_null() {
+        return 0;
+    }
+    // SAFETY: no preconditions.
+    let bld = unsafe { OSSL_PARAM_BLD_new() };
+    if bld.is_null() {
+        return 0;
+    }
+    let target = Target::Builder(bld);
+    let mut kept = Kept::default();
+    let mut selection = OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS;
+    let ok = (|| {
+        // SAFETY: the key's group; the builder; `kept` outlives the array's making.
+        if !unsafe { group_todata(group, target, &mut kept) } {
+            return false;
+        }
+        // SAFETY: the key's `EC_KEY`.
+        let has_pub = !unsafe { EC_KEY_get0_public_key(ec) }.is_null();
+        // SAFETY: as above.
+        let has_priv = !unsafe { EC_KEY_get0_private_key(ec) }.is_null();
+        // SAFETY: as above.
+        if !unsafe { key_todata(ec, target, &mut kept, true) } {
+            return false;
+        }
+        if has_pub {
+            selection |= OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
+        }
+        if has_priv {
+            selection |= OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS;
+            // SAFETY: as above.
+            let mode = c_int::from(unsafe { EC_KEY_get_flags(ec) } & EC_FLAG_COFACTOR_ECDH != 0);
+            // SAFETY: the builder; a static key.
+            return unsafe { target.int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, mode) };
+        }
+        true
+    })();
+    let mut rv = 0;
+    if ok {
+        // SAFETY: the builder; what it reads is kept until here.
+        let params = unsafe { OSSL_PARAM_BLD_to_param(bld) };
+        rv = importer(selection, params);
+        // SAFETY: the array made above, or NULL.
+        unsafe { OSSL_PARAM_free(params) };
+    }
+    // SAFETY: the builder made above.
+    unsafe { OSSL_PARAM_BLD_free(bld) };
+    rv
+}
+
+/// `ec_pkey_import_from`: a new `EC_KEY` from `params` (group, other parameters, key pair),
+/// assigned to `to` (as SM2's type on SM2's curve).
+///
+/// # Safety
+/// `params` is a parameter array; `to` is a live key.
+pub(crate) unsafe fn ec_pkey_import_from(
+    params: *const OSSL_PARAM,
+    to: *mut EVP_PKEY,
+    libctx: *mut OSSL_LIB_CTX,
+) -> c_int {
+    // SAFETY: the library context; no query.
+    let ec = unsafe { new_key(libctx, ptr::null()) };
+    if ec.is_null() {
+        err::raise(ERR_LIB_EC, ERR_R_EC_LIB, "ec_pkey_import_from");
+        return 0;
+    }
+    // SAFETY: the key just made; the caller's array.
+    let ok = unsafe { group_fromdata(ec, params) }
+        // SAFETY: as above.
+        && unsafe { otherparams_fromdata(ec, params) }
+        // SAFETY: as above.
+        && unsafe { key_fromdata(ec, params, true) }
+        // SAFETY: the caller's key; the `EC_KEY`, which it takes.
+        && unsafe { EVP_PKEY_assign(to, EVP_PKEY_EC, ec.cast()) } != 0;
+    if !ok {
+        // SAFETY: the key made above.
+        unsafe { EC_KEY_free(ec) };
+    }
+    c_int::from(ok)
+}
+
 /// `evp_pkey_get0_EC_KEY_int`: the key's `EC_KEY`, or NULL with `EVP_R_EXPECTING_A_EC_KEY` for
 /// another type.
 ///
@@ -445,6 +548,118 @@ ffi_export! {
     }
 }
 
+/// A provided key's UTF-8 parameter `name` (at most 79 characters), or `None`.
+///
+/// # Safety
+/// `pkey` is a live key.
+unsafe fn utf8_param(pkey: *const EVP_PKEY, name: &CStr) -> Option<Vec<u8>> {
+    let mut buf = [0u8; 80];
+    let mut len = 0usize;
+    // SAFETY: the caller's key; a static name; a buffer of its size; a local.
+    let ok = unsafe {
+        EVP_PKEY_get_utf8_string_param(
+            pkey,
+            name.as_ptr(),
+            buf.as_mut_ptr().cast(),
+            buf.len(),
+            &raw mut len,
+        )
+    };
+    (ok != 0).then(|| buf.get(..len).unwrap_or_default().to_vec())
+}
+
+/// Whether a key is held by a key manager (with data), rather than in legacy form.
+///
+/// # Safety
+/// `pkey` is a live key.
+unsafe fn is_provided(pkey: *const EVP_PKEY) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { super::pkey(pkey) }.is_some_and(|k| {
+        let (km, kd) = k.provided();
+        km.is_some() && kd.is_some()
+    })
+}
+
+ffi_export! {
+    /// The point conversion form of an EC key's public key encodings; 0 for another key or on
+    /// failure.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_ec_point_conv_form(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        if pkey.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        if !unsafe { is_provided(pkey) } {
+            // SAFETY: as above.
+            let ec = unsafe { get0_ec(pkey) };
+            if ec.is_null() {
+                return 0;
+            }
+            // SAFETY: the key's `EC_KEY`.
+            return unsafe { EC_KEY_get_conv_form(ec) }.cast_signed();
+        }
+        // SAFETY: as above.
+        let Some(name) = (unsafe { utf8_param(pkey, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT) }) else {
+            return 0;
+        };
+        let form = match name.as_slice() {
+            b"uncompressed" => POINT_CONVERSION_UNCOMPRESSED,
+            b"compressed" => POINT_CONVERSION_COMPRESSED,
+            b"hybrid" => POINT_CONVERSION_HYBRID,
+            _ => return 0,
+        };
+        form.cast_signed()
+    }
+}
+
+ffi_export! {
+    /// The field type (`NID_X9_62_prime_field` or `NID_X9_62_characteristic_two_field`) of an
+    /// EC key's group; 0 for another key or on failure. OpenSSL's check of a provided key's
+    /// field type is inverted, so a provided key over a characteristic-two field gives 0, and
+    /// one of an unknown field type gives the characteristic-two NID; this does the same.
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_field_type(pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        if pkey.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        if !unsafe { is_provided(pkey) } {
+            // SAFETY: as above.
+            let ec = unsafe { get0_ec(pkey) };
+            let group = if ec.is_null() {
+                ptr::null()
+            } else {
+                // SAFETY: the key's `EC_KEY`.
+                unsafe { EC_KEY_get0_group(ec) }
+            };
+            if group.is_null() {
+                return 0;
+            }
+            // SAFETY: its group.
+            return unsafe { EC_GROUP_get_field_type(group) };
+        }
+        // SAFETY: as above.
+        let Some(name) = (unsafe { utf8_param(pkey, OSSL_PKEY_PARAM_EC_FIELD_TYPE) }) else {
+            return 0;
+        };
+        if name == SN_X9_62_prime_field.to_bytes() {
+            NID_X9_62_prime_field
+        } else if name != SN_X9_62_characteristic_two_field.to_bytes() {
+            NID_X9_62_characteristic_two_field
+        } else {
+            0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,6 +672,26 @@ mod tests {
         // SAFETY: a live key; NULL.
         assert_eq!(unsafe { EVP_PKEY_set1_EC_KEY(k, ptr::null_mut()) }, 0);
         // SAFETY: made above, freed once.
+        unsafe { super::super::EVP_PKEY_free(k) };
+    }
+
+    /// docs/DEVIATIONS.md: OpenSSL's calls the missing callback.
+    #[test]
+    fn export_without_a_callback_fails() {
+        // SAFETY: no preconditions.
+        let k = unsafe { super::super::EVP_PKEY_new() };
+        // SAFETY: no preconditions.
+        let ec = unsafe { EC_KEY_new() };
+        // SAFETY: live objects; the key takes a reference.
+        assert_eq!(unsafe { EVP_PKEY_set1_EC_KEY(k, ec) }, 1);
+        // SAFETY: a live key; no callback.
+        let r = unsafe {
+            super::super::EVP_PKEY_export(k, rustyssl_abi::EVP_PKEY_KEYPAIR, None, ptr::null_mut())
+        };
+        assert_eq!(r, 0);
+        // SAFETY: made above, each freed once.
+        unsafe { EC_KEY_free(ec) };
+        // SAFETY: as above.
         unsafe { super::super::EVP_PKEY_free(k) };
     }
 }

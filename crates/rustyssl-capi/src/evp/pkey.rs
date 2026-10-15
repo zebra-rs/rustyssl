@@ -1809,13 +1809,22 @@ ffi_export! {
         };
         if k.lock().is_legacy() {
             let builtin = k.lock().ameth.as_ref().is_some_and(|m| !m.get().is_dynamic());
-            if builtin {
-                // A built-in key type's ASN.1 method exports it (4.3 onwards).
-                crate::stub::unimplemented("EVP_PKEY_export of a key typed by an ASN.1 method");
+            if !builtin {
+                // An application's method has no `export_to` (the reference calls through NULL;
+                // docs/DEVIATIONS.md).
+                return 0;
             }
-            // An application's method has no `export_to` (the reference calls through NULL;
-            // docs/DEVIATIONS.md).
-            return 0;
+            let Some(export_to) = k.ameth_funcs().and_then(|f| f.export_to) else {
+                // The built-in key types of later steps export with them.
+                crate::stub::unimplemented("EVP_PKEY_export of a key typed by an ASN.1 method");
+            };
+            // `pkey_fake_import`: the parameters go straight to the callback, whatever the
+            // selection. Without a callback there's nothing to give them to.
+            let Some(cb) = export_cb else { return 0 };
+            // SAFETY: the caller's callback, which takes its argument.
+            let mut importer = |_, params| unsafe { cb(params, export_cbarg) };
+            // SAFETY: the method's key.
+            return unsafe { export_to(pkey, &mut importer) };
         }
         // SAFETY: the caller's guarantee.
         unsafe { export(k, selection, export_cb, export_cbarg) }

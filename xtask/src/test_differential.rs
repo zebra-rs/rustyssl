@@ -391,6 +391,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ecpk", ecpk_session),
     ("eckey", eckey_session),
     ("ecdsa", ecdsa_session),
+    ("eckm", eckm_session),
     ("string", string_session),
 ];
 
@@ -2942,6 +2943,77 @@ fn ecdsa_session(random: &mut Random, out: &mut String) -> Result {
                 writeln!(out, "ecdh {curve} {d} {peer} {}", random.below(2))?;
             }
         }
+    }
+    Ok(())
+}
+
+/// A random session of the EC key manager on one curve: keys from data of every selection,
+/// with private keys of every size, public keys near valid encodings (a random compressed x
+/// decompresses about half the time), and the other parameters with good and bad values; and
+/// DHKEM key generation on the NIST curves and others, from inputs of every length.
+fn eckm_session(random: &mut Random, out: &mut String) -> Result {
+    let i = usize::try_from(random.below(EC_CURVES.len() as u64)).unwrap_or(0);
+    let (curve, fl) = EC_CURVES.get(i).copied().unwrap_or(("prime256v1", 32));
+    for _ in 0..random.below(6).saturating_add(1) {
+        if random.below(5) == 0 {
+            let group = random.pick(&["P-256", "P-384", "P-521", "P-224", curve]);
+            let len = usize::try_from(random.below(80)).unwrap_or(32);
+            writeln!(out, "ecdhkem {group} {}", random_hex(random, len))?;
+            continue;
+        }
+        let selection = random.pick(&[
+            "87", "87", "86", "85", "84", "83", "81", "80", "7", "6", "4", "1", "0",
+        ]);
+        let group = if random.below(12) == 0 {
+            random.pick(&["-", "nosuchcurve", "SM2", "P-256"])
+        } else {
+            curve
+        };
+        let privkey = match random.below(6) {
+            0 => "-".to_owned(),
+            1 => format!("{:x}", random.below(4)),
+            2 => "F".repeat(fl.saturating_mul(2)),
+            _ => random_hex(random, fl),
+        };
+        let pubkey = match random.below(4) {
+            0 => "-".to_owned(),
+            _ => {
+                let first = random.pick(&["02", "03", "04", "06", "07", "00", "05"]);
+                let mut len = match first {
+                    "02" | "03" => fl,
+                    "00" => 0,
+                    _ => fl.saturating_mul(2),
+                };
+                if random.below(8) == 0 {
+                    len = len.saturating_add(1);
+                }
+                format!("{first}{}", random_hex(random, len))
+            }
+        };
+        let mut other = Vec::new();
+        for (key, values) in [
+            (
+                "point-format",
+                &["compressed", "uncompressed", "hybrid", "bogus"][..],
+            ),
+            ("encoding", &["named_curve", "explicit", "bogus"][..]),
+            (
+                "group-check",
+                &["default", "named", "named-nist", "bogus"][..],
+            ),
+            ("use-cofactor-flag", &["#0", "#1", "#2", "#-1"][..]),
+            ("include-public", &["#0", "#1"][..]),
+        ] {
+            if random.below(4) == 0 {
+                other.push(format!("{key}={}", random.pick(values)));
+            }
+        }
+        let other = if other.is_empty() {
+            "-".to_owned()
+        } else {
+            other.join(",")
+        };
+        writeln!(out, "eckm {selection} {group} {privkey} {pubkey} {other}")?;
     }
     Ok(())
 }
