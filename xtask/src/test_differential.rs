@@ -389,6 +389,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("conf_modules", conf_modules_session),
     ("ec", ec_session),
     ("ecpk", ecpk_session),
+    ("eckey", eckey_session),
     ("string", string_session),
 ];
 
@@ -2824,8 +2825,19 @@ const ECPK_SEEDS: &[&str] = &[
 /// A random session of `ecpk` commands: the seed encodings with octets changed, removed, or
 /// added, cut short, or whole.
 fn ecpk_session(random: &mut Random, out: &mut String) -> Result {
+    mutated_sessions(random, out, "ecpk", ECPK_SEEDS)
+}
+
+/// Commands `command <hex>` on `seeds` with octets changed, removed, or added, cut short, or
+/// whole.
+fn mutated_sessions(
+    random: &mut Random,
+    out: &mut String,
+    command: &str,
+    seeds: &[&str],
+) -> Result {
     for _ in 0..random.below(6) + 1 {
-        let seed = random.pick(ECPK_SEEDS);
+        let seed = random.pick(seeds);
         let mut der: Vec<u8> = (0..seed.len() / 2)
             .filter_map(|i| seed.get(2 * i..2 * i + 2))
             .filter_map(|h| u8::from_str_radix(h, 16).ok())
@@ -2856,9 +2868,24 @@ fn ecpk_session(random: &mut Random, out: &mut String) -> Result {
         }
         der.truncate(250);
         let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
-        writeln!(out, "ecpk {hex}")?;
+        writeln!(out, "{command} {hex}")?;
     }
     Ok(())
+}
+
+/// Encodings of EC private keys for `eckey` sessions to start from: prime256v1 with private key
+/// 1 (named, then with no parameters), with a public key off the curve, and with a private key
+/// longer than the order.
+const ECKEY_SEEDS: &[&str] = &[
+    "3012020101040101a00a06082a8648ce3d030107",
+    "3006020101040101",
+    "3058020101040101a00a06082a8648ce3d030107a144034200040102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+    "30350201010424ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa00a06082a8648ce3d030107",
+];
+
+/// A random session of `eckey` commands: the seed encodings mutated as `ecpk`'s are.
+fn eckey_session(random: &mut Random, out: &mut String) -> Result {
+    mutated_sessions(random, out, "eckey", ECKEY_SEEDS)
 }
 
 /// A random session of EC commands on one curve: encodings near valid ones (random x, which a

@@ -117,14 +117,14 @@ struct Params {
 /// `ECPKPARAMETERS` (`struct ecpk_parameters_st`): `value` is a named curve's object, the
 /// explicit `ECPARAMETERS`, or implicitlyCA's NULL, as `type` says.
 #[repr(C)]
-struct PkParams {
-    kind: c_int,
+pub(crate) struct PkParams {
+    pub(crate) kind: c_int,
     value: *mut c_void,
 }
 
 /// `ECPKPARAMETERS_TYPE_NAMED`, `_EXPLICIT`, and `_IMPLICIT`.
 const TYPE_NAMED: c_int = 0;
-const TYPE_EXPLICIT: c_int = 1;
+pub(crate) const TYPE_EXPLICIT: c_int = 1;
 const TYPE_IMPLICIT: c_int = 2;
 
 static PENTANOMIAL_TT: Templates<3> = Templates([

@@ -981,13 +981,20 @@ ffi_export! {
         let Some((v, [p])) = (unsafe { with(group, [point.cast_const()], "EC_POINT_oct2point") }) else {
             return 0;
         };
-        let input: &[u8] = if len == 0 {
+        // No encoding is longer than an uncompressed point of the largest field, so a longer
+        // `len` is refused for its length, as OpenSSL refuses it, from no more octets than one
+        // past that (which keeps a huge `len` from becoming a slice).
+        let max_field = usize::try_from(rustyssl_abi::OPENSSL_ECC_MAX_FIELD_BITS)
+            .unwrap_or(0)
+            .div_ceil(8);
+        let read = len.min(max_field.saturating_mul(2).saturating_add(2));
+        let input: &[u8] = if read == 0 {
             &[]
         } else if buf.is_null() {
             return 0;
         } else {
-            // SAFETY: the caller's `len` octets.
-            unsafe { core::slice::from_raw_parts(buf, len) }
+            // SAFETY: the caller's `len` octets, of which these are the first.
+            unsafe { core::slice::from_raw_parts(buf, read) }
         };
         // SAFETY: as above.
         let mut rng = unsafe { random(ctx, v.libctx) };
