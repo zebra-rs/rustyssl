@@ -967,6 +967,22 @@ mod tests {
         unsafe { RSA_free(r) };
     }
 
+    /// Each reference `RSA_up_ref` adds is one `RSA_free` drops, and the last frees the key
+    /// (Miri reports the key leaked otherwise).
+    #[test]
+    fn references_balance() {
+        // SAFETY: no preconditions.
+        let r = unsafe { RSA_new() };
+        // SAFETY: a live key.
+        assert_eq!(unsafe { RSA_up_ref(r) }, 1);
+        // SAFETY: as above.
+        assert_eq!(unsafe { RSA_up_ref(r) }, 1);
+        for _ in 0..3 {
+            // SAFETY: one of the three references.
+            unsafe { RSA_free(r) };
+        }
+    }
+
     /// docs/DEVIATIONS.md: OpenSSL's `RSA_new` dereferences a NULL default method.
     #[test]
     fn a_null_default_method_gives_new_keys_the_built_in_one() {

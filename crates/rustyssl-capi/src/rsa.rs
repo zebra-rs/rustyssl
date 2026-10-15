@@ -486,9 +486,9 @@ pub(crate) unsafe fn up_ref(r: *const RSA) -> bool {
     let Some(k) = (unsafe { rsa(r) }) else {
         return false;
     };
+    // The key's count alone: `free` drops the handle's one `Arc` reference at the last.
     k.references.fetch_add(1, Ordering::AcqRel);
-    // SAFETY: as above: a live key.
-    unsafe { RSA::up_ref(r) }
+    true
 }
 
 /// The `RSA_R_*` (or `ERR_R_*`) code of a reason.
