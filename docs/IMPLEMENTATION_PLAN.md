@@ -3459,6 +3459,35 @@ chunking) is clean.
   - ECDSA (random and deterministic, RFC 6979), ECDH (cofactor), SM2 sign and encrypt
 
   Document the constant-time level for each curve.
+
+  **Decision:** the field and curve arithmetic is our own, over `rustyssl_crypto::bn`, as
+  4.1 decided for BIGNUM. No vetted pure-Rust crate covers OpenSSL's curves: about 80 named
+  ones, binary fields, and explicit parameters, all behind the generic `EC_POINT` API.
+  Operations on secrets (scalar multiplication by a private key or nonce) use a
+  constant-time Montgomery ladder on fixed-width limbs, as OpenSSL's `ec_scalar_mul_ladder`
+  does. The other operations use the public-input algorithms OpenSSL uses (wNAF), so their
+  results, and the random numbers they draw, are the reference's. The curve parameters are
+  generated from OpenSSL's `crypto/ec/ec_curve.c`, vendored with the release and
+  preprocessed with the default build's options.
+
+  In sub-steps, each its own PR:
+  - [ ] **4.4a Groups and points:** the generated curve table; the field arithmetic (GF(p)
+    and GF(2^m)) and the point arithmetic with OpenSSL's formulas, so even the Jacobian
+    coordinates `EC_POINT_get_Jprojective_coordinates_GFp` shows are the reference's; the
+    constant-time ladder for secret scalars; `EC_GROUP` (named and explicit groups, the
+    `EC_METHOD`s, the accessors, `check`, `cmp`, the conversion form and ASN.1 flag,
+    `EC_get_builtin_curves` and the names); and the full `EC_POINT` API (arithmetic,
+    coordinates, octet, BIGNUM, and hex conversions, compressed points, `mul`).
+  - [ ] **4.4b Parameters:** `ECPARAMETERS`/`ECPKPARAMETERS` and their ASN.1
+    (`d2i_`/`i2d_ECPKParameters`, `EC_GROUP_new_from_ecparameters`, ...), the groups'
+    `OSSL_PARAM` forms (`EC_GROUP_new_from_params`, `EC_GROUP_to_params`), and
+    `ECPKParameters_print`.
+  - [ ] **4.4c Keys and their primitives:** `EC_KEY` and `EC_KEY_METHOD`, `ECDSA_SIG`,
+    `ECDSA_*` and `ECDH_compute_key`, the key's ASN.1 (`ECPrivateKey`, `i2o`/`o2i`), and
+    EC in `EVP_PKEY` (with printing).
+  - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
+    ECDH (cofactor, X9.63 KDF), and the legacy EC `EVP_PKEY_METHOD`.
+  - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
 - [ ] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)
   - ML-KEM-512/768/1024, ML-DSA-44/65/87, and every SLH-DSA parameter set
