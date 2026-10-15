@@ -1177,7 +1177,9 @@ mod tests {
     use rustyssl_abi::NID_X9_62_prime256v1;
 
     use super::*;
-    use crate::ec::key::{EC_KEY_free, EC_KEY_generate_key, EC_KEY_new_by_curve_name};
+    use crate::ec::key::{
+        EC_KEY_free, EC_KEY_new_by_curve_name, EC_KEY_set_private_key, EC_KEY_set_public_key,
+    };
 
     /// docs/DEVIATIONS.md: OpenSSL's dereference NULL keys, signatures, and outputs, and the
     /// missing numbers of an empty signature.
@@ -1188,8 +1190,16 @@ mod tests {
         let empty = unsafe { ECDSA_SIG_new() };
         // SAFETY: no preconditions.
         let k = unsafe { EC_KEY_new_by_curve_name(NID_X9_62_prime256v1) };
-        // SAFETY: a live key.
-        assert_eq!(unsafe { EC_KEY_generate_key(k) }, 1);
+        // A key without randomness (which Miri can't draw): private key 1, public key G.
+        let one = new_bignum(BigNum::one(), false);
+        // SAFETY: a live key and number.
+        assert_eq!(unsafe { EC_KEY_set_private_key(k, one) }, 1);
+        // SAFETY: the key's group.
+        let g = unsafe { crate::ec::group::EC_GROUP_get0_generator(EC_KEY_get0_group(k)) };
+        // SAFETY: a live key and point.
+        assert_eq!(unsafe { EC_KEY_set_public_key(k, g) }, 1);
+        // SAFETY: made above, freed once.
+        unsafe { BN_clear_free(one) };
         // SAFETY: an empty signature.
         assert_eq!(unsafe { i2d_ECDSA_SIG(empty, ptr::null_mut()) }, -1);
         // SAFETY: a digest, an empty signature, and a key.
