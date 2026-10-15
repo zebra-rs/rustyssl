@@ -15,17 +15,17 @@ use std::ffi::CString;
 
 use rustyssl_abi::{
     BIGNUM, EC_FLAG_CHECK_NAMED_GROUP, EC_FLAG_CHECK_NAMED_GROUP_NIST, EC_FLAG_COFACTOR_ECDH,
-    EC_GROUP, EC_KEY, ERR_LIB_EC, ERR_LIB_PROV, NID_X9_62_characteristic_two_field,
-    NID_X9_62_ppBasis, NID_X9_62_tpBasis, NID_sm2, OSSL_CALLBACK, OSSL_FUNC_KEYMGMT_DUP,
-    OSSL_FUNC_KEYMGMT_EXPORT, OSSL_FUNC_KEYMGMT_EXPORT_TYPES, OSSL_FUNC_KEYMGMT_FREE,
-    OSSL_FUNC_KEYMGMT_GEN, OSSL_FUNC_KEYMGMT_GEN_CLEANUP, OSSL_FUNC_KEYMGMT_GEN_GET_PARAMS,
-    OSSL_FUNC_KEYMGMT_GEN_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_GEN_INIT,
-    OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE,
-    OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_GET_PARAMS,
-    OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS, OSSL_FUNC_KEYMGMT_IMPORT,
-    OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_LOAD, OSSL_FUNC_KEYMGMT_MATCH,
-    OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME, OSSL_FUNC_KEYMGMT_SET_PARAMS,
-    OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_VALIDATE,
+    EC_GROUP, EC_KEY, ERR_LIB_EC, ERR_LIB_PROV, ERR_LIB_SM2, ERR_R_PASSED_NULL_PARAMETER,
+    NID_X9_62_characteristic_two_field, NID_X9_62_ppBasis, NID_X9_62_tpBasis, NID_sm2,
+    OSSL_CALLBACK, OSSL_FUNC_KEYMGMT_DUP, OSSL_FUNC_KEYMGMT_EXPORT, OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
+    OSSL_FUNC_KEYMGMT_FREE, OSSL_FUNC_KEYMGMT_GEN, OSSL_FUNC_KEYMGMT_GEN_CLEANUP,
+    OSSL_FUNC_KEYMGMT_GEN_GET_PARAMS, OSSL_FUNC_KEYMGMT_GEN_GETTABLE_PARAMS,
+    OSSL_FUNC_KEYMGMT_GEN_INIT, OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+    OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+    OSSL_FUNC_KEYMGMT_GET_PARAMS, OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS,
+    OSSL_FUNC_KEYMGMT_IMPORT, OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_LOAD,
+    OSSL_FUNC_KEYMGMT_MATCH, OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME,
+    OSSL_FUNC_KEYMGMT_SET_PARAMS, OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_VALIDATE,
     OSSL_KEYMGMT_SELECT_ALL_PARAMETERS, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
     OSSL_KEYMGMT_SELECT_KEYPAIR, OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS,
     OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
@@ -57,12 +57,14 @@ use crate::ec::backend::{
     set_check_group_type_from_name, set_ecdh_cofactor_mode,
 };
 use crate::ec::ecdsa::ECDSA_size;
+use crate::ec::group::EC_GROUP_get0_order;
 use crate::ec::group::{
     EC_GROUP_check, EC_GROUP_check_named_curve, EC_GROUP_cmp, EC_GROUP_dup, EC_GROUP_free,
     EC_GROUP_get_basis_type, EC_GROUP_get_curve_name, EC_GROUP_get_degree, EC_GROUP_get_field_type,
     EC_GROUP_get_pentanomial_basis, EC_GROUP_get_trinomial_basis, EC_GROUP_order_bits,
     EC_GROUP_set_asn1_flag, EC_GROUP_set_point_conversion_form,
 };
+use crate::ec::key::EC_KEY_new_by_curve_name_ex;
 use crate::ec::key::{
     EC_KEY_decoded_from_explicit_params, EC_KEY_generate_key, EC_KEY_get_flags, EC_KEY_get0_group,
     EC_KEY_get0_public_key, EC_KEY_oct2key, EC_KEY_set_group, dup, free, generate_dhkem, key,
@@ -75,6 +77,7 @@ use crate::ec::params::{
 use crate::ec::point::{EC_POINT_cmp, EC_POINT_point2oct};
 use crate::err;
 use crate::ffi::ffi_callback;
+use crate::generated::err_strings::SM2_R_INVALID_PRIVATE_KEY;
 use crate::mem::OPENSSL_cleanse;
 use crate::params::bn::OSSL_PARAM_get_BN;
 use crate::params::build::{
@@ -87,8 +90,9 @@ use crate::params::{
     OSSL_PARAM_set_utf8_string,
 };
 
-/// `EC_DEFAULT_MD`.
+/// `EC_DEFAULT_MD` and `SM2_DEFAULT_MD`.
 const EC_DEFAULT_MD: &CStr = c"SHA256";
+const SM2_DEFAULT_MD: &CStr = c"SM3";
 
 const KEYPAIR: c_int = OSSL_KEYMGMT_SELECT_KEYPAIR;
 const PUBLIC: c_int = OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
@@ -269,34 +273,48 @@ unsafe fn check_sm2(ec: *const EC_KEY, sm2_wanted: bool) -> bool {
     !group.is_null() && sm2_wanted == (unsafe { EC_GROUP_get_curve_name(group) } == NID_sm2)
 }
 
+/// `common_import`: the domain parameters (which must be selected, and on SM2's curve exactly
+/// when `sm2`), then the key pair and the other parameters as selected.
+///
+/// # Safety
+/// `keydata` is NULL or live key data; `params` is NULL or an array.
+unsafe fn import(
+    keydata: *mut c_void,
+    selection: c_int,
+    params: *const OSSL_PARAM,
+    sm2: bool,
+) -> c_int {
+    let h = keydata.cast::<EC_KEY>();
+    if h.is_null() || selection & DOMAIN == 0 {
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
+    let mut ok = unsafe { group_fromdata(h, params) };
+    // SAFETY: as above.
+    if !unsafe { check_sm2(h, sm2) } {
+        return 0;
+    }
+    if selection & KEYPAIR != 0 {
+        // SAFETY: as above.
+        ok = ok && unsafe { key_fromdata(h, params, selection & PRIVATE != 0) };
+    }
+    if selection & OTHER != 0 {
+        // SAFETY: as above.
+        ok = ok && unsafe { otherparams_fromdata(h, params) };
+    }
+    c_int::from(ok)
+}
+
 ffi_callback! {
-    /// `ec_import` (`common_import`): the domain parameters (which must be selected and not be
-    /// SM2's curve), then the key pair and the other parameters as selected.
+    /// `ec_import`: as `common_import`, not on SM2's curve.
     ///
     /// # Safety
     /// `keydata` is NULL or live key data; `params` is NULL or an array.
     pub(crate) unsafe extern "C" fn ec_import(keydata: *mut c_void, selection: c_int, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        let h = keydata.cast::<EC_KEY>();
-        if h.is_null() || selection & DOMAIN == 0 {
-            return 0;
-        }
         // SAFETY: the caller's guarantee.
-        let mut ok = unsafe { group_fromdata(h, params) };
-        // SAFETY: as above.
-        if !unsafe { check_sm2(h, false) } {
-            return 0;
-        }
-        if selection & KEYPAIR != 0 {
-            // SAFETY: as above.
-            ok = ok && unsafe { key_fromdata(h, params, selection & PRIVATE != 0) };
-        }
-        if selection & OTHER != 0 {
-            // SAFETY: as above.
-            ok = ok && unsafe { otherparams_fromdata(h, params) };
-        }
-        c_int::from(ok)
+        unsafe { import(keydata, selection, params, false) }
     }
 }
 
@@ -514,6 +532,7 @@ unsafe fn get_params(
     group: *const EC_GROUP,
     params: *mut OSSL_PARAM,
     ctx: *mut rustyssl_abi::BN_CTX,
+    sm2: bool,
 ) -> bool {
     // SAFETY: the caller's guarantee, here and below.
     let bits = unsafe { EC_GROUP_order_bits(group) };
@@ -541,15 +560,19 @@ unsafe fn get_params(
     }
     // SAFETY: as above.
     let p = unsafe { find(params, OSSL_PKEY_PARAM_DEFAULT_DIGEST) };
+    let md = if sm2 { SM2_DEFAULT_MD } else { EC_DEFAULT_MD };
     // SAFETY: a parameter of the array; a static string.
-    if !p.is_null() && unsafe { OSSL_PARAM_set_utf8_string(p, EC_DEFAULT_MD.as_ptr()) } == 0 {
+    if !p.is_null() && unsafe { OSSL_PARAM_set_utf8_string(p, md.as_ptr()) } == 0 {
         return false;
     }
-    // SAFETY: as above.
-    let cofactor = c_int::from(unsafe { EC_KEY_get_flags(h) } & EC_FLAG_COFACTOR_ECDH != 0);
-    // SAFETY: as above.
-    if !unsafe { set_int(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, cofactor) } {
-        return false;
+    // SM2 has no cofactor mode.
+    if !sm2 {
+        // SAFETY: as above.
+        let cofactor = c_int::from(unsafe { EC_KEY_get_flags(h) } & EC_FLAG_COFACTOR_ECDH != 0);
+        // SAFETY: as above.
+        if !unsafe { set_int(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, cofactor) } {
+            return false;
+        }
     }
     // SAFETY: as above.
     let p = unsafe { find(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY) };
@@ -589,34 +612,45 @@ unsafe fn get_params(
         && unsafe { otherparams_todata(h, target) }
 }
 
+/// `common_get_params`: the sizes, strengths, default digest, cofactor mode (not SM2's),
+/// uncompressed public key, then the group, key, and other parameters. Fails with
+/// `PROV_R_NO_PARAMETERS_SET` for a key without a group.
+///
+/// # Safety
+/// `keydata` is NULL or live key data; `params` is NULL or an array.
+unsafe fn common_get_params(keydata: *mut c_void, params: *mut OSSL_PARAM, sm2: bool) -> c_int {
+    let h = keydata.cast::<EC_KEY>().cast_const();
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { ec(keydata) }) else {
+        return 0;
+    };
+    let f = k.get();
+    if f.group.0.is_null() {
+        err::raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET, "common_get_params");
+        return 0;
+    }
+    // SAFETY: the key's library context.
+    let ctx = unsafe { BN_CTX_new_ex(f.libctx.0) };
+    if ctx.is_null() {
+        return 0;
+    }
+    // SAFETY: the key, its group, the caller's array, the context.
+    let ok = unsafe { get_params(h, f.group.0, params, ctx, sm2) };
+    // SAFETY: the context made above.
+    unsafe { BN_CTX_free(ctx) };
+    c_int::from(ok)
+}
+
 ffi_callback! {
-    /// `ec_get_params` (`common_get_params`): the sizes, strengths, default digest, cofactor
-    /// mode, uncompressed public key, then the group, key, and other parameters. Fails with
-    /// `PROV_R_NO_PARAMETERS_SET` for a key without a group.
+    /// `ec_get_params` (`common_get_params`).
     ///
     /// # Safety
     /// `keydata` is NULL or live key data; `params` is NULL or an array.
     pub(crate) unsafe extern "C" fn ec_get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        let h = keydata.cast::<EC_KEY>().cast_const();
         // SAFETY: the caller's guarantee.
-        let Some(k) = (unsafe { ec(keydata) }) else { return 0 };
-        let f = k.get();
-        if f.group.0.is_null() {
-            err::raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET, "common_get_params");
-            return 0;
-        }
-        // SAFETY: the key's library context.
-        let ctx = unsafe { BN_CTX_new_ex(f.libctx.0) };
-        if ctx.is_null() {
-            return 0;
-        }
-        // SAFETY: the key, its group, the caller's array, the context.
-        let ok = unsafe { get_params(h, f.group.0, params, ctx) };
-        // SAFETY: the context made above.
-        unsafe { BN_CTX_free(ctx) };
-        c_int::from(ok)
+        unsafe { common_get_params(keydata, params, false) }
     }
 }
 
@@ -1150,7 +1184,7 @@ unsafe fn gen_set_group_from_params(g: &mut GenCtx) -> bool {
 ///
 /// # Safety
 /// `h` is a live key; `g`'s objects are NULL or live.
-unsafe fn gen_into(g: &mut GenCtx, h: *mut EC_KEY) -> bool {
+unsafe fn gen_into(g: &mut GenCtx, h: *mut EC_KEY, sm2: bool) -> bool {
     if g.gen_group.is_null() {
         // SAFETY: the caller's guarantee.
         if !unsafe { gen_set_group_from_params(g) } {
@@ -1184,6 +1218,14 @@ unsafe fn gen_into(g: &mut GenCtx, h: *mut EC_KEY) -> bool {
         // SAFETY: the key; the context's group.
         (unsafe { EC_KEY_set_group(h, g.gen_group) }) > 0
     };
+    // `sm2_gen` has no DHKEM input, cofactor mode, or check type.
+    if sm2 {
+        if g.selection & KEYPAIR != 0 {
+            // SAFETY: the key, with its group.
+            ok = ok && (unsafe { EC_KEY_generate_key(h) }) != 0;
+        }
+        return ok;
+    }
     if g.selection & KEYPAIR != 0 {
         ok = ok
             && match g.dhkem_ikm.as_deref() {
@@ -1220,7 +1262,7 @@ ffi_callback! {
             return ptr::null_mut();
         }
         // SAFETY: the key just made; the context's objects.
-        if unsafe { gen_into(g, h) } {
+        if unsafe { gen_into(g, h, false) } {
             return h.cast();
         }
         // SAFETY: the key made above.
@@ -1299,29 +1341,38 @@ ffi_callback! {
     }
 }
 
+/// `common_load`: the key the reference points to, if it's on SM2's curve exactly when `sm2`;
+/// the reference is cleared, its key passing to the result.
+///
+/// # Safety
+/// `reference` is NULL or points to `reference_sz` writable octets holding a live key's
+/// pointer.
+unsafe fn load(reference: *const c_void, reference_sz: usize, sm2: bool) -> *mut c_void {
+    if reference.is_null() || reference_sz != size_of::<*mut EC_KEY>() {
+        return ptr::null_mut();
+    }
+    let slot = reference.cast::<*mut EC_KEY>().cast_mut();
+    // SAFETY: the caller's guarantee: a key's pointer.
+    let h = unsafe { slot.read_unaligned() };
+    // SAFETY: as above.
+    if unsafe { ec(h.cast()) }.is_none() || !unsafe { check_sm2(h, sm2) } {
+        return ptr::null_mut();
+    }
+    // SAFETY: as above: writable.
+    unsafe { slot.write_unaligned(ptr::null_mut()) };
+    h.cast()
+}
+
 ffi_callback! {
-    /// `ec_load` (`common_load`): the key the reference points to, if it isn't on SM2's
-    /// curve; the reference is cleared, its key passing to the result.
+    /// `ec_load` (`common_load`): not on SM2's curve.
     ///
     /// # Safety
-    /// `reference` is NULL or points to `reference_sz` writable octets holding a live key's
-    /// pointer.
+    /// As for `common_load`.
     pub(crate) unsafe extern "C" fn ec_load(reference: *const c_void, reference_sz: usize) -> *mut c_void
     where failure = ptr::null_mut(), library = ERR_LIB_EC
     {
-        if reference.is_null() || reference_sz != size_of::<*mut EC_KEY>() {
-            return ptr::null_mut();
-        }
-        let slot = reference.cast::<*mut EC_KEY>().cast_mut();
-        // SAFETY: the caller's guarantee: a key's pointer.
-        let h = unsafe { slot.read_unaligned() };
-        // SAFETY: as above.
-        if unsafe { ec(h.cast()) }.is_none() || !unsafe { check_sm2(h, false) } {
-            return ptr::null_mut();
-        }
-        // SAFETY: as above: writable.
-        unsafe { slot.write_unaligned(ptr::null_mut()) };
-        h.cast()
+        // SAFETY: the caller's guarantee.
+        unsafe { load(reference, reference_sz, false) }
     }
 }
 
@@ -1335,6 +1386,270 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { dup(keydata.cast(), selection) }.cast()
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// SM2 (`ossl_sm2_keymgmt_functions`): the EC key manager's functions for keys on SM2's curve,
+// with SM3 as the default digest, no cofactor mode, and SM2's private-key range.
+
+ffi_callback! {
+    /// `sm2_query_operation_name`: SM2 keys sign with SM2.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn sm2_query_operation_name(operation_id: c_int) -> *const c_char
+    where failure = ptr::null(), library = ERR_LIB_EC
+    {
+        match operation_id {
+            OSSL_OP_SIGNATURE => c"SM2".as_ptr(),
+            _ => ptr::null(),
+        }
+    }
+}
+
+ffi_callback! {
+    /// `sm2_newdata`: a key on SM2's curve in the provider's library context.
+    ///
+    /// # Safety
+    /// `provctx` is the default provider's context.
+    pub(crate) unsafe extern "C" fn sm2_newdata(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let libctx = unsafe { libctx_of(provctx) };
+        // SAFETY: the provider's library context; no query.
+        unsafe { EC_KEY_new_by_curve_name_ex(libctx, ptr::null(), NID_sm2) }.cast()
+    }
+}
+
+ffi_callback! {
+    /// `sm2_import`: as `common_import`, only on SM2's curve.
+    ///
+    /// # Safety
+    /// `keydata` is NULL or live key data; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn sm2_import(keydata: *mut c_void, selection: c_int, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { import(keydata, selection, params, true) }
+    }
+}
+
+ffi_callback! {
+    /// `sm2_get_params` (`common_get_params` for SM2).
+    ///
+    /// # Safety
+    /// `keydata` is NULL or live key data; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn sm2_get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { common_get_params(keydata, params, true) }
+    }
+}
+
+/// `sm2_known_gettable_params`.
+static SM2_GETTABLE: Params<23> = Params([
+    defn(OSSL_PKEY_PARAM_BITS, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_SECURITY_BITS, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_MAX_SIZE, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_DEFAULT_DIGEST, UTF8, 0),
+    defn(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OCTETS, 0),
+    defn(
+        OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS,
+        INT,
+        INT_SIZE,
+    ),
+    defn(OSSL_PKEY_PARAM_GROUP_NAME, UTF8, 0),
+    defn(OSSL_PKEY_PARAM_EC_ENCODING, UTF8, 0),
+    defn(OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, UTF8, 0),
+    defn(OSSL_PKEY_PARAM_EC_FIELD_TYPE, UTF8, 0),
+    defn(OSSL_PKEY_PARAM_EC_P, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_A, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_B, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_GENERATOR, OCTETS, 0),
+    defn(OSSL_PKEY_PARAM_EC_ORDER, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_COFACTOR, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_SEED, OCTETS, 0),
+    defn(
+        OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS,
+        INT,
+        INT_SIZE,
+    ),
+    defn(OSSL_PKEY_PARAM_PUB_KEY, OCTETS, 0),
+    defn(OSSL_PKEY_PARAM_EC_PUB_X, BN, 0),
+    defn(OSSL_PKEY_PARAM_EC_PUB_Y, BN, 0),
+    defn(OSSL_PKEY_PARAM_PRIV_KEY, BN, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `sm2_gettable_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn sm2_gettable_params(_provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_EC
+    {
+        SM2_GETTABLE.0.as_ptr()
+    }
+}
+
+/// `sm2_known_settable_params`.
+static SM2_SETTABLE: Params<2> = Params([
+    defn(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OCTETS, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `sm2_settable_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn sm2_settable_params(_provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_EC
+    {
+        SM2_SETTABLE.0.as_ptr()
+    }
+}
+
+/// `ossl_sm2_key_private_check`: the private key is in `[1, n-2]`.
+///
+/// # Safety
+/// `f`'s objects are NULL or live.
+unsafe fn sm2_private_check(f: &crate::ec::key::Fields) -> bool {
+    const F: &str = "ossl_sm2_key_private_check";
+    let order = if f.group.0.is_null() {
+        None
+    } else {
+        // SAFETY: the key's group.
+        let o = unsafe { EC_GROUP_get0_order(f.group.0) };
+        // SAFETY: the group's number, or NULL.
+        unsafe { crate::bn::value(o) }
+    };
+    // SAFETY: the key's number, or NULL.
+    let d = unsafe { crate::bn::value(f.priv_key.0) };
+    let (Some(order), Some(d)) = (order, d) else {
+        err::raise(ERR_LIB_SM2, ERR_R_PASSED_NULL_PARAMETER, F);
+        return false;
+    };
+    let mut max = order;
+    if max.sub_word(1).is_err() {
+        return false;
+    }
+    let one = rustyssl_crypto::bn::BigNum::one();
+    if rustyssl_crypto::bn::cmp(&d, &one).is_lt() || rustyssl_crypto::bn::cmp(&d, &max).is_ge() {
+        err::raise(ERR_LIB_SM2, SM2_R_INVALID_PRIVATE_KEY, F);
+        return false;
+    }
+    true
+}
+
+ffi_callback! {
+    /// `sm2_validate`: the group, the public key (quickly or fully), SM2's private-key range,
+    /// and the pair together.
+    ///
+    /// # Safety
+    /// `keydata` is NULL or live key data.
+    pub(crate) unsafe extern "C" fn sm2_validate(keydata: *const c_void, selection: c_int, checktype: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { ec(keydata) }) else { return 0 };
+        if selection & POSSIBLE == 0 {
+            return 1;
+        }
+        let f = k.get();
+        // SAFETY: the key's library context.
+        let ctx = unsafe { BN_CTX_new_ex(f.libctx.0) };
+        if ctx.is_null() {
+            return 0;
+        }
+        let mut ok = true;
+        if selection & DOMAIN != 0 {
+            // SAFETY: the key's group, or NULL; the context.
+            ok = (unsafe { EC_GROUP_check(f.group.0, ctx) }) != 0;
+        }
+        if selection & PUBLIC != 0 {
+            ok = ok
+                && if checktype == OSSL_KEYMGMT_VALIDATE_QUICK_CHECK {
+                    // SAFETY: the key's objects, or NULL; the context.
+                    unsafe { public_check_quick(&f, ctx) }
+                } else {
+                    // SAFETY: as above.
+                    unsafe { public_check(&f, ctx) }
+                };
+        }
+        if selection & PRIVATE != 0 {
+            // SAFETY: as above.
+            ok = ok && unsafe { sm2_private_check(&f) };
+        }
+        if selection & KEYPAIR == KEYPAIR {
+            // SAFETY: as above.
+            ok = ok && unsafe { pairwise_check(&f, ctx) };
+        }
+        // SAFETY: the context made above.
+        unsafe { BN_CTX_free(ctx) };
+        c_int::from(ok)
+    }
+}
+
+ffi_callback! {
+    /// `sm2_gen_init`: as `ec_gen_init`, on SM2's curve unless a group is named.
+    ///
+    /// # Safety
+    /// `provctx` is the default provider's context; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn sm2_gen_init(provctx: *mut c_void, selection: c_int, params: *const OSSL_PARAM) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let g = unsafe { ec_gen_init(provctx, selection, params) };
+        // SAFETY: the context just made, or NULL.
+        if let Some(c) = unsafe { gen_ctx(g) }
+            && c.group_name.is_none()
+        {
+            c.group_name = Some(c"sm2".to_owned());
+        }
+        g
+    }
+}
+
+ffi_callback! {
+    /// `sm2_gen`: a new key with the context's group (and a key pair, if selected), or NULL.
+    ///
+    /// # Safety
+    /// `genctx` is NULL or a live generation context.
+    pub(crate) unsafe extern "C" fn sm2_gen(genctx: *mut c_void, _cb: OSSL_CALLBACK, _cbarg: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(g) = (unsafe { gen_ctx(genctx) }) else { return ptr::null_mut() };
+        // SAFETY: the context's library context; no query.
+        let h = unsafe { new_key(g.libctx, ptr::null()) };
+        if h.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: the key just made; the context's objects.
+        if unsafe { gen_into(g, h, true) } {
+            return h.cast();
+        }
+        // SAFETY: the key made above.
+        unsafe { free(h) };
+        ptr::null_mut()
+    }
+}
+
+ffi_callback! {
+    /// `sm2_load` (`common_load`): only on SM2's curve.
+    ///
+    /// # Safety
+    /// As for `common_load`.
+    pub(crate) unsafe extern "C" fn sm2_load(reference: *const c_void, reference_sz: usize) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { load(reference, reference_sz, true) }
     }
 }
 
@@ -1412,6 +1727,57 @@ pub(crate) static EC_KEYMGMT: Dispatch<25> = Dispatch([
     entry!(
         OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME,
         ec_query_operation_name,
+        QueryFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_DUP, ec_dup, DupFn),
+    END,
+]);
+
+/// `ossl_sm2_keymgmt_functions`.
+pub(crate) static SM2_KEYMGMT: Dispatch<23> = Dispatch([
+    entry!(OSSL_FUNC_KEYMGMT_NEW, sm2_newdata, NewFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_INIT, sm2_gen_init, GenInitFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE,
+        ec_gen_set_template,
+        GenTemplateFn
+    ),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+        ec_gen_set_params,
+        SetParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
+        ec_gen_settable_params,
+        GenListFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_GEN, sm2_gen, GenFn),
+    entry!(OSSL_FUNC_KEYMGMT_GEN_CLEANUP, ec_gen_cleanup, FreeFn),
+    entry!(OSSL_FUNC_KEYMGMT_LOAD, sm2_load, LoadFn),
+    entry!(OSSL_FUNC_KEYMGMT_FREE, ec_freedata, FreeFn),
+    entry!(OSSL_FUNC_KEYMGMT_GET_PARAMS, sm2_get_params, GetParamsFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS,
+        sm2_gettable_params,
+        ListFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_SET_PARAMS, ec_set_params, SetParamsFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS,
+        sm2_settable_params,
+        ListFn
+    ),
+    entry!(OSSL_FUNC_KEYMGMT_HAS, ec_has, HasFn),
+    entry!(OSSL_FUNC_KEYMGMT_MATCH, ec_match, MatchFn),
+    entry!(OSSL_FUNC_KEYMGMT_VALIDATE, sm2_validate, ValidateFn),
+    entry!(OSSL_FUNC_KEYMGMT_IMPORT, sm2_import, ImportFn),
+    entry!(OSSL_FUNC_KEYMGMT_IMPORT_TYPES, ec_imexport_types, TypesFn),
+    entry!(OSSL_FUNC_KEYMGMT_EXPORT, ec_export, ExportFn),
+    entry!(OSSL_FUNC_KEYMGMT_EXPORT_TYPES, ec_imexport_types, TypesFn),
+    entry!(
+        OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME,
+        sm2_query_operation_name,
         QueryFn
     ),
     entry!(OSSL_FUNC_KEYMGMT_DUP, ec_dup, DupFn),

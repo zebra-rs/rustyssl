@@ -1,4 +1,5 @@
-//! Fuzzes EC keys made from parameters (`EVP_PKEY_fromdata` through the EC key manager), as a
+//! Fuzzes EC keys made from parameters (`EVP_PKEY_fromdata` through the EC key manager, or SM2's
+//! for a selection octet with its top bit set), as a
 //! decoder hands it a key from an untrusted file: a named group or explicit parameters (field,
 //! curve, generator, order, cofactor, seed), a private number, an encoded public point, and
 //! the other parameters (point format, encoding, check type, cofactor mode). Nothing may crash
@@ -71,7 +72,8 @@ unsafe extern "C" {
 
 /// The selections a key is made with: key pair, public key, parameters, and odd ones.
 const SELECTIONS: [c_int; 6] = [0x87, 0x86, 0x84, 0x85, 0x80, 0x07];
-const GROUPS: [&[u8]; 6] = [
+const GROUPS: [&[u8]; 7] = [
+    b"SM2\0",
     b"prime256v1\0",
     b"secp384r1\0",
     b"secp112r1\0",
@@ -105,10 +107,10 @@ fn key(s: &[u8]) -> *const c_char {
     s.as_ptr().cast()
 }
 
-/// Makes a key from `params`, or NULL.
-fn fromdata(selection: c_int, params: *mut OSSL_PARAM) -> *mut EVP_PKEY {
+/// Makes a key of `keytype` from `params`, or NULL.
+fn fromdata(keytype: &[u8], selection: c_int, params: *mut OSSL_PARAM) -> *mut EVP_PKEY {
     // SAFETY: static names.
-    let c = unsafe { EVP_PKEY_CTX_new_from_name(ptr::null_mut(), key(b"EC\0"), ptr::null()) };
+    let c = unsafe { EVP_PKEY_CTX_new_from_name(ptr::null_mut(), key(keytype), ptr::null()) };
     let mut k = ptr::null_mut();
     // SAFETY: the context; an array or NULL.
     unsafe {
@@ -122,7 +124,9 @@ fn fromdata(selection: c_int, params: *mut OSSL_PARAM) -> *mut EVP_PKEY {
 fuzz_target!(|input: &[u8]| {
     let mut ch = Chunks(input);
     let flags = ch.byte();
-    let selection = SELECTIONS[usize::from(ch.byte()) % SELECTIONS.len()];
+    let sel = ch.byte();
+    let selection = SELECTIONS[usize::from(sel & 0x7f) % SELECTIONS.len()];
+    let keytype: &[u8] = if sel & 0x80 != 0 { b"SM2\0" } else { b"EC\0" };
     let mut numbers: Vec<*mut BIGNUM> = Vec::new();
     // SAFETY: no preconditions.
     let bld = unsafe { OSSL_PARAM_BLD_new() };
@@ -183,13 +187,13 @@ fuzz_target!(|input: &[u8]| {
     }
     // SAFETY: the builder; what it reads is alive.
     let params = unsafe { OSSL_PARAM_BLD_to_param(bld) };
-    let k = fromdata(selection, params);
+    let k = fromdata(keytype, selection, params);
     if !k.is_null() {
         let mut out = ptr::null_mut();
         // SAFETY: a live key; a place for an array. A private number longer than the order
         // doesn't fit its padded export, which fails as OpenSSL's does.
         if unsafe { EVP_PKEY_todata(k, 0x87, &mut out) } == 1 {
-            let back = fromdata(0x87, out);
+            let back = fromdata(keytype, 0x87, out);
             assert!(!back.is_null(), "its export imports");
             // SAFETY: live keys.
             assert_eq!(

@@ -3669,7 +3669,24 @@ chunking) is clean.
         `EVP_PKEY_CTX_get_ecdh_kdf_outlen` crashes on every legacy EC context; this one works.
       - `tests/c/evp_ec_legacy.c` (15 checks), with an application's `EC_KEY_METHOD` that
         counts its calls.
-  - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.
+  - [ ] **4.4e SM2**, in sub-steps (no public exports: OpenSSL 3's SM2 functions are internal,
+    and SM2 has no legacy method):
+    - [x] **4.4e1 The SM2 key manager** (`rustyssl-capi/src/provider/ec_kmgmt.rs`; no new
+      exports): the EC key manager's functions for keys on SM2's curve only (the import's and
+      load's curve check flips), SM3 as the default digest, no cofactor mode, its own
+      parameter lists, the private key's range `[1, n-2]` (`ossl_sm2_key_private_check`, with
+      `SM2_R_INVALID_PRIVATE_KEY`), generation on SM2's curve unless a group is named (another
+      named curve gives a key of that curve in the SM2 key manager, as OpenSSL's does), and
+      the operation name SM2 for signatures.
+      - Tests: `tests/c/evp_sm2_kmgmt.c` (11 checks: the lists, keys from data, every
+        parameter, the checks across the private key's range, generation of keys and
+        parameters, a legacy `EC_KEY` on SM2's curve moved into the key manager); the probe's
+        `sm2km` in `corpus/eckm.txt` and random sessions (500 pass); the `ec_kmgmt` fuzz target
+        also makes keys through the SM2 key manager.
+    - [ ] **4.4e2 SM2 signatures:** `Z = H(ENTL || ID || a || b || G || P)`, signing in
+      constant time and verifying, the signature provider with its ID and digest.
+    - [ ] **4.4e3 SM2 encryption:** the ciphertext's ASN.1 (`C1x, C1y, C3, C2`), encrypting and
+      decrypting through X9.63's KDF, the asymmetric cipher provider; a fuzz target.
 - [ ] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)
   - ML-KEM-512/768/1024, ML-DSA-44/65/87, and every SLH-DSA parameter set

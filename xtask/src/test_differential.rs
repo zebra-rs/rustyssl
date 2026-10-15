@@ -3111,7 +3111,16 @@ fn eckm_session(random: &mut Random, out: &mut String) -> Result {
         } else {
             other.join(",")
         };
-        writeln!(out, "eckm {selection} {group} {privkey} {pubkey} {other}")?;
+        // The SM2 key manager takes only SM2's curve; it gets that and others.
+        let command = if curve == "SM2" || random.below(8) == 0 {
+            "sm2km"
+        } else {
+            "eckm"
+        };
+        writeln!(
+            out,
+            "{command} {selection} {group} {privkey} {pubkey} {other}"
+        )?;
     }
     Ok(())
 }

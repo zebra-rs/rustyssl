@@ -1014,7 +1014,11 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &CMAC_LEGACY_KEYMGMT,
         c"OpenSSL CMAC via EVP_PKEY implementation",
     ),
-    pending(c"SM2:1.2.156.10197.1.301"),
+    alg_desc(
+        c"SM2:1.2.156.10197.1.301",
+        &super::ec_kmgmt::SM2_KEYMGMT,
+        c"OpenSSL SM2 implementation",
+    ),
     pending(c"ML-KEM-512:MLKEM512:id-alg-ml-kem-512:2.16.840.1.101.3.4.4.1"),
     pending(c"ML-KEM-768:MLKEM768:id-alg-ml-kem-768:2.16.840.1.101.3.4.4.2"),
     pending(c"ML-KEM-1024:MLKEM1024:id-alg-ml-kem-1024:2.16.840.1.101.3.4.4.3"),
