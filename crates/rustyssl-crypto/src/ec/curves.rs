@@ -85,7 +85,10 @@ pub fn nist_name(nid: i32) -> Option<&'static str> {
 /// `EC_curve_nist2nid`: the curve with this NIST name (exactly).
 #[must_use]
 pub fn nist_nid(name: &[u8]) -> Option<i32> {
-    NIST_NAMES.iter().find(|(s, _)| s.as_bytes() == name).map(|(_, n)| *n)
+    NIST_NAMES
+        .iter()
+        .find(|(s, _)| s.as_bytes() == name)
+        .map(|(_, n)| *n)
 }
 
 #[cfg(test)]

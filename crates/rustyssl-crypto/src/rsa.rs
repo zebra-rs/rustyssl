@@ -55,7 +55,7 @@ pub trait Hash {
 }
 
 /// The caller's random octets (`RAND_bytes_ex`): fills the buffer, or says it couldn't.
-pub type Random<'a> = dyn FnMut(&mut [u8]) -> bool + 'a;
+pub type Random<'a> = crate::bn::rand::Random<'a>;
 
 /// An error OpenSSL raises in RSA: an `RSA_R_*` reason, or an `ERR_R_*` one in the RSA
 /// library.
