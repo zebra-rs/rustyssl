@@ -24,6 +24,7 @@ pub(crate) mod items;
 pub(crate) mod new;
 pub(crate) mod print;
 pub(crate) mod shadow;
+pub(crate) mod statics;
 pub(crate) mod util;
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
