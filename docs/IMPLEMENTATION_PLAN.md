@@ -3524,7 +3524,7 @@ chunking) is clean.
       encodings; the `ec_params` fuzz target; three deviations where OpenSSL crashes or
       corrupts memory (a NULL `ECPARAMETERS`, refilling an existing `ECPARAMETERS`, a failed
       conversion into the caller's `ECPKPARAMETERS`).
-  - [ ] **4.4c Keys and their primitives**, in sub-steps:
+  - [x] **4.4c Keys and their primitives**, in sub-steps:
     - [x] **4.4c1 Constant-time field arithmetic** (`rustyssl-crypto/src/ec/fe.rs`): elements of
       the modulus's length in limbs, in Montgomery form (`mul_fixed` and `redc`), with masked
       sums and differences, constant-time swaps, and Fermat inversion. The curve-specific
@@ -3568,8 +3568,21 @@ chunking) is clean.
         methods); the probe's `ecgen`, `ecsign`, `ecsetup`, `ecverify`, and `ecdh` from
         deterministic generators, with `corpus/ecdsa.txt` and random sessions; the
         `ecdsa_sig` fuzz target; deviations for NULL arguments and empty signatures.
-    - [ ] **4.4c4 EC in `EVP_PKEY`:** `get0`/`get1`/`set1_EC_KEY`, the ASN.1 method (SPKI and
-      PKCS #8, parameters, printing), and legacy keys.
+    - [x] **4.4c4 EC in `EVP_PKEY`** (`evp/pkey/ec.rs`; 3 exports): `EVP_PKEY_set1_EC_KEY`,
+      `EVP_PKEY_get0_EC_KEY`, `EVP_PKEY_get1_EC_KEY`, and `EVP_PKEY_assign` for EC data (SM2's
+      curve is SM2's type and any other EC's, whatever is asked; an `EC_KEY` with an
+      application's method is a foreign key). The built-in EC ASN.1 method's functions over
+      the `EC_KEY`: compare (the public point; the group for the parameters), size, bits,
+      security bits, printing (public, private, parameters), the parameters' decoding,
+      encoding, copy, and test for missing ones, the traditional private key's decoding, the
+      checks, copy, the controls (the default digest, SHA-256 or SM3 for SM2; the TLS encoded
+      point both ways), and the dirty count. `EVP_PKEY_get_params` on a legacy EC key
+      follows OpenSSL's payload table (the group name, the compressed public key, the
+      private key, `qx` and `qy`, decoded-from-explicit).
+      - Moving a key between its legacy and provided forms (`export_to`, `import_from`) needs
+        the EC key manager, and comes with 4.4d.
+      - Tests: `tests/c/evp_pkey_ec.c` (53 checks: five curves, SM2's types, other types,
+        a foreign key); one deviation (`EVP_PKEY_set1_EC_KEY` of NULL).
   - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
     ECDH (cofactor, X9.63 KDF), and the legacy EC `EVP_PKEY_METHOD`.
   - [ ] **4.4e SM2:** signing with an ID, encryption, and their provider parts.

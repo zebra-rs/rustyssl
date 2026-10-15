@@ -233,6 +233,7 @@ OpenSSL never depends on them.
 | The `EC_KEY_*` and `EC_KEY_METHOD_*` functions given a NULL key or method (other than those OpenSSL checks: `EC_KEY_free`, `EC_KEY_check_key`, `EC_KEY_key2buf`, `EC_KEY_copy`, the encoders) | dereference NULL | fail as each fails (0, NULL), or do nothing | `ec::key_asn1::tests::a_null_key_fails` |
 | The `ECDSA_*` and `ECDH_compute_key` functions given a NULL key, signature, or output pointer (`ECDSA_sign_setup`'s `kinvp`/`rp`, `ECDSA_sign`'s `siglen`), and `ECDSA_SIG_get0*` of NULL | dereference NULL | fail as each fails (0, -1, NULL) | `ec::ecdsa::tests::null_and_empty_arguments_fail` |
 | `i2d_ECDSA_SIG` and `ECDSA_do_verify` of a signature without its numbers (`ECDSA_SIG_new` before `ECDSA_SIG_set0`) | dereference the missing numbers | -1 (as for a negative number), and 0 with `EC_R_BAD_SIGNATURE` | `ec::ecdsa::tests::null_and_empty_arguments_fail` |
+| `EVP_PKEY_set1_EC_KEY` with a NULL `EC_KEY` | takes a reference to it (dereferencing NULL) | returns 0 | `evp::pkey::ec::tests::set1_of_null_fails` |
 
 ## Notes
 

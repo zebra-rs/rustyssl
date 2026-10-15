@@ -57,6 +57,7 @@ use crate::params::{
 use crate::provider::Ptr;
 
 pub(crate) mod ameth;
+pub(crate) mod ec;
 pub(crate) mod params;
 pub(crate) mod print;
 pub(crate) mod raw;
@@ -2074,19 +2075,45 @@ ffi_export! {
         let Some(k) = (unsafe { self::pkey(pkey) }) else { return 0 };
         let base = ameth::find(type_).map(|m| (m.get().base_id, m.get().is_dynamic()));
         let rsa = matches!(base, Some((EVP_PKEY_RSA | EVP_PKEY_RSA_PSS, false)));
-        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa {
-            // The other built-in key types' data (and the EC group check) come with them.
+        let ec = matches!(base, Some((rustyssl_abi::EVP_PKEY_EC, false)));
+        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec {
+            // The other built-in key types' data come with them.
             crate::stub::unimplemented("EVP_PKEY_assign of a built-in key type's data");
+        }
+        let mut type_ = type_;
+        if ec && !key.is_null() {
+            // Whatever is asked, SM2's curve is SM2's type and any other curve EC's.
+            // SAFETY: the caller's guarantee: an `EC_KEY`.
+            let g = unsafe { crate::ec::key::EC_KEY_get0_group(key.cast()) };
+            if !g.is_null() {
+                // SAFETY: its group.
+                let curve = unsafe { crate::ec::group::EC_GROUP_get_curve_name(g) };
+                // SAFETY: no preconditions.
+                let pktype = unsafe { EVP_PKEY_type(type_) };
+                if curve == rustyssl_abi::NID_sm2 && pktype == rustyssl_abi::EVP_PKEY_EC {
+                    type_ = rustyssl_abi::EVP_PKEY_SM2;
+                } else if curve != rustyssl_abi::NID_sm2 && pktype == rustyssl_abi::EVP_PKEY_SM2 {
+                    type_ = rustyssl_abi::EVP_PKEY_EC;
+                }
+            }
         }
         if !set_type(Some(k), type_, None, None) {
             return 0;
         }
-        // `detect_foreign_key`: an `RSA` whose method isn't OpenSSL's.
-        let foreign = rsa && {
+        // `detect_foreign_key`: an `RSA` or (EC's type, not SM2's) an `EC_KEY` whose method
+        // isn't OpenSSL's.
+        let foreign = if rsa {
             // SAFETY: the caller's guarantee: an `RSA`.
             let meth = unsafe { crate::rsa::rsa(key.cast()) }.map(crate::rsa::Rsa::meth);
             // SAFETY: no preconditions.
             meth.is_some_and(|m| m != unsafe { crate::rsa_meth::RSA_PKCS1_OpenSSL() })
+        } else if ec && type_ == rustyssl_abi::EVP_PKEY_EC && !key.is_null() {
+            // SAFETY: the caller's guarantee: an `EC_KEY`.
+            let m = unsafe { crate::ec::key::EC_KEY_get_method(key.cast()) };
+            // SAFETY: no preconditions.
+            m != unsafe { crate::ec::key::EC_KEY_OpenSSL() }
+        } else {
+            false
         };
         let mut s = k.lock();
         s.legacy = Ptr(key);

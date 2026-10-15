@@ -585,7 +585,7 @@ ffi_export! {
 
 /// What `do_EC_KEY_print` prints.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Print {
+pub(crate) enum Print {
     Param,
     Public,
     Private,
@@ -596,7 +596,7 @@ enum Print {
 ///
 /// # Safety
 /// `bp` is a live BIO; `x` is NULL or a live key.
-unsafe fn print_key(bp: *mut BIO, x: *const EC_KEY, off: c_int, ktype: Print) -> c_int {
+pub(crate) unsafe fn print_key(bp: *mut BIO, x: *const EC_KEY, off: c_int, ktype: Print) -> c_int {
     const F: &str = "do_EC_KEY_print";
     // SAFETY: the caller's guarantee.
     let group = if x.is_null() {

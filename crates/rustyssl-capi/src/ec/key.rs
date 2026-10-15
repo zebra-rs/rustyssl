@@ -255,6 +255,11 @@ impl EcKey {
         self.dirty.fetch_add(1, Ordering::AcqRel);
     }
 
+    /// The change count.
+    pub(crate) fn dirty_count(&self) -> usize {
+        self.dirty.load(Ordering::Acquire)
+    }
+
     /// The property query, or NULL.
     pub(crate) fn propq(&self) -> *const c_char {
         self.propq.as_ref().map_or(ptr::null(), |p| p.as_ptr())

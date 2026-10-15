@@ -559,7 +559,7 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
     use crate::rsa_lib as r;
     use rustyssl_abi::{
         EVP_PKEY_DH, EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
-        EVP_R_EXPECTING_A_EC_KEY, EVP_R_UNSUPPORTED_KEY_TYPE,
+        EVP_R_UNSUPPORTED_KEY_TYPE,
     };
     const F: &str = "evp_pkey_setget_params_to_ctrl";
     let unsupported = || {
@@ -582,24 +582,72 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
         // `EVP_PKEY_get0_RSA` raises for another type, as the numbered getters see it.
         // SAFETY: the caller's key.
         let rsa = || unsafe { super::rsa::get0_rsa(pkey) };
+        // SAFETY: the caller's key.
+        let ec = || unsafe { super::ec::EVP_PKEY_get0_EC_KEY(pkey) };
+        let bn_type = param.data_type == rustyssl_abi::OSSL_PARAM_UNSIGNED_INTEGER as u32;
         ret = match which {
-            Payload::GroupName | Payload::PubKey | Payload::EcDecoded => unsupported(),
-            Payload::PrivKey => {
-                if param.data_type == rustyssl_abi::OSSL_PARAM_UNSIGNED_INTEGER as u32 {
-                    unsupported()
+            Payload::GroupName => {
+                if base == EVP_PKEY_EC {
+                    // SAFETY: the parameter; the key's EC_KEY.
+                    unsafe { ec_group_name(param, ec()) }
                 } else {
+                    unsupported()
+                }
+            }
+            Payload::PubKey => {
+                if base == EVP_PKEY_EC {
+                    let octets = param.data_type == rustyssl_abi::OSSL_PARAM_OCTET_STRING as u32;
+                    if octets {
+                        // SAFETY: the parameter; the key's EC_KEY.
+                        unsafe { ec_public_key(param, ec()) }
+                    } else {
+                        0
+                    }
+                } else {
+                    unsupported()
+                }
+            }
+            Payload::EcDecoded => {
+                if base == EVP_PKEY_EC {
+                    // SAFETY: the key's EC_KEY.
+                    let v = unsafe { crate::ec::key::EC_KEY_decoded_from_explicit_params(ec()) };
+                    if v < 0 {
+                        err::raise(
+                            ERR_LIB_EVP,
+                            rustyssl_abi::EVP_R_INVALID_KEY,
+                            "get_ec_decoded_from_explicit_params",
+                        );
+                        0
+                    } else {
+                        // SAFETY: the parameter.
+                        unsafe { crate::params::OSSL_PARAM_set_int(param, v) }
+                    }
+                } else {
+                    unsupported()
+                }
+            }
+            Payload::PrivKey => {
+                if !bn_type {
                     0
+                } else if base == EVP_PKEY_EC {
+                    // SAFETY: the key's EC_KEY.
+                    let bn = unsafe { crate::ec::key::EC_KEY_get0_private_key(ec()) };
+                    // SAFETY: the parameter; the number or NULL.
+                    unsafe { put_bn(param, bn) }
+                } else {
+                    unsupported()
                 }
             }
             Payload::EcPubXy => {
-                if base != EVP_PKEY_EC {
-                    err::raise(
-                        ERR_LIB_EVP,
-                        EVP_R_EXPECTING_A_EC_KEY,
-                        "evp_pkey_get0_EC_KEY_int",
-                    );
+                let e = ec();
+                if e.is_null() {
+                    unsupported()
+                } else if !bn_type {
+                    0
+                } else {
+                    // SAFETY: the parameter and its key; the key's EC_KEY.
+                    unsafe { ec_public_xy(param, key, e) }
                 }
-                unsupported()
             }
             Payload::FfcP => {
                 if base != EVP_PKEY_DH && base != EVP_PKEY_DSA {
@@ -636,6 +684,103 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
         // SAFETY: still within the array.
         p = unsafe { p.add(1) };
     }
+    ret
+}
+
+/// `get_payload_group_name` for an EC key: its curve's name (nothing for a curve without
+/// one). 1, or 0.
+///
+/// # Safety
+/// `p` is a parameter; `ec` is NULL or a live `EC_KEY`.
+unsafe fn ec_group_name(p: *mut OSSL_PARAM, ec: *const rustyssl_abi::EC_KEY) -> c_int {
+    let g = if ec.is_null() {
+        ptr::null()
+    } else {
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::ec::key::EC_KEY_get0_group(ec) }
+    };
+    let nid = if g.is_null() {
+        rustyssl_abi::NID_undef
+    } else {
+        // SAFETY: its group.
+        unsafe { crate::ec::group::EC_GROUP_get_curve_name(g) }
+    };
+    // SAFETY: no preconditions.
+    let name = unsafe { crate::ec::curves::OSSL_EC_curve_nid2name(nid) };
+    if name.is_null() {
+        return 1;
+    }
+    // SAFETY: the caller's parameter; a static name.
+    unsafe { crate::params::OSSL_PARAM_set_utf8_string(p, name) }
+}
+
+/// `get_payload_public_key` for an EC key: its point, compressed. 1, or 0.
+///
+/// # Safety
+/// `p` is an octet-string parameter; `ec` is NULL or a live `EC_KEY`.
+unsafe fn ec_public_key(p: *mut OSSL_PARAM, ec: *const rustyssl_abi::EC_KEY) -> c_int {
+    if ec.is_null() {
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
+    let g = unsafe { crate::ec::key::EC_KEY_get0_group(ec) };
+    // SAFETY: as above.
+    let pt = unsafe { crate::ec::key::EC_KEY_get0_public_key(ec) };
+    let mut buf: *mut u8 = ptr::null_mut();
+    // SAFETY: the key's group and point, or NULL; a local.
+    let n = unsafe {
+        crate::ec::point::EC_POINT_point2buf(
+            g,
+            pt,
+            rustyssl_abi::POINT_CONVERSION_COMPRESSED,
+            &raw mut buf,
+            ptr::null_mut(),
+        )
+    };
+    // SAFETY: the caller's parameter; the encoding (or NULL and 0).
+    let ret = unsafe { crate::params::OSSL_PARAM_set_octet_string(p, buf.cast(), n) };
+    // SAFETY: NULL or the encoding, freed once.
+    unsafe { crate::mem::release(buf.cast()) };
+    ret
+}
+
+/// `get_payload_public_key_ec`: the point's x (for `qx`) or y (for `qy`, by the key's first two
+/// octets, as OpenSSL compares them). 1, or 0.
+///
+/// # Safety
+/// `p` is an unsigned-integer parameter; `ec` is a live `EC_KEY`.
+unsafe fn ec_public_xy(p: *mut OSSL_PARAM, key: &[u8], ec: *const rustyssl_abi::EC_KEY) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let g = unsafe { crate::ec::key::EC_KEY_get0_group(ec) };
+    // SAFETY: as above.
+    let pt = unsafe { crate::ec::key::EC_KEY_get0_public_key(ec) };
+    // SAFETY: no preconditions.
+    let (x, y) = (unsafe { crate::bn::BN_new() }, unsafe {
+        crate::bn::BN_new()
+    });
+    let ret = (|| {
+        if x.is_null() || y.is_null() {
+            return 0;
+        }
+        // SAFETY: the key's group and point; live numbers.
+        if unsafe {
+            crate::ec::point::EC_POINT_get_affine_coordinates(g, pt, x, y, ptr::null_mut())
+        } == 0
+        {
+            return 0;
+        }
+        let which = match key.get(..2) {
+            Some(b"qx") => x,
+            Some(b"qy") => y,
+            _ => return 0,
+        };
+        // SAFETY: the parameter; the number.
+        unsafe { put_bn(p, which) }
+    })();
+    // SAFETY: made above, or NULL.
+    unsafe { crate::bn::BN_free(x) };
+    // SAFETY: as above.
+    unsafe { crate::bn::BN_free(y) };
     ret
 }
 
