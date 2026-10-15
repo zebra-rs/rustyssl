@@ -309,6 +309,11 @@
  *                              encoding, check, and print
  *   eckey <hex>                d2i_ECPrivateKey: what it consumes, and the key's state,
  *                              encoding, check, and print
+ *   ecgen <curve>              EC_KEY_generate_key: the private and public keys
+ *   ecsign <curve> <priv> <digest>        ECDSA_sign's DER (its nonce from the generator)
+ *   ecsetup <curve> <priv>     ECDSA_sign_setup's kinv and r
+ *   ecverify <curve> <priv> <digest> <sig>  ECDSA_verify of any octets
+ *   ecdh <curve> <priv> <peer's priv> <0|1>  ECDH_compute_key, with the cofactor for 1
  *
  *   # ...              comment, echoed
  */
@@ -4205,6 +4210,109 @@ static void ec_print_point(const EC_POINT *p)
     BN_free(z);
 }
 
+/* A key on the curve `sn` with private key `priv_hex` (and its public key), or NULL. */
+static EC_KEY *ec_fixed_key(const char *sn, const char *priv_hex)
+{
+    EC_KEY *k = EC_KEY_new_by_curve_name(OBJ_sn2nid(sn));
+    BIGNUM *priv = NULL;
+    EC_POINT *P;
+
+    if (k == NULL)
+        return NULL;
+    BN_hex2bn(&priv, priv_hex);
+    P = EC_POINT_new(EC_KEY_get0_group(k));
+    EC_POINT_mul(EC_KEY_get0_group(k), P, priv, NULL, NULL, NULL);
+    EC_KEY_set_private_key(k, priv);
+    EC_KEY_set_public_key(k, P);
+    BN_free(priv);
+    EC_POINT_free(P);
+    return k;
+}
+
+/* ecgen, ecsign, ecsetup, ecverify, ecdh: ECDSA and ECDH with keys on named curves. */
+static void ec_key_command(const char *command, const char *line)
+{
+    char sn[64] = "", a[700] = "-", b[700] = "-", c[700] = "-";
+    unsigned char dg[300], sg[300];
+    size_t dlen = 0, slen = 0;
+    EC_KEY *k;
+
+    sscanf(line, "%*s %63s %699s %699s %699s", sn, a, b, c);
+    if (strcmp(command, "ecgen") == 0) {
+        char *ph;
+        unsigned char *pub = NULL;
+        size_t pl;
+
+        k = EC_KEY_new_by_curve_name(OBJ_sn2nid(sn));
+        if (k == NULL) {
+            printf(" no curve\n");
+            return;
+        }
+        printf(" %d", EC_KEY_generate_key(k));
+        ph = BN_bn2hex(EC_KEY_get0_private_key(k));
+        pl = EC_KEY_key2buf(k, POINT_CONVERSION_UNCOMPRESSED, &pub, NULL);
+        printf(" priv %s", ph != NULL ? ph : "-");
+        print_hex(" pub", pub, pl);
+        OPENSSL_free(ph);
+        OPENSSL_free(pub);
+        print_asn_errors();
+        EC_KEY_free(k);
+        return;
+    }
+    k = ec_fixed_key(sn, a);
+    if (k == NULL) {
+        printf(" no curve\n");
+        return;
+    }
+    if (strcmp(command, "ecsign") == 0) {
+        /* ecsign <curve> <priv> <digest> */
+        unsigned int siglen = sizeof(sg);
+
+        if (!parse_hex(b, dg, &dlen)) {
+            printf(" bad hex\n");
+            EC_KEY_free(k);
+            return;
+        }
+        printf(" %d", ECDSA_sign(0, dg, (int)dlen, sg, &siglen, k));
+        print_hex(" sig", sg, siglen);
+        printf(" verify %d", ECDSA_verify(0, dg, (int)dlen, sg, (int)siglen, k));
+    } else if (strcmp(command, "ecsetup") == 0) {
+        BIGNUM *kinv = NULL, *r = NULL;
+        char *kh, *rh;
+
+        printf(" %d", ECDSA_sign_setup(k, NULL, &kinv, &r));
+        kh = kinv != NULL ? BN_bn2hex(kinv) : NULL;
+        rh = r != NULL ? BN_bn2hex(r) : NULL;
+        printf(" kinv %s r %s", kh != NULL ? kh : "-", rh != NULL ? rh : "-");
+        OPENSSL_free(kh);
+        OPENSSL_free(rh);
+        BN_clear_free(kinv);
+        BN_clear_free(r);
+    } else if (strcmp(command, "ecverify") == 0) {
+        /* ecverify <curve> <priv> <digest> <signature> */
+        if (!parse_hex(b, dg, &dlen) || !parse_hex(c, sg, &slen)) {
+            printf(" bad hex\n");
+            EC_KEY_free(k);
+            return;
+        }
+        printf(" %d", ECDSA_verify(0, dg, (int)dlen, sg, (int)slen, k));
+    } else {
+        /* ecdh <curve> <priv> <peer's priv> <cofactor flag> */
+        EC_KEY *peer = ec_fixed_key(sn, b);
+        unsigned char sec[200];
+        int n;
+
+        if (strcmp(c, "1") == 0)
+            EC_KEY_set_flags(k, EC_FLAG_COFACTOR_ECDH);
+        n = ECDH_compute_key(sec, sizeof(sec), EC_KEY_get0_public_key(peer), k, NULL);
+        printf(" %d", n);
+        print_hex(" secret", sec, n > 0 ? (size_t)n : 0);
+        EC_KEY_free(peer);
+    }
+    print_asn_errors();
+    EC_KEY_free(k);
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -4216,9 +4324,17 @@ static int ec_command(const char *command, const char *line)
     if (strcmp(command, "ecgrp") != 0 && strcmp(command, "ecpt") != 0
         && strcmp(command, "eccomp") != 0 && strcmp(command, "ecmul") != 0
         && strcmp(command, "ecadd") != 0 && strcmp(command, "ecpk") != 0
-        && strcmp(command, "eckey") != 0)
+        && strcmp(command, "eckey") != 0 && strcmp(command, "ecgen") != 0
+        && strcmp(command, "ecsign") != 0 && strcmp(command, "ecsetup") != 0
+        && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "ecgen") == 0 || strcmp(command, "ecsign") == 0
+        || strcmp(command, "ecsetup") == 0 || strcmp(command, "ecverify") == 0
+        || strcmp(command, "ecdh") == 0) {
+        ec_key_command(command, line);
+        return 1;
+    }
     if (strcmp(command, "eckey") == 0) {
         /* eckey <hex>: d2i_ECPrivateKey, and the key it makes. */
         const unsigned char *p = buf;

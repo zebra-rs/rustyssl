@@ -390,6 +390,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ec", ec_session),
     ("ecpk", ecpk_session),
     ("eckey", eckey_session),
+    ("ecdsa", ecdsa_session),
     ("string", string_session),
 ];
 
@@ -2886,6 +2887,63 @@ const ECKEY_SEEDS: &[&str] = &[
 /// A random session of `eckey` commands: the seed encodings mutated as `ecpk`'s are.
 fn eckey_session(random: &mut Random, out: &mut String) -> Result {
     mutated_sessions(random, out, "eckey", ECKEY_SEEDS)
+}
+
+/// The lines that make the probe's private and public generators deterministic, so random
+/// nonces and keys come out the same on both libraries.
+const DETERMINISTIC_RAND: [&str; 10] = [
+    "rctx 0",
+    "rnew TEST-RAND",
+    "rset strength=256 test_entropy=64 test_nonce=32",
+    "rinst 0 0",
+    "rctx 1",
+    "rnew HASH-DRBG child",
+    "rset digest=SHA256",
+    "rinst 0 0",
+    "rsetpub",
+    "rsetpriv",
+];
+
+/// A random session of ECDSA and ECDH on one curve, from deterministic generators: key
+/// generation, signatures (whose nonces come from the generator), setups, verification of a
+/// signature's mutations and of random octets, and shared secrets with and without the
+/// cofactor; private keys of every size, digests of every length up to 70 octets.
+fn ecdsa_session(random: &mut Random, out: &mut String) -> Result {
+    for line in DETERMINISTIC_RAND {
+        writeln!(out, "{line}")?;
+    }
+    let i = usize::try_from(random.below(EC_CURVES.len() as u64)).unwrap_or(0);
+    let (curve, fl) = EC_CURVES.get(i).copied().unwrap_or(("prime256v1", 32));
+    let privkey = |random: &mut Random| match random.below(5) {
+        0 => format!("{:x}", random.below(1000).saturating_add(1)),
+        1 => "F".repeat(fl.saturating_mul(2)),
+        _ => random_hex(random, fl),
+    };
+    for _ in 0..random.below(8).saturating_add(1) {
+        let d = privkey(random);
+        let dlen = usize::try_from(random.below(71)).unwrap_or(32);
+        match random.below(6) {
+            0 => writeln!(out, "ecgen {curve}")?,
+            1 | 2 => writeln!(out, "ecsign {curve} {d} {}", random_hex(random, dlen))?,
+            3 => writeln!(out, "ecsetup {curve} {d}")?,
+            4 => {
+                let siglen = usize::try_from(random.below(16))
+                    .unwrap_or(0)
+                    .saturating_add(fl.saturating_mul(2));
+                writeln!(
+                    out,
+                    "ecverify {curve} {d} {} 30{}",
+                    random_hex(random, dlen),
+                    random_hex(random, siglen)
+                )?;
+            }
+            _ => {
+                let peer = privkey(random);
+                writeln!(out, "ecdh {curve} {d} {peer} {}", random.below(2))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// A random session of EC commands on one curve: encodings near valid ones (random x, which a

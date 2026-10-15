@@ -1,0 +1,35 @@
+# ECDSA and ECDH from deterministic generators: key generation, signatures (nonces from the
+# generator), setups, verification, and shared secrets, on curves of each method.
+rctx 0
+rnew TEST-RAND
+rset strength=256 test_entropy=64 test_nonce=32
+rinst 0 0
+rctx 1
+rnew HASH-DRBG child
+rset digest=SHA256
+rinst 0 0
+rsetpub
+rsetpriv
+ecgen prime256v1
+ecgen secp384r1
+ecgen secp521r1
+ecgen secp224r1
+ecgen SM2
+ecgen sect163k1
+ecgen brainpoolP256r1
+ecgen secp112r1
+ecsign prime256v1 C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721 af2bdbe1aa9b6ec1e2ade1d694f41fc71a831d0268e9891562113d8a62add1bf
+ecsign secp521r1 1 0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210
+ecsign sect163k1 3A41434AA99C2EF40C8495B2ED9739CB2155A1E0D 00
+ecsign secp256k1 FEDCBA9876543210 ff
+ecsign SM2 3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8 1234
+ecsign secp112r1 AB 0102030405060708090a0b0c0d0e0f10
+ecsetup prime256v1 C0FFEE
+ecsetup sect233k1 12345
+ecsetup secp112r1 AB
+ecverify prime256v1 C0FFEE 00 3006020101020101
+ecverify prime256v1 C0FFEE 00 30
+ecdh prime256v1 C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721 7E5A 0
+ecdh sect163r1 3A41434AA99C2EF40C8495B2ED9739CB2155A1E0D 1234567 1
+ecdh secp521r1 1 1F 1
+ecdh prime256v1 FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551 2 0

@@ -351,3 +351,9 @@ name = "ec_key"
 path = "fuzz_targets/ec_key.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ecdsa_sig"
+path = "fuzz_targets/ecdsa_sig.rs"
+test = false
+doc = false
