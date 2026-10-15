@@ -3380,9 +3380,22 @@ chunking) is clean.
         it from the public one.
       - New deviation: negative lengths and NULL buffers in the padding functions.
       - `tests/c/rsa_ops.c` (67 checks), with known generators.
-    - [ ] **4.3d3** RSA in `EVP_PKEY`: the legacy key data (`EVP_PKEY_assign`, `set1_RSA`,
-      `get0_RSA`, `get1_RSA`), its ASN.1 method, and moving keys between their legacy and
-      provided forms.
+    - [x] **4.3d3 RSA in `EVP_PKEY`** (`evp/pkey/rsa.rs`; 3 exports):
+      - `EVP_PKEY_set1_RSA`, `EVP_PKEY_get0_RSA`, `EVP_PKEY_get1_RSA`, and `EVP_PKEY_assign`
+        for RSA and RSA-PSS data.
+      - The ASN.1 method's functions over the `RSA`: compare, size, bits, security bits,
+        free, check, copy, the default digest (SHA-256), and the dirty count, which every
+        change to the key's numbers raises.
+      - Moving a key between its forms: a legacy key is exported to a provider's key once per
+        dirty count and cached, as OpenSSL caches it; `EVP_PKEY_get0_RSA` on a provided key
+        makes the legacy copy (`copy_downgraded`); comparisons export across as OpenSSL's do.
+      - `EVP_PKEY_get_params` on a legacy key follows OpenSSL's payload table: keys in any
+        case, -2 for an unknown key, and the last parameter's result is the answer.
+      - An `RSA` with an application's method (a "foreign" key) isn't exported; its
+        operations would go through the legacy `EVP_PKEY_METHOD`, which isn't implemented
+        yet, so they abort as unimplemented (fail closed). The ASN.1-dependent parts (print,
+        the private key's decoding, `RSA_get0_pss_params`) come with 4.3e and 4.7.
+      - `tests/c/evp_pkey_rsa.c` (38 checks).
   - [ ] **4.3e** RSA's ASN.1 items (`RSAPublicKey`, `RSAPrivateKey`, `RSA_PSS_PARAMS`,
     `RSA_OAEP_PARAMS`).
 - [ ] **4.4 EC:**
