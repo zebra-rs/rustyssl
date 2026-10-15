@@ -251,8 +251,8 @@ enum Kind {
     RsaPss,
     /// DH and DHX.
     Dh,
-    /// DSA and EC.
-    DsaEc,
+    Dsa,
+    Ec,
     Ecx,
     Alias,
 }
@@ -275,7 +275,7 @@ impl Kind {
             ..Funcs::default()
         };
         match self {
-            Self::Dh | Self::DsaEc => {
+            Self::Dh | Self::Dsa => {
                 f.param_decode = Some(builtin_param_decode);
                 f.param_print = Some(builtin_print);
                 f.param_missing = Some(builtin_key);
@@ -286,6 +286,29 @@ impl Kind {
                 f.param_cmp = Some(builtin_cmp);
                 f.get_priv_key = Some(builtin_get_raw);
                 f.get_pub_key = Some(builtin_get_raw);
+            }
+            Self::Ec => {
+                use super::ec as e;
+                f.pub_cmp = Some(e::eckey_pub_cmp);
+                f.pub_print = Some(e::eckey_pub_print);
+                f.priv_print = Some(e::eckey_priv_print);
+                f.pkey_size = Some(e::int_ec_size);
+                f.pkey_bits = Some(e::ec_bits);
+                f.pkey_security_bits = Some(e::ec_security_bits);
+                f.param_decode = Some(e::eckey_param_decode);
+                f.param_encode = Some(e::eckey_param_encode);
+                f.param_missing = Some(e::ec_missing_parameters);
+                f.param_copy = Some(e::ec_copy_parameters);
+                f.param_cmp = Some(e::ec_cmp_parameters);
+                f.param_print = Some(e::eckey_param_print);
+                f.pkey_free = Some(e::int_ec_free);
+                f.pkey_ctrl = Some(e::ec_pkey_ctrl);
+                f.old_priv_decode = Some(e::old_ec_priv_decode);
+                f.pkey_check = Some(e::ec_pkey_check);
+                f.pkey_public_check = Some(e::ec_pkey_public_check);
+                f.pkey_param_check = Some(e::ec_pkey_param_check);
+                f.dirty_cnt = Some(e::ec_pkey_dirty_cnt);
+                f.copy = Some(e::ec_pkey_copy);
             }
             Self::Rsa | Self::RsaPss => {
                 use super::rsa as r;
@@ -309,7 +332,7 @@ impl Kind {
             }
             Self::Alias => {}
         }
-        if matches!(self, Self::Rsa | Self::DsaEc) {
+        if matches!(self, Self::Rsa | Self::Dsa) {
             f.old_priv_decode = Some(builtin_old_priv_decode);
         }
         f
@@ -368,8 +391,8 @@ static STANDARD_TABLE: [Std; 15] = [
     alias(EVP_PKEY_DSA1, EVP_PKEY_DSA),
     alias(EVP_PKEY_DSA4, EVP_PKEY_DSA2),
     alias(EVP_PKEY_DSA3, EVP_PKEY_DSA2),
-    entry(EVP_PKEY_DSA, 0, c"DSA", c"OpenSSL DSA method", Kind::DsaEc),
-    entry(EVP_PKEY_EC, 0, c"EC", c"OpenSSL EC algorithm", Kind::DsaEc),
+    entry(EVP_PKEY_DSA, 0, c"DSA", c"OpenSSL DSA method", Kind::Dsa),
+    entry(EVP_PKEY_EC, 0, c"EC", c"OpenSSL EC algorithm", Kind::Ec),
     entry(
         EVP_PKEY_RSA_PSS,
         ASN1_PKEY_SIGPARAM_NULL,
