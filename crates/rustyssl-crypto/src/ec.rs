@@ -12,6 +12,7 @@
 //! on plain residues here.
 
 pub mod curves;
+pub mod fe;
 pub mod gf2m;
 pub mod gfp;
 pub mod group;
