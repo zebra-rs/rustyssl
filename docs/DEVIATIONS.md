@@ -230,6 +230,7 @@ OpenSSL never depends on them.
 | `EC_GROUP_new_from_ecparameters(NULL)` | dereferences NULL | fails with `ERR_R_PASSED_NULL_PARAMETER` | `ec::asn1::tests::null_ecparameters_fail` |
 | `EC_GROUP_get_ecparameters` into an existing `ECPARAMETERS` | frees the old field parameters as an ASN.1 ANY whatever they are (a prime's INTEGER, a binary field's parameters), corrupting memory | frees them as the type their field type made them, then fills the structure | `ec::asn1::tests::existing_ecparameters_are_refilled` |
 | `EC_GROUP_get_ecpkparameters` into the caller's `ECPKPARAMETERS`, failing (a named curve without an OID) | frees the caller's structure, which the caller frees again | leaves it to the caller, emptied | `ec::asn1::tests::a_failed_ecpkparameters_leaves_the_callers` |
+| The `EC_KEY_*` and `EC_KEY_METHOD_*` functions given a NULL key or method (other than those OpenSSL checks: `EC_KEY_free`, `EC_KEY_check_key`, `EC_KEY_key2buf`, `EC_KEY_copy`, the encoders) | dereference NULL | fail as each fails (0, NULL), or do nothing | `ec::key_asn1::tests::a_null_key_fails` |
 
 ## Notes
 

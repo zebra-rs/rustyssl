@@ -14,7 +14,10 @@
 
 pub(crate) mod asn1;
 pub(crate) mod curves;
+pub(crate) mod ecdsa;
 pub(crate) mod group;
+pub(crate) mod key;
+pub(crate) mod key_asn1;
 pub(crate) mod params;
 pub(crate) mod point;
 

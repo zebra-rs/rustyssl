@@ -3118,6 +3118,10 @@ const _: unsafe extern "C" fn(*mut BIO, *const EC_GROUP, core::ffi::c_int) -> co
     crate::ec::asn1::ECPKParameters_print;
 const _: unsafe extern "C" fn(*mut FILE, *const EC_GROUP, core::ffi::c_int) -> core::ffi::c_int =
     crate::ec::asn1::ECPKParameters_print_fp;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
+    crate::ec::key_asn1::ECParameters_print;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
+    crate::ec::key_asn1::ECParameters_print_fp;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GF2m_simple_method;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_mont_method;
 const _: unsafe extern "C" fn() -> *const EC_METHOD = crate::ec::EC_GFp_nist_method;
@@ -3278,6 +3282,265 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *mut BN_CTX,
 ) -> *mut OSSL_PARAM = crate::ec::params::EC_GROUP_to_params;
+const _: unsafe extern "C" fn(*mut EC_KEY_METHOD) = crate::ec::key::EC_KEY_METHOD_free;
+const _: unsafe extern "C" fn(
+    *const EC_KEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            psec: *mut *mut core::ffi::c_uchar,
+            pseclen: *mut usize,
+            pub_key: *const EC_POINT,
+            ecdh: *const EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_get_compute_key;
+const _: unsafe extern "C" fn(
+    *const EC_KEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> core::ffi::c_int>,
+    *mut ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY)>,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(dest: *mut EC_KEY, src: *const EC_KEY) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, grp: *const EC_GROUP) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, priv_key: *const BIGNUM) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, pub_key: *const EC_POINT) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_get_init;
+const _: unsafe extern "C" fn(
+    *const EC_KEY_METHOD,
+    *mut ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> core::ffi::c_int>,
+) = crate::ec::key::EC_KEY_METHOD_get_keygen;
+const _: unsafe extern "C" fn(
+    *const EC_KEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            type_: core::ffi::c_int,
+            dgst: *const core::ffi::c_uchar,
+            dlen: core::ffi::c_int,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut core::ffi::c_uint,
+            kinv: *const BIGNUM,
+            r: *const BIGNUM,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            eckey: *mut EC_KEY,
+            ctx_in: *mut BN_CTX,
+            kinvp: *mut *mut BIGNUM,
+            rp: *mut *mut BIGNUM,
+        ) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            in_kinv: *const BIGNUM,
+            in_r: *const BIGNUM,
+            eckey: *mut EC_KEY,
+        ) -> *mut ECDSA_SIG,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_get_sign;
+const _: unsafe extern "C" fn(
+    *const EC_KEY_METHOD,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            type_: core::ffi::c_int,
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            sigbuf: *const core::ffi::c_uchar,
+            sig_len: core::ffi::c_int,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+    *mut ::core::option::Option<
+        unsafe extern "C" fn(
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            sig: *const ECDSA_SIG,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_get_verify;
+const _: unsafe extern "C" fn(*const EC_KEY_METHOD) -> *mut EC_KEY_METHOD =
+    crate::ec::key::EC_KEY_METHOD_new;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            psec: *mut *mut core::ffi::c_uchar,
+            pseclen: *mut usize,
+            pub_key: *const EC_POINT,
+            ecdh: *const EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_set_compute_key;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> core::ffi::c_int>,
+    ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY)>,
+    ::core::option::Option<
+        unsafe extern "C" fn(dest: *mut EC_KEY, src: *const EC_KEY) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, grp: *const EC_GROUP) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, priv_key: *const BIGNUM) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(key: *mut EC_KEY, pub_key: *const EC_POINT) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_set_init;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> core::ffi::c_int>,
+) = crate::ec::key::EC_KEY_METHOD_set_keygen;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            type_: core::ffi::c_int,
+            dgst: *const core::ffi::c_uchar,
+            dlen: core::ffi::c_int,
+            sig: *mut core::ffi::c_uchar,
+            siglen: *mut core::ffi::c_uint,
+            kinv: *const BIGNUM,
+            r: *const BIGNUM,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            eckey: *mut EC_KEY,
+            ctx_in: *mut BN_CTX,
+            kinvp: *mut *mut BIGNUM,
+            rp: *mut *mut BIGNUM,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            in_kinv: *const BIGNUM,
+            in_r: *const BIGNUM,
+            eckey: *mut EC_KEY,
+        ) -> *mut ECDSA_SIG,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_set_sign;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            type_: core::ffi::c_int,
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            sigbuf: *const core::ffi::c_uchar,
+            sig_len: core::ffi::c_int,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            dgst: *const core::ffi::c_uchar,
+            dgst_len: core::ffi::c_int,
+            sig: *const ECDSA_SIG,
+            eckey: *mut EC_KEY,
+        ) -> core::ffi::c_int,
+    >,
+) = crate::ec::key::EC_KEY_METHOD_set_verify;
+const _: unsafe extern "C" fn() -> *const EC_KEY_METHOD = crate::ec::key::EC_KEY_OpenSSL;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_int = crate::ec::key::EC_KEY_can_sign;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_int = crate::ec::key::EC_KEY_check_key;
+const _: unsafe extern "C" fn(*mut EC_KEY, core::ffi::c_int) = crate::ec::key::EC_KEY_clear_flags;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const EC_KEY) -> *mut EC_KEY =
+    crate::ec::key::EC_KEY_copy;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_decoded_from_explicit_params;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *mut EC_KEY = crate::ec::key::EC_KEY_dup;
+const _: unsafe extern "C" fn(*mut EC_KEY) = crate::ec::key::EC_KEY_free;
+const _: unsafe extern "C" fn(*mut EC_KEY) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_generate_key;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *mut ENGINE = crate::ec::key::EC_KEY_get0_engine;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *const EC_GROUP = crate::ec::key::EC_KEY_get0_group;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *const BIGNUM =
+    crate::ec::key::EC_KEY_get0_private_key;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *const EC_POINT =
+    crate::ec::key::EC_KEY_get0_public_key;
+const _: unsafe extern "C" fn(*const EC_KEY) -> point_conversion_form_t =
+    crate::ec::key::EC_KEY_get_conv_form;
+const _: unsafe extern "C" fn() -> *const EC_KEY_METHOD = crate::ec::key::EC_KEY_get_default_method;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_uint =
+    crate::ec::key::EC_KEY_get_enc_flags;
+const _: unsafe extern "C" fn(*const EC_KEY, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::ec::key::EC_KEY_get_ex_data;
+const _: unsafe extern "C" fn(*const EC_KEY) -> core::ffi::c_int = crate::ec::key::EC_KEY_get_flags;
+const _: unsafe extern "C" fn(*const EC_KEY) -> *const EC_KEY_METHOD =
+    crate::ec::key::EC_KEY_get_method;
+const _: unsafe extern "C" fn(
+    *const EC_KEY,
+    point_conversion_form_t,
+    *mut *mut core::ffi::c_uchar,
+    *mut BN_CTX,
+) -> usize = crate::ec::key::EC_KEY_key2buf;
+const _: unsafe extern "C" fn() -> *mut EC_KEY = crate::ec::key::EC_KEY_new;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut EC_KEY =
+    crate::ec::key::EC_KEY_new_by_curve_name;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut EC_KEY = crate::ec::key::EC_KEY_new_by_curve_name_ex;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut EC_KEY =
+    crate::ec::key::EC_KEY_new_ex;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut EC_KEY = crate::ec::key::EC_KEY_new_method;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut BN_CTX,
+) -> core::ffi::c_int = crate::ec::key::EC_KEY_oct2key;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_oct2priv;
+const _: unsafe extern "C" fn(*mut EC_KEY, *mut BN_CTX) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_precompute_mult;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ec::key_asn1::EC_KEY_print;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ec::key_asn1::EC_KEY_print_fp;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> usize =
+    crate::ec::key::EC_KEY_priv2buf;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut core::ffi::c_uchar, usize) -> usize =
+    crate::ec::key::EC_KEY_priv2oct;
+const _: unsafe extern "C" fn(*mut EC_KEY, core::ffi::c_int) = crate::ec::key::EC_KEY_set_asn1_flag;
+const _: unsafe extern "C" fn(*mut EC_KEY, point_conversion_form_t) =
+    crate::ec::key::EC_KEY_set_conv_form;
+const _: unsafe extern "C" fn(*const EC_KEY_METHOD) = crate::ec::key::EC_KEY_set_default_method;
+const _: unsafe extern "C" fn(*mut EC_KEY, core::ffi::c_uint) =
+    crate::ec::key::EC_KEY_set_enc_flags;
+const _: unsafe extern "C" fn(
+    *mut EC_KEY,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ec::key::EC_KEY_set_ex_data;
+const _: unsafe extern "C" fn(*mut EC_KEY, core::ffi::c_int) = crate::ec::key::EC_KEY_set_flags;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const EC_GROUP) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_set_group;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const EC_KEY_METHOD) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_set_method;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const BIGNUM) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_set_private_key;
+const _: unsafe extern "C" fn(*mut EC_KEY, *const EC_POINT) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_set_public_key;
+const _: unsafe extern "C" fn(*mut EC_KEY, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::ec::key::EC_KEY_set_public_key_affine_coordinates;
+const _: unsafe extern "C" fn(*mut EC_KEY) -> core::ffi::c_int = crate::ec::key::EC_KEY_up_ref;
 const _: unsafe extern "C" fn(*const EC_METHOD) -> core::ffi::c_int =
     crate::ec::EC_METHOD_get_field_type;
 const _: unsafe extern "C" fn(
@@ -8896,6 +9159,20 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut EC_GROUP = crate::ec::asn1::d2i_ECPKParameters;
 const _: unsafe extern "C" fn(
+    *mut *mut EC_KEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EC_KEY = crate::ec::key_asn1::d2i_ECParameters;
+const _: unsafe extern "C" fn(
+    *mut *mut EC_KEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EC_KEY = crate::ec::key_asn1::d2i_ECPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut EC_KEY) -> *mut EC_KEY =
+    crate::ec::key_asn1::d2i_ECPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut EC_KEY) -> *mut EC_KEY =
+    crate::ec::key_asn1::d2i_ECPrivateKey_fp;
+const _: unsafe extern "C" fn(
     *mut *mut RSA,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -9025,6 +9302,14 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
 const _: unsafe extern "C" fn(*const EC_GROUP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::ec::asn1::i2d_ECPKParameters;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ec::key_asn1::i2d_ECParameters;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ec::key_asn1::i2d_ECPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
+    crate::ec::key_asn1::i2d_ECPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
+    crate::ec::key_asn1::i2d_ECPrivateKey_fp;
 const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::rsa_asn1::i2d_RSAPrivateKey;
 const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
@@ -9047,6 +9332,8 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::rsa_asn1::i2d_RSA_PSS_PARAMS;
 const _: unsafe extern "C" fn(*const X509_ALGOR, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::asn1::tpl::items::i2d_X509_ALGOR;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ec::key_asn1::i2o_ECPublicKey;
 const _: unsafe extern "C" fn(
     *mut X509V3_EXT_METHOD,
     *const ASN1_ENUMERATED,
@@ -9068,6 +9355,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *const ASN1_OBJECT,
 ) -> core::ffi::c_int = crate::objects::i2t_ASN1_OBJECT;
+const _: unsafe extern "C" fn(
+    *mut *mut EC_KEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EC_KEY = crate::ec::key_asn1::o2i_ECPublicKey;
 const _: unsafe extern "C" fn(
     *mut X509V3_EXT_METHOD,
     *const core::ffi::c_char,
