@@ -225,6 +225,20 @@ ffi_export! {
 }
 
 ffi_export! {
+    /// An RSA-PSS key's restrictions (from its generation through the legacy method; decoding
+    /// keys comes with the key decoders), or NULL.
+    ///
+    /// # Safety
+    /// `r` is NULL or a live key.
+    pub unsafe extern "C" fn RSA_get0_pss_params(r: *const RSA) -> *const RSA_PSS_PARAMS
+    where failure = ptr::null(), library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { key(r) }.map_or(ptr::null(), |k| k.legacy().pss.0.cast_const())
+    }
+}
+
+ffi_export! {
     /// The key's engine: none.
     ///
     /// # Safety
@@ -233,19 +247,6 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_RSA
     {
         ptr::null_mut()
-    }
-}
-
-ffi_export! {
-    /// The key's decoded RSASSA-PSS parameters: none, as no key has been decoded from
-    /// ASN.1 yet (keys made by the providers keep their restrictions apart, as OpenSSL's do).
-    ///
-    /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn RSA_get0_pss_params(_r: *const RSA) -> *const RSA_PSS_PARAMS
-    where failure = ptr::null(), library = ERR_LIB_RSA
-    {
-        ptr::null()
     }
 }
 

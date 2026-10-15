@@ -52,6 +52,7 @@ mod rsa_gen;
 mod rsa_lib;
 mod rsa_meth;
 mod rsa_ops;
+mod rsa_pmeth;
 mod secure;
 mod sleep;
 mod ssl;

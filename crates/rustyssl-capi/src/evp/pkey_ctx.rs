@@ -1228,6 +1228,58 @@ ffi_export! {
     }
 }
 
+/// A context without a key, method, or key manager, for testing a method's functions alone
+/// (making one the usual way loads the configuration, which Miri can't).
+#[cfg(test)]
+pub(crate) fn bare_context() -> *mut EVP_PKEY_CTX {
+    EVP_PKEY_CTX::new_handle(PkeyCtx {
+        state: Mutex::new(State::new(ptr::null_mut(), None, None, None, 0)),
+    })
+}
+
+/// `trans_cb` (`evp_pkey_set_cb_translate`): a legacy method's generation progress `a`, `b`
+/// into the context's `keygen_info` (the first two values), then the application's callback
+/// (1 without one).
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+pub(crate) unsafe fn legacy_gen_progress(ctx: *mut EVP_PKEY_CTX, a: c_int, b: c_int) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
+    let cb = {
+        let mut s = c.lock();
+        match &mut s.keygen_info {
+            KeygenInfo::Own(v) => *v = [a, b],
+            KeygenInfo::App(p, n) if !p.0.is_null() && *n >= 2 => {
+                // SAFETY: the array of at least two ints the context was given.
+                unsafe { p.0.write(a) };
+                // SAFETY: as above.
+                unsafe { p.0.wrapping_add(1).write(b) };
+            }
+            _ => {}
+        }
+        s.pkey_gencb
+    };
+    let Some(cb) = cb else { return 1 };
+    // SAFETY: the application's callback with its context; no lock is held.
+    unsafe { cb(ctx) }
+}
+
+/// The operation a context is set up for (`EVP_PKEY_OP_*`), and the key type of its legacy
+/// method (`ctx->pmeth->pkey_id`; 0 without one).
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+pub(crate) unsafe fn legacy_op(ctx: *const EVP_PKEY_CTX) -> (c_int, c_int) {
+    // SAFETY: the caller's guarantee.
+    unsafe { context(ctx) }.map_or((0, 0), |c| {
+        let s = c.lock();
+        (s.operation, s.pmeth.as_ref().map_or(0, |m| m.get().pkey_id))
+    })
+}
+
 /// `ossl_callback_to_pkey_gencb`: the provider's progress to the application's callback.
 ///
 /// # Safety

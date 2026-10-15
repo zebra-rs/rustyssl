@@ -12,8 +12,9 @@
 //! - `EVP_PKEY_meth_free` frees only methods `EVP_PKEY_meth_new` made, and `EVP_PKEY_meth_copy`
 //!   copies the functions and keeps the key type and flags.
 //!
-//! The built-in methods' functions work on the key types' legacy data (4.3 onwards): until then
-//! they abort when called (AGENTS.md rule 10). A context keeps its method alive while it uses
+//! The built-in methods' functions work on the key types' legacy data: RSA's and RSA-PSS's are
+//! `rsa_pmeth.rs`'s; the other types' come with them (4.4 onwards) and abort when called until
+//! then (AGENTS.md rule 10). A context keeps its method alive while it uses
 //! it (OpenSSL's would use a freed method). Changing a built-in method, which OpenSSL can't do
 //! (they're read-only), does nothing here, and NULL methods are refused where it would crash
 //! (docs/DEVIATIONS.md).
@@ -179,7 +180,8 @@ unsafe fn put<T>(p: *mut T, v: T) {
     }
 }
 
-// The built-in methods' functions, which need the key types' legacy data (4.3 onwards).
+// The other built-in methods' functions, which need their key types' legacy data (4.4
+// onwards).
 
 extern "C" fn builtin_init(_: *mut EVP_PKEY_CTX) -> c_int {
     crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's function of a context")
@@ -266,13 +268,22 @@ fn context_funcs() -> Funcs {
 /// type).
 fn standard_table() -> [(c_int, c_int, Funcs); 10] {
     let base = context_funcs();
-    let rsa = Funcs {
-        sign: Some(builtin_transform),
-        verify: Some(builtin_verify),
-        verify_recover: Some(builtin_transform),
-        encrypt: Some(builtin_transform),
-        decrypt: Some(builtin_transform),
-        ..base
+    let rsa = {
+        use crate::rsa_pmeth as r;
+        Funcs {
+            init: Some(r::pkey_rsa_init),
+            copy: Some(r::pkey_rsa_copy),
+            cleanup: Some(r::pkey_rsa_cleanup),
+            keygen: Some(r::pkey_rsa_keygen),
+            sign: Some(r::pkey_rsa_sign),
+            verify: Some(r::pkey_rsa_verify),
+            verify_recover: Some(r::pkey_rsa_verifyrecover),
+            encrypt: Some(r::pkey_rsa_encrypt),
+            decrypt: Some(r::pkey_rsa_decrypt),
+            ctrl: Some(r::pkey_rsa_ctrl),
+            ctrl_str: Some(r::pkey_rsa_ctrl_str),
+            ..Funcs::default()
+        }
     };
     let dh = Funcs {
         paramgen: Some(builtin_gen),
@@ -290,11 +301,12 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         ..dsa
     };
     let pss = Funcs {
-        sign_init: Some(builtin_init),
-        sign: Some(builtin_transform),
-        verify_init: Some(builtin_init),
-        verify: Some(builtin_verify),
-        ..base
+        sign_init: Some(crate::rsa_pmeth::pkey_pss_init),
+        verify_init: Some(crate::rsa_pmeth::pkey_pss_init),
+        verify_recover: None,
+        encrypt: None,
+        decrypt: None,
+        ..rsa
     };
     let ecx = Funcs {
         keygen: Some(builtin_gen),
