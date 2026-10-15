@@ -307,6 +307,8 @@
  *   ecadd <r> <a> <b>          EC_POINT_add of registers
  *   ecpk <hex>                 d2i_ECPKParameters: what it consumes, and the group's state,
  *                              encoding, check, and print
+ *   eckey <hex>                d2i_ECPrivateKey: what it consumes, and the key's state,
+ *                              encoding, check, and print
  *
  *   # ...              comment, echoed
  */
@@ -4213,9 +4215,54 @@ static int ec_command(const char *command, const char *line)
 
     if (strcmp(command, "ecgrp") != 0 && strcmp(command, "ecpt") != 0
         && strcmp(command, "eccomp") != 0 && strcmp(command, "ecmul") != 0
-        && strcmp(command, "ecadd") != 0 && strcmp(command, "ecpk") != 0)
+        && strcmp(command, "ecadd") != 0 && strcmp(command, "ecpk") != 0
+        && strcmp(command, "eckey") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "eckey") == 0) {
+        /* eckey <hex>: d2i_ECPrivateKey, and the key it makes. */
+        const unsigned char *p = buf;
+        EC_KEY *k;
+
+        sscanf(line, "%*s %699s", a);
+        if (!parse_hex(a, buf, &len)) {
+            printf(" bad hex\n");
+            return 1;
+        }
+        k = d2i_ECPrivateKey(NULL, &p, (long)len);
+        printf(" %s %ld", k != NULL ? "decoded" : "refused", (long)(p - buf));
+        if (k != NULL) {
+            unsigned char *der = NULL, *pub = NULL;
+            int n;
+            size_t pl;
+            char *priv = BN_bn2hex(EC_KEY_get0_private_key(k));
+            BIO *mem = BIO_new(BIO_s_mem());
+            char *text;
+            long tlen;
+
+            printf(" curve %d flags %d enc %u form %d priv %s",
+                   EC_GROUP_get_curve_name(EC_KEY_get0_group(k)), EC_KEY_get_flags(k),
+                   EC_KEY_get_enc_flags(k), (int)EC_KEY_get_conv_form(k), priv);
+            OPENSSL_free(priv);
+            pl = EC_KEY_key2buf(k, POINT_CONVERSION_UNCOMPRESSED, &pub, NULL);
+            print_hex(" pub", pub, pl);
+            OPENSSL_free(pub);
+            n = i2d_ECPrivateKey(k, &der);
+            print_hex(" der", der, n > 0 ? (size_t)n : 0);
+            OPENSSL_free(der);
+            print_asn_errors();
+            printf(" check %d", EC_KEY_check_key(k));
+            print_asn_errors();
+            printf(" print %d", EC_KEY_print(mem, k, 1));
+            tlen = BIO_get_mem_data(mem, &text);
+            for (long i = 0; i < tlen; i++)
+                putchar(text[i] == '\n' ? '|' : text[i]);
+            BIO_free(mem);
+            EC_KEY_free(k);
+        }
+        print_asn_errors();
+        return 1;
+    }
     if (strcmp(command, "ecpk") == 0) {
         /* ecpk <hex>: d2i_ECPKParameters, and the group it makes. */
         const unsigned char *p = buf;
