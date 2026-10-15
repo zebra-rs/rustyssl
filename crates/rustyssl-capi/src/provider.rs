@@ -51,6 +51,7 @@ pub(crate) mod ciphers;
 pub(crate) mod conf;
 pub(crate) mod digests;
 pub(crate) mod ec_kmgmt;
+mod ecdh_exch;
 mod ecdsa_sig;
 pub(crate) mod exchanges;
 pub(crate) mod kdfs;
