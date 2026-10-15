@@ -17,10 +17,10 @@ use core::ptr;
 use libc::FILE;
 
 use rustyssl_abi::{
-    ASN1_AUX, ASN1_ITEM, ASN1_ITYPE_EXTERN, ASN1_ITYPE_SEQUENCE, ASN1_OP_D2I_POST,
-    ASN1_OP_FREE_PRE, ASN1_TEMPLATE, ASN1_TFLG_EMBED, ASN1_TFLG_EXPLICIT, ASN1_TFLG_OPTIONAL,
-    ASN1_TFLG_SEQUENCE_OF, ASN1_VALUE, BIGNUM, BIO, ERR_LIB_ASN1, OPENSSL_STACK, RSA,
-    RSA_ASN1_VERSION_MULTI, RSA_OAEP_PARAMS, RSA_PSS_PARAMS, V_ASN1_SEQUENCE,
+    ASN1_ITEM, ASN1_ITYPE_EXTERN, ASN1_OP_D2I_POST, ASN1_OP_FREE_PRE, ASN1_TFLG_EMBED,
+    ASN1_TFLG_EXPLICIT, ASN1_TFLG_OPTIONAL, ASN1_TFLG_SEQUENCE_OF, ASN1_VALUE, BIGNUM, BIO,
+    ERR_LIB_ASN1, OPENSSL_STACK, RSA, RSA_ASN1_VERSION_MULTI, RSA_OAEP_PARAMS, RSA_PSS_PARAMS,
+    V_ASN1_SEQUENCE,
 };
 
 use crate::asn1::tpl::bignum::{BIGNUM_it, CBIGNUM_it};
@@ -32,8 +32,9 @@ use crate::asn1::tpl::items::{
     ASN1_INTEGER_it, X509_ALGOR_free, X509_ALGOR_it, d2i, i2d, new_free,
 };
 use crate::asn1::tpl::shadow::{self, Lend, Shadowed};
+use crate::asn1::tpl::statics::{Aux, Templates, aux, sequence};
 use crate::asn1::tpl::util::ASN1_item_dup;
-use crate::asn1::tpl::{Item, item, item_fns, size_of_long, template_at};
+use crate::asn1::tpl::{Item, item, item_fns, template_at};
 use crate::ffi::{ffi_callback, ffi_export};
 use crate::mem;
 use crate::rsa::{Field, rsa};
@@ -45,54 +46,6 @@ use crate::rsa_lib::{
 use crate::stack::{
     OPENSSL_sk_free, OPENSSL_sk_new_null, OPENSSL_sk_num, OPENSSL_sk_push, OPENSSL_sk_value,
 };
-
-/// A table of templates in a static.
-struct Templates<const N: usize>([ASN1_TEMPLATE; N]);
-// SAFETY: immutable tables of pointers to static data.
-unsafe impl<const N: usize> Sync for Templates<N> {}
-
-/// An aux table in a static.
-struct Aux(ASN1_AUX);
-// SAFETY: immutable, with no pointers but the callback.
-unsafe impl Sync for Aux {}
-
-/// An aux table with callback `cb`, as `ASN1_SEQUENCE_cb` makes.
-const fn aux(
-    cb: unsafe extern "C" fn(c_int, *mut *mut ASN1_VALUE, *const ASN1_ITEM, *mut c_void) -> c_int,
-) -> Aux {
-    Aux(ASN1_AUX {
-        app_data: ptr::null_mut(),
-        flags: 0,
-        ref_offset: 0,
-        ref_lock: 0,
-        asn1_cb: Some(cb),
-        enc_offset: 0,
-        asn1_const_cb: None,
-    })
-}
-
-/// A SEQUENCE item over `T` with `templates` and `aux`.
-const fn sequence<T, const N: usize>(
-    templates: &'static Templates<N>,
-    aux: Option<&'static Aux>,
-    sname: &'static core::ffi::CStr,
-) -> Item {
-    let funcs: *const c_void = match aux {
-        Some(a) => (&raw const a.0).cast(),
-        None => ptr::null(),
-    };
-    #[expect(clippy::cast_possible_wrap, reason = "a handful of templates")]
-    let tcount = N as core::ffi::c_long;
-    item(
-        ASN1_ITYPE_SEQUENCE,
-        V_ASN1_SEQUENCE,
-        (&raw const templates.0).cast(),
-        tcount,
-        funcs,
-        size_of_long::<T>(),
-        sname,
-    )
-}
 
 /// The key's numbers in OpenSSL's order, with the fields that hold them.
 const FIELDS: [Field; 8] = [
