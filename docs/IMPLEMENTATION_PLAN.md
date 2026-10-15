@@ -3471,18 +3471,44 @@ chunking) is clean.
   preprocessed with the default build's options.
 
   In sub-steps, each its own PR:
-  - [ ] **4.4a Groups and points:** the generated curve table; the field arithmetic (GF(p)
-    and GF(2^m)) and the point arithmetic with OpenSSL's formulas, so even the Jacobian
-    coordinates `EC_POINT_get_Jprojective_coordinates_GFp` shows are the reference's; the
-    constant-time ladder for secret scalars; `EC_GROUP` (named and explicit groups, the
-    `EC_METHOD`s, the accessors, `check`, `cmp`, the conversion form and ASN.1 flag,
-    `EC_get_builtin_curves` and the names); and the full `EC_POINT` API (arithmetic,
-    coordinates, octet, BIGNUM, and hex conversions, compressed points, `mul`).
+  - [x] **4.4a Groups and points** (`rustyssl-crypto/src/ec/`, `rustyssl-capi/src/ec/`; 92
+    exports): the generated curve table (82 curves, with each one's method for the target);
+    the field arithmetic (GF(p) by method, GF(2^m) by the field's polynomial) and the point
+    arithmetic with OpenSSL's formulas, so the generic methods' Jacobian coordinates and the
+    random numbers they draw are the reference's; `EC_GROUP` (named and explicit groups, every
+    `EC_METHOD` of the default build, the accessors, `check`, `check_named_curve`, `cmp`,
+    precomputation, the conversion form and ASN.1 flag, `EC_get_builtin_curves` and the
+    names); and the full `EC_POINT` API (arithmetic, coordinates, the octet, BIGNUM, and hex
+    encodings, compressed points, `mul` by ladder and wNAF).
+    - The curve-specific methods (`nistp224`, `nistp256`, `nistp521`, `nistz256`, `sm2p256`)
+      run the ladder per term with Fermat inversions and give the same affine points; their
+      Jacobian coordinates differ (docs/DEVIATIONS.md, Notes), but which results are affine,
+      and so which conversions draw random numbers, follows theirs (`sm2p256`'s table and
+      window copies included).
+    - OpenSSL's failure states are kept: a binary curve's sum off the curve, a prime point
+      made affine off the curve, and a refused generator (left at infinity) stay in their
+      objects as in the reference.
+    - Constant-time level, per curve: a lone scalar (`EC_POINT_mul` with one term, as keys
+      and nonces use) always takes the Montgomery ladder, with the scalar padded to the same
+      length and constant-time swaps, so the steps don't depend on it. On the generic prime
+      and binary methods (brainpool, secp*k1, the other secp and binary curves, explicit
+      groups) the ladder's coordinates are also randomized, as OpenSSL's are. On P-224,
+      P-256, P-384, P-521, and (on aarch64) SM2 it isn't (their methods draw nothing), and the field
+      arithmetic is BIGNUM's, whose time can depend on the numbers' lengths: weaker than
+      OpenSSL's fixed-limb code there, to fix before 4.4c gives keys these groups. Sums of
+      several terms use wNAF, which isn't constant-time; OpenSSL uses them only with public
+      scalars (verification).
+    - Tests: `tests/c/ec_group_point.c` (277 checks); the differential probe's `ecgrp`,
+      `ecpt`, `eccomp`, `ecmul`, `ecadd` with random sessions over every curve (5,000
+      sessions pass) and `corpus/ec.txt`; the `ec_point` fuzz target (decoding, re-encoding,
+      and multiplying by the group's order); three deviations (crashes on a missing point,
+      NULL arguments, and groups without generators).
   - [ ] **4.4b Parameters:** `ECPARAMETERS`/`ECPKPARAMETERS` and their ASN.1
     (`d2i_`/`i2d_ECPKParameters`, `EC_GROUP_new_from_ecparameters`, ...), the groups'
     `OSSL_PARAM` forms (`EC_GROUP_new_from_params`, `EC_GROUP_to_params`), and
     `ECPKParameters_print`.
-  - [ ] **4.4c Keys and their primitives:** `EC_KEY` and `EC_KEY_METHOD`, `ECDSA_SIG`,
+  - [ ] **4.4c Keys and their primitives:** first, constant-time field arithmetic for the
+    curve-specific methods' curves (4.4a); then `EC_KEY` and `EC_KEY_METHOD`, `ECDSA_SIG`,
     `ECDSA_*` and `ECDH_compute_key`, the key's ASN.1 (`ECPrivateKey`, `i2o`/`o2i`), and
     EC in `EVP_PKEY` (with printing).
   - [ ] **4.4d The providers:** the EC key manager, ECDSA (random nonces and RFC 6979's),
