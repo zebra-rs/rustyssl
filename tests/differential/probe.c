@@ -319,6 +319,7 @@
  *                              or ints with a leading #): the key's export, checks, parameters
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
+ *   sm2km <sel> <group|-> <priv|-> <pub|-> <k=v,...|->  as eckm, with the SM2 key manager
  *   ecdhx <curve> <priv> <peer's priv> <mode> <md|-> <outlen> <ukm|-> <room>  the ECDH
  *                              provider: the shared secret into a buffer of room octets, with
  *                              the cofactor mode (-1 the key's, or anything set), and X9.63's
@@ -4353,8 +4354,8 @@ static void ec_print_params(const OSSL_PARAM *p)
     }
 }
 
-/* eckm: an EC key from data, then what the key manager makes of it. */
-static void ec_keymgmt_command(const char *line)
+/* eckm and sm2km: an EC key from data, then what the key manager (keytype's) makes of it. */
+static void ec_keymgmt_command(const char *line, const char *keytype)
 {
     char group[64] = "-", priv[700] = "-", pub[700] = "-", other[300] = "-";
     unsigned int sel = 0;
@@ -4363,7 +4364,7 @@ static void ec_keymgmt_command(const char *line)
     BIGNUM *d = NULL;
     OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
     OSSL_PARAM *ps, *out = NULL;
-    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, keytype, NULL);
     EVP_PKEY *k = NULL;
 
     sscanf(line, "%*s %x %63s %699s %699s %299s", &sel, group, priv, pub, other);
@@ -4676,7 +4677,8 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "ecsign") != 0 && strcmp(command, "ecsetup") != 0
         && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
-        && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0)
+        && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0
+        && strcmp(command, "sm2km") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "ecdhx") == 0) {
@@ -4687,8 +4689,8 @@ static int ec_command(const char *command, const char *line)
         ec_sig_command(line);
         return 1;
     }
-    if (strcmp(command, "eckm") == 0) {
-        ec_keymgmt_command(line);
+    if (strcmp(command, "eckm") == 0 || strcmp(command, "sm2km") == 0) {
+        ec_keymgmt_command(line, command[0] == 's' ? "SM2" : "EC");
         return 1;
     }
     if (strcmp(command, "ecdhkem") == 0) {
