@@ -413,12 +413,7 @@ ffi_export! {
         }
         let (core, precomputed, seed) = {
             let st = s.lock();
-            let seed = if st.seed.0.is_null() {
-                None
-            } else {
-                st.core.seed.clone()
-            };
-            (Arc::clone(&st.core), st.precomputed, seed)
+            (Arc::clone(&st.core), st.precomputed, st.core.seed.clone())
         };
         let mut ds = d.lock();
         if ds.core.meth != core.meth {
