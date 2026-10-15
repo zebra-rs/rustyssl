@@ -1735,9 +1735,13 @@ fn any_session(random: &mut Random, out: &mut String) -> Result {
 /// little off, and cut short), decoded with one of the probe's items.
 fn d2i_session(random: &mut Random, out: &mut String) -> Result {
     for _ in 0..random.below(8) + 1 {
-        let item = random.below(14);
+        let item = random.below(19);
         let mut der = Vec::new();
-        ber_value(random, &mut der, item, 0);
+        if item >= 14 && random.below(4) != 0 {
+            rsa_ber(random, &mut der, item);
+        } else {
+            ber_value(random, &mut der, item, 0);
+        }
         if random.below(10) == 0 {
             let cut = usize::try_from(random.below(u64::try_from(der.len()).unwrap_or(1) + 1))
                 .unwrap_or(0);
@@ -1769,6 +1773,122 @@ fn d2i_session(random: &mut Random, out: &mut String) -> Result {
         }
     }
     Ok(())
+}
+
+/// Appends a TLV with a definite length (the short form, or the long one when it must be).
+fn tlv(out: &mut Vec<u8>, tag: u8, content: &[u8]) {
+    out.push(tag);
+    let len = content.len();
+    if len < 0x80 {
+        out.push(u8::try_from(len).unwrap_or(0));
+    } else if len < 0x100 {
+        out.extend([0x81, u8::try_from(len).unwrap_or(0)]);
+    } else {
+        out.extend([
+            0x82,
+            u8::try_from(len >> 8).unwrap_or(0),
+            u8::try_from(len & 0xff).unwrap_or(0),
+        ]);
+    }
+    out.extend(content);
+}
+
+/// Appends a random INTEGER: mostly short, sometimes empty, negative, or with leading zeros;
+/// a version (`small`) is mostly 0, 1, or 2.
+fn rsa_integer(random: &mut Random, out: &mut Vec<u8>, small: bool) {
+    let content: Vec<u8> = if small && random.below(4) != 0 {
+        vec![pick_octet(random, &[0, 1, 1, 2, 5, 0xff])]
+    } else {
+        let len = match random.below(6) {
+            0 => 0,
+            1 => 1,
+            2 => 5,
+            _ => random.below(14),
+        };
+        (0..len)
+            .map(|_| u8::try_from(random.below(256)).unwrap_or(0))
+            .collect()
+    };
+    tlv(out, 0x02, &content);
+}
+
+/// Appends a random AlgorithmIdentifier: a digest's, MGF1's, or pSpecified's OID, with NULL,
+/// nothing, another AlgorithmIdentifier, or an OCTET STRING.
+fn rsa_algor(random: &mut Random, out: &mut Vec<u8>, depth: u32) {
+    let oids: [&[u8]; 4] = [
+        &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01],
+        &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08],
+        &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x09],
+        &[0x2b, 0x0e, 0x03, 0x02, 0x1a],
+    ];
+    let mut body = Vec::new();
+    let which = usize::try_from(random.below(4)).unwrap_or(0);
+    tlv(&mut body, 0x06, oids.get(which).copied().unwrap_or(&[]));
+    match random.below(5) {
+        0 => {}
+        1 if depth == 0 => rsa_algor(random, &mut body, 1),
+        2 => tlv(&mut body, 0x04, b"label"),
+        _ => tlv(&mut body, 0x05, &[]),
+    }
+    tlv(out, 0x30, &body);
+}
+
+/// Appends BER near what RSA's items take (14 RSAPublicKey, 15 RSAPrivateKey, 16
+/// RSA_PSS_PARAMS, 17 RSA_OAEP_PARAMS, 18 BIGNUM): their fields mostly in place, some missing,
+/// replaced by other values, or followed by more, and a multi-prime key's list of other primes.
+fn rsa_ber(random: &mut Random, out: &mut Vec<u8>, item: u64) {
+    let mut body = Vec::new();
+    match item {
+        14 | 15 => {
+            let count = if item == 14 { 2 } else { 9 };
+            for i in 0..count {
+                match random.below(20) {
+                    0 => {}
+                    1 => ber_value(random, &mut body, item, 2),
+                    _ => rsa_integer(random, &mut body, item == 15 && i == 0),
+                }
+            }
+            if item == 15 && random.below(3) == 0 {
+                let mut list = Vec::new();
+                for _ in 0..random.below(4) {
+                    let mut info = Vec::new();
+                    for _ in 0..3 - u32::from(random.below(8) == 0) {
+                        rsa_integer(random, &mut info, false);
+                    }
+                    tlv(&mut list, 0x30, &info);
+                }
+                tlv(&mut body, 0x30, &list);
+            }
+            if random.below(10) == 0 {
+                ber_value(random, &mut body, item, 2);
+            }
+        }
+        16 | 17 => {
+            let fields = if item == 16 { 4 } else { 3 };
+            for tag in 0..fields {
+                if random.below(3) == 0 {
+                    continue;
+                }
+                let mut inner = Vec::new();
+                if item == 16 && tag >= 2 {
+                    rsa_integer(random, &mut inner, true);
+                } else {
+                    rsa_algor(random, &mut inner, 0);
+                }
+                let tag = if random.below(12) == 0 {
+                    0xa5
+                } else {
+                    0xa0 | tag
+                };
+                tlv(&mut body, tag, &inner);
+            }
+        }
+        _ => {
+            rsa_integer(random, out, false);
+            return;
+        }
+    }
+    tlv(out, 0x30, &body);
 }
 
 /// One of `octets`, at random.

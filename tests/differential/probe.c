@@ -121,7 +121,9 @@
  *   asnd2i <item> <hex>        ASN1_item_d2i of the octets with item <item> (0 ANY, 1 SEQUENCE_ANY,
  *                              2 SET_ANY, 3 OCTET_STRING, 4 INTEGER, 5 BIT_STRING, 6 BMPSTRING,
  *                              7 TIME, 8 DIRECTORYSTRING, 9 INT64, 10 UINT32, 11 the probe's
- *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING): how much was read
+ *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING, 14 RSAPublicKey,
+ *                              15 RSAPrivateKey, 16 RSA_PSS_PARAMS, 17 RSA_OAEP_PARAMS,
+ *                              18 BIGNUM): how much was read
  *                              and the re-encoding and ASN1_item_print listing, or the errors with
  *                              their data
  *   asnbio <hex>               ASN1_item_d2i_bio (as ANY) from a memory BIO over the octets until
@@ -339,6 +341,7 @@
 #include <openssl/rc2.h>
 #include <openssl/rc4.h>
 #include <openssl/ripemd.h>
+#include <openssl/rsa.h>
 #include <openssl/seed.h>
 #include <openssl/sha.h>
 #include <openssl/core_names.h>
@@ -1312,6 +1315,11 @@ static const ASN1_ITEM *probe_item(int n)
     case 10: return ASN1_ITEM_rptr(UINT32);
     case 11: return ASN1_ITEM_rptr(PROBEREC);
     case 12: return ASN1_ITEM_rptr(ASN1_SEQUENCE);
+    case 14: return ASN1_ITEM_rptr(RSAPublicKey);
+    case 15: return ASN1_ITEM_rptr(RSAPrivateKey);
+    case 16: return ASN1_ITEM_rptr(RSA_PSS_PARAMS);
+    case 17: return ASN1_ITEM_rptr(RSA_OAEP_PARAMS);
+    case 18: return ASN1_ITEM_rptr(BIGNUM);
     default: return ASN1_ITEM_rptr(ASN1_UTF8STRING);
     }
 }
