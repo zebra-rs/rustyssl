@@ -3529,10 +3529,24 @@ chunking) is clean.
       formulas on them, so neither its steps nor its arithmetic depend on the scalar; their
       results are unchanged (the C tests and 3,000 random EC sessions agree with the
       reference). The generic ladder no longer has a non-random mode.
-    - [ ] **4.4c2 `EC_KEY`:** the object and `EC_KEY_METHOD`, key generation and checks, the
-      public key's and private key's encodings, the key's ASN.1 (`ECPrivateKey`,
-      `ECParameters`, `i2o`/`o2i_ECPublicKey`), and `EC_KEY_print(_fp)` and
-      `ECParameters_print(_fp)`.
+    - [x] **4.4c2 `EC_KEY`** (`rustyssl-capi/src/ec/key.rs`, `ec/key_asn1.rs`; 68 exports):
+      the key as OpenSSL's structure holds it (a group, a point, and a private number, whose
+      handles `get0` returns), with references, ex_data, copy and dup, the flags and forms,
+      key generation (drawing as OpenSSL draws, SM2's range included) and the full check, the
+      octet forms of both keys, and `EC_KEY_METHOD` (an application's functions run around
+      every change, with no lock held). SEC 1's `ECPrivateKey` (OpenSSL's private
+      `EC_PRIVATEKEY` item, with its encoding flags) and its BIO and FILE forms,
+      `ECParameters`, `o2i`/`i2o_ECPublicKey`, `EC_KEY_print(_fp)`, and
+      `ECParameters_print(_fp)`. The library method's ECDSA and ECDH entries fail closed
+      until 4.4c3.
+      - `EC_POINT_oct2point` now reads at most one octet past the longest encoding, so a
+        huge length (`o2i_ECPublicKey`'s negative one, as `size_t`) is refused as OpenSSL
+        refuses it, without a slice of that length.
+      - Tests: `tests/c/ec_key.c` (145 checks: five curves' fixed keys every way, generation
+        on six, bad keys, copies, octets, eleven malformed encodings, BIO and FILE, an
+        application's method counting its calls, ex_data); the probe's `eckey` with
+        `corpus/eckey.txt` and random mutations; the `ec_key` fuzz target; one deviation
+        (NULL keys, which OpenSSL dereferences).
     - [ ] **4.4c3 ECDSA and ECDH:** `ECDSA_SIG` and its ASN.1, `ECDSA_sign`/`verify` and their
       `_ex` and setup forms, `ECDSA_size`, and `ECDH_compute_key` (cofactor mode, the X9.63
       KDF).
