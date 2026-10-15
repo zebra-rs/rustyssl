@@ -13,7 +13,7 @@
 //!   copies the functions and keeps the key type and flags.
 //!
 //! The built-in methods' functions work on the key types' legacy data: RSA's and RSA-PSS's are
-//! `rsa_pmeth.rs`'s; the other types' come with them (4.4 onwards) and abort when called until
+//! `rsa_pmeth.rs`'s, EC's `ec_pmeth.rs`'s; the other types' come with them (4.4 onwards) and abort when called until
 //! then (AGENTS.md rule 10). A context keeps its method alive while it uses
 //! it (OpenSSL's would use a freed method). Changing a built-in method, which OpenSSL can't do
 //! (they're read-only), does nothing here, and NULL methods are refused where it would crash
@@ -296,9 +296,21 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         verify: Some(builtin_verify),
         ..base
     };
-    let ec = Funcs {
-        derive: Some(builtin_derive),
-        ..dsa
+    let ec = {
+        use crate::ec_pmeth as e;
+        Funcs {
+            init: Some(e::pkey_ec_init),
+            copy: Some(e::pkey_ec_copy),
+            cleanup: Some(e::pkey_ec_cleanup),
+            paramgen: Some(e::pkey_ec_paramgen),
+            keygen: Some(e::pkey_ec_keygen),
+            sign: Some(e::pkey_ec_sign),
+            verify: Some(e::pkey_ec_verify),
+            derive: Some(e::pkey_ec_kdf_derive),
+            ctrl: Some(e::pkey_ec_ctrl),
+            ctrl_str: Some(e::pkey_ec_ctrl_str),
+            ..Funcs::default()
+        }
     };
     let pss = Funcs {
         sign_init: Some(crate::rsa_pmeth::pkey_pss_init),

@@ -2038,8 +2038,12 @@ ffi_export! {
                 | EVP_PKEY_DSA
                 | rustyssl_abi::EVP_PKEY_ED25519
                 | rustyssl_abi::EVP_PKEY_ED448 => 1,
-                // `EC_KEY_can_sign` of the key's data, which a typed key doesn't have yet.
-                EVP_PKEY_EC => crate::stub::unimplemented("EVP_PKEY_can_sign of an EC key"),
+                EVP_PKEY_EC => {
+                    // SAFETY: the caller's key.
+                    let ec = unsafe { super::pkey::ec::EVP_PKEY_get0_EC_KEY(pkey) };
+                    // SAFETY: its EC key, or NULL.
+                    unsafe { crate::ec::key::EC_KEY_can_sign(ec) }
+                }
                 _ => 0,
             };
         };
