@@ -84,7 +84,13 @@ fn tokenize(text: &str) -> Result<Vec<Token>> {
                     Some('"') => break,
                     Some('\\') => {
                         let e = chars.next().ok_or("an unfinished escape")?;
-                        s.push(e);
+                        s.push(match e {
+                            'n' => '\n',
+                            't' => '\t',
+                            'r' => '\r',
+                            '0' => '\0',
+                            other => other,
+                        });
                     }
                     Some(c) => s.push(c),
                     None => return Err("an unfinished string".into()),

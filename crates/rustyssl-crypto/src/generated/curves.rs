@@ -2466,7 +2466,7 @@ pub(crate) static CURVES: &[Curve] = &[
             0x1b, 0xd0, 0x86, 0x8f, 0xa8, 0x6c,
         ],
         method: Method::Generic,
-        comment: "ntIPSec/IKE/Oakley curve #3 over a 155 bit binary field.ntNot suitable for ECDSA.ntQuestionable extension field!",
+        comment: "\n\tIPSec/IKE/Oakley curve #3 over a 155 bit binary field.\n\tNot suitable for ECDSA.\n\tQuestionable extension field!",
     },
     Curve {
         nid: 750,
@@ -2498,7 +2498,7 @@ pub(crate) static CURVES: &[Curve] = &[
             0x7c, 0x44, 0xdb, 0x9f, 0x24, 0x20, 0xba, 0xfc, 0xa7, 0x5e,
         ],
         method: Method::Generic,
-        comment: "ntIPSec/IKE/Oakley curve #4 over a 185 bit binary field.ntNot suitable for ECDSA.ntQuestionable extension field!",
+        comment: "\n\tIPSec/IKE/Oakley curve #4 over a 185 bit binary field.\n\tNot suitable for ECDSA.\n\tQuestionable extension field!",
     },
     Curve {
         nid: 921,
