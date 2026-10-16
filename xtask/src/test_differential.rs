@@ -394,6 +394,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("eckm", eckm_session),
     ("ecsig", ecsig_session),
     ("ecdhx", ecdhx_session),
+    ("sm2sig", sm2sig_session),
     ("string", string_session),
 ];
 
@@ -3041,6 +3042,51 @@ fn ecdhx_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "ecdhx {curve} {a} {b} {mode} {md} {outlen} {ukm} {room}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the SM2 signature provider, from deterministic generators: messages and
+/// digest-sized numbers signed by keys of every size, with IDs of every length (or none), with
+/// SM3 or another digest; and signatures near valid ones verified.
+fn sm2sig_session(random: &mut Random, out: &mut String) -> Result {
+    for line in DETERMINISTIC_RAND {
+        writeln!(out, "{line}")?;
+    }
+    for _ in 0..random.below(6).saturating_add(1) {
+        let d = match random.below(6) {
+            0 => format!("{:x}", random.below(1000)),
+            1 => "F".repeat(64),
+            _ => random_hex(random, 32),
+        };
+        let id = match random.below(3) {
+            0 => "-".to_owned(),
+            _ => {
+                let len = usize::try_from(random.below(40)).unwrap_or(0);
+                if len == 0 {
+                    "-".to_owned()
+                } else {
+                    random_hex(random, len)
+                }
+            }
+        };
+        let md = random.pick(&["-", "-", "SM3", "SHA256"]);
+        let msg = if random.below(3) == 0 {
+            random_hex(random, 32)
+        } else {
+            let len = usize::try_from(random.below(100)).unwrap_or(0);
+            random_hex(random, len)
+        };
+        let sig = match random.below(3) {
+            0 => {
+                let len = usize::try_from(random.below(8))
+                    .unwrap_or(0)
+                    .saturating_add(64);
+                format!("30{}", random_hex(random, len))
+            }
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "sm2sig {d} {id} {md} {msg} {sig}")?;
     }
     Ok(())
 }

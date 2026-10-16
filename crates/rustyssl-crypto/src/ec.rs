@@ -22,6 +22,7 @@ pub mod group;
 pub mod mult;
 pub mod oct;
 pub mod point;
+pub mod sm2;
 
 pub use group::{Group, Meth};
 pub use point::Point;
