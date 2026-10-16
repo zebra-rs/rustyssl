@@ -323,6 +323,12 @@
  *   ecxkm <type> <sel> <priv|-> <pub|-> <ikm|->  an ECX key (X25519, ED25519, ...) from data,
  *                              its export, raw keys, and checks; with ikm, one generated from
  *                              DHKEM input key material instead
+ *   mlkemkm <alg> <sel> <seed|-> <privfrom|-> <pubfrom|-> <edits|->  an ML-KEM key from data:
+ *                              the seed given, and the private and public keys of the keys
+ *                              generated from the 64-octet seeds given, edited (comma-separated
+ *                              p@N^XX or q@N^XX to xor octet N of the private or public key,
+ *                              p@N=XX to set it, p#N to make it N octets); the key's parts (as
+ *                              SHA-256 prefixes), checks, sizes, and export
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5037,6 +5043,173 @@ static void ed25519_command(const char *line, int id)
     EVP_PKEY_free(k);
 }
 
+/* The first 8 octets of the SHA-256 of the octets, after a space, with their length. */
+static void ml_kem_digest(const unsigned char *p, size_t n)
+{
+    unsigned char d[32];
+    unsigned int dl = 0;
+
+    EVP_Digest(p, n, d, &dl, EVP_sha256(), NULL);
+    printf(" %zu:", n);
+    for (int i = 0; i < 8; i++)
+        printf("%02x", d[i]);
+}
+
+/* The private and public keys of the ML-KEM key of |alg| generated from a 64-octet seed. */
+static int ml_kem_keys_from_seed(const char *alg, const unsigned char *seed, unsigned char *priv,
+                                 size_t *privlen, unsigned char *pub, size_t *publen)
+{
+    OSSL_PARAM ps[2];
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
+    EVP_PKEY *k = NULL;
+    int ok;
+
+    ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED, (void *)seed, 64);
+    ps[1] = OSSL_PARAM_construct_end();
+    ok = c != NULL && EVP_PKEY_keygen_init(c) == 1 && EVP_PKEY_CTX_set_params(c, ps) == 1
+        && EVP_PKEY_generate(c, &k) == 1 && EVP_PKEY_get_raw_private_key(k, priv, privlen) == 1
+        && EVP_PKEY_get_raw_public_key(k, pub, publen) == 1;
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+    return ok;
+}
+
+/* Applies one edit (p@N^XX, p@N=XX, p#N, or the same with q) to the keys; 0 if malformed. */
+static int ml_kem_edit(const char *e, unsigned char *priv, size_t *privlen, unsigned char *pub,
+                       size_t *publen, size_t room)
+{
+    unsigned char *b = e[0] == 'p' ? priv : pub;
+    size_t *len = e[0] == 'p' ? privlen : publen;
+    size_t n;
+    unsigned int x;
+    char op;
+
+    if (e[0] != 'p' && e[0] != 'q')
+        return 0;
+    if (e[1] == '#') {
+        if (sscanf(e + 2, "%zu", &n) != 1 || n > room)
+            return 0;
+        if (n > *len)
+            memset(b + *len, 0, n - *len);
+        *len = n;
+        return 1;
+    }
+    if (e[1] != '@' || sscanf(e + 2, "%zu%c%2x", &n, &op, &x) != 3 || n >= *len)
+        return 0;
+    if (op == '^')
+        b[n] ^= (unsigned char)x;
+    else if (op == '=')
+        b[n] = (unsigned char)x;
+    else
+        return 0;
+    return 1;
+}
+
+/* mlkemkm: an ML-KEM key from data, and what its key manager makes of it. */
+static void ml_kem_keymgmt_command(const char *line)
+{
+    char alg[32] = "-", seed[300] = "-", privfrom[300] = "-", pubfrom[300] = "-";
+    char edits[300] = "-";
+    static unsigned char priv[4000], pub[2000], scratch[4000];
+    unsigned char sb[150], fb[150];
+    size_t sl = 0, fl = 0, privlen = 0, publen = 0, n;
+    unsigned int sel = 0;
+    OSSL_PARAM ps[4], *p = ps, *out = NULL;
+    EVP_PKEY_CTX *c;
+    EVP_PKEY *k = NULL;
+    static const char *const parts[] = { OSSL_PKEY_PARAM_ML_KEM_SEED, OSSL_PKEY_PARAM_PRIV_KEY,
+                                         OSSL_PKEY_PARAM_PUB_KEY };
+
+    sscanf(line, "%*s %31s %x %299s %299s %299s %299s", alg, &sel, seed, privfrom, pubfrom,
+           edits);
+    if (strcmp(seed, "-") != 0 && !parse_hex(seed, sb, &sl)) {
+        printf(" bad input\n");
+        return;
+    }
+    if (strcmp(privfrom, "-") != 0) {
+        size_t ql = sizeof(scratch);
+
+        privlen = sizeof(priv);
+        if (!parse_hex(privfrom, fb, &fl) || fl != 64
+            || !ml_kem_keys_from_seed(alg, fb, priv, &privlen, scratch, &ql)) {
+            printf(" bad private seed\n");
+            ERR_clear_error();
+            return;
+        }
+    }
+    if (strcmp(pubfrom, "-") != 0) {
+        size_t dl = sizeof(scratch);
+
+        publen = sizeof(pub);
+        if (!parse_hex(pubfrom, fb, &fl) || fl != 64
+            || !ml_kem_keys_from_seed(alg, fb, scratch, &dl, pub, &publen)) {
+            printf(" bad public seed\n");
+            ERR_clear_error();
+            return;
+        }
+    }
+    if (strcmp(edits, "-") != 0) {
+        for (char *e = strtok(edits, ","); e != NULL; e = strtok(NULL, ",")) {
+            if (!ml_kem_edit(e, priv, &privlen, pub, &publen,
+                             e[0] == 'p' ? sizeof(priv) : sizeof(pub))) {
+                printf(" bad edit\n");
+                return;
+            }
+        }
+    }
+    if (strcmp(seed, "-") != 0)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED, sb, sl);
+    if (strcmp(privfrom, "-") != 0)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, priv, privlen);
+    if (strcmp(pubfrom, "-") != 0)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub, publen);
+    *p = OSSL_PARAM_construct_end();
+    c = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
+    printf(" %d", EVP_PKEY_fromdata_init(c));
+    printf(" %d", EVP_PKEY_fromdata(c, &k, (int)sel, ps));
+    print_asn_errors();
+    if (k != NULL) {
+        EVP_PKEY_CTX *v = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+
+        printf(" ");
+        for (int i = 0; i < 3; i++) {
+            n = 0;
+            printf(" %s %d", parts[i],
+                   EVP_PKEY_get_octet_string_param(k, parts[i], scratch, sizeof(scratch), &n));
+            if (n > 0)
+                ml_kem_digest(scratch, n);
+        }
+        print_asn_errors();
+        printf("  check %d", EVP_PKEY_check(v));
+        printf(" public %d", EVP_PKEY_public_check(v));
+        printf(" private %d", EVP_PKEY_private_check(v));
+        printf(" pairwise %d", EVP_PKEY_pairwise_check(v));
+        printf(" bits %d security %d size %d", EVP_PKEY_get_bits(k),
+               EVP_PKEY_get_security_bits(k), EVP_PKEY_get_size(k));
+        print_asn_errors();
+        printf("  todata %d", EVP_PKEY_todata(k, EVP_PKEY_KEYPAIR, &out));
+        for (OSSL_PARAM *q = out; q != NULL && q->key != NULL; q++) {
+            printf(" %s", q->key);
+            ml_kem_digest(q->data, q->data_size);
+        }
+        print_asn_errors();
+        EVP_PKEY_CTX_free(v);
+    }
+    OSSL_PARAM_free(out);
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+}
+
+/* Runs an ML-KEM command; returns 0 if `command` isn't one. */
+static int ml_kem_command(const char *command, const char *line)
+{
+    if (strcmp(command, "mlkemkm") != 0)
+        return 0;
+    printf("%s:", line);
+    ml_kem_keymgmt_command(line);
+    return 1;
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -8796,7 +8969,8 @@ int main(void)
             || idea_seed_camellia_command(command, line) || bio_evp_command(command, line)
             || skey_command(command, line) || md_meth_command(command, line)
             || cipher_meth_command(command, line) || conf_command(command, line)
-            || conf_modules_command(command, line) || ec_command(command, line)) {
+            || conf_modules_command(command, line) || ec_command(command, line)
+            || ml_kem_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

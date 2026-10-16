@@ -8,6 +8,7 @@
 
 use core::ffi::{CStr, c_int, c_void};
 use core::ptr;
+use std::ffi::CString;
 
 use rustyssl_abi::{
     ERR_LIB_CRYPTO, OPENSSL_CORE_CTX, OPENSSL_FULL_VERSION_STRING, OPENSSL_VERSION_STR,
@@ -17,10 +18,11 @@ use rustyssl_abi::{
     OSSL_OP_ASYM_CIPHER, OSSL_OP_CIPHER, OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_KEM, OSSL_OP_KEYEXCH,
     OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_OP_SIGNATURE, OSSL_OP_SKEYMGMT, OSSL_PARAM,
     OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME,
-    OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_provider_init_fn,
+    OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_PROVIDER, OSSL_provider_init_fn,
 };
 
 use crate::ffi::ffi_callback;
+use crate::handle::Handle;
 use crate::params::{OSSL_PARAM_locate, OSSL_PARAM_set_int, OSSL_PARAM_set_utf8_ptr};
 use crate::version::OpenSSL_version;
 
@@ -35,8 +37,7 @@ pub(crate) static PREDEFINED: &[(&CStr, OSSL_provider_init_fn, bool)] = &[
 struct ProvCtx {
     /// The library context the provider was loaded into.
     libctx: *mut OPENSSL_CORE_CTX,
-    /// The provider's handle.
-    #[expect(dead_code, reason = "the algorithms (Phase 3 onwards) use it")]
+    /// The provider's handle (its `OSSL_PROVIDER`).
     handle: *const OSSL_CORE_HANDLE,
 }
 
@@ -48,6 +49,39 @@ struct ProvCtx {
 pub(crate) unsafe fn libctx_of(provctx: *mut c_void) -> *mut OSSL_LIB_CTX {
     // SAFETY: the caller's guarantee.
     unsafe { provctx.cast::<ProvCtx>().as_ref() }.map_or(ptr::null_mut(), |c| c.libctx.cast())
+}
+
+/// `ossl_prov_ctx_get_param`: the provider's configuration parameter `name`, or `None`.
+///
+/// # Safety
+/// As for [`libctx_of`].
+pub(crate) unsafe fn conf_param(provctx: *mut c_void, name: &CStr) -> Option<CString> {
+    // SAFETY: the caller's guarantee.
+    let c = unsafe { provctx.cast::<ProvCtx>().as_ref() }?;
+    // SAFETY: the context's handle is its provider, alive while the context is.
+    let prov: Option<&super::Provider> = unsafe { OSSL_PROVIDER::get(c.handle.cast()) };
+    super::conf_value(prov?, name)
+}
+
+/// `ossl_prov_ctx_get_bool_param`: the parameter `name` as a boolean (`1`, `yes`, `true`, `on`,
+/// or `0`, `no`, `false`, `off`, ignoring case), else `default`.
+///
+/// # Safety
+/// As for [`libctx_of`].
+pub(crate) unsafe fn conf_bool(provctx: *mut c_void, name: &CStr, default: bool) -> bool {
+    // SAFETY: the caller's guarantee.
+    let Some(v) = (unsafe { conf_param(provctx, name) }) else {
+        return default;
+    };
+    let v = v.to_bytes();
+    let is = |words: &[&[u8]]| words.iter().any(|w| v.eq_ignore_ascii_case(w));
+    if v == b"1" || is(&[b"yes", b"true", b"on"]) {
+        true
+    } else if v == b"0" || is(&[b"no", b"false", b"off"]) {
+        false
+    } else {
+        default
+    }
 }
 
 /// The parameters each built-in reports (`OSSL_PARAM_DEFN`s), ended by an empty one.

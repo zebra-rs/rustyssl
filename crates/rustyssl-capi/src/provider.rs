@@ -61,6 +61,7 @@ pub(crate) mod kdfs;
 mod kdfs_more;
 pub(crate) mod keymgmt;
 pub(crate) mod macs;
+pub(crate) mod ml_kem_kmgmt;
 pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
@@ -1420,6 +1421,17 @@ ffi_export! {
         p.parameters.lock().unwrap_or_else(PoisonError::into_inner).push((name, value));
         1
     }
+}
+
+/// The provider's configuration parameter `name`, as the core's `core_get_params` gives it to
+/// the provider (the last of that name winning).
+pub(crate) fn conf_value(p: &Provider, name: &CStr) -> Option<CString> {
+    let parameters = p.parameters.lock().unwrap_or_else(PoisonError::into_inner);
+    parameters
+        .iter()
+        .rev()
+        .find(|(n, _)| n.as_c_str() == name)
+        .map(|(_, v)| v.clone())
 }
 
 /// `OSSL_PROVIDER_get_conf_parameters`: points each parameter of `params` named like one of
