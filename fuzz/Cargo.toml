@@ -401,6 +401,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "mlx_kem"
+path = "fuzz_targets/mlx_kem.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ml_kem_kmgmt"
 path = "fuzz_targets/ml_kem_kmgmt.rs"
 test = false

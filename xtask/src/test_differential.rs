@@ -404,6 +404,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("mldsa", mldsa_session),
     ("slhdsakm", slhdsakm_session),
     ("slhdsa", slhdsa_session),
+    ("mlx", mlx_session),
     ("string", string_session),
 ];
 
@@ -3492,6 +3493,29 @@ fn slhdsa_session(random: &mut Random, out: &mut String) -> Result {
             edits.join(",")
         };
         writeln!(out, "slhdsa {alg} {seed} {msg} {ctx} {opts} {room} {edits}")?;
+    }
+    Ok(())
+}
+
+/// A random session of the hybrid ML-KEM groups: keys from random seeds, and decapsulations of
+/// streamed ciphertexts of the right length most often, else a little shorter or longer.
+fn mlx_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let alg = random.pick(&[
+            "X25519MLKEM768",
+            "X448MLKEM1024",
+            "SecP256r1MLKEM768",
+            "SecP384r1MLKEM1024",
+        ]);
+        let seed = random_hex(random, 64);
+        let len = usize::try_from(random.below(16).saturating_add(1)).unwrap_or(1);
+        let ctseed = random_hex(random, len);
+        let delta = match random.below(6) {
+            0 => -1 - i64::try_from(random.below(60)).unwrap_or(0),
+            1 => 1 + i64::try_from(random.below(60)).unwrap_or(0),
+            _ => 0,
+        };
+        writeln!(out, "mlx {alg} {seed} {ctseed} {delta}")?;
     }
     Ok(())
 }

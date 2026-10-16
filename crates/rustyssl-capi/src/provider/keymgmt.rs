@@ -1062,10 +1062,26 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &super::ml_kem_kmgmt::ML_KEM_1024_KEYMGMT,
         c"OpenSSL ML-KEM-1024 implementation",
     ),
-    pending(c"X25519MLKEM768"),
-    pending(c"X448MLKEM1024"),
-    pending(c"SecP256r1MLKEM768"),
-    pending(c"SecP384r1MLKEM1024"),
+    alg_desc(
+        c"X25519MLKEM768",
+        &super::mlx_kmgmt::X25519_KEYMGMT,
+        c"X25519+ML-KEM-768 TLS hybrid implementation",
+    ),
+    alg_desc(
+        c"X448MLKEM1024",
+        &super::mlx_kmgmt::X448_KEYMGMT,
+        c"X448+ML-KEM-1024 TLS hybrid implementation",
+    ),
+    alg_desc(
+        c"SecP256r1MLKEM768",
+        &super::mlx_kmgmt::P256_KEYMGMT,
+        c"P-256+ML-KEM-768 TLS hybrid implementation",
+    ),
+    alg_desc(
+        c"SecP384r1MLKEM1024",
+        &super::mlx_kmgmt::P384_KEYMGMT,
+        c"P-384+ML-KEM-1024 TLS hybrid implementation",
+    ),
     alg_desc(
         c"SLH-DSA-SHA2-128s:id-slh-dsa-sha2-128s:2.16.840.1.101.3.4.3.20",
         &super::slh_dsa_kmgmt::SHA2_128S_KEYMGMT,

@@ -3716,7 +3716,7 @@ chunking) is clean.
         legacy `EC_KEY`); the probe's `sm2enc` with `corpus/sm2enc.txt` and random sessions
         (ciphertexts compared whole, from deterministic generators; 1,000 pass); the
         `sm2_crypt` fuzz target (arbitrary ciphertexts decrypted, the input round-tripped).
-- [ ] **4.5 ECX and post-quantum:**
+- [x] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)
   - ML-KEM-512/768/1024, ML-DSA-44/65/87, and every SLH-DSA parameter set
   - the hybrid TLS groups (X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024)
@@ -3930,8 +3930,24 @@ chunking) is clean.
         rooms and public keys, other algorithms, the `EVP_DigestSign` route, and the
         operation's context); the probe's `slhdsa` (the `mldsa` command generalized) with
         `corpus/slhdsa.txt` and random sessions; the `slh_dsa_ops` fuzz target.
-  - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
-    SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).
+  - [x] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
+    SecP384r1MLKEM1024 (`provider/mlx_kmgmt.rs`, `provider/mlx_kem.rs`; no new exports). As in
+    `mlx_kmgmt.c` and `mlx_kem.c`, each key is an ML-KEM `EVP_PKEY` and an ECDH one, made and
+    used through EVP with the key's library context and properties; the encodings concatenate
+    the two (ML-KEM's first, except for the NIST curves). A key is set once (an import, an
+    encoded public key on a key from parameter generation, or a generation) and never mutated;
+    the private key goes through the components as octet strings, so a NIST curve's (an integer
+    parameter) can be neither imported nor exported, as in OpenSSL; copies are of no key or the
+    whole pair. The KEM encapsulates with ML-KEM and an ephemeral ECDH key (its public key the
+    ECDH part of the ciphertext) and decapsulates with both, with ML-KEM's KEM's buffer rules
+    and the secret wiped on failure. Locks are never held across the EVP calls.
+    - Tests: `tests/c/evp_mlx_kem.c` (12 checks: names, lists, generated keys, exports by
+      selection, imports of each part and of wrong lengths, an encoded public key set on an empty
+      key and again, copies, round trips, size queries, rooms too small, missing buffers,
+      ciphertexts changed and of other lengths, and properties without the components); the
+      probe's `mlx` (keys from seeds, decapsulations of streamed ciphertexts byte for byte, and
+      encapsulations) with `corpus/mlx.txt` and random sessions (200 pass); the `mlx_kem` fuzz
+      target.
 - [ ] **4.6 DH and DSA:**
   - DH: the FFDHE (RFC 7919) and MODP groups, X9.42 DHX, paramgen, the check functions
     (CVE-2023-3446/3817 bounds)

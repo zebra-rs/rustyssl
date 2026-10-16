@@ -65,6 +65,8 @@ pub(crate) mod ml_dsa_kmgmt;
 pub(crate) mod ml_dsa_sig;
 mod ml_kem_kem;
 pub(crate) mod ml_kem_kmgmt;
+mod mlx_kem;
+pub(crate) mod mlx_kmgmt;
 pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
