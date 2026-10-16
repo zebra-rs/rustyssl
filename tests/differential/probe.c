@@ -377,6 +377,10 @@
  *   dsader <k|p|u> <hex>       d2i_DSAPrivateKey (k), d2i_DSAparams (p), or d2i_DSAPublicKey (u)
  *                              of the octets: the result, the octets consumed, the numbers, and
  *                              whether each encoding of the key re-encodes them
+ *   dsakey <p> <q> <g> <pub|gx> <priv> <edit|->  a DSA key from data through the key manager
+ *                              (numbers in hex, - for none, or RFC 6979's DSA-1024 key's parts
+ *                              k:p, k:q, k:g, k:y, k:x; gx for g^priv mod p; the edit adds to
+ *                              one, as for dhkey), then its sizes and every validation
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -6051,12 +6055,130 @@ static void dsa_der_command(const char *line)
     OPENSSL_free(der);
 }
 
+/* A number from hex, - (none), or one of RFC 6979's DSA-1024 key's parts (k:p ...). */
+static BIGNUM *dsa_number(const char *spec)
+{
+    BIGNUM *b = NULL;
+    DSA *d;
+    const BIGNUM *v = NULL;
+
+    if (strcmp(spec, "-") == 0)
+        return NULL;
+    if (strncmp(spec, "k:", 2) == 0) {
+        d = rfc6979_dsa("k");
+        switch (spec[2]) {
+        case 'p':
+            v = DSA_get0_p(d);
+            break;
+        case 'q':
+            v = DSA_get0_q(d);
+            break;
+        case 'g':
+            v = DSA_get0_g(d);
+            break;
+        case 'y':
+            v = DSA_get0_pub_key(d);
+            break;
+        default:
+            BN_hex2bn(&b, "411602CB19A6CCC34494D79D98EF1E7ED5AF25F7");
+            break;
+        }
+        if (v != NULL)
+            b = BN_dup(v);
+        DSA_free(d);
+        return b;
+    }
+    if (BN_hex2bn(&b, spec) == 0)
+        return NULL;
+    return b;
+}
+
+/* dsakey: a DSA key from data through the key manager, then its checks. */
+static void dsa_key_command(const char *line)
+{
+    char ps[400] = "-", qs[100] = "-", gs[400] = "-", ys[400] = "-", xs[100] = "-";
+    char edit[32] = "-";
+    BIGNUM *p, *q, *g, *y = NULL, *x;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *params;
+    EVP_PKEY_CTX *c;
+    EVP_PKEY *k = NULL;
+    unsigned int add;
+
+    sscanf(line, "%*s %399s %99s %399s %399s %99s %31s", ps, qs, gs, ys, xs, edit);
+    p = dsa_number(ps);
+    q = dsa_number(qs);
+    g = dsa_number(gs);
+    x = dsa_number(xs);
+    if (strcmp(ys, "gx") == 0) {
+        BN_CTX *bc = BN_CTX_new();
+
+        y = BN_new();
+        if (p == NULL || g == NULL || x == NULL || BN_is_zero(p) || !BN_mod_exp(y, g, x, p, bc)) {
+            BN_free(y);
+            y = NULL;
+        }
+        BN_CTX_free(bc);
+    } else {
+        y = dsa_number(ys);
+    }
+    if (sscanf(edit, "p%u", &add) == 1 && p != NULL)
+        BN_add_word(p, add);
+    else if (sscanf(edit, "q%u", &add) == 1 && q != NULL)
+        BN_add_word(q, add);
+    else if (sscanf(edit, "g%u", &add) == 1 && g != NULL)
+        BN_add_word(g, add);
+    else if (sscanf(edit, "y%u", &add) == 1 && y != NULL)
+        BN_add_word(y, add);
+    else if (sscanf(edit, "x%u", &add) == 1 && x != NULL)
+        BN_add_word(x, add);
+    if (p != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, p);
+    if (q != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, q);
+    if (g != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, g);
+    if (y != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, y);
+    if (x != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, x);
+    params = OSSL_PARAM_BLD_to_param(bld);
+    c = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    printf(" fromdata %d", EVP_PKEY_fromdata_init(c));
+    printf(" %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, params));
+    EVP_PKEY_CTX_free(c);
+    OSSL_PARAM_free(params);
+    OSSL_PARAM_BLD_free(bld);
+    BN_free(p);
+    BN_free(q);
+    BN_free(g);
+    BN_free(y);
+    BN_free(x);
+    print_asn_errors();
+    if (k == NULL)
+        return;
+    printf("  bits %d security %d size %d", EVP_PKEY_get_bits(k), EVP_PKEY_get_security_bits(k),
+           EVP_PKEY_get_size(k));
+    c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+    printf(" check %d", EVP_PKEY_check(c));
+    printf(" public %d", EVP_PKEY_public_check(c));
+    printf(" %d", EVP_PKEY_public_check_quick(c));
+    printf(" param %d", EVP_PKEY_param_check(c));
+    printf(" %d", EVP_PKEY_param_check_quick(c));
+    printf(" private %d", EVP_PKEY_private_check(c));
+    printf(" pairwise %d", EVP_PKEY_pairwise_check(c));
+    EVP_PKEY_CTX_free(c);
+    print_asn_errors();
+    EVP_PKEY_free(k);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
     if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
         && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0
-        && strcmp(command, "dsaverify") != 0 && strcmp(command, "dsader") != 0)
+        && strcmp(command, "dsaverify") != 0 && strcmp(command, "dsader") != 0
+        && strcmp(command, "dsakey") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
@@ -6069,6 +6191,8 @@ static int dh_command(const char *command, const char *line)
         dsa_verify_command(line);
     else if (strcmp(command, "dsader") == 0)
         dsa_der_command(line);
+    else if (strcmp(command, "dsakey") == 0)
+        dsa_key_command(line);
     else
         dh_check_command(line);
     return 1;

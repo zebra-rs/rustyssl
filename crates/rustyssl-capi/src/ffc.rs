@@ -13,8 +13,9 @@ use core::ptr;
 use std::ffi::CString;
 
 use rustyssl_abi::{
-    DH_R_BAD_FFC_PARAMETERS, DH_R_NOT_SUITABLE_GENERATOR, DSA_R_BAD_FFC_PARAMETERS,
-    DSA_R_P_NOT_PRIME, DSA_R_Q_NOT_PRIME, ERR_LIB_DH, ERR_LIB_DSA, OSSL_LIB_CTX,
+    BN_R_NO_INVERSE, DH_R_BAD_FFC_PARAMETERS, DH_R_NOT_SUITABLE_GENERATOR,
+    DSA_R_BAD_FFC_PARAMETERS, DSA_R_P_NOT_PRIME, DSA_R_Q_NOT_PRIME, ERR_LIB_BN, ERR_LIB_DH,
+    ERR_LIB_DSA, OSSL_LIB_CTX,
 };
 use rustyssl_crypto::bn::{self as core_bn, BigNum, Endian};
 use rustyssl_crypto::ffc::{self, NamedGroup};
@@ -261,6 +262,18 @@ fn canonical_g(md: &Md, p: &BigNum, e: &BigNum, gindex: c_int, seed: &[u8]) -> O
         }
     }
     None
+}
+
+/// `BN_MONT_CTX_set` of p, which the g stage of generation and verification does first: false
+/// for an even p (with `BN_R_NO_INVERSE`) or zero.
+fn mont_ok(p: &BigNum) -> bool {
+    if p.is_odd() {
+        return true;
+    }
+    if !p.is_zero() {
+        err::raise(ERR_LIB_BN, BN_R_NO_INVERSE, "BN_mod_inverse");
+    }
+    false
 }
 
 /// `ossl_ffc_params_validate_unverifiable_g` (FIPS 186-4 A.2.2): `2 <= g <= p - 1` and
@@ -647,6 +660,9 @@ pub(crate) unsafe fn gen_verify_186_4(
     };
 
     // g.
+    if !mont_ok(&p) {
+        return Status::Failed;
+    }
     if flags & VALIDATE_G != 0 {
         let Some(g) = params.g.as_ref() else {
             return Status::Failed;
@@ -842,6 +858,9 @@ pub(crate) unsafe fn gen_verify_186_2(
     };
     let mut g_out = None;
     let mut hret = -1;
+    if !mont_ok(&p) {
+        return Status::Failed;
+    }
     if !verify {
         let mut pm1 = p.clone();
         if pm1.sub_word(1).is_err() {

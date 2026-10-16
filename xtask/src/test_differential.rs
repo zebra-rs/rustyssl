@@ -411,6 +411,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dhexch", dhexch_session),
     ("dsaverify", dsaverify_session),
     ("dsader", dsader_session),
+    ("dsakey", dsakey_session),
     ("string", string_session),
 ];
 
@@ -3815,6 +3816,51 @@ fn dsader_session(random: &mut Random, out: &mut String) -> Result {
         };
         let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
         writeln!(out, "dsader {kind} {hex}")?;
+    }
+    Ok(())
+}
+
+/// A random session of DSA keys from data: RFC 6979's DSA-1024 parameters (now and then a part
+/// missing or small), private keys of random lengths or at q, public keys computed from them or
+/// at the bounds, and a number now and then changed.
+fn dsakey_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let part = |random: &mut Random, name: &str| match random.below(14) {
+            0 => "-".to_owned(),
+            1 => format!("{:x}", random.below(64).saturating_add(2)),
+            _ => format!("k:{name}"),
+        };
+        let p = part(random, "p");
+        let q = part(random, "q");
+        let g = part(random, "g");
+        let x = match random.below(8) {
+            0 => "-".to_owned(),
+            1 => "k:q".to_owned(),
+            2 => format!("{:x}", random.below(4)),
+            3 => "k:x".to_owned(),
+            _ => {
+                let len = usize::try_from(random.below(22))
+                    .unwrap_or(0)
+                    .saturating_add(1);
+                random_hex(random, len)
+            }
+        };
+        let y = match random.below(8) {
+            0 => "-".to_owned(),
+            1 => format!("{:x}", random.below(4)),
+            2 => "k:p".to_owned(),
+            3 => "k:y".to_owned(),
+            _ => "gx".to_owned(),
+        };
+        let edit = match random.below(5) {
+            0 => format!(
+                "{}{}",
+                random.pick(&["p", "q", "g", "y", "x"]),
+                random.below(5).saturating_add(1)
+            ),
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "dsakey {p} {q} {g} {y} {x} {edit}")?;
     }
     Ok(())
 }

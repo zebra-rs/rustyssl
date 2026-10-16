@@ -1,0 +1,22 @@
+# DSA keys from data through the key manager: RFC 6979's DSA-1024 key, its public key computed
+# from other private keys, keys at and out of their ranges, missing parts, and numbers changed.
+dsakey k:p k:q k:g k:y k:x -
+dsakey k:p k:q k:g gx k:x -
+dsakey k:p k:q k:g gx 1234 -
+dsakey k:p k:q k:g gx k:q -
+dsakey k:p k:q k:g gx 0 -
+dsakey k:p k:q k:g gx 1 -
+dsakey k:p k:q k:g k:y k:x y1
+dsakey k:p k:q k:g k:y k:x x1
+dsakey k:p k:q k:g k:y k:x p2
+dsakey k:p k:q k:g k:y k:x q2
+dsakey k:p k:q k:g k:y k:x g1
+dsakey k:p k:q k:g 1 - -
+dsakey k:p k:q k:g k:p - -
+dsakey k:p - k:g k:y k:x -
+dsakey - k:q k:g k:y k:x -
+dsakey k:p k:q - k:y k:x -
+dsakey k:q k:q 5 2 3 -
+dsakey 17 3 5 7 2 -
+dsakey k:p k:q k:g - k:x -
+dsakey - - - - - -

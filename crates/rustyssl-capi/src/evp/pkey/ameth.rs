@@ -203,10 +203,6 @@ extern "C" fn builtin_key(_: *const EVP_PKEY) -> c_int {
     crate::stub::unimplemented("a built-in ASN.1 method's function of a key")
 }
 
-extern "C" fn builtin_param_copy(_: *mut EVP_PKEY, _: *const EVP_PKEY) -> c_int {
-    crate::stub::unimplemented("copying parameters through a built-in ASN.1 method")
-}
-
 extern "C" fn builtin_ctrl(_: *mut EVP_PKEY, _: c_int, _: c_long, _: *mut c_void) -> c_int {
     crate::stub::unimplemented("a built-in ASN.1 method's ctrl")
 }
@@ -221,10 +217,6 @@ extern "C" fn builtin_old_priv_decode(_: *mut EVP_PKEY, _: *mut *const c_uchar, 
 
 extern "C" fn builtin_print(_: *mut BIO, _: *const EVP_PKEY, _: c_int, _: *mut ASN1_PCTX) -> c_int {
     crate::stub::unimplemented("printing a key through a built-in ASN.1 method")
-}
-
-extern "C" fn builtin_param_decode(_: *mut EVP_PKEY, _: *mut *const c_uchar, _: c_int) -> c_int {
-    crate::stub::unimplemented("decoding parameters through a built-in ASN.1 method")
 }
 
 ffi_callback! {
@@ -305,11 +297,26 @@ impl Kind {
                 f.copy = Some(d::dh_pkey_copy);
             }
             Self::Dsa => {
-                f.param_decode = Some(builtin_param_decode);
-                f.param_print = Some(builtin_print);
-                f.param_missing = Some(builtin_key);
-                f.param_copy = Some(builtin_param_copy);
-                f.param_cmp = Some(builtin_cmp);
+                use super::dsa as d;
+                f.pub_cmp = Some(d::dsa_pub_cmp);
+                f.pub_print = Some(d::dsa_pub_print);
+                f.priv_print = Some(d::dsa_priv_print);
+                f.pkey_size = Some(d::int_dsa_size);
+                f.pkey_bits = Some(d::dsa_bits);
+                f.pkey_security_bits = Some(d::dsa_security_bits);
+                f.param_decode = Some(d::dsa_param_decode);
+                f.param_encode = Some(d::dsa_param_encode);
+                f.param_missing = Some(d::dsa_missing_parameters);
+                f.param_copy = Some(d::dsa_copy_parameters);
+                f.param_cmp = Some(d::dsa_cmp_parameters);
+                f.param_print = Some(d::dsa_param_print);
+                f.pkey_free = Some(d::int_dsa_free);
+                f.pkey_ctrl = Some(d::dsa_pkey_ctrl);
+                f.old_priv_decode = Some(d::old_dsa_priv_decode);
+                f.dirty_cnt = Some(d::dsa_pkey_dirty_cnt);
+                f.export_to = Some(d::dsa_pkey_export_to);
+                f.import_from = Some(d::dsa_pkey_import_from);
+                f.copy = Some(d::dsa_pkey_copy);
             }
             Self::Ecx { ed, is448 } => {
                 use super::ecx as x;
@@ -382,7 +389,7 @@ impl Kind {
             }
             Self::Alias => {}
         }
-        if matches!(self, Self::Rsa | Self::Dsa) {
+        if matches!(self, Self::Rsa) {
             f.old_priv_decode = Some(builtin_old_priv_decode);
         }
         f
