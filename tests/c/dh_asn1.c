@@ -257,7 +257,7 @@ static void test_pem(void)
     back = PEM_read_bio_DHparams(b, NULL, NULL, NULL);
     show("read back", back);
     DH_free(back);
-    BIO_reset(b);
+    (void)BIO_reset(b);
     printf("  write x %d", PEM_write_bio_DHxparams(b, r));
     n = BIO_get_mem_data(b, &data);
     printf(" (%ld):\n%.*s", n, (int)n, data);
@@ -265,7 +265,7 @@ static void test_pem(void)
     show("read back", back);
     DH_free(back);
     errors();
-    BIO_reset(b);
+    (void)BIO_reset(b);
     back = PEM_read_bio_DHparams(b, NULL, NULL, NULL);
     printf("  read empty %d", back != NULL);
     errors();
