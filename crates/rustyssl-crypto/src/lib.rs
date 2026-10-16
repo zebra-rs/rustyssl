@@ -16,6 +16,7 @@ pub mod lowlevel;
 pub mod mac;
 pub mod md;
 pub mod method_store;
+pub mod mlkem;
 pub mod namemap;
 pub mod params;
 pub mod property;
