@@ -383,6 +383,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "ml_dsa_ops"
+path = "fuzz_targets/ml_dsa_ops.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ml_kem_kmgmt"
 path = "fuzz_targets/ml_kem_kmgmt.rs"
 test = false

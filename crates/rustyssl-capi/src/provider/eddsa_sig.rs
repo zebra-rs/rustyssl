@@ -206,8 +206,8 @@ impl EddsaCtx {
     }
 }
 
-/// `ossl_DER_w_algorithmIdentifier_ED25519` and `_ED448`: `SEQUENCE { OID }`.
-fn eddsa_aid(nid: c_int) -> Vec<u8> {
+/// `ossl_DER_w_algorithmIdentifier_ED25519` and `_ED448` (and ML-DSA's): `SEQUENCE { OID }`.
+pub(super) fn eddsa_aid(nid: c_int) -> Vec<u8> {
     let Some(oid) = objects::object(nid).map(|o| o.der) else {
         return Vec::new();
     };

@@ -336,6 +336,13 @@
  *                              ikmE given, else random) into rooms of croom and sroom octets,
  *                              then the decapsulation of its ciphertext edited (comma-separated
  *                              c@N^XX to xor octet N, c#N to make it N octets)
+ *   mldsa <alg> <keyseed> <msg|-> <ctx|-|e> <opts|-> <room> <edits|->  an ML-DSA signature with
+ *                              the key generated from the 32-octet seed, of the message (with
+ *                              the context string, e for an empty one), the options (comma-
+ *                              separated det=N, enc=N, mu=N, ent=HEX for the parameters; pub to
+ *                              verify with the public key alone), into room octets (0 for a size
+ *                              query), then its verification edited (s@N^XX to xor octet N of
+ *                              the signature, s#N to make it N octets, m@N^XX for the message)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5281,15 +5288,122 @@ static void ml_kem_ops_command(const char *line)
     EVP_PKEY_free(k);
 }
 
-/* Runs an ML-KEM command; returns 0 if `command` isn't one. */
+/* mldsa: a signature with the options given, then the verification of it, edited. */
+static void ml_dsa_ops_command(const char *line)
+{
+    char alg[32] = "-", keyseed[100] = "-", msg[600] = "-", ctx[600] = "-", opts[700] = "-";
+    char edits[300] = "-";
+    static unsigned char priv[6000], pub[3000], sig[6000];
+    unsigned char kb[300], mb[300], cb[300], eb[300], vm[300];
+    size_t kl = 0, ml = 0, cl = 0, el = 0, privlen = sizeof(priv), publen = sizeof(pub);
+    size_t room = 0, siglen;
+    int det = 0, enc = 1, mu = 0, have_det = 0, have_enc = 0, have_mu = 0, have_ent = 0;
+    int pubonly = 0, r, fixed;
+    OSSL_PARAM ps[6], *p = ps;
+    EVP_PKEY *k, *vk;
+    EVP_PKEY_CTX *c;
+    EVP_SIGNATURE *s;
+
+    sscanf(line, "%*s %31s %99s %599s %599s %699s %zu %299s", alg, keyseed, msg, ctx, opts,
+           &room, edits);
+    if (!parse_hex(keyseed, kb, &kl) || kl != 32
+        || (strcmp(msg, "-") != 0 && !parse_hex(msg, mb, &ml))
+        || (strcmp(ctx, "-") != 0 && strcmp(ctx, "e") != 0 && !parse_hex(ctx, cb, &cl))
+        || room > sizeof(sig) || !ml_kem_keys_from_seed(alg, kb, priv, &privlen, pub, &publen)) {
+        printf(" bad input\n");
+        ERR_clear_error();
+        return;
+    }
+    if (strcmp(opts, "-") != 0) {
+        for (char *o = strtok(opts, ","); o != NULL; o = strtok(NULL, ",")) {
+            if (sscanf(o, "det=%d", &det) == 1) {
+                have_det = 1;
+            } else if (sscanf(o, "enc=%d", &enc) == 1) {
+                have_enc = 1;
+            } else if (sscanf(o, "mu=%d", &mu) == 1) {
+                have_mu = 1;
+            } else if (strncmp(o, "ent=", 4) == 0 && parse_hex(o + 4, eb, &el)) {
+                have_ent = 1;
+            } else if (strcmp(o, "pub") == 0) {
+                pubonly = 1;
+            } else {
+                printf(" bad option\n");
+                return;
+            }
+        }
+    }
+    if (strcmp(ctx, "-") != 0)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, cb, cl);
+    if (have_ent)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_SIGNATURE_PARAM_TEST_ENTROPY, eb, el);
+    if (have_det)
+        *p++ = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, &det);
+    if (have_enc)
+        *p++ = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING, &enc);
+    if (have_mu)
+        *p++ = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_MU, &mu);
+    *p = OSSL_PARAM_construct_end();
+    /* Signatures are fixed with 32 octets of test entropy, or deterministic without any. */
+    fixed = have_ent ? el == 32 : det == 1;
+
+    k = EVP_PKEY_new_raw_private_key_ex(NULL, alg, NULL, priv, privlen);
+    s = EVP_SIGNATURE_fetch(NULL, alg, NULL);
+    c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+    printf(" init %d", EVP_PKEY_sign_message_init(c, s, ps));
+    memset(sig, 0x77, sizeof(sig));
+    siglen = room;
+    r = EVP_PKEY_sign(c, room == 0 ? NULL : sig, &siglen, mb, ml);
+    printf(" sign %d %zu", r, siglen);
+    if (r == 1 && room != 0 && fixed)
+        ml_kem_digest(sig, siglen);
+    print_asn_errors();
+    EVP_PKEY_CTX_free(c);
+    if (r == 1 && room != 0) {
+        memcpy(vm, mb, ml);
+        if (strcmp(edits, "-") != 0) {
+            for (char *e = strtok(edits, ","); e != NULL; e = strtok(NULL, ",")) {
+                size_t n;
+                unsigned int x;
+
+                if (e[0] == 's' && e[1] == '#' && sscanf(e + 2, "%zu", &n) == 1
+                    && n <= sizeof(sig)) {
+                    siglen = n;
+                } else if (e[0] == 's' && e[1] == '@' && sscanf(e + 2, "%zu^%2x", &n, &x) == 2
+                           && n < siglen) {
+                    sig[n] ^= (unsigned char)x;
+                } else if (e[0] == 'm' && e[1] == '@' && sscanf(e + 2, "%zu^%2x", &n, &x) == 2
+                           && n < ml) {
+                    vm[n] ^= (unsigned char)x;
+                } else {
+                    printf("  bad edit\n");
+                    break;
+                }
+            }
+        }
+        vk = pubonly ? EVP_PKEY_new_raw_public_key_ex(NULL, alg, NULL, pub, publen) : k;
+        c = EVP_PKEY_CTX_new_from_pkey(NULL, vk, NULL);
+        printf("  vinit %d", EVP_PKEY_verify_message_init(c, s, ps));
+        printf(" verify %d", EVP_PKEY_verify(c, sig, siglen, vm, ml));
+        print_asn_errors();
+        EVP_PKEY_CTX_free(c);
+        if (vk != k)
+            EVP_PKEY_free(vk);
+    }
+    EVP_SIGNATURE_free(s);
+    EVP_PKEY_free(k);
+}
+
+/* Runs an ML-KEM or ML-DSA command; returns 0 if `command` isn't one. */
 static int ml_kem_command(const char *command, const char *line)
 {
     if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0
-        && strcmp(command, "mldsakm") != 0)
+        && strcmp(command, "mldsakm") != 0 && strcmp(command, "mldsa") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "mlkem") == 0)
         ml_kem_ops_command(line);
+    else if (strcmp(command, "mldsa") == 0)
+        ml_dsa_ops_command(line);
     else
         ml_kem_keymgmt_command(line);
     return 1;

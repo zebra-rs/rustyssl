@@ -401,6 +401,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("mlkemkm", mlkemkm_session),
     ("mlkem", mlkem_session),
     ("mldsakm", mldsakm_session),
+    ("mldsa", mldsa_session),
     ("string", string_session),
 ];
 
@@ -3296,6 +3297,106 @@ fn mldsakm_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "mldsakm {alg} {selection} {seed} {privfrom} {pubfrom} {edits}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the ML-DSA signatures: messages and context strings of every length up
+/// to past the limit (often none), each option now and then (deterministic, an encoding, mu
+/// with a message of 64 octets or another length, test entropy of 32 octets or another
+/// length, the public key alone for the verification), rooms around the signature's size (or
+/// a size query), and the verification of the signature as is, with octets of it or the
+/// message changed, or of another length.
+fn mldsa_session(random: &mut Random, out: &mut String) -> Result {
+    const ALGS: [(&str, u64); 3] = [
+        ("ML-DSA-44", 2420),
+        ("ML-DSA-65", 3309),
+        ("ML-DSA-87", 4627),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(3)).unwrap_or(0);
+        let (alg, slen) = ALGS.get(i).copied().unwrap_or(ALGS[0]);
+        let seed = random_hex(random, 32);
+        let mut opts = Vec::new();
+        if random.below(3) != 0 {
+            opts.push(format!("det={}", random.below(3)));
+        }
+        if random.below(5) == 0 {
+            opts.push(format!("enc={}", random.below(3)));
+        }
+        let mu = random.below(5) == 0;
+        if mu {
+            opts.push(format!("mu={}", random.below(2)));
+        }
+        if random.below(4) == 0 {
+            let len = match random.below(4) {
+                0 => usize::try_from(random.below(40)).unwrap_or(0),
+                _ => 32,
+            };
+            opts.push(format!("ent={}", random_hex(random, len)));
+        }
+        if random.below(4) == 0 {
+            opts.push("pub".to_owned());
+        }
+        let opts = if opts.is_empty() {
+            "-".to_owned()
+        } else {
+            opts.join(",")
+        };
+        let mlen = match random.below(4) {
+            0 if mu => 64,
+            0 => 0,
+            1 => usize::try_from(random.below(257)).unwrap_or(0),
+            _ => usize::try_from(random.below(70)).unwrap_or(0),
+        };
+        let msg = if mlen == 0 {
+            "-".to_owned()
+        } else {
+            random_hex(random, mlen)
+        };
+        let ctx = match random.below(6) {
+            0 => "e".to_owned(),
+            1 => {
+                let len = usize::try_from(random.below(3).saturating_add(254)).unwrap_or(0);
+                random_hex(random, len)
+            }
+            2 | 3 => {
+                let len = usize::try_from(random.below(20).saturating_add(1)).unwrap_or(1);
+                random_hex(random, len)
+            }
+            _ => "-".to_owned(),
+        };
+        let room = match random.below(8) {
+            0 => 0,
+            1 => slen.saturating_sub(random.below(3).saturating_add(1)),
+            2 => slen.saturating_add(random.below(100)),
+            _ => slen,
+        };
+        let mut edits = Vec::new();
+        for _ in 0..random.below(3) {
+            edits.push(match random.below(5) {
+                0 => format!(
+                    "s#{}",
+                    slen.saturating_add(random.below(3)).saturating_sub(1)
+                ),
+                1 if mlen > 0 => format!(
+                    "m@{}^{:02x}",
+                    random.below(u64::try_from(mlen).unwrap_or(1)),
+                    random.below(255).saturating_add(1)
+                ),
+                _ => format!(
+                    "s@{}^{:02x}",
+                    random.below(slen),
+                    random.below(255).saturating_add(1)
+                ),
+            });
+        }
+        let edits = if edits.is_empty() {
+            "-".to_owned()
+        } else {
+            edits.join(",")
+        };
+        writeln!(out, "mldsa {alg} {seed} {msg} {ctx} {opts} {room} {edits}")?;
     }
     Ok(())
 }
