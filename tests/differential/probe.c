@@ -345,6 +345,8 @@
  *                              verify with the public key alone), into room octets (0 for a size
  *                              query), then its verification edited (s@N^XX to xor octet N of
  *                              the signature, s#N to make it N octets, m@N^XX for the message)
+ *   slhdsa <alg> <keyseed> <msg|-> <ctx|-|e> <opts|-> <room> <edits|->  as mldsa, for SLH-DSA
+ *                              (keys from 3n octets of seeds; no mu, test entropy of n octets)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5303,12 +5305,12 @@ static void ml_kem_ops_command(const char *line)
     EVP_PKEY_free(k);
 }
 
-/* mldsa: a signature with the options given, then the verification of it, edited. */
+/* mldsa and slhdsa: a signature with the options given, then the verification of it, edited. */
 static void ml_dsa_ops_command(const char *line)
 {
-    char alg[32] = "-", keyseed[100] = "-", msg[600] = "-", ctx[600] = "-", opts[700] = "-";
+    char alg[32] = "-", keyseed[200] = "-", msg[600] = "-", ctx[600] = "-", opts[700] = "-";
     char edits[300] = "-";
-    static unsigned char priv[6000], pub[3000], sig[6000];
+    static unsigned char priv[6000], pub[3000], sig[50000];
     unsigned char kb[300], mb[300], cb[300], eb[300], vm[300];
     size_t kl = 0, ml = 0, cl = 0, el = 0, privlen = sizeof(priv), publen = sizeof(pub);
     size_t room = 0, siglen;
@@ -5319,9 +5321,9 @@ static void ml_dsa_ops_command(const char *line)
     EVP_PKEY_CTX *c;
     EVP_SIGNATURE *s;
 
-    sscanf(line, "%*s %31s %99s %599s %599s %699s %zu %299s", alg, keyseed, msg, ctx, opts,
+    sscanf(line, "%*s %31s %199s %599s %599s %699s %zu %299s", alg, keyseed, msg, ctx, opts,
            &room, edits);
-    if (!parse_hex(keyseed, kb, &kl) || kl != 32
+    if (!parse_hex(keyseed, kb, &kl) || kl != pq_seed_len(alg)
         || (strcmp(msg, "-") != 0 && !parse_hex(msg, mb, &ml))
         || (strcmp(ctx, "-") != 0 && strcmp(ctx, "e") != 0 && !parse_hex(ctx, cb, &cl))
         || room > sizeof(sig) || !ml_kem_keys_from_seed(alg, kb, priv, &privlen, pub, &publen)) {
@@ -5358,8 +5360,14 @@ static void ml_dsa_ops_command(const char *line)
     if (have_mu)
         *p++ = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_MU, &mu);
     *p = OSSL_PARAM_construct_end();
-    /* Signatures are fixed with 32 octets of test entropy, or deterministic without any. */
-    fixed = have_ent ? el == 32 : det == 1;
+    /*
+     * Signatures are fixed with test entropy of the right length (32 octets, or SLH-DSA's n), or
+     * deterministic without any (ML-DSA's deterministic is 1, SLH-DSA's any nonzero value).
+     */
+    if (strncmp(alg, "SLH-DSA", 7) == 0)
+        fixed = have_ent ? el == pq_seed_len(alg) / 3 : det != 0;
+    else
+        fixed = have_ent ? el == 32 : det == 1;
 
     k = EVP_PKEY_new_raw_private_key_ex(NULL, alg, NULL, priv, privlen);
     s = EVP_SIGNATURE_fetch(NULL, alg, NULL);
@@ -5413,12 +5421,12 @@ static int ml_kem_command(const char *command, const char *line)
 {
     if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0
         && strcmp(command, "mldsakm") != 0 && strcmp(command, "mldsa") != 0
-        && strcmp(command, "slhdsakm") != 0)
+        && strcmp(command, "slhdsakm") != 0 && strcmp(command, "slhdsa") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "mlkem") == 0)
         ml_kem_ops_command(line);
-    else if (strcmp(command, "mldsa") == 0)
+    else if (strcmp(command, "mldsa") == 0 || strcmp(command, "slhdsa") == 0)
         ml_dsa_ops_command(line);
     else
         ml_kem_keymgmt_command(line);

@@ -403,6 +403,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("mldsakm", mldsakm_session),
     ("mldsa", mldsa_session),
     ("slhdsakm", slhdsakm_session),
+    ("slhdsa", slhdsa_session),
     ("string", string_session),
 ];
 
@@ -3385,6 +3386,112 @@ fn slhdsakm_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "slhdsakm {alg} {selection} - {privfrom} {pubfrom} {edits}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the SLH-DSA signatures, as `mldsa_session` (keys from `3n` octets of
+/// seeds, test entropy of `n` octets or another length, no `mu`), on the fast parameter sets
+/// (the small ones, slow to sign, rarely).
+fn slhdsa_session(random: &mut Random, out: &mut String) -> Result {
+    const ALGS: [(&str, usize, u64); 12] = [
+        ("SLH-DSA-SHA2-128f", 16, 17088),
+        ("SLH-DSA-SHA2-192f", 24, 35664),
+        ("SLH-DSA-SHA2-256f", 32, 49856),
+        ("SLH-DSA-SHAKE-128f", 16, 17088),
+        ("SLH-DSA-SHAKE-192f", 24, 35664),
+        ("SLH-DSA-SHAKE-256f", 32, 49856),
+        ("SLH-DSA-SHA2-128s", 16, 7856),
+        ("SLH-DSA-SHA2-192s", 24, 16224),
+        ("SLH-DSA-SHA2-256s", 32, 29792),
+        ("SLH-DSA-SHAKE-128s", 16, 7856),
+        ("SLH-DSA-SHAKE-192s", 24, 16224),
+        ("SLH-DSA-SHAKE-256s", 32, 29792),
+    ];
+    for _ in 0..random.below(3).saturating_add(1) {
+        let i = if random.below(10) == 0 {
+            random.below(12)
+        } else {
+            random.below(6)
+        };
+        let i = usize::try_from(i).unwrap_or(0);
+        let (alg, n, slen) = ALGS.get(i).copied().unwrap_or(ALGS[0]);
+        let seed = random_hex(random, n.saturating_mul(3));
+        let mut opts = Vec::new();
+        if random.below(3) != 0 {
+            opts.push(format!("det={}", random.below(3)));
+        }
+        if random.below(5) == 0 {
+            opts.push(format!("enc={}", random.below(3)));
+        }
+        if random.below(4) == 0 {
+            let len = match random.below(4) {
+                0 => usize::try_from(random.below(40)).unwrap_or(0),
+                _ => n,
+            };
+            opts.push(format!("ent={}", random_hex(random, len)));
+        }
+        if random.below(4) == 0 {
+            opts.push("pub".to_owned());
+        }
+        let opts = if opts.is_empty() {
+            "-".to_owned()
+        } else {
+            opts.join(",")
+        };
+        let mlen = match random.below(4) {
+            0 => 0,
+            1 => usize::try_from(random.below(257)).unwrap_or(0),
+            _ => usize::try_from(random.below(70)).unwrap_or(0),
+        };
+        let msg = if mlen == 0 {
+            "-".to_owned()
+        } else {
+            random_hex(random, mlen)
+        };
+        let ctx = match random.below(6) {
+            0 => "e".to_owned(),
+            1 => {
+                let len = usize::try_from(random.below(3).saturating_add(254)).unwrap_or(0);
+                random_hex(random, len)
+            }
+            2 | 3 => {
+                let len = usize::try_from(random.below(20).saturating_add(1)).unwrap_or(1);
+                random_hex(random, len)
+            }
+            _ => "-".to_owned(),
+        };
+        let room = match random.below(8) {
+            0 => 0,
+            1 => slen.saturating_sub(random.below(3).saturating_add(1)),
+            2 => slen.saturating_add(random.below(100)),
+            _ => slen,
+        };
+        let mut edits = Vec::new();
+        for _ in 0..random.below(3) {
+            edits.push(match random.below(5) {
+                0 => format!(
+                    "s#{}",
+                    slen.saturating_add(random.below(3)).saturating_sub(1)
+                ),
+                1 if mlen > 0 => format!(
+                    "m@{}^{:02x}",
+                    random.below(u64::try_from(mlen).unwrap_or(1)),
+                    random.below(255).saturating_add(1)
+                ),
+                _ => format!(
+                    "s@{}^{:02x}",
+                    random.below(slen),
+                    random.below(255).saturating_add(1)
+                ),
+            });
+        }
+        let edits = if edits.is_empty() {
+            "-".to_owned()
+        } else {
+            edits.join(",")
+        };
+        writeln!(out, "slhdsa {alg} {seed} {msg} {ctx} {opts} {room} {edits}")?;
     }
     Ok(())
 }
