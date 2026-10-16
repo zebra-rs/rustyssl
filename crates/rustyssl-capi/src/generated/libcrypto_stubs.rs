@@ -3759,18 +3759,8 @@ pub extern "C" fn EVP_PKEY_delete_attr(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_DH(_: *const EVP_PKEY) -> *const dh_st {
-    crate::stub::unimplemented("EVP_PKEY_get0_DH")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get0_DSA(_: *const EVP_PKEY) -> *const dsa_st {
     crate::stub::unimplemented("EVP_PKEY_get0_DSA")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get1_DH(_: *mut EVP_PKEY) -> *mut dh_st {
-    crate::stub::unimplemented("EVP_PKEY_get1_DH")
 }
 
 #[unsafe(no_mangle)]
@@ -3807,11 +3797,6 @@ pub extern "C" fn EVP_PKEY_get_attr_by_OBJ(
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get_attr_count(_: *const EVP_PKEY) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_get_attr_count")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set1_DH(_: *mut EVP_PKEY, _: *mut dh_st) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set1_DH")
 }
 
 #[unsafe(no_mangle)]

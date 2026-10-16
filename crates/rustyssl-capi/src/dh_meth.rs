@@ -13,17 +13,18 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
 use rustyssl_abi::{
-    BIGNUM, BN_CTX, BN_FLG_CONSTTIME, BN_GENCB, BN_MONT_CTX, BN_RAND_BOTTOM_ANY, BN_RAND_TOP_ONE,
-    DH, DH_FLAG_CACHE_MONT_P, DH_FLAG_FIPS_METHOD, DH_METHOD, DH_R_INVALID_SECRET,
-    DH_R_MODULUS_TOO_LARGE, DH_R_MODULUS_TOO_SMALL, DH_R_NO_PRIVATE_VALUE, DH_R_Q_TOO_LARGE,
-    ERR_LIB_DH, ERR_R_BN_LIB, OPENSSL_DH_MAX_MODULUS_BITS,
+    BIGNUM, BN_CTX, BN_FLG_CONSTTIME, BN_GENCB, BN_MONT_CTX, BN_R_CALLED_WITH_EVEN_MODULUS,
+    BN_R_NO_INVERSE, BN_RAND_BOTTOM_ANY, BN_RAND_TOP_ONE, DH, DH_FLAG_CACHE_MONT_P,
+    DH_FLAG_FIPS_METHOD, DH_METHOD, DH_R_INVALID_SECRET, DH_R_MODULUS_TOO_LARGE,
+    DH_R_MODULUS_TOO_SMALL, DH_R_NO_PRIVATE_VALUE, DH_R_Q_TOO_LARGE, ERR_LIB_BN, ERR_LIB_DH,
+    ERR_R_BN_LIB, OPENSSL_DH_MAX_MODULUS_BITS,
 };
 use rustyssl_crypto::bn::{self as core_bn, BigNum, Endian};
 
 use crate::bn::ctx::{BN_CTX_free, BN_CTX_new_ex};
 use crate::bn::modular::BN_mod_exp_mont;
 use crate::bn::{BN_free, BN_set_flags, new_bignum, value};
-use crate::dh::{DhState, dh};
+use crate::dh::{Dh, DhState, dh};
 use crate::err;
 use crate::ffc;
 use crate::ffi::{ffi_callback, ffi_export};
@@ -193,6 +194,11 @@ unsafe fn mod_exp(
     let f = f?;
     let builtin: BnModExpFn = dh_bn_mod_exp;
     if ptr::fn_addr_eq(f, builtin) {
+        // `BN_mod_exp_mont` takes only an odd modulus.
+        if !m.is_odd() {
+            err::raise(ERR_LIB_BN, BN_R_CALLED_WITH_EVEN_MODULUS, "BN_mod_exp_mont");
+            return None;
+        }
         return core_bn::modular::exp_mod(a, e, m).ok();
     }
     // SAFETY: the key's library context (via the key), or NULL.
@@ -211,6 +217,36 @@ unsafe fn mod_exp(
     unsafe { BN_CTX_free(ctx) };
     // SAFETY: ours.
     ok.then(|| unsafe { value(r.0) }).flatten()
+}
+
+/// `BN_MONT_CTX_set_locked` of the prime, for a key that caches its Montgomery form
+/// (`DH_FLAG_CACHE_MONT_P`): false, with `BN_R_NO_INVERSE`, for an even prime (which has
+/// none), as OpenSSL fails before running the method's `bn_mod_exp`.
+fn mont_ok(k: &Dh, p: &BigNum) -> bool {
+    if k.flags() & DH_FLAG_CACHE_MONT_P == 0 || p.is_odd() {
+        return true;
+    }
+    if !p.is_zero() {
+        err::raise(ERR_LIB_BN, BN_R_NO_INVERSE, "BN_mod_inverse");
+    }
+    false
+}
+
+/// `ossl_dh_generate_public_key`: `g^x mod p` with the key's method's `bn_mod_exp`, or `None`.
+///
+/// # Safety
+/// `d` is a live key.
+pub(crate) unsafe fn generate_public_key(d: *mut DH, st: &DhState, x: &BigNum) -> Option<BigNum> {
+    // SAFETY: the caller's guarantee.
+    let k = unsafe { dh(d) }?;
+    // SAFETY: the key's method, live.
+    let f = unsafe { fns_of(k.meth()) }.and_then(|f| f.bn_mod_exp);
+    let (p, g) = (st.params.p.as_ref()?, st.params.g.as_ref()?);
+    if !mont_ok(k, p) {
+        return None;
+    }
+    // SAFETY: the caller's key and its method's function.
+    unsafe { mod_exp(d, f, g, x, p) }
 }
 
 /// The modulus limits both operations check first: `None` to go on, else the result to
@@ -308,6 +344,9 @@ ffi_callback! {
             let (Some(p), Some(g)) = (st.params.p.as_ref(), st.params.g.as_ref()) else {
                 return None;
             };
+            if !mont_ok(k, p) {
+                return None;
+            }
             // SAFETY: the caller's key and its method's function.
             let pub_key = unsafe { mod_exp(dh, f, g, &priv_key, p) }?;
             st.priv_key = Some(priv_key);
@@ -347,6 +386,9 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(peer) = (unsafe { value(pub_key) }) else { return -1 };
         let Some(p) = st.params.p.as_ref() else { return -1 };
+        if !mont_ok(k, p) {
+            return -1;
+        }
         // SAFETY: the key's method, live.
         let f = unsafe { fns_of(k.meth()) }.and_then(|f| f.bn_mod_exp);
         // SAFETY: the caller's key and its method's function.

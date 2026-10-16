@@ -3,8 +3,9 @@
 //! curve name, or its explicit parameters, each way. The key manager reuses the conversion to
 //! fill a caller's array.
 
-use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_long, c_void};
 use core::ptr;
+use std::ffi::CString;
 
 use rustyssl_abi::{
     BIGNUM, BN_CTX, CRYPTO_R_TOO_SMALL_BUFFER, EC_GROUP, EC_POINT, EC_R_FIELD_TOO_LARGE,
@@ -47,12 +48,13 @@ use crate::ffi::ffi_export;
 use crate::params::bn::{OSSL_PARAM_get_BN, OSSL_PARAM_set_BN};
 use crate::params::build::{
     OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_BN, OSSL_PARAM_BLD_push_BN_pad,
-    OSSL_PARAM_BLD_push_int, OSSL_PARAM_BLD_push_octet_string, OSSL_PARAM_BLD_push_utf8_string,
-    OSSL_PARAM_BLD_to_param,
+    OSSL_PARAM_BLD_push_int, OSSL_PARAM_BLD_push_long, OSSL_PARAM_BLD_push_octet_string,
+    OSSL_PARAM_BLD_push_utf8_string, OSSL_PARAM_BLD_to_param,
 };
 use crate::params::{
     OSSL_PARAM_get_int, OSSL_PARAM_get_utf8_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
-    OSSL_PARAM_set_int, OSSL_PARAM_set_octet_string, OSSL_PARAM_set_utf8_string,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_long, OSSL_PARAM_set_octet_string,
+    OSSL_PARAM_set_utf8_string,
 };
 
 /// The parameter types, as `data_type` holds them.
@@ -216,11 +218,28 @@ impl Target {
         }
     }
 
-    /// `ossl_param_build_set_utf8_string`.
+    /// `ossl_param_build_set_long`.
     ///
     /// # Safety
     /// The target is live.
-    pub(crate) unsafe fn utf8(self, key: &CStr, v: &'static CStr) -> bool {
+    pub(crate) unsafe fn long(self, key: &CStr, v: c_long) -> bool {
+        match self {
+            // SAFETY: the caller's guarantee; a static key.
+            Self::Builder(b) => (unsafe { OSSL_PARAM_BLD_push_long(b, key.as_ptr(), v) }) != 0,
+            Self::Params(p) => {
+                // SAFETY: as above.
+                let q = unsafe { Self::locate(p, key) };
+                // SAFETY: a parameter of the array.
+                q.is_null() || unsafe { OSSL_PARAM_set_long(q, v) } != 0
+            }
+        }
+    }
+
+    /// `ossl_param_build_set_utf8_string`; a builder reads `v` when it makes its array.
+    ///
+    /// # Safety
+    /// The target is live; `v` lives until a builder makes its array.
+    pub(crate) unsafe fn utf8(self, key: &CStr, v: &CStr) -> bool {
         match self {
             Self::Builder(b) => {
                 // SAFETY: the caller's guarantee; static strings.
@@ -317,6 +336,7 @@ pub(crate) struct Kept {
     numbers: Vec<*mut BIGNUM>,
     generator: Option<Encoded>,
     octets: Vec<Vec<u8>>,
+    strings: Vec<CString>,
 }
 
 impl Kept {
@@ -324,6 +344,12 @@ impl Kept {
     pub(crate) fn octets(&mut self, v: Vec<u8>) -> &[u8] {
         self.octets.push(v);
         self.octets.last().map_or(&[], Vec::as_slice)
+    }
+
+    /// A string kept until the array is made.
+    pub(crate) fn string(&mut self, v: CString) -> &CStr {
+        self.strings.push(v);
+        self.strings.last().map_or(c"", CString::as_c_str)
     }
 
     /// A new number kept until the array is made, or NULL.

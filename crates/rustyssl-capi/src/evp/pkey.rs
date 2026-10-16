@@ -58,6 +58,7 @@ use crate::params::{
 use crate::provider::Ptr;
 
 pub(crate) mod ameth;
+pub(crate) mod dh;
 pub(crate) mod ec;
 pub(crate) mod ecx;
 pub(crate) mod params;
@@ -2105,6 +2106,7 @@ ffi_export! {
         let base = ameth::find(type_).map(|m| (m.get().base_id, m.get().is_dynamic()));
         let rsa = matches!(base, Some((EVP_PKEY_RSA | EVP_PKEY_RSA_PSS, false)));
         let ec = matches!(base, Some((rustyssl_abi::EVP_PKEY_EC, false)));
+        let dh = matches!(base, Some((rustyssl_abi::EVP_PKEY_DH | rustyssl_abi::EVP_PKEY_DHX, false)));
         let ecx = matches!(
             base,
             Some((
@@ -2115,7 +2117,7 @@ ffi_export! {
                 false
             ))
         );
-        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec && !ecx {
+        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec && !ecx && !dh {
             // The other built-in key types' data come with them.
             crate::stub::unimplemented("EVP_PKEY_assign of a built-in key type's data");
         }
@@ -2139,8 +2141,8 @@ ffi_export! {
         if !set_type(Some(k), type_, None, None) {
             return 0;
         }
-        // `detect_foreign_key`: an `RSA` or (EC's type, not SM2's) an `EC_KEY` whose method
-        // isn't OpenSSL's.
+        // `detect_foreign_key`: an `RSA`, (EC's type, not SM2's) an `EC_KEY`, or (DH's type,
+        // not DHX's) a `DH` whose method isn't OpenSSL's.
         let foreign = if rsa {
             // SAFETY: the caller's guarantee: an `RSA`.
             let meth = unsafe { crate::rsa::rsa(key.cast()) }.map(crate::rsa::Rsa::meth);
@@ -2151,6 +2153,9 @@ ffi_export! {
             let m = unsafe { crate::ec::key::EC_KEY_get_method(key.cast()) };
             // SAFETY: no preconditions.
             m != unsafe { crate::ec::key::EC_KEY_OpenSSL() }
+        } else if dh && type_ == rustyssl_abi::EVP_PKEY_DH {
+            // SAFETY: the caller's guarantee: a `DH`, or NULL.
+            unsafe { super::pkey::dh::is_foreign(key.cast()) }
         } else {
             false
         };

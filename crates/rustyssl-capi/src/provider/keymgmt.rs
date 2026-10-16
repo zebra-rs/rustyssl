@@ -954,8 +954,16 @@ static KDF_KEYMGMT: Dispatch<4> = Dispatch([
 /// The default provider's key managers, in `deflt_keymgmt`'s order; the key types of later
 /// steps are pending (their names registered, nothing offered).
 static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
-    pending(c"DH:dhKeyAgreement:1.2.840.113549.1.3.1"),
-    pending(c"DHX:X9.42 DH:dhpublicnumber:1.2.840.10046.2.1"),
+    alg_desc(
+        c"DH:dhKeyAgreement:1.2.840.113549.1.3.1",
+        &super::dh_kmgmt::DH_KEYMGMT,
+        c"OpenSSL PKCS#3 DH implementation",
+    ),
+    alg_desc(
+        c"DHX:X9.42 DH:dhpublicnumber:1.2.840.10046.2.1",
+        &super::dh_kmgmt::DHX_KEYMGMT,
+        c"OpenSSL X9.42 DH implementation",
+    ),
     pending(c"DSA:dsaEncryption:1.2.840.10040.4.1"),
     alg_desc(
         c"RSA:rsaEncryption:1.2.840.113549.1.1.1",

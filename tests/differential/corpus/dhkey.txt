@@ -1,0 +1,28 @@
+# DH and DHX keys from data through the key managers: named groups and RFC 5114's with public
+# keys computed from their private keys (gx), keys at and out of their ranges, missing parts,
+# private key lengths, and numbers changed by an edit.
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef - -
+dhkey DH ffdhe2048:p ffdhe2048:q ffdhe2048:g gx 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef 256 -
+dhkey DH ffdhe2048:p ffdhe2048:q ffdhe2048:g gx 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef 225 -
+dhkey DHX dh_2048_256:p dh_2048_256:q dh_2048_256:g gx 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef - -
+dhkey DHX dh_1024_160:p dh_1024_160:q dh_1024_160:g gx abcdef0123456789 - -
+dhkey DH dh_2048_224:p dh_2048_224:q dh_2048_224:g gx 7 - -
+dhkey DHX dh_2048_224:p dh_2048_224:q dh_2048_224:g gx 7 - q1
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 1234 - y1
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 1234 - x1
+dhkey DH ffdhe2048:p - ffdhe2048:g 1 - - -
+dhkey DH ffdhe2048:p - ffdhe2048:g 2 - - -
+dhkey DH ffdhe2048:p - ffdhe2048:g ffdhe2048:p - - -
+dhkey DH ffdhe2048:p - ffdhe2048:g ffdhe2048:p - - y1
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 0 - -
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 1 - -
+dhkey DH ffdhe2048:p ffdhe2048:q ffdhe2048:g gx ffdhe2048:q - -
+dhkey DH ffdhe2048:p ffdhe2048:q ffdhe2048:g gx ffdhe2048:q - x1
+dhkey DH modp_1536:p - modp_1536:g gx 12345 100 -
+dhkey DH modp_1536:p - modp_1536:g gx 1ffff 17 -
+dhkey DH - - - 5 3 - -
+dhkey DH f7e75fdc469067ffdc4e847c51f452df - 05 gx 1234 - -
+dhkey DH f7e75fdc469067ffdc4e847c51f452df 7bf3afee234833ff 05 gx 1234 - -
+dhkey DH ffdhe3072:p - ffdhe3072:g - 1234 - -
+dhkey DHX ffdhe3072:p ffdhe3072:q ffdhe3072:g gx 99 - g1
+dhkey DH ffdhe2048:p - ffdhe2048:g gx 1234567890abcdef - p2
