@@ -3995,8 +3995,26 @@ chunking) is clean.
         RFC 5114, broken, missing, and generated parameters; public keys at and around the
         bounds; and the KDF); the probe's `dhcheck` with `corpus/dhcheck.txt` and random
         sessions (300 pass).
-    - [ ] **4.6a3 ASN.1, printing, and `EVP_PKEY`** (`d2i`/`i2d_DHparams`, `DHxparams`,
-      `DHparams_print`, PEM, `EVP_PKEY_get1_DH`).
+    - [x] **4.6a3 ASN.1, PEM, and printing** (`dh_asn1.rs`; 14 exports): PKCS #3's
+      DHparameter as `DHparams_it` (a shadowed item over the `DH` handle, as `RSAPublicKey` is,
+      with OpenSSL's field names `params.p`, `params.g`, and an optional zero-default `length`),
+      whose decoding reuses the key's p and g, types it DH, and caches its named group;
+      X9.42's DomainParameters through OpenSSL's private items `int_dhx942_dh` and
+      `int_dhvparams` (`d2i_DHxparams` makes a new DHX-typed key, replacing the one given, with
+      j and the validation seed and counter; `i2d_DHxparams` encodes the seed as a BIT STRING
+      without unused bits, and the counter, only when both are set); PEM writing of each kind
+      and reading of either (`PEM_read_bio_DHparams`, with the FILE forms); and
+      `DHparams_print` (`do_dh_print` with `ossl_ffc_params_print`: the seed 15 octets a line,
+      the counter, and the recommended private length).
+      - Tests: `tests/c/dh_asn1.c` (5 checks: round trips of named, RFC 5114, made-up, and
+        empty parameters as both encodings; hand-made encodings with lengths, j, validation
+        parameters (unused bits, empty seeds, missing counters), and malformed ones with their
+        errors; the item through `ASN1_item_d2i` and `ASN1_item_i2d`, and decoding into a key;
+        PEM through BIOs and FILEs; and printing); the probe's `dhder` with `corpus/dhder.txt`
+        and random mutated sessions (400 pass); the `dh_params` fuzz target (1.5 million runs, clean).
+    - [ ] **4.6a4 The DH providers and `EVP_PKEY`**: the DH and DHX key managers, the DH
+      exchange (with the X9.42 KDF), `EVP_PKEY_get1_DH` and its siblings, and the legacy
+      ASN.1 and `EVP_PKEY_METHOD`s.
   - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
     (with deterministic nonces); ASN.1, printing, and `EVP_PKEY`.
   - [ ] **4.6c The providers**: the DH and DHX key managers and exchange, the DSA key manager

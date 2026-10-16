@@ -407,6 +407,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "dh_params"
+path = "fuzz_targets/dh_params.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ml_kem_kmgmt"
 path = "fuzz_targets/ml_kem_kmgmt.rs"
 test = false
