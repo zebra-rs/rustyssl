@@ -3851,7 +3851,7 @@ chunking) is clean.
         decapsulation of the ciphertext as is, changed, and of other lengths, random
         encapsulations, a public key, and an empty key); the probe's `mlkem` with
         `corpus/mlkem.txt` and random sessions (300 pass); the `ml_kem_ops` fuzz target.
-  - [ ] **4.5d ML-DSA-44/65/87**, in sub-steps:
+  - [x] **4.5d ML-DSA-44/65/87**, in sub-steps:
     - [x] **4.5d1 The arithmetic and the key managers** (`rustyssl-crypto/src/mldsa.rs`,
       `provider/ml_dsa_kmgmt.rs`; no new exports): FIPS 204 written in-house over our SHAKE
       sponge: polynomials mod `q = 8380417` with Montgomery multiplication, the NTT,
@@ -3872,8 +3872,24 @@ chunking) is clean.
         against the reference, as unit tests; `tests/c/evp_ml_dsa_kmgmt.c` (13 checks); the
         probe's `mldsakm` with `corpus/mldsakm.txt` and random sessions (200 pass); the
         `ml_dsa_kmgmt` fuzz target.
-    - [ ] **4.5d2 The signatures** (`ml_dsa_sig.c`): pure, with a context string, external mu,
-      deterministic and hedged, through each EVP route.
+    - [x] **4.5d2 The signatures** (`provider/ml_dsa_sig.rs`; no new exports): `ml_dsa_sig.c`
+      and `ml_dsa_sign.c`'s message handling, through `EVP_PKEY_sign_message_init` and
+      `EVP_DigestSign` (no digest may be named): the pure encoding with a context string of at
+      most 255 octets (`message-encoding` 1, the default, or any value but 0), the raw message
+      (0), or an external `mu` of exactly 64 octets; hedged randomness, zeros
+      (`deterministic` 1), or a `test-entropy` of exactly 32 octets. As in OpenSSL, the context
+      holds the key data without a reference and keeps its parameters across its own inits
+      (only `mu` is reset; EVP's inits make a new one), a key of another parameter set fails
+      the init without an error, a key without a private key fails even a size query, a room
+      too small or a `mu` of the wrong length fails without an error (the latter still
+      reporting the signature's length), and the algorithm identifier is
+      `SEQUENCE { id-ml-dsa-NN }`.
+      - Tests: `tests/c/evp_ml_dsa_ops.c` (30 checks: names and parameters, deterministic
+        signatures with context strings and encodings, verification of changed signatures,
+        messages, and contexts, external mu, test entropy, hedged signatures, rooms and
+        public keys, other algorithms' keys, the `EVP_DigestSign` route, and the operation's
+        context); the probe's `mldsa` with `corpus/mldsa.txt` and random sessions (500 pass);
+        the `ml_dsa_ops` fuzz target.
   - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.
   - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
     SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).

@@ -25,7 +25,7 @@ use super::builtin::libctx_of;
 use super::keymgmt::{mac_free, mac_key, mac_key_up_ref};
 use super::rsa_sig;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, entry, pending};
-use super::{ecdsa_sig, eddsa_sig};
+use super::{ecdsa_sig, eddsa_sig, ml_dsa_sig};
 use crate::err;
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch,
@@ -528,9 +528,18 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
         &ecdsa_sig::ECDSA_SHA3_512_SIGNATURE,
     ),
     alg(c"SM2:1.2.156.10197.1.301", &super::sm2_sig::SM2_SIGNATURE),
-    pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
-    pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
-    pending(c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87"),
+    alg(
+        c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44",
+        &ml_dsa_sig::ML_DSA_44_SIGNATURE,
+    ),
+    alg(
+        c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65",
+        &ml_dsa_sig::ML_DSA_65_SIGNATURE,
+    ),
+    alg(
+        c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87",
+        &ml_dsa_sig::ML_DSA_87_SIGNATURE,
+    ),
     alg(c"HMAC", &HMAC_SIGNATURE),
     alg(c"SIPHASH", &SIPHASH_SIGNATURE),
     alg(c"POLY1305", &POLY1305_SIGNATURE),
