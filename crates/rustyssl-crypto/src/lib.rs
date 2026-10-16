@@ -8,6 +8,7 @@
 
 pub mod bn;
 pub mod ec;
+pub mod ecx;
 mod generated;
 pub mod kdf;
 pub mod lowlevel;

@@ -17,6 +17,7 @@ camellia = { version = "0.2", default-features = false, features = ["zeroize"] }
 cast5 = { version = "0.12", default-features = false, features = ["zeroize"] }
 chacha20 = { version = "0.10", default-features = false, features = ["cipher", "legacy", "zeroize"] }
 cipher = { version = "0.5", default-features = false }
+curve25519-dalek = { version = "4.1", default-features = false, features = ["precomputed-tables", "zeroize"] }
 des = { version = "0.9", default-features = false, features = ["zeroize"] }
 digest = { version = "0.11", default-features = false, features = ["zeroize"] }
 getrandom = { version = "0.4", default-features = false }

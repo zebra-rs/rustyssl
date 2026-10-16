@@ -26,6 +26,9 @@ allow-wildcard-paths = true
 # cfgs; anything new must be reviewed and added here.
 allow-build-scripts = [
     # Sets `getrandom_msan` when built with MemorySanitizer; nothing else.
+    # Sets cfgs for the limb width (from the target's pointer width), the backend (SIMD on
+    # x86_64, serial elsewhere), and the nightly channel (through rustc_version); nothing else.
+    { crate = "curve25519-dalek" },
     { crate = "getrandom" },
     { crate = "libc" },
     { crate = "proc-macro2" },
@@ -34,6 +37,11 @@ allow-build-scripts = [
 executables = "deny"
 interpreted = "deny"
 script-extensions = ["sh", "bash", "py", "pl", "rb", "ps1", "bat", "cmd"]
+
+# The crate's own test script, which builds never run.
+[[bans.build.bypass]]
+crate = "curve25519-dalek"
+allow-globs = ["tests/build_tests.sh"]
 
 [sources]
 unknown-registry = "deny"

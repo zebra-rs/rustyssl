@@ -53,6 +53,26 @@ pub const KEMS: [Kem; 3] = [
     },
 ];
 
+/// The KEMs over X25519 and X448, whose private keys are the KDF's output as it is.
+pub const ECX_KEMS: [Kem; 2] = [
+    Kem {
+        curve: "X25519",
+        id: 0x20,
+        digest: Algorithm::Sha256,
+        secret_len: 32,
+        private_len: 32,
+        bitmask: 0xff,
+    },
+    Kem {
+        curve: "X448",
+        id: 0x21,
+        digest: Algorithm::Sha512,
+        secret_len: 64,
+        private_len: 56,
+        bitmask: 0xff,
+    },
+];
+
 /// The KEM over the curve of a NIST name (in any case).
 pub fn kem_by_curve(name: &[u8]) -> Option<&'static Kem> {
     KEMS.iter()
@@ -142,6 +162,22 @@ pub fn derive_private(kem: &Kem, order: &BigNum, ikm: &[u8]) -> Result<BigNum, E
     Err(Error::Exhausted)
 }
 
+/// `ossl_ecx_dhkem_derive_private` (RFC 9180, 7.1.3, for X25519 and X448):
+/// `LabeledExpand(LabeledExtract("", "dkp_prk", ikm), "sk", "", Nsk)`.
+pub fn derive_ecx_private(kem: &Kem, ikm: &[u8]) -> Result<Zeroizing<Vec<u8>>, Error> {
+    if ikm.len() < kem.private_len {
+        return Err(Error::ShortInput {
+            len: ikm.len(),
+            min: kem.private_len,
+        });
+    }
+    let mut prk = Zeroizing::new(vec![0u8; kem.secret_len]);
+    labeled_extract(kem, &[], b"dkp_prk", ikm, &mut prk)?;
+    let mut sk = Zeroizing::new(vec![0u8; kem.private_len]);
+    labeled_expand(kem, &prk, b"sk", &[], &mut sk)?;
+    Ok(sk)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +210,25 @@ mod tests {
             Err(Error::ShortInput { len: 31, min: 32 })
         );
         assert!(kem_by_curve(b"P-224").is_none());
+    }
+
+    /// RFC 9180, A.1.1: DHKEM(X25519, HKDF-SHA256), the sender's ephemeral key.
+    #[test]
+    fn rfc9180_x25519() {
+        let [kem, _] = &ECX_KEMS;
+        let hex = |h: &[u8]| {
+            BigNum::from_hex_digits(h)
+                .ok()
+                .and_then(|n| n.to_bin(Some(32), Endian::Big, false))
+                .map(|z| z.to_vec())
+                .unwrap_or_default()
+        };
+        let ikm = hex(b"7268600d403fce431561aef583ee1613527cff655c1343f29812e66706df3234");
+        let sk = derive_ecx_private(kem, &ikm).unwrap_or_default();
+        assert_eq!(
+            sk.to_vec(),
+            hex(b"52c4a758a802cd8b936eceea314432798d5baf2d7e9235dc084ab1b9cfa2f736")
+        );
+        assert!(derive_ecx_private(kem, ikm.get(..31).unwrap_or_default()).is_err());
     }
 }
