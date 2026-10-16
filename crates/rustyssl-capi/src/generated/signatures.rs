@@ -3316,6 +3316,302 @@ const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::D
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DISPLAYTEXT_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DISPLAYTEXT_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DISPLAYTEXT_new;
+const _: unsafe extern "C" fn() -> *const DSA_METHOD = crate::dsa_meth::DSA_OpenSSL;
+const _: unsafe extern "C" fn(*mut DSA_SIG) = crate::dsa_ops::DSA_SIG_free;
+const _: unsafe extern "C" fn(*const DSA_SIG, *mut *const BIGNUM, *mut *const BIGNUM) =
+    crate::dsa_ops::DSA_SIG_get0;
+const _: unsafe extern "C" fn() -> *mut DSA_SIG = crate::dsa_ops::DSA_SIG_new;
+const _: unsafe extern "C" fn(*mut DSA_SIG, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::dsa_ops::DSA_SIG_set0;
+const _: unsafe extern "C" fn(*const DSA) -> core::ffi::c_int = crate::dsa::DSA_bits;
+const _: unsafe extern "C" fn(*mut DSA, core::ffi::c_int) = crate::dsa::DSA_clear_flags;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut DSA,
+) -> *mut DSA_SIG = crate::dsa_ops::DSA_do_sign;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut DSA_SIG,
+    *mut DSA,
+) -> core::ffi::c_int = crate::dsa_ops::DSA_do_verify;
+const _: unsafe extern "C" fn(*const DSA) -> *mut DH = crate::dsa::DSA_dup_DH;
+const _: unsafe extern "C" fn(*mut DSA) = crate::dsa::DSA_free;
+const _: unsafe extern "C" fn(*mut DSA) -> core::ffi::c_int = crate::dsa_ops::DSA_generate_key;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_ulong,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: core::ffi::c_int,
+            arg2: core::ffi::c_int,
+            arg3: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) -> *mut DSA = crate::dsa_ops::DSA_generate_parameters;
+const _: unsafe extern "C" fn(
+    *mut DSA,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_ulong,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::dsa_ops::DSA_generate_parameters_ex;
+const _: unsafe extern "C" fn(*mut DSA) -> *mut ENGINE = crate::dsa::DSA_get0_engine;
+const _: unsafe extern "C" fn(*const DSA) -> *const BIGNUM = crate::dsa::DSA_get0_g;
+const _: unsafe extern "C" fn(*const DSA, *mut *const BIGNUM, *mut *const BIGNUM) =
+    crate::dsa::DSA_get0_key;
+const _: unsafe extern "C" fn(*const DSA) -> *const BIGNUM = crate::dsa::DSA_get0_p;
+const _: unsafe extern "C" fn(
+    *const DSA,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+) = crate::dsa::DSA_get0_pqg;
+const _: unsafe extern "C" fn(*const DSA) -> *const BIGNUM = crate::dsa::DSA_get0_priv_key;
+const _: unsafe extern "C" fn(*const DSA) -> *const BIGNUM = crate::dsa::DSA_get0_pub_key;
+const _: unsafe extern "C" fn(*const DSA) -> *const BIGNUM = crate::dsa::DSA_get0_q;
+const _: unsafe extern "C" fn() -> *const DSA_METHOD = crate::dsa_meth::DSA_get_default_method;
+const _: unsafe extern "C" fn(*const DSA, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::dsa::DSA_get_ex_data;
+const _: unsafe extern "C" fn(*mut DSA) -> *const DSA_METHOD = crate::dsa::DSA_get_method;
+const _: unsafe extern "C" fn(*const DSA_METHOD) -> *mut DSA_METHOD = crate::dsa_meth::DSA_meth_dup;
+const _: unsafe extern "C" fn(*mut DSA_METHOD) = crate::dsa_meth::DSA_meth_free;
+const _: unsafe extern "C" fn(*const DSA_METHOD) -> *mut core::ffi::c_void =
+    crate::dsa_meth::DSA_meth_get0_app_data;
+const _: unsafe extern "C" fn(*const DSA_METHOD) -> *const core::ffi::c_char =
+    crate::dsa_meth::DSA_meth_get0_name;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *mut DSA,
+        arg1: *mut BIGNUM,
+        arg2: *const BIGNUM,
+        arg3: *const BIGNUM,
+        arg4: *const BIGNUM,
+        arg5: *mut BN_CTX,
+        arg6: *mut BN_MONT_CTX,
+    ) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dsam: *mut DSA) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_finish;
+const _: unsafe extern "C" fn(*const DSA_METHOD) -> core::ffi::c_int =
+    crate::dsa_meth::DSA_meth_get_flags;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dsam: *mut DSA) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_init;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dsam: *mut DSA) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_keygen;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *mut DSA,
+        arg1: *mut BIGNUM,
+        arg2: *const BIGNUM,
+        arg3: *const BIGNUM,
+        arg4: *const BIGNUM,
+        arg5: *const BIGNUM,
+        arg6: *const BIGNUM,
+        arg7: *mut BN_CTX,
+        arg8: *mut BN_MONT_CTX,
+    ) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_mod_exp;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *mut DSA,
+        arg1: core::ffi::c_int,
+        arg2: *const core::ffi::c_uchar,
+        arg3: core::ffi::c_int,
+        arg4: *mut core::ffi::c_int,
+        arg5: *mut core::ffi::c_ulong,
+        arg6: *mut BN_GENCB,
+    ) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_paramgen;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *const core::ffi::c_uchar,
+        arg1: core::ffi::c_int,
+        arg2: *mut DSA,
+    ) -> *mut DSA_SIG,
+> = crate::dsa_meth::DSA_meth_get_sign;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *mut DSA,
+        arg1: *mut BN_CTX,
+        arg2: *mut *mut BIGNUM,
+        arg3: *mut *mut BIGNUM,
+    ) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_sign_setup;
+const _: unsafe extern "C" fn(
+    *const DSA_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dsam: *const core::ffi::c_uchar,
+        arg1: core::ffi::c_int,
+        arg2: *mut DSA_SIG,
+        arg3: *mut DSA,
+    ) -> core::ffi::c_int,
+> = crate::dsa_meth::DSA_meth_get_verify;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> *mut DSA_METHOD =
+    crate::dsa_meth::DSA_meth_new;
+const _: unsafe extern "C" fn(*mut DSA_METHOD, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::dsa_meth::DSA_meth_set0_app_data;
+const _: unsafe extern "C" fn(*mut DSA_METHOD, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::dsa_meth::DSA_meth_set1_name;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut DSA,
+            arg2: *mut BIGNUM,
+            arg3: *const BIGNUM,
+            arg4: *const BIGNUM,
+            arg5: *const BIGNUM,
+            arg6: *mut BN_CTX,
+            arg7: *mut BN_MONT_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DSA) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_finish;
+const _: unsafe extern "C" fn(*mut DSA_METHOD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::dsa_meth::DSA_meth_set_flags;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DSA) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_init;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DSA) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_keygen;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut DSA,
+            arg2: *mut BIGNUM,
+            arg3: *const BIGNUM,
+            arg4: *const BIGNUM,
+            arg5: *const BIGNUM,
+            arg6: *const BIGNUM,
+            arg7: *const BIGNUM,
+            arg8: *mut BN_CTX,
+            arg9: *mut BN_MONT_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_mod_exp;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut DSA,
+            arg2: core::ffi::c_int,
+            arg3: *const core::ffi::c_uchar,
+            arg4: core::ffi::c_int,
+            arg5: *mut core::ffi::c_int,
+            arg6: *mut core::ffi::c_ulong,
+            arg7: *mut BN_GENCB,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_paramgen;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_uchar,
+            arg2: core::ffi::c_int,
+            arg3: *mut DSA,
+        ) -> *mut DSA_SIG,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_sign;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut DSA,
+            arg2: *mut BN_CTX,
+            arg3: *mut *mut BIGNUM,
+            arg4: *mut *mut BIGNUM,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_sign_setup;
+const _: unsafe extern "C" fn(
+    *mut DSA_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const core::ffi::c_uchar,
+            arg2: core::ffi::c_int,
+            arg3: *mut DSA_SIG,
+            arg4: *mut DSA,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_verify;
+const _: unsafe extern "C" fn() -> *mut DSA = crate::dsa::DSA_new;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut DSA = crate::dsa::DSA_new_method;
+const _: unsafe extern "C" fn(*const DSA) -> core::ffi::c_int = crate::dsa::DSA_security_bits;
+const _: unsafe extern "C" fn(*mut DSA, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::dsa::DSA_set0_key;
+const _: unsafe extern "C" fn(*mut DSA, *mut BIGNUM, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::dsa::DSA_set0_pqg;
+const _: unsafe extern "C" fn(*const DSA_METHOD) = crate::dsa_meth::DSA_set_default_method;
+const _: unsafe extern "C" fn(
+    *mut DSA,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::dsa::DSA_set_ex_data;
+const _: unsafe extern "C" fn(*mut DSA, core::ffi::c_int) = crate::dsa::DSA_set_flags;
+const _: unsafe extern "C" fn(*mut DSA, *const DSA_METHOD) -> core::ffi::c_int =
+    crate::dsa::DSA_set_method;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *mut DSA,
+) -> core::ffi::c_int = crate::dsa_ops::DSA_sign;
+const _: unsafe extern "C" fn(
+    *mut DSA,
+    *mut BN_CTX,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+) -> core::ffi::c_int = crate::dsa_ops::DSA_sign_setup;
+const _: unsafe extern "C" fn(*const DSA) -> core::ffi::c_int = crate::dsa_ops::DSA_size;
+const _: unsafe extern "C" fn(*const DSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::dsa::DSA_test_flags;
+const _: unsafe extern "C" fn(*mut DSA) -> core::ffi::c_int = crate::dsa::DSA_up_ref;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut DSA,
+) -> core::ffi::c_int = crate::dsa_ops::DSA_verify;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     usize,
@@ -9491,6 +9787,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut *mut DSA_SIG,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DSA_SIG = crate::dsa_ops::d2i_DSA_SIG;
+const _: unsafe extern "C" fn(
     *mut *mut ECDSA_SIG,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -9646,6 +9947,8 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const DSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dsa_ops::i2d_DSA_SIG;
 const _: unsafe extern "C" fn(*const ECDSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::ec::ecdsa::i2d_ECDSA_SIG;
 const _: unsafe extern "C" fn(*const EC_GROUP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =

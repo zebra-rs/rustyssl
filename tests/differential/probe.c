@@ -370,6 +370,10 @@
  *                              sets p - 1), through the provider (p) or, with an application's
  *                              DH_METHOD, the legacy method (l); padded or not; through X9.42's
  *                              KDF given as digest:outlen:cekalg:ukm-hex; into room octets
+ *   dsaverify <dgst|-> <sig|-> <key>  DSA_verify (and d2i_DSA_SIG and DSA_do_verify of what
+ *                              decodes) of a signature in hex over a digest in hex with RFC
+ *                              6979's DSA-1024 key (key: k, or nopub, small, q+2, or even for a
+ *                              key changed so; OpenSSL crashes without the public key)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -425,6 +429,7 @@
 #include <openssl/des.h>
 #include <openssl/ec.h>
 #include <openssl/dh.h>
+#include <openssl/dsa.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/idea.h>
@@ -5944,11 +5949,75 @@ end:
     DH_meth_free(meth);
 }
 
+/* RFC 6979's DSA-1024 key (A.2.1), changed as `how` says. */
+static DSA *rfc6979_dsa(const char *how)
+{
+    DSA *d = DSA_new();
+    BIGNUM *p = NULL, *q = NULL, *g = NULL, *y = NULL;
+
+    BN_hex2bn(&p, "86F5CA03DCFEB225063FF830A0C769B9DD9D6153AD91D7CE27F787C43278B447E6533B86B18B"
+                  "ED6E8A48B784A14C252C5BE0DBF60B86D6385BD2F12FB763ED8873ABFD3F5BA2E0A8C0A59082"
+                  "EAC056935E529DAF7C610467899C77ADEDFC846C881870B7B19B2B58F9BE0521A17002E3BDD6"
+                  "B86685EE90B3D9A1B02B782B1779");
+    BN_hex2bn(&q, "996F967F6C8E388D9E28D01E205FBA957A5698B1");
+    BN_hex2bn(&g, "07B0F92546150B62514BB771E2A0C0CE387F03BDA6C56B505209FF25FD3C133D89BBCD97E904"
+                  "E09114D9A7DEFDEADFC9078EA544D2E401AEECC40BB9FBBF78FD87995A10A1C27CB7789B594B"
+                  "A7EFB5C4326A9FE59A070E136DB77175464ADCA417BE5DCE2F40D10A46A3A3943F26AB7FD9C0"
+                  "398FF8C76EE0A56826A8A88F1DBD");
+    BN_hex2bn(&y, "5DF5E01DED31D0297E274E1691C192FE5868FEF9E19A84776454B100CF16F65392195A38B905"
+                  "23E2542EE61871C0440CB87C322FC4B4D2EC5E1E7EC766E1BE8D4CE935437DC11C3C8FD42633"
+                  "8933EBFE739CB3465F4D3668C5E473508253B1E682F65CBDC4FAE93C2EA212390E54905A86E2"
+                  "223170B44EAA7DA5DD9FFCFB7F3B");
+    if (strcmp(how, "small") == 0)
+        BN_rshift(q, q, 40);
+    else if (strcmp(how, "q+2") == 0)
+        BN_add_word(q, 2);
+    else if (strcmp(how, "even") == 0)
+        BN_add_word(p, 1);
+    DSA_set0_pqg(d, p, q, g);
+    if (strcmp(how, "nopub") == 0)
+        BN_free(y);
+    else
+        DSA_set0_key(d, y, NULL);
+    return d;
+}
+
+/* dsaverify: a DSA signature's decoding and verification. */
+static void dsa_verify_command(const char *line)
+{
+    char dhex[300] = "-", shex[600] = "-", how[16] = "k";
+    unsigned char *dg = NULL, *sg = NULL;
+    long dl = 0, sl = 0;
+    DSA *d;
+    DSA_SIG *s;
+    const unsigned char *pp;
+
+    sscanf(line, "%*s %299s %599s %15s", dhex, shex, how);
+    if (strcmp(dhex, "-") != 0)
+        dg = OPENSSL_hexstr2buf(dhex, &dl);
+    if (strcmp(shex, "-") != 0)
+        sg = OPENSSL_hexstr2buf(shex, &sl);
+    d = rfc6979_dsa(how);
+    printf(" verify %d", DSA_verify(0, dg, (int)dl, sg, (int)sl, d));
+    print_asn_errors();
+    pp = sg;
+    s = d2i_DSA_SIG(NULL, &pp, sl);
+    printf("  d2i %s consumed %ld", s == NULL ? "fails" : "ok", (long)(pp - sg));
+    if (s != NULL)
+        printf(" do_verify %d", DSA_do_verify(dg, (int)dl, s, d));
+    print_asn_errors();
+    DSA_SIG_free(s);
+    DSA_free(d);
+    OPENSSL_free(dg);
+    OPENSSL_free(sg);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
     if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
-        && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0)
+        && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0
+        && strcmp(command, "dsaverify") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
@@ -5957,6 +6026,8 @@ static int dh_command(const char *command, const char *line)
         dh_key_command(line);
     else if (strcmp(command, "dhexch") == 0)
         dh_exch_command(line);
+    else if (strcmp(command, "dsaverify") == 0)
+        dsa_verify_command(line);
     else
         dh_check_command(line);
     return 1;
