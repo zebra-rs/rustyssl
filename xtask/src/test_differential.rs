@@ -409,6 +409,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dhder", dhder_session),
     ("dhkey", dhkey_session),
     ("dhexch", dhexch_session),
+    ("dsaverify", dsaverify_session),
     ("string", string_session),
 ];
 
@@ -3700,6 +3701,73 @@ fn dhexch_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "dhexch {how} {group} {xa} {xb} {edit} {pad} {kdf} {room}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of DSA verification: RFC 6979's SHA-1 signature of "sample" with octets
+/// changed, dropped, or added, over its digest (now and then changed, cut, or extended), with
+/// the key now and then changed (never without its public key, which the reference reads
+/// through NULL).
+fn dsaverify_session(random: &mut Random, out: &mut String) -> Result {
+    const SIG: &str = "302c02142e1a0c2562b2912caaf89186fb0f42001585da55021429efb6b0aff2d7a68eb70ca313022253b9a88df5";
+    const DGST: &str = "8151325dcdbae9e0ff95f9f9658432dbedfdb209";
+    let bytes = |h: &str| -> Vec<u8> {
+        (0..h.len() / 2)
+            .filter_map(|j| u8::from_str_radix(h.get(2 * j..2 * j + 2)?, 16).ok())
+            .collect()
+    };
+    let hex = |b: &[u8]| -> String { b.iter().map(|x| format!("{x:02x}")).collect() };
+    for _ in 0..random.below(4).saturating_add(1) {
+        let mut sig = bytes(SIG);
+        for _ in 0..random.below(3) {
+            let len = u64::try_from(sig.len()).unwrap_or(1).max(1);
+            let at = usize::try_from(random.below(len)).unwrap_or(0);
+            match random.below(4) {
+                0 if !sig.is_empty() => {
+                    sig.remove(at.min(sig.len().saturating_sub(1)));
+                }
+                1 => sig.insert(at, u8::try_from(random.below(256)).unwrap_or(0)),
+                _ => {
+                    if let Some(b) = sig.get_mut(at) {
+                        *b ^= u8::try_from(random.below(255).saturating_add(1)).unwrap_or(1);
+                    }
+                }
+            }
+        }
+        let mut dgst = bytes(DGST);
+        match random.below(6) {
+            0 => {
+                let at = usize::try_from(random.below(20)).unwrap_or(0);
+                if let Some(b) = dgst.get_mut(at) {
+                    *b ^= 1;
+                }
+            }
+            1 => dgst.truncate(usize::try_from(random.below(20)).unwrap_or(0)),
+            2 => {
+                for _ in 0..random.below(44) {
+                    dgst.push(u8::try_from(random.below(256)).unwrap_or(0));
+                }
+            }
+            _ => {}
+        }
+        let key = match random.below(10) {
+            1 => "small",
+            2 => "q+2",
+            3 => "even",
+            _ => "k",
+        };
+        let d = if dgst.is_empty() {
+            "-".to_owned()
+        } else {
+            hex(&dgst)
+        };
+        let s = if sig.is_empty() {
+            "-".to_owned()
+        } else {
+            hex(&sig)
+        };
+        writeln!(out, "dsaverify {d} {s} {key}")?;
     }
     Ok(())
 }

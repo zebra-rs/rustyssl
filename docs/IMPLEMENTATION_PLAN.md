@@ -4050,8 +4050,24 @@ chunking) is clean.
         generation through an application's copy of each method); the probe's `dhexch` with
         `corpus/dhexch.txt` and random sessions through the provider and the legacy method
         (1100 pass).
-  - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
-    (with deterministic nonces); ASN.1, printing, and `EVP_PKEY`.
+  - [ ] **4.6b DSA**:
+    - [x] **4.6b1 The object, methods, signatures, and generation** (`dsa.rs`, `dsa_meth.rs`,
+      `dsa_ops.rs`): `DSA` (shared FFC parameters, the key pair, flags, application data,
+      references; `get0` numbers kept for the key's life), `DSA_METHOD` (every getter and
+      setter; the built-in method without exponentiation functions, as OpenSSL's),
+      `DSA_SIG` (`ECDSA_SIG`'s structure and DER), signing as OpenSSL's (its nonce, k + q or
+      k + 2q in the exponent, Fermat's inverse, the blinding draw, retries), verification,
+      `DSA_sign`/`DSA_verify` (exactly DER), `DSA_size`, key generation, parameter
+      generation (FIPS 186-2 below 2048 bits with a short seed, else 186-4; the old and new
+      callbacks), and `DSA_dup_DH`. Verifying without a public key and `DSA_sign_setup` with
+      a NULL `*rp` are safe (docs/DEVIATIONS.md).
+      - Tests: `tests/c/dsa_lib.c` (6 checks, on a known DRBG: the object, generation,
+        signatures of every digest length with tampering and errors, `DSA_SIG`, methods with
+        a counting method and custom exponentiations, `DSA_dup_DH`); the probe's `dsaverify`
+        (RFC 6979's DSA-1024 signature, changed) with `corpus/dsaverify.txt` and random
+        sessions (800 pass).
+    - [ ] **4.6b2 ASN.1, PEM, and printing**: `DSAparams`, the private and public key
+      encodings, `DSA_SIG`'s item, PEM, `DSA_print`, `DSAparams_print`, `DSAparams_dup`.
   - [ ] **4.6c The DSA providers**: the DSA key manager and signatures, and the legacy DSA
     `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
 - [ ] **4.7 Key encoders and decoders:**

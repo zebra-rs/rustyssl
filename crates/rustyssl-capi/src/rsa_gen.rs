@@ -113,6 +113,11 @@ impl Env {
         (!ctx.is_null()).then_some(Env { ctx, cb: gencb(cb) })
     }
 
+    /// The `BN_CTX`, for the functions that take one.
+    pub(crate) fn ctx(&self) -> *mut BN_CTX {
+        self.ctx
+    }
+
     /// `BN_GENCB_call`: whether to go on.
     pub(crate) fn call(&self, a: c_int, b: c_int) -> bool {
         // SAFETY: the callback this was made with, live for its life.
