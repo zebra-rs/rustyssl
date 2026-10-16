@@ -16,8 +16,9 @@
 //!   `pkey_free` frees its data, whenever the key is cleared, retyped, or freed.
 //!
 //! The built-in key types' legacy data comes with the key types: RSA and RSA-PSS have it (an
-//! `RSA`), EC and SM2 (an `EC_KEY`), and X25519 and ED25519 (an ECX key); until the others do
-//! a key can't be given theirs, and their built-in methods' functions abort (AGENTS.md rule 10).
+//! `RSA`), EC and SM2 (an `EC_KEY`), and X25519, X448, ED25519, and ED448 (an ECX key); until
+//! the others do a key can't be given theirs, and their built-in methods' functions abort
+//! (AGENTS.md rule 10).
 //! Functions given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
@@ -2106,7 +2107,13 @@ ffi_export! {
         let ec = matches!(base, Some((rustyssl_abi::EVP_PKEY_EC, false)));
         let ecx = matches!(
             base,
-            Some((rustyssl_abi::EVP_PKEY_X25519 | rustyssl_abi::EVP_PKEY_ED25519, false))
+            Some((
+                rustyssl_abi::EVP_PKEY_X25519
+                    | rustyssl_abi::EVP_PKEY_X448
+                    | rustyssl_abi::EVP_PKEY_ED25519
+                    | rustyssl_abi::EVP_PKEY_ED448,
+                false
+            ))
         );
         if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec && !ecx {
             // The other built-in key types' data come with them.

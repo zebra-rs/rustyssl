@@ -1,6 +1,6 @@
-//! ECX keys in `EVP_PKEY` (`ecx_meth.c`): the built-in X25519 and ED25519 ASN.1 methods'
-//! functions for a key whose legacy data is an ECX key (`crate::ecx`, the key managers' key
-//! data, shared by reference).
+//! ECX keys in `EVP_PKEY` (`ecx_meth.c`): the built-in X25519, X448, ED25519, and ED448 ASN.1
+//! methods' functions for a key whose legacy data is an ECX key (`crate::ecx`, the key managers'
+//! key data, shared by reference).
 //!
 //! A key moves between its legacy and provided forms (`export_to`, `import_from`) through the
 //! raw public and private keys the ECX key managers take. Keys are compared by their public
@@ -16,6 +16,7 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
 };
 use rustyssl_crypto::ecx::ED25519_SIGSIZE;
+use rustyssl_crypto::ecx448::ED448_SIGSIZE;
 
 use super::{EVP_PKEY_assign, EVP_PKEY_get_id, legacy_data};
 use crate::asn1::hex::ASN1_buf_print;
@@ -32,10 +33,16 @@ use crate::params::build::{
 use crate::params::dup::OSSL_PARAM_free;
 use crate::provider::macs::wipe;
 
-/// `X25519_BITS` (and `ED25519_BITS`).
+/// `X25519_BITS` (which `ecx_bits` gives ED25519 too).
 const BITS_25519: c_int = 253;
+/// `X448_BITS`.
+const BITS_X448: c_int = 448;
+/// `ED448_BITS`.
+const BITS_ED448: c_int = 456;
 /// `X25519_SECURITY_BITS`.
 const SECURITY_BITS_25519: c_int = 128;
+/// `X448_SECURITY_BITS`.
+const SECURITY_BITS_448: c_int = 224;
 
 /// The key's type, by its ASN.1 method (`pkey->ameth->pkey_id`).
 ///
@@ -131,26 +138,47 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `ecx_bits`.
+    /// `ecd_size448`: a signature's size.
     ///
     /// # Safety
     /// No preconditions.
-    pub(crate) unsafe extern "C" fn ecx_bits(_p: *const EVP_PKEY) -> c_int
+    pub(crate) unsafe extern "C" fn ecd_size448(_p: *const EVP_PKEY) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        BITS_25519
+        c_int::try_from(ED448_SIGSIZE).unwrap_or(0)
     }
 }
 
 ffi_callback! {
-    /// `ecx_security_bits`.
+    /// `ecx_bits`: by the key's type.
     ///
     /// # Safety
-    /// No preconditions.
-    pub(crate) unsafe extern "C" fn ecx_security_bits(_p: *const EVP_PKEY) -> c_int
+    /// `p` is a live key of the method's type.
+    pub(crate) unsafe extern "C" fn ecx_bits(p: *const EVP_PKEY) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        SECURITY_BITS_25519
+        // SAFETY: the caller's key.
+        match unsafe { type_of(p) } {
+            Some(EcxType::X448) => BITS_X448,
+            Some(EcxType::Ed448) => BITS_ED448,
+            _ => BITS_25519,
+        }
+    }
+}
+
+ffi_callback! {
+    /// `ecx_security_bits`: by the key's type.
+    ///
+    /// # Safety
+    /// `p` is a live key of the method's type.
+    pub(crate) unsafe extern "C" fn ecx_security_bits(p: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's key.
+        match unsafe { type_of(p) } {
+            Some(EcxType::X448 | EcxType::Ed448) => SECURITY_BITS_448,
+            _ => SECURITY_BITS_25519,
+        }
     }
 }
 

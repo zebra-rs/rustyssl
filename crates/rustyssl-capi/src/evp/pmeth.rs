@@ -231,26 +231,6 @@ extern "C" fn builtin_ctrl_str(_: *mut EVP_PKEY_CTX, _: *const c_char, _: *const
     crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's ctrl_str")
 }
 
-extern "C" fn builtin_digestsign(
-    _: *mut EVP_MD_CTX,
-    _: *mut c_uchar,
-    _: *mut usize,
-    _: *const c_uchar,
-    _: usize,
-) -> c_int {
-    crate::stub::unimplemented("signing with a built-in EVP_PKEY_METHOD")
-}
-
-extern "C" fn builtin_digestverify(
-    _: *mut EVP_MD_CTX,
-    _: *const c_uchar,
-    _: usize,
-    _: *const c_uchar,
-    _: usize,
-) -> c_int {
-    crate::stub::unimplemented("verifying with a built-in EVP_PKEY_METHOD")
-}
-
 /// The functions every built-in method with a context of its own has.
 fn context_funcs() -> Funcs {
     Funcs {
@@ -320,34 +300,32 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         decrypt: None,
         ..rsa
     };
-    let ecx = Funcs {
-        keygen: Some(builtin_gen),
-        derive: Some(builtin_derive),
-        ctrl: Some(builtin_ctrl),
-        ..Funcs::default()
-    };
-    let ed = Funcs {
-        keygen: Some(builtin_gen),
-        ctrl: Some(builtin_ctrl),
-        digestsign: Some(builtin_digestsign),
-        digestverify: Some(builtin_digestverify),
-        ..Funcs::default()
-    };
-    let (x25519, ed25519) = {
+    let (x25519, x448, ed25519, ed448) = {
         use crate::ecx_pmeth as x;
+        let x25519 = Funcs {
+            keygen: Some(x::pkey_ecx_keygen),
+            derive: Some(x::pkey_ecx_derive25519),
+            ctrl: Some(x::pkey_ecx_ctrl),
+            ..Funcs::default()
+        };
+        let ed25519 = Funcs {
+            keygen: Some(x::pkey_ecx_keygen),
+            ctrl: Some(x::pkey_ecd_ctrl),
+            digestsign: Some(x::pkey_ecd_digestsign25519),
+            digestverify: Some(x::pkey_ecd_digestverify25519),
+            ..Funcs::default()
+        };
         (
+            x25519,
             Funcs {
-                keygen: Some(x::pkey_ecx_keygen),
-                derive: Some(x::pkey_ecx_derive25519),
-                ctrl: Some(x::pkey_ecx_ctrl),
-                ..Funcs::default()
+                derive: Some(x::pkey_ecx_derive448),
+                ..x25519
             },
+            ed25519,
             Funcs {
-                keygen: Some(x::pkey_ecx_keygen),
-                ctrl: Some(x::pkey_ecd_ctrl),
-                digestsign: Some(x::pkey_ecd_digestsign25519),
-                digestverify: Some(x::pkey_ecd_digestverify25519),
-                ..Funcs::default()
+                digestsign: Some(x::pkey_ecd_digestsign448),
+                digestverify: Some(x::pkey_ecd_digestverify448),
+                ..ed25519
             },
         )
     };
@@ -359,9 +337,9 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         (EVP_PKEY_RSA_PSS, EVP_PKEY_FLAG_AUTOARGLEN, pss),
         (EVP_PKEY_DHX, 0, dh),
         (EVP_PKEY_X25519, 0, x25519),
-        (EVP_PKEY_X448, 0, ecx),
+        (EVP_PKEY_X448, 0, x448),
         (EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed25519),
-        (EVP_PKEY_ED448, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed),
+        (EVP_PKEY_ED448, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed448),
     ]
 }
 
