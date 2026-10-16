@@ -3454,7 +3454,7 @@ chunking) is clean.
     - `tests/c/evp_rsa_legacy.c` (120 checks), with an application's method that counts its
       calls. OpenSSL's `EVP_PKEY_CTX_ctrl_str` crashes on a NULL value, so the test sends that
       to the method's `ctrl_str` directly.
-- [ ] **4.4 EC:**
+- [x] **4.4 EC:**
   - `EC_GROUP`: every named curve in the default build (NIST, secp*k1, brainpool, SM2,
     binary curves), explicit parameters, `check`, conversion forms
   - the full `EC_POINT` API
@@ -3669,7 +3669,7 @@ chunking) is clean.
         `EVP_PKEY_CTX_get_ecdh_kdf_outlen` crashes on every legacy EC context; this one works.
       - `tests/c/evp_ec_legacy.c` (15 checks), with an application's `EC_KEY_METHOD` that
         counts its calls.
-  - [ ] **4.4e SM2**, in sub-steps (no public exports: OpenSSL 3's SM2 functions are internal,
+  - [x] **4.4e SM2**, in sub-steps (no public exports: OpenSSL 3's SM2 functions are internal,
     and SM2 has no legacy method):
     - [x] **4.4e1 The SM2 key manager** (`rustyssl-capi/src/provider/ec_kmgmt.rs`; no new
       exports): the EC key manager's functions for keys on SM2's curve only (the import's and
@@ -3699,8 +3699,23 @@ chunking) is clean.
         parameter, a legacy `EC_KEY`); the probe's `sm2sig` with `corpus/sm2sig.txt` and random
         sessions (signatures compared whole, from deterministic generators); the `ecdsa_sig`
         fuzz target also verifies through SM2; unit tests of the arithmetic and the Z input.
-    - [ ] **4.4e3 SM2 encryption:** the ciphertext's ASN.1 (`C1x, C1y, C3, C2`), encrypting and
-      decrypting through X9.63's KDF, the asymmetric cipher provider; a fuzz target.
+    - [x] **4.4e3 SM2 encryption** (`rustyssl-capi/src/ec/sm2_crypt.rs`,
+      `rustyssl-capi/src/provider/sm2_enc.rs`; no new exports): the ciphertext
+      `SEQUENCE { C1x, C1y, C3, C2 }` through the template engine (OpenSSL's `SM2_Ciphertext`
+      item, so its decoding errors name the same fields), its size for a message and a
+      message's size in it, encrypting (`C1 = kG`, the mask from X9.63's KDF over `kP`, drawn
+      again while it's all zeros, `C3 = H(x2 || M || y2)`) and decrypting (the message written
+      before the constant-time check, the buffer cleared on any failure, early ones too). The
+      asymmetric cipher (`SM2`) takes the digest given (SM3, fetched on first use and then
+      reported, unless another is named) and the caller's room from the output length, as
+      OpenSSL's does; an empty message fails without an error, as OpenSSL's allocation of no
+      octets does.
+      - Tests: `tests/c/evp_sm2_enc.c` (6 checks: the lists, the reference's ciphertexts with SM3
+        and SHA-256, each digest round trip, sizes, short buffers, changed, cut, extended, and
+        malformed ciphertexts, an empty message, the digest parameter, a copy, a public key, a
+        legacy `EC_KEY`); the probe's `sm2enc` with `corpus/sm2enc.txt` and random sessions
+        (ciphertexts compared whole, from deterministic generators; 1,000 pass); the
+        `sm2_crypt` fuzz target (arbitrary ciphertexts decrypted, the input round-tripped).
 - [ ] **4.5 ECX and post-quantum:**
   - X25519, X448, Ed25519, Ed448 (including ph and ctx variants)
   - ML-KEM-512/768/1024, ML-DSA-44/65/87, and every SLH-DSA parameter set

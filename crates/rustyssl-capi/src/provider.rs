@@ -67,6 +67,7 @@ pub(crate) mod rsa_kmgmt;
 pub(crate) mod rsa_sig;
 pub(crate) mod signatures;
 pub(crate) mod skeymgmt;
+mod sm2_enc;
 mod sm2_sig;
 pub(crate) mod tables;
 pub(crate) mod upcalls;
