@@ -359,6 +359,11 @@
  *   dhder <p|x> <hex>          d2i_DHparams (p) or d2i_DHxparams (x) of the octets: the result,
  *                              the octets consumed, and the parameters' sizes, encoding,
  *                              checks, and printed text (as a SHA-256 prefix)
+ *   dhkey <DH|DHX> <p|-> <q|-> <g|-> <pub|gx|-> <priv|-> <length|-> <edit|->  a DH or DHX
+ *                              key from data through its key manager (numbers as for dhcheck;
+ *                              gx for g^priv mod p; the edit also takes xN for the private
+ *                              key), then its sizes, every validation, its encoded public key,
+ *                              that set on a copy, and a comparison with the copy
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5705,14 +5710,115 @@ static void dh_der_command(const char *line)
     DH_free(dh);
 }
 
+/* dhkey: a DH or DHX key from data, then its checks and its encoded public key. */
+static void dh_key_command(const char *line)
+{
+    char type[8] = "DH", ps[1200] = "-", qs[1200] = "-", gs[1200] = "-", ys[1200] = "-";
+    char xs[1200] = "-", ls[32] = "-", edit[64] = "-";
+    BIGNUM *p, *q, *g, *y = NULL, *x;
+    OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *params;
+    EVP_PKEY_CTX *c;
+    EVP_PKEY *k = NULL, *k2;
+    unsigned char *enc = NULL;
+    size_t n;
+    unsigned int add;
+    int r;
+
+    sscanf(line, "%*s %7s %1199s %1199s %1199s %1199s %1199s %31s %63s", type, ps, qs, gs, ys,
+           xs, ls, edit);
+    p = dh_number(ps);
+    q = dh_number(qs);
+    g = dh_number(gs);
+    x = dh_number(xs);
+    if (strcmp(ys, "gx") == 0) {
+        BN_CTX *bc = BN_CTX_new();
+
+        y = BN_new();
+        if (p == NULL || g == NULL || x == NULL || !BN_mod_exp(y, g, x, p, bc)) {
+            BN_free(y);
+            y = NULL;
+        }
+        BN_CTX_free(bc);
+    } else {
+        y = dh_number(ys);
+    }
+    if (sscanf(edit, "p%u", &add) == 1 && p != NULL)
+        BN_add_word(p, add);
+    else if (sscanf(edit, "q%u", &add) == 1 && q != NULL)
+        BN_add_word(q, add);
+    else if (sscanf(edit, "g%u", &add) == 1 && g != NULL)
+        BN_add_word(g, add);
+    else if (sscanf(edit, "y%u", &add) == 1 && y != NULL)
+        BN_add_word(y, add);
+    else if (sscanf(edit, "x%u", &add) == 1 && x != NULL)
+        BN_add_word(x, add);
+    if (p != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, p);
+    if (q != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, q);
+    if (g != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, g);
+    if (y != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, y);
+    if (x != NULL)
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, x);
+    if (strcmp(ls, "-") != 0)
+        OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, atoi(ls));
+    params = OSSL_PARAM_BLD_to_param(bld);
+    c = EVP_PKEY_CTX_new_from_name(NULL, type, NULL);
+    printf(" fromdata %d", EVP_PKEY_fromdata_init(c));
+    printf(" %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, params));
+    EVP_PKEY_CTX_free(c);
+    OSSL_PARAM_free(params);
+    OSSL_PARAM_BLD_free(bld);
+    BN_free(p);
+    BN_free(q);
+    BN_free(g);
+    BN_free(y);
+    BN_free(x);
+    print_asn_errors();
+    if (k == NULL)
+        return;
+    printf("  bits %d security %d size %d", EVP_PKEY_get_bits(k), EVP_PKEY_get_security_bits(k),
+           EVP_PKEY_get_size(k));
+    c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+    printf(" check %d", EVP_PKEY_check(c));
+    printf(" public %d", EVP_PKEY_public_check(c));
+    printf(" %d", EVP_PKEY_public_check_quick(c));
+    printf(" param %d", EVP_PKEY_param_check(c));
+    printf(" %d", EVP_PKEY_param_check_quick(c));
+    printf(" private %d", EVP_PKEY_private_check(c));
+    printf(" pairwise %d", EVP_PKEY_pairwise_check(c));
+    EVP_PKEY_CTX_free(c);
+    print_asn_errors();
+    n = EVP_PKEY_get1_encoded_public_key(k, &enc);
+    printf("  encoded %zu", n);
+    if (n > 0)
+        ml_kem_digest(enc, n);
+    print_asn_errors();
+    k2 = EVP_PKEY_dup(k);
+    if (k2 != NULL) {
+        r = EVP_PKEY_set1_encoded_public_key(k2, enc, n);
+        printf("  set %d eq %d", r, EVP_PKEY_eq(k, k2));
+        print_asn_errors();
+    }
+    OPENSSL_free(enc);
+    EVP_PKEY_free(k2);
+    EVP_PKEY_free(k);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
-    if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0)
+    if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
+        && strcmp(command, "dhkey") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
         dh_der_command(line);
+    else if (strcmp(command, "dhkey") == 0)
+        dh_key_command(line);
     else
         dh_check_command(line);
     return 1;

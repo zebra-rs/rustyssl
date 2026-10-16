@@ -4012,13 +4012,33 @@ chunking) is clean.
         errors; the item through `ASN1_item_d2i` and `ASN1_item_i2d`, and decoding into a key;
         PEM through BIOs and FILEs; and printing); the probe's `dhder` with `corpus/dhder.txt`
         and random mutated sessions (400 pass); the `dh_params` fuzz target (1.5 million runs, clean).
-    - [ ] **4.6a4 The DH providers and `EVP_PKEY`**: the DH and DHX key managers, the DH
-      exchange (with the X9.42 KDF), `EVP_PKEY_get1_DH` and its siblings, and the legacy
-      ASN.1 and `EVP_PKEY_METHOD`s.
+    - [x] **4.6a4 The key managers and `EVP_PKEY`** (`provider/dh_kmgmt.rs`,
+      `dh_backend.rs`, `evp/pkey/dh.rs`; 3 exports): the DH and DHX key managers (made empty,
+      from data with a named group or explicit FFC parameters, j, the seed, index, counter, h,
+      validation flags, digest, and private key length; described, given an encoded public key
+      checked by RFC 8446's partial test, exported by selection, compared, copied, validated
+      lightly or fully, loaded; generated from a group by name or size, as a safe prime with a
+      generator, or by FIPS 186-4 or 186-2, and keys from those or a template's), with
+      OpenSSL's quirks (both take DH's generation parameters at `gen_init`; a group name
+      overrides the type; 186-2 parameters are marked for legacy validation); the built-in DH
+      and DHX ASN.1 methods' functions and the moves between a `DH` and the key managers;
+      `EVP_PKEY_set1_DH` (DHX's type for parameters with q outside the safe-prime groups),
+      `EVP_PKEY_get0_DH`, `EVP_PKEY_get1_DH`. A key keeps its own copy of the FFC digest's
+      name, and a NULL generation type is refused (docs/DEVIATIONS.md). The DH operations
+      now fail as OpenSSL's do for an even prime (its Montgomery setup's `BN_R_NO_INVERSE`, or
+      `BN_R_CALLED_WITH_EVEN_MODULUS`).
+      - Tests: `tests/c/evp_dh_kmgmt.c` (8 checks: the key managers' names and lists; keys
+        from data of each kind and selection with every gettable parameter and export, and
+        the errors; the encoded public key; generation on a known DRBG (named, by size,
+        generator, FIPS 186-4 and 186-2, seeds, templates, the setters, and every refusal);
+        comparison and validation; `DH` in `EVP_PKEY` both ways); the probe's `dhkey` with
+        `corpus/dhkey.txt` and random sessions (1400 pass).
+    - [ ] **4.6a5 The DH exchange and the legacy `EVP_PKEY_METHOD`**: the DH key exchange
+      (padding, the X9.42 KDF), and the built-in DH and DHX `EVP_PKEY_METHOD`s.
   - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
     (with deterministic nonces); ASN.1, printing, and `EVP_PKEY`.
-  - [ ] **4.6c The providers**: the DH and DHX key managers and exchange, the DSA key manager
-    and signatures, and the legacy `EVP_PKEY_METHOD`s.
+  - [ ] **4.6c The DSA providers**: the DSA key manager and signatures, and the legacy DSA
+    `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
 - [ ] **4.7 Key encoders and decoders:**
   - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
     including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider

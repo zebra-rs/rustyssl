@@ -407,6 +407,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("mlx", mlx_session),
     ("dhcheck", dhcheck_session),
     ("dhder", dhder_session),
+    ("dhkey", dhkey_session),
     ("string", string_session),
 ];
 
@@ -3565,6 +3566,74 @@ fn dhcheck_session(random: &mut Random, out: &mut String) -> Result {
             _ => "-".to_owned(),
         };
         writeln!(out, "dhcheck {p} {q} {g} {y} {edit}")?;
+    }
+    Ok(())
+}
+
+/// A random session of DH and DHX keys from data: a named group's or RFC 5114's parameters
+/// (now and then without q, or another group's; none of 3072 bits, whose prime tests are
+/// slow), private keys of random lengths or at q, public
+/// keys computed from them or at the bounds, private key lengths around the group's sizes, and
+/// a number now and then changed.
+fn dhkey_session(random: &mut Random, out: &mut String) -> Result {
+    const GROUPS: [&str; 6] = [
+        "ffdhe2048",
+        "modp_1536",
+        "modp_2048",
+        "dh_1024_160",
+        "dh_2048_224",
+        "dh_2048_256",
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let group = random.pick(&GROUPS);
+        let other = random.pick(&GROUPS);
+        let type_ = random.pick(&["DH", "DHX"]);
+        let part = |random: &mut Random, name: &str| match random.below(12) {
+            0 => "-".to_owned(),
+            1 => format!("{other}:{name}"),
+            _ => format!("{group}:{name}"),
+        };
+        let p = part(random, "p");
+        let q = if random.below(3) == 0 {
+            "-".to_owned()
+        } else {
+            part(random, "q")
+        };
+        let g = part(random, "g");
+        let x = match random.below(8) {
+            0 => "-".to_owned(),
+            1 => format!("{group}:q"),
+            2 => format!("{:x}", random.below(4)),
+            _ => {
+                let len = usize::try_from(random.below(40))
+                    .unwrap_or(0)
+                    .saturating_add(1);
+                random_hex(random, len)
+            }
+        };
+        let y = match random.below(8) {
+            0 => "-".to_owned(),
+            1 => format!("{:x}", random.below(4)),
+            2 => format!("{group}:p"),
+            _ => "gx".to_owned(),
+        };
+        let length = match random.below(8) {
+            0 => "0".to_owned(),
+            1 => "160".to_owned(),
+            2 => "225".to_owned(),
+            3 => "4000".to_owned(),
+            4 => random.below(300).to_string(),
+            _ => "-".to_owned(),
+        };
+        let edit = match random.below(5) {
+            0 => format!(
+                "{}{}",
+                random.pick(&["p", "q", "g", "y", "x"]),
+                random.below(5).saturating_add(1)
+            ),
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "dhkey {type_} {p} {q} {g} {y} {x} {length} {edit}")?;
     }
     Ok(())
 }

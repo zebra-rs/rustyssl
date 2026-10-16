@@ -459,6 +459,75 @@ unsafe fn ffc_print(bp: *mut BIO, params: &ffc::Params, off: c_int) -> bool {
     true
 }
 
+/// What `do_print` prints: the parameters, or the public key, or the private key too.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Part {
+    Params,
+    Public,
+    Private,
+}
+
+/// `do_dh_print`: the kind and the prime's bits, the private and public keys (as `part`
+/// asks), the FFC fields, and the private key length if set, indented `off`. 1, or 0 (without
+/// a prime or a key asked for, or when writing fails) with the error raised.
+///
+/// # Safety
+/// `bp` is a live BIO.
+pub(crate) unsafe fn do_print(
+    bp: *mut BIO,
+    st: &crate::dh::DhState,
+    off: c_int,
+    part: Part,
+) -> c_int {
+    const F: &str = "do_dh_print";
+    let priv_key = if part == Part::Private {
+        st.priv_key.as_ref()
+    } else {
+        None
+    };
+    let pub_key = if part == Part::Params {
+        None
+    } else {
+        st.pub_key.as_ref()
+    };
+    let Some(p) = st.params.p.as_ref() else {
+        err::raise(ERR_LIB_DH, ERR_R_PASSED_NULL_PARAMETER, F);
+        return 0;
+    };
+    if (part == Part::Private && priv_key.is_none()) || (part != Part::Params && pub_key.is_none())
+    {
+        err::raise(ERR_LIB_DH, ERR_R_PASSED_NULL_PARAMETER, F);
+        return 0;
+    }
+    let ktype = match part {
+        Part::Private => c"DH Private-Key",
+        Part::Public => c"DH Public-Key",
+        Part::Params => c"DH Parameters",
+    };
+    let bits = c_int::try_from(p.num_bits()).unwrap_or(c_int::MAX);
+    let inner = off.saturating_add(4);
+    // SAFETY: the caller's BIO; a format and its arguments.
+    let ok = unsafe { indent(bp, off) }
+        // SAFETY: as above.
+        && unsafe { BIO_printf(bp, c"%s: (%d bit)\n".as_ptr(), ktype.as_ptr(), bits) } > 0
+        // SAFETY: as above.
+        && unsafe { bn_print(bp, c"private-key:", priv_key, inner) }
+        // SAFETY: as above.
+        && unsafe { bn_print(bp, c"public-key:", pub_key, inner) }
+        // SAFETY: as above.
+        && unsafe { ffc_print(bp, &st.params, inner) }
+        && (st.length == 0
+            // SAFETY: as above.
+            || (unsafe { indent(bp, inner) }
+                // SAFETY: as above; a format and its argument.
+                && unsafe { BIO_printf(bp, c"recommended-private-length: %d bits\n".as_ptr(), st.length) } > 0));
+    if !ok {
+        err::raise(ERR_LIB_DH, ERR_R_BUF_LIB, F);
+        return 0;
+    }
+    1
+}
+
 ffi_export! {
     /// The parameters' text (`do_dh_print` of parameters, indented 4): "DH Parameters", the
     /// prime's bits, the FFC fields, and the private key length if set. 1, or 0 (without a
@@ -469,31 +538,10 @@ ffi_export! {
     pub unsafe extern "C" fn DHparams_print(bp: *mut BIO, x: *const DH) -> c_int
     where failure = 0, library = ERR_LIB_DH
     {
-        const F: &str = "do_dh_print";
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { dh(x) }) else { return 0 };
-        let st = k.snapshot();
-        let Some(p) = st.params.p.as_ref() else {
-            err::raise(ERR_LIB_DH, ERR_R_PASSED_NULL_PARAMETER, F);
-            return 0;
-        };
-        let bits = c_int::try_from(p.num_bits()).unwrap_or(c_int::MAX);
-        // SAFETY: the caller's BIO; a format and its arguments.
-        let ok = unsafe { indent(bp, 4) }
-            // SAFETY: as above.
-            && unsafe { BIO_printf(bp, c"%s: (%d bit)\n".as_ptr(), c"DH Parameters".as_ptr(), bits) } > 0
-            // SAFETY: as above.
-            && unsafe { ffc_print(bp, &st.params, 8) }
-            && (st.length == 0
-                // SAFETY: as above.
-                || (unsafe { indent(bp, 8) }
-                    // SAFETY: as above; a format and its argument.
-                    && unsafe { BIO_printf(bp, c"recommended-private-length: %d bits\n".as_ptr(), st.length) } > 0));
-        if !ok {
-            err::raise(ERR_LIB_DH, ERR_R_BUF_LIB, F);
-            return 0;
-        }
-        1
+        // SAFETY: the caller's BIO.
+        unsafe { do_print(bp, &k.snapshot(), 4, Part::Params) }
     }
 }
 

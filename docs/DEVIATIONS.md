@@ -242,6 +242,9 @@ OpenSSL never depends on them.
 | SM2 signing with a private key of n - 1 (which a key from data can have; `[1, n-2]` is only checked when validating) | `(1 + d)` is 0 mod n, so every `s` is 0 and the signer draws nonces forever | refuses the key with `SM2_R_INVALID_PRIVATE_KEY` | `ec::sm2::tests::a_private_key_of_n_minus_1_is_refused` |
 | The built-in X25519 and X448 `EVP_PKEY_METHOD`s' derive (an application's copy of the method) with less room than the secret (32 or 56 octets) | writes the whole secret whatever `*keylen` says (nothing in the EVP layer checks it for these methods) | refuses with `EC_R_BUFFER_TOO_SMALL` and writes nothing | `ecx_pmeth::tests::derive_into_less_room_is_refused` |
 | The built-in ED25519 and ED448 `EVP_PKEY_METHOD`s' digest-sign with a key without a private key | reads the private key from NULL and crashes | fails (0) | `ecx_pmeth::tests::signing_without_a_private_key_fails` |
+| `EVP_PKEY_set1_DH(pkey, NULL)`; `EVP_PKEY_get0_DH(NULL)` | dereference NULL and crash | return 0; NULL | `evp::pkey::dh::tests::set1_and_get0_of_null_fail` |
+| A DH or DHX key given an FFC digest (`OSSL_PKEY_PARAM_FFC_DIGEST`, `_DIGEST_PROPS`) from data or by its generation context | keeps the pointer it's given: the caller's parameter data, or the generation context's copy, which is freed when generation ends, so exporting the key or verifying its parameters later reads freed memory | keeps its own copy of the name and properties | `dh_backend::tests::the_digest_name_is_copied` |
+| `EVP_PKEY_CTX_set_dh_paramgen_type` on a provider's DH or DHX parameter generation | the translation passes the type as a NULL string as long as the type number, which the key manager reads and crashes | the key manager refuses it (0, `ERR_R_PASSED_INVALID_ARGUMENT`) | `provider::dh_kmgmt::tests::a_null_type_name_is_refused` |
 
 ## Notes
 

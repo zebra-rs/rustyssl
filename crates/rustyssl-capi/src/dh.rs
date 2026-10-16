@@ -255,6 +255,11 @@ impl Dh {
         self.dirty.fetch_add(1, Ordering::AcqRel);
     }
 
+    /// The dirty count (`dirty_cnt`).
+    pub(crate) fn dirty_count(&self) -> usize {
+        self.dirty.load(Ordering::Acquire)
+    }
+
     /// The method.
     pub(crate) fn meth(&self) -> *const DH_METHOD {
         self.legacy().meth.0

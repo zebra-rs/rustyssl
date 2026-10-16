@@ -22,6 +22,7 @@ mod cmac;
 mod conf;
 mod dh;
 mod dh_asn1;
+mod dh_backend;
 mod dh_meth;
 mod dh_ops;
 mod dir;

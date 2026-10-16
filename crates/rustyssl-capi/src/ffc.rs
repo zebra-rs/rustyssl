@@ -880,6 +880,48 @@ pub(crate) unsafe fn gen_verify_186_2(
     }
 }
 
+/// `ossl_ffc_params_FIPS186_4_generate`: 1 (2 for an unverifiable generator), or 0.
+///
+/// # Safety
+/// As for [`gen_verify_186_4`].
+pub(crate) unsafe fn generate_186_4(
+    libctx: *mut OSSL_LIB_CTX,
+    env: &Env,
+    params: &mut Params,
+    ty: Type,
+    l: usize,
+    n: usize,
+    res: &mut c_int,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    match unsafe { gen_verify_186_4(libctx, env, params, false, ty, l, n, res) } {
+        Status::Failed => 0,
+        Status::Success => 1,
+        Status::UnverifiableG => 2,
+    }
+}
+
+/// `ossl_ffc_params_FIPS186_2_generate`: 1, the parameters marked for legacy validation, or 0.
+///
+/// # Safety
+/// As for [`gen_verify_186_4`].
+pub(crate) unsafe fn generate_186_2(
+    libctx: *mut OSSL_LIB_CTX,
+    env: &Env,
+    params: &mut Params,
+    ty: Type,
+    l: usize,
+    n: usize,
+    res: &mut c_int,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if unsafe { gen_verify_186_2(libctx, env, params, false, ty, l, n, res) } == Status::Failed {
+        return 0;
+    }
+    params.flags |= VALIDATE_LEGACY;
+    1
+}
+
 /// `ossl_ffc_params_FIPS186_4_validate` / `_FIPS186_2_validate`: verification of `p` and `q`
 /// as they are (`L` and `N` their sizes).
 ///

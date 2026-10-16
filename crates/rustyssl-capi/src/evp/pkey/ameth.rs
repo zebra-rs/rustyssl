@@ -245,8 +245,10 @@ ffi_callback! {
 enum Kind {
     Rsa,
     RsaPss,
-    /// DH and DHX.
-    Dh,
+    /// DH and DHX (`x`).
+    Dh {
+        x: bool,
+    },
     Dsa,
     Ec,
     /// X25519, X448, ED25519 (`ed`), and ED448 (`ed`, `is448`).
@@ -275,7 +277,34 @@ impl Kind {
             ..Funcs::default()
         };
         match self {
-            Self::Dh | Self::Dsa => {
+            Self::Dh { x } => {
+                use super::dh as d;
+                f.pub_cmp = Some(d::dh_pub_cmp);
+                f.pub_print = Some(d::dh_public_print);
+                f.priv_print = Some(d::dh_private_print);
+                f.pkey_size = Some(d::int_dh_size);
+                f.pkey_bits = Some(d::dh_bits);
+                f.pkey_security_bits = Some(d::dh_security_bits);
+                f.param_decode = Some(d::dh_param_decode);
+                f.param_encode = Some(d::dh_param_encode);
+                f.param_missing = Some(d::dh_missing_parameters);
+                f.param_copy = Some(d::dh_copy_parameters);
+                f.param_cmp = Some(d::dh_cmp_parameters);
+                f.param_print = Some(d::dh_param_print);
+                f.pkey_free = Some(d::int_dh_free);
+                f.pkey_ctrl = Some(if x { d::dhx_pkey_ctrl } else { d::dh_pkey_ctrl });
+                f.pkey_public_check = Some(d::dh_pkey_public_check);
+                f.pkey_param_check = Some(d::dh_pkey_param_check);
+                f.dirty_cnt = Some(d::dh_pkey_dirty_cnt);
+                f.export_to = Some(d::dh_pkey_export_to);
+                f.import_from = Some(if x {
+                    d::dhx_pkey_import_from
+                } else {
+                    d::dh_pkey_import_from
+                });
+                f.copy = Some(d::dh_pkey_copy);
+            }
+            Self::Dsa => {
                 f.param_decode = Some(builtin_param_decode);
                 f.param_print = Some(builtin_print);
                 f.param_missing = Some(builtin_key);
@@ -408,7 +437,13 @@ static STANDARD_TABLE: [Std; 15] = [
         Kind::Rsa,
     ),
     alias(EVP_PKEY_RSA2, EVP_PKEY_RSA),
-    entry(EVP_PKEY_DH, 0, c"DH", c"OpenSSL PKCS#3 DH method", Kind::Dh),
+    entry(
+        EVP_PKEY_DH,
+        0,
+        c"DH",
+        c"OpenSSL PKCS#3 DH method",
+        Kind::Dh { x: false },
+    ),
     alias(EVP_PKEY_DSA1, EVP_PKEY_DSA),
     alias(EVP_PKEY_DSA4, EVP_PKEY_DSA2),
     alias(EVP_PKEY_DSA3, EVP_PKEY_DSA2),
@@ -426,7 +461,7 @@ static STANDARD_TABLE: [Std; 15] = [
         0,
         c"X9.42 DH",
         c"OpenSSL X9.42 DH method",
-        Kind::Dh,
+        Kind::Dh { x: true },
     ),
     entry(
         EVP_PKEY_X25519,
