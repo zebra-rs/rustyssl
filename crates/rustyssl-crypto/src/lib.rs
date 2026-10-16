@@ -10,6 +10,7 @@ pub mod bn;
 pub mod ec;
 pub mod ecx;
 pub mod ecx448;
+pub mod ffc;
 mod generated;
 pub mod kdf;
 pub mod lowlevel;
