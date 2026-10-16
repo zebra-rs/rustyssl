@@ -398,6 +398,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("sm2enc", sm2enc_session),
     ("ecxkm", ecxkm_session),
     ("ecxop", ecxop_session),
+    ("mlkemkm", mlkemkm_session),
     ("string", string_session),
 ];
 
@@ -3075,6 +3076,89 @@ fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
         let privkey = part(random);
         let pubkey = part(random);
         writeln!(out, "ecxkm {kind} {selection} {privkey} {pubkey} -")?;
+    }
+    Ok(())
+}
+
+/// A random session of the ML-KEM key managers: keys from a seed (of every length, the right
+/// one most often) and the private and public keys of keys generated from a few seeds, so that
+/// they match or not, by every selection, sometimes edited (octets changed, set, or the length
+/// changed).
+fn mlkemkm_session(random: &mut Random, out: &mut String) -> Result {
+    const ALGS: [(&str, usize, usize); 3] = [
+        ("ML-KEM-512", 1632, 800),
+        ("ML-KEM-768", 2400, 1184),
+        ("ML-KEM-1024", 3168, 1568),
+    ];
+    let pool: Vec<String> = (0..3).map(|_| random_hex(random, 64)).collect();
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(3)).unwrap_or(0);
+        let (alg, privlen, publen) = ALGS.get(i).copied().unwrap_or(ALGS[0]);
+        let selection = random.pick(&[
+            "87", "87", "87", "86", "85", "84", "83", "81", "80", "7", "4",
+        ]);
+        let from_pool = |random: &mut Random| {
+            let j = usize::try_from(random.below(3)).unwrap_or(0);
+            pool.get(j).cloned().unwrap_or_default()
+        };
+        let seed = match random.below(6) {
+            0 | 1 => "-".to_owned(),
+            2 => {
+                let len = usize::try_from(random.below(70)).unwrap_or(0);
+                random_hex(random, len)
+            }
+            _ => from_pool(random),
+        };
+        let privfrom = if random.below(2) == 0 {
+            "-".to_owned()
+        } else {
+            from_pool(random)
+        };
+        let pubfrom = if random.below(2) == 0 {
+            "-".to_owned()
+        } else {
+            from_pool(random)
+        };
+        let mut edits = Vec::new();
+        if random.below(4) == 0 {
+            for _ in 0..random.below(2).saturating_add(1) {
+                let (target, len) = match (privfrom.as_str(), pubfrom.as_str()) {
+                    ("-", "-") => break,
+                    ("-", _) => ("q", publen),
+                    (_, "-") => ("p", privlen),
+                    _ if random.below(2) == 0 => ("p", privlen),
+                    _ => ("q", publen),
+                };
+                let len = u64::try_from(len).unwrap_or(1);
+                edits.push(match random.below(4) {
+                    0 => {
+                        let n = random.pick(&["-1", "+1", "0", "short"]);
+                        let n = match n {
+                            "-1" => len.saturating_sub(1),
+                            "+1" => len.saturating_add(1),
+                            "0" => 0,
+                            _ => random.below(len),
+                        };
+                        format!("{target}#{n}")
+                    }
+                    1 => format!("{target}@{}={:02x}", random.below(len), random.below(256)),
+                    _ => format!(
+                        "{target}@{}^{:02x}",
+                        random.below(len),
+                        random.below(255).saturating_add(1)
+                    ),
+                });
+            }
+        }
+        let edits = if edits.is_empty() {
+            "-".to_owned()
+        } else {
+            edits.join(",")
+        };
+        writeln!(
+            out,
+            "mlkemkm {alg} {selection} {seed} {privfrom} {pubfrom} {edits}"
+        )?;
     }
     Ok(())
 }

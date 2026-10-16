@@ -3815,8 +3815,31 @@ chunking) is clean.
       4.5a3's two deviations cover them too.
       - Tests: `tests/c/evp_ecx448_legacy.c` (7 checks, `evp_ecx_legacy.c`'s over Curve448 with
         RFC 8032's and RFC 7748's vectors); the deviations' Rust tests over both curves.
-  - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
-    OpenSSL's formats, the KEM.
+  - [ ] **4.5c ML-KEM-512/768/1024**, in sub-steps:
+    - [x] **4.5c1 The arithmetic and the key managers** (`rustyssl-crypto/src/mlkem.rs`,
+      `provider/ml_kem_kmgmt.rs`; no new exports): FIPS 203 written in-house over our SHA-3 and
+      SHAKE sponge: polynomials mod `q = 3329` with Barrett reduction and masked corrections,
+      the NTT, compression without division, constant-time sampling of the secret vectors,
+      the private key's decoding check, and the decapsulation's comparison and selection (the
+      public matrix's rejection sampling depends only on `rho`). Encodings are checked as
+      OpenSSL checks them: every 12-bit coefficient below `q`, and the private key's `H(ek)`.
+      The key managers copy `ml_kem_kmgmt.c`: keys from a seed, an expanded private key, or a
+      public key, each given one checked against the others (embedded public key, `z`, the
+      key the seed makes), the import's pairwise test, export by selection, the encoded public
+      key given once to an empty key, comparison by `H(ek)`, copies by selection, and a seed
+      used once by generation. The provider's configuration sets each new key's flags
+      (`ml-kem.retain_seed`, `ml-kem.prefer_seed`, `ml-kem.import_pct_type`), read through a
+      new `builtin::conf_param` (`ossl_prov_ctx_get_param`). Keys need SHA-3 and SHAKE
+      fetchable with the properties, as OpenSSL's do.
+      - Tests: FIPS 203 round trips and arithmetic, and keys, ciphertexts, secrets, and
+        rejection secrets byte for byte against the reference, as unit tests;
+        `tests/c/evp_ml_kem_kmgmt.c` (13 checks: every import case and its error text, the
+        parameters, exports, copies, the empty key's encoded public key, the checks, seeds of
+        the wrong length, properties without SHA-3, and the three configuration options); the
+        probe's `mlkemkm` with `corpus/mlkemkm.txt` and random sessions (300 pass); the
+        `ml_kem_kmgmt` fuzz target.
+    - [ ] **4.5c2 The KEM** (`ml_kem_kem.c`): encapsulation (random, or `ikmE`) and
+      decapsulation, with their buffer and length rules.
   - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures
     (pure, with context, external mu, deterministic and hedged).
   - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.
