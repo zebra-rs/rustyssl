@@ -3953,6 +3953,40 @@ chunking) is clean.
     (CVE-2023-3446/3817 bounds)
   - DSA: keygen and FIPS 186-4 paramgen, signatures (including deterministic DSA)
   - the legacy `DH_*`/`DSA_*` APIs and their methods
+
+  Sub-steps (the legacy objects first, as for RSA and EC, then the providers):
+  - [ ] **4.6a DH**, in sub-steps:
+    - [x] **4.6a1 The FFC parameters, the object, its methods, and its keys**
+      (`rustyssl-crypto/src/ffc.rs`, `rustyssl-capi/src/ffc.rs`, `dh.rs`, `dh_meth.rs`; 58
+      exports): the named groups (RFC 7919's `ffdhe*`, RFC 3526's `modp_*` with `q = (p-1)/2`,
+      and RFC 5114's three with their own `q` and `g`, numbered 1 to 3 as OpenSSL numbers
+      them), from OpenSSL's `bn_dh.c` and checked against their properties; `FFC_PARAMS` with
+      FIPS 186-4 and FIPS 186-2 generation and verification (the same digests, seeds, primality
+      tests, and progress callbacks as `ffc_params_generate.c`, so a seed gives the reference's
+      parameters), the simple and full validations, and private key generation (SP 800-56A);
+      `DH` with its numbers kept as the application's `BIGNUM`s once seen or given (as `RSA`'s
+      are), the named group cached from `p`, `g` (and `q`, filled in if missing),
+      `DH_new_by_nid`, `DH_get_1024_160` and its siblings (which, as in OpenSSL, don't cache
+      their group), flags, application data, references, `DHparams_dup`, and `DH_METHOD` with
+      OpenSSL's built-in key generation and shared secret, which run the key's method's
+      `bn_mod_exp` (an application's through its function). Key generation follows
+      `dh_key.c`: a named group's private key within its strength and the key length, a legacy
+      key of the length (bit 0 cleared for `g = 2` when `p mod 8 = 3`) without `q`, else one
+      below `q` after the simple validation (whose `L`, `N` rules refuse other sizes); the
+      shared secret refuses `z <= 1` and `z = p - 1`.
+      - Tests: the groups and FFC helpers as unit tests; `tests/c/dh_lib.c` (7 checks: empty
+        objects, numbers given and cached, every named group, keys, application data, key
+        generation from known generators (so the keys are the reference's) for named, RFC 5114,
+        and unnamed parameters with lengths and limits, shared secrets and bad peers, and
+        methods counting their calls through OpenSSL's).
+    - [ ] **4.6a2 Parameter generation and the checks** (`DH_generate_parameters_ex`, the
+      safe-prime generator, `DH_check*`, `DH_KDF_X9_42`).
+    - [ ] **4.6a3 ASN.1, printing, and `EVP_PKEY`** (`d2i`/`i2d_DHparams`, `DHxparams`,
+      `DHparams_print`, PEM, `EVP_PKEY_get1_DH`).
+  - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
+    (with deterministic nonces); ASN.1, printing, and `EVP_PKEY`.
+  - [ ] **4.6c The providers**: the DH and DHX key managers and exchange, the DSA key manager
+    and signatures, and the legacy `EVP_PKEY_METHOD`s.
 - [ ] **4.7 Key encoders and decoders:**
   - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
     including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider
