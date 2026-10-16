@@ -253,6 +253,11 @@ enum Kind {
     Dh,
     Dsa,
     Ec,
+    /// X25519 and ED25519.
+    Ecx25519 {
+        ed: bool,
+    },
+    /// X448 and ED448.
     Ecx,
     Alias,
 }
@@ -286,6 +291,26 @@ impl Kind {
                 f.param_cmp = Some(builtin_cmp);
                 f.get_priv_key = Some(builtin_get_raw);
                 f.get_pub_key = Some(builtin_get_raw);
+            }
+            Self::Ecx25519 { ed } => {
+                use super::ecx as x;
+                f.pub_cmp = Some(x::ecx_pub_cmp);
+                f.pub_print = Some(x::ecx_pub_print);
+                f.priv_print = Some(x::ecx_priv_print);
+                f.pkey_size = Some(if ed { x::ecd_size25519 } else { x::ecx_size });
+                f.pkey_bits = Some(x::ecx_bits);
+                f.pkey_security_bits = Some(x::ecx_security_bits);
+                f.param_cmp = Some(x::ecx_cmp_parameters);
+                f.pkey_free = Some(x::ecx_free);
+                f.pkey_ctrl = Some(if ed { x::ecd_ctrl } else { x::ecx_ctrl });
+                f.set_priv_key = Some(x::ecx_set_priv_key);
+                f.set_pub_key = Some(x::ecx_set_pub_key);
+                f.get_priv_key = Some(x::ecx_get_priv_key);
+                f.get_pub_key = Some(x::ecx_get_pub_key);
+                f.dirty_cnt = Some(x::ecx_pkey_dirty_cnt);
+                f.export_to = Some(x::ecx_pkey_export_to);
+                f.import_from = Some(x::ecx_pkey_import_from);
+                f.copy = Some(x::ecx_pkey_copy);
             }
             Self::Ec => {
                 use super::ec as e;
@@ -414,7 +439,7 @@ static STANDARD_TABLE: [Std; 15] = [
         0,
         c"X25519",
         c"OpenSSL X25519 algorithm",
-        Kind::Ecx,
+        Kind::Ecx25519 { ed: false },
     ),
     entry(
         EVP_PKEY_X448,
@@ -428,7 +453,7 @@ static STANDARD_TABLE: [Std; 15] = [
         0,
         c"ED25519",
         c"OpenSSL ED25519 algorithm",
-        Kind::Ecx,
+        Kind::Ecx25519 { ed: true },
     ),
     entry(
         EVP_PKEY_ED448,

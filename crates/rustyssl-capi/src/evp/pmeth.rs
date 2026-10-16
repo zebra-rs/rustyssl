@@ -333,6 +333,24 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         digestverify: Some(builtin_digestverify),
         ..Funcs::default()
     };
+    let (x25519, ed25519) = {
+        use crate::ecx_pmeth as x;
+        (
+            Funcs {
+                keygen: Some(x::pkey_ecx_keygen),
+                derive: Some(x::pkey_ecx_derive25519),
+                ctrl: Some(x::pkey_ecx_ctrl),
+                ..Funcs::default()
+            },
+            Funcs {
+                keygen: Some(x::pkey_ecx_keygen),
+                ctrl: Some(x::pkey_ecd_ctrl),
+                digestsign: Some(x::pkey_ecd_digestsign25519),
+                digestverify: Some(x::pkey_ecd_digestverify25519),
+                ..Funcs::default()
+            },
+        )
+    };
     [
         (EVP_PKEY_RSA, EVP_PKEY_FLAG_AUTOARGLEN, rsa),
         (EVP_PKEY_DH, 0, dh),
@@ -340,9 +358,9 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         (EVP_PKEY_EC, 0, ec),
         (EVP_PKEY_RSA_PSS, EVP_PKEY_FLAG_AUTOARGLEN, pss),
         (EVP_PKEY_DHX, 0, dh),
-        (EVP_PKEY_X25519, 0, ecx),
+        (EVP_PKEY_X25519, 0, x25519),
         (EVP_PKEY_X448, 0, ecx),
-        (EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed),
+        (EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed25519),
         (EVP_PKEY_ED448, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed),
     ]
 }

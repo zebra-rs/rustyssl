@@ -36,9 +36,9 @@ use rustyssl_crypto::ec::dhkem::{self, ECX_KEMS};
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox, wipe};
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
-use crate::ecx::{self, EcxKey, EcxType, MAX_KEYLEN};
+use crate::ecx::{self, EcxKey, EcxType, MAX_KEYLEN, key_fromdata, octet_param};
 use crate::err;
-use crate::ffi::{bytes, ffi_callback};
+use crate::ffi::ffi_callback;
 use crate::mem::CRYPTO_memcmp;
 use crate::params::build::{
     OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_octet_string,
@@ -56,7 +56,6 @@ const PUBLIC: c_int = OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
 const PRIVATE: c_int = OSSL_KEYMGMT_SELECT_PRIVATE_KEY;
 /// `ECX_POSSIBLE_SELECTIONS`.
 const POSSIBLE: c_int = KEYPAIR | OSSL_KEYMGMT_SELECT_ALL_PARAMETERS;
-const OCTETS_TYPE: u32 = OSSL_PARAM_OCTET_STRING.cast_unsigned();
 const UTF8_TYPE: u32 = OSSL_PARAM_UTF8_STRING.cast_unsigned();
 const INT_SIZE: usize = size_of::<c_int>();
 
@@ -163,69 +162,6 @@ ffi_callback! {
         }
         c_int::from(ok)
     }
-}
-
-/// An octet-string parameter's octets, if it is one.
-fn octet_param(p: &OSSL_PARAM) -> Option<&[u8]> {
-    if p.data_type != OCTETS_TYPE {
-        return None;
-    }
-    // SAFETY: an octet-string parameter's data holds its size.
-    unsafe { bytes(p.data.cast(), p.data_size) }
-}
-
-/// `ossl_ecx_key_fromdata`: the private key (if `include_private`) and the public key, each of
-/// the key's length, the public key derived when it's absent.
-///
-/// # Safety
-/// `params` is NULL or an array.
-unsafe fn key_fromdata(k: &EcxKey, params: *const OSSL_PARAM, include_private: bool) -> bool {
-    // SAFETY: the caller's array; static names.
-    let p_pub = unsafe { locate(params, OSSL_PKEY_PARAM_PUB_KEY) };
-    let p_priv = if include_private {
-        // SAFETY: as above.
-        unsafe { locate(params, OSSL_PKEY_PARAM_PRIV_KEY) }
-    } else {
-        None
-    };
-    if p_pub.is_none() && p_priv.is_none() {
-        return false;
-    }
-    let keylen = k.keylen();
-    let mut s = k.lock();
-    if let Some(p) = p_priv {
-        // `OSSL_PARAM_get_octet_string` with room for the key's length.
-        let Some(d) = octet_param(p).filter(|d| d.len() <= keylen) else {
-            return false;
-        };
-        if d.len() != keylen {
-            return false;
-        }
-        if let Some(old) = s.privkey.as_mut() {
-            wipe(old);
-        }
-        s.privkey = Some(d.to_vec());
-    }
-    if let Some(p) = p_pub {
-        let Some(q) = octet_param(p).filter(|q| q.len() <= MAX_KEYLEN) else {
-            return false;
-        };
-        if let Some(dst) = s.pubkey.get_mut(..q.len()) {
-            dst.copy_from_slice(q);
-        }
-        if q.len() != keylen {
-            return false;
-        }
-    } else if !ecx::public_from_private(k, &mut s) {
-        err::raise(
-            ERR_LIB_EC,
-            rustyssl_abi::EC_R_FAILED_MAKING_PUBLIC_KEY,
-            "ossl_ecx_public_from_private",
-        );
-        return false;
-    }
-    s.haspubkey = true;
-    true
 }
 
 ffi_callback! {
