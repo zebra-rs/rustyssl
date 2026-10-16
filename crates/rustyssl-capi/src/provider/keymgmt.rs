@@ -29,9 +29,7 @@ use rustyssl_abi::{
 
 use super::builtin::libctx_of;
 use super::macs::{Prov, locate};
-use super::tables::{
-    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg_desc, defn, entry, pending,
-};
+use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg_desc, defn, entry};
 use crate::err;
 use crate::evp::cipher::{EVP_CIPHER_get0_name, EVP_CIPHER_is_a};
 use crate::ffi::ffi_callback;
@@ -951,8 +949,7 @@ static KDF_KEYMGMT: Dispatch<4> = Dispatch([
     END,
 ]);
 
-/// The default provider's key managers, in `deflt_keymgmt`'s order; the key types of later
-/// steps are pending (their names registered, nothing offered).
+/// The default provider's key managers, in `deflt_keymgmt`'s order.
 static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
     alg_desc(
         c"DH:dhKeyAgreement:1.2.840.113549.1.3.1",
@@ -964,7 +961,11 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &super::dh_kmgmt::DHX_KEYMGMT,
         c"OpenSSL X9.42 DH implementation",
     ),
-    pending(c"DSA:dsaEncryption:1.2.840.10040.4.1"),
+    alg_desc(
+        c"DSA:dsaEncryption:1.2.840.10040.4.1",
+        &super::dsa_kmgmt::DSA_KEYMGMT,
+        c"OpenSSL DSA implementation",
+    ),
     alg_desc(
         c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
         &super::rsa_kmgmt::RSA_KEYMGMT,

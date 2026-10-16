@@ -2077,30 +2077,6 @@ pub extern "C" fn DIST_POINT_set_dpname(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn DSA_print(_: *mut BIO, _: *const DSA, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("DSA_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DSA_print_fp(
-    _: *mut FILE,
-    _: *const DSA,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("DSA_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DSAparams_print(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("DSAparams_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DSAparams_print_fp(_: *mut FILE, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("DSAparams_print_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn DSO_METHOD_openssl() -> *mut DSO_METHOD {
     crate::stub::unimplemented("DSO_METHOD_openssl")
 }
@@ -3193,16 +3169,6 @@ pub extern "C" fn EVP_PKEY_delete_attr(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get0_DSA(_: *const EVP_PKEY) -> *const dsa_st {
-    crate::stub::unimplemented("EVP_PKEY_get0_DSA")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get1_DSA(_: *mut EVP_PKEY) -> *mut dsa_st {
-    crate::stub::unimplemented("EVP_PKEY_get1_DSA")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get_attr(
     _: *const EVP_PKEY,
     _: core::ffi::c_int,
@@ -3231,11 +3197,6 @@ pub extern "C" fn EVP_PKEY_get_attr_by_OBJ(
 #[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_get_attr_count(_: *const EVP_PKEY) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_get_attr_count")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_set1_DSA(_: *mut EVP_PKEY, _: *mut dsa_st) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_set1_DSA")
 }
 
 #[unsafe(no_mangle)]

@@ -378,7 +378,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `bp` is a live BIO.
-unsafe fn indent(bp: *mut BIO, n: c_int) -> bool {
+pub(crate) unsafe fn indent(bp: *mut BIO, n: c_int) -> bool {
     // SAFETY: the caller's guarantee.
     (unsafe { BIO_indent(bp, n, 128) }) != 0
 }
@@ -387,7 +387,7 @@ unsafe fn indent(bp: *mut BIO, n: c_int) -> bool {
 ///
 /// # Safety
 /// `bp` is a live BIO.
-unsafe fn bn_print(
+pub(crate) unsafe fn bn_print(
     bp: *mut BIO,
     label: &CStr,
     v: Option<&rustyssl_crypto::bn::BigNum>,
@@ -405,7 +405,7 @@ unsafe fn bn_print(
 ///
 /// # Safety
 /// `bp` is a live BIO.
-unsafe fn ffc_print(bp: *mut BIO, params: &ffc::Params, off: c_int) -> bool {
+pub(crate) unsafe fn ffc_print(bp: *mut BIO, params: &ffc::Params, off: c_int) -> bool {
     // SAFETY: the caller's guarantee.
     let ok = unsafe { bn_print(bp, c"prime P:", params.p.as_ref(), off) }
         // SAFETY: as above.

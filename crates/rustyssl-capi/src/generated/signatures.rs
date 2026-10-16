@@ -3572,6 +3572,10 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::dsa_meth::DSA_meth_set_verify;
 const _: unsafe extern "C" fn() -> *mut DSA = crate::dsa::DSA_new;
 const _: unsafe extern "C" fn(*mut ENGINE) -> *mut DSA = crate::dsa::DSA_new_method;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::dsa::DSA_print;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA, core::ffi::c_int) -> core::ffi::c_int =
+    crate::evp::pkey::dsa::DSA_print_fp;
 const _: unsafe extern "C" fn(*const DSA) -> core::ffi::c_int = crate::dsa::DSA_security_bits;
 const _: unsafe extern "C" fn(*mut DSA, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
     crate::dsa::DSA_set0_key;
@@ -3613,6 +3617,10 @@ const _: unsafe extern "C" fn(
     *mut DSA,
 ) -> core::ffi::c_int = crate::dsa_ops::DSA_verify;
 const _: unsafe extern "C" fn(*const DSA) -> *mut DSA = crate::dsa_asn1::DSAparams_dup;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
+    crate::evp::pkey::dsa::DSAparams_print;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
+    crate::evp::pkey::dsa::DSAparams_print_fp;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     usize,
@@ -6266,6 +6274,8 @@ const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut core::ffi::c_void =
     crate::evp::pkey::EVP_PKEY_get0;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const dh_st =
     crate::evp::pkey::dh::EVP_PKEY_get0_DH;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const dsa_st =
+    crate::evp::pkey::dsa::EVP_PKEY_get0_DSA;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const ec_key_st =
     crate::evp::pkey::ec::EVP_PKEY_get0_EC_KEY;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const rsa_st =
@@ -6287,6 +6297,8 @@ const _: unsafe extern "C" fn(*const EVP_PKEY, *mut usize) -> *const core::ffi::
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> *const core::ffi::c_char =
     crate::evp::pkey::EVP_PKEY_get0_type_name;
 const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut dh_st = crate::evp::pkey::dh::EVP_PKEY_get1_DH;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut dsa_st =
+    crate::evp::pkey::dsa::EVP_PKEY_get1_DSA;
 const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut ec_key_st =
     crate::evp::pkey::ec::EVP_PKEY_get1_EC_KEY;
 const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut rsa_st =
@@ -6870,6 +6882,8 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY, core::ffi::c_int) -> core::ffi::c_i
     crate::evp::pkey::EVP_PKEY_save_parameters;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut dh_st) -> core::ffi::c_int =
     crate::evp::pkey::dh::EVP_PKEY_set1_DH;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut dsa_st) -> core::ffi::c_int =
+    crate::evp::pkey::dsa::EVP_PKEY_set1_DSA;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut ec_key_st) -> core::ffi::c_int =
     crate::evp::pkey::ec::EVP_PKEY_set1_EC_KEY;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut rsa_st) -> core::ffi::c_int =

@@ -253,7 +253,6 @@ impl Dsa {
     }
 
     /// The dirty count (`dirty_cnt`).
-    #[expect(dead_code, reason = "the DSA ASN.1 method's (step 4.6c)")]
     pub(crate) fn dirty_count(&self) -> usize {
         self.dirty.load(Ordering::Acquire)
     }

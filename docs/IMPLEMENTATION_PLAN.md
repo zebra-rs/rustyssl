@@ -4077,8 +4077,24 @@ chunking) is clean.
         errors, decoding into a key, BIOs, FILEs, PEM, copies); the probe's `dsader` with
         `corpus/dsader.txt` and random mutated sessions (400 pass); the `dsa_der` fuzz target
         (1.7 million runs, clean).
-  - [ ] **4.6c The DSA providers**: the DSA key manager and signatures, and the legacy DSA
-    `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
+  - [ ] **4.6c The DSA providers**:
+    - [x] **4.6c1 The key manager and `EVP_PKEY`** (`provider/dsa_kmgmt.rs`, `dsa_backend.rs`,
+      `evp/pkey/dsa.rs`; 7 exports): the DSA key manager (from data with the FFC fields and the
+      key pair; described with SHA-256 as the default digest; exported by selection; compared,
+      copied, validated simply or fully, loaded; FIPS 186-4 or 186-2 parameters, by default by
+      size, with their seed, index, counter, h, and digest, or a template's, and keys); the
+      built-in DSA ASN.1 method's functions (including OpenSSL's `do_dsa_print`, which heads
+      the parameters "Public-Key"); `EVP_PKEY_set1_DSA`, `EVP_PKEY_get0_DSA`,
+      `EVP_PKEY_get1_DSA`, `DSA_print`, `DSAparams_print`, and their `_fp` forms. FFC
+      verification now fails as OpenSSL's does for an even p (its Montgomery setup's
+      `BN_R_NO_INVERSE`).
+      - Tests: `tests/c/evp_dsa_kmgmt.c` (5 checks: the key manager's names and lists, keys
+        from data with every gettable parameter and export, generation on a known DRBG with
+        its refusals, comparison and validation, DSA in `EVP_PKEY` with the legacy printing);
+        the probe's `dsakey` with `corpus/dsakey.txt` and random sessions (300 pass).
+    - [ ] **4.6c2 The signatures and the legacy `EVP_PKEY_METHOD`**: DSA signatures (with
+      the digest algorithms and RFC 6979's deterministic nonces) and the built-in DSA
+      `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
 - [ ] **4.7 Key encoders and decoders:**
   - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
     including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider

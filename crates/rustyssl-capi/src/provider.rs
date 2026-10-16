@@ -52,6 +52,7 @@ pub(crate) mod conf;
 mod dh_exch;
 pub(crate) mod dh_kmgmt;
 pub(crate) mod digests;
+pub(crate) mod dsa_kmgmt;
 pub(crate) mod ec_kmgmt;
 mod ecdh_exch;
 mod ecdsa_sig;
