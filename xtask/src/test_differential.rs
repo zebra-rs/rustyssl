@@ -413,6 +413,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dsader", dsader_session),
     ("dsakey", dsakey_session),
     ("dsasig", dsasig_session),
+    ("p8der", p8der_session),
     ("string", string_session),
 ];
 
@@ -3817,6 +3818,58 @@ fn dsader_session(random: &mut Random, out: &mut String) -> Result {
         };
         let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
         writeln!(out, "dsader {kind} {hex}")?;
+    }
+    Ok(())
+}
+
+/// A random session of PKCS#8's and X.509's structure decoders: small valid PrivateKeyInfos
+/// (with attributes and a public key), DigestInfos, attributes, and SEQUENCEs OF
+/// AlgorithmIdentifier with octets changed, dropped, or added, now and then given to another
+/// decoder.
+fn p8der_session(random: &mut Random, out: &mut String) -> Result {
+    const SEEDS: [(&str, &str); 7] = [
+        ("k", "3010020100300506032b6570040404020102"),
+        ("k", "3015020101300506032b65700404040201028103000a0b"),
+        (
+            "k",
+            "301d020100300506032b6570040404020102a00b30090603551d0f31020500",
+        ),
+        (
+            "s",
+            "3021300906052b0e03021a05000414000102030405060708090a0b0c0d0e0f10111213",
+        ),
+        ("a", "3011060a0992268993f22c6401013103160161"),
+        ("a", "30090603551d0f31020500"),
+        ("l", "3010300606022a03050030060602480e0500"),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(7)).unwrap_or(0);
+        let (kind, hex) = SEEDS.get(i).copied().unwrap_or(SEEDS[0]);
+        let mut der: Vec<u8> = (0..hex.len() / 2)
+            .filter_map(|j| u8::from_str_radix(hex.get(2 * j..2 * j + 2)?, 16).ok())
+            .collect();
+        for _ in 0..random.below(3) {
+            let len = u64::try_from(der.len()).unwrap_or(1).max(1);
+            let at = usize::try_from(random.below(len)).unwrap_or(0);
+            match random.below(4) {
+                0 if !der.is_empty() => {
+                    der.remove(at.min(der.len().saturating_sub(1)));
+                }
+                1 => der.insert(at, u8::try_from(random.below(256)).unwrap_or(0)),
+                _ => {
+                    if let Some(b) = der.get_mut(at) {
+                        *b ^= u8::try_from(random.below(255).saturating_add(1)).unwrap_or(1);
+                    }
+                }
+            }
+        }
+        let kind = if random.below(5) == 0 {
+            random.pick(&["k", "s", "a", "l"])
+        } else {
+            kind
+        };
+        let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
+        writeln!(out, "p8der {kind} {hex}")?;
     }
     Ok(())
 }
