@@ -2034,21 +2034,6 @@ pub extern "C" fn CT_POLICY_EVAL_CTX_set_time(_: *mut CT_POLICY_EVAL_CTX, _: u64
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn DHparams_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("DHparams_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DHparams_print(_: *mut BIO, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("DHparams_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DHparams_print_fp(_: *mut FILE, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("DHparams_print_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn DIST_POINT_NAME_dup(_: *const DIST_POINT_NAME) -> *mut DIST_POINT_NAME {
     crate::stub::unimplemented("DIST_POINT_NAME_dup")
 }
@@ -9262,16 +9247,6 @@ pub extern "C" fn PEM_read_CMS(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_DHparams(
-    _: *mut FILE,
-    _: *mut *mut DH,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DH {
-    crate::stub::unimplemented("PEM_read_DHparams")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_read_DSAPrivateKey(
     _: *mut FILE,
     _: *mut *mut DSA,
@@ -9513,16 +9488,6 @@ pub extern "C" fn PEM_read_bio_CMS(
     _: *mut core::ffi::c_void,
 ) -> *mut CMS_ContentInfo {
     crate::stub::unimplemented("PEM_read_bio_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_DHparams(
-    _: *mut BIO,
-    _: *mut *mut DH,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DH {
-    crate::stub::unimplemented("PEM_read_bio_DHparams")
 }
 
 #[unsafe(no_mangle)]
@@ -9780,16 +9745,6 @@ pub extern "C" fn PEM_write_CMS(_: *mut FILE, _: *const CMS_ContentInfo) -> core
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_DHparams(_: *mut FILE, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_DHparams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_DHxparams(_: *mut FILE, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_DHxparams")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_DSAPrivateKey(
     _: *mut FILE,
     _: *const DSA,
@@ -10013,16 +9968,6 @@ pub extern "C" fn PEM_write_bio_CMS_stream(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_CMS_stream")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_DHparams(_: *mut BIO, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_DHparams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_DHxparams(_: *mut BIO, _: *const DH) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_DHxparams")
 }
 
 #[unsafe(no_mangle)]
@@ -19466,24 +19411,6 @@ pub extern "C" fn d2i_CRL_DIST_POINTS(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_DHparams(
-    _: *mut *mut DH,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DH {
-    crate::stub::unimplemented("d2i_DHparams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DHxparams(
-    _: *mut *mut DH,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DH {
-    crate::stub::unimplemented("d2i_DHxparams")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_DIST_POINT(
     _: *mut *mut DIST_POINT,
     _: *mut *const core::ffi::c_uchar,
@@ -21334,16 +21261,6 @@ pub extern "C" fn i2d_CRL_DIST_POINTS(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_CRL_DIST_POINTS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DHparams(_: *const DH, _: *mut *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DHparams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DHxparams(_: *const DH, _: *mut *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DHxparams")
 }
 
 #[unsafe(no_mangle)]

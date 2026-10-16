@@ -3305,6 +3305,11 @@ const _: unsafe extern "C" fn(*const DH, core::ffi::c_int) -> core::ffi::c_int =
     crate::dh::DH_test_flags;
 const _: unsafe extern "C" fn(*mut DH) -> core::ffi::c_int = crate::dh::DH_up_ref;
 const _: unsafe extern "C" fn(*const DH) -> *mut DH = crate::dh::DHparams_dup;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::dh_asn1::DHparams_it;
+const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::DHparams_print;
+const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::DHparams_print_fp;
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DIRECTORYSTRING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DIRECTORYSTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DIRECTORYSTRING_new;
@@ -8200,12 +8205,24 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_read;
 const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut DH,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DH = crate::dh_asn1::PEM_read_DHparams;
+const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,
     *mut *mut core::ffi::c_char,
     *mut *mut core::ffi::c_uchar,
     *mut core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_read_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut DH,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DH = crate::dh_asn1::PEM_read_bio_DHparams;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,
@@ -8221,6 +8238,10 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_write;
+const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::PEM_write_DHparams;
+const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::PEM_write_DHxparams;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_char,
@@ -8228,6 +8249,10 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_write_bio;
+const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::PEM_write_bio_DHparams;
+const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
+    crate::dh_asn1::PEM_write_bio_DHxparams;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -9441,6 +9466,16 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_VISIBLESTRING = crate::asn1::tpl::items::d2i_ASN1_VISIBLESTRING;
 const _: unsafe extern "C" fn(
+    *mut *mut DH,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DH = crate::dh_asn1::d2i_DHparams;
+const _: unsafe extern "C" fn(
+    *mut *mut DH,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DH = crate::dh_asn1::d2i_DHxparams;
+const _: unsafe extern "C" fn(
     *mut *mut ASN1_STRING,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -9594,6 +9629,10 @@ const _: unsafe extern "C" fn(
     *const ASN1_VISIBLESTRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_ASN1_VISIBLESTRING;
+const _: unsafe extern "C" fn(*const DH, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dh_asn1::i2d_DHparams;
+const _: unsafe extern "C" fn(*const DH, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dh_asn1::i2d_DHxparams;
 const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,

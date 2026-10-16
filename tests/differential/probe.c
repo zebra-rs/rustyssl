@@ -356,6 +356,9 @@
  *                              DH_check_pub_key, with their _ex forms) of numbers in hex or a
  *                              named group's (ffdhe2048:p, dh_2048_256:q, ...), one of them
  *                              added to by the edit (p3 adds 3 to p, y1 to the public key)
+ *   dhder <p|x> <hex>          d2i_DHparams (p) or d2i_DHxparams (x) of the octets: the result,
+ *                              the octets consumed, and the parameters' sizes, encoding,
+ *                              checks, and printed text (as a SHA-256 prefix)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5658,13 +5661,60 @@ static void dh_check_command(const char *line)
     DH_free(dh);
 }
 
+/* dhder: d2i_DHparams or d2i_DHxparams of the octets, then what the parameters are. */
+static void dh_der_command(const char *line)
+{
+    char kind[8] = "-", hexs[2100] = "-";
+    static unsigned char der[1100];
+    unsigned char *re = NULL;
+    const unsigned char *pp = der;
+    size_t n = 0, i;
+    DH *dh;
+    BIO *b;
+    char *text;
+    long tn;
+    int rn, x942, ret = -1;
+
+    sscanf(line, "%*s %7s %2099s", kind, hexs);
+    x942 = strcmp(kind, "x") == 0;
+    for (i = 0; hexs[2 * i] != '\0' && hexs[2 * i + 1] != '\0' && i < sizeof(der); i++) {
+        unsigned int v;
+
+        if (sscanf(hexs + 2 * i, "%2x", &v) != 1)
+            break;
+        der[i] = (unsigned char)v;
+    }
+    n = i;
+    dh = x942 ? d2i_DHxparams(NULL, &pp, (long)n) : d2i_DHparams(NULL, &pp, (long)n);
+    printf(" %s consumed %ld", dh == NULL ? "fails" : "ok", (long)(pp - der));
+    print_asn_errors();
+    if (dh == NULL)
+        return;
+    printf("  bits %d nid %d length %ld", DH_bits(dh), DH_get_nid(dh), DH_get_length(dh));
+    rn = x942 ? i2d_DHxparams(dh, &re) : i2d_DHparams(dh, &re);
+    printf(" re %d same %d", rn, rn == (int)n && memcmp(re, der, n) == 0);
+    OPENSSL_free(re);
+    DH_check_params(dh, &ret);
+    printf(" params %#x", ret);
+    b = BIO_new(BIO_s_mem());
+    printf(" print %d", DHparams_print(b, dh));
+    tn = BIO_get_mem_data(b, &text);
+    ml_kem_digest((const unsigned char *)text, (size_t)tn);
+    BIO_free(b);
+    print_asn_errors();
+    DH_free(dh);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
-    if (strcmp(command, "dhcheck") != 0)
+    if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0)
         return 0;
     printf("%s:", line);
-    dh_check_command(line);
+    if (strcmp(command, "dhder") == 0)
+        dh_der_command(line);
+    else
+        dh_check_command(line);
     return 1;
 }
 

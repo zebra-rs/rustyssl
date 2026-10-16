@@ -406,6 +406,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("slhdsa", slhdsa_session),
     ("mlx", mlx_session),
     ("dhcheck", dhcheck_session),
+    ("dhder", dhder_session),
     ("string", string_session),
 ];
 
@@ -3564,6 +3565,49 @@ fn dhcheck_session(random: &mut Random, out: &mut String) -> Result {
             _ => "-".to_owned(),
         };
         writeln!(out, "dhcheck {p} {q} {g} {y} {edit}")?;
+    }
+    Ok(())
+}
+
+/// A random session of DH parameter decoding: small valid PKCS #3 and X9.42 encodings with
+/// octets changed, dropped, or added.
+fn dhder_session(random: &mut Random, out: &mut String) -> Result {
+    const SEEDS: [(&str, &str); 6] = [
+        ("p", "3006020117020105"),
+        ("p", "3009020117020105020164"),
+        ("x", "300c02011702010502010b020102"),
+        ("x", "301302011702010502010b30080303000102020107"),
+        ("x", "301602011702010502010b02010230080303000102020107"),
+        ("p", "3016021100f7e75fdc469067ffdc4e847c51f452df020105"),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(6)).unwrap_or(0);
+        let (kind, hex) = SEEDS.get(i).copied().unwrap_or(SEEDS[0]);
+        let mut der: Vec<u8> = (0..hex.len() / 2)
+            .filter_map(|j| u8::from_str_radix(hex.get(2 * j..2 * j + 2)?, 16).ok())
+            .collect();
+        for _ in 0..random.below(3).saturating_add(1) {
+            let len = u64::try_from(der.len()).unwrap_or(1).max(1);
+            let at = usize::try_from(random.below(len)).unwrap_or(0);
+            match random.below(4) {
+                0 if !der.is_empty() => {
+                    der.remove(at.min(der.len().saturating_sub(1)));
+                }
+                1 => der.insert(at, u8::try_from(random.below(256)).unwrap_or(0)),
+                _ => {
+                    if let Some(b) = der.get_mut(at) {
+                        *b ^= u8::try_from(random.below(255).saturating_add(1)).unwrap_or(1);
+                    }
+                }
+            }
+        }
+        let kind = if random.below(5) == 0 {
+            if kind == "p" { "x" } else { "p" }
+        } else {
+            kind
+        };
+        let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
+        writeln!(out, "dhder {kind} {hex}")?;
     }
     Ok(())
 }

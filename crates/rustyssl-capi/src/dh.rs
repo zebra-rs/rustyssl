@@ -13,8 +13,9 @@ use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    BIGNUM, BN_FLG_CONSTTIME, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_DH, DH, DH_METHOD,
-    DH_R_INVALID_PARAMETER_NID, ENGINE, ERR_LIB_DH, ERR_R_INIT_FAIL, OSSL_LIB_CTX,
+    BIGNUM, BN_FLG_CONSTTIME, CRYPTO_EX_DATA, CRYPTO_EX_INDEX_DH, DH, DH_FLAG_TYPE_DH,
+    DH_FLAG_TYPE_DHX, DH_FLAG_TYPE_MASK, DH_METHOD, DH_R_INVALID_PARAMETER_NID, ENGINE, ERR_LIB_DH,
+    ERR_R_INIT_FAIL, OSSL_LIB_CTX,
 };
 use rustyssl_crypto::bn::BigNum;
 use rustyssl_crypto::ffc as groups;
@@ -301,6 +302,36 @@ impl Dh {
         if old.0 != b {
             lg.numbers.retire(old);
         }
+    }
+
+    /// Takes decoded `BIGNUM`s as the key's numbers (each non-NULL one; the key owns it from
+    /// then on, keeping a replaced one alive).
+    ///
+    /// # Safety
+    /// Each `BIGNUM` is NULL or live, given up by the caller.
+    pub(crate) unsafe fn adopt(&self, fields: &[(Field, *mut BIGNUM)]) {
+        let mut st = self.lock();
+        let mut lg = self.legacy();
+        lg.numbers.read(&mut st);
+        for &(f, b) in fields {
+            if !b.is_null() {
+                // SAFETY: the caller's guarantee.
+                unsafe { self.set0(&mut st, &mut lg, f, b) };
+            }
+        }
+        drop(lg);
+        drop(st);
+        self.touch();
+    }
+
+    /// Marks the key as PKCS #3 DH or X9.42 DHX (`DH_FLAG_TYPE_*`).
+    pub(crate) fn set_type(&self, dhx: bool) {
+        let t = if dhx {
+            DH_FLAG_TYPE_DHX
+        } else {
+            DH_FLAG_TYPE_DH
+        };
+        self.set_flags_to((self.flags() & !DH_FLAG_TYPE_MASK) | t);
     }
 
     /// `ossl_dh_cache_named_group`: the named group `p`, `g` (and `q`, if set) are, cached
