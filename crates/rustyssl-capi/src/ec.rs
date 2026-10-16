@@ -21,6 +21,7 @@ pub(crate) mod key;
 pub(crate) mod key_asn1;
 pub(crate) mod params;
 pub(crate) mod point;
+pub(crate) mod sm2;
 
 use core::ffi::c_int;
 use std::sync::LazyLock;

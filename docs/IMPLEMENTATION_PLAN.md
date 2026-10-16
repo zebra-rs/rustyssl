@@ -3683,8 +3683,22 @@ chunking) is clean.
         parameters, a legacy `EC_KEY` on SM2's curve moved into the key manager); the probe's
         `sm2km` in `corpus/eckm.txt` and random sessions (500 pass); the `ec_kmgmt` fuzz target
         also makes keys through the SM2 key manager.
-    - [ ] **4.4e2 SM2 signatures:** `Z = H(ENTL || ID || a || b || G || P)`, signing in
-      constant time and verifying, the signature provider with its ID and digest.
+    - [x] **4.4e2 SM2 signatures** (`rustyssl-capi/src/ec/sm2.rs`,
+      `rustyssl-capi/src/provider/sm2_sig.rs`, `rustyssl-crypto/src/ec/sm2.rs`; no new
+      exports): the Z value `H(ENTL || ID || a || b || xG || yG || xA || yA)`, signing a
+      digest-sized number with a nonce from `BN_priv_rand_range_ex` (drawn again while r is 0,
+      `k = n - r` in a constant-time comparison, or s is 0) and `s = (1 + d)^-1 (k - r d)` on
+      constant-time field elements, verifying, and the strict-DER signatures
+      (`ossl_sm2_internal_sign`/`_verify`). The provider (`SM2`) signs and verifies numbers as
+      they are and messages through SM3 with the Z value over the `distid` (settable only
+      before it's computed), with SM2-with-SM3's algorithm identifier and OpenSSL's errors.
+      A private key of n - 1 is refused where OpenSSL loops forever (docs/DEVIATIONS.md).
+      - Tests: `tests/c/evp_sm2_sig.c` (8 checks: the lists, the reference's signatures with
+        and without an ID verified, changed, malformed, and out of range, messages and numbers
+        signed and verified, a copy mid-message, the ID too late, other digests, every context
+        parameter, a legacy `EC_KEY`); the probe's `sm2sig` with `corpus/sm2sig.txt` and random
+        sessions (signatures compared whole, from deterministic generators); the `ecdsa_sig`
+        fuzz target also verifies through SM2; unit tests of the arithmetic and the Z input.
     - [ ] **4.4e3 SM2 encryption:** the ciphertext's ASN.1 (`C1x, C1y, C3, C2`), encrypting and
       decrypting through X9.63's KDF, the asymmetric cipher provider; a fuzz target.
 - [ ] **4.5 ECX and post-quantum:**

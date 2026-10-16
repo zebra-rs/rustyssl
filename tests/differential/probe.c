@@ -320,6 +320,10 @@
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
  *   sm2km <sel> <group|-> <priv|-> <pub|-> <k=v,...|->  as eckm, with the SM2 key manager
+ *   sm2sig <priv> <id|-> <md|-> <msg> <sig|->  the SM2 signature provider: with no signature,
+ *                              the message signed through a digest context (with the ID) and,
+ *                              as a number, by EVP_PKEY_sign, each verified; with one, it's
+ *                              verified both ways
  *   ecdhx <curve> <priv> <peer's priv> <mode> <md|-> <outlen> <ukm|-> <room>  the ECDH
  *                              provider: the shared secret into a buffer of room octets, with
  *                              the cofactor mode (-1 the key's, or anything set), and X9.63's
@@ -4458,8 +4462,8 @@ static void ec_dhkem_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
-/* An EC key on the curve from a private number, or NULL (its errors printed). */
-static EVP_PKEY *ec_fromdata(const char *curve, const char *priv)
+/* A key of keytype on the curve from a private number, or NULL. */
+static EVP_PKEY *ec_fromdata_type(const char *keytype, const char *curve, const char *priv)
 {
     BIGNUM *d = NULL;
     EC_GROUP *g = EC_GROUP_new_by_curve_name(OBJ_sn2nid(curve));
@@ -4468,7 +4472,7 @@ static EVP_PKEY *ec_fromdata(const char *curve, const char *priv)
     size_t publen = 0;
     OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
     OSSL_PARAM *ps;
-    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, keytype, NULL);
     EVP_PKEY *k = NULL;
 
     if (BN_hex2bn(&d, priv) > 0 && q != NULL && EC_POINT_mul(g, q, d, NULL, NULL, NULL))
@@ -4488,6 +4492,12 @@ static EVP_PKEY *ec_fromdata(const char *curve, const char *priv)
     BN_free(d);
     EVP_PKEY_CTX_free(c);
     return k;
+}
+
+/* An EC key on the curve from a private number, or NULL. */
+static EVP_PKEY *ec_fromdata(const char *curve, const char *priv)
+{
+    return ec_fromdata_type("EC", curve, priv);
 }
 
 /* ecdhx: a shared secret through the ECDH provider. */
@@ -4540,6 +4550,74 @@ static void ec_exchange_command(const char *line)
     }
     EVP_PKEY_free(ka);
     EVP_PKEY_free(kb);
+}
+
+/* sm2sig: an SM2 key's signatures through the SM2 provider. */
+static void sm2_sig_command(const char *line)
+{
+    char priv[700] = "-", id[300] = "-", md[64] = "-", msg[700] = "-", sighex[700] = "-";
+    unsigned char mb[300], sb[300], ib[150], sig[300];
+    size_t ml = 0, sl = 0, il = 0, len;
+    const char *mdname;
+    EVP_PKEY *k;
+
+    sscanf(line, "%*s %699s %299s %63s %699s %699s", priv, id, md, msg, sighex);
+    mdname = strcmp(md, "-") == 0 ? NULL : md;
+    if (!parse_hex(msg, mb, &ml) || (strcmp(id, "-") != 0 && !parse_hex(id, ib, &il))
+        || (strcmp(sighex, "-") != 0 && !parse_hex(sighex, sb, &sl))) {
+        printf(" bad input\n");
+        return;
+    }
+    printf(" key");
+    k = ec_fromdata_type("SM2", "SM2", priv);
+    print_asn_errors();
+    if (k != NULL) {
+        EVP_MD_CTX *m = EVP_MD_CTX_new();
+        EVP_PKEY_CTX *pc = NULL;
+        int r;
+
+        if (strcmp(sighex, "-") != 0) {
+            r = EVP_DigestVerifyInit_ex(m, &pc, mdname, NULL, NULL, k, NULL);
+            if (r == 1 && strcmp(id, "-") != 0)
+                r = r * 10 + EVP_PKEY_CTX_set1_id(pc, ib, il);
+            printf("  digest verify %d %d", r, EVP_DigestVerify(m, sb, sl, mb, ml));
+            print_asn_errors();
+            pc = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+            r = EVP_PKEY_verify_init(pc);
+            printf("  verify %d %d", r, EVP_PKEY_verify(pc, sb, sl, mb, ml));
+            print_asn_errors();
+            EVP_PKEY_CTX_free(pc);
+        } else {
+            len = sizeof(sig);
+            r = EVP_DigestSignInit_ex(m, &pc, mdname, NULL, NULL, k, NULL);
+            if (r == 1 && strcmp(id, "-") != 0)
+                r = r * 10 + EVP_PKEY_CTX_set1_id(pc, ib, il);
+            r = r * 10 + EVP_DigestSign(m, sig, &len, mb, ml);
+            printf("  digest sign %d", r);
+            if (r % 10 == 1) {
+                print_hex("", sig, len);
+                r = EVP_DigestVerifyInit_ex(m, &pc, mdname, NULL, NULL, k, NULL);
+                if (r == 1 && strcmp(id, "-") != 0)
+                    r = r * 10 + EVP_PKEY_CTX_set1_id(pc, ib, il);
+                printf("  verify %d %d", r, EVP_DigestVerify(m, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            pc = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+            len = sizeof(sig);
+            r = EVP_PKEY_sign_init(pc);
+            r = r * 10 + EVP_PKEY_sign(pc, sig, &len, mb, ml);
+            printf("  sign %d", r);
+            if (r == 11) {
+                print_hex("", sig, len);
+                r = EVP_PKEY_verify_init(pc);
+                printf("  verify %d %d", r, EVP_PKEY_verify(pc, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            EVP_PKEY_CTX_free(pc);
+        }
+        EVP_MD_CTX_free(m);
+    }
+    EVP_PKEY_free(k);
 }
 
 /* ecsig: an EC key's signatures through the ECDSA provider. */
@@ -4678,9 +4756,13 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
         && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0
-        && strcmp(command, "sm2km") != 0)
+        && strcmp(command, "sm2km") != 0 && strcmp(command, "sm2sig") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "sm2sig") == 0) {
+        sm2_sig_command(line);
+        return 1;
+    }
     if (strcmp(command, "ecdhx") == 0) {
         ec_exchange_command(line);
         return 1;

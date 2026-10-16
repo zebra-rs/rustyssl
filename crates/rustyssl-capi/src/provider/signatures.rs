@@ -527,7 +527,7 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
         c"ECDSA-SHA3-512:ecdsa_with_SHA3-512:id-ecdsa-with-sha3-512:2.16.840.1.101.3.4.3.12",
         &ecdsa_sig::ECDSA_SHA3_512_SIGNATURE,
     ),
-    pending(c"SM2:1.2.156.10197.1.301"),
+    alg(c"SM2:1.2.156.10197.1.301", &super::sm2_sig::SM2_SIGNATURE),
     pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
     pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
     pending(c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87"),

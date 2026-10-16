@@ -3,7 +3,7 @@
 //! or read out of bounds (ASan); a signature it reads must encode, and its encoding read back
 //! to the same numbers; and `ECDSA_verify` must refuse anything that isn't exactly DER. Through
 //! the ECDSA provider too: the input as a signature of itself never verifies, and its RFC 6979
-//! signature (nonce type 1) always does.
+//! signature (nonce type 1) always does; nor does it verify through the SM2 provider.
 
 #![no_main]
 
@@ -109,8 +109,26 @@ static PKEY: LazyLock<Pkey> = LazyLock::new(|| {
     Pkey(p)
 });
 
+/// An SM2 key (a legacy EC_KEY on SM2's curve), made once.
+static SM2: LazyLock<Pkey> = LazyLock::new(|| {
+    // SAFETY: 1172 is sm2.
+    let k = unsafe { EC_KEY_new_by_curve_name(1172) };
+    // SAFETY: a live key.
+    assert_eq!(unsafe { EC_KEY_generate_key(k) }, 1);
+    // SAFETY: no preconditions.
+    let p = unsafe { EVP_PKEY_new() };
+    // SAFETY: a live key and EC key.
+    assert_eq!(unsafe { EVP_PKEY_set1_EC_KEY(p, k) }, 1);
+    Pkey(p)
+});
+
 /// `EVP_DigestVerify` of `sig` over `msg` with SHA-256.
 fn digest_verify(sig: &[u8], msg: &[u8]) -> c_int {
+    digest_verify_with(PKEY.0, c"SHA256", sig, msg)
+}
+
+/// `EVP_DigestVerify` of `sig` over `msg` with `pkey` and the digest `md`.
+fn digest_verify_with(pkey: *mut EVP_PKEY, md: &core::ffi::CStr, sig: &[u8], msg: &[u8]) -> c_int {
     // SAFETY: no preconditions.
     let m = unsafe { EVP_MD_CTX_new() };
     // SAFETY: a context, a digest name, and the key.
@@ -118,10 +136,10 @@ fn digest_verify(sig: &[u8], msg: &[u8]) -> c_int {
         EVP_DigestVerifyInit_ex(
             m,
             ptr::null_mut(),
-            c"SHA256".as_ptr(),
+            md.as_ptr(),
             ptr::null_mut(),
             ptr::null(),
-            PKEY.0,
+            pkey,
             ptr::null(),
         )
     };
@@ -172,6 +190,8 @@ fuzz_target!(|input: &[u8]| {
     assert!(v == -1 || v == 0, "a random signature never verifies");
     let v = digest_verify(input, input);
     assert!(v == -1 || v == 0, "nor through the provider");
+    let v = digest_verify_with(SM2.0, c"SM3", input, input);
+    assert!(v == -1 || v == 0, "nor through SM2's");
     let mut nonce: u32 = 1;
     // SAFETY: a static key; a local.
     let params = [
