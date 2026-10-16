@@ -3749,8 +3749,19 @@ chunking) is clean.
         from data of each kind, every parameter, the sets, checks, generation by each route);
         the probe's `ecxkm` with `corpus/ecxkm.txt` and random sessions (1,000 pass); the
         `ecx_kmgmt` fuzz target; RFC vectors as unit tests.
-    - [ ] **4.5a2 The X25519 exchange and Ed25519 signatures** (Ed25519, Ed25519ctx,
-      Ed25519ph, digest-signing).
+    - [x] **4.5a2 The X25519 exchange and Ed25519 signatures** (`provider/ecx_exch.rs`,
+      `provider/eddsa_sig.rs`; no new exports): the X25519 exchange (`ecx_exch.c`: keys of the
+      context's length, a missing key, a short buffer, and an all-zero secret written and then
+      refused) and the ED25519, ED25519ph, and ED25519ctx signatures (`eddsa_sig.c`): the
+      instance preset by each algorithm or set on ED25519 (ignored if it doesn't fit the key),
+      the caller's prehash for a plain init, SHA-512's otherwise, context strings of at most
+      255 octets, no explicit digest, and the algorithm identifier; the dispatch tables
+      copied entry for entry (ED25519ph's duplicate inits included).
+      - Tests: `tests/c/evp_ecx_ops.c` (5 checks: the lists, RFC 7748's secret and its
+        failures, RFC 8032's signatures through each route, the parameters and their errors,
+        the algorithm identifier, prehashes of the wrong length); the probe's `x25519x` and
+        `ed25519` with `corpus/ecxop.txt` and random sessions (`ecxop`, 2,000 pass); the
+        `ecx_ops` fuzz target.
     - [ ] **4.5a3 The legacy ECX ASN.1 and key methods.**
   - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448).
   - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with

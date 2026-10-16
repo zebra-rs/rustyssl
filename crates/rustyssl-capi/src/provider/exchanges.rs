@@ -355,7 +355,7 @@ kdf_keyexch!(
 static DEFAULT_KEYEXCH: Algorithms<8> = Algorithms([
     pending(c"DH:dhKeyAgreement:1.2.840.113549.1.3.1"),
     alg(c"ECDH", &super::ecdh_exch::ECDH_KEYEXCH),
-    pending(c"X25519:1.3.101.110"),
+    alg(c"X25519:1.3.101.110", &super::ecx_exch::X25519_KEYEXCH),
     pending(c"X448:1.3.101.111"),
     alg(c"TLS1-PRF", &TLS1_PRF_KEYEXCH),
     alg(c"HKDF", &HKDF_KEYEXCH),

@@ -323,6 +323,11 @@
  *   ecxkm <type> <sel> <priv|-> <pub|-> <ikm|->  an ECX key (X25519, ED25519, ...) from data,
  *                              its export, raw keys, and checks; with ikm, one generated from
  *                              DHKEM input key material instead
+ *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
+ *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
+ *                              an algorithm (- for EVP_DigestSign) with the instance and context
+ *                              string given: with no signature, the message signed and
+ *                              verified; with one, verified
  *   sm2enc <priv> <md|-> <msg> <ct|-> <room>  the SM2 asymmetric cipher: with no ciphertext,
  *                              the message's size, encryption, and decryption again; with one,
  *                              its message's size and its decryption into room octets
@@ -4895,6 +4900,139 @@ static void ecx_keymgmt_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
+/* Octets in hex after a space, on the same line. */
+static void ecx_hex(const unsigned char *p, size_t n)
+{
+    printf(" ");
+    for (size_t i = 0; i < n; i++)
+        printf("%02x", p[i]);
+}
+
+/* x25519x: the X25519 exchange of a private key and a peer's public key into room octets. */
+static void x25519_exchange_command(const char *line)
+{
+    char priv[300] = "-", pub[300] = "-";
+    unsigned char db[150], qb[150], s[100];
+    size_t dl = 0, ql = 0, room = 0, len;
+    EVP_PKEY *k, *peer;
+    EVP_PKEY_CTX *c;
+    int r;
+
+    sscanf(line, "%*s %299s %299s %zu", priv, pub, &room);
+    if (!parse_hex(priv, db, &dl) || !parse_hex(pub, qb, &ql) || room > sizeof(s)) {
+        printf(" bad input\n");
+        return;
+    }
+    k = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, db, dl);
+    peer = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, qb, ql);
+    printf(" keys %d %d", k != NULL, peer != NULL);
+    print_asn_errors();
+    if (k != NULL && peer != NULL) {
+        c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+        printf("  init %d", EVP_PKEY_derive_init(c));
+        printf(" peer %d", EVP_PKEY_derive_set_peer(c, peer));
+        len = 0;
+        r = EVP_PKEY_derive(c, NULL, &len);
+        printf(" size %d %zu", r, len);
+        memset(s, 0x77, sizeof(s));
+        len = room;
+        r = EVP_PKEY_derive(c, s, &len);
+        printf(" derive %d", r);
+        printf(" buffer");
+        ecx_hex(s, room < 32 ? room : 32);
+        print_asn_errors();
+        EVP_PKEY_CTX_free(c);
+    }
+    EVP_PKEY_free(k);
+    EVP_PKEY_free(peer);
+}
+
+/*
+ * ed25519: Ed25519 signatures with an algorithm (ED25519, ED25519ph, ED25519ctx; - for
+ * EVP_DigestSign), an instance and a context string (each - for none), a private key, and a
+ * message: with no signature, the message signed and verified; with one, verified.
+ */
+static void ed25519_command(const char *line)
+{
+    char alg[32] = "-", inst[32] = "-", ctxs[600] = "-", priv[300] = "-", msg[600] = "-",
+         sig[300] = "-";
+    unsigned char db[150], cb[300], mb[300], sb[150], out[100];
+    size_t dl = 0, cl = 0, ml = 0, sl = 0, len = sizeof(out);
+    OSSL_PARAM ps[3], *p = ps;
+    EVP_PKEY *k;
+    int r;
+
+    sscanf(line, "%*s %31s %31s %599s %299s %599s %299s", alg, inst, ctxs, priv, msg, sig);
+    if ((strcmp(ctxs, "-") != 0 && !parse_hex(ctxs, cb, &cl)) || !parse_hex(priv, db, &dl)
+        || (strcmp(msg, "-") != 0 && !parse_hex(msg, mb, &ml))
+        || (strcmp(sig, "-") != 0 && !parse_hex(sig, sb, &sl))) {
+        printf(" bad input\n");
+        return;
+    }
+    if (strcmp(inst, "-") != 0)
+        *p++ = OSSL_PARAM_construct_utf8_string(OSSL_SIGNATURE_PARAM_INSTANCE, inst, 0);
+    if (strcmp(ctxs, "-") != 0)
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, cb, cl);
+    *p = OSSL_PARAM_construct_end();
+    k = EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, NULL, db, dl);
+    printf(" key %d", k != NULL);
+    if (k == NULL) {
+        print_asn_errors();
+        return;
+    }
+    if (strcmp(alg, "-") == 0) {
+        EVP_MD_CTX *m = EVP_MD_CTX_new();
+
+        if (strcmp(sig, "-") == 0) {
+            r = EVP_DigestSignInit_ex(m, NULL, NULL, NULL, NULL, k, ps);
+            printf(" sign %d", r);
+            r = EVP_DigestSign(m, out, &len, mb, ml);
+            printf(" %d", r);
+            if (r == 1) {
+                ecx_hex(out, len);
+                memcpy(sb, out, len);
+                sl = len;
+            }
+            print_asn_errors();
+        }
+        if (sl > 0) {
+            r = EVP_DigestVerifyInit_ex(m, NULL, NULL, NULL, NULL, k, ps);
+            printf("  verify %d", r);
+            printf(" %d", EVP_DigestVerify(m, sb, sl, mb, ml));
+            print_asn_errors();
+        }
+        EVP_MD_CTX_free(m);
+    } else {
+        EVP_SIGNATURE *s = EVP_SIGNATURE_fetch(NULL, alg, NULL);
+        EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+
+        if (strcmp(sig, "-") == 0) {
+            r = EVP_PKEY_sign_message_init(c, s, ps);
+            printf(" sign %d", r);
+            r = EVP_PKEY_sign(c, out, &len, mb, ml);
+            printf(" %d", r);
+            if (r == 1) {
+                ecx_hex(out, len);
+                memcpy(sb, out, len);
+                sl = len;
+            }
+            print_asn_errors();
+        }
+        if (sl > 0) {
+            r = EVP_PKEY_verify_message_init(c, s, ps);
+            printf("  verify %d", r);
+            printf(" %d", EVP_PKEY_verify(c, sb, sl, mb, ml));
+            r = EVP_PKEY_verify_init_ex2(c, s, ps);
+            printf(" through verify_init %d", r);
+            printf(" %d", EVP_PKEY_verify(c, sb, sl, mb, ml));
+            print_asn_errors();
+        }
+        EVP_PKEY_CTX_free(c);
+        EVP_SIGNATURE_free(s);
+    }
+    EVP_PKEY_free(k);
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -4912,9 +5050,18 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
         && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0
         && strcmp(command, "sm2km") != 0 && strcmp(command, "sm2sig") != 0
-        && strcmp(command, "sm2enc") != 0 && strcmp(command, "ecxkm") != 0)
+        && strcmp(command, "sm2enc") != 0 && strcmp(command, "ecxkm") != 0
+        && strcmp(command, "x25519x") != 0 && strcmp(command, "ed25519") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "x25519x") == 0) {
+        x25519_exchange_command(line);
+        return 1;
+    }
+    if (strcmp(command, "ed25519") == 0) {
+        ed25519_command(line);
+        return 1;
+    }
     if (strcmp(command, "ecxkm") == 0) {
         ecx_keymgmt_command(line);
         return 1;
