@@ -3851,8 +3851,29 @@ chunking) is clean.
         decapsulation of the ciphertext as is, changed, and of other lengths, random
         encapsulations, a public key, and an empty key); the probe's `mlkem` with
         `corpus/mlkem.txt` and random sessions (300 pass); the `ml_kem_ops` fuzz target.
-  - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures
-    (pure, with context, external mu, deterministic and hedged).
+  - [ ] **4.5d ML-DSA-44/65/87**, in sub-steps:
+    - [x] **4.5d1 The arithmetic and the key managers** (`rustyssl-crypto/src/mldsa.rs`,
+      `provider/ml_dsa_kmgmt.rs`; no new exports): FIPS 204 written in-house over our SHAKE
+      sponge: polynomials mod `q = 8380417` with Montgomery multiplication, the NTT,
+      `Power2Round`, `Decompose` by multiplication and shifts, hints, and norms with masks
+      (rejection sampling, as in OpenSSL and FIPS 204 3.6.3, isn't constant-time), the
+      encodings, `ExpandA`/`ExpandS`/`ExpandMask`/`SampleInBall`, key generation, and signing
+      and verifying a message representative `mu`. A private key is checked as OpenSSL checks
+      it: `s1` and `s2` within `eta` (failing without an error), then the public key they make
+      matching its `t0` and `tr`. The key managers copy `ml_dsa_kmgmt.c`: keys from a seed, a
+      private key, or a public key (a given public key checked against the private key's;
+      unlike ML-KEM no pairwise test on import, and an empty parameter with data is a length
+      error), export, `BITS` as eight times the public key's length, comparison (keys without
+      a public key are unequal), copies, the pairwise check, and generation whatever the
+      selection, from a seed the context keeps (a seed shorter than 32 octets fails the
+      generation without an error) or random. `ml-dsa.retain_seed` and `ml-dsa.prefer_seed`
+      set each new key's flags.
+      - Tests: arithmetic, round trips, and keys and deterministic signatures byte for byte
+        against the reference, as unit tests; `tests/c/evp_ml_dsa_kmgmt.c` (13 checks); the
+        probe's `mldsakm` with `corpus/mldsakm.txt` and random sessions (200 pass); the
+        `ml_dsa_kmgmt` fuzz target.
+    - [ ] **4.5d2 The signatures** (`ml_dsa_sig.c`): pure, with a context string, external mu,
+      deterministic and hedged, through each EVP route.
   - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.
   - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
     SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).
