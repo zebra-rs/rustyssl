@@ -154,6 +154,21 @@ impl Env {
         unsafe { BN_check_prime(w.0, self.ctx, ptr::null_mut()) }
     }
 
+    /// `BN_generate_prime_ex2(bits, safe, add, rem)` with this callback.
+    pub(crate) fn generate_prime_with(
+        &self,
+        bits: usize,
+        safe: bool,
+        add: &BigNum,
+        rem: &BigNum,
+    ) -> Option<BigNum> {
+        let (r, add, rem) = (Bn::zero(), Bn::new(add), Bn::new(rem));
+        let bits = c_int::try_from(bits).ok()?;
+        // SAFETY: ours; this context and callback.
+        (unsafe { generate(r.0, bits, safe, add.0, rem.0, self.cb, self.ctx) } == 1)
+            .then(|| r.get())
+    }
+
     /// `BN_generate_prime_ex2(bits, 0, NULL, NULL)`.
     fn generate_prime(&self, bits: usize) -> Option<BigNum> {
         let r = Bn::zero();

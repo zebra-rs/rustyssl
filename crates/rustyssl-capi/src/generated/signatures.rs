@@ -3102,8 +3102,28 @@ const _: unsafe extern "C" fn(
     *mut const_DES_cblock,
     core::ffi::c_int,
 ) = crate::lowlevel::des::DES_xcbc_encrypt;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut ASN1_OBJECT,
+    *const core::ffi::c_uchar,
+    usize,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::dh_ops::DH_KDF_X9_42;
 const _: unsafe extern "C" fn() -> *const DH_METHOD = crate::dh_meth::DH_OpenSSL;
 const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh::DH_bits;
+const _: unsafe extern "C" fn(*const DH, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::dh_ops::DH_check;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh_ops::DH_check_ex;
+const _: unsafe extern "C" fn(*const DH, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::dh_ops::DH_check_params;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh_ops::DH_check_params_ex;
+const _: unsafe extern "C" fn(*const DH, *const BIGNUM, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::dh_ops::DH_check_pub_key;
+const _: unsafe extern "C" fn(*const DH, *const BIGNUM) -> core::ffi::c_int =
+    crate::dh_ops::DH_check_pub_key_ex;
 const _: unsafe extern "C" fn(*mut DH, core::ffi::c_int) = crate::dh::DH_clear_flags;
 const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const BIGNUM, *mut DH) -> core::ffi::c_int =
     crate::dh_meth::DH_compute_key;
@@ -3111,6 +3131,24 @@ const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const BIGNUM, *mut DH) -
     crate::dh_meth::DH_compute_key_padded;
 const _: unsafe extern "C" fn(*mut DH) = crate::dh::DH_free;
 const _: unsafe extern "C" fn(*mut DH) -> core::ffi::c_int = crate::dh_meth::DH_generate_key;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: core::ffi::c_int,
+            arg2: core::ffi::c_int,
+            arg3: *mut core::ffi::c_void,
+        ),
+    >,
+    *mut core::ffi::c_void,
+) -> *mut DH = crate::dh_ops::DH_generate_parameters;
+const _: unsafe extern "C" fn(
+    *mut DH,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut BN_GENCB,
+) -> core::ffi::c_int = crate::dh_ops::DH_generate_parameters_ex;
 const _: unsafe extern "C" fn(*mut DH) -> *mut ENGINE = crate::dh::DH_get0_engine;
 const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_g;
 const _: unsafe extern "C" fn(*const DH, *mut *const BIGNUM, *mut *const BIGNUM) =
