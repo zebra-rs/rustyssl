@@ -361,7 +361,7 @@ enum Nonce<'a> {
 /// OpenSSL seeds a new KDF for each nonce, so a nonce whose `r` is zero comes again and its loop
 /// never ends; this one goes on to the DRBG's next candidate, as RFC 6979 (3.2 h.3) says
 /// (docs/DEVIATIONS.md).
-struct Deterministic {
+pub(crate) struct Deterministic {
     kdf: *mut EVP_KDF_CTX,
     rfc: Rfc6979,
 }
@@ -379,7 +379,7 @@ impl Deterministic {
     ///
     /// # Safety
     /// `libctx` is NULL or a live library context; `propq` is NULL or a string.
-    unsafe fn new(
+    pub(crate) unsafe fn new(
         order: &BigNum,
         x: &BigNum,
         dgst: &[u8],
@@ -444,7 +444,7 @@ impl Deterministic {
     }
 
     /// The next nonce: the DRBG's candidates until one is above 1 and below the order.
-    fn next(&mut self) -> Option<BigNum> {
+    pub(crate) fn next(&mut self) -> Option<BigNum> {
         let mut t = vec![0u8; self.rfc.candidate_len()];
         let k = loop {
             // SAFETY: the context this owns; room for the candidate.

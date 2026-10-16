@@ -24,10 +24,8 @@ use rustyssl_abi::{
 use super::builtin::libctx_of;
 use super::keymgmt::{mac_free, mac_key, mac_key_up_ref};
 use super::rsa_sig;
-use super::tables::{
-    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, alg_desc, entry, pending,
-};
-use super::{ecdsa_sig, eddsa_sig, ml_dsa_sig};
+use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, alg_desc, entry};
+use super::{dsa_sig, ecdsa_sig, eddsa_sig, ml_dsa_sig};
 use crate::err;
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch,
@@ -418,19 +416,48 @@ mac_signature_table!(
     mac_cmac_settable_ctx_params
 );
 
-/// The default provider's signature algorithms, in `deflt_signature`'s order; those of the key
-/// types of later steps are pending (their names registered, nothing offered).
+/// The default provider's signature algorithms, in `deflt_signature`'s order.
 static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
-    pending(c"DSA:dsaEncryption:1.2.840.10040.4.1"),
-    pending(c"DSA-SHA1:DSA-SHA-1:dsaWithSHA1:1.2.840.10040.4.3"),
-    pending(c"DSA-SHA2-224:DSA-SHA224:dsa_with_SHA224:2.16.840.1.101.3.4.3.1"),
-    pending(c"DSA-SHA2-256:DSA-SHA256:dsa_with_SHA256:2.16.840.1.101.3.4.3.2"),
-    pending(c"DSA-SHA2-384:DSA-SHA384:dsa_with_SHA384:id-dsa-with-sha384:1.2.840.1.101.3.4.3.3"),
-    pending(c"DSA-SHA2-512:DSA-SHA512:dsa_with_SHA512:id-dsa-with-sha512:1.2.840.1.101.3.4.3.4"),
-    pending(c"DSA-SHA3-224:dsa_with_SHA3-224:id-dsa-with-sha3-224:2.16.840.1.101.3.4.3.5"),
-    pending(c"DSA-SHA3-256:dsa_with_SHA3-256:id-dsa-with-sha3-256:2.16.840.1.101.3.4.3.6"),
-    pending(c"DSA-SHA3-384:dsa_with_SHA3-384:id-dsa-with-sha3-384:2.16.840.1.101.3.4.3.7"),
-    pending(c"DSA-SHA3-512:dsa_with_SHA3-512:id-dsa-with-sha3-512:2.16.840.1.101.3.4.3.8"),
+    alg(
+        c"DSA:dsaEncryption:1.2.840.10040.4.1",
+        &dsa_sig::DSA_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA1:DSA-SHA-1:dsaWithSHA1:1.2.840.10040.4.3",
+        &dsa_sig::DSA_SHA1_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA2-224:DSA-SHA224:dsa_with_SHA224:2.16.840.1.101.3.4.3.1",
+        &dsa_sig::DSA_SHA224_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA2-256:DSA-SHA256:dsa_with_SHA256:2.16.840.1.101.3.4.3.2",
+        &dsa_sig::DSA_SHA256_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA2-384:DSA-SHA384:dsa_with_SHA384:id-dsa-with-sha384:1.2.840.1.101.3.4.3.3",
+        &dsa_sig::DSA_SHA384_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA2-512:DSA-SHA512:dsa_with_SHA512:id-dsa-with-sha512:1.2.840.1.101.3.4.3.4",
+        &dsa_sig::DSA_SHA512_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA3-224:dsa_with_SHA3-224:id-dsa-with-sha3-224:2.16.840.1.101.3.4.3.5",
+        &dsa_sig::DSA_SHA3_224_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA3-256:dsa_with_SHA3-256:id-dsa-with-sha3-256:2.16.840.1.101.3.4.3.6",
+        &dsa_sig::DSA_SHA3_256_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA3-384:dsa_with_SHA3-384:id-dsa-with-sha3-384:2.16.840.1.101.3.4.3.7",
+        &dsa_sig::DSA_SHA3_384_SIGNATURE,
+    ),
+    alg(
+        c"DSA-SHA3-512:dsa_with_SHA3-512:id-dsa-with-sha3-512:2.16.840.1.101.3.4.3.8",
+        &dsa_sig::DSA_SHA3_512_SIGNATURE,
+    ),
     alg(
         c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
         &rsa_sig::RSA_SIGNATURE,

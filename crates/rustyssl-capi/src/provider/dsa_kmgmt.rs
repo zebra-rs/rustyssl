@@ -110,7 +110,7 @@ ffi_callback! {
     where failure = ptr::null_mut(), library = ERR_LIB_DSA
     {
         // SAFETY: the caller's guarantee.
-        Dsa::new_handle_in(unsafe { libctx_of(provctx) }).cast()
+        Dsa::new_handle_provided(unsafe { libctx_of(provctx) }).cast()
     }
 }
 
@@ -690,7 +690,7 @@ struct Plan {
 /// # Safety
 /// `genctx` is a live generation context (the callback's argument).
 unsafe fn generate(plan: Plan, genctx: *mut c_void) -> *mut DSA {
-    let h = Dsa::new_handle_in(plan.libctx);
+    let h = Dsa::new_handle_provided(plan.libctx);
     // SAFETY: just made, or NULL.
     let Some(k) = (unsafe { dsa(h) }) else {
         return ptr::null_mut();

@@ -180,70 +180,9 @@ unsafe fn put<T>(p: *mut T, v: T) {
     }
 }
 
-// The other built-in methods' functions, which need their key types' legacy data (4.4
-// onwards).
-
-extern "C" fn builtin_init(_: *mut EVP_PKEY_CTX) -> c_int {
-    crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's function of a context")
-}
-
-extern "C" fn builtin_copy(_: *mut EVP_PKEY_CTX, _: *const EVP_PKEY_CTX) -> c_int {
-    crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's copy")
-}
-
-extern "C" fn builtin_cleanup(_: *mut EVP_PKEY_CTX) {
-    crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's cleanup")
-}
-
-extern "C" fn builtin_gen(_: *mut EVP_PKEY_CTX, _: *mut EVP_PKEY) -> c_int {
-    crate::stub::unimplemented("generating with a built-in EVP_PKEY_METHOD")
-}
-
-extern "C" fn builtin_transform(
-    _: *mut EVP_PKEY_CTX,
-    _: *mut c_uchar,
-    _: *mut usize,
-    _: *const c_uchar,
-    _: usize,
-) -> c_int {
-    crate::stub::unimplemented("an operation of a built-in EVP_PKEY_METHOD")
-}
-
-extern "C" fn builtin_verify(
-    _: *mut EVP_PKEY_CTX,
-    _: *const c_uchar,
-    _: usize,
-    _: *const c_uchar,
-    _: usize,
-) -> c_int {
-    crate::stub::unimplemented("verifying with a built-in EVP_PKEY_METHOD")
-}
-
-extern "C" fn builtin_ctrl(_: *mut EVP_PKEY_CTX, _: c_int, _: c_int, _: *mut c_void) -> c_int {
-    crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's ctrl")
-}
-
-extern "C" fn builtin_ctrl_str(_: *mut EVP_PKEY_CTX, _: *const c_char, _: *const c_char) -> c_int {
-    crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's ctrl_str")
-}
-
-/// The functions every built-in method with a context of its own has.
-fn context_funcs() -> Funcs {
-    Funcs {
-        init: Some(builtin_init),
-        copy: Some(builtin_copy),
-        cleanup: Some(builtin_cleanup),
-        keygen: Some(builtin_gen),
-        ctrl: Some(builtin_ctrl),
-        ctrl_str: Some(builtin_ctrl_str),
-        ..Funcs::default()
-    }
-}
-
 /// `standard_methods`: each method's key type, flags, and functions, in OpenSSL's order (by key
 /// type).
 fn standard_table() -> [(c_int, c_int, Funcs); 10] {
-    let base = context_funcs();
     let rsa = {
         use crate::rsa_pmeth as r;
         Funcs {
@@ -282,11 +221,20 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
             },
         )
     };
-    let dsa = Funcs {
-        paramgen: Some(builtin_gen),
-        sign: Some(builtin_transform),
-        verify: Some(builtin_verify),
-        ..base
+    let dsa = {
+        use crate::dsa_pmeth as d;
+        Funcs {
+            init: Some(d::pkey_dsa_init),
+            copy: Some(d::pkey_dsa_copy),
+            cleanup: Some(d::pkey_dsa_cleanup),
+            paramgen: Some(d::pkey_dsa_paramgen),
+            keygen: Some(d::pkey_dsa_keygen),
+            sign: Some(d::pkey_dsa_sign),
+            verify: Some(d::pkey_dsa_verify),
+            ctrl: Some(d::pkey_dsa_ctrl),
+            ctrl_str: Some(d::pkey_dsa_ctrl_str),
+            ..Funcs::default()
+        }
     };
     let ec = {
         use crate::ec_pmeth as e;

@@ -3948,14 +3948,14 @@ chunking) is clean.
       probe's `mlx` (keys from seeds, decapsulations of streamed ciphertexts byte for byte, and
       encapsulations) with `corpus/mlx.txt` and random sessions (200 pass); the `mlx_kem` fuzz
       target.
-- [ ] **4.6 DH and DSA:**
+- [x] **4.6 DH and DSA:**
   - DH: the FFDHE (RFC 7919) and MODP groups, X9.42 DHX, paramgen, the check functions
     (CVE-2023-3446/3817 bounds)
   - DSA: keygen and FIPS 186-4 paramgen, signatures (including deterministic DSA)
   - the legacy `DH_*`/`DSA_*` APIs and their methods
 
   Sub-steps (the legacy objects first, as for RSA and EC, then the providers):
-  - [ ] **4.6a DH**, in sub-steps:
+  - [x] **4.6a DH**, in sub-steps:
     - [x] **4.6a1 The FFC parameters, the object, its methods, and its keys**
       (`rustyssl-crypto/src/ffc.rs`, `rustyssl-capi/src/ffc.rs`, `dh.rs`, `dh_meth.rs`; 58
       exports): the named groups (RFC 7919's `ffdhe*`, RFC 3526's `modp_*` with `q = (p-1)/2`,
@@ -4050,7 +4050,7 @@ chunking) is clean.
         generation through an application's copy of each method); the probe's `dhexch` with
         `corpus/dhexch.txt` and random sessions through the provider and the legacy method
         (1100 pass).
-  - [ ] **4.6b DSA**:
+  - [x] **4.6b DSA**:
     - [x] **4.6b1 The object, methods, signatures, and generation** (`dsa.rs`, `dsa_meth.rs`,
       `dsa_ops.rs`): `DSA` (shared FFC parameters, the key pair, flags, application data,
       references; `get0` numbers kept for the key's life), `DSA_METHOD` (every getter and
@@ -4077,7 +4077,7 @@ chunking) is clean.
         errors, decoding into a key, BIOs, FILEs, PEM, copies); the probe's `dsader` with
         `corpus/dsader.txt` and random mutated sessions (400 pass); the `dsa_der` fuzz target
         (1.7 million runs, clean).
-  - [ ] **4.6c The DSA providers**:
+  - [x] **4.6c The DSA providers**:
     - [x] **4.6c1 The key manager and `EVP_PKEY`** (`provider/dsa_kmgmt.rs`, `dsa_backend.rs`,
       `evp/pkey/dsa.rs`; 7 exports): the DSA key manager (from data with the FFC fields and the
       key pair; described with SHA-256 as the default digest; exported by selection; compared,
@@ -4092,9 +4092,20 @@ chunking) is clean.
         from data with every gettable parameter and export, generation on a known DRBG with
         its refusals, comparison and validation, DSA in `EVP_PKEY` with the legacy printing);
         the probe's `dsakey` with `corpus/dsakey.txt` and random sessions (300 pass).
-    - [ ] **4.6c2 The signatures and the legacy `EVP_PKEY_METHOD`**: DSA signatures (with
-      the digest algorithms and RFC 6979's deterministic nonces) and the built-in DSA
-      `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
+    - [x] **4.6c2 The signatures and the legacy `EVP_PKEY_METHOD`** (`provider/dsa_sig.rs`,
+      `dsa_pmeth.rs`; no exports): the default provider's `DSA` signature (a digest, or a
+      message through a digest context, with the approved digests; the algorithm identifier
+      of DSA with SHA-1, SHA-2, or SHA-3) and the composite `DSA-SHA1` to `DSA-SHA3-512`;
+      RFC 6979's nonces (nonce type 1) for keys made in a library context, as OpenSSL's
+      `ossl_dsa_sign_int` chooses, else the key's method; the built-in DSA `EVP_PKEY_METHOD`
+      (signing and verifying through `DSA_sign`/`DSA_verify`, the ctrls and ctrl strings,
+      FIPS 186-4 parameter generation, key generation). Its getter writes nothing through NULL
+      (docs/DEVIATIONS.md).
+      - Tests: `tests/c/evp_dsa_sig.c` (68 checks: the algorithms and their lists, RFC 6979's
+        A.2.1 signatures with each digest and a generated 2048/256-bit key, signing digests,
+        the context's parameters and their errors, copies, the composite algorithms, a legacy
+        DSA, a DSA with an application's method, generation through a copy of the method); the
+        probe's `dsasig` with `corpus/dsasig.txt` and random sessions (200 pass).
 - [ ] **4.7 Key encoders and decoders:**
   - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
     including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider

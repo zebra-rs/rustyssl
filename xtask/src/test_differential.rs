@@ -412,6 +412,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dsaverify", dsaverify_session),
     ("dsader", dsader_session),
     ("dsakey", dsakey_session),
+    ("dsasig", dsasig_session),
     ("string", string_session),
 ];
 
@@ -3861,6 +3862,74 @@ fn dsakey_session(random: &mut Random, out: &mut String) -> Result {
             _ => "-".to_owned(),
         };
         writeln!(out, "dsakey {p} {q} {g} {y} {x} {edit}")?;
+    }
+    Ok(())
+}
+
+/// A random session of DSA signatures from deterministic generators with RFC 6979's DSA-1024
+/// parameters: private keys of random lengths (now and then at the bounds), each kind of key
+/// (from the key manager, a legacy DSA, one with an application's method), messages of every
+/// length signed with each nonce type (through a digest context, as a digest, and with a
+/// composite algorithm) with digests good and bad; and signatures near valid ones verified.
+fn dsasig_session(random: &mut Random, out: &mut String) -> Result {
+    for line in DETERMINISTIC_RAND {
+        writeln!(out, "{line}")?;
+    }
+    for _ in 0..random.below(6).saturating_add(1) {
+        let x = match random.below(8) {
+            0 => format!("{:x}", random.below(4).saturating_add(1)),
+            1 => "996F967F6C8E388D9E28D01E205FBA957A5698B0".to_owned(),
+            2 | 3 => "k:x".to_owned(),
+            _ => {
+                let len = usize::try_from(random.below(20))
+                    .unwrap_or(0)
+                    .saturating_add(1);
+                random_hex(random, len)
+            }
+        };
+        let how = random.pick(&["p", "p", "p", "l", "f"]);
+        let md = random.pick(&[
+            "SHA256",
+            "SHA256",
+            "SHA1",
+            "SHA224",
+            "SHA384",
+            "SHA512",
+            "SHA3-256",
+            "SHA3-512",
+            "SHA512-256",
+            "MD5",
+            "SM3",
+            "SHAKE128",
+            "-",
+        ]);
+        let nonce = random.pick(&["1", "1", "0", "2"]);
+        let alg = random.pick(&[
+            "-",
+            "DSA-SHA256",
+            "DSA-SHA1",
+            "DSA-SHA384",
+            "DSA-SHA3-224",
+            "DSA-SHA2-512",
+        ]);
+        let msg = if random.below(4) == 0 {
+            // A digest's length, for signing as a digest.
+            let len = random.pick(&["20", "28", "32", "48", "64"]);
+            random_hex(random, len.parse().unwrap_or(32))
+        } else {
+            let len = usize::try_from(random.below(100)).unwrap_or(0);
+            random_hex(random, len)
+        };
+        let sig = match random.below(3) {
+            0 => {
+                let len = usize::try_from(random.below(8))
+                    .unwrap_or(0)
+                    .saturating_add(44);
+                format!("30{}", random_hex(random, len))
+            }
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "dsasig {x} {how} {md} {nonce} {alg} {msg} {sig}")?;
     }
     Ok(())
 }
