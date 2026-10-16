@@ -3721,6 +3721,45 @@ chunking) is clean.
   - ML-KEM-512/768/1024, ML-DSA-44/65/87, and every SLH-DSA parameter set
   - the hybrid TLS groups (X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024)
   - key input/output formats exactly as OpenSSL implements them (seed vs. expanded keys)
+
+  **Decision (hybrid backends):** the 25519 arithmetic comes from `curve25519-dalek` (widely
+  audited, constant-time, covered by imported cargo-vet audits), with OpenSSL's encodings and
+  edge checks (clamping, low-order results, canonical encodings, `s < L`) in our own code.
+  X448/Ed448 and ML-KEM, ML-DSA, and SLH-DSA are our own, on `rustyssl_crypto`'s
+  constant-time field elements and Keccak; all are deterministic given their seeds, so the
+  differential probe compares them byte for byte with the reference. None of 4.5 adds public
+  exports: OpenSSL 3 offers these only through EVP and the providers.
+
+  Sub-steps:
+  - [ ] **4.5a X25519 and Ed25519**, in sub-steps:
+    - [x] **4.5a1 The arithmetic and the key managers** (`rustyssl-crypto/src/ecx.rs`,
+      `rustyssl-capi/src/ecx.rs`, `rustyssl-capi/src/provider/ecx_kmgmt.rs`; no new exports):
+      X25519 (`mul_clamped`, an all-zero result refused) and Ed25519 (`dom2` for the ctx and ph
+      variants, the strict verification equation, `s < L`) over `curve25519-dalek`, checked
+      against RFC 7748 and RFC 8032; RFC 9180's DHKEM derivation for X25519 and X448. The
+      X25519 and ED25519 key managers (`ecx_kmgmt.c`, written once for the four types): keys
+      from raw private and public keys (the public key derived, after SHA-512 is fetched with
+      the key's properties for Ed25519), described, X25519's encoded public key and properties
+      set, exported, compared, copied, validated, loaded, and generated (random, or for X25519
+      from DHKEM input, then clamped), with a group name only X25519 takes.
+      - The dependency: `curve25519-dalek` 4.1 in `docs/DEPENDENCIES.md`, its build script
+        (cfgs only) and never-run test script allowed in `deny.toml`, and cargo-vet
+        exemptions for it and the crates it brings.
+      - Tests: `tests/c/evp_ecx_kmgmt.c` (6 checks: the lists, raw keys of every length, keys
+        from data of each kind, every parameter, the sets, checks, generation by each route);
+        the probe's `ecxkm` with `corpus/ecxkm.txt` and random sessions (1,000 pass); the
+        `ecx_kmgmt` fuzz target; RFC vectors as unit tests.
+    - [ ] **4.5a2 The X25519 exchange and Ed25519 signatures** (Ed25519, Ed25519ctx,
+      Ed25519ph, digest-signing).
+    - [ ] **4.5a3 The legacy ECX ASN.1 and key methods.**
+  - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448).
+  - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
+    OpenSSL's formats, the KEM.
+  - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures
+    (pure, with context, external mu, deterministic and hedged).
+  - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.
+  - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
+    SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).
 - [ ] **4.6 DH and DSA:**
   - DH: the FFDHE (RFC 7919) and MODP groups, X9.42 DHX, paramgen, the check functions
     (CVE-2023-3446/3817 bounds)

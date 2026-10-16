@@ -396,6 +396,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ecdhx", ecdhx_session),
     ("sm2sig", sm2sig_session),
     ("sm2enc", sm2enc_session),
+    ("ecxkm", ecxkm_session),
     ("string", string_session),
 ];
 
@@ -3043,6 +3044,33 @@ fn ecdhx_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "ecdhx {curve} {a} {b} {mode} {md} {outlen} {ukm} {room}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the ECX key managers: keys from data of every selection, with private
+/// and public keys of every length (the right one most often), matching or not, and keys
+/// generated from DHKEM input of every length.
+fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(6).saturating_add(1) {
+        let kind = random.pick(&["X25519", "ED25519"]);
+        if random.below(5) == 0 {
+            let len = usize::try_from(random.below(48)).unwrap_or(32);
+            writeln!(out, "ecxkm {kind} 87 - - {}", random_hex(random, len))?;
+            continue;
+        }
+        let selection = random.pick(&["87", "87", "86", "85", "84", "83", "81", "80", "7", "4"]);
+        let part = |random: &mut Random| match random.below(5) {
+            0 => "-".to_owned(),
+            1 => {
+                let len = usize::try_from(random.below(40)).unwrap_or(0);
+                random_hex(random, len)
+            }
+            _ => random_hex(random, 32),
+        };
+        let privkey = part(random);
+        let pubkey = part(random);
+        writeln!(out, "ecxkm {kind} {selection} {privkey} {pubkey} -")?;
     }
     Ok(())
 }

@@ -53,6 +53,7 @@ pub(crate) mod digests;
 pub(crate) mod ec_kmgmt;
 mod ecdh_exch;
 mod ecdsa_sig;
+mod ecx_kmgmt;
 pub(crate) mod exchanges;
 pub(crate) mod kdfs;
 mod kdfs_more;
