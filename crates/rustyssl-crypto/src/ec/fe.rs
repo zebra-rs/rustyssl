@@ -197,6 +197,63 @@ impl Fp {
         a.0.iter().fold(0, |acc, &x| acc | x) == 0
     }
 
+    /// An element of the little-endian octets `b`, of at most the modulus's limbs' octets,
+    /// reduced (as [`Fp::from_bn_unreduced`]), in time that depends only on `b`'s length.
+    /// `None` for a longer `b`.
+    pub fn from_le_bytes(&self, b: &[u8]) -> Option<Fe> {
+        if b.len() > self.n().saturating_mul(8) {
+            return None;
+        }
+        let mut l = vec![0; self.n()];
+        for (limb, chunk) in l.iter_mut().zip(b.chunks(8)) {
+            let mut w = [0u8; 8];
+            w.get_mut(..chunk.len())?.copy_from_slice(chunk);
+            *limb = Limb::from_le_bytes(w);
+        }
+        Some(Fe(self.redc_mul(&l, &self.rr)))
+    }
+
+    /// The number an element stands for, as `len` little-endian octets (cut to `len`), in time
+    /// that depends only on `len`.
+    pub fn to_le_bytes(&self, a: &Fe, len: usize) -> Vec<u8> {
+        let mut out: Vec<u8> = self
+            .mont
+            .redc(&a.0)
+            .iter()
+            .flat_map(|l| l.to_le_bytes())
+            .collect();
+        out.resize(len, 0);
+        out
+    }
+
+    /// Whether `a` and `b` are equal (the time doesn't depend on them).
+    pub fn eq(&self, a: &Fe, b: &Fe) -> bool {
+        a.0.iter().zip(&b.0).fold(0, |acc, (&x, &y)| acc | (x ^ y)) == 0
+    }
+
+    /// Whether the number an element stands for is odd.
+    pub fn is_odd(&self, a: &Fe) -> bool {
+        self.mont.redc(&a.0).first().is_some_and(|&l| l & 1 == 1)
+    }
+
+    /// `-a`.
+    pub fn neg(&self, a: &Fe) -> Fe {
+        self.sub(&self.zero(), a)
+    }
+
+    /// `a^e` for a public exponent `e`.
+    pub fn pow(&self, a: &Fe, e: &BigNum) -> Fe {
+        let mut r = self.one();
+        for i in (0..e.num_bits()).rev() {
+            r = self.sqr(&r);
+            // The exponent is public.
+            if e.is_bit_set(i) {
+                r = self.mul(&r, a);
+            }
+        }
+        r
+    }
+
     /// Swaps `a` and `b` when `c`, in constant time.
     pub fn cswap(c: bool, a: &mut Fe, b: &mut Fe) {
         let m = mask(Limb::from(c));
