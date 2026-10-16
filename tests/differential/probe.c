@@ -329,6 +329,8 @@
  *                              p@N^XX or q@N^XX to xor octet N of the private or public key,
  *                              p@N=XX to set it, p#N to make it N octets); the key's parts (as
  *                              SHA-256 prefixes), checks, sizes, and export
+ *   mldsakm <alg> <sel> <seed|-> <privfrom|-> <pubfrom|-> <edits|->  as mlkemkm, for ML-DSA
+ *                              (whose seeds are 32 octets)
  *   mlkem <alg> <keyseed> <ikme|-> <edits|-> <croom> <sroom>  the ML-KEM KEM with the key
  *                              generated from the 64-octet seed: an encapsulation (with the
  *                              ikmE given, else random) into rooms of croom and sroom octets,
@@ -5060,16 +5062,21 @@ static void ml_kem_digest(const unsigned char *p, size_t n)
         printf("%02x", d[i]);
 }
 
-/* The private and public keys of the ML-KEM key of |alg| generated from a 64-octet seed. */
+/*
+ * The private and public keys of the ML-KEM or ML-DSA key of |alg| generated from a seed (64
+ * octets for ML-KEM, 32 for ML-DSA).
+ */
 static int ml_kem_keys_from_seed(const char *alg, const unsigned char *seed, unsigned char *priv,
                                  size_t *privlen, unsigned char *pub, size_t *publen)
 {
+    size_t seedlen = strncmp(alg, "ML-DSA", 6) == 0 ? 32 : 64;
     OSSL_PARAM ps[2];
     EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
     EVP_PKEY *k = NULL;
     int ok;
 
-    ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED, (void *)seed, 64);
+    ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED, (void *)seed,
+                                              seedlen);
     ps[1] = OSSL_PARAM_construct_end();
     ok = c != NULL && EVP_PKEY_keygen_init(c) == 1 && EVP_PKEY_CTX_set_params(c, ps) == 1
         && EVP_PKEY_generate(c, &k) == 1 && EVP_PKEY_get_raw_private_key(k, priv, privlen) == 1
@@ -5110,12 +5117,12 @@ static int ml_kem_edit(const char *e, unsigned char *priv, size_t *privlen, unsi
     return 1;
 }
 
-/* mlkemkm: an ML-KEM key from data, and what its key manager makes of it. */
+/* mlkemkm and mldsakm: an ML-KEM or ML-DSA key from data, and what its key manager makes of it. */
 static void ml_kem_keymgmt_command(const char *line)
 {
     char alg[32] = "-", seed[300] = "-", privfrom[300] = "-", pubfrom[300] = "-";
     char edits[300] = "-";
-    static unsigned char priv[4000], pub[2000], scratch[4000];
+    static unsigned char priv[6000], pub[3000], scratch[6000];
     unsigned char sb[150], fb[150];
     size_t sl = 0, fl = 0, privlen = 0, publen = 0, n;
     unsigned int sel = 0;
@@ -5135,7 +5142,7 @@ static void ml_kem_keymgmt_command(const char *line)
         size_t ql = sizeof(scratch);
 
         privlen = sizeof(priv);
-        if (!parse_hex(privfrom, fb, &fl) || fl != 64
+        if (!parse_hex(privfrom, fb, &fl) || (fl != 64 && fl != 32)
             || !ml_kem_keys_from_seed(alg, fb, priv, &privlen, scratch, &ql)) {
             printf(" bad private seed\n");
             ERR_clear_error();
@@ -5146,7 +5153,7 @@ static void ml_kem_keymgmt_command(const char *line)
         size_t dl = sizeof(scratch);
 
         publen = sizeof(pub);
-        if (!parse_hex(pubfrom, fb, &fl) || fl != 64
+        if (!parse_hex(pubfrom, fb, &fl) || (fl != 64 && fl != 32)
             || !ml_kem_keys_from_seed(alg, fb, scratch, &dl, pub, &publen)) {
             printf(" bad public seed\n");
             ERR_clear_error();
@@ -5277,7 +5284,8 @@ static void ml_kem_ops_command(const char *line)
 /* Runs an ML-KEM command; returns 0 if `command` isn't one. */
 static int ml_kem_command(const char *command, const char *line)
 {
-    if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0)
+    if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0
+        && strcmp(command, "mldsakm") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "mlkem") == 0)

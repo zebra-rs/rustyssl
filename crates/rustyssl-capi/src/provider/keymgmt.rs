@@ -992,9 +992,21 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &super::ecx_kmgmt::ED448_KEYMGMT,
         c"OpenSSL ED448 implementation",
     ),
-    pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
-    pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
-    pending(c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87"),
+    alg_desc(
+        c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44",
+        &super::ml_dsa_kmgmt::ML_DSA_44_KEYMGMT,
+        c"OpenSSL ML-DSA-44 implementation",
+    ),
+    alg_desc(
+        c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65",
+        &super::ml_dsa_kmgmt::ML_DSA_65_KEYMGMT,
+        c"OpenSSL ML-DSA-65 implementation",
+    ),
+    alg_desc(
+        c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87",
+        &super::ml_dsa_kmgmt::ML_DSA_87_KEYMGMT,
+        c"OpenSSL ML-DSA-87 implementation",
+    ),
     alg_desc(
         c"TLS1-PRF",
         &KDF_KEYMGMT,
