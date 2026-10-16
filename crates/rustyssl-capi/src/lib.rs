@@ -20,6 +20,8 @@ mod bn;
 mod buffer;
 mod cmac;
 mod conf;
+mod dh;
+mod dh_meth;
 mod dir;
 mod ec;
 mod ec_pmeth;
@@ -30,6 +32,11 @@ mod err;
 mod errno;
 mod evp;
 mod ex_data;
+#[expect(
+    dead_code,
+    reason = "the parameter checks and DSA's use the rest (steps 4.6a2 and 4.6b)"
+)]
+mod ffc;
 mod ffi;
 mod generated;
 mod handle;

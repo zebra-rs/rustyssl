@@ -3102,6 +3102,171 @@ const _: unsafe extern "C" fn(
     *mut const_DES_cblock,
     core::ffi::c_int,
 ) = crate::lowlevel::des::DES_xcbc_encrypt;
+const _: unsafe extern "C" fn() -> *const DH_METHOD = crate::dh_meth::DH_OpenSSL;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh::DH_bits;
+const _: unsafe extern "C" fn(*mut DH, core::ffi::c_int) = crate::dh::DH_clear_flags;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const BIGNUM, *mut DH) -> core::ffi::c_int =
+    crate::dh_meth::DH_compute_key;
+const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *const BIGNUM, *mut DH) -> core::ffi::c_int =
+    crate::dh_meth::DH_compute_key_padded;
+const _: unsafe extern "C" fn(*mut DH) = crate::dh::DH_free;
+const _: unsafe extern "C" fn(*mut DH) -> core::ffi::c_int = crate::dh_meth::DH_generate_key;
+const _: unsafe extern "C" fn(*mut DH) -> *mut ENGINE = crate::dh::DH_get0_engine;
+const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_g;
+const _: unsafe extern "C" fn(*const DH, *mut *const BIGNUM, *mut *const BIGNUM) =
+    crate::dh::DH_get0_key;
+const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_p;
+const _: unsafe extern "C" fn(
+    *const DH,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+    *mut *const BIGNUM,
+) = crate::dh::DH_get0_pqg;
+const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_priv_key;
+const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_pub_key;
+const _: unsafe extern "C" fn(*const DH) -> *const BIGNUM = crate::dh::DH_get0_q;
+const _: unsafe extern "C" fn() -> *mut DH = crate::dh::DH_get_1024_160;
+const _: unsafe extern "C" fn() -> *mut DH = crate::dh::DH_get_2048_224;
+const _: unsafe extern "C" fn() -> *mut DH = crate::dh::DH_get_2048_256;
+const _: unsafe extern "C" fn() -> *const DH_METHOD = crate::dh_meth::DH_get_default_method;
+const _: unsafe extern "C" fn(*const DH, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::dh::DH_get_ex_data;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_long = crate::dh::DH_get_length;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh::DH_get_nid;
+const _: unsafe extern "C" fn(*const DH_METHOD) -> *mut DH_METHOD = crate::dh_meth::DH_meth_dup;
+const _: unsafe extern "C" fn(*mut DH_METHOD) = crate::dh_meth::DH_meth_free;
+const _: unsafe extern "C" fn(*const DH_METHOD) -> *mut core::ffi::c_void =
+    crate::dh_meth::DH_meth_get0_app_data;
+const _: unsafe extern "C" fn(*const DH_METHOD) -> *const core::ffi::c_char =
+    crate::dh_meth::DH_meth_get0_name;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dhm: *const DH,
+        arg1: *mut BIGNUM,
+        arg2: *const BIGNUM,
+        arg3: *const BIGNUM,
+        arg4: *const BIGNUM,
+        arg5: *mut BN_CTX,
+        arg6: *mut BN_MONT_CTX,
+    ) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dhm: *mut core::ffi::c_uchar,
+        arg1: *const BIGNUM,
+        arg2: *mut DH,
+    ) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_compute_key;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dhm: *mut DH) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_finish;
+const _: unsafe extern "C" fn(*const DH_METHOD) -> core::ffi::c_int =
+    crate::dh_meth::DH_meth_get_flags;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dhm: *mut DH) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_generate_key;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(
+        dhm: *mut DH,
+        arg1: core::ffi::c_int,
+        arg2: core::ffi::c_int,
+        arg3: *mut BN_GENCB,
+    ) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_generate_params;
+const _: unsafe extern "C" fn(
+    *const DH_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(dhm: *mut DH) -> core::ffi::c_int,
+> = crate::dh_meth::DH_meth_get_init;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> *mut DH_METHOD =
+    crate::dh_meth::DH_meth_new;
+const _: unsafe extern "C" fn(*mut DH_METHOD, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::dh_meth::DH_meth_set0_app_data;
+const _: unsafe extern "C" fn(*mut DH_METHOD, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::dh_meth::DH_meth_set1_name;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const DH,
+            arg2: *mut BIGNUM,
+            arg3: *const BIGNUM,
+            arg4: *const BIGNUM,
+            arg5: *const BIGNUM,
+            arg6: *mut BN_CTX,
+            arg7: *mut BN_MONT_CTX,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_bn_mod_exp;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            key: *mut core::ffi::c_uchar,
+            pub_key: *const BIGNUM,
+            dh: *mut DH,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_compute_key;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DH) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_finish;
+const _: unsafe extern "C" fn(*mut DH_METHOD, core::ffi::c_int) -> core::ffi::c_int =
+    crate::dh_meth::DH_meth_set_flags;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DH) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_generate_key;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut DH,
+            arg2: core::ffi::c_int,
+            arg3: core::ffi::c_int,
+            arg4: *mut BN_GENCB,
+        ) -> core::ffi::c_int,
+    >,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_generate_params;
+const _: unsafe extern "C" fn(
+    *mut DH_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DH) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::dh_meth::DH_meth_set_init;
+const _: unsafe extern "C" fn() -> *mut DH = crate::dh::DH_new;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut DH = crate::dh::DH_new_by_nid;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut DH = crate::dh::DH_new_method;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh::DH_security_bits;
+const _: unsafe extern "C" fn(*mut DH, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::dh::DH_set0_key;
+const _: unsafe extern "C" fn(*mut DH, *mut BIGNUM, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::dh::DH_set0_pqg;
+const _: unsafe extern "C" fn(*const DH_METHOD) = crate::dh_meth::DH_set_default_method;
+const _: unsafe extern "C" fn(
+    *mut DH,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::dh::DH_set_ex_data;
+const _: unsafe extern "C" fn(*mut DH, core::ffi::c_int) = crate::dh::DH_set_flags;
+const _: unsafe extern "C" fn(*mut DH, core::ffi::c_long) -> core::ffi::c_int =
+    crate::dh::DH_set_length;
+const _: unsafe extern "C" fn(*mut DH, *const DH_METHOD) -> core::ffi::c_int =
+    crate::dh::DH_set_method;
+const _: unsafe extern "C" fn(*const DH) -> core::ffi::c_int = crate::dh::DH_size;
+const _: unsafe extern "C" fn(*const DH, core::ffi::c_int) -> core::ffi::c_int =
+    crate::dh::DH_test_flags;
+const _: unsafe extern "C" fn(*mut DH) -> core::ffi::c_int = crate::dh::DH_up_ref;
+const _: unsafe extern "C" fn(*const DH) -> *mut DH = crate::dh::DHparams_dup;
 const _: unsafe extern "C" fn(*mut ASN1_STRING) = crate::asn1::tpl::items::DIRECTORYSTRING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::DIRECTORYSTRING_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::DIRECTORYSTRING_new;

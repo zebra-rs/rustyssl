@@ -114,13 +114,13 @@ impl Env {
     }
 
     /// `BN_GENCB_call`: whether to go on.
-    fn call(&self, a: c_int, b: c_int) -> bool {
+    pub(crate) fn call(&self, a: c_int, b: c_int) -> bool {
         // SAFETY: the callback this was made with, live for its life.
         (unsafe { call(self.cb, a, b) }) != 0
     }
 
     /// `BN_priv_rand_ex(bits, top, bottom)`.
-    fn rand_bits(&self, bits: usize, top: c_int, bottom: c_int) -> Option<BigNum> {
+    pub(crate) fn rand_bits(&self, bits: usize, top: c_int, bottom: c_int) -> Option<BigNum> {
         let r = Bn::zero();
         let bits = c_int::try_from(bits).ok()?;
         // SAFETY: ours; this context.
@@ -141,8 +141,14 @@ impl Env {
         unsafe { is_prime_int(w, rounds, self.ctx, true, self.cb) }
     }
 
+    /// `BN_check_prime(w, ctx, cb)` with this callback: 1, 0, or -1.
+    pub(crate) fn check_prime_cb(&self, w: &BigNum) -> c_int {
+        // SAFETY: this context and callback.
+        unsafe { is_prime_int(w, 0, self.ctx, true, self.cb) }
+    }
+
     /// `BN_check_prime` (with no callback, as validation calls it): 1, 0, or -1.
-    fn check_prime(&self, w: &BigNum) -> c_int {
+    pub(crate) fn check_prime(&self, w: &BigNum) -> c_int {
         let w = Bn::new(w);
         // SAFETY: ours; this context.
         unsafe { BN_check_prime(w.0, self.ctx, ptr::null_mut()) }
@@ -175,7 +181,7 @@ impl Env {
     }
 
     /// `BN_div(a, d)`: the quotient and remainder, raising its errors.
-    fn div(&self, a: &BigNum, d: &BigNum) -> Option<(BigNum, BigNum)> {
+    pub(crate) fn div(&self, a: &BigNum, d: &BigNum) -> Option<(BigNum, BigNum)> {
         let (q, r, a, d) = (Bn::zero(), Bn::zero(), Bn::new(a), Bn::new(d));
         // SAFETY: ours; this context.
         (unsafe { BN_div(q.0, r.0, a.0, d.0, self.ctx) } == 1).then(|| (q.get(), r.get()))
