@@ -33,9 +33,8 @@ use rustyssl_crypto::ecx::{Dom, ED25519_SIGSIZE};
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox, wipe};
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
-use crate::ecx::{self, EcxKey, EcxType};
+use crate::ecx::{self, EcxKey, EcxType, sha512_available};
 use crate::err;
-use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free};
 use crate::evp::md_ctx::EVP_Q_digest;
 use crate::ffi::{bytes, ffi_callback};
 use crate::params::{
@@ -182,20 +181,6 @@ impl EddsaCtx {
         }
         Some(tbs.to_vec())
     }
-}
-
-/// Whether SHA-512 can be fetched with the properties given, as `ossl_ed25519_sign` and
-/// `ossl_ed25519_verify` fetch it.
-fn sha512_available(libctx: *mut OSSL_LIB_CTX, propq: Option<&CStr>) -> bool {
-    let propq = propq.map_or(ptr::null(), CStr::as_ptr);
-    // SAFETY: a library context; a static name; a query or NULL.
-    let md = unsafe { EVP_MD_fetch(libctx, c"SHA512".as_ptr(), propq) };
-    if md.is_null() {
-        return false;
-    }
-    // SAFETY: the reference fetched above.
-    unsafe { EVP_MD_free(md) };
-    true
 }
 
 /// `ossl_DER_w_algorithmIdentifier_ED25519`: `SEQUENCE { OID }`.

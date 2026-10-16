@@ -16,8 +16,8 @@
 //!   `pkey_free` frees its data, whenever the key is cleared, retyped, or freed.
 //!
 //! The built-in key types' legacy data comes with the key types: RSA and RSA-PSS have it (an
-//! `RSA`); until the others do (4.4 onwards) a key can't be given theirs, and their built-in
-//! methods' functions abort (AGENTS.md rule 10).
+//! `RSA`), EC and SM2 (an `EC_KEY`), and X25519 and ED25519 (an ECX key); until the others do
+//! a key can't be given theirs, and their built-in methods' functions abort (AGENTS.md rule 10).
 //! Functions given a NULL key fail here where the reference would crash (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
@@ -58,6 +58,7 @@ use crate::provider::Ptr;
 
 pub(crate) mod ameth;
 pub(crate) mod ec;
+pub(crate) mod ecx;
 pub(crate) mod params;
 pub(crate) mod print;
 pub(crate) mod raw;
@@ -234,6 +235,20 @@ fn free_legacy(k: &Pkey) {
 pub(crate) unsafe fn legacy_data(p: *const EVP_PKEY) -> *mut c_void {
     // SAFETY: the caller's guarantee.
     unsafe { pkey(p) }.map_or(ptr::null_mut(), |k| k.lock().legacy.0)
+}
+
+/// The library context of the key's key manager's provider, or NULL without one (as the
+/// built-in ASN.1 methods take it).
+///
+/// # Safety
+/// `p` is NULL or a live key.
+pub(crate) unsafe fn keymgmt_libctx(p: *const EVP_PKEY) -> *mut OSSL_LIB_CTX {
+    // SAFETY: the caller's guarantee.
+    let km = unsafe { pkey(p) }.and_then(|k| k.lock().keymgmt.clone());
+    km.map_or(ptr::null_mut(), |km| {
+        // SAFETY: the key manager's live provider.
+        unsafe { crate::provider::libctx_of(km.get().prov.0) }
+    })
 }
 
 /// `evp_pkey_get_legacy`: the key's legacy data; for a provided key, a copy made by its type's
@@ -2089,7 +2104,11 @@ ffi_export! {
         let base = ameth::find(type_).map(|m| (m.get().base_id, m.get().is_dynamic()));
         let rsa = matches!(base, Some((EVP_PKEY_RSA | EVP_PKEY_RSA_PSS, false)));
         let ec = matches!(base, Some((rustyssl_abi::EVP_PKEY_EC, false)));
-        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec {
+        let ecx = matches!(
+            base,
+            Some((rustyssl_abi::EVP_PKEY_X25519 | rustyssl_abi::EVP_PKEY_ED25519, false))
+        );
+        if !key.is_null() && base.is_some_and(|(_, dynamic)| !dynamic) && !rsa && !ec && !ecx {
             // The other built-in key types' data come with them.
             crate::stub::unimplemented("EVP_PKEY_assign of a built-in key type's data");
         }

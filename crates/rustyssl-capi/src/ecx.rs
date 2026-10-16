@@ -6,16 +6,23 @@
 //! As in OpenSSL, deriving an Ed25519 public key fetches SHA-512 with the key's library context
 //! and properties, so a key whose properties exclude it can't be made from its private key.
 
-use core::ffi::{CStr, c_void};
+use core::ffi::{CStr, c_int, c_void};
 use core::ptr;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use rustyssl_abi::OSSL_LIB_CTX;
+use rustyssl_abi::{
+    EC_R_FAILED_MAKING_PUBLIC_KEY, EC_R_INVALID_ENCODING, ERR_LIB_EC, EVP_PKEY_ED25519,
+    EVP_PKEY_X25519, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_OCTET_STRING, OSSL_PKEY_PARAM_PRIV_KEY,
+    OSSL_PKEY_PARAM_PUB_KEY,
+};
 
+use crate::err;
 use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free};
+use crate::ffi::bytes;
 use crate::provider::Ptr;
-use crate::provider::macs::wipe;
+use crate::provider::macs::{locate, wipe};
+use crate::rand_lib::RAND_priv_bytes_ex;
 
 /// The largest key (Ed448's 57 octets).
 pub(crate) const MAX_KEYLEN: usize = 57;
@@ -188,4 +195,174 @@ pub(crate) fn dup(k: &EcxKey, public: bool, private: bool) -> *mut c_void {
         }
     }
     n
+}
+
+/// `OSSL_PARAM_OCTET_STRING` as a parameter's type.
+const OCTETS_TYPE: u32 = OSSL_PARAM_OCTET_STRING.cast_unsigned();
+
+/// An octet-string parameter's octets, if it is one.
+pub(crate) fn octet_param(p: &OSSL_PARAM) -> Option<&[u8]> {
+    if p.data_type != OCTETS_TYPE {
+        return None;
+    }
+    // SAFETY: an octet-string parameter's data holds its size.
+    unsafe { bytes(p.data.cast(), p.data_size) }
+}
+
+/// `ossl_ecx_key_fromdata`: the private key (if `include_private`) and the public key, each of
+/// the key's length, the public key derived when it's absent.
+///
+/// # Safety
+/// `params` is NULL or an array.
+pub(crate) unsafe fn key_fromdata(
+    k: &EcxKey,
+    params: *const OSSL_PARAM,
+    include_private: bool,
+) -> bool {
+    // SAFETY: the caller's array; static names.
+    let p_pub = unsafe { locate(params, OSSL_PKEY_PARAM_PUB_KEY) };
+    let p_priv = if include_private {
+        // SAFETY: as above.
+        unsafe { locate(params, OSSL_PKEY_PARAM_PRIV_KEY) }
+    } else {
+        None
+    };
+    if p_pub.is_none() && p_priv.is_none() {
+        return false;
+    }
+    let keylen = k.keylen();
+    let mut s = k.lock();
+    if let Some(p) = p_priv {
+        // `OSSL_PARAM_get_octet_string` with room for the key's length.
+        let Some(d) = octet_param(p).filter(|d| d.len() <= keylen) else {
+            return false;
+        };
+        if d.len() != keylen {
+            return false;
+        }
+        if let Some(old) = s.privkey.as_mut() {
+            wipe(old);
+        }
+        s.privkey = Some(d.to_vec());
+    }
+    if let Some(p) = p_pub {
+        let Some(q) = octet_param(p).filter(|q| q.len() <= MAX_KEYLEN) else {
+            return false;
+        };
+        if let Some(dst) = s.pubkey.get_mut(..q.len()) {
+            dst.copy_from_slice(q);
+        }
+        if q.len() != keylen {
+            return false;
+        }
+    } else if !public_from_private(k, &mut s) {
+        err::raise(
+            ERR_LIB_EC,
+            rustyssl_abi::EC_R_FAILED_MAKING_PUBLIC_KEY,
+            "ossl_ecx_public_from_private",
+        );
+        return false;
+    }
+    s.haspubkey = true;
+    true
+}
+
+/// The ECX type of a key type (`KEYNID2TYPE`), for the types whose arithmetic is here.
+pub(crate) fn type_of(pkey_id: c_int) -> Option<EcxType> {
+    match pkey_id {
+        EVP_PKEY_X25519 => Some(EcxType::X25519),
+        EVP_PKEY_ED25519 => Some(EcxType::Ed25519),
+        _ => None,
+    }
+}
+
+/// What `key_op` makes a key from.
+pub(crate) enum KeyOp<'a> {
+    Public(&'a [u8]),
+    Private(&'a [u8]),
+    Keygen,
+}
+
+/// `ossl_ecx_key_op` (without an algorithm identifier): a new key of `kind` from a public key
+/// or a private key of the type's length, or with a random private key (clamped for X25519),
+/// the public key derived from a private one; NULL with an EC error.
+pub(crate) fn key_op(libctx: *mut OSSL_LIB_CTX, kind: EcxType, op: &KeyOp<'_>) -> *mut c_void {
+    const F: &str = "ossl_ecx_key_op";
+    let keylen = kind.keylen();
+    if let KeyOp::Public(p) | KeyOp::Private(p) = op
+        && p.len() != keylen
+    {
+        err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, F);
+        return ptr::null_mut();
+    }
+    let h = new(libctx, kind, None);
+    // SAFETY: the key just made.
+    let Some(k) = (unsafe { key(h) }) else {
+        return ptr::null_mut();
+    };
+    let ok = {
+        let mut s = k.lock();
+        match op {
+            KeyOp::Public(p) => {
+                if let Some(dst) = s.pubkey.get_mut(..keylen) {
+                    dst.copy_from_slice(p);
+                }
+                s.haspubkey = true;
+                true
+            }
+            KeyOp::Private(d) => {
+                s.privkey = Some(d.to_vec());
+                derive_public(k, &mut s)
+            }
+            KeyOp::Keygen => {
+                let mut d = vec![0u8; keylen];
+                // SAFETY: the key's library context; room for the key.
+                if (unsafe { RAND_priv_bytes_ex(libctx, d.as_mut_ptr(), keylen, 0) }) <= 0 {
+                    wipe(&mut d);
+                    false
+                } else {
+                    if kind == EcxType::X25519
+                        && let [first, .., last] = d.as_mut_slice()
+                    {
+                        *first &= 248;
+                        *last &= 127;
+                        *last |= 64;
+                    }
+                    s.privkey = Some(d);
+                    derive_public(k, &mut s)
+                }
+            }
+        }
+    };
+    if !ok {
+        // SAFETY: the key made above.
+        unsafe { free(h) };
+        return ptr::null_mut();
+    }
+    h
+}
+
+/// The public key from the private key (`ossl_ecx_public_from_private`), raising
+/// `EC_R_FAILED_MAKING_PUBLIC_KEY` if it can't be made.
+fn derive_public(k: &EcxKey, s: &mut State) -> bool {
+    if !public_from_private(k, s) {
+        err::raise(ERR_LIB_EC, EC_R_FAILED_MAKING_PUBLIC_KEY, "ossl_ecx_key_op");
+        return false;
+    }
+    s.haspubkey = true;
+    true
+}
+
+/// Whether SHA-512 can be fetched with the properties given, as `ossl_ed25519_sign` and
+/// `ossl_ed25519_verify` fetch it.
+pub(crate) fn sha512_available(libctx: *mut OSSL_LIB_CTX, propq: Option<&CStr>) -> bool {
+    let propq = propq.map_or(ptr::null(), CStr::as_ptr);
+    // SAFETY: a library context; a static name; a query or NULL.
+    let md = unsafe { EVP_MD_fetch(libctx, c"SHA512".as_ptr(), propq) };
+    if md.is_null() {
+        return false;
+    }
+    // SAFETY: the reference fetched above.
+    unsafe { EVP_MD_free(md) };
+    true
 }

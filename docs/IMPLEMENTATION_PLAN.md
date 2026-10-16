@@ -3731,7 +3731,7 @@ chunking) is clean.
   exports: OpenSSL 3 offers these only through EVP and the providers.
 
   Sub-steps:
-  - [ ] **4.5a X25519 and Ed25519**, in sub-steps:
+  - [x] **4.5a X25519 and Ed25519**, in sub-steps:
     - [x] **4.5a1 The arithmetic and the key managers** (`rustyssl-crypto/src/ecx.rs`,
       `rustyssl-capi/src/ecx.rs`, `rustyssl-capi/src/provider/ecx_kmgmt.rs`; no new exports):
       X25519 (`mul_clamped`, an all-zero result refused) and Ed25519 (`dom2` for the ctx and ph
@@ -3762,7 +3762,20 @@ chunking) is clean.
         the algorithm identifier, prehashes of the wrong length); the probe's `x25519x` and
         `ed25519` with `corpus/ecxop.txt` and random sessions (`ecxop`, 2,000 pass); the
         `ecx_ops` fuzz target.
-    - [ ] **4.5a3 The legacy ECX ASN.1 and key methods.**
+    - [x] **4.5a3 The legacy ECX ASN.1 and key methods** (`evp/pkey/ecx.rs`, `ecx_pmeth.rs`;
+      no new exports): X25519's and ED25519's built-in ASN.1 methods (`ecx_meth.c`: public
+      key comparison, sizes, bits, printing, the TLS encoded point, no default digest for
+      EdDSA, raw keys set and got, copies, and the legacy and provided forms exchanged through
+      the raw keys) and `EVP_PKEY_METHOD`s (key generation, X25519's derive, pure Ed25519's
+      digest-sign and digest-verify, and the ctrls), with `EVP_PKEY_assign` taking their ECX
+      keys. X448's and ED448's stay stubs until 4.5b. Two deviations: a derive into less room
+      than the secret, which OpenSSL overruns, and signing without a private key, which
+      crashes it, are refused.
+      - Tests: `tests/c/evp_ecx_legacy.c` (7 checks: the methods' functions on provided keys
+        with RFC 8032's and RFC 7748's vectors, the ctrls, the ASN.1 methods' details, and
+        legacy keys from applications' copies of the methods, generated with a counting
+        `RAND_METHOD`, against provided keys from the same octets); the deviations' Rust
+        tests.
   - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448).
   - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
     OpenSSL's formats, the KEM.
