@@ -977,13 +977,21 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         &super::ecx_kmgmt::X25519_KEYMGMT,
         c"OpenSSL X25519 implementation",
     ),
-    pending(c"X448:1.3.101.111"),
+    alg_desc(
+        c"X448:1.3.101.111",
+        &super::ecx_kmgmt::X448_KEYMGMT,
+        c"OpenSSL X448 implementation",
+    ),
     alg_desc(
         c"ED25519:1.3.101.112",
         &super::ecx_kmgmt::ED25519_KEYMGMT,
         c"OpenSSL ED25519 implementation",
     ),
-    pending(c"ED448:1.3.101.113"),
+    alg_desc(
+        c"ED448:1.3.101.113",
+        &super::ecx_kmgmt::ED448_KEYMGMT,
+        c"OpenSSL ED448 implementation",
+    ),
     pending(c"ML-DSA-44:MLDSA44:2.16.840.1.101.3.4.3.17:id-ml-dsa-44"),
     pending(c"ML-DSA-65:MLDSA65:2.16.840.1.101.3.4.3.18:id-ml-dsa-65"),
     pending(c"ML-DSA-87:MLDSA87:2.16.840.1.101.3.4.3.19:id-ml-dsa-87"),

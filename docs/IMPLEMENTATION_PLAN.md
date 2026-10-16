@@ -3776,7 +3776,25 @@ chunking) is clean.
         legacy keys from applications' copies of the methods, generated with a counting
         `RAND_METHOD`, against provided keys from the same octets); the deviations' Rust
         tests.
-  - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448).
+  - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448), in sub-steps:
+    - [x] **4.5b1 The arithmetic and the key managers** (`rustyssl-crypto/src/ecx448.rs`; no new
+      exports): Curve448 written in-house on `ec::fe`'s constant-time Montgomery field (which
+      gains constant-time octet conversions, equality, parity, negation, and public powers)
+      for both `GF(2^448 - 2^224 - 1)` and the scalars mod `L`. X448 is RFC 7748's ladder with
+      OpenSSL's clamp and an all-zero result refused; Ed448 and Ed448ph use projective points
+      with RFC 8032's complete formulas, double-and-add-always with constant-time selection
+      for secret scalars, and `dom4`. As OpenSSL decodes them, points need `y < p`, the spare
+      bits zero, and `x != 0` (so the identity and the order-2 point never decode), and
+      verification is cofactored (`4 (S B - k A - R) = O`, from OpenSSL's decaf-based equality,
+      confirmed against the reference with torsion-shifted `R` and `A`). The X448 and ED448 key
+      managers come from the generic ECX one (the public key derived after SHAKE256 is
+      fetched with the key's properties for Ed448), and a public key read into the key's room
+      raises `CRYPTO_R_TOO_SMALL_BUFFER` when longer, as OpenSSL reads it.
+      - Tests: RFC 7748 and RFC 8032 vectors and the cofactored check as unit tests;
+        `tests/c/evp_ecx_kmgmt.c` for all four types; the probe's `ecxkm` corpus and random
+        sessions with X448 and ED448 (500 pass); the `ecx_kmgmt` fuzz target over the four.
+    - [ ] **4.5b2 The X448 exchange and the Ed448 and Ed448ph signatures.**
+    - [ ] **4.5b3 The legacy X448 and ED448 ASN.1 and key methods.**
   - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
     OpenSSL's formats, the KEM.
   - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures

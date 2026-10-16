@@ -870,3 +870,27 @@ ecx_keymgmt!(
     ed25519_validate,
     ed25519_gen_init
 );
+ecx_keymgmt!(
+    X448_KEYMGMT,
+    EcxType::X448,
+    false,
+    x448_new_key,
+    x448_get_params,
+    x448_gettable_params,
+    x448_set_params,
+    x448_settable_params,
+    x448_validate,
+    x448_gen_init
+);
+ecx_keymgmt!(
+    ED448_KEYMGMT,
+    EcxType::Ed448,
+    true,
+    ed448_new_key,
+    ed448_get_params,
+    ed448_gettable_params,
+    ed448_set_params,
+    ed448_settable_params,
+    ed448_validate,
+    ed448_gen_init
+);
