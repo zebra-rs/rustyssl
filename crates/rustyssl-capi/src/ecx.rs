@@ -85,7 +85,6 @@ impl EcxKey {
     }
 
     /// The public key's octets.
-    #[expect(dead_code, reason = "the exchange and signatures (step 4.5a2) use it")]
     pub(crate) fn public(&self) -> Vec<u8> {
         let s = self.lock();
         s.pubkey.get(..self.keylen()).unwrap_or_default().to_vec()
@@ -117,7 +116,6 @@ pub(crate) unsafe fn key<'a>(p: *const c_void) -> Option<&'a EcxKey> {
 }
 
 /// `ossl_ecx_key_up_ref`.
-#[expect(dead_code, reason = "the exchange and signatures (step 4.5a2) use it")]
 ///
 /// # Safety
 /// `p` is key data from [`new`] with a reference alive.

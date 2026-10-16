@@ -22,10 +22,10 @@ use rustyssl_abi::{
 };
 
 use super::builtin::libctx_of;
-use super::ecdsa_sig;
 use super::keymgmt::{mac_free, mac_key, mac_key_up_ref};
 use super::rsa_sig;
 use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, entry, pending};
+use super::{ecdsa_sig, eddsa_sig};
 use crate::err;
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch,
@@ -485,9 +485,9 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
         c"RSA-SM3:sm3WithRSAEncryption:1.2.156.10197.1.504",
         &rsa_sig::RSA_SM3_SIGNATURE,
     ),
-    pending(c"ED25519:1.3.101.112"),
-    pending(c"ED25519ph"),
-    pending(c"ED25519ctx"),
+    alg(c"ED25519:1.3.101.112", &eddsa_sig::ED25519_SIGNATURE),
+    alg(c"ED25519ph", &eddsa_sig::ED25519PH_SIGNATURE),
+    alg(c"ED25519ctx", &eddsa_sig::ED25519CTX_SIGNATURE),
     pending(c"ED448:1.3.101.113"),
     pending(c"ED448ph"),
     alg(c"ECDSA", &ecdsa_sig::ECDSA_SIGNATURE),
