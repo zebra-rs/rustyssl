@@ -320,6 +320,9 @@
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
  *   sm2km <sel> <group|-> <priv|-> <pub|-> <k=v,...|->  as eckm, with the SM2 key manager
+ *   sm2enc <priv> <md|-> <msg> <ct|-> <room>  the SM2 asymmetric cipher: with no ciphertext,
+ *                              the message's size, encryption, and decryption again; with one,
+ *                              its message's size and its decryption into room octets
  *   sm2sig <priv> <id|-> <md|-> <msg> <sig|->  the SM2 signature provider: with no signature,
  *                              the message signed through a digest context (with the ID) and,
  *                              as a number, by EVP_PKEY_sign, each verified; with one, it's
@@ -4552,6 +4555,87 @@ static void ec_exchange_command(const char *line)
     EVP_PKEY_free(kb);
 }
 
+/* An SM2 cipher context for op on k, with the digest md (NULL for the default). */
+static EVP_PKEY_CTX *sm2_crypt_ctx(EVP_PKEY *k, int enc, const char *md)
+{
+    EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+    int r = enc ? EVP_PKEY_encrypt_init(c) : EVP_PKEY_decrypt_init(c);
+
+    if (r == 1 && md != NULL) {
+        OSSL_PARAM p[2];
+
+        p[0] = OSSL_PARAM_construct_utf8_string(OSSL_ASYM_CIPHER_PARAM_DIGEST, (char *)md, 0);
+        p[1] = OSSL_PARAM_construct_end();
+        r = EVP_PKEY_CTX_set_params(c, p);
+    }
+    printf(" init %d", r);
+    return c;
+}
+
+/* sm2enc: an SM2 key's encryption through the SM2 asymmetric cipher. */
+static void sm2_enc_command(const char *line)
+{
+    char priv[700] = "-", md[64] = "-", msg[700] = "-", cthex[700] = "-";
+    unsigned char mb[300], cb[300], out[400];
+    size_t ml = 0, cl = 0, room = 0, len;
+    const char *mdname;
+    EVP_PKEY *k;
+    EVP_PKEY_CTX *c;
+    int r;
+
+    sscanf(line, "%*s %699s %63s %699s %699s %zu", priv, md, msg, cthex, &room);
+    mdname = strcmp(md, "-") == 0 ? NULL : md;
+    if (room > sizeof(out) || !parse_hex(msg, mb, &ml)
+        || (strcmp(cthex, "-") != 0 && !parse_hex(cthex, cb, &cl))) {
+        printf(" bad input\n");
+        return;
+    }
+    printf(" key");
+    k = ec_fromdata_type("SM2", "SM2", priv);
+    print_asn_errors();
+    if (k == NULL)
+        return;
+    if (strcmp(cthex, "-") == 0) {
+        printf("  encrypt");
+        c = sm2_crypt_ctx(k, 1, mdname);
+        len = 0;
+        r = EVP_PKEY_encrypt(c, NULL, &len, mb, ml);
+        printf(" size %d %zu", r, len);
+        len = room;
+        r = EVP_PKEY_encrypt(c, out, &len, mb, ml);
+        printf(" %d", r);
+        if (r == 1)
+            print_hex("", out, len);
+        else
+            print_asn_errors();
+        EVP_PKEY_CTX_free(c);
+        if (r != 1) {
+            EVP_PKEY_free(k);
+            return;
+        }
+        memcpy(cb, out, len);
+        cl = len;
+        room = sizeof(out);
+    }
+    printf("  decrypt");
+    c = sm2_crypt_ctx(k, 0, mdname);
+    len = 0;
+    r = EVP_PKEY_decrypt(c, NULL, &len, cb, cl);
+    printf(" size %d %zu", r, len);
+    print_asn_errors();
+    len = room;
+    memset(out, 0x77, sizeof(out));
+    r = EVP_PKEY_decrypt(c, out, &len, cb, cl);
+    printf("  %d", r);
+    if (r == 1)
+        print_hex("", out, len);
+    else
+        print_hex(" buffer", out, room);
+    print_asn_errors();
+    EVP_PKEY_CTX_free(c);
+    EVP_PKEY_free(k);
+}
+
 /* sm2sig: an SM2 key's signatures through the SM2 provider. */
 static void sm2_sig_command(const char *line)
 {
@@ -4756,9 +4840,14 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "ecverify") != 0 && strcmp(command, "ecdh") != 0
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
         && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0
-        && strcmp(command, "sm2km") != 0 && strcmp(command, "sm2sig") != 0)
+        && strcmp(command, "sm2km") != 0 && strcmp(command, "sm2sig") != 0
+        && strcmp(command, "sm2enc") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "sm2enc") == 0) {
+        sm2_enc_command(line);
+        return 1;
+    }
     if (strcmp(command, "sm2sig") == 0) {
         sm2_sig_command(line);
         return 1;

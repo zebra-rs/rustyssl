@@ -395,6 +395,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ecsig", ecsig_session),
     ("ecdhx", ecdhx_session),
     ("sm2sig", sm2sig_session),
+    ("sm2enc", sm2enc_session),
     ("string", string_session),
 ];
 
@@ -3042,6 +3043,34 @@ fn ecdhx_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "ecdhx {curve} {a} {b} {mode} {md} {outlen} {ukm} {room}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the SM2 asymmetric cipher, from deterministic generators: messages of
+/// every length encrypted with digests good and bad into buffers of every size and decrypted
+/// again, and ciphertexts near valid ones decrypted.
+fn sm2enc_session(random: &mut Random, out: &mut String) -> Result {
+    for line in DETERMINISTIC_RAND {
+        writeln!(out, "{line}")?;
+    }
+    for _ in 0..random.below(5).saturating_add(1) {
+        let d = match random.below(5) {
+            0 => format!("{:x}", random.below(1000).saturating_add(1)),
+            _ => random_hex(random, 32),
+        };
+        let md = random.pick(&["-", "-", "SM3", "SHA256", "SHA1", "SHAKE256", "nosuch"]);
+        let len = usize::try_from(random.below(60)).unwrap_or(0);
+        let msg = random_hex(random, len);
+        let room = random.pick(&["300", "300", "120", "100", "20", "0"]);
+        let ct = match random.below(4) {
+            0 => {
+                let n = usize::try_from(random.below(120)).unwrap_or(0);
+                format!("30{}", random_hex(random, n))
+            }
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "sm2enc {d} {md} {msg} {ct} {room}")?;
     }
     Ok(())
 }
