@@ -1,11 +1,11 @@
 /*
- * Conformance test for the default provider's X25519 and ED25519 key managers
+ * Conformance test for the default provider's X25519, X448, ED25519, and ED448 key managers
  * (EVP_PKEY-X25519(7), EVP_PKEY-ED25519(7), provider-keymgmt(7)), in TAP format: their names and
  * parameter lists; raw keys (private and public, of every length); keys from data (each part
  * alone, both, mismatched, of the wrong length); every gettable parameter; exports; the
  * encoded public key and properties set; the checks (the pair, public, private); generation
  * (random, from an RFC 9180 DHKEM input key for X25519, with a group name); comparison and
- * copies.
+ * copies. The 448 types get the 25519 keys' octets where a wrong length is wanted.
  *
  * The fixed keys are RFC 7748's and RFC 8032's; generated keys are random, so only what they
  * have and whether they check is printed.
@@ -178,6 +178,15 @@ static const char X_PRIV[] = "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab1
 static const char X_PUB[] = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
 static const char E_PRIV[] = "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb";
 static const char E_PUB[] = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
+/* RFC 7748 6.2's Alice and RFC 8032 7.4's blank message key. */
+static const char X448_PRIV[] = "9a8f4925d1519f5775cf46b04b5800d4ee9ee8bae8bc5565d498c28dd9c9baf5"
+                                "74a9419744897391006382a6f127ab1d9ac2d8c0a598726b";
+static const char X448_PUB[] = "9b08f7cc31b7e3e67d22d5aea121074a273bd2b83de09c63faa73d2c22c5d9bb"
+                               "c836647241d953d40c5b12da88120d53177f80e532c41fa0";
+static const char E448_PRIV[] = "6c82a562cb808d10d632be89c8513ebf6c929f34ddfa8c9f63c9960ef6e348a3"
+                                "528c8a3fcc2f044e39a3fc5b94492f8f032e7549a20098f95b";
+static const char E448_PUB[] = "5fd7449b59b461fd2ce787ec616ad46a1da1342485a70e1f8a0ea75d80e96778"
+                               "edf124769b46c7061bd6783df1e50f6cd1fa1abeafe8256180";
 
 static void test_keymgmt(const char *type)
 {
@@ -404,6 +413,14 @@ int main(void)
     test_fromdata("ED25519", E_PRIV, E_PUB);
     test_gen("X25519");
     test_gen("ED25519");
+    test_keymgmt("X448");
+    test_keymgmt("ED448");
+    test_raw("X448", EVP_PKEY_X448, X448_PRIV, X448_PUB);
+    test_raw("ED448", EVP_PKEY_ED448, E448_PRIV, E448_PUB);
+    test_fromdata("X448", X448_PRIV, X448_PUB);
+    test_fromdata("ED448", E448_PRIV, E448_PUB);
+    test_gen("X448");
+    test_gen("ED448");
     errors();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;

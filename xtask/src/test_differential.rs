@@ -3049,14 +3049,17 @@ fn ecdhx_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
-/// A random session of the ECX key managers: keys from data of every selection, with private
-/// and public keys of every length (the right one most often), matching or not, and keys
+/// A random session of the ECX key managers (X25519, ED25519, X448, ED448): keys from data of
+/// every selection, with private and public keys of every length (the right one most often), matching or not, and keys
 /// generated from DHKEM input of every length.
 fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
     for _ in 0..random.below(6).saturating_add(1) {
-        let kind = random.pick(&["X25519", "ED25519"]);
+        const KINDS: [(&str, usize); 4] =
+            [("X25519", 32), ("ED25519", 32), ("X448", 56), ("ED448", 57)];
+        let i = usize::try_from(random.below(4)).unwrap_or(0);
+        let (kind, keylen) = KINDS.get(i).copied().unwrap_or(("X25519", 32));
         if random.below(5) == 0 {
-            let len = usize::try_from(random.below(48)).unwrap_or(32);
+            let len = usize::try_from(random.below(72)).unwrap_or(32);
             writeln!(out, "ecxkm {kind} 87 - - {}", random_hex(random, len))?;
             continue;
         }
@@ -3064,10 +3067,10 @@ fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
         let part = |random: &mut Random| match random.below(5) {
             0 => "-".to_owned(),
             1 => {
-                let len = usize::try_from(random.below(40)).unwrap_or(0);
+                let len = usize::try_from(random.below(64)).unwrap_or(0);
                 random_hex(random, len)
             }
-            _ => random_hex(random, 32),
+            _ => random_hex(random, keylen),
         };
         let privkey = part(random);
         let pubkey = part(random);

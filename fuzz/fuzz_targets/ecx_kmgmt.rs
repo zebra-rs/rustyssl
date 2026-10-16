@@ -1,5 +1,5 @@
-//! Fuzzes ECX keys made from parameters (`EVP_PKEY_fromdata` through the X25519 and ED25519 key
-//! managers), as a decoder hands them a key from an untrusted file: private and public keys of
+//! Fuzzes ECX keys made from parameters (`EVP_PKEY_fromdata` through the X25519, ED25519, X448,
+//! and ED448 key managers), as a decoder hands them a key from an untrusted file: private and public keys of
 //! any length, either alone or both. Nothing may crash or read out of bounds (ASan); a key it
 //! makes exports, imports again to an equal key, and checks cleanly.
 
@@ -66,12 +66,8 @@ fuzz_target!(|input: &[u8]| {
     let Some((&flags, rest)) = input.split_first() else {
         return;
     };
-    let keytype = if flags & 1 == 0 {
-        c"X25519"
-    } else {
-        c"ED25519"
-    };
-    let selection = SELECTIONS[usize::from(flags >> 1) % SELECTIONS.len()];
+    let keytype = [c"X25519", c"ED25519", c"X448", c"ED448"][usize::from(flags & 3)];
+    let selection = SELECTIONS[usize::from(flags >> 2) % SELECTIONS.len()];
     let cut = usize::from(flags >> 4).saturating_mul(4).min(rest.len());
     let (mut d, mut q) = (rest[..cut].to_vec(), rest[cut..].to_vec());
     let mut params = Vec::new();
