@@ -211,10 +211,6 @@ extern "C" fn builtin_ctrl(_: *mut EVP_PKEY, _: c_int, _: c_long, _: *mut c_void
     crate::stub::unimplemented("a built-in ASN.1 method's ctrl")
 }
 
-extern "C" fn builtin_get_raw(_: *const EVP_PKEY, _: *mut c_uchar, _: *mut usize) -> c_int {
-    crate::stub::unimplemented("a raw key through a built-in ASN.1 method")
-}
-
 extern "C" fn builtin_copy(_: *mut EVP_PKEY, _: *mut EVP_PKEY) -> c_int {
     crate::stub::unimplemented("copying a key through a built-in ASN.1 method")
 }
@@ -253,12 +249,11 @@ enum Kind {
     Dh,
     Dsa,
     Ec,
-    /// X25519 and ED25519.
-    Ecx25519 {
+    /// X25519, X448, ED25519 (`ed`), and ED448 (`ed`, `is448`).
+    Ecx {
         ed: bool,
+        is448: bool,
     },
-    /// X448 and ED448.
-    Ecx,
     Alias,
 }
 
@@ -287,17 +282,16 @@ impl Kind {
                 f.param_copy = Some(builtin_param_copy);
                 f.param_cmp = Some(builtin_cmp);
             }
-            Self::Ecx => {
-                f.param_cmp = Some(builtin_cmp);
-                f.get_priv_key = Some(builtin_get_raw);
-                f.get_pub_key = Some(builtin_get_raw);
-            }
-            Self::Ecx25519 { ed } => {
+            Self::Ecx { ed, is448 } => {
                 use super::ecx as x;
                 f.pub_cmp = Some(x::ecx_pub_cmp);
                 f.pub_print = Some(x::ecx_pub_print);
                 f.priv_print = Some(x::ecx_priv_print);
-                f.pkey_size = Some(if ed { x::ecd_size25519 } else { x::ecx_size });
+                f.pkey_size = Some(match (ed, is448) {
+                    (false, _) => x::ecx_size,
+                    (true, false) => x::ecd_size25519,
+                    (true, true) => x::ecd_size448,
+                });
                 f.pkey_bits = Some(x::ecx_bits);
                 f.pkey_security_bits = Some(x::ecx_security_bits);
                 f.param_cmp = Some(x::ecx_cmp_parameters);
@@ -439,28 +433,40 @@ static STANDARD_TABLE: [Std; 15] = [
         0,
         c"X25519",
         c"OpenSSL X25519 algorithm",
-        Kind::Ecx25519 { ed: false },
+        Kind::Ecx {
+            ed: false,
+            is448: false,
+        },
     ),
     entry(
         EVP_PKEY_X448,
         0,
         c"X448",
         c"OpenSSL X448 algorithm",
-        Kind::Ecx,
+        Kind::Ecx {
+            ed: false,
+            is448: true,
+        },
     ),
     entry(
         EVP_PKEY_ED25519,
         0,
         c"ED25519",
         c"OpenSSL ED25519 algorithm",
-        Kind::Ecx25519 { ed: true },
+        Kind::Ecx {
+            ed: true,
+            is448: false,
+        },
     ),
     entry(
         EVP_PKEY_ED448,
         0,
         c"ED448",
         c"OpenSSL ED448 algorithm",
-        Kind::Ecx,
+        Kind::Ecx {
+            ed: true,
+            is448: true,
+        },
     ),
     alias(EVP_PKEY_SM2, EVP_PKEY_EC),
 ];

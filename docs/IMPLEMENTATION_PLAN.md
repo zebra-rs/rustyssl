@@ -3776,7 +3776,7 @@ chunking) is clean.
         legacy keys from applications' copies of the methods, generated with a counting
         `RAND_METHOD`, against provided keys from the same octets); the deviations' Rust
         tests.
-  - [ ] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448), in sub-steps:
+  - [x] **4.5b X448 and Ed448:** the same over Curve448 (SHAKE256 for Ed448), in sub-steps:
     - [x] **4.5b1 The arithmetic and the key managers** (`rustyssl-crypto/src/ecx448.rs`; no new
       exports): Curve448 written in-house on `ec::fe`'s constant-time Montgomery field (which
       gains constant-time octet conversions, equality, parity, negation, and public powers)
@@ -3806,7 +3806,15 @@ chunking) is clean.
         instances preset, foreign, and unknown, the algorithm identifier, a caller's prehash);
         the probe's `x448x` and `ed448` with `corpus/ecxop.txt` and random `ecxop` sessions
         over both curves (1,000 pass); the `ecx_ops` fuzz target over both curves.
-    - [ ] **4.5b3 The legacy X448 and ED448 ASN.1 and key methods.**
+    - [x] **4.5b3 The legacy X448 and ED448 ASN.1 and key methods** (`evp/pkey/ecx.rs`,
+      `ecx_pmeth.rs`; no new exports): 4.5a3's methods extended to X448 and ED448, with their
+      bits (448 and 456), security bits (224), and ED448's signature size (114); X448's derive
+      (through the shared X25519/X448 path, zeros from a low-order peer written then refused);
+      and pure Ed448's digest-sign and digest-verify, which fetch SHAKE256 with the key's
+      library context and properties as OpenSSL does. `EVP_PKEY_assign` takes their ECX keys.
+      4.5a3's two deviations cover them too.
+      - Tests: `tests/c/evp_ecx448_legacy.c` (7 checks, `evp_ecx_legacy.c`'s over Curve448 with
+        RFC 8032's and RFC 7748's vectors); the deviations' Rust tests over both curves.
   - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
     OpenSSL's formats, the KEM.
   - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures
