@@ -2091,11 +2091,6 @@ pub extern "C" fn DSA_print_fp(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn DSAparams_dup(_: *const DSA) -> *mut DSA {
-    crate::stub::unimplemented("DSAparams_dup")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn DSAparams_print(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
     crate::stub::unimplemented("DSAparams_print")
 }
@@ -8691,16 +8686,6 @@ pub extern "C" fn PEM_read_DSA_PUBKEY(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_DSAparams(
-    _: *mut FILE,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_DSAparams")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_read_ECPKParameters(
     _: *mut FILE,
     _: *mut *mut EC_GROUP,
@@ -8932,16 +8917,6 @@ pub extern "C" fn PEM_read_bio_DSA_PUBKEY(
     _: *mut core::ffi::c_void,
 ) -> *mut DSA {
     crate::stub::unimplemented("PEM_read_bio_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_DSAparams(
-    _: *mut BIO,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_bio_DSAparams")
 }
 
 #[unsafe(no_mangle)]
@@ -9187,11 +9162,6 @@ pub extern "C" fn PEM_write_DSA_PUBKEY(_: *mut FILE, _: *const DSA) -> core::ffi
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_DSAparams(_: *mut FILE, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_DSAparams")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_ECPKParameters(_: *mut FILE, _: *const EC_GROUP) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_ECPKParameters")
 }
@@ -9410,11 +9380,6 @@ pub extern "C" fn PEM_write_bio_DSAPrivateKey(
 #[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_bio_DSA_PUBKEY(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_DSAparams(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_DSAparams")
 }
 
 #[unsafe(no_mangle)]
@@ -18853,34 +18818,6 @@ pub extern "C" fn d2i_DIST_POINT_NAME(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSAPrivateKey(
-    _: *mut *mut DSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSAPrivateKey_bio(_: *mut BIO, _: *mut *mut DSA) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSAPrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSAPrivateKey_fp(_: *mut FILE, _: *mut *mut DSA) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSAPrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSAPublicKey(
-    _: *mut *mut DSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_DSA_PUBKEY(
     _: *mut *mut DSA,
     _: *mut *const core::ffi::c_uchar,
@@ -18897,15 +18834,6 @@ pub extern "C" fn d2i_DSA_PUBKEY_bio(_: *mut BIO, _: *mut *mut DSA) -> *mut DSA 
 #[unsafe(no_mangle)]
 pub extern "C" fn d2i_DSA_PUBKEY_fp(_: *mut FILE, _: *mut *mut DSA) -> *mut DSA {
     crate::stub::unimplemented("d2i_DSA_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSAparams(
-    _: *mut *mut DSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSAparams")
 }
 
 #[unsafe(no_mangle)]
@@ -20695,32 +20623,6 @@ pub extern "C" fn i2d_DIST_POINT_NAME(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSAPrivateKey(
-    _: *const DSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSAPrivateKey_bio(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSAPrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSAPrivateKey_fp(_: *mut FILE, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSAPrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSAPublicKey(
-    _: *const DSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_DSA_PUBKEY(
     _: *const DSA,
     _: *mut *mut core::ffi::c_uchar,
@@ -20736,14 +20638,6 @@ pub extern "C" fn i2d_DSA_PUBKEY_bio(_: *mut BIO, _: *const DSA) -> core::ffi::c
 #[unsafe(no_mangle)]
 pub extern "C" fn i2d_DSA_PUBKEY_fp(_: *mut FILE, _: *const DSA) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_DSA_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSAparams(
-    _: *const DSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSAparams")
 }
 
 #[unsafe(no_mangle)]

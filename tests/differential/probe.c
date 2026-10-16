@@ -374,6 +374,9 @@
  *                              decodes) of a signature in hex over a digest in hex with RFC
  *                              6979's DSA-1024 key (key: k, or nopub, small, q+2, or even for a
  *                              key changed so; OpenSSL crashes without the public key)
+ *   dsader <k|p|u> <hex>       d2i_DSAPrivateKey (k), d2i_DSAparams (p), or d2i_DSAPublicKey (u)
+ *                              of the octets: the result, the octets consumed, the numbers, and
+ *                              whether each encoding of the key re-encodes them
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -6012,12 +6015,48 @@ static void dsa_verify_command(const char *line)
     OPENSSL_free(sg);
 }
 
+/* dsader: one of DSA's decoders, then the key's encodings. */
+static void dsa_der_command(const char *line)
+{
+    char kind[4] = "p", hexs[2100] = "";
+    long n = 0;
+    unsigned char *der, *re = NULL;
+    const unsigned char *pp;
+    DSA *d;
+    int rn;
+
+    sscanf(line, "%*s %3s %2099s", kind, hexs);
+    der = OPENSSL_hexstr2buf(hexs, &n);
+    pp = der;
+    if (strcmp(kind, "k") == 0)
+        d = d2i_DSAPrivateKey(NULL, &pp, n);
+    else if (strcmp(kind, "u") == 0)
+        d = d2i_DSAPublicKey(NULL, &pp, n);
+    else
+        d = d2i_DSAparams(NULL, &pp, n);
+    printf(" %s consumed %ld", d == NULL ? "fails" : "ok", (long)(pp - der));
+    print_asn_errors();
+    if (d != NULL) {
+        printf("  bits %d", DSA_bits(d));
+        rn = strcmp(kind, "k") == 0   ? i2d_DSAPrivateKey(d, &re)
+             : strcmp(kind, "u") == 0 ? i2d_DSAPublicKey(d, &re)
+                                      : i2d_DSAparams(d, &re);
+        printf(" re %d same %d", rn, rn == (int)n && re != NULL && memcmp(re, der, (size_t)n) == 0);
+        OPENSSL_free(re);
+        printf(" params %d public %d private %d", i2d_DSAparams(d, NULL), i2d_DSAPublicKey(d, NULL),
+               i2d_DSAPrivateKey(d, NULL));
+        print_asn_errors();
+    }
+    DSA_free(d);
+    OPENSSL_free(der);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
     if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
         && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0
-        && strcmp(command, "dsaverify") != 0)
+        && strcmp(command, "dsaverify") != 0 && strcmp(command, "dsader") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
@@ -6028,6 +6067,8 @@ static int dh_command(const char *command, const char *line)
         dh_exch_command(line);
     else if (strcmp(command, "dsaverify") == 0)
         dsa_verify_command(line);
+    else if (strcmp(command, "dsader") == 0)
+        dsa_der_command(line);
     else
         dh_check_command(line);
     return 1;

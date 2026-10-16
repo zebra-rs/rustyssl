@@ -3612,6 +3612,7 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut DSA,
 ) -> core::ffi::c_int = crate::dsa_ops::DSA_verify;
+const _: unsafe extern "C" fn(*const DSA) -> *mut DSA = crate::dsa_asn1::DSAparams_dup;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     usize,
@@ -8512,6 +8513,12 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
 ) -> *mut DH = crate::dh_asn1::PEM_read_DHparams;
 const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DSA = crate::dsa_asn1::PEM_read_DSAparams;
+const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,
     *mut *mut core::ffi::c_char,
@@ -8524,6 +8531,12 @@ const _: unsafe extern "C" fn(
     pem_password_cb,
     *mut core::ffi::c_void,
 ) -> *mut DH = crate::dh_asn1::PEM_read_bio_DHparams;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DSA = crate::dsa_asn1::PEM_read_bio_DSAparams;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,
@@ -8543,6 +8556,8 @@ const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_DHparams;
 const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_DHxparams;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
+    crate::dsa_asn1::PEM_write_DSAparams;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_char,
@@ -8554,6 +8569,8 @@ const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHparams;
 const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHxparams;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
+    crate::dsa_asn1::PEM_write_bio_DSAparams;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -9787,10 +9804,29 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_STRING = crate::asn1::tpl::items::d2i_DISPLAYTEXT;
 const _: unsafe extern "C" fn(
+    *mut *mut DSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DSA = crate::dsa_asn1::d2i_DSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut DSA) -> *mut DSA =
+    crate::dsa_asn1::d2i_DSAPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut DSA) -> *mut DSA =
+    crate::dsa_asn1::d2i_DSAPrivateKey_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut DSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DSA = crate::dsa_asn1::d2i_DSAPublicKey;
+const _: unsafe extern "C" fn(
     *mut *mut DSA_SIG,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut DSA_SIG = crate::dsa_ops::d2i_DSA_SIG;
+const _: unsafe extern "C" fn(
+    *mut *mut DSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DSA = crate::dsa_asn1::d2i_DSAparams;
 const _: unsafe extern "C" fn(
     *mut *mut ECDSA_SIG,
     *mut *const core::ffi::c_uchar,
@@ -9947,8 +9983,18 @@ const _: unsafe extern "C" fn(
     *const ASN1_STRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_DISPLAYTEXT;
+const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dsa_asn1::i2d_DSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
+    crate::dsa_asn1::i2d_DSAPrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
+    crate::dsa_asn1::i2d_DSAPrivateKey_fp;
+const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dsa_asn1::i2d_DSAPublicKey;
 const _: unsafe extern "C" fn(*const DSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::dsa_ops::i2d_DSA_SIG;
+const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::dsa_asn1::i2d_DSAparams;
 const _: unsafe extern "C" fn(*const ECDSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::ec::ecdsa::i2d_ECDSA_SIG;
 const _: unsafe extern "C" fn(*const EC_GROUP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
