@@ -329,6 +329,11 @@
  *                              p@N^XX or q@N^XX to xor octet N of the private or public key,
  *                              p@N=XX to set it, p#N to make it N octets); the key's parts (as
  *                              SHA-256 prefixes), checks, sizes, and export
+ *   mlkem <alg> <keyseed> <ikme|-> <edits|-> <croom> <sroom>  the ML-KEM KEM with the key
+ *                              generated from the 64-octet seed: an encapsulation (with the
+ *                              ikmE given, else random) into rooms of croom and sroom octets,
+ *                              then the decapsulation of its ciphertext edited (comma-separated
+ *                              c@N^XX to xor octet N, c#N to make it N octets)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5200,13 +5205,85 @@ static void ml_kem_keymgmt_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
+/* mlkem: an encapsulation and the decapsulation of its ciphertext, edited. */
+static void ml_kem_ops_command(const char *line)
+{
+    char alg[32] = "-", keyseed[300] = "-", ikme[300] = "-", edits[300] = "-";
+    static unsigned char priv[4000], pub[2000], ct[2000];
+    unsigned char kb[150], eb[150], ss[100], ss2[100];
+    size_t kl = 0, el = 0, privlen = sizeof(priv), publen = sizeof(pub), croom = 0, sroom = 0;
+    size_t clen, slen, s2;
+    OSSL_PARAM ps[2];
+    EVP_PKEY *k;
+    EVP_PKEY_CTX *c;
+    int r, random;
+
+    sscanf(line, "%*s %31s %299s %299s %299s %zu %zu", alg, keyseed, ikme, edits, &croom, &sroom);
+    random = strcmp(ikme, "-") == 0;
+    if (!parse_hex(keyseed, kb, &kl) || kl != 64 || (!random && !parse_hex(ikme, eb, &el))
+        || croom > sizeof(ct) || sroom > sizeof(ss)
+        || !ml_kem_keys_from_seed(alg, kb, priv, &privlen, pub, &publen)) {
+        printf(" bad input\n");
+        ERR_clear_error();
+        return;
+    }
+    k = EVP_PKEY_new_raw_private_key_ex(NULL, alg, NULL, priv, privlen);
+    c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+    ps[0] = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME, eb, el);
+    ps[1] = OSSL_PARAM_construct_end();
+    printf(" init %d", EVP_PKEY_encapsulate_init(c, random ? NULL : ps));
+    memset(ct, 0x77, sizeof(ct));
+    memset(ss, 0x77, sizeof(ss));
+    clen = croom;
+    slen = sroom;
+    r = EVP_PKEY_encapsulate(c, ct, &clen, ss, &slen);
+    printf(" encap %d %zu %zu", r, clen, slen);
+    if (r == 1 && !random) {
+        ml_kem_digest(ct, clen);
+        ml_kem_digest(ss, slen);
+    }
+    print_asn_errors();
+    if (r == 1) {
+        if (strcmp(edits, "-") != 0) {
+            for (char *e = strtok(edits, ","); e != NULL; e = strtok(NULL, ",")) {
+                size_t n;
+                unsigned int x;
+
+                if (e[0] == 'c' && e[1] == '#' && sscanf(e + 2, "%zu", &n) == 1
+                    && n <= sizeof(ct)) {
+                    clen = n;
+                } else if (e[0] == 'c' && e[1] == '@' && sscanf(e + 2, "%zu^%2x", &n, &x) == 2
+                           && n < clen) {
+                    ct[n] ^= (unsigned char)x;
+                } else {
+                    printf("  bad edit\n");
+                    break;
+                }
+            }
+        }
+        printf("  decap init %d", EVP_PKEY_decapsulate_init(c, NULL));
+        memset(ss2, 0x55, sizeof(ss2));
+        s2 = sizeof(ss2);
+        r = EVP_PKEY_decapsulate(c, ss2, &s2, ct, clen);
+        printf(" decap %d %zu same %d", r, s2, memcmp(ss, ss2, 32) == 0);
+        if (r == 1 && !random)
+            ml_kem_digest(ss2, s2);
+        print_asn_errors();
+    }
+    EVP_PKEY_CTX_free(c);
+    EVP_PKEY_free(k);
+}
+
 /* Runs an ML-KEM command; returns 0 if `command` isn't one. */
 static int ml_kem_command(const char *command, const char *line)
 {
-    if (strcmp(command, "mlkemkm") != 0)
+    if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0)
         return 0;
     printf("%s:", line);
-    ml_kem_keymgmt_command(line);
+    if (strcmp(command, "mlkem") == 0)
+        ml_kem_ops_command(line);
+    else
+        ml_kem_keymgmt_command(line);
     return 1;
 }
 

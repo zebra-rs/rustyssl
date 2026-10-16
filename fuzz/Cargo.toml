@@ -383,6 +383,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "ml_kem_ops"
+path = "fuzz_targets/ml_kem_ops.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ecx_ops"
 path = "fuzz_targets/ecx_ops.rs"
 test = false
