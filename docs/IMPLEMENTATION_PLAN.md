@@ -3890,7 +3890,7 @@ chunking) is clean.
         public keys, other algorithms' keys, the `EVP_DigestSign` route, and the operation's
         context); the probe's `mldsa` with `corpus/mldsa.txt` and random sessions (500 pass);
         the `ml_dsa_ops` fuzz target.
-  - [ ] **4.5e SLH-DSA**, in sub-steps:
+  - [x] **4.5e SLH-DSA**, in sub-steps:
     - [x] **4.5e1 The hash trees and the key managers** (`rustyssl-crypto/src/slhdsa.rs`,
       `provider/slh_dsa_kmgmt.rs`; no new exports): FIPS 205 written in-house for the twelve
       parameter sets: the tweakable hashes over SHAKE256 (11.1) or SHA-256 and SHA-512 with
@@ -3914,8 +3914,22 @@ chunking) is clean.
         parameters, seeds of other lengths, every import case, exports, copies, comparisons,
         checks, and properties without the digests); the probe's `slhdsakm` with
         `corpus/slhdsakm.txt` and random sessions; the `slh_dsa_kmgmt` fuzz target.
-    - [ ] **4.5e2 The signatures** (`slh_dsa_sig.c`): pure and raw, with a context string,
-      deterministic and hedged, through each EVP route.
+    - [x] **4.5e2 The signatures** (`provider/slh_dsa_sig.rs`; no new exports): `slh_dsa_sig.c`
+      and `slh_dsa.c`'s message handling, registered with their descriptions, through
+      `EVP_PKEY_sign_message_init` and `EVP_DigestSign` (no digest may be named): the pure
+      encoding with a context string of at most 255 octets (`message-encoding` 1, the default,
+      or any value but 0) or the raw message (0); `n` octets of fresh randomness, `PK.seed`
+      (`deterministic` any nonzero value), or a `test-entropy` of exactly `n` octets (another
+      length fails the parameters without an error). As in OpenSSL, the context holds the key
+      data without a reference, a key of another parameter set fails the init without an error,
+      a size query needs no private key, a room too small (`is N, should be at least M`) and a
+      missing key are errors, and the algorithm identifier is `SEQUENCE { id-slh-dsa-* }`.
+      - Tests: `tests/c/evp_slh_dsa_ops.c` (26 checks: every parameter set's names and
+        deterministic signature, and on two sets context strings, encodings, verification of
+        changed signatures, messages, contexts, and keys, test entropy, hedged signatures,
+        rooms and public keys, other algorithms, the `EVP_DigestSign` route, and the
+        operation's context); the probe's `slhdsa` (the `mldsa` command generalized) with
+        `corpus/slhdsa.txt` and random sessions; the `slh_dsa_ops` fuzz target.
   - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
     SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).
 - [ ] **4.6 DH and DSA:**
