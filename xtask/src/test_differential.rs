@@ -405,6 +405,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("slhdsakm", slhdsakm_session),
     ("slhdsa", slhdsa_session),
     ("mlx", mlx_session),
+    ("dhcheck", dhcheck_session),
     ("string", string_session),
 ];
 
@@ -3520,6 +3521,53 @@ fn mlx_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
+/// A random session of DH's checks: a named group's parameters (a part left out now and then,
+/// one changed by a small amount), and public keys from small numbers, the generator, and
+/// the prime.
+fn dhcheck_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let group = random.pick(&[
+            "ffdhe2048",
+            "ffdhe3072",
+            "modp_1536",
+            "modp_2048",
+            "dh_1024_160",
+            "dh_2048_224",
+            "dh_2048_256",
+        ]);
+        let part = |random: &mut Random, name: &str| {
+            if random.below(8) == 0 {
+                "-".to_owned()
+            } else {
+                format!("{group}:{name}")
+            }
+        };
+        let p = part(random, "p");
+        let q = if random.below(3) == 0 {
+            "-".to_owned()
+        } else {
+            part(random, "q")
+        };
+        let g = part(random, "g");
+        let y = match random.below(5) {
+            0 => "-".to_owned(),
+            1 => format!("{group}:g"),
+            2 => format!("{group}:p"),
+            _ => format!("{:x}", random.below(64)),
+        };
+        let edit = match random.below(4) {
+            0 => format!(
+                "{}{}",
+                random.pick(&["p", "q", "g", "y"]),
+                random.below(5).saturating_add(1)
+            ),
+            _ => "-".to_owned(),
+        };
+        writeln!(out, "dhcheck {p} {q} {g} {y} {edit}")?;
+    }
+    Ok(())
+}
+
 /// A random session of the ML-DSA signatures: messages and context strings of every length up
 /// to past the limit (often none), each option now and then (deterministic, an encoding, mu
 /// with a message of 64 octets or another length, test entropy of 32 octets or another
@@ -6126,9 +6174,9 @@ mod tests {
 
     #[test]
     fn a_seed_replays_the_same_sessions() {
-        let first = random_sessions(42, 500, &[]).unwrap();
-        assert_eq!(first, random_sessions(42, 500, &[]).unwrap());
-        assert_ne!(first, random_sessions(43, 500, &[]).unwrap());
+        let first = random_sessions(42, 2000, &[]).unwrap();
+        assert_eq!(first, random_sessions(42, 2000, &[]).unwrap());
+        assert_ne!(first, random_sessions(43, 2000, &[]).unwrap());
         // Every kind of session.
         for start in [
             "\nnew ",

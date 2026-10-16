@@ -27,7 +27,7 @@ use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
 
 /// An old-style callback.
-type OldCb = unsafe extern "C" fn(c_int, c_int, *mut c_void);
+pub(crate) type OldCb = unsafe extern "C" fn(c_int, c_int, *mut c_void);
 /// A new-style callback.
 type NewCb = unsafe extern "C" fn(c_int, c_int, *mut BN_GENCB) -> c_int;
 

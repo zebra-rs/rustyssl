@@ -352,6 +352,10 @@
  *                              private key (X25519 and X448) and public key imported, the
  *                              decapsulation of a ciphertext streamed from ctseed (of the right
  *                              length plus delta), and an encapsulation to the public key
+ *   dhcheck <p|-> <q|-> <g|-> <pub|-> <edit|->  DH's checks (DH_check, DH_check_params, and
+ *                              DH_check_pub_key, with their _ex forms) of numbers in hex or a
+ *                              named group's (ffdhe2048:p, dh_2048_256:q, ...), one of them
+ *                              added to by the edit (p3 adds 3 to p, y1 to the public key)
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -406,6 +410,7 @@
 #include <openssl/crypto.h>
 #include <openssl/des.h>
 #include <openssl/ec.h>
+#include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/idea.h>
@@ -5568,6 +5573,101 @@ static void mlx_command(const char *line)
     EVP_PKEY_free(xk);
 }
 
+/* A number from hex (a named group's part "ffdhe2048:p" etc. for convenience), or NULL. */
+static BIGNUM *dh_number(const char *spec)
+{
+    BIGNUM *b = NULL;
+    const BIGNUM *p, *q, *g;
+    char name[32];
+    char part;
+    int nid;
+    DH *dh;
+
+    if (strcmp(spec, "-") == 0)
+        return NULL;
+    if (sscanf(spec, "%31[^:]:%c", name, &part) == 2) {
+        nid = OBJ_sn2nid(name);
+        if (strcmp(name, "dh_1024_160") == 0)
+            dh = DH_get_1024_160();
+        else if (strcmp(name, "dh_2048_224") == 0)
+            dh = DH_get_2048_224();
+        else if (strcmp(name, "dh_2048_256") == 0)
+            dh = DH_get_2048_256();
+        else
+            dh = DH_new_by_nid(nid);
+        if (dh == NULL)
+            return NULL;
+        DH_get0_pqg(dh, &p, &q, &g);
+        b = BN_dup(part == 'p' ? p : part == 'q' ? q : g);
+        DH_free(dh);
+        return b;
+    }
+    if (BN_hex2bn(&b, spec) == 0)
+        return NULL;
+    return b;
+}
+
+/* dhcheck: DH's checks of parameters and a public key from data. */
+static void dh_check_command(const char *line)
+{
+    char ps[1200] = "-", qs[1200] = "-", gs[1200] = "-", ys[1200] = "-", edit[64] = "-";
+    BIGNUM *p, *q, *g, *y;
+    DH *dh = DH_new();
+    int ret, r;
+    unsigned int add;
+
+    sscanf(line, "%*s %1199s %1199s %1199s %1199s %63s", ps, qs, gs, ys, edit);
+    p = dh_number(ps);
+    q = dh_number(qs);
+    g = dh_number(gs);
+    y = dh_number(ys);
+    /* An edit: pN, qN, gN, yN adds N to that number. */
+    if (sscanf(edit, "p%u", &add) == 1 && p != NULL)
+        BN_add_word(p, add);
+    else if (sscanf(edit, "q%u", &add) == 1 && q != NULL)
+        BN_add_word(q, add);
+    else if (sscanf(edit, "g%u", &add) == 1 && g != NULL)
+        BN_add_word(g, add);
+    else if (sscanf(edit, "y%u", &add) == 1 && y != NULL)
+        BN_add_word(y, add);
+    r = DH_set0_pqg(dh, p, q, g);
+    if (r == 0) {
+        BN_free(p);
+        BN_free(q);
+        BN_free(g);
+    }
+    printf(" set %d nid %d bits %d security %d", r, DH_get_nid(dh), DH_bits(dh),
+           DH_security_bits(dh));
+    ret = -1;
+    r = DH_check(dh, &ret);
+    printf(" check %d %#x", r, ret);
+    ret = -1;
+    r = DH_check_params(dh, &ret);
+    printf(" params %d %#x", r, ret);
+    if (y != NULL) {
+        ret = -1;
+        r = DH_check_pub_key(dh, y, &ret);
+        printf(" pub %d %#x", r, ret);
+    }
+    print_asn_errors();
+    printf("  ex %d %d", DH_check_ex(dh), DH_check_params_ex(dh));
+    if (y != NULL)
+        printf(" %d", DH_check_pub_key_ex(dh, y));
+    print_asn_errors();
+    BN_free(y);
+    DH_free(dh);
+}
+
+/* Runs a DH command; returns 0 if `command` isn't one. */
+static int dh_command(const char *command, const char *line)
+{
+    if (strcmp(command, "dhcheck") != 0)
+        return 0;
+    printf("%s:", line);
+    dh_check_command(line);
+    return 1;
+}
+
 /* Runs an ML-KEM or ML-DSA command; returns 0 if `command` isn't one. */
 static int ml_kem_command(const char *command, const char *line)
 {
@@ -9348,7 +9448,7 @@ int main(void)
             || skey_command(command, line) || md_meth_command(command, line)
             || cipher_meth_command(command, line) || conf_command(command, line)
             || conf_modules_command(command, line) || ec_command(command, line)
-            || ml_kem_command(command, line)) {
+            || ml_kem_command(command, line) || dh_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

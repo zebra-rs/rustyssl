@@ -3979,8 +3979,22 @@ chunking) is clean.
         generation from known generators (so the keys are the reference's) for named, RFC 5114,
         and unnamed parameters with lengths and limits, shared secrets and bad peers, and
         methods counting their calls through OpenSSL's).
-    - [ ] **4.6a2 Parameter generation and the checks** (`DH_generate_parameters_ex`, the
-      safe-prime generator, `DH_check*`, `DH_KDF_X9_42`).
+    - [x] **4.6a2 Parameter generation and the checks** (`dh_ops.rs`; 9 exports):
+      `DH_generate_parameters_ex` (the key's method's `generate_params`, else OpenSSL's
+      safe-prime generation: `p mod 24 = 23` for generator 2, `p mod 60 = 59` for 5, else
+      `p mod 12 = 11`, the generator as given, and RFC 7919's private key length for the
+      prime's strength; as in OpenSSL, a bad generator leaves the key with zero `p` and `g`),
+      the deprecated `DH_generate_parameters` with an old-style callback, `DH_check` (a named
+      group's parameters pass unchecked; otherwise q's range, primality, and cofactor, g's
+      order, and p prime and safe), `DH_check_params`, `DH_check_pub_key` (SP 800-56A
+      5.6.2.3.1), their `_ex` forms with each flag's error in OpenSSL's order, and
+      `DH_KDF_X9_42` through `X942KDF-ASN1` with the digest's provider's library context.
+      - Tests: `tests/c/dh_check.c` (5 checks: generation for generators 2, 5, and 7 from
+        known generators with the progress callback's events, sizes and generators refused, a
+        stopping callback, the deprecated function, a method's generation; the checks of named,
+        RFC 5114, broken, missing, and generated parameters; public keys at and around the
+        bounds; and the KDF); the probe's `dhcheck` with `corpus/dhcheck.txt` and random
+        sessions (300 pass).
     - [ ] **4.6a3 ASN.1, printing, and `EVP_PKEY`** (`d2i`/`i2d_DHparams`, `DHxparams`,
       `DHparams_print`, PEM, `EVP_PKEY_get1_DH`).
   - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
