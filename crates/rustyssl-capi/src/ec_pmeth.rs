@@ -600,7 +600,7 @@ ffi_callback! {
 
 /// C's `atoi`: leading white space, a sign, digits; 0 for none (a value past an int saturates,
 /// where C's is undefined).
-fn atoi(s: &[u8]) -> c_int {
+pub(crate) fn atoi(s: &[u8]) -> c_int {
     let mut it = s
         .iter()
         .copied()

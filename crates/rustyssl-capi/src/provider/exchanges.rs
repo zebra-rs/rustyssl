@@ -350,10 +350,12 @@ kdf_keyexch!(
     kdf_scrypt_gettable
 );
 
-/// The default provider's key exchanges, in `deflt_keyexch`'s order; those of later steps'
-/// key types are pending.
+/// The default provider's key exchanges, in `deflt_keyexch`'s order.
 static DEFAULT_KEYEXCH: Algorithms<8> = Algorithms([
-    pending(c"DH:dhKeyAgreement:1.2.840.113549.1.3.1"),
+    alg(
+        c"DH:dhKeyAgreement:1.2.840.113549.1.3.1",
+        &super::dh_exch::DH_KEYEXCH,
+    ),
     alg(c"ECDH", &super::ecdh_exch::ECDH_KEYEXCH),
     alg(c"X25519:1.3.101.110", &super::ecx_exch::X25519_KEYEXCH),
     alg(c"X448:1.3.101.111", &super::ecx_exch::X448_KEYEXCH),

@@ -1,0 +1,30 @@
+# The DH exchange through the provider (p) and the legacy method (l): named groups and RFC
+# 5114's, small and large private keys, padded and not, rooms around the secret's size, bad
+# peers (1, p - 1, edited), and X9.42's KDF with each digest, length, algorithm, and keying
+# material.
+dhexch p ffdhe2048 1234567890abcdef fedcba0987654321 - 0 - 256
+dhexch p ffdhe2048 1234567890abcdef fedcba0987654321 - 1 - 256
+dhexch p ffdhe2048 1234567890abcdef fedcba0987654321 - 0 - 255
+dhexch p ffdhe2048 1234567890abcdef fedcba0987654321 - 0 - 300
+dhexch l ffdhe2048 1234567890abcdef fedcba0987654321 - 0 - 256
+dhexch l ffdhe2048 1234567890abcdef fedcba0987654321 - 1 - 256
+dhexch p modp_1536 99 77 - 0 - 192
+dhexch l modp_1536 99 77 - 1 - 192
+dhexch p dh_2048_256 abcdef 123456 - 0 - 256
+dhexch l dh_1024_160 abcdef 123456 - 1 - 128
+dhexch p ffdhe2048 1234 5678 y=1 0 - 256
+dhexch p ffdhe2048 1234 5678 y=p 0 - 256
+dhexch l ffdhe2048 1234 5678 y=1 0 - 256
+dhexch l ffdhe2048 1234 5678 y=p 1 - 256
+dhexch p ffdhe2048 1234 5678 y1 0 - 256
+dhexch p ffdhe2048 1234 5678 - 0 SHA256:32:id-aes128-wrap: 32
+dhexch l ffdhe2048 1234 5678 - 0 SHA256:32:id-aes128-wrap: 32
+dhexch p ffdhe2048 1234 5678 - 0 SHA1:24:id-aes192-wrap:0102030405 24
+dhexch l ffdhe2048 1234 5678 - 0 SHA1:24:id-aes192-wrap:0102030405 24
+dhexch p ffdhe2048 1234 5678 - 0 SHA512:64:id-aes256-wrap:aabb 64
+dhexch l ffdhe2048 1234 5678 - 0 SHA512:64:id-aes256-wrap:aabb 64
+dhexch p ffdhe2048 1234 5678 - 0 SHA256:32:id-aes128-wrap: 31
+dhexch l ffdhe2048 1234 5678 - 0 SHA256:32:id-aes128-wrap: 33
+dhexch p ffdhe2048 1234 5678 - 0 SHA256:32:nonsense: 32
+dhexch p ffdhe2048 1234 5678 - 0 SHA256:0:id-aes128-wrap: 32
+dhexch l ffdhe2048 1234 5678 - 0 SHA256:0:id-aes128-wrap: 32

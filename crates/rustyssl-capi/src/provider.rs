@@ -49,6 +49,7 @@ pub(crate) mod aeads;
 pub(crate) mod builtin;
 pub(crate) mod ciphers;
 pub(crate) mod conf;
+mod dh_exch;
 pub(crate) mod dh_kmgmt;
 pub(crate) mod digests;
 pub(crate) mod ec_kmgmt;

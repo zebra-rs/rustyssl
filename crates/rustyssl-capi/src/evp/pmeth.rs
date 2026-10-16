@@ -219,10 +219,6 @@ extern "C" fn builtin_verify(
     crate::stub::unimplemented("verifying with a built-in EVP_PKEY_METHOD")
 }
 
-extern "C" fn builtin_derive(_: *mut EVP_PKEY_CTX, _: *mut c_uchar, _: *mut usize) -> c_int {
-    crate::stub::unimplemented("deriving with a built-in EVP_PKEY_METHOD")
-}
-
 extern "C" fn builtin_ctrl(_: *mut EVP_PKEY_CTX, _: c_int, _: c_int, _: *mut c_void) -> c_int {
     crate::stub::unimplemented("a built-in EVP_PKEY_METHOD's ctrl")
 }
@@ -265,10 +261,26 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
             ..Funcs::default()
         }
     };
-    let dh = Funcs {
-        paramgen: Some(builtin_gen),
-        derive: Some(builtin_derive),
-        ..base
+    let (dh, dhx) = {
+        use crate::dh_pmeth as d;
+        let dh = Funcs {
+            init: Some(d::pkey_dh_init),
+            copy: Some(d::pkey_dh_copy),
+            cleanup: Some(d::pkey_dh_cleanup),
+            paramgen: Some(d::pkey_dh_paramgen),
+            keygen: Some(d::pkey_dh_keygen),
+            derive: Some(d::pkey_dh_derive),
+            ctrl: Some(d::pkey_dh_ctrl),
+            ctrl_str: Some(d::pkey_dh_ctrl_str),
+            ..Funcs::default()
+        };
+        (
+            dh,
+            Funcs {
+                keygen: Some(d::pkey_dhx_keygen),
+                ..dh
+            },
+        )
     };
     let dsa = Funcs {
         paramgen: Some(builtin_gen),
@@ -335,7 +347,7 @@ fn standard_table() -> [(c_int, c_int, Funcs); 10] {
         (EVP_PKEY_DSA, EVP_PKEY_FLAG_AUTOARGLEN, dsa),
         (EVP_PKEY_EC, 0, ec),
         (EVP_PKEY_RSA_PSS, EVP_PKEY_FLAG_AUTOARGLEN, pss),
-        (EVP_PKEY_DHX, 0, dh),
+        (EVP_PKEY_DHX, 0, dhx),
         (EVP_PKEY_X25519, 0, x25519),
         (EVP_PKEY_X448, 0, x448),
         (EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM, ed25519),
