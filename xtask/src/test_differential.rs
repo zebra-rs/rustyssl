@@ -3079,7 +3079,7 @@ fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
     Ok(())
 }
 
-/// A random session of the X25519 exchange and the Ed25519 signatures: secrets with peers
+/// A random session of the X25519 and X448 exchanges and the Ed25519 and Ed448 signatures: secrets with peers
 /// random and low-order into buffers of every size, and messages signed and verified by every
 /// algorithm and instance, with contexts of every length, and signatures changed or not.
 fn ecxop_session(random: &mut Random, out: &mut String) -> Result {
@@ -3088,18 +3088,43 @@ fn ecxop_session(random: &mut Random, out: &mut String) -> Result {
         "0100000000000000000000000000000000000000000000000000000000000000",
         "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
     ];
+    // X448's: 0, 1, and p - 1 (which the ladder takes as -1).
+    const LOW_ORDER_448: [&str; 3] = [
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "fefffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    ];
     for _ in 0..random.below(8).saturating_add(1) {
+        let wide = random.below(2) == 0;
         if random.below(3) == 0 {
-            let peer = if random.below(4) == 0 {
-                random.pick(&LOW_ORDER).to_owned()
+            let (cmd, len, low) = if wide {
+                ("x448x", 56, &LOW_ORDER_448)
             } else {
-                random_hex(random, 32)
+                ("x25519x", 32, &LOW_ORDER)
             };
-            let room = random.pick(&["32", "32", "64", "31", "0"]);
-            writeln!(out, "x25519x {} {peer} {room}", random_hex(random, 32))?;
+            let peer = if random.below(4) == 0 {
+                random.pick(low).to_owned()
+            } else {
+                random_hex(random, len)
+            };
+            let room = if wide {
+                random.pick(&["56", "56", "64", "55", "0"])
+            } else {
+                random.pick(&["32", "32", "64", "31", "0"])
+            };
+            writeln!(out, "{cmd} {} {peer} {room}", random_hex(random, len))?;
             continue;
         }
-        let alg = random.pick(&["-", "-", "ED25519", "ED25519ph", "ED25519ctx"]);
+        let (cmd, keylen, siglen) = if wide {
+            ("ed448", 57, 114)
+        } else {
+            ("ed25519", 32, 64)
+        };
+        let alg = if wide {
+            random.pick(&["-", "-", "ED448", "ED448ph"])
+        } else {
+            random.pick(&["-", "-", "ED25519", "ED25519ph", "ED25519ctx"])
+        };
         let instance = random.pick(&[
             "-",
             "-",
@@ -3109,6 +3134,7 @@ fn ecxop_session(random: &mut Random, out: &mut String) -> Result {
             "Ed25519ph",
             "ed25519PH",
             "Ed448",
+            "Ed448ph",
             "bogus",
         ]);
         let context = match random.below(4) {
@@ -3133,9 +3159,9 @@ fn ecxop_session(random: &mut Random, out: &mut String) -> Result {
         };
         let msg = if msg.is_empty() { "-".to_owned() } else { msg };
         let sig = match random.below(4) {
-            0 => random_hex(random, 64),
+            0 => random_hex(random, siglen),
             1 => {
-                let n = usize::try_from(random.below(70)).unwrap_or(0);
+                let n = usize::try_from(random.below(120)).unwrap_or(0);
                 random_hex(random, n)
             }
             _ => "-".to_owned(),
@@ -3143,8 +3169,8 @@ fn ecxop_session(random: &mut Random, out: &mut String) -> Result {
         let sig = if sig.is_empty() { "-".to_owned() } else { sig };
         writeln!(
             out,
-            "ed25519 {alg} {instance} {context} {} {msg} {sig}",
-            random_hex(random, 32)
+            "{cmd} {alg} {instance} {context} {} {msg} {sig}",
+            random_hex(random, keylen)
         )?;
     }
     Ok(())

@@ -1,5 +1,5 @@
-//! The default provider's X25519 key exchange (`ecx_exch.c`): the shared secret of a private
-//! key and a peer's public key of the same length.
+//! The default provider's X25519 and X448 key exchanges (`ecx_exch.c`): the shared secret of a
+//! private key and a peer's public key of the same length.
 //!
 //! As in OpenSSL (`ossl_ecx_compute_key`), a secret of all zeros (from a low-order peer) is
 //! written to the caller's buffer and then refused.
@@ -63,6 +63,22 @@ ffi_callback! {
     }
 }
 
+ffi_callback! {
+    /// `x448_newctx`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn x448_newctx(_provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        boxed(EcxCtx {
+            keylen: EcxType::X448.keylen(),
+            key: ptr::null_mut(),
+            peerkey: ptr::null_mut(),
+        })
+    }
+}
+
 /// Takes a reference to `vkey` into `slot` if it has the context's length (`ecx_init`,
 /// `ecx_set_peer`), raising an internal error if not.
 ///
@@ -104,6 +120,19 @@ ffi_callback! {
 }
 
 ffi_callback! {
+    /// `x448_init`: the key (the parameters are ignored).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `vkey` is NULL or live ECX key data.
+    pub(crate) unsafe extern "C" fn x448_init(vctx: *mut c_void, vkey: *mut c_void, _params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { take(vctx, vkey, false, "ecx_init") }
+    }
+}
+
+ffi_callback! {
     /// `ecx_set_peer`.
     ///
     /// # Safety
@@ -137,34 +166,31 @@ ffi_callback! {
             err::raise(ERR_LIB_PROV, PROV_R_MISSING_KEY, F);
             return 0;
         };
-        let private = {
-            let s = k.lock();
-            s.privkey.as_deref().map(|p| <[u8; 32]>::try_from(p).ok())
-        };
-        let Some(private) = private else {
+        let Some(mut private) = k.lock().privkey.clone() else {
             err::raise(ERR_LIB_PROV, PROV_R_MISSING_KEY, F);
             return 0;
         };
         if secret.is_null() {
+            wipe(&mut private);
             // SAFETY: the caller's guarantee.
             unsafe { psecretlen.write(c.keylen) };
             return 1;
         }
         if outlen < c.keylen {
+            wipe(&mut private);
             err::raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL, F);
             return 0;
         }
-        let (Some(mut s), Ok(p)) = (private, <[u8; 32]>::try_from(peer.public())) else {
+        let shared = ecx::exchange(&private, &peer.public());
+        wipe(&mut private);
+        let Some((mut out, nonzero)) = shared.filter(|(o, _)| o.len() == c.keylen) else {
             err::raise(ERR_LIB_PROV, PROV_R_FAILED_DURING_DERIVATION, F);
             return 0;
         };
-        let shared = rustyssl_crypto::ecx::x25519(&s, &p);
-        wipe(&mut s);
-        let zeros = [0u8; 32];
-        let out: &[u8; 32] = shared.as_deref().unwrap_or(&zeros);
-        // SAFETY: the caller's room for `outlen` (at least 32) octets; a local.
+        // SAFETY: the caller's room for `outlen` (at least the key's length) octets; a local.
         unsafe { ptr::copy_nonoverlapping(out.as_ptr(), secret, out.len()) };
-        if shared.is_none() {
+        wipe(&mut out);
+        if !nonzero {
             err::raise(ERR_LIB_PROV, PROV_R_FAILED_DURING_DERIVATION, F);
             return 0;
         }
@@ -247,23 +273,41 @@ type DupCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type ListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
-/// `ossl_x25519_keyexch_functions`.
-pub(crate) static X25519_KEYEXCH: Dispatch<9> = Dispatch([
-    entry!(OSSL_FUNC_KEYEXCH_NEWCTX, x25519_newctx, NewCtxFn),
-    entry!(OSSL_FUNC_KEYEXCH_INIT, x25519_init, InitFn),
-    entry!(OSSL_FUNC_KEYEXCH_DERIVE, ecx_derive, DeriveFn),
-    entry!(OSSL_FUNC_KEYEXCH_SET_PEER, ecx_set_peer, SetPeerFn),
-    entry!(OSSL_FUNC_KEYEXCH_FREECTX, ecx_freectx, FreeCtxFn),
-    entry!(OSSL_FUNC_KEYEXCH_DUPCTX, ecx_dupctx, DupCtxFn),
-    entry!(
-        OSSL_FUNC_KEYEXCH_GET_CTX_PARAMS,
-        ecx_get_ctx_params,
-        GetParamsFn
-    ),
-    entry!(
-        OSSL_FUNC_KEYEXCH_GETTABLE_CTX_PARAMS,
-        ecx_gettable_ctx_params,
-        ListFn
-    ),
-    END,
-]);
+/// An ECX key exchange's dispatch table.
+macro_rules! ecx_keyexch {
+    ($table:ident, $doc:literal, $newctx:ident, $init:ident) => {
+        #[doc = $doc]
+        pub(crate) static $table: Dispatch<9> = Dispatch([
+            entry!(OSSL_FUNC_KEYEXCH_NEWCTX, $newctx, NewCtxFn),
+            entry!(OSSL_FUNC_KEYEXCH_INIT, $init, InitFn),
+            entry!(OSSL_FUNC_KEYEXCH_DERIVE, ecx_derive, DeriveFn),
+            entry!(OSSL_FUNC_KEYEXCH_SET_PEER, ecx_set_peer, SetPeerFn),
+            entry!(OSSL_FUNC_KEYEXCH_FREECTX, ecx_freectx, FreeCtxFn),
+            entry!(OSSL_FUNC_KEYEXCH_DUPCTX, ecx_dupctx, DupCtxFn),
+            entry!(
+                OSSL_FUNC_KEYEXCH_GET_CTX_PARAMS,
+                ecx_get_ctx_params,
+                GetParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_KEYEXCH_GETTABLE_CTX_PARAMS,
+                ecx_gettable_ctx_params,
+                ListFn
+            ),
+            END,
+        ]);
+    };
+}
+
+ecx_keyexch!(
+    X25519_KEYEXCH,
+    "`ossl_x25519_keyexch_functions`.",
+    x25519_newctx,
+    x25519_init
+);
+ecx_keyexch!(
+    X448_KEYEXCH,
+    "`ossl_x448_keyexch_functions`.",
+    x448_newctx,
+    x448_init
+);
