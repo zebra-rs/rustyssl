@@ -320,6 +320,9 @@
  *                              set back, and comparison with its copy
  *   ecdhkem <group> <ikm>      an EC key generated from DHKEM input key material
  *   sm2km <sel> <group|-> <priv|-> <pub|-> <k=v,...|->  as eckm, with the SM2 key manager
+ *   ecxkm <type> <sel> <priv|-> <pub|-> <ikm|->  an ECX key (X25519, ED25519, ...) from data,
+ *                              its export, raw keys, and checks; with ikm, one generated from
+ *                              DHKEM input key material instead
  *   sm2enc <priv> <md|-> <msg> <ct|-> <room>  the SM2 asymmetric cipher: with no ciphertext,
  *                              the message's size, encryption, and decryption again; with one,
  *                              its message's size and its decryption into room octets
@@ -4824,6 +4827,74 @@ static void ec_sig_command(const char *line)
     EVP_PKEY_CTX_free(c);
 }
 
+/* ecxkm: an ECX key from data (or DHKEM input), and what its key manager makes of it. */
+static void ecx_keymgmt_command(const char *line)
+{
+    char type[32] = "-", priv[300] = "-", pub[300] = "-", ikm[300] = "-";
+    unsigned int sel = 0;
+    unsigned char db[150], qb[150], ib[150], raw[200];
+    size_t dl = 0, ql = 0, il = 0, n;
+    OSSL_PARAM ps[3], *p = ps;
+    EVP_PKEY_CTX *c;
+    EVP_PKEY *k = NULL;
+    OSSL_PARAM *out = NULL;
+    int r;
+
+    sscanf(line, "%*s %31s %x %299s %299s %299s", type, &sel, priv, pub, ikm);
+    if ((strcmp(priv, "-") != 0 && !parse_hex(priv, db, &dl))
+        || (strcmp(pub, "-") != 0 && !parse_hex(pub, qb, &ql))
+        || (strcmp(ikm, "-") != 0 && !parse_hex(ikm, ib, &il))) {
+        printf(" bad input\n");
+        return;
+    }
+    c = EVP_PKEY_CTX_new_from_name(NULL, type, NULL);
+    if (strcmp(ikm, "-") != 0) {
+        ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_DHKEM_IKM, ib, il);
+        ps[1] = OSSL_PARAM_construct_end();
+        printf(" gen %d", EVP_PKEY_keygen_init(c));
+        printf(" %d", EVP_PKEY_CTX_set_params(c, ps));
+        printf(" %d", EVP_PKEY_keygen(c, &k));
+    } else {
+        if (strcmp(priv, "-") != 0)
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, db, dl);
+        if (strcmp(pub, "-") != 0)
+            *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, qb, ql);
+        *p = OSSL_PARAM_construct_end();
+        printf(" %d", EVP_PKEY_fromdata_init(c));
+        printf(" %d", EVP_PKEY_fromdata(c, &k, (int)sel, ps));
+    }
+    print_asn_errors();
+    if (k != NULL) {
+        EVP_PKEY_CTX *v = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+
+        printf("  todata %d", EVP_PKEY_todata(k, EVP_PKEY_KEYPAIR, &out));
+        ec_print_params(out);
+        print_asn_errors();
+        n = sizeof(raw);
+        r = EVP_PKEY_get_raw_public_key(k, raw, &n);
+        printf("  raw public %d", r);
+        if (r == 1)
+            print_hex("", raw, n);
+        n = sizeof(raw);
+        r = EVP_PKEY_get_raw_private_key(k, raw, &n);
+        printf("  raw private %d", r);
+        if (r == 1)
+            print_hex("", raw, n);
+        print_asn_errors();
+        printf("  check %d", EVP_PKEY_check(v));
+        printf(" public %d", EVP_PKEY_public_check(v));
+        printf(" private %d", EVP_PKEY_private_check(v));
+        printf(" pairwise %d", EVP_PKEY_pairwise_check(v));
+        printf(" bits %d security %d size %d", EVP_PKEY_get_bits(k),
+               EVP_PKEY_get_security_bits(k), EVP_PKEY_get_size(k));
+        print_asn_errors();
+        EVP_PKEY_CTX_free(v);
+    }
+    OSSL_PARAM_free(out);
+    EVP_PKEY_free(k);
+    EVP_PKEY_CTX_free(c);
+}
+
 /* Runs an EC command; returns 0 if `command` isn't one. */
 static int ec_command(const char *command, const char *line)
 {
@@ -4841,9 +4912,13 @@ static int ec_command(const char *command, const char *line)
         && strcmp(command, "eckm") != 0 && strcmp(command, "ecdhkem") != 0
         && strcmp(command, "ecsig") != 0 && strcmp(command, "ecdhx") != 0
         && strcmp(command, "sm2km") != 0 && strcmp(command, "sm2sig") != 0
-        && strcmp(command, "sm2enc") != 0)
+        && strcmp(command, "sm2enc") != 0 && strcmp(command, "ecxkm") != 0)
         return 0;
     printf("%s:", line);
+    if (strcmp(command, "ecxkm") == 0) {
+        ecx_keymgmt_command(line);
+        return 1;
+    }
     if (strcmp(command, "sm2enc") == 0) {
         sm2_enc_command(line);
         return 1;

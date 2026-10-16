@@ -369,3 +369,9 @@ name = "sm2_crypt"
 path = "fuzz_targets/sm2_crypt.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ecx_kmgmt"
+path = "fuzz_targets/ecx_kmgmt.rs"
+test = false
+doc = false

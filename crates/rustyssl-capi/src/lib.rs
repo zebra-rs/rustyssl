@@ -23,6 +23,7 @@ mod conf;
 mod dir;
 mod ec;
 mod ec_pmeth;
+mod ecx;
 mod engine;
 mod err;
 mod errno;
