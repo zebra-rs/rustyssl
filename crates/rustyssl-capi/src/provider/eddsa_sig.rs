@@ -1,17 +1,20 @@
 //! The default provider's EdDSA signatures (`eddsa_sig.c`): Ed25519 and its variants Ed25519ctx
-//! and Ed25519ph (RFC 8032), signing and verifying a whole message at once.
+//! and Ed25519ph, and Ed448 and Ed448ph (RFC 8032), signing and verifying a whole message at
+//! once.
 //!
 //! The context follows OpenSSL's. Each algorithm presets its instance: ED25519ph and ED25519ctx
-//! refuse the `instance` parameter, while ED25519 (through a digest init or a plain init) takes
-//! it. A plain sign or verify init expects the caller to have prehashed, so it works only once
-//! the instance is Ed25519ph. An instance that doesn't fit the key is ignored. The algorithm
-//! identifier is `SEQUENCE { id-Ed25519 }`.
+//! refuse the `instance` parameter, while ED25519 and ED448 (through a digest init or a plain
+//! init) take it. A plain sign or verify init expects the caller to have prehashed, so it works
+//! only once the instance is a ph one. An instance that doesn't fit the key is ignored. The
+//! prehash is SHA-512's for Ed25519ph and SHAKE256's (64 octets) for Ed448ph, whose context
+//! strings any instance takes. The algorithm identifier is `SEQUENCE { id-Ed25519 }` or
+//! `SEQUENCE { id-Ed448 }`.
 
 use core::ffi::{CStr, c_char, c_int, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, NID_ED25519, OSSL_FUNC_SIGNATURE_DIGEST_SIGN,
+    ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, NID_ED448, NID_ED25519, OSSL_FUNC_SIGNATURE_DIGEST_SIGN,
     OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_FUNC_SIGNATURE_DIGEST_VERIFY,
     OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_FUNC_SIGNATURE_DUPCTX,
     OSSL_FUNC_SIGNATURE_FREECTX, OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS,
@@ -29,11 +32,12 @@ use rustyssl_abi::{
 };
 use rustyssl_asn1::objects;
 use rustyssl_crypto::ecx::{Dom, ED25519_SIGSIZE};
+use rustyssl_crypto::ecx448::ED448_SIGSIZE;
 
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox, wipe};
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
-use crate::ecx::{self, EcxKey, EcxType, sha512_available};
+use crate::ecx::{self, EcxKey, EcxType, digest_available, sha512_available};
 use crate::err;
 use crate::evp::md_ctx::EVP_Q_digest;
 use crate::ffi::{bytes, ffi_callback};
@@ -57,18 +61,27 @@ enum Instance {
     Ed25519,
     Ed25519ctx,
     Ed25519ph,
+    Ed448,
+    Ed448ph,
 }
 
 impl Instance {
-    /// The instances by name, as `eddsa_set_ctx_params` matches them (ignoring case); Ed448's
-    /// are known but never fit an Ed25519 key.
-    const NAMES: [(&'static str, Option<Self>); 5] = [
-        ("Ed25519", Some(Self::Ed25519)),
-        ("Ed25519ctx", Some(Self::Ed25519ctx)),
-        ("Ed25519ph", Some(Self::Ed25519ph)),
-        ("Ed448", None),
-        ("Ed448ph", None),
+    /// The instances by name, as `eddsa_set_ctx_params` matches them (ignoring case).
+    const NAMES: [(&'static str, Self); 5] = [
+        ("Ed25519", Self::Ed25519),
+        ("Ed25519ctx", Self::Ed25519ctx),
+        ("Ed25519ph", Self::Ed25519ph),
+        ("Ed448", Self::Ed448),
+        ("Ed448ph", Self::Ed448ph),
     ];
+
+    /// The key type the instance needs.
+    const fn key_type(self) -> EcxType {
+        match self {
+            Self::Ed25519 | Self::Ed25519ctx | Self::Ed25519ph => EcxType::Ed25519,
+            Self::Ed448 | Self::Ed448ph => EcxType::Ed448,
+        }
+    }
 }
 
 /// `PROV_EDDSA_CTX`.
@@ -113,15 +126,18 @@ impl EddsaCtx {
         unsafe { ecx::key(self.key) }
     }
 
-    /// `eddsa_setup_instance`: whether the instance fits the key (then set with its flags).
+    /// `eddsa_setup_instance`: whether the instance fits the key (then set with its flags;
+    /// Ed448's leave `dom2` as it was).
     fn setup_instance(&mut self, instance: Instance, preset: bool, by_caller: bool) -> bool {
-        if self.key().map(|k| k.kind) != Some(EcxType::Ed25519) {
+        if self.key().map(|k| k.kind) != Some(instance.key_type()) {
             return false;
         }
         (self.dom2, self.prehash, self.context_required) = match instance {
             Instance::Ed25519 => (false, false, false),
             Instance::Ed25519ctx => (true, false, true),
             Instance::Ed25519ph => (true, true, false),
+            Instance::Ed448 => (self.dom2, false, false),
+            Instance::Ed448ph => (self.dom2, true, false),
         };
         self.instance = Some(instance);
         self.instance_preset = preset;
@@ -139,9 +155,10 @@ impl EddsaCtx {
         }
     }
 
-    /// The message as the signature covers it: SHA-512's prehash of `tbs` for a ph instance
-    /// (or the caller's, checked), `tbs` otherwise (refused if the caller meant to prehash).
-    fn message(&self, tbs: &[u8], f: &str) -> Option<Vec<u8>> {
+    /// The message as the signature covers it: the prehash of `tbs` for a ph instance (or the
+    /// caller's, checked), `tbs` otherwise (refused if the caller meant to prehash). Ed448's
+    /// prehash is SHAKE256's, failing without an error if it can't be fetched.
+    fn message(&self, tbs: &[u8], f: &str, ed448: bool) -> Option<Vec<u8>> {
         if self.prehash {
             if self.prehash_by_caller {
                 if tbs.len() != PREHASH_LEN {
@@ -149,6 +166,12 @@ impl EddsaCtx {
                     return None;
                 }
                 return Some(tbs.to_vec());
+            }
+            if ed448 {
+                if !digest_available(self.libctx, c"SHAKE256", None) {
+                    return None;
+                }
+                return rustyssl_crypto::ecx448::ed448_prehash(tbs).map(|h| h.to_vec());
             }
             let mut md = [0u8; 64];
             let mut mdlen = 0;
@@ -183,9 +206,9 @@ impl EddsaCtx {
     }
 }
 
-/// `ossl_DER_w_algorithmIdentifier_ED25519`: `SEQUENCE { OID }`.
-fn ed25519_aid() -> Vec<u8> {
-    let Some(oid) = objects::object(NID_ED25519).map(|o| o.der) else {
+/// `ossl_DER_w_algorithmIdentifier_ED25519` and `_ED448`: `SEQUENCE { OID }`.
+fn eddsa_aid(nid: c_int) -> Vec<u8> {
+    let Some(oid) = objects::object(nid).map(|o| o.der) else {
         return Vec::new();
     };
     let (Ok(n), Ok(m)) = (
@@ -236,7 +259,8 @@ unsafe fn signverify_init(c: &mut EddsaCtx, vedkey: *mut c_void) -> bool {
         return false;
     };
     let aid = match k.kind {
-        EcxType::Ed25519 => ed25519_aid(),
+        EcxType::Ed25519 => eddsa_aid(NID_ED25519),
+        EcxType::Ed448 => eddsa_aid(NID_ED448),
         _ => {
             err::raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, F);
             return false;
@@ -330,6 +354,34 @@ eddsa_init!(
     true
 );
 eddsa_init!(
+    ed448_signverify_message_init,
+    "`ed448_signverify_message_init`.",
+    Ed448,
+    true,
+    false
+);
+eddsa_init!(
+    ed448ph_signverify_message_init,
+    "`ed448ph_signverify_message_init`.",
+    Ed448ph,
+    true,
+    false
+);
+eddsa_init!(
+    ed448ph_signverify_init,
+    "`ed448ph_signverify_init`: the caller prehashes.",
+    Ed448ph,
+    true,
+    true
+);
+eddsa_init!(
+    ed448_signverify_init,
+    "`ed448_signverify_init`: the caller prehashes, so it signs once the instance is Ed448ph.",
+    Ed448,
+    false,
+    true
+);
+eddsa_init!(
     ed25519ctx_signverify_message_init,
     "`ed25519ctx_signverify_message_init`.",
     Ed25519ctx,
@@ -337,34 +389,65 @@ eddsa_init!(
     false
 );
 
+/// `ed25519_digest_signverify_init` and `ed448_digest_signverify_init`: no digest may be
+/// named; without a key, only the parameters (on a context with one).
+///
+/// # Safety
+/// `vctx` is NULL or a live context; `mdname` is NULL or a string; `vedkey` is NULL or live
+/// ECX key data; `params` is NULL or an array.
+unsafe fn digest_init(
+    vctx: *mut c_void,
+    mdname: *const c_char,
+    vedkey: *mut c_void,
+    params: *const OSSL_PARAM,
+    instance: Instance,
+    f: &str,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !mdname.is_null() && unsafe { *mdname } != 0 {
+        err::raise_with_text(
+            ERR_LIB_PROV,
+            PROV_R_INVALID_DIGEST,
+            f,
+            "Explicit digest not allowed with EdDSA operations",
+        );
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { ctx(vctx) }) else {
+        return 0;
+    };
+    if vedkey.is_null() && !c.key.is_null() {
+        // SAFETY: the caller's guarantee.
+        return unsafe { eddsa_set_ctx_params(vctx, params) };
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { init(vctx, vedkey, params, instance, false, false) }
+}
+
 ffi_callback! {
-    /// `ed25519_digest_signverify_init`: no digest may be named; without a key, only the
-    /// parameters (on a context with one).
+    /// `ed25519_digest_signverify_init`.
     ///
     /// # Safety
-    /// `vctx` is NULL or a live context; `mdname` is NULL or a string; `vedkey` is NULL or live
-    /// ECX key data; `params` is NULL or an array.
+    /// As for `digest_init`.
     pub(crate) unsafe extern "C" fn ed25519_digest_signverify_init(vctx: *mut c_void, mdname: *const c_char, vedkey: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
-        if !mdname.is_null() && unsafe { *mdname } != 0 {
-            err::raise_with_text(
-                ERR_LIB_PROV,
-                PROV_R_INVALID_DIGEST,
-                "ed25519_digest_signverify_init",
-                "Explicit digest not allowed with EdDSA operations",
-            );
-            return 0;
-        }
+        unsafe { digest_init(vctx, mdname, vedkey, params, Instance::Ed25519, "ed25519_digest_signverify_init") }
+    }
+}
+
+ffi_callback! {
+    /// `ed448_digest_signverify_init`.
+    ///
+    /// # Safety
+    /// As for `digest_init`.
+    pub(crate) unsafe extern "C" fn ed448_digest_signverify_init(vctx: *mut c_void, mdname: *const c_char, vedkey: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
         // SAFETY: the caller's guarantee.
-        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
-        if vedkey.is_null() && !c.key.is_null() {
-            // SAFETY: the caller's guarantee.
-            return unsafe { eddsa_set_ctx_params(vctx, params) };
-        }
-        // SAFETY: the caller's guarantee.
-        unsafe { init(vctx, vedkey, params, Instance::Ed25519, false, false) }
+        unsafe { digest_init(vctx, mdname, vedkey, params, Instance::Ed448, "ed448_digest_signverify_init") }
     }
 }
 
@@ -402,7 +485,7 @@ ffi_callback! {
         };
         // SAFETY: the caller's guarantee.
         let Some(tbs) = (unsafe { bytes(tbs, tbslen) }) else { return 0 };
-        let Some(msg) = c.message(tbs, F) else { return 0 };
+        let Some(msg) = c.message(tbs, F, false) else { return 0 };
         let sig = match (private, public) {
             (Some(mut s), Some(p)) if sha512_available(c.libctx, None) => {
                 let sig = rustyssl_crypto::ecx::ed25519_sign(&msg, &p, &s, &c.dom());
@@ -450,7 +533,7 @@ ffi_callback! {
         let Some(sig) = (unsafe { bytes(sig, siglen) }) else { return 0 };
         // SAFETY: as above.
         let Some(tbs) = (unsafe { bytes(tbs, tbslen) }) else { return 0 };
-        let Some(msg) = c.message(tbs, "ed25519_verify") else { return 0 };
+        let Some(msg) = c.message(tbs, "ed25519_verify", false) else { return 0 };
         let (Ok(sig), Some(public)) = (<&[u8; ED25519_SIGSIZE]>::try_from(sig), public) else {
             return 0;
         };
@@ -458,6 +541,101 @@ ffi_callback! {
             return 0;
         }
         c_int::from(rustyssl_crypto::ecx::ed25519_verify(&msg, sig, &public, &c.dom()))
+    }
+}
+
+ffi_callback! {
+    /// `ed448_sign`: the signature's size when `sigret` is NULL, else the signature (SHAKE256
+    /// fetched with the key's properties).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `sigret` is NULL or has room for `sigsize` octets;
+    /// `siglen` is writable; `tbs` holds `tbslen` octets.
+    pub(crate) unsafe extern "C" fn ed448_sign(vctx: *mut c_void, sigret: *mut c_uchar, siglen: *mut usize, sigsize: usize, tbs: *const c_uchar, tbslen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "ed448_sign";
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        if sigret.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { siglen.write(ED448_SIGSIZE) };
+            return 1;
+        }
+        if sigsize < ED448_SIGSIZE {
+            err::raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL, F);
+            return 0;
+        }
+        let Some(k) = c.key() else { return 0 };
+        let (public, private, propq) = {
+            let s = k.lock();
+            let public = <[u8; 57]>::try_from(s.pubkey.get(..57).unwrap_or_default()).ok();
+            let private = s.privkey.as_deref().map(|p| <[u8; 57]>::try_from(p).ok());
+            (public, private, s.propq.clone())
+        };
+        let Some(private) = private else {
+            err::raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY, F);
+            return 0;
+        };
+        // SAFETY: the caller's guarantee.
+        let Some(tbs) = (unsafe { bytes(tbs, tbslen) }) else { return 0 };
+        let Some(msg) = c.message(tbs, F, true) else { return 0 };
+        let usable = digest_available(c.libctx, c"SHAKE256", propq.as_deref());
+        let sig = match (private, public) {
+            (Some(mut s), Some(p)) if usable => {
+                let sig = rustyssl_crypto::ecx448::ed448_sign(&msg, &p, &s, c.prehash, &c.context);
+                wipe(&mut s);
+                sig
+            }
+            (Some(mut s), _) => {
+                wipe(&mut s);
+                None
+            }
+            _ => None,
+        };
+        let Some(sig) = sig else {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SIGN, F);
+            return 0;
+        };
+        // SAFETY: the caller's room for `sigsize` (at least 114) octets; a local.
+        unsafe { ptr::copy_nonoverlapping(sig.as_ptr(), sigret, sig.len()) };
+        // SAFETY: the caller's guarantee.
+        unsafe { siglen.write(ED448_SIGSIZE) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `ed448_verify`: whether `sig` (of exactly 114 octets) signs `tbs`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `sig` holds `siglen` octets; `tbs` holds `tbslen`
+    /// octets.
+    pub(crate) unsafe extern "C" fn ed448_verify(vctx: *mut c_void, sig: *const c_uchar, siglen: usize, tbs: *const c_uchar, tbslen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        if siglen != ED448_SIGSIZE {
+            return 0;
+        }
+        let Some(k) = c.key() else { return 0 };
+        let (public, propq) = {
+            let s = k.lock();
+            (<[u8; 57]>::try_from(s.pubkey.get(..57).unwrap_or_default()).ok(), s.propq.clone())
+        };
+        // SAFETY: the caller's guarantee.
+        let Some(sig) = (unsafe { bytes(sig, siglen) }) else { return 0 };
+        // SAFETY: as above.
+        let Some(tbs) = (unsafe { bytes(tbs, tbslen) }) else { return 0 };
+        let Some(msg) = c.message(tbs, "ed448_verify", true) else { return 0 };
+        let (Ok(sig), Some(public)) = (<&[u8; ED448_SIGSIZE]>::try_from(sig), public) else {
+            return 0;
+        };
+        if !digest_available(c.libctx, c"SHAKE256", propq.as_deref()) {
+            return 0;
+        }
+        c_int::from(rustyssl_crypto::ecx448::ed448_verify(&msg, sig, &public, c.prehash, &c.context))
     }
 }
 
@@ -497,6 +675,7 @@ struct KeyTypes([*const c_char; 2]);
 // SAFETY: pointers to static strings.
 unsafe impl Sync for KeyTypes {}
 static ED25519_KEY_TYPES: KeyTypes = KeyTypes([c"ED25519".as_ptr(), ptr::null()]);
+static ED448_KEY_TYPES: KeyTypes = KeyTypes([c"ED448".as_ptr(), ptr::null()]);
 
 ffi_callback! {
     /// `ed25519_sigalg_query_key_types`.
@@ -507,6 +686,18 @@ ffi_callback! {
     where failure = ptr::null(), library = ERR_LIB_PROV
     {
         ED25519_KEY_TYPES.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// `ed448_sigalg_query_key_types`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn ed448_sigalg_query_key_types() -> *const *const c_char
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        ED448_KEY_TYPES.0.as_ptr()
     }
 }
 
@@ -596,7 +787,7 @@ ffi_callback! {
             }
             // SAFETY: NUL-terminated by the call.
             let name = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_bytes();
-            let Some((_, instance)) = Instance::NAMES
+            let Some(&(_, instance)) = Instance::NAMES
                 .iter()
                 .find(|(n, _)| n.as_bytes().eq_ignore_ascii_case(name))
             else {
@@ -608,10 +799,8 @@ ffi_callback! {
                 );
                 return 0;
             };
-            if let Some(i) = *instance {
-                let by_caller = c.prehash_by_caller;
-                c.setup_instance(i, false, by_caller);
-            }
+            let by_caller = c.prehash_by_caller;
+            c.setup_instance(instance, false, by_caller);
         }
         // SAFETY: the caller's array; a static name.
         if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_CONTEXT_STRING) } {
@@ -695,19 +884,20 @@ type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type SetParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
 type ListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
-/// `IMPL_EDDSA_DISPATCH(vn, ed25519)`: a table's common start, with `vn`'s message init.
+/// `IMPL_EDDSA_DISPATCH(vn, bn)`: a table's common start, with `vn`'s message init and the
+/// base `bn`'s sign, verify, and key types.
 macro_rules! eddsa_dispatch {
-    ($n:literal, $name:ident, $doc:literal, $message_init:ident, [$($rest:expr),* $(,)?]) => {
+    ($n:literal, $name:ident, $doc:literal, $message_init:ident, $sign:ident, $verify:ident, $key_types:ident, [$($rest:expr),* $(,)?]) => {
         #[doc = $doc]
         pub(crate) static $name: Dispatch<$n> = Dispatch([
             entry!(OSSL_FUNC_SIGNATURE_NEWCTX, eddsa_newctx, NewCtxFn),
             entry!(OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, $message_init, InitFn),
-            entry!(OSSL_FUNC_SIGNATURE_SIGN, ed25519_sign, SignFn),
+            entry!(OSSL_FUNC_SIGNATURE_SIGN, $sign, SignFn),
             entry!(OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, $message_init, InitFn),
-            entry!(OSSL_FUNC_SIGNATURE_VERIFY, ed25519_verify, VerifyFn),
+            entry!(OSSL_FUNC_SIGNATURE_VERIFY, $verify, VerifyFn),
             entry!(OSSL_FUNC_SIGNATURE_FREECTX, eddsa_freectx, FreeCtxFn),
             entry!(OSSL_FUNC_SIGNATURE_DUPCTX, eddsa_dupctx, DupCtxFn),
-            entry!(OSSL_FUNC_SIGNATURE_QUERY_KEY_TYPES, ed25519_sigalg_query_key_types, KeyTypesFn),
+            entry!(OSSL_FUNC_SIGNATURE_QUERY_KEY_TYPES, $key_types, KeyTypesFn),
             $($rest,)*
             entry!(OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, eddsa_get_ctx_params, GetParamsFn),
             entry!(OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, eddsa_gettable_ctx_params, ListFn),
@@ -722,6 +912,9 @@ eddsa_dispatch!(
     ED25519_SIGNATURE,
     "`ossl_ed25519_signature_functions`.",
     ed25519_signverify_message_init,
+    ed25519_sign,
+    ed25519_verify,
+    ed25519_sigalg_query_key_types,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -758,6 +951,9 @@ eddsa_dispatch!(
     ED25519PH_SIGNATURE,
     "`ossl_ed25519ph_signature_functions` (its second inits are never used, as in OpenSSL).",
     ed25519ph_signverify_message_init,
+    ed25519_sign,
+    ed25519_verify,
+    ed25519_sigalg_query_key_types,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -792,6 +988,9 @@ eddsa_dispatch!(
     ED25519CTX_SIGNATURE,
     "`ossl_ed25519ctx_signature_functions`.",
     ed25519ctx_signverify_message_init,
+    ed25519_sign,
+    ed25519_verify,
+    ed25519_sigalg_query_key_types,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -801,6 +1000,78 @@ eddsa_dispatch!(
         entry!(
             OSSL_FUNC_SIGNATURE_VERIFY_INIT,
             ed25519ctx_signverify_message_init,
+            InitFn
+        ),
+        entry!(
+            OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS,
+            eddsa_settable_variant_ctx_params,
+            ListFn
+        ),
+    ]
+);
+
+eddsa_dispatch!(
+    19,
+    ED448_SIGNATURE,
+    "`ossl_ed448_signature_functions`.",
+    ed448_signverify_message_init,
+    ed448_sign,
+    ed448_verify,
+    ed448_sigalg_query_key_types,
+    [
+        entry!(OSSL_FUNC_SIGNATURE_SIGN_INIT, ed448_signverify_init, InitFn),
+        entry!(
+            OSSL_FUNC_SIGNATURE_VERIFY_INIT,
+            ed448_signverify_init,
+            InitFn
+        ),
+        entry!(
+            OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT,
+            ed448_digest_signverify_init,
+            DigestInitFn
+        ),
+        entry!(OSSL_FUNC_SIGNATURE_DIGEST_SIGN, ed448_sign, SignFn),
+        entry!(
+            OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT,
+            ed448_digest_signverify_init,
+            DigestInitFn
+        ),
+        entry!(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY, ed448_verify, VerifyFn),
+        entry!(
+            OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS,
+            eddsa_settable_ctx_params,
+            ListFn
+        ),
+    ]
+);
+
+eddsa_dispatch!(
+    17,
+    ED448PH_SIGNATURE,
+    "`ossl_ed448ph_signature_functions` (its second inits are never used, as in OpenSSL).",
+    ed448ph_signverify_message_init,
+    ed448_sign,
+    ed448_verify,
+    ed448_sigalg_query_key_types,
+    [
+        entry!(
+            OSSL_FUNC_SIGNATURE_SIGN_INIT,
+            ed448ph_signverify_init,
+            InitFn
+        ),
+        entry!(
+            OSSL_FUNC_SIGNATURE_VERIFY_INIT,
+            ed448ph_signverify_init,
+            InitFn
+        ),
+        entry!(
+            OSSL_FUNC_SIGNATURE_SIGN_INIT,
+            ed448ph_signverify_message_init,
+            InitFn
+        ),
+        entry!(
+            OSSL_FUNC_SIGNATURE_VERIFY_INIT,
+            ed448ph_signverify_message_init,
             InitFn
         ),
         entry!(

@@ -3793,7 +3793,19 @@ chunking) is clean.
       - Tests: RFC 7748 and RFC 8032 vectors and the cofactored check as unit tests;
         `tests/c/evp_ecx_kmgmt.c` for all four types; the probe's `ecxkm` corpus and random
         sessions with X448 and ED448 (500 pass); the `ecx_kmgmt` fuzz target over the four.
-    - [ ] **4.5b2 The X448 exchange and the Ed448 and Ed448ph signatures.**
+    - [x] **4.5b2 The X448 exchange and the Ed448 and Ed448ph signatures**
+      (`provider/ecx_exch.rs`, `provider/eddsa_sig.rs`; no new exports): the X448 exchange (the
+      X25519 one's, by key length; secrets of 0 from peers 0, 1, and `p - 1` written then
+      refused) and the ED448 and ED448ph signatures (`eddsa_sig.c`'s Ed448 paths): Ed448's
+      instances leave `dom2` alone and take any context of at most 255 octets, the prehash is
+      SHAKE256's 64 octets (failing without an error if it can't be fetched), signing and
+      verifying fetch SHAKE256 with the key's properties, the algorithm identifier is
+      `SEQUENCE { id-Ed448 }`, and the dispatch tables are copied entry for entry.
+      - Tests: `tests/c/evp_ecx448_ops.c` (4 checks: the lists, RFC 7748's secret and its
+        failures, RFC 8032's signatures through each route, contexts of 255 and 256 octets,
+        instances preset, foreign, and unknown, the algorithm identifier, a caller's prehash);
+        the probe's `x448x` and `ed448` with `corpus/ecxop.txt` and random `ecxop` sessions
+        over both curves (1,000 pass); the `ecx_ops` fuzz target over both curves.
     - [ ] **4.5b3 The legacy X448 and ED448 ASN.1 and key methods.**
   - [ ] **4.5c ML-KEM-512/768/1024:** keys from seeds and expanded, the key manager with
     OpenSSL's formats, the KEM.

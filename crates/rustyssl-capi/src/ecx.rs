@@ -406,3 +406,31 @@ pub(crate) fn digest_available(
     unsafe { EVP_MD_free(md) };
     true
 }
+
+/// X25519 or X448 (by the keys' length) of a private key and a peer's public key: the
+/// secret's octets (zeros from a low-order peer) and whether it's nonzero, or `None` for keys
+/// of other lengths.
+pub(crate) fn exchange(private: &[u8], public: &[u8]) -> Option<(Vec<u8>, bool)> {
+    let shared = match private.len() {
+        32 => {
+            let mut d = <[u8; 32]>::try_from(private).ok()?;
+            let q = <[u8; 32]>::try_from(public).ok()?;
+            let s = rustyssl_crypto::ecx::x25519(&d, &q).map(|s| s.to_vec());
+            wipe(&mut d);
+            s
+        }
+        56 => {
+            let mut d = <[u8; 56]>::try_from(private).ok()?;
+            let q = <[u8; 56]>::try_from(public).ok()?;
+            let s = rustyssl_crypto::ecx448::x448(&d, &q).map(|s| s.to_vec());
+            wipe(&mut d);
+            s
+        }
+        _ => return None,
+    };
+    let n = private.len();
+    Some(match shared {
+        Some(s) => (s, true),
+        None => (vec![0; n], false),
+    })
+}

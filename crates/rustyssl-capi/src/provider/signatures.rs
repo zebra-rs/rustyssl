@@ -488,8 +488,8 @@ static DEFAULT_SIGNATURES: Algorithms<60> = Algorithms([
     alg(c"ED25519:1.3.101.112", &eddsa_sig::ED25519_SIGNATURE),
     alg(c"ED25519ph", &eddsa_sig::ED25519PH_SIGNATURE),
     alg(c"ED25519ctx", &eddsa_sig::ED25519CTX_SIGNATURE),
-    pending(c"ED448:1.3.101.113"),
-    pending(c"ED448ph"),
+    alg(c"ED448:1.3.101.113", &eddsa_sig::ED448_SIGNATURE),
+    alg(c"ED448ph", &eddsa_sig::ED448PH_SIGNATURE),
     alg(c"ECDSA", &ecdsa_sig::ECDSA_SIGNATURE),
     alg(
         c"ECDSA-SHA1:ECDSA-SHA-1:ecdsa-with-SHA1:1.2.840.10045.4.1",
