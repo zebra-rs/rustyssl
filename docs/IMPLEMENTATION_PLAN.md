@@ -3890,7 +3890,32 @@ chunking) is clean.
         public keys, other algorithms' keys, the `EVP_DigestSign` route, and the operation's
         context); the probe's `mldsa` with `corpus/mldsa.txt` and random sessions (500 pass);
         the `ml_dsa_ops` fuzz target.
-  - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.
+  - [ ] **4.5e SLH-DSA**, in sub-steps:
+    - [x] **4.5e1 The hash trees and the key managers** (`rustyssl-crypto/src/slhdsa.rs`,
+      `provider/slh_dsa_kmgmt.rs`; no new exports): FIPS 205 written in-house for the twelve
+      parameter sets: the tweakable hashes over SHAKE256 (11.1) or SHA-256 and SHA-512 with
+      `ADRSc`, HMAC, and MGF1 (11.2; the SHA-2 state after `PK.seed` and its zero padding is
+      computed once per key), WOTS+, XMSS, the hypertree, FORS, key generation from
+      `SK.seed || SK.prf || PK.seed`, and signing (randomness given, or `PK.seed`) and verifying
+      of an encoded message. The key managers copy `slh_dsa_kmgmt.c` and `slh_dsa_key.c`: keys
+      made once the parameter set's digests (and HMAC) can be fetched, imported from a private
+      key of `4n` octets (a public key ignored), half of one with a public key, or a public key,
+      all taken as given (validation recomputes the root); an import that fails after reading
+      the private key leaves the key empty, and a public key imported into a key with a private
+      key keeps its private half; export by selection (an empty export when nothing selected is
+      present); comparison by public key, else by the private key's first `2n` octets; copies
+      by selection; and generation from seeds of exactly `3n` octets (other lengths fail without
+      an error) or random ones (`SK.seed` and `SK.prf` private, `PK.seed` public).
+      - Tests: helpers, sizes, round trips, changed signatures and keys, and the reference's
+        roots and signatures (deterministic, raw, and with randomness and a context) for the
+        128f sets as unit tests, and for all twelve in an ignored test for optimized builds
+        (`cargo test --release -p rustyssl-crypto -- --ignored`); `tests/c/evp_slh_dsa_kmgmt.c`
+        (24 checks: every parameter set's names, lists, sizes, and key, and on four sets the
+        parameters, seeds of other lengths, every import case, exports, copies, comparisons,
+        checks, and properties without the digests); the probe's `slhdsakm` with
+        `corpus/slhdsakm.txt` and random sessions; the `slh_dsa_kmgmt` fuzz target.
+    - [ ] **4.5e2 The signatures** (`slh_dsa_sig.c`): pure and raw, with a context string,
+      deterministic and hedged, through each EVP route.
   - [ ] **4.5f The hybrid TLS groups:** X25519MLKEM768, X448MLKEM1024, SecP256r1MLKEM768,
     SecP384r1MLKEM1024 (`mlx_kmgmt.c`, `mlx_kem.c`).
 - [ ] **4.6 DH and DSA:**

@@ -402,6 +402,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("mlkem", mlkem_session),
     ("mldsakm", mldsakm_session),
     ("mldsa", mldsa_session),
+    ("slhdsakm", slhdsakm_session),
     ("string", string_session),
 ];
 
@@ -3296,6 +3297,93 @@ fn mldsakm_session(random: &mut Random, out: &mut String) -> Result {
         writeln!(
             out,
             "mldsakm {alg} {selection} {seed} {privfrom} {pubfrom} {edits}"
+        )?;
+    }
+    Ok(())
+}
+
+/// A random session of the SLH-DSA key managers, as `mldsakm_session` (with seeds of `3n`
+/// octets, the fast parameter sets most often, and edits that halve the private key or change
+/// its root).
+fn slhdsakm_session(random: &mut Random, out: &mut String) -> Result {
+    const FAST: [(&str, usize); 6] = [
+        ("SLH-DSA-SHA2-128f", 16),
+        ("SLH-DSA-SHA2-192f", 24),
+        ("SLH-DSA-SHA2-256f", 32),
+        ("SLH-DSA-SHAKE-128f", 16),
+        ("SLH-DSA-SHAKE-192f", 24),
+        ("SLH-DSA-SHAKE-256f", 32),
+    ];
+    const SMALL: [(&str, usize); 6] = [
+        ("SLH-DSA-SHA2-128s", 16),
+        ("SLH-DSA-SHA2-192s", 24),
+        ("SLH-DSA-SHA2-256s", 32),
+        ("SLH-DSA-SHAKE-128s", 16),
+        ("SLH-DSA-SHAKE-192s", 24),
+        ("SLH-DSA-SHAKE-256s", 32),
+    ];
+    for _ in 0..random.below(3).saturating_add(1) {
+        let set = if random.below(6) == 0 { &SMALL } else { &FAST };
+        let i = usize::try_from(random.below(6)).unwrap_or(0);
+        let (alg, n) = set.get(i).copied().unwrap_or(FAST[0]);
+        let pool: Vec<String> = (0..2)
+            .map(|_| random_hex(random, n.saturating_mul(3)))
+            .collect();
+        let selection = random.pick(&["87", "87", "87", "86", "85", "84", "83", "81", "7", "4"]);
+        let from_pool = |random: &mut Random| {
+            let j = usize::try_from(random.below(2)).unwrap_or(0);
+            pool.get(j).cloned().unwrap_or_default()
+        };
+        let privfrom = if random.below(3) == 0 {
+            "-".to_owned()
+        } else {
+            from_pool(random)
+        };
+        let pubfrom = if random.below(2) == 0 {
+            "-".to_owned()
+        } else {
+            from_pool(random)
+        };
+        let (privlen, publen) = (n.saturating_mul(4), n.saturating_mul(2));
+        let mut edits = Vec::new();
+        if random.below(3) == 0 {
+            for _ in 0..random.below(2).saturating_add(1) {
+                let (target, len) = match (privfrom.as_str(), pubfrom.as_str()) {
+                    ("-", "-") => break,
+                    ("-", _) => ("q", publen),
+                    (_, "-") => ("p", privlen),
+                    _ if random.below(2) == 0 => ("p", privlen),
+                    _ => ("q", publen),
+                };
+                let len = u64::try_from(len).unwrap_or(1);
+                edits.push(match random.below(5) {
+                    0 => {
+                        let n = match random.pick(&["half", "-1", "+1", "0", "short"]) {
+                            "half" => len / 2,
+                            "-1" => len.saturating_sub(1),
+                            "+1" => len.saturating_add(1),
+                            "0" => 0,
+                            _ => random.below(len),
+                        };
+                        format!("{target}#{n}")
+                    }
+                    1 => format!("{target}#{}", len / 2),
+                    _ => format!(
+                        "{target}@{}^{:02x}",
+                        random.below(len),
+                        random.below(255).saturating_add(1)
+                    ),
+                });
+            }
+        }
+        let edits = if edits.is_empty() {
+            "-".to_owned()
+        } else {
+            edits.join(",")
+        };
+        writeln!(
+            out,
+            "slhdsakm {alg} {selection} - {privfrom} {pubfrom} {edits}"
         )?;
     }
     Ok(())

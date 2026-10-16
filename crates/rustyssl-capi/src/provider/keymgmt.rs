@@ -1066,18 +1066,66 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
     pending(c"X448MLKEM1024"),
     pending(c"SecP256r1MLKEM768"),
     pending(c"SecP384r1MLKEM1024"),
-    pending(c"SLH-DSA-SHA2-128s:id-slh-dsa-sha2-128s:2.16.840.1.101.3.4.3.20"),
-    pending(c"SLH-DSA-SHA2-128f:id-slh-dsa-sha2-128f:2.16.840.1.101.3.4.3.21"),
-    pending(c"SLH-DSA-SHA2-192s:id-slh-dsa-sha2-192s:2.16.840.1.101.3.4.3.22"),
-    pending(c"SLH-DSA-SHA2-192f:id-slh-dsa-sha2-192f:2.16.840.1.101.3.4.3.23"),
-    pending(c"SLH-DSA-SHA2-256s:id-slh-dsa-sha2-256s:2.16.840.1.101.3.4.3.24"),
-    pending(c"SLH-DSA-SHA2-256f:id-slh-dsa-sha2-256f:2.16.840.1.101.3.4.3.25"),
-    pending(c"SLH-DSA-SHAKE-128s:id-slh-dsa-shake-128s:2.16.840.1.101.3.4.3.26"),
-    pending(c"SLH-DSA-SHAKE-128f:id-slh-dsa-shake-128f:2.16.840.1.101.3.4.3.27"),
-    pending(c"SLH-DSA-SHAKE-192s:id-slh-dsa-shake-192s:2.16.840.1.101.3.4.3.28"),
-    pending(c"SLH-DSA-SHAKE-192f:id-slh-dsa-shake-192f:2.16.840.1.101.3.4.3.29"),
-    pending(c"SLH-DSA-SHAKE-256s:id-slh-dsa-shake-256s:2.16.840.1.101.3.4.3.30"),
-    pending(c"SLH-DSA-SHAKE-256f:id-slh-dsa-shake-256f:2.16.840.1.101.3.4.3.31"),
+    alg_desc(
+        c"SLH-DSA-SHA2-128s:id-slh-dsa-sha2-128s:2.16.840.1.101.3.4.3.20",
+        &super::slh_dsa_kmgmt::SHA2_128S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-128s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHA2-128f:id-slh-dsa-sha2-128f:2.16.840.1.101.3.4.3.21",
+        &super::slh_dsa_kmgmt::SHA2_128F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-128f implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHA2-192s:id-slh-dsa-sha2-192s:2.16.840.1.101.3.4.3.22",
+        &super::slh_dsa_kmgmt::SHA2_192S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-192s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHA2-192f:id-slh-dsa-sha2-192f:2.16.840.1.101.3.4.3.23",
+        &super::slh_dsa_kmgmt::SHA2_192F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-192f implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHA2-256s:id-slh-dsa-sha2-256s:2.16.840.1.101.3.4.3.24",
+        &super::slh_dsa_kmgmt::SHA2_256S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-256s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHA2-256f:id-slh-dsa-sha2-256f:2.16.840.1.101.3.4.3.25",
+        &super::slh_dsa_kmgmt::SHA2_256F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHA2-256f implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-128s:id-slh-dsa-shake-128s:2.16.840.1.101.3.4.3.26",
+        &super::slh_dsa_kmgmt::SHAKE_128S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-128s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-128f:id-slh-dsa-shake-128f:2.16.840.1.101.3.4.3.27",
+        &super::slh_dsa_kmgmt::SHAKE_128F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-128f implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-192s:id-slh-dsa-shake-192s:2.16.840.1.101.3.4.3.28",
+        &super::slh_dsa_kmgmt::SHAKE_192S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-192s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-192f:id-slh-dsa-shake-192f:2.16.840.1.101.3.4.3.29",
+        &super::slh_dsa_kmgmt::SHAKE_192F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-192f implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-256s:id-slh-dsa-shake-256s:2.16.840.1.101.3.4.3.30",
+        &super::slh_dsa_kmgmt::SHAKE_256S_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-256s implementation",
+    ),
+    alg_desc(
+        c"SLH-DSA-SHAKE-256f:id-slh-dsa-shake-256f:2.16.840.1.101.3.4.3.31",
+        &super::slh_dsa_kmgmt::SHAKE_256F_KEYMGMT,
+        c"OpenSSL SLH-DSA-SHAKE-256f implementation",
+    ),
     ALG_END,
 ]);
 

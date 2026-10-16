@@ -24,4 +24,5 @@ pub mod property;
 pub mod provided;
 pub mod rand;
 pub mod rsa;
+pub mod slhdsa;
 pub mod sym;
