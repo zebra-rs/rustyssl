@@ -134,7 +134,11 @@ pub(crate) unsafe fn dup(h: *const DSA, selection: c_int) -> *mut DSA {
     if selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0 {
         st.priv_key = src.priv_key.clone();
     }
-    let out = Dsa::new_handle_in(k.libctx.0);
+    let out = if k.in_libctx {
+        Dsa::new_handle_provided(k.libctx.0)
+    } else {
+        Dsa::new_handle_in(k.libctx.0)
+    };
     // SAFETY: just made, or NULL.
     let Some(d) = (unsafe { dsa(out) }) else {
         return ptr::null_mut();

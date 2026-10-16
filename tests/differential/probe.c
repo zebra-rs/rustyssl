@@ -381,6 +381,13 @@
  *                              (numbers in hex, - for none, or RFC 6979's DSA-1024 key's parts
  *                              k:p, k:q, k:g, k:y, k:x; gx for g^priv mod p; the edit adds to
  *                              one, as for dhkey), then its sizes and every validation
+ *   dsasig <priv> <how> <md|-> <nonce-type> <alg|-> <msg> <sig|->  DSA signatures with RFC
+ *                              6979's DSA-1024 parameters and the private key (hex, or k:x;
+ *                              its public key computed): a key from the key manager (p), a
+ *                              legacy DSA in a key (l), or one with an application's method
+ *                              (f, through the built-in EVP_PKEY_METHOD); the message signed
+ *                              through a digest context, as a digest, and with a composite
+ *                              algorithm, or with a signature, verified
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -6172,13 +6179,164 @@ static void dsa_key_command(const char *line)
     EVP_PKEY_free(k);
 }
 
+/* The key for dsasig: RFC 6979's parameters with private key x, made as `how` says. */
+static EVP_PKEY *dsa_sig_key(const char *xs, const char *how, DSA_METHOD *meth)
+{
+    DSA *d = rfc6979_dsa("k");
+    BIGNUM *x = dsa_number(xs), *y = BN_new();
+    BN_CTX *bc = BN_CTX_new();
+    EVP_PKEY *k = NULL;
+
+    if (x == NULL || !BN_mod_exp(y, DSA_get0_g(d), x, DSA_get0_p(d), bc)) {
+        BN_free(x);
+        BN_free(y);
+        BN_CTX_free(bc);
+        DSA_free(d);
+        return NULL;
+    }
+    BN_CTX_free(bc);
+    if (strcmp(how, "p") == 0) {
+        OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+        OSSL_PARAM *params;
+        EVP_PKEY_CTX *c = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, DSA_get0_p(d));
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, DSA_get0_q(d));
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, DSA_get0_g(d));
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, y);
+        OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, x);
+        params = OSSL_PARAM_BLD_to_param(bld);
+        EVP_PKEY_fromdata_init(c);
+        printf(" key %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, params));
+        EVP_PKEY_CTX_free(c);
+        OSSL_PARAM_free(params);
+        OSSL_PARAM_BLD_free(bld);
+        BN_free(x);
+        BN_free(y);
+    } else {
+        DSA *e = DSA_new();
+
+        if (strcmp(how, "f") == 0)
+            DSA_set_method(e, meth);
+        DSA_set0_pqg(e, BN_dup(DSA_get0_p(d)), BN_dup(DSA_get0_q(d)), BN_dup(DSA_get0_g(d)));
+        DSA_set0_key(e, y, x);
+        k = EVP_PKEY_new();
+        printf(" key %d", EVP_PKEY_set1_DSA(k, e));
+        DSA_free(e);
+    }
+    DSA_free(d);
+    return k;
+}
+
+/* dsasig: DSA signatures through the provider, or the legacy method. */
+static void dsa_sig_command(const char *line)
+{
+    char xs[100] = "-", how[4] = "p", md[64] = "-", alg[64] = "-", msg[700] = "-";
+    char sighex[300] = "-";
+    unsigned int nonce = 0;
+    unsigned char mb[300], sb[150], sig[150];
+    size_t ml = 0, sl = 0, len;
+    const char *mdname;
+    OSSL_PARAM np[2];
+    DSA_METHOD *meth = DSA_meth_dup(DSA_OpenSSL());
+    EVP_PKEY *k;
+    int legacy;
+
+    sscanf(line, "%*s %99s %3s %63s %u %63s %699s %299s", xs, how, md, &nonce, alg, msg, sighex);
+    mdname = strcmp(md, "-") == 0 ? NULL : md;
+    legacy = strcmp(how, "f") == 0;
+    if (!parse_hex(msg, mb, &ml) || (strcmp(sighex, "-") != 0 && !parse_hex(sighex, sb, &sl))) {
+        printf(" bad input\n");
+        DSA_meth_free(meth);
+        return;
+    }
+    k = dsa_sig_key(xs, how, meth);
+    print_asn_errors();
+    np[0] = OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &nonce);
+    np[1] = OSSL_PARAM_construct_end();
+    if (k != NULL) {
+        EVP_MD_CTX *m = EVP_MD_CTX_new();
+        EVP_PKEY_CTX *pc = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+        EVP_SIGNATURE *s = strcmp(alg, "-") == 0 || legacy ? NULL
+                                                           : EVP_SIGNATURE_fetch(NULL, alg, NULL);
+        int r;
+
+        if (strcmp(sighex, "-") != 0) {
+            r = EVP_DigestVerifyInit_ex(m, NULL, mdname, NULL, NULL, k, NULL);
+            printf("  digest verify %d", r);
+            if (r == 1)
+                printf(" %d", EVP_DigestVerify(m, sb, sl, mb, ml));
+            print_asn_errors();
+            r = EVP_PKEY_verify_init(pc);
+            if (mdname != NULL)
+                r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+            printf("  verify %d %d", r, EVP_PKEY_verify(pc, sb, sl, mb, ml));
+            print_asn_errors();
+            if (s != NULL) {
+                r = EVP_PKEY_verify_message_init(pc, s, NULL);
+                r = r * 10 + EVP_PKEY_CTX_set_signature(pc, sb, sl);
+                r = r * 10 + EVP_PKEY_verify_message_update(pc, mb, ml);
+                printf("  %s verify %d %d", alg, r, EVP_PKEY_verify_message_final(pc));
+                print_asn_errors();
+            }
+        } else {
+            len = sizeof(sig);
+            r = EVP_DigestSignInit_ex(m, NULL, mdname, NULL, NULL, k, legacy ? NULL : np);
+            /* Not after a failed init, which OpenSSL's crashes on. */
+            if (r == 1)
+                r = r * 10 + EVP_DigestSign(m, sig, &len, mb, ml);
+            printf("  digest sign %d", r);
+            if (r == 11) {
+                print_hex("", sig, len);
+                printf("  verify %d", EVP_DigestVerifyInit_ex(m, NULL, mdname, NULL, NULL, k,
+                                                               NULL));
+                printf(" %d", EVP_DigestVerify(m, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            len = sizeof(sig);
+            r = legacy ? EVP_PKEY_sign_init(pc) : EVP_PKEY_sign_init_ex(pc, np);
+            if (mdname != NULL)
+                r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+            r = r * 10 + EVP_PKEY_sign(pc, sig, &len, mb, ml);
+            printf("  sign %d", r);
+            if (r % 10 == 1) {
+                print_hex("", sig, len);
+                r = EVP_PKEY_verify_init(pc);
+                if (mdname != NULL)
+                    r = r * 10 + EVP_PKEY_CTX_set_signature_md(pc, EVP_get_digestbyname(mdname));
+                printf("  verify %d %d", r, EVP_PKEY_verify(pc, sig, len, mb, ml));
+            }
+            print_asn_errors();
+            if (s != NULL) {
+                len = sizeof(sig);
+                r = EVP_PKEY_sign_message_init(pc, s, np);
+                r = r * 10 + EVP_PKEY_sign(pc, sig, &len, mb, ml);
+                printf("  %s sign %d", alg, r);
+                if (r == 11) {
+                    print_hex("", sig, len);
+                    r = EVP_PKEY_verify_message_init(pc, s, NULL);
+                    r = r * 10 + EVP_PKEY_CTX_set_signature(pc, sig, len);
+                    r = r * 10 + EVP_PKEY_verify_message_update(pc, mb, ml);
+                    printf("  verify %d %d", r, EVP_PKEY_verify_message_final(pc));
+                }
+                print_asn_errors();
+            }
+        }
+        EVP_SIGNATURE_free(s);
+        EVP_PKEY_CTX_free(pc);
+        EVP_MD_CTX_free(m);
+    }
+    EVP_PKEY_free(k);
+    DSA_meth_free(meth);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
     if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
         && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0
         && strcmp(command, "dsaverify") != 0 && strcmp(command, "dsader") != 0
-        && strcmp(command, "dsakey") != 0)
+        && strcmp(command, "dsakey") != 0 && strcmp(command, "dsasig") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
@@ -6193,6 +6351,8 @@ static int dh_command(const char *command, const char *line)
         dsa_der_command(line);
     else if (strcmp(command, "dsakey") == 0)
         dsa_key_command(line);
+    else if (strcmp(command, "dsasig") == 0)
+        dsa_sig_command(line);
     else
         dh_check_command(line);
     return 1;

@@ -5,12 +5,13 @@
 //! at most 20 octets, else FIPS 186-4).
 //!
 //! Signing follows OpenSSL's steps and draws its random numbers in the same order: the nonce
-//! from `BN_generate_dsa_nonce` over the digest (a random one below q for `DSA_sign_setup`),
+//! from `BN_generate_dsa_nonce` over the digest (a random one below q for `DSA_sign_setup`;
+//! RFC 6979's for a provider's signature that asks for it, from a key made in a library context),
 //! r = (g^k mod p) mod q through the method's `bn_mod_exp` if it has one, k's inverse by
 //! Fermat, then a blinding value below 2^(|q|-1) (whose inverse must exist). The signature is
 //! computed directly; the blinding protects nothing here, as the arithmetic is constant-time.
 
-use core::ffi::{c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
+use core::ffi::{CStr, c_char, c_int, c_long, c_uchar, c_uint, c_ulong, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
@@ -18,7 +19,7 @@ use rustyssl_abi::{
     BN_RAND_BOTTOM_ANY, BN_RAND_TOP_ANY, DSA, DSA_FLAG_CACHE_MONT_P, DSA_R_BAD_Q_VALUE,
     DSA_R_INVALID_PARAMETERS, DSA_R_MISSING_PARAMETERS, DSA_R_MISSING_PRIVATE_KEY,
     DSA_R_MODULUS_TOO_LARGE, DSA_R_TOO_MANY_RETRIES, DSA_SIG, ECDSA_SIG, ERR_LIB_BN, ERR_LIB_DSA,
-    ERR_R_BN_LIB, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, OPENSSL_DSA_MAX_MODULUS_BITS,
+    ERR_R_BN_LIB, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, OPENSSL_DSA_MAX_MODULUS_BITS, OSSL_LIB_CTX,
 };
 use rustyssl_crypto::bn::{self as core_bn, BigNum, Endian};
 use rustyssl_crypto::ec::ecdsa as ecdsa_core;
@@ -28,7 +29,8 @@ use crate::bn::{BN_clear_free, BN_free, BN_new, BN_set_flags, new_bignum, store,
 use crate::dsa::{Dsa, DsaState, dsa};
 use crate::dsa_meth::{BnModExpFn, ModExpFn, fns_of, is_default};
 use crate::ec::ecdsa::{
-    ECDSA_SIG_free, ECDSA_SIG_get0, ECDSA_SIG_new, ECDSA_SIG_set0, d2i_ECDSA_SIG, i2d_ECDSA_SIG,
+    Deterministic, ECDSA_SIG_free, ECDSA_SIG_get0, ECDSA_SIG_new, ECDSA_SIG_set0, d2i_ECDSA_SIG,
+    i2d_ECDSA_SIG,
 };
 use crate::err;
 use crate::ffc;
@@ -220,6 +222,14 @@ enum Nonce<'a> {
     Random,
     /// `BN_generate_dsa_nonce` over the digest.
     Dsa(&'a [u8]),
+    /// RFC 6979's, from HMAC-DRBG-KDF with the digest named, fetched from `libctx` with
+    /// `propq` (NULL or a string).
+    Rfc6979 {
+        dgst: &'a [u8],
+        mdname: &'a CStr,
+        libctx: *mut OSSL_LIB_CTX,
+        propq: *const c_char,
+    },
 }
 
 /// `dsa_sign_setup`: a nonce k and r = (g^k mod p) mod q, with k's inverse mod q. `None` with
@@ -282,6 +292,17 @@ unsafe fn sign_setup(
                     }
                     out.get()?
                 }
+                Nonce::Rfc6979 {
+                    dgst,
+                    mdname,
+                    libctx,
+                    propq,
+                } => {
+                    // A new generator each time, as OpenSSL's: a retry gets the same nonce.
+                    // SAFETY: the caller's library context and query.
+                    let mut d = unsafe { Deterministic::new(q, x, dgst, mdname, libctx, propq) }?;
+                    d.next()?
+                }
                 Nonce::Random => env.rand_range(q)?,
             };
             if !kv.is_zero() {
@@ -327,6 +348,15 @@ fn env_ctx(env: &Env) -> *mut BN_CTX {
 /// # Safety
 /// `h` is a live key.
 pub(crate) unsafe fn do_sign_int(dgst: &[u8], h: *mut DSA) -> *mut DSA_SIG {
+    // SAFETY: the caller's guarantee.
+    unsafe { do_sign_with(dgst, h, Nonce::Dsa(dgst)) }
+}
+
+/// `ossl_dsa_do_sign_int` with the nonce `nonce`.
+///
+/// # Safety
+/// `h` is a live key.
+unsafe fn do_sign_with(dgst: &[u8], h: *mut DSA, nonce: Nonce<'_>) -> *mut DSA_SIG {
     const F: &str = "ossl_dsa_do_sign_int";
     // SAFETY: the caller's guarantee.
     let Some(k) = (unsafe { dsa(h) }) else {
@@ -348,7 +378,7 @@ pub(crate) unsafe fn do_sign_int(dgst: &[u8], h: *mut DSA) -> *mut DSA_SIG {
         let mut retries = 0u32;
         loop {
             // SAFETY: the caller's key and its state.
-            let (kinv, r) = unsafe { sign_setup(h, k, &st, &env, Nonce::Dsa(dgst)) }?;
+            let (kinv, r) = unsafe { sign_setup(h, k, &st, &env, nonce) }?;
             let dlen = dgst.len().min(q.num_bytes());
             let m = BigNum::from_bin(dgst.get(..dlen)?, Endian::Big, false).ok()?;
             let blind = loop {
@@ -689,39 +719,73 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_DSA
     {
         // SAFETY: the caller's guarantee.
-        let Some(k) = (unsafe { self::dsa(dsa) }) else { return 0 };
-        let put = |v: c_int| {
-            if !siglen.is_null() {
-                // SAFETY: the caller's guarantee.
-                unsafe { siglen.write(c_uint::try_from(v).unwrap_or(0)) };
-            }
-        };
-        if sig.is_null() {
-            // SAFETY: the caller's key.
-            put(unsafe { DSA_size(dsa) });
-            return 1;
-        }
-        let s = if k.libctx.0.is_null() || !is_default(k.meth()) {
-            // SAFETY: the caller's guarantee.
-            unsafe { DSA_do_sign(dgst, dlen, dsa) }
-        } else {
-            // SAFETY: as above.
-            let d = unsafe { digest(dgst, dlen) };
-            // SAFETY: as above.
-            unsafe { do_sign_int(d, dsa) }
-        };
-        if s.is_null() {
-            put(0);
-            return 0;
-        }
-        let mut out = sig;
-        // SAFETY: the signature; the caller's room.
-        let n = unsafe { i2d_DSA_SIG(s, &raw mut out) };
-        put(n);
-        // SAFETY: made above.
-        unsafe { DSA_SIG_free(s) };
-        1
+        unsafe { sign_int(dgst, dlen, sig, siglen, dsa, 0, None, ptr::null_mut(), ptr::null()) }
     }
+}
+
+/// `ossl_dsa_sign_int`: `DSA_sign` with a nonce type and the digest it names. A key made
+/// outside a library context, or with an application's method, signs through its method
+/// (`DSA_do_sign`); another with OpenSSL's code, whose nonce is RFC 6979's for type 1 (from
+/// `mdname`'s HMAC-DRBG-KDF in `libctx` with `propq`), else the digest-seeded one.
+///
+/// # Safety
+/// As for `DSA_sign`; `libctx` is NULL or a live library context; `propq` is NULL or a string.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn sign_int(
+    dgst: *const c_uchar,
+    dlen: c_int,
+    sig: *mut c_uchar,
+    siglen: *mut c_uint,
+    dsa: *mut DSA,
+    nonce_type: c_uint,
+    mdname: Option<&CStr>,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { self::dsa(dsa) }) else {
+        return 0;
+    };
+    let put = |v: c_int| {
+        if !siglen.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { siglen.write(c_uint::try_from(v).unwrap_or(0)) };
+        }
+    };
+    if sig.is_null() {
+        // SAFETY: the caller's key.
+        put(unsafe { DSA_size(dsa) });
+        return 1;
+    }
+    let s = if !k.in_libctx || !is_default(k.meth()) {
+        // SAFETY: the caller's guarantee.
+        unsafe { DSA_do_sign(dgst, dlen, dsa) }
+    } else {
+        // SAFETY: as above.
+        let d = unsafe { digest(dgst, dlen) };
+        let nonce = match mdname {
+            Some(mdname) if nonce_type == 1 => Nonce::Rfc6979 {
+                dgst: d,
+                mdname,
+                libctx,
+                propq,
+            },
+            _ => Nonce::Dsa(d),
+        };
+        // SAFETY: as above.
+        unsafe { do_sign_with(d, dsa, nonce) }
+    };
+    if s.is_null() {
+        put(0);
+        return 0;
+    }
+    let mut out = sig;
+    // SAFETY: the signature; the caller's room.
+    let n = unsafe { i2d_DSA_SIG(s, &raw mut out) };
+    put(n);
+    // SAFETY: made above.
+    unsafe { DSA_SIG_free(s) };
+    1
 }
 
 ffi_export! {

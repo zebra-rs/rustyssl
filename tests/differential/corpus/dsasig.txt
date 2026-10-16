@@ -1,0 +1,39 @@
+# DSA signatures from deterministic generators with RFC 6979's DSA-1024 key: messages signed
+# through a digest context, as digests, and with the composite algorithms, with RFC 6979's and
+# digest-seeded nonces, by a key from the key manager, a legacy DSA in a key, and a DSA with an
+# application's method (the built-in EVP_PKEY_METHOD); and verification of good, changed, and
+# malformed signatures.
+rctx 0
+rnew TEST-RAND
+rset strength=256 test_entropy=64 test_nonce=32
+rinst 0 0
+rctx 1
+rnew HASH-DRBG child
+rset digest=SHA256
+rinst 0 0
+rsetpub
+rsetpriv
+dsasig k:x p SHA1 1 DSA-SHA1 73616d706c65 -
+dsasig k:x p SHA256 1 DSA-SHA256 73616d706c65 -
+dsasig k:x p SHA512 1 DSA-SHA512 74657374 -
+dsasig k:x p SHA256 0 DSA-SHA256 73616d706c65 -
+dsasig k:x p SHA256 2 - 73616d706c65 -
+dsasig k:x p - 1 - 8151325dcdbae9e0ff95f9f9658432dbedfdb209 -
+dsasig k:x p - 0 - 00 -
+dsasig k:x p SHA3-512 1 DSA-SHA3-512 74657374 -
+dsasig k:x p SHA512-224 1 - 74657374 -
+dsasig k:x p MD5 1 - 74657374 -
+dsasig k:x p SHAKE256 1 - 74657374 -
+dsasig k:x l SHA1 1 DSA-SHA1 73616d706c65 -
+dsasig k:x l SHA224 0 DSA-SHA224 73616d706c65 -
+dsasig k:x f SHA256 0 - 73616d706c65 -
+dsasig k:x f SHA1 0 - 73616d706c65 -
+dsasig k:x f MD5 0 - 73616d706c65 -
+dsasig k:x f - 0 - 8151325dcdbae9e0ff95f9f9658432dbedfdb209 -
+dsasig 1 p SHA256 1 - 73616d706c65 -
+dsasig 996F967F6C8E388D9E28D01E205FBA957A5698B0 p SHA256 1 DSA-SHA256 73616d706c65 -
+dsasig k:x p SHA1 1 DSA-SHA1 73616d706c65 302c02142e1a0c2562b2912caaf89186fb0f42001585da55021429efb6b0aff2d7a68eb70ca313022253b9a88df5
+dsasig k:x p SHA1 1 DSA-SHA1 73616d706c65 302c02142e1a0c2562b2912caaf89186fb0f42001585da55021429efb6b0aff2d7a68eb70ca313022253b9a88df4
+dsasig k:x p SHA1 1 DSA-SHA1 73616d706c65 302c02142e1a0c2562b2912caaf89186fb0f42001585da55021429efb6b0aff2d7a68eb70ca313022253b9a88df500
+dsasig k:x p SHA1 1 DSA-SHA1 73616d706c65 3000
+dsasig k:x f SHA1 0 - 73616d706c65 302c02142e1a0c2562b2912caaf89186fb0f42001585da55021429efb6b0aff2d7a68eb70ca313022253b9a88df5

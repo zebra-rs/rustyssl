@@ -146,6 +146,9 @@ unsafe impl Sync for ExData {}
 /// A DSA key (`DSA`), shared by reference.
 pub(crate) struct Dsa {
     pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    /// Made in a library context (OpenSSL's non-NULL `libctx`: by a provider, or from a key
+    /// that was), which signs through OpenSSL's own code rather than the key's method.
+    pub(crate) in_libctx: bool,
     references: AtomicI32,
     /// `dirty_cnt`.
     dirty: AtomicUsize,
@@ -175,11 +178,22 @@ impl Dsa {
     /// `dsa_new_intern`: an empty key in `libctx` with the default method (whose `init` it
     /// runs) and its flags but `DSA_FLAG_NON_FIPS_ALLOW`, or NULL with the error raised.
     pub(crate) fn new_handle_in(libctx: *mut OSSL_LIB_CTX) -> *mut DSA {
+        Self::make(libctx, false)
+    }
+
+    /// `ossl_dsa_new`: as `new_handle_in`, for a key made in a library context.
+    pub(crate) fn new_handle_provided(libctx: *mut OSSL_LIB_CTX) -> *mut DSA {
+        Self::make(libctx, true)
+    }
+
+    /// `dsa_new_intern`.
+    fn make(libctx: *mut OSSL_LIB_CTX, in_libctx: bool) -> *mut DSA {
         let meth = crate::dsa_meth::default_or_builtin();
         // SAFETY: a live method.
         let mflags = unsafe { crate::dsa_meth::flags(meth) };
         let h = DSA::new_handle(Dsa {
             libctx: Ptr(libctx),
+            in_libctx,
             references: AtomicI32::new(1),
             dirty: AtomicUsize::new(0),
             state: Mutex::new(DsaState::default()),

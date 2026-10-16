@@ -375,7 +375,7 @@ pub(crate) unsafe fn dsa_pkey_import_from(
     to: *mut EVP_PKEY,
     libctx: *mut OSSL_LIB_CTX,
 ) -> c_int {
-    let h = Dsa::new_handle_in(libctx);
+    let h = Dsa::new_handle_provided(libctx);
     // SAFETY: just made, or NULL.
     let Some(k) = (unsafe { dsa(h) }) else {
         err::raise(ERR_LIB_DSA, ERR_R_DSA_LIB, "dsa_pkey_import_from");
