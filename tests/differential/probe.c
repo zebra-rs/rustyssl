@@ -347,6 +347,11 @@
  *                              the signature, s#N to make it N octets, m@N^XX for the message)
  *   slhdsa <alg> <keyseed> <msg|-> <ctx|-|e> <opts|-> <room> <edits|->  as mldsa, for SLH-DSA
  *                              (keys from 3n octets of seeds; no mu, test entropy of n octets)
+ *   mlx <alg> <keyseed> <ctseed> <delta>  a hybrid ML-KEM key: ML-KEM's from the 64-octet seed,
+ *                              X25519's or X448's from it too (a NIST curve's random); the
+ *                              private key (X25519 and X448) and public key imported, the
+ *                              decapsulation of a ciphertext streamed from ctseed (of the right
+ *                              length plus delta), and an encapsulation to the public key
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5416,18 +5421,168 @@ static void ml_dsa_ops_command(const char *line)
     EVP_PKEY_free(k);
 }
 
+/* |n| octets of SHA-256(seed || counter) blocks: a deterministic stream from a seed. */
+static void hash_stream(const unsigned char *seed, size_t seedlen, unsigned char *out, size_t n)
+{
+    unsigned char block[32], ctr[4];
+    unsigned int dl;
+    size_t off = 0;
+    uint32_t i = 0;
+
+    while (off < n) {
+        EVP_MD_CTX *m = EVP_MD_CTX_new();
+
+        ctr[0] = (unsigned char)(i >> 24);
+        ctr[1] = (unsigned char)(i >> 16);
+        ctr[2] = (unsigned char)(i >> 8);
+        ctr[3] = (unsigned char)i;
+        EVP_DigestInit_ex(m, EVP_sha256(), NULL);
+        EVP_DigestUpdate(m, seed, seedlen);
+        EVP_DigestUpdate(m, ctr, 4);
+        EVP_DigestFinal_ex(m, block, &dl);
+        EVP_MD_CTX_free(m);
+        memcpy(out + off, block, n - off < 32 ? n - off : 32);
+        off += 32;
+        i++;
+    }
+}
+
+/* mlx: a hybrid key from data, and its KEM. */
+static void mlx_command(const char *line)
+{
+    char alg[32] = "-", keyseed[300] = "-", ctseed[300] = "-";
+    static unsigned char mpriv[4000], mpub[2000], priv[4000], pub[2000], ct[4000], buf[4000];
+    unsigned char kb[150], cb[150], ss[200], ss2[200];
+    size_t kl = 0, cl = 0, mprivlen = sizeof(mpriv), mpublen = sizeof(mpub), n;
+    long ctdelta = 0;
+    int big = strstr(alg, "1024") != NULL, nist, r;
+    size_t xpriv, xpub, ctlen, slen, s2, privlen, publen;
+    const char *mlkem;
+    OSSL_PARAM ps[2];
+    EVP_PKEY_CTX *c;
+    EVP_PKEY *k = NULL, *pk = NULL, *xk = NULL;
+
+    sscanf(line, "%*s %31s %299s %299s %ld", alg, keyseed, ctseed, &ctdelta);
+    big = strstr(alg, "1024") != NULL;
+    nist = strncmp(alg, "SecP", 4) == 0;
+    mlkem = big ? "ML-KEM-1024" : "ML-KEM-768";
+    if (!parse_hex(keyseed, kb, &kl) || kl != 64 || !parse_hex(ctseed, cb, &cl)
+        || !ml_kem_keys_from_seed(mlkem, kb, mpriv, &mprivlen, mpub, &mpublen)) {
+        printf(" bad input\n");
+        ERR_clear_error();
+        return;
+    }
+    /* The ECDH half: X25519's or X448's private key from the stream, or a NIST curve's. */
+    if (strncmp(alg, "X25519", 6) == 0) {
+        xpriv = 32;
+        xk = EVP_PKEY_new_raw_private_key_ex(NULL, "X25519", NULL, kb, 32);
+    } else if (strncmp(alg, "X448", 4) == 0) {
+        xpriv = 56;
+        hash_stream(kb, kl, buf, 56);
+        xk = EVP_PKEY_new_raw_private_key_ex(NULL, "X448", NULL, buf, 56);
+    } else {
+        xpriv = big ? 48 : 32;
+        xk = EVP_PKEY_Q_keygen(NULL, NULL, "EC", big ? "P-384" : "P-256");
+    }
+    xpub = 0;
+    EVP_PKEY_get_octet_string_param(xk, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, buf, sizeof(buf),
+                                    &xpub);
+    if (nist) {
+        memcpy(pub, buf, xpub);
+        memcpy(pub + xpub, mpub, mpublen);
+    } else {
+        memcpy(pub, mpub, mpublen);
+        memcpy(pub + mpublen, buf, xpub);
+        memcpy(priv, mpriv, mprivlen);
+        n = xpriv;
+        EVP_PKEY_get_raw_private_key(xk, priv + mprivlen, &n);
+    }
+    publen = mpublen + xpub;
+    privlen = mprivlen + xpriv;
+
+    /* The private key (X25519 and X448 only: a NIST curve's can't be imported as octets). */
+    if (!nist) {
+        ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, priv, privlen);
+        ps[1] = OSSL_PARAM_construct_end();
+        c = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
+        printf(" priv %d", EVP_PKEY_fromdata_init(c));
+        printf(" %d", EVP_PKEY_fromdata(c, &k, EVP_PKEY_KEYPAIR, ps));
+        EVP_PKEY_CTX_free(c);
+        if (k != NULL) {
+            n = 0;
+            printf(" encoded %d", EVP_PKEY_get_octet_string_param(
+                       k, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, buf, sizeof(buf), &n));
+            ml_kem_digest(buf, n);
+            printf(" same %d", n == publen && memcmp(buf, pub, n) == 0);
+        }
+        print_asn_errors();
+    }
+    ps[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub, publen);
+    ps[1] = OSSL_PARAM_construct_end();
+    c = EVP_PKEY_CTX_new_from_name(NULL, alg, NULL);
+    printf("  pub %d", EVP_PKEY_fromdata_init(c));
+    printf(" %d", EVP_PKEY_fromdata(c, &pk, EVP_PKEY_PUBLIC_KEY, ps));
+    EVP_PKEY_CTX_free(c);
+    if (pk != NULL && k != NULL)
+        printf(" eq %d", EVP_PKEY_eq(pk, k));
+    print_asn_errors();
+
+    ctlen = (big ? 1568 : 1088) + xpub;
+    if (ctdelta < 0 && (size_t)-ctdelta > ctlen)
+        ctdelta = -(long)ctlen;
+    ctlen = (size_t)((long)ctlen + ctdelta);
+    if (ctlen > sizeof(ct))
+        ctlen = sizeof(ct);
+    hash_stream(cb, cl, ct, ctlen);
+    if (k != NULL) {
+        c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+        slen = sizeof(ss);
+        printf("  decap %d", EVP_PKEY_decapsulate_init(c, NULL));
+        r = EVP_PKEY_decapsulate(c, ss, &slen, ct, ctlen);
+        printf(" %d %zu", r, slen);
+        if (r == 1)
+            ml_kem_digest(ss, slen);
+        print_asn_errors();
+        EVP_PKEY_CTX_free(c);
+    }
+    if (pk != NULL) {
+        c = EVP_PKEY_CTX_new_from_pkey(NULL, pk, NULL);
+        n = sizeof(ct);
+        slen = sizeof(ss);
+        printf("  encap %d", EVP_PKEY_encapsulate_init(c, NULL));
+        r = EVP_PKEY_encapsulate(c, ct, &n, ss, &slen);
+        printf(" %d %zu %zu", r, n, slen);
+        EVP_PKEY_CTX_free(c);
+        if (r == 1 && k != NULL) {
+            c = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL);
+            s2 = sizeof(ss2);
+            EVP_PKEY_decapsulate_init(c, NULL);
+            printf(" back %d", EVP_PKEY_decapsulate(c, ss2, &s2, ct, n));
+            printf(" same %d", s2 == slen && memcmp(ss, ss2, slen) == 0);
+            EVP_PKEY_CTX_free(c);
+        }
+        print_asn_errors();
+    }
+    EVP_PKEY_free(k);
+    EVP_PKEY_free(pk);
+    EVP_PKEY_free(xk);
+}
+
 /* Runs an ML-KEM or ML-DSA command; returns 0 if `command` isn't one. */
 static int ml_kem_command(const char *command, const char *line)
 {
     if (strcmp(command, "mlkemkm") != 0 && strcmp(command, "mlkem") != 0
         && strcmp(command, "mldsakm") != 0 && strcmp(command, "mldsa") != 0
-        && strcmp(command, "slhdsakm") != 0 && strcmp(command, "slhdsa") != 0)
+        && strcmp(command, "slhdsakm") != 0 && strcmp(command, "slhdsa") != 0
+        && strcmp(command, "mlx") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "mlkem") == 0)
         ml_kem_ops_command(line);
     else if (strcmp(command, "mldsa") == 0 || strcmp(command, "slhdsa") == 0)
         ml_dsa_ops_command(line);
+    else if (strcmp(command, "mlx") == 0)
+        mlx_command(line);
     else
         ml_kem_keymgmt_command(line);
     return 1;

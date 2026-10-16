@@ -1533,7 +1533,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `libctx` is NULL or a live library context; `params` is an array.
-unsafe fn quick_keygen(
+pub(crate) unsafe fn quick_keygen(
     libctx: *mut OSSL_LIB_CTX,
     name: *const c_char,
     propq: *const c_char,

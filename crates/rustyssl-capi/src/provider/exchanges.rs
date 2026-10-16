@@ -394,10 +394,10 @@ static DEFAULT_KEMS: Algorithms<12> = Algorithms([
         c"ML-KEM-1024:MLKEM1024:id-alg-ml-kem-1024:2.16.840.1.101.3.4.4.3",
         &super::ml_kem_kem::ML_KEM_KEM,
     ),
-    pending(c"X25519MLKEM768"),
-    pending(c"X448MLKEM1024"),
-    pending(c"SecP256r1MLKEM768"),
-    pending(c"SecP384r1MLKEM1024"),
+    alg(c"X25519MLKEM768", &super::mlx_kem::MLX_KEM),
+    alg(c"X448MLKEM1024", &super::mlx_kem::MLX_KEM),
+    alg(c"SecP256r1MLKEM768", &super::mlx_kem::MLX_KEM),
+    alg(c"SecP384r1MLKEM1024", &super::mlx_kem::MLX_KEM),
     ALG_END,
 ]);
 
