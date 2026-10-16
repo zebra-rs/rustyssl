@@ -3815,7 +3815,7 @@ chunking) is clean.
       4.5a3's two deviations cover them too.
       - Tests: `tests/c/evp_ecx448_legacy.c` (7 checks, `evp_ecx_legacy.c`'s over Curve448 with
         RFC 8032's and RFC 7748's vectors); the deviations' Rust tests over both curves.
-  - [ ] **4.5c ML-KEM-512/768/1024**, in sub-steps:
+  - [x] **4.5c ML-KEM-512/768/1024**, in sub-steps:
     - [x] **4.5c1 The arithmetic and the key managers** (`rustyssl-crypto/src/mlkem.rs`,
       `provider/ml_kem_kmgmt.rs`; no new exports): FIPS 203 written in-house over our SHA-3 and
       SHAKE sponge: polynomials mod `q = 3329` with Barrett reduction and masked corrections,
@@ -3838,8 +3838,19 @@ chunking) is clean.
         the wrong length, properties without SHA-3, and the three configuration options); the
         probe's `mlkemkm` with `corpus/mlkemkm.txt` and random sessions (300 pass); the
         `ml_kem_kmgmt` fuzz target.
-    - [ ] **4.5c2 The KEM** (`ml_kem_kem.c`): encapsulation (random, or `ikmE`) and
-      decapsulation, with their buffer and length rules.
+    - [x] **4.5c2 The KEM** (`provider/ml_kem_kem.rs`; no new exports): `ml_kem_kem.c`'s
+      encapsulation (random entropy, or an `ikmE` of exactly 32 octets used for one
+      encapsulation and forgotten by a decapsulation's parameters) and decapsulation, with its
+      buffer and length rules: a size query needs one length, the ciphertext's length is
+      written before the secret's room is checked, a decapsulation tolerates a NULL length,
+      and a ciphertext of the wrong length fails with random octets written. The context holds
+      the key data without a reference, and the dispatch table is copied entry for entry (no
+      `dupctx`).
+      - Tests: `tests/c/evp_ml_kem_ops.c` (12 checks: the KEM's names and parameters, sizes,
+        rooms too small, missing buffers, `ikmE` of other lengths and set later, the
+        decapsulation of the ciphertext as is, changed, and of other lengths, random
+        encapsulations, a public key, and an empty key); the probe's `mlkem` with
+        `corpus/mlkem.txt` and random sessions (300 pass); the `ml_kem_ops` fuzz target.
   - [ ] **4.5d ML-DSA-44/65/87:** keys from seeds and expanded, the key manager, signatures
     (pure, with context, external mu, deterministic and hedged).
   - [ ] **4.5e SLH-DSA:** the twelve parameter sets, the key manager, signatures.

@@ -382,9 +382,18 @@ static DEFAULT_KEMS: Algorithms<12> = Algorithms([
     pending(c"X25519:1.3.101.110"),
     pending(c"X448:1.3.101.111"),
     pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
-    pending(c"ML-KEM-512:MLKEM512:id-alg-ml-kem-512:2.16.840.1.101.3.4.4.1"),
-    pending(c"ML-KEM-768:MLKEM768:id-alg-ml-kem-768:2.16.840.1.101.3.4.4.2"),
-    pending(c"ML-KEM-1024:MLKEM1024:id-alg-ml-kem-1024:2.16.840.1.101.3.4.4.3"),
+    alg(
+        c"ML-KEM-512:MLKEM512:id-alg-ml-kem-512:2.16.840.1.101.3.4.4.1",
+        &super::ml_kem_kem::ML_KEM_KEM,
+    ),
+    alg(
+        c"ML-KEM-768:MLKEM768:id-alg-ml-kem-768:2.16.840.1.101.3.4.4.2",
+        &super::ml_kem_kem::ML_KEM_KEM,
+    ),
+    alg(
+        c"ML-KEM-1024:MLKEM1024:id-alg-ml-kem-1024:2.16.840.1.101.3.4.4.3",
+        &super::ml_kem_kem::ML_KEM_KEM,
+    ),
     pending(c"X25519MLKEM768"),
     pending(c"X448MLKEM1024"),
     pending(c"SecP256r1MLKEM768"),

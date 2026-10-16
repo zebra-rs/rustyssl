@@ -399,6 +399,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("ecxkm", ecxkm_session),
     ("ecxop", ecxop_session),
     ("mlkemkm", mlkemkm_session),
+    ("mlkem", mlkem_session),
     ("string", string_session),
 ];
 
@@ -3159,6 +3160,61 @@ fn mlkemkm_session(random: &mut Random, out: &mut String) -> Result {
             out,
             "mlkemkm {alg} {selection} {seed} {privfrom} {pubfrom} {edits}"
         )?;
+    }
+    Ok(())
+}
+
+/// A random session of the ML-KEM KEM: encapsulations (with an ikmE of every length, the right
+/// one most often, or random) into rooms around the right sizes, and decapsulations of the
+/// ciphertext as is, with octets changed, or of another length.
+fn mlkem_session(random: &mut Random, out: &mut String) -> Result {
+    const ALGS: [(&str, u64); 3] = [
+        ("ML-KEM-512", 768),
+        ("ML-KEM-768", 1088),
+        ("ML-KEM-1024", 1568),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(3)).unwrap_or(0);
+        let (alg, clen) = ALGS.get(i).copied().unwrap_or(ALGS[0]);
+        let seed = random_hex(random, 64);
+        let ikme = match random.below(6) {
+            0 => "-".to_owned(),
+            1 => {
+                let len = usize::try_from(random.below(40)).unwrap_or(0);
+                random_hex(random, len)
+            }
+            _ => random_hex(random, 32),
+        };
+        let croom = match random.below(6) {
+            0 => clen.saturating_sub(random.below(3).saturating_add(1)),
+            1 => clen.saturating_add(random.below(100)),
+            _ => clen,
+        };
+        let sroom = match random.below(6) {
+            0 => random.below(32),
+            1 => 32u64.saturating_add(random.below(64)),
+            _ => 32,
+        };
+        let mut edits = Vec::new();
+        for _ in 0..random.below(3) {
+            edits.push(match random.below(4) {
+                0 => format!(
+                    "c#{}",
+                    clen.saturating_add(random.below(3)).saturating_sub(1)
+                ),
+                _ => format!(
+                    "c@{}^{:02x}",
+                    random.below(clen),
+                    random.below(255).saturating_add(1)
+                ),
+            });
+        }
+        let edits = if edits.is_empty() {
+            "-".to_owned()
+        } else {
+            edits.join(",")
+        };
+        writeln!(out, "mlkem {alg} {seed} {ikme} {edits} {croom} {sroom}")?;
     }
     Ok(())
 }

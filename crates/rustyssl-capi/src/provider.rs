@@ -61,6 +61,7 @@ pub(crate) mod kdfs;
 mod kdfs_more;
 pub(crate) mod keymgmt;
 pub(crate) mod macs;
+mod ml_kem_kem;
 pub(crate) mod ml_kem_kmgmt;
 pub(crate) mod modes;
 mod module;
