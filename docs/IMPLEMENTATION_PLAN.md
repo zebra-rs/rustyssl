@@ -4066,8 +4066,17 @@ chunking) is clean.
         a counting method and custom exponentiations, `DSA_dup_DH`); the probe's `dsaverify`
         (RFC 6979's DSA-1024 signature, changed) with `corpus/dsaverify.txt` and random
         sessions (800 pass).
-    - [ ] **4.6b2 ASN.1, PEM, and printing**: `DSAparams`, the private and public key
-      encodings, `DSA_SIG`'s item, PEM, `DSA_print`, `DSAparams_print`, `DSAparams_dup`.
+    - [x] **4.6b2 ASN.1 and PEM** (`dsa_asn1.rs`; 17 exports): the traditional
+      DSAPrivateKey, DSAparams, and DSAPublicKey, shadowed items over the `DSA` handle that
+      OpenSSL keeps private (all named "DSA", as their errors say; decoding into a key reuses
+      its numbers; the private key's version kept); the private key's BIO and FILE forms;
+      DSAparams' PEM; and `DSAparams_dup`. `DSA_print`, `DSAparams_print`, and their `_fp`
+      forms print through `EVP_PKEY_print_*` with the DSA ASN.1 method (4.6c1); the
+      `*_PUBKEY` and traditional PEM private key functions come with 4.7.
+      - Tests: `tests/c/dsa_asn1.c` (4 checks: round trips, hand-made encodings with their
+        errors, decoding into a key, BIOs, FILEs, PEM, copies); the probe's `dsader` with
+        `corpus/dsader.txt` and random mutated sessions (400 pass); the `dsa_der` fuzz target
+        (1.7 million runs, clean).
   - [ ] **4.6c The DSA providers**: the DSA key manager and signatures, and the legacy DSA
     `EVP_PKEY_METHOD` (DH's are 4.6a4 and 4.6a5).
 - [ ] **4.7 Key encoders and decoders:**

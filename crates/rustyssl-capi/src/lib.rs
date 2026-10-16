@@ -28,6 +28,7 @@ mod dh_ops;
 mod dh_pmeth;
 mod dir;
 mod dsa;
+mod dsa_asn1;
 mod dsa_meth;
 mod dsa_ops;
 mod ec;

@@ -410,6 +410,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dhkey", dhkey_session),
     ("dhexch", dhexch_session),
     ("dsaverify", dsaverify_session),
+    ("dsader", dsader_session),
     ("string", string_session),
 ];
 
@@ -3768,6 +3769,52 @@ fn dsaverify_session(random: &mut Random, out: &mut String) -> Result {
             hex(&sig)
         };
         writeln!(out, "dsaverify {d} {s} {key}")?;
+    }
+    Ok(())
+}
+
+/// A random session of DSA decoding: small valid DSAPrivateKey, DSAparams, and DSAPublicKey
+/// encodings with octets changed, dropped, or added, now and then given to another decoder.
+fn dsader_session(random: &mut Random, out: &mut String) -> Result {
+    const SEEDS: [(&str, &str); 6] = [
+        ("k", "3012020100020117020103020105020107020102"),
+        ("k", "3012020105020117020103020105020107020100"),
+        ("p", "3009020117020103020105"),
+        ("p", "30800201170201030201050000"),
+        ("u", "300c020107020117020103020105"),
+        (
+            "p",
+            "3020021100f7e75fdc469067ffdc4e847c51f452df02087bf3afee234833ff020105",
+        ),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(6)).unwrap_or(0);
+        let (kind, hex) = SEEDS.get(i).copied().unwrap_or(SEEDS[0]);
+        let mut der: Vec<u8> = (0..hex.len() / 2)
+            .filter_map(|j| u8::from_str_radix(hex.get(2 * j..2 * j + 2)?, 16).ok())
+            .collect();
+        for _ in 0..random.below(3) {
+            let len = u64::try_from(der.len()).unwrap_or(1).max(1);
+            let at = usize::try_from(random.below(len)).unwrap_or(0);
+            match random.below(4) {
+                0 if !der.is_empty() => {
+                    der.remove(at.min(der.len().saturating_sub(1)));
+                }
+                1 => der.insert(at, u8::try_from(random.below(256)).unwrap_or(0)),
+                _ => {
+                    if let Some(b) = der.get_mut(at) {
+                        *b ^= u8::try_from(random.below(255).saturating_add(1)).unwrap_or(1);
+                    }
+                }
+            }
+        }
+        let kind = if random.below(5) == 0 {
+            random.pick(&["k", "p", "u"])
+        } else {
+            kind
+        };
+        let hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
+        writeln!(out, "dsader {kind} {hex}")?;
     }
     Ok(())
 }

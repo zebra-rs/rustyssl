@@ -31,6 +31,8 @@ use crate::provider::Ptr;
 #[derive(Clone, Default)]
 pub(crate) struct DsaState {
     pub(crate) params: ffc::Params,
+    /// DSAPrivateKey's version (`int32_t version`), kept from decoding for encoding.
+    pub(crate) version: i32,
     pub(crate) pub_key: Option<BigNum>,
     pub(crate) priv_key: Option<BigNum>,
 }
