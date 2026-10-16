@@ -447,6 +447,77 @@ ffi_export! {
     }
 }
 
+/// `ossl_dh_kdf_X9_42_asn1`: the X9.42 KDF (`X942KDF-ASN1`, fetched from `libctx`) of the
+/// shared secret `z`, `outlen` octets into `out`, for the key-wrap algorithm `cek_alg` (by
+/// name; NULL fails in the KDF), with the keying material if any, by the digest `md` (NULL
+/// fails in the KDF). True on success.
+///
+/// # Safety
+/// `out` has room for `outlen` octets; `cek_alg` is NULL or a string; `md` is NULL or a live
+/// digest; `libctx` is NULL or a live library context.
+pub(crate) unsafe fn kdf_x9_42_asn1(
+    out: *mut c_uchar,
+    outlen: usize,
+    z: &[u8],
+    cek_alg: *const c_char,
+    ukm: Option<&[u8]>,
+    md: *const EVP_MD,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+) -> bool {
+    let mdname = if md.is_null() {
+        ptr::null()
+    } else {
+        // SAFETY: the caller's digest.
+        unsafe { EVP_MD_get0_name(md) }
+    };
+    // SAFETY: the library context; a static name.
+    let kdf = unsafe { EVP_KDF_fetch(libctx, OSSL_KDF_NAME_X942KDF_ASN1.as_ptr(), ptr::null()) };
+    if kdf.is_null() {
+        return false;
+    }
+    // SAFETY: the KDF fetched above.
+    let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
+    let mut ret = false;
+    if !kctx.is_null() {
+        let mut params = Vec::with_capacity(5);
+        // SAFETY: a static name; the digest's name, or NULL, which outlives the array.
+        params.push(unsafe {
+            OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST.as_ptr(), mdname.cast_mut(), 0)
+        });
+        // SAFETY: a static name; the caller's secret, which outlives the array.
+        params.push(unsafe {
+            OSSL_PARAM_construct_octet_string(
+                OSSL_KDF_PARAM_KEY.as_ptr(),
+                z.as_ptr().cast_mut().cast(),
+                z.len(),
+            )
+        });
+        if let Some(u) = ukm {
+            // SAFETY: a static name; the caller's ukm, which outlives the array.
+            params.push(unsafe {
+                OSSL_PARAM_construct_octet_string(
+                    OSSL_KDF_PARAM_UKM.as_ptr(),
+                    u.as_ptr().cast_mut().cast(),
+                    u.len(),
+                )
+            });
+        }
+        // SAFETY: a static name; the caller's name, or NULL, which outlives the array.
+        params.push(unsafe {
+            OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG.as_ptr(), cek_alg.cast_mut(), 0)
+        });
+        // SAFETY: no preconditions.
+        params.push(unsafe { OSSL_PARAM_construct_end() });
+        // SAFETY: the context; the caller's room; the array.
+        ret = unsafe { EVP_KDF_derive(kctx, out, outlen, params.as_ptr()) } > 0;
+    }
+    // SAFETY: made above.
+    unsafe { EVP_KDF_CTX_free(kctx) };
+    // SAFETY: as above.
+    unsafe { EVP_KDF_free(kdf) };
+    ret
+}
+
 ffi_export! {
     /// The X9.42 KDF (the ASN.1 variant, `X942KDF-ASN1`) of the shared secret `Z`: `outlen`
     /// octets for the key-wrap algorithm `key_oid`, with the `ukm` if given, the digest `md`
@@ -465,41 +536,19 @@ ffi_export! {
         if unsafe { OBJ_obj2txt(key_alg.as_mut_ptr(), len, key_oid, 0) } <= 0 {
             return 0;
         }
-        // SAFETY: the caller's digest.
-        let prov = unsafe { EVP_MD_get0_provider(md) };
-        // SAFETY: the digest's provider, or NULL.
-        let libctx = unsafe { libctx_of(prov) };
-        // SAFETY: as above.
-        let mdname = unsafe { EVP_MD_get0_name(md) };
-        // SAFETY: the library context; a static name.
-        let kdf = unsafe { EVP_KDF_fetch(libctx, OSSL_KDF_NAME_X942KDF_ASN1.as_ptr(), ptr::null()) };
-        if kdf.is_null() {
-            return 0;
-        }
-        // SAFETY: the KDF fetched above.
-        let kctx = unsafe { EVP_KDF_CTX_new(kdf) };
-        let mut ret = 0;
-        if !kctx.is_null() {
-            let mut params = Vec::with_capacity(5);
-            // SAFETY: a static name; the digest's name, which outlives the array.
-            params.push(unsafe { OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST.as_ptr(), mdname.cast_mut(), 0) });
-            // SAFETY: a static name; the caller's secret, which outlives the array.
-            params.push(unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY.as_ptr(), Z.cast_mut().cast(), Zlen) });
-            if !ukm.is_null() {
-                // SAFETY: a static name; the caller's ukm, which outlives the array.
-                params.push(unsafe { OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_UKM.as_ptr(), ukm.cast_mut().cast(), ukmlen) });
-            }
-            // SAFETY: a static name; the local name, which outlives the array.
-            params.push(unsafe { OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG.as_ptr(), key_alg.as_mut_ptr(), 0) });
-            // SAFETY: no preconditions.
-            params.push(unsafe { OSSL_PARAM_construct_end() });
-            // SAFETY: the context; the caller's room; the array.
-            ret = c_int::from(unsafe { EVP_KDF_derive(kctx, out, outlen, params.as_ptr()) } > 0);
-        }
-        // SAFETY: made above.
-        unsafe { EVP_KDF_CTX_free(kctx) };
-        // SAFETY: as above.
-        unsafe { EVP_KDF_free(kdf) };
-        ret
+        let libctx = if md.is_null() {
+            ptr::null_mut()
+        } else {
+            // SAFETY: the caller's digest.
+            let prov = unsafe { EVP_MD_get0_provider(md) };
+            // SAFETY: the digest's provider, or NULL.
+            unsafe { libctx_of(prov) }
+        };
+        // SAFETY: the caller's secret.
+        let Some(z) = (unsafe { crate::ffi::bytes(Z, Zlen) }) else { return 0 };
+        // SAFETY: the caller's keying material, if any.
+        let u = if ukm.is_null() { None } else { unsafe { crate::ffi::bytes(ukm, ukmlen) } };
+        // SAFETY: the caller's room; the name above; the caller's digest; its library context.
+        c_int::from(unsafe { kdf_x9_42_asn1(out, outlen, z, key_alg.as_ptr(), u, md, libctx) })
     }
 }

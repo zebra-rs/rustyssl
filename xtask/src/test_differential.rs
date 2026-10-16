@@ -408,6 +408,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("dhcheck", dhcheck_session),
     ("dhder", dhder_session),
     ("dhkey", dhkey_session),
+    ("dhexch", dhexch_session),
     ("string", string_session),
 ];
 
@@ -3634,6 +3635,71 @@ fn dhkey_session(random: &mut Random, out: &mut String) -> Result {
             _ => "-".to_owned(),
         };
         writeln!(out, "dhkey {type_} {p} {q} {g} {y} {x} {length} {edit}")?;
+    }
+    Ok(())
+}
+
+/// A random session of the DH exchange through the provider and the legacy method: named
+/// groups and RFC 5114's with random private keys, peers now and then broken, padding, rooms
+/// around the secret's size, and X9.42's KDF with random digests, lengths, key-wrap
+/// algorithms (now and then an unknown one), and keying material.
+fn dhexch_session(random: &mut Random, out: &mut String) -> Result {
+    const GROUPS: [(&str, u64); 5] = [
+        ("ffdhe2048", 256),
+        ("modp_1536", 192),
+        ("modp_2048", 256),
+        ("dh_2048_256", 256),
+        ("dh_1024_160", 128),
+    ];
+    for _ in 0..random.below(4).saturating_add(1) {
+        let i = usize::try_from(random.below(5)).unwrap_or(0);
+        let (group, size) = GROUPS.get(i).copied().unwrap_or(GROUPS[0]);
+        let how = random.pick(&["p", "l"]);
+        let priv_hex = |random: &mut Random| {
+            let len = usize::try_from(random.below(32))
+                .unwrap_or(0)
+                .saturating_add(1);
+            let h = random_hex(random, len);
+            if h.trim_start_matches('0').is_empty() {
+                "1".to_owned()
+            } else {
+                h
+            }
+        };
+        let (xa, xb) = (priv_hex(random), priv_hex(random));
+        let edit = match random.below(8) {
+            0 => "y=1".to_owned(),
+            1 => "y=p".to_owned(),
+            2 => format!("y{}", random.below(5).saturating_add(1)),
+            _ => "-".to_owned(),
+        };
+        let pad = random.below(2);
+        let (kdf, want) = if random.below(2) == 0 {
+            ("-".to_owned(), size)
+        } else {
+            let md = random.pick(&["SHA1", "SHA256", "SHA512", "SHA3-256", "SHA224"]);
+            let outlen = random.below(80);
+            let cek = random.pick(&[
+                "id-aes128-wrap",
+                "id-aes192-wrap",
+                "id-aes256-wrap",
+                "id-smime-alg-CMS3DESwrap",
+                "nonsense",
+            ]);
+            let ulen = usize::try_from(random.below(17)).unwrap_or(0);
+            let ukm = random_hex(random, ulen);
+            (format!("{md}:{outlen}:{cek}:{ukm}"), outlen)
+        };
+        let room = match random.below(4) {
+            0 => want.saturating_sub(1),
+            1 => want.saturating_add(1),
+            2 => random.below(300),
+            _ => want,
+        };
+        writeln!(
+            out,
+            "dhexch {how} {group} {xa} {xb} {edit} {pad} {kdf} {room}"
+        )?;
     }
     Ok(())
 }

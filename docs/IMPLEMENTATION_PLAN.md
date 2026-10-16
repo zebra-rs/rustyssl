@@ -4033,8 +4033,23 @@ chunking) is clean.
         generator, FIPS 186-4 and 186-2, seeds, templates, the setters, and every refusal);
         comparison and validation; `DH` in `EVP_PKEY` both ways); the probe's `dhkey` with
         `corpus/dhkey.txt` and random sessions (1400 pass).
-    - [ ] **4.6a5 The DH exchange and the legacy `EVP_PKEY_METHOD`**: the DH key exchange
-      (padding, the X9.42 KDF), and the built-in DH and DHX `EVP_PKEY_METHOD`s.
+    - [x] **4.6a5 The DH exchange and the legacy `EVP_PKEY_METHOD`** (`provider/dh_exch.rs`,
+      `dh_pmeth.rs`): the DH key exchange (through the key's method; padded or not; X9.42's KDF
+      in its ASN.1 form with its digest, length, keying material, and key-wrap algorithm, from
+      the padded secret; the peer's parameters matched, q only when the peer has one; the
+      context's parameters and copies as OpenSSL's), and the built-in DH and DHX
+      `EVP_PKEY_METHOD`s (derive, plain or padded or through X9.42's KDF; parameter generation
+      from a named group, RFC 5114's, FIPS 186-4 or 186-2, or a safe prime; key generation;
+      the ctrls and ctrl strings; a context without a KDF object can't be copied, as in
+      OpenSSL). `ossl_dh_kdf_X9_42_asn1` is shared with `DH_KDF_X9_42`. The legacy derive
+      refuses less room than the secret, and its getters don't write through NULL
+      (docs/DEVIATIONS.md).
+      - Tests: `tests/c/evp_dh_exch.c` (4 checks: the exchange's names and lists, secrets both
+        ways, padded, rooms, bad peers, the KDF with and without keying material and
+        algorithms, the typed setters; a foreign key's legacy derive with its ctrls; and
+        generation through an application's copy of each method); the probe's `dhexch` with
+        `corpus/dhexch.txt` and random sessions through the provider and the legacy method
+        (1100 pass).
   - [ ] **4.6b DSA**: the object, its methods, and `DSA_SIG`; parameters, keys, and signatures
     (with deterministic nonces); ASN.1, printing, and `EVP_PKEY`.
   - [ ] **4.6c The DSA providers**: the DSA key manager and signatures, and the legacy DSA

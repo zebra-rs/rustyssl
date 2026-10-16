@@ -364,6 +364,12 @@
  *                              gx for g^priv mod p; the edit also takes xN for the private
  *                              key), then its sizes, every validation, its encoded public key,
  *                              that set on a copy, and a comparison with the copy
+ *   dhexch <p|l> <group> <priv> <peer's priv> <edit|-> <pad> <kdf|-> <room>  the DH exchange
+ *                              of two keys of a named group made from their private keys (the
+ *                              peer's public key changed by the edit: yN adds N, y=1 sets 1, y=p
+ *                              sets p - 1), through the provider (p) or, with an application's
+ *                              DH_METHOD, the legacy method (l); padded or not; through X9.42's
+ *                              KDF given as digest:outlen:cekalg:ukm-hex; into room octets
  *   x25519x <priv> <peer's pub> <room>  the X25519 exchange into room octets (prefilled 0x77)
  *   x448x <priv> <peer's pub> <room>  the same with X448
  *   ed25519 <alg|-> <instance|-> <ctx|-> <priv> <msg|-> <sig|->  Ed25519 signatures through
@@ -5808,17 +5814,149 @@ static void dh_key_command(const char *line)
     EVP_PKEY_free(k);
 }
 
+/* A DH of a named group (by short name) with the private key x, its public key computed. */
+static DH *dh_from_priv(const char *group, const char *x, const DH_METHOD *meth)
+{
+    DH *dh;
+    BIGNUM *priv = NULL;
+
+    if (strcmp(group, "dh_2048_256") == 0)
+        dh = DH_get_2048_256();
+    else if (strcmp(group, "dh_1024_160") == 0)
+        dh = DH_get_1024_160();
+    else
+        dh = DH_new_by_nid(OBJ_sn2nid(group));
+    if (dh == NULL)
+        return NULL;
+    if (meth != NULL)
+        DH_set_method(dh, meth);
+    if (BN_hex2bn(&priv, x) == 0) {
+        DH_free(dh);
+        return NULL;
+    }
+    DH_set0_key(dh, NULL, priv);
+    DH_generate_key(dh);
+    return dh;
+}
+
+/* dhexch: a DH exchange through the provider or the legacy method. */
+static void dh_exch_command(const char *line)
+{
+    char how[4] = "p", group[32] = "ffdhe2048", xa[300] = "1", xb[300] = "1", edit[32] = "-";
+    char kdf[300] = "-";
+    int pad = 0;
+    size_t room = 0, n = 0;
+    static unsigned char out[1100];
+    DH_METHOD *meth = NULL;
+    DH *a, *b;
+    EVP_PKEY *ka = EVP_PKEY_new(), *kb = EVP_PKEY_new();
+    EVP_PKEY_CTX *c;
+    int r;
+
+    sscanf(line, "%*s %3s %31s %299s %299s %31s %d %299s %zu", how, group, xa, xb, edit, &pad,
+           kdf, &room);
+    if (strcmp(how, "l") == 0)
+        meth = DH_meth_dup(DH_OpenSSL());
+    a = dh_from_priv(group, xa, meth);
+    b = dh_from_priv(group, xb, meth);
+    if (a == NULL || b == NULL) {
+        printf(" no keys\n");
+        goto end;
+    }
+    {
+        BIGNUM *y = BN_dup(DH_get0_pub_key(b));
+        unsigned int add;
+
+        if (strcmp(edit, "y=1") == 0)
+            BN_one(y);
+        else if (strcmp(edit, "y=p") == 0)
+            BN_sub(y, DH_get0_p(b), BN_value_one());
+        else if (sscanf(edit, "y%u", &add) == 1)
+            BN_add_word(y, add);
+        DH_set0_key(b, y, NULL);
+    }
+    EVP_PKEY_set1_DH(ka, a);
+    EVP_PKEY_set1_DH(kb, b);
+    c = EVP_PKEY_CTX_new(ka, NULL);
+    printf(" init %d", EVP_PKEY_derive_init(c));
+    printf(" peer %d", EVP_PKEY_derive_set_peer_ex(c, kb, 0));
+    printf(" pad %d", EVP_PKEY_CTX_set_dh_pad(c, pad));
+    if (strcmp(kdf, "-") != 0) {
+        char md[64] = "", cek[64] = "", ukm[200] = "";
+        int outlen = 0;
+
+        sscanf(kdf, "%63[^:]:%d:%63[^:]:%199s", md, &outlen, cek, ukm);
+        if (meth == NULL) {
+            OSSL_PARAM ps[6], *q = ps;
+            size_t ol = (size_t)outlen;
+            unsigned char ub[100];
+            long ul = 0;
+            unsigned char *u = ukm[0] != '\0' ? OPENSSL_hexstr2buf(ukm, &ul) : NULL;
+
+            if (u != NULL && ul > 0 && ul <= (long)sizeof(ub))
+                memcpy(ub, u, (size_t)ul);
+            *q++ = OSSL_PARAM_construct_utf8_string(OSSL_EXCHANGE_PARAM_KDF_TYPE,
+                                                    OSSL_KDF_NAME_X942KDF_ASN1, 0);
+            *q++ = OSSL_PARAM_construct_utf8_string(OSSL_EXCHANGE_PARAM_KDF_DIGEST, md, 0);
+            *q++ = OSSL_PARAM_construct_size_t(OSSL_EXCHANGE_PARAM_KDF_OUTLEN, &ol);
+            *q++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG, cek, 0);
+            if (u != NULL)
+                *q++ = OSSL_PARAM_construct_octet_string(OSSL_EXCHANGE_PARAM_KDF_UKM, ub,
+                                                         (size_t)ul);
+            *q = OSSL_PARAM_construct_end();
+            printf(" kdf %d", EVP_PKEY_CTX_set_params(c, ps));
+            OPENSSL_free(u);
+        } else {
+            long ul = 0;
+            unsigned char *u = ukm[0] != '\0' ? OPENSSL_hexstr2buf(ukm, &ul) : NULL;
+            ASN1_OBJECT *o = OBJ_txt2obj(cek, 0);
+
+            r = EVP_PKEY_CTX_ctrl(c, -1, EVP_PKEY_OP_DERIVE, EVP_PKEY_CTRL_DH_KDF_TYPE,
+                                  EVP_PKEY_DH_KDF_X9_42, NULL);
+            r = r * 10 + EVP_PKEY_CTX_ctrl(c, -1, EVP_PKEY_OP_DERIVE, EVP_PKEY_CTRL_DH_KDF_MD, 0,
+                                           (void *)EVP_get_digestbyname(md));
+            r = r * 10 + EVP_PKEY_CTX_ctrl(c, -1, EVP_PKEY_OP_DERIVE,
+                                           EVP_PKEY_CTRL_DH_KDF_OUTLEN, outlen, NULL);
+            r = r * 10 + EVP_PKEY_CTX_ctrl(c, -1, EVP_PKEY_OP_DERIVE, EVP_PKEY_CTRL_DH_KDF_OID,
+                                           0, o);
+            if (u != NULL)
+                r = r * 10 + EVP_PKEY_CTX_ctrl(c, -1, EVP_PKEY_OP_DERIVE,
+                                               EVP_PKEY_CTRL_DH_KDF_UKM, (int)ul, u);
+            printf(" kdf %d", r);
+        }
+    }
+    r = EVP_PKEY_derive(c, NULL, &n);
+    printf(" size %d %zu", r, n);
+    if (meth != NULL && strcmp(kdf, "-") == 0 && room < n)
+        room = n; /* OpenSSL's legacy method writes the whole secret (docs/DEVIATIONS.md). */
+    n = room < sizeof(out) ? room : sizeof(out);
+    r = EVP_PKEY_derive(c, out, &n);
+    printf(" derive %d %zu", r, n);
+    if (r > 0)
+        ml_kem_digest(out, n);
+    print_asn_errors();
+    EVP_PKEY_CTX_free(c);
+end:
+    DH_free(a);
+    DH_free(b);
+    EVP_PKEY_free(ka);
+    EVP_PKEY_free(kb);
+    DH_meth_free(meth);
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
     if (strcmp(command, "dhcheck") != 0 && strcmp(command, "dhder") != 0
-        && strcmp(command, "dhkey") != 0)
+        && strcmp(command, "dhkey") != 0 && strcmp(command, "dhexch") != 0)
         return 0;
     printf("%s:", line);
     if (strcmp(command, "dhder") == 0)
         dh_der_command(line);
     else if (strcmp(command, "dhkey") == 0)
         dh_key_command(line);
+    else if (strcmp(command, "dhexch") == 0)
+        dh_exch_command(line);
     else
         dh_check_command(line);
     return 1;

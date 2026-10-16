@@ -25,6 +25,7 @@ mod dh_asn1;
 mod dh_backend;
 mod dh_meth;
 mod dh_ops;
+mod dh_pmeth;
 mod dir;
 mod ec;
 mod ec_pmeth;
