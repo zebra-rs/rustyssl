@@ -8304,56 +8304,6 @@ pub extern "C" fn PEM_read_CMS(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_DSAPrivateKey(
-    _: *mut FILE,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_DSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_DSA_PUBKEY(
-    _: *mut FILE,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_ECPKParameters(
-    _: *mut FILE,
-    _: *mut *mut EC_GROUP,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_GROUP {
-    crate::stub::unimplemented("PEM_read_ECPKParameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_ECPrivateKey(
-    _: *mut FILE,
-    _: *mut *mut EC_KEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_KEY {
-    crate::stub::unimplemented("PEM_read_ECPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_EC_PUBKEY(
-    _: *mut FILE,
-    _: *mut *mut EC_KEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_KEY {
-    crate::stub::unimplemented("PEM_read_EC_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_read_NETSCAPE_CERT_SEQUENCE(
     _: *mut FILE,
     _: *mut *mut NETSCAPE_CERT_SEQUENCE,
@@ -8371,100 +8321,6 @@ pub extern "C" fn PEM_read_PKCS7(
     _: *mut core::ffi::c_void,
 ) -> *mut PKCS7 {
     crate::stub::unimplemented("PEM_read_PKCS7")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PKCS8(
-    _: *mut FILE,
-    _: *mut *mut X509_SIG,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PEM_read_PKCS8")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PKCS8_PRIV_KEY_INFO(
-    _: *mut FILE,
-    _: *mut *mut PKCS8_PRIV_KEY_INFO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut PKCS8_PRIV_KEY_INFO {
-    crate::stub::unimplemented("PEM_read_PKCS8_PRIV_KEY_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PUBKEY(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PUBKEY_ex(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_PUBKEY_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PrivateKey(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_PrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_PrivateKey_ex(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_PrivateKey_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_RSAPrivateKey(
-    _: *mut FILE,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_RSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_RSAPublicKey(
-    _: *mut FILE,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_RSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_RSA_PUBKEY(
-    _: *mut FILE,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_RSA_PUBKEY")
 }
 
 #[unsafe(no_mangle)]
@@ -8508,16 +8364,6 @@ pub extern "C" fn PEM_read_X509_CRL(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_X509_PUBKEY(
-    _: *mut FILE,
-    _: *mut *mut X509_PUBKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("PEM_read_X509_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_read_X509_REQ(
     _: *mut FILE,
     _: *mut *mut X509_REQ,
@@ -8538,56 +8384,6 @@ pub extern "C" fn PEM_read_bio_CMS(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_DSAPrivateKey(
-    _: *mut BIO,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_bio_DSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_DSA_PUBKEY(
-    _: *mut BIO,
-    _: *mut *mut DSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut DSA {
-    crate::stub::unimplemented("PEM_read_bio_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_ECPKParameters(
-    _: *mut BIO,
-    _: *mut *mut EC_GROUP,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_GROUP {
-    crate::stub::unimplemented("PEM_read_bio_ECPKParameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_ECPrivateKey(
-    _: *mut BIO,
-    _: *mut *mut EC_KEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_KEY {
-    crate::stub::unimplemented("PEM_read_bio_ECPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_EC_PUBKEY(
-    _: *mut BIO,
-    _: *mut *mut EC_KEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EC_KEY {
-    crate::stub::unimplemented("PEM_read_bio_EC_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_read_bio_NETSCAPE_CERT_SEQUENCE(
     _: *mut BIO,
     _: *mut *mut NETSCAPE_CERT_SEQUENCE,
@@ -8605,115 +8401,6 @@ pub extern "C" fn PEM_read_bio_PKCS7(
     _: *mut core::ffi::c_void,
 ) -> *mut PKCS7 {
     crate::stub::unimplemented("PEM_read_bio_PKCS7")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PKCS8(
-    _: *mut BIO,
-    _: *mut *mut X509_SIG,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PEM_read_bio_PKCS8")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PKCS8_PRIV_KEY_INFO(
-    _: *mut BIO,
-    _: *mut *mut PKCS8_PRIV_KEY_INFO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut PKCS8_PRIV_KEY_INFO {
-    crate::stub::unimplemented("PEM_read_bio_PKCS8_PRIV_KEY_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PUBKEY(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PUBKEY_ex(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_PUBKEY_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_Parameters(_: *mut BIO, _: *mut *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_Parameters")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_Parameters_ex(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_Parameters_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PrivateKey(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_PrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_PrivateKey_ex(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("PEM_read_bio_PrivateKey_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_RSAPrivateKey(
-    _: *mut BIO,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_bio_RSAPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_RSAPublicKey(
-    _: *mut BIO,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_bio_RSAPublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_RSA_PUBKEY(
-    _: *mut BIO,
-    _: *mut *mut RSA,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut RSA {
-    crate::stub::unimplemented("PEM_read_bio_RSA_PUBKEY")
 }
 
 #[unsafe(no_mangle)]
@@ -8754,16 +8441,6 @@ pub extern "C" fn PEM_read_bio_X509_CRL(
     _: *mut core::ffi::c_void,
 ) -> *mut X509_CRL {
     crate::stub::unimplemented("PEM_read_bio_X509_CRL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_X509_PUBKEY(
-    _: *mut BIO,
-    _: *mut *mut X509_PUBKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("PEM_read_bio_X509_PUBKEY")
 }
 
 #[unsafe(no_mangle)]

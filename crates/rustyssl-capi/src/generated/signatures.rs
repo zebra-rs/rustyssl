@@ -8665,7 +8665,101 @@ const _: unsafe extern "C" fn(
     *mut *mut DSA,
     pem_password_cb,
     *mut core::ffi::c_void,
+) -> *mut DSA = crate::pem_pkey::PEM_read_DSAPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DSA = crate::pem_pkey::PEM_read_DSA_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
 ) -> *mut DSA = crate::dsa_asn1::PEM_read_DSAparams;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EC_GROUP,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_GROUP = crate::pem_pkey::PEM_read_ECPKParameters;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EC_KEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_KEY = crate::pem_pkey::PEM_read_ECPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EC_KEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_KEY = crate::pem_pkey::PEM_read_EC_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut X509_SIG,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut X509_SIG = crate::pem_pkey::PEM_read_PKCS8;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut PKCS8_PRIV_KEY_INFO,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut PKCS8_PRIV_KEY_INFO = crate::pem_pkey::PEM_read_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_PUBKEY_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_PrivateKey_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_RSAPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_RSAPublicKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_RSA_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut X509_PUBKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut X509_PUBKEY = crate::pem_pkey::PEM_read_X509_PUBKEY;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,
@@ -8684,7 +8778,109 @@ const _: unsafe extern "C" fn(
     *mut *mut DSA,
     pem_password_cb,
     *mut core::ffi::c_void,
+) -> *mut DSA = crate::pem_pkey::PEM_read_bio_DSAPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut DSA = crate::pem_pkey::PEM_read_bio_DSA_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut DSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
 ) -> *mut DSA = crate::dsa_asn1::PEM_read_bio_DSAparams;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EC_GROUP,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_GROUP = crate::pem_pkey::PEM_read_bio_ECPKParameters;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EC_KEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_KEY = crate::pem_pkey::PEM_read_bio_ECPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EC_KEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EC_KEY = crate::pem_pkey::PEM_read_bio_EC_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut X509_SIG,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut X509_SIG = crate::pem_pkey::PEM_read_bio_PKCS8;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut PKCS8_PRIV_KEY_INFO,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut PKCS8_PRIV_KEY_INFO = crate::pem_pkey::PEM_read_bio_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_bio_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_bio_PUBKEY_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut EVP_PKEY) -> *mut EVP_PKEY =
+    crate::pem_pkey::PEM_read_bio_Parameters;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_bio_Parameters_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_bio_PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pem_pkey::PEM_read_bio_PrivateKey_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_bio_RSAPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_bio_RSAPublicKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut RSA,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut RSA = crate::pem_pkey::PEM_read_bio_RSA_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut X509_PUBKEY,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> *mut X509_PUBKEY = crate::pem_pkey::PEM_read_bio_X509_PUBKEY;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut *mut core::ffi::c_char,

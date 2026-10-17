@@ -264,3 +264,47 @@ pub(crate) unsafe extern "C" fn passphrase_callback_enc(
     // SAFETY: the caller's guarantee.
     c_int::from(unsafe { PwData::get(arg.cast(), pass, pass_size, pass_len, params, true) })
 }
+
+/// `ossl_pw_pem_password`: a `pem_password_cb` over a `PwData` (as `userdata`), asking with
+/// the prompt info "PEM" (`ossl_pw_get_password`): the passphrase's length, or -1.
+///
+/// # Safety
+/// As for a `pem_password_cb`, with `userdata` a live `PwData`.
+pub(crate) unsafe extern "C" fn pw_pem_password(
+    buf: *mut c_char,
+    size: c_int,
+    rwflag: c_int,
+    userdata: *mut c_void,
+) -> c_int {
+    let info = c"PEM";
+    let params = [
+        // SAFETY: a static name and string, read during the call.
+        unsafe {
+            crate::params::OSSL_PARAM_construct_utf8_string(
+                OSSL_PASSPHRASE_PARAM_INFO.as_ptr(),
+                info.as_ptr().cast_mut(),
+                0,
+            )
+        },
+        // SAFETY: no preconditions.
+        unsafe { crate::params::OSSL_PARAM_construct_end() },
+    ];
+    let mut len = 0usize;
+    let size = usize::try_from(size).unwrap_or(0);
+    // SAFETY: the caller's guarantee; a local for the length.
+    let ok = unsafe {
+        PwData::get(
+            userdata.cast(),
+            buf,
+            size,
+            &raw mut len,
+            params.as_ptr(),
+            rwflag != 0,
+        )
+    };
+    if ok {
+        c_int::try_from(len).unwrap_or(-1)
+    } else {
+        -1
+    }
+}

@@ -38,7 +38,7 @@ use crate::pem_cipher::{PEM_do_header, PEM_get_EVP_CIPHER_INFO};
 
 /// `ossl_pem_check_suffix`: the length of the part of `pem` before " `suffix`", or `None` if
 /// it doesn't end so (or nothing comes before).
-fn check_suffix<'a>(pem: &'a [u8], suffix: &[u8]) -> Option<&'a [u8]> {
+pub(crate) fn check_suffix<'a>(pem: &'a [u8], suffix: &[u8]) -> Option<&'a [u8]> {
     if suffix.len() + 1 >= pem.len() {
         return None;
     }
