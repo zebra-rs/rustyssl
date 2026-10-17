@@ -4,7 +4,7 @@
 //! chains if asked for), then checked: trust, the extensions and purposes, path and proxy path
 //! lengths, the security level of keys and signatures, the identities, revocation (`revoke.rs`),
 //! Suite B, the signatures and validity times, name constraints, RFC 3779 resources (5.4e),
-//! and policies (5.4d). Each failure goes to the verification callback, which may accept it,
+//! and policies (`pcy.rs`). Each failure goes to the verification callback, which may accept it,
 //! with the error, its depth, and its certificate set, as OpenSSL's.
 //!
 //! DANE comes with libssl's: verifying with a DANE state aborts until then.

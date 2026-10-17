@@ -5,8 +5,8 @@
 //! searches of the store; issuer lookup; validity-time checks; and the verification errors'
 //! text.
 //!
-//! The verification itself is in `verify.rs` and revocation in `revoke.rs`; policies come with
-//! step 5.4d: until then the context's default function for them aborts (AGENTS.md rule 10).
+//! The verification itself is in `verify.rs`, revocation in `revoke.rs`, and policies in
+//! `pcy.rs`.
 //!
 //! The type is opaque in OpenSSL's headers, so its layout is ours (OpenSSL's, in fact).
 
@@ -143,15 +143,6 @@ unsafe extern "C" fn check_issued(
             c_int::from(unsafe { likely_issued(issuer, x) } == X509_V_OK)
         },
     )
-}
-
-/// A default function of a later part of step 5.4: aborts.
-fn later(what: &str) -> ! {
-    crate::stub::unimplemented(what)
-}
-
-pub(crate) unsafe extern "C" fn check_policy(_ctx: *mut X509_STORE_CTX) -> c_int {
-    later("check_policy (step 5.4d)")
 }
 
 // Callbacks and time checks.
@@ -1615,9 +1606,9 @@ ffi_export! {
             }
             c.param = ptr::null_mut();
         }
-        if !c.tree.is_null() {
-            later("X509_policy_tree_free (step 5.4d)");
-        }
+        // SAFETY: its own tree, or NULL.
+        unsafe { crate::x509::pcy::X509_policy_tree_free(c.tree) };
+        c.tree = ptr::null_mut();
         // SAFETY: its own chain, or NULL.
         unsafe { OSSL_STACK_OF_X509_free(c.chain) };
         c.chain = ptr::null_mut();
@@ -1682,7 +1673,7 @@ ffi_export! {
         c.get_crl = cb.get_crl;
         c.check_crl = cb.check_crl.or(Some(super::revoke::check_crl));
         c.cert_crl = cb.cert_crl.or(Some(super::revoke::cert_crl));
-        c.check_policy = cb.check_policy.or(Some(check_policy));
+        c.check_policy = cb.check_policy.or(Some(super::pcy::check_policy));
         c.lookup_certs = cb.lookup_certs.or(Some(X509_STORE_CTX_get1_certs));
         c.lookup_crls = cb.lookup_crls.or(Some(X509_STORE_CTX_get1_crls));
         // SAFETY: no preconditions.

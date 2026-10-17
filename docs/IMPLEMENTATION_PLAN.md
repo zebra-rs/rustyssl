@@ -4841,8 +4841,8 @@ Exit checks:
     security level of keys and signatures; identities (`check_id`, with 5.5); Suite B; the
     signatures and validity times (`internal_verify`); name constraints
     (`NAME_CONSTRAINTS_check`, `_check_CN`, punycode for SmtpUTF8Mailbox, `OSSL_parse_url` for
-    URIs). Revocation (with `X509_V_FLAG_CRL_CHECK`) came with 5.4c; policies run with
-    `X509_V_FLAG_POLICY_CHECK` (5.4d), RFC 3779 resources and DANE abort until 5.4e and libssl.
+    URIs). Revocation (with `X509_V_FLAG_CRL_CHECK`) came with 5.4c and policies (with
+    `X509_V_FLAG_POLICY_CHECK`) with 5.4d; RFC 3779 resources and DANE abort until 5.4e and libssl.
     Tests: `tests/c/x509_verify.c` (33 chains with the callback's trace), unit tests (punycode
     with the CVE-2022-3602 overflow, name constraints, URLs). The CVE-2015-1793 alternate-chain
     regression waits for the `tests/cve/` suite.
@@ -4857,8 +4857,17 @@ Exit checks:
     and partial reasons need `X509_V_FLAG_EXTENDED_CRL_SUPPORT`, as in OpenSSL. Tests:
     `tests/c/x509_crlcheck.c` (39 runs with the callback's trace and current CRL, on a PKI and
     13 CRLs made with the reference's tool).
-  - [ ] **5.4d Policies:** the policy tree (with a bound, the CVE-2023-0464 lesson) and the
-    `X509_policy_*` exports.
+  - [x] **5.4d Policies** (`x509/pcy.rs`, from `pcy_*.c`; 12 exports): each certificate's
+    policies, mappings, and constraints cached on it once (duplicates and bad constraints mark
+    it `EXFLAG_INVALID_POLICY`); `X509_policy_check` growing and pruning RFC 5280's valid
+    policy tree as OpenSSL does, bounded at 1,000 nodes (OpenSSL's fix for CVE-2023-0464);
+    the authority and user policy sets; the tree, level, and node getters;
+    `X509_POLICY_NODE_print`; and the context's default `check_policy`
+    (`X509_V_FLAG_POLICY_CHECK`, `_EXPLICIT_POLICY`, `_INHIBIT_ANY`, `_INHIBIT_MAP`,
+    `_NOTIFY_POLICY`). The tree is Rust objects whose addresses the getters return; its
+    policy sets are C stacks. Tests: `tests/c/x509_policy.c` (32 verifications and 10 direct
+    checks printing whole trees, including a mapping chain that hits the bound). The
+    CVE-2023-0464 regression proper waits for the `tests/cve/` suite.
   - [ ] **5.4e The rest:** RFC 3779 resources (`X509v3_addr_validate_path`,
     `X509v3_asid_validate_path`, and the `_validate_resource_set` functions, deferred from
     5.2f), DANE (with libssl's), and raw public keys.
