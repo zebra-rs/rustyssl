@@ -54,7 +54,8 @@ static OPENSSLDIR: OnceLock<CString> = OnceLock::new();
 static ENGINESDIR: OnceLock<CString> = OnceLock::new();
 static MODULESDIR: OnceLock<CString> = OnceLock::new();
 
-fn openssldir() -> &'static CStr {
+/// The directory of the configuration, certificates, and keys (`OPENSSLDIR`).
+pub(crate) fn openssldir() -> &'static CStr {
     directory(
         &OPENSSLDIR,
         option_env!("RUSTYSSL_OPENSSLDIR"),

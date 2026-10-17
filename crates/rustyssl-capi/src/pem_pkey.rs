@@ -22,7 +22,9 @@ use rustyssl_abi::{
     PEM_R_BAD_PASSWORD_READ, PEM_R_UNSUPPORTED_KEY_COMPONENTS, PEM_STRING_DSA,
     PEM_STRING_ECPARAMETERS, PEM_STRING_ECPRIVATEKEY, PEM_STRING_EVP_PKEY, PEM_STRING_PARAMETERS,
     PEM_STRING_PKCS8, PEM_STRING_PKCS8INF, PEM_STRING_PUBLIC, PEM_STRING_RSA,
-    PEM_STRING_RSA_PUBLIC, PKCS8_PRIV_KEY_INFO, RSA, X509_PUBKEY, X509_SIG, pem_password_cb,
+    PEM_STRING_RSA_PUBLIC, PEM_STRING_X509, PEM_STRING_X509_REQ, PEM_STRING_X509_REQ_OLD,
+    PEM_STRING_X509_TRUSTED, PKCS8_PRIV_KEY_INFO, RSA, X509, X509_PUBKEY, X509_REQ, X509_SIG,
+    pem_password_cb,
 };
 
 use crate::bio::{BIO_ctrl, BIO_free, BIO_new, BIO_pop, BIO_push};
@@ -782,6 +784,24 @@ pem_read! {
     pub unsafe extern "C" fn PEM_read_PKCS8_PRIV_KEY_INFO();
 }
 
+pem_read! {
+    X509, crate::x509::cert::d2i_X509, PEM_STRING_X509, d2i_x509_void;
+    pub unsafe extern "C" fn PEM_read_bio_X509();
+    pub unsafe extern "C" fn PEM_read_X509();
+}
+
+pem_read! {
+    X509, crate::x509::cert::d2i_X509_AUX, PEM_STRING_X509_TRUSTED, d2i_x509_aux_void;
+    pub unsafe extern "C" fn PEM_read_bio_X509_AUX();
+    pub unsafe extern "C" fn PEM_read_X509_AUX();
+}
+
+pem_read! {
+    X509_REQ, crate::x509::req::d2i_X509_REQ, PEM_STRING_X509_REQ, d2i_x509_req_void;
+    pub unsafe extern "C" fn PEM_read_bio_X509_REQ();
+    pub unsafe extern "C" fn PEM_read_X509_REQ();
+}
+
 type I2dOfVoid = unsafe extern "C" fn(*const c_void, *mut *mut c_uchar) -> c_int;
 
 /// Single-structure PEM writers (`IMPLEMENT_PEM_write`, unencrypted): `PEM_ASN1_write_bio`
@@ -844,6 +864,30 @@ pem_write! {
     PKCS8_PRIV_KEY_INFO, crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO, PEM_STRING_PKCS8INF, i2d_p8inf_void;
     pub unsafe extern "C" fn PEM_write_bio_PKCS8_PRIV_KEY_INFO();
     pub unsafe extern "C" fn PEM_write_PKCS8_PRIV_KEY_INFO();
+}
+
+pem_write! {
+    X509, crate::x509::cert::i2d_X509, PEM_STRING_X509, i2d_x509_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509();
+    pub unsafe extern "C" fn PEM_write_X509();
+}
+
+pem_write! {
+    X509, crate::x509::cert::i2d_X509_AUX, PEM_STRING_X509_TRUSTED, i2d_x509_aux_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509_AUX();
+    pub unsafe extern "C" fn PEM_write_X509_AUX();
+}
+
+pem_write! {
+    X509_REQ, crate::x509::req::i2d_X509_REQ, PEM_STRING_X509_REQ, i2d_x509_req_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509_REQ();
+    pub unsafe extern "C" fn PEM_write_X509_REQ();
+}
+
+pem_write! {
+    X509_REQ, crate::x509::req::i2d_X509_REQ, PEM_STRING_X509_REQ_OLD, i2d_x509_req_new_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509_REQ_NEW();
+    pub unsafe extern "C" fn PEM_write_X509_REQ_NEW();
 }
 
 /// The type-specific writers that may encrypt (`IMPLEMENT_PEM_write_cb`): the structure's
