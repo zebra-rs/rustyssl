@@ -9107,21 +9107,6 @@ pub extern "C" fn TXT_DB_write(_: *mut BIO, _: *mut TXT_DB) -> core::ffi::c_long
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_ACERT_print(_: *mut BIO, _: *mut X509_ACERT) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_ACERT_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_ACERT_print_ex(
-    _: *mut BIO,
-    _: *mut X509_ACERT,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_ACERT_print_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_CRL_load_http(
     _: *const core::ffi::c_char,
     _: *mut BIO,
@@ -9132,62 +9117,6 @@ pub extern "C" fn X509_CRL_load_http(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_CRL_print(_: *mut BIO, _: *mut X509_CRL) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_CRL_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_CRL_print_ex(
-    _: *mut BIO,
-    _: *mut X509_CRL,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_CRL_print_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_CRL_print_fp(_: *mut FILE, _: *mut X509_CRL) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_CRL_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_REQ_print(_: *mut BIO, _: *mut X509_REQ) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_REQ_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_REQ_print_ex(
-    _: *mut BIO,
-    _: *mut X509_REQ,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_REQ_print_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_REQ_print_fp(_: *mut FILE, _: *mut X509_REQ) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_REQ_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_STORE_CTX_print_verify_cb(
-    _: core::ffi::c_int,
-    _: *mut X509_STORE_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_STORE_CTX_print_verify_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_aux_print(
-    _: *mut BIO,
-    _: *mut X509,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_aux_print")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_load_http(
     _: *const core::ffi::c_char,
     _: *mut BIO,
@@ -9195,50 +9124,6 @@ pub extern "C" fn X509_load_http(
     _: core::ffi::c_int,
 ) -> *mut X509 {
     crate::stub::unimplemented("X509_load_http")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_ocspid_print(_: *mut BIO, _: *mut X509) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_ocspid_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_print(_: *mut BIO, _: *mut X509) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_print_ex(
-    _: *mut BIO,
-    _: *mut X509,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_print_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_print_ex_fp(
-    _: *mut FILE,
-    _: *mut X509,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_print_ex_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_print_fp(_: *mut FILE, _: *mut X509) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_signature_print(
-    _: *mut BIO,
-    _: *const X509_ALGOR,
-    _: *const ASN1_STRING,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_signature_print")
 }
 
 #[unsafe(no_mangle)]

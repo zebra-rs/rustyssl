@@ -1,5 +1,5 @@
 //! Printing certificates' parts (`t_x509.c`): signatures, in hex or by their key type's
-//! printer, and serial numbers. The rest of `t_x509.c` comes with step 5.6.
+//! printer, and serial numbers. The rest of `t_x509.c` is in `tprint.rs`.
 
 use core::ffi::{CStr, c_int};
 use core::ptr;

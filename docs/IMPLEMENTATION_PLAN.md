@@ -4885,9 +4885,17 @@ Exit checks:
   identity setters came with 5.3a; verification uses them in 5.4b. Tests:
   `tests/c/x509_check.c` (wildcard, partial, IDNA, common-name-only, NUL, UTF-8 and BMP
   names).
-- [ ] **5.6 Printing:** the `X509`, `X509_CRL`, `X509_REQ`, and `X509_NAME` `print_ex`
-  functions, `X509_signature_print`, `X509_ocspid_print`, `X509_ACERT_print_ex`. All
-  byte-exact. (`X509_signature_dump` and the signature printers came with 5.1f3.)
+- [x] **5.6 Printing** (`x509/tprint.rs`, from the rest of `t_x509.c`, `t_crl.c`, `t_req.c`,
+  and `t_acert.c`; 17 exports): `X509_print_ex` (every `X509_FLAG_NO_*`, name flags,
+  `X509_FLAG_EXTENSIONS_ONLY_KID`) and `X509_print`, `_fp`, `_ex_fp`; `X509_signature_print`
+  (RSA, RSA-PSS, and DSA by their printers, others in hex); `X509_aux_print`;
+  `X509_ocspid_print`; `X509_STORE_CTX_print_verify_cb` (the brief certificate form, the
+  expected identities, untrusted and trusted certificates); `X509_CRL_print_ex` and forms;
+  `X509_REQ_print_ex` and forms (OpenSSL's attribute padding quirk kept); `X509_ACERT_print_ex`
+  and `X509_ACERT_print`. `X509_NAME_print_ex` came with 5.1, `X509_signature_dump` with 5.1f3.
+  `OSSL_IETF_ATTR_SYNTAX_print` comes with the rest of that type. Tests:
+  `tests/c/x509_print.c` (EC, RSA, RSA-PSS, DSA, Ed25519, version 1, trusted certificates,
+  CRLs, requests, upstream's attribute certificates; 1,300 lines, byte-identical).
 - [ ] **5.7 Certificate Transparency:** `SCT`, `CTLOG`, `CTLOG_STORE`,
   `CT_POLICY_EVAL_CTX`, SCT validation.
 
