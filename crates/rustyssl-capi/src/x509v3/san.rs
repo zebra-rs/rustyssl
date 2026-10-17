@@ -5,8 +5,7 @@
 //! and IP addresses and networks as text.
 //!
 //! A directory name is read from a section of the context's configuration. An other name's
-//! value is `ASN1_generate_v3` text, which comes with step 6.1: making one aborts until then
-//! (AGENTS.md rule 10).
+//! value is `ASN1_generate_v3` text (`asn1/generate.rs`).
 
 use core::ffi::{CStr, c_char, c_int};
 use core::ptr;
@@ -759,11 +758,11 @@ ffi_export! {
                 }
             }
             GEN_OTHERNAME => {
-                if !v.contains(&b';') {
+                // SAFETY: the name; the caller's string and context.
+                if !unsafe { do_othername(g, v, ctx) } {
                     err::raise(ERR_LIB_X509V3, X509V3_R_OTHERNAME_ERROR, F);
                     return fail();
                 }
-                crate::stub::unimplemented("an otherName from text (ASN1_generate_v3, step 6.1)");
             }
             _ => {
                 err::raise(ERR_LIB_X509V3, X509V3_R_UNSUPPORTED_TYPE, F);
@@ -773,6 +772,45 @@ ffi_export! {
         g.type_ = gen_type;
         gname
     }
+}
+
+/// `do_othername`: an other name from `OID;value`, the value in `ASN1_generate_v3`'s language.
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+unsafe fn do_othername(g: &mut GENERAL_NAME, v: &[u8], ctx: *mut X509V3_CTX) -> bool {
+    let Some(semi) = v.iter().position(|&c| c == b';') else {
+        return false;
+    };
+    // SAFETY: no preconditions.
+    let on = unsafe { super::genn::OTHERNAME_new() };
+    // SAFETY: new, or NULL.
+    let Some(o) = (unsafe { on.as_mut() }) else {
+        return false;
+    };
+    let (Ok(value), Ok(oid)) = (
+        std::ffi::CString::new(v.get(semi + 1..).unwrap_or_default()),
+        std::ffi::CString::new(v.get(..semi).unwrap_or_default()),
+    ) else {
+        // SAFETY: made above.
+        unsafe { super::genn::OTHERNAME_free(on) };
+        return false;
+    };
+    // SAFETY: its own (an empty value); freed to be replaced, as OpenSSL does.
+    unsafe { crate::asn1::tpl::items::ASN1_TYPE_free(o.value) };
+    // SAFETY: a C string; the caller's context.
+    o.value = unsafe { crate::asn1::generate::ASN1_generate_v3(value.as_ptr(), ctx) };
+    if !o.value.is_null() {
+        // SAFETY: a C string.
+        o.type_id = unsafe { OBJ_txt2obj(oid.as_ptr(), 0) };
+    }
+    if o.value.is_null() || o.type_id.is_null() {
+        // SAFETY: made above.
+        unsafe { super::genn::OTHERNAME_free(on) };
+        return false;
+    }
+    g.d.otherName = on;
+    true
 }
 
 /// `do_dirname`: a directory name from the context's section `value`.

@@ -56,19 +56,6 @@ pub extern "C" fn ASN1_SCTX_set_app_data(_: *mut ASN1_SCTX, _: *mut core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_generate_nconf(_: *const core::ffi::c_char, _: *mut CONF) -> *mut ASN1_TYPE {
-    crate::stub::unimplemented("ASN1_generate_nconf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_generate_v3(
-    _: *const core::ffi::c_char,
-    _: *mut X509V3_CTX,
-) -> *mut ASN1_TYPE {
-    crate::stub::unimplemented("ASN1_generate_v3")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASYNC_WAIT_CTX_clear_fd(
     _: *mut ASYNC_WAIT_CTX,
     _: *const core::ffi::c_void,

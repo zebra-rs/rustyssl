@@ -23,6 +23,12 @@ rustyssl-crypto = { path = "../crates/rustyssl-crypto" }
 [workspace]
 
 [[bin]]
+name = "asn1_generate"
+path = "fuzz_targets/asn1_generate.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "buf_mem"
 path = "fuzz_targets/buf_mem.rs"
 test = false
