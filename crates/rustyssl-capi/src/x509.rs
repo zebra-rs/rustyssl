@@ -2,6 +2,7 @@
 //! need (step 4.7: the rest of AlgorithmIdentifier's functions, attributes, `X509_SIG`, and
 //! PKCS#8's PrivateKeyInfo), and phase 5's so far: names, extensions, certificates, and requests.
 
+pub(crate) mod acert;
 pub(crate) mod algor;
 pub(crate) mod attrib;
 pub(crate) mod cert;
