@@ -6,11 +6,13 @@
  * invalid extensions, an unknown critical extension, RSA-PSS, Ed25519, and a version 1
  * self-signed one) with their flags, usages, path lengths, and key identifiers; every
  * purpose for each, as leaf and as CA; issuer checks; comparisons; adding to lists; the
- * purpose table, including added purposes; and signature information.
+ * purpose table, including added purposes; signature information; certificate types
+ * (X509_certificate_type); and adding extensions (X509_add1_ext_i2d).
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
  */
+#define OPENSSL_SUPPRESS_DEPRECATED
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -427,6 +429,30 @@ int main(void)
     check(X509_add_certs(NULL, sk, 0) == 0, "no list");
     errors();
     printf("  more: %d, first is the copy %d\n", sk_X509_num(more), X509_cmp(sk_X509_value(more, 0), copy) == 0);
+
+    printf("# certificate types\n");
+    printf("  CA %#x, server %#x, PSS %#x, Ed25519 %#x, v1 %#x, empty %#x, NULL %#x\n",
+           (unsigned)X509_certificate_type(ca, NULL), (unsigned)X509_certificate_type(server, NULL),
+           (unsigned)X509_certificate_type(pss, NULL), (unsigned)X509_certificate_type(ed, NULL),
+           (unsigned)X509_certificate_type(v1, NULL), (unsigned)X509_certificate_type(fresh, NULL),
+           (unsigned)X509_certificate_type(NULL, key));
+    printf("  server with the Ed25519 key %#x\n", (unsigned)X509_certificate_type(server, key));
+    errors();
+
+    printf("# X509_add1_ext_i2d\n");
+    {
+        ASN1_IA5STRING *comment = ASN1_IA5STRING_new();
+
+        ASN1_STRING_set(comment, "a comment", -1);
+        check(X509_add1_ext_i2d(fresh, NID_netscape_comment, comment, 0, X509V3_ADD_DEFAULT) == 1, "added");
+        check(X509_add1_ext_i2d(fresh, NID_netscape_comment, comment, 0, X509V3_ADD_DEFAULT) == 0,
+              "added again fails");
+        errors();
+        check(X509_add1_ext_i2d(fresh, NID_netscape_comment, comment, 1, X509V3_ADD_REPLACE) == 1, "replaced");
+        check(X509_add1_ext_i2d(fresh, NID_netscape_comment, NULL, 0, X509V3_ADD_DELETE) == 1, "deleted");
+        printf("  extensions: %d\n", X509_get_ext_count(fresh));
+        ASN1_IA5STRING_free(comment);
+    }
 
     test_table(server);
     test_siginf(server);

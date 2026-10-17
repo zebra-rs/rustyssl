@@ -6,7 +6,8 @@
 //! As OpenSSL's:
 //! - The holder's and issuer's names are read only when they're a single directory name.
 //! - The validity times must be GeneralizedTimes.
-//! - Printing comes with step 5.6 (it needs `X509_signature_print`); `ASN1:` attribute values
+//! - Printing comes with step 5.6 (it needs `X509_signature_print`), but for the issuer and
+//!   serial number and the object digest info, which the extensions print; `ASN1:` attribute values
 //!   from configuration need `ASN1_generate_nconf` (step 6.1), and abort until then.
 //!
 //! The types are opaque in OpenSSL's headers, so their layouts are ours (OpenSSL's, in fact).
@@ -35,9 +36,12 @@ use super::attrib::{
 use super::cert::X509_VAL_it;
 use super::ext::X509_EXTENSION_it;
 use super::name::{X509_NAME_dup, X509_NAME_free};
+use super::print::{X509_signature_dump, sig_print};
+use crate::asn1::hex::i2a_ASN1_STRING;
 use crate::asn1::integer::{
     ASN1_ENUMERATED_get, ASN1_ENUMERATED_set, ASN1_INTEGER_get, ASN1_INTEGER_set,
 };
+use crate::asn1::integer::{ASN1_ENUMERATED_get_int64, i2a_ASN1_INTEGER};
 use crate::asn1::sign::{ASN1_item_sign_ctx, ASN1_item_sign_ex, ASN1_item_verify_ex};
 use crate::asn1::string::{
     ASN1_BIT_STRING_free, ASN1_STRING_copy, ASN1_STRING_dup, ASN1_STRING_free,
@@ -56,17 +60,26 @@ use crate::conf::NCONF_get_section;
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::objects::OBJ_obj2nid;
+use crate::objects::i2a_ASN1_OBJECT;
 use crate::stack::{
     OPENSSL_sk_free, OPENSSL_sk_new_null, OPENSSL_sk_num, OPENSSL_sk_push, OPENSSL_sk_value,
 };
+use crate::x509v3::crld::OSSL_GENERAL_NAMES_print;
 use crate::x509v3::genn::{
     GENERAL_NAME_free, GENERAL_NAME_it, GENERAL_NAME_new, GENERAL_NAME_set0_value,
     GENERAL_NAMES_free,
 };
 use crate::x509v3::registry::{X509V3_add1_i2d, X509V3_get_d2i};
+use crate::x509v3::text::Out;
+use rustyssl_abi::{ERR_R_PASSED_NULL_PARAMETER, V_ASN1_BIT_STRING};
 
 /// `X509_ACERT_ISSUER_V2` (`x509_acert.h`, not public): the issuer's v2Form.
 const ISSUER_V2: c_int = 1;
+
+/// The digested object types (`OSSL_ODI_TYPE_*`, `x509_acert.h`, not public).
+const OSSL_ODI_TYPE_PUBLIC_KEY: c_int = 0;
+const OSSL_ODI_TYPE_PUBLIC_KEY_CERT: c_int = 1;
+const OSSL_ODI_TYPE_OTHER: c_int = 2;
 
 /// `OSSL_OBJECT_DIGEST_INFO`.
 #[repr(C)]
@@ -163,7 +176,7 @@ static ODI_TT: Templates<4> = Templates([
 ]);
 
 /// ObjectDigestInfo.
-unsafe extern "C" fn object_digest_info_it() -> *const ASN1_ITEM {
+pub(crate) unsafe extern "C" fn object_digest_info_it() -> *const ASN1_ITEM {
     static ITEM: crate::asn1::tpl::Item =
         sequence::<ObjectDigestInfo, 4>(&ODI_TT, None, c"OSSL_OBJECT_DIGEST_INFO");
     &raw const ITEM.0
@@ -194,7 +207,7 @@ static ISS_TT: Templates<3> = Templates([
 ]);
 
 /// IssuerSerial.
-unsafe extern "C" fn issuer_serial_it() -> *const ASN1_ITEM {
+pub(crate) unsafe extern "C" fn issuer_serial_it() -> *const ASN1_ITEM {
     static ITEM: crate::asn1::tpl::Item =
         sequence::<IssuerSerial, 3>(&ISS_TT, None, c"OSSL_ISSUER_SERIAL");
     &raw const ITEM.0
@@ -1305,6 +1318,118 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         unsafe { ASN1_item_i2d_bio(it, bp, acert.cast()) }
     }
+}
+
+// Printing (`v3_ac_tgt.c`'s, shared with the attribute certificate extensions).
+
+/// `i2r_ISSUER_SERIAL`: the issuer's names, serial number, and unique ID, each `indent` in: 1,
+/// or 0.
+///
+/// # Safety
+/// `out` is a live BIO; `iss` is NULL or a live `OSSL_ISSUER_SERIAL`.
+pub(crate) unsafe fn issuer_serial_print(
+    out: *mut BIO,
+    iss: *const OSSL_ISSUER_SERIAL,
+    indent: c_int,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(iss) = (unsafe { iss.cast::<IssuerSerial>().as_ref() }) else {
+        return 0;
+    };
+    // SAFETY: as above.
+    let o = unsafe { Out::new(out) };
+    if iss.issuer.is_null() {
+        o.line(indent, "Issuer Names: <none>\n");
+    } else {
+        o.line(indent, "Issuer Names:\n");
+        // SAFETY: the caller's BIO; its names.
+        unsafe { OSSL_GENERAL_NAMES_print(out, iss.issuer, indent) };
+        o.print("\n");
+    }
+    o.line(indent, "Issuer Serial: ");
+    // SAFETY: as above; its serial number.
+    if unsafe { i2a_ASN1_INTEGER(out, &raw const iss.serial) } <= 0 {
+        return 0;
+    }
+    o.print("\n");
+    if iss.issuer_uid.is_null() {
+        o.line(indent, "Issuer UID: <none>\n");
+    } else {
+        o.line(indent, "Issuer UID: ");
+        // SAFETY: as above; its unique ID.
+        if unsafe { i2a_ASN1_STRING(out, iss.issuer_uid, V_ASN1_BIT_STRING) } <= 0 {
+            return 0;
+        }
+        o.print("\n");
+    }
+    1
+}
+
+/// `i2r_OBJECT_DIGEST_INFO`: the digested object's type, the algorithm, and the digest (by the
+/// algorithm's key type's printer, or in hex): 1, or 0.
+///
+/// # Safety
+/// `out` is a live BIO; `odi` is NULL or a live `OSSL_OBJECT_DIGEST_INFO`.
+pub(crate) unsafe fn object_digest_info_print(
+    out: *mut BIO,
+    odi: *const OSSL_OBJECT_DIGEST_INFO,
+    indent: c_int,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(odi) = (unsafe { odi.cast::<ObjectDigestInfo>().as_ref() }) else {
+        err::raise(
+            ERR_LIB_ASN1,
+            ERR_R_PASSED_NULL_PARAMETER,
+            "i2r_OBJECT_DIGEST_INFO",
+        );
+        return 0;
+    };
+    // SAFETY: as above.
+    let o = unsafe { Out::new(out) };
+    let mut dot: i64 = 0;
+    // SAFETY: a local; its type.
+    if unsafe { ASN1_ENUMERATED_get_int64(&raw mut dot, &raw const odi.digested_object_type) } == 0
+    {
+        return 0;
+    }
+    let kind = match dot {
+        d if d == i64::from(OSSL_ODI_TYPE_PUBLIC_KEY) => Some("Public Key"),
+        d if d == i64::from(OSSL_ODI_TYPE_PUBLIC_KEY_CERT) => Some("Public Key Certificate"),
+        d if d == i64::from(OSSL_ODI_TYPE_OTHER) => Some("Other"),
+        _ => None,
+    };
+    if let Some(k) = kind {
+        o.line(indent, &format!("Digest Type: {k}\n"));
+    }
+    if !odi.other_object_type_id.is_null() {
+        o.line(indent, "Digest Type Identifier: ");
+        // SAFETY: the caller's BIO; its type's identifier.
+        unsafe { i2a_ASN1_OBJECT(out, odi.other_object_type_id) };
+        o.print("\n");
+    }
+    if o.line(indent, "Signature Algorithm: ") <= 0 {
+        return 0;
+    }
+    // SAFETY: as above; its algorithm.
+    if unsafe { i2a_ASN1_OBJECT(out, odi.digest_algorithm.algorithm) } <= 0 {
+        return 0;
+    }
+    o.print("\n");
+    let pad = usize::try_from(indent.unsigned_abs()).unwrap_or(0);
+    if o.print(&format!("\n{:pad$}Signature Value: ", "")) <= 0 {
+        return 0;
+    }
+    let sig = &raw const odi.object_digest;
+    let ind = indent.saturating_add(4);
+    // SAFETY: as above; its algorithm and digest.
+    if let Some(r) = unsafe { sig_print(out, &odi.digest_algorithm, sig, ind) } {
+        return r;
+    }
+    if o.write(b"\n") != 1 {
+        return 0;
+    }
+    // SAFETY: as above.
+    unsafe { X509_signature_dump(out, sig, ind) }
 }
 
 #[cfg(test)]

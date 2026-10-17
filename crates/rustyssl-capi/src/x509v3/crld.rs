@@ -5,8 +5,8 @@
 //!
 //! As OpenSSL's, distribution points are made from names (`URI:…`) or from sections
 //! (`fullname`, `relativename`, `reasons`, `CRLissuer`), and printed with their reasons by
-//! name. The attribute authority's issuing distribution point comes with the attribute
-//! certificate extensions.
+//! name. So is an attribute authority's issuing distribution point (an attribute certificate
+//! extension), from a name or a section, its booleans printed only when true.
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::mem::offset_of;
@@ -18,10 +18,11 @@ use rustyssl_abi::{
     ASN1_TFLG_SET_OF, ASN1_VALUE, BIO, BIT_STRING_BITNAME, CONF_VALUE, CRL_DIST_POINTS, DIST_POINT,
     DIST_POINT_NAME, ERR_LIB_ASN1, ERR_LIB_X509V3, ERR_R_ASN1_LIB, ERR_R_CRYPTO_LIB, GENERAL_NAMES,
     ISSUING_DIST_POINT, MBSTRING_ASC, NID_crl_distribution_points, NID_freshest_crl,
-    NID_hold_instruction_code, NID_invalidity_date, NID_issuing_distribution_point, X509_NAME,
-    X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE, X509V3_R_DISTPOINT_ALREADY_SET,
-    X509V3_R_INVALID_MULTIPLE_RDNS, X509V3_R_INVALID_NAME, X509V3_R_MISSING_VALUE,
-    X509V3_R_SECTION_NOT_FOUND, XN_FLAG_ONELINE, stack_st_CONF_VALUE,
+    NID_hold_instruction_code, NID_id_aa_issuing_distribution_point, NID_invalidity_date,
+    NID_issuing_distribution_point, OSSL_AA_DIST_POINT, X509_NAME, X509V3_CTX, X509V3_EXT_METHOD,
+    X509V3_EXT_MULTILINE, X509V3_R_DISTPOINT_ALREADY_SET, X509V3_R_INVALID_MULTIPLE_RDNS,
+    X509V3_R_INVALID_NAME, X509V3_R_MISSING_VALUE, X509V3_R_SECTION_NOT_FOUND, XN_FLAG_ONELINE,
+    stack_st_CONF_VALUE,
 };
 
 use super::ctx::{X509V3_NAME_from_section, X509V3_get_section, X509V3_section_free};
@@ -34,8 +35,8 @@ use crate::asn1::bit_string::{ASN1_BIT_STRING_get_bit, ASN1_BIT_STRING_set_bit};
 use crate::asn1::string::ASN1_BIT_STRING_new;
 use crate::asn1::time::ASN1_GENERALIZEDTIME_print;
 use crate::asn1::tpl::items::{
-    ASN1_BIT_STRING_it, ASN1_FBOOLEAN_it, ASN1_GENERALIZEDTIME_it, ASN1_OBJECT_it, d2i, i2d,
-    new_free,
+    ASN1_BIT_STRING_it, ASN1_FBOOLEAN_it, ASN1_GENERALIZEDTIME_it, ASN1_OBJECT_it,
+    ASN1_TBOOLEAN_it, d2i, i2d, new_free,
 };
 use crate::asn1::tpl::statics::{Aux, Templates, aux, choice, sequence};
 use crate::asn1::tpl::util::ASN1_item_dup;
@@ -1008,6 +1009,251 @@ ffi_export! {
         c_int::from(!d.dpname.is_null())
     }
 }
+
+// The attribute authority's issuing distribution point.
+
+static AADP_TT: Templates<6> = Templates([
+    template_at(
+        ASN1_TFLG_EXPLICIT | ASN1_TFLG_OPTIONAL,
+        0,
+        offset_of!(OSSL_AA_DIST_POINT, distpoint),
+        c"distpoint",
+        DIST_POINT_NAME_it,
+    ),
+    template_at(
+        ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+        1,
+        offset_of!(OSSL_AA_DIST_POINT, reasons),
+        c"reasons",
+        ASN1_BIT_STRING_it,
+    ),
+    template_at(
+        ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+        2,
+        offset_of!(OSSL_AA_DIST_POINT, indirectCRL),
+        c"indirectCRL",
+        ASN1_FBOOLEAN_it,
+    ),
+    template_at(
+        ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+        3,
+        offset_of!(OSSL_AA_DIST_POINT, containsUserAttributeCerts),
+        c"containsUserAttributeCerts",
+        ASN1_TBOOLEAN_it,
+    ),
+    template_at(
+        ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+        4,
+        offset_of!(OSSL_AA_DIST_POINT, containsAACerts),
+        c"containsAACerts",
+        ASN1_TBOOLEAN_it,
+    ),
+    template_at(
+        ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+        5,
+        offset_of!(OSSL_AA_DIST_POINT, containsSOAPublicKeyCerts),
+        c"containsSOAPublicKeyCerts",
+        ASN1_TBOOLEAN_it,
+    ),
+]);
+
+item_fns! {
+    /// An attribute authority's issuing distribution point.
+    pub unsafe extern "C" fn OSSL_AA_DIST_POINT_it = sequence::<OSSL_AA_DIST_POINT, 6>(&AADP_TT, None, c"OSSL_AA_DIST_POINT");
+}
+
+new_free! {
+    pub unsafe extern "C" fn OSSL_AA_DIST_POINT_new, pub unsafe extern "C" fn OSSL_AA_DIST_POINT_free(OSSL_AA_DIST_POINT) = OSSL_AA_DIST_POINT_it;
+}
+
+i2d! {
+    /// Encodes an `OSSL_AA_DIST_POINT`.
+    pub unsafe extern "C" fn i2d_OSSL_AA_DIST_POINT(OSSL_AA_DIST_POINT) = OSSL_AA_DIST_POINT_it;
+}
+
+d2i! {
+    /// Decodes an `OSSL_AA_DIST_POINT` (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_OSSL_AA_DIST_POINT(OSSL_AA_DIST_POINT) = OSSL_AA_DIST_POINT_it;
+}
+
+/// `aaidp_from_section`: an attribute authority's distribution point from a section's values;
+/// names other than the point's name, `reasons`, `indirectCRL`, and the three `contains…`
+/// booleans are ignored.
+///
+/// # Safety
+/// `ctx` is NULL or a live context; `nval` is a live stack of `CONF_VALUE`s.
+unsafe fn aaidp_from_section(
+    ctx: *mut X509V3_CTX,
+    nval: *mut stack_st_CONF_VALUE,
+) -> *mut OSSL_AA_DIST_POINT {
+    // SAFETY: no preconditions.
+    let point = unsafe { OSSL_AA_DIST_POINT_new() };
+    // SAFETY: new, or NULL.
+    let Some(p) = (unsafe { point.as_mut() }) else {
+        return ptr::null_mut();
+    };
+    let fail = || {
+        // SAFETY: made above.
+        unsafe { OSSL_AA_DIST_POINT_free(point) };
+        ptr::null_mut()
+    };
+    // SAFETY: the caller's stack.
+    let n = unsafe { OPENSSL_sk_num(nval.cast()) };
+    for i in 0..n {
+        // SAFETY: an index within the stack; a `CONF_VALUE`.
+        let cnfp = unsafe { OPENSSL_sk_value(nval.cast(), i) }.cast::<CONF_VALUE>();
+        // SAFETY: as above.
+        let Some(cnf) = (unsafe { cnfp.as_ref() }) else {
+            continue;
+        };
+        // SAFETY: the point's name; the caller's context; the value.
+        match unsafe { set_dist_point_name(&mut p.distpoint, ctx, cnf) } {
+            r if r > 0 => continue,
+            r if r < 0 => return fail(),
+            _ => {}
+        }
+        // SAFETY: its name.
+        let name = unsafe { text(cnf.name) };
+        let field = match name {
+            Some(b"indirectCRL") => Some(&raw mut p.indirectCRL),
+            Some(b"containsUserAttributeCerts") => Some(&raw mut p.containsUserAttributeCerts),
+            Some(b"containsAACerts") => Some(&raw mut p.containsAACerts),
+            Some(b"containsSOAPublicKeyCerts") => Some(&raw mut p.containsSOAPublicKeyCerts),
+            _ => None,
+        };
+        if let Some(f) = field {
+            // SAFETY: the value; the field.
+            if unsafe { X509V3_get_value_bool(cnfp, f) } == 0 {
+                return fail();
+            }
+        } else if name == Some(b"reasons") {
+            // SAFETY: the point's reasons; the value.
+            if !unsafe { set_reasons(&mut p.reasons, cnf.value) } {
+                return fail();
+            }
+        }
+    }
+    point
+}
+
+ffi_callback! {
+    /// `v2i_aaidp`: the point from the section named by the first value (one without a value),
+    /// or of the first value as a name (`URI:…`); the others are ignored.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live context; `nval` is NULL or a live stack of `CONF_VALUE`s.
+    pub(crate) unsafe extern "C" fn aaidp_v2i(method: *const X509V3_EXT_METHOD, ctx: *mut X509V3_CTX, nval: *mut stack_st_CONF_VALUE) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_X509V3
+    {
+        const F: &str = "v2i_aaidp";
+        // SAFETY: the caller's stack, or NULL.
+        let cnf = unsafe { OPENSSL_sk_value(nval.cast(), 0) }.cast::<CONF_VALUE>();
+        // SAFETY: a `CONF_VALUE` of the stack, or NULL.
+        let Some(c) = (unsafe { cnf.as_ref() }) else { return ptr::null_mut() };
+        if c.value.is_null() {
+            // SAFETY: the caller's context; the section's name.
+            let dpsect = unsafe { X509V3_get_section(ctx, c.name) };
+            if dpsect.is_null() {
+                return ptr::null_mut();
+            }
+            // SAFETY: as above; the section.
+            let point = unsafe { aaidp_from_section(ctx, dpsect) };
+            // SAFETY: the context's section.
+            unsafe { X509V3_section_free(ctx, dpsect) };
+            return point.cast();
+        }
+        // SAFETY: the caller's context; the value.
+        let gname = unsafe { v2i_GENERAL_NAME(method, ctx, cnf) };
+        if gname.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: no preconditions.
+        let gens = unsafe { GENERAL_NAMES_new() };
+        if gens.is_null() {
+            err::raise(ERR_LIB_X509V3, ERR_R_ASN1_LIB, F);
+            // SAFETY: made above.
+            unsafe { GENERAL_NAME_free(gname) };
+            return ptr::null_mut();
+        }
+        // SAFETY: the stack; the name, which it takes.
+        if unsafe { OPENSSL_sk_push(gens.cast(), gname.cast()) } == 0 {
+            err::raise(ERR_LIB_X509V3, ERR_R_CRYPTO_LIB, F);
+            // SAFETY: as above.
+            unsafe { GENERAL_NAME_free(gname) };
+            // SAFETY: as above.
+            unsafe { GENERAL_NAMES_free(gens) };
+            return ptr::null_mut();
+        }
+        // SAFETY: no preconditions.
+        let point = unsafe { OSSL_AA_DIST_POINT_new() };
+        // SAFETY: as above.
+        let dpn = if point.is_null() { ptr::null_mut() } else { unsafe { DIST_POINT_NAME_new() } };
+        // SAFETY: new, or NULL.
+        let (Some(p), Some(d)) = (unsafe { point.as_mut() }, unsafe { dpn.as_mut() }) else {
+            err::raise(ERR_LIB_X509V3, ERR_R_ASN1_LIB, F);
+            // SAFETY: made above, or NULL.
+            unsafe { OSSL_AA_DIST_POINT_free(point) };
+            // SAFETY: as above.
+            unsafe { GENERAL_NAMES_free(gens) };
+            return ptr::null_mut();
+        };
+        d.name.fullname = gens;
+        d.type_ = 0;
+        p.distpoint = dpn;
+        point.cast()
+    }
+}
+
+ffi_callback! {
+    /// `i2r_aaidp`: the point's name, its reasons, and the booleans that are true.
+    ///
+    /// # Safety
+    /// `ext` is a live `OSSL_AA_DIST_POINT`; `out` is a live BIO.
+    pub(crate) unsafe extern "C" fn aaidp_i2r(_method: *const X509V3_EXT_METHOD, ext: *mut c_void, out: *mut BIO, indent: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(p) = (unsafe { ext.cast::<OSSL_AA_DIST_POINT>().as_ref() }) else { return 0 };
+        // SAFETY: its name, live when set.
+        if let Some(dpn) = unsafe { p.distpoint.as_ref() } {
+            // SAFETY: the caller's BIO; the name.
+            unsafe { print_distpoint(out, dpn, indent) };
+        }
+        if !p.reasons.is_null() {
+            // SAFETY: as above; its reasons.
+            unsafe { print_reasons(out, c"Reasons", p.reasons, indent) };
+        }
+        let flags = [
+            (p.indirectCRL, c"Indirect CRL: "),
+            (p.containsUserAttributeCerts, c"Contains User Attribute Certificates: "),
+            (p.containsAACerts, c"Contains Attribute Authority (AA) Certificates: "),
+            (p.containsSOAPublicKeyCerts, c"Contains Source Of Authority (SOA) Public Key Certificates: "),
+        ];
+        for (b, label) in flags {
+            if b == 0 {
+                continue;
+            }
+            // SAFETY: as above; a static format and its arguments.
+            if unsafe { BIO_printf(out, c"%*s%s".as_ptr(), indent, c"".as_ptr(), label.as_ptr()) } <= 0 {
+                return 0;
+            }
+            // `print_boolean`: any value but 0 is TRUE.
+            // SAFETY: as above.
+            if unsafe { BIO_puts(out, c"TRUE\n".as_ptr()) } <= 0 {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+pub(crate) static AA_ISSUING_DIST_POINT: Method = Method({
+    let mut m = method(NID_id_aa_issuing_distribution_point, 0);
+    m.it = Some(OSSL_AA_DIST_POINT_it);
+    m.v2i = Some(aaidp_v2i);
+    m.i2r = Some(aaidp_i2r);
+    m
+});
 
 const fn crld(nid: c_int) -> Method {
     let mut m = method(nid, 0);
