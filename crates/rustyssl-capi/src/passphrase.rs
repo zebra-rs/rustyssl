@@ -7,7 +7,7 @@
 //! cleared, or dropped. A `pem_password_cb` or a `UI_METHOD` is asked through the UI layer,
 //! which comes with step 4.7d: until then asking one aborts.
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
@@ -416,7 +416,36 @@ pub(crate) unsafe extern "C" fn pw_pem_password(
     rwflag: c_int,
     userdata: *mut c_void,
 ) -> c_int {
-    let info = c"PEM";
+    // SAFETY: the caller's guarantee.
+    unsafe { pw_get_password(buf, size, rwflag, userdata, c"PEM") }
+}
+
+/// `ossl_pw_pvk_password`: as `pw_pem_password`, with the prompt info "PVK".
+///
+/// # Safety
+/// As for `pw_pem_password`.
+pub(crate) unsafe extern "C" fn pw_pvk_password(
+    buf: *mut c_char,
+    size: c_int,
+    rwflag: c_int,
+    userdata: *mut c_void,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe { pw_get_password(buf, size, rwflag, userdata, c"PVK") }
+}
+
+/// `ossl_pw_get_password`: the passphrase the `PwData` gives, asking with the prompt `info`:
+/// its length, or -1.
+///
+/// # Safety
+/// As for `pw_pem_password`.
+unsafe fn pw_get_password(
+    buf: *mut c_char,
+    size: c_int,
+    rwflag: c_int,
+    userdata: *mut c_void,
+    info: &CStr,
+) -> c_int {
     let params = [
         // SAFETY: a static name and string, read during the call.
         unsafe {

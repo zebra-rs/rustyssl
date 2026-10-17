@@ -256,6 +256,7 @@ OpenSSL never depends on them.
 | `d2i_PrivateKey` (and `d2i_AutoPrivateKey`, `_ex`) given a key in `*a`, when the decoders fail and the type's legacy decoding finds a PrivateKeyInfo of another type | frees `*a` before checking the type, then fails, leaving the application's pointer dangling | frees `*a` only once the new key is accepted; on failure `*a` is still the application's key (retyped, as OpenSSL's was before being freed) | `evp::pkey::d2i::tests::a_key_given_survives_a_failed_decoding` |
 | `EVP_PKEY2PKCS8` of a legacy DH or DHX key without a private key | encodes the private key from NULL and crashes | fails with `DH_R_BN_ERROR` | `evp::pkey::dh::tests::pkcs8_without_a_private_key_fails` |
 | `i2d_DSA_PUBKEY` (and `PEM_write_bio_DSA_PUBKEY`) of a DSA key without a public key | encodes the public key from NULL and crashes | fails (-1, or 0 for the PEM writer) with `ERR_R_ASN1_LIB` | `x509::pubkey::tests::a_dsa_key_without_a_public_key_isnt_encoded` |
+| `b2i_PrivateKey` and `b2i_PublicKey` with a negative length | take it as a huge `unsigned int`, so the length checks pass and the key is read past the buffer | fail with `PEM_R_KEYBLOB_TOO_SHORT` | `pvkfmt::tests::a_negative_length_is_refused` |
 
 ## Notes
 

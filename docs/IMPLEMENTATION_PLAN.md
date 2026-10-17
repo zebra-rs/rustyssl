@@ -4106,10 +4106,10 @@ chunking) is clean.
         the context's parameters and their errors, copies, the composite algorithms, a legacy
         DSA, a DSA with an application's method, generation through a copy of the method); the
         probe's `dsasig` with `corpus/dsasig.txt` and random sessions (200 pass).
-- [ ] **4.7 Key encoders and decoders:**
+- [x] **4.7 Key encoders and decoders:**
   - the `OSSL_ENCODER` and `OSSL_DECODER` frameworks and their built-in implementations,
-    including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs` aborts where a provider
-    has a text encoder for the key until then)
+    including `EVP_PKEY_print_*`'s text encoding (`evp/pkey/print.rs`, through the text
+    encoders)
   - formats: DER and PEM, PKCS#8 (plain, and encrypted with PBES2/scrypt or legacy PBES1),
     SPKI, PKCS#1, SEC1, "traditional" PEM with DEK-Info, MSBLOB/PVK, text
   - `PEM_{read,write}_bio_{PrivateKey,PUBKEY,RSAPrivateKey,…}`,
@@ -4179,7 +4179,7 @@ chunking) is clean.
       and given the provider's library context, which RSA, DSA, DH, and ECX keys can now take
       afterwards; `export_object` for another provider's key manager); placeholders for the
       post-quantum, MSBLOB, and PVK decoders that pass other input over and abort for theirs
-      (4.7b2b, 4.7e); `OSSL_DECODER_CTX_new_for_pkey` (the key managers and decoders collected
+      (since replaced: 4.7b2b, 4.7e); `OSSL_DECODER_CTX_new_for_pkey` (the key managers and decoders collected
       as OpenSSL does, the construct loading the key or exporting it to another provider, a
       template copied as OpenSSL's cache copies it — instances with fresh contexts — though
       without the cache); `d2i_PrivateKey`, `d2i_AutoPrivateKey` (decoders, then the legacy
@@ -4247,8 +4247,8 @@ chunking) is clean.
         saving them, DH's always, RSA's NULL, and a restricted RSA-PSS key's parameters.
         A type-specific PEM private key given a cipher is a traditional encrypted PEM.
       - EC's and SM2's `key2blob`.
-      - The text encoders (4.7c2) and MSBLOB and PVK (`pending_encoders.rs`, 4.7e) as
-        placeholders: their contexts are real, and their encoding aborts.
+      - The text encoders (4.7c2) and MSBLOB and PVK (4.7e) as placeholders, since
+        replaced: their contexts were real, and their encoding aborted.
       - An EncryptedPrivateKeyInfo (4.7d) aborts once it has the passphrase.
 
       Also: `i2d_PrivateKey`, `i2d_PublicKey`, and `i2d_KeyParams` (`evp/pkey/i2d.rs`, with the
@@ -4367,8 +4367,29 @@ chunking) is clean.
         - the errors.
 
         The PBE fuzz target covers the decryption.
-  - [ ] **4.7e MSBLOB and PVK**: `encode_key2ms`, `decode_msblob2key`, `decode_pvk2key`,
-    and `b2i_*`/`i2b_*`.
+  - [x] **4.7e MSBLOB and PVK** (`pvkfmt.rs`, `provider/blob2key.rs`, `provider/key2ms.rs`):
+    - `b2i_PrivateKey`, `b2i_PublicKey`, and their `_bio` forms; `i2b_PrivateKey_bio` and
+      `i2b_PublicKey_bio`; `b2i_PVK_bio(_ex)` and `i2b_PVK_bio(_ex)`. RSA and DSS blobs, with
+      OpenSSL's 32-bit length arithmetic (a bit length that wraps included), its header
+      checks and errors, and its limits (`BLOB_MAX_LENGTH`, PVK's key and salt lengths).
+    - Reading goes through a bounds-checked cursor, so a length claimed past the input fails
+      where OpenSSL would read past it; a negative length is a deviation (docs/DEVIATIONS.md).
+    - A PVK is encrypted with RC4 under PVKKDF's key (40 or 128 bits; reading tries the
+      128-bit key, then the 40-bit one). Both are the legacy provider's (9.1), so without it
+      an encrypted PVK fails after the passphrase is asked for, as the reference's does with
+      only the default provider. `b2i_PVK_bio_ex` drops its library context, as OpenSSL's
+      does.
+    - The MSBLOB and PVK decoders (`decode_msblob2key.c`, `decode_pvk2key.c`) and encoders
+      (`encode_key2ms.c`): selections, `export_object`, the PVK decoder's properties, the
+      "PVK" passphrase prompt (`ossl_pw_pvk_password`), a bad passphrase as a fatal error,
+      the encoders' `import_object`, and the PVK encoder's encryption level.
+    - Tests:
+      - `tests/c/pvkfmt.c` (31 checks): RSA and DSA keys through every writer and reader and
+        back, the decoders and encoders, every truncation, header field, and kind mismatch,
+        crafted headers (wrapped bit lengths, too long), keys a blob can't hold, and the
+        encrypted fixtures failing without the legacy provider.
+      - The probe's `msblob`, with `corpus/msblob.txt` and random sessions (300 pass).
+      - `fuzz/fuzz_targets/msblob.rs` (232k runs clean).
 - [ ] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD
   combination, and GREASE.
 

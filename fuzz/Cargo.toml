@@ -477,3 +477,9 @@ name = "pbe"
 path = "fuzz_targets/pbe.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "msblob"
+path = "fuzz_targets/msblob.rs"
+test = false
+doc = false

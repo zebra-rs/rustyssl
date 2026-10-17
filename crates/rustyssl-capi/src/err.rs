@@ -55,6 +55,16 @@ pub(crate) fn library_of(code: c_ulong) -> c_int {
     c_int::try_from(library).unwrap_or(0)
 }
 
+/// `ERR_GET_REASON(code)` from `err.h`.
+pub(crate) fn reason_of(code: c_ulong) -> c_int {
+    let mask = if is_system(code) {
+        c_ulong::from(c_int::MAX.cast_unsigned())
+    } else {
+        c_ulong::from(ERR_REASON_MASK.cast_unsigned())
+    };
+    c_int::try_from(code & mask).unwrap_or(0)
+}
+
 /// `ERR_SYSTEM_ERROR(code)` from `err.h`.
 fn is_system(code: c_ulong) -> bool {
     code & c_ulong::from(ERR_SYSTEM_FLAG) != 0

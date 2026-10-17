@@ -12,8 +12,7 @@
 //! - A type-specific PEM private key given a cipher is a traditional encrypted PEM.
 //! - `import_object` makes a key of the encoder's type from another provider's key's parameters.
 //!
-//! The text encoders' text is `key2text`'s; MSBLOB and PVK come with step 4.7e
-//! (`pending_encoders`).
+//! The text encoders' text is `key2text`'s; MSBLOB's and PVK's encoders are `key2ms`'s.
 
 use core::ffi::{CStr, c_char, c_int, c_uchar, c_void};
 use core::ptr;
@@ -303,7 +302,7 @@ fn check_selection(selection: c_int, mask: c_int) -> c_int {
 ///
 /// # Safety
 /// `fns` is one of the built-in key managers' tables; `params` is NULL or an array.
-unsafe fn import_key(
+pub(super) unsafe fn import_key(
     fns: &[OSSL_DISPATCH],
     provctx: *mut c_void,
     selection: c_int,
@@ -1821,7 +1820,7 @@ const fn encoder<const N: usize>(
     }
 }
 
-use super::pending_encoders::{DSA_TO_MSBLOB, DSA_TO_PVK, RSA_TO_MSBLOB, RSA_TO_PVK};
+use super::key2ms::{DSA_TO_MSBLOB, DSA_TO_PVK, RSA_TO_MSBLOB, RSA_TO_PVK};
 
 /// `deflt_encoder`.
 pub(crate) fn default_encoders() -> *const OSSL_ALGORITHM {

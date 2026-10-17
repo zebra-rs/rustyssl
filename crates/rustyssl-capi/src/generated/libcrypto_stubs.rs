@@ -15960,52 +15960,6 @@ pub extern "C" fn a2i_IPADDRESS_NC(_: *const core::ffi::c_char) -> *mut ASN1_OCT
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn b2i_PVK_bio(
-    _: *mut BIO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PVK_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn b2i_PVK_bio_ex(
-    _: *mut BIO,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PVK_bio_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn b2i_PrivateKey(
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn b2i_PrivateKey_bio(_: *mut BIO) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn b2i_PublicKey(
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn b2i_PublicKey_bio(_: *mut BIO) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("b2i_PublicKey_bio")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn conf_ssl_get(
     _: usize,
     _: *mut *const core::ffi::c_char,
@@ -17462,40 +17416,6 @@ pub extern "C" fn i2a_ACCESS_DESCRIPTION(
     _: *const ACCESS_DESCRIPTION,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2a_ACCESS_DESCRIPTION")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2b_PVK_bio(
-    _: *mut BIO,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2b_PVK_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2b_PVK_bio_ex(
-    _: *mut BIO,
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2b_PVK_bio_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2b_PrivateKey_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2b_PrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2b_PublicKey_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2b_PublicKey_bio")
 }
 
 #[unsafe(no_mangle)]
