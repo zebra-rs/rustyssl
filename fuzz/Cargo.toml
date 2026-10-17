@@ -48,6 +48,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "smime_text"
+path = "fuzz_targets/smime_text.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "stack"
 path = "fuzz_targets/stack.rs"
 test = false

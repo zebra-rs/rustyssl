@@ -4948,7 +4948,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     signing time, content type, and message digest. The type's streaming callbacks abort until
     6.3b and 6.3c. Tests: `tests/c/pkcs7.c` (the reference tool's signed, detached,
     certificates-only, and enveloped objects; every type built), the `pkcs7_d2i` fuzz target.
-  - [ ] **6.3b Sign, verify, encrypt, decrypt** (`pk7_doit.c`, `pk7_smime.c`).
+  - [x] **6.3b Sign, verify, encrypt, decrypt** (`pkcs7/doit.rs` and `pkcs7/smime.rs`, from
+    `pk7_doit.c` and `pk7_smime.c`; `asn1/mime.rs`'s `SMIME_crlf_copy` and `SMIME_text`, over
+    `rustyssl_asn1::mime`, OpenSSL's MIME header parser quirk for quirk, bounded; 18 exports):
+    the data path (`PKCS7_dataInit` with its digest and cipher BIOs and a new content key
+    encrypted to each recipient, `_dataDecode`, which keeps a random key in place of one that
+    fails to decrypt, `_dataFinal`, `_SIGNER_INFO_sign`, `_dataVerify`, `_signatureVerify`,
+    comparing the message digest in constant time) and the one-call operations (`PKCS7_sign`,
+    `_sign_ex`, `_sign_add_signer` with S/MIME capabilities and `PKCS7_REUSE_DIGEST`, `_final`,
+    `_verify` with every flag, `_get0_signers`, `_encrypt`, `_encrypt_ex`, `_decrypt`). Tests:
+    `tests/c/pkcs7_smime.c` (the reference tool's attached, detached, EC, and enveloped objects
+    verified and decrypted; objects made here round-tripped with each flag; tampered,
+    untrusted, mismatched, and missing inputs; the MIME helpers), the `smime_text` fuzz target.
   - [ ] **6.3c Streaming and S/MIME** (`bio_ndef.c`, `bio_asn1.c`, `asn_mime.c`, `pk7_mime.c`).
 - [ ] **6.4 CMS:**
   - every content type and recipient-info type present in the target headers
