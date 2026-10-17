@@ -4275,7 +4275,9 @@ fn hpke_session(random: &mut Random, out: &mut String) -> Result {
 /// Values for `v3print` sessions to start from, by NID (only extensions whose methods are in):
 /// key usage, Netscape's certificate type and comment, the signing tool, the CRL number and
 /// reason, inhibitAnyPolicy, the subject key identifier, basic constraints, extended key usage,
-/// and the private key usage period.
+/// the private key usage period, a subject alternative name of every type, the authority key
+/// identifier, the information access extensions, CRL distribution points and the freshest CRL,
+/// an issuing distribution point, and an invalidity date.
 const V3PRINT_SEEDS: &[(u32, &[&str])] = &[
     (83, &["030205a0", "0303070080"]),
     (71, &["030200ff"]),
@@ -4294,6 +4296,40 @@ const V3PRINT_SEEDS: &[(u32, &[&str])] = &[
         84,
         &["3022800f32303234303130313030303030305a810f32303235303130313030303030305a"],
     ),
+    (
+        90,
+        &[
+            "3058801454ffa67b8d3e6d5207ec8981c3096390b0e6e2b7a136a4343032310b3009060355040613024a503111300f060355040a0c08727573747973736c3110300e06035504030c075465737420434182081234567890abcdef",
+        ],
+    ),
+    (
+        177,
+        &[
+            "3048302006082b060105050730018614687474703a2f2f6f6373702e6578616d706c652f302406082b060105050730028618687474703a2f2f63612e6578616d706c652f63612e637274",
+        ],
+    ),
+    (
+        398,
+        &["3022302006082b060105050730058614687474703a2f2f7265706f2e6578616d706c652f"],
+    ),
+    (
+        103,
+        &[
+            "306c301ea01ca01a8618687474703a2f2f63726c2e6578616d706c652f612e63726c304aa029a0278618687474703a2f2f63726c2e6578616d706c652f622e63726c810b63726c406578616d706c6581020560a219a41730153113301106035504030c0a43524c20497373756572",
+        ],
+    ),
+    (
+        857,
+        &["30243022a020a01e861c687474703a2f2f63726c2e6578616d706c652f64656c74612e63726c"],
+    ),
+    (
+        85,
+        &[
+            "3081dc820b73616e2e6578616d706c65820d2a2e73616e2e6578616d706c658704c0000201871020010db8000000000000000000000001810b6140622e6578616d706c65861568747470733a2f2f73616e2e6578616d706c652f7888032a0304a4223020310b3009060355040613024a503111300f06035504030c08646972206e616d65a01b060a2b060104018237140203a00d0c0b75706e406578616d706c65a02006082b06010505070807a01416125f687474702e5f7463702e6578616d706c65a00d06042a030405a0051603726177a00b06042a030406a003020107",
+        ],
+    ),
+    (770, &["30138008a0068604687474708101ff8201ff8401ff8501ff"]),
+    (142, &["180f32303234303130323033303430355a"]),
 ];
 
 /// A random session of `v3print` commands: a NID's seeds with octets changed, removed, or

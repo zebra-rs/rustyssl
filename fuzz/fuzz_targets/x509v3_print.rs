@@ -32,9 +32,10 @@ unsafe extern "C" {
 
 /// The extensions whose methods are in: key usage, Netscape's certificate type and strings,
 /// the signing tool, the CRL numbers and reason, inhibitAnyPolicy, the subject key identifier,
-/// basic constraints, the extended key usages, the private key usage period, and one without
-/// a method (commonName).
-const NIDS: [c_int; 21] = [
+/// basic constraints, the extended key usages, the private key usage period, the alternative
+/// names, the key identifier, the information access and distribution point extensions, the
+/// CRL entries' extensions, and one without a method (commonName).
+const NIDS: [c_int; 32] = [
     abi::NID_key_usage,
     abi::NID_netscape_cert_type,
     abi::NID_netscape_base_url,
@@ -55,6 +56,17 @@ const NIDS: [c_int; 21] = [
     abi::NID_id_pkix_OCSP_acceptableResponses,
     abi::NID_private_key_usage_period,
     abi::NID_acceptable_cert_policies,
+    abi::NID_subject_alt_name,
+    abi::NID_issuer_alt_name,
+    abi::NID_certificate_issuer,
+    abi::NID_authority_key_identifier,
+    abi::NID_info_access,
+    abi::NID_sinfo_access,
+    abi::NID_crl_distribution_points,
+    abi::NID_freshest_crl,
+    abi::NID_issuing_distribution_point,
+    abi::NID_invalidity_date,
+    abi::NID_hold_instruction_code,
     abi::NID_commonName,
 ];
 

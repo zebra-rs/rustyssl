@@ -7,24 +7,20 @@ use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 use rustyssl_abi::{
     BIO, NID_ac_auditIdentity, NID_allowed_attribute_assignments, NID_associated_information,
     NID_attribute_descriptor, NID_attribute_mappings, NID_authority_attribute_identifier,
-    NID_authority_key_identifier, NID_basic_att_constraints, NID_certificate_issuer,
-    NID_certificate_policies, NID_crl_distribution_points, NID_ct_cert_scts, NID_ct_precert_poison,
-    NID_ct_precert_scts, NID_delegated_name_constraints, NID_freshest_crl, NID_group_ac,
-    NID_hold_instruction_code, NID_holder_name_constraints, NID_id_aa_issuing_distribution_point,
-    NID_id_pkix_OCSP_CrlID, NID_id_pkix_OCSP_Nonce, NID_id_pkix_OCSP_archiveCutoff,
-    NID_id_pkix_OCSP_noCheck, NID_id_pkix_OCSP_serviceLocator, NID_indirect_issuer,
-    NID_info_access, NID_invalidity_date, NID_issued_on_behalf_of, NID_issuer_alt_name,
-    NID_issuerSignTool, NID_issuing_distribution_point, NID_name_constraints, NID_no_assertion,
-    NID_no_rev_avail, NID_policy_constraints, NID_policy_mappings, NID_proxyCertInfo,
-    NID_role_spec_cert_identifier, NID_sbgp_autonomousSysNum, NID_sbgp_ipAddrBlock,
-    NID_sinfo_access, NID_single_use, NID_soa_identifier, NID_subject_alt_name,
-    NID_subject_directory_attributes, NID_sxnet, NID_target_information, NID_time_specification,
-    NID_tlsfeature, NID_user_notice, NID_x509ExtAdmission, X509V3_CTX, X509V3_EXT_METHOD,
-    X509V3_EXT_MULTILINE, stack_st_CONF_VALUE,
+    NID_basic_att_constraints, NID_certificate_policies, NID_ct_cert_scts, NID_ct_precert_poison,
+    NID_ct_precert_scts, NID_delegated_name_constraints, NID_group_ac, NID_holder_name_constraints,
+    NID_id_aa_issuing_distribution_point, NID_id_pkix_OCSP_CrlID, NID_id_pkix_OCSP_Nonce,
+    NID_id_pkix_OCSP_archiveCutoff, NID_id_pkix_OCSP_noCheck, NID_id_pkix_OCSP_serviceLocator,
+    NID_indirect_issuer, NID_issued_on_behalf_of, NID_issuerSignTool, NID_name_constraints,
+    NID_no_assertion, NID_no_rev_avail, NID_policy_constraints, NID_policy_mappings,
+    NID_proxyCertInfo, NID_role_spec_cert_identifier, NID_sbgp_autonomousSysNum,
+    NID_sbgp_ipAddrBlock, NID_single_use, NID_soa_identifier, NID_subject_directory_attributes,
+    NID_sxnet, NID_target_information, NID_time_specification, NID_tlsfeature, NID_user_notice,
+    NID_x509ExtAdmission, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE, stack_st_CONF_VALUE,
 };
 
 use super::registry::{Method, method};
-use super::simple;
+use super::{akid, crld, info, san, simple};
 
 fn later() -> ! {
     crate::stub::unimplemented("an X509v3 extension method of a later part of step 5.2")
@@ -91,15 +87,9 @@ const fn placeholder(nid: c_int, flags: c_int) -> Method {
     Method(m)
 }
 
-static LATER: [Method; 52] = [
-    placeholder(NID_subject_alt_name, 0),
-    placeholder(NID_issuer_alt_name, 0),
+static LATER: [Method; 41] = [
     placeholder(NID_certificate_policies, 0),
-    placeholder(NID_authority_key_identifier, X509V3_EXT_MULTILINE),
-    placeholder(NID_crl_distribution_points, 0),
-    placeholder(NID_invalidity_date, 0),
     placeholder(NID_sxnet, X509V3_EXT_MULTILINE),
-    placeholder(NID_info_access, X509V3_EXT_MULTILINE),
     placeholder(NID_ac_auditIdentity, 0),
     placeholder(NID_sbgp_ipAddrBlock, 0),
     placeholder(NID_sbgp_autonomousSysNum, 0),
@@ -108,18 +98,13 @@ static LATER: [Method; 52] = [
     placeholder(NID_id_pkix_OCSP_noCheck, 0),
     placeholder(NID_id_pkix_OCSP_archiveCutoff, 0),
     placeholder(NID_id_pkix_OCSP_serviceLocator, 0),
-    placeholder(NID_sinfo_access, X509V3_EXT_MULTILINE),
     placeholder(NID_policy_constraints, 0),
     placeholder(NID_target_information, 0),
     placeholder(NID_no_rev_avail, 0),
-    placeholder(NID_hold_instruction_code, 0),
     placeholder(NID_proxyCertInfo, 0),
     placeholder(NID_name_constraints, 0),
     placeholder(NID_policy_mappings, 0),
     placeholder(NID_subject_directory_attributes, X509V3_EXT_MULTILINE),
-    placeholder(NID_issuing_distribution_point, X509V3_EXT_MULTILINE),
-    placeholder(NID_certificate_issuer, 0),
-    placeholder(NID_freshest_crl, 0),
     placeholder(NID_ct_precert_scts, 0),
     placeholder(NID_ct_precert_poison, 0),
     placeholder(NID_ct_cert_scts, 0),
@@ -163,6 +148,17 @@ pub(crate) fn methods() -> impl Iterator<Item = &'static Method> {
         &simple::SIGN_TOOL,
         &simple::ACC_CERT_POLICIES,
         &simple::ACC_PRIV_POLICIES,
+        &san::SUBJECT_ALT,
+        &san::ISSUER_ALT,
+        &san::CERT_ISSUER,
+        &akid::AKEY_ID,
+        &info::INFO,
+        &info::SINFO,
+        &crld::CRLD,
+        &crld::FRESHEST_CRL,
+        &crld::IDP,
+        &crld::CRL_INVDATE,
+        &crld::CRL_HOLD,
     ]
     .into_iter()
     .chain(simple::NS_IA5.iter())
