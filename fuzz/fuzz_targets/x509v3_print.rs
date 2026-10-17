@@ -34,8 +34,10 @@ unsafe extern "C" {
 /// the signing tool, the CRL numbers and reason, inhibitAnyPolicy, the subject key identifier,
 /// basic constraints, the extended key usages, the private key usage period, the alternative
 /// names, the key identifier, the information access and distribution point extensions, the
-/// CRL entries' extensions, and one without a method (commonName).
-const NIDS: [c_int; 32] = [
+/// CRL entries' extensions, the policy and constraint extensions, the smaller ones (SXNET, the
+/// TLS feature, the signing tools, the audit identity), RFC 3779's, and one without a method
+/// (commonName).
+const NIDS: [c_int; 45] = [
     abi::NID_key_usage,
     abi::NID_netscape_cert_type,
     abi::NID_netscape_base_url,
@@ -67,6 +69,19 @@ const NIDS: [c_int; 32] = [
     abi::NID_issuing_distribution_point,
     abi::NID_invalidity_date,
     abi::NID_hold_instruction_code,
+    abi::NID_certificate_policies,
+    abi::NID_policy_mappings,
+    abi::NID_policy_constraints,
+    abi::NID_proxyCertInfo,
+    abi::NID_name_constraints,
+    abi::NID_holder_name_constraints,
+    abi::NID_delegated_name_constraints,
+    abi::NID_sxnet,
+    abi::NID_tlsfeature,
+    abi::NID_issuerSignTool,
+    abi::NID_ac_auditIdentity,
+    abi::NID_sbgp_ipAddrBlock,
+    abi::NID_sbgp_autonomousSysNum,
     abi::NID_commonName,
 ];
 

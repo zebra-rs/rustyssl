@@ -99,51 +99,6 @@ pub extern "C" fn ADMISSION_SYNTAX_set0_contentsOfAdmissions(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASIdOrRange_free(_: *mut ASIdOrRange) {
-    crate::stub::unimplemented("ASIdOrRange_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdOrRange_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASIdOrRange_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdOrRange_new() -> *mut ASIdOrRange {
-    crate::stub::unimplemented("ASIdOrRange_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifierChoice_free(_: *mut ASIdentifierChoice) {
-    crate::stub::unimplemented("ASIdentifierChoice_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifierChoice_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASIdentifierChoice_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifierChoice_new() -> *mut ASIdentifierChoice {
-    crate::stub::unimplemented("ASIdentifierChoice_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifiers_free(_: *mut ASIdentifiers) {
-    crate::stub::unimplemented("ASIdentifiers_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifiers_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASIdentifiers_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASIdentifiers_new() -> *mut ASIdentifiers {
-    crate::stub::unimplemented("ASIdentifiers_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_ITEM_get(_: usize) -> *const ASN1_ITEM {
     crate::stub::unimplemented("ASN1_ITEM_get")
 }
@@ -201,21 +156,6 @@ pub extern "C" fn ASN1_generate_v3(
     _: *mut X509V3_CTX,
 ) -> *mut ASN1_TYPE {
     crate::stub::unimplemented("ASN1_generate_v3")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASRange_free(_: *mut ASRange) {
-    crate::stub::unimplemented("ASRange_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASRange_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASRange_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASRange_new() -> *mut ASRange {
-    crate::stub::unimplemented("ASRange_new")
 }
 
 #[unsafe(no_mangle)]
@@ -469,21 +409,6 @@ pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_log")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CERTIFICATEPOLICIES_free(_: *mut CERTIFICATEPOLICIES) {
-    crate::stub::unimplemented("CERTIFICATEPOLICIES_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CERTIFICATEPOLICIES_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CERTIFICATEPOLICIES_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CERTIFICATEPOLICIES_new() -> *mut CERTIFICATEPOLICIES {
-    crate::stub::unimplemented("CERTIFICATEPOLICIES_new")
 }
 
 #[unsafe(no_mangle)]
@@ -2863,96 +2788,6 @@ pub extern "C" fn EVP_SealInit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_SUBTREE_free(_: *mut GENERAL_SUBTREE) {
-    crate::stub::unimplemented("GENERAL_SUBTREE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_SUBTREE_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("GENERAL_SUBTREE_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_SUBTREE_new() -> *mut GENERAL_SUBTREE {
-    crate::stub::unimplemented("GENERAL_SUBTREE_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressChoice_free(_: *mut IPAddressChoice) {
-    crate::stub::unimplemented("IPAddressChoice_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressChoice_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("IPAddressChoice_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressChoice_new() -> *mut IPAddressChoice {
-    crate::stub::unimplemented("IPAddressChoice_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressFamily_free(_: *mut IPAddressFamily) {
-    crate::stub::unimplemented("IPAddressFamily_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressFamily_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("IPAddressFamily_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressFamily_new() -> *mut IPAddressFamily {
-    crate::stub::unimplemented("IPAddressFamily_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressOrRange_free(_: *mut IPAddressOrRange) {
-    crate::stub::unimplemented("IPAddressOrRange_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressOrRange_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("IPAddressOrRange_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressOrRange_new() -> *mut IPAddressOrRange {
-    crate::stub::unimplemented("IPAddressOrRange_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressRange_free(_: *mut IPAddressRange) {
-    crate::stub::unimplemented("IPAddressRange_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressRange_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("IPAddressRange_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn IPAddressRange_new() -> *mut IPAddressRange {
-    crate::stub::unimplemented("IPAddressRange_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUER_SIGN_TOOL_free(_: *mut ISSUER_SIGN_TOOL) {
-    crate::stub::unimplemented("ISSUER_SIGN_TOOL_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUER_SIGN_TOOL_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ISSUER_SIGN_TOOL_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUER_SIGN_TOOL_new() -> *mut ISSUER_SIGN_TOOL {
-    crate::stub::unimplemented("ISSUER_SIGN_TOOL_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn NAME_CONSTRAINTS_check(
     _: *mut X509,
     _: *mut NAME_CONSTRAINTS,
@@ -2966,21 +2801,6 @@ pub extern "C" fn NAME_CONSTRAINTS_check_CN(
     _: *mut NAME_CONSTRAINTS,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("NAME_CONSTRAINTS_check_CN")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NAME_CONSTRAINTS_free(_: *mut NAME_CONSTRAINTS) {
-    crate::stub::unimplemented("NAME_CONSTRAINTS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NAME_CONSTRAINTS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("NAME_CONSTRAINTS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NAME_CONSTRAINTS_new() -> *mut NAME_CONSTRAINTS {
-    crate::stub::unimplemented("NAME_CONSTRAINTS_new")
 }
 
 #[unsafe(no_mangle)]
@@ -3131,21 +2951,6 @@ pub extern "C" fn NETSCAPE_SPKI_verify(
     _: *mut EVP_PKEY,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("NETSCAPE_SPKI_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NOTICEREF_free(_: *mut NOTICEREF) {
-    crate::stub::unimplemented("NOTICEREF_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NOTICEREF_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("NOTICEREF_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NOTICEREF_new() -> *mut NOTICEREF {
-    crate::stub::unimplemented("NOTICEREF_new")
 }
 
 #[unsafe(no_mangle)]
@@ -8685,71 +8490,6 @@ pub extern "C" fn PKCS7_verify(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn POLICYINFO_free(_: *mut POLICYINFO) {
-    crate::stub::unimplemented("POLICYINFO_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICYINFO_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("POLICYINFO_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICYINFO_new() -> *mut POLICYINFO {
-    crate::stub::unimplemented("POLICYINFO_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICYQUALINFO_free(_: *mut POLICYQUALINFO) {
-    crate::stub::unimplemented("POLICYQUALINFO_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICYQUALINFO_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("POLICYQUALINFO_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICYQUALINFO_new() -> *mut POLICYQUALINFO {
-    crate::stub::unimplemented("POLICYQUALINFO_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_CONSTRAINTS_free(_: *mut POLICY_CONSTRAINTS) {
-    crate::stub::unimplemented("POLICY_CONSTRAINTS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_CONSTRAINTS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("POLICY_CONSTRAINTS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_CONSTRAINTS_new() -> *mut POLICY_CONSTRAINTS {
-    crate::stub::unimplemented("POLICY_CONSTRAINTS_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_MAPPINGS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("POLICY_MAPPINGS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_MAPPING_free(_: *mut POLICY_MAPPING) {
-    crate::stub::unimplemented("POLICY_MAPPING_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_MAPPING_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("POLICY_MAPPING_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn POLICY_MAPPING_new() -> *mut POLICY_MAPPING {
-    crate::stub::unimplemented("POLICY_MAPPING_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PROFESSION_INFO_free(_: *mut PROFESSION_INFO) {
     crate::stub::unimplemented("PROFESSION_INFO_free")
 }
@@ -8837,36 +8577,6 @@ pub extern "C" fn PROFESSION_INFO_set0_registrationNumber(
     _: *mut ASN1_PRINTABLESTRING,
 ) {
     crate::stub::unimplemented("PROFESSION_INFO_set0_registrationNumber")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_CERT_INFO_EXTENSION_free(_: *mut PROXY_CERT_INFO_EXTENSION) {
-    crate::stub::unimplemented("PROXY_CERT_INFO_EXTENSION_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_CERT_INFO_EXTENSION_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PROXY_CERT_INFO_EXTENSION_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_CERT_INFO_EXTENSION_new() -> *mut PROXY_CERT_INFO_EXTENSION {
-    crate::stub::unimplemented("PROXY_CERT_INFO_EXTENSION_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_POLICY_free(_: *mut PROXY_POLICY) {
-    crate::stub::unimplemented("PROXY_POLICY_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_POLICY_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PROXY_POLICY_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PROXY_POLICY_new() -> *mut PROXY_POLICY {
-    crate::stub::unimplemented("PROXY_POLICY_new")
 }
 
 #[unsafe(no_mangle)]
@@ -9408,100 +9118,6 @@ pub extern "C" fn SRP_user_pwd_set1_ids(
 #[unsafe(no_mangle)]
 pub extern "C" fn SRP_user_pwd_set_gN(_: *mut SRP_user_pwd, _: *const BIGNUM, _: *const BIGNUM) {
     crate::stub::unimplemented("SRP_user_pwd_set_gN")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNETID_free(_: *mut SXNETID) {
-    crate::stub::unimplemented("SXNETID_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNETID_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("SXNETID_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNETID_new() -> *mut SXNETID {
-    crate::stub::unimplemented("SXNETID_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_add_id_INTEGER(
-    _: *mut *mut SXNET,
-    _: *mut ASN1_INTEGER,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SXNET_add_id_INTEGER")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_add_id_asc(
-    _: *mut *mut SXNET,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SXNET_add_id_asc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_add_id_ulong(
-    _: *mut *mut SXNET,
-    _: core::ffi::c_ulong,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SXNET_add_id_ulong")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_free(_: *mut SXNET) {
-    crate::stub::unimplemented("SXNET_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_get_id_INTEGER(
-    _: *mut SXNET,
-    _: *mut ASN1_INTEGER,
-) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("SXNET_get_id_INTEGER")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_get_id_asc(
-    _: *mut SXNET,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("SXNET_get_id_asc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_get_id_ulong(
-    _: *mut SXNET,
-    _: core::ffi::c_ulong,
-) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("SXNET_get_id_ulong")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("SXNET_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SXNET_new() -> *mut SXNET {
-    crate::stub::unimplemented("SXNET_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn TLS_FEATURE_free(_: *mut TLS_FEATURE) {
-    crate::stub::unimplemented("TLS_FEATURE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn TLS_FEATURE_new() -> *mut TLS_FEATURE {
-    crate::stub::unimplemented("TLS_FEATURE_new")
 }
 
 #[unsafe(no_mangle)]
@@ -10598,21 +10214,6 @@ pub extern "C" fn TXT_DB_read(_: *mut BIO, _: core::ffi::c_int) -> *mut TXT_DB {
 #[unsafe(no_mangle)]
 pub extern "C" fn TXT_DB_write(_: *mut BIO, _: *mut TXT_DB) -> core::ffi::c_long {
     crate::stub::unimplemented("TXT_DB_write")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn USERNOTICE_free(_: *mut USERNOTICE) {
-    crate::stub::unimplemented("USERNOTICE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn USERNOTICE_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("USERNOTICE_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn USERNOTICE_new() -> *mut USERNOTICE {
-    crate::stub::unimplemented("USERNOTICE_new")
 }
 
 #[unsafe(no_mangle)]
@@ -13650,76 +13251,6 @@ pub extern "C" fn X509_verify_cert_error_string(_: core::ffi::c_long) -> *const 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_add_inherit(
-    _: *mut IPAddrBlocks,
-    _: core::ffi::c_uint,
-    _: *const core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_add_inherit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_add_prefix(
-    _: *mut IPAddrBlocks,
-    _: core::ffi::c_uint,
-    _: *const core::ffi::c_uint,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_add_prefix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_add_range(
-    _: *mut IPAddrBlocks,
-    _: core::ffi::c_uint,
-    _: *const core::ffi::c_uint,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_add_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_canonize(_: *mut IPAddrBlocks) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_canonize")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_get_afi(_: *const IPAddressFamily) -> core::ffi::c_uint {
-    crate::stub::unimplemented("X509v3_addr_get_afi")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_get_range(
-    _: *mut IPAddressOrRange,
-    _: core::ffi::c_uint,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_get_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_inherits(_: *mut IPAddrBlocks) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_inherits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_is_canonical(_: *mut IPAddrBlocks) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_is_canonical")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_subset(
-    _: *mut IPAddrBlocks,
-    _: *mut IPAddrBlocks,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_subset")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509v3_addr_validate_path(_: *mut X509_STORE_CTX) -> core::ffi::c_int {
     crate::stub::unimplemented("X509v3_addr_validate_path")
 }
@@ -13731,47 +13262,6 @@ pub extern "C" fn X509v3_addr_validate_resource_set(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509v3_addr_validate_resource_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_add_id_or_range(
-    _: *mut ASIdentifiers,
-    _: core::ffi::c_int,
-    _: *mut ASN1_INTEGER,
-    _: *mut ASN1_INTEGER,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_add_id_or_range")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_add_inherit(
-    _: *mut ASIdentifiers,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_add_inherit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_canonize(_: *mut ASIdentifiers) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_canonize")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_inherits(_: *mut ASIdentifiers) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_inherits")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_is_canonical(_: *mut ASIdentifiers) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_is_canonical")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_subset(
-    _: *mut ASIdentifiers,
-    _: *mut ASIdentifiers,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_subset")
 }
 
 #[unsafe(no_mangle)]
@@ -13831,51 +13321,6 @@ pub extern "C" fn d2i_ADMISSION_SYNTAX(
     _: core::ffi::c_long,
 ) -> *mut ADMISSION_SYNTAX {
     crate::stub::unimplemented("d2i_ADMISSION_SYNTAX")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ASIdOrRange(
-    _: *mut *mut ASIdOrRange,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ASIdOrRange {
-    crate::stub::unimplemented("d2i_ASIdOrRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ASIdentifierChoice(
-    _: *mut *mut ASIdentifierChoice,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ASIdentifierChoice {
-    crate::stub::unimplemented("d2i_ASIdentifierChoice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ASIdentifiers(
-    _: *mut *mut ASIdentifiers,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ASIdentifiers {
-    crate::stub::unimplemented("d2i_ASIdentifiers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ASRange(
-    _: *mut *mut ASRange,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ASRange {
-    crate::stub::unimplemented("d2i_ASRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_CERTIFICATEPOLICIES(
-    _: *mut *mut CERTIFICATEPOLICIES,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut CERTIFICATEPOLICIES {
-    crate::stub::unimplemented("d2i_CERTIFICATEPOLICIES")
 }
 
 #[unsafe(no_mangle)]
@@ -13947,51 +13392,6 @@ pub extern "C" fn d2i_ESS_SIGNING_CERT_V2(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_IPAddressChoice(
-    _: *mut *mut IPAddressChoice,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut IPAddressChoice {
-    crate::stub::unimplemented("d2i_IPAddressChoice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_IPAddressFamily(
-    _: *mut *mut IPAddressFamily,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut IPAddressFamily {
-    crate::stub::unimplemented("d2i_IPAddressFamily")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_IPAddressOrRange(
-    _: *mut *mut IPAddressOrRange,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut IPAddressOrRange {
-    crate::stub::unimplemented("d2i_IPAddressOrRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_IPAddressRange(
-    _: *mut *mut IPAddressRange,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut IPAddressRange {
-    crate::stub::unimplemented("d2i_IPAddressRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ISSUER_SIGN_TOOL(
-    _: *mut *mut ISSUER_SIGN_TOOL,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ISSUER_SIGN_TOOL {
-    crate::stub::unimplemented("d2i_ISSUER_SIGN_TOOL")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_NAMING_AUTHORITY(
     _: *mut *mut NAMING_AUTHORITY,
     _: *mut *const core::ffi::c_uchar,
@@ -14025,15 +13425,6 @@ pub extern "C" fn d2i_NETSCAPE_SPKI(
     _: core::ffi::c_long,
 ) -> *mut NETSCAPE_SPKI {
     crate::stub::unimplemented("d2i_NETSCAPE_SPKI")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_NOTICEREF(
-    _: *mut *mut NOTICEREF,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut NOTICEREF {
-    crate::stub::unimplemented("d2i_NOTICEREF")
 }
 
 #[unsafe(no_mangle)]
@@ -14758,24 +14149,6 @@ pub extern "C" fn d2i_PKCS7_fp(_: *mut FILE, _: *mut *mut PKCS7) -> *mut PKCS7 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_POLICYINFO(
-    _: *mut *mut POLICYINFO,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut POLICYINFO {
-    crate::stub::unimplemented("d2i_POLICYINFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_POLICYQUALINFO(
-    _: *mut *mut POLICYQUALINFO,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut POLICYQUALINFO {
-    crate::stub::unimplemented("d2i_POLICYQUALINFO")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_PROFESSION_INFO(
     _: *mut *mut PROFESSION_INFO,
     _: *mut *const core::ffi::c_uchar,
@@ -14785,48 +14158,12 @@ pub extern "C" fn d2i_PROFESSION_INFO(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_PROXY_CERT_INFO_EXTENSION(
-    _: *mut *mut PROXY_CERT_INFO_EXTENSION,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PROXY_CERT_INFO_EXTENSION {
-    crate::stub::unimplemented("d2i_PROXY_CERT_INFO_EXTENSION")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PROXY_POLICY(
-    _: *mut *mut PROXY_POLICY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PROXY_POLICY {
-    crate::stub::unimplemented("d2i_PROXY_POLICY")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_SCT_LIST(
     _: *mut *mut stack_st_SCT,
     _: *mut *const core::ffi::c_uchar,
     _: core::ffi::c_long,
 ) -> *mut stack_st_SCT {
     crate::stub::unimplemented("d2i_SCT_LIST")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_SXNET(
-    _: *mut *mut SXNET,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut SXNET {
-    crate::stub::unimplemented("d2i_SXNET")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_SXNETID(
-    _: *mut *mut SXNETID,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut SXNETID {
-    crate::stub::unimplemented("d2i_SXNETID")
 }
 
 #[unsafe(no_mangle)]
@@ -14930,15 +14267,6 @@ pub extern "C" fn d2i_TS_TST_INFO_fp(_: *mut FILE, _: *mut *mut TS_TST_INFO) -> 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_USERNOTICE(
-    _: *mut *mut USERNOTICE,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut USERNOTICE {
-    crate::stub::unimplemented("d2i_USERNOTICE")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_X509_ACERT(
     _: *mut *mut X509_ACERT,
     _: *mut *const core::ffi::c_uchar,
@@ -15011,30 +14339,6 @@ pub extern "C" fn i2d_ADMISSION_SYNTAX(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASIdOrRange(
-    _: *const ASIdOrRange,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASIdOrRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASIdentifierChoice(
-    _: *const ASIdentifierChoice,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASIdentifierChoice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASIdentifiers(
-    _: *const ASIdentifiers,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASIdentifiers")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_ASN1_bio_stream(
     _: *mut BIO,
     _: *mut ASN1_VALUE,
@@ -15043,22 +14347,6 @@ pub extern "C" fn i2d_ASN1_bio_stream(
     _: *const ASN1_ITEM,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_ASN1_bio_stream")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASRange(
-    _: *const ASRange,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CERTIFICATEPOLICIES(
-    _: *const CERTIFICATEPOLICIES,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CERTIFICATEPOLICIES")
 }
 
 #[unsafe(no_mangle)]
@@ -15133,46 +14421,6 @@ pub extern "C" fn i2d_ESS_SIGNING_CERT_V2(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_IPAddressChoice(
-    _: *const IPAddressChoice,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_IPAddressChoice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_IPAddressFamily(
-    _: *const IPAddressFamily,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_IPAddressFamily")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_IPAddressOrRange(
-    _: *const IPAddressOrRange,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_IPAddressOrRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_IPAddressRange(
-    _: *const IPAddressRange,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_IPAddressRange")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ISSUER_SIGN_TOOL(
-    _: *const ISSUER_SIGN_TOOL,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ISSUER_SIGN_TOOL")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_NAMING_AUTHORITY(
     _: *const NAMING_AUTHORITY,
     _: *mut *mut core::ffi::c_uchar,
@@ -15202,14 +14450,6 @@ pub extern "C" fn i2d_NETSCAPE_SPKI(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_NETSCAPE_SPKI")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_NOTICEREF(
-    _: *const NOTICEREF,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_NOTICEREF")
 }
 
 #[unsafe(no_mangle)]
@@ -15869,22 +15109,6 @@ pub extern "C" fn i2d_PKCS7_fp(_: *mut FILE, _: *const PKCS7) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_POLICYINFO(
-    _: *const POLICYINFO,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_POLICYINFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_POLICYQUALINFO(
-    _: *const POLICYQUALINFO,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_POLICYQUALINFO")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PROFESSION_INFO(
     _: *const PROFESSION_INFO,
     _: *mut *mut core::ffi::c_uchar,
@@ -15893,40 +15117,11 @@ pub extern "C" fn i2d_PROFESSION_INFO(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PROXY_CERT_INFO_EXTENSION(
-    _: *const PROXY_CERT_INFO_EXTENSION,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PROXY_CERT_INFO_EXTENSION")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PROXY_POLICY(
-    _: *const PROXY_POLICY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PROXY_POLICY")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_SCT_LIST(
     _: *const stack_st_SCT,
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_SCT_LIST")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_SXNET(_: *const SXNET, _: *mut *mut core::ffi::c_uchar) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_SXNET")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_SXNETID(
-    _: *const SXNETID,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_SXNETID")
 }
 
 #[unsafe(no_mangle)]
@@ -16021,14 +15216,6 @@ pub extern "C" fn i2d_TS_TST_INFO_bio(_: *mut BIO, _: *const TS_TST_INFO) -> cor
 #[unsafe(no_mangle)]
 pub extern "C" fn i2d_TS_TST_INFO_fp(_: *mut FILE, _: *const TS_TST_INFO) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_TS_TST_INFO_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_USERNOTICE(
-    _: *const USERNOTICE,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_USERNOTICE")
 }
 
 #[unsafe(no_mangle)]

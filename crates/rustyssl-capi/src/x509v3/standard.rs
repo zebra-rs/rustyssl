@@ -5,22 +5,20 @@
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
 use rustyssl_abi::{
-    BIO, NID_ac_auditIdentity, NID_allowed_attribute_assignments, NID_associated_information,
-    NID_attribute_descriptor, NID_attribute_mappings, NID_authority_attribute_identifier,
-    NID_basic_att_constraints, NID_certificate_policies, NID_ct_cert_scts, NID_ct_precert_poison,
-    NID_ct_precert_scts, NID_delegated_name_constraints, NID_group_ac, NID_holder_name_constraints,
+    BIO, NID_allowed_attribute_assignments, NID_associated_information, NID_attribute_descriptor,
+    NID_attribute_mappings, NID_authority_attribute_identifier, NID_basic_att_constraints,
+    NID_ct_cert_scts, NID_ct_precert_poison, NID_ct_precert_scts, NID_group_ac,
     NID_id_aa_issuing_distribution_point, NID_id_pkix_OCSP_CrlID, NID_id_pkix_OCSP_Nonce,
     NID_id_pkix_OCSP_archiveCutoff, NID_id_pkix_OCSP_noCheck, NID_id_pkix_OCSP_serviceLocator,
-    NID_indirect_issuer, NID_issued_on_behalf_of, NID_issuerSignTool, NID_name_constraints,
-    NID_no_assertion, NID_no_rev_avail, NID_policy_constraints, NID_policy_mappings,
-    NID_proxyCertInfo, NID_role_spec_cert_identifier, NID_sbgp_autonomousSysNum,
-    NID_sbgp_ipAddrBlock, NID_single_use, NID_soa_identifier, NID_subject_directory_attributes,
-    NID_sxnet, NID_target_information, NID_time_specification, NID_tlsfeature, NID_user_notice,
-    NID_x509ExtAdmission, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE, stack_st_CONF_VALUE,
+    NID_indirect_issuer, NID_issued_on_behalf_of, NID_no_assertion, NID_no_rev_avail,
+    NID_role_spec_cert_identifier, NID_single_use, NID_soa_identifier,
+    NID_subject_directory_attributes, NID_target_information, NID_time_specification,
+    NID_user_notice, NID_x509ExtAdmission, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE,
+    stack_st_CONF_VALUE,
 };
 
 use super::registry::{Method, method};
-use super::{akid, crld, info, san, simple};
+use super::{akid, crld, info, misc, policy, rfc3779, san, simple};
 
 fn later() -> ! {
     crate::stub::unimplemented("an X509v3 extension method of a later part of step 5.2")
@@ -87,34 +85,22 @@ const fn placeholder(nid: c_int, flags: c_int) -> Method {
     Method(m)
 }
 
-static LATER: [Method; 41] = [
-    placeholder(NID_certificate_policies, 0),
-    placeholder(NID_sxnet, X509V3_EXT_MULTILINE),
-    placeholder(NID_ac_auditIdentity, 0),
-    placeholder(NID_sbgp_ipAddrBlock, 0),
-    placeholder(NID_sbgp_autonomousSysNum, 0),
+static LATER: [Method; 28] = [
     placeholder(NID_id_pkix_OCSP_Nonce, 0),
     placeholder(NID_id_pkix_OCSP_CrlID, 0),
     placeholder(NID_id_pkix_OCSP_noCheck, 0),
     placeholder(NID_id_pkix_OCSP_archiveCutoff, 0),
     placeholder(NID_id_pkix_OCSP_serviceLocator, 0),
-    placeholder(NID_policy_constraints, 0),
     placeholder(NID_target_information, 0),
     placeholder(NID_no_rev_avail, 0),
-    placeholder(NID_proxyCertInfo, 0),
-    placeholder(NID_name_constraints, 0),
-    placeholder(NID_policy_mappings, 0),
     placeholder(NID_subject_directory_attributes, X509V3_EXT_MULTILINE),
     placeholder(NID_ct_precert_scts, 0),
     placeholder(NID_ct_precert_poison, 0),
     placeholder(NID_ct_cert_scts, 0),
-    placeholder(NID_issuerSignTool, X509V3_EXT_MULTILINE),
-    placeholder(NID_tlsfeature, 0),
     placeholder(NID_x509ExtAdmission, 0),
     placeholder(NID_authority_attribute_identifier, X509V3_EXT_MULTILINE),
     placeholder(NID_role_spec_cert_identifier, X509V3_EXT_MULTILINE),
     placeholder(NID_basic_att_constraints, 0),
-    placeholder(NID_delegated_name_constraints, 0),
     placeholder(NID_time_specification, X509V3_EXT_MULTILINE),
     placeholder(NID_attribute_descriptor, X509V3_EXT_MULTILINE),
     placeholder(NID_user_notice, 0),
@@ -127,7 +113,6 @@ static LATER: [Method; 41] = [
     placeholder(NID_group_ac, 0),
     placeholder(NID_allowed_attribute_assignments, 0),
     placeholder(NID_attribute_mappings, X509V3_EXT_MULTILINE),
-    placeholder(NID_holder_name_constraints, 0),
     placeholder(NID_associated_information, X509V3_EXT_MULTILINE),
 ];
 
@@ -159,6 +144,19 @@ pub(crate) fn methods() -> impl Iterator<Item = &'static Method> {
         &crld::IDP,
         &crld::CRL_INVDATE,
         &crld::CRL_HOLD,
+        &policy::CPOLS,
+        &policy::POLICY_MAPPINGS,
+        &policy::POLICY_CONSTRAINTS_METHOD,
+        &policy::PCI,
+        &policy::NAME_CONSTRAINTS_METHOD,
+        &policy::HOLDER_NAME_CONSTRAINTS,
+        &policy::DELEGATED_NAME_CONSTRAINTS,
+        &misc::SXNET_METHOD,
+        &misc::TLS_FEATURE_METHOD,
+        &misc::ISSUER_SIGN_TOOL_METHOD,
+        &misc::AUDIT_IDENTITY,
+        &rfc3779::ADDR,
+        &rfc3779::ASID,
     ]
     .into_iter()
     .chain(simple::NS_IA5.iter())
