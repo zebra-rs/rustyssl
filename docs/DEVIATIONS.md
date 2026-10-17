@@ -280,6 +280,7 @@ OpenSSL never depends on them.
 | The `X509_REQ_get*`, `X509_REQ_set*`, and attribute-reading functions, `X509_REQ_verify`, `X509_REQ_add_extensions`, and `X509_REQ_digest` with a NULL request | dereference NULL | answer NULL, 0, or -1 (an attribute count or index), or do nothing | `x509::req::tests::null_requests_are_safe` |
 | The default `check_crl` and `cert_crl` of a verification context (reachable through `X509_STORE_CTX_get_check_crl` and `_get_cert_crl`, or a custom `get_crl` that returns success without a CRL) with a NULL CRL | dereference NULL | fail (0) | `x509::revoke::tests::null_crls_fail` |
 | `X509_policy_check` with a NULL `ptree` or `pexplicit_policy`; `X509_POLICY_NODE_print` with a NULL node | write or read through NULL | return `X509_PCY_TREE_INTERNAL`; print nothing | `x509::pcy::tests::null_arguments_are_refused` |
+| `X509v3_addr_validate_path` and `X509v3_addr_validate_resource_set` with a NULL certificate in the chain | dereference NULL | fail (0, with `X509_V_ERR_UNSPECIFIED` in a context), as the AS identifier validation does | `x509v3::rfc3779::tests::null_certificates_in_chains_fail` |
 
 ## Notes
 

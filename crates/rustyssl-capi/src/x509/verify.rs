@@ -3,7 +3,7 @@
 //! certificates and the store (trusted issuers first or last, then alternate chains, partial
 //! chains if asked for), then checked: trust, the extensions and purposes, path and proxy path
 //! lengths, the security level of keys and signatures, the identities, revocation (`revoke.rs`),
-//! Suite B, the signatures and validity times, name constraints, RFC 3779 resources (5.4e),
+//! Suite B, the signatures and validity times, name constraints, RFC 3779 resources,
 //! and policies (`pcy.rs`). Each failure goes to the verification callback, which may accept it,
 //! with the error, its depth, and its certificate set, as OpenSSL's.
 //!
@@ -1407,28 +1407,18 @@ unsafe fn verify_chain(ctx: *mut X509_STORE_CTX) -> c_int {
     ok
 }
 
-/// The RFC 3779 resource checks (`X509v3_asid_validate_path`, `X509v3_addr_validate_path`),
-/// which come with step 5.4e; until then a chain with resources aborts.
+/// The RFC 3779 resource checks (`X509v3_asid_validate_path`, `X509v3_addr_validate_path`).
 ///
 /// # Safety
 /// `ctx` is a live context.
 unsafe fn rfc3779(ctx: *mut X509_STORE_CTX) -> c_int {
     // SAFETY: the caller's guarantee.
-    let Some(cx) = (unsafe { c(ctx) }) else {
-        return 0;
-    };
-    let chain = cx.chain;
-    let any = (0..len(chain)).any(|i| {
-        // SAFETY: a certificate of the chain.
-        let x = unsafe { cert_of(at(chain, i)) };
-        x.is_some_and(|x| !x.cache.addr.is_null() || !x.cache.asid.is_null())
-    });
-    if any {
-        crate::stub::unimplemented(
-            "X509v3_asid_validate_path and X509v3_addr_validate_path (step 5.4e)",
-        );
+    let ok = unsafe { crate::x509v3::rfc3779::X509v3_asid_validate_path(ctx) };
+    if ok <= 0 {
+        return ok;
     }
-    1
+    // SAFETY: as above.
+    unsafe { crate::x509v3::rfc3779::X509v3_addr_validate_path(ctx) }
 }
 
 /// `x509_verify_x509`.
