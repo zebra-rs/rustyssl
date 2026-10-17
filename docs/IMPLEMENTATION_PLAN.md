@@ -4147,7 +4147,7 @@ chunking) is clean.
       - Tests: `tests/c/x509_pubkey.c` (19 checks); the probe's `spkider` with
         `corpus/spkider.txt` and random sessions (300 pass); `fuzz/fuzz_targets/spki_der.rs`;
         Rust tests of the ECX codecs (no API reaches a legacy ECX key yet).
-  - [ ] **4.7b Decoders**, in sub-steps:
+  - [x] **4.7b Decoders**, in sub-steps:
     - [x] **4.7b1 The framework and the structural decoders** (`decoder.rs`,
       `decoder/ctx.rs`, `passphrase.rs`, `provider/decoders.rs`; 40 exports): `OSSL_DECODER`
       (fetched through the EVP fetch, whose `Kind` now has OpenSSL's fetch style: the decoder
@@ -4218,9 +4218,22 @@ chunking) is clean.
         preference; seeds and keys that disagree; malformed encodings and their errors); the
         probe's `d2ikey` corpus and random sessions with post-quantum seeds (2,000 pass); the
         `d2i_pkey` fuzz target over them (330k runs clean).
-    - [ ] **4.7b2c PEM key readers**: `PEM_read_bio_PrivateKey` (`_ex`), `_PUBKEY`,
-      `_Parameters`, the type-specific readers (`_RSAPrivateKey`, `_RSA_PUBKEY`, `_DSAparams`,
-      `_ECPrivateKey`, `_DHparams`, ...), and their `FILE` forms, through the decoders.
+    - [x] **4.7b2c PEM key readers** (`pem_pkey.rs`; 32 exports): `PEM_read_bio_PrivateKey`,
+      `_PUBKEY`, and `_Parameters` with their `_ex` and `FILE` forms, as `pem_pkey.c` reads: the
+      decoders from the BIO's position (moving past blocks they don't support), then the legacy
+      reading by name (PKCS#8, a type's traditional key, a SubjectPublicKeyInfo, a type's
+      parameters) from the same position, with the password callback (the default one for none)
+      asked through a cache (OpenSSL's `ossl_pw_pem_password`) and a read buffer under a BIO
+      that can't tell its position; the type-specific readers (`_RSAPrivateKey`,
+      `_DSAPrivateKey`, `_ECPrivateKey` over the key reading; `_RSAPublicKey`, `_RSA_PUBKEY`,
+      `_DSA_PUBKEY`, `_EC_PUBKEY`, `_ECPKParameters`, `_X509_PUBKEY`, `_PKCS8`,
+      `_PKCS8_PRIV_KEY_INFO` over `PEM_ASN1_read_bio`) and their `FILE` forms. Encrypted keys
+      (asking a `pem_password_cb` through the UI, and PKCS#8 decryption) come with 4.7d.
+      - Tests: `tests/c/pem_pkey.c` (every kind of block through every reader; several blocks
+        in one input, read in turn and past others; a pipe; files; replacing `*x`; the password
+        callback never asked for an unencrypted key; the errors); the probe's `pemkey` with
+        `corpus/pemkey.txt` and random sessions (1,500 pass); `fuzz/fuzz_targets/pem_pkey.rs`
+        (173k runs clean).
   - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an
     output type and structure), the default provider's `key2any` (DER and PEM:
     PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures, parameters) and

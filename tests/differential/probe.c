@@ -386,6 +386,10 @@
  *                              the input type and structure (- for none), the selection (hex),
  *                              and a passphrase (- for none, so decryption fails): what each
  *                              construct got, the result, and the octets left
+ *   pemkey <k|u|p> <hex>       PEM_read_bio_PrivateKey (k), PEM_read_bio_PUBKEY (u), or
+ *                              PEM_read_bio_Parameters (p) of the text in hex, read again
+ *                              until it fails: each key's type and sizes, the octets left,
+ *                              and the errors
  *   d2ikey <how> <hex>         a key from the octets through the decoders and the legacy
  *                              fallbacks: d2i_AutoPrivateKey (a), d2i_PrivateKey of a key type
  *                              (its number), d2i_PUBKEY (u), EVP_PKCS82PKEY of the PrivateKeyInfo
@@ -6428,6 +6432,34 @@ static int x509_command(const char *command, const char *line)
         }
         print_asn_errors();
         OSSL_DECODER_CTX_free(dctx);
+        OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "pemkey") == 0) {
+        char how[4] = "k", hx[8200] = "";
+        long len = 0;
+        unsigned char *in;
+        BIO *b;
+        int i;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %3s %8199s", how, hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        b = in != NULL ? BIO_new_mem_buf(in, (int)len) : NULL;
+        for (i = 0; b != NULL && i < 4; i++) {
+            EVP_PKEY *k = how[0] == 'u'   ? PEM_read_bio_PUBKEY(b, NULL, NULL, (void *)"")
+                          : how[0] == 'p' ? PEM_read_bio_Parameters(b, NULL)
+                                          : PEM_read_bio_PrivateKey(b, NULL, NULL, (void *)"");
+
+            if (k == NULL)
+                break;
+            printf(" [%s %d %d]", EVP_PKEY_get0_type_name(k) != NULL ? EVP_PKEY_get0_type_name(k) : "-",
+                   EVP_PKEY_get_id(k), EVP_PKEY_get_bits(k));
+            EVP_PKEY_free(k);
+        }
+        printf(" left %d", b != NULL ? (int)BIO_pending(b) : -1);
+        print_asn_errors();
+        BIO_free(b);
         OPENSSL_free(in);
         return 1;
     }

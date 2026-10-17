@@ -62,6 +62,7 @@ mod params;
 mod passphrase;
 mod pem;
 mod pem_cipher;
+mod pem_pkey;
 mod pem_read;
 mod pkcs12;
 mod property;
