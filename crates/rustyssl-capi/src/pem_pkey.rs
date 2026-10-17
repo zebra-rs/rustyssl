@@ -16,13 +16,13 @@ use core::ptr;
 use libc::FILE;
 use rustyssl_abi::{
     BIO, BIO_C_FILE_SEEK, BIO_C_FILE_TELL, BIO_CTRL_EOF, DSA, EC_GROUP, EC_KEY, ERR_LIB_PEM,
-    ERR_R_ASN1_LIB, ERR_R_UNSUPPORTED, ERR_REASON_MASK, ERR_SYSTEM_FLAG, EVP_PKEY,
+    ERR_R_ASN1_LIB, ERR_R_UNSUPPORTED, ERR_REASON_MASK, ERR_SYSTEM_FLAG, EVP_CIPHER, EVP_PKEY,
     EVP_PKEY_KEY_PARAMETERS, EVP_PKEY_KEYPAIR, EVP_PKEY_PUBLIC_KEY,
     OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, PEM_BUFSIZE,
-    PEM_R_BAD_PASSWORD_READ, PEM_R_UNSUPPORTED_KEY_COMPONENTS, PEM_STRING_ECPARAMETERS,
-    PEM_STRING_EVP_PKEY, PEM_STRING_PARAMETERS, PEM_STRING_PKCS8, PEM_STRING_PKCS8INF,
-    PEM_STRING_PUBLIC, PEM_STRING_RSA_PUBLIC, PKCS8_PRIV_KEY_INFO, RSA, X509_PUBKEY, X509_SIG,
-    pem_password_cb,
+    PEM_R_BAD_PASSWORD_READ, PEM_R_UNSUPPORTED_KEY_COMPONENTS, PEM_STRING_DSA,
+    PEM_STRING_ECPARAMETERS, PEM_STRING_ECPRIVATEKEY, PEM_STRING_EVP_PKEY, PEM_STRING_PARAMETERS,
+    PEM_STRING_PKCS8, PEM_STRING_PKCS8INF, PEM_STRING_PUBLIC, PEM_STRING_RSA,
+    PEM_STRING_RSA_PUBLIC, PKCS8_PRIV_KEY_INFO, RSA, X509_PUBKEY, X509_SIG, pem_password_cb,
 };
 
 use crate::bio::{BIO_ctrl, BIO_free, BIO_new, BIO_pop, BIO_push};
@@ -830,4 +830,723 @@ pem_write! {
     PKCS8_PRIV_KEY_INFO, crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO, PEM_STRING_PKCS8INF, i2d_p8inf_void;
     pub unsafe extern "C" fn PEM_write_bio_PKCS8_PRIV_KEY_INFO();
     pub unsafe extern "C" fn PEM_write_PKCS8_PRIV_KEY_INFO();
+}
+
+/// The type-specific writers that may encrypt (`IMPLEMENT_PEM_write_cb`): the structure's
+/// `i2d` through `PEM_ASN1_write_bio` with the cipher, passphrase, and callback.
+macro_rules! pem_write_cb {
+    (
+        $ty:ty, $i2d:path, $name:expr, $void:ident;
+        pub unsafe extern "C" fn $bio:ident();
+        pub unsafe extern "C" fn $fp:ident();
+    ) => {
+        /// The structure's `i2d` as an `i2d_of_void`.
+        unsafe extern "C" fn $void(x: *const c_void, pp: *mut *mut c_uchar) -> c_int {
+            // SAFETY: the caller's guarantee.
+            unsafe { $i2d(x.cast_mut().cast(), pp) }
+        }
+
+        ffi_export! {
+            /// Writes the structure as a PEM block of its name, encrypted with `enc` (and the
+            /// passphrase `kstr`, else asked of `cb`) if given. 1, or 0.
+            ///
+            /// # Safety
+            /// `bp` is a live BIO; `x` is a live value; `enc` is NULL or a cipher; `kstr` is NULL
+            /// or `klen` octets; `cb` is NULL or a password callback taking `u`.
+            pub unsafe extern "C" fn $bio(bp: *mut BIO, x: *const $ty, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void) -> c_int
+            where failure = 0, library = ERR_LIB_PEM
+            {
+                let f: I2dOfVoid = $void;
+                // SAFETY: the caller's guarantee.
+                unsafe { crate::pem_cipher::PEM_ASN1_write_bio(Some(f), $name.as_ptr(), bp, x.cast(), enc, kstr, klen, cb, u) }
+            }
+        }
+
+        ffi_export! {
+            /// The writer to a `FILE`.
+            ///
+            /// # Safety
+            /// `fp` is an open `FILE`; otherwise as for the BIO writer.
+            pub unsafe extern "C" fn $fp(fp: *mut FILE, x: *const $ty, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void) -> c_int
+            where failure = 0, library = ERR_LIB_PEM
+            {
+                let f: I2dOfVoid = $void;
+                // SAFETY: the caller's guarantee.
+                unsafe { crate::pem_cipher::PEM_ASN1_write(Some(f), $name.as_ptr(), fp, x.cast(), enc, kstr, klen, cb, u) }
+            }
+        }
+    };
+}
+
+pem_write_cb! {
+    RSA, crate::rsa_asn1::i2d_RSAPrivateKey, PEM_STRING_RSA, i2d_rsa_private_void;
+    pub unsafe extern "C" fn PEM_write_bio_RSAPrivateKey();
+    pub unsafe extern "C" fn PEM_write_RSAPrivateKey();
+}
+
+pem_write! {
+    RSA, crate::rsa_asn1::i2d_RSAPublicKey, PEM_STRING_RSA_PUBLIC, i2d_rsa_public_void;
+    pub unsafe extern "C" fn PEM_write_bio_RSAPublicKey();
+    pub unsafe extern "C" fn PEM_write_RSAPublicKey();
+}
+
+pem_write! {
+    RSA, crate::x509::pubkey::i2d_RSA_PUBKEY, PEM_STRING_PUBLIC, i2d_rsa_pubkey_void;
+    pub unsafe extern "C" fn PEM_write_bio_RSA_PUBKEY();
+    pub unsafe extern "C" fn PEM_write_RSA_PUBKEY();
+}
+
+pem_write_cb! {
+    DSA, crate::dsa_asn1::i2d_DSAPrivateKey, PEM_STRING_DSA, i2d_dsa_private_void;
+    pub unsafe extern "C" fn PEM_write_bio_DSAPrivateKey();
+    pub unsafe extern "C" fn PEM_write_DSAPrivateKey();
+}
+
+pem_write! {
+    DSA, crate::x509::pubkey::i2d_DSA_PUBKEY, PEM_STRING_PUBLIC, i2d_dsa_pubkey_void;
+    pub unsafe extern "C" fn PEM_write_bio_DSA_PUBKEY();
+    pub unsafe extern "C" fn PEM_write_DSA_PUBKEY();
+}
+
+pem_write! {
+    EC_GROUP, crate::ec::asn1::i2d_ECPKParameters, PEM_STRING_ECPARAMETERS, i2d_ecpkparameters_void;
+    pub unsafe extern "C" fn PEM_write_bio_ECPKParameters();
+    pub unsafe extern "C" fn PEM_write_ECPKParameters();
+}
+
+pem_write_cb! {
+    EC_KEY, crate::ec::key_asn1::i2d_ECPrivateKey, PEM_STRING_ECPRIVATEKEY, i2d_ec_private_void;
+    pub unsafe extern "C" fn PEM_write_bio_ECPrivateKey();
+    pub unsafe extern "C" fn PEM_write_ECPrivateKey();
+}
+
+pem_write! {
+    EC_KEY, crate::x509::pubkey::i2d_EC_PUBKEY, PEM_STRING_PUBLIC, i2d_ec_pubkey_void;
+    pub unsafe extern "C" fn PEM_write_bio_EC_PUBKEY();
+    pub unsafe extern "C" fn PEM_write_EC_PUBKEY();
+}
+
+// The key writers (`pem_pkey.c`, `pem_pk8.c`, and `pem_all.c`'s PUBKEY): a provided key through
+// the PEM encoders (`IMPLEMENT_PEM_provided_write_body_*`), a legacy one through its ASN.1
+// method.
+
+/// Where a key writer writes: a BIO, or a `FILE` (`OSSL_ENCODER_to_bio` or `_to_fp`, and
+/// `PEM_ASN1_write_bio` or `PEM_ASN1_write`).
+#[derive(Clone, Copy)]
+enum Sink {
+    Bio(*mut BIO),
+    File(*mut FILE),
+}
+
+impl Sink {
+    /// The encoder's output into it.
+    ///
+    /// # Safety
+    /// The context is live; the sink's BIO or `FILE` is.
+    unsafe fn encode(self, ctx: *mut rustyssl_abi::OSSL_ENCODER_CTX) -> c_int {
+        match self {
+            // SAFETY: the caller's guarantee.
+            Self::Bio(b) => unsafe { crate::encoder::ctx::OSSL_ENCODER_to_bio(ctx, b) },
+            // SAFETY: as above.
+            Self::File(f) => unsafe { crate::encoder::ctx::OSSL_ENCODER_to_fp(ctx, f) },
+        }
+    }
+
+    /// `PEM_ASN1_write_bio` (or `PEM_ASN1_write`) into it.
+    ///
+    /// # Safety
+    /// As for `PEM_ASN1_write_bio`.
+    #[allow(clippy::too_many_arguments, reason = "PEM_ASN1_write_bio's")]
+    unsafe fn asn1(
+        self,
+        i2d: I2dOfVoid,
+        name: *const c_char,
+        x: *const c_void,
+        enc: *const EVP_CIPHER,
+        kstr: *const c_uchar,
+        klen: c_int,
+        cb: pem_password_cb,
+        u: *mut c_void,
+    ) -> c_int {
+        match self {
+            // SAFETY: the caller's guarantee.
+            Self::Bio(b) => unsafe {
+                crate::pem_cipher::PEM_ASN1_write_bio(Some(i2d), name, b, x, enc, kstr, klen, cb, u)
+            },
+            // SAFETY: as above.
+            Self::File(f) => unsafe {
+                crate::pem_cipher::PEM_ASN1_write(Some(i2d), name, f, x, enc, kstr, klen, cb, u)
+            },
+        }
+    }
+}
+
+/// `IMPLEMENT_PEM_provided_write_body_vars`: the PEM encoders of the key's part and structure,
+/// or `None` (the context freed) when there are none, for the legacy path.
+///
+/// # Safety
+/// `x` is NULL or a live key; `propq` is NULL or a C string.
+unsafe fn pem_encoders(
+    x: *const EVP_PKEY,
+    selection: c_int,
+    structure: &CStr,
+    propq: *const c_char,
+) -> Option<*mut rustyssl_abi::OSSL_ENCODER_CTX> {
+    use crate::encoder::ctx::{OSSL_ENCODER_CTX_free, OSSL_ENCODER_CTX_get_num_encoders};
+    // SAFETY: the caller's key; static strings; the caller's properties.
+    let ctx = unsafe {
+        crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey(
+            x,
+            selection,
+            c"PEM".as_ptr(),
+            structure.as_ptr(),
+            propq,
+        )
+    };
+    // SAFETY: the new context, or NULL.
+    if unsafe { OSSL_ENCODER_CTX_get_num_encoders(ctx) } == 0 {
+        // SAFETY: as above.
+        unsafe { OSSL_ENCODER_CTX_free(ctx) };
+        return None;
+    }
+    Some(ctx)
+}
+
+/// `IMPLEMENT_PEM_provided_write_body_pass`: the cipher and passphrase (`kstr`, else `u` as
+/// one, else `cb` or `PEM_def_callback`) set on the context. False if they can't be.
+///
+/// # Safety
+/// The context is live; `enc`, `kstr`, `cb`, and `u` as for a key writer.
+unsafe fn pem_pass(
+    ctx: *mut rustyssl_abi::OSSL_ENCODER_CTX,
+    enc: *const EVP_CIPHER,
+    mut kstr: *const c_uchar,
+    mut klen: c_int,
+    mut cb: pem_password_cb,
+    u: *mut c_void,
+) -> bool {
+    use crate::encoder::ctx::{
+        OSSL_ENCODER_CTX_set_cipher, OSSL_ENCODER_CTX_set_passphrase,
+        OSSL_ENCODER_CTX_set_pem_password_cb,
+    };
+    if kstr.is_null() && cb.is_none() {
+        if u.is_null() {
+            cb = Some(crate::pem_cipher::PEM_def_callback);
+        } else {
+            kstr = u.cast_const().cast();
+            // SAFETY: OpenSSL takes `u` as the passphrase then, a C string.
+            klen = c_int::try_from(unsafe { CStr::from_ptr(kstr.cast()) }.to_bytes().len())
+                .unwrap_or(c_int::MAX);
+        }
+    }
+    if enc.is_null() {
+        return true;
+    }
+    // SAFETY: the caller's cipher.
+    let name = unsafe { crate::evp::cipher::EVP_CIPHER_get0_name(enc) };
+    // SAFETY: the caller's context; the cipher's name.
+    if unsafe { OSSL_ENCODER_CTX_set_cipher(ctx, name, ptr::null()) } == 0 {
+        return false;
+    }
+    if !kstr.is_null() {
+        let Ok(len) = usize::try_from(klen) else {
+            return false;
+        };
+        // SAFETY: the caller's `klen` octets.
+        return unsafe { OSSL_ENCODER_CTX_set_passphrase(ctx, kstr, len) } != 0;
+    }
+    // SAFETY: the caller's callback and argument.
+    cb.is_none() || unsafe { OSSL_ENCODER_CTX_set_pem_password_cb(ctx, cb, u) } != 0
+}
+
+/// `PEM_write_bio_PrivateKey_ex`: a provided key's PrivateKeyInfo through
+/// the encoders, a legacy one's PKCS#8 or, for a type without, its traditional form.
+///
+/// # Safety
+/// As for `PEM_write_bio_PrivateKey_ex`.
+#[allow(clippy::too_many_arguments, reason = "PEM_write_bio_PrivateKey_ex's")]
+unsafe fn write_private_key(
+    out: *mut BIO,
+    x: *const EVP_PKEY,
+    enc: *const EVP_CIPHER,
+    kstr: *const c_uchar,
+    klen: c_int,
+    cb: pem_password_cb,
+    u: *mut c_void,
+    propq: *const c_char,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let encoders = unsafe { pem_encoders(x, EVP_PKEY_KEYPAIR, c"PrivateKeyInfo", propq) };
+    if let Some(ctx) = encoders {
+        // SAFETY: the new context; the caller's arguments.
+        let ret = if unsafe { pem_pass(ctx, enc, kstr, klen, cb, u) } {
+            // SAFETY: as above.
+            unsafe { Sink::Bio(out).encode(ctx) }
+        } else {
+            0
+        };
+        // SAFETY: made above.
+        unsafe { crate::encoder::ctx::OSSL_ENCODER_CTX_free(ctx) };
+        return ret;
+    }
+    // SAFETY: the caller's guarantee.
+    let pkcs8 =
+        unsafe { pkey(x) }.is_some_and(|k| k.ameth_funcs().is_none_or(|f| f.priv_encode.is_some()));
+    if pkcs8 {
+        // SAFETY: as above.
+        return unsafe { do_pk8pkey(Sink::Bio(out), x, false, -1, enc, kstr.cast(), klen, cb, u) };
+    }
+    // SAFETY: as above.
+    unsafe { PEM_write_bio_PrivateKey_traditional(out, x, enc, kstr, klen, cb, u) }
+}
+
+ffi_export! {
+    /// Writes the private key as PEM: a PrivateKeyInfo (encrypted with `enc` if given, as an
+    /// EncryptedPrivateKeyInfo), or a legacy key's traditional form when its type has no
+    /// PKCS#8 encoding. 1, or 0.
+    ///
+    /// # Safety
+    /// `out` is a live BIO; `x` is NULL or a live key; `enc` is NULL or a cipher; `kstr` is NULL
+    /// or `klen` octets; `cb` is NULL or a password callback taking `u` (or `u` is NULL or a C
+    /// string); `propq` is NULL or a C string.
+    pub unsafe extern "C" fn PEM_write_bio_PrivateKey_ex(out: *mut BIO, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void, _libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_private_key(out, x, enc, kstr, klen, cb, u, propq) }
+    }
+}
+
+ffi_export! {
+    /// `PEM_write_bio_PrivateKey_ex` without a library context or properties.
+    ///
+    /// # Safety
+    /// As for `PEM_write_bio_PrivateKey_ex`.
+    pub unsafe extern "C" fn PEM_write_bio_PrivateKey(out: *mut BIO, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_private_key(out, x, enc, kstr, klen, cb, u, ptr::null()) }
+    }
+}
+
+/// A BIO on the `FILE` (not closing it), or NULL with `ERR_R_BUF_LIB`.
+///
+/// # Safety
+/// `fp` is an open `FILE`.
+unsafe fn fp_bio(fp: *mut FILE, f: &str) -> *mut BIO {
+    // SAFETY: the caller's guarantee.
+    let b = unsafe { crate::bio::file::BIO_new_fp(fp, rustyssl_abi::BIO_NOCLOSE) };
+    if b.is_null() {
+        err::raise(ERR_LIB_PEM, rustyssl_abi::ERR_R_BUF_LIB, f);
+    }
+    b
+}
+
+ffi_export! {
+    /// `PEM_write_bio_PrivateKey_ex` to a `FILE`.
+    ///
+    /// # Safety
+    /// `out` is an open `FILE`; otherwise as for `PEM_write_bio_PrivateKey_ex`.
+    pub unsafe extern "C" fn PEM_write_PrivateKey_ex(out: *mut FILE, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void, libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        let b = unsafe { fp_bio(out, "PEM_write_PrivateKey_ex") };
+        if b.is_null() {
+            return 0;
+        }
+        // SAFETY: as above, into the BIO.
+        let ret = unsafe { PEM_write_bio_PrivateKey_ex(b, x, enc, kstr, klen, cb, u, libctx, propq) };
+        // SAFETY: made above.
+        unsafe { BIO_free(b) };
+        ret
+    }
+}
+
+ffi_export! {
+    /// `PEM_write_PrivateKey_ex` without a library context or properties.
+    ///
+    /// # Safety
+    /// As for `PEM_write_PrivateKey_ex`.
+    pub unsafe extern "C" fn PEM_write_PrivateKey(out: *mut FILE, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { PEM_write_PrivateKey_ex(out, x, enc, kstr, klen, cb, u, ptr::null_mut(), ptr::null()) }
+    }
+}
+
+ffi_export! {
+    /// Writes the private key in its type's traditional form ("RSA PRIVATE KEY" and so on; a
+    /// provided key through a legacy copy). 1, or 0 (with `PEM_R_UNSUPPORTED_PUBLIC_KEY_TYPE`
+    /// for a type without one).
+    ///
+    /// # Safety
+    /// As for `PEM_write_bio_PrivateKey`.
+    pub unsafe extern "C" fn PEM_write_bio_PrivateKey_traditional(bp: *mut BIO, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_uchar, klen: c_int, cb: pem_password_cb, u: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { pkey(x) }) else { return 0 };
+        let copy = if k.assigned() && k.is_provided() { crate::evp::pkey::copy_downgraded(k) } else { None };
+        let key = copy.as_ref().map_or(x, |c| c.as_ptr().cast_const());
+        // SAFETY: the caller's key, or the copy made here.
+        let Some(kk) = (unsafe { pkey(key) }) else { return 0 };
+        if kk.ameth_funcs().is_none_or(|f| f.old_priv_encode.is_none()) {
+            err::raise(ERR_LIB_PEM, rustyssl_abi::PEM_R_UNSUPPORTED_PUBLIC_KEY_TYPE, "PEM_write_bio_PrivateKey_traditional");
+            return 0;
+        }
+        let mut name = kk.ameth_pem_str().map_or_else(|| b"<NULL>".to_vec(), |s| s.into_bytes());
+        name.extend_from_slice(b" PRIVATE KEY");
+        name.truncate(79);
+        let Ok(name) = std::ffi::CString::new(name) else { return 0 };
+        let f: I2dOfVoid = crate::evp::pkey::i2d::private_key_void;
+        // SAFETY: the key; the name; the caller's BIO, cipher, passphrase, and callback.
+        unsafe { crate::pem_cipher::PEM_ASN1_write_bio(Some(f), name.as_ptr(), bp, key.cast(), enc, kstr, klen, cb, u) }
+    }
+}
+
+/// `PEM_write_bio_Parameters` into the sink.
+///
+/// # Safety
+/// `x` is NULL or a live key.
+unsafe fn write_parameters(out: Sink, x: *const EVP_PKEY) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let encoders =
+        unsafe { pem_encoders(x, EVP_PKEY_KEY_PARAMETERS, c"type-specific", ptr::null()) };
+    if let Some(ctx) = encoders {
+        // SAFETY: the new context.
+        let ret = unsafe { out.encode(ctx) };
+        // SAFETY: made above.
+        unsafe { crate::encoder::ctx::OSSL_ENCODER_CTX_free(ctx) };
+        return ret;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { pkey(x) }) else {
+        return 0;
+    };
+    if k.ameth_funcs().is_none_or(|f| f.param_encode.is_none()) {
+        return 0;
+    }
+    let mut name = k
+        .ameth_pem_str()
+        .map_or_else(|| b"<NULL>".to_vec(), |s| s.into_bytes());
+    name.extend_from_slice(b" PARAMETERS");
+    name.truncate(79);
+    let Ok(name) = std::ffi::CString::new(name) else {
+        return 0;
+    };
+    let f: I2dOfVoid = crate::evp::pkey::i2d::key_params_void;
+    // SAFETY: the key; the name; no encryption.
+    unsafe {
+        out.asn1(
+            f,
+            name.as_ptr(),
+            x.cast(),
+            ptr::null(),
+            ptr::null(),
+            0,
+            None,
+            ptr::null_mut(),
+        )
+    }
+}
+
+ffi_export! {
+    /// Writes the key's parameters as PEM ("<type> PARAMETERS"). 1, or 0.
+    ///
+    /// # Safety
+    /// `out` is a live BIO; `x` is NULL or a live key.
+    pub unsafe extern "C" fn PEM_write_bio_Parameters(out: *mut BIO, x: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_parameters(Sink::Bio(out), x) }
+    }
+}
+
+/// `i2d_PUBKEY` as an `i2d_of_void`.
+unsafe extern "C" fn i2d_pubkey_void(x: *const c_void, pp: *mut *mut c_uchar) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe { crate::x509::pubkey::i2d_PUBKEY(x.cast(), pp) }
+}
+
+/// `PEM_write_bio_PUBKEY_ex` into the sink: a provided key's SubjectPublicKeyInfo through the
+/// encoders, a legacy one's through `i2d_PUBKEY`.
+///
+/// # Safety
+/// `x` is NULL or a live key; `propq` is NULL or a C string.
+unsafe fn write_pubkey(out: Sink, x: *const EVP_PKEY, propq: *const c_char) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let encoders = unsafe { pem_encoders(x, EVP_PKEY_PUBLIC_KEY, c"SubjectPublicKeyInfo", propq) };
+    if let Some(ctx) = encoders {
+        // SAFETY: the new context.
+        let ret = unsafe { out.encode(ctx) };
+        // SAFETY: made above.
+        unsafe { crate::encoder::ctx::OSSL_ENCODER_CTX_free(ctx) };
+        return ret;
+    }
+    // SAFETY: the caller's key; no encryption.
+    unsafe {
+        out.asn1(
+            i2d_pubkey_void,
+            PEM_STRING_PUBLIC.as_ptr(),
+            x.cast(),
+            ptr::null(),
+            ptr::null(),
+            0,
+            None,
+            ptr::null_mut(),
+        )
+    }
+}
+
+ffi_export! {
+    /// Writes the key's SubjectPublicKeyInfo as PEM ("PUBLIC KEY"). 1, or 0.
+    ///
+    /// # Safety
+    /// `out` is a live BIO; `x` is NULL or a live key.
+    pub unsafe extern "C" fn PEM_write_bio_PUBKEY(out: *mut BIO, x: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_pubkey(Sink::Bio(out), x, ptr::null()) }
+    }
+}
+
+ffi_export! {
+    /// `PEM_write_bio_PUBKEY` with the encoders' properties.
+    ///
+    /// # Safety
+    /// As for `PEM_write_bio_PUBKEY`; `propq` is NULL or a C string.
+    pub unsafe extern "C" fn PEM_write_bio_PUBKEY_ex(out: *mut BIO, x: *const EVP_PKEY, _libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_pubkey(Sink::Bio(out), x, propq) }
+    }
+}
+
+ffi_export! {
+    /// `PEM_write_bio_PUBKEY` to a `FILE`.
+    ///
+    /// # Safety
+    /// `out` is an open `FILE`; `x` is NULL or a live key.
+    pub unsafe extern "C" fn PEM_write_PUBKEY(out: *mut FILE, x: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_pubkey(Sink::File(out), x, ptr::null()) }
+    }
+}
+
+ffi_export! {
+    /// `PEM_write_bio_PUBKEY_ex` to a `FILE`.
+    ///
+    /// # Safety
+    /// As for `PEM_write_PUBKEY`; `propq` is NULL or a C string.
+    pub unsafe extern "C" fn PEM_write_PUBKEY_ex(out: *mut FILE, x: *const EVP_PKEY, _libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_PEM
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { write_pubkey(Sink::File(out), x, propq) }
+    }
+}
+
+/// `do_pk8pkey` (and `do_pk8pkey_fp`'s body): the key's PrivateKeyInfo in DER or PEM, through
+/// the encoders when they can (no PBE `nid`), else through `EVP_PKEY2PKCS8`. Encrypting it
+/// (with `enc` or the PBE `nid`) comes with step 4.7d.
+///
+/// # Safety
+/// As for `PEM_write_bio_PKCS8PrivateKey`, into the sink.
+#[allow(clippy::too_many_arguments, reason = "do_pk8pkey's")]
+unsafe fn do_pk8pkey(
+    out: Sink,
+    x: *const EVP_PKEY,
+    isder: bool,
+    nid: c_int,
+    enc: *const EVP_CIPHER,
+    kstr: *const c_char,
+    klen: c_int,
+    cb: pem_password_cb,
+    u: *mut c_void,
+) -> c_int {
+    use crate::encoder::ctx::{OSSL_ENCODER_CTX_free, OSSL_ENCODER_CTX_get_num_encoders};
+    let outtype = if isder { c"DER" } else { c"PEM" };
+    // SAFETY: the caller's key; static strings.
+    let ctx = unsafe {
+        crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey(
+            x,
+            rustyssl_abi::OSSL_KEYMGMT_SELECT_ALL,
+            outtype.as_ptr(),
+            c"PrivateKeyInfo".as_ptr(),
+            ptr::null(),
+        )
+    };
+    if ctx.is_null() {
+        return 0;
+    }
+    let (mut kstr, mut klen, mut cb) = (kstr.cast::<c_uchar>(), klen, cb);
+    if kstr.is_null() && cb.is_none() {
+        if u.is_null() {
+            cb = Some(crate::pem_cipher::PEM_def_callback);
+        } else {
+            kstr = u.cast_const().cast();
+            // SAFETY: OpenSSL takes `u` as the passphrase then, a C string.
+            klen = c_int::try_from(unsafe { CStr::from_ptr(kstr.cast()) }.to_bytes().len())
+                .unwrap_or(c_int::MAX);
+        }
+    }
+    let ret;
+    // SAFETY: the new context.
+    if nid == -1 && unsafe { OSSL_ENCODER_CTX_get_num_encoders(ctx) } != 0 {
+        // SAFETY: as above; the caller's arguments (`kstr` and `cb` settled above).
+        let ok = unsafe { pem_pass(ctx, enc, kstr, klen, cb, u) };
+        // SAFETY: as above.
+        ret = c_int::from(ok && unsafe { out.encode(ctx) } != 0);
+    } else {
+        // SAFETY: the caller's key.
+        let p8inf = unsafe { crate::evp::pkey::d2i::EVP_PKEY2PKCS8(x) };
+        if p8inf.is_null() {
+            err::raise(
+                ERR_LIB_PEM,
+                rustyssl_abi::PEM_R_ERROR_CONVERTING_PRIVATE_KEY,
+                "do_pk8pkey",
+            );
+            ret = 0;
+        } else {
+            if !enc.is_null() || nid != -1 {
+                if kstr.is_null() {
+                    let mut buf = zeroize_buf();
+                    // SAFETY: room for `PEM_BUFSIZE` octets; the callback (set above) and its
+                    // argument.
+                    let n = cb.map_or(-1, |f| unsafe { f(buf.as_mut_ptr(), PEM_BUFSIZE, 1, u) });
+                    if n < 0 {
+                        err::raise(ERR_LIB_PEM, rustyssl_abi::PEM_R_READ_KEY, "do_pk8pkey");
+                        // SAFETY: made above.
+                        unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8inf) };
+                        // SAFETY: as above.
+                        unsafe { OSSL_ENCODER_CTX_free(ctx) };
+                        return 0;
+                    }
+                }
+                crate::stub::unimplemented("PKCS8_encrypt (an EncryptedPrivateKeyInfo, step 4.7d)");
+            }
+            ret = match (out, isder) {
+                // SAFETY: the sink's BIO; the new structure.
+                (Sink::Bio(b), true) => unsafe {
+                    crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_bio(b, p8inf)
+                },
+                // SAFETY: as above.
+                (Sink::Bio(b), false) => unsafe { PEM_write_bio_PKCS8_PRIV_KEY_INFO(b, p8inf) },
+                // SAFETY: the sink's `FILE`; the new structure.
+                (Sink::File(f), true) => unsafe {
+                    crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_fp(f, p8inf)
+                },
+                // SAFETY: as above.
+                (Sink::File(f), false) => unsafe { PEM_write_PKCS8_PRIV_KEY_INFO(f, p8inf) },
+            };
+            // SAFETY: made above.
+            unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8inf) };
+        }
+    }
+    // SAFETY: made above.
+    unsafe { OSSL_ENCODER_CTX_free(ctx) };
+    ret
+}
+
+/// A wiped buffer of `PEM_BUFSIZE` for a passphrase.
+fn zeroize_buf() -> rustyssl_crypto::bn::Zeroizing<[c_char; 1024]> {
+    rustyssl_crypto::bn::Zeroizing::new([0; 1024])
+}
+
+/// `do_pk8pkey_fp`: `do_pk8pkey` through a BIO on the `FILE`.
+///
+/// # Safety
+/// `fp` is an open `FILE`; otherwise as for `do_pk8pkey`.
+#[allow(clippy::too_many_arguments, reason = "do_pk8pkey's")]
+unsafe fn do_pk8pkey_fp(
+    fp: *mut FILE,
+    x: *const EVP_PKEY,
+    isder: bool,
+    nid: c_int,
+    enc: *const EVP_CIPHER,
+    kstr: *const c_char,
+    klen: c_int,
+    cb: pem_password_cb,
+    u: *mut c_void,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let b = unsafe { fp_bio(fp, "do_pk8pkey_fp") };
+    if b.is_null() {
+        return 0;
+    }
+    // SAFETY: as above, into the BIO.
+    let ret = unsafe { do_pk8pkey(Sink::Bio(b), x, isder, nid, enc, kstr, klen, cb, u) };
+    // SAFETY: made above.
+    unsafe { BIO_free(b) };
+    ret
+}
+
+/// The PKCS#8 writers (`pem_pk8.c`): `PEM_write_bio_PKCS8PrivateKey` and the others, each a
+/// `do_pk8pkey` (or `do_pk8pkey_fp`) with its output and cipher.
+macro_rules! pk8_writer {
+    ($(
+        $(#[$doc:meta])*
+        pub unsafe extern "C" fn $name:ident($out:ident: $outty:ty, $x:ident: $xty:ty, $t:ident: $tty:ty, $kstr:ident: $kty:ty, $klen:ident: $klty:ty, $cb:ident: $cbty:ty, $u:ident: $uty:ty) via $do:ident($isder:expr, $nid:expr, $enc:expr);
+    )*) => {$(
+        ffi_export! {
+            $(#[$doc])*
+            ///
+            /// # Safety
+            /// The output is live; `x` is NULL or a live key; `kstr` is NULL or `klen` octets;
+            /// `cb` is NULL or a password callback taking `u` (or `u` is NULL or a C string).
+            pub unsafe extern "C" fn $name($out: $outty, $x: $xty, $t: $tty, $kstr: $kty, $klen: $klty, $cb: $cbty, $u: $uty) -> c_int
+            where failure = 0, library = ERR_LIB_PEM
+            {
+                // SAFETY: the caller's guarantee.
+                unsafe { $do($out, $x, $isder, $nid, $enc, $kstr, $klen, $cb, $u) }
+            }
+        }
+    )*};
+}
+
+/// `do_pk8pkey` into a BIO.
+///
+/// # Safety
+/// As for `do_pk8pkey`, with `bp` a live BIO.
+#[allow(clippy::too_many_arguments, reason = "do_pk8pkey's")]
+unsafe fn do_pk8pkey_bio(
+    bp: *mut BIO,
+    x: *const EVP_PKEY,
+    isder: bool,
+    nid: c_int,
+    enc: *const EVP_CIPHER,
+    kstr: *const c_char,
+    klen: c_int,
+    cb: pem_password_cb,
+    u: *mut c_void,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe { do_pk8pkey(Sink::Bio(bp), x, isder, nid, enc, kstr, klen, cb, u) }
+}
+
+pk8_writer! {
+    /// Writes the key's PrivateKeyInfo as PEM, encrypted with `enc` if given. 1, or 0.
+    pub unsafe extern "C" fn PEM_write_bio_PKCS8PrivateKey(bp: *mut BIO, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_bio(false, -1, enc);
+    /// Writes the key's PrivateKeyInfo as PEM, encrypted with the PBE algorithm `nid`. 1, or 0.
+    pub unsafe extern "C" fn PEM_write_bio_PKCS8PrivateKey_nid(bp: *mut BIO, x: *const EVP_PKEY, nid: c_int, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_bio(false, nid, ptr::null());
+    /// Writes the key's PrivateKeyInfo as DER, encrypted with `enc` if given. 1, or 0.
+    pub unsafe extern "C" fn i2d_PKCS8PrivateKey_bio(bp: *mut BIO, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_bio(true, -1, enc);
+    /// Writes the key's PrivateKeyInfo as DER, encrypted with the PBE algorithm `nid`. 1, or 0.
+    pub unsafe extern "C" fn i2d_PKCS8PrivateKey_nid_bio(bp: *mut BIO, x: *const EVP_PKEY, nid: c_int, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_bio(true, nid, ptr::null());
+    /// `PEM_write_bio_PKCS8PrivateKey` to a `FILE`.
+    pub unsafe extern "C" fn PEM_write_PKCS8PrivateKey(fp: *mut FILE, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_fp(false, -1, enc);
+    /// `PEM_write_bio_PKCS8PrivateKey_nid` to a `FILE`.
+    pub unsafe extern "C" fn PEM_write_PKCS8PrivateKey_nid(fp: *mut FILE, x: *const EVP_PKEY, nid: c_int, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_fp(false, nid, ptr::null());
+    /// `i2d_PKCS8PrivateKey_bio` to a `FILE`.
+    pub unsafe extern "C" fn i2d_PKCS8PrivateKey_fp(fp: *mut FILE, x: *const EVP_PKEY, enc: *const EVP_CIPHER, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_fp(true, -1, enc);
+    /// `i2d_PKCS8PrivateKey_nid_bio` to a `FILE`.
+    pub unsafe extern "C" fn i2d_PKCS8PrivateKey_nid_fp(fp: *mut FILE, x: *const EVP_PKEY, nid: c_int, kstr: *const c_char, klen: c_int, cb: pem_password_cb, u: *mut c_void) via do_pk8pkey_fp(true, nid, ptr::null());
 }

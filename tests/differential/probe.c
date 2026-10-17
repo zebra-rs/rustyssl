@@ -401,6 +401,10 @@
  *                              selection (hex), output type, and structure: the encoders, the
  *                              result, and the octets in hex; then the lengths of i2d_PrivateKey,
  *                              i2d_PublicKey, i2d_KeyParams, and i2d_PUBKEY of the key
+ *   pemwrite <hex>             a key from the octets (d2i_AutoPrivateKey, else d2i_PUBKEY) through
+ *                              the PEM writers (PEM_write_bio_PrivateKey, _PrivateKey_traditional,
+ *                              _PKCS8PrivateKey, i2d_PKCS8PrivateKey_bio, _PUBKEY, _Parameters):
+ *                              each one's result, length, and a hash of what it wrote
  *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
  *                              octets: the result, the octets consumed, the key's size, and
  *                              its SubjectPublicKeyInfo encoded again
@@ -6576,6 +6580,51 @@ static int x509_command(const char *command, const char *line)
                    i2d_KeyParams(k, NULL), i2d_PUBKEY(k, NULL));
         }
         print_asn_errors();
+        EVP_PKEY_free(k);
+        OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "pemwrite") == 0) {
+        char hx[4100] = "";
+        long len = 0;
+        unsigned char *in;
+        const unsigned char *q;
+        EVP_PKEY *k = NULL;
+        int i;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %4099s", hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        if (in != NULL) {
+            q = in;
+            k = d2i_AutoPrivateKey(NULL, &q, len);
+            if (k == NULL) {
+                q = in;
+                k = d2i_PUBKEY(NULL, &q, len);
+            }
+        }
+        ERR_clear_error();
+        if (k == NULL)
+            printf(" no key");
+        for (i = 0; k != NULL && i < 6; i++) {
+            BIO *b = BIO_new(BIO_s_mem());
+            char *data = NULL;
+            long n, j;
+            unsigned long h = 2166136261UL;
+            int r = i == 0   ? PEM_write_bio_PrivateKey(b, k, NULL, NULL, 0, NULL, NULL)
+                    : i == 1 ? PEM_write_bio_PrivateKey_traditional(b, k, NULL, NULL, 0, NULL, NULL)
+                    : i == 2 ? PEM_write_bio_PKCS8PrivateKey(b, k, NULL, NULL, 0, NULL, NULL)
+                    : i == 3 ? i2d_PKCS8PrivateKey_bio(b, k, NULL, NULL, 0, NULL, NULL)
+                    : i == 4 ? PEM_write_bio_PUBKEY(b, k)
+                             : PEM_write_bio_Parameters(b, k);
+
+            n = BIO_get_mem_data(b, &data);
+            for (j = 0; j < n; j++)
+                h = ((h ^ (unsigned char)data[j]) * 16777619UL) & 0xffffffffUL;
+            printf(" [%d %ld %08lx]", r, n, h);
+            print_asn_errors();
+            BIO_free(b);
+        }
         EVP_PKEY_free(k);
         OPENSSL_free(in);
         return 1;

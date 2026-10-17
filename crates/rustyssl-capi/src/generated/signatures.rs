@@ -9013,12 +9013,95 @@ const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_DHparams;
 const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_DHxparams;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const DSA,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_DSAPrivateKey;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_DSA_PUBKEY;
 const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
     crate::dsa_asn1::PEM_write_DSAparams;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_GROUP) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_ECPKParameters;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EC_KEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_ECPrivateKey;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_EC_PUBKEY;
 const _: unsafe extern "C" fn(*mut FILE, *const X509_SIG) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_PKCS8;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_PKCS8PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_PKCS8PrivateKey_nid;
 const _: unsafe extern "C" fn(*mut FILE, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_PUBKEY_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_PrivateKey_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const RSA,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_RSAPrivateKey;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_RSAPublicKey;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_RSA_PUBKEY;
 const _: unsafe extern "C" fn(*mut FILE, *const X509_PUBKEY) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_X509_PUBKEY;
 const _: unsafe extern "C" fn(
@@ -9032,12 +9115,106 @@ const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHparams;
 const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHxparams;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const DSA,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_DSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_DSA_PUBKEY;
 const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
     crate::dsa_asn1::PEM_write_bio_DSAparams;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_GROUP) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_ECPKParameters;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EC_KEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_ECPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_EC_PUBKEY;
 const _: unsafe extern "C" fn(*mut BIO, *const X509_SIG) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_PKCS8;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PKCS8PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PKCS8PrivateKey_nid;
 const _: unsafe extern "C" fn(*mut BIO, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_PUBKEY;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PUBKEY_ex;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_Parameters;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PrivateKey;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PrivateKey_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_PrivateKey_traditional;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const RSA,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::PEM_write_bio_RSAPrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_RSAPublicKey;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_RSA_PUBKEY;
 const _: unsafe extern "C" fn(*mut BIO, *const X509_PUBKEY) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_X509_PUBKEY;
 const _: unsafe extern "C" fn(
@@ -10851,6 +11028,42 @@ const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_fp;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::i2d_PKCS8PrivateKey_bio;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    *const EVP_CIPHER,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::i2d_PKCS8PrivateKey_fp;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::i2d_PKCS8PrivateKey_nid_bio;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pem_pkey::i2d_PKCS8PrivateKey_nid_fp;
 const _: unsafe extern "C" fn(
     *const PKCS8_PRIV_KEY_INFO,
     *mut *mut core::ffi::c_uchar,

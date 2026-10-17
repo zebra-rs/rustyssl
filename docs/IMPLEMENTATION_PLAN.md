@@ -4234,7 +4234,7 @@ chunking) is clean.
         callback never asked for an unencrypted key; the errors); the probe's `pemkey` with
         `corpus/pemkey.txt` and random sessions (1,500 pass); `fuzz/fuzz_targets/pem_pkey.rs`
         (173k runs clean).
-  - [ ] **4.7c Encoders**, in sub-steps:
+  - [x] **4.7c Encoders**, in sub-steps:
     - [x] **4.7c1 The framework and key2any**: the `OSSL_ENCODER` framework (fetch, names,
       properties, listing; contexts, `encoder_process`'s chain, `OSSL_ENCODER_CTX_new_for_pkey`
       and its construct, which imports a key into another provider's encoders; `to_bio`,
@@ -4279,8 +4279,34 @@ chunking) is clean.
         way at two indentations, through `_fp`, and to TEXT with each selection alone (7,300
         lines of text, the same on both). TEXT output in the probe's `enckey` sessions and
         corpus (2,000 random sessions pass), and in `fuzz/fuzz_targets/encode_pkey.rs` (309k runs clean).
-    - [ ] **4.7c3 The PEM key writers**: `PEM_write_bio_PrivateKey`, `_PUBKEY`,
-      `_Parameters`, the type-specific ones, and `_PKCS8PrivateKey` unencrypted.
+    - [x] **4.7c3 The PEM key writers** (`pem_pkey.rs`, from `pem_pkey.c`, `pem_pk8.c`, and
+      `pem_all.c`):
+      - `PEM_write_bio_PrivateKey` and its `_ex` and `FILE` forms: a provided key through the
+        PEM PrivateKeyInfo encoders; a legacy one as PKCS#8, or in its traditional form when
+        its type has no PKCS#8 encoding.
+      - `_PrivateKey_traditional`, through a provided key's legacy copy.
+      - `_Parameters` and `_PUBKEY` (with `_ex` and `FILE` forms).
+      - `PEM_write_bio_PKCS8PrivateKey`, `i2d_PKCS8PrivateKey_bio`, and their `_nid` and
+        `FILE` forms (`do_pk8pkey`).
+      - The RSA, DSA, and EC type-specific writers (`_RSAPrivateKey`, `_RSAPublicKey`,
+        `_RSA_PUBKEY`, `_DSAPrivateKey`, `_DSA_PUBKEY`, `_ECPrivateKey`, `_EC_PUBKEY`,
+        `_ECPKParameters`).
+
+      The cipher and passphrase are OpenSSL's `IMPLEMENT_PEM_provided_write_body_pass`, with
+      `u` taken as the passphrase. Encrypting a PrivateKeyInfo (with a cipher or a PBE NID)
+      comes with 4.7d; traditional encryption works now.
+
+      Also fixed: a provided RSA-PSS key's legacy copy now gets its RSASSA-PSS-params
+      (`rsa_int_import_from`'s `ossl_rsa_pss_params_create`), so `i2d_RSA_PUBKEY` writes
+      them. And `i2d_DSA_PUBKEY` of a DSA key without a public key fails where the reference
+      crashes (docs/DEVIATIONS.md).
+      - Tests:
+        - `tests/c/pem_write_pkey.c`: every key type, provided and legacy, through each
+          writer; traditional encryption with a passphrase given or asked of a callback,
+          decrypted back to the key.
+        - The probe's `pemwrite`, with `corpus/pemwrite.txt` and random sessions (1,500
+          pass).
+        - The PEM writers in `fuzz/fuzz_targets/encode_pkey.rs` (223k runs clean).
   - [ ] **4.7d Encrypted keys**: PKCS#5 PBES1 and PBES2 (PBKDF2, scrypt) and the PBE
     table (`EVP_PBE_*`, `PKCS5_pbe2_set_iv`, ...), `PKCS8_encrypt`/`PKCS8_decrypt`,
     EncryptedPrivateKeyInfo encoding and decoding, `PEM_write_bio_PKCS8PrivateKey`,

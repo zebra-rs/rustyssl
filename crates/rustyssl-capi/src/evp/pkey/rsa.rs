@@ -215,6 +215,12 @@ unsafe fn import_from(
     }
     // SAFETY: the key just made; the caller's array.
     let mut ok = unsafe { rsa_import(r.cast(), OSSL_KEYMGMT_SELECT_ALL as c_int, params) } != 0;
+    if ok && kind == Kind::RsaPss {
+        // A restricted key's RSASSA-PSS-params too (`rsa->pss`), which its legacy encoding
+        // writes.
+        // SAFETY: the key just made.
+        ok = unsafe { set_legacy_pss(r) };
+    }
     if ok {
         let type_ = if kind == Kind::Rsa {
             EVP_PKEY_RSA
@@ -229,6 +235,38 @@ unsafe fn import_from(
         unsafe { free(r) };
     }
     c_int::from(ok)
+}
+
+/// `rsa_int_import_from`'s `ossl_rsa_pss_params_create` of a restricted RSA-PSS key's digests
+/// and salt length (the digests by their NIDs' names), set as its `RSA_PSS_PARAMS`. False if
+/// it can't be made.
+///
+/// # Safety
+/// `r` is a live key.
+unsafe fn set_legacy_pss(r: *mut RSA) -> bool {
+    use crate::evp::legacy_md::EVP_get_digestbyname;
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { crate::rsa::rsa(r) }) else {
+        return false;
+    };
+    let pss = k.lock().pss;
+    if !pss.restricted() {
+        return true;
+    }
+    let digest = |nid: c_int| {
+        // SAFETY: a number.
+        let sn = unsafe { crate::objects::OBJ_nid2sn(nid) };
+        // SAFETY: NULL or a static name.
+        unsafe { EVP_get_digestbyname(sn) }
+    };
+    let (md, mgf1md) = (digest(pss.hash), digest(pss.mask_gen_hash));
+    // SAFETY: the digests, or NULL.
+    let params = unsafe { crate::rsa_pmeth::pss_params_create(md, mgf1md, pss.salt_len) };
+    if params.is_null() {
+        return false;
+    }
+    k.set_pss_params(params);
+    true
 }
 
 /// `rsa_pkey_import_from`.

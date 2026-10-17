@@ -1672,4 +1672,21 @@ mod tests {
         // SAFETY: no preconditions.
         unsafe { crate::err::ERR_clear_error() };
     }
+
+    /// docs/DEVIATIONS.md: a DSA key without a public key has no SubjectPublicKeyInfo.
+    #[test]
+    #[cfg_attr(miri, ignore = "loads the configuration")]
+    fn a_dsa_key_without_a_public_key_isnt_encoded() {
+        // SAFETY: no preconditions.
+        let d = unsafe { crate::dsa::DSA_new() };
+        assert!(!d.is_null());
+        let mut out: *mut c_uchar = ptr::null_mut();
+        // SAFETY: the key; a place for a new encoding.
+        assert!(unsafe { i2d_DSA_PUBKEY(d, &raw mut out) } <= 0);
+        assert!(out.is_null());
+        // SAFETY: made above.
+        unsafe { crate::dsa::DSA_free(d) };
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_clear_error() };
+    }
 }
