@@ -26,6 +26,7 @@
 #include <openssl/evp.h>
 #include <openssl/param_build.h>
 #include <openssl/params.h>
+#include <openssl/rsaerr.h>
 
 static int failures = 0;
 static int number = 0;
@@ -39,6 +40,13 @@ static void check(int ok, const char *what)
 }
 
 /* The error queue, emptied: each entry's library, reason, and text. */
+/*
+ * Whether errors() prints RSA's two PKCS#1 type 1 padding-check reasons as one: recovering a
+ * PSS signature with PKCS#1 padding fails one way or the other depending on whether the random
+ * salt makes the recovered value's first octet zero (1 time in 256, on either library).
+ */
+static int merge_padding_reasons = 0;
+
 static void errors(void)
 {
     unsigned long code;
@@ -47,6 +55,12 @@ static void errors(void)
 
     printf("  errors:");
     while ((code = ERR_get_error_all(NULL, NULL, NULL, &data, &flags)) != 0) {
+        if (merge_padding_reasons && ERR_GET_LIB(code) == ERR_LIB_RSA
+            && (ERR_GET_REASON(code) == RSA_R_INVALID_PADDING
+                || ERR_GET_REASON(code) == RSA_R_BLOCK_TYPE_IS_NOT_01)) {
+            printf(" %d/padding", ERR_LIB_RSA);
+            continue;
+        }
         printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
         if ((flags & ERR_TXT_STRING) != 0 && *data != '\0')
             printf(" (%s)", data);
@@ -679,7 +693,9 @@ static void pkey_sign(EVP_PKEY *k, const char *alg, const EVP_MD *md, const char
         printf("  recover %d\n", r);
         if (r == 1)
             hex("recovered", rec, rl);
+        merge_padding_reasons = random;
         errors();
+        merge_padding_reasons = 0;
         rl = 3;
         printf("  recover into 3 octets %d\n", EVP_PKEY_verify_recover(c, rec, &rl, sig, sl));
         errors();

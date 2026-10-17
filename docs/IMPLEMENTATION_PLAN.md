@@ -4269,8 +4269,16 @@ chunking) is clean.
         The probe's `enckey` with `corpus/enckey.txt` and random sessions (3,000 pass);
         `fuzz/fuzz_targets/encode_pkey.rs` (464k runs clean). A `pem_password_cb` asks through the UI layer
         (4.7d), so it isn't tested here.
-    - [ ] **4.7c2 key2text**: the text encoders, so `EVP_PKEY_print_public`/`_private`/
-      `_params` print provided keys.
+    - [x] **4.7c2 key2text**: the text encoders (`provider/key2text.rs`, from
+      `encode_key2text.c`, `encoder_lib.c`'s labeled printers, and the post-quantum codecs'
+      `*_key_to_text`), so `EVP_PKEY_print_public`/`_private`/`_params` print provided keys
+      through `OSSL_ENCODER_CTX_new_for_pkey(..., "TEXT", ...)`. A legacy key keeps printing
+      with its ASN.1 method. The text is written as it's made, so a key missing a part it's
+      asked for prints up to that part, as OpenSSL's does.
+      - Tests: `tests/c/key2text.c`: every key type, decoded into a provided key, printed each
+        way at two indentations, through `_fp`, and to TEXT with each selection alone (7,300
+        lines of text, the same on both). TEXT output in the probe's `enckey` sessions and
+        corpus (2,000 random sessions pass), and in `fuzz/fuzz_targets/encode_pkey.rs` (309k runs clean).
     - [ ] **4.7c3 The PEM key writers**: `PEM_write_bio_PrivateKey`, `_PUBKEY`,
       `_Parameters`, the type-specific ones, and `_PKCS8PrivateKey` unencrypted.
   - [ ] **4.7d Encrypted keys**: PKCS#5 PBES1 and PBES2 (PBKDF2, scrypt) and the PBE
