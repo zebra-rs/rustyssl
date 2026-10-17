@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod ct;
 pub mod identity;
 pub mod ip;
 pub mod ncons;

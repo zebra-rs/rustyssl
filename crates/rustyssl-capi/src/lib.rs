@@ -20,6 +20,7 @@ mod bn;
 mod buffer;
 mod cmac;
 mod conf;
+mod ct;
 mod decoder;
 mod dh;
 mod dh_asn1;

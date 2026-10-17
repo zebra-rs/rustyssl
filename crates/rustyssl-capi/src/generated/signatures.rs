@@ -2997,6 +2997,64 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_zalloc;
+const _: unsafe extern "C" fn(*mut CTLOG_STORE) = crate::ct::CTLOG_STORE_free;
+const _: unsafe extern "C" fn(*const CTLOG_STORE, *const u8, usize) -> *const CTLOG =
+    crate::ct::CTLOG_STORE_get0_log_by_id;
+const _: unsafe extern "C" fn(*mut CTLOG_STORE) -> core::ffi::c_int =
+    crate::ct::CTLOG_STORE_load_default_file;
+const _: unsafe extern "C" fn(*mut CTLOG_STORE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ct::CTLOG_STORE_load_file;
+const _: unsafe extern "C" fn() -> *mut CTLOG_STORE = crate::ct::CTLOG_STORE_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut CTLOG_STORE =
+    crate::ct::CTLOG_STORE_new_ex;
+const _: unsafe extern "C" fn(*mut CTLOG) = crate::ct::CTLOG_free;
+const _: unsafe extern "C" fn(*const CTLOG, *mut *const u8, *mut usize) =
+    crate::ct::CTLOG_get0_log_id;
+const _: unsafe extern "C" fn(*const CTLOG) -> *const core::ffi::c_char =
+    crate::ct::CTLOG_get0_name;
+const _: unsafe extern "C" fn(*const CTLOG) -> *mut EVP_PKEY = crate::ct::CTLOG_get0_public_key;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *const core::ffi::c_char) -> *mut CTLOG =
+    crate::ct::CTLOG_new;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CTLOG = crate::ct::CTLOG_new_ex;
+const _: unsafe extern "C" fn(
+    *mut *mut CTLOG,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ct::CTLOG_new_from_base64;
+const _: unsafe extern "C" fn(
+    *mut *mut CTLOG,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ct::CTLOG_new_from_base64_ex;
+const _: unsafe extern "C" fn(*mut CT_POLICY_EVAL_CTX) = crate::ct::CT_POLICY_EVAL_CTX_free;
+const _: unsafe extern "C" fn(*const CT_POLICY_EVAL_CTX) -> *mut X509 =
+    crate::ct::CT_POLICY_EVAL_CTX_get0_cert;
+const _: unsafe extern "C" fn(*const CT_POLICY_EVAL_CTX) -> *mut X509 =
+    crate::ct::CT_POLICY_EVAL_CTX_get0_issuer;
+const _: unsafe extern "C" fn(*const CT_POLICY_EVAL_CTX) -> *const CTLOG_STORE =
+    crate::ct::CT_POLICY_EVAL_CTX_get0_log_store;
+const _: unsafe extern "C" fn(*const CT_POLICY_EVAL_CTX) -> u64 =
+    crate::ct::CT_POLICY_EVAL_CTX_get_time;
+const _: unsafe extern "C" fn() -> *mut CT_POLICY_EVAL_CTX = crate::ct::CT_POLICY_EVAL_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CT_POLICY_EVAL_CTX = crate::ct::CT_POLICY_EVAL_CTX_new_ex;
+const _: unsafe extern "C" fn(*mut CT_POLICY_EVAL_CTX, *mut X509) -> core::ffi::c_int =
+    crate::ct::CT_POLICY_EVAL_CTX_set1_cert;
+const _: unsafe extern "C" fn(*mut CT_POLICY_EVAL_CTX, *mut X509) -> core::ffi::c_int =
+    crate::ct::CT_POLICY_EVAL_CTX_set1_issuer;
+const _: unsafe extern "C" fn(*mut CT_POLICY_EVAL_CTX, *mut CTLOG_STORE) =
+    crate::ct::CT_POLICY_EVAL_CTX_set_shared_CTLOG_STORE;
+const _: unsafe extern "C" fn(*mut CT_POLICY_EVAL_CTX, u64) =
+    crate::ct::CT_POLICY_EVAL_CTX_set_time;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -11231,6 +11289,67 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut SCRYPT_PARAMS) = crate::x509::pbe::SCRYPT_PARAMS_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::SCRYPT_PARAMS_it;
 const _: unsafe extern "C" fn() -> *mut SCRYPT_PARAMS = crate::x509::pbe::SCRYPT_PARAMS_new;
+const _: unsafe extern "C" fn(*mut stack_st_SCT) = crate::ct::SCT_LIST_free;
+const _: unsafe extern "C" fn(
+    *const stack_st_SCT,
+    *mut BIO,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const CTLOG_STORE,
+) = crate::ct::SCT_LIST_print;
+const _: unsafe extern "C" fn(*const stack_st_SCT, *mut CT_POLICY_EVAL_CTX) -> core::ffi::c_int =
+    crate::ct::SCT_LIST_validate;
+const _: unsafe extern "C" fn(*mut SCT) = crate::ct::SCT_free;
+const _: unsafe extern "C" fn(*const SCT, *mut *mut core::ffi::c_uchar) -> usize =
+    crate::ct::SCT_get0_extensions;
+const _: unsafe extern "C" fn(*const SCT, *mut *mut core::ffi::c_uchar) -> usize =
+    crate::ct::SCT_get0_log_id;
+const _: unsafe extern "C" fn(*const SCT, *mut *mut core::ffi::c_uchar) -> usize =
+    crate::ct::SCT_get0_signature;
+const _: unsafe extern "C" fn(*const SCT) -> ct_log_entry_type_t =
+    crate::ct::SCT_get_log_entry_type;
+const _: unsafe extern "C" fn(*const SCT) -> core::ffi::c_int = crate::ct::SCT_get_signature_nid;
+const _: unsafe extern "C" fn(*const SCT) -> sct_source_t = crate::ct::SCT_get_source;
+const _: unsafe extern "C" fn(*const SCT) -> u64 = crate::ct::SCT_get_timestamp;
+const _: unsafe extern "C" fn(*const SCT) -> sct_validation_status_t =
+    crate::ct::SCT_get_validation_status;
+const _: unsafe extern "C" fn(*const SCT) -> sct_version_t = crate::ct::SCT_get_version;
+const _: unsafe extern "C" fn() -> *mut SCT = crate::ct::SCT_new;
+const _: unsafe extern "C" fn(
+    core::ffi::c_uchar,
+    *const core::ffi::c_char,
+    ct_log_entry_type_t,
+    u64,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut SCT = crate::ct::SCT_new_from_base64;
+const _: unsafe extern "C" fn(*const SCT, *mut BIO, core::ffi::c_int, *const CTLOG_STORE) =
+    crate::ct::SCT_print;
+const _: unsafe extern "C" fn(*mut SCT, *mut core::ffi::c_uchar, usize) =
+    crate::ct::SCT_set0_extensions;
+const _: unsafe extern "C" fn(*mut SCT, *mut core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ct::SCT_set0_log_id;
+const _: unsafe extern "C" fn(*mut SCT, *mut core::ffi::c_uchar, usize) =
+    crate::ct::SCT_set0_signature;
+const _: unsafe extern "C" fn(*mut SCT, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ct::SCT_set1_extensions;
+const _: unsafe extern "C" fn(*mut SCT, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ct::SCT_set1_log_id;
+const _: unsafe extern "C" fn(*mut SCT, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ct::SCT_set1_signature;
+const _: unsafe extern "C" fn(*mut SCT, ct_log_entry_type_t) -> core::ffi::c_int =
+    crate::ct::SCT_set_log_entry_type;
+const _: unsafe extern "C" fn(*mut SCT, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ct::SCT_set_signature_nid;
+const _: unsafe extern "C" fn(*mut SCT, sct_source_t) -> core::ffi::c_int =
+    crate::ct::SCT_set_source;
+const _: unsafe extern "C" fn(*mut SCT, u64) = crate::ct::SCT_set_timestamp;
+const _: unsafe extern "C" fn(*mut SCT, sct_version_t) -> core::ffi::c_int =
+    crate::ct::SCT_set_version;
+const _: unsafe extern "C" fn(*mut SCT, *const CT_POLICY_EVAL_CTX) -> core::ffi::c_int =
+    crate::ct::SCT_validate;
+const _: unsafe extern "C" fn(*const SCT) -> *const core::ffi::c_char =
+    crate::ct::SCT_validation_status_string;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -14550,6 +14669,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut SCRYPT_PARAMS = crate::x509::pbe::d2i_SCRYPT_PARAMS;
 const _: unsafe extern "C" fn(
+    *mut *mut stack_st_SCT,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut stack_st_SCT = crate::ct::d2i_SCT_LIST;
+const _: unsafe extern "C" fn(
     *mut *mut SXNET,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -15217,6 +15341,10 @@ const _: unsafe extern "C" fn(
     *const SCRYPT_PARAMS,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509::pbe::i2d_SCRYPT_PARAMS;
+const _: unsafe extern "C" fn(
+    *const stack_st_SCT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ct::i2d_SCT_LIST;
 const _: unsafe extern "C" fn(*const SXNET, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::misc::i2d_SXNET;
 const _: unsafe extern "C" fn(*const SXNETID, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
@@ -15311,6 +15439,12 @@ const _: unsafe extern "C" fn(*mut X509, *mut *mut core::ffi::c_uchar) -> core::
     crate::x509::cert::i2d_re_X509_tbs;
 const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::ec::key_asn1::i2o_ECPublicKey;
+const _: unsafe extern "C" fn(*const SCT, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ct::i2o_SCT;
+const _: unsafe extern "C" fn(
+    *const stack_st_SCT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ct::i2o_SCT_LIST;
 const _: unsafe extern "C" fn(
     *mut X509V3_EXT_METHOD,
     *const ASN1_ENUMERATED,
@@ -15360,6 +15494,13 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut EC_KEY = crate::ec::key_asn1::o2i_ECPublicKey;
+const _: unsafe extern "C" fn(*mut *mut SCT, *mut *const core::ffi::c_uchar, usize) -> *mut SCT =
+    crate::ct::o2i_SCT;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_SCT,
+    *mut *const core::ffi::c_uchar,
+    usize,
+) -> *mut stack_st_SCT = crate::ct::o2i_SCT_LIST;
 const _: unsafe extern "C" fn(
     *mut X509V3_EXT_METHOD,
     *mut X509V3_CTX,

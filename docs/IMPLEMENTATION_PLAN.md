@@ -4896,8 +4896,18 @@ Exit checks:
   `OSSL_IETF_ATTR_SYNTAX_print` comes with the rest of that type. Tests:
   `tests/c/x509_print.c` (EC, RSA, RSA-PSS, DSA, Ed25519, version 1, trusted certificates,
   CRLs, requests, upstream's attribute certificates; 1,300 lines, byte-identical).
-- [ ] **5.7 Certificate Transparency:** `SCT`, `CTLOG`, `CTLOG_STORE`,
-  `CT_POLICY_EVAL_CTX`, SCT validation.
+- [x] **5.7 Certificate Transparency** (`rustyssl-pki`'s `ct`, capi `ct.rs`, from `crypto/ct`;
+  63 exports and the three extension methods): SCTs and their setters and getters; the TLS
+  encodings of an SCT and an SCT list (parsed in the safe core, with OpenSSL's errors, partial
+  progress, and skipped trailing octets) and the DER of a list; SCTs from base64; logs (their
+  identifiers the SHA-256 of the key) and log stores loaded from `ct_log_list.cnf` or
+  `$CTLOG_FILE`; the policy evaluation context; `SCT_validate` and `SCT_LIST_validate` (the
+  precertificate's TBS without the SCT or poison extension, the issuer key hash, the log's
+  signature, future timestamps); `SCT_print` and `SCT_LIST_print`; and the precertificate SCT,
+  poison, and OCSP SCT extensions, replacing their placeholders. Tests: `tests/c/ct.c`
+  (upstream's embedded-SCT certificates and log list: decoding, printing, validation in each
+  outcome, malformed lists, built and base64 SCTs, log files), core unit tests, and the
+  `ct_sct` fuzz target.
 
 **Exit:** x509-limbo results equal the reference's (any difference is a documented
 deviation). Differential verification over a large real-world chain corpus matches in both

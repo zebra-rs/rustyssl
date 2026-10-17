@@ -30,6 +30,12 @@ doc = false
 bench = false
 
 [[bin]]
+name = "ct_sct"
+path = "fuzz_targets/ct_sct.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "stack"
 path = "fuzz_targets/stack.rs"
 test = false
