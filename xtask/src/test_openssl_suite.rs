@@ -16,6 +16,8 @@
 //! lines and the same number of `ERROR` lines: `evp_test` counts some tests that fail to start
 //! (a key generation whose algorithm can't be fetched) as passed, saying so only in one. The
 //! other programs must succeed on both with the same numbers of `ok` and `not ok` lines.
+//! `evp_test`'s one look inside OpenSSL's private `EVP_PKEY` (whether a generated key is a
+//! provider's) is replaced with the public `EVP_PKEY_get0_provider` before it's built.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -71,7 +73,7 @@ fn ensure(root: &Path, version: &str, reference: &Path) -> Result<PathBuf> {
     let mut options: Vec<&str> = CONFIGURE_OPTIONS.to_vec();
     options.push("-g");
     let inputs = format!(
-        "version = {version}\ntarget = {}\noptions = {}\nprograms = {}\ndynamic = {}\n",
+        "version = {version}\ntarget = {}\noptions = {}\nprograms = {}\ndynamic = {}\npublic provided-key check\n",
         target.configure,
         options.join(" "),
         PROGRAMS.join(" "),
@@ -101,6 +103,20 @@ fn ensure(root: &Path, version: &str, reference: &Path) -> Result<PathBuf> {
         );
     }
     fs::write(&build_info, rules)?;
+    // `evp_test` tells a provided key from a legacy one by reading `keymgmt` out of OpenSSL's
+    // private `struct evp_pkey_st` (`evp_pkey_is_provided`, from an internal header), which
+    // no application can (the type is opaque); rustyssl's keys have another layout, so the
+    // public equivalent goes in its place, for both libraries.
+    let evp_test_c = src.join("test/evp_test.c");
+    let program = fs::read_to_string(&evp_test_c)?;
+    let internal = "if (!evp_pkey_is_provided(pkey)) {";
+    if !program.contains(internal) {
+        return Err(format!("test/evp_test.c has no `{internal}`").into());
+    }
+    fs::write(
+        &evp_test_c,
+        program.replace(internal, "if (EVP_PKEY_get0_provider(pkey) == NULL) {"),
+    )?;
     println!(
         "Building upstream OpenSSL {version}'s test programs for {} (log: {})...",
         target.configure,
