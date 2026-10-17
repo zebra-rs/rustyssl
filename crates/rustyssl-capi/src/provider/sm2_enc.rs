@@ -186,16 +186,13 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return ptr::null_mut() };
+        let Some(md) = c.md.copy() else { return ptr::null_mut() };
         // SAFETY: the context's key, or NULL.
         if !c.key.is_null() && unsafe { EC_KEY_up_ref(c.key) } == 0 {
             return ptr::null_mut();
         }
-        let copy = Sm2EncCtx { libctx: c.libctx, key: c.key, md: Prov::NONE };
-        let Some(md) = c.md.copy() else {
-            drop(copy);
-            return ptr::null_mut();
-        };
-        boxed(Sm2EncCtx { md, ..copy })
+        // The copy holds the reference just taken (and frees it when it's freed).
+        boxed(Sm2EncCtx { libctx: c.libctx, key: c.key, md })
     }
 }
 

@@ -459,6 +459,39 @@ static void number_theory(void)
         BN_free(b);
     }
 
+    /* Into the modulus: OpenSSL fails where its steps leave a value it has to reduce. */
+    {
+        static const char *const pairs[][2] = {
+            {"5193817943", "3259122431"}, {"3", "7"}, {"7", "3"}, {"2", "B"}, {"-5", "11"},
+            {"123456789ABCDEF", "FEDCBA987654321F"}, {"10", "21"}, {"1234567", "10000"},
+            {"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE", "10001"},
+        };
+        size_t i;
+        int flagged;
+
+        for (flagged = 0; flagged < 2; flagged++)
+            for (i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
+                BIGNUM *a = NULL, *b = NULL, *inv;
+
+                if (i == 0) {
+                    BN_dec2bn(&a, pairs[i][0]);
+                    BN_dec2bn(&b, pairs[i][1]);
+                } else {
+                    BN_hex2bn(&a, pairs[i][0]);
+                    BN_hex2bn(&b, pairs[i][1]);
+                }
+                if (flagged)
+                    BN_set_flags(a, BN_FLG_CONSTTIME);
+                inv = BN_mod_inverse(b, a, b, ctx);
+                printf("   inverse of %s into the modulus%s: %s", pairs[i][0], flagged ? " (consttime)" : "",
+                       inv == b ? "into it" : "none");
+                show("", b);
+                codes();
+                BN_free(a);
+                BN_free(b);
+            }
+    }
+
     /* Square roots: p = 3 (mod 4), 5 (mod 8), 1 (mod 8), 2, and composites. */
     {
         static const char *const primes[] = {"7", "D", "11", "61", "2", "-61", "9", "F", "1", "4",

@@ -4431,6 +4431,46 @@ timing signal. dudect is clean on the constant-time paths. Key encode, decode, a
 identical to the reference. Upstream `bntest`, `ectest`, `rsa_test`, and the `evp_test` pkey
 files pass.
 
+Exit checks:
+- [x] **The `evp_test` pkey files**: all 47 `evppkey_*.txt` files now run in
+  `test-openssl-suite`, which covers every data file but `evpciph_aes_stitched.txt` (Phase 7).
+  That's 109 files, each with the reference's counts. Running them found two bugs:
+  - The SM2 cipher's `dupctx` dropped the key reference it had just taken (a struct update
+    copied the raw pointer out of a value whose `Drop` then freed it). So freeing a copy and
+    its original freed the key under `evp_test`.
+  - The RSA KEM's decapsulation size query didn't write the length.
+
+  Both now have tests in `tests/c/evp_sm2_enc.c` and `evp_rsa_kem.c`.
+- [x] **The asymmetric Wycheproof suites** (`test-wycheproof`): besides RSA's,
+  - ECDSA, DER and P1363, on every curve the default provider has (73 files less the SHAKE
+    ones, a digest OpenSSL's ECDSA refuses, and Bitcoin's low-S rule, which OpenSSL doesn't
+    apply);
+  - DSA, DER and P1363;
+  - Ed25519 and Ed448;
+  - ECDH, peers as SubjectPublicKeyInfos and as points, prime and binary curves;
+  - X25519 and X448, raw and ASN.1.
+
+  The runner's new commands are `pkver`, `ecdh`, and `xdh`. That's 94 more files, 61,339
+  tests in all, with no output differing from the reference. The reference departs from
+  Wycheproof on ten more pairs of ECDH tests (explicit curves with no cofactor, or n as one),
+  listed in `reference.txt`. ML-DSA's Wycheproof vectors run in `evp_test`'s copies
+  (`evppkey_ml_dsa_*_wycheproof_*.txt`). ML-KEM's (seeds, encapsulation, semi-expanded keys)
+  are left for a runner command of their own.
+- [x] **Upstream `bntest`, `ectest`, and `rsa_test`**: `test-openssl-suite` builds them and
+  runs `bntest` on each of its six data files and alone, then `ectest` and `rsa_test`. Upstream
+  links the last two with the static `libcrypto.a`, but they use only exported functions, so
+  they're linked with the shared one here. All runs give the reference's results (174, 853,
+  and 28 checks). Running them found two bugs:
+  - `BN_mod_inverse` with its result aliasing the modulus. OpenSSL fails there (its
+    `BN_nnmod` refusing `r == m`) whenever its own steps leave a value to reduce. That case
+    now replays OpenSSL's binary or Euclidean steps (`openssl_inverse_tail`, used for nothing
+    else) to fail where it does. The differential probe's `bninv` no longer skips the case.
+  - `EC_GROUP_have_precompute_mult` on nistz256's P-256 counts the built-in table only while
+    the generator is the standard one.
+
+  Both now have checks in `tests/c/bn_mod.c` and `ec_group_point.c`.
+- [ ] Marvin (RSA PKCS#1 v1.5 decryption timing) and dudect on the constant-time paths.
+
 ## Phase 5: X.509 and certificate verification
 
 - [ ] **5.1 Objects:**

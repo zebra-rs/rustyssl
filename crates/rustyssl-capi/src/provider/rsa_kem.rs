@@ -365,6 +365,10 @@ unsafe fn recover(
             err::raise(ERR_LIB_PROV, PROV_R_INVALID_KEY, F);
             return 0;
         }
+        // SAFETY: the caller's guarantee: NULL or a live `size_t`.
+        if let Some(l) = unsafe { outlen.as_mut() } {
+            *l = nlen;
+        }
         return 1;
     }
     if inlen != nlen {

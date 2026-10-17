@@ -599,11 +599,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BN_cmp` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `dh_lib`, `dsa_lib`, `evp_dsa_kmgmt`, `evp_pkey_rsa`, `evp_rsa`, `rsa_asn1`, `rsa_ops`, `x509_pubkey` |
 | `BN_consttime_swap` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_copy` | libcrypto | `openssl/bn.h` | `bn`, `dh_check`, `evp_rsa_kem` |
-| `BN_dec2bn` | libcrypto | `openssl/bn.h` | `bn` |
+| `BN_dec2bn` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod` |
 | `BN_div` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_div_recp` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_div_word` | libcrypto | `openssl/bn.h` | `bn` |
-| `BN_dup` | libcrypto | `openssl/bn.h` | `bn`, `dh_check`, `dh_lib`, `dsa_lib`, `ec_key`, `ecdsa`, `evp_dh_exch`, `evp_pkey_rsa`, `pvkfmt`, `rsa_ops` |
+| `BN_dup` | libcrypto | `openssl/bn.h` | `bn`, `dh_check`, `dh_lib`, `dsa_lib`, `ec_group_point`, `ec_key`, `ecdsa`, `evp_dh_exch`, `evp_pkey_rsa`, `pvkfmt`, `rsa_ops` |
 | `BN_exp` | libcrypto | `openssl/bn.h` | `bn` |
 | `BN_free` | libcrypto | `openssl/bn.h` | `bn`, `bn_mod`, `bn_prime`, `d2i_pkey`, `dh_check`, `dh_lib`, `dsa_lib`, `ec_group_point`, `ec_key`, `ec_params`, `ecdsa`, `evp_derive`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_rsa_legacy`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `pem_pkey`, `rsa_asn1`, `rsa_ops`, `x509_pubkey` |
 | `BN_from_montgomery` | libcrypto | `openssl/bn.h` | `bn_mod` |
@@ -1798,7 +1798,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_decapsulate_init` | libcrypto | `openssl/evp.h` | `d2i_pq`, `dhkem`, `evp_derive`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_pkey_ops`, `evp_rsa_kem` |
 | `EVP_PKEY_decrypt` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_sm2_enc` |
 | `EVP_PKEY_decrypt_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_sm2_enc` |
-| `EVP_PKEY_decrypt_init_ex` | libcrypto | `openssl/evp.h` | `evp_derive` |
+| `EVP_PKEY_decrypt_init_ex` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_sm2_enc` |
 | `EVP_PKEY_decrypt_old` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_derive` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_dh_exch`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_pkey_meth`, `evp_pkey_ops` |
 | `EVP_PKEY_derive_init` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_pkey_meth`, `evp_pkey_ops` |

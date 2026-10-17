@@ -7708,11 +7708,6 @@ static int bn_command(const char *command, const char *line)
         sscanf(line, "%*s %7s %lu %lu", t, &a, &b);
         in = t[0] == '-' ? NULL : bn_at(strtoul(t, NULL, 10));
         /* OpenSSL's result into the modulus fails (or not) depending on its reduction. */
-        if (in == bn_at(b)) {
-            printf(" skipped: into the modulus\n");
-            BN_CTX_free(ctx);
-            return 1;
-        }
         if (BN_num_bits(bn_at(b)) > 4096) {
             printf(" skipped: too large\n");
             BN_CTX_free(ctx);

@@ -55,13 +55,22 @@ enum Kind {
     RsaVerify,
     /// PKCS #1 v1.5 signing (`RsassaPkcs1Generate`).
     RsaSign,
+    /// Verification with a SubjectPublicKeyInfo (`EcdsaVerify`, `EcdsaP1363Verify`,
+    /// `DsaVerify`, `DsaP1363Verify`, `EddsaVerify`), the signature's format the template.
+    SigVerify,
+    /// ECDH (`EcdhTest`, `EcdhEcpointTest`), the peer's encoding the template.
+    Ecdh,
+    /// X25519 and X448 (`XdhComp`, `XdhAsnComp`), the algorithm (or `asn`) the template.
+    Xdh,
 }
 
 /// Each file's kind and its algorithm, as the runner names it: `{k}` stands for the key's
 /// bits, `{h}` for half of them, and `{t}` for the tag's octets. For MACs, the MAC's name and
 /// its parameters; for PBES2, the digest and the cipher; for RSA, the padding (the digests come
 /// from each group). RSA-PSS's files with parameters in the key wait for key decoding (4.7),
-/// and its SHAKE files test an MGF OpenSSL doesn't offer.
+/// and its SHAKE files test an MGF OpenSSL doesn't offer. ECDSA's SHAKE files test a digest
+/// OpenSSL's ECDSA refuses (an XOF), and its Bitcoin file a rule (low S) OpenSSL doesn't
+/// apply; the PEM, JWK, and WebCrypto encodings aren't OpenSSL's API.
 #[rustfmt::skip]
 const FILES: &[(&str, Kind, &str)] = &[
     ("aead_aes_siv_cmac", Kind::AeadSiv, "AES-{h}-SIV"),
@@ -82,6 +91,96 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("camellia_cbc_pkcs5", Kind::Cipher, "CAMELLIA-{k}-CBC"),
     ("camellia_cmac", Kind::Mac, "CMAC cipher=CAMELLIA-{k}-CBC"),
     ("chacha20_poly1305", Kind::Aead, "ChaCha20-Poly1305"),
+    ("dsa_2048_224_sha224", Kind::SigVerify, "der"),
+    ("dsa_2048_224_sha224_p1363", Kind::SigVerify, "p1363"),
+    ("dsa_2048_224_sha256", Kind::SigVerify, "der"),
+    ("dsa_2048_224_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("dsa_2048_256_sha256", Kind::SigVerify, "der"),
+    ("dsa_2048_256_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("dsa_3072_256_sha256", Kind::SigVerify, "der"),
+    ("dsa_3072_256_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdh_brainpoolP224r1", Kind::Ecdh, "spki"),
+    ("ecdh_brainpoolP256r1", Kind::Ecdh, "spki"),
+    ("ecdh_brainpoolP320r1", Kind::Ecdh, "spki"),
+    ("ecdh_brainpoolP384r1", Kind::Ecdh, "spki"),
+    ("ecdh_brainpoolP512r1", Kind::Ecdh, "spki"),
+    ("ecdh_secp224r1", Kind::Ecdh, "spki"),
+    ("ecdh_secp224r1_ecpoint", Kind::Ecdh, "point"),
+    ("ecdh_secp256k1", Kind::Ecdh, "spki"),
+    ("ecdh_secp256r1", Kind::Ecdh, "spki"),
+    ("ecdh_secp256r1_ecpoint", Kind::Ecdh, "point"),
+    ("ecdh_secp384r1", Kind::Ecdh, "spki"),
+    ("ecdh_secp384r1_ecpoint", Kind::Ecdh, "point"),
+    ("ecdh_secp521r1", Kind::Ecdh, "spki"),
+    ("ecdh_secp521r1_ecpoint", Kind::Ecdh, "point"),
+    ("ecdh_sect283k1", Kind::Ecdh, "spki"),
+    ("ecdh_sect283r1", Kind::Ecdh, "spki"),
+    ("ecdh_sect409k1", Kind::Ecdh, "spki"),
+    ("ecdh_sect409r1", Kind::Ecdh, "spki"),
+    ("ecdh_sect571k1", Kind::Ecdh, "spki"),
+    ("ecdh_sect571r1", Kind::Ecdh, "spki"),
+    ("ecdsa_brainpoolP224r1_sha224", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP224r1_sha224_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_brainpoolP224r1_sha3_224", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP256r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP256r1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_brainpoolP256r1_sha3_256", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP320r1_sha384", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP320r1_sha384_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_brainpoolP320r1_sha3_384", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP384r1_sha384", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP384r1_sha384_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_brainpoolP384r1_sha3_384", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP512r1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP512r1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_brainpoolP512r1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp160k1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp160k1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp160r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp160r1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp160r2_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp160r2_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp192k1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp192k1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp192r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp192r1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp224k1_sha224", Kind::SigVerify, "der"),
+    ("ecdsa_secp224k1_sha224_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp224k1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp224k1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp224r1_sha224", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha224_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp224r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp224r1_sha3_224", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha3_256", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_secp224r1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp256k1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp256k1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp256k1_sha3_256", Kind::SigVerify, "der"),
+    ("ecdsa_secp256k1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_secp256k1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_secp256k1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp256r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp256r1_sha256_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp256r1_sha3_256", Kind::SigVerify, "der"),
+    ("ecdsa_secp256r1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_secp256r1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_secp256r1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp384r1_sha256", Kind::SigVerify, "der"),
+    ("ecdsa_secp384r1_sha384", Kind::SigVerify, "der"),
+    ("ecdsa_secp384r1_sha384_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp384r1_sha3_384", Kind::SigVerify, "der"),
+    ("ecdsa_secp384r1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_secp384r1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_secp384r1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ecdsa_secp521r1_sha3_512", Kind::SigVerify, "der"),
+    ("ecdsa_secp521r1_sha512", Kind::SigVerify, "der"),
+    ("ecdsa_secp521r1_sha512_p1363", Kind::SigVerify, "p1363"),
+    ("ed25519", Kind::SigVerify, "der"),
+    ("ed448", Kind::SigVerify, "der"),
     ("hkdf_sha1", Kind::Hkdf, "SHA1"),
     ("hkdf_sha256", Kind::Hkdf, "SHA2-256"),
     ("hkdf_sha384", Kind::Hkdf, "SHA2-384"),
@@ -90,11 +189,11 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("hmac_sha224", Kind::Mac, "HMAC digest=SHA2-224"),
     ("hmac_sha256", Kind::Mac, "HMAC digest=SHA2-256"),
     ("hmac_sha384", Kind::Mac, "HMAC digest=SHA2-384"),
-    ("hmac_sha512", Kind::Mac, "HMAC digest=SHA2-512"),
     ("hmac_sha3_224", Kind::Mac, "HMAC digest=SHA3-224"),
     ("hmac_sha3_256", Kind::Mac, "HMAC digest=SHA3-256"),
     ("hmac_sha3_384", Kind::Mac, "HMAC digest=SHA3-384"),
     ("hmac_sha3_512", Kind::Mac, "HMAC digest=SHA3-512"),
+    ("hmac_sha512", Kind::Mac, "HMAC digest=SHA2-512"),
     ("hmac_sha512_224", Kind::Mac, "HMAC digest=SHA2-512/224"),
     ("hmac_sha512_256", Kind::Mac, "HMAC digest=SHA2-512/256"),
     ("hmac_sm3", Kind::Mac, "HMAC digest=SM3"),
@@ -142,13 +241,13 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("rsa_oaep_4096_sha512_mgf1sha1", Kind::RsaDecrypt, "oaep"),
     ("rsa_oaep_4096_sha512_mgf1sha512", Kind::RsaDecrypt, "oaep"),
     ("rsa_oaep_misc", Kind::RsaDecrypt, "oaep"),
-    ("rsa_pkcs1_2048", Kind::RsaDecrypt, "pkcs1"),
-    ("rsa_pkcs1_3072", Kind::RsaDecrypt, "pkcs1"),
-    ("rsa_pkcs1_4096", Kind::RsaDecrypt, "pkcs1"),
     ("rsa_pkcs1_1024_sig_gen", Kind::RsaSign, "pkcs1"),
     ("rsa_pkcs1_1536_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_2048", Kind::RsaDecrypt, "pkcs1"),
     ("rsa_pkcs1_2048_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_3072", Kind::RsaDecrypt, "pkcs1"),
     ("rsa_pkcs1_3072_sig_gen", Kind::RsaSign, "pkcs1"),
+    ("rsa_pkcs1_4096", Kind::RsaDecrypt, "pkcs1"),
     ("rsa_pkcs1_4096_sig_gen", Kind::RsaSign, "pkcs1"),
     ("rsa_pss_2048_sha1_mgf1_20", Kind::RsaVerify, "pss"),
     ("rsa_pss_2048_sha256_mgf1_0", Kind::RsaVerify, "pss"),
@@ -170,20 +269,20 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("rsa_signature_2048_sha3_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_2048_sha3_384", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_2048_sha3_512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_2048_sha512", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_2048_sha512_224", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_2048_sha512_256", Kind::RsaVerify, "pkcs1"),
-    ("rsa_signature_2048_sha512", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha384", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha3_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha3_384", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha3_512", Kind::RsaVerify, "pkcs1"),
-    ("rsa_signature_3072_sha512_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_3072_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_3072_sha512_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_4096_sha256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_4096_sha384", Kind::RsaVerify, "pkcs1"),
-    ("rsa_signature_4096_sha512_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_4096_sha512", Kind::RsaVerify, "pkcs1"),
+    ("rsa_signature_4096_sha512_256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_8192_sha256", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_8192_sha384", Kind::RsaVerify, "pkcs1"),
     ("rsa_signature_8192_sha512", Kind::RsaVerify, "pkcs1"),
@@ -197,6 +296,10 @@ const FILES: &[(&str, Kind, &str)] = &[
     ("siphashx_4_8", Kind::Mac, "SIPHASH size=16,c-rounds=4,d-rounds=8"),
     ("sm4_ccm", Kind::Aead, "SM4-CCM"),
     ("sm4_gcm", Kind::Aead, "SM4-GCM"),
+    ("x25519", Kind::Xdh, "X25519"),
+    ("x25519_asn", Kind::Xdh, "asn"),
+    ("x448", Kind::Xdh, "X448"),
+    ("x448_asn", Kind::Xdh, "asn"),
 ];
 
 /// Algorithms Wycheproof tests that the reference doesn't offer: their tests are skipped.
@@ -274,6 +377,15 @@ fn rsa_key(group: &Value) -> Result<String> {
     Ok(format!("{},{}", text(k, "modulus")?, text(k, "publicExponent")?).to_ascii_lowercase())
 }
 
+/// OpenSSL's name for one of Wycheproof's curves (the two it names otherwise).
+fn curve(name: &str) -> &str {
+    match name {
+        "secp192r1" => "prime192v1",
+        "secp256r1" => "prime256v1",
+        other => other,
+    }
+}
+
 /// A group's digest field as the runner takes it: `-` when there's none.
 fn digest(group: &Value, key: &str) -> String {
     match group.get(key).and_then(Value::as_str) {
@@ -313,6 +425,8 @@ fn cases(kind: Kind, template: &str, doc: &Value) -> Result<(Vec<Case>, usize)> 
         let taglen = group.get("tagSize").and_then(Value::as_u64).unwrap_or(0) / 8;
         let key = match kind {
             Kind::RsaDecrypt | Kind::RsaVerify | Kind::RsaSign => rsa_key(group)?,
+            Kind::SigVerify => text(group, "publicKeyDer")?.to_ascii_lowercase(),
+            Kind::Ecdh => curve(text(group, "curve")?).to_owned(),
             _ => String::new(),
         };
         let (md, mgf1) = (digest(group, "sha"), digest(group, "mgfSha"));
@@ -470,6 +584,21 @@ fn cases(kind: Kind, template: &str, doc: &Value) -> Result<(Vec<Case>, usize)> 
                     vec![format!("S:{}", s("sig")?)],
                     None,
                 ),
+                Kind::SigVerify => (
+                    format!("pkver {algorithm} {md} {key} {} {}", s("msg")?, s("sig")?),
+                    vec!["V:ok".to_owned()],
+                    None,
+                ),
+                Kind::Ecdh => (
+                    format!("ecdh {key} {algorithm} {} {}", s("private")?, s("public")?),
+                    vec![format!("K:{}", s("shared")?)],
+                    None,
+                ),
+                Kind::Xdh => (
+                    format!("xdh {algorithm} {} {}", s("private")?, s("public")?),
+                    vec![format!("K:{}", s("shared")?)],
+                    None,
+                ),
             };
             cases.push(Case {
                 tc_id: number(t, "tcId")?,
@@ -511,8 +640,8 @@ fn agrees(case: &Case, fields: &[&str]) -> bool {
                     .and_then(|f| f.strip_prefix("T:"))
                     .is_none_or(|t| t.starts_with("fail") || !t.starts_with(tag))
             }
-            Kind::Hkdf | Kind::Pbkdf2 => failed("K:"),
-            Kind::RsaVerify => failed("V:"),
+            Kind::Hkdf | Kind::Pbkdf2 | Kind::Ecdh | Kind::Xdh => failed("K:"),
+            Kind::RsaVerify | Kind::SigVerify => failed("V:"),
             Kind::RsaSign => failed("S:"),
             // An invalid key to wrap comes with no ciphertext: wrapping it must fail.
             Kind::Wrap if case.expected.first().is_some_and(|e| e == "E:_") => failed("E:"),

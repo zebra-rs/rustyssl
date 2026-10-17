@@ -116,8 +116,7 @@ fn new_group(core: CoreGroup, libctx: *mut OSSL_LIB_CTX) -> *mut EC_GROUP {
         generator: Ptr(ptr::null_mut()),
         seed: Ptr(ptr::null_mut()),
         mont: Ptr(ptr::null_mut()),
-        // nistz256's table of the standard generator is built in.
-        precomputed: core.meth == Meth::Nistz256,
+        precomputed: false,
         core: Arc::new(core),
     };
     let h = EC_GROUP::new_handle(EcGroup {
@@ -1214,9 +1213,36 @@ ffi_export! {
         c_int::from(match s.core.meth {
             Meth::Simple | Meth::Mont | Meth::Nist => s.core.pre_comp.is_some(),
             Meth::Gf2m | Meth::Sm2p256 => false,
+            // nistz256's table of the standard generator is built in.
+            Meth::Nistz256 => s.precomputed || is_affine_g(&s.core),
             _ => s.precomputed,
         })
     }
+}
+
+/// `ecp_nistz256_is_affine_G`: whether the group's generator is P-256's, its coordinates as
+/// setting it from affine ones leaves them (Z one).
+fn is_affine_g(c: &CoreGroup) -> bool {
+    let (Some(g), Some(curve)) = (
+        c.generator.as_ref(),
+        curves::by_nid(rustyssl_abi::NID_X9_62_prime256v1),
+    ) else {
+        return false;
+    };
+    let (Ok(x), Ok(y)) = (
+        BigNum::from_bin(curve.x, Endian::Big, false),
+        BigNum::from_bin(curve.y, Endian::Big, false),
+    ) else {
+        return false;
+    };
+    let mut std = CorePoint::infinity();
+    if cp::set_affine(c, &mut std, &x, &y).is_err() {
+        return false;
+    }
+    g.z_is_one
+        && core_bn::cmp(&g.x, &std.x).is_eq()
+        && core_bn::cmp(&g.y, &std.y).is_eq()
+        && core_bn::cmp(&g.z, &std.z).is_eq()
 }
 
 /// A binary field's polynomial's nonzero exponents (`poly[]` before its 0).
