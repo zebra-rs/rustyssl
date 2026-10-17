@@ -4841,12 +4841,22 @@ Exit checks:
     security level of keys and signatures; identities (`check_id`, with 5.5); Suite B; the
     signatures and validity times (`internal_verify`); name constraints
     (`NAME_CONSTRAINTS_check`, `_check_CN`, punycode for SmtpUTF8Mailbox, `OSSL_parse_url` for
-    URIs). Revocation runs only with `X509_V_FLAG_CRL_CHECK` (5.4c), policies with
+    URIs). Revocation (with `X509_V_FLAG_CRL_CHECK`) came with 5.4c; policies run with
     `X509_V_FLAG_POLICY_CHECK` (5.4d), RFC 3779 resources and DANE abort until 5.4e and libssl.
     Tests: `tests/c/x509_verify.c` (33 chains with the callback's trace), unit tests (punycode
     with the CVE-2022-3602 overflow, name constraints, URLs). The CVE-2015-1793 alternate-chain
     regression waits for the `tests/cve/` suite.
-  - [ ] **5.4c Revocation:** CRLs (scores, delta, indirect, IDP, the CRL issuer's path).
+  - [x] **5.4c Revocation** (`x509/revoke.rs`): the context's default `check_revocation`,
+    `check_crl`, and `cert_crl`. With `X509_V_FLAG_CRL_CHECK` the leaf (with `_CHECK_ALL`, the
+    whole chain) is checked until every reason is covered: CRLs from the context and then the
+    store (or a custom `get_crl`) are scored as OpenSSL's are (issuer name, authority key
+    identifier and where the CRL issuer is, distribution point scope, times, critical
+    extensions), the best taken with its delta CRL (`X509_V_FLAG_USE_DELTAS`,
+    `removeFromCRL`), then checked (cRLSign, scope, the CRL issuer's own path in a child
+    context, the IDP's validity, times, Suite B, the signature) and searched. Indirect CRLs
+    and partial reasons need `X509_V_FLAG_EXTENDED_CRL_SUPPORT`, as in OpenSSL. Tests:
+    `tests/c/x509_crlcheck.c` (39 runs with the callback's trace and current CRL, on a PKI and
+    13 CRLs made with the reference's tool).
   - [ ] **5.4d Policies:** the policy tree (with a bound, the CVE-2023-0464 lesson) and the
     `X509_policy_*` exports.
   - [ ] **5.4e The rest:** RFC 3779 resources (`X509v3_addr_validate_path`,

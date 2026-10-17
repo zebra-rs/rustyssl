@@ -5,9 +5,8 @@
 //! searches of the store; issuer lookup; validity-time checks; and the verification errors'
 //! text.
 //!
-//! The verification itself is in `verify.rs`; revocation comes with step 5.4c and policies
-//! with 5.4d: until then the context's default functions for them abort when they'd have work
-//! to do (AGENTS.md rule 10).
+//! The verification itself is in `verify.rs` and revocation in `revoke.rs`; policies come with
+//! step 5.4d: until then the context's default function for them aborts (AGENTS.md rule 10).
 //!
 //! The type is opaque in OpenSSL's headers, so its layout is ours (OpenSSL's, in fact).
 
@@ -149,40 +148,6 @@ unsafe extern "C" fn check_issued(
 /// A default function of a later part of step 5.4: aborts.
 fn later(what: &str) -> ! {
     crate::stub::unimplemented(what)
-}
-
-/// `check_revocation`: nothing to check without `X509_V_FLAG_CRL_CHECK`; CRLs come with step
-/// 5.4c.
-pub(crate) unsafe extern "C" fn check_revocation(ctx: *mut X509_STORE_CTX) -> c_int {
-    crate::ffi::guard(
-        ERR_LIB_X509,
-        "check_revocation",
-        || 0,
-        move || {
-            // SAFETY: the context the verification is called with.
-            let Some(c) = (unsafe { ctx_of(ctx) }) else {
-                return 0;
-            };
-            let crl_check =
-                param(c).is_some_and(|p| p.flags & flag(rustyssl_abi::X509_V_FLAG_CRL_CHECK) != 0);
-            if !crl_check {
-                return 1;
-            }
-            later("check_revocation (step 5.4c)")
-        },
-    )
-}
-
-pub(crate) unsafe extern "C" fn check_crl(_ctx: *mut X509_STORE_CTX, _crl: *mut X509_CRL) -> c_int {
-    later("check_crl (step 5.4c)")
-}
-
-pub(crate) unsafe extern "C" fn cert_crl(
-    _ctx: *mut X509_STORE_CTX,
-    _crl: *mut X509_CRL,
-    _x: *mut X509,
-) -> c_int {
-    later("cert_crl (step 5.4c)")
 }
 
 pub(crate) unsafe extern "C" fn check_policy(_ctx: *mut X509_STORE_CTX) -> c_int {
@@ -523,7 +488,7 @@ ffi_export! {
 }
 
 /// `X509_CRL_free` as a stack's free function.
-unsafe extern "C" fn crl_free(c: *mut c_void) {
+pub(crate) unsafe extern "C" fn crl_free(c: *mut c_void) {
     // SAFETY: a CRL of the stack, which the stack held a reference to.
     unsafe { X509_CRL_free(c.cast()) };
 }
@@ -1713,10 +1678,10 @@ ffi_export! {
         c.get_issuer = cb.get_issuer.or(Some(X509_STORE_CTX_get1_issuer));
         c.verify_cb = cb.verify_cb.or(Some(null_callback));
         c.verify = cb.verify.or(Some(super::verify::internal_verify));
-        c.check_revocation = cb.check_revocation.or(Some(check_revocation));
+        c.check_revocation = cb.check_revocation.or(Some(super::revoke::check_revocation));
         c.get_crl = cb.get_crl;
-        c.check_crl = cb.check_crl.or(Some(check_crl));
-        c.cert_crl = cb.cert_crl.or(Some(cert_crl));
+        c.check_crl = cb.check_crl.or(Some(super::revoke::check_crl));
+        c.cert_crl = cb.cert_crl.or(Some(super::revoke::cert_crl));
         c.check_policy = cb.check_policy.or(Some(check_policy));
         c.lookup_certs = cb.lookup_certs.or(Some(X509_STORE_CTX_get1_certs));
         c.lookup_crls = cb.lookup_crls.or(Some(X509_STORE_CTX_get1_crls));

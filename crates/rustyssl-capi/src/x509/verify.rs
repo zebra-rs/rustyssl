@@ -2,7 +2,7 @@
 //! `X509_build_chain`. The chain is built from the certificate up through the untrusted
 //! certificates and the store (trusted issuers first or last, then alternate chains, partial
 //! chains if asked for), then checked: trust, the extensions and purposes, path and proxy path
-//! lengths, the security level of keys and signatures, the identities, revocation (5.4c),
+//! lengths, the security level of keys and signatures, the identities, revocation (`revoke.rs`),
 //! Suite B, the signatures and validity times, name constraints, RFC 3779 resources (5.4e),
 //! and policies (5.4d). Each failure goes to the verification callback, which may accept it,
 //! with the error, its depth, and its certificate set, as OpenSSL's.

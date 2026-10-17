@@ -959,7 +959,7 @@ ffi_callback! {
 ///
 /// # Safety
 /// `dpn` is a live relative name; `iname` is a live name.
-unsafe fn full_name(dpn: &DIST_POINT_NAME, iname: *const X509_NAME) -> *mut X509_NAME {
+pub(crate) unsafe fn full_name(dpn: &DIST_POINT_NAME, iname: *const X509_NAME) -> *mut X509_NAME {
     // SAFETY: the caller's guarantee.
     let dpname = unsafe { X509_NAME_dup(iname) };
     if dpname.is_null() {

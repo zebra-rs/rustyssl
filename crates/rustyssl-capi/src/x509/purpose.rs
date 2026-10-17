@@ -1927,6 +1927,7 @@ pub(crate) struct CacheView {
     pub(crate) skid: *mut ASN1_OCTET_STRING,
     pub(crate) altname: *mut GENERAL_NAMES,
     pub(crate) nc: *mut rustyssl_abi::NAME_CONSTRAINTS,
+    pub(crate) crldp: *mut rustyssl_abi::CRL_DIST_POINTS,
 }
 
 /// The certificate's cache as it stands, read under its lock; an empty one for NULL.
@@ -1943,6 +1944,7 @@ pub(crate) unsafe fn cache_view(xp: *const X509) -> CacheView {
         skid: ptr::null_mut(),
         altname: ptr::null_mut(),
         nc: ptr::null_mut(),
+        crldp: ptr::null_mut(),
     };
     // SAFETY: the caller's guarantee.
     let Some(x) = (unsafe { cert_of(xp) }) else {
@@ -1962,6 +1964,7 @@ pub(crate) unsafe fn cache_view(xp: *const X509) -> CacheView {
         skid: c.skid,
         altname: c.altname,
         nc: c.nc,
+        crldp: c.crldp,
     };
     // SAFETY: as above.
     unsafe { CRYPTO_THREAD_unlock(x.lock) };
