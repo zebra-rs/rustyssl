@@ -7,11 +7,13 @@
 //! slice of `omax` octets.
 
 pub(crate) mod any;
+pub(crate) mod bio_asn1;
 pub(crate) mod bit_string;
 pub(crate) mod generate;
 pub(crate) mod hex;
 pub(crate) mod integer;
 pub(crate) mod mime;
+pub(crate) mod ndef;
 pub(crate) mod parse;
 pub(crate) mod sign;
 pub(crate) mod string;

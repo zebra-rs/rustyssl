@@ -3,9 +3,8 @@
 //! DER, PEM, BIO, and `FILE` forms.
 //!
 //! The structures are public in `pkcs7.h`; their layouts are OpenSSL's. Signing, verifying,
-//! encrypting, and decrypting are in [`doit`] and [`smime`]; streaming and S/MIME come with step
-//! 6.3c, and until then the type's streaming callbacks abort (AGENTS.md rule 10). A NULL object,
-//! which OpenSSL reads through, fails (docs/DEVIATIONS.md).
+//! encrypting, and decrypting are in [`doit`] and [`smime`], streaming and S/MIME in [`mime`]. A
+//! NULL object, which OpenSSL reads through, fails (docs/DEVIATIONS.md).
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_void};
 use core::mem::offset_of;
@@ -81,6 +80,7 @@ use crate::x509::name::{X509_NAME_it, X509_NAME_set};
 use crate::x509::purpose::X509_add_cert;
 
 pub(crate) mod doit;
+pub(crate) mod mime;
 pub(crate) mod smime;
 
 /// `OBJ_nid2obj`: the NID's static object, or NULL.
@@ -171,20 +171,36 @@ unsafe extern "C" fn p7_adb() -> *const ASN1_ITEM {
 }
 
 ffi_callback! {
-    /// `pk7_cb`: streaming and detached encoding, which need the ASN.1 streaming BIOs (step
-    /// 6.3c), and abort until then.
+    /// `pk7_cb`: streaming and detached encoding, through the object's data path.
     ///
     /// # Safety
-    /// As the template engine calls it.
-    pub(crate) unsafe extern "C" fn pk7_cb(operation: c_int, _pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM, _exarg: *mut c_void) -> c_int
+    /// As the template engine and the streaming functions call it.
+    pub(crate) unsafe extern "C" fn pk7_cb(operation: c_int, pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM, exarg: *mut c_void) -> c_int
     where failure = 0, library = ERR_LIB_PKCS7
     {
-        match operation {
-            ASN1_OP_STREAM_PRE | ASN1_OP_DETACHED_PRE | ASN1_OP_STREAM_POST | ASN1_OP_DETACHED_POST => {
-                crate::stub::unimplemented("PKCS#7 streaming (step 6.3c)")
-            }
-            _ => 1,
+        let streaming = [ASN1_OP_STREAM_PRE, ASN1_OP_DETACHED_PRE, ASN1_OP_STREAM_POST, ASN1_OP_DETACHED_POST];
+        if !streaming.contains(&operation) {
+            return 1;
         }
+        // SAFETY: the stream's arguments, as the streaming functions pass them.
+        let Some(sarg) = (unsafe { exarg.cast::<rustyssl_abi::ASN1_STREAM_ARG>().as_mut() }) else {
+            return 0;
+        };
+        // SAFETY: the slot of the value being streamed.
+        let Some(&p7) = (unsafe { pval.cast::<*mut PKCS7>().as_ref() }) else {
+            return 0;
+        };
+        if operation == ASN1_OP_STREAM_POST || operation == ASN1_OP_DETACHED_POST {
+            // SAFETY: the object and the chain its data path made.
+            return c_int::from(unsafe { doit::PKCS7_dataFinal(p7, sarg.ndef_bio) } > 0);
+        }
+        // SAFETY: the object; room for the boundary.
+        if operation == ASN1_OP_STREAM_PRE && unsafe { mime::PKCS7_stream(&mut sarg.boundary, p7) } <= 0 {
+            return 0;
+        }
+        // SAFETY: the object; the stream's output.
+        sarg.ndef_bio = unsafe { doit::PKCS7_dataInit(p7, sarg.out) };
+        c_int::from(!sarg.ndef_bio.is_null())
     }
 }
 

@@ -223,47 +223,6 @@ pub extern "C" fn ASYNC_unblock_pause() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_asn1_get_prefix(
-    _: *mut BIO,
-    _: *mut asn1_ps_func,
-    _: *mut asn1_ps_func,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_asn1_get_prefix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_asn1_get_suffix(
-    _: *mut BIO,
-    _: *mut asn1_ps_func,
-    _: *mut asn1_ps_func,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_asn1_get_suffix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_asn1_set_prefix(
-    _: *mut BIO,
-    _: asn1_ps_func,
-    _: asn1_ps_func,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_asn1_set_prefix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_asn1_set_suffix(
-    _: *mut BIO,
-    _: asn1_ps_func,
-    _: asn1_ps_func,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_asn1_set_suffix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_f_asn1() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_asn1")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_f_brotli() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_f_brotli")
 }
@@ -281,16 +240,6 @@ pub extern "C" fn BIO_f_zstd() -> *const BIO_METHOD {
 #[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_CMS(_: *mut BIO, _: *mut CMS_ContentInfo) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_NDEF(_: *mut BIO, _: *mut ASN1_VALUE, _: *const ASN1_ITEM) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_NDEF")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_PKCS7(_: *mut BIO, _: *mut PKCS7) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_PKCS7")
 }
 
 #[unsafe(no_mangle)]
@@ -5980,18 +5929,6 @@ pub extern "C" fn PEM_write_CMS(_: *mut FILE, _: *const CMS_ContentInfo) -> core
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_ASN1_stream(
-    _: *mut BIO,
-    _: *mut ASN1_VALUE,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: *const ASN1_ITEM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_ASN1_stream")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_bio_CMS(_: *mut BIO, _: *const CMS_ContentInfo) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_CMS")
 }
@@ -6004,16 +5941,6 @@ pub extern "C" fn PEM_write_bio_CMS_stream(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_CMS_stream")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_PKCS7_stream(
-    _: *mut BIO,
-    _: *mut PKCS7,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_PKCS7_stream")
 }
 
 #[unsafe(no_mangle)]
@@ -6671,38 +6598,8 @@ pub extern "C" fn PKCS1_MGF1(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_stream(
-    _: *mut *mut *mut core::ffi::c_uchar,
-    _: *mut PKCS7,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_stream")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PKCS7_to_TS_TST_INFO(_: *mut PKCS7) -> *mut TS_TST_INFO {
     crate::stub::unimplemented("PKCS7_to_TS_TST_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_ASN1(
-    _: *mut BIO,
-    _: *mut *mut BIO,
-    _: *const ASN1_ITEM,
-) -> *mut ASN1_VALUE {
-    crate::stub::unimplemented("SMIME_read_ASN1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_ASN1_ex(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *mut *mut BIO,
-    _: *const ASN1_ITEM,
-    _: *mut *mut ASN1_VALUE,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_VALUE {
-    crate::stub::unimplemented("SMIME_read_ASN1_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -6721,50 +6618,6 @@ pub extern "C" fn SMIME_read_CMS_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_PKCS7(_: *mut BIO, _: *mut *mut BIO) -> *mut PKCS7 {
-    crate::stub::unimplemented("SMIME_read_PKCS7")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_PKCS7_ex(
-    _: *mut BIO,
-    _: *mut *mut BIO,
-    _: *mut *mut PKCS7,
-) -> *mut PKCS7 {
-    crate::stub::unimplemented("SMIME_read_PKCS7_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_write_ASN1(
-    _: *mut BIO,
-    _: *mut ASN1_VALUE,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut stack_st_X509_ALGOR,
-    _: *const ASN1_ITEM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_write_ASN1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_write_ASN1_ex(
-    _: *mut BIO,
-    _: *mut ASN1_VALUE,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut stack_st_X509_ALGOR,
-    _: *const ASN1_ITEM,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_write_ASN1_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn SMIME_write_CMS(
     _: *mut BIO,
     _: *mut CMS_ContentInfo,
@@ -6772,16 +6625,6 @@ pub extern "C" fn SMIME_write_CMS(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SMIME_write_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_write_PKCS7(
-    _: *mut BIO,
-    _: *mut PKCS7,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_write_PKCS7")
 }
 
 #[unsafe(no_mangle)]
@@ -8655,17 +8498,6 @@ pub extern "C" fn d2i_TS_TST_INFO_fp(_: *mut FILE, _: *mut *mut TS_TST_INFO) -> 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_ASN1_bio_stream(
-    _: *mut BIO,
-    _: *mut ASN1_VALUE,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *const ASN1_ITEM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ASN1_bio_stream")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_CMS_ContentInfo(
     _: *const CMS_ContentInfo,
     _: *mut *mut core::ffi::c_uchar,
@@ -9013,16 +8845,6 @@ pub extern "C" fn i2d_PKCS12_bio(_: *mut BIO, _: *const PKCS12) -> core::ffi::c_
 #[unsafe(no_mangle)]
 pub extern "C" fn i2d_PKCS12_fp(_: *mut FILE, _: *const PKCS12) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_PKCS12_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS7_bio_stream(
-    _: *mut BIO,
-    _: *mut PKCS7,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS7_bio_stream")
 }
 
 #[unsafe(no_mangle)]

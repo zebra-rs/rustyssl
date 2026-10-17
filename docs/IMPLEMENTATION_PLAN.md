@@ -4935,7 +4935,7 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   of the UI came with 4.7d1: `UI_*`, `UI_UTIL_read_pw`, `PEM_def_callback`, and
   `EVP_read_pw_string`. Tests: `tests/c/ui_console.c` (18 scenarios, each in a child on a
   pseudo-terminal it controls, or on pipes, the parent typing and recording the screen).
-- [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
+- [x] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
   decrypt. `SMIME_read/write_PKCS7` uses a strict, bounded MIME parser.
   `PEM_write_bio_ASN1_stream` comes here (from 2.6), with the ASN.1 streaming BIO.
   - [x] **6.3a Structures** (`pkcs7.rs`, from `pk7_asn1.c`, `pk7_lib.c`, `pk7_attr.c`, and
@@ -4960,7 +4960,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     `tests/c/pkcs7_smime.c` (the reference tool's attached, detached, EC, and enveloped objects
     verified and decrypted; objects made here round-tripped with each flag; tampered,
     untrusted, mismatched, and missing inputs; the MIME helpers), the `smime_text` fuzz target.
-  - [ ] **6.3c Streaming and S/MIME** (`bio_ndef.c`, `bio_asn1.c`, `asn_mime.c`, `pk7_mime.c`).
+  - [x] **6.3c Streaming and S/MIME** (`asn1/bio_asn1.rs`, `asn1/ndef.rs`, `asn1/mime.rs`, and
+    `pkcs7/mime.rs`, from `bio_asn1.c`, `bio_ndef.c`, `asn_mime.c`, `pk7_mime.c`, and
+    `bio_pk7.c`; 21 exports): the ASN.1 streaming filter (`BIO_f_asn1`, its prefix and suffix
+    functions called without its lock held), `BIO_new_NDEF` (the prefix and suffix cut at the
+    streamed string's boundary only where it lies within the encoding), `i2d_ASN1_bio_stream`,
+    `PEM_write_bio_ASN1_stream`, `SMIME_write_ASN1(_ex)` and `SMIME_read_ASN1(_ex)` (the bounded
+    header parser, the multipart splitter), PKCS#7's streaming callbacks, `PKCS7_stream`,
+    `BIO_new_PKCS7`, `i2d_PKCS7_bio_stream`, `PEM_write_bio_PKCS7_stream`,
+    `SMIME_write_PKCS7`, and `SMIME_read_PKCS7(_ex)`. Tests: `tests/c/pkcs7_stream.c` (the filter
+    with prefix and suffix functions; short and long streams as DER, PEM, and S/MIME, read back
+    and verified or decrypted; the reference tool's S/MIME messages; malformed messages), the
+    `smime_read` fuzz target.
 - [ ] **6.4 CMS:**
   - every content type and recipient-info type present in the target headers
   - signed attributes and receipts
