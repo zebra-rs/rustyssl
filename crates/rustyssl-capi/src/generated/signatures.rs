@@ -13,6 +13,34 @@ const _: unsafe extern "C" fn(*mut ACCESS_DESCRIPTION) =
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::info::ACCESS_DESCRIPTION_it;
 const _: unsafe extern "C" fn() -> *mut ACCESS_DESCRIPTION =
     crate::x509v3::info::ACCESS_DESCRIPTION_new;
+const _: unsafe extern "C" fn(*mut ADMISSIONS) = crate::x509v3::admission::ADMISSIONS_free;
+const _: unsafe extern "C" fn(*const ADMISSIONS) -> *const GENERAL_NAME =
+    crate::x509v3::admission::ADMISSIONS_get0_admissionAuthority;
+const _: unsafe extern "C" fn(*const ADMISSIONS) -> *const NAMING_AUTHORITY =
+    crate::x509v3::admission::ADMISSIONS_get0_namingAuthority;
+const _: unsafe extern "C" fn(*const ADMISSIONS) -> *const PROFESSION_INFOS =
+    crate::x509v3::admission::ADMISSIONS_get0_professionInfos;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::admission::ADMISSIONS_it;
+const _: unsafe extern "C" fn() -> *mut ADMISSIONS = crate::x509v3::admission::ADMISSIONS_new;
+const _: unsafe extern "C" fn(*mut ADMISSIONS, *mut GENERAL_NAME) =
+    crate::x509v3::admission::ADMISSIONS_set0_admissionAuthority;
+const _: unsafe extern "C" fn(*mut ADMISSIONS, *mut NAMING_AUTHORITY) =
+    crate::x509v3::admission::ADMISSIONS_set0_namingAuthority;
+const _: unsafe extern "C" fn(*mut ADMISSIONS, *mut PROFESSION_INFOS) =
+    crate::x509v3::admission::ADMISSIONS_set0_professionInfos;
+const _: unsafe extern "C" fn(*mut ADMISSION_SYNTAX) =
+    crate::x509v3::admission::ADMISSION_SYNTAX_free;
+const _: unsafe extern "C" fn(*const ADMISSION_SYNTAX) -> *const GENERAL_NAME =
+    crate::x509v3::admission::ADMISSION_SYNTAX_get0_admissionAuthority;
+const _: unsafe extern "C" fn(*const ADMISSION_SYNTAX) -> *const stack_st_ADMISSIONS =
+    crate::x509v3::admission::ADMISSION_SYNTAX_get0_contentsOfAdmissions;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::admission::ADMISSION_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut ADMISSION_SYNTAX =
+    crate::x509v3::admission::ADMISSION_SYNTAX_new;
+const _: unsafe extern "C" fn(*mut ADMISSION_SYNTAX, *mut GENERAL_NAME) =
+    crate::x509v3::admission::ADMISSION_SYNTAX_set0_admissionAuthority;
+const _: unsafe extern "C" fn(*mut ADMISSION_SYNTAX, *mut stack_st_ADMISSIONS) =
+    crate::x509v3::admission::ADMISSION_SYNTAX_set0_contentsOfAdmissions;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -7893,6 +7921,23 @@ const _: unsafe extern "C" fn(*mut NAME_CONSTRAINTS) = crate::x509v3::policy::NA
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::policy::NAME_CONSTRAINTS_it;
 const _: unsafe extern "C" fn() -> *mut NAME_CONSTRAINTS =
     crate::x509v3::policy::NAME_CONSTRAINTS_new;
+const _: unsafe extern "C" fn(*mut NAMING_AUTHORITY) =
+    crate::x509v3::admission::NAMING_AUTHORITY_free;
+const _: unsafe extern "C" fn(*const NAMING_AUTHORITY) -> *const ASN1_OBJECT =
+    crate::x509v3::admission::NAMING_AUTHORITY_get0_authorityId;
+const _: unsafe extern "C" fn(*const NAMING_AUTHORITY) -> *const ASN1_STRING =
+    crate::x509v3::admission::NAMING_AUTHORITY_get0_authorityText;
+const _: unsafe extern "C" fn(*const NAMING_AUTHORITY) -> *const ASN1_IA5STRING =
+    crate::x509v3::admission::NAMING_AUTHORITY_get0_authorityURL;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::admission::NAMING_AUTHORITY_it;
+const _: unsafe extern "C" fn() -> *mut NAMING_AUTHORITY =
+    crate::x509v3::admission::NAMING_AUTHORITY_new;
+const _: unsafe extern "C" fn(*mut NAMING_AUTHORITY, *mut ASN1_OBJECT) =
+    crate::x509v3::admission::NAMING_AUTHORITY_set0_authorityId;
+const _: unsafe extern "C" fn(*mut NAMING_AUTHORITY, *mut ASN1_STRING) =
+    crate::x509v3::admission::NAMING_AUTHORITY_set0_authorityText;
+const _: unsafe extern "C" fn(*mut NAMING_AUTHORITY, *mut ASN1_IA5STRING) =
+    crate::x509v3::admission::NAMING_AUTHORITY_set0_authorityURL;
 const _: unsafe extern "C" fn() -> *mut CONF_METHOD = crate::conf::NCONF_WIN32;
 const _: unsafe extern "C" fn() -> *mut CONF_METHOD = crate::conf::NCONF_default;
 const _: unsafe extern "C" fn(*const CONF, *mut BIO) -> core::ffi::c_int =
@@ -10081,6 +10126,31 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::policy::POL
 const _: unsafe extern "C" fn(*mut POLICY_MAPPING) = crate::x509v3::policy::POLICY_MAPPING_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::policy::POLICY_MAPPING_it;
 const _: unsafe extern "C" fn() -> *mut POLICY_MAPPING = crate::x509v3::policy::POLICY_MAPPING_new;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO) =
+    crate::x509v3::admission::PROFESSION_INFO_free;
+const _: unsafe extern "C" fn(*const PROFESSION_INFO) -> *const ASN1_OCTET_STRING =
+    crate::x509v3::admission::PROFESSION_INFO_get0_addProfessionInfo;
+const _: unsafe extern "C" fn(*const PROFESSION_INFO) -> *const NAMING_AUTHORITY =
+    crate::x509v3::admission::PROFESSION_INFO_get0_namingAuthority;
+const _: unsafe extern "C" fn(*const PROFESSION_INFO) -> *const stack_st_ASN1_STRING =
+    crate::x509v3::admission::PROFESSION_INFO_get0_professionItems;
+const _: unsafe extern "C" fn(*const PROFESSION_INFO) -> *const stack_st_ASN1_OBJECT =
+    crate::x509v3::admission::PROFESSION_INFO_get0_professionOIDs;
+const _: unsafe extern "C" fn(*const PROFESSION_INFO) -> *const ASN1_PRINTABLESTRING =
+    crate::x509v3::admission::PROFESSION_INFO_get0_registrationNumber;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::admission::PROFESSION_INFO_it;
+const _: unsafe extern "C" fn() -> *mut PROFESSION_INFO =
+    crate::x509v3::admission::PROFESSION_INFO_new;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO, *mut ASN1_OCTET_STRING) =
+    crate::x509v3::admission::PROFESSION_INFO_set0_addProfessionInfo;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO, *mut NAMING_AUTHORITY) =
+    crate::x509v3::admission::PROFESSION_INFO_set0_namingAuthority;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO, *mut stack_st_ASN1_STRING) =
+    crate::x509v3::admission::PROFESSION_INFO_set0_professionItems;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO, *mut stack_st_ASN1_OBJECT) =
+    crate::x509v3::admission::PROFESSION_INFO_set0_professionOIDs;
+const _: unsafe extern "C" fn(*mut PROFESSION_INFO, *mut ASN1_PRINTABLESTRING) =
+    crate::x509v3::admission::PROFESSION_INFO_set0_registrationNumber;
 const _: unsafe extern "C" fn(*mut PROXY_CERT_INFO_EXTENSION) =
     crate::x509v3::policy::PROXY_CERT_INFO_EXTENSION_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
@@ -11239,13 +11309,55 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::WHIRLPOOL_Update;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *mut X509_REQ,
+) -> core::ffi::c_int = crate::x509v3::conf::X509V3_EXT_REQ_add_conf;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *mut X509_REQ,
+) -> core::ffi::c_int = crate::x509v3::conf::X509V3_EXT_REQ_add_nconf;
 const _: unsafe extern "C" fn(*mut X509V3_EXT_METHOD) -> core::ffi::c_int =
     crate::x509v3::registry::X509V3_EXT_add;
 const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
     crate::x509v3::registry::X509V3_EXT_add_alias;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *mut X509,
+) -> core::ffi::c_int = crate::x509v3::conf::X509V3_EXT_add_conf;
 const _: unsafe extern "C" fn(*mut X509V3_EXT_METHOD) -> core::ffi::c_int =
     crate::x509v3::registry::X509V3_EXT_add_list;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *mut X509,
+) -> core::ffi::c_int = crate::x509v3::conf::X509V3_EXT_add_nconf;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *mut *mut stack_st_X509_EXTENSION,
+) -> core::ffi::c_int = crate::x509v3::conf::X509V3_EXT_add_nconf_sk;
 const _: unsafe extern "C" fn() = crate::x509v3::registry::X509V3_EXT_cleanup;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::x509v3::conf::X509V3_EXT_conf;
+const _: unsafe extern "C" fn(
+    *mut lhash_st_CONF_VALUE,
+    *mut X509V3_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::x509v3::conf::X509V3_EXT_conf_nid;
 const _: unsafe extern "C" fn(*mut X509_EXTENSION) -> *mut core::ffi::c_void =
     crate::x509v3::registry::X509V3_EXT_d2i;
 const _: unsafe extern "C" fn(*mut X509_EXTENSION) -> *const X509V3_EXT_METHOD =
@@ -11257,6 +11369,18 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut core::ffi::c_void,
 ) -> *mut X509_EXTENSION = crate::x509v3::registry::X509V3_EXT_i2d;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *mut X509V3_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::x509v3::conf::X509V3_EXT_nconf;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *mut X509V3_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::x509v3::conf::X509V3_EXT_nconf_nid;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *mut X509_EXTENSION,
@@ -11651,6 +11775,41 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::pubkey::X509_PUBKEY_set0_param;
 const _: unsafe extern "C" fn(*mut X509_PUBKEY, *mut core::ffi::c_uchar, core::ffi::c_int) =
     crate::x509::pubkey::X509_PUBKEY_set0_public_key;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *const X509_PURPOSE,
+            arg2: *const X509,
+            arg3: core::ffi::c_int,
+        ) -> core::ffi::c_int,
+    >,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::x509::purpose::X509_PURPOSE_add;
+const _: unsafe extern "C" fn() = crate::x509::purpose::X509_PURPOSE_cleanup;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut X509_PURPOSE =
+    crate::x509::purpose::X509_PURPOSE_get0;
+const _: unsafe extern "C" fn(*const X509_PURPOSE) -> *mut core::ffi::c_char =
+    crate::x509::purpose::X509_PURPOSE_get0_name;
+const _: unsafe extern "C" fn(*const X509_PURPOSE) -> *mut core::ffi::c_char =
+    crate::x509::purpose::X509_PURPOSE_get0_sname;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_get_by_id;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_get_by_sname;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::x509::purpose::X509_PURPOSE_get_count;
+const _: unsafe extern "C" fn(*const X509_PURPOSE) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_get_id;
+const _: unsafe extern "C" fn(*const X509_PURPOSE) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_get_trust;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_get_unused_id;
+const _: unsafe extern "C" fn(*mut core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::purpose::X509_PURPOSE_set;
 const _: unsafe extern "C" fn(*mut X509_REQ_INFO) = crate::x509::req::X509_REQ_INFO_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::req::X509_REQ_INFO_it;
 const _: unsafe extern "C" fn() -> *mut X509_REQ_INFO = crate::x509::req::X509_REQ_INFO_new;
@@ -11767,6 +11926,20 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::x509::req::X509_REQ_verify_ex;
+const _: unsafe extern "C" fn(
+    *const X509_SIG_INFO,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut u32,
+) -> core::ffi::c_int = crate::x509::purpose::X509_SIG_INFO_get;
+const _: unsafe extern "C" fn(
+    *mut X509_SIG_INFO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    u32,
+) = crate::x509::purpose::X509_SIG_INFO_set;
 const _: unsafe extern "C" fn(*mut X509_SIG) = crate::x509::sig::X509_SIG_free;
 const _: unsafe extern "C" fn(
     *const X509_SIG,
@@ -11780,6 +11953,13 @@ const _: unsafe extern "C" fn() -> *mut X509_SIG = crate::x509::sig::X509_SIG_ne
 const _: unsafe extern "C" fn(*mut X509_VAL) = crate::x509::cert::X509_VAL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::cert::X509_VAL_it;
 const _: unsafe extern "C" fn() -> *mut X509_VAL = crate::x509::cert::X509_VAL_new;
+const _: unsafe extern "C" fn(*mut stack_st_X509, *mut X509, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::purpose::X509_add_cert;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut stack_st_X509,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::purpose::X509_add_certs;
 const _: unsafe extern "C" fn(
     *mut X509,
     *mut X509_EXTENSION,
@@ -11793,8 +11973,17 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::cert::X509_chain_check_suiteb;
 const _: unsafe extern "C" fn(*mut stack_st_X509) -> *mut stack_st_X509 =
     crate::x509::cert::X509_chain_up_ref;
+const _: unsafe extern "C" fn(*const X509, *const AUTHORITY_KEYID) -> core::ffi::c_int =
+    crate::x509::purpose::X509_check_akid;
+const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_int = crate::x509::purpose::X509_check_ca;
+const _: unsafe extern "C" fn(*mut X509, *mut X509) -> core::ffi::c_int =
+    crate::x509::purpose::X509_check_issued;
 const _: unsafe extern "C" fn(*const X509, *const EVP_PKEY) -> core::ffi::c_int =
     crate::x509::cert::X509_check_private_key;
+const _: unsafe extern "C" fn(*mut X509, core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::purpose::X509_check_purpose;
+const _: unsafe extern "C" fn(*const X509, *const X509) -> core::ffi::c_int =
+    crate::x509::purpose::X509_cmp;
 const _: unsafe extern "C" fn(*const ASN1_TIME) -> core::ffi::c_int =
     crate::x509::cert::X509_cmp_current_time;
 const _: unsafe extern "C" fn(*const ASN1_TIME, *mut time_t) -> core::ffi::c_int =
@@ -11821,6 +12010,12 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut stack_st_X509, *const X509_NAME) -> *mut X509 =
     crate::x509::cert::X509_find_by_subject;
 const _: unsafe extern "C" fn(*mut X509) = crate::x509::cert::X509_free;
+const _: unsafe extern "C" fn(*mut X509) -> *const GENERAL_NAMES =
+    crate::x509::purpose::X509_get0_authority_issuer;
+const _: unsafe extern "C" fn(*mut X509) -> *const ASN1_OCTET_STRING =
+    crate::x509::purpose::X509_get0_authority_key_id;
+const _: unsafe extern "C" fn(*mut X509) -> *const ASN1_INTEGER =
+    crate::x509::purpose::X509_get0_authority_serial;
 const _: unsafe extern "C" fn(*mut X509) -> *mut ASN1_OCTET_STRING =
     crate::x509::cert::X509_get0_distinguishing_id;
 const _: unsafe extern "C" fn(*const X509) -> *const stack_st_X509_EXTENSION =
@@ -11836,6 +12031,8 @@ const _: unsafe extern "C" fn(*const X509) -> *const ASN1_INTEGER =
     crate::x509::cert::X509_get0_serialNumber;
 const _: unsafe extern "C" fn(*mut *const ASN1_BIT_STRING, *mut *const X509_ALGOR, *const X509) =
     crate::x509::cert::X509_get0_signature;
+const _: unsafe extern "C" fn(*mut X509) -> *const ASN1_OCTET_STRING =
+    crate::x509::purpose::X509_get0_subject_key_id;
 const _: unsafe extern "C" fn(*const X509) -> *const X509_ALGOR =
     crate::x509::cert::X509_get0_tbs_sigalg;
 const _: unsafe extern "C" fn(
@@ -11872,13 +12069,33 @@ const _: unsafe extern "C" fn(*const X509, core::ffi::c_int, core::ffi::c_int) -
     crate::x509::cert::X509_get_ext_by_critical;
 const _: unsafe extern "C" fn(*const X509) -> core::ffi::c_int =
     crate::x509::cert::X509_get_ext_count;
+const _: unsafe extern "C" fn(
+    *const X509,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::x509::purpose::X509_get_ext_d2i;
+const _: unsafe extern "C" fn(*mut X509) -> u32 = crate::x509::purpose::X509_get_extended_key_usage;
+const _: unsafe extern "C" fn(*mut X509) -> u32 = crate::x509::purpose::X509_get_extension_flags;
 const _: unsafe extern "C" fn(*const X509) -> *mut X509_NAME =
     crate::x509::cert::X509_get_issuer_name;
+const _: unsafe extern "C" fn(*mut X509) -> u32 = crate::x509::purpose::X509_get_key_usage;
+const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_long =
+    crate::x509::purpose::X509_get_pathlen;
+const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_long =
+    crate::x509::purpose::X509_get_proxy_pathlen;
 const _: unsafe extern "C" fn(*mut X509) -> *mut EVP_PKEY = crate::x509::cert::X509_get_pubkey;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut stack_st_X509) -> core::ffi::c_int =
     crate::x509::cert::X509_get_pubkey_parameters;
 const _: unsafe extern "C" fn(*mut X509) -> *mut ASN1_INTEGER =
     crate::x509::cert::X509_get_serialNumber;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut u32,
+) -> core::ffi::c_int = crate::x509::purpose::X509_get_signature_info;
 const _: unsafe extern "C" fn(*const X509) -> core::ffi::c_int =
     crate::x509::cert::X509_get_signature_nid;
 const _: unsafe extern "C" fn(*const X509) -> core::ffi::c_int =
@@ -11913,6 +12130,8 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *mut core::ffi::c_uint,
 ) -> core::ffi::c_int = crate::x509::cert::X509_pubkey_digest;
+const _: unsafe extern "C" fn(*mut X509, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::purpose::X509_self_signed;
 const _: unsafe extern "C" fn(*mut X509, *mut ASN1_OCTET_STRING) =
     crate::x509::cert::X509_set0_distinguishing_id;
 const _: unsafe extern "C" fn(*mut X509, *const ASN1_TIME) -> core::ffi::c_int =
@@ -11926,6 +12145,9 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::cert::X509_set_ex_data;
 const _: unsafe extern "C" fn(*mut X509, *const X509_NAME) -> core::ffi::c_int =
     crate::x509::cert::X509_set_issuer_name;
+const _: unsafe extern "C" fn(*mut X509) = crate::x509::purpose::X509_set_proxy_flag;
+const _: unsafe extern "C" fn(*mut X509, core::ffi::c_long) =
+    crate::x509::purpose::X509_set_proxy_pathlen;
 const _: unsafe extern "C" fn(*mut X509, *mut EVP_PKEY) -> core::ffi::c_int =
     crate::x509::cert::X509_set_pubkey;
 const _: unsafe extern "C" fn(*mut X509, *mut ASN1_INTEGER) -> core::ffi::c_int =
@@ -11944,6 +12166,8 @@ const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_ulong =
     crate::x509::cert::X509_subject_name_hash;
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_ulong =
     crate::x509::cert::X509_subject_name_hash_old;
+const _: unsafe extern "C" fn(*mut X509_EXTENSION) -> core::ffi::c_int =
+    crate::x509::purpose::X509_supported_extension;
 const _: unsafe extern "C" fn(*mut ASN1_TIME, core::ffi::c_long, *mut time_t) -> *mut ASN1_TIME =
     crate::x509::cert::X509_time_adj;
 const _: unsafe extern "C" fn(
@@ -12157,6 +12381,16 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut ACCESS_DESCRIPTION = crate::x509v3::info::d2i_ACCESS_DESCRIPTION;
+const _: unsafe extern "C" fn(
+    *mut *mut ADMISSIONS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ADMISSIONS = crate::x509v3::admission::d2i_ADMISSIONS;
+const _: unsafe extern "C" fn(
+    *mut *mut ADMISSION_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ADMISSION_SYNTAX = crate::x509v3::admission::d2i_ADMISSION_SYNTAX;
 const _: unsafe extern "C" fn(
     *mut *mut ASIdOrRange,
     *mut *const core::ffi::c_uchar,
@@ -12479,6 +12713,11 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(core::ffi::c_int, *mut *mut EVP_PKEY, *mut BIO) -> *mut EVP_PKEY =
     crate::evp::pkey::d2i::d2i_KeyParams_bio;
 const _: unsafe extern "C" fn(
+    *mut *mut NAMING_AUTHORITY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut NAMING_AUTHORITY = crate::x509v3::admission::d2i_NAMING_AUTHORITY;
+const _: unsafe extern "C" fn(
     *mut *mut NOTICEREF,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -12550,6 +12789,11 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut POLICYQUALINFO = crate::x509v3::policy::d2i_POLICYQUALINFO;
+const _: unsafe extern "C" fn(
+    *mut *mut PROFESSION_INFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PROFESSION_INFO = crate::x509v3::admission::d2i_PROFESSION_INFO;
 const _: unsafe extern "C" fn(
     *mut *mut PROXY_CERT_INFO_EXTENSION,
     *mut *const core::ffi::c_uchar,
@@ -12808,6 +13052,12 @@ const _: unsafe extern "C" fn(
     *const ACCESS_DESCRIPTION,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509v3::info::i2d_ACCESS_DESCRIPTION;
+const _: unsafe extern "C" fn(*const ADMISSIONS, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509v3::admission::i2d_ADMISSIONS;
+const _: unsafe extern "C" fn(
+    *const ADMISSION_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::admission::i2d_ADMISSION_SYNTAX;
 const _: unsafe extern "C" fn(
     *const ASIdOrRange,
     *mut *mut core::ffi::c_uchar,
@@ -13018,6 +13268,10 @@ const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> 
     crate::evp::pkey::i2d::i2d_KeyParams;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_KeyParams_bio;
+const _: unsafe extern "C" fn(
+    *const NAMING_AUTHORITY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::admission::i2d_NAMING_AUTHORITY;
 const _: unsafe extern "C" fn(*const NOTICEREF, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::policy::i2d_NOTICEREF;
 const _: unsafe extern "C" fn(*const OTHERNAME, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
@@ -13096,6 +13350,10 @@ const _: unsafe extern "C" fn(
     *const POLICYQUALINFO,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509v3::policy::i2d_POLICYQUALINFO;
+const _: unsafe extern "C" fn(
+    *const PROFESSION_INFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::admission::i2d_PROFESSION_INFO;
 const _: unsafe extern "C" fn(
     *const PROXY_CERT_INFO_EXTENSION,
     *mut *mut core::ffi::c_uchar,

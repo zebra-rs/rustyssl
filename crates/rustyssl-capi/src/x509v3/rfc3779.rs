@@ -2548,7 +2548,7 @@ ffi_callback! {
 }
 
 /// `IPAddressFamily_free` as a stack's free function.
-unsafe extern "C" fn free_family(p: *mut c_void) {
+pub(crate) unsafe extern "C" fn free_family(p: *mut c_void) {
     // SAFETY: a family of the stack, which the stack owned.
     unsafe { IPAddressFamily_free(p.cast()) };
 }

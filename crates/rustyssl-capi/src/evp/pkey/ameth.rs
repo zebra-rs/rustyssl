@@ -193,6 +193,15 @@ unsafe fn method<'a>(ameth: *const EVP_PKEY_ASN1_METHOD) -> Option<&'a Ameth> {
     unsafe { EVP_PKEY_ASN1_METHOD::get(ameth) }
 }
 
+/// The method's `siginf_set`, if it has one.
+///
+/// # Safety
+/// `ameth` is NULL or a live method.
+pub(crate) unsafe fn siginf_set_of(ameth: *const EVP_PKEY_ASN1_METHOD) -> Option<SiginfSet> {
+    // SAFETY: the caller's guarantee.
+    unsafe { method(ameth) }.and_then(|m| m.funcs().siginf_set)
+}
+
 /// Changes an application's method's functions with `f`; a built-in method stays as it is.
 ///
 /// # Safety
@@ -356,6 +365,11 @@ impl Kind {
                 f.pkey_free = Some(x::ecx_free);
                 f.pkey_ctrl = Some(if ed { x::ecd_ctrl } else { x::ecx_ctrl });
                 if ed {
+                    f.siginf_set = Some(if is448 {
+                        x::ecd_sig_info_set448
+                    } else {
+                        x::ecd_sig_info_set25519
+                    });
                     f.item_verify = Some(x::ecd_item_verify);
                     f.item_sign = Some(if is448 {
                         x::ecd_item_sign448
@@ -418,6 +432,7 @@ impl Kind {
                 f.pkey_ctrl = Some(r::rsa_pkey_ctrl);
                 f.item_verify = Some(r::rsa_item_verify);
                 f.item_sign = Some(r::rsa_item_sign);
+                f.siginf_set = Some(r::rsa_sig_info_set);
                 f.pkey_check = Some(r::rsa_pkey_check);
                 f.copy = Some(r::rsa_pkey_copy);
                 f.dirty_cnt = Some(r::rsa_pkey_dirty_cnt);

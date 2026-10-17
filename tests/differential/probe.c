@@ -423,6 +423,10 @@
  *                              under each unknown-extension flag (the return and the text), then
  *                              X509V3_EXT_d2i and X509V3_EXT_i2d of what it decodes to (the
  *                              extension's DER), with the errors
+ *   x509cache <hex>            d2i_X509 of the octets, then what its extension cache gives:
+ *                              the flags, key usages, path lengths, X509_check_ca, every
+ *                              purpose as leaf and CA, X509_self_signed, the signature
+ *                              information, and the key identifiers, with the errors
  *   x509name <hex>             d2i_X509_NAME of the octets: what was read, the re-encoding, the
  *                              entries, X509_NAME_oneline, print_ex (ONELINE, RFC2253, MULTILINE),
  *                              the hashes, and the comparison with a copy re-encoded from its
@@ -6807,6 +6811,54 @@ static int x509_command(const char *command, const char *line)
         X509_EXTENSION_free(ext);
         ASN1_OCTET_STRING_free(os);
         OPENSSL_free(der);
+        return 1;
+    }
+    if (strcmp(command, "x509cache") == 0) {
+        char hex[2400] = "-";
+        unsigned char data[1200];
+        const unsigned char *q = data;
+        size_t len = 0;
+        X509 *x;
+        int id, md = 0, pk = 0, bits = 0;
+        uint32_t sflags = 0;
+        unsigned long code;
+        const char *edata;
+        int eflags;
+
+        sscanf(line, "%*s %2399s", hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex_max(hex, data, &len, sizeof(data))) {
+            printf("x509cache bad hex\n");
+            return 1;
+        }
+        x = d2i_X509(NULL, &q, (long)len);
+        printf("x509cache:");
+        if (x != NULL) {
+            const ASN1_OCTET_STRING *skid, *akid;
+
+            printf(" flags=%08x ku=%08x xku=%08x path=%ld proxy=%ld ca=%d",
+                   (unsigned)X509_get_extension_flags(x), (unsigned)X509_get_key_usage(x),
+                   (unsigned)X509_get_extended_key_usage(x), X509_get_pathlen(x),
+                   X509_get_proxy_pathlen(x), X509_check_ca(x));
+            printf(" purposes=");
+            for (id = X509_PURPOSE_MIN; id <= X509_PURPOSE_MAX; id++)
+                printf("%d/%d,", X509_check_purpose(x, id, 0), X509_check_purpose(x, id, 1));
+            printf(" ss=%d", X509_self_signed(x, 0));
+            printf(" sig=%d:%d:%d:%d:%u", X509_get_signature_info(x, &md, &pk, &bits, &sflags), md, pk,
+                   bits, (unsigned)sflags);
+            skid = X509_get0_subject_key_id(x);
+            akid = X509_get0_authority_key_id(x);
+            printf(" skid=%d akid=%d", skid == NULL ? -1 : ASN1_STRING_length(skid),
+                   akid == NULL ? -1 : ASN1_STRING_length(akid));
+            X509_free(x);
+        } else {
+            printf(" none");
+        }
+        while ((code = ERR_get_error_all(NULL, NULL, NULL, &edata, &eflags)) != 0) {
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+            if ((eflags & ERR_TXT_STRING) != 0 && edata[0] != '\0')
+                printf("[%s]", edata);
+        }
+        printf("\n");
         return 1;
     }
     if (strcmp(command, "x509name") == 0) {

@@ -467,7 +467,7 @@ ffi_export! {
 }
 
 /// `X509_EXTENSION_free` as a stack's free function.
-unsafe extern "C" fn free_ext(e: *mut c_void) {
+pub(crate) unsafe extern "C" fn free_ext(e: *mut c_void) {
     // SAFETY: an extension of the stack, which the stack owned.
     unsafe { X509_EXTENSION_free(e.cast()) };
 }
