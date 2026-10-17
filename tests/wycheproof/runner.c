@@ -35,6 +35,18 @@
  *       length). Prints `V:ok` or `V:fail`.
  *   rsasign <digest> <key> <msg>
  *       EVP_DigestSign with PKCS #1 v1.5 padding. Prints `S:<sig>` or `S:fail`.
+ *   pkver <format> <digest> <spki> <msg> <sig>
+ *       EVP_DigestVerify of sig over msg with the key of the SubjectPublicKeyInfo (ECDSA, DSA,
+ *       EdDSA), the digest `-` for none. <format> `der` passes the signature as it is; `p1363`
+ *       makes r || s (each half of it, of the group order's length) a DER signature first, one
+ *       of another length failing as `fail(0/0)`. Prints `V:ok` or `V:fail`.
+ *   ecdh <group> <encoding> <priv> <pub>
+ *       ECDH of the private key (the scalar, of the group) and the peer's public key, a
+ *       SubjectPublicKeyInfo (`spki`) or an encoded point (`point`), the peer set with
+ *       validation. Prints `K:<shared>` or `K:fail`.
+ *   xdh <alg> <priv> <pub>
+ *       X25519 or X448 of raw keys; with <alg> `asn`, a PrivateKeyInfo and a
+ *       SubjectPublicKeyInfo. Prints `K:<shared>` or `K:fail`.
  *
  * An RSA key is its numbers in hex, comma-separated: n and e (a public key), then d, then
  * optionally the primes, their exponents, and the coefficients, as OpenSSL's parameters
@@ -51,11 +63,13 @@
 
 #include <openssl/bn.h>
 #include <openssl/core_names.h>
+#include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/param_build.h>
 #include <openssl/rsa.h>
+#include <openssl/x509.h>
 
 struct buf {
     unsigned char *p;
@@ -529,6 +543,138 @@ static void rsa_sign(char **w)
     free(msg.p);
 }
 
+/* pkver <format> <digest> <spki> <msg> <sig> */
+static void pk_verify(char **w)
+{
+    struct buf key = hex(w[2]), msg = hex(w[3]), sig = hex(w[4]);
+    const unsigned char *p = key.p, *s = sig.p;
+    EVP_PKEY *k = d2i_PUBKEY(NULL, &p, (long)key.n);
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    unsigned char *der = NULL;
+    size_t slen = sig.n;
+    int r = -1;
+
+    printf(" V:");
+    if (k != NULL && strcmp(w[0], "p1363") == 0) {
+        ECDSA_SIG *es;
+        int dl;
+
+        BIGNUM *q = NULL;
+        size_t half;
+
+        /* Each half is the group order's length (DSA's q, an EC key's order). */
+        if (EVP_PKEY_is_a(k, "DSA") && EVP_PKEY_get_bn_param(k, OSSL_PKEY_PARAM_FFC_Q, &q))
+            half = (size_t)BN_num_bytes(q);
+        else
+            half = (size_t)(EVP_PKEY_get_bits(k) + 7) / 8;
+        BN_free(q);
+        if (sig.n == 0 || sig.n != 2 * half) {
+            printf("fail(0/0)");
+            ERR_clear_error();
+            goto end;
+        }
+        es = ECDSA_SIG_new();
+        ECDSA_SIG_set0(es, BN_bin2bn(sig.p, (int)(sig.n / 2), NULL),
+                       BN_bin2bn(sig.p + sig.n / 2, (int)(sig.n / 2), NULL));
+        dl = i2d_ECDSA_SIG(es, &der);
+        ECDSA_SIG_free(es);
+        s = der;
+        slen = dl > 0 ? (size_t)dl : 0;
+    }
+    if (k != NULL && EVP_DigestVerifyInit_ex(ctx, NULL, strcmp(w[1], "-") == 0 ? NULL : w[1], NULL,
+                                             NULL, k, NULL) == 1)
+        r = EVP_DigestVerify(ctx, s, slen, msg.p, msg.n);
+    if (r == 1)
+        printf("ok");
+    else
+        print_fail();
+end:
+    OPENSSL_free(der);
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(k);
+    free(key.p);
+    free(msg.p);
+    free(sig.p);
+}
+
+/* An EC key of the group from its parameters: the private scalar or the public point. */
+static EVP_PKEY *ec_key(const char *group, const struct buf *priv, const struct buf *pub)
+{
+    OSSL_PARAM_BLD *b = OSSL_PARAM_BLD_new();
+    OSSL_PARAM *params = NULL;
+    EVP_PKEY_CTX *pc = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    EVP_PKEY *k = NULL;
+    BIGNUM *d = priv != NULL ? BN_bin2bn(priv->p, (int)priv->n, NULL) : NULL;
+
+    if (b != NULL && pc != NULL
+        && OSSL_PARAM_BLD_push_utf8_string(b, OSSL_PKEY_PARAM_GROUP_NAME, group, 0)
+        && (d == NULL || OSSL_PARAM_BLD_push_BN(b, OSSL_PKEY_PARAM_PRIV_KEY, d))
+        && (pub == NULL
+            || OSSL_PARAM_BLD_push_octet_string(b, OSSL_PKEY_PARAM_PUB_KEY, pub->p, pub->n))
+        && (params = OSSL_PARAM_BLD_to_param(b)) != NULL
+        && EVP_PKEY_fromdata_init(pc) == 1)
+        EVP_PKEY_fromdata(pc, &k, d != NULL ? EVP_PKEY_KEYPAIR : EVP_PKEY_PUBLIC_KEY, params);
+    OSSL_PARAM_free(params);
+    OSSL_PARAM_BLD_free(b);
+    EVP_PKEY_CTX_free(pc);
+    BN_free(d);
+    return k;
+}
+
+/* The shared secret of the keys, `K:` printed. */
+static void derive(EVP_PKEY *k, EVP_PKEY *peer)
+{
+    EVP_PKEY_CTX *dc = k != NULL ? EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL) : NULL;
+    unsigned char *out = NULL;
+    size_t outlen = 0;
+    int ok = dc != NULL && peer != NULL && EVP_PKEY_derive_init(dc) == 1
+             && EVP_PKEY_derive_set_peer_ex(dc, peer, 1) == 1
+             && EVP_PKEY_derive(dc, NULL, &outlen) == 1
+             && (out = OPENSSL_malloc(outlen > 0 ? outlen : 1)) != NULL
+             && EVP_PKEY_derive(dc, out, &outlen) == 1;
+
+    field("K", ok, out, outlen);
+    OPENSSL_free(out);
+    EVP_PKEY_CTX_free(dc);
+}
+
+/* ecdh <group> <encoding> <priv> <pub> */
+static void ecdh(char **w)
+{
+    struct buf priv = hex(w[2]), pub = hex(w[3]);
+    const unsigned char *p = pub.p;
+    EVP_PKEY *k = ec_key(w[0], &priv, NULL);
+    EVP_PKEY *peer = strcmp(w[1], "spki") == 0 ? d2i_PUBKEY(NULL, &p, (long)pub.n)
+                                                : ec_key(w[0], NULL, &pub);
+
+    derive(k, peer);
+    EVP_PKEY_free(k);
+    EVP_PKEY_free(peer);
+    free(priv.p);
+    free(pub.p);
+}
+
+/* xdh <alg> <priv> <pub> */
+static void xdh(char **w)
+{
+    struct buf priv = hex(w[1]), pub = hex(w[2]);
+    const unsigned char *p = priv.p, *q = pub.p;
+    EVP_PKEY *k, *peer;
+
+    if (strcmp(w[0], "asn") == 0) {
+        k = d2i_AutoPrivateKey(NULL, &p, (long)priv.n);
+        peer = d2i_PUBKEY(NULL, &q, (long)pub.n);
+    } else {
+        k = EVP_PKEY_new_raw_private_key_ex(NULL, w[0], NULL, priv.p, priv.n);
+        peer = EVP_PKEY_new_raw_public_key_ex(NULL, w[0], NULL, pub.p, pub.n);
+    }
+    derive(k, peer);
+    EVP_PKEY_free(k);
+    EVP_PKEY_free(peer);
+    free(priv.p);
+    free(pub.p);
+}
+
 int main(void)
 {
     char *line = NULL, *w[16];
@@ -558,6 +704,12 @@ int main(void)
             rsa_verify(w + 2);
         else if (strcmp(w[1], "rsasign") == 0 && n == 5)
             rsa_sign(w + 2);
+        else if (strcmp(w[1], "pkver") == 0 && n == 7)
+            pk_verify(w + 2);
+        else if (strcmp(w[1], "ecdh") == 0 && n == 6)
+            ecdh(w + 2);
+        else if (strcmp(w[1], "xdh") == 0 && n == 5)
+            xdh(w + 2);
         else {
             fprintf(stderr, "bad command: %s\n", w[1]);
             return 2;

@@ -12,3 +12,16 @@ sm4_gcm 90 IV longer than OpenSSL's 128-octet GCM maximum
 # Wrapping an empty key: EVP_CipherUpdate passes no input to the cipher and EVP_CipherFinal_ex
 # has nothing to finish, so the empty key "wraps" to nothing, successfully.
 aes_wrap 22,64,119 EVP passes an empty input to no cipher, so an empty key wraps to nothing
+
+# ECDH with a peer's key on an explicit curve whose cofactor is missing or n: OpenSSL takes
+# the cofactor as given (or computes it when absent), and the point checks out on the curve.
+ecdh_brainpoolP224r1 532,534 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_brainpoolP256r1 551,553 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_brainpoolP320r1 519,521 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_brainpoolP384r1 671,673 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_brainpoolP512r1 547,549 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_secp224r1 467,469 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_secp256k1 503,505 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_secp256r1 359,361 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_secp384r1 799,801 OpenSSL accepts explicit parameters with no or a wrong cofactor
+ecdh_secp521r1 660,662 OpenSSL accepts explicit parameters with no or a wrong cofactor
