@@ -73,9 +73,14 @@ static int s_open(UI *ui)
 
 static int s_write(UI *ui, UI_STRING *uis)
 {
+    const char *out = UI_get0_output_string(uis);
+
     (void)ui;
+    /* A queued error's line starts with the thread's id, which differs from run to run. */
+    if (UI_get_string_type(uis) == UIT_ERROR && out != NULL && strchr(out, ':') != NULL)
+        out = strchr(out, ':') + 1;
     printf("  write type %d flags %d out [%s] action [%s] test [%s] min %d max %d\n",
-           (int)UI_get_string_type(uis), UI_get_input_flags(uis), str(UI_get0_output_string(uis)),
+           (int)UI_get_string_type(uis), UI_get_input_flags(uis), str(out),
            str(UI_get0_action_string(uis)), str(UI_get0_test_string(uis)),
            UI_get_result_minsize(uis), UI_get_result_maxsize(uis));
     return write_ret;
