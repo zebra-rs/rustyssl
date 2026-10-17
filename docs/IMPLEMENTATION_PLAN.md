@@ -4817,23 +4817,34 @@ Exit checks:
     - Deviations: NULL stores, objects, lookups, and methods (docs/DEVIATIONS.md).
     - Tests: `tests/c/x509_store.c` (files and a hashed directory made at run time, the default
       paths from the environment).
-- [ ] **5.4 Path validation** (core in `rustyssl-pki`):
-  - chain building over multiple candidate issuers (alternate chains, the CVE-2015-1793
-    lesson), trusted-first, partial chains
-  - RFC 5280 checks: signatures under security levels, validity time, basic constraints and
-    path length, key usage, name constraints (including the CN-as-hostname rules), the policy
-    tree (with a bound, the CVE-2023-0464 lesson)
-  - EKU and purpose checks (`X509_PURPOSE`, `X509_check_purpose`, `X509_check_ca`)
-  - `X509_TRUST`
-  - CRLs (delta, indirect, IDP)
-  - Suite B, DANE, proxy certificates
-  - RFC 3779 resources (`X509v3_addr_validate_path`, `X509v3_asid_validate_path`, and the
-    `_validate_resource_set` functions, deferred from 5.2f)
-  - the full `X509_STORE_CTX` API with exact verify-callback semantics (the callback is
-    invoked per error with an override, and the error, depth, and current certificate are
-    exact)
-  - `X509_verify_cert_error_string`, byte-exact
-  - `X509_build_chain` and `X509_cmp_timeframe`
+- [ ] **5.4 Path validation.** The engine is in `rustyssl-capi` (`x509/ctx.rs` and what follows),
+  as OpenSSL's `x509_vfy.c` is: each check reports to the application's verification callback
+  as it goes, on the application's objects, so it doesn't fit a sans-IO core. The parts that
+  are pure matching (host names, name constraints, punycode) are in `rustyssl-pki`.
+  - [x] **5.4a The verification context** (`x509/ctx.rs`, from `x509_vfy.c`'s context parts,
+    `x509_lu.c`'s searches, and `x509_txt.c`; 65 exports): `X509_STORE_CTX` and every getter
+    and setter; `init` (the store's callbacks or the defaults, parameters inheriting the
+    store's and then "default"), `init_rpk`, `cleanup`, `free`; the purpose, trust, and named
+    defaults; searches of the store and its lookups (`get_by_subject`, `get_obj_by_subject`,
+    `get1_certs`, `get1_crls`); issuer lookup (`X509_STORE_CTX_get1_issuer`, and from a trusted
+    list); the validity-time checks and `X509_cmp_timeframe`; and the verification errors'
+    text (`X509_verify_cert_error_string`, generated from the vendored `x509_txt.c`). The
+    default verification functions (`internal_verify`, revocation, CRL, and policy checks)
+    abort until 5.4b–d; `X509_STORE_CTX_print_verify_cb` needs `X509_print_ex` and comes with
+    5.6. Tests: `tests/c/x509_ctx.c`.
+  - [ ] **5.4b Chain building and the checks:** `X509_verify_cert`, `X509_STORE_CTX_verify`,
+    `X509_build_chain`; chain building over multiple candidate issuers (alternate chains, the
+    CVE-2015-1793 lesson), trusted-first, partial chains; trust (`X509_check_trust`), the
+    extensions and purposes, path and proxy path lengths, the security level of keys and
+    signatures, validity times, signatures (`internal_verify`), identities (`check_id`, with
+    5.5), Suite B, and name constraints (`NAME_CONSTRAINTS_check` and `_check_CN`, with
+    punycode and `OSSL_parse_url`).
+  - [ ] **5.4c Revocation:** CRLs (scores, delta, indirect, IDP, the CRL issuer's path).
+  - [ ] **5.4d Policies:** the policy tree (with a bound, the CVE-2023-0464 lesson) and the
+    `X509_policy_*` exports.
+  - [ ] **5.4e The rest:** RFC 3779 resources (`X509v3_addr_validate_path`,
+    `X509v3_asid_validate_path`, and the `_validate_resource_set` functions, deferred from
+    5.2f), DANE (with libssl's), and raw public keys.
 - [ ] **5.5 Identity checks:** `X509_check_host` (every `X509_CHECK_FLAG_*`, the wildcard
   rules, `peername`), `X509_check_email`, `X509_check_ip(_asc)`, the
   `X509_VERIFY_PARAM_*` host, email, and IP setters, and `X509_get1_email`,
