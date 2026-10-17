@@ -2,10 +2,8 @@
 //! untrusted sources: d2i_AutoPrivateKey, d2i_PrivateKey of each classic key type, d2i_PUBKEY,
 //! EVP_PKCS82PKEY, and d2i_X509_PUBKEY, through the key decoders and the legacy fallbacks.
 //! Nothing may crash or read out of bounds (ASan), the octets consumed must lie within the
-//! input, and a key decoded must answer for its sizes and parameters.
-//!
-//! The post-quantum key decoders come with step 4.7b2b (their placeholders abort for a key of
-//! theirs), so inputs naming the NIST algorithm arcs they use are skipped.
+//! input, and a key decoded must answer for its sizes and parameters. The post-quantum types
+//! (ML-KEM, ML-DSA, SLH-DSA) come through the same entry points.
 
 #![no_main]
 
@@ -37,23 +35,13 @@ unsafe extern "C" {
 }
 
 /// The key types d2i_PrivateKey is given (rsaEncryption, RSA-PSS, DSA, DH, X9.42 DH, EC, SM2,
-/// X25519, X448, ED25519, ED448).
-const TYPES: [c_int; 11] = [6, 912, 116, 28, 920, 408, 1172, 1034, 1035, 1087, 1088];
-
-/// The NIST arcs of ML-DSA and SLH-DSA (2.16.840.1.101.3.4.3) and ML-KEM (...4.4).
-fn names_post_quantum(input: &[u8]) -> bool {
-    input.windows(8).any(|w| {
-        w[..7] == [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04] && (w[7] == 3 || w[7] == 4)
-    })
-}
+/// X25519, X448, ED25519, ED448, ML-KEM-512, ML-DSA-44, SLH-DSA-SHA2-128s).
+const TYPES: [c_int; 14] = [6, 912, 116, 28, 920, 408, 1172, 1034, 1035, 1087, 1088, 1454, 1457, 1460];
 
 fuzz_target!(|input: &[u8]| {
     let Some((&how, der)) = input.split_first() else {
         return;
     };
-    if names_post_quantum(der) {
-        return;
-    }
     let Ok(len) = c_long::try_from(der.len()) else {
         return;
     };

@@ -4200,9 +4200,24 @@ chunking) is clean.
         random sessions (3,000 pass);
         `fuzz/fuzz_targets/d2i_pkey.rs` (247k runs clean); Rust tests for the deviations.
       - Later: OpenSSL's cache of templates (a cost, not a behavior).
-    - [ ] **4.7b2b Post-quantum key codecs**: ML-KEM's, ML-DSA's, and SLH-DSA's PrivateKeyInfo and
-      SubjectPublicKeyInfo decoding (`ml_kem_codecs.c`, `ml_dsa_codecs.c`, `der2key`'s SLH-DSA
-      functions), replacing their placeholders.
+    - [x] **4.7b2b Post-quantum key codecs** (`provider/ml_codecs.rs`, the ML-KEM, ML-DSA, and
+      SLH-DSA key managers' `d2i_*` functions and `load`): `der2key` for ML-KEM-512/768/1024,
+      ML-DSA-44/65/87, and the twelve SLH-DSA parameter sets in PrivateKeyInfo and
+      SubjectPublicKeyInfo, replacing their placeholders. ML-KEM's and ML-DSA's private keys come
+      in the six formats of `ml_common_codecs.c` (derived here from the key sizes, which gives
+      OpenSSL's tables), in the order the provider's `ml-kem.input_formats` and
+      `ml-dsa.input_formats` give; their SubjectPublicKeyInfos must be exactly the 22-octet prefix
+      and the key. A decoded private key is pending (its seed and expanded key) until the key
+      manager's `load` makes it as OpenSSL's does: from the seed when there's no expanded key or
+      the key prefers its seed (checked against the expanded key), else from the expanded key
+      (ML-KEM's with the pairwise test), with OpenSSL's errors when they disagree. SLH-DSA's
+      SubjectPublicKeyInfo goes through OpenSSL's stricter `BARE_PUBKEY` template (an
+      AlgorithmIdentifier of the OID alone), with its errors.
+      - Tests: `tests/c/d2i_pq.c` (81 checks: every parameter set's PrivateKeyInfo and
+        SubjectPublicKeyInfo, used; each private-key format; configured input formats and seed
+        preference; seeds and keys that disagree; malformed encodings and their errors); the
+        probe's `d2ikey` corpus and random sessions with post-quantum seeds (2,000 pass); the
+        `d2i_pkey` fuzz target over them (330k runs clean).
     - [ ] **4.7b2c PEM key readers**: `PEM_read_bio_PrivateKey` (`_ex`), `_PUBKEY`,
       `_Parameters`, the type-specific readers (`_RSAPrivateKey`, `_RSA_PUBKEY`, `_DSAparams`,
       `_ECPrivateKey`, `_DHparams`, ...), and their `FILE` forms, through the decoders.

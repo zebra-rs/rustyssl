@@ -822,3 +822,200 @@ slh_dsa_keymgmt!(
     slh_dsa_shake_256f_new_key,
     slh_dsa_shake_256f_gen
 );
+
+/// `BARE_ALGOR`: an AlgorithmIdentifier that is only its OID.
+#[repr(C)]
+struct BareAlgor {
+    oid: *mut rustyssl_abi::ASN1_OBJECT,
+}
+
+/// `BARE_PUBKEY`: a SubjectPublicKeyInfo with a `BARE_ALGOR`.
+#[repr(C)]
+struct BarePubkey {
+    algor: BareAlgor,
+    pubkey: *mut rustyssl_abi::ASN1_BIT_STRING,
+}
+
+static BARE_ALGOR_TT: crate::asn1::tpl::statics::Templates<1> =
+    crate::asn1::tpl::statics::Templates([crate::asn1::tpl::template_at(
+        0,
+        0,
+        core::mem::offset_of!(BareAlgor, oid),
+        c"oid",
+        crate::asn1::tpl::items::ASN1_OBJECT_it,
+    )]);
+
+static BARE_ALGOR: crate::asn1::tpl::Item =
+    crate::asn1::tpl::statics::sequence::<BareAlgor, 1>(&BARE_ALGOR_TT, None, c"BARE_ALGOR");
+
+extern "C" fn bare_algor_it() -> *const rustyssl_abi::ASN1_ITEM {
+    &raw const BARE_ALGOR.0
+}
+
+static BARE_PUBKEY_TT: crate::asn1::tpl::statics::Templates<2> =
+    crate::asn1::tpl::statics::Templates([
+        crate::asn1::tpl::template_at(
+            rustyssl_abi::ASN1_TFLG_EMBED,
+            0,
+            core::mem::offset_of!(BarePubkey, algor),
+            c"algor",
+            bare_algor_it,
+        ),
+        crate::asn1::tpl::template_at(
+            0,
+            0,
+            core::mem::offset_of!(BarePubkey, pubkey),
+            c"pubkey",
+            crate::asn1::tpl::items::ASN1_BIT_STRING_it,
+        ),
+    ]);
+
+static BARE_PUBKEY: crate::asn1::tpl::Item =
+    crate::asn1::tpl::statics::sequence::<BarePubkey, 2>(&BARE_PUBKEY_TT, None, c"BARE_PUBKEY");
+
+extern "C" fn bare_pubkey_it() -> *const rustyssl_abi::ASN1_ITEM {
+    &raw const BARE_PUBKEY.0
+}
+
+/// Raises `PROV_R_BAD_ENCODING` from `slh_dsa_d2i_PUBKEY` with `text`.
+#[track_caller]
+fn bad_encoding(text: &str) {
+    crate::err::raise_with_text(
+        ERR_LIB_PROV,
+        rustyssl_abi::PROV_R_BAD_ENCODING,
+        "slh_dsa_d2i_PUBKEY",
+        text,
+    );
+}
+
+/// `slh_dsa_d2i_PUBKEY` (`decode_der2key.c`): a key of the parameter set from a
+/// SubjectPublicKeyInfo of exactly its length, with an AlgorithmIdentifier of its OID alone
+/// and a BIT STRING of the public key; NULL (with OpenSSL's errors) otherwise.
+///
+/// # Safety
+/// `provctx` is the default provider's context; `propq` is NULL or a string.
+pub(crate) unsafe fn d2i_pubkey(
+    provctx: *mut c_void,
+    propq: Option<&CStr>,
+    variant: Variant,
+    nid: c_int,
+    der: &[u8],
+) -> *mut c_void {
+    // SAFETY: the caller's guarantee.
+    let libctx = unsafe { libctx_of(provctx) };
+    let h = new_key(libctx, propq, variant);
+    // SAFETY: the new key data, or NULL.
+    let Some(k) = (unsafe { key(h) }) else {
+        return ptr::null_mut();
+    };
+    let name = variant.name();
+    let fail = || {
+        // SAFETY: made above.
+        unsafe { unbox::<SlhDsaKey>(h) };
+        ptr::null_mut()
+    };
+    let len = variant.public_key_bytes();
+    if der.len() != 18 + len {
+        bad_encoding(&format!(
+            "unexpected {name} public key length: {} != {}",
+            der.len(),
+            18 + len
+        ));
+        return fail();
+    }
+    let Ok(dlen) = core::ffi::c_long::try_from(der.len()) else {
+        return fail();
+    };
+    let mut p = der.as_ptr();
+    // SAFETY: no preconditions.
+    let it = bare_pubkey_it();
+    // SAFETY: a new value; the octets; the item.
+    let v =
+        unsafe { crate::asn1::tpl::decode::ASN1_item_d2i(ptr::null_mut(), &raw mut p, dlen, it) };
+    // SAFETY: the decoded structure, or NULL.
+    let Some(spki) = (unsafe { v.cast::<BarePubkey>().as_ref() }) else {
+        bad_encoding(&format!("malformed {name} public key ASN.1 encoding"));
+        return fail();
+    };
+    let free_spki = || {
+        // SAFETY: decoded above, freed once.
+        unsafe { crate::asn1::tpl::free::ASN1_item_free(v, it) };
+    };
+    // SAFETY: the decoded BIT STRING.
+    let bits = unsafe { &*spki.pubkey };
+    if bits.flags & 0x7 != 0 || p != der.as_ptr().wrapping_add(der.len()) {
+        bad_encoding(&format!("malformed {name} public key ASN.1 encoding"));
+        free_spki();
+        return fail();
+    }
+    // SAFETY: no preconditions.
+    let want = unsafe { crate::objects::OBJ_nid2obj(nid) };
+    // SAFETY: the type's object; the decoded one.
+    if unsafe { crate::objects::OBJ_cmp(want, spki.algor.oid) } != 0 {
+        bad_encoding(&format!(
+            "unexpected algorithm OID for an {name} public key"
+        ));
+        free_spki();
+        return fail();
+    }
+    // SAFETY: the BIT STRING's octets.
+    let octets = unsafe { crate::ffi::bytes(bits.data, usize::try_from(bits.length).unwrap_or(0)) };
+    let public = octets.and_then(|o| PublicKey::from_bytes(variant, o));
+    free_spki();
+    let Some(public) = public else {
+        bad_encoding(&format!(
+            "failed to parse {name} public key from input data"
+        ));
+        return fail();
+    };
+    *k.lock() = Material::Public(public);
+    h
+}
+
+/// `slh_dsa_d2i_PKCS8` (`decode_der2key.c`): a key of the parameter set from a
+/// PrivateKeyInfo without parameters whose key octets are its whole private key; NULL
+/// otherwise.
+///
+/// # Safety
+/// `provctx` is the default provider's context; `propq` is NULL or a string.
+pub(crate) unsafe fn d2i_pkcs8(
+    provctx: *mut c_void,
+    propq: Option<&CStr>,
+    variant: Variant,
+    nid: c_int,
+    der: &[u8],
+) -> *mut c_void {
+    // SAFETY: the caller's guarantee.
+    let Some((octets, ptype, alg)) = (unsafe { super::der2key::p8_parts(der) }) else {
+        return ptr::null_mut();
+    };
+    let name = variant.name();
+    (|| {
+        if ptype != rustyssl_abi::V_ASN1_UNDEF {
+            crate::err::raise_with_text(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_UNEXPECTED_KEY_PARAMETERS,
+                "slh_dsa_d2i_PKCS8",
+                &format!("unexpected parameters with a PKCS#8 {name} private key"),
+            );
+            return ptr::null_mut();
+        }
+        if alg != nid {
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's guarantee.
+        let libctx = unsafe { libctx_of(provctx) };
+        let h = new_key(libctx, propq, variant);
+        // SAFETY: the new key data, or NULL.
+        let Some(k) = (unsafe { key(h) }) else {
+            return ptr::null_mut();
+        };
+        let Some(private) = PrivateKey::from_bytes(variant, &octets) else {
+            // SAFETY: made above.
+            unsafe { unbox::<SlhDsaKey>(h) };
+            return ptr::null_mut();
+        };
+        *k.lock() = Material::Private(private);
+        h
+    })()
+}

@@ -62,18 +62,38 @@ const RETAIN_SEED: c_int = 2;
 /// `ML_DSA_KEY_PROV_FLAGS_DEFAULT`.
 const FLAGS_DEFAULT: c_int = PREFER_SEED | RETAIN_SEED;
 
-/// What a key holds: nothing yet, a public key, or a private key (with its public key).
+/// What a key holds: nothing yet, a public key, a private key (with its public key), or what
+/// a PrivateKeyInfo decoded to, which loading makes the key from.
 pub(crate) enum Material {
     Empty,
     Public(PublicKey),
     Private(PrivateKey),
+    Pending(Prekey),
+}
+
+/// A decoded PrivateKeyInfo's seed and expanded private key (`ossl_ml_dsa_set_prekey`), wiped
+/// when dropped.
+pub(crate) struct Prekey {
+    seed: Option<[u8; SEED_BYTES]>,
+    sk: Option<Vec<u8>>,
+}
+
+impl Drop for Prekey {
+    fn drop(&mut self) {
+        if let Some(s) = self.seed.as_mut() {
+            wipe(s);
+        }
+        if let Some(d) = self.sk.as_mut() {
+            wipe(d);
+        }
+    }
 }
 
 impl Material {
     /// The public key, if there is one.
     pub(crate) fn public(&self) -> Option<&PublicKey> {
         match self {
-            Self::Empty => None,
+            Self::Empty | Self::Pending(_) => None,
             Self::Public(p) => Some(p),
             Self::Private(k) => Some(k.public()),
         }
@@ -113,6 +133,13 @@ pub(crate) unsafe fn key<'a>(keydata: *const c_void) -> Option<&'a MlDsaKey> {
     unsafe { keydata.cast::<MlDsaKey>().as_ref() }
 }
 
+/// Whether SHAKE-128 and SHAKE-256 can be fetched with `propq` (`ossl_ml_dsa_key_new`'s).
+fn hashes_available(libctx: *mut OSSL_LIB_CTX, propq: Option<&CStr>) -> bool {
+    // Both are fetched (each failure raising its error), as OpenSSL's does.
+    let fetched = [c"SHAKE-128", c"SHAKE-256"].map(|name| digest_available(libctx, name, propq));
+    !fetched.contains(&false)
+}
+
 /// `ossl_prov_ml_dsa_new`: an empty key, once SHAKE-128 and SHAKE-256 can be fetched with
 /// `propq`, with the flags the provider's configuration sets, as key data.
 ///
@@ -121,8 +148,7 @@ pub(crate) unsafe fn key<'a>(keydata: *const c_void) -> Option<&'a MlDsaKey> {
 unsafe fn prov_new(provctx: *mut c_void, propq: Option<&CStr>, variant: Variant) -> *mut c_void {
     // SAFETY: the caller's guarantee.
     let libctx = unsafe { libctx_of(provctx) };
-    let fetched = [c"SHAKE-128", c"SHAKE-256"].map(|name| digest_available(libctx, name, propq));
-    if fetched.contains(&false) {
+    if !hashes_available(libctx, propq) {
         return ptr::null_mut();
     }
     let mut flags = FLAGS_DEFAULT;
@@ -708,8 +734,51 @@ ffi_callback! {
     }
 }
 
+/// `ml_dsa_load`'s completion of a decoded key: from the seed (checked against the expanded
+/// key if there is one) when there's no expanded key or the key prefers its seed, else from
+/// the expanded key. False (with OpenSSL's errors) on failure.
+fn complete(k: &MlDsaKey, pre: &Prekey) -> bool {
+    if let Some(seed) = pre
+        .seed
+        .as_ref()
+        .filter(|_| pre.sk.is_none() || k.flags & PREFER_SEED != 0)
+    {
+        let Some(p) = generate(k, Some(seed), pre.sk.as_deref()) else {
+            return false;
+        };
+        *k.lock() = Material::Private(p);
+        return true;
+    }
+    let Some(sk) = &pre.sk else { return true };
+    let name = k.variant.name();
+    match PrivateKey::parse(k.variant, sk) {
+        Ok(p) => {
+            *k.lock() = Material::Private(p);
+            true
+        }
+        Err(e) => {
+            if matches!(e, mldsa::Error::Mismatch) {
+                err::raise_with_text(
+                    ERR_LIB_PROV,
+                    PROV_R_INVALID_KEY,
+                    "ossl_ml_dsa_sk_decode",
+                    &format!("{name} private key does not match its pubkey part"),
+                );
+            }
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                PROV_R_INVALID_KEY,
+                "ml_dsa_load",
+                &format!("error parsing {name} private key"),
+            );
+            false
+        }
+    }
+}
+
 ffi_callback! {
-    /// `ml_dsa_load`: the key the reference points to, the reference cleared.
+    /// `ml_dsa_load`: the key the reference points to, the reference cleared; a decoded key
+    /// made from its seed or expanded key first (freed, giving NULL, if that fails).
     ///
     /// # Safety
     /// `reference` is NULL or points to `reference_sz` writable octets holding live key data's
@@ -725,8 +794,141 @@ ffi_callback! {
         let h = unsafe { slot.read_unaligned() };
         // SAFETY: as above: writable.
         unsafe { slot.write_unaligned(ptr::null_mut()) };
+        // SAFETY: the key data the reference held.
+        let Some(k) = (unsafe { key(h) }) else { return h };
+        let pending = {
+            let mut m = k.lock();
+            match core::mem::replace(&mut *m, Material::Empty) {
+                Material::Pending(pre) => Some(pre),
+                other => {
+                    *m = other;
+                    None
+                }
+            }
+        };
+        if let Some(pre) = pending
+            && !complete(k, &pre)
+        {
+            // SAFETY: the key, now the caller's no longer.
+            unsafe { unbox::<MlDsaKey>(h) };
+            return ptr::null_mut();
+        }
         h
     }
+}
+
+/// `ossl_ml_dsa_d2i_PUBKEY`: a key of the variant (with the default flags) from a
+/// SubjectPublicKeyInfo of exactly its length and prefix; NULL otherwise.
+///
+/// # Safety
+/// `provctx` is the default provider's context.
+pub(crate) unsafe fn d2i_pubkey(
+    provctx: *mut c_void,
+    propq: Option<&CStr>,
+    variant: Variant,
+    nid: c_int,
+    der: &[u8],
+) -> *mut c_void {
+    use super::ml_codecs::{SPKI_OVERHEAD, oid_octets, spki_prefix};
+    let pk = variant.public_key_bytes();
+    let prefix = oid_octets(nid).and_then(|o| spki_prefix(&o, pk));
+    let (Some(prefix), true) = (prefix, der.len() == SPKI_OVERHEAD + pk) else {
+        return ptr::null_mut();
+    };
+    if der.get(..SPKI_OVERHEAD) != Some(&prefix[..]) {
+        return ptr::null_mut();
+    }
+    // SAFETY: the caller's guarantee.
+    let libctx = unsafe { libctx_of(provctx) };
+    if !hashes_available(libctx, propq) {
+        return ptr::null_mut();
+    }
+    match PublicKey::parse(variant, der.get(SPKI_OVERHEAD..).unwrap_or_default()) {
+        Ok(p) => boxed(MlDsaKey {
+            libctx: Ptr(libctx),
+            variant,
+            flags: FLAGS_DEFAULT,
+            material: Mutex::new(Material::Public(p)),
+        }),
+        Err(_) => {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_BAD_ENCODING,
+                "ossl_ml_dsa_d2i_PUBKEY",
+                &format!(
+                    "error parsing {} public key from input SPKI",
+                    variant.name()
+                ),
+            );
+            ptr::null_mut()
+        }
+    }
+}
+
+/// `ossl_ml_dsa_d2i_PKCS8`: a key of the variant (with the provider's flags) holding a
+/// PrivateKeyInfo's seed and expanded key, by the configuration's enabled input formats, for
+/// loading to make the key from; NULL otherwise.
+///
+/// # Safety
+/// `provctx` is the default provider's context.
+pub(crate) unsafe fn d2i_pkcs8(
+    provctx: *mut c_void,
+    propq: Option<&CStr>,
+    variant: Variant,
+    nid: c_int,
+    der: &[u8],
+) -> *mut c_void {
+    use super::ml_codecs::{Refused, formats, order, parse};
+    let name = variant.name();
+    // SAFETY: the caller's guarantee.
+    let Some((key_octets, ptype, alg)) = (unsafe { super::der2key::p8_parts(der) }) else {
+        return ptr::null_mut();
+    };
+    if alg != nid {
+        return ptr::null_mut();
+    }
+    let (sk_len, pk_len) = (variant.private_key_bytes(), variant.public_key_bytes());
+    let table = formats(SEED_BYTES, sk_len, pk_len);
+    // SAFETY: as above.
+    let list = unsafe {
+        super::builtin::conf_param(provctx, rustyssl_abi::OSSL_PKEY_PARAM_ML_DSA_INPUT_FORMATS)
+    };
+    let Some(slots) = order(name, &table, "input", list.as_deref()) else {
+        return ptr::null_mut();
+    };
+    if ptype != rustyssl_abi::V_ASN1_UNDEF {
+        err::raise_with_text(
+            ERR_LIB_PROV,
+            rustyssl_abi::PROV_R_UNEXPECTED_KEY_PARAMETERS,
+            "ossl_ml_dsa_d2i_PKCS8",
+            &format!("unexpected parameters with a PKCS#8 {name} private key"),
+        );
+        return ptr::null_mut();
+    }
+    let parts = match parse(&key_octets, &slots, SEED_BYTES, sk_len, pk_len) {
+        Ok(p) => p,
+        Err(Refused::NoFormat) => {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_ML_DSA_NO_FORMAT,
+                "ossl_ml_dsa_d2i_PKCS8",
+                &format!("no matching enabled {name} private key input formats"),
+            );
+            return ptr::null_mut();
+        }
+        Err(Refused::Malformed) => return ptr::null_mut(),
+    };
+    let seed = parts
+        .seed
+        .and_then(|s| <[u8; SEED_BYTES]>::try_from(s).ok());
+    let sk = parts.private.map(<[u8]>::to_vec);
+    // SAFETY: as above.
+    let h = unsafe { prov_new(provctx, propq, variant) };
+    // SAFETY: the new key data, or NULL.
+    if let Some(k) = unsafe { key(h) } {
+        *k.lock() = Material::Pending(Prekey { seed, sk });
+    }
+    h
 }
 
 ffi_callback! {

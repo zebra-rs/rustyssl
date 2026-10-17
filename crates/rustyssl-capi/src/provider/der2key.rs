@@ -12,8 +12,9 @@
 //!   the decoder's type) and takes the provider's library context.
 //! - `export_object` gives a key decoded by one provider to another's key manager.
 //!
-//! The post-quantum key decoders (ML-KEM, ML-DSA, SLH-DSA) come with step 4.7b2b: until then
-//! theirs abort when given a key of their type (AGENTS.md rule 10), and pass on anything else.
+//! The post-quantum types (ML-KEM, ML-DSA, SLH-DSA) take their PrivateKeyInfo and
+//! SubjectPublicKeyInfo through their key managers' codecs; an ML-KEM or ML-DSA key decoded
+//! from a PrivateKeyInfo is made from its seed or expanded key when its key manager loads it.
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_uchar, c_void};
 use core::ptr;
@@ -82,6 +83,17 @@ struct Type {
     check: Option<unsafe fn(*mut c_void, &KeyCtx) -> bool>,
     adjust: unsafe fn(*mut c_void, &KeyCtx),
     free: unsafe fn(*mut c_void),
+    /// A post-quantum type's parameter set (`None` for the classic types).
+    pq: Pq,
+}
+
+/// A post-quantum key type's parameter set, which its codecs take.
+#[derive(Clone, Copy)]
+enum Pq {
+    None,
+    MlKem(rustyssl_crypto::mlkem::Variant),
+    MlDsa(rustyssl_crypto::mldsa::Variant),
+    SlhDsa(rustyssl_crypto::slhdsa::Variant),
 }
 
 /// The structures a decoder reads (`DO_*` in `decode_der2key.c`).
@@ -511,6 +523,72 @@ unsafe fn decode_p8(
     key
 }
 
+/// A PrivateKeyInfo's key octets, wiped when dropped.
+pub(super) struct KeyOctets(Vec<u8>);
+
+impl core::ops::Deref for KeyOctets {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Drop for KeyOctets {
+    fn drop(&mut self) {
+        super::macs::wipe(&mut self.0);
+    }
+}
+
+/// A PrivateKeyInfo's key octets, its AlgorithmIdentifier's parameter type, and its algorithm's
+/// NID, or `None` if it doesn't decode (the post-quantum codecs' first steps).
+///
+/// # Safety
+/// No preconditions beyond `der` being the input.
+pub(super) unsafe fn p8_parts(der: &[u8]) -> Option<(KeyOctets, c_int, c_int)> {
+    let len = c_long::try_from(der.len()).ok()?;
+    let mut p = der.as_ptr();
+    // SAFETY: the octets.
+    let p8 = unsafe { crate::x509::p8::d2i_PKCS8_PRIV_KEY_INFO(ptr::null_mut(), &raw mut p, len) };
+    if p8.is_null() {
+        return None;
+    }
+    let (mut buf, mut blen, mut alg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the decoded structure; locals.
+    let got = unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut buf,
+            &raw mut blen,
+            &raw mut alg,
+            p8,
+        )
+    } != 0;
+    let parts = if got {
+        let mut ptype = 0;
+        // SAFETY: its AlgorithmIdentifier; a local.
+        unsafe {
+            crate::x509::algor::X509_ALGOR_get0(
+                ptr::null_mut(),
+                &raw mut ptype,
+                ptr::null_mut(),
+                alg,
+            )
+        };
+        // SAFETY: as above.
+        let obj = unsafe { (*alg).algorithm };
+        // SAFETY: its object.
+        let nid = unsafe { crate::objects::OBJ_obj2nid(obj) };
+        // SAFETY: the structure's `blen` octets.
+        let octets = unsafe { crate::ffi::bytes(buf, usize::try_from(blen).unwrap_or(0)) };
+        Some((KeyOctets(octets.unwrap_or_default().to_vec()), ptype, nid))
+    } else {
+        None
+    };
+    // SAFETY: decoded above, freed once.
+    unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8) };
+    parts
+}
+
 /// Whether an EC key is in SM2's range (`EC_FLAG_SM2_RANGE`).
 ///
 /// # Safety
@@ -786,6 +864,84 @@ mod fns {
         // SAFETY: as above.
         unsafe { crate::ecx::free(key) };
     }
+
+    /// The input's octets as a slice (`der2key_decode` gives a whole element).
+    ///
+    /// # Safety
+    /// `pp` holds a pointer to `len` octets.
+    unsafe fn input<'a>(pp: *mut *const c_uchar, len: c_long) -> &'a [u8] {
+        // SAFETY: the caller's guarantee.
+        let p = unsafe { pp.read() };
+        // SAFETY: as above.
+        unsafe { crate::ffi::bytes(p, usize::try_from(len).unwrap_or(0)) }.unwrap_or_default()
+    }
+
+    /// The context's properties (`None` for an empty string, as a C string holding none).
+    fn propq(c: &KeyCtx) -> Option<&CStr> {
+        // SAFETY: the context's NUL-terminated buffer.
+        let q = unsafe { CStr::from_ptr(c.propq()) };
+        Some(q)
+    }
+
+    pub(super) unsafe fn pq_p8(p: *mut *const c_uchar, l: c_long, c: &KeyCtx) -> *mut c_void {
+        let t = c.desc.t;
+        // SAFETY: the caller's octets.
+        let der = unsafe { input(p, l) };
+        let q = propq(c);
+        match t.pq {
+            // SAFETY: the provider's context.
+            Pq::MlKem(v) => unsafe {
+                super::super::ml_kem_kmgmt::d2i_pkcs8(c.provctx, q, v, t.evp_type, der)
+            },
+            // SAFETY: as above.
+            Pq::MlDsa(v) => unsafe {
+                super::super::ml_dsa_kmgmt::d2i_pkcs8(c.provctx, q, v, t.evp_type, der)
+            },
+            // SAFETY: as above.
+            Pq::SlhDsa(v) => unsafe {
+                super::super::slh_dsa_kmgmt::d2i_pkcs8(c.provctx, q, v, t.evp_type, der)
+            },
+            Pq::None => ptr::null_mut(),
+        }
+    }
+
+    pub(super) unsafe fn pq_pubkey(p: *mut *const c_uchar, l: c_long, c: &KeyCtx) -> *mut c_void {
+        let t = c.desc.t;
+        // SAFETY: the caller's octets.
+        let der = unsafe { input(p, l) };
+        let q = propq(c);
+        match t.pq {
+            // SAFETY: the provider's context.
+            Pq::MlKem(v) => unsafe {
+                super::super::ml_kem_kmgmt::d2i_pubkey(c.provctx, q, v, t.evp_type, der)
+            },
+            // SAFETY: as above.
+            Pq::MlDsa(v) => unsafe {
+                super::super::ml_dsa_kmgmt::d2i_pubkey(c.provctx, q, v, t.evp_type, der)
+            },
+            // SAFETY: as above.
+            Pq::SlhDsa(v) => unsafe {
+                super::super::slh_dsa_kmgmt::d2i_pubkey(c.provctx, q, v, t.evp_type, der)
+            },
+            Pq::None => ptr::null_mut(),
+        }
+    }
+
+    /// The post-quantum types' `adjust`: none.
+    pub(super) unsafe fn pq_adjust(_key: *mut c_void, _c: &KeyCtx) {}
+
+    pub(super) unsafe fn ml_kem_free(key: *mut c_void) {
+        // SAFETY: the caller's key, freed once.
+        unsafe { super::super::ml_kem_kmgmt::ml_kem_free_key(key) };
+    }
+    pub(super) unsafe fn ml_dsa_free(key: *mut c_void) {
+        // SAFETY: as above.
+        unsafe { super::super::ml_dsa_kmgmt::ml_dsa_free_key(key) };
+    }
+    pub(super) unsafe fn slh_dsa_free(key: *mut c_void) {
+        // SAFETY: as above.
+        unsafe { super::super::slh_dsa_kmgmt::slh_dsa_free_key(key) };
+    }
 }
 
 use super::dh_kmgmt::dh_export;
@@ -806,6 +962,7 @@ const DH: Type = Type {
     check: None,
     adjust: fns::dh_adjust,
     free: fns::dh_free,
+    pq: Pq::None,
 };
 
 const DHX: Type = Type {
@@ -828,6 +985,7 @@ const DSA: Type = Type {
     check: None,
     adjust: fns::dsa_adjust,
     free: fns::dsa_free,
+    pq: Pq::None,
 };
 
 const EC: Type = Type {
@@ -842,6 +1000,7 @@ const EC: Type = Type {
     check: Some(ec_check),
     adjust: fns::ec_adjust,
     free: fns::ec_free,
+    pq: Pq::None,
 };
 
 const SM2: Type = Type {
@@ -862,6 +1021,7 @@ const X25519: Type = Type {
     check: None,
     adjust: fns::ecx_adjust,
     free: fns::ecx_free,
+    pq: Pq::None,
 };
 
 const X448: Type = Type {
@@ -894,6 +1054,7 @@ const RSA: Type = Type {
     check: Some(rsa_check),
     adjust: fns::rsa_adjust,
     free: fns::rsa_free,
+    pq: Pq::None,
 };
 
 const RSA_PSS: Type = Type {
@@ -1164,5 +1325,568 @@ decoder!(
     spki_rsapss_newctx,
     spki_rsapss_does_selection,
     RSA_PSS,
+    Kind::SubjectPublicKeyInfo
+);
+
+use super::ml_dsa_kmgmt::ml_dsa_export;
+use super::ml_kem_kmgmt::ml_kem_export;
+use super::slh_dsa_kmgmt::slh_dsa_export;
+
+const ML_KEM_512: Type = Type {
+    name: c"ML-KEM-512",
+    evp_type: rustyssl_abi::NID_ML_KEM_512,
+    export: ml_kem_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_kem_free,
+    pq: Pq::MlKem(rustyssl_crypto::mlkem::Variant::MlKem512),
+};
+
+const ML_KEM_768: Type = Type {
+    name: c"ML-KEM-768",
+    evp_type: rustyssl_abi::NID_ML_KEM_768,
+    export: ml_kem_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_kem_free,
+    pq: Pq::MlKem(rustyssl_crypto::mlkem::Variant::MlKem768),
+};
+
+const ML_KEM_1024: Type = Type {
+    name: c"ML-KEM-1024",
+    evp_type: rustyssl_abi::NID_ML_KEM_1024,
+    export: ml_kem_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_kem_free,
+    pq: Pq::MlKem(rustyssl_crypto::mlkem::Variant::MlKem1024),
+};
+
+const ML_DSA_44: Type = Type {
+    name: c"ML-DSA-44",
+    evp_type: rustyssl_abi::NID_ML_DSA_44,
+    export: ml_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_dsa_free,
+    pq: Pq::MlDsa(rustyssl_crypto::mldsa::Variant::MlDsa44),
+};
+
+const ML_DSA_65: Type = Type {
+    name: c"ML-DSA-65",
+    evp_type: rustyssl_abi::NID_ML_DSA_65,
+    export: ml_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_dsa_free,
+    pq: Pq::MlDsa(rustyssl_crypto::mldsa::Variant::MlDsa65),
+};
+
+const ML_DSA_87: Type = Type {
+    name: c"ML-DSA-87",
+    evp_type: rustyssl_abi::NID_ML_DSA_87,
+    export: ml_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::ml_dsa_free,
+    pq: Pq::MlDsa(rustyssl_crypto::mldsa::Variant::MlDsa87),
+};
+
+const SLH_DSA_SHA2_128S: Type = Type {
+    name: c"SLH-DSA-SHA2-128s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_128s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_128s),
+};
+
+const SLH_DSA_SHA2_128F: Type = Type {
+    name: c"SLH-DSA-SHA2-128f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_128f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_128f),
+};
+
+const SLH_DSA_SHA2_192S: Type = Type {
+    name: c"SLH-DSA-SHA2-192s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_192s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_192s),
+};
+
+const SLH_DSA_SHA2_192F: Type = Type {
+    name: c"SLH-DSA-SHA2-192f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_192f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_192f),
+};
+
+const SLH_DSA_SHA2_256S: Type = Type {
+    name: c"SLH-DSA-SHA2-256s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_256s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_256s),
+};
+
+const SLH_DSA_SHA2_256F: Type = Type {
+    name: c"SLH-DSA-SHA2-256f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHA2_256f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Sha2_256f),
+};
+
+const SLH_DSA_SHAKE_128S: Type = Type {
+    name: c"SLH-DSA-SHAKE-128s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_128s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake128s),
+};
+
+const SLH_DSA_SHAKE_128F: Type = Type {
+    name: c"SLH-DSA-SHAKE-128f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_128f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake128f),
+};
+
+const SLH_DSA_SHAKE_192S: Type = Type {
+    name: c"SLH-DSA-SHAKE-192s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_192s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake192s),
+};
+
+const SLH_DSA_SHAKE_192F: Type = Type {
+    name: c"SLH-DSA-SHAKE-192f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_192f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake192f),
+};
+
+const SLH_DSA_SHAKE_256S: Type = Type {
+    name: c"SLH-DSA-SHAKE-256s",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_256s,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake256s),
+};
+
+const SLH_DSA_SHAKE_256F: Type = Type {
+    name: c"SLH-DSA-SHAKE-256f",
+    evp_type: rustyssl_abi::NID_SLH_DSA_SHAKE_256f,
+    export: slh_dsa_export,
+    private: None,
+    public: None,
+    params: None,
+    pkcs8: Some(fns::pq_p8),
+    pubkey: Some(fns::pq_pubkey),
+    check: None,
+    adjust: fns::pq_adjust,
+    free: fns::slh_dsa_free,
+    pq: Pq::SlhDsa(rustyssl_crypto::slhdsa::Variant::Shake256f),
+};
+
+decoder!(
+    P8_ML_KEM_512,
+    P8_ML_KEM_512_DESC,
+    p8_ml_kem_512_newctx,
+    p8_ml_kem_512_does_selection,
+    ML_KEM_512,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_KEM_512,
+    SPKI_ML_KEM_512_DESC,
+    spki_ml_kem_512_newctx,
+    spki_ml_kem_512_does_selection,
+    ML_KEM_512,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_ML_KEM_768,
+    P8_ML_KEM_768_DESC,
+    p8_ml_kem_768_newctx,
+    p8_ml_kem_768_does_selection,
+    ML_KEM_768,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_KEM_768,
+    SPKI_ML_KEM_768_DESC,
+    spki_ml_kem_768_newctx,
+    spki_ml_kem_768_does_selection,
+    ML_KEM_768,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_ML_KEM_1024,
+    P8_ML_KEM_1024_DESC,
+    p8_ml_kem_1024_newctx,
+    p8_ml_kem_1024_does_selection,
+    ML_KEM_1024,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_KEM_1024,
+    SPKI_ML_KEM_1024_DESC,
+    spki_ml_kem_1024_newctx,
+    spki_ml_kem_1024_does_selection,
+    ML_KEM_1024,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_ML_DSA_44,
+    P8_ML_DSA_44_DESC,
+    p8_ml_dsa_44_newctx,
+    p8_ml_dsa_44_does_selection,
+    ML_DSA_44,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_DSA_44,
+    SPKI_ML_DSA_44_DESC,
+    spki_ml_dsa_44_newctx,
+    spki_ml_dsa_44_does_selection,
+    ML_DSA_44,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_ML_DSA_65,
+    P8_ML_DSA_65_DESC,
+    p8_ml_dsa_65_newctx,
+    p8_ml_dsa_65_does_selection,
+    ML_DSA_65,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_DSA_65,
+    SPKI_ML_DSA_65_DESC,
+    spki_ml_dsa_65_newctx,
+    spki_ml_dsa_65_does_selection,
+    ML_DSA_65,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_ML_DSA_87,
+    P8_ML_DSA_87_DESC,
+    p8_ml_dsa_87_newctx,
+    p8_ml_dsa_87_does_selection,
+    ML_DSA_87,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_ML_DSA_87,
+    SPKI_ML_DSA_87_DESC,
+    spki_ml_dsa_87_newctx,
+    spki_ml_dsa_87_does_selection,
+    ML_DSA_87,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_128S,
+    P8_SLH_DSA_SHA2_128S_DESC,
+    p8_slh_dsa_sha2_128s_newctx,
+    p8_slh_dsa_sha2_128s_does_selection,
+    SLH_DSA_SHA2_128S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_128S,
+    SPKI_SLH_DSA_SHA2_128S_DESC,
+    spki_slh_dsa_sha2_128s_newctx,
+    spki_slh_dsa_sha2_128s_does_selection,
+    SLH_DSA_SHA2_128S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_128F,
+    P8_SLH_DSA_SHA2_128F_DESC,
+    p8_slh_dsa_sha2_128f_newctx,
+    p8_slh_dsa_sha2_128f_does_selection,
+    SLH_DSA_SHA2_128F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_128F,
+    SPKI_SLH_DSA_SHA2_128F_DESC,
+    spki_slh_dsa_sha2_128f_newctx,
+    spki_slh_dsa_sha2_128f_does_selection,
+    SLH_DSA_SHA2_128F,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_192S,
+    P8_SLH_DSA_SHA2_192S_DESC,
+    p8_slh_dsa_sha2_192s_newctx,
+    p8_slh_dsa_sha2_192s_does_selection,
+    SLH_DSA_SHA2_192S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_192S,
+    SPKI_SLH_DSA_SHA2_192S_DESC,
+    spki_slh_dsa_sha2_192s_newctx,
+    spki_slh_dsa_sha2_192s_does_selection,
+    SLH_DSA_SHA2_192S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_192F,
+    P8_SLH_DSA_SHA2_192F_DESC,
+    p8_slh_dsa_sha2_192f_newctx,
+    p8_slh_dsa_sha2_192f_does_selection,
+    SLH_DSA_SHA2_192F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_192F,
+    SPKI_SLH_DSA_SHA2_192F_DESC,
+    spki_slh_dsa_sha2_192f_newctx,
+    spki_slh_dsa_sha2_192f_does_selection,
+    SLH_DSA_SHA2_192F,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_256S,
+    P8_SLH_DSA_SHA2_256S_DESC,
+    p8_slh_dsa_sha2_256s_newctx,
+    p8_slh_dsa_sha2_256s_does_selection,
+    SLH_DSA_SHA2_256S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_256S,
+    SPKI_SLH_DSA_SHA2_256S_DESC,
+    spki_slh_dsa_sha2_256s_newctx,
+    spki_slh_dsa_sha2_256s_does_selection,
+    SLH_DSA_SHA2_256S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHA2_256F,
+    P8_SLH_DSA_SHA2_256F_DESC,
+    p8_slh_dsa_sha2_256f_newctx,
+    p8_slh_dsa_sha2_256f_does_selection,
+    SLH_DSA_SHA2_256F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHA2_256F,
+    SPKI_SLH_DSA_SHA2_256F_DESC,
+    spki_slh_dsa_sha2_256f_newctx,
+    spki_slh_dsa_sha2_256f_does_selection,
+    SLH_DSA_SHA2_256F,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_128S,
+    P8_SLH_DSA_SHAKE_128S_DESC,
+    p8_slh_dsa_shake_128s_newctx,
+    p8_slh_dsa_shake_128s_does_selection,
+    SLH_DSA_SHAKE_128S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_128S,
+    SPKI_SLH_DSA_SHAKE_128S_DESC,
+    spki_slh_dsa_shake_128s_newctx,
+    spki_slh_dsa_shake_128s_does_selection,
+    SLH_DSA_SHAKE_128S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_128F,
+    P8_SLH_DSA_SHAKE_128F_DESC,
+    p8_slh_dsa_shake_128f_newctx,
+    p8_slh_dsa_shake_128f_does_selection,
+    SLH_DSA_SHAKE_128F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_128F,
+    SPKI_SLH_DSA_SHAKE_128F_DESC,
+    spki_slh_dsa_shake_128f_newctx,
+    spki_slh_dsa_shake_128f_does_selection,
+    SLH_DSA_SHAKE_128F,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_192S,
+    P8_SLH_DSA_SHAKE_192S_DESC,
+    p8_slh_dsa_shake_192s_newctx,
+    p8_slh_dsa_shake_192s_does_selection,
+    SLH_DSA_SHAKE_192S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_192S,
+    SPKI_SLH_DSA_SHAKE_192S_DESC,
+    spki_slh_dsa_shake_192s_newctx,
+    spki_slh_dsa_shake_192s_does_selection,
+    SLH_DSA_SHAKE_192S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_192F,
+    P8_SLH_DSA_SHAKE_192F_DESC,
+    p8_slh_dsa_shake_192f_newctx,
+    p8_slh_dsa_shake_192f_does_selection,
+    SLH_DSA_SHAKE_192F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_192F,
+    SPKI_SLH_DSA_SHAKE_192F_DESC,
+    spki_slh_dsa_shake_192f_newctx,
+    spki_slh_dsa_shake_192f_does_selection,
+    SLH_DSA_SHAKE_192F,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_256S,
+    P8_SLH_DSA_SHAKE_256S_DESC,
+    p8_slh_dsa_shake_256s_newctx,
+    p8_slh_dsa_shake_256s_does_selection,
+    SLH_DSA_SHAKE_256S,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_256S,
+    SPKI_SLH_DSA_SHAKE_256S_DESC,
+    spki_slh_dsa_shake_256s_newctx,
+    spki_slh_dsa_shake_256s_does_selection,
+    SLH_DSA_SHAKE_256S,
+    Kind::SubjectPublicKeyInfo
+);
+decoder!(
+    P8_SLH_DSA_SHAKE_256F,
+    P8_SLH_DSA_SHAKE_256F_DESC,
+    p8_slh_dsa_shake_256f_newctx,
+    p8_slh_dsa_shake_256f_does_selection,
+    SLH_DSA_SHAKE_256F,
+    Kind::PrivateKeyInfo
+);
+decoder!(
+    SPKI_SLH_DSA_SHAKE_256F,
+    SPKI_SLH_DSA_SHAKE_256F_DESC,
+    spki_slh_dsa_shake_256f_newctx,
+    spki_slh_dsa_shake_256f_does_selection,
+    SLH_DSA_SHAKE_256F,
     Kind::SubjectPublicKeyInfo
 );

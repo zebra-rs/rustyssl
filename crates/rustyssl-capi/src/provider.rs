@@ -67,6 +67,7 @@ pub(crate) mod kdfs;
 mod kdfs_more;
 pub(crate) mod keymgmt;
 pub(crate) mod macs;
+mod ml_codecs;
 pub(crate) mod ml_dsa_kmgmt;
 pub(crate) mod ml_dsa_sig;
 mod ml_kem_kem;
