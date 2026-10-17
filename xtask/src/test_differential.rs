@@ -422,6 +422,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("pbe", pbe_session),
     ("msblob", msblob_session),
     ("hpke", hpke_session),
+    ("x509name", x509name_session),
     ("decode", decode_session),
     ("string", string_session),
 ];
@@ -4179,6 +4180,24 @@ fn hpke_session(random: &mut Random, out: &mut String) -> Result {
         )?;
     }
     Ok(())
+}
+
+/// Names for `x509name` sessions to start from (tests/c/x509_name.c's): one with every string
+/// type, multi-valued RDNs, and control octets; the same with entries deleted; the empty
+/// name; a multi-valued RDN; Universal and T61 strings; and GeneralStrings.
+const X509NAME_SEEDS: &[&str] = &[
+    "3081d831123010060355040716096c696e650a66656564310b3009060355040613024a5031283009060355040513023432300b06035504290c04426dd090300e06035504090c074d61696e2053743110300e06035504080c0754c58d6b79c58d31163014060355040a130d4578616d706c652c20496e632e3110300e060355040b0c075226442b4f7073313d301c06035504030c15204e616d6520205769746820202053706163657320301d06092a864886f70d0109011610526f6f74404578616d706c652e434f4d3110300e06042a0304051306616e204f4944",
+    "3081a2310b3009060355040613024a5031183009060355040513023432300b06035504290c04426dd0903110300e06035504080c0754c58d6b79c58d31163014060355040a130d4578616d706c652c20496e632e3110300e060355040b0c075226442b4f7073313d301c06035504030c15204e616d6520205769746820202053706163657320301d06092a864886f70d0109011610526f6f74404578616d706c652e434f4d",
+    "3000",
+    "30233116300a06035504030c036162633008060355040a0c014f3109300706035504061300",
+    "302b3115301306035504031c0c00000041000030420000002031123010060355040714095afc72696368202058",
+    "30273111300f06035504031b0800000068000000693112301006035504040a1b09782f2b80ff003d5c2c",
+];
+
+/// A random session of `x509name` commands: the seeds with octets changed, removed, or added,
+/// cut short, or whole.
+fn x509name_session(random: &mut Random, out: &mut String) -> Result {
+    mutated_sessions_upto(random, out, "x509name", X509NAME_SEEDS, 480)
 }
 
 /// A random session of the PEM key writers: keys of each type (now and then changed) through

@@ -521,3 +521,105 @@ mod tests {
         unsafe { err::ERR_clear_error() };
     }
 }
+
+/// `ossl_asn1_item_digest_ex`: the digest of `asn`'s encoding (with the digest fetched in the
+/// library context when it isn't a provider's): 1, or 0.
+///
+/// # Safety
+/// `it` is a live item; `md` is a live digest; `asn` is a value of `it`; `data` has room for
+/// the digest; `len` is NULL or writable; `libctx` is NULL or live; `propq` is NULL or a
+/// string.
+pub(crate) unsafe fn item_digest_ex(
+    it: *const ASN1_ITEM,
+    md: *const rustyssl_abi::EVP_MD,
+    asn: *mut c_void,
+    data: *mut c_uchar,
+    len: *mut core::ffi::c_uint,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> c_int {
+    let mut s: *mut c_uchar = ptr::null_mut();
+    // SAFETY: the caller's value and item; a place for the encoding.
+    let i = unsafe { ASN1_item_i2d(asn.cast(), &raw mut s, it) };
+    if i < 0 || s.is_null() {
+        return 0;
+    }
+    let mut fetched = md.cast_mut();
+    // SAFETY: the caller's digest.
+    if unsafe { crate::evp::digest::EVP_MD_get0_provider(md) }.is_null() {
+        // No engines: the digest is fetched by its name.
+        // SAFETY: the caller's digest.
+        let name = unsafe { crate::evp::digest::EVP_MD_get0_name(md) };
+        // SAFETY: the caller's library context and properties; the digest's name.
+        fetched = unsafe { crate::evp::digest::EVP_MD_fetch(libctx, name, propq) };
+    }
+    let ret = if fetched.is_null() {
+        0
+    } else {
+        // SAFETY: the encoding (`i` octets); the caller's room.
+        unsafe {
+            crate::evp::md_ctx::EVP_Digest(
+                s.cast(),
+                usize::try_from(i).unwrap_or(0),
+                data,
+                len,
+                fetched,
+                ptr::null_mut(),
+            )
+        }
+    };
+    // SAFETY: the encoding made above.
+    unsafe { mem::release(s.cast()) };
+    if !ptr::eq(fetched, md) {
+        // SAFETY: fetched above.
+        unsafe { crate::evp::digest::EVP_MD_free(fetched) };
+    }
+    ret
+}
+
+ffi_export! {
+    /// The digest of `asn`'s encoding into `data` (its length into `*len`): 1, or 0.
+    ///
+    /// # Safety
+    /// `it` is a live item; `md` is a live digest; `asn` is a value of `it`; `data` has room
+    /// for the digest; `len` is NULL or writable.
+    pub unsafe extern "C" fn ASN1_item_digest(it: *const ASN1_ITEM, md: *const rustyssl_abi::EVP_MD, asn: *mut c_void, data: *mut c_uchar, len: *mut core::ffi::c_uint) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { item_digest_ex(it, md, asn, data, len, ptr::null_mut(), ptr::null()) }
+    }
+}
+
+ffi_export! {
+    /// The digest of what `i2d` encodes `data` to: 1, or 0 (`ERR_R_INTERNAL_ERROR` for an
+    /// empty or failed encoding).
+    ///
+    /// # Safety
+    /// `i2d` is a trusted encoder of `data`'s type; `type_` is a live digest; `md` has room for
+    /// the digest; `len` is NULL or writable.
+    pub unsafe extern "C" fn ASN1_digest(i2d: i2d_of_void, type_: *const rustyssl_abi::EVP_MD, data: *mut c_char, md: *mut c_uchar, len: *mut core::ffi::c_uint) -> c_int
+    where failure = 0, library = ERR_LIB_ASN1
+    {
+        let Some(i2d) = i2d else { return 0 };
+        // SAFETY: the caller's encoder and value.
+        let inl = unsafe { i2d(data.cast(), ptr::null_mut()) };
+        if inl <= 0 {
+            err::raise(ERR_LIB_ASN1, rustyssl_abi::ERR_R_INTERNAL_ERROR, "ASN1_digest");
+            return 0;
+        }
+        let ul = usize::try_from(inl).unwrap_or(0);
+        let s: *mut c_uchar = mem::alloc(ul).cast();
+        if s.is_null() {
+            return 0;
+        }
+        let mut p = s;
+        // SAFETY: as above; room for the encoding.
+        unsafe { i2d(data.cast(), &raw mut p) };
+        // SAFETY: the encoding; the caller's room.
+        let ok = unsafe { crate::evp::md_ctx::EVP_Digest(s.cast(), ul, md, len, type_, ptr::null_mut()) } != 0;
+        // SAFETY: made above.
+        unsafe { mem::release(s.cast()) };
+        c_int::from(ok)
+    }
+}

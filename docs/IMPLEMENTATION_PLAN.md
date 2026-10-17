@@ -4515,6 +4515,39 @@ Exit checks:
   - `X509_INFO` and `PEM_X509_INFO_read_bio`
   - `X509_AUX` trust settings ("TRUSTED CERTIFICATE")
   - Netscape SPKI
+
+  Sub-steps:
+  - [x] **5.1a Names** (`x509/name.rs`, from `x_name.c`, `x509name.c`, `x509_obj.c`, and the
+    name parts of `x509_cmp.c` and `a_strex.c`):
+    - `X509_NAME` as OpenSSL's extern item over its own structure: the entries with their RDN
+      numbers, the DER kept, and the canonical encoding (UTF-8, lowercased, spaces collapsed,
+      the RDNs without the outer SEQUENCE), both remade on the next encoding after a change.
+    - `X509_NAME_ENTRY` and its functions; the entry functions with OpenSSL's RDN numbering
+      (adding at each place, deleting a lone RDN's entry renumbers those after).
+    - `X509_NAME_oneline` (escapes, GeneralStrings of four-octet characters, the entries that
+      don't fit a buffer left out), `X509_NAME_print`, `print_ex` and `_fp` with every
+      `XN_FLAG_*` and string flag.
+    - `X509_NAME_cmp`, `hash_ex`, `hash_old`, `digest`, `get0_der`, `set`, `dup`; also
+      `ASN1_item_digest` and `ASN1_digest`.
+    - Tests:
+      - `tests/c/x509_name.c`: names built every way, decoded from crafted DER, and printed
+        under 18 styles.
+      - The probe's `x509name`, with a corpus and random sessions (1,000 pass).
+      - `fuzz/fuzz_targets/x509_name.rs` (1.6M runs clean).
+  - [x] **5.1b Extensions as structures** (`x509/ext.rs`, from `x_exten.c` and
+    `x509_v3.c`):
+    - `X509_EXTENSION` (critical stored as 0xFF, a DER FALSE left out; an explicit FALSE or
+      a non-DER TRUE kept as decoded) and `X509_EXTENSIONS`, with their functions.
+    - The `X509v3_*` stack functions (by NID, object, and criticality; add, delete, and
+      `add_extensions`, which replaces every extension of an object added).
+    - `X509_EXTENSION_set_data` refuses a NULL value, which OpenSSL reads through.
+    - Tests: `tests/c/x509_ext.c` and the probe's `asnd2i` items 19 and 20 (corpus
+      `asnd2i_x509.txt`). The attributes (`X509at_*`) came with 4.7a1.
+  - [ ] **5.1c Certificates**: `X509` (with its cached SHA-1 hash, flags, and ex_data),
+    d2i/i2d/PEM, the getters and setters, sign/verify/digest, and the `cmp` family.
+  - [ ] **5.1d Requests**: `X509_REQ`.
+  - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`.
+  - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT`.
 - [ ] **5.2 X509v3 extensions:**
   - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for
     application-defined methods)
