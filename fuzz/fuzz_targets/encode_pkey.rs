@@ -1,6 +1,7 @@
 //! Fuzzes encoding keys decoded from untrusted DER: each key the decoders make of the input
 //! (d2i_AutoPrivateKey, else d2i_PUBKEY) through OSSL_ENCODER_CTX_new_for_pkey with a selection,
-//! output type, and structure the input picks, and through i2d_PrivateKey, i2d_PublicKey,
+//! output type (DER, PEM, a blob, or text), and structure the input picks, and through
+//! i2d_PrivateKey, i2d_PublicKey,
 //! i2d_KeyParams, and i2d_PUBKEY. Nothing may crash or write out of bounds (ASan), and each
 //! i2d's length must be the length it writes, into a new buffer or the caller's.
 
@@ -30,7 +31,7 @@ unsafe extern "C" {
 }
 
 const SELECTIONS: [c_int; 6] = [0x87, 0x86, 0x84, 0x01, 0x02, 0];
-const TYPES: [&core::ffi::CStr; 3] = [c"DER", c"PEM", c"blob"];
+const TYPES: [&core::ffi::CStr; 4] = [c"DER", c"PEM", c"blob", c"TEXT"];
 const STRUCTURES: [Option<&core::ffi::CStr>; 8] = [
     None,
     Some(c"PrivateKeyInfo"),
@@ -65,7 +66,7 @@ fuzz_target!(|input: &[u8]| {
         }
         let sel = SELECTIONS[usize::from(how) % SELECTIONS.len()];
         let t = TYPES[usize::from(how / 6) % TYPES.len()];
-        let s = STRUCTURES[usize::from(how / 18) % STRUCTURES.len()];
+        let s = STRUCTURES[usize::from(how / 24) % STRUCTURES.len()];
         let ctx = OSSL_ENCODER_CTX_new_for_pkey(k, sel, t.as_ptr(), s.map_or(ptr::null(), |s| s.as_ptr()), ptr::null());
         let mut data: *mut c_uchar = ptr::null_mut();
         let mut dlen = 0usize;

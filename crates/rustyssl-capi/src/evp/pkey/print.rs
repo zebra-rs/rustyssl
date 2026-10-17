@@ -10,105 +10,24 @@
 //!   error stays); a key typed by an ASN.1 method has no encoders.
 //! - The fallback line says "Public Key" for the private key and parameters too, and names the
 //!   key type by its long name (`<NULL>`, with `OBJ_R_UNKNOWN_NID`, for a type without one).
-//!
-//! Encoding a provided key with its providers' text encoders comes with the encoders (4.7):
-//! until then, a key a provider has an encoder for aborts (AGENTS.md rule 10). The default
-//! provider has none for the key types there are so far (the MAC and KDF keys).
 
-use core::ffi::{CStr, c_int, c_long, c_void};
+use core::ffi::{CStr, c_int, c_long};
 use core::ptr;
-use std::sync::Arc;
 
 use libc::FILE;
 use rustyssl_abi::{
-    ASN1_PCTX, BIO, BIO_CTRL_GET_INDENT, BIO_CTRL_SET_INDENT, BIO_NOCLOSE, ERR_LIB_EVP,
-    ERR_LIB_OSSL_ENCODER, ERR_R_PASSED_INVALID_ARGUMENT, EVP_PKEY, OSSL_ALGORITHM, OSSL_OP_ENCODER,
-    OSSL_PROVIDER,
+    ASN1_PCTX, BIO, BIO_CTRL_GET_INDENT, BIO_CTRL_SET_INDENT, BIO_NOCLOSE, ERR_LIB_EVP, EVP_PKEY,
+    EVP_PKEY_KEY_PARAMETERS, EVP_PKEY_KEYPAIR, EVP_PKEY_PUBLIC_KEY,
 };
 
 use super::Pkey;
 use super::ameth::Print;
 use crate::bio::{BIO_ctrl, BIO_free, BIO_indent, BIO_new, BIO_pop, BIO_push, BIO_write};
-use crate::err;
-use crate::evp::fetch::{self, Kind};
-use crate::ffi::ffi_export;
-use crate::provider::Ptr;
-
-/// An encoder a provider offers, as far as printing needs: its names.
-struct Encoder {
-    name_id: u32,
-    prov: Ptr<OSSL_PROVIDER>,
-}
-
-/// `fetch`'s method functions for [`Encoder`]s (`Arc`s behind raw pointers).
-///
-/// # Safety
-/// `prov` is a live provider.
-unsafe fn encoder_from_algorithm(
-    name_id: u32,
-    _: &OSSL_ALGORITHM,
-    prov: *mut OSSL_PROVIDER,
-) -> *mut c_void {
-    Arc::into_raw(Arc::new(Encoder {
-        name_id,
-        prov: Ptr(prov),
-    }))
-    .cast_mut()
-    .cast()
-}
-
-/// # Safety
-/// `m` is from [`encoder_from_algorithm`], with a reference.
-unsafe fn encoder_up_ref(m: *mut c_void) {
-    // SAFETY: the caller's guarantee.
-    unsafe { Arc::increment_strong_count(m.cast_const().cast::<Encoder>()) };
-}
-
-/// # Safety
-/// As for [`encoder_up_ref`]; the caller gives up its reference.
-unsafe fn encoder_free(m: *mut c_void) {
-    // SAFETY: the caller's guarantee.
-    unsafe { Arc::decrement_strong_count(m.cast_const().cast::<Encoder>()) };
-}
-
-static ENCODERS: Kind = Kind {
-    operation: OSSL_OP_ENCODER,
-    style: crate::evp::fetch::Style::Encoder,
-    from_algorithm: encoder_from_algorithm,
-    up_ref: encoder_up_ref,
-    free: encoder_free,
+use crate::encoder::ctx::{
+    OSSL_ENCODER_CTX_free, OSSL_ENCODER_CTX_get_num_encoders, OSSL_ENCODER_to_bio,
 };
-
-/// What `OSSL_ENCODER_CTX_new_for_pkey` finds for printing `k`: whether any encoder of the
-/// providers of its key manager's library context is for its type (one of its key manager's
-/// names). A key without data raises OpenSSL's error and has none.
-fn has_encoders(k: &Pkey) -> bool {
-    let (assigned, km) = {
-        let s = k.lock();
-        (s.is_assigned(), s.keymgmt.clone())
-    };
-    if !assigned {
-        err::raise_with_text(
-            ERR_LIB_OSSL_ENCODER,
-            ERR_R_PASSED_INVALID_ARGUMENT,
-            "OSSL_ENCODER_CTX_new_for_pkey",
-            "The passed EVP_PKEY must be assigned a key",
-        );
-        return false;
-    }
-    let Some(km) = km else { return false };
-    // SAFETY: the key manager's live provider.
-    let libctx = unsafe { crate::provider::libctx_of(km.get().prov.0) };
-    // SAFETY: the provider's library context.
-    let all = unsafe { fetch::all(libctx, &ENCODERS) };
-    all.iter().any(|m| {
-        // SAFETY: an encoder of this kind, held by `all`.
-        let e = unsafe { &*m.as_ptr().cast_const().cast::<Encoder>() };
-        fetch::names_of(e.prov.0, e.name_id)
-            .iter()
-            .any(|n| km.get().is_a(n))
-    })
-}
+use crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey;
+use crate::ffi::ffi_export;
 
 /// `print_set_indent` and `print_reset_indent`: runs `f` with `out` (or a prefix BIO pushed on
 /// it) indenting by `indent`; 0 if the indentation can't be set.
@@ -224,9 +143,32 @@ unsafe fn print(
         Part::Private => f.priv_print,
         Part::Params => f.param_print,
     });
+    let selection = match part {
+        Part::Public => EVP_PKEY_PUBLIC_KEY,
+        Part::Private => EVP_PKEY_KEYPAIR,
+        Part::Params => EVP_PKEY_KEY_PARAMETERS,
+    };
     let body = |b: *mut BIO| {
-        if has_encoders(k) {
-            crate::stub::unimplemented("printing a key with its providers' text encoders");
+        // SAFETY: the caller's key; a static output type.
+        let ctx = unsafe {
+            OSSL_ENCODER_CTX_new_for_pkey(
+                pkey,
+                selection,
+                c"TEXT".as_ptr(),
+                ptr::null(),
+                ptr::null(),
+            )
+        };
+        let mut ret = -2;
+        // SAFETY: the new context, or NULL.
+        if unsafe { OSSL_ENCODER_CTX_get_num_encoders(ctx) } != 0 {
+            // SAFETY: as above; the (indenting) BIO.
+            ret = unsafe { OSSL_ENCODER_to_bio(ctx, b) };
+        }
+        // SAFETY: as above.
+        unsafe { OSSL_ENCODER_CTX_free(ctx) };
+        if ret != -2 {
+            return ret;
         }
         match legacy {
             // SAFETY: the method's function with the (indenting) BIO, the key, and the caller's

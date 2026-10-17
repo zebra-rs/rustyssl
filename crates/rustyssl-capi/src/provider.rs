@@ -66,6 +66,7 @@ mod encoders;
 pub(crate) mod exchanges;
 pub(crate) mod kdfs;
 mod kdfs_more;
+mod key2text;
 pub(crate) mod keymgmt;
 pub(crate) mod macs;
 mod ml_codecs;

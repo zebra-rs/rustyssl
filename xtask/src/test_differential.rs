@@ -4028,7 +4028,7 @@ fn enckey_session(random: &mut Random, out: &mut String) -> Result {
     for _ in 0..random.below(4).saturating_add(1) {
         let data = mutated_seed(random);
         let sel = random.pick(&["87", "86", "84", "1", "2", "4", "0", "80", "85"]);
-        let type_ = random.pick(&["DER", "DER", "PEM", "PEM", "blob"]);
+        let type_ = random.pick(&["DER", "DER", "PEM", "PEM", "blob", "TEXT", "TEXT"]);
         let structure = random.pick(&[
             "-",
             "PrivateKeyInfo",

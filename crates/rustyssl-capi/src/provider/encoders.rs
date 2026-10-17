@@ -13,7 +13,7 @@
 //! - A type-specific PEM private key given a cipher is a traditional encrypted PEM.
 //! - `import_object` makes a key of the encoder's type from another provider's key's parameters.
 //!
-//! The text encoders come with step 4.7c2, and MSBLOB and PVK with step 4.7e
+//! The text encoders' text is `key2text`'s; MSBLOB and PVK come with step 4.7e
 //! (`pending_encoders`).
 
 use core::ffi::{CStr, c_char, c_int, c_uchar, c_void};
@@ -94,6 +94,8 @@ struct Family {
     private: Option<K2d>,
     public: Option<K2d>,
     domain: Option<K2d>,
+    /// The key's text (`type##_to_text`).
+    to_text: super::key2text::ToText,
 }
 
 /// A key type (`impl` in `MAKE_ENCODER`).
@@ -1108,6 +1110,7 @@ static RSA_FAMILY: Family = Family {
     private: Some(rsa_prv_k2d),
     public: Some(rsa_pub_k2d),
     domain: None,
+    to_text: super::key2text::rsa_to_text,
 };
 
 // DH.
@@ -1201,6 +1204,7 @@ static DH_FAMILY: Family = Family {
     private: None,
     public: None,
     domain: Some(dh_params_k2d),
+    to_text: super::key2text::dh_to_text,
 };
 
 // DSA.
@@ -1263,6 +1267,7 @@ static DSA_FAMILY: Family = Family {
     private: Some(dsa_prv_k2d),
     public: Some(dsa_pub_k2d),
     domain: Some(dsa_param_k2d),
+    to_text: super::key2text::dsa_to_text,
 };
 
 // EC (and SM2).
@@ -1355,6 +1360,7 @@ static EC_FAMILY: Family = Family {
     private: Some(ec_prv_k2d),
     public: None,
     domain: Some(ec_param_k2d),
+    to_text: super::key2text::ec_to_text,
 };
 
 // X25519, X448, Ed25519, and Ed448.
@@ -1416,6 +1422,7 @@ static ECX_FAMILY: Family = Family {
     private: None,
     public: None,
     domain: None,
+    to_text: super::key2text::ecx_to_text,
 };
 
 // ML-DSA and ML-KEM.
@@ -1513,6 +1520,7 @@ static ML_DSA_FAMILY: Family = Family {
     private: None,
     public: None,
     domain: None,
+    to_text: super::key2text::ml_dsa_to_text,
 };
 
 static ML_KEM_FAMILY: Family = Family {
@@ -1523,6 +1531,7 @@ static ML_KEM_FAMILY: Family = Family {
     private: None,
     public: None,
     domain: None,
+    to_text: super::key2text::ml_kem_to_text,
 };
 
 // SLH-DSA.
@@ -1575,6 +1584,7 @@ static SLH_DSA_FAMILY: Family = Family {
     private: None,
     public: None,
     domain: None,
+    to_text: super::key2text::slh_dsa_to_text,
 };
 
 // An EC key's public point as a blob (`encode_key2blob.c`).
@@ -1708,24 +1718,55 @@ static SM2_TO_BLOB: Dispatch<7> = Dispatch([
     END,
 ]);
 
-// The text encoders, placeholders until step 4.7c2 (`MAKE_TEXT_ENCODER`): their contexts and
-// keys are real, their encoding aborts.
+// The text encoders (`MAKE_TEXT_ENCODER` in `encode_key2text.c`).
 
-ffi_callback! {
-    /// A text encoder's `encode`, which comes with step 4.7c2.
-    ///
-    /// # Safety
-    /// No preconditions: it aborts.
-    pub(crate) unsafe extern "C" fn key2text_encode(_vctx: *mut c_void, _cout: *mut OSSL_CORE_BIO, _key: *const c_void, _key_abstract: *const OSSL_PARAM, _selection: c_int, _cb: OSSL_PASSPHRASE_CALLBACK, _cbarg: *mut c_void) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        crate::stub::unimplemented("the text encoders (a key's text, step 4.7c2)")
+/// `key2text_encode`: the key's text, through a BIO on the core BIO.
+///
+/// # Safety
+/// `cout` is a core BIO; `key` is NULL or a key `to_text` takes.
+unsafe fn key2text_encode(
+    cout: *mut OSSL_CORE_BIO,
+    key: *const c_void,
+    key_abstract: *const OSSL_PARAM,
+    selection: c_int,
+    to_text: super::key2text::ToText,
+) -> c_int {
+    if !key_abstract.is_null() {
+        err::raise(
+            ERR_LIB_PROV,
+            ERR_R_PASSED_INVALID_ARGUMENT,
+            "key2text_encode",
+        );
+        return 0;
     }
+    // SAFETY: the caller's core BIO.
+    let out = unsafe { bio_new_from_core_bio(cout) };
+    if out.is_null() {
+        return 0;
+    }
+    // SAFETY: the BIO made here; the caller's key.
+    let ret = unsafe { to_text(out, key, selection) };
+    // SAFETY: made above.
+    unsafe { BIO_free(out) };
+    ret
 }
 
-/// A text encoder's dispatch table, with its own `import_object`.
+/// A text encoder's dispatch table, with its own `import_object` and `encode`.
 macro_rules! text_encoder {
-    ($table:ident, $import:ident, $imp:ident) => {
+    ($table:ident, $import:ident, $encode:ident, $imp:ident) => {
+        ffi_callback! {
+            /// The text encoder's `encode`: the key's text (`type##_to_text`).
+            ///
+            /// # Safety
+            /// `cout` is a core BIO; `key` is NULL or a key of the encoder's type.
+            pub(crate) unsafe extern "C" fn $encode(_vctx: *mut c_void, cout: *mut OSSL_CORE_BIO, key: *const c_void, key_abstract: *const OSSL_PARAM, selection: c_int, _cb: OSSL_PASSPHRASE_CALLBACK, _cbarg: *mut c_void) -> c_int
+            where failure = 0, library = ERR_LIB_PROV
+            {
+                // SAFETY: the caller's guarantee; the type's function.
+                unsafe { key2text_encode(cout, key, key_abstract, selection, $imp.family.to_text) }
+            }
+        }
+
         ffi_callback! {
             /// The text encoder's `import_object` (with the provider's context).
             ///
@@ -1744,7 +1785,7 @@ macro_rules! text_encoder {
             entry!(OSSL_FUNC_ENCODER_FREECTX, key2blob_freectx, FreeCtxFn),
             entry!(OSSL_FUNC_ENCODER_IMPORT_OBJECT, $import, ImportObjectFn),
             entry!(OSSL_FUNC_ENCODER_FREE_OBJECT, free::$imp, FreeObjectFn),
-            entry!(OSSL_FUNC_ENCODER_ENCODE, key2text_encode, EncodeFn),
+            entry!(OSSL_FUNC_ENCODER_ENCODE, $encode, EncodeFn),
             END,
         ]);
     };
@@ -3378,105 +3419,168 @@ encoder!(EC_TO_X9_62_PEM, ec_to_x9_62_pem_newctx, EC, NoPub, Pem);
 
 // The text encoders, which come with step 4.7c2 (`MAKE_TEXT_ENCODER` in `encode_key2text.c`).
 
-text_encoder!(RSA_TO_TEXT, rsa_to_text_import_object, RSA);
-text_encoder!(RSAPSS_TO_TEXT, rsapss_to_text_import_object, RSAPSS);
-text_encoder!(DH_TO_TEXT, dh_to_text_import_object, DH);
-text_encoder!(DHX_TO_TEXT, dhx_to_text_import_object, DHX);
-text_encoder!(DSA_TO_TEXT, dsa_to_text_import_object, DSA);
-text_encoder!(EC_TO_TEXT, ec_to_text_import_object, EC);
-text_encoder!(ED25519_TO_TEXT, ed25519_to_text_import_object, ED25519);
-text_encoder!(ED448_TO_TEXT, ed448_to_text_import_object, ED448);
-text_encoder!(X25519_TO_TEXT, x25519_to_text_import_object, X25519);
-text_encoder!(X448_TO_TEXT, x448_to_text_import_object, X448);
-text_encoder!(SM2_TO_TEXT, sm2_to_text_import_object, SM2);
+text_encoder!(
+    RSA_TO_TEXT,
+    rsa_to_text_import_object,
+    rsa_to_text_encode,
+    RSA
+);
+text_encoder!(
+    RSAPSS_TO_TEXT,
+    rsapss_to_text_import_object,
+    rsapss_to_text_encode,
+    RSAPSS
+);
+text_encoder!(DH_TO_TEXT, dh_to_text_import_object, dh_to_text_encode, DH);
+text_encoder!(
+    DHX_TO_TEXT,
+    dhx_to_text_import_object,
+    dhx_to_text_encode,
+    DHX
+);
+text_encoder!(
+    DSA_TO_TEXT,
+    dsa_to_text_import_object,
+    dsa_to_text_encode,
+    DSA
+);
+text_encoder!(EC_TO_TEXT, ec_to_text_import_object, ec_to_text_encode, EC);
+text_encoder!(
+    ED25519_TO_TEXT,
+    ed25519_to_text_import_object,
+    ed25519_to_text_encode,
+    ED25519
+);
+text_encoder!(
+    ED448_TO_TEXT,
+    ed448_to_text_import_object,
+    ed448_to_text_encode,
+    ED448
+);
+text_encoder!(
+    X25519_TO_TEXT,
+    x25519_to_text_import_object,
+    x25519_to_text_encode,
+    X25519
+);
+text_encoder!(
+    X448_TO_TEXT,
+    x448_to_text_import_object,
+    x448_to_text_encode,
+    X448
+);
+text_encoder!(
+    SM2_TO_TEXT,
+    sm2_to_text_import_object,
+    sm2_to_text_encode,
+    SM2
+);
 text_encoder!(
     ML_KEM_512_TO_TEXT,
     ml_kem_512_to_text_import_object,
+    ml_kem_512_to_text_encode,
     ML_KEM_512
 );
 text_encoder!(
     ML_KEM_768_TO_TEXT,
     ml_kem_768_to_text_import_object,
+    ml_kem_768_to_text_encode,
     ML_KEM_768
 );
 text_encoder!(
     ML_KEM_1024_TO_TEXT,
     ml_kem_1024_to_text_import_object,
+    ml_kem_1024_to_text_encode,
     ML_KEM_1024
 );
 text_encoder!(
     ML_DSA_44_TO_TEXT,
     ml_dsa_44_to_text_import_object,
+    ml_dsa_44_to_text_encode,
     ML_DSA_44
 );
 text_encoder!(
     ML_DSA_65_TO_TEXT,
     ml_dsa_65_to_text_import_object,
+    ml_dsa_65_to_text_encode,
     ML_DSA_65
 );
 text_encoder!(
     ML_DSA_87_TO_TEXT,
     ml_dsa_87_to_text_import_object,
+    ml_dsa_87_to_text_encode,
     ML_DSA_87
 );
 text_encoder!(
     SLH_DSA_SHA2_128S_TO_TEXT,
     slh_dsa_sha2_128s_to_text_import_object,
+    slh_dsa_sha2_128s_to_text_encode,
     SLH_DSA_SHA2_128S
 );
 text_encoder!(
     SLH_DSA_SHA2_128F_TO_TEXT,
     slh_dsa_sha2_128f_to_text_import_object,
+    slh_dsa_sha2_128f_to_text_encode,
     SLH_DSA_SHA2_128F
 );
 text_encoder!(
     SLH_DSA_SHA2_192S_TO_TEXT,
     slh_dsa_sha2_192s_to_text_import_object,
+    slh_dsa_sha2_192s_to_text_encode,
     SLH_DSA_SHA2_192S
 );
 text_encoder!(
     SLH_DSA_SHA2_192F_TO_TEXT,
     slh_dsa_sha2_192f_to_text_import_object,
+    slh_dsa_sha2_192f_to_text_encode,
     SLH_DSA_SHA2_192F
 );
 text_encoder!(
     SLH_DSA_SHA2_256S_TO_TEXT,
     slh_dsa_sha2_256s_to_text_import_object,
+    slh_dsa_sha2_256s_to_text_encode,
     SLH_DSA_SHA2_256S
 );
 text_encoder!(
     SLH_DSA_SHA2_256F_TO_TEXT,
     slh_dsa_sha2_256f_to_text_import_object,
+    slh_dsa_sha2_256f_to_text_encode,
     SLH_DSA_SHA2_256F
 );
 text_encoder!(
     SLH_DSA_SHAKE_128S_TO_TEXT,
     slh_dsa_shake_128s_to_text_import_object,
+    slh_dsa_shake_128s_to_text_encode,
     SLH_DSA_SHAKE_128S
 );
 text_encoder!(
     SLH_DSA_SHAKE_128F_TO_TEXT,
     slh_dsa_shake_128f_to_text_import_object,
+    slh_dsa_shake_128f_to_text_encode,
     SLH_DSA_SHAKE_128F
 );
 text_encoder!(
     SLH_DSA_SHAKE_192S_TO_TEXT,
     slh_dsa_shake_192s_to_text_import_object,
+    slh_dsa_shake_192s_to_text_encode,
     SLH_DSA_SHAKE_192S
 );
 text_encoder!(
     SLH_DSA_SHAKE_192F_TO_TEXT,
     slh_dsa_shake_192f_to_text_import_object,
+    slh_dsa_shake_192f_to_text_encode,
     SLH_DSA_SHAKE_192F
 );
 text_encoder!(
     SLH_DSA_SHAKE_256S_TO_TEXT,
     slh_dsa_shake_256s_to_text_import_object,
+    slh_dsa_shake_256s_to_text_encode,
     SLH_DSA_SHAKE_256S
 );
 text_encoder!(
     SLH_DSA_SHAKE_256F_TO_TEXT,
     slh_dsa_shake_256f_to_text_import_object,
+    slh_dsa_shake_256f_to_text_encode,
     SLH_DSA_SHAKE_256F
 );
 
