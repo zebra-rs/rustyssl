@@ -19,6 +19,7 @@ mod test_apps;
 mod test_c;
 mod test_differential;
 mod test_openssl_suite;
+mod test_timing;
 mod test_wycheproof;
 mod usage_scan;
 mod util;
@@ -41,6 +42,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("test-differential", "compare results against the reference OpenSSL"),
     ("test-openssl-suite", "run the upstream OpenSSL test suite against our libraries"),
     ("test-wycheproof", "run Wycheproof's test vectors on the reference and rustyssl"),
+    ("test-timing", "dudect's constant-time checks (and Marvin's RSA split) on both libraries"),
     ("test-consumers", "run consumer test suites (curl, nginx, openssh, ...) on our libraries"),
     ("regen-golden", "regenerate golden files from the reference OpenSSL"),
     ("bench", "benchmark against the reference OpenSSL"),
@@ -65,6 +67,7 @@ fn main() -> ExitCode {
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
         Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),
         Some("test-wycheproof") => report("test-wycheproof", test_wycheproof::run(&rest)),
+        Some("test-timing") => report("test-timing", test_timing::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),
         Some("vendor") => report("vendor", vendor::run(&rest)),
         Some(name) if COMMANDS.iter().any(|(known, _)| *known == name) => {

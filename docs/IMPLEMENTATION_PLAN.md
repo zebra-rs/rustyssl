@@ -4432,6 +4432,11 @@ identical to the reference. Upstream `bntest`, `ectest`, `rsa_test`, and the `ev
 files pass.
 
 Exit checks:
+- [x] **Key encode, decode, and print identical to the reference**: verified by the C
+  conformance tests of 4.7 (`encoder`, `decoder`, `key2text`, `pem_pkey`, `pem_write_pkey`,
+  `pkcs8_crypt`, `pvkfmt`, `d2i_pkey`, `x509_pubkey`, `evp_pkey_print`, ...), the differential
+  probe's `enckey`, `pemwrite`, `decode`, `d2ikey`, `pemkey`, and `msblob` sessions, and
+  upstream `evp_test`'s key files.
 - [x] **The `evp_test` pkey files**: all 47 `evppkey_*.txt` files now run in
   `test-openssl-suite`, which covers every data file but `evpciph_aes_stitched.txt` (Phase 7).
   That's 109 files, each with the reference's counts. Running them found two bugs:
@@ -4469,7 +4474,30 @@ Exit checks:
     the generator is the standard one.
 
   Both now have checks in `tests/c/bn_mod.c` and `ec_group_point.c`.
-- [ ] Marvin (RSA PKCS#1 v1.5 decryption timing) and dudect on the constant-time paths.
+- [x] **dudect and Marvin's split** (`cargo xtask test-timing`, `tests/timing/dudect.c`): ten
+  targets on both libraries. AES-GCM (the key), GCM's tag check and `CRYPTO_memcmp` (a tag
+  wrong in its last octet against random ones), Poly1305 (the key), X25519 (the private key),
+  ECDSA P-256 signing (the key), RSA-2048 raw decryption (the ciphertext), RSA PKCS#1 v1.5
+  decryption with implicit rejection (Marvin's classes: a valid padding against random
+  invalid ones), `BN_mod_exp_mont_consttime` (the exponent), and ML-KEM-768 decapsulation
+  (valid against random ciphertexts, so implicit rejection).
+
+  Each target runs Welch's t-test over dudect's percentile crops and a second-order test. A
+  target passes under |t| = 10 ("definitely not constant time"), with the reference's value
+  printed beside it. All ten pass. Most come near the reference's values; Poly1305 stays
+  around 4 to 8 against the reference's 1 to 3, without growing with the number of
+  measurements (6.5 at 1.6 million), so it reads as noise rather than a leak.
+
+  The run found a real leak: `CRYPTO_memcmp` had passed each octet's result through
+  `subtle`'s `black_box`, which stores it to the stack, and Apple cores time stores of zeros
+  differently. It reached |t| ~ 100 between "differs in the last octet" and random input. It
+  now reads its inputs volatile and ORs their XORs in a register, as OpenSSL's C does (|t|
+  1 to 6 across runs).
+
+  The other comparisons (the AEADs' tags, key wrap's ICV) already OR in registers. On a
+  shared CI machine the timings are too noisy for a per-push gate, so this runs on demand
+  (TEST_PLAN.md puts it nightly). TLS's CBC padding and MAC check comes with the record layer
+  (Phase 7), and Marvin over TLS RSA key exchange with libssl.
 
 ## Phase 5: X.509 and certificate verification
 

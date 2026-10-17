@@ -22,7 +22,6 @@ use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering, compiler_fence};
 use rustyssl_abi::{
     CRYPTO_free_fn, CRYPTO_malloc_fn, CRYPTO_realloc_fn, ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE,
 };
-use subtle::ConstantTimeEq;
 
 use crate::err;
 use crate::ffi::ffi_export;
@@ -565,11 +564,22 @@ ffi_export! {
         if in_a.is_null() || in_b.is_null() {
             return 1;
         }
-        // SAFETY: `in_a` is non-null and valid for `len` bytes of reads (caller's guarantee).
-        let a = unsafe { core::slice::from_raw_parts(in_a.cast::<u8>(), len) };
-        // SAFETY: as for `in_a`.
-        let b = unsafe { core::slice::from_raw_parts(in_b.cast::<u8>(), len) };
-        c_int::from((!a.ct_eq(b)).unwrap_u8())
+        // OpenSSL's way: the OR of the octets' XORs, each octet read volatile (so the compiler
+        // neither skips nor batches reads, nor exits early), the OR kept in a register, then 1
+        // if any bit is set, without a branch. (Passing each XOR through `black_box` instead
+        // stores it to the stack, and stores of zeros time differently on some CPUs.)
+        let (pa, pb) = (in_a.cast::<u8>(), in_b.cast::<u8>());
+        let mut x = 0u8;
+        for i in 0..len {
+            let (ai, bi) = (pa.wrapping_add(i), pb.wrapping_add(i));
+            // SAFETY: `i < len`, and `in_a` is valid for `len` bytes of reads (caller's guarantee).
+            let p = unsafe { ai.read_volatile() };
+            // SAFETY: as for `in_a`.
+            let q = unsafe { bi.read_volatile() };
+            x |= p ^ q;
+        }
+        let differs = u32::from(x).wrapping_neg() >> 31;
+        c_int::try_from(differs).unwrap_or(1)
     }
 }
 
