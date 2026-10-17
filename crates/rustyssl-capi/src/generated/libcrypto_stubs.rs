@@ -2698,22 +2698,6 @@ pub extern "C" fn EVP_SealInit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn NAME_CONSTRAINTS_check(
-    _: *mut X509,
-    _: *mut NAME_CONSTRAINTS,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NAME_CONSTRAINTS_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn NAME_CONSTRAINTS_check_CN(
-    _: *mut X509,
-    _: *mut NAME_CONSTRAINTS,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("NAME_CONSTRAINTS_check_CN")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OCSP_BASICRESP_add1_ext_i2d(
     _: *mut OCSP_BASICRESP,
     _: core::ffi::c_int,
@@ -6119,21 +6103,6 @@ pub extern "C" fn OSSL_STORE_vctrl(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_parse_url(
-    _: *const core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut core::ffi::c_int,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_parse_url")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PBMAC1_get1_pbkdf2_param(_: *const X509_ALGOR) -> *mut PBKDF2PARAM {
     crate::stub::unimplemented("PBMAC1_get1_pbkdf2_param")
 }
@@ -9219,29 +9188,12 @@ pub extern "C" fn X509_STORE_CTX_print_verify_cb(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_STORE_CTX_verify(_: *mut X509_STORE_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_STORE_CTX_verify")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_aux_print(
     _: *mut BIO,
     _: *mut X509,
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509_aux_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_build_chain(
-    _: *mut X509,
-    _: *mut stack_st_X509,
-    _: *mut X509_STORE,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut stack_st_X509 {
-    crate::stub::unimplemented("X509_build_chain")
 }
 
 #[unsafe(no_mangle)]
@@ -9371,11 +9323,6 @@ pub extern "C" fn X509_signature_print(
     _: *const ASN1_STRING,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509_signature_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_verify_cert(_: *mut X509_STORE_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_verify_cert")
 }
 
 #[unsafe(no_mangle)]

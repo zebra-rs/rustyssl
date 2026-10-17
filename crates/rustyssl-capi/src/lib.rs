@@ -54,6 +54,7 @@ mod generated;
 mod handle;
 mod hmac;
 mod hpke;
+mod http_lib;
 mod init;
 mod lhash;
 mod libctx;

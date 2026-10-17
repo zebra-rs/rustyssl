@@ -7917,6 +7917,10 @@ const _: unsafe extern "C" fn(*mut core::ffi::c_uchar, *mut MDC2_CTX) -> core::f
 const _: unsafe extern "C" fn(*mut MDC2_CTX) -> core::ffi::c_int = crate::lowlevel::hash::MDC2_Init;
 const _: unsafe extern "C" fn(*mut MDC2_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
     crate::lowlevel::hash::MDC2_Update;
+const _: unsafe extern "C" fn(*mut X509, *mut NAME_CONSTRAINTS) -> core::ffi::c_int =
+    crate::x509v3::ncons::NAME_CONSTRAINTS_check;
+const _: unsafe extern "C" fn(*mut X509, *mut NAME_CONSTRAINTS) -> core::ffi::c_int =
+    crate::x509v3::ncons::NAME_CONSTRAINTS_check_CN;
 const _: unsafe extern "C" fn(*mut NAME_CONSTRAINTS) = crate::x509v3::policy::NAME_CONSTRAINTS_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::policy::NAME_CONSTRAINTS_it;
 const _: unsafe extern "C" fn() -> *mut NAME_CONSTRAINTS =
@@ -9304,6 +9308,17 @@ const _: unsafe extern "C" fn() -> *mut OSSL_USER_NOTICE_SYNTAX =
     crate::x509v3::acext::OSSL_USER_NOTICE_SYNTAX_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::http_lib::OSSL_parse_url;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
     crate::libctx::OSSL_set_max_threads;
 const _: unsafe extern "C" fn(u64) = crate::sleep::OSSL_sleep;
@@ -12918,6 +12933,8 @@ const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_verify_fn) =
     crate::x509::ctx::X509_STORE_CTX_set_verify;
 const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_verify_cb) =
     crate::x509::ctx::X509_STORE_CTX_set_verify_cb;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::verify::X509_STORE_CTX_verify;
 const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509) -> core::ffi::c_int =
     crate::x509::store::X509_STORE_add_cert;
 const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509_CRL) -> core::ffi::c_int =
@@ -13214,6 +13231,14 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::x509::trust::X509_alias_set1;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut stack_st_X509 = crate::x509::verify::X509_build_chain;
 const _: unsafe extern "C" fn(*const X509, *const EVP_PKEY) -> core::ffi::c_int =
     crate::x509::cert::X509_certificate_type;
 const _: unsafe extern "C" fn(
@@ -13513,6 +13538,8 @@ const _: unsafe extern "C" fn(*const X509) -> core::ffi::c_int = crate::x509::tr
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_int = crate::x509::cert::X509_up_ref;
 const _: unsafe extern "C" fn(*mut X509, *mut EVP_PKEY) -> core::ffi::c_int =
     crate::x509::cert::X509_verify;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::verify::X509_verify_cert;
 const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
     crate::x509::ctx::X509_verify_cert_error_string;
 const _: unsafe extern "C" fn(
