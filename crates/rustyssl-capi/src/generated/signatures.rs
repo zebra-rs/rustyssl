@@ -11015,6 +11015,21 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::asn1::hex::a2i_ASN1_STRING;
 const _: unsafe extern "C" fn(*mut BIO, *mut *mut BUF_MEM) -> core::ffi::c_int =
     crate::asn1::tpl::io::asn1_d2i_read_bio;
+const _: unsafe extern "C" fn(*mut BIO, pem_password_cb, *mut core::ffi::c_void) -> *mut EVP_PKEY =
+    crate::pvkfmt::b2i_PVK_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::pvkfmt::b2i_PVK_bio_ex;
+const _: unsafe extern "C" fn(*mut *const core::ffi::c_uchar, core::ffi::c_long) -> *mut EVP_PKEY =
+    crate::pvkfmt::b2i_PrivateKey;
+const _: unsafe extern "C" fn(*mut BIO) -> *mut EVP_PKEY = crate::pvkfmt::b2i_PrivateKey_bio;
+const _: unsafe extern "C" fn(*mut *const core::ffi::c_uchar, core::ffi::c_long) -> *mut EVP_PKEY =
+    crate::pvkfmt::b2i_PublicKey;
+const _: unsafe extern "C" fn(*mut BIO) -> *mut EVP_PKEY = crate::pvkfmt::b2i_PublicKey_bio;
 const _: unsafe extern "C" fn(
     *mut *mut ASN1_BIT_STRING,
     *mut *const core::ffi::c_uchar,
@@ -11422,6 +11437,26 @@ const _: unsafe extern "C" fn(*mut BIO, *const ASN1_OBJECT) -> core::ffi::c_int 
     crate::objects::i2a_ASN1_OBJECT;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_STRING, core::ffi::c_int) -> core::ffi::c_int =
     crate::asn1::hex::i2a_ASN1_STRING;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::pvkfmt::i2b_PVK_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pvkfmt::i2b_PVK_bio_ex;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::pvkfmt::i2b_PrivateKey_bio;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::pvkfmt::i2b_PublicKey_bio;
 const _: unsafe extern "C" fn(
     *const ASN1_BIT_STRING,
     *mut *mut core::ffi::c_uchar,

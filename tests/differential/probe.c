@@ -410,6 +410,10 @@
  *                              the PEM writers (PEM_write_bio_PrivateKey, _PrivateKey_traditional,
  *                              _PKCS8PrivateKey, i2d_PKCS8PrivateKey_bio, _PUBKEY, _Parameters):
  *                              each one's result, length, and a hash of what it wrote
+ *   msblob <hex>               the octets as a Microsoft key blob and PVK: b2i_PrivateKey,
+ *                              b2i_PublicKey, their _bio forms, and b2i_PVK_bio (passphrase
+ *                              "pw"), each key's type and size and its blob or PVK written
+ *                              again; then the MSBLOB and PVK decoders' results
  *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
  *                              octets: the result, the octets consumed, the key's size, and
  *                              its SubjectPublicKeyInfo encoded again
@@ -1150,6 +1154,17 @@ static int obj_command(const char *command, const char *line)
         print_obj_error();
     }
     return 1;
+}
+
+/* The passphrase callback of the msblob command: "pw". */
+static int msblob_pw(char *buf, int size, int rwflag, void *u)
+{
+    (void)rwflag;
+    (void)u;
+    if (size < 2)
+        return -1;
+    memcpy(buf, "pw", 2);
+    return 2;
 }
 
 static void print_asn_errors(void)
@@ -6587,6 +6602,77 @@ static int x509_command(const char *command, const char *line)
         print_asn_errors();
         EVP_PKEY_free(k);
         OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "msblob") == 0) {
+        char hexs[1000] = "";
+        long n = 0;
+        unsigned char *der;
+        int i;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %999s", hexs);
+        der = OPENSSL_hexstr2buf(hexs, &n);
+        if (der == NULL) {
+            printf(" bad hex\n");
+            ERR_clear_error();
+            return 1;
+        }
+        for (i = 0; i < 5; i++) {
+            static const char *names[] = { "priv", "pub", "priv-bio", "pub-bio", "pvk" };
+            const unsigned char *q = der;
+            BIO *b = BIO_new_mem_buf(der, (int)n), *w = BIO_new(BIO_s_mem());
+            EVP_PKEY *k;
+            char *data = NULL;
+            long wl, j;
+            int r;
+
+            if (i == 0)
+                k = b2i_PrivateKey(&q, n);
+            else if (i == 1)
+                k = b2i_PublicKey(&q, n);
+            else if (i == 2)
+                k = b2i_PrivateKey_bio(b);
+            else if (i == 3)
+                k = b2i_PublicKey_bio(b);
+            else
+                k = b2i_PVK_bio(b, msblob_pw, NULL);
+            printf(" %s", names[i]);
+            if (k == NULL) {
+                printf(" none");
+            } else {
+                printf(" %s %d left %d", EVP_PKEY_get0_type_name(k), EVP_PKEY_get_bits(k),
+                       (int)BIO_pending(b));
+                r = i == 4 ? i2b_PVK_bio(w, k, 0, NULL, NULL)
+                    : (i & 1) != 0 ? i2b_PublicKey_bio(w, k) : i2b_PrivateKey_bio(w, k);
+                wl = BIO_get_mem_data(w, &data);
+                printf(" wrote %d ", r);
+                for (j = 0; j < wl; j++)
+                    printf("%02x", (unsigned char)data[j]);
+            }
+            print_asn_errors();
+            EVP_PKEY_free(k);
+            BIO_free(b);
+            BIO_free(w);
+        }
+        for (i = 0; i < 2; i++) {
+            EVP_PKEY *k = NULL;
+            OSSL_DECODER_CTX *dctx = OSSL_DECODER_CTX_new_for_pkey(&k, i == 0 ? "MSBLOB" : "PVK",
+                                                                   NULL, NULL, 0, NULL, NULL);
+            const unsigned char *q = der;
+            size_t left = (size_t)n;
+
+            OSSL_DECODER_CTX_set_passphrase(dctx, (const unsigned char *)"pw", 2);
+            printf(" decoder %s %d left %zu", i == 0 ? "MSBLOB" : "PVK",
+                   OSSL_DECODER_from_data(dctx, &q, &left), left);
+            if (k != NULL)
+                printf(" %s %d", EVP_PKEY_get0_type_name(k), EVP_PKEY_get_bits(k));
+            ERR_clear_error();
+            printf("\n");
+            EVP_PKEY_free(k);
+            OSSL_DECODER_CTX_free(dctx);
+        }
+        OPENSSL_free(der);
         return 1;
     }
     if (strcmp(command, "pbe") == 0) {

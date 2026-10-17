@@ -1,6 +1,6 @@
 //! The default and base providers' decoders (`decoders.inc`; `decode_pem2der.c`,
-//! `decode_spki2typespki.c`, `decode_epki2pki.c`): the key decoders (`der2key`, with
-//! placeholders for those still to come in `pending_keys`) and the structural ones a key's
+//! `decode_spki2typespki.c`, `decode_epki2pki.c`): the key decoders (`der2key`, and
+//! `blob2key` for MSBLOB and PVK) and the structural ones a key's
 //! decoding goes through — PEM to DER (`pem2der`, which also decrypts a traditional PEM's
 //! DEK-Info and names what each PEM type holds), SubjectPublicKeyInfo to its key type's
 //! (`spki2typespki`), and EncryptedPrivateKeyInfo to PrivateKeyInfo (`epki2pki`, decrypting
@@ -30,7 +30,7 @@ use rustyssl_abi::{
 
 use super::builtin::libctx_of;
 use super::tables::{Algorithms, Dispatch, END, PARAM_END, Params, defn, entry};
-use super::{der2key, pending_keys};
+use super::{blob2key, der2key};
 use crate::decoder::ctx::bio_new_from_core_bio;
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::ffi_callback;
@@ -860,8 +860,7 @@ const fn decoder<const N: usize>(
     }
 }
 
-/// The default provider's decoders, in `decoders.inc`'s order (the structural ones come last);
-/// the MSBLOB and PVK ones are placeholders (`pending_keys`).
+/// The default provider's decoders, in `decoders.inc`'s order (the structural ones come last).
 static DEFAULT_DECODERS: Algorithms<77> = Algorithms([
     decoder(
         c"DH",
@@ -926,12 +925,12 @@ static DEFAULT_DECODERS: Algorithms<77> = Algorithms([
     decoder(
         c"DSA",
         c"provider=default,fips=yes,input=msblob",
-        &pending_keys::MSBLOB_DSA,
+        &blob2key::MSBLOB_DSA,
     ),
     decoder(
         c"DSA",
         c"provider=default,fips=yes,input=pvk",
-        &pending_keys::PVK_DSA,
+        &blob2key::PVK_DSA,
     ),
     decoder(
         c"EC",
@@ -1191,12 +1190,12 @@ static DEFAULT_DECODERS: Algorithms<77> = Algorithms([
     decoder(
         c"RSA",
         c"provider=default,fips=yes,input=msblob",
-        &pending_keys::MSBLOB_RSA,
+        &blob2key::MSBLOB_RSA,
     ),
     decoder(
         c"RSA",
         c"provider=default,fips=yes,input=pvk",
-        &pending_keys::PVK_RSA,
+        &blob2key::PVK_RSA,
     ),
     decoder(
         c"ML-DSA-44",
@@ -1307,12 +1306,12 @@ static BASE_DECODERS: Algorithms<77> = Algorithms([
     decoder(
         c"DSA",
         c"provider=base,fips=yes,input=msblob",
-        &pending_keys::MSBLOB_DSA,
+        &blob2key::MSBLOB_DSA,
     ),
     decoder(
         c"DSA",
         c"provider=base,fips=yes,input=pvk",
-        &pending_keys::PVK_DSA,
+        &blob2key::PVK_DSA,
     ),
     decoder(
         c"EC",
@@ -1572,12 +1571,12 @@ static BASE_DECODERS: Algorithms<77> = Algorithms([
     decoder(
         c"RSA",
         c"provider=base,fips=yes,input=msblob",
-        &pending_keys::MSBLOB_RSA,
+        &blob2key::MSBLOB_RSA,
     ),
     decoder(
         c"RSA",
         c"provider=base,fips=yes,input=pvk",
-        &pending_keys::PVK_RSA,
+        &blob2key::PVK_RSA,
     ),
     decoder(
         c"ML-DSA-44",

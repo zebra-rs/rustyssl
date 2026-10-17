@@ -69,6 +69,7 @@ mod pkcs12;
 mod pkcs8_crypt;
 mod property;
 mod provider;
+mod pvkfmt;
 mod rand;
 mod rand_file;
 mod rand_lib;
