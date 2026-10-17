@@ -39,6 +39,32 @@ pub(crate) const fn aux(cb: Callback) -> Aux {
     })
 }
 
+/// An aux table with `flags`, the reference count at `ref_offset` and its lock at `ref_lock`
+/// (`ASN1_AFLG_REFCOUNT`), callback `cb`, and the kept encoding at `enc_offset`
+/// (`ASN1_AFLG_ENCODING`), as `ASN1_SEQUENCE_ref` and `ASN1_SEQUENCE_enc` make them.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "offsets within a structure"
+)]
+pub(crate) const fn aux_ex(
+    flags: c_int,
+    ref_offset: usize,
+    ref_lock: usize,
+    cb: Option<Callback>,
+    enc_offset: usize,
+) -> Aux {
+    Aux(ASN1_AUX {
+        app_data: ptr::null_mut(),
+        flags,
+        ref_offset: ref_offset as c_int,
+        ref_lock: ref_lock as c_int,
+        asn1_cb: cb,
+        enc_offset: enc_offset as c_int,
+        asn1_const_cb: None,
+    })
+}
+
 /// A count of templates, as an item holds it.
 #[expect(clippy::cast_possible_wrap, reason = "a handful of templates")]
 const fn count(n: usize) -> c_long {

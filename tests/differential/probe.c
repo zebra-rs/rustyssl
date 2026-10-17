@@ -123,7 +123,9 @@
  *                              7 TIME, 8 DIRECTORYSTRING, 9 INT64, 10 UINT32, 11 the probe's
  *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING, 14 RSAPublicKey,
  *                              15 RSAPrivateKey, 16 RSA_PSS_PARAMS, 17 RSA_OAEP_PARAMS,
- *                              18 BIGNUM, 19 X509_EXTENSION, 20 X509_EXTENSIONS): how much was read
+ *                              18 BIGNUM, 19 X509_EXTENSION, 20 X509_EXTENSIONS, 21 X509,
+ *                              22 X509_CINF, 23 X509_CERT_AUX, 24 X509_VAL, 25 X509_REQ,
+ *                              26 X509_REQ_INFO): how much was read
  *                              and the re-encoding and ASN1_item_print listing, or the errors with
  *                              their data
  *   asnbio <hex>               ASN1_item_d2i_bio (as ANY) from a memory BIO over the octets until
@@ -536,11 +538,12 @@ static void print_state(const char *command, size_t result)
     printf("%s %zu length=%zu max=%zu\n", command, result, buffer->length, buffer->max);
 }
 
-static int parse_hex(const char *hex, unsigned char *out, size_t *len)
+/* Parses the hex of at most `max` octets into `out`. */
+static int parse_hex_max(const char *hex, unsigned char *out, size_t *len, size_t max)
 {
     size_t n = strlen(hex);
 
-    if (n % 2 != 0 || n / 2 > 256)
+    if (n % 2 != 0 || n / 2 > max)
         return 0;
     for (size_t i = 0; i < n / 2; i++) {
         unsigned int byte;
@@ -551,6 +554,11 @@ static int parse_hex(const char *hex, unsigned char *out, size_t *len)
     }
     *len = n / 2;
     return 1;
+}
+
+static int parse_hex(const char *hex, unsigned char *out, size_t *len)
+{
+    return parse_hex_max(hex, out, len, 256);
 }
 
 static void print_hex(const char *label, const unsigned char *data, size_t len)
@@ -1508,6 +1516,12 @@ static const ASN1_ITEM *probe_item(int n)
     case 18: return ASN1_ITEM_rptr(BIGNUM);
     case 19: return ASN1_ITEM_rptr(X509_EXTENSION);
     case 20: return ASN1_ITEM_rptr(X509_EXTENSIONS);
+    case 21: return ASN1_ITEM_rptr(X509);
+    case 22: return ASN1_ITEM_rptr(X509_CINF);
+    case 23: return ASN1_ITEM_rptr(X509_CERT_AUX);
+    case 24: return ASN1_ITEM_rptr(X509_VAL);
+    case 25: return ASN1_ITEM_rptr(X509_REQ);
+    case 26: return ASN1_ITEM_rptr(X509_REQ_INFO);
     default: return ASN1_ITEM_rptr(ASN1_UTF8STRING);
     }
 }
@@ -1754,8 +1768,8 @@ static int template_command(const char *command, const char *line)
         return 1;
     }
     if (strcmp(command, "asnd2i") == 0) {
-        char hex[700] = "-";
-        unsigned char data[300], *der = NULL;
+        char hex[2400] = "-";
+        unsigned char data[1200], *der = NULL;
         const unsigned char *q = data;
         size_t len = 0;
         int n = 0, i;
@@ -1765,8 +1779,8 @@ static int template_command(const char *command, const char *line)
         const char *edata;
         int eflags;
 
-        sscanf(line, "%*s %d %699s", &n, hex);
-        if (strcmp(hex, "-") != 0 && !parse_hex(hex, data, &len)) {
+        sscanf(line, "%*s %d %2399s", &n, hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex_max(hex, data, &len, sizeof(data))) {
             printf("asnd2i bad hex\n");
             return 1;
         }
@@ -10828,7 +10842,7 @@ int main(void)
 {
     for (int i = 0; i < 64; i++)
         pool[i] = i * 7 % 10;
-    char line[1024], command[32], argument[1000];
+    char line[2600], command[32], argument[1000];
 
     while (fgets(line, sizeof(line), stdin) != NULL) {
         line[strcspn(line, "\n")] = '\0';

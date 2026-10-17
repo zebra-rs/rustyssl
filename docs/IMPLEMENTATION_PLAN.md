@@ -4557,12 +4557,62 @@ Exit checks:
     - Tests: `tests/c/asn1_item_sign.c` covers RSA (PKCS #1 and PSS, provided and legacy
       keys, each salt-length setting), RSA-PSS keys, EC, Ed25519, Ed448, SM2 with IDs, the
       failure cases, and the deprecated forms.
-  - [ ] **5.1c2 Certificates**: `X509` (with its cached SHA-1 hash, flags, and ex_data),
-    d2i/i2d/PEM, the getters and setters, sign/verify/digest, and the `cmp` family.
-  - [ ] **5.1d Requests**: `X509_REQ`.
-  - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`.
+  - [x] **5.1c2 Certificates** (`x509/cert.rs`, from `x_x509.c`, `x_val.c`, `x_x509a.c`,
+    `x509_set.c`, `x509_cmp.c`, `x509_ext.c`, `x_all.c`, `x509_def.c`, and the time
+    functions of `x509_vfy.c`):
+    - The items `X509`, `X509_CINF`, `X509_VAL`, and `X509_CERT_AUX` over OpenSSL's layouts.
+      `X509` is a reference-counted SEQUENCE with OpenSSL's callback: ex_data, auxiliary data,
+      a distinguishing ID, and the library context, carried to a copy and given to the decoder.
+      Its TBSCertificate keeps the DER it was decoded from (`ASN1_SEQUENCE_enc`), so a decoded
+      certificate re-encodes byte for byte until a setter marks it changed. A template's aux
+      table can now carry a reference count and a kept encoding (`statics::aux_ex`).
+    - `d2i`/`i2d` and their AUX (trusted), BIO, `FILE`, and PEM forms, plus `i2d_re_X509_tbs`
+      and `X509_dup`/`X509_new_ex`/`X509_up_ref`.
+    - The setters and getters, and the extension-list functions (`X509_get_ext*`,
+      `X509_delete_ext`, `X509_add_ext`).
+    - `X509_sign`/`X509_sign_ctx` (version 3 with extensions), `X509_verify` (it refuses
+      AlgorithmIdentifiers that differ), `X509_digest`, `X509_pubkey_digest`, and
+      `X509_digest_sig` (with RSA-PSS's digest and EdDSA's fallbacks).
+    - The issuer-and-serial and name comparisons and hashes, the stack lookups,
+      `X509_check_private_key`, `X509_chain_check_suiteb`, `X509_chain_up_ref`,
+      `OSSL_STACK_OF_X509_free`, and `X509_get_pubkey_parameters`.
+    - `X509_cmp_time`, `X509_cmp_current_time`, `X509_gmtime_adj`, `X509_time_adj(_ex)`, and
+      the default directories and environment variables, under `OPENSSLDIR`.
+    - What needs the extension cache (`ossl_x509v3_cache_extensions`) waits for 5.2's
+      extension types: `X509_cmp`, `X509_check_purpose`/`_ca`/`_issued`/`_akid`,
+      `X509_self_signed`, the extension, key-usage, and proxy flags and path lengths, the key
+      identifiers, `X509_get_signature_info` with `X509_SIG_INFO_get`/`_set` and the
+      methods' `siginf_set`, and `X509_add_cert(s)`. So does `X509_get_ext_d2i`.
+      `X509_cmp_timeframe` waits for 5.4's verify parameters.
+    - NULL certificates get NULL or 0 where OpenSSL reads through them (docs/DEVIATIONS.md).
+    - Tests:
+      - `tests/c/x509_cert.c`: EC, RSA-PSS, Ed25519, leaf, and trusted certificates, their
+        fields, encodings, fingerprints, hashes, and comparisons; certificates built and signed
+        deterministically; the PEM, BIO, and `FILE` forms; times; and Suite B.
+      - The probe's `asnd2i` items 21 to 24, with the corpus `asnd2i_cert.txt` and random
+        mutations of real certificates (3,000 sessions pass).
+      - `fuzz/fuzz_targets/x509_cert.rs`.
+  - [x] **5.1d Requests** (`x509/req.rs`, from `x_req.c`, `x509_req.c`, `x509rset.c`,
+    `x509_r2x.c`, and the request parts of `x_all.c`):
+    - `X509_REQ` and `X509_REQ_INFO` over OpenSSL's layouts: reference counts, the kept
+      encoding, an empty attribute set when new, and a copy with its own key.
+    - The getters and setters (version 1 only), the attribute functions, and the requested
+      extensions. Those are read from the first attribute in the extension-NID list
+      (`X509_REQ_set_extension_nids` can replace it), and adding merges into an existing one.
+    - Sign and verify (`X509_R_UNSUPPORTED_VERSION` for other versions), the digest, and the
+      BIO, `FILE`, and PEM forms (`_NEW` writes the old name).
+    - `X509_to_X509_REQ` and `X509_REQ_to_X509` (self-issued, signed with MD5).
+    - `X509_REQ_get1_email` waits for 5.2's GENERAL_NAMEs, and the printers for 5.6.
+    - NULL requests get NULL, 0, or -1 (docs/DEVIATIONS.md).
+    - Tests: `tests/c/x509_req.c`, and the probe's `asnd2i` items 25 and 26 with the corpus
+      `asnd2i_req.txt` and random mutations.
+  - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`. Done after 5.2: decoding a CRL caches
+    its extensions (the IDP, AKID, CRL and delta numbers, and each entry's reason and
+    certificate issuer), which are 5.2's types.
   - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT`.
 - [ ] **5.2 X509v3 extensions:**
+  - the certificate's extension cache (`ossl_x509v3_cache_extensions`: the SHA-1 hash, the
+    flags, and the decoded extensions) and what 5.1c2 left for it (listed there)
   - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for
     application-defined methods)
   - every built-in extension: BC, KU, EKU, SKI, AKI, SAN, IAN (`GENERAL_NAME`; the
