@@ -7465,6 +7465,7 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const EVP_CIPHER =
     crate::evp::legacy_cipher::EVP_get_cipherbyname;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const EVP_MD =
     crate::evp::legacy_md::EVP_get_digestbyname;
+const _: unsafe extern "C" fn() -> *mut core::ffi::c_char = crate::ui::ui_lib::EVP_get_pw_prompt;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_cbc;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_cfb64;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_idea_ecb;
@@ -7483,6 +7484,19 @@ const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4_40;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_rc4_hmac_md5;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::EVP_read_pw_string;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::EVP_read_pw_string_min;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_ripemd160;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_cbc;
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_cfb128;
@@ -7490,6 +7504,7 @@ const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher
 const _: unsafe extern "C" fn() -> *const EVP_CIPHER = crate::evp::legacy_cipher::EVP_seed_ofb;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::property::EVP_set_default_properties;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) = crate::ui::ui_lib::EVP_set_pw_prompt;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha1;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha224;
 const _: unsafe extern "C" fn() -> *const EVP_MD = crate::evp::legacy_md::EVP_sha256;
@@ -10194,9 +10209,129 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn() -> *mut UI_METHOD = crate::ui::UI_OpenSSL;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_UTIL_read_pw;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_UTIL_read_pw_string;
+const _: unsafe extern "C" fn(pem_password_cb, core::ffi::c_int) -> *mut UI_METHOD =
+    crate::ui::ui_lib::UI_UTIL_wrap_read_pem_callback;
+const _: unsafe extern "C" fn(*mut UI, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_add_error_string;
+const _: unsafe extern "C" fn(*mut UI, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_add_info_string;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_add_input_boolean;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_add_input_string;
+const _: unsafe extern "C" fn(*mut UI, *mut core::ffi::c_void) -> *mut core::ffi::c_void =
+    crate::ui::ui_lib::UI_add_user_data;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_add_verify_string;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::ui::ui_lib::UI_construct_prompt;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut UI_METHOD =
     crate::ui::UI_create_method;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+    ::core::option::Option<unsafe extern "C" fn()>,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_ctrl;
 const _: unsafe extern "C" fn(*mut UI_METHOD) = crate::ui::UI_destroy_method;
+const _: unsafe extern "C" fn(*mut UI, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_dup_error_string;
+const _: unsafe extern "C" fn(*mut UI, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_dup_info_string;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_dup_input_boolean;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_dup_input_string;
+const _: unsafe extern "C" fn(*mut UI, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_dup_user_data;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_dup_verify_string;
+const _: unsafe extern "C" fn(*mut UI) = crate::ui::ui_lib::UI_free;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> *const core::ffi::c_char =
+    crate::ui::ui_lib::UI_get0_action_string;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> *const core::ffi::c_char =
+    crate::ui::ui_lib::UI_get0_output_string;
+const _: unsafe extern "C" fn(*mut UI, core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ui::ui_lib::UI_get0_result;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> *const core::ffi::c_char =
+    crate::ui::ui_lib::UI_get0_result_string;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> *const core::ffi::c_char =
+    crate::ui::ui_lib::UI_get0_test_string;
+const _: unsafe extern "C" fn(*mut UI) -> *mut core::ffi::c_void =
+    crate::ui::ui_lib::UI_get0_user_data;
+const _: unsafe extern "C" fn() -> *const UI_METHOD = crate::ui::ui_lib::UI_get_default_method;
+const _: unsafe extern "C" fn(*const UI, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::ui::ui_lib::UI_get_ex_data;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_get_input_flags;
+const _: unsafe extern "C" fn(*mut UI) -> *const UI_METHOD = crate::ui::ui_lib::UI_get_method;
+const _: unsafe extern "C" fn(*mut UI, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_get_result_length;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_get_result_maxsize;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_get_result_minsize;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> core::ffi::c_int =
+    crate::ui::ui_lib::UI_get_result_string_length;
+const _: unsafe extern "C" fn(*mut UI_STRING) -> UI_string_types =
+    crate::ui::ui_lib::UI_get_string_type;
 const _: unsafe extern "C" fn(
     *const UI_METHOD,
 ) -> ::core::option::Option<
@@ -10292,7 +10427,29 @@ const _: unsafe extern "C" fn(
         unsafe extern "C" fn(ui: *mut UI, uis: *mut UI_STRING) -> core::ffi::c_int,
     >,
 ) -> core::ffi::c_int = crate::ui::UI_method_set_writer;
+const _: unsafe extern "C" fn() -> *mut UI = crate::ui::ui_lib::UI_new;
+const _: unsafe extern "C" fn(*const UI_METHOD) -> *mut UI = crate::ui::ui_lib::UI_new_method;
 const _: unsafe extern "C" fn() -> *const UI_METHOD = crate::ui::UI_null;
+const _: unsafe extern "C" fn(*mut UI) -> core::ffi::c_int = crate::ui::ui_lib::UI_process;
+const _: unsafe extern "C" fn(*const UI_METHOD) = crate::ui::ui_lib::UI_set_default_method;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_set_ex_data;
+const _: unsafe extern "C" fn(*mut UI, *const UI_METHOD) -> *const UI_METHOD =
+    crate::ui::ui_lib::UI_set_method;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *mut UI_STRING,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_set_result;
+const _: unsafe extern "C" fn(
+    *mut UI,
+    *mut UI_STRING,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ui::ui_lib::UI_set_result_ex;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,

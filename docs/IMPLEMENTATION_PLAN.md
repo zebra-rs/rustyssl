@@ -4307,10 +4307,32 @@ chunking) is clean.
         - The probe's `pemwrite`, with `corpus/pemwrite.txt` and random sessions (1,500
           pass).
         - The PEM writers in `fuzz/fuzz_targets/encode_pkey.rs` (223k runs clean).
-  - [ ] **4.7d Encrypted keys**: PKCS#5 PBES1 and PBES2 (PBKDF2, scrypt) and the PBE
-    table (`EVP_PBE_*`, `PKCS5_pbe2_set_iv`, ...), `PKCS8_encrypt`/`PKCS8_decrypt`,
-    EncryptedPrivateKeyInfo encoding and decoding, `PEM_write_bio_PKCS8PrivateKey`,
-    traditional PEM with DEK-Info for keys, and the password-callback contract.
+  - [ ] **4.7d Encrypted keys**, in sub-steps:
+    - [x] **4.7d1 The UI and the password-callback contract** (`ui/ui_lib.rs`, from
+      `ui_lib.c`, `ui_util.c`, and `evp_key.c`; brought forward from 6.2):
+      - `UI_new`, `UI_new_method`, and `UI_free`; the strings (input, verify, boolean, info,
+        error, each added or duplicated); `UI_process`, with its stages' failures and
+        cancellation; the results and their sizes; `UI_ctrl`; user data, plain and
+        duplicated; application data; `UI_construct_prompt`; the string getters; the
+        default method.
+      - `UI_UTIL_read_pw`, `UI_UTIL_read_pw_string`, `UI_UTIL_wrap_read_pem_callback`,
+        `EVP_read_pw_string`, `EVP_read_pw_string_min`, and `EVP_set_pw_prompt`/`_get_`.
+      - `PEM_def_callback` asks through the default UI.
+      - The passphrase layer's `pem_password_cb` and `UI_METHOD` sources
+        (`do_ui_passphrase`), so encoders and decoders ask either.
+
+      `UI_OpenSSL`'s console still aborts until 6.2, so a prompt with the default method
+      fails closed; an application's own method works.
+      - Tests: `tests/c/ui.c`. A scripted method logs each call and answers from a list,
+        exercising every function, the failures at each stage, the utilities, the wrapper,
+        and an encoder asking a `pem_password_cb` or a UI method for a passphrase.
+    - [ ] **4.7d2 PBE**: the PBEPARAM, PBE2PARAM, PBKDF2PARAM, and SCRYPT_PARAMS types, the
+      `EVP_PBE_*` table, and PKCS#5 v1, v2, and scrypt, and PKCS#12's key and IV derivation
+      (`PKCS5_*_keyivgen`, `PKCS12_PBE_keyivgen`, `PKCS5_pbe*_set`).
+    - [ ] **4.7d3 Encrypted PKCS#8**: `PKCS8_encrypt`/`PKCS8_decrypt` and `PKCS8_set0_pbe`,
+      the EncryptedPrivateKeyInfo decoder's decryption (`epki2pki`), the encoders'
+      EncryptedPrivateKeyInfo, `PEM_write_bio_PKCS8PrivateKey` encrypted, and
+      `d2i_PKCS8PrivateKey_bio`/`_fp`.
   - [ ] **4.7e MSBLOB and PVK**: `encode_key2ms`, `decode_msblob2key`, `decode_pvk2key`,
     and `b2i_*`/`i2b_*`.
 - [ ] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD
@@ -4384,8 +4406,9 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
 - [ ] **6.1 Config-driven ASN.1** (the file format, the `CONF`/`NCONF` interface, and the
   configuration modules moved to 3.12):
   - `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language
-- [ ] **6.2 UI:** `UI_*` (including `UI_OpenSSL` reading the tty), `UI_UTIL_read_pw`,
-  `PEM_def_callback` (from 2.6), `EVP_read_pw_string`.
+- [ ] **6.2 UI:** `UI_OpenSSL` reading the tty (echo off, the verify check, the redo loop).
+  The rest of the UI came with 4.7d1: `UI_*`, `UI_UTIL_read_pw`, `PEM_def_callback`, and
+  `EVP_read_pw_string`.
 - [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
   decrypt. `SMIME_read/write_PKCS7` uses a strict, bounded MIME parser.
   `PEM_write_bio_ASN1_stream` comes here (from 2.6), with the ASN.1 streaming BIO.
