@@ -73,6 +73,7 @@ OpenSSL never depends on them.
 | `ASN1_item_i2d`, `ASN1_item_ndef_i2d`, and the `i2d_` functions allocating the output, when an application's aux or item callback makes the writing pass longer than the sizing pass | writes past the end of the buffer it allocated | drops the write, frees the buffer, and returns -1 with `ERR_R_INTERNAL_ERROR` | `asn1::tpl::encode::tests::a_callback_cannot_overrun_the_buffer` |
 | Encoding an `ASN1_TYPE` (`ASN1_ANY`) of a string or OBJECT type with no value | dereferences NULL | leaves it out, as an absent value (0) | `asn1::tpl::encode::tests::an_any_without_a_value_is_left_out` |
 | `ASN1_item_d2i`, `ASN1_item_d2i_ex`, `ASN1_item_ex_d2i`, and the `d2i_` functions with NULL `in` or `*in` and a positive length | dereference NULL | fail with `ERR_R_PASSED_NULL_PARAMETER` | `asn1::tpl::decode::tests::null_input_is_an_error` |
+| `ASN1_item_verify`/`_ex`/`_ctx` with a NULL AlgorithmIdentifier or signature; `ASN1_item_sign_ctx` with a NULL signature; `ASN1_sign` and `ASN1_verify` with a NULL `i2d`, digest, AlgorithmIdentifier, or signature | dereference NULL | -1 (`ERR_R_PASSED_NULL_PARAMETER` for the item functions) or 0 for signing | `asn1::sign::tests::null_arguments_fail` |
 | Decoding with an application's extern item whose `d2i` moves `*in` past the length it was given | carries on past the input | fails with `ERR_R_INTERNAL_ERROR` | `asn1::tpl::decode::tests::an_item_reading_past_its_input_is_refused` |
 | `INT32`/`UINT32`/`INT64`/`UINT64` fields (and their `Z` forms) made OPTIONAL without `ASN1_TFLG_EMBED` | `ASN1_item_new` writes through a NULL pointer to clear them | clearing an absent number does nothing | `asn1::tpl::ints::tests::clearing_no_number_does_nothing` |
 | `ASN1_item_unpack` and `ASN1_item_unpack_ex` with a NULL string; `ASN1_TYPE_get_int_octetstring` with a NULL `ASN1_TYPE` or a negative `max_len` | dereference NULL; copy a negative length | NULL with `ERR_R_PASSED_NULL_PARAMETER`; -1 with `ASN1_R_DATA_IS_WRONG`; copy nothing | `asn1::tpl::util::tests::null_and_negative_arguments_are_safe` |
@@ -257,6 +258,7 @@ OpenSSL never depends on them.
 | `EVP_PKEY2PKCS8` of a legacy DH or DHX key without a private key | encodes the private key from NULL and crashes | fails with `DH_R_BN_ERROR` | `evp::pkey::dh::tests::pkcs8_without_a_private_key_fails` |
 | `i2d_DSA_PUBKEY` (and `PEM_write_bio_DSA_PUBKEY`) of a DSA key without a public key | encodes the public key from NULL and crashes | fails (-1, or 0 for the PEM writer) with `ERR_R_ASN1_LIB` | `x509::pubkey::tests::a_dsa_key_without_a_public_key_isnt_encoded` |
 | `b2i_PrivateKey` and `b2i_PublicKey` with a negative length | take it as a huge `unsigned int`, so the length checks pass and the key is read past the buffer | fail with `PEM_R_KEYBLOB_TOO_SHORT` | `pvkfmt::tests::a_negative_length_is_refused` |
+| `X509_EXTENSION_set_data` with NULL data | dereferences NULL | returns 0, keeping the value | `x509::ext::tests::null_data_is_refused` |
 
 ## Notes
 

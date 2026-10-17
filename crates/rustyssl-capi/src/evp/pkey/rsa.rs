@@ -15,6 +15,9 @@ use rustyssl_abi::{
     EVP_PKEY_RSA, EVP_PKEY_RSA_PSS, EVP_R_EXPECTING_AN_RSA_KEY, NID_sha256, OSSL_CALLBACK,
     OSSL_KEYMGMT_SELECT_ALL, OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
     OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, RSA, RSA_METHOD_FLAG_NO_CHECK,
+    RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_AUTO, RSA_PSS_SALTLEN_AUTO_DIGEST_MAX,
+    RSA_PSS_SALTLEN_DIGEST, RSA_PSS_SALTLEN_MAX, RSA_R_DIGEST_DOES_NOT_MATCH,
+    RSA_R_INVALID_PSS_PARAMETERS, RSA_R_UNSUPPORTED_SIGNATURE_TYPE, V_ASN1_SEQUENCE,
 };
 
 use super::{EVP_PKEY_assign, get_legacy, legacy_data, pkey};
@@ -760,7 +763,9 @@ unsafe fn param_encode(r: *mut RSA) -> Option<(c_int, *mut rustyssl_abi::ASN1_ST
 ///
 /// # Safety
 /// `alg` is a live AlgorithmIdentifier.
-unsafe fn pss_decode(alg: *const rustyssl_abi::X509_ALGOR) -> *mut rustyssl_abi::RSA_PSS_PARAMS {
+pub(crate) unsafe fn pss_decode(
+    alg: *const rustyssl_abi::X509_ALGOR,
+) -> *mut rustyssl_abi::RSA_PSS_PARAMS {
     // SAFETY: no preconditions.
     let it = unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_it() };
     // SAFETY: the caller's guarantee.
@@ -1084,5 +1089,235 @@ ffi_callback! {
         let key = unsafe { data(p) };
         // SAFETY: the key's data (or NULL); the caller's output.
         unsafe { crate::rsa_asn1::i2d_RSAPrivateKey(key, pder) }
+    }
+}
+
+/// `ossl_rsa_pss_to_ctx`: an RSA-PSS AlgorithmIdentifier's parameters given to a verification:
+/// with `pkey`, `ctx` initialised to verify with it and the parameters' digest (and `pkctx` its
+/// key context); without, `pkctx` checked to have that digest. Then the context's padding, salt
+/// length, and MGF1 digest set from them. 1, or -1.
+///
+/// # Safety
+/// `ctx` is a live digest context; `pkctx` is NULL or a live key context (not NULL without
+/// `pkey`); `sigalg` is a live AlgorithmIdentifier; `pkey` is NULL or a live key.
+pub(crate) unsafe fn pss_to_ctx(
+    ctx: *mut rustyssl_abi::EVP_MD_CTX,
+    mut pkctx: *mut rustyssl_abi::EVP_PKEY_CTX,
+    sigalg: *const rustyssl_abi::X509_ALGOR,
+    pkey: *mut EVP_PKEY,
+) -> c_int {
+    use crate::evp::setters::{
+        EVP_PKEY_CTX_set_rsa_mgf1_md, EVP_PKEY_CTX_set_rsa_padding,
+        EVP_PKEY_CTX_set_rsa_pss_saltlen,
+    };
+    const F: &str = "ossl_rsa_pss_to_ctx";
+    // SAFETY: the caller's AlgorithmIdentifier.
+    let obj = unsafe { (*sigalg).algorithm };
+    // SAFETY: its object.
+    if unsafe { crate::objects::OBJ_obj2nid(obj) } != EVP_PKEY_RSA_PSS {
+        err::raise(ERR_LIB_RSA, RSA_R_UNSUPPORTED_SIGNATURE_TYPE, F);
+        return -1;
+    }
+    // SAFETY: as above.
+    let pss = unsafe { pss_decode(sigalg) };
+    let rv = (|| {
+        let params = if pss.is_null() {
+            None
+        } else {
+            // SAFETY: just decoded.
+            unsafe { crate::rsa_pmeth::pss_get_param(pss) }
+        };
+        let Some((md, mgf1md, saltlen)) = params else {
+            err::raise(ERR_LIB_RSA, RSA_R_INVALID_PSS_PARAMETERS, F);
+            return -1;
+        };
+        if pkey.is_null() {
+            let mut checkmd = ptr::null();
+            // SAFETY: the caller's key context; a writable digest.
+            if unsafe { crate::evp::signature::EVP_PKEY_CTX_get_signature_md(pkctx, &mut checkmd) }
+                <= 0
+            {
+                return -1;
+            }
+            // SAFETY: the digests.
+            let t1 = unsafe { crate::evp::digest::EVP_MD_get_type(md) };
+            // SAFETY: as above.
+            let t2 = unsafe { crate::evp::digest::EVP_MD_get_type(checkmd) };
+            if t1 != t2 {
+                err::raise(ERR_LIB_RSA, RSA_R_DIGEST_DOES_NOT_MATCH, F);
+                return -1;
+            }
+        // SAFETY: the caller's context and key; the parameters' digest.
+        } else if unsafe {
+            crate::evp::sigver::EVP_DigestVerifyInit(ctx, &mut pkctx, md, ptr::null_mut(), pkey)
+        } == 0
+        {
+            return -1;
+        }
+        // SAFETY: the key context, verifying.
+        let ok = unsafe { EVP_PKEY_CTX_set_rsa_padding(pkctx, RSA_PKCS1_PSS_PADDING) } > 0
+            // SAFETY: as above.
+            && unsafe { EVP_PKEY_CTX_set_rsa_pss_saltlen(pkctx, saltlen) } > 0
+            // SAFETY: as above; the parameters' MGF1 digest.
+            && unsafe { EVP_PKEY_CTX_set_rsa_mgf1_md(pkctx, mgf1md) } > 0;
+        if ok { 1 } else { -1 }
+    })();
+    // SAFETY: decoded above, or NULL.
+    unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss) };
+    rv
+}
+
+/// `rsa_ctx_to_pss`: the RSA-PSS parameters a signing context's settings make (its digest,
+/// MGF1 digest, and salt length, a special length worked out for the key), or NULL.
+///
+/// # Safety
+/// `pkctx` is a live key context with a key.
+unsafe fn ctx_to_pss(pkctx: *mut rustyssl_abi::EVP_PKEY_CTX) -> *mut rustyssl_abi::RSA_PSS_PARAMS {
+    use crate::evp::digest::EVP_MD_get_size;
+    use crate::evp::setters::{EVP_PKEY_CTX_get_rsa_mgf1_md, EVP_PKEY_CTX_get_rsa_pss_saltlen};
+    // SAFETY: the caller's context.
+    let pk = unsafe { crate::evp::pkey_ctx::EVP_PKEY_CTX_get0_pkey(pkctx) };
+    let (mut sigmd, mut mgf1md) = (ptr::null(), ptr::null());
+    // SAFETY: as above; a writable digest.
+    if unsafe { crate::evp::signature::EVP_PKEY_CTX_get_signature_md(pkctx, &mut sigmd) } <= 0 {
+        return ptr::null_mut();
+    }
+    // SAFETY: the context's digest.
+    let md_size = unsafe { EVP_MD_get_size(sigmd) };
+    if md_size <= 0 {
+        return ptr::null_mut();
+    }
+    // SAFETY: as above.
+    if unsafe { EVP_PKEY_CTX_get_rsa_mgf1_md(pkctx, &mut mgf1md) } <= 0 {
+        return ptr::null_mut();
+    }
+    let mut saltlen = 0;
+    // SAFETY: as above; a writable length.
+    if unsafe { EVP_PKEY_CTX_get_rsa_pss_saltlen(pkctx, &mut saltlen) } <= 0 {
+        return ptr::null_mut();
+    }
+    let mut saltlen_max = -1;
+    if saltlen == RSA_PSS_SALTLEN_DIGEST {
+        saltlen = md_size;
+    } else if saltlen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX {
+        saltlen = RSA_PSS_SALTLEN_MAX;
+        saltlen_max = md_size;
+    }
+    if saltlen == RSA_PSS_SALTLEN_MAX || saltlen == RSA_PSS_SALTLEN_AUTO {
+        // SAFETY: the context's key.
+        let size = unsafe { crate::evp::pkey::EVP_PKEY_get_size(pk) };
+        // SAFETY: as above.
+        let bits = unsafe { crate::evp::pkey::EVP_PKEY_get_bits(pk) };
+        saltlen = size.saturating_sub(md_size).saturating_sub(2);
+        if bits & 0x7 == 1 {
+            saltlen = saltlen.saturating_sub(1);
+        }
+        if saltlen < 0 {
+            return ptr::null_mut();
+        }
+        if saltlen_max >= 0 && saltlen > saltlen_max {
+            saltlen = saltlen_max;
+        }
+    }
+    // SAFETY: the context's digests.
+    unsafe { crate::rsa_pmeth::pss_params_create(sigmd, mgf1md, saltlen) }
+}
+
+/// `ossl_rsa_ctx_to_pss_string`: [`ctx_to_pss`]'s parameters encoded as a string, or NULL.
+///
+/// # Safety
+/// As for [`ctx_to_pss`].
+pub(crate) unsafe fn ctx_to_pss_string(
+    pkctx: *mut rustyssl_abi::EVP_PKEY_CTX,
+) -> *mut rustyssl_abi::ASN1_STRING {
+    // SAFETY: the caller's guarantee.
+    let pss = unsafe { ctx_to_pss(pkctx) };
+    if pss.is_null() {
+        return ptr::null_mut();
+    }
+    // SAFETY: no preconditions.
+    let it = unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_it() };
+    // SAFETY: the parameters, of the item.
+    let os = unsafe { crate::asn1::tpl::util::ASN1_item_pack(pss.cast(), it, ptr::null_mut()) };
+    // SAFETY: made above.
+    unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss) };
+    os
+}
+
+ffi_callback! {
+    /// `rsa_item_verify`: an RSA-PSS AlgorithmIdentifier's parameters given to the
+    /// verification (2), or -1.
+    ///
+    /// # Safety
+    /// `ctx` is a live digest context; `sigalg` a live AlgorithmIdentifier; `pkey` a live key.
+    pub(crate) unsafe extern "C" fn rsa_item_verify(ctx: *mut rustyssl_abi::EVP_MD_CTX, _it: *const rustyssl_abi::ASN1_ITEM, _asn: *const c_void, sigalg: *const rustyssl_abi::X509_ALGOR, _sig: *const rustyssl_abi::ASN1_BIT_STRING, pkey: *mut EVP_PKEY) -> c_int
+    where failure = -1, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's AlgorithmIdentifier.
+        let obj = unsafe { (*sigalg).algorithm };
+        // SAFETY: its object.
+        if unsafe { crate::objects::OBJ_obj2nid(obj) } != EVP_PKEY_RSA_PSS {
+            err::raise(ERR_LIB_RSA, RSA_R_UNSUPPORTED_SIGNATURE_TYPE, "rsa_item_verify");
+            return -1;
+        }
+        // SAFETY: the caller's guarantee.
+        if unsafe { pss_to_ctx(ctx, ptr::null_mut(), sigalg, pkey) } > 0 { 2 } else { -1 }
+    }
+}
+
+ffi_callback! {
+    /// `rsa_item_sign`: for PSS padding, the AlgorithmIdentifiers set to RSA-PSS with the
+    /// context's parameters (3); for other padding, 2 (named from the digest); 0 on failure.
+    ///
+    /// # Safety
+    /// `ctx` is a live digest context initialised to sign; `alg1` and `alg2` are NULL or live
+    /// AlgorithmIdentifiers.
+    pub(crate) unsafe extern "C" fn rsa_item_sign(ctx: *mut rustyssl_abi::EVP_MD_CTX, _it: *const rustyssl_abi::ASN1_ITEM, _asn: *const c_void, alg1: *mut rustyssl_abi::X509_ALGOR, alg2: *mut rustyssl_abi::X509_ALGOR, _sig: *mut rustyssl_abi::ASN1_BIT_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        use crate::asn1::string::ASN1_STRING_free;
+        use crate::x509::algor::X509_ALGOR_set0;
+        // SAFETY: the caller's context.
+        let pkctx = unsafe { crate::evp::sigver::EVP_MD_CTX_get_pkey_ctx(ctx) };
+        let mut pad_mode = 0;
+        // SAFETY: its key context; a writable mode.
+        if unsafe { crate::evp::setters::EVP_PKEY_CTX_get_rsa_padding(pkctx, &mut pad_mode) } <= 0 {
+            return 0;
+        }
+        if pad_mode != RSA_PKCS1_PSS_PADDING {
+            return 2;
+        }
+        // SAFETY: the key context.
+        let legacy = unsafe { crate::evp::pkey_ctx::context(pkctx) }.is_some_and(|c| c.lock().keymgmt.is_none());
+        if !legacy {
+            // SAFETY: the key context; the caller's AlgorithmIdentifiers.
+            return if unsafe { crate::asn1::sign::algorithm_id(pkctx, alg1, alg2) }.is_ok() { 3 } else { 0 };
+        }
+        // SAFETY: the key context.
+        let os1 = unsafe { ctx_to_pss_string(pkctx) };
+        if os1.is_null() {
+            return 0;
+        }
+        // SAFETY: a NID.
+        let pss_obj = || unsafe { crate::objects::OBJ_nid2obj(EVP_PKEY_RSA_PSS) };
+        if !alg2.is_null() {
+            // SAFETY: the parameters' string.
+            let os2 = unsafe { crate::asn1::string::ASN1_STRING_dup(os1) };
+            // SAFETY: the caller's AlgorithmIdentifier; the copy, which it takes.
+            if os2.is_null() || unsafe { X509_ALGOR_set0(alg2, pss_obj(), V_ASN1_SEQUENCE, os2.cast()) } == 0 {
+                // SAFETY: made above, or NULL.
+                unsafe { ASN1_STRING_free(os1) };
+                // SAFETY: as above.
+                unsafe { ASN1_STRING_free(os2) };
+                return 0;
+            }
+        }
+        // SAFETY: as above.
+        if unsafe { X509_ALGOR_set0(alg1, pss_obj(), V_ASN1_SEQUENCE, os1.cast()) } == 0 {
+            // SAFETY: made above.
+            unsafe { ASN1_STRING_free(os1) };
+            return 0;
+        }
+        3
     }
 }

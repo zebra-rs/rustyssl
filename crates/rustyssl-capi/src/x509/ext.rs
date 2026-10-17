@@ -518,3 +518,25 @@ ffi_export! {
         unsafe { target.read() }.cast()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// docs/DEVIATIONS.md: `X509_EXTENSION_set_data` with NULL data, which OpenSSL reads
+    /// through, fails and keeps the value.
+    #[test]
+    fn null_data_is_refused() {
+        // SAFETY: no preconditions.
+        let ex = unsafe { X509_EXTENSION_new() };
+        assert!(!ex.is_null());
+        // SAFETY: a live extension; NULL data.
+        assert_eq!(unsafe { X509_EXTENSION_set_data(ex, ptr::null_mut()) }, 0);
+        // SAFETY: as above.
+        let data = unsafe { X509_EXTENSION_get_data(ex) };
+        // SAFETY: its value.
+        assert_eq!(unsafe { crate::asn1::string::ASN1_STRING_length(data) }, 0);
+        // SAFETY: made above.
+        unsafe { X509_EXTENSION_free(ex) };
+    }
+}

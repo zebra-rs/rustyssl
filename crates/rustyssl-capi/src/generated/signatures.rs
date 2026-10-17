@@ -641,6 +641,35 @@ const _: unsafe extern "C" fn(
     *const ASN1_ITEM,
     *const ASN1_PCTX,
 ) -> core::ffi::c_int = crate::asn1::tpl::print::ASN1_item_print;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut X509_ALGOR,
+    *mut X509_ALGOR,
+    *mut ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_sign;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut X509_ALGOR,
+    *mut X509_ALGOR,
+    *mut ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *mut EVP_MD_CTX,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_sign_ctx;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *mut X509_ALGOR,
+    *mut X509_ALGOR,
+    *mut ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *const ASN1_OCTET_STRING,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_sign_ex;
 const _: unsafe extern "C" fn(*const ASN1_STRING, *const ASN1_ITEM) -> *mut core::ffi::c_void =
     crate::asn1::tpl::util::ASN1_item_unpack;
 const _: unsafe extern "C" fn(
@@ -649,6 +678,30 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> *mut core::ffi::c_void = crate::asn1::tpl::util::ASN1_item_unpack_ex;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *const X509_ALGOR,
+    *const ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_verify;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *const X509_ALGOR,
+    *const ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *mut EVP_MD_CTX,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_verify_ctx;
+const _: unsafe extern "C" fn(
+    *const ASN1_ITEM,
+    *const X509_ALGOR,
+    *const ASN1_BIT_STRING,
+    *const core::ffi::c_void,
+    *const ASN1_OCTET_STRING,
+    *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_item_verify_ex;
 const _: unsafe extern "C" fn(
     *mut *mut ASN1_STRING,
     *const core::ffi::c_uchar,
@@ -693,6 +746,15 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) = crate::asn1::ASN1_put_object;
 const _: unsafe extern "C" fn(
+    i2d_of_void,
+    *mut X509_ALGOR,
+    *mut X509_ALGOR,
+    *mut ASN1_BIT_STRING,
+    *mut core::ffi::c_char,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_sign;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     *mut core::ffi::c_ulong,
 ) -> core::ffi::c_int = crate::asn1::text::ASN1_str2mask;
@@ -700,6 +762,13 @@ const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_ulong =
     crate::asn1::text::ASN1_tag2bit;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::asn1::text::ASN1_tag2str;
+const _: unsafe extern "C" fn(
+    i2d_of_void,
+    *mut X509_ALGOR,
+    *mut ASN1_BIT_STRING,
+    *mut core::ffi::c_char,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::asn1::sign::ASN1_verify;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,

@@ -11,9 +11,10 @@ use core::ptr;
 
 use rustyssl_abi::{
     ASN1_PCTX, ASN1_PKEY_CTRL_DEFAULT_MD_NID, ASN1_PKEY_CTRL_GET1_TLS_ENCPT,
-    ASN1_PKEY_CTRL_SET1_TLS_ENCPT, BIO, ERR_LIB_EC, ERR_R_EC_LIB, EVP_PKEY, NID_undef,
-    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM,
-    OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
+    ASN1_PKEY_CTRL_SET1_TLS_ENCPT, BIO, EC_R_INVALID_ENCODING, ERR_LIB_EC, ERR_R_EC_LIB, EVP_PKEY,
+    NID_ED448, NID_ED25519, NID_undef, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_PRIV_KEY,
+    OSSL_PKEY_PARAM_PUB_KEY, V_ASN1_UNDEF,
 };
 use rustyssl_crypto::ecx::ED25519_SIGSIZE;
 use rustyssl_crypto::ecx448::ED448_SIGSIZE;
@@ -867,4 +868,76 @@ pub(crate) unsafe fn get1_ecx_key(p: *mut EVP_PKEY, type_: c_int) -> *mut c_void
         unsafe { ecx::up_ref(d) };
     }
     d
+}
+
+ffi_callback! {
+    /// `ecd_item_verify`: an Ed25519 or Ed448 AlgorithmIdentifier, without parameters, readies
+    /// the verification with the key (2); anything else is 0, with `EC_R_INVALID_ENCODING`.
+    ///
+    /// # Safety
+    /// `ctx` is a live digest context; `sigalg` a live AlgorithmIdentifier; `pkey` a live key.
+    pub(crate) unsafe extern "C" fn ecd_item_verify(ctx: *mut rustyssl_abi::EVP_MD_CTX, _it: *const rustyssl_abi::ASN1_ITEM, _asn: *const c_void, sigalg: *const rustyssl_abi::X509_ALGOR, _sig: *const rustyssl_abi::ASN1_BIT_STRING, pkey: *mut EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        let (mut obj, mut ptype) = (ptr::null(), 0);
+        // SAFETY: the caller's AlgorithmIdentifier; writable outputs.
+        unsafe { crate::x509::algor::X509_ALGOR_get0(&mut obj, &mut ptype, ptr::null_mut(), sigalg) };
+        // SAFETY: its object.
+        let nid = unsafe { crate::objects::OBJ_obj2nid(obj) };
+        if (nid != NID_ED25519 && nid != NID_ED448) || ptype != V_ASN1_UNDEF {
+            err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, "ecd_item_verify");
+            return 0;
+        }
+        // SAFETY: the caller's context and key.
+        if unsafe { crate::evp::sigver::EVP_DigestVerifyInit(ctx, ptr::null_mut(), ptr::null(), ptr::null_mut(), pkey) } == 0 {
+            return 0;
+        }
+        2
+    }
+}
+
+/// `ecd_item_sign`: the AlgorithmIdentifiers set to `nid`'s, without parameters (3).
+///
+/// # Safety
+/// `alg1` and `alg2` are NULL or live AlgorithmIdentifiers.
+unsafe fn ecd_item_sign(
+    alg1: *mut rustyssl_abi::X509_ALGOR,
+    alg2: *mut rustyssl_abi::X509_ALGOR,
+    nid: c_int,
+) -> c_int {
+    for alg in [alg1, alg2] {
+        if !alg.is_null() {
+            // SAFETY: a NID.
+            let obj = unsafe { crate::objects::OBJ_nid2obj(nid) };
+            // SAFETY: the caller's AlgorithmIdentifier; no parameter, so it can't fail.
+            unsafe { crate::x509::algor::X509_ALGOR_set0(alg, obj, V_ASN1_UNDEF, ptr::null_mut()) };
+        }
+    }
+    3
+}
+
+ffi_callback! {
+    /// `ecd_item_sign25519`.
+    ///
+    /// # Safety
+    /// As for [`ecd_item_sign`].
+    pub(crate) unsafe extern "C" fn ecd_item_sign25519(_ctx: *mut rustyssl_abi::EVP_MD_CTX, _it: *const rustyssl_abi::ASN1_ITEM, _asn: *const c_void, alg1: *mut rustyssl_abi::X509_ALGOR, alg2: *mut rustyssl_abi::X509_ALGOR, _sig: *mut rustyssl_abi::ASN1_BIT_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { ecd_item_sign(alg1, alg2, NID_ED25519) }
+    }
+}
+
+ffi_callback! {
+    /// `ecd_item_sign448`.
+    ///
+    /// # Safety
+    /// As for [`ecd_item_sign`].
+    pub(crate) unsafe extern "C" fn ecd_item_sign448(_ctx: *mut rustyssl_abi::EVP_MD_CTX, _it: *const rustyssl_abi::ASN1_ITEM, _asn: *const c_void, alg1: *mut rustyssl_abi::X509_ALGOR, alg2: *mut rustyssl_abi::X509_ALGOR, _sig: *mut rustyssl_abi::ASN1_BIT_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { ecd_item_sign(alg1, alg2, NID_ED448) }
+    }
 }

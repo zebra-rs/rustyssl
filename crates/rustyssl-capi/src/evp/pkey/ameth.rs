@@ -355,6 +355,14 @@ impl Kind {
                 f.param_cmp = Some(x::ecx_cmp_parameters);
                 f.pkey_free = Some(x::ecx_free);
                 f.pkey_ctrl = Some(if ed { x::ecd_ctrl } else { x::ecx_ctrl });
+                if ed {
+                    f.item_verify = Some(x::ecd_item_verify);
+                    f.item_sign = Some(if is448 {
+                        x::ecd_item_sign448
+                    } else {
+                        x::ecd_item_sign25519
+                    });
+                }
                 f.set_priv_key = Some(x::ecx_set_priv_key);
                 f.set_pub_key = Some(x::ecx_set_pub_key);
                 f.get_priv_key = Some(x::ecx_get_priv_key);
@@ -408,6 +416,8 @@ impl Kind {
                 f.pub_print = Some(r::rsa_pub_print);
                 f.priv_print = Some(r::rsa_priv_print);
                 f.pkey_ctrl = Some(r::rsa_pkey_ctrl);
+                f.item_verify = Some(r::rsa_item_verify);
+                f.item_sign = Some(r::rsa_item_sign);
                 f.pkey_check = Some(r::rsa_pkey_check);
                 f.copy = Some(r::rsa_pkey_copy);
                 f.dirty_cnt = Some(r::rsa_pkey_dirty_cnt);
