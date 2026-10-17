@@ -815,6 +815,12 @@ pem_read! {
 }
 
 pem_read! {
+    rustyssl_abi::PKCS7, crate::pkcs7::d2i_PKCS7, rustyssl_abi::PEM_STRING_PKCS7, d2i_pkcs7_void;
+    pub unsafe extern "C" fn PEM_read_bio_PKCS7();
+    pub unsafe extern "C" fn PEM_read_PKCS7();
+}
+
+pem_read! {
     X509_REQ, crate::x509::req::d2i_X509_REQ, PEM_STRING_X509_REQ, d2i_x509_req_void;
     pub unsafe extern "C" fn PEM_read_bio_X509_REQ();
     pub unsafe extern "C" fn PEM_read_X509_REQ();
@@ -912,6 +918,12 @@ pem_write! {
     X509_CRL, crate::x509::crl::i2d_X509_CRL, PEM_STRING_X509_CRL, i2d_x509_crl_void;
     pub unsafe extern "C" fn PEM_write_bio_X509_CRL();
     pub unsafe extern "C" fn PEM_write_X509_CRL();
+}
+
+pem_write! {
+    rustyssl_abi::PKCS7, crate::pkcs7::i2d_PKCS7, rustyssl_abi::PEM_STRING_PKCS7, i2d_pkcs7_void;
+    pub unsafe extern "C" fn PEM_write_bio_PKCS7();
+    pub unsafe extern "C" fn PEM_write_PKCS7();
 }
 
 pem_write! {

@@ -2007,6 +2007,23 @@ pub(crate) unsafe fn asn1_ctrl(
     })
 }
 
+/// [`asn1_ctrl`] of the key behind a pointer: `None` for NULL or a key without an ASN.1
+/// method.
+///
+/// # Safety
+/// `pkey` is NULL or a live key; `arg2` is what the command needs.
+pub(crate) unsafe fn asn1_ctrl_of(
+    pkey: *mut EVP_PKEY,
+    op: c_int,
+    arg1: c_long,
+    arg2: *mut c_void,
+) -> Option<c_int> {
+    // SAFETY: the caller's guarantee.
+    let k = unsafe { self::pkey(pkey) }?;
+    // SAFETY: as above.
+    unsafe { asn1_ctrl(k, op, arg1, arg2) }
+}
+
 ffi_export! {
     /// The name of the digest the key signs with by default into `mdname`: 2 if it's
     /// mandatory, 1 if it's a default, -2 if there's none, 0 on failure.

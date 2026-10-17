@@ -285,6 +285,7 @@ OpenSSL never depends on them.
 | The `SCT_*`, `CTLOG_*`, and `CT_POLICY_EVAL_CTX_*` functions with a NULL object; `SCT_validate` with no certificate in the context; `CT_POLICY_EVAL_CTX_set1_cert` and `_set1_issuer` with NULL | dereference NULL | fail (0, -1, or NULL), do nothing, or (for no certificate) give `SCT_VALIDATION_STATUS_UNVERIFIED` | `ct::tests::null_objects_are_refused` |
 | `CTLOG_STORE_get0_log_by_id` with a log identifier longer than 32 octets | reads past the log's identifier | matches no log | `ct::tests::long_log_ids_match_nothing` |
 | `ASN1_generate_v3` and `ASN1_generate_nconf` with a NULL string | parse with the type left uninitialised | fail with `ASN1_R_UNKNOWN_TAG` | `asn1::generate::tests::null_strings_fail` |
+| The `PKCS7_*` building, reading, and attribute functions with a NULL object | dereference NULL | fail (0 or NULL; `PKCS7_type_is_other` answers 1), or do nothing | `pkcs7::tests::null_objects_are_refused` |
 
 ## Notes
 

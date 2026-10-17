@@ -4938,6 +4938,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
 - [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
   decrypt. `SMIME_read/write_PKCS7` uses a strict, bounded MIME parser.
   `PEM_write_bio_ASN1_stream` comes here (from 2.6), with the ASN.1 streaming BIO.
+  - [x] **6.3a Structures** (`pkcs7.rs`, from `pk7_asn1.c`, `pk7_lib.c`, `pk7_attr.c`, and
+    `pk7_doit.c`'s attribute functions; 80 exports): every content type's ASN.1 (the ANY DEFINED
+    BY content, indefinite-length capable), new/free/dup/print, DER, `NDEF`, PEM, BIO, and
+    `FILE` forms, decoding into a library context; building them (`PKCS7_set_type`,
+    `_content_new`, `_set_content`, `_add_signature`/`_SIGNER_INFO_set` with RSA, EC, and DSA
+    keys and the ASN.1 method's control for others, recipients, certificates, CRLs, the cipher
+    and digest, the detached flag); signed and unsigned attributes, S/MIME capabilities,
+    signing time, content type, and message digest. The type's streaming callbacks abort until
+    6.3b and 6.3c. Tests: `tests/c/pkcs7.c` (the reference tool's signed, detached,
+    certificates-only, and enveloped objects; every type built), the `pkcs7_d2i` fuzz target.
+  - [ ] **6.3b Sign, verify, encrypt, decrypt** (`pk7_doit.c`, `pk7_smime.c`).
+  - [ ] **6.3c Streaming and S/MIME** (`bio_ndef.c`, `bio_asn1.c`, `asn_mime.c`, `pk7_mime.c`).
 - [ ] **6.4 CMS:**
   - every content type and recipient-info type present in the target headers
   - signed attributes and receipts
