@@ -275,6 +275,7 @@ unsafe fn free(m: *mut c_void) {
 /// Random methods to fetching.
 static RANDS: Kind = Kind {
     operation: OSSL_OP_RAND,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

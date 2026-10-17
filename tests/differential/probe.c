@@ -381,6 +381,11 @@
  *                              (numbers in hex, - for none, or RFC 6979's DSA-1024 key's parts
  *                              k:p, k:q, k:g, k:y, k:x; gx for g^priv mod p; the edit adds to
  *                              one, as for dhkey), then its sizes and every validation
+ *   decode <type|-> <structure|-> <selection> <pass|-> <hex>  the default provider's decoders
+ *                              (all three structural ones, then add_extra's) on the octets, with
+ *                              the input type and structure (- for none), the selection (hex),
+ *                              and a passphrase (- for none, so decryption fails): what each
+ *                              construct got, the result, and the octets left
  *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
  *                              octets: the result, the octets consumed, the key's size, and
  *                              its SubjectPublicKeyInfo encoded again
@@ -446,6 +451,8 @@
 #include <openssl/buffer.h>
 #include <openssl/camellia.h>
 #include <openssl/crypto.h>
+#include <openssl/core_object.h>
+#include <openssl/decoder.h>
 #include <openssl/des.h>
 #include <openssl/ec.h>
 #include <openssl/dh.h>
@@ -6337,6 +6344,34 @@ static void dsa_sig_command(const char *line)
     DSA_meth_free(meth);
 }
 
+/* decode's constructor: what the decoder passed on; refuses certificates, to go on. */
+static int decode_construct(OSSL_DECODER_INSTANCE *inst, const OSSL_PARAM *params, void *data)
+{
+    const OSSL_PARAM *p;
+    int objtype = 0;
+
+    (void)data;
+    printf("  construct by %s/%s:", OSSL_DECODER_INSTANCE_get_input_type(inst),
+           OSSL_DECODER_get0_properties(OSSL_DECODER_INSTANCE_get_decoder(inst)));
+    for (p = params; p != NULL && p->key != NULL; p++) {
+        if (p->data_type == OSSL_PARAM_UTF8_STRING) {
+            printf(" %s=%s", p->key, (const char *)p->data);
+        } else if (p->data_type == OSSL_PARAM_OCTET_STRING) {
+            const unsigned char *d = p->data;
+            size_t i;
+
+            printf(" %s(%zu)=", p->key, p->data_size);
+            for (i = 0; i < p->data_size && i < 16; i++)
+                printf("%02x", d[i]);
+        } else if (p->data_type == OSSL_PARAM_INTEGER) {
+            objtype = *(const int *)p->data;
+            printf(" %s=%d", p->key, objtype);
+        }
+    }
+    printf("\n");
+    return objtype != OSSL_OBJECT_CERT;
+}
+
 /* p8der: one of PKCS#8's and X.509's structure decoders, then what it holds and its DER. */
 static int x509_command(const char *command, const char *line)
 {
@@ -6348,6 +6383,48 @@ static int x509_command(const char *command, const char *line)
     void *v;
     int rn;
 
+    if (strcmp(command, "decode") == 0) {
+        char type[32] = "-", st[64] = "-", pass[64] = "-", hx[4100] = "";
+        unsigned int sel = 0;
+        long len = 0;
+        unsigned char *in;
+        OSSL_DECODER_CTX *dctx = OSSL_DECODER_CTX_new();
+        static const char *const props[] = {
+            "structure=SubjectPublicKeyInfo", "input=pem", "structure=EncryptedPrivateKeyInfo"
+        };
+        size_t i;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %31s %63s %x %63s %4099s", type, st, &sel, pass, hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        for (i = 0; i < 3; i++) {
+            OSSL_DECODER *d = OSSL_DECODER_fetch(NULL, "DER", props[i]);
+
+            OSSL_DECODER_CTX_add_decoder(dctx, d);
+            OSSL_DECODER_free(d);
+        }
+        OSSL_DECODER_CTX_add_extra(dctx, NULL, NULL);
+        if (strcmp(type, "-") != 0)
+            OSSL_DECODER_CTX_set_input_type(dctx, type);
+        if (strcmp(st, "-") != 0)
+            OSSL_DECODER_CTX_set_input_structure(dctx, st);
+        OSSL_DECODER_CTX_set_selection(dctx, (int)sel);
+        if (strcmp(pass, "-") != 0)
+            OSSL_DECODER_CTX_set_passphrase(dctx, (unsigned char *)pass, strlen(pass));
+        OSSL_DECODER_CTX_set_construct(dctx, decode_construct);
+        printf(" decoders %d", OSSL_DECODER_CTX_get_num_decoders(dctx));
+        if (in != NULL) {
+            const unsigned char *p = in;
+            size_t left = (size_t)len;
+            int r = OSSL_DECODER_from_data(dctx, &p, &left);
+
+            printf("  result %d left %zu", r, left);
+        }
+        print_asn_errors();
+        OSSL_DECODER_CTX_free(dctx);
+        OPENSSL_free(in);
+        return 1;
+    }
     if (strcmp(command, "spkider") == 0) {
         char k[4] = "r", hx[2100] = "";
         long len = 0;

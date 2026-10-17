@@ -112,6 +112,7 @@ pub(crate) type Ref = opmeth::Ref<EVP_ASYM_CIPHER>;
 /// Asymmetric ciphers to fetching.
 static CIPHERS: Kind = Kind {
     operation: OSSL_OP_ASYM_CIPHER,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm: opmeth::from_algorithm::<EVP_ASYM_CIPHER, Funcs>,
     up_ref: opmeth::up_ref::<EVP_ASYM_CIPHER>,
     free: opmeth::free::<EVP_ASYM_CIPHER>,

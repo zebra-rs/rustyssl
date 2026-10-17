@@ -4147,13 +4147,35 @@ chunking) is clean.
       - Tests: `tests/c/x509_pubkey.c` (19 checks); the probe's `spkider` with
         `corpus/spkider.txt` and random sessions (300 pass); `fuzz/fuzz_targets/spki_der.rs`;
         Rust tests of the ECX codecs (no API reaches a legacy ECX key yet).
-  - [ ] **4.7b Decoders**: the built-in ASN.1 methods' private codecs (`priv_decode`,
-    `priv_encode`, and the type-specific `ossl_*_key_from_pkcs8`), the `OSSL_DECODER`
-    framework (fetch, contexts, chains of decoders, the construct callback), `pem2der`,
-    `der2key`, `spki2typespki`, `epki2pki`, and the post-quantum codecs' decoding;
-    `d2i_X509_PUBKEY` (its key), `d2i_PUBKEY`,
-    `d2i_PrivateKey`, `d2i_AutoPrivateKey`, `d2i_PublicKey`, `EVP_PKCS82PKEY`, and the PEM
-    readers of keys (`PEM_read_bio_PrivateKey`, `_PUBKEY`, `_RSAPrivateKey`, ...).
+  - [ ] **4.7b Decoders**, in sub-steps:
+    - [x] **4.7b1 The framework and the structural decoders** (`decoder.rs`,
+      `decoder/ctx.rs`, `passphrase.rs`, `provider/decoders.rs`; 40 exports): `OSSL_DECODER`
+      (fetched through the EVP fetch, whose `Kind` now has OpenSSL's fetch style: the decoder
+      and encoder fetches' errors name the "Name", keep a method made under a name the context
+      doesn't know, and are `OSSL_DECODER`'s); `OSSL_DECODER_CTX` with `decoder_process`'s walk
+      ported step for step (the start input type, the previous decoder's name, the data type and
+      structure passed on, the input structure checked once, each decoder within an error mark),
+      `add_extra`'s chains, the passphrase setters over a port of `passphrase.c` (explicit,
+      cached, `OSSL_PASSPHRASE_CALLBACK`; a `pem_password_cb` or `UI_METHOD` aborts until 4.7d's
+      UI work), `from_bio` (with OpenSSL's "No supported data to decode" text), `from_data`,
+      `from_fp`, `OSSL_DECODER_export`, and the instance getters; the default and base
+      providers' `pem2der` (with traditional DEK-Info decryption), `spki2typespki` (SM2 for an EC
+      key on SM2's curve), and `epki2pki` (decryption aborts until 4.7d), with every key decoder
+      of `decoders.inc` registered as pending, so names keep OpenSSL's numbers. A core BIO is the
+      BIO with a reference. NULL decoders OpenSSL dereferences are refused
+      (docs/DEVIATIONS.md).
+      - Tests: `tests/c/decoder.c` (4 checks and the decodings' output: fetching and listing,
+        contexts and their errors, PEM of each kind with passphrases each way, DER, input types,
+        structures, selections, `add_extra`'s 18-instance chain, from_data, from_fp, cleanup);
+        the probe's `decode` with `corpus/decode.txt` and random sessions (400 pass);
+        `fuzz/fuzz_targets/decoder.rs`.
+    - [ ] **4.7b2 Key decoders**: the built-in ASN.1 methods' private codecs (`priv_decode`,
+      `priv_encode`, the type-specific `ossl_*_key_from_pkcs8`), `der2key` for every key type
+      (PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures), the post-quantum
+      codecs' decoding, `OSSL_DECODER_CTX_new_for_pkey` and its construct, `d2i_X509_PUBKEY`
+      (its key), `d2i_PUBKEY`, `d2i_PrivateKey`, `d2i_AutoPrivateKey`, `d2i_PublicKey`,
+      `EVP_PKCS82PKEY`, and the PEM readers of keys (`PEM_read_bio_PrivateKey`, `_PUBKEY`,
+      `_RSAPrivateKey`, ...).
   - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an
     output type and structure), the default provider's `key2any` (DER and PEM:
     PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures, parameters) and

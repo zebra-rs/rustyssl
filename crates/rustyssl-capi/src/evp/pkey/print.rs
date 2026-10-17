@@ -73,6 +73,7 @@ unsafe fn encoder_free(m: *mut c_void) {
 
 static ENCODERS: Kind = Kind {
     operation: OSSL_OP_ENCODER,
+    style: crate::evp::fetch::Style::Encoder,
     from_algorithm: encoder_from_algorithm,
     up_ref: encoder_up_ref,
     free: encoder_free,

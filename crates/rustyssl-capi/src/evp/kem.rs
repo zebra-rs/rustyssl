@@ -114,6 +114,7 @@ pub(crate) type Ref = opmeth::Ref<EVP_KEM>;
 /// KEMs to fetching.
 static KEMS: Kind = Kind {
     operation: OSSL_OP_KEM,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm: opmeth::from_algorithm::<EVP_KEM, Funcs>,
     up_ref: opmeth::up_ref::<EVP_KEM>,
     free: opmeth::free::<EVP_KEM>,

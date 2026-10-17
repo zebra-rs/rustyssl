@@ -309,6 +309,7 @@ unsafe fn free(m: *mut c_void) {
 /// Key managers to fetching.
 static KEYMGMTS: Kind = Kind {
     operation: OSSL_OP_KEYMGMT,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

@@ -208,6 +208,7 @@ unsafe fn free(m: *mut c_void) {
 /// MAC methods to fetching.
 static MACS: Kind = Kind {
     operation: OSSL_OP_MAC,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,
