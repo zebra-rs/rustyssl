@@ -4390,8 +4390,41 @@ chunking) is clean.
         encrypted fixtures failing without the legacy provider.
       - The probe's `msblob`, with `corpus/msblob.txt` and random sessions (300 pass).
       - `fuzz/fuzz_targets/msblob.rs` (232k runs clean).
-- [ ] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD
-  combination, and GREASE.
+- [x] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD
+  combination, and GREASE. In sub-steps:
+  - [x] **4.8a The DHKEMs** (`provider/dhkem.rs`, from `ec_kem.c` and `ecx_kem.c`): the
+    default provider's EC KEM (P-256, P-384, P-521) and ECX KEM (X25519, X448) in the
+    "DHKEM" operation, with and without a sender's authentication key; the ephemeral key from
+    the `ikme` parameter (or random octets), RFC 9180's `ExtractAndExpand`, the peers' public
+    keys checked, and OpenSSL's errors and size queries. A key of a curve no KEM uses fails
+    the initialization with -2. These were the default provider's last pending algorithms.
+    - Tests: `tests/c/dhkem.c` (31 checks): fixed keys and ephemeral seeds on every curve,
+      base and auth, their encapsulated keys and secrets printed and decapsulated back,
+      random round trips, and the errors.
+  - [x] **4.8b The HPKE API** (`hpke.rs`, from `hpke.c` and `hpke_util.c`): the 20
+    `OSSL_HPKE_*` exports:
+    - `OSSL_HPKE_CTX` in the base, psk, auth, and psk-auth modes, with every KEM, KDF, and
+      AEAD (export-only included).
+    - The encapsulation and decapsulation through `EVP_PKEY_(auth_)encapsulate` and
+      `_decapsulate`, and RFC 9180's key schedule through the HKDF `EVP_KDF` (extract-only
+      and expand-only), with labels OpenSSL's.
+    - Seal and open through the fetched AEAD, with the sequence number in the nonce; the
+      exporter.
+    - The psk, ikme, authpriv, and authpub setters, with their limits and role checks.
+    - `OSSL_HPKE_keygen` (from input key material, or random), `_suite_check`,
+      `_str2suite` (names and numbers in any case), the sizes, and GREASE (a random suite
+      through `ossl_rand_uniform_uint32`, never export-only).
+    - Every argument check and error, each failure inside adding `ERR_R_INTERNAL_ERROR` on its
+      way out, as OpenSSL's does.
+    - Tests:
+      - `tests/c/hpke.c`: every suite in every mode (240 deterministic encapsulations, two
+        messages each, and exports, as hashes) opened back; random round trips; each
+        function's errors; the string parser; the sizes; GREASE.
+      - The probe's `hpke`, with `corpus/hpke.txt` and random sessions (500 pass), receivers
+        also given random encapsulated keys and ciphertexts.
+      - `fuzz/fuzz_targets/hpke.rs`: the receiver on untrusted encapsulated keys and
+        ciphertexts, and the suite parser (61k runs clean).
+      - Unit tests in `hpke::tests`.
 
 **Exit:** all asymmetric Wycheproof suites pass. The Marvin toolkit finds no measurable RSA
 timing signal. dudect is clean on the constant-time paths. Key encode, decode, and print are

@@ -410,6 +410,13 @@
  *                              the PEM writers (PEM_write_bio_PrivateKey, _PrivateKey_traditional,
  *                              _PKCS8PrivateKey, i2d_PKCS8PrivateKey_bio, _PUBKEY, _Parameters):
  *                              each one's result, length, and a hash of what it wrote
+ *   hpke <suite> <mode> <ikmR> <ikmE> <info> <aad> <pt> <enc|=> <ct|=>  HPKE of the suite
+ *                              (OSSL_HPKE_str2suite) in the mode: keys from ikmR (the sender's
+ *                              authentication key from ikmR with its first octet flipped), a
+ *                              sender's encapsulation with ikmE and the plaintext sealed with the
+ *                              AAD (each in hex, - for none), printed with an exported secret;
+ *                              then a receiver's decapsulation and opening of the encapsulated
+ *                              key and ciphertext given (= for the sender's)
  *   msblob <hex>               the octets as a Microsoft key blob and PVK: b2i_PrivateKey,
  *                              b2i_PublicKey, their _bio forms, and b2i_PVK_bio (passphrase
  *                              "pw"), each key's type and size and its blob or PVK written
@@ -488,6 +495,7 @@
 #include <openssl/dsa.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hpke.h>
 #include <openssl/idea.h>
 #include <openssl/kdf.h>
 #include <openssl/lhash.h>
@@ -6602,6 +6610,115 @@ static int x509_command(const char *command, const char *line)
         print_asn_errors();
         EVP_PKEY_free(k);
         OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "hpke") == 0) {
+        char sstr[64] = "", ikmr_hx[200] = "-", ikme_hx[200] = "-", info_hx[300] = "-", aad_hx[100] = "-";
+        char pt_hx[200] = "-", enc_hx[300] = "=", ct_hx[300] = "=";
+        int mode = 0, r;
+        OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
+        long ikmrl = 0, ikmel = 0, infol = 0, aadl = 0, ptl = 0, encl = 0, ctl = 0;
+        unsigned char *ikmr, *ikme, *info, *aad, *pt, *genc, *gct;
+        unsigned char rpub[200], spub[200], enc[200], ct[200], out[200], exp[32];
+        size_t rpublen = sizeof(rpub), spublen = sizeof(spub), enclen = sizeof(enc), ctlen = sizeof(ct);
+        size_t outlen = sizeof(out), i;
+        EVP_PKEY *rk = NULL, *sk = NULL;
+        OSSL_HPKE_CTX *sctx, *rctx;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %63s %d %199s %199s %299s %99s %199s %299s %299s", sstr, &mode, ikmr_hx,
+               ikme_hx, info_hx, aad_hx, pt_hx, enc_hx, ct_hx);
+#define HX(h, l) (strcmp(h, "-") == 0 || strcmp(h, "=") == 0 ? NULL : OPENSSL_hexstr2buf(h, &l))
+        ikmr = HX(ikmr_hx, ikmrl);
+        ikme = HX(ikme_hx, ikmel);
+        info = HX(info_hx, infol);
+        aad = HX(aad_hx, aadl);
+        pt = HX(pt_hx, ptl);
+        genc = HX(enc_hx, encl);
+        gct = HX(ct_hx, ctl);
+#undef HX
+        r = OSSL_HPKE_str2suite(sstr, &suite);
+        printf(" suite %d %04x,%04x,%04x", r, suite.kem_id, suite.kdf_id, suite.aead_id);
+        r = OSSL_HPKE_keygen(suite, rpub, &rpublen, &rk, ikmr, (size_t)ikmrl, NULL, NULL);
+        printf(" keygen %d", r);
+        if (ikmr != NULL && ikmrl > 0)
+            ikmr[0] ^= 1;
+        r = OSSL_HPKE_keygen(suite, spub, &spublen, &sk, ikmr, (size_t)ikmrl, NULL, NULL);
+        printf(" %d", r);
+        if (rk != NULL && ikmr != NULL) {
+            printf(" pkR ");
+            for (i = 0; i < rpublen; i++)
+                printf("%02x", rpub[i]);
+        }
+        print_asn_errors();
+        sctx = OSSL_HPKE_CTX_new(mode, suite, OSSL_HPKE_ROLE_SENDER, NULL, NULL);
+        rctx = OSSL_HPKE_CTX_new(mode, suite, OSSL_HPKE_ROLE_RECEIVER, NULL, NULL);
+        printf("  ctx %d %d", sctx != NULL, rctx != NULL);
+        if (sctx != NULL && rctx != NULL) {
+            static const unsigned char psk[32] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+            if (mode == 1 || mode == 3)
+                printf(" psk %d %d", OSSL_HPKE_CTX_set1_psk(sctx, "id", psk, 32),
+                       OSSL_HPKE_CTX_set1_psk(rctx, "id", psk, 32));
+            if ((mode == 2 || mode == 3) && sk != NULL)
+                printf(" auth %d %d", OSSL_HPKE_CTX_set1_authpriv(sctx, sk),
+                       OSSL_HPKE_CTX_set1_authpub(rctx, spub, spublen));
+            if (ikme != NULL)
+                printf(" ikme %d", OSSL_HPKE_CTX_set1_ikme(sctx, ikme, (size_t)ikmel));
+            r = OSSL_HPKE_encap(sctx, enc, &enclen, rpub, rk != NULL ? rpublen : 0, info, (size_t)infol);
+            printf(" encap %d", r);
+            if (r == 1) {
+                int fixed = ikme != NULL && ikmr != NULL;
+
+                if (ikme != NULL) {
+                    printf(" enc ");
+                    for (i = 0; i < enclen; i++)
+                        printf("%02x", enc[i]);
+                }
+                r = OSSL_HPKE_seal(sctx, ct, &ctlen, aad, (size_t)aadl, pt, (size_t)ptl);
+                printf(" seal %d", r);
+                if (r == 1 && fixed) {
+                    printf(" ");
+                    for (i = 0; i < ctlen; i++)
+                        printf("%02x", ct[i]);
+                }
+                r = OSSL_HPKE_export(sctx, exp, sizeof(exp), aad, (size_t)aadl);
+                printf(" export %d", r);
+                if (r == 1 && fixed) {
+                    printf(" ");
+                    for (i = 0; i < sizeof(exp); i++)
+                        printf("%02x", exp[i]);
+                }
+            }
+            print_asn_errors();
+            r = OSSL_HPKE_decap(rctx, genc != NULL ? genc : enc, genc != NULL ? (size_t)encl : enclen,
+                                rk, info, (size_t)infol);
+            printf("  decap %d", r);
+            if (r == 1) {
+                r = OSSL_HPKE_open(rctx, out, &outlen, aad, (size_t)aadl, gct != NULL ? gct : ct,
+                                   gct != NULL ? (size_t)ctl : ctlen);
+                printf(" open %d", r);
+                if (r == 1) {
+                    printf(" ");
+                    for (i = 0; i < outlen; i++)
+                        printf("%02x", out[i]);
+                }
+                r = OSSL_HPKE_export(rctx, out, 32, aad, (size_t)aadl);
+                printf(" export %d same %d", r, r == 1 && memcmp(out, exp, 32) == 0);
+            }
+        }
+        print_asn_errors();
+        OSSL_HPKE_CTX_free(sctx);
+        OSSL_HPKE_CTX_free(rctx);
+        EVP_PKEY_free(rk);
+        EVP_PKEY_free(sk);
+        OPENSSL_free(ikmr);
+        OPENSSL_free(ikme);
+        OPENSSL_free(info);
+        OPENSSL_free(aad);
+        OPENSSL_free(pt);
+        OPENSSL_free(genc);
+        OPENSSL_free(gct);
         return 1;
     }
     if (strcmp(command, "msblob") == 0) {

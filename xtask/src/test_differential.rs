@@ -421,6 +421,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("pemwrite", pemwrite_session),
     ("pbe", pbe_session),
     ("msblob", msblob_session),
+    ("hpke", hpke_session),
     ("decode", decode_session),
     ("string", string_session),
 ];
@@ -4123,6 +4124,61 @@ const MSBLOB_SEEDS: &[&str] = &[
 /// cut short, or whole.
 fn msblob_session(random: &mut Random, out: &mut String) -> Result {
     mutated_sessions_upto(random, out, "msblob", MSBLOB_SEEDS, 480)
+}
+
+/// A random session of HPKE: suites by name and number (now and then ones there aren't), each
+/// mode (and one there isn't), input key material of the KEM's recommended length (now and
+/// then shorter or none), info, AAD, and plaintext, and the receiver given the sender's
+/// encapsulated key and ciphertext or random ones.
+fn hpke_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let kem = random.pick(&[
+            "P-256", "P-384", "P-521", "X25519", "x448", "0x10", "32", "0x13",
+        ]);
+        let kdf = random.pick(&["hkdf-sha256", "hkdf-sha384", "hkdf-sha512", "1", "0x3", "4"]);
+        let aead = random.pick(&[
+            "aes-128-gcm",
+            "aes-256-gcm",
+            "chacha20-poly1305",
+            "exporter",
+            "2",
+            "0xff",
+            "5",
+        ]);
+        let mode = random.pick(&["0", "1", "2", "3", "0", "4"]);
+        let nsk: usize = match kem {
+            "P-384" => 48,
+            "P-521" => 66,
+            "x448" => 56,
+            _ => 32,
+        };
+        let hexof = |random: &mut Random, len: usize, none: u64| {
+            if random.below(none) == 0 {
+                "-".to_owned()
+            } else {
+                random_hex(random, len)
+            }
+        };
+        let short = if random.below(8) == 0 { 8 } else { nsk };
+        let ikm_r = hexof(random, short, 12);
+        let ikm_e = hexof(random, nsk, 4);
+        let (info_len, aad_len, pt_len) = (random.below(40), random.below(20), random.below(60));
+        let len = |n: u64| usize::try_from(n).unwrap_or(0).max(1);
+        let info = hexof(random, len(info_len), 3);
+        let aad = hexof(random, len(aad_len), 3);
+        let pt = hexof(random, len(pt_len), 10);
+        let (enc, ct) = match random.below(6) {
+            0 => (random_hex(random, nsk * 2 + 1), "=".to_owned()),
+            1 => ("=".to_owned(), random_hex(random, 40)),
+            2 => (random_hex(random, nsk), "=".to_owned()),
+            _ => ("=".to_owned(), "=".to_owned()),
+        };
+        writeln!(
+            out,
+            "hpke {kem},{kdf},{aead} {mode} {ikm_r} {ikm_e} {info} {aad} {pt} {enc} {ct}"
+        )?;
+    }
+    Ok(())
 }
 
 /// A random session of the PEM key writers: keys of each type (now and then changed) through

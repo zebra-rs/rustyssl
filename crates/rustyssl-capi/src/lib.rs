@@ -53,6 +53,7 @@ mod ffi;
 mod generated;
 mod handle;
 mod hmac;
+mod hpke;
 mod init;
 mod lhash;
 mod libctx;

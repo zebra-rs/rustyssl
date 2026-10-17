@@ -483,3 +483,9 @@ name = "msblob"
 path = "fuzz_targets/msblob.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "hpke"
+path = "fuzz_targets/hpke.rs"
+test = false
+doc = false
