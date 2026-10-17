@@ -30,11 +30,12 @@ use rustyssl_abi::{
     IANA_AFI_IPV4, IANA_AFI_IPV6, IPAddrBlocks, IPAddressChoice, IPAddressChoice_addressesOrRanges,
     IPAddressChoice_inherit, IPAddressFamily, IPAddressOrRange, IPAddressOrRange_addressPrefix,
     IPAddressOrRange_addressRange, IPAddressOrRanges, IPAddressRange, NID_sbgp_autonomousSysNum,
-    NID_sbgp_ipAddrBlock, V3_ASID_ASNUM, V3_ASID_RDI, X509V3_CTX, X509V3_EXT_METHOD,
-    X509V3_R_EXTENSION_NAME_ERROR, X509V3_R_EXTENSION_VALUE_ERROR, X509V3_R_INVALID_ASNUMBER,
-    X509V3_R_INVALID_ASRANGE, X509V3_R_INVALID_INHERITANCE, X509V3_R_INVALID_IPADDRESS,
-    X509V3_R_INVALID_NULL_ARGUMENT, X509V3_R_INVALID_SAFI, X509V3_R_MISSING_VALUE,
-    stack_st_CONF_VALUE,
+    NID_sbgp_ipAddrBlock, V3_ASID_ASNUM, V3_ASID_RDI, X509, X509_STORE_CTX,
+    X509_V_ERR_INVALID_EXTENSION, X509_V_ERR_OUT_OF_MEM, X509_V_ERR_UNNESTED_RESOURCE,
+    X509_V_ERR_UNSPECIFIED, X509V3_CTX, X509V3_EXT_METHOD, X509V3_R_EXTENSION_NAME_ERROR,
+    X509V3_R_EXTENSION_VALUE_ERROR, X509V3_R_INVALID_ASNUMBER, X509V3_R_INVALID_ASRANGE,
+    X509V3_R_INVALID_INHERITANCE, X509V3_R_INVALID_IPADDRESS, X509V3_R_INVALID_NULL_ARGUMENT,
+    X509V3_R_INVALID_SAFI, X509V3_R_MISSING_VALUE, stack_st_CONF_VALUE, stack_st_X509,
 };
 
 use super::registry::{Method, indent_to, method};
@@ -60,10 +61,12 @@ use crate::err;
 use crate::ffi::{ffi_callback, ffi_export};
 use crate::mem;
 use crate::stack::{
-    OPENSSL_sk_delete, OPENSSL_sk_find, OPENSSL_sk_new, OPENSSL_sk_new_null, OPENSSL_sk_num,
-    OPENSSL_sk_pop_free, OPENSSL_sk_push, OPENSSL_sk_reserve, OPENSSL_sk_set,
-    OPENSSL_sk_set_cmp_func, OPENSSL_sk_sort, OPENSSL_sk_value,
+    OPENSSL_sk_delete, OPENSSL_sk_dup, OPENSSL_sk_find, OPENSSL_sk_free, OPENSSL_sk_new,
+    OPENSSL_sk_new_null, OPENSSL_sk_num, OPENSSL_sk_pop_free, OPENSSL_sk_push, OPENSSL_sk_reserve,
+    OPENSSL_sk_set, OPENSSL_sk_set_cmp_func, OPENSSL_sk_sort, OPENSSL_sk_value,
 };
+use crate::x509::ctx::ctx_of;
+use crate::x509::purpose::cache_view;
 
 /// `ADDR_RAW_BUF_LEN`: room for the longest address, IPv6's.
 const RAW: usize = 16;
@@ -2561,6 +2564,460 @@ pub(crate) static ADDR: Method = Method({
     m
 });
 
+// Path validation (RFC 3779 section 2.3 and 3.3): each certificate's resources within its
+// issuer's.
+
+/// A certificate's cached AS identifiers, or NULL (also for NULL).
+fn asid_of(x: *const X509) -> *mut ASIdentifiers {
+    // SAFETY: a chain's certificate, or NULL.
+    unsafe { cache_view(x) }.asid
+}
+
+/// A certificate's cached address blocks, or NULL (also for NULL).
+fn addr_of(x: *const X509) -> *mut IPAddrBlocks {
+    // SAFETY: as above.
+    unsafe { cache_view(x) }.addr
+}
+
+/// The chain's certificate at `i`.
+fn chain_at(chain: *mut stack_st_X509, i: c_int) -> *mut X509 {
+    // SAFETY: a live list of certificates, or NULL.
+    unsafe { OPENSSL_sk_value(chain.cast(), i) }.cast()
+}
+
+/// `validation_err`'s report: with a context, `err` for `x` at depth `i` to its callback (its
+/// answer); without one, 0.
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+unsafe fn report(ctx: *mut X509_STORE_CTX, err: c_int, i: c_int, x: *mut X509) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { ctx_of(ctx) }) else {
+        return 0;
+    };
+    c.error = err;
+    c.error_depth = i;
+    c.current_cert = x;
+    let cb = c.verify_cb;
+    // SAFETY: the context's callback, with no reference into the context held.
+    cb.map_or(0, |f| unsafe { f(0, ctx) })
+}
+
+/// Sets the context's error (if any) to `X509_V_ERR_UNSPECIFIED`: 0.
+///
+/// # Safety
+/// `ctx` is NULL or a live context.
+unsafe fn unspecified(ctx: *mut X509_STORE_CTX) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if let Some(c) = unsafe { ctx_of(ctx) } {
+        c.error = X509_V_ERR_UNSPECIFIED;
+    }
+    0
+}
+
+/// Whether the arguments are as the path validations need them (`ossl_assert`s): a chain,
+/// and a context with a callback or resources.
+///
+/// # Safety
+/// `ctx` is NULL or a live context; `chain` is NULL or a live list.
+unsafe fn validation_args_ok(
+    ctx: *mut X509_STORE_CTX,
+    chain: *mut stack_st_X509,
+    ext_given: bool,
+) -> bool {
+    // SAFETY: the caller's guarantee.
+    let n = unsafe { OPENSSL_sk_num(chain.cast()) };
+    // SAFETY: as above.
+    let ctx_ok = unsafe { ctx_of(ctx) }.map_or(ext_given, |c| c.verify_cb.is_some());
+    !chain.is_null() && n > 0 && ctx_ok
+}
+
+/// A choice's identifiers if it lists them, and whether it inherits.
+fn as_choice_of(c: *mut ASIdentifierChoice) -> Option<(*mut ASIdOrRanges, bool)> {
+    // SAFETY: an identifiers' choice, or NULL.
+    let c = unsafe { c.as_ref() }?;
+    Some(if c.type_ == ASIdentifierChoice_asIdsOrRanges {
+        (as_list(c), false)
+    } else {
+        (ptr::null_mut(), c.type_ == ASIdentifierChoice_inherit)
+    })
+}
+
+/// `asid_validate_path_internal`: the AS identifiers of `ext` (or the chain's leaf's) within
+/// each issuer's up the chain, each failure going to the context's callback (or failing).
+///
+/// # Safety
+/// `ctx` is NULL or a live context; `chain` is NULL or a live list of live certificates;
+/// `ext` is NULL or live identifiers.
+unsafe fn asid_validate(
+    ctx: *mut X509_STORE_CTX,
+    chain: *mut stack_st_X509,
+    ext: *mut ASIdentifiers,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe { validation_args_ok(ctx, chain, !ext.is_null()) } {
+        // SAFETY: as above.
+        return unsafe { unspecified(ctx) };
+    }
+    let mut ret = 1;
+    let (mut i, mut x, ext) = if ext.is_null() {
+        let x = chain_at(chain, 0);
+        let ext = asid_of(x);
+        if ext.is_null() {
+            return ret;
+        }
+        (0, x, ext)
+    } else {
+        (-1, ptr::null_mut(), ext)
+    };
+    macro_rules! verr {
+        ($err:expr) => {
+            // SAFETY: the caller's context, or NULL.
+            ret = unsafe { report(ctx, $err, i, x) };
+            if ret == 0 {
+                return ret;
+            }
+        };
+    }
+    // SAFETY: the identifiers.
+    if unsafe { X509v3_asid_is_canonical(ext) } == 0 {
+        verr!(X509_V_ERR_INVALID_EXTENSION);
+    }
+    // SAFETY: as above.
+    let e = unsafe { &*ext };
+    let (mut child_as, mut inherit_as) = as_choice_of(e.asnum).unwrap_or((ptr::null_mut(), false));
+    let (mut child_rdi, mut inherit_rdi) = as_choice_of(e.rdi).unwrap_or((ptr::null_mut(), false));
+    // SAFETY: the caller's list.
+    let n = unsafe { OPENSSL_sk_num(chain.cast()) };
+    i += 1;
+    while i < n {
+        x = chain_at(chain, i);
+        if x.is_null() {
+            // SAFETY: as above.
+            return unsafe { unspecified(ctx) };
+        }
+        let xa = asid_of(x);
+        // SAFETY: the certificate's identifiers, or NULL.
+        let Some(xr) = (unsafe { xa.as_ref() }) else {
+            if !child_as.is_null() || !child_rdi.is_null() {
+                verr!(X509_V_ERR_UNNESTED_RESOURCE);
+            }
+            i += 1;
+            continue;
+        };
+        // SAFETY: as above.
+        if unsafe { X509v3_asid_is_canonical(xa) } == 0 {
+            verr!(X509_V_ERR_INVALID_EXTENSION);
+        }
+        for (choice, child, inherit) in [
+            (xr.asnum, &mut child_as, &mut inherit_as),
+            (xr.rdi, &mut child_rdi, &mut inherit_rdi),
+        ] {
+            let parent = as_choice_of(choice);
+            if parent.is_none() && !child.is_null() {
+                verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                *child = ptr::null_mut();
+                *inherit = false;
+            }
+            // SAFETY: the choice, if any.
+            if unsafe { choice.as_ref() }
+                .is_some_and(|c| c.type_ == ASIdentifierChoice_asIdsOrRanges)
+            {
+                let list = parent.map_or(ptr::null_mut(), |(l, _)| l);
+                if *inherit || as_contains(list, *child) {
+                    *child = list;
+                    *inherit = false;
+                } else {
+                    verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                }
+            }
+        }
+        i += 1;
+    }
+    if x.is_null() {
+        // SAFETY: as above.
+        return unsafe { unspecified(ctx) };
+    }
+    // The trust anchor can't inherit.
+    // SAFETY: the last certificate's identifiers, or NULL.
+    if let Some(xr) = unsafe { asid_of(x).as_ref() } {
+        for choice in [xr.asnum, xr.rdi] {
+            if as_choice_of(choice).is_some_and(|(_, inherit)| inherit) {
+                verr!(X509_V_ERR_UNNESTED_RESOURCE);
+            }
+        }
+    }
+    ret
+}
+
+ffi_export! {
+    /// Validates the AS identifiers down the context's chain (RFC 3779 section 3.3), each
+    /// failure going to the callback: 1, or 0 (also, with `X509_V_ERR_UNSPECIFIED`, for no
+    /// chain or callback), or the callback's answer.
+    ///
+    /// # Safety
+    /// `ctx` is a live context.
+    pub unsafe extern "C" fn X509v3_asid_validate_path(ctx: *mut X509_STORE_CTX) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx_of(ctx) }) else { return 0 };
+        let chain = c.chain;
+        // SAFETY: the context's chain, or NULL.
+        if chain.is_null() || unsafe { OPENSSL_sk_num(chain.cast()) } == 0 || c.verify_cb.is_none() {
+            c.error = X509_V_ERR_UNSPECIFIED;
+            return 0;
+        }
+        // SAFETY: the context and its chain.
+        unsafe { asid_validate(ctx, chain, ptr::null_mut()) }
+    }
+}
+
+ffi_export! {
+    /// Whether the identifiers `ext` (inheriting only if `allow_inheritance`) are within the
+    /// chain's (the issuer first): 1 (also for NULL `ext`), or 0.
+    ///
+    /// # Safety
+    /// `chain` is NULL or a live list of live certificates; `ext` is NULL or live identifiers.
+    pub unsafe extern "C" fn X509v3_asid_validate_resource_set(chain: *mut stack_st_X509, ext: *mut ASIdentifiers, allow_inheritance: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        if ext.is_null() {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        if chain.is_null() || unsafe { OPENSSL_sk_num(chain.cast()) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        if allow_inheritance == 0 && unsafe { X509v3_asid_inherits(ext) } != 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        unsafe { asid_validate(ptr::null_mut(), chain, ext) }
+    }
+}
+
+/// A family's choice's type, or `None` for no choice.
+fn choice_type(f: &IPAddressFamily) -> Option<c_int> {
+    // SAFETY: the family's choice, or NULL.
+    unsafe { f.ipAddressChoice.as_ref() }.map(|c| c.type_)
+}
+
+/// A family's addresses (whatever its choice's type), or NULL.
+fn family_list(f: &IPAddressFamily) -> *mut IPAddressOrRanges {
+    // SAFETY: as above.
+    unsafe { f.ipAddressChoice.as_ref() }.map_or(ptr::null_mut(), ip_list)
+}
+
+/// The family at `j` of a list.
+fn family_at<'a>(sk: *mut c_void, j: c_int) -> Option<&'a IPAddressFamily> {
+    // SAFETY: a live list of families, or NULL.
+    let f = unsafe { OPENSSL_sk_value(sk.cast(), j) }.cast::<IPAddressFamily>();
+    // SAFETY: as above.
+    unsafe { f.as_ref() }
+}
+
+/// `addr_validate_path_internal`: the address blocks of `ext` (or the chain's leaf's) within
+/// each issuer's up the chain, family by family, each failure going to the context's
+/// callback (or failing). Sorts each certificate's families, as OpenSSL does.
+///
+/// # Safety
+/// As for [`asid_validate`], `ext` being NULL or a live list of families.
+unsafe fn addr_validate(
+    ctx: *mut X509_STORE_CTX,
+    chain: *mut stack_st_X509,
+    ext: *mut IPAddrBlocks,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe { validation_args_ok(ctx, chain, !ext.is_null()) } {
+        // SAFETY: as above.
+        return unsafe { unspecified(ctx) };
+    }
+    let (mut i, mut x, ext) = if ext.is_null() {
+        let x = chain_at(chain, 0);
+        let ext = addr_of(x);
+        if ext.is_null() {
+            return 1;
+        }
+        (0, x, ext)
+    } else {
+        (-1, ptr::null_mut(), ext)
+    };
+    let mut child: *mut c_void = ptr::null_mut();
+    // SAFETY: the context, or NULL; the chain; the families.
+    let ret = 'done: {
+        macro_rules! verr {
+            ($err:expr) => {
+                // SAFETY: the caller's context, or NULL.
+                if unsafe { report(ctx, $err, i, x) } == 0 {
+                    break 'done 0;
+                }
+            };
+        }
+        // SAFETY: the families.
+        if unsafe { X509v3_addr_is_canonical(ext) } == 0 {
+            verr!(X509_V_ERR_INVALID_EXTENSION);
+        }
+        // SAFETY: as above; a comparison of families.
+        unsafe { OPENSSL_sk_set_cmp_func(ext.cast(), Some(family_cmp)) };
+        // SAFETY: as above.
+        child = unsafe { OPENSSL_sk_dup(ext.cast()) }.cast();
+        if child.is_null() {
+            err::raise(
+                ERR_LIB_X509V3,
+                ERR_R_CRYPTO_LIB,
+                "addr_validate_path_internal",
+            );
+            // SAFETY: the caller's context, or NULL.
+            if let Some(c) = unsafe { ctx_of(ctx) } {
+                c.error = X509_V_ERR_OUT_OF_MEM;
+            }
+            break 'done 0;
+        }
+        // SAFETY: the copy.
+        unsafe { OPENSSL_sk_sort(child.cast()) };
+        // SAFETY: the caller's list.
+        let n = unsafe { OPENSSL_sk_num(chain.cast()) };
+        // SAFETY: the copy.
+        let nchild = || unsafe { OPENSSL_sk_num(child.cast()) };
+        i += 1;
+        while i < n {
+            x = chain_at(chain, i);
+            if x.is_null() {
+                // SAFETY: as above.
+                break 'done unsafe { unspecified(ctx) };
+            }
+            let xa = addr_of(x);
+            // SAFETY: the certificate's families, or NULL.
+            if unsafe { X509v3_addr_is_canonical(xa) } == 0 {
+                verr!(X509_V_ERR_INVALID_EXTENSION);
+            }
+            if xa.is_null() {
+                for j in 0..nchild() {
+                    let Some(fc) = family_at(child, j) else {
+                        break 'done 0;
+                    };
+                    if !family_len_ok(fc) {
+                        break 'done 0;
+                    }
+                    if choice_type(fc) != Some(IPAddressChoice_inherit) {
+                        verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                        break;
+                    }
+                }
+                i += 1;
+                continue;
+            }
+            // SAFETY: as above; a comparison of families.
+            unsafe { OPENSSL_sk_set_cmp_func(xa.cast(), Some(family_cmp)) };
+            // SAFETY: as above.
+            unsafe { OPENSSL_sk_sort(xa.cast()) };
+            for j in 0..nchild() {
+                let Some(fc) = family_at(child, j) else {
+                    break 'done 0;
+                };
+                // SAFETY: the certificate's families; a family to find.
+                let k = unsafe { OPENSSL_sk_find(xa.cast(), ptr::from_ref(fc).cast()) };
+                let Some(fp) = family_at(xa.cast(), k) else {
+                    if choice_type(fc) == Some(IPAddressChoice_addressesOrRanges) {
+                        verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                        break;
+                    }
+                    continue;
+                };
+                if !family_len_ok(fc) || !family_len_ok(fp) {
+                    break 'done 0;
+                }
+                if choice_type(fp) == Some(IPAddressChoice_addressesOrRanges) {
+                    let fc_ptr = ptr::from_ref(fc);
+                    if choice_type(fc) == Some(IPAddressChoice_inherit)
+                        || ip_contains(family_list(fp), family_list(fc), family_addr_len(fc_ptr))
+                    {
+                        // SAFETY: the copy; an index within it; the issuer's family.
+                        unsafe { OPENSSL_sk_set(child.cast(), j, ptr::from_ref(fp).cast()) };
+                    } else {
+                        verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                    }
+                }
+            }
+            i += 1;
+        }
+        // The trust anchor can't inherit.
+        let xa = addr_of(x);
+        if !xa.is_null() {
+            // SAFETY: the certificate's families.
+            for j in 0..unsafe { OPENSSL_sk_num(xa.cast()) } {
+                let Some(fp) = family_at(xa.cast(), j) else {
+                    break 'done 0;
+                };
+                if !family_len_ok(fp) {
+                    break 'done 0;
+                }
+                if choice_type(fp) == Some(IPAddressChoice_inherit)
+                    // SAFETY: the copy; a family to find.
+                    && unsafe { OPENSSL_sk_find(child.cast(), ptr::from_ref(fp).cast()) } >= 0
+                {
+                    verr!(X509_V_ERR_UNNESTED_RESOURCE);
+                }
+            }
+        }
+        1
+    };
+    // SAFETY: the copy, or NULL.
+    unsafe { OPENSSL_sk_free(child.cast()) };
+    ret
+}
+
+ffi_export! {
+    /// Validates the address blocks down the context's chain (RFC 3779 section 2.3), each
+    /// failure going to the callback: 1, or 0 (also, with `X509_V_ERR_UNSPECIFIED`, for no
+    /// chain or callback).
+    ///
+    /// # Safety
+    /// `ctx` is a live context.
+    pub unsafe extern "C" fn X509v3_addr_validate_path(ctx: *mut X509_STORE_CTX) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx_of(ctx) }) else { return 0 };
+        let chain = c.chain;
+        // SAFETY: the context's chain, or NULL.
+        if chain.is_null() || unsafe { OPENSSL_sk_num(chain.cast()) } == 0 || c.verify_cb.is_none() {
+            c.error = X509_V_ERR_UNSPECIFIED;
+            return 0;
+        }
+        // SAFETY: the context and its chain.
+        unsafe { addr_validate(ctx, chain, ptr::null_mut()) }
+    }
+}
+
+ffi_export! {
+    /// Whether the address blocks `ext` (inheriting only if `allow_inheritance`) are within
+    /// the chain's (the issuer first): 1 (also for NULL `ext`), or 0.
+    ///
+    /// # Safety
+    /// `chain` is NULL or a live list of live certificates; `ext` is NULL or a live list of
+    /// families.
+    pub unsafe extern "C" fn X509v3_addr_validate_resource_set(chain: *mut stack_st_X509, ext: *mut IPAddrBlocks, allow_inheritance: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        if ext.is_null() {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        if chain.is_null() || unsafe { OPENSSL_sk_num(chain.cast()) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        if allow_inheritance == 0 && unsafe { X509v3_addr_inherits(ext) } != 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        unsafe { addr_validate(ptr::null_mut(), chain, ext) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2639,5 +3096,31 @@ mod tests {
         assert_eq!(range_prefix(&lo, &hi, 4), Some(29));
         let all = [0xFFu8; RAW];
         assert_eq!(range_prefix(&[0; RAW], &all, 4), Some(0));
+    }
+
+    /// docs/DEVIATIONS.md: a NULL certificate in the chain, which OpenSSL's address
+    /// validation reads through, fails the validation.
+    #[test]
+    fn null_certificates_in_chains_fail() {
+        // SAFETY: new lists, freed below.
+        let chain = unsafe { OPENSSL_sk_new_null() };
+        // SAFETY: as above.
+        let ext = unsafe { OPENSSL_sk_new(Some(family_cmp)) };
+        // SAFETY: the list; NULL where OpenSSL dereferences it.
+        assert_eq!(unsafe { OPENSSL_sk_push(chain, ptr::null()) }, 1);
+        // SAFETY: the lists.
+        let r = unsafe { X509v3_addr_validate_resource_set(chain.cast(), ext.cast(), 1) };
+        assert_eq!(r, 0);
+        // SAFETY: no preconditions; freed below.
+        let asid = unsafe { ASIdentifiers_new() };
+        // SAFETY: as above.
+        let r = unsafe { X509v3_asid_validate_resource_set(chain.cast(), asid, 1) };
+        assert_eq!(r, 0);
+        // SAFETY: made above.
+        unsafe { ASIdentifiers_free(asid) };
+        // SAFETY: made above.
+        unsafe { OPENSSL_sk_free(chain) };
+        // SAFETY: as above.
+        unsafe { OPENSSL_sk_free(ext) };
     }
 }

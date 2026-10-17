@@ -4817,7 +4817,7 @@ Exit checks:
     - Deviations: NULL stores, objects, lookups, and methods (docs/DEVIATIONS.md).
     - Tests: `tests/c/x509_store.c` (files and a hashed directory made at run time, the default
       paths from the environment).
-- [ ] **5.4 Path validation.** The engine is in `rustyssl-capi` (`x509/ctx.rs` and what follows),
+- [x] **5.4 Path validation.** The engine is in `rustyssl-capi` (`x509/ctx.rs` and what follows),
   as OpenSSL's `x509_vfy.c` is: each check reports to the application's verification callback
   as it goes, on the application's objects, so it doesn't fit a sans-IO core. The parts that
   are pure matching (host names, name constraints, punycode) are in `rustyssl-pki`.
@@ -4842,7 +4842,7 @@ Exit checks:
     signatures and validity times (`internal_verify`); name constraints
     (`NAME_CONSTRAINTS_check`, `_check_CN`, punycode for SmtpUTF8Mailbox, `OSSL_parse_url` for
     URIs). Revocation (with `X509_V_FLAG_CRL_CHECK`) came with 5.4c and policies (with
-    `X509_V_FLAG_POLICY_CHECK`) with 5.4d; RFC 3779 resources and DANE abort until 5.4e and libssl.
+    `X509_V_FLAG_POLICY_CHECK`) with 5.4d, RFC 3779 resources with 5.4e; DANE waits for libssl.
     Tests: `tests/c/x509_verify.c` (33 chains with the callback's trace), unit tests (punycode
     with the CVE-2022-3602 overflow, name constraints, URLs). The CVE-2015-1793 alternate-chain
     regression waits for the `tests/cve/` suite.
@@ -4868,9 +4868,14 @@ Exit checks:
     policy sets are C stacks. Tests: `tests/c/x509_policy.c` (32 verifications and 10 direct
     checks printing whole trees, including a mapping chain that hits the bound). The
     CVE-2023-0464 regression proper waits for the `tests/cve/` suite.
-  - [ ] **5.4e The rest:** RFC 3779 resources (`X509v3_addr_validate_path`,
-    `X509v3_asid_validate_path`, and the `_validate_resource_set` functions, deferred from
-    5.2f), DANE (with libssl's), and raw public keys.
+  - [x] **5.4e RFC 3779 resources** (`x509v3/rfc3779.rs`): `X509v3_asid_validate_path`,
+    `X509v3_addr_validate_path`, and the `_validate_resource_set` functions (deferred from
+    5.2f), run by `X509_verify_cert` after revocation, as OpenSSL's: each certificate's
+    address blocks and AS identifiers within its issuer's (inheritance, missing families, the
+    trust anchor not inheriting), each failure to the callback. Raw public keys came with
+    5.4b. DANE needs libssl's `SSL_DANE` state, so verifying with one aborts until libssl's
+    DANE (Phase 6). Tests: `tests/c/x509_rfc3779.c` (15 verifications with the callback's
+    trace and the validations rerun, 9 resource-set checks).
 - [x] **5.5 Identity checks** (`x509v3/check.rs`, the matching in `rustyssl-pki`'s `identity`,
   from `v3_utl.c`): `X509_check_host` (every `X509_CHECK_FLAG_*`, wildcards with OpenSSL's
   rules, IDNA labels, leading-dot subdomains, `peername`), `X509_check_email` (domain case

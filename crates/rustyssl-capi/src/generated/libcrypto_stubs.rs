@@ -9242,34 +9242,6 @@ pub extern "C" fn X509_signature_print(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_validate_path(_: *mut X509_STORE_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_validate_path")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_addr_validate_resource_set(
-    _: *mut stack_st_X509,
-    _: *mut IPAddrBlocks,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_addr_validate_resource_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_validate_path(_: *mut X509_STORE_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_validate_path")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509v3_asid_validate_resource_set(
-    _: *mut stack_st_X509,
-    _: *mut ASIdentifiers,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509v3_asid_validate_resource_set")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn conf_ssl_get(
     _: usize,
     _: *mut *const core::ffi::c_char,

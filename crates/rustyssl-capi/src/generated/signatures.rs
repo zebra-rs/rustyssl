@@ -13666,6 +13666,13 @@ const _: unsafe extern "C" fn(*mut IPAddrBlocks) -> core::ffi::c_int =
     crate::x509v3::rfc3779::X509v3_addr_is_canonical;
 const _: unsafe extern "C" fn(*mut IPAddrBlocks, *mut IPAddrBlocks) -> core::ffi::c_int =
     crate::x509v3::rfc3779::X509v3_addr_subset;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509v3::rfc3779::X509v3_addr_validate_path;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut IPAddrBlocks,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509v3::rfc3779::X509v3_addr_validate_resource_set;
 const _: unsafe extern "C" fn(
     *mut ASIdentifiers,
     core::ffi::c_int,
@@ -13682,6 +13689,13 @@ const _: unsafe extern "C" fn(*mut ASIdentifiers) -> core::ffi::c_int =
     crate::x509v3::rfc3779::X509v3_asid_is_canonical;
 const _: unsafe extern "C" fn(*mut ASIdentifiers, *mut ASIdentifiers) -> core::ffi::c_int =
     crate::x509v3::rfc3779::X509v3_asid_subset;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509v3::rfc3779::X509v3_asid_validate_path;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut ASIdentifiers,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509v3::rfc3779::X509v3_asid_validate_resource_set;
 const _: unsafe extern "C" fn(
     *mut stack_st_X509_EXTENSION,
     core::ffi::c_int,
