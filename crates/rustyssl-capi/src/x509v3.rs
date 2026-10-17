@@ -9,6 +9,7 @@ pub(crate) mod acext;
 pub(crate) mod admission;
 pub(crate) mod akid;
 pub(crate) mod attrdesc;
+pub(crate) mod check;
 pub(crate) mod conf;
 pub(crate) mod crld;
 pub(crate) mod ctx;

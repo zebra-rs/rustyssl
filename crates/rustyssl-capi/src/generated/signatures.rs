@@ -12634,6 +12634,8 @@ const _: unsafe extern "C" fn(
     *mut *const ASN1_BIT_STRING,
     *mut *const X509_ALGOR,
 ) = crate::x509::req::X509_REQ_get0_signature;
+const _: unsafe extern "C" fn(*mut X509_REQ) -> *mut stack_st_OPENSSL_STRING =
+    crate::x509v3::check::X509_REQ_get1_email;
 const _: unsafe extern "C" fn(*mut X509_REQ) -> *mut X509_PUBKEY =
     crate::x509::req::X509_REQ_get_X509_PUBKEY;
 const _: unsafe extern "C" fn(*const X509_REQ, core::ffi::c_int) -> *mut X509_ATTRIBUTE =
@@ -13225,6 +13227,30 @@ const _: unsafe extern "C" fn(*mut stack_st_X509) -> *mut stack_st_X509 =
 const _: unsafe extern "C" fn(*const X509, *const AUTHORITY_KEYID) -> core::ffi::c_int =
     crate::x509::purpose::X509_check_akid;
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_int = crate::x509::purpose::X509_check_ca;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *const core::ffi::c_char,
+    usize,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::x509v3::check::X509_check_email;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *const core::ffi::c_char,
+    usize,
+    core::ffi::c_uint,
+    *mut *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509v3::check::X509_check_host;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *const core::ffi::c_uchar,
+    usize,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::x509v3::check::X509_check_ip;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *const core::ffi::c_char,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::x509v3::check::X509_check_ip_asc;
 const _: unsafe extern "C" fn(*mut X509, *mut X509) -> core::ffi::c_int =
     crate::x509::purpose::X509_check_issued;
 const _: unsafe extern "C" fn(*const X509, *const EVP_PKEY) -> core::ffi::c_int =
@@ -13258,6 +13284,7 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_int,
 ) -> *mut ASN1_OCTET_STRING = crate::x509::cert::X509_digest_sig;
 const _: unsafe extern "C" fn(*const X509) -> *mut X509 = crate::x509::cert::X509_dup;
+const _: unsafe extern "C" fn(*mut stack_st_OPENSSL_STRING) = crate::x509v3::check::X509_email_free;
 const _: unsafe extern "C" fn(
     *mut stack_st_X509,
     *const X509_NAME,
@@ -13300,6 +13327,10 @@ const _: unsafe extern "C" fn(
     *mut *const ASN1_BIT_STRING,
     *mut *const ASN1_BIT_STRING,
 ) = crate::x509::cert::X509_get0_uids;
+const _: unsafe extern "C" fn(*mut X509) -> *mut stack_st_OPENSSL_STRING =
+    crate::x509v3::check::X509_get1_email;
+const _: unsafe extern "C" fn(*mut X509) -> *mut stack_st_OPENSSL_STRING =
+    crate::x509v3::check::X509_get1_ocsp;
 const _: unsafe extern "C" fn(*const X509) -> *mut X509_PUBKEY =
     crate::x509::cert::X509_get_X509_PUBKEY;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
