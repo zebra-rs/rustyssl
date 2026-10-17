@@ -412,7 +412,8 @@ static void test_codecs(EVP_PKEY *k)
         OSSL_DECODER_CTX_set_passphrase(dctx, (const unsigned char *)"no", 2);
         snprintf(what, sizeof(what), "the wrong passphrase decodes nothing (%s)", outs[i]);
         check(!OSSL_DECODER_from_data(dctx, &in, &inlen) && back == NULL, what);
-        errors();
+        /* The errors depend on the random salt: a wrong key's padding is sometimes valid. */
+        ERR_clear_error();
         OSSL_DECODER_CTX_free(dctx);
         OPENSSL_free(data);
     }
