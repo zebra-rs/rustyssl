@@ -507,3 +507,9 @@ name = "x509v3_print"
 path = "fuzz_targets/x509v3_print.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "rfc3779"
+path = "fuzz_targets/rfc3779.rs"
+test = false
+doc = false

@@ -4663,6 +4663,39 @@ Exit checks:
     extensions (3,000 sessions pass); the `x509v3_print` fuzz target over these NIDs too (1M
     runs clean); and the IP parser's unit tests. NULL names and contexts are refused
     (docs/DEVIATIONS.md).
+  - [x] **5.2d Policies and constraints** (`x509v3/policy.rs`, from `v3_cpols.c`, `v3_pmaps.c`,
+    `v3_pcons.c`, `v3_pci.c`, `v3_pcia.c`, and `v3_ncons.c`):
+    - Certificate policies, with CPS and user-notice qualifiers (`POLICYQUALINFO` through its
+      ADB), made from text and sections (`ia5org`, notice numbers, explicit text of each
+      display type), and printed.
+    - Policy mappings, policy constraints, and proxy certificate information (`language`,
+      `pathlen`, and `policy` from text, a file, or hex).
+    - Name constraints, also of holders and delegated (permitted and excluded subtrees).
+      `NAME_CONSTRAINTS_check` and `_check_CN` belong to path validation (5.4).
+  - [x] **5.2e Smaller extensions** (`x509v3/misc.rs`, from `v3_sxnet.c`, `v3_tlsf.c`,
+    `v3_ist.c`, and `v3_audit_id.c`): strong extranet IDs (`SXNET_add_id_*`, `SXNET_get_id_*`),
+    the TLS feature, the issuer's signing tools, and the audit identity.
+  - Tests for 5.2d and 5.2e: `tests/c/x509v3_policy.c` and `tests/c/x509v3_misc.c`; the probe's
+    `v3print` with the corpus `v3print_policy.txt` and random mutations (5,000 sessions pass);
+    and the `x509v3_print` fuzz target over these NIDs too (1M runs clean).
+  - [x] **5.2f RFC 3779** (`x509v3/rfc3779.rs`, from `v3_addr.c` and `v3_asid.c`):
+    - IP address blocks: the items, the method (made from text with prefixes, ranges, SAFIs,
+      and inheritance; printed), and `X509v3_addr_add_*`, `_get_afi` (two octets only when
+      there are two: CVE-2017-3735), `_get_range`, `_is_canonical`, `_canonize`, `_inherits`,
+      and `_subset`.
+    - AS identifiers: the items, the method, and `X509v3_asid_add_*`, `_is_canonical`,
+      `_canonize`, `_inherits`, and `_subset`.
+    - As OpenSSL's, a list decoded from DER has no comparison, so canonizing it doesn't sort
+      it; C's `strtoul` and its conversions to `unsigned` and `int` are kept for SAFIs and
+      prefix lengths.
+    - `X509v3_addr_validate_path`, `X509v3_asid_validate_path`, and the
+      `_validate_resource_set` functions read the certificates' cached extensions: they come
+      with path validation (5.4).
+    - Tests: `tests/c/x509v3_rfc3779.c`; the probe's `v3print` with the corpus
+      `v3print_rfc3779.txt` and random mutations; the `x509v3_print` fuzz target over both
+      NIDs and the new `rfc3779` target (decoding, canonical form, canonizing, ranges, and
+      subsets of untrusted values); families without their parts fail
+      (docs/DEVIATIONS.md).
   - the certificate's extension cache (`ossl_x509v3_cache_extensions`: the SHA-1 hash, the
     flags, and the decoded extensions) and what 5.1c2 left for it (listed there)
   - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for
@@ -4689,6 +4722,8 @@ Exit checks:
   - `X509_TRUST`
   - CRLs (delta, indirect, IDP)
   - Suite B, DANE, proxy certificates
+  - RFC 3779 resources (`X509v3_addr_validate_path`, `X509v3_asid_validate_path`, and the
+    `_validate_resource_set` functions, deferred from 5.2f)
   - the full `X509_STORE_CTX` API with exact verify-callback semantics (the callback is
     invoked per error with an override, and the error, depth, and current certificate are
     exact)

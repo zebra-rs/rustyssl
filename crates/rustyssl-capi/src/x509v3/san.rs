@@ -89,7 +89,7 @@ unsafe fn add_len_value(name: &[u8], value: &[u8], ret: *mut *mut stack_st_CONF_
 }
 
 /// `ossl_v3_name_cmp`: whether `name` is `cmp`, or `cmp` followed by `.` and anything.
-fn name_is(name: Option<&[u8]>, cmp: &[u8]) -> bool {
+pub(crate) fn name_is(name: Option<&[u8]>, cmp: &[u8]) -> bool {
     name.and_then(|n| n.strip_prefix(cmp))
         .is_some_and(|rest| rest.first().is_none_or(|&c| c == b'.'))
 }
