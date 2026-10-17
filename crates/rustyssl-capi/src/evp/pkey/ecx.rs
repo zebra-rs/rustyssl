@@ -941,3 +941,33 @@ ffi_callback! {
         unsafe { ecd_item_sign(alg1, alg2, NID_ED448) }
     }
 }
+
+ffi_callback! {
+    /// `ecd_sig_info_set25519`: no digest, Ed25519's 128 bits, usable in TLS.
+    ///
+    /// # Safety
+    /// `siginf` is a live `X509_SIG_INFO`.
+    pub(crate) unsafe extern "C" fn ecd_sig_info_set25519(siginf: *mut rustyssl_abi::X509_SIG_INFO, _alg: *const rustyssl_abi::X509_ALGOR, _sig: *const rustyssl_abi::ASN1_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        let flags = rustyssl_abi::X509_SIG_INFO_TLS.cast_unsigned();
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::x509::purpose::X509_SIG_INFO_set(siginf, rustyssl_abi::NID_undef, rustyssl_abi::NID_ED25519, SECURITY_BITS_25519, flags) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `ecd_sig_info_set448`: no digest, Ed448's 224 bits, usable in TLS.
+    ///
+    /// # Safety
+    /// `siginf` is a live `X509_SIG_INFO`.
+    pub(crate) unsafe extern "C" fn ecd_sig_info_set448(siginf: *mut rustyssl_abi::X509_SIG_INFO, _alg: *const rustyssl_abi::X509_ALGOR, _sig: *const rustyssl_abi::ASN1_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        let flags = rustyssl_abi::X509_SIG_INFO_TLS.cast_unsigned();
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::x509::purpose::X509_SIG_INFO_set(siginf, rustyssl_abi::NID_undef, rustyssl_abi::NID_ED448, SECURITY_BITS_448, flags) };
+        1
+    }
+}

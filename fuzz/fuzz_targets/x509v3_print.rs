@@ -35,9 +35,9 @@ unsafe extern "C" {
 /// basic constraints, the extended key usages, the private key usage period, the alternative
 /// names, the key identifier, the information access and distribution point extensions, the
 /// CRL entries' extensions, the policy and constraint extensions, the smaller ones (SXNET, the
-/// TLS feature, the signing tools, the audit identity), RFC 3779's, and one without a method
-/// (commonName).
-const NIDS: [c_int; 45] = [
+/// TLS feature, the signing tools, the audit identity), RFC 3779's, the admission, and one
+/// without a method (commonName).
+const NIDS: [c_int; 46] = [
     abi::NID_key_usage,
     abi::NID_netscape_cert_type,
     abi::NID_netscape_base_url,
@@ -82,6 +82,7 @@ const NIDS: [c_int; 45] = [
     abi::NID_ac_auditIdentity,
     abi::NID_sbgp_ipAddrBlock,
     abi::NID_sbgp_autonomousSysNum,
+    abi::NID_x509ExtAdmission,
     abi::NID_commonName,
 ];
 

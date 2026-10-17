@@ -5,7 +5,9 @@
 //! `rustyssl_asn1::number` rather than BIGNUM, with the same text: decimal below 128 bits, `0x`
 //! and hex above.
 
+pub(crate) mod admission;
 pub(crate) mod akid;
+pub(crate) mod conf;
 pub(crate) mod crld;
 pub(crate) mod ctx;
 pub(crate) mod genn;

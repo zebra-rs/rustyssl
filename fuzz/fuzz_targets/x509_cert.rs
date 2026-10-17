@@ -1,9 +1,10 @@
 //! Fuzzes certificate decoding on untrusted input: d2i_X509_AUX (a certificate and, if more
-//! follows, its auxiliary data), then everything that reads a decoded certificate without the
-//! extension cache: the re-encodings (as decoded, the trusted form, and the TBSCertificate
-//! afresh), a copy, the getters, the extension list, the fingerprints and hashes, the key, a
-//! verification with its own key, and the time comparisons. Nothing may crash or read out of
-//! bounds (ASan).
+//! follows, its auxiliary data), then everything that reads a decoded certificate: the
+//! re-encodings (as decoded, the trusted form, and the TBSCertificate afresh), a copy, the
+//! getters, the extension list, the fingerprints and hashes, the key, a verification with its
+//! own key, the time comparisons, and the extension cache (its flags, usages, path lengths, key
+//! identifiers, and signature information, every purpose, self-signing, the comparison with the
+//! copy, and the copy as issued by it). Nothing may crash or read out of bounds (ASan).
 
 #![no_main]
 
@@ -12,6 +13,7 @@ use core::ptr;
 
 use libfuzzer_sys::fuzz_target;
 use rustyssl_abi::{
+    self as abi,
     ASN1_BIT_STRING, ASN1_INTEGER, ASN1_OCTET_STRING, ASN1_TIME, EVP_MD, EVP_PKEY, X509,
     X509_ALGOR, X509_EXTENSION, X509_NAME,
 };
@@ -56,6 +58,19 @@ unsafe extern "C" {
     fn EVP_sha256() -> *const EVP_MD;
     fn CRYPTO_free(p: *mut c_void, file: *const c_char, line: c_int);
     fn ERR_clear_error();
+    fn X509_check_purpose(x: *mut X509, id: c_int, non_leaf: c_int) -> c_int;
+    fn X509_check_ca(x: *mut X509) -> c_int;
+    fn X509_check_issued(issuer: *mut X509, subject: *mut X509) -> c_int;
+    fn X509_get_extension_flags(x: *mut X509) -> u32;
+    fn X509_get_key_usage(x: *mut X509) -> u32;
+    fn X509_get_extended_key_usage(x: *mut X509) -> u32;
+    fn X509_get0_subject_key_id(x: *mut X509) -> *const ASN1_OCTET_STRING;
+    fn X509_get0_authority_key_id(x: *mut X509) -> *const ASN1_OCTET_STRING;
+    fn X509_get_pathlen(x: *mut X509) -> c_long;
+    fn X509_get_proxy_pathlen(x: *mut X509) -> c_long;
+    fn X509_get_signature_info(x: *mut X509, mdnid: *mut c_int, pknid: *mut c_int, secbits: *mut c_int, flags: *mut u32) -> c_int;
+    fn X509_self_signed(x: *mut X509, verify: c_int) -> c_int;
+    fn X509_cmp(a: *const X509, b: *const X509) -> c_int;
 }
 
 /// Encodes with `f` and frees the encoding.
@@ -97,7 +112,7 @@ fuzz_target!(|data: &[u8]| {
         for i in 0..X509_get_ext_count(x) {
             X509_get_ext(x, i);
         }
-        X509_get_ext_by_NID(x, 87, -1);
+        X509_get_ext_by_NID(x, abi::NID_basic_constraints, -1);
         X509_get_ext_by_critical(x, 1, -1);
         let mut md = [0u8; 64];
         let mut mdlen = 0;
@@ -111,6 +126,26 @@ fuzz_target!(|data: &[u8]| {
         X509_subject_name_hash_old(x);
         X509_issuer_and_serial_hash(x);
         X509_issuer_and_serial_cmp(x, copy);
+        // The extension cache and what reads it.
+        X509_get_extension_flags(x);
+        for id in abi::X509_PURPOSE_MIN..=abi::X509_PURPOSE_MAX {
+            X509_check_purpose(x, id, 0);
+            X509_check_purpose(x, id, 1);
+        }
+        X509_check_ca(x);
+        X509_get_key_usage(x);
+        X509_get_extended_key_usage(x);
+        X509_get0_subject_key_id(x);
+        X509_get0_authority_key_id(x);
+        X509_get_pathlen(x);
+        X509_get_proxy_pathlen(x);
+        let (mut a, mut b, mut c, mut d) = (0, 0, 0, 0);
+        X509_get_signature_info(x, &mut a, &mut b, &mut c, &mut d);
+        X509_self_signed(x, 0);
+        if !copy.is_null() {
+            X509_cmp(x, copy);
+            X509_check_issued(x, copy);
+        }
         let key = X509_get0_pubkey(x);
         if !key.is_null() {
             X509_verify(x, key);

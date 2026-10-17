@@ -10,6 +10,7 @@ pub(crate) mod name;
 pub(crate) mod p8;
 pub(crate) mod pbe;
 pub(crate) mod pubkey;
+pub(crate) mod purpose;
 pub(crate) mod req;
 pub(crate) mod sig;
 

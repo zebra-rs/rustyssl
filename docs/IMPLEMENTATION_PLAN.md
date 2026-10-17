@@ -4608,9 +4608,11 @@ Exit checks:
       `asnd2i_req.txt` and random mutations.
   - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`. Done after 5.2: decoding a CRL caches
     its extensions (the IDP, AKID, CRL and delta numbers, and each entry's reason and
-    certificate issuer), which are 5.2's types.
-  - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT`.
-- [ ] **5.2 X509v3 extensions:**
+    certificate issuer), which are 5.2's types. With it come `X509V3_EXT_CRL_add_nconf` and
+    `_CRL_add_conf` (5.2h).
+  - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT` (with
+    the attribute certificate extensions and subject directory attributes left from 5.2).
+- [x] **5.2 X509v3 extensions:**
   - [x] **5.2a The methods and the simple extensions** (`x509v3/registry.rs`,
     `x509v3/standard.rs`, `x509v3/simple.rs`, from `v3_lib.c`, `v3_prn.c`, `do_ext_i2d`,
     `v3_bitst.c`, `v3_ia5.c`, `v3_utf8.c`, `v3_int.c`, `v3_enum.c`, `v3_skid.c`, `v3_bcons.c`,
@@ -4696,17 +4698,40 @@ Exit checks:
       NIDs and the new `rfc3779` target (decoding, canonical form, canonizing, ranges, and
       subsets of untrusted values); families without their parts fail
       (docs/DEVIATIONS.md).
-  - the certificate's extension cache (`ossl_x509v3_cache_extensions`: the SHA-1 hash, the
-    flags, and the decoded extensions) and what 5.1c2 left for it (listed there)
-  - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for
-    application-defined methods)
-  - every built-in extension: BC, KU, EKU, SKI, AKI, SAN, IAN (`GENERAL_NAME`; the
-    CVE-2023-0286 lesson), CRL DP, freshestCRL, AIA, SIA, policies, mappings, constraints,
-    inhibitAnyPolicy, name constraints, TLS feature, SCT list, RFC 3779, IDP, Netscape
-    extensions, …
-  - the `v2i`/`i2v`/`s2i`/`i2s`/`i2r`/`r2i` conversions
-  - `X509V3_EXT_conf_nid` / `X509V3_EXT_nconf` (the config-string language)
-  - `X509V3_get_d2i`, `X509V3_add1_i2d`, `X509V3_EXT_print` (byte-exact)
+  - [x] **5.2g The admission extension** (`x509v3/admission.rs`, from `v3_admis.c`):
+    `ADMISSION_SYNTAX`, `ADMISSIONS`, `PROFESSION_INFO`, and `NAMING_AUTHORITY` with their
+    getters and setters, printed as OpenSSL does (an empty naming authority fails the whole
+    printing; object identifiers are cut at 127 characters). Tests:
+    `tests/c/x509v3_admission.c`, the corpus `v3print_admission.txt`, and the `x509v3_print`
+    fuzz target over its NID.
+  - [x] **5.2h Extensions from configuration text** (`x509v3/conf.rs`, from `v3_conf.c`):
+    `X509V3_EXT_nconf` and `_nconf_nid` (`critical,`, `DER:`, `@section`, lists, strings, and
+    the `r2i` policies), `X509V3_EXT_add_nconf_sk`, `_add_nconf` (the subject key identifier
+    made before the authority's, `X509V3_CTX_REPLACE`), `_REQ_add_nconf`, and the legacy `CONF`
+    forms. `ASN1:` values need `ASN1_generate_v3` (6.1) and abort until then;
+    `X509V3_EXT_CRL_add_nconf` and `_CRL_add_conf` come with CRLs (5.1e). A NULL name or value
+    fails (docs/DEVIATIONS.md). Test: `tests/c/x509v3_conf.c`.
+  - [x] **5.2i The extension cache and purposes** (`x509/purpose.rs`, from `v3_purp.c`, and
+    `X509_cmp`, `X509_add_cert(s)`, `X509_self_signed`, and the signature information of
+    `x509_cmp.c`, `x509_vfy.c`, and `x509_set.c`):
+    - The cache, filled once under the certificate's lock: the SHA-1 fingerprint, the
+      `EXFLAG_*` flags (an undecodable or impossible extension is `EXFLAG_INVALID`), the key
+      usages, path lengths, key identifiers, alternative names, name constraints, distribution
+      points, RFC 3779 resources, and the signature information (with the RSA-PSS and EdDSA
+      methods' `siginf_set`).
+    - The purposes (`X509_PURPOSE_*`, including added and changed ones, with OpenSSL's
+      renumbering quirk), `X509_check_purpose`, `_ca`, `_issued`, `_akid`,
+      `X509_supported_extension`, the flag, usage, key identifier, and path length getters,
+      `X509_get_ext_d2i`, `X509_set_proxy_flag` and `_pathlen`, `X509_SIG_INFO_get`/`_set`,
+      and `X509_get_signature_info`.
+    - A NULL certificate answers as an invalid one (docs/DEVIATIONS.md).
+    - Tests: `tests/c/x509_purpose.c` (certificates of every kind, every purpose as leaf and
+      CA, issuers, comparisons, lists, the table); the probe's `x509cache` with the corpus
+      `x509cache.txt` and the mutated certificates of `asnd2i` sessions; and the `x509_cert`
+      fuzz target over the cache too.
+  - The methods still placeholders arrive with their types: the OCSP extensions (6.6), the
+    SCT lists and precertificate poison (5.7), and the attribute certificate extensions and
+    subject directory attributes (with `X509_ACERT`, 5.1f).
 - [ ] **5.3 Store and lookup:**
   - `X509_STORE`, `X509_OBJECT`
   - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store

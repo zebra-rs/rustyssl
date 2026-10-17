@@ -127,10 +127,12 @@ pub(crate) struct Cert {
     pub(crate) ex_data: CRYPTO_EX_DATA,
     /// The auxiliary trust data, from `d2i_X509_AUX` or the trust setters.
     pub(crate) aux: *mut X509_CERT_AUX,
-    lock: *mut CRYPTO_RWLOCK,
+    pub(crate) lock: *mut CRYPTO_RWLOCK,
     pub(crate) distinguishing_id: *mut ASN1_OCTET_STRING,
     pub(crate) libctx: *mut OSSL_LIB_CTX,
     pub(crate) propq: *mut c_char,
+    /// The extension cache (`v3_purp.c`).
+    pub(crate) cache: crate::x509::purpose::Cache,
 }
 
 /// `X509_CERT_AUX` (`x509_cert_aux_st`).
@@ -385,6 +387,7 @@ unsafe fn free_extras(x: &mut Cert, v: *mut ASN1_VALUE, going: bool) {
     unsafe { ASN1_OCTET_STRING_free(x.distinguishing_id) };
     x.aux = ptr::null_mut();
     x.distinguishing_id = ptr::null_mut();
+    x.cache.free();
     if going {
         // SAFETY: as above.
         unsafe { mem::release(x.propq.cast()) };
@@ -412,6 +415,7 @@ ffi_callback! {
                     // SAFETY: the certificate at `v`.
                     unsafe { free_extras(x, v, false) };
                 }
+                x.cache.reset();
                 // SAFETY: as above.
                 c_int::from(unsafe { CRYPTO_new_ex_data(CRYPTO_EX_INDEX_X509, v.cast(), &raw mut x.ex_data) } != 0)
             }
@@ -1810,6 +1814,19 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { cert_of(cert) }) else { return 0 };
+        // The cached SHA-1 fingerprint, as OpenSSL answers once the cache is filled.
+        if let Some(sha1) = c.cache.sha1_fingerprint()
+            // SAFETY: the caller's digest.
+            && !md.is_null() && unsafe { crate::evp::digest::EVP_MD_is_a(md, c"SHA1".as_ptr()) } != 0
+        {
+            if !len.is_null() {
+                // SAFETY: the caller's guarantee.
+                unsafe { len.write(20) };
+            }
+            // SAFETY: the caller's room for a SHA-1 digest.
+            unsafe { ptr::copy_nonoverlapping(sha1.as_ptr(), data, sha1.len()) };
+            return 1;
+        }
         // SAFETY: no preconditions.
         let it = unsafe { X509_it() };
         // SAFETY: the certificate, of the item; the caller's digest and room.

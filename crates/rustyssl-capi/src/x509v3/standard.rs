@@ -13,12 +13,11 @@ use rustyssl_abi::{
     NID_indirect_issuer, NID_issued_on_behalf_of, NID_no_assertion, NID_no_rev_avail,
     NID_role_spec_cert_identifier, NID_single_use, NID_soa_identifier,
     NID_subject_directory_attributes, NID_target_information, NID_time_specification,
-    NID_user_notice, NID_x509ExtAdmission, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE,
-    stack_st_CONF_VALUE,
+    NID_user_notice, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE, stack_st_CONF_VALUE,
 };
 
 use super::registry::{Method, method};
-use super::{akid, crld, info, misc, policy, rfc3779, san, simple};
+use super::{admission, akid, crld, info, misc, policy, rfc3779, san, simple};
 
 fn later() -> ! {
     crate::stub::unimplemented("an X509v3 extension method of a later part of step 5.2")
@@ -85,7 +84,7 @@ const fn placeholder(nid: c_int, flags: c_int) -> Method {
     Method(m)
 }
 
-static LATER: [Method; 28] = [
+static LATER: [Method; 27] = [
     placeholder(NID_id_pkix_OCSP_Nonce, 0),
     placeholder(NID_id_pkix_OCSP_CrlID, 0),
     placeholder(NID_id_pkix_OCSP_noCheck, 0),
@@ -97,7 +96,6 @@ static LATER: [Method; 28] = [
     placeholder(NID_ct_precert_scts, 0),
     placeholder(NID_ct_precert_poison, 0),
     placeholder(NID_ct_cert_scts, 0),
-    placeholder(NID_x509ExtAdmission, 0),
     placeholder(NID_authority_attribute_identifier, X509V3_EXT_MULTILINE),
     placeholder(NID_role_spec_cert_identifier, X509V3_EXT_MULTILINE),
     placeholder(NID_basic_att_constraints, 0),
@@ -157,6 +155,7 @@ pub(crate) fn methods() -> impl Iterator<Item = &'static Method> {
         &misc::AUDIT_IDENTITY,
         &rfc3779::ADDR,
         &rfc3779::ASID,
+        &admission::ADMISSION,
     ]
     .into_iter()
     .chain(simple::NS_IA5.iter())

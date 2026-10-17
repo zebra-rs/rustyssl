@@ -1321,3 +1321,55 @@ ffi_callback! {
         3
     }
 }
+
+ffi_callback! {
+    /// `rsa_sig_info_set`: an RSA-PSS signature's digest and security bits (half the digest's,
+    /// SHA-1 and MD5 lower), usable in TLS with SHA-2 for both digests and a salt as long.
+    ///
+    /// # Safety
+    /// `siginf` is a live `X509_SIG_INFO`; `sigalg` is a live AlgorithmIdentifier.
+    pub(crate) unsafe extern "C" fn rsa_sig_info_set(siginf: *mut rustyssl_abi::X509_SIG_INFO, sigalg: *const rustyssl_abi::X509_ALGOR, _sig: *const rustyssl_abi::ASN1_STRING) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let obj = unsafe { (*sigalg).algorithm };
+        // SAFETY: its object.
+        if unsafe { crate::objects::OBJ_obj2nid(obj) } != EVP_PKEY_RSA_PSS {
+            return 0;
+        }
+        // SAFETY: as above.
+        let pss = unsafe { pss_decode(sigalg) };
+        let rv = (|| {
+            if pss.is_null() {
+                return 0;
+            }
+            // SAFETY: just decoded.
+            let Some((md, mgf1md, saltlen)) = (unsafe { crate::rsa_pmeth::pss_get_param(pss) }) else { return 0 };
+            // SAFETY: a digest.
+            let md_size = unsafe { crate::evp::digest::EVP_MD_get_size(md) };
+            if md_size <= 0 {
+                return 0;
+            }
+            // SAFETY: as above.
+            let mdnid = unsafe { crate::evp::digest::EVP_MD_get_type(md) };
+            // SAFETY: as above.
+            let mgfnid = unsafe { crate::evp::digest::EVP_MD_get_type(mgf1md) };
+            let tls = [NID_sha256, rustyssl_abi::NID_sha384, rustyssl_abi::NID_sha512].contains(&mdnid)
+                && mdnid == mgfnid
+                && saltlen == md_size;
+            let flags = if tls { rustyssl_abi::X509_SIG_INFO_TLS.cast_unsigned() } else { 0 };
+            let secbits = match mdnid {
+                n if n == rustyssl_abi::NID_sha1 => 64,
+                n if n == rustyssl_abi::NID_md5_sha1 => 68,
+                n if n == rustyssl_abi::NID_md5 => 39,
+                _ => md_size.saturating_mul(4),
+            };
+            // SAFETY: the caller's information.
+            unsafe { crate::x509::purpose::X509_SIG_INFO_set(siginf, mdnid, EVP_PKEY_RSA_PSS, secbits, flags) };
+            1
+        })();
+        // SAFETY: decoded above, or NULL.
+        unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss) };
+        rv
+    }
+}
