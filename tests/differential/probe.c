@@ -419,6 +419,10 @@
  *                              AAD (each in hex, - for none), printed with an exported secret;
  *                              then a receiver's decapsulation and opening of the encapsulated
  *                              key and ciphertext given (= for the sender's)
+ *   v3print <nid> <hex>        an extension of <nid> with the octets as its value: X509V3_EXT_print
+ *                              under each unknown-extension flag (the return and the text), then
+ *                              X509V3_EXT_d2i and X509V3_EXT_i2d of what it decodes to (the
+ *                              extension's DER), with the errors
  *   x509name <hex>             d2i_X509_NAME of the octets: what was read, the re-encoding, the
  *                              entries, X509_NAME_oneline, print_ex (ONELINE, RFC2253, MULTILINE),
  *                              the hashes, and the comparison with a copy re-encoded from its
@@ -6739,6 +6743,70 @@ static int x509_command(const char *command, const char *line)
         OPENSSL_free(pt);
         OPENSSL_free(genc);
         OPENSSL_free(gct);
+        return 1;
+    }
+    if (strcmp(command, "v3print") == 0) {
+        static const unsigned long flags[] = { X509V3_EXT_DEFAULT, X509V3_EXT_ERROR_UNKNOWN,
+                                               X509V3_EXT_PARSE_UNKNOWN, X509V3_EXT_DUMP_UNKNOWN };
+        char hexs[1000] = "";
+        long n = 0;
+        int nid = 0;
+        unsigned char *der = NULL;
+        ASN1_OCTET_STRING *os = ASN1_OCTET_STRING_new();
+        X509_EXTENSION *ext;
+        const X509V3_EXT_METHOD *m;
+        void *v;
+        size_t k;
+
+        if (sscanf(line, "%*s %d %999s", &nid, hexs) >= 1 && hexs[0] != '\0')
+            der = OPENSSL_hexstr2buf(hexs, &n);
+        ASN1_OCTET_STRING_set(os, der, (int)n);
+        ext = X509_EXTENSION_create_by_NID(NULL, nid, 0, os);
+        printf("v3print %d:", nid);
+        for (k = 0; ext != NULL && k < sizeof(flags) / sizeof(flags[0]); k++) {
+            BIO *mem = BIO_new(BIO_s_mem());
+            char *text;
+            long tlen;
+            int r = X509V3_EXT_print(mem, ext, flags[k], 1);
+
+            tlen = BIO_get_mem_data(mem, &text);
+            print_escaped(" print", r, text, (size_t)tlen);
+            BIO_free(mem);
+        }
+        m = X509V3_EXT_get_nid(nid);
+        v = ext == NULL ? NULL : X509V3_EXT_d2i(ext);
+        if (v != NULL) {
+            X509_EXTENSION *again = X509V3_EXT_i2d(nid, 0, v);
+            unsigned char *enc = NULL;
+            int len = again == NULL ? -1 : i2d_X509_EXTENSION(again, &enc), i;
+
+            printf(" i2d=");
+            for (i = 0; i < len; i++)
+                printf("%02x", enc[i]);
+            OPENSSL_free(enc);
+            X509_EXTENSION_free(again);
+            if (m->it != NULL)
+                ASN1_item_free(v, ASN1_ITEM_ptr(m->it));
+            else
+                m->ext_free(v);
+        } else {
+            printf(" d2i=none");
+        }
+        {
+            unsigned long code;
+            const char *edata;
+            int eflags;
+
+            while ((code = ERR_get_error_all(NULL, NULL, NULL, &edata, &eflags)) != 0) {
+                printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+                if ((eflags & ERR_TXT_STRING) != 0 && edata[0] != '\0')
+                    printf("[%s]", edata);
+            }
+        }
+        printf("\n");
+        X509_EXTENSION_free(ext);
+        ASN1_OCTET_STRING_free(os);
+        OPENSSL_free(der);
         return 1;
     }
     if (strcmp(command, "x509name") == 0) {

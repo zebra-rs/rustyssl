@@ -1,0 +1,37 @@
+# X509V3_EXT_print, X509V3_EXT_d2i, and X509V3_EXT_i2d of the simple extensions (key usage, Netscape's
+# certificate type and strings, the signing tool, the CRL numbers and reason, inhibitAnyPolicy, the
+# subject key identifier, basic constraints, extended key usage, the private key usage period): good,
+# empty, broken, and not DER values, and an extension without a method.
+v3print 83 030205a0
+v3print 83 0303070080
+v3print 83 030100
+v3print 71 030200ff
+v3print 78 160b48656c6c6f20776f726c64
+v3print 78 1600
+v3print 72 1605687474703a
+v3print 1007 0c05746f6f6cc3
+v3print 1007 0c00
+v3print 88 02020100
+v3print 88 02110100000000000000000000000000000000
+v3print 140 0201ff
+v3print 141 0a0101
+v3print 141 0a0107
+v3print 141 0a012a
+v3print 748 020100
+v3print 82 0404deadbeef
+v3print 82 0400
+v3print 87 30060101ff020103
+v3print 87 3000
+v3print 87 30030101
+v3print 126 301406082b0601050507030106082b06010505070302
+v3print 126 300506032a0304
+v3print 126 3000
+v3print 368 300b06092b0601050507300101
+v3print 84 3022800f32303234303130313030303030305a810f32303235303130313030303030305a
+v3print 84 3011800f32303234303130313030303030305a
+v3print 84 3000
+v3print 83 0302
+v3print 83 04020000
+v3print 87 3003010100
+v3print 126 30030602
+v3print 13 3003020105
