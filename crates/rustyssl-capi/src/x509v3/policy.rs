@@ -4,9 +4,9 @@
 //! and name constraints (and the attribute certificates' holder and delegated ones), as their
 //! types, printed and made from text.
 //!
-//! Checking a certificate's names against name constraints (`NAME_CONSTRAINTS_check`) comes
-//! with path validation (step 5.4), and printing a policy tree's node (`X509_POLICY_NODE_print`)
-//! with the policy tree.
+//! Checking a certificate's names against name constraints (`NAME_CONSTRAINTS_check`) is in
+//! `ncons.rs`, and printing a policy tree's node (`X509_POLICY_NODE_print`) with the policy
+//! tree (`x509/pcy.rs`).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
 use core::mem::offset_of;
@@ -302,7 +302,7 @@ d2i! {
 }
 
 /// `POLICYINFO_free` as a stack's free function.
-unsafe extern "C" fn free_pol(p: *mut c_void) {
+pub(crate) unsafe extern "C" fn free_pol(p: *mut c_void) {
     // SAFETY: a policy of the stack, which the stack owned.
     unsafe { POLICYINFO_free(p.cast()) };
 }
@@ -972,7 +972,7 @@ ffi_callback! {
 }
 
 /// `POLICY_MAPPING_free` as a stack's free function.
-unsafe extern "C" fn free_pmap(p: *mut c_void) {
+pub(crate) unsafe extern "C" fn free_pmap(p: *mut c_void) {
     // SAFETY: a mapping of the stack, which the stack owned.
     unsafe { POLICY_MAPPING_free(p.cast()) };
 }

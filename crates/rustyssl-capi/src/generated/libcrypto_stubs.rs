@@ -9151,15 +9151,6 @@ pub extern "C" fn X509_CRL_print_fp(_: *mut FILE, _: *mut X509_CRL) -> core::ffi
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_POLICY_NODE_print(
-    _: *mut BIO,
-    _: *mut X509_POLICY_NODE,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("X509_POLICY_NODE_print")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_REQ_print(_: *mut BIO, _: *mut X509_REQ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509_REQ_print")
 }
@@ -9209,81 +9200,6 @@ pub extern "C" fn X509_load_http(
 #[unsafe(no_mangle)]
 pub extern "C" fn X509_ocspid_print(_: *mut BIO, _: *mut X509) -> core::ffi::c_int {
     crate::stub::unimplemented("X509_ocspid_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_check(
-    _: *mut *mut X509_POLICY_TREE,
-    _: *mut core::ffi::c_int,
-    _: *mut stack_st_X509,
-    _: *mut stack_st_ASN1_OBJECT,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_policy_check")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_level_get0_node(
-    _: *const X509_POLICY_LEVEL,
-    _: core::ffi::c_int,
-) -> *mut X509_POLICY_NODE {
-    crate::stub::unimplemented("X509_policy_level_get0_node")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_level_node_count(_: *mut X509_POLICY_LEVEL) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_policy_level_node_count")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_node_get0_parent(
-    _: *const X509_POLICY_NODE,
-) -> *const X509_POLICY_NODE {
-    crate::stub::unimplemented("X509_policy_node_get0_parent")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_node_get0_policy(_: *const X509_POLICY_NODE) -> *const ASN1_OBJECT {
-    crate::stub::unimplemented("X509_policy_node_get0_policy")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_node_get0_qualifiers(
-    _: *const X509_POLICY_NODE,
-) -> *mut stack_st_POLICYQUALINFO {
-    crate::stub::unimplemented("X509_policy_node_get0_qualifiers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_tree_free(_: *mut X509_POLICY_TREE) {
-    crate::stub::unimplemented("X509_policy_tree_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_tree_get0_level(
-    _: *const X509_POLICY_TREE,
-    _: core::ffi::c_int,
-) -> *mut X509_POLICY_LEVEL {
-    crate::stub::unimplemented("X509_policy_tree_get0_level")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_tree_get0_policies(
-    _: *const X509_POLICY_TREE,
-) -> *mut stack_st_X509_POLICY_NODE {
-    crate::stub::unimplemented("X509_policy_tree_get0_policies")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_tree_get0_user_policies(
-    _: *const X509_POLICY_TREE,
-) -> *mut stack_st_X509_POLICY_NODE {
-    crate::stub::unimplemented("X509_policy_tree_get0_user_policies")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_policy_tree_level_count(_: *const X509_POLICY_TREE) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_policy_tree_level_count")
 }
 
 #[unsafe(no_mangle)]

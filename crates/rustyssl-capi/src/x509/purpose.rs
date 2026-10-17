@@ -119,6 +119,8 @@ pub(crate) struct Cache {
     pub(crate) crldp: *mut rustyssl_abi::CRL_DIST_POINTS,
     pub(crate) addr: *mut rustyssl_abi::IPAddrBlocks,
     pub(crate) asid: *mut rustyssl_abi::ASIdentifiers,
+    /// The policies, mappings, and constraints, made on first use (`x509/pcy.rs`).
+    pub(crate) policy_cache: *mut crate::x509::pcy::PolicyCache,
     siginf: SigInfo,
 }
 
@@ -138,6 +140,7 @@ impl Cache {
         self.crldp = ptr::null_mut();
         self.addr = ptr::null_mut();
         self.asid = ptr::null_mut();
+        self.policy_cache = ptr::null_mut();
     }
 
     /// The cached SHA-1 fingerprint, once the cache is filled with one.
@@ -162,6 +165,8 @@ impl Cache {
         unsafe { OPENSSL_sk_pop_free(self.addr.cast(), Some(free_family)) };
         // SAFETY: as above.
         unsafe { ASIdentifiers_free(self.asid) };
+        // SAFETY: as above.
+        unsafe { crate::x509::pcy::cache_free(self.policy_cache) };
         self.reset();
     }
 }

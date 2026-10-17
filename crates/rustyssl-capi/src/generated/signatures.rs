@@ -12526,6 +12526,8 @@ const _: unsafe extern "C" fn(*mut X509_OBJECT) -> core::ffi::c_int =
     crate::x509::store::X509_OBJECT_up_ref_count;
 const _: unsafe extern "C" fn(*mut X509_PKEY) = crate::x509::info::X509_PKEY_free;
 const _: unsafe extern "C" fn() -> *mut X509_PKEY = crate::x509::info::X509_PKEY_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509_POLICY_NODE, core::ffi::c_int) =
+    crate::x509::pcy::X509_POLICY_NODE_print;
 const _: unsafe extern "C" fn(*const X509_PUBKEY) -> *mut X509_PUBKEY =
     crate::x509::pubkey::X509_PUBKEY_dup;
 const _: unsafe extern "C" fn(*const X509_PUBKEY, *const X509_PUBKEY) -> core::ffi::c_int =
@@ -13476,6 +13478,32 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *mut X509 = crate::x509::cert::X509_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509 =
     crate::x509::cert::X509_new_ex;
+const _: unsafe extern "C" fn(
+    *mut *mut X509_POLICY_TREE,
+    *mut core::ffi::c_int,
+    *mut stack_st_X509,
+    *mut stack_st_ASN1_OBJECT,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::x509::pcy::X509_policy_check;
+const _: unsafe extern "C" fn(*const X509_POLICY_LEVEL, core::ffi::c_int) -> *mut X509_POLICY_NODE =
+    crate::x509::pcy::X509_policy_level_get0_node;
+const _: unsafe extern "C" fn(*mut X509_POLICY_LEVEL) -> core::ffi::c_int =
+    crate::x509::pcy::X509_policy_level_node_count;
+const _: unsafe extern "C" fn(*const X509_POLICY_NODE) -> *const X509_POLICY_NODE =
+    crate::x509::pcy::X509_policy_node_get0_parent;
+const _: unsafe extern "C" fn(*const X509_POLICY_NODE) -> *const ASN1_OBJECT =
+    crate::x509::pcy::X509_policy_node_get0_policy;
+const _: unsafe extern "C" fn(*const X509_POLICY_NODE) -> *mut stack_st_POLICYQUALINFO =
+    crate::x509::pcy::X509_policy_node_get0_qualifiers;
+const _: unsafe extern "C" fn(*mut X509_POLICY_TREE) = crate::x509::pcy::X509_policy_tree_free;
+const _: unsafe extern "C" fn(*const X509_POLICY_TREE, core::ffi::c_int) -> *mut X509_POLICY_LEVEL =
+    crate::x509::pcy::X509_policy_tree_get0_level;
+const _: unsafe extern "C" fn(*const X509_POLICY_TREE) -> *mut stack_st_X509_POLICY_NODE =
+    crate::x509::pcy::X509_policy_tree_get0_policies;
+const _: unsafe extern "C" fn(*const X509_POLICY_TREE) -> *mut stack_st_X509_POLICY_NODE =
+    crate::x509::pcy::X509_policy_tree_get0_user_policies;
+const _: unsafe extern "C" fn(*const X509_POLICY_TREE) -> core::ffi::c_int =
+    crate::x509::pcy::X509_policy_tree_level_count;
 const _: unsafe extern "C" fn(
     *const X509,
     *const EVP_MD,
