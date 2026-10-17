@@ -109,7 +109,7 @@ pub(super) fn is_detached(p7: *mut PKCS7) -> bool {
 }
 
 /// A new memory BIO that reads as EOF when empty, or NULL.
-pub(super) fn mem_bio() -> *mut BIO {
+pub(crate) fn mem_bio() -> *mut BIO {
     // SAFETY: no preconditions.
     let method = unsafe { BIO_s_mem() };
     // SAFETY: the built-in method.

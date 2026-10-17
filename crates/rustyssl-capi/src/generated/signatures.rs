@@ -918,6 +918,14 @@ const _: unsafe extern "C" fn(
     *mut BIO_ADDR,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::bio::sock::BIO_accept_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut asn1_ps_func, *mut asn1_ps_func) -> core::ffi::c_int =
+    crate::asn1::bio_asn1::BIO_asn1_get_prefix;
+const _: unsafe extern "C" fn(*mut BIO, *mut asn1_ps_func, *mut asn1_ps_func) -> core::ffi::c_int =
+    crate::asn1::bio_asn1::BIO_asn1_get_suffix;
+const _: unsafe extern "C" fn(*mut BIO, asn1_ps_func, asn1_ps_func) -> core::ffi::c_int =
+    crate::asn1::bio_asn1::BIO_asn1_set_prefix;
+const _: unsafe extern "C" fn(*mut BIO, asn1_ps_func, asn1_ps_func) -> core::ffi::c_int =
+    crate::asn1::bio_asn1::BIO_asn1_set_suffix;
 const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *const BIO_ADDR,
@@ -1018,6 +1026,7 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut BIO) -> *mut BIO = crate::bio::BIO_dup_chain;
 const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
     crate::bio::dgram::BIO_err_is_non_fatal;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::asn1::bio_asn1::BIO_f_asn1;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::base64::BIO_f_base64;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_cipher;
@@ -1335,6 +1344,9 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const BIO) -> *const core::ffi::c_char = crate::bio::BIO_method_name;
 const _: unsafe extern "C" fn(*const BIO) -> core::ffi::c_int = crate::bio::BIO_method_type;
 const _: unsafe extern "C" fn(*const BIO_METHOD) -> *mut BIO = crate::bio::BIO_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut ASN1_VALUE, *const ASN1_ITEM) -> *mut BIO =
+    crate::asn1::ndef::BIO_new_NDEF;
+const _: unsafe extern "C" fn(*mut BIO, *mut PKCS7) -> *mut BIO = crate::pkcs7::mime::BIO_new_PKCS7;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut BIO =
     crate::bio::accept::BIO_new_accept;
 const _: unsafe extern "C" fn(*mut *mut BIO, usize, *mut *mut BIO, usize) -> core::ffi::c_int =
@@ -10008,6 +10020,14 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> core::ffi::c_int = crate::pem::PEM_write_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut ASN1_VALUE,
+    *mut BIO,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const ASN1_ITEM,
+) -> core::ffi::c_int = crate::asn1::mime::PEM_write_bio_ASN1_stream;
 const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHparams;
 const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
@@ -10042,6 +10062,12 @@ const _: unsafe extern "C" fn(*mut BIO, *const NETSCAPE_CERT_SEQUENCE) -> core::
     crate::pem_pkey::PEM_write_bio_NETSCAPE_CERT_SEQUENCE;
 const _: unsafe extern "C" fn(*mut BIO, *const PKCS7) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_PKCS7;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut PKCS7,
+    *mut BIO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs7::mime::PEM_write_bio_PKCS7_stream;
 const _: unsafe extern "C" fn(*mut BIO, *const X509_SIG) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_PKCS8;
 const _: unsafe extern "C" fn(
@@ -10661,6 +10687,8 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::pkcs7::PKCS7_simple_smimecap;
+const _: unsafe extern "C" fn(*mut *mut *mut core::ffi::c_uchar, *mut PKCS7) -> core::ffi::c_int =
+    crate::pkcs7::mime::PKCS7_stream;
 const _: unsafe extern "C" fn(*mut PKCS7) -> core::ffi::c_int = crate::pkcs7::PKCS7_type_is_other;
 const _: unsafe extern "C" fn(
     *mut PKCS7,
@@ -11721,8 +11749,51 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::lowlevel::hash::SHA512_Update;
 const _: unsafe extern "C" fn(*mut BIO, *mut BIO, core::ffi::c_int) -> core::ffi::c_int =
     crate::asn1::mime::SMIME_crlf_copy;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut BIO, *const ASN1_ITEM) -> *mut ASN1_VALUE =
+    crate::asn1::mime::SMIME_read_ASN1;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    core::ffi::c_int,
+    *mut *mut BIO,
+    *const ASN1_ITEM,
+    *mut *mut ASN1_VALUE,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut ASN1_VALUE = crate::asn1::mime::SMIME_read_ASN1_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut BIO) -> *mut PKCS7 =
+    crate::pkcs7::mime::SMIME_read_PKCS7;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut BIO, *mut *mut PKCS7) -> *mut PKCS7 =
+    crate::pkcs7::mime::SMIME_read_PKCS7_ex;
 const _: unsafe extern "C" fn(*mut BIO, *mut BIO) -> core::ffi::c_int =
     crate::asn1::mime::SMIME_text;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut ASN1_VALUE,
+    *mut BIO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut stack_st_X509_ALGOR,
+    *const ASN1_ITEM,
+) -> core::ffi::c_int = crate::asn1::mime::SMIME_write_ASN1;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut ASN1_VALUE,
+    *mut BIO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut stack_st_X509_ALGOR,
+    *const ASN1_ITEM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::asn1::mime::SMIME_write_ASN1_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut PKCS7,
+    *mut BIO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs7::mime::SMIME_write_PKCS7;
 const _: unsafe extern "C" fn(*mut SXNETID) = crate::x509v3::misc::SXNETID_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::misc::SXNETID_it;
 const _: unsafe extern "C" fn() -> *mut SXNETID = crate::x509v3::misc::SXNETID_new;
@@ -15251,6 +15322,13 @@ const _: unsafe extern "C" fn(
     *const ASN1_VISIBLESTRING,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::asn1::tpl::items::i2d_ASN1_VISIBLESTRING;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut ASN1_VALUE,
+    *mut BIO,
+    core::ffi::c_int,
+    *const ASN1_ITEM,
+) -> core::ffi::c_int = crate::asn1::mime::i2d_ASN1_bio_stream;
 const _: unsafe extern "C" fn(*const ASRange, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::rfc3779::i2d_ASRange;
 const _: unsafe extern "C" fn(
@@ -15577,6 +15655,12 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::pkcs7::i2d_PKCS7_SIGN_ENVELOPE;
 const _: unsafe extern "C" fn(*mut BIO, *const PKCS7) -> core::ffi::c_int =
     crate::pkcs7::i2d_PKCS7_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut PKCS7,
+    *mut BIO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs7::mime::i2d_PKCS7_bio_stream;
 const _: unsafe extern "C" fn(*mut FILE, *const PKCS7) -> core::ffi::c_int =
     crate::pkcs7::i2d_PKCS7_fp;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =

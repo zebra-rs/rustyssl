@@ -287,6 +287,7 @@ OpenSSL never depends on them.
 | `ASN1_generate_v3` and `ASN1_generate_nconf` with a NULL string | parse with the type left uninitialised | fail with `ASN1_R_UNKNOWN_TAG` | `asn1::generate::tests::null_strings_fail` |
 | `PKCS7_dataFinal` storing a content written to its memory BIO | hands the BIO's buffer to the object and makes the BIO read-only (the BIO then points into memory the object frees) | copies the content; the BIO keeps its buffer and stays writable | `pkcs7::doit::tests::data_final_copies_the_content` |
 | `SMIME_text` (and the S/MIME readers) with more than 10,000 headers and parameters | keeps them all | fails with `ASN1_R_MIME_PARSE_ERROR` | `rustyssl_asn1::mime::tests::entries_are_capped` |
+| `BIO_new_NDEF`, `SMIME_write_ASN1` (detached), and the other streaming functions with an item that isn't a SEQUENCE or CHOICE | read the item's functions as aux data | fail with `ASN1_R_STREAMING_NOT_SUPPORTED` | `asn1::ndef::tests::primitives_have_no_stream_callback` |
 | The `PKCS7_*` building, reading, and attribute functions with a NULL object | dereference NULL | fail (0 or NULL; `PKCS7_type_is_other` answers 1), or do nothing | `pkcs7::tests::null_objects_are_refused` |
 
 ## Notes
