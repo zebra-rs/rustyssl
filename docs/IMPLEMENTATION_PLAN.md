@@ -4633,6 +4633,36 @@ Exit checks:
       - The probe's `v3print`, with the corpus `v3print.txt` and random mutations (2,000
         sessions pass).
       - `fuzz/fuzz_targets/x509v3_print.rs`.
+  - [x] **5.2b General and alternative names** (`x509v3/genn.rs`, `x509v3/san.rs`,
+    `x509v3/ctx.rs`, and `rustyssl_pki::ip`, from `v3_genn.c`, `v3_san.c`, the context parts of
+    `v3_conf.c`, and the IP address and section functions of `v3_utl.c`):
+    - `GENERAL_NAME` (an X.400 address is an `ASN1_STRING`, as since CVE-2023-0286; comparing
+      EDI party names doesn't read through a missing part, as since CVE-2020-1971),
+      `GENERAL_NAMES`, `OTHERNAME`, and `EDIPARTYNAME`, with their functions.
+    - The subject and issuer alternative names and a CRL entry's certificate issuer, listed,
+      printed, and made from text: each type, `email:copy`/`move` from the subject, and
+      `issuer:copy`. Directory names come from the context's sections.
+    - IP addresses and networks as text, parsed and written exactly as OpenSSL does, in
+      safe Rust.
+    - The context: `X509V3_set_ctx`, `_set_nconf`, `_set_conf_lhash`, `_set_issuer_pkey`, the
+      section and string getters, and `X509V3_NAME_from_section`.
+    - An other name made from text needs `ASN1_generate_v3` (step 6.1), and aborts until then.
+  - [x] **5.2c Key identifiers, information access, and distribution points**
+    (`x509v3/akid.rs`, `x509v3/info.rs`, `x509v3/crld.rs`, from `v3_akid.c`, `v3_akeya.c`,
+    `v3_info.c`, and `v3_crld.c`):
+    - The authority key identifier: `keyid` and `issuer`, `always`, `none`, and the issuer key
+      for a self-issued certificate.
+    - The authority and subject information access, and `ACCESS_DESCRIPTION`.
+    - CRL distribution points and the freshest CRL, from names or sections (full or relative
+      names, reasons, CRL issuers); the issuing distribution point; `DIST_POINT_set_dpname`;
+      `OSSL_GENERAL_NAMES_print`; and a CRL entry's invalidity date and hold instruction.
+    - The attribute authority's issuing distribution point comes with the attribute
+      certificate extensions.
+  - Tests for 5.2b and 5.2c: `tests/c/x509v3_san.c` and `tests/c/x509v3_crld.c`; the
+    probe's `v3print` with the corpus `v3print_names.txt` and random mutations of real
+    extensions (3,000 sessions pass); the `x509v3_print` fuzz target over these NIDs too (1M
+    runs clean); and the IP parser's unit tests. NULL names and contexts are refused
+    (docs/DEVIATIONS.md).
   - the certificate's extension cache (`ossl_x509v3_cache_extensions`: the SHA-1 hash, the
     flags, and the decoded extensions) and what 5.1c2 left for it (listed there)
   - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for

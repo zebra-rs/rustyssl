@@ -82,6 +82,19 @@ pub(crate) struct Name {
     pub(crate) canon_enclen: c_int,
 }
 
+impl Name {
+    /// A name of only `entries` (no encodings), as OpenSSL's on-stack names are for printing.
+    pub(crate) fn of_entries(entries: *mut OPENSSL_STACK) -> Self {
+        Self {
+            entries,
+            modified: 1,
+            bytes: core::ptr::null_mut(),
+            canon_enc: core::ptr::null_mut(),
+            canon_enclen: 0,
+        }
+    }
+}
+
 static ENTRY_TT: Templates<2> = Templates([
     template_at(0, 0, offset_of!(Entry, object), c"object", ASN1_OBJECT_it),
     template_at(0, 0, offset_of!(Entry, value), c"value", ASN1_PRINTABLE_it),

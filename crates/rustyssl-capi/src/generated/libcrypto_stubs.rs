@@ -9,21 +9,6 @@ use libc::{FILE, time_t};
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ACCESS_DESCRIPTION_free(_: *mut ACCESS_DESCRIPTION) {
-    crate::stub::unimplemented("ACCESS_DESCRIPTION_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ACCESS_DESCRIPTION_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ACCESS_DESCRIPTION_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ACCESS_DESCRIPTION_new() -> *mut ACCESS_DESCRIPTION {
-    crate::stub::unimplemented("ACCESS_DESCRIPTION_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ADMISSIONS_free(_: *mut ADMISSIONS) {
     crate::stub::unimplemented("ADMISSIONS_free")
 }
@@ -398,36 +383,6 @@ pub extern "C" fn ASYNC_start_job(
 #[unsafe(no_mangle)]
 pub extern "C" fn ASYNC_unblock_pause() {
     crate::stub::unimplemented("ASYNC_unblock_pause")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_INFO_ACCESS_free(_: *mut AUTHORITY_INFO_ACCESS) {
-    crate::stub::unimplemented("AUTHORITY_INFO_ACCESS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_INFO_ACCESS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("AUTHORITY_INFO_ACCESS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_INFO_ACCESS_new() -> *mut AUTHORITY_INFO_ACCESS {
-    crate::stub::unimplemented("AUTHORITY_INFO_ACCESS_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_KEYID_free(_: *mut AUTHORITY_KEYID) {
-    crate::stub::unimplemented("AUTHORITY_KEYID_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_KEYID_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("AUTHORITY_KEYID_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn AUTHORITY_KEYID_new() -> *mut AUTHORITY_KEYID {
-    crate::stub::unimplemented("AUTHORITY_KEYID_new")
 }
 
 #[unsafe(no_mangle)]
@@ -1717,21 +1672,6 @@ pub extern "C" fn COMP_zstd_oneshot() -> *mut COMP_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRL_DIST_POINTS_free(_: *mut CRL_DIST_POINTS) {
-    crate::stub::unimplemented("CRL_DIST_POINTS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRL_DIST_POINTS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CRL_DIST_POINTS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRL_DIST_POINTS_new() -> *mut CRL_DIST_POINTS {
-    crate::stub::unimplemented("CRL_DIST_POINTS_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CTLOG_STORE_free(_: *mut CTLOG_STORE) {
     crate::stub::unimplemented("CTLOG_STORE_free")
 }
@@ -1896,49 +1836,6 @@ pub extern "C" fn CT_POLICY_EVAL_CTX_set_time(_: *mut CT_POLICY_EVAL_CTX, _: u64
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_NAME_dup(_: *const DIST_POINT_NAME) -> *mut DIST_POINT_NAME {
-    crate::stub::unimplemented("DIST_POINT_NAME_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_NAME_free(_: *mut DIST_POINT_NAME) {
-    crate::stub::unimplemented("DIST_POINT_NAME_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_NAME_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("DIST_POINT_NAME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_NAME_new() -> *mut DIST_POINT_NAME {
-    crate::stub::unimplemented("DIST_POINT_NAME_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_free(_: *mut DIST_POINT) {
-    crate::stub::unimplemented("DIST_POINT_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("DIST_POINT_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_new() -> *mut DIST_POINT {
-    crate::stub::unimplemented("DIST_POINT_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn DIST_POINT_set_dpname(
-    _: *mut DIST_POINT_NAME,
-    _: *const X509_NAME,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("DIST_POINT_set_dpname")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn DSO_METHOD_openssl() -> *mut DSO_METHOD {
     crate::stub::unimplemented("DSO_METHOD_openssl")
 }
@@ -2032,21 +1929,6 @@ pub extern "C" fn DSO_set_filename(_: *mut DSO, _: *const core::ffi::c_char) -> 
 #[unsafe(no_mangle)]
 pub extern "C" fn DSO_up_ref(_: *mut DSO) -> core::ffi::c_int {
     crate::stub::unimplemented("DSO_up_ref")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EDIPARTYNAME_free(_: *mut EDIPARTYNAME) {
-    crate::stub::unimplemented("EDIPARTYNAME_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EDIPARTYNAME_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("EDIPARTYNAME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EDIPARTYNAME_new() -> *mut EDIPARTYNAME {
-    crate::stub::unimplemented("EDIPARTYNAME_new")
 }
 
 #[unsafe(no_mangle)]
@@ -2981,94 +2863,6 @@ pub extern "C" fn EVP_SealInit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAMES_free(_: *mut GENERAL_NAMES) {
-    crate::stub::unimplemented("GENERAL_NAMES_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAMES_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("GENERAL_NAMES_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAMES_new() -> *mut GENERAL_NAMES {
-    crate::stub::unimplemented("GENERAL_NAMES_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_cmp(_: *mut GENERAL_NAME, _: *mut GENERAL_NAME) -> core::ffi::c_int {
-    crate::stub::unimplemented("GENERAL_NAME_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_dup(_: *const GENERAL_NAME) -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("GENERAL_NAME_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_free(_: *mut GENERAL_NAME) {
-    crate::stub::unimplemented("GENERAL_NAME_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_get0_otherName(
-    _: *const GENERAL_NAME,
-    _: *mut *mut ASN1_OBJECT,
-    _: *mut *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("GENERAL_NAME_get0_otherName")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_get0_value(
-    _: *const GENERAL_NAME,
-    _: *mut core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("GENERAL_NAME_get0_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("GENERAL_NAME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_new() -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("GENERAL_NAME_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_print(_: *mut BIO, _: *mut GENERAL_NAME) -> core::ffi::c_int {
-    crate::stub::unimplemented("GENERAL_NAME_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_set0_othername(
-    _: *mut GENERAL_NAME,
-    _: *mut ASN1_OBJECT,
-    _: *mut ASN1_TYPE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("GENERAL_NAME_set0_othername")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_set0_value(
-    _: *mut GENERAL_NAME,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("GENERAL_NAME_set0_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn GENERAL_NAME_set1_X509_NAME(
-    _: *mut *mut GENERAL_NAME,
-    _: *const X509_NAME,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("GENERAL_NAME_set1_X509_NAME")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn GENERAL_SUBTREE_free(_: *mut GENERAL_SUBTREE) {
     crate::stub::unimplemented("GENERAL_SUBTREE_free")
 }
@@ -3156,21 +2950,6 @@ pub extern "C" fn ISSUER_SIGN_TOOL_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn ISSUER_SIGN_TOOL_new() -> *mut ISSUER_SIGN_TOOL {
     crate::stub::unimplemented("ISSUER_SIGN_TOOL_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUING_DIST_POINT_free(_: *mut ISSUING_DIST_POINT) {
-    crate::stub::unimplemented("ISSUING_DIST_POINT_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUING_DIST_POINT_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ISSUING_DIST_POINT_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ISSUING_DIST_POINT_new() -> *mut ISSUING_DIST_POINT {
-    crate::stub::unimplemented("ISSUING_DIST_POINT_new")
 }
 
 #[unsafe(no_mangle)]
@@ -6196,15 +5975,6 @@ pub extern "C" fn OSSL_ESS_signing_cert_v2_new_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_GENERAL_NAMES_print(
-    _: *mut BIO,
-    _: *mut GENERAL_NAMES,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_GENERAL_NAMES_print")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_HASH_free(_: *mut OSSL_HASH) {
     crate::stub::unimplemented("OSSL_HASH_free")
 }
@@ -7392,26 +7162,6 @@ pub extern "C" fn OSSL_parse_url(
     _: *mut *mut core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("OSSL_parse_url")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OTHERNAME_cmp(_: *mut OTHERNAME, _: *mut OTHERNAME) -> core::ffi::c_int {
-    crate::stub::unimplemented("OTHERNAME_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OTHERNAME_free(_: *mut OTHERNAME) {
-    crate::stub::unimplemented("OTHERNAME_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OTHERNAME_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("OTHERNAME_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OTHERNAME_new() -> *mut OTHERNAME {
-    crate::stub::unimplemented("OTHERNAME_new")
 }
 
 #[unsafe(no_mangle)]
@@ -10976,69 +10726,6 @@ pub extern "C" fn X509V3_EXT_nconf_nid(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_NAME_from_section(
-    _: *mut X509_NAME,
-    _: *mut stack_st_CONF_VALUE,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_NAME_from_section")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_get_section(
-    _: *mut X509V3_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("X509V3_get_section")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_get_string(
-    _: *mut X509V3_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("X509V3_get_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_section_free(_: *mut X509V3_CTX, _: *mut stack_st_CONF_VALUE) {
-    crate::stub::unimplemented("X509V3_section_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_set_conf_lhash(_: *mut X509V3_CTX, _: *mut lhash_st_CONF_VALUE) {
-    crate::stub::unimplemented("X509V3_set_conf_lhash")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_set_ctx(
-    _: *mut X509V3_CTX,
-    _: *mut X509,
-    _: *mut X509,
-    _: *mut X509_REQ,
-    _: *mut X509_CRL,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("X509V3_set_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_set_issuer_pkey(_: *mut X509V3_CTX, _: *mut EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_set_issuer_pkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_set_nconf(_: *mut X509V3_CTX, _: *mut CONF) {
-    crate::stub::unimplemented("X509V3_set_nconf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_string_free(_: *mut X509V3_CTX, _: *mut core::ffi::c_char) {
-    crate::stub::unimplemented("X509V3_string_free")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_ACERT_INFO_free(_: *mut X509_ACERT_INFO) {
     crate::stub::unimplemented("X509_ACERT_INFO_free")
 }
@@ -14102,28 +13789,6 @@ pub extern "C" fn X509v3_asid_validate_resource_set(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn a2i_GENERAL_NAME(
-    _: *mut GENERAL_NAME,
-    _: *const X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("a2i_GENERAL_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn a2i_IPADDRESS(_: *const core::ffi::c_char) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("a2i_IPADDRESS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn a2i_IPADDRESS_NC(_: *const core::ffi::c_char) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("a2i_IPADDRESS_NC")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn conf_ssl_get(
     _: usize,
     _: *mut *const core::ffi::c_char,
@@ -14148,15 +13813,6 @@ pub extern "C" fn conf_ssl_name_find(
     _: *mut usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("conf_ssl_name_find")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ACCESS_DESCRIPTION(
-    _: *mut *mut ACCESS_DESCRIPTION,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ACCESS_DESCRIPTION {
-    crate::stub::unimplemented("d2i_ACCESS_DESCRIPTION")
 }
 
 #[unsafe(no_mangle)]
@@ -14214,24 +13870,6 @@ pub extern "C" fn d2i_ASRange(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_AUTHORITY_INFO_ACCESS(
-    _: *mut *mut AUTHORITY_INFO_ACCESS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut AUTHORITY_INFO_ACCESS {
-    crate::stub::unimplemented("d2i_AUTHORITY_INFO_ACCESS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_AUTHORITY_KEYID(
-    _: *mut *mut AUTHORITY_KEYID,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut AUTHORITY_KEYID {
-    crate::stub::unimplemented("d2i_AUTHORITY_KEYID")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_CERTIFICATEPOLICIES(
     _: *mut *mut CERTIFICATEPOLICIES,
     _: *mut *const core::ffi::c_uchar,
@@ -14261,42 +13899,6 @@ pub extern "C" fn d2i_CMS_ReceiptRequest(
 #[unsafe(no_mangle)]
 pub extern "C" fn d2i_CMS_bio(_: *mut BIO, _: *mut *mut CMS_ContentInfo) -> *mut CMS_ContentInfo {
     crate::stub::unimplemented("d2i_CMS_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_CRL_DIST_POINTS(
-    _: *mut *mut CRL_DIST_POINTS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut CRL_DIST_POINTS {
-    crate::stub::unimplemented("d2i_CRL_DIST_POINTS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DIST_POINT(
-    _: *mut *mut DIST_POINT,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DIST_POINT {
-    crate::stub::unimplemented("d2i_DIST_POINT")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DIST_POINT_NAME(
-    _: *mut *mut DIST_POINT_NAME,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DIST_POINT_NAME {
-    crate::stub::unimplemented("d2i_DIST_POINT_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_EDIPARTYNAME(
-    _: *mut *mut EDIPARTYNAME,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EDIPARTYNAME {
-    crate::stub::unimplemented("d2i_EDIPARTYNAME")
 }
 
 #[unsafe(no_mangle)]
@@ -14345,24 +13947,6 @@ pub extern "C" fn d2i_ESS_SIGNING_CERT_V2(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_GENERAL_NAME(
-    _: *mut *mut GENERAL_NAME,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("d2i_GENERAL_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_GENERAL_NAMES(
-    _: *mut *mut GENERAL_NAMES,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut GENERAL_NAMES {
-    crate::stub::unimplemented("d2i_GENERAL_NAMES")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_IPAddressChoice(
     _: *mut *mut IPAddressChoice,
     _: *mut *const core::ffi::c_uchar,
@@ -14405,15 +13989,6 @@ pub extern "C" fn d2i_ISSUER_SIGN_TOOL(
     _: core::ffi::c_long,
 ) -> *mut ISSUER_SIGN_TOOL {
     crate::stub::unimplemented("d2i_ISSUER_SIGN_TOOL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ISSUING_DIST_POINT(
-    _: *mut *mut ISSUING_DIST_POINT,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ISSUING_DIST_POINT {
-    crate::stub::unimplemented("d2i_ISSUING_DIST_POINT")
 }
 
 #[unsafe(no_mangle)]
@@ -15037,15 +14612,6 @@ pub extern "C" fn d2i_OSSL_USER_NOTICE_SYNTAX(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_OTHERNAME(
-    _: *mut *mut OTHERNAME,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut OTHERNAME {
-    crate::stub::unimplemented("d2i_OTHERNAME")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_PKCS12(
     _: *mut *mut PKCS12,
     _: *mut *const core::ffi::c_uchar,
@@ -15429,22 +14995,6 @@ pub extern "C" fn d2i_X509_REVOKED(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2a_ACCESS_DESCRIPTION(
-    _: *mut BIO,
-    _: *const ACCESS_DESCRIPTION,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2a_ACCESS_DESCRIPTION")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ACCESS_DESCRIPTION(
-    _: *const ACCESS_DESCRIPTION,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ACCESS_DESCRIPTION")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_ADMISSIONS(
     _: *const ADMISSIONS,
     _: *mut *mut core::ffi::c_uchar,
@@ -15504,22 +15054,6 @@ pub extern "C" fn i2d_ASRange(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_AUTHORITY_INFO_ACCESS(
-    _: *const AUTHORITY_INFO_ACCESS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_AUTHORITY_INFO_ACCESS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_AUTHORITY_KEYID(
-    _: *const AUTHORITY_KEYID,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_AUTHORITY_KEYID")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_CERTIFICATEPOLICIES(
     _: *const CERTIFICATEPOLICIES,
     _: *mut *mut core::ffi::c_uchar,
@@ -15556,38 +15090,6 @@ pub extern "C" fn i2d_CMS_bio_stream(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_CMS_bio_stream")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CRL_DIST_POINTS(
-    _: *const CRL_DIST_POINTS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CRL_DIST_POINTS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DIST_POINT(
-    _: *const DIST_POINT,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DIST_POINT")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DIST_POINT_NAME(
-    _: *const DIST_POINT_NAME,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DIST_POINT_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_EDIPARTYNAME(
-    _: *const EDIPARTYNAME,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_EDIPARTYNAME")
 }
 
 #[unsafe(no_mangle)]
@@ -15631,22 +15133,6 @@ pub extern "C" fn i2d_ESS_SIGNING_CERT_V2(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_GENERAL_NAME(
-    _: *const GENERAL_NAME,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_GENERAL_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_GENERAL_NAMES(
-    _: *const GENERAL_NAMES,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_GENERAL_NAMES")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_IPAddressChoice(
     _: *const IPAddressChoice,
     _: *mut *mut core::ffi::c_uchar,
@@ -15684,14 +15170,6 @@ pub extern "C" fn i2d_ISSUER_SIGN_TOOL(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_ISSUER_SIGN_TOOL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ISSUING_DIST_POINT(
-    _: *const ISSUING_DIST_POINT,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ISSUING_DIST_POINT")
 }
 
 #[unsafe(no_mangle)]
@@ -16244,14 +15722,6 @@ pub extern "C" fn i2d_OSSL_USER_NOTICE_SYNTAX(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_OTHERNAME(
-    _: *const OTHERNAME,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_OTHERNAME")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PKCS12(
     _: *const PKCS12,
     _: *mut *mut core::ffi::c_uchar,
@@ -16635,24 +16105,6 @@ pub extern "C" fn i2o_SCT_LIST(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2v_GENERAL_NAME(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut GENERAL_NAME,
-    _: *mut stack_st_CONF_VALUE,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("i2v_GENERAL_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2v_GENERAL_NAMES(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut GENERAL_NAMES,
-    _: *mut stack_st_CONF_VALUE,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("i2v_GENERAL_NAMES")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn o2i_SCT(
     _: *mut *mut SCT,
     _: *mut *const core::ffi::c_uchar,
@@ -16668,33 +16120,4 @@ pub extern "C" fn o2i_SCT_LIST(
     _: usize,
 ) -> *mut stack_st_SCT {
     crate::stub::unimplemented("o2i_SCT_LIST")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn v2i_GENERAL_NAME(
-    _: *const X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *mut CONF_VALUE,
-) -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("v2i_GENERAL_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn v2i_GENERAL_NAMES(
-    _: *const X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *mut stack_st_CONF_VALUE,
-) -> *mut GENERAL_NAMES {
-    crate::stub::unimplemented("v2i_GENERAL_NAMES")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn v2i_GENERAL_NAME_ex(
-    _: *mut GENERAL_NAME,
-    _: *const X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *mut CONF_VALUE,
-    _: core::ffi::c_int,
-) -> *mut GENERAL_NAME {
-    crate::stub::unimplemented("v2i_GENERAL_NAME_ex")
 }

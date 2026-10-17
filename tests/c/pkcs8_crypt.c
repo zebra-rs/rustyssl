@@ -301,7 +301,11 @@ static void writers(const char *name, EVP_PKEY *k)
     back = PEM_read_bio_PrivateKey(b, NULL, NULL, "wrong");
     snprintf(what, sizeof(what), "%s a wrong password fails", name);
     check(back == NULL, what);
-    errors();
+    /*
+     * The salt and IV are random, so a wrong key passes the padding check one time in 256 and
+     * fails in the decoder instead: which error comes is chance, in OpenSSL too.
+     */
+    ERR_clear_error();
     BIO_free(b);
 
     b = BIO_new(BIO_s_mem());

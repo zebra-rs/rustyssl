@@ -5,7 +5,13 @@
 //! `rustyssl_asn1::number` rather than BIGNUM, with the same text: decimal below 128 bits, `0x`
 //! and hex above.
 
+pub(crate) mod akid;
+pub(crate) mod crld;
+pub(crate) mod ctx;
+pub(crate) mod genn;
+pub(crate) mod info;
 pub(crate) mod registry;
+pub(crate) mod san;
 pub(crate) mod simple;
 mod standard;
 
@@ -415,4 +421,15 @@ ffi_export! {
         err::add_error_data([Some(&b"name="[..]), name, Some(b", value="), text]);
         0
     }
+}
+
+/// The `i`th item of a stack as a `T`, if there's one.
+///
+/// # Safety
+/// `sk` is NULL or a live stack of `T`s.
+pub(crate) unsafe fn item_at<'a, T>(sk: *const core::ffi::c_void, i: c_int) -> Option<&'a mut T> {
+    // SAFETY: the caller's guarantee.
+    let p = unsafe { crate::stack::OPENSSL_sk_value(sk.cast(), i) };
+    // SAFETY: as above.
+    unsafe { p.cast::<T>().as_mut() }
 }
