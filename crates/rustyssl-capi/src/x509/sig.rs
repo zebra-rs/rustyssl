@@ -125,3 +125,34 @@ ffi_export! {
         unsafe { crate::asn1::tpl::io::ASN1_item_i2d_fp(it, fp, p8.cast()) }
     }
 }
+
+ffi_export! {
+    /// Reads an `X509_SIG` (an EncryptedPrivateKeyInfo) from a BIO (`ASN1_d2i_bio_of`), into
+    /// `*p8` too when given. NULL on failure.
+    ///
+    /// # Safety
+    /// `bp` is a live BIO; `p8` is NULL or holds NULL or a live `X509_SIG`.
+    pub unsafe extern "C" fn d2i_PKCS8_bio(bp: *mut rustyssl_abi::BIO, p8: *mut *mut X509_SIG) -> *mut X509_SIG
+    where failure = core::ptr::null_mut(), library = ERR_LIB_ASN1
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_SIG_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { crate::asn1::tpl::io::ASN1_item_d2i_bio(it, bp, p8.cast()) }.cast()
+    }
+}
+
+ffi_export! {
+    /// Reads an `X509_SIG` from a `FILE`, as `d2i_PKCS8_bio`.
+    ///
+    /// # Safety
+    /// `fp` is an open `FILE`; `p8` as for `d2i_PKCS8_bio`.
+    pub unsafe extern "C" fn d2i_PKCS8_fp(fp: *mut libc::FILE, p8: *mut *mut X509_SIG) -> *mut X509_SIG
+    where failure = core::ptr::null_mut(), library = ERR_LIB_ASN1
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_SIG_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { crate::asn1::tpl::io::ASN1_item_d2i_fp(it, fp, p8.cast()) }.cast()
+    }
+}

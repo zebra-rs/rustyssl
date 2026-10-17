@@ -3,8 +3,8 @@
 //! placeholders for those still to come in `pending_keys`) and the structural ones a key's
 //! decoding goes through — PEM to DER (`pem2der`, which also decrypts a traditional PEM's
 //! DEK-Info and names what each PEM type holds), SubjectPublicKeyInfo to its key type's
-//! (`spki2typespki`), and EncryptedPrivateKeyInfo to PrivateKeyInfo (`epki2pki`, whose
-//! decryption comes with step 4.7d).
+//! (`spki2typespki`), and EncryptedPrivateKeyInfo to PrivateKeyInfo (`epki2pki`, decrypting
+//! it with the passphrase).
 //!
 //! As OpenSSL's, a decoder that doesn't recognize its input succeeds without passing anything
 //! on, so the walk tries the next one.
@@ -50,19 +50,11 @@ const NAME_LEN: c_int = 50;
 /// A structural decoder's context: the provider's context, the data structure asked for
 /// (`pem2der` only), and the properties to fetch with, each in OpenSSL's fixed buffers.
 struct DecCtx {
-    #[allow(
-        dead_code,
-        reason = "the key decoders (4.7b2) and decryption (4.7d) fetch with it"
-    )]
     provctx: *mut c_void,
     data_structure: [c_char; MAX_CODEC_STRUCT],
     propq: [c_char; MAX_PROPQUERY],
 }
 
-#[allow(
-    dead_code,
-    reason = "the key decoders (4.7b2) and decryption (4.7d) fetch with these"
-)]
 impl DecCtx {
     /// The library context of the provider's context.
     fn libctx(&self) -> *mut rustyssl_abi::OSSL_LIB_CTX {
@@ -361,23 +353,26 @@ unsafe fn spki2typespki_der_decode(
     }
 }
 
-/// `ossl_epki2pki_der_decode`: an EncryptedPrivateKeyInfo decrypted with the passphrase (step
-/// 4.7d), then a PrivateKeyInfo passed on as its key type's; anything else succeeds with
-/// nothing.
+/// `ossl_epki2pki_der_decode`: an EncryptedPrivateKeyInfo decrypted with the passphrase
+/// (`PKCS12_pbe_crypt_ex` with the decoder's library context and properties), then a
+/// PrivateKeyInfo passed on as its key type's; anything else succeeds with nothing.
 ///
 /// # Safety
-/// `der` holds its octets; the callbacks take their arguments.
+/// `der` holds its octets; the callbacks take their arguments; `c` is the decoder's context.
 unsafe fn epki2pki_der_decode(
     der: &[u8],
     data_cb: OSSL_CALLBACK,
     data_cbarg: *mut c_void,
     pw_cb: OSSL_PASSPHRASE_CALLBACK,
     pw_cbarg: *mut c_void,
+    c: &DecCtx,
 ) -> c_int {
     let Ok(len) = c_long::try_from(der.len()) else {
         return 1;
     };
     let mut ok = 1;
+    let mut new_der: *mut c_uchar = ptr::null_mut();
+    let mut new_der_len: c_int = 0;
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
     let mut pder = der.as_ptr();
@@ -407,19 +402,56 @@ unsafe fn epki2pki_der_decode(
             None => false,
         };
         if got {
-            crate::stub::unimplemented(
-                "decrypting an EncryptedPrivateKeyInfo (PKCS12_pbe_crypt_ex, step 4.7d)",
+            let mut alg: *const rustyssl_abi::X509_ALGOR = ptr::null();
+            let mut oct: *const rustyssl_abi::ASN1_OCTET_STRING = ptr::null();
+            // SAFETY: the decoded structure; locals.
+            unsafe { crate::x509::sig::X509_SIG_get0(p8, &raw mut alg, &raw mut oct) };
+            // SAFETY: its OCTET STRING.
+            let o = unsafe { &*oct };
+            let (data, len) = (o.data, o.length);
+            let plen = c_int::try_from(plen).unwrap_or(0);
+            // SAFETY: the AlgorithmIdentifier; the passphrase; the octets; locals for the
+            // plaintext; the decoder's library context and properties.
+            let made = unsafe {
+                crate::pkcs8_crypt::PKCS12_pbe_crypt_ex(
+                    alg,
+                    pbuf.as_ptr(),
+                    plen,
+                    data,
+                    len,
+                    &raw mut new_der,
+                    &raw mut new_der_len,
+                    0,
+                    c.libctx(),
+                    c.propq(),
+                )
+            };
+            if made.is_null() {
+                ok = 0;
+            }
+        } else {
+            err::raise(
+                ERR_LIB_PROV,
+                PROV_R_UNABLE_TO_GET_PASSPHRASE,
+                "ossl_epki2pki_der_decode",
             );
+            ok = 0;
         }
-        err::raise(
-            ERR_LIB_PROV,
-            PROV_R_UNABLE_TO_GET_PASSPHRASE,
-            "ossl_epki2pki_der_decode",
-        );
-        ok = 0;
+        // The passphrase, wiped.
+        // SAFETY: the buffer's own octets.
+        unsafe { crate::mem::OPENSSL_cleanse(pbuf.as_mut_ptr().cast(), pbuf.len()) };
         // SAFETY: decoded above.
         unsafe { crate::x509::sig::X509_SIG_free(p8) };
     }
+    // The decrypted PrivateKeyInfo, if there was one.
+    let decrypted = if new_der.is_null() {
+        None
+    } else {
+        // SAFETY: the plaintext `PKCS12_pbe_crypt_ex` made, of its length.
+        unsafe { crate::ffi::bytes(new_der, usize::try_from(new_der_len).unwrap_or(0)) }
+    };
+    let der = decrypted.unwrap_or(der);
+    let len = c_long::try_from(der.len()).unwrap_or(0);
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
     let mut pder = der.as_ptr();
@@ -462,6 +494,8 @@ unsafe fn epki2pki_der_decode(
     }
     // SAFETY: decoded above, or NULL.
     unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8inf) };
+    // SAFETY: the plaintext, which holds the key, or NULL.
+    unsafe { crate::mem::release_clean(new_der.cast(), usize::try_from(new_der_len).unwrap_or(0)) };
     ok
 }
 
@@ -502,13 +536,15 @@ ffi_callback! {
     ///
     /// # Safety
     /// As for a decoder's `decode`.
-    pub(crate) unsafe extern "C" fn epki2pki_decode(_vctx: *mut c_void, cin: *mut OSSL_CORE_BIO, _selection: c_int, data_cb: OSSL_CALLBACK, data_cbarg: *mut c_void, pw_cb: OSSL_PASSPHRASE_CALLBACK, pw_cbarg: *mut c_void) -> c_int
+    pub(crate) unsafe extern "C" fn epki2pki_decode(vctx: *mut c_void, cin: *mut OSSL_CORE_BIO, _selection: c_int, data_cb: OSSL_CALLBACK, data_cbarg: *mut c_void, pw_cb: OSSL_PASSPHRASE_CALLBACK, pw_cbarg: *mut c_void) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { dctx(vctx) }) else { return 0 };
+        // SAFETY: as above.
         let Some(der) = (unsafe { read_der(cin) }) else { return 1 };
         // SAFETY: as above.
-        unsafe { epki2pki_der_decode(&der, data_cb, data_cbarg, pw_cb, pw_cbarg) }
+        unsafe { epki2pki_der_decode(&der, data_cb, data_cbarg, pw_cb, pw_cbarg, c) }
     }
 }
 
@@ -726,7 +762,7 @@ ffi_callback! {
                 || asked.eq_ignore_ascii_case(b"PrivateKeyInfo"))
         {
             // SAFETY: the octets; the caller's callbacks.
-            unsafe { epki2pki_der_decode(bytes, data_cb, data_cbarg, pw_cb, pw_cbarg) }
+            unsafe { epki2pki_der_decode(bytes, data_cb, data_cbarg, pw_cb, pw_cbarg, c) }
         } else if i <= SPKI_LAST_IDX
             && (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY != 0 || asked.eq_ignore_ascii_case(b"SubjectPublicKeyInfo"))
         {

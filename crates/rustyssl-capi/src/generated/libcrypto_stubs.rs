@@ -8623,58 +8623,6 @@ pub extern "C" fn PKCS12_it() -> *const ASN1_ITEM {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_item_decrypt_d2i(
-    _: *const X509_ALGOR,
-    _: *const ASN1_ITEM,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const ASN1_OCTET_STRING,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("PKCS12_item_decrypt_d2i")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_item_decrypt_d2i_ex(
-    _: *const X509_ALGOR,
-    _: *const ASN1_ITEM,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const ASN1_OCTET_STRING,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("PKCS12_item_decrypt_d2i_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_item_i2d_encrypt(
-    _: *mut X509_ALGOR,
-    _: *const ASN1_ITEM,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("PKCS12_item_i2d_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_item_i2d_encrypt_ex(
-    _: *mut X509_ALGOR,
-    _: *const ASN1_ITEM,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("PKCS12_item_i2d_encrypt_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PKCS12_item_pack_safebag(
     _: *mut core::ffi::c_void,
     _: *const ASN1_ITEM,
@@ -8753,36 +8701,6 @@ pub extern "C" fn PKCS12_parse(
     _: *mut *mut stack_st_X509,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PKCS12_parse")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_pbe_crypt(
-    _: *const X509_ALGOR,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("PKCS12_pbe_crypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_pbe_crypt_ex(
-    _: *const X509_ALGOR,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut core::ffi::c_uchar {
-    crate::stub::unimplemented("PKCS12_pbe_crypt_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -9452,78 +9370,6 @@ pub extern "C" fn PKCS7_verify(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PKCS7_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_decrypt(
-    _: *const X509_SIG,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut PKCS8_PRIV_KEY_INFO {
-    crate::stub::unimplemented("PKCS8_decrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_decrypt_ex(
-    _: *const X509_SIG,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut PKCS8_PRIV_KEY_INFO {
-    crate::stub::unimplemented("PKCS8_decrypt_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_encrypt(
-    _: core::ffi::c_int,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut PKCS8_PRIV_KEY_INFO,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PKCS8_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_encrypt_ex(
-    _: core::ffi::c_int,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut PKCS8_PRIV_KEY_INFO,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PKCS8_encrypt_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_set0_pbe(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut PKCS8_PRIV_KEY_INFO,
-    _: *mut X509_ALGOR,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PKCS8_set0_pbe")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS8_set0_pbe_ex(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut PKCS8_PRIV_KEY_INFO,
-    _: *mut X509_ALGOR,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut X509_SIG {
-    crate::stub::unimplemented("PKCS8_set0_pbe_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -17243,36 +17089,6 @@ pub extern "C" fn d2i_PKCS7_bio(_: *mut BIO, _: *mut *mut PKCS7) -> *mut PKCS7 {
 #[unsafe(no_mangle)]
 pub extern "C" fn d2i_PKCS7_fp(_: *mut FILE, _: *mut *mut PKCS7) -> *mut PKCS7 {
     crate::stub::unimplemented("d2i_PKCS7_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PKCS8PrivateKey_bio(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PKCS8PrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PKCS8PrivateKey_fp(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PKCS8PrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PKCS8_bio(_: *mut BIO, _: *mut *mut X509_SIG) -> *mut X509_SIG {
-    crate::stub::unimplemented("d2i_PKCS8_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PKCS8_fp(_: *mut FILE, _: *mut *mut X509_SIG) -> *mut X509_SIG {
-    crate::stub::unimplemented("d2i_PKCS8_fp")
 }
 
 #[unsafe(no_mangle)]
