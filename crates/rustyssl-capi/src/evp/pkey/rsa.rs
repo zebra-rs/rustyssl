@@ -685,3 +685,218 @@ pub(crate) unsafe fn pss_param_print(
     unsafe { puts(bp, c"\n") };
     true
 }
+
+/// `rsa_param_encode`: the AlgorithmIdentifier's parameter of a key: NULL for RSA; for
+/// RSA-PSS, its restrictions as a SEQUENCE, or none without any. `None` if they can't be
+/// encoded.
+///
+/// # Safety
+/// `r` is NULL or a live key.
+unsafe fn param_encode(r: *mut RSA) -> Option<(c_int, *mut rustyssl_abi::ASN1_STRING)> {
+    use rustyssl_abi::{
+        RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSASSAPSS, V_ASN1_NULL, V_ASN1_SEQUENCE, V_ASN1_UNDEF,
+    };
+    // SAFETY: the caller's guarantee.
+    if unsafe { crate::rsa_lib::RSA_test_flags(r, RSA_FLAG_TYPE_MASK) } != RSA_FLAG_TYPE_RSASSAPSS {
+        return Some((V_ASN1_NULL, ptr::null_mut()));
+    }
+    // SAFETY: as above.
+    let pss = unsafe { crate::rsa_lib::RSA_get0_pss_params(r) };
+    if pss.is_null() {
+        return Some((V_ASN1_UNDEF, ptr::null_mut()));
+    }
+    let mut s = ptr::null_mut();
+    // SAFETY: no preconditions.
+    let it = unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_it() };
+    // SAFETY: the key's restrictions, a value of the item; a place for the new string.
+    let packed =
+        unsafe { crate::asn1::tpl::util::ASN1_item_pack(pss.cast_mut().cast(), it, &raw mut s) };
+    if packed.is_null() {
+        return None;
+    }
+    Some((V_ASN1_SEQUENCE, s))
+}
+
+/// `ossl_rsa_pss_decode`: an AlgorithmIdentifier's RSA-PSS restrictions, with MGF1's digest
+/// decoded, or NULL.
+///
+/// # Safety
+/// `alg` is a live AlgorithmIdentifier.
+unsafe fn pss_decode(alg: *const rustyssl_abi::X509_ALGOR) -> *mut rustyssl_abi::RSA_PSS_PARAMS {
+    // SAFETY: no preconditions.
+    let it = unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_it() };
+    // SAFETY: the caller's guarantee.
+    let param = unsafe { (*alg).parameter };
+    // SAFETY: its parameter, NULL or a live `ASN1_TYPE`.
+    let pss: *mut rustyssl_abi::RSA_PSS_PARAMS =
+        unsafe { crate::asn1::tpl::util::ASN1_TYPE_unpack_sequence(it, param) }.cast();
+    // SAFETY: just decoded, or NULL.
+    let Some(p) = (unsafe { pss.as_mut() }) else {
+        return ptr::null_mut();
+    };
+    if !p.maskGenAlgorithm.is_null() {
+        // SAFETY: its MGF's AlgorithmIdentifier.
+        p.maskHash = unsafe { crate::rsa_pmeth::mgf1_decode(p.maskGenAlgorithm) };
+        if p.maskHash.is_null() {
+            // SAFETY: decoded above.
+            unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss) };
+            return ptr::null_mut();
+        }
+    }
+    pss
+}
+
+/// `ossl_rsa_param_decode`: an RSA-PSS AlgorithmIdentifier's restrictions given to the key
+/// (as its `RSA_PSS_PARAMS` and, unverified, as its provider form). False on failure.
+///
+/// # Safety
+/// `r` is a live key; `alg` is a live AlgorithmIdentifier.
+pub(crate) unsafe fn param_decode(r: *mut RSA, alg: *const rustyssl_abi::X509_ALGOR) -> bool {
+    use rustyssl_abi::{NID_mgf1, RSA_R_INVALID_PSS_PARAMETERS, V_ASN1_SEQUENCE, V_ASN1_UNDEF};
+    let (mut algoid, mut ptype, mut pval) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's AlgorithmIdentifier; locals.
+    unsafe {
+        crate::x509::algor::X509_ALGOR_get0(&raw mut algoid, &raw mut ptype, &raw mut pval, alg)
+    };
+    // SAFETY: its object.
+    if unsafe { crate::objects::OBJ_obj2nid(algoid) } != EVP_PKEY_RSA_PSS || ptype == V_ASN1_UNDEF {
+        return true;
+    }
+    if ptype != V_ASN1_SEQUENCE {
+        err::raise(
+            ERR_LIB_RSA,
+            RSA_R_INVALID_PSS_PARAMETERS,
+            "ossl_rsa_param_decode",
+        );
+        return false;
+    }
+    // SAFETY: the caller's guarantee.
+    let pss = unsafe { pss_decode(alg) };
+    // SAFETY: as above.
+    let Some(k) = (unsafe { rsa(r) }) else {
+        // SAFETY: decoded above, or NULL.
+        unsafe { crate::rsa_asn1::RSA_PSS_PARAMS_free(pss) };
+        return false;
+    };
+    if pss.is_null() {
+        return false;
+    }
+    k.set_pss_params(pss);
+    // `ossl_rsa_sync_to_pss_params_30`, unverified (`ossl_rsa_pss_get_param_unverified`).
+    // SAFETY: the key's restrictions now.
+    let p = unsafe { &*pss };
+    // SAFETY: their AlgorithmIdentifiers.
+    let md = unsafe { crate::rsa_pmeth::md_of_algor(p.hashAlgorithm) };
+    if md.is_null() {
+        return false;
+    }
+    // SAFETY: as above.
+    let mgf1md = unsafe { crate::rsa_pmeth::md_of_algor(p.maskHash) };
+    if mgf1md.is_null() {
+        return false;
+    }
+    let int = |i: *const rustyssl_abi::ASN1_INTEGER, default: c_int| {
+        if i.is_null() {
+            default
+        } else {
+            // SAFETY: its INTEGER (one past an int reads as -1, as in `pss_get_param`).
+            c_int::try_from(unsafe { crate::asn1::integer::ASN1_INTEGER_get(i) }).unwrap_or(-1)
+        }
+    };
+    let (salt_len, trailer) = (int(p.saltLength, 20), int(p.trailerField, 1));
+    // SAFETY: the digests.
+    let hash = unsafe { crate::evp::digest::EVP_MD_get_type(md) };
+    // SAFETY: as above.
+    let mask_gen_hash = unsafe { crate::evp::digest::EVP_MD_get_type(mgf1md) };
+    k.lock().pss = crate::rsa::Pss30 {
+        hash,
+        mask_gen: NID_mgf1,
+        mask_gen_hash,
+        salt_len,
+        trailer,
+    };
+    true
+}
+
+ffi_callback! {
+    /// `rsa_pub_encode`: the key's RSAPublicKey with its type's object and parameter (none for
+    /// RSA-PSS without restrictions).
+    ///
+    /// # Safety
+    /// `pk` is a live SubjectPublicKeyInfo; `pkey` is a live RSA or RSA-PSS key.
+    pub(crate) unsafe extern "C" fn rsa_pub_encode(pk: *mut rustyssl_abi::X509_PUBKEY, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let r = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let Some((strtype, str_)) = (unsafe { param_encode(r) }) else { return 0 };
+        let mut penc = ptr::null_mut();
+        // SAFETY: the key; a place for a new encoding.
+        let penclen = unsafe { crate::rsa_asn1::i2d_RSAPublicKey(r, &raw mut penc) };
+        if penclen <= 0 {
+            // SAFETY: made above, or NULL.
+            unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_set0_param(pk, obj, strtype, str_.cast(), penc, penclen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above.
+        unsafe { crate::mem::release(penc.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+        0
+    }
+}
+
+ffi_callback! {
+    /// `rsa_pub_decode`: an RSAPublicKey, its RSA-PSS restrictions, and its kind (the key's
+    /// type's), assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed RSA or RSA-PSS; `pubkey` is a live SubjectPublicKeyInfo.
+    pub(crate) unsafe extern "C" fn rsa_pub_decode(pkey: *mut EVP_PKEY, pubkey: *const rustyssl_abi::X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        use rustyssl_abi::{RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA, RSA_FLAG_TYPE_RSASSAPSS};
+        let (mut p, mut pklen, mut alg) = (ptr::null(), 0, ptr::null_mut());
+        // SAFETY: the caller's structure; locals.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_get0_param(ptr::null_mut(), &raw mut p, &raw mut pklen, &raw mut alg, pubkey) } == 0 {
+            return 0;
+        }
+        // SAFETY: the structure's `pklen` octets.
+        let r = unsafe { crate::rsa_asn1::d2i_RSAPublicKey(ptr::null_mut(), &raw mut p, c_long::from(pklen)) };
+        if r.is_null() {
+            return 0;
+        }
+        // SAFETY: the new key; the structure's AlgorithmIdentifier.
+        let ok = unsafe { param_decode(r, alg) };
+        // SAFETY: the new key.
+        let Some(k) = (unsafe { rsa(r) }).filter(|_| ok) else {
+            // SAFETY: made above.
+            unsafe { free(r) };
+            return 0;
+        };
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        let kind = match id {
+            EVP_PKEY_RSA => RSA_FLAG_TYPE_RSA,
+            EVP_PKEY_RSA_PSS => RSA_FLAG_TYPE_RSASSAPSS,
+            _ => 0,
+        };
+        k.set_flags_to((k.flags() & !RSA_FLAG_TYPE_MASK) | kind);
+        // SAFETY: the caller's key takes the new one.
+        if unsafe { EVP_PKEY_assign(pkey, id, r.cast()) } == 0 {
+            // SAFETY: made above, not taken.
+            unsafe { free(r) };
+            return 0;
+        }
+        1
+    }
+}

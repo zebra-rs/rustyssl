@@ -271,6 +271,8 @@ impl Kind {
         match self {
             Self::Dh { x } => {
                 use super::dh as d;
+                f.pub_decode = Some(d::dh_pub_decode);
+                f.pub_encode = Some(d::dh_pub_encode);
                 f.pub_cmp = Some(d::dh_pub_cmp);
                 f.pub_print = Some(d::dh_public_print);
                 f.priv_print = Some(d::dh_private_print);
@@ -298,6 +300,8 @@ impl Kind {
             }
             Self::Dsa => {
                 use super::dsa as d;
+                f.pub_decode = Some(d::dsa_pub_decode);
+                f.pub_encode = Some(d::dsa_pub_encode);
                 f.pub_cmp = Some(d::dsa_pub_cmp);
                 f.pub_print = Some(d::dsa_pub_print);
                 f.priv_print = Some(d::dsa_priv_print);
@@ -320,6 +324,8 @@ impl Kind {
             }
             Self::Ecx { ed, is448 } => {
                 use super::ecx as x;
+                f.pub_decode = Some(x::ecx_pub_decode);
+                f.pub_encode = Some(x::ecx_pub_encode);
                 f.pub_cmp = Some(x::ecx_pub_cmp);
                 f.pub_print = Some(x::ecx_pub_print);
                 f.priv_print = Some(x::ecx_priv_print);
@@ -344,6 +350,8 @@ impl Kind {
             }
             Self::Ec => {
                 use super::ec as e;
+                f.pub_decode = Some(e::eckey_pub_decode);
+                f.pub_encode = Some(e::eckey_pub_encode);
                 f.pub_cmp = Some(e::eckey_pub_cmp);
                 f.pub_print = Some(e::eckey_pub_print);
                 f.priv_print = Some(e::eckey_priv_print);
@@ -369,6 +377,8 @@ impl Kind {
             }
             Self::Rsa | Self::RsaPss => {
                 use super::rsa as r;
+                f.pub_decode = Some(r::rsa_pub_decode);
+                f.pub_encode = Some(r::rsa_pub_encode);
                 f.pub_cmp = Some(r::rsa_pub_cmp);
                 f.pkey_size = Some(r::int_rsa_size);
                 f.pkey_bits = Some(r::rsa_bits);

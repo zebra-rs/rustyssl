@@ -192,6 +192,11 @@ impl Pkey {
         self.this.load(Ordering::Relaxed)
     }
 
+    /// `save_parameters`: whether a DSA or EC key's public key is encoded with its parameters.
+    pub(crate) fn save_parameters(&self) -> c_int {
+        self.lock().save_parameters
+    }
+
     /// The functions of the key's ASN.1 method, if it has one.
     pub(crate) fn ameth_funcs(&self) -> Option<ameth::Funcs> {
         let m = self.lock().ameth.clone();

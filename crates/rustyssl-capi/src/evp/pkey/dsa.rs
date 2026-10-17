@@ -28,7 +28,7 @@ use crate::dsa_asn1::{d2i_DSAPrivateKey, d2i_DSAparams, i2d_DSAparams};
 use crate::dsa_backend::{self as backend, key_fromdata, params_fromdata};
 use crate::ec::params::{Kept, Target};
 use crate::err;
-use crate::ffi::ffi_export;
+use crate::ffi::{ffi_callback, ffi_export};
 use crate::params::build::{OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_to_param};
 use crate::params::dup::OSSL_PARAM_free;
 
@@ -610,4 +610,130 @@ ffi_export! {
 pub(crate) unsafe fn is_foreign(key: *const DSA) -> bool {
     // SAFETY: the caller's guarantee.
     unsafe { dsa(key) }.is_some_and(backend::is_foreign)
+}
+
+ffi_callback! {
+    /// `dsa_pub_decode`: the key's parameters (a SEQUENCE, or none for NULL or absent) and its
+    /// public key (an INTEGER), assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed DSA; `pubkey` is a live SubjectPublicKeyInfo.
+    pub(crate) unsafe extern "C" fn dsa_pub_decode(pkey: *mut EVP_PKEY, pubkey: *const rustyssl_abi::X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DSA
+    {
+        use crate::x509::pubkey::{IntError, int_decode, sequence_octets};
+        use rustyssl_abi::{
+            DSA_R_BN_DECODE_ERROR, DSA_R_DECODE_ERROR, DSA_R_PARAMETER_ENCODING_ERROR,
+            ERR_R_DSA_LIB, V_ASN1_NULL, V_ASN1_SEQUENCE, V_ASN1_UNDEF,
+        };
+        const F: &str = "dsa_pub_decode";
+        let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null_mut());
+        // SAFETY: the caller's structure; locals.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_get0_param(ptr::null_mut(), &raw mut p, &raw mut pklen, &raw mut palg, pubkey) } == 0 {
+            return 0;
+        }
+        let (mut ptype, mut pval) = (0, ptr::null());
+        // SAFETY: its AlgorithmIdentifier; locals.
+        unsafe { crate::x509::algor::X509_ALGOR_get0(ptr::null_mut(), &raw mut ptype, &raw mut pval, palg) };
+        let d = if ptype == V_ASN1_SEQUENCE {
+            // SAFETY: a SEQUENCE parameter is an `ASN1_STRING`.
+            let (mut pm, pmlen) = unsafe { sequence_octets(pval) };
+            // SAFETY: its octets.
+            let d = unsafe { d2i_DSAparams(ptr::null_mut(), &raw mut pm, pmlen) };
+            if d.is_null() {
+                err::raise(ERR_LIB_DSA, DSA_R_DECODE_ERROR, F);
+                return 0;
+            }
+            d
+        } else if ptype == V_ASN1_NULL || ptype == V_ASN1_UNDEF {
+            // SAFETY: no preconditions.
+            let d = unsafe { DSA_new() };
+            if d.is_null() {
+                err::raise(ERR_LIB_DSA, ERR_R_DSA_LIB, F);
+                return 0;
+            }
+            d
+        } else {
+            err::raise(ERR_LIB_DSA, DSA_R_PARAMETER_ENCODING_ERROR, F);
+            return 0;
+        };
+        // SAFETY: the structure's `pklen` octets.
+        let pub_key = match unsafe { int_decode(p, c_long::from(pklen), false) } {
+            Ok(b) => b,
+            Err(e) => {
+                let reason = match e {
+                    IntError::Decode => DSA_R_DECODE_ERROR,
+                    IntError::Bn => DSA_R_BN_DECODE_ERROR,
+                };
+                err::raise(ERR_LIB_DSA, reason, F);
+                // SAFETY: made above.
+                unsafe { free(d) };
+                return 0;
+            }
+        };
+        // SAFETY: the new key takes the number.
+        unsafe { crate::dsa::DSA_set0_key(d, pub_key, ptr::null_mut()) };
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, EVP_PKEY_DSA, d.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `dsa_pub_encode`: the public key as an INTEGER, with the parameters (a SEQUENCE) when the
+    /// key saves them and has them all, else none.
+    ///
+    /// # Safety
+    /// `pk` is a live SubjectPublicKeyInfo; `pkey` is a live DSA key.
+    pub(crate) unsafe extern "C" fn dsa_pub_encode(pk: *mut rustyssl_abi::X509_PUBKEY, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DSA
+    {
+        use crate::x509::pubkey::{int_encode, sequence_param};
+        use rustyssl_abi::{ERR_R_ASN1_LIB, V_ASN1_OCTET_STRING, V_ASN1_SEQUENCE, V_ASN1_UNDEF};
+        const F: &str = "dsa_pub_encode";
+        // SAFETY: the caller's guarantee.
+        let d = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let save = unsafe { super::pkey(pkey) }.is_some_and(|k| k.save_parameters() != 0);
+        // SAFETY: as above.
+        let full = unsafe { state(pkey) }.is_some_and(|st| {
+            st.params.p.is_some() && st.params.q.is_some() && st.params.g.is_some()
+        });
+        let (ptype, str_) = if save && full {
+            let i2d = |out: *mut *mut c_uchar| {
+                // SAFETY: the key; the caller's place for a new encoding.
+                unsafe { i2d_DSAparams(d, out) }
+            };
+            // SAFETY: the closure writes a new buffer through its argument.
+            match unsafe { sequence_param(V_ASN1_OCTET_STRING, i2d) } {
+                Some(s) => (V_ASN1_SEQUENCE, s),
+                None => {
+                    err::raise(ERR_LIB_DSA, ERR_R_ASN1_LIB, F);
+                    return 0;
+                }
+            }
+        } else {
+            (V_ASN1_UNDEF, ptr::null_mut())
+        };
+        // SAFETY: the key's public key.
+        let pubk = unsafe { crate::dsa::DSA_get0_pub_key(d) };
+        // SAFETY: as above.
+        let Ok((penc, penclen)) = (unsafe { int_encode(pubk) }) else {
+            err::raise(ERR_LIB_DSA, ERR_R_ASN1_LIB, F);
+            // SAFETY: made above, or NULL.
+            unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+            return 0;
+        };
+        // SAFETY: no preconditions.
+        let aobj = unsafe { crate::objects::OBJ_nid2obj(EVP_PKEY_DSA) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if !aobj.is_null() && unsafe { crate::x509::pubkey::X509_PUBKEY_set0_param(pk, aobj, ptype, str_.cast(), penc, penclen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above.
+        unsafe { crate::mem::release(penc.cast()) };
+        // SAFETY: as above, or NULL.
+        unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+        0
+    }
 }

@@ -1193,7 +1193,7 @@ unsafe fn pss_params_create(
 ///
 /// # Safety
 /// `alg` is NULL or a live AlgorithmIdentifier.
-unsafe fn md_of_algor(alg: *const X509_ALGOR) -> *const EVP_MD {
+pub(crate) unsafe fn md_of_algor(alg: *const X509_ALGOR) -> *const EVP_MD {
     if alg.is_null() {
         // SAFETY: no preconditions.
         return unsafe { EVP_sha1() };

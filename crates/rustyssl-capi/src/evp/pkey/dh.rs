@@ -27,7 +27,7 @@ use crate::dh_backend::{self as backend, key_fromdata, params_fromdata};
 use crate::dh_ops::{DH_check_ex, DH_check_pub_key_ex};
 use crate::ec::params::{Kept, Target};
 use crate::err;
-use crate::ffi::ffi_export;
+use crate::ffi::{ffi_callback, ffi_export};
 use crate::mem;
 use crate::params::build::{OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_to_param};
 use crate::params::dup::OSSL_PARAM_free;
@@ -607,5 +607,129 @@ mod tests {
         assert!(unsafe { EVP_PKEY_get0_DH(ptr::null()) }.is_null());
         // SAFETY: made above, freed once.
         unsafe { super::super::EVP_PKEY_free(k) };
+    }
+}
+
+ffi_callback! {
+    /// `dh_pub_decode`: the key's parameters (a SEQUENCE: DHparams, or DHxparams for DHX) and
+    /// its public key (an INTEGER), assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed DH or DHX; `pubkey` is a live SubjectPublicKeyInfo.
+    pub(crate) unsafe extern "C" fn dh_pub_decode(pkey: *mut EVP_PKEY, pubkey: *const rustyssl_abi::X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DH
+    {
+        use crate::x509::pubkey::{IntError, int_decode, sequence_octets};
+        use rustyssl_abi::{
+            DH_R_BN_DECODE_ERROR, DH_R_DECODE_ERROR, DH_R_PARAMETER_ENCODING_ERROR, V_ASN1_SEQUENCE,
+        };
+        const F: &str = "dh_pub_decode";
+        let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null_mut());
+        // SAFETY: the caller's structure; locals.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_get0_param(ptr::null_mut(), &raw mut p, &raw mut pklen, &raw mut palg, pubkey) } == 0 {
+            return 0;
+        }
+        let (mut ptype, mut pval) = (0, ptr::null());
+        // SAFETY: its AlgorithmIdentifier; locals.
+        unsafe { crate::x509::algor::X509_ALGOR_get0(ptr::null_mut(), &raw mut ptype, &raw mut pval, palg) };
+        if ptype != V_ASN1_SEQUENCE {
+            err::raise(ERR_LIB_DH, DH_R_PARAMETER_ENCODING_ERROR, F);
+            return 0;
+        }
+        // SAFETY: a SEQUENCE parameter is an `ASN1_STRING`.
+        let (mut pm, pmlen) = unsafe { sequence_octets(pval) };
+        // SAFETY: the caller's key; the parameter's octets.
+        let dh = if unsafe { is_dhx(pkey) } {
+            // SAFETY: as above.
+            unsafe { d2i_DHxparams(ptr::null_mut(), &raw mut pm, pmlen) }
+        } else {
+            // SAFETY: as above.
+            unsafe { d2i_DHparams(ptr::null_mut(), &raw mut pm, pmlen) }
+        };
+        if dh.is_null() {
+            err::raise(ERR_LIB_DH, DH_R_DECODE_ERROR, F);
+            return 0;
+        }
+        // SAFETY: the structure's `pklen` octets.
+        let pub_key = match unsafe { int_decode(p, c_long::from(pklen), false) } {
+            Ok(b) => b,
+            Err(e) => {
+                let reason = match e {
+                    IntError::Decode => DH_R_DECODE_ERROR,
+                    IntError::Bn => DH_R_BN_DECODE_ERROR,
+                };
+                err::raise(ERR_LIB_DH, reason, F);
+                // SAFETY: made above.
+                unsafe { crate::dh::DH_free(dh) };
+                return 0;
+            }
+        };
+        // SAFETY: the new key takes the number.
+        unsafe { crate::dh::DH_set0_key(dh, pub_key, ptr::null_mut()) };
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, id, dh.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `dh_pub_encode`: the key's parameters (DHparams, or DHxparams for DHX) and its public
+    /// key as an INTEGER.
+    ///
+    /// # Safety
+    /// `pk` is a live SubjectPublicKeyInfo; `pkey` is a live DH or DHX key.
+    pub(crate) unsafe extern "C" fn dh_pub_encode(pk: *mut rustyssl_abi::X509_PUBKEY, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DH
+    {
+        use crate::x509::pubkey::{int_encode, sequence_param};
+        use rustyssl_abi::{ERR_R_ASN1_LIB, V_ASN1_OCTET_STRING, V_ASN1_SEQUENCE};
+        const F: &str = "dh_pub_encode";
+        // SAFETY: the caller's guarantee.
+        let dh = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let dhx = unsafe { is_dhx(pkey) };
+        let i2d = |out: *mut *mut core::ffi::c_uchar| {
+            if dhx {
+                // SAFETY: the key; the caller's place for a new encoding.
+                unsafe { i2d_DHxparams(dh, out) }
+            } else {
+                // SAFETY: as above.
+                unsafe { i2d_DHparams(dh, out) }
+            }
+        };
+        // SAFETY: the closure writes a new buffer through its argument.
+        let Some(str_) = (unsafe { sequence_param(V_ASN1_OCTET_STRING, i2d) }) else {
+            err::raise(ERR_LIB_DH, ERR_R_ASN1_LIB, F);
+            return 0;
+        };
+        // SAFETY: the key's public key.
+        let pubk = unsafe { crate::dh::DH_get0_pub_key(dh) };
+        // SAFETY: as above.
+        let (penc, penclen) = match unsafe { int_encode(pubk) } {
+            Ok(v) => v,
+            Err(no_integer) => {
+                if !no_integer {
+                    err::raise(ERR_LIB_DH, ERR_R_ASN1_LIB, F);
+                }
+                // SAFETY: made above.
+                unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+                return 0;
+            }
+        };
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_set0_param(pk, obj, V_ASN1_SEQUENCE, str_.cast(), penc, penclen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above.
+        unsafe { crate::mem::release(penc.cast()) };
+        // SAFETY: as above.
+        unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+        0
     }
 }
