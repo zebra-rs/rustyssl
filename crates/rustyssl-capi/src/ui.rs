@@ -1,11 +1,10 @@
 //! User-interface methods (`UI_create_method(3)`; `ui_lib.c`, `ui_null.c`, `ui_openssl.c`): the
 //! method objects applications build their prompting on, `UI_null`, and `UI_OpenSSL`.
 //!
-//! These come ahead of the rest of the UI (step 6.2) because every OpenSSL command-line tool
-//! sets its method up at start-up. `UI_OpenSSL`'s console functions read the terminal; until
-//! 6.2 they abort when called, as an unimplemented export does (security rule 10). Nothing
-//! reaches them before then: they're called with a `UI`, which only `UI_new` (still a stub)
-//! makes.
+//! The rest of the UI (`UI_new`, its strings, `UI_process`, and the utilities) is in `ui_lib`.
+//! `UI_OpenSSL`'s console functions read the terminal; until step 6.2 they abort when called, as
+//! an unimplemented export does (security rule 10): a prompt with the default method fails
+//! closed, and an application's own method (`UI_set_default_method`, `UI_new_method`) works.
 
 use core::cell::UnsafeCell;
 use core::ffi::{CStr, c_char, c_int, c_void};
@@ -24,23 +23,32 @@ use crate::ex_data::{
 };
 use crate::ffi::ffi_export;
 
-type SessionFn = unsafe extern "C" fn(*mut UI) -> c_int;
-type StringFn = unsafe extern "C" fn(*mut UI, *mut UI_STRING) -> c_int;
-type DupFn = unsafe extern "C" fn(*mut UI, *mut c_void) -> *mut c_void;
-type DestroyFn = unsafe extern "C" fn(*mut UI, *mut c_void);
-type PromptFn = unsafe extern "C" fn(*mut UI, *const c_char, *const c_char) -> *mut c_char;
+pub(crate) mod ui_lib;
+
+pub(crate) use ui_lib::{
+    EVP_get_pw_prompt, EVP_read_pw_string_min, UI_UTIL_wrap_read_pem_callback, UI_add_input_string,
+    UI_add_user_data, UI_add_verify_string, UI_construct_prompt, UI_free, UI_get_result_length,
+    UI_new, UI_process, UI_set_method,
+};
+
+pub(crate) type SessionFn = unsafe extern "C" fn(*mut UI) -> c_int;
+pub(crate) type StringFn = unsafe extern "C" fn(*mut UI, *mut UI_STRING) -> c_int;
+pub(crate) type DupFn = unsafe extern "C" fn(*mut UI, *mut c_void) -> *mut c_void;
+pub(crate) type DestroyFn = unsafe extern "C" fn(*mut UI, *mut c_void);
+pub(crate) type PromptFn =
+    unsafe extern "C" fn(*mut UI, *const c_char, *const c_char) -> *mut c_char;
 
 /// A method's functions (`struct ui_method_st`).
 #[derive(Clone, Copy, Default)]
-struct Funcs {
-    open: Option<SessionFn>,
-    write: Option<StringFn>,
-    flush: Option<SessionFn>,
-    read: Option<StringFn>,
-    close: Option<SessionFn>,
-    duplicate: Option<DupFn>,
-    destroy: Option<DestroyFn>,
-    prompt: Option<PromptFn>,
+pub(crate) struct Funcs {
+    pub(crate) open: Option<SessionFn>,
+    pub(crate) write: Option<StringFn>,
+    pub(crate) flush: Option<SessionFn>,
+    pub(crate) read: Option<StringFn>,
+    pub(crate) close: Option<SessionFn>,
+    pub(crate) duplicate: Option<DupFn>,
+    pub(crate) destroy: Option<DestroyFn>,
+    pub(crate) prompt: Option<PromptFn>,
 }
 
 /// The method's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -88,6 +96,15 @@ impl Method {
 unsafe fn method<'a>(m: *const UI_METHOD) -> Option<&'a Method> {
     // SAFETY: the caller's guarantee.
     unsafe { m.cast::<Method>().as_ref() }
+}
+
+/// A copy of the method's functions (none for NULL), to call with no lock held.
+///
+/// # Safety
+/// As for [`method`].
+pub(crate) unsafe fn funcs_of(m: *const UI_METHOD) -> Funcs {
+    // SAFETY: the caller's guarantee.
+    unsafe { method(m) }.map(|m| *m.funcs()).unwrap_or_default()
 }
 
 /// `UI_OpenSSL`'s console functions, until the terminal UI comes (6.2).

@@ -27,7 +27,6 @@ enum Source {
     /// `is_expl_passphrase`: a copy.
     Explicit(Zeroizing<Vec<u8>>),
     /// `is_pem_password`.
-    #[allow(dead_code, reason = "asked through the UI layer (4.7d)")]
     Pem(
         unsafe extern "C" fn(*mut c_char, c_int, c_int, *mut c_void) -> c_int,
         *mut c_void,
@@ -44,7 +43,6 @@ enum Source {
         *mut c_void,
     ),
     /// `is_ui_method`.
-    #[allow(dead_code, reason = "asked through the UI layer (4.7d)")]
     Ui(*const UI_METHOD, *mut c_void),
 }
 
@@ -184,7 +182,8 @@ impl PwData {
                     )
                 };
                 // SAFETY: a parameter of the array, or NULL.
-                if let Some(p) = unsafe { p.as_ref() }
+                let p = unsafe { p.as_ref() };
+                if let Some(p) = p
                     && p.data_type != OSSL_PARAM_UTF8_STRING.cast_unsigned()
                 {
                     err::raise_with_text(
@@ -195,16 +194,49 @@ impl PwData {
                     );
                     return false;
                 }
+                let prompt_info: *const c_char =
+                    p.map_or(ptr::null(), |p| p.data.cast_const().cast());
                 // SAFETY: the caller's guarantee (re-borrowed after the parameter check).
                 let Some(d) = (unsafe { this.as_mut() }) else {
                     return false;
                 };
                 match d.source {
-                    Source::Pem(..) | Source::Ui(..) => {
-                        let _ = verify;
-                        crate::stub::unimplemented(
-                            "a passphrase through a pem_password_cb or UI_METHOD (the UI layer, step 4.7d)",
-                        )
+                    Source::Pem(cb, arg) => {
+                        // The callback asked through a UI wrapper of it.
+                        // SAFETY: the application's callback.
+                        let m = unsafe {
+                            crate::ui::UI_UTIL_wrap_read_pem_callback(Some(cb), c_int::from(verify))
+                        };
+                        if m.is_null() {
+                            err::raise(
+                                ERR_LIB_CRYPTO,
+                                rustyssl_abi::ERR_R_UI_LIB,
+                                "ossl_pw_get_passphrase",
+                            );
+                            return false;
+                        }
+                        // SAFETY: the caller's room and length; the wrapper and the callback's
+                        // argument.
+                        let ok = unsafe {
+                            do_ui_passphrase(pass, pass_size, pass_len, prompt_info, verify, m, arg)
+                        };
+                        // SAFETY: made above.
+                        unsafe { crate::ui::UI_destroy_method(m) };
+                        ok
+                    }
+                    Source::Ui(m, data) => {
+                        // SAFETY: as above, with the application's method and data.
+                        unsafe {
+                            do_ui_passphrase(
+                                pass,
+                                pass_size,
+                                pass_len,
+                                prompt_info,
+                                verify,
+                                m,
+                                data,
+                            )
+                        }
                     }
                     _ => {
                         err::raise_with_text(
@@ -231,6 +263,114 @@ impl PwData {
         }
         ok
     }
+}
+
+/// `do_ui_passphrase`: the passphrase asked through a UI with `ui_method` (and its data) and the
+/// method's prompt for "pass phrase" (with `prompt_info`), twice when verifying. True, or
+/// false with an error.
+///
+/// # Safety
+/// `pass` has room for `pass_size` octets; `pass_len` is writable; `prompt_info` is NULL or a C
+/// string; `ui_method` is NULL or a live method taking `ui_data`.
+unsafe fn do_ui_passphrase(
+    pass: *mut c_char,
+    pass_size: usize,
+    pass_len: *mut usize,
+    prompt_info: *const c_char,
+    verify: bool,
+    ui_method: *const UI_METHOD,
+    ui_data: *mut c_void,
+) -> bool {
+    use crate::ui::{
+        UI_add_input_string, UI_add_user_data, UI_add_verify_string, UI_construct_prompt, UI_free,
+        UI_get_result_length, UI_new, UI_process, UI_set_method,
+    };
+    use rustyssl_abi::{ERR_R_INTERRUPTED_OR_CANCELLED, ERR_R_UI_LIB, UI_INPUT_FLAG_DEFAULT_PWD};
+    const F: &str = "do_ui_passphrase";
+    if pass.is_null() || pass_size == 0 || pass_len.is_null() {
+        err::raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER, F);
+        return false;
+    }
+    // SAFETY: no preconditions.
+    let ui = unsafe { UI_new() };
+    if ui.is_null() {
+        err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F);
+        return false;
+    }
+    if !ui_method.is_null() {
+        // SAFETY: the new UI; the caller's method.
+        unsafe { UI_set_method(ui, ui_method) };
+        if !ui_data.is_null() {
+            // SAFETY: as above, with the method's data.
+            unsafe { UI_add_user_data(ui, ui_data) };
+        }
+    }
+    let size = c_int::try_from(pass_size).unwrap_or(c_int::MAX);
+    let (mut ipass, mut vpass) = (ptr::null_mut::<c_char>(), ptr::null_mut::<c_char>());
+    // SAFETY: the new UI; a static description; the caller's info.
+    let prompt = unsafe { UI_construct_prompt(ui, c"pass phrase".as_ptr(), prompt_info) };
+    let mut ret = false;
+    'ask: {
+        if prompt.is_null() {
+            err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F);
+            break 'ask;
+        }
+        ipass = crate::mem::zalloc(pass_size.saturating_add(1), ptr::null(), 0).cast();
+        if ipass.is_null() {
+            break 'ask;
+        }
+        // SAFETY: the UI; its prompt; a buffer of `pass_size + 1`.
+        let prompt_idx =
+            unsafe { UI_add_input_string(ui, prompt, UI_INPUT_FLAG_DEFAULT_PWD, ipass, 0, size) }
+                .saturating_sub(1);
+        if prompt_idx < 0 {
+            err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F);
+            break 'ask;
+        }
+        if verify {
+            vpass = crate::mem::zalloc(pass_size.saturating_add(1), ptr::null(), 0).cast();
+            if vpass.is_null() {
+                break 'ask;
+            }
+            // SAFETY: as above, verifying against the first answer.
+            let verify_idx = unsafe {
+                UI_add_verify_string(ui, prompt, UI_INPUT_FLAG_DEFAULT_PWD, vpass, 0, size, ipass)
+            }
+            .saturating_sub(1);
+            if verify_idx < 0 {
+                err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F);
+                break 'ask;
+            }
+        }
+        // SAFETY: the UI, through its method (no lock held).
+        match unsafe { UI_process(ui) } {
+            -2 => err::raise(ERR_LIB_CRYPTO, ERR_R_INTERRUPTED_OR_CANCELLED, F),
+            -1 => err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F),
+            _ => {
+                // SAFETY: as above.
+                let res = unsafe { UI_get_result_length(ui, prompt_idx) };
+                let Ok(n) = usize::try_from(res) else {
+                    err::raise(ERR_LIB_CRYPTO, ERR_R_UI_LIB, F);
+                    break 'ask;
+                };
+                let n = n.min(pass_size);
+                // SAFETY: the caller's guarantee.
+                unsafe { pass_len.write(n) };
+                // SAFETY: the answer's `n` octets; the caller's room for them.
+                unsafe { ptr::copy_nonoverlapping(ipass, pass, n) };
+                ret = true;
+            }
+        }
+    }
+    // SAFETY: made above (of `pass_size + 1` octets), or NULL.
+    unsafe { crate::mem::release_clean(vpass.cast(), pass_size.saturating_add(1)) };
+    // SAFETY: as above.
+    unsafe { crate::mem::release_clean(ipass.cast(), pass_size.saturating_add(1)) };
+    // SAFETY: made by the UI, or NULL.
+    unsafe { crate::mem::release(prompt.cast()) };
+    // SAFETY: made above.
+    unsafe { UI_free(ui) };
+    ret
 }
 
 /// `ossl_pw_passphrase_callback_dec`: an `OSSL_PASSPHRASE_CALLBACK` over a `PwData` (as `arg`),

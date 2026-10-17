@@ -43,11 +43,6 @@ fn wipe(b: &mut [u8]) {
     unsafe { crate::mem::OPENSSL_cleanse(b.as_mut_ptr().cast(), b.len()) };
 }
 
-unsafe extern "C" {
-    /// The UI's prompt (6.2), an aborting stub until then.
-    fn EVP_get_pw_prompt() -> *mut c_char;
-}
-
 /// `PEM_BUFSIZE`, the password buffer's size.
 const BUFSIZE: usize = PEM_BUFSIZE as usize;
 const MAX_IV: usize = EVP_MAX_IV_LENGTH as usize;
@@ -64,11 +59,23 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_PEM
     {
         if userdata.is_null() {
-            // The prompt is the UI's (6.2). Until then its functions abort: this fails closed.
-            let _ = rwflag;
+            // `MIN_LENGTH`: a password to encrypt with has at least 4 characters.
+            const MIN_LENGTH: c_int = 4;
             // SAFETY: no preconditions.
-            unsafe { EVP_get_pw_prompt() };
-            return -1;
+            let mut prompt = unsafe { crate::ui::EVP_get_pw_prompt() }.cast_const();
+            if prompt.is_null() {
+                prompt = c"Enter PEM pass phrase:".as_ptr();
+            }
+            let min_len = if rwflag != 0 { MIN_LENGTH } else { 0 };
+            // SAFETY: the caller's room for `num` octets; the prompt.
+            if unsafe { crate::ui::EVP_read_pw_string_min(buf, min_len, num, prompt, rwflag) } != 0 {
+                err::raise(ERR_LIB_PEM, rustyssl_abi::PEM_R_PROBLEMS_GETTING_PASSWORD, "PEM_def_callback");
+                // SAFETY: as above.
+                unsafe { ptr::write_bytes(buf, 0, usize::try_from(num).unwrap_or(0)) };
+                return -1;
+            }
+            // SAFETY: the UI's result, a C string in the caller's buffer.
+            return c_int::try_from(unsafe { CStr::from_ptr(buf) }.count_bytes()).unwrap_or(-1);
         }
         // SAFETY: the caller's guarantee: a string.
         let len = unsafe { CStr::from_ptr(userdata.cast::<c_char>()) }.count_bytes();
