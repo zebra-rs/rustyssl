@@ -76,6 +76,10 @@ pub(crate) const fn alg_desc<const N: usize>(
 static PENDING: Dispatch<1> = Dispatch([END]);
 
 /// One of the default provider's algorithms that comes with a later step (see [`PENDING`]).
+#[allow(
+    dead_code,
+    reason = "none is pending now; a later step's algorithms are listed with it"
+)]
 pub(crate) const fn pending(names: &'static CStr) -> OSSL_ALGORITHM {
     OSSL_ALGORITHM {
         algorithm_names: names.as_ptr(),
