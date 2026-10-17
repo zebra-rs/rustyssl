@@ -1,13 +1,13 @@
 //! The built-in methods (`standard_exts.h`): one for each extension OpenSSL knows. Those of
-//! the OCSP extensions (step 6.6) and the certificate transparency ones (step 5.7) have only
-//! their NIDs, and functions that abort when called (AGENTS.md rule 10).
+//! the OCSP extensions (step 6.6) have only their NIDs, and functions that abort when called
+//! (AGENTS.md rule 10).
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
 use rustyssl_abi::{
-    BIO, NID_ct_cert_scts, NID_ct_precert_poison, NID_ct_precert_scts, NID_id_pkix_OCSP_CrlID,
-    NID_id_pkix_OCSP_Nonce, NID_id_pkix_OCSP_archiveCutoff, NID_id_pkix_OCSP_noCheck,
-    NID_id_pkix_OCSP_serviceLocator, X509V3_CTX, X509V3_EXT_METHOD, stack_st_CONF_VALUE,
+    BIO, NID_id_pkix_OCSP_CrlID, NID_id_pkix_OCSP_Nonce, NID_id_pkix_OCSP_archiveCutoff,
+    NID_id_pkix_OCSP_noCheck, NID_id_pkix_OCSP_serviceLocator, X509V3_CTX, X509V3_EXT_METHOD,
+    stack_st_CONF_VALUE,
 };
 
 use super::registry::{Method, method};
@@ -16,7 +16,7 @@ use super::{
 };
 
 fn later() -> ! {
-    crate::stub::unimplemented("an X509v3 extension method of step 5.7 or 6.6")
+    crate::stub::unimplemented("an X509v3 extension method of step 6.6")
 }
 
 extern "C" fn later_new() -> *mut c_void {
@@ -80,15 +80,12 @@ const fn placeholder(nid: c_int, flags: c_int) -> Method {
     Method(m)
 }
 
-static LATER: [Method; 8] = [
+static LATER: [Method; 5] = [
     placeholder(NID_id_pkix_OCSP_Nonce, 0),
     placeholder(NID_id_pkix_OCSP_CrlID, 0),
     placeholder(NID_id_pkix_OCSP_noCheck, 0),
     placeholder(NID_id_pkix_OCSP_archiveCutoff, 0),
     placeholder(NID_id_pkix_OCSP_serviceLocator, 0),
-    placeholder(NID_ct_precert_scts, 0),
-    placeholder(NID_ct_precert_poison, 0),
-    placeholder(NID_ct_cert_scts, 0),
 ];
 
 /// Every built-in method, in no order.
@@ -131,6 +128,9 @@ pub(crate) fn methods() -> impl Iterator<Item = &'static Method> {
         &misc::ISSUER_SIGN_TOOL_METHOD,
         &misc::AUDIT_IDENTITY,
         &rfc3779::ADDR,
+        &crate::ct::PRECERT_SCTS,
+        &crate::ct::POISON,
+        &crate::ct::CERT_SCTS,
         &rfc3779::ASID,
         &admission::ADMISSION,
         &crld::AA_ISSUING_DIST_POINT,
