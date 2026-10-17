@@ -284,6 +284,7 @@ OpenSSL never depends on them.
 | `X509_print_ex`, `X509_CRL_print_ex`, `X509_REQ_print_ex`, `X509_ACERT_print_ex`, and `X509_aux_print` with a NULL object; `X509_signature_print` with a NULL algorithm; `X509_STORE_CTX_print_verify_cb` for a context without a store | dereference NULL | return 0 (print nothing); print no expected identities | `x509::tprint::tests::null_objects_print_nothing` |
 | The `SCT_*`, `CTLOG_*`, and `CT_POLICY_EVAL_CTX_*` functions with a NULL object; `SCT_validate` with no certificate in the context; `CT_POLICY_EVAL_CTX_set1_cert` and `_set1_issuer` with NULL | dereference NULL | fail (0, -1, or NULL), do nothing, or (for no certificate) give `SCT_VALIDATION_STATUS_UNVERIFIED` | `ct::tests::null_objects_are_refused` |
 | `CTLOG_STORE_get0_log_by_id` with a log identifier longer than 32 octets | reads past the log's identifier | matches no log | `ct::tests::long_log_ids_match_nothing` |
+| `ASN1_generate_v3` and `ASN1_generate_nconf` with a NULL string | parse with the type left uninitialised | fail with `ASN1_R_UNKNOWN_TAG` | `asn1::generate::tests::null_strings_fail` |
 
 ## Notes
 

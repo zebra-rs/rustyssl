@@ -8,7 +8,7 @@
 //! - In a section, a subject key identifier listed after the authority key identifier is
 //!   made first, since the authority's may need it.
 //! - With `X509V3_CTX_REPLACE`, an extension replaces those of its type already there.
-//! - `ASN1:` values need `ASN1_generate_v3` (step 6.1), and abort until then; the CRL
+//! - `ASN1:` values are `ASN1_generate_v3`'s (`asn1/generate.rs`); the CRL
 //!   functions come with CRLs (step 5.1e).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
@@ -115,6 +115,24 @@ fn data(pieces: &[(&str, Option<&[u8]>)], sep: &str) -> Vec<u8> {
     v
 }
 
+/// `generic_asn1`: the DER of the value `ASN1_generate_v3` makes of `value`, or NULL.
+///
+/// # Safety
+/// `value` is a C string; `ctx` is NULL or a live context.
+unsafe fn generic_asn1(value: *const c_char, ctx: *mut X509V3_CTX, len: &mut c_long) -> *mut u8 {
+    // SAFETY: the caller's guarantee.
+    let typ = unsafe { crate::asn1::generate::ASN1_generate_v3(value, ctx) };
+    if typ.is_null() {
+        return ptr::null_mut();
+    }
+    let mut der = ptr::null_mut();
+    // SAFETY: the value; a new buffer.
+    *len = c_long::from(unsafe { crate::asn1::tpl::items::i2d_ASN1_TYPE(typ, &raw mut der) });
+    // SAFETY: made above.
+    unsafe { crate::asn1::tpl::items::ASN1_TYPE_free(typ) };
+    der
+}
+
 /// `v3_generic_extension`: an extension of the object `ext` (a name or dotted) whose value
 /// is the text's octets, or NULL.
 ///
@@ -125,6 +143,7 @@ unsafe fn generic_extension(
     value: *const c_char,
     crit: c_int,
     kind: c_int,
+    ctx: *mut X509V3_CTX,
 ) -> *mut X509_EXTENSION {
     const F: &str = "v3_generic_extension";
     // SAFETY: the caller's guarantee.
@@ -140,7 +159,8 @@ unsafe fn generic_extension(
         // SAFETY: as above; a place for the length.
         unsafe { OPENSSL_hexstr2buf(value, &raw mut len) }
     } else {
-        crate::stub::unimplemented("an ASN1: extension value (ASN1_generate_v3, step 6.1)")
+        // SAFETY: as above; the caller's context.
+        unsafe { generic_asn1(value, ctx, &mut len) }
     };
     let mut extension = ptr::null_mut();
     if der.is_null() {
@@ -319,7 +339,7 @@ unsafe fn nconf_int(
     let kind = unsafe { check_generic(&mut value) };
     if kind != 0 {
         // SAFETY: C strings.
-        return unsafe { generic_extension(name, value, crit, kind) };
+        return unsafe { generic_extension(name, value, crit, kind, ctx) };
     }
     // SAFETY: a C string.
     let nid = unsafe { OBJ_sn2nid(name) };
@@ -385,7 +405,7 @@ ffi_export! {
                 return ptr::null_mut();
             }
             // SAFETY: C strings.
-            return unsafe { generic_extension(sn, value, crit, kind) };
+            return unsafe { generic_extension(sn, value, crit, kind, c) };
         }
         // SAFETY: the caller's guarantee; a live context.
         unsafe { do_ext_nconf(conf, c, ext_nid, crit, value) }

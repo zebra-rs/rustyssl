@@ -558,6 +558,10 @@ const _: unsafe extern "C" fn(
     d2i_of_void,
     *const core::ffi::c_void,
 ) -> *mut core::ffi::c_void = crate::asn1::tpl::util::ASN1_dup;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut CONF) -> *mut ASN1_TYPE =
+    crate::asn1::generate::ASN1_generate_nconf;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut X509V3_CTX) -> *mut ASN1_TYPE =
+    crate::asn1::generate::ASN1_generate_v3;
 const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     *mut core::ffi::c_long,

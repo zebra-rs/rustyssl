@@ -8,7 +8,7 @@
 //! - The validity times must be GeneralizedTimes.
 //! - Printing comes with step 5.6 (it needs `X509_signature_print`), but for the issuer and
 //!   serial number and the object digest info, which the extensions print; `ASN1:` attribute values
-//!   from configuration need `ASN1_generate_nconf` (step 6.1), and abort until then.
+//!   from configuration are `ASN1_generate_nconf`'s.
 //!
 //! The types are opaque in OpenSSL's headers, so their layouts are ours (OpenSSL's, in fact).
 
@@ -1122,7 +1122,7 @@ fn asn1_value(v: &[u8]) -> Option<&[u8]> {
 
 ffi_export! {
     /// Adds an attribute for each value of the configuration's `section`, named by its name:
-    /// the value as an OCTET STRING (`ASN1:` values need step 6.1). 1, or 0.
+    /// the value as an OCTET STRING, or an `ASN1:` value's DER (`ASN1_generate_nconf`). 1, or 0.
     ///
     /// # Safety
     /// `conf` is NULL or a live configuration; `section` is NULL or a C string; `acert` is NULL
@@ -1155,8 +1155,26 @@ ffi_export! {
             }
             // SAFETY: a C string.
             let value = unsafe { CStr::from_ptr(v.value) }.to_bytes();
-            if asn1_value(value).is_some() {
-                crate::stub::unimplemented("an ASN1: attribute value (ASN1_generate_nconf, step 6.1)");
+            if let Some(text) = asn1_value(value) {
+                let Ok(text) = std::ffi::CString::new(text) else { return 0 };
+                // SAFETY: a C string; the caller's configuration.
+                let typ = unsafe { crate::asn1::generate::ASN1_generate_nconf(text.as_ptr(), conf) };
+                if typ.is_null() {
+                    return 0;
+                }
+                let mut der = ptr::null_mut();
+                // SAFETY: the value; a new buffer.
+                let n = unsafe { crate::asn1::tpl::items::i2d_ASN1_TYPE(typ, &raw mut der) };
+                // SAFETY: the caller's certificate; the value's name and DER.
+                let ok = unsafe { X509_ACERT_add1_attr_by_txt(acert, v.name, rustyssl_abi::V_ASN1_SEQUENCE, der, n) };
+                // SAFETY: made above.
+                unsafe { crate::mem::release(der.cast()) };
+                // SAFETY: as above.
+                unsafe { crate::asn1::tpl::items::ASN1_TYPE_free(typ) };
+                if ok == 0 {
+                    return 0;
+                }
+                continue;
             }
             let len = c_int::try_from(value.len()).unwrap_or(c_int::MAX);
             // SAFETY: the caller's certificate; the value's name and octets.

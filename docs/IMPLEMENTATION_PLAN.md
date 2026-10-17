@@ -4704,7 +4704,7 @@ Exit checks:
       safe Rust.
     - The context: `X509V3_set_ctx`, `_set_nconf`, `_set_conf_lhash`, `_set_issuer_pkey`, the
       section and string getters, and `X509V3_NAME_from_section`.
-    - An other name made from text needs `ASN1_generate_v3` (step 6.1), and aborts until then.
+    - An other name made from text needs `ASN1_generate_v3`, which came with step 6.1.
   - [x] **5.2c Key identifiers, information access, and distribution points**
     (`x509v3/akid.rs`, `x509v3/info.rs`, `x509v3/crld.rs`, from `v3_akid.c`, `v3_akeya.c`,
     `v3_info.c`, and `v3_crld.c`):
@@ -4764,7 +4764,7 @@ Exit checks:
     `X509V3_EXT_nconf` and `_nconf_nid` (`critical,`, `DER:`, `@section`, lists, strings, and
     the `r2i` policies), `X509V3_EXT_add_nconf_sk`, `_add_nconf` (the subject key identifier
     made before the authority's, `X509V3_CTX_REPLACE`), `_REQ_add_nconf`, and the legacy `CONF`
-    forms. `ASN1:` values need `ASN1_generate_v3` (6.1) and abort until then;
+    forms. `ASN1:` values need `ASN1_generate_v3`, which came with 6.1;
     `X509V3_EXT_CRL_add_nconf` and `_CRL_add_conf` come with CRLs (5.1e). A NULL name or value
     fails (docs/DEVIATIONS.md). Test: `tests/c/x509v3_conf.c`.
   - [x] **5.2i The extension cache and purposes** (`x509/purpose.rs`, from `v3_purp.c`, and
@@ -4916,9 +4916,16 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
 
 ## Phase 6: PKI containers, config, misc libcrypto
 
-- [ ] **6.1 Config-driven ASN.1** (the file format, the `CONF`/`NCONF` interface, and the
-  configuration modules moved to 3.12):
-  - `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language
+- [x] **6.1 Config-driven ASN.1** (`asn1/generate.rs`, from `asn1_gen.c`; the file format, the
+  `CONF`/`NCONF` interface, and the configuration modules moved to 3.12):
+  `ASN1_generate_nconf`/`ASN1_generate_v3` (moved from 2.5), the string → DER mini-language:
+  every universal type and format, the tagging and wrapping modifiers (at most 20), and
+  SEQUENCE and SET from configuration sections (50 deep), with OpenSSL's quirks (the value
+  running to the end of the string, `strtoul` tag numbers truncated to `int`). It completes
+  `ASN1:` extension values, otherName alternative names from text, and `ASN1:` attribute
+  certificate attributes, which aborted until now. Tests: `tests/c/asn1_generate.c` (129
+  strings with and without a configuration, and the three users), the `asn1_generate` fuzz
+  target.
 - [ ] **6.2 UI:** `UI_OpenSSL` reading the tty (echo off, the verify check, the redo loop).
   The rest of the UI came with 4.7d1: `UI_*`, `UI_UTIL_read_pw`, `PEM_def_callback`, and
   `EVP_read_pw_string`.
