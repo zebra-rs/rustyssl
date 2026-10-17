@@ -10,6 +10,7 @@ pub(crate) mod cert;
 pub(crate) mod crl;
 pub(crate) mod ext;
 pub(crate) mod info;
+pub(crate) mod lookup;
 pub(crate) mod name;
 pub(crate) mod p8;
 pub(crate) mod pbe;
@@ -19,6 +20,7 @@ pub(crate) mod purpose;
 pub(crate) mod req;
 pub(crate) mod sig;
 pub(crate) mod spki;
+pub(crate) mod store;
 pub(crate) mod trust;
 pub(crate) mod vpm;
 

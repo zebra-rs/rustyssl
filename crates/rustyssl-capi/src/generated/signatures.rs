@@ -12201,6 +12201,141 @@ const _: unsafe extern "C" fn(*mut X509_EXTENSION, *const ASN1_OBJECT) -> core::
 const _: unsafe extern "C" fn(*mut X509_INFO) = crate::x509::info::X509_INFO_free;
 const _: unsafe extern "C" fn() -> *mut X509_INFO = crate::x509::info::X509_INFO_new;
 const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    X509_LOOKUP_TYPE,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut X509_OBJECT,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_by_alias;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    X509_LOOKUP_TYPE,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut X509_OBJECT,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_by_fingerprint;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+    *const ASN1_INTEGER,
+    *mut X509_OBJECT,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_by_issuer_serial;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+    *mut X509_OBJECT,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_by_subject;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+    *mut X509_OBJECT,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_by_subject_ex;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_long,
+    *mut *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_ctrl;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_long,
+    *mut *mut core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_ctrl_ex;
+const _: unsafe extern "C" fn() -> *mut X509_LOOKUP_METHOD = crate::x509::lookup::X509_LOOKUP_file;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP) = crate::x509::lookup::X509_LOOKUP_free;
+const _: unsafe extern "C" fn(*const X509_LOOKUP) -> *mut core::ffi::c_void =
+    crate::x509::lookup::X509_LOOKUP_get_method_data;
+const _: unsafe extern "C" fn(*const X509_LOOKUP) -> *mut X509_STORE =
+    crate::x509::lookup::X509_LOOKUP_get_store;
+const _: unsafe extern "C" fn() -> *mut X509_LOOKUP_METHOD =
+    crate::x509::lookup::X509_LOOKUP_hash_dir;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP) -> core::ffi::c_int =
+    crate::x509::lookup::X509_LOOKUP_init;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP_METHOD) = crate::x509::lookup::X509_LOOKUP_meth_free;
+const _: unsafe extern "C" fn(*const X509_LOOKUP_METHOD) -> X509_LOOKUP_ctrl_fn =
+    crate::x509::lookup::X509_LOOKUP_meth_get_ctrl;
+const _: unsafe extern "C" fn(
+    *const X509_LOOKUP_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut X509_LOOKUP),
+> = crate::x509::lookup::X509_LOOKUP_meth_get_free;
+const _: unsafe extern "C" fn(*const X509_LOOKUP_METHOD) -> X509_LOOKUP_get_by_alias_fn =
+    crate::x509::lookup::X509_LOOKUP_meth_get_get_by_alias;
+const _: unsafe extern "C" fn(*const X509_LOOKUP_METHOD) -> X509_LOOKUP_get_by_fingerprint_fn =
+    crate::x509::lookup::X509_LOOKUP_meth_get_get_by_fingerprint;
+const _: unsafe extern "C" fn(*const X509_LOOKUP_METHOD) -> X509_LOOKUP_get_by_issuer_serial_fn =
+    crate::x509::lookup::X509_LOOKUP_meth_get_get_by_issuer_serial;
+const _: unsafe extern "C" fn(*const X509_LOOKUP_METHOD) -> X509_LOOKUP_get_by_subject_fn =
+    crate::x509::lookup::X509_LOOKUP_meth_get_get_by_subject;
+const _: unsafe extern "C" fn(
+    *const X509_LOOKUP_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut X509_LOOKUP) -> core::ffi::c_int,
+> = crate::x509::lookup::X509_LOOKUP_meth_get_init;
+const _: unsafe extern "C" fn(
+    *const X509_LOOKUP_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut X509_LOOKUP) -> core::ffi::c_int,
+> = crate::x509::lookup::X509_LOOKUP_meth_get_new_item;
+const _: unsafe extern "C" fn(
+    *const X509_LOOKUP_METHOD,
+) -> ::core::option::Option<
+    unsafe extern "C" fn(method: *mut X509_LOOKUP) -> core::ffi::c_int,
+> = crate::x509::lookup::X509_LOOKUP_meth_get_shutdown;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut X509_LOOKUP_METHOD =
+    crate::x509::lookup::X509_LOOKUP_meth_new;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP_METHOD, X509_LOOKUP_ctrl_fn) -> core::ffi::c_int =
+    crate::x509::lookup::X509_LOOKUP_meth_set_ctrl;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut X509_LOOKUP)>,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_free;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    X509_LOOKUP_get_by_alias_fn,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_get_by_alias;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    X509_LOOKUP_get_by_fingerprint_fn,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_get_by_fingerprint;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    X509_LOOKUP_get_by_issuer_serial_fn,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_get_by_issuer_serial;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    X509_LOOKUP_get_by_subject_fn,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_get_by_subject;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut X509_LOOKUP) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_init;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut X509_LOOKUP) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_new_item;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP_METHOD,
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut X509_LOOKUP) -> core::ffi::c_int>,
+) -> core::ffi::c_int = crate::x509::lookup::X509_LOOKUP_meth_set_shutdown;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP_METHOD) -> *mut X509_LOOKUP =
+    crate::x509::lookup::X509_LOOKUP_new;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::x509::lookup::X509_LOOKUP_set_method_data;
+const _: unsafe extern "C" fn(*mut X509_LOOKUP) -> core::ffi::c_int =
+    crate::x509::lookup::X509_LOOKUP_shutdown;
+const _: unsafe extern "C" fn() -> *mut X509_LOOKUP_METHOD = crate::x509::lookup::X509_LOOKUP_store;
+const _: unsafe extern "C" fn(
     *mut *mut X509_NAME_ENTRY,
     core::ffi::c_int,
     core::ffi::c_int,
@@ -12348,6 +12483,32 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::name::X509_NAME_print_ex_fp;
 const _: unsafe extern "C" fn(*mut *mut X509_NAME, *const X509_NAME) -> core::ffi::c_int =
     crate::x509::name::X509_NAME_set;
+const _: unsafe extern "C" fn(*mut X509_OBJECT) = crate::x509::store::X509_OBJECT_free;
+const _: unsafe extern "C" fn(*const X509_OBJECT) -> *mut X509 =
+    crate::x509::store::X509_OBJECT_get0_X509;
+const _: unsafe extern "C" fn(*const X509_OBJECT) -> *mut X509_CRL =
+    crate::x509::store::X509_OBJECT_get0_X509_CRL;
+const _: unsafe extern "C" fn(*const X509_OBJECT) -> X509_LOOKUP_TYPE =
+    crate::x509::store::X509_OBJECT_get_type;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509_OBJECT,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+) -> core::ffi::c_int = crate::x509::store::X509_OBJECT_idx_by_subject;
+const _: unsafe extern "C" fn() -> *mut X509_OBJECT = crate::x509::store::X509_OBJECT_new;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509_OBJECT,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+) -> *mut X509_OBJECT = crate::x509::store::X509_OBJECT_retrieve_by_subject;
+const _: unsafe extern "C" fn(*mut stack_st_X509_OBJECT, *mut X509_OBJECT) -> *mut X509_OBJECT =
+    crate::x509::store::X509_OBJECT_retrieve_match;
+const _: unsafe extern "C" fn(*mut X509_OBJECT, *mut X509) -> core::ffi::c_int =
+    crate::x509::store::X509_OBJECT_set1_X509;
+const _: unsafe extern "C" fn(*mut X509_OBJECT, *mut X509_CRL) -> core::ffi::c_int =
+    crate::x509::store::X509_OBJECT_set1_X509_CRL;
+const _: unsafe extern "C" fn(*mut X509_OBJECT) -> core::ffi::c_int =
+    crate::x509::store::X509_OBJECT_up_ref_count;
 const _: unsafe extern "C" fn(*mut X509_PKEY) = crate::x509::info::X509_PKEY_free;
 const _: unsafe extern "C" fn() -> *mut X509_PKEY = crate::x509::info::X509_PKEY_new;
 const _: unsafe extern "C" fn(*const X509_PUBKEY) -> *mut X509_PUBKEY =
@@ -12611,6 +12772,130 @@ const _: unsafe extern "C" fn(*mut X509_SIG, *mut *mut X509_ALGOR, *mut *mut ASN
     crate::x509::sig::X509_SIG_getm;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::sig::X509_SIG_it;
 const _: unsafe extern "C" fn() -> *mut X509_SIG = crate::x509::sig::X509_SIG_new;
+const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_add_cert;
+const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509_CRL) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_add_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509_LOOKUP_METHOD) -> *mut X509_LOOKUP =
+    crate::x509::store::X509_STORE_add_lookup;
+const _: unsafe extern "C" fn(*mut X509_STORE) = crate::x509::store::X509_STORE_free;
+const _: unsafe extern "C" fn(*const X509_STORE) -> *mut stack_st_X509_OBJECT =
+    crate::x509::store::X509_STORE_get0_objects;
+const _: unsafe extern "C" fn(*const X509_STORE) -> *mut X509_VERIFY_PARAM =
+    crate::x509::store::X509_STORE_get0_param;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> *mut stack_st_X509 =
+    crate::x509::store::X509_STORE_get1_all_certs;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> *mut stack_st_X509_OBJECT =
+    crate::x509::store::X509_STORE_get1_objects;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_cert_crl_fn =
+    crate::x509::store::X509_STORE_get_cert_crl;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_check_crl_fn =
+    crate::x509::store::X509_STORE_get_check_crl;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_check_issued_fn =
+    crate::x509::store::X509_STORE_get_check_issued;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_check_policy_fn =
+    crate::x509::store::X509_STORE_get_check_policy;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_check_revocation_fn =
+    crate::x509::store::X509_STORE_get_check_revocation;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_cleanup_fn =
+    crate::x509::store::X509_STORE_get_cleanup;
+const _: unsafe extern "C" fn(*const X509_STORE, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::x509::store::X509_STORE_get_ex_data;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_get_crl_fn =
+    crate::x509::store::X509_STORE_get_get_crl;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_get_issuer_fn =
+    crate::x509::store::X509_STORE_get_get_issuer;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_lookup_certs_fn =
+    crate::x509::store::X509_STORE_get_lookup_certs;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_lookup_crls_fn =
+    crate::x509::store::X509_STORE_get_lookup_crls;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_verify_fn =
+    crate::x509::store::X509_STORE_get_verify;
+const _: unsafe extern "C" fn(*const X509_STORE) -> X509_STORE_CTX_verify_cb =
+    crate::x509::store::X509_STORE_get_verify_cb;
+const _: unsafe extern "C" fn(*mut X509_STORE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_load_file;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_load_file_ex;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_load_locations;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_load_locations_ex;
+const _: unsafe extern "C" fn(*mut X509_STORE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_load_path;
+const _: unsafe extern "C" fn(*mut X509_STORE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_load_store;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_load_store_ex;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_lock;
+const _: unsafe extern "C" fn() -> *mut X509_STORE = crate::x509::store::X509_STORE_new;
+const _: unsafe extern "C" fn(*mut X509_STORE, *const X509_VERIFY_PARAM) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set1_param;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_cert_crl_fn) =
+    crate::x509::store::X509_STORE_set_cert_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_check_crl_fn) =
+    crate::x509::store::X509_STORE_set_check_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_check_issued_fn) =
+    crate::x509::store::X509_STORE_set_check_issued;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_check_policy_fn) =
+    crate::x509::store::X509_STORE_set_check_policy;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_check_revocation_fn) =
+    crate::x509::store::X509_STORE_set_check_revocation;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_cleanup_fn) =
+    crate::x509::store::X509_STORE_set_cleanup;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set_default_paths;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_set_default_paths_ex;
+const _: unsafe extern "C" fn(*mut X509_STORE, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set_depth;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::x509::store::X509_STORE_set_ex_data;
+const _: unsafe extern "C" fn(*mut X509_STORE, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set_flags;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_get_crl_fn) =
+    crate::x509::store::X509_STORE_set_get_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_get_issuer_fn) =
+    crate::x509::store::X509_STORE_set_get_issuer;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_lookup_certs_fn) =
+    crate::x509::store::X509_STORE_set_lookup_certs;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_lookup_crls_fn) =
+    crate::x509::store::X509_STORE_set_lookup_crls;
+const _: unsafe extern "C" fn(*mut X509_STORE, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set_purpose;
+const _: unsafe extern "C" fn(*mut X509_STORE, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_set_trust;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_verify_fn) =
+    crate::x509::store::X509_STORE_set_verify;
+const _: unsafe extern "C" fn(*mut X509_STORE, X509_STORE_CTX_verify_cb) =
+    crate::x509::store::X509_STORE_set_verify_cb;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_unlock;
+const _: unsafe extern "C" fn(*mut X509_STORE) -> core::ffi::c_int =
+    crate::x509::store::X509_STORE_up_ref;
 const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
@@ -12954,6 +13239,35 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::x509::trust::X509_keyid_set1;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::lookup::X509_load_cert_crl_file;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::lookup::X509_load_cert_crl_file_ex;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::lookup::X509_load_cert_file;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::lookup::X509_load_cert_file_ex;
+const _: unsafe extern "C" fn(
+    *mut X509_LOOKUP,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::lookup::X509_load_crl_file;
 const _: unsafe extern "C" fn() -> *mut X509 = crate::x509::cert::X509_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509 =
     crate::x509::cert::X509_new_ex;

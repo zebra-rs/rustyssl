@@ -4788,7 +4788,7 @@ Exit checks:
   - The methods still placeholders arrive with their types: the OCSP extensions (6.6) and the
     SCT lists and precertificate poison (5.7). The attribute certificate extensions and
     subject directory attributes came with 5.1f3.
-- [ ] **5.3 Store and lookup:**
+- [x] **5.3 Store and lookup:**
   - [x] **5.3a Verification parameters** (`x509/vpm.rs`, from `x509_vpm.c`): `X509_VERIFY_PARAM`
     (39 exports): flags, inheritance flags, purpose, trust, depth, security level, time,
     policies, host names (a NUL may end one but not be in it), host flags, the peer name, email
@@ -4797,14 +4797,26 @@ Exit checks:
     that use the identities come with 5.5. Three deviations, for NULL parameters, adding a
     parameter the table holds, and inheriting from itself (docs/DEVIATIONS.md). Tests:
     `tests/c/x509_vpm.c`.
-  - [ ] **5.3b The store and its lookups:**
-    - `X509_STORE`, `X509_OBJECT`
-    - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store
-    - `load_locations`, default paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`, OPENSSLDIR)
-    - every store callback setter
-    - `X509_load_cert_file`, `X509_load_crl_file`, `X509_load_cert_crl_file` and their `_ex`
-      forms (`by_file.c`); `X509_load_http` and `X509_CRL_load_http` come with the HTTP
-      client (6.8)
+  - [x] **5.3b The store and its lookups** (`x509/store.rs`, `x509/lookup.rs`, from
+    `x509_lu.c`, `x509_d2.c`, `x509_meth.c`, `by_file.c`, `by_dir.c`, and `by_store.c`;
+    105 exports):
+    - `X509_STORE`: its objects (`X509_OBJECT`, certificates and CRLs, kept once each and
+      sorted by subject or issuer when searched), lookups, parameters, the twelve callbacks,
+      application data, and lock; `X509_OBJECT` and its searches.
+    - `X509_LOOKUP` and `X509_LOOKUP_METHOD` (the application's, and each function of the
+      built-in ones as OpenSSL's tables have them).
+    - The file lookup and `X509_load_cert_file`, `X509_load_crl_file`, and
+      `X509_load_cert_crl_file` (PEM and DER), with their `_ex` forms.
+    - The hashed-directory lookup: `:`-separated directories, `<hash>.<n>` and `<hash>.r<n>`
+      files tried while they exist (a dangling link is skipped), the CRL suffixes remembered.
+    - `X509_STORE_load_file`, `load_path`, `load_locations` (and `_ex`), and the default paths
+      (`SSL_CERT_FILE`, `SSL_CERT_DIR`, or OPENSSLDIR's).
+    - The store lookup works without URIs (the default paths add it so); one aborts until
+      OSSL_STORE (6.9), as `X509_STORE_load_store` with a URI does.
+    - `X509_STORE_CTX` and its searches of the store come with 5.4, `X509_load_http` with 6.8.
+    - Deviations: NULL stores, objects, lookups, and methods (docs/DEVIATIONS.md).
+    - Tests: `tests/c/x509_store.c` (files and a hashed directory made at run time, the default
+      paths from the environment).
 - [ ] **5.4 Path validation** (core in `rustyssl-pki`):
   - chain building over multiple candidate issuers (alternate chains, the CVE-2015-1793
     lesson), trusted-first, partial chains
@@ -4867,7 +4879,8 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
 - [ ] **6.8 HTTP client** (`OSSL_HTTP_*`): get and transfer, proxies and `no_proxy` (the
   CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits.
 - [ ] **6.9 OSSL_STORE:** the `file:` loader (PEM bundles, DER, PKCS#12, directories),
-  `OSSL_STORE_INFO`, search, and custom `OSSL_STORE_LOADER` registration.
+  `OSSL_STORE_INFO`, search, and custom `OSSL_STORE_LOADER` registration; then the URIs of
+  `X509_LOOKUP_store` and `X509_STORE_load_store`, which abort until then (5.3b).
 - [ ] **6.10 CMP/CRMF** (RFC 4210/4211/9480): the structures, the `OSSL_CMP_CTX` client, and
   the server/mock APIs. Large and seldom used, so it's scheduled last in this phase.
 - [ ] **6.11 Remainder:**
