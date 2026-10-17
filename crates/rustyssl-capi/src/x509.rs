@@ -5,7 +5,9 @@
 pub(crate) mod algor;
 pub(crate) mod attrib;
 pub(crate) mod cert;
+pub(crate) mod crl;
 pub(crate) mod ext;
+pub(crate) mod info;
 pub(crate) mod name;
 pub(crate) mod p8;
 pub(crate) mod pbe;
@@ -13,6 +15,8 @@ pub(crate) mod pubkey;
 pub(crate) mod purpose;
 pub(crate) mod req;
 pub(crate) mod sig;
+pub(crate) mod spki;
+pub(crate) mod trust;
 
 #[cfg(test)]
 mod tests {

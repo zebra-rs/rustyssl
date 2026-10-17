@@ -16,11 +16,12 @@ use core::ptr;
 
 use rustyssl_abi::{
     CONF, CONF_VALUE, ERR_LIB_X509V3, ERR_R_ASN1_LIB, ERR_R_PASSED_NULL_PARAMETER, NID_undef, X509,
-    X509_EXTENSION, X509_REQ, X509V3_CTX, X509V3_CTX_REPLACE, X509V3_R_ERROR_IN_EXTENSION,
-    X509V3_R_EXTENSION_NAME_ERROR, X509V3_R_EXTENSION_SETTING_NOT_SUPPORTED,
-    X509V3_R_EXTENSION_VALUE_ERROR, X509V3_R_INVALID_EXTENSION_STRING, X509V3_R_NO_CONFIG_DATABASE,
-    X509V3_R_UNKNOWN_EXTENSION, X509V3_R_UNKNOWN_EXTENSION_NAME, lhash_st_CONF_VALUE,
-    stack_st_CONF_VALUE, stack_st_X509_EXTENSION,
+    X509_CRL, X509_EXTENSION, X509_REQ, X509V3_CTX, X509V3_CTX_REPLACE,
+    X509V3_R_ERROR_IN_EXTENSION, X509V3_R_EXTENSION_NAME_ERROR,
+    X509V3_R_EXTENSION_SETTING_NOT_SUPPORTED, X509V3_R_EXTENSION_VALUE_ERROR,
+    X509V3_R_INVALID_EXTENSION_STRING, X509V3_R_NO_CONFIG_DATABASE, X509V3_R_UNKNOWN_EXTENSION,
+    X509V3_R_UNKNOWN_EXTENSION_NAME, lhash_st_CONF_VALUE, stack_st_CONF_VALUE,
+    stack_st_X509_EXTENSION,
 };
 
 use super::ctx::{X509V3_set_ctx, X509V3_set_nconf};
@@ -589,6 +590,34 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         with_lhash(conf, 0, |c| unsafe { X509V3_EXT_REQ_add_nconf(c, ctx, section, req) })
+    }
+}
+
+ffi_export! {
+    /// Adds the section's extensions to the CRL (or only makes them, for NULL): 1, or 0.
+    ///
+    /// # Safety
+    /// As for [`X509V3_EXT_add_nconf_sk`]; `crl` is NULL or a live CRL.
+    pub unsafe extern "C" fn X509V3_EXT_CRL_add_nconf(conf: *mut CONF, ctx: *mut X509V3_CTX, section: *const c_char, crl: *mut X509_CRL) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        let sk = unsafe { crate::x509::crl::crl_of(crl) }.map_or(ptr::null_mut(), |c| &raw mut c.crl.extensions);
+        // SAFETY: as above; the CRL's list, or NULL.
+        unsafe { X509V3_EXT_add_nconf_sk(conf, ctx, section, sk) }
+    }
+}
+
+ffi_export! {
+    /// [`X509V3_EXT_CRL_add_nconf`] over a legacy `CONF` hash.
+    ///
+    /// # Safety
+    /// `conf` is NULL or a live hash; otherwise as for [`X509V3_EXT_CRL_add_nconf`].
+    pub unsafe extern "C" fn X509V3_EXT_CRL_add_conf(conf: *mut lhash_st_CONF_VALUE, ctx: *mut X509V3_CTX, section: *const c_char, crl: *mut X509_CRL) -> c_int
+    where failure = 0, library = ERR_LIB_X509V3
+    {
+        // SAFETY: the caller's guarantee.
+        with_lhash(conf, 0, |c| unsafe { X509V3_EXT_CRL_add_nconf(c, ctx, section, crl) })
     }
 }
 

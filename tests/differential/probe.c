@@ -427,6 +427,10 @@
  *                              the flags, key usages, path lengths, X509_check_ca, every
  *                              purpose as leaf and CA, X509_self_signed, the signature
  *                              information, and the key identifiers, with the errors
+ *   x509crl <hex>              d2i_X509_CRL of the octets, then what decoding cached and the
+ *                              lookups give: the version, extensions, entries, each entry's
+ *                              lookup by serial number (sorting them) and reason, the CRL
+ *                              number, the re-encoding, and the errors
  *   x509name <hex>             d2i_X509_NAME of the octets: what was read, the re-encoding, the
  *                              entries, X509_NAME_oneline, print_ex (ONELINE, RFC2253, MULTILINE),
  *                              the hashes, and the comparison with a copy re-encoded from its
@@ -6850,6 +6854,59 @@ static int x509_command(const char *command, const char *line)
             printf(" skid=%d akid=%d", skid == NULL ? -1 : ASN1_STRING_length(skid),
                    akid == NULL ? -1 : ASN1_STRING_length(akid));
             X509_free(x);
+        } else {
+            printf(" none");
+        }
+        while ((code = ERR_get_error_all(NULL, NULL, NULL, &edata, &eflags)) != 0) {
+            printf(" %d/%d", ERR_GET_LIB(code), ERR_GET_REASON(code));
+            if ((eflags & ERR_TXT_STRING) != 0 && edata[0] != '\0')
+                printf("[%s]", edata);
+        }
+        printf("\n");
+        return 1;
+    }
+    if (strcmp(command, "x509crl") == 0) {
+        char hex[2400] = "-";
+        unsigned char data[1200], *der = NULL;
+        const unsigned char *q = data;
+        size_t len = 0;
+        X509_CRL *crl;
+        unsigned long code;
+        const char *edata;
+        int eflags, i, dlen;
+
+        sscanf(line, "%*s %2399s", hex);
+        if (strcmp(hex, "-") != 0 && !parse_hex_max(hex, data, &len, sizeof(data))) {
+            printf("x509crl bad hex\n");
+            return 1;
+        }
+        crl = d2i_X509_CRL(NULL, &q, (long)len);
+        printf("x509crl:");
+        if (crl != NULL) {
+            STACK_OF(X509_REVOKED) *revs = X509_CRL_get_REVOKED(crl);
+            X509_CRL *copy = X509_CRL_dup(crl);
+            ASN1_INTEGER *num = X509_CRL_get_ext_d2i(crl, NID_crl_number, NULL, NULL);
+
+            printf(" v=%ld exts=%d entries=%d number=%ld", X509_CRL_get_version(crl), X509_CRL_get_ext_count(crl),
+                   sk_X509_REVOKED_num(revs), num == NULL ? -1 : ASN1_INTEGER_get(num));
+            ASN1_INTEGER_free(num);
+            for (i = 0; copy != NULL && i < sk_X509_REVOKED_num(X509_CRL_get_REVOKED(copy)); i++) {
+                X509_REVOKED *r = sk_X509_REVOKED_value(X509_CRL_get_REVOKED(copy), i), *found = NULL;
+                int crit = -2;
+                ASN1_ENUMERATED *reason = X509_REVOKED_get_ext_d2i(r, NID_crl_reason, &crit, NULL);
+
+                printf(" [%d:%d", X509_CRL_get0_by_serial(crl, &found, X509_REVOKED_get0_serialNumber(r)),
+                       found == NULL ? -1 : X509_REVOKED_get_ext_count(found));
+                printf(" r=%ld/%d]", reason == NULL ? -1 : ASN1_ENUMERATED_get(reason), crit);
+                ASN1_ENUMERATED_free(reason);
+            }
+            dlen = i2d_X509_CRL(crl, &der);
+            printf(" i2d=");
+            for (i = 0; i < dlen; i++)
+                printf("%02x", der[i]);
+            OPENSSL_free(der);
+            X509_CRL_free(copy);
+            X509_CRL_free(crl);
         } else {
             printf(" none");
         }

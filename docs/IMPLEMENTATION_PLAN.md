@@ -4606,12 +4606,41 @@ Exit checks:
     - NULL requests get NULL, 0, or -1 (docs/DEVIATIONS.md).
     - Tests: `tests/c/x509_req.c`, and the probe's `asnd2i` items 25 and 26 with the corpus
       `asnd2i_req.txt` and random mutations.
-  - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`. Done after 5.2: decoding a CRL caches
-    its extensions (the IDP, AKID, CRL and delta numbers, and each entry's reason and
-    certificate issuer), which are 5.2's types. With it come `X509V3_EXT_CRL_add_nconf` and
-    `_CRL_add_conf` (5.2h).
-  - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT` (with
-    the attribute certificate extensions and subject directory attributes left from 5.2).
+  - [x] **5.1e CRLs** (`x509/crl.rs`, from `x_crl.c`, `x509cset.c`, and the CRL parts of
+    `x509_ext.c`, `x509_cmp.c`, `x_all.c`, and `x509_vfy.c`):
+    - `X509_CRL` (reference-counted, keeping its TBSCertList's DER until it changes) and
+      `X509_REVOKED`, with their getters, setters, extension functions, encodings, and the
+      PEM, BIO, and `FILE` forms.
+    - Decoding caches what path validation reads: the SHA-1 fingerprint, the issuing
+      distribution point (as flags and reasons), the key identifier, the CRL and delta
+      numbers, each entry's certificate issuer (carried to the entries after it) and reason,
+      and the flags.
+    - Lookups (`X509_CRL_get0_by_serial`, `_by_cert`) sort the entries first under the CRL's
+      lock; 2 for an entry removed from the CRL. Applications' `X509_CRL_METHOD`s.
+    - `X509_CRL_sign`, `_sign_ctx`, `_verify`, `_digest` (the cached fingerprint for SHA-1),
+      `_cmp`, `_match`, `_sort`, `_check_suiteb`, `_diff`, and `X509V3_EXT_CRL_add_nconf` and
+      `_CRL_add_conf` (from 5.2h).
+    - Printing comes with 5.6, and `X509_CRL_load_http` with 6.8.
+    - Tests: `tests/c/x509_crl.c` (the reference tool's CRLs, built ones signed with Ed25519,
+      lookups before and after decoding, a delta, methods, the encodings); the probe's
+      `x509crl` with the corpus `x509crl.txt` and mutated CRLs in `asnd2i` sessions; and the
+      `x509_crl` fuzz target. A NULL CRL or entry is refused (docs/DEVIATIONS.md).
+  - [x] **5.1f1 Trust, PEM bundles, and Netscape SPKI** (`x509/trust.rs`, `x509/info.rs`,
+    `x509/spki.rs`, from `x509_trust.c`, `x_x509a.c`, `pem_info.c`, `x_info.c`, `x_pkey.c`,
+    `x_spki.c`, `x509spki.c`, `t_spki.c`, and `nsseq.c`):
+    - The trust table (`X509_TRUST_*`, added and changed entries, the default check),
+      `X509_check_trust`, and the auxiliary trust data (trusted and rejected uses, alias, key
+      ID).
+    - `X509_INFO`, `X509_PKEY`, and `PEM_X509_INFO_read_bio_ex` and its forms: certificates,
+      CRLs, and keys typed by their PEM names, encrypted ones kept encrypted; and
+      `PEM_X509_INFO_write_bio`. Where OpenSSL reads through a key slot without a key, or an
+      encrypted PKCS#8 entry without a cipher, writing fails (docs/DEVIATIONS.md).
+    - `NETSCAPE_SPKI`, `NETSCAPE_SPKAC`, the base64 form, signing, verification, printing,
+      and `NETSCAPE_CERT_SEQUENCE` with its PEM forms.
+    - Tests: `tests/c/x509_trust.c`, `x509_info.c`, `x509_spki.c`; the `pem_info` and `spki`
+      fuzz targets.
+  - [ ] **5.1f2 Attribute certificates**: `X509_ACERT` with the attribute certificate
+    extensions and subject directory attributes left from 5.2.
 - [x] **5.2 X509v3 extensions:**
   - [x] **5.2a The methods and the simple extensions** (`x509v3/registry.rs`,
     `x509v3/standard.rs`, `x509v3/simple.rs`, from `v3_lib.c`, `v3_prn.c`, `do_ext_i2d`,

@@ -1777,6 +1777,10 @@ fn d2i_session(random: &mut Random, out: &mut String) -> Result {
             cert_line(random, out)?;
             continue;
         }
+        if random.below(10) == 0 {
+            crl_line(random, out)?;
+            continue;
+        }
         let item = random.below(19);
         let mut der = Vec::new();
         if item >= 14 && random.below(4) != 0 {
@@ -1861,14 +1865,8 @@ const CERT_SEEDS: [(u64, &str); 10] = [
     ),
 ];
 
-/// An `asnd2i` of a certificate item: one of [`CERT_SEEDS`] as it is, or with octets changed, a
-/// range cut out, or cut short.
-fn cert_line(random: &mut Random, out: &mut String) -> Result {
-    let i = usize::try_from(random.below(10)).unwrap_or(0);
-    let (item, hex) = CERT_SEEDS.get(i).copied().unwrap_or((21, ""));
-    let mut der: Vec<u8> = (0..hex.len() / 2)
-        .filter_map(|i| u8::from_str_radix(hex.get(2 * i..2 * i + 2)?, 16).ok())
-        .collect();
+/// Changes up to three octets, cuts a range out, or cuts the octets short.
+fn mutate(random: &mut Random, der: &mut Vec<u8>) {
     for _ in 0..random.below(4) {
         let len = u64::try_from(der.len()).unwrap_or(0);
         if len == 0 {
@@ -1893,6 +1891,42 @@ fn cert_line(random: &mut Random, out: &mut String) -> Result {
             _ => der.truncate(at),
         }
     }
+}
+
+/// Seeds for `x509crl`, in hex: the reference tool's CRL (with an issuing distribution point)
+/// and a CRL built with entries out of order, reasons, a certificate issuer, and a removal.
+const CRL_SEEDS: [&str; 2] = [
+    "308201233081ca020101300a06082a8648ce3d04030230153113301106035504030c0a507572706f7365204341170d3236313031373135313531315a170d3236313131363135313531315a30223020020107170d3236313031373135313531315a300c300a0603551d1504030a0101a060305e301f0603551d230418301680143496cc3c74ec4ff75918857cdd9c71f79a92e135302f0603551d1c0101ff04253023a01da01b8619687474703a2f2f63726c2e6578616d706c652f63612e63726c83020348300a0603551d140403020111300a06082a8648ce3d04030203480030450221008efa92bece57a14c32aa525c81297b0dfcfe413e08cc72198c1e8e355b8e1c88022047f63f2888fda2df8e7474a562d0c8afc3bdee21d3ea393e0cd6d7aa0865e95c",
+    "3082016130820113020101300506032b657030153113301106035504030c0a43524c20497373756572180f32303236303130313030303030305a180f32303236303230313030303030305a3081bd302202011e180f32303236303130323033303430355a300c300a0603551d1504030a0101301402010a180f32303236303130323033303430355a3022020114180f32303236303130323033303430355a300c300a0603551d1504030a01083047020128180f32303236303130323033303430355a3031300a0603551d1504030a010230230603551d1d0101ff04193017a41530133111300f06035504030c084f746865722043413014020132180f32303236303130323033303430355aa00e300c300a0603551d140403020105300506032b6570034100cb7c40fe9ca4ba63b69a0ea573d1c748b12755b26547b8905a1516eb5620866d63a0c195ae966f9096a9ec7aab782862d7a144294cb841b118f234027181870e",
+];
+
+/// An `x509crl` of one of [`CRL_SEEDS`] as it is, or with octets changed, a range cut out, or
+/// cut short.
+fn crl_line(random: &mut Random, out: &mut String) -> Result {
+    let i = usize::try_from(random.below(2)).unwrap_or(0);
+    let hex = CRL_SEEDS.get(i).copied().unwrap_or("");
+    let mut der: Vec<u8> = (0..hex.len() / 2)
+        .filter_map(|i| u8::from_str_radix(hex.get(2 * i..2 * i + 2)?, 16).ok())
+        .collect();
+    mutate(random, &mut der);
+    let hex: String = if der.is_empty() {
+        "-".to_owned()
+    } else {
+        der.iter().map(|b| format!("{b:02x}")).collect()
+    };
+    writeln!(out, "x509crl {hex}")?;
+    Ok(())
+}
+
+/// An `asnd2i` of a certificate item: one of [`CERT_SEEDS`] as it is, or with octets changed, a
+/// range cut out, or cut short.
+fn cert_line(random: &mut Random, out: &mut String) -> Result {
+    let i = usize::try_from(random.below(10)).unwrap_or(0);
+    let (item, hex) = CERT_SEEDS.get(i).copied().unwrap_or((21, ""));
+    let mut der: Vec<u8> = (0..hex.len() / 2)
+        .filter_map(|i| u8::from_str_radix(hex.get(2 * i..2 * i + 2)?, 16).ok())
+        .collect();
+    mutate(random, &mut der);
     let hex: String = if der.is_empty() {
         "-".to_owned()
     } else {

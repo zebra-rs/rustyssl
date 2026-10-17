@@ -245,6 +245,19 @@ int main(void)
         X509_free(y);
         X509_REQ_free(r);
     }
+    {
+        X509_CRL *crl = X509_CRL_new();
+
+        X509V3_set_ctx(&ctx, ca, NULL, NULL, crl, 0);
+        X509V3_set_nconf(&ctx, conf);
+        check(X509V3_EXT_CRL_add_nconf(conf, &ctx, "more", crl) == 1, "added to a CRL");
+        show_exts("CRL", X509_CRL_get0_extensions(crl));
+        X509V3_set_conf_lhash(&ctx, lh);
+        check(X509V3_EXT_CRL_add_conf(lh, &ctx, "more", crl) == 1, "legacy, to a CRL");
+        printf("  CRL extensions: %d\n", X509_CRL_get_ext_count(crl));
+        check(X509V3_EXT_CRL_add_nconf(conf, NULL, "more", NULL) == 1, "made without a CRL");
+        X509_CRL_free(crl);
+    }
     CONF_free(lh);
 
     sk_X509_EXTENSION_pop_free(list, X509_EXTENSION_free);

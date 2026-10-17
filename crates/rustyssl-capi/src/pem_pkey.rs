@@ -17,14 +17,14 @@ use libc::FILE;
 use rustyssl_abi::{
     BIO, BIO_C_FILE_SEEK, BIO_C_FILE_TELL, BIO_CTRL_EOF, DSA, EC_GROUP, EC_KEY, ERR_LIB_PEM,
     ERR_R_ASN1_LIB, ERR_R_UNSUPPORTED, ERR_REASON_MASK, ERR_SYSTEM_FLAG, EVP_CIPHER, EVP_PKEY,
-    EVP_PKEY_KEY_PARAMETERS, EVP_PKEY_KEYPAIR, EVP_PKEY_PUBLIC_KEY,
+    EVP_PKEY_KEY_PARAMETERS, EVP_PKEY_KEYPAIR, EVP_PKEY_PUBLIC_KEY, NETSCAPE_CERT_SEQUENCE,
     OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, PEM_BUFSIZE,
     PEM_R_BAD_PASSWORD_READ, PEM_R_UNSUPPORTED_KEY_COMPONENTS, PEM_STRING_DSA,
     PEM_STRING_ECPARAMETERS, PEM_STRING_ECPRIVATEKEY, PEM_STRING_EVP_PKEY, PEM_STRING_PARAMETERS,
     PEM_STRING_PKCS8, PEM_STRING_PKCS8INF, PEM_STRING_PUBLIC, PEM_STRING_RSA,
-    PEM_STRING_RSA_PUBLIC, PEM_STRING_X509, PEM_STRING_X509_REQ, PEM_STRING_X509_REQ_OLD,
-    PEM_STRING_X509_TRUSTED, PKCS8_PRIV_KEY_INFO, RSA, X509, X509_PUBKEY, X509_REQ, X509_SIG,
-    pem_password_cb,
+    PEM_STRING_RSA_PUBLIC, PEM_STRING_X509, PEM_STRING_X509_CRL, PEM_STRING_X509_REQ,
+    PEM_STRING_X509_REQ_OLD, PEM_STRING_X509_TRUSTED, PKCS8_PRIV_KEY_INFO, RSA, X509, X509_CRL,
+    X509_PUBKEY, X509_REQ, X509_SIG, pem_password_cb,
 };
 
 use crate::bio::{BIO_ctrl, BIO_free, BIO_new, BIO_pop, BIO_push};
@@ -797,6 +797,18 @@ pem_read! {
 }
 
 pem_read! {
+    NETSCAPE_CERT_SEQUENCE, crate::x509::spki::d2i_NETSCAPE_CERT_SEQUENCE, PEM_STRING_X509, d2i_nsseq_void;
+    pub unsafe extern "C" fn PEM_read_bio_NETSCAPE_CERT_SEQUENCE();
+    pub unsafe extern "C" fn PEM_read_NETSCAPE_CERT_SEQUENCE();
+}
+
+pem_read! {
+    X509_CRL, crate::x509::crl::d2i_X509_CRL, PEM_STRING_X509_CRL, d2i_x509_crl_void;
+    pub unsafe extern "C" fn PEM_read_bio_X509_CRL();
+    pub unsafe extern "C" fn PEM_read_X509_CRL();
+}
+
+pem_read! {
     X509_REQ, crate::x509::req::d2i_X509_REQ, PEM_STRING_X509_REQ, d2i_x509_req_void;
     pub unsafe extern "C" fn PEM_read_bio_X509_REQ();
     pub unsafe extern "C" fn PEM_read_X509_REQ();
@@ -876,6 +888,18 @@ pem_write! {
     X509, crate::x509::cert::i2d_X509_AUX, PEM_STRING_X509_TRUSTED, i2d_x509_aux_void;
     pub unsafe extern "C" fn PEM_write_bio_X509_AUX();
     pub unsafe extern "C" fn PEM_write_X509_AUX();
+}
+
+pem_write! {
+    NETSCAPE_CERT_SEQUENCE, crate::x509::spki::i2d_NETSCAPE_CERT_SEQUENCE, PEM_STRING_X509, i2d_nsseq_void;
+    pub unsafe extern "C" fn PEM_write_bio_NETSCAPE_CERT_SEQUENCE();
+    pub unsafe extern "C" fn PEM_write_NETSCAPE_CERT_SEQUENCE();
+}
+
+pem_write! {
+    X509_CRL, crate::x509::crl::i2d_X509_CRL, PEM_STRING_X509_CRL, i2d_x509_crl_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509_CRL();
+    pub unsafe extern "C" fn PEM_write_X509_CRL();
 }
 
 pem_write! {
