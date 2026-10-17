@@ -24,6 +24,7 @@ pub(crate) mod revoke;
 pub(crate) mod sig;
 pub(crate) mod spki;
 pub(crate) mod store;
+pub(crate) mod tprint;
 pub(crate) mod trust;
 pub(crate) mod verify;
 pub(crate) mod vpm;

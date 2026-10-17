@@ -281,6 +281,7 @@ OpenSSL never depends on them.
 | The default `check_crl` and `cert_crl` of a verification context (reachable through `X509_STORE_CTX_get_check_crl` and `_get_cert_crl`, or a custom `get_crl` that returns success without a CRL) with a NULL CRL | dereference NULL | fail (0) | `x509::revoke::tests::null_crls_fail` |
 | `X509_policy_check` with a NULL `ptree` or `pexplicit_policy`; `X509_POLICY_NODE_print` with a NULL node | write or read through NULL | return `X509_PCY_TREE_INTERNAL`; print nothing | `x509::pcy::tests::null_arguments_are_refused` |
 | `X509v3_addr_validate_path` and `X509v3_addr_validate_resource_set` with a NULL certificate in the chain | dereference NULL | fail (0, with `X509_V_ERR_UNSPECIFIED` in a context), as the AS identifier validation does | `x509v3::rfc3779::tests::null_certificates_in_chains_fail` |
+| `X509_print_ex`, `X509_CRL_print_ex`, `X509_REQ_print_ex`, `X509_ACERT_print_ex`, and `X509_aux_print` with a NULL object; `X509_signature_print` with a NULL algorithm; `X509_STORE_CTX_print_verify_cb` for a context without a store | dereference NULL | return 0 (print nothing); print no expected identities | `x509::tprint::tests::null_objects_print_nothing` |
 
 ## Notes
 

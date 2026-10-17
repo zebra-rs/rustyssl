@@ -11936,6 +11936,14 @@ const _: unsafe extern "C" fn(*const X509_ACERT) -> core::ffi::c_long =
     crate::x509::acert::X509_ACERT_get_version;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::acert::X509_ACERT_it;
 const _: unsafe extern "C" fn() -> *mut X509_ACERT = crate::x509::acert::X509_ACERT_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509_ACERT) -> core::ffi::c_int =
+    crate::x509::tprint::X509_ACERT_print;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut X509_ACERT,
+    core::ffi::c_ulong,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::x509::tprint::X509_ACERT_print_ex;
 const _: unsafe extern "C" fn(*mut X509_ACERT, *mut OSSL_ISSUER_SERIAL) =
     crate::x509::acert::X509_ACERT_set0_holder_baseCertId;
 const _: unsafe extern "C" fn(*mut X509_ACERT, *mut OSSL_OBJECT_DIGEST_INFO) =
@@ -12162,6 +12170,12 @@ const _: unsafe extern "C" fn(*const X509_CRL, *const X509_CRL) -> core::ffi::c_
 const _: unsafe extern "C" fn() -> *mut X509_CRL = crate::x509::crl::X509_CRL_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509_CRL =
     crate::x509::crl::X509_CRL_new_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509_CRL) -> core::ffi::c_int =
+    crate::x509::tprint::X509_CRL_print;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509_CRL, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::x509::tprint::X509_CRL_print_ex;
+const _: unsafe extern "C" fn(*mut FILE, *mut X509_CRL) -> core::ffi::c_int =
+    crate::x509::tprint::X509_CRL_print_fp;
 const _: unsafe extern "C" fn(*mut X509_CRL, *const ASN1_TIME) -> core::ffi::c_int =
     crate::x509::crl::X509_CRL_set1_lastUpdate;
 const _: unsafe extern "C" fn(*mut X509_CRL, *const ASN1_TIME) -> core::ffi::c_int =
@@ -12685,6 +12699,16 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::req::X509_REQ
 const _: unsafe extern "C" fn() -> *mut X509_REQ = crate::x509::req::X509_REQ_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509_REQ =
     crate::x509::req::X509_REQ_new_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509_REQ) -> core::ffi::c_int =
+    crate::x509::tprint::X509_REQ_print;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut X509_REQ,
+    core::ffi::c_ulong,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::x509::tprint::X509_REQ_print_ex;
+const _: unsafe extern "C" fn(*mut FILE, *mut X509_REQ) -> core::ffi::c_int =
+    crate::x509::tprint::X509_REQ_print_fp;
 const _: unsafe extern "C" fn(*mut X509_REQ, *mut ASN1_OCTET_STRING) =
     crate::x509::req::X509_REQ_set0_distinguishing_id;
 const _: unsafe extern "C" fn(*mut X509_REQ, *mut ASN1_BIT_STRING) =
@@ -12882,6 +12906,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *mut X509_STORE_CTX = crate::x509::ctx::X509_STORE_CTX_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509_STORE_CTX =
     crate::x509::ctx::X509_STORE_CTX_new_ex;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::tprint::X509_STORE_CTX_print_verify_cb;
 const _: unsafe extern "C" fn(
     *mut X509_STORE_CTX,
     core::ffi::c_int,
@@ -13233,6 +13259,8 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::x509::trust::X509_alias_set1;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::tprint::X509_aux_print;
 const _: unsafe extern "C" fn(
     *mut X509,
     *mut stack_st_X509,
@@ -13478,6 +13506,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *mut X509 = crate::x509::cert::X509_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509 =
     crate::x509::cert::X509_new_ex;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509) -> core::ffi::c_int =
+    crate::x509::tprint::X509_ocspid_print;
 const _: unsafe extern "C" fn(
     *mut *mut X509_POLICY_TREE,
     *mut core::ffi::c_int,
@@ -13504,6 +13534,22 @@ const _: unsafe extern "C" fn(*const X509_POLICY_TREE) -> *mut stack_st_X509_POL
     crate::x509::pcy::X509_policy_tree_get0_user_policies;
 const _: unsafe extern "C" fn(*const X509_POLICY_TREE) -> core::ffi::c_int =
     crate::x509::pcy::X509_policy_tree_level_count;
+const _: unsafe extern "C" fn(*mut BIO, *mut X509) -> core::ffi::c_int =
+    crate::x509::tprint::X509_print;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut X509,
+    core::ffi::c_ulong,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::x509::tprint::X509_print_ex;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut X509,
+    core::ffi::c_ulong,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::x509::tprint::X509_print_ex_fp;
+const _: unsafe extern "C" fn(*mut FILE, *mut X509) -> core::ffi::c_int =
+    crate::x509::tprint::X509_print_fp;
 const _: unsafe extern "C" fn(
     *const X509,
     *const EVP_MD,
@@ -13543,6 +13589,8 @@ const _: unsafe extern "C" fn(*mut X509, *mut EVP_MD_CTX) -> core::ffi::c_int =
     crate::x509::cert::X509_sign_ctx;
 const _: unsafe extern "C" fn(*mut BIO, *const ASN1_STRING, core::ffi::c_int) -> core::ffi::c_int =
     crate::x509::print::X509_signature_dump;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_ALGOR, *const ASN1_STRING) -> core::ffi::c_int =
+    crate::x509::tprint::X509_signature_print;
 const _: unsafe extern "C" fn(*const X509, *const X509) -> core::ffi::c_int =
     crate::x509::cert::X509_subject_name_cmp;
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_ulong =
