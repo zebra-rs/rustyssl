@@ -1,9 +1,11 @@
-//! X.509's structures (`crypto/x509`, `crypto/asn1/x_*.c`), so far those the key encoders and
-//! decoders need (step 4.7): the rest of AlgorithmIdentifier's functions, attributes,
-//! `X509_SIG`, and PKCS#8's PrivateKeyInfo. Certificates and the rest come in phase 5.
+//! X.509's structures (`crypto/x509`, `crypto/asn1/x_*.c`): those the key encoders and decoders
+//! need (step 4.7: the rest of AlgorithmIdentifier's functions, attributes, `X509_SIG`, and
+//! PKCS#8's PrivateKeyInfo), and phase 5's so far: names.
 
 pub(crate) mod algor;
 pub(crate) mod attrib;
+pub(crate) mod ext;
+pub(crate) mod name;
 pub(crate) mod p8;
 pub(crate) mod pbe;
 pub(crate) mod pubkey;

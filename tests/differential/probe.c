@@ -123,7 +123,7 @@
  *                              7 TIME, 8 DIRECTORYSTRING, 9 INT64, 10 UINT32, 11 the probe's
  *                              PROBEREC, 12 ASN1_SEQUENCE, 13 UTF8STRING, 14 RSAPublicKey,
  *                              15 RSAPrivateKey, 16 RSA_PSS_PARAMS, 17 RSA_OAEP_PARAMS,
- *                              18 BIGNUM): how much was read
+ *                              18 BIGNUM, 19 X509_EXTENSION, 20 X509_EXTENSIONS): how much was read
  *                              and the re-encoding and ASN1_item_print listing, or the errors with
  *                              their data
  *   asnbio <hex>               ASN1_item_d2i_bio (as ANY) from a memory BIO over the octets until
@@ -417,6 +417,10 @@
  *                              AAD (each in hex, - for none), printed with an exported secret;
  *                              then a receiver's decapsulation and opening of the encapsulated
  *                              key and ciphertext given (= for the sender's)
+ *   x509name <hex>             d2i_X509_NAME of the octets: what was read, the re-encoding, the
+ *                              entries, X509_NAME_oneline, print_ex (ONELINE, RFC2253, MULTILINE),
+ *                              the hashes, and the comparison with a copy re-encoded from its
+ *                              entries; or the errors
  *   msblob <hex>               the octets as a Microsoft key blob and PVK: b2i_PrivateKey,
  *                              b2i_PublicKey, their _bio forms, and b2i_PVK_bio (passphrase
  *                              "pw"), each key's type and size and its blob or PVK written
@@ -1502,6 +1506,8 @@ static const ASN1_ITEM *probe_item(int n)
     case 16: return ASN1_ITEM_rptr(RSA_PSS_PARAMS);
     case 17: return ASN1_ITEM_rptr(RSA_OAEP_PARAMS);
     case 18: return ASN1_ITEM_rptr(BIGNUM);
+    case 19: return ASN1_ITEM_rptr(X509_EXTENSION);
+    case 20: return ASN1_ITEM_rptr(X509_EXTENSIONS);
     default: return ASN1_ITEM_rptr(ASN1_UTF8STRING);
     }
 }
@@ -6719,6 +6725,66 @@ static int x509_command(const char *command, const char *line)
         OPENSSL_free(pt);
         OPENSSL_free(genc);
         OPENSSL_free(gct);
+        return 1;
+    }
+    if (strcmp(command, "x509name") == 0) {
+        char hexs[1000] = "";
+        long n = 0;
+        unsigned char *der = sscanf(line, "%*s %999s", hexs) == 1 ? OPENSSL_hexstr2buf(hexs, &n) : NULL;
+        const unsigned char *q = der;
+        X509_NAME *nm = der != NULL ? d2i_X509_NAME(NULL, &q, n) : NULL;
+
+        printf("%s:", line);
+        if (nm == NULL) {
+            printf(" none");
+        } else {
+            static const unsigned long styles[] = { XN_FLAG_ONELINE, XN_FLAG_RFC2253, XN_FLAG_MULTILINE };
+            unsigned char *enc = NULL;
+            int len = i2d_X509_NAME(nm, &enc), i, ok = -1;
+            char *one = X509_NAME_oneline(nm, NULL, 0);
+            X509_NAME *copy = X509_NAME_new();
+            size_t k;
+
+            printf(" used %ld der ", (long)(q - der));
+            for (i = 0; i < len; i++)
+                printf("%02x", enc[i]);
+            OPENSSL_free(enc);
+            printf(" entries");
+            for (i = 0; i < X509_NAME_entry_count(nm); i++) {
+                X509_NAME_ENTRY *e = X509_NAME_get_entry(nm, i);
+
+                printf(" %d/%d/%d", X509_NAME_ENTRY_set(e), OBJ_obj2nid(X509_NAME_ENTRY_get_object(e)),
+                       ASN1_STRING_type(X509_NAME_ENTRY_get_data(e)));
+                X509_NAME_add_entry(copy, e, -1, i == 0 || X509_NAME_ENTRY_set(e) != X509_NAME_ENTRY_set(X509_NAME_get_entry(nm, i - 1)) ? 0 : -1);
+            }
+            printf(" oneline [%s]", one != NULL ? one : "(null)");
+            OPENSSL_free(one);
+            for (k = 0; k < sizeof(styles) / sizeof(styles[0]); k++) {
+                BIO *mem = BIO_new(BIO_s_mem());
+                char *text;
+                long tlen;
+                int r = X509_NAME_print_ex(mem, nm, 1, styles[k]);
+
+                tlen = BIO_get_mem_data(mem, &text);
+                printf(" print %d \"", r);
+                for (i = 0; i < tlen; i++) {
+                    unsigned char c = (unsigned char)text[i];
+
+                    if (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+                        putchar(c);
+                    else
+                        printf("\\x%02x", c);
+                }
+                printf("\"");
+                BIO_free(mem);
+            }
+            printf(" hash %08lx", X509_NAME_hash_ex(nm, NULL, NULL, &ok));
+            printf(" ok %d old %08lx cmp %d", ok, X509_NAME_hash_old(nm), X509_NAME_cmp(nm, copy));
+            X509_NAME_free(copy);
+            X509_NAME_free(nm);
+        }
+        OPENSSL_free(der);
+        print_asn_errors();
         return 1;
     }
     if (strcmp(command, "msblob") == 0) {

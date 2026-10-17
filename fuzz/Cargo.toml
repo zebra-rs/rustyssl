@@ -489,3 +489,9 @@ name = "hpke"
 path = "fuzz_targets/hpke.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "x509_name"
+path = "fuzz_targets/x509_name.rs"
+test = false
+doc = false

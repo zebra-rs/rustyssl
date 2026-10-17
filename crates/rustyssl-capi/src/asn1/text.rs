@@ -55,7 +55,7 @@ fn mask(bits: c_int) -> c_ulong {
 ///
 /// # Safety
 /// `data` is NULL or holds `len` octets.
-unsafe fn octets<'a>(data: *const c_uchar, len: c_int) -> &'a [u8] {
+pub(crate) unsafe fn octets<'a>(data: *const c_uchar, len: c_int) -> &'a [u8] {
     match usize::try_from(len) {
         // SAFETY: the caller's guarantee.
         Ok(n) if !data.is_null() => unsafe { core::slice::from_raw_parts(data, n) },
@@ -967,7 +967,11 @@ ffi_export! {
 ///
 /// # Safety
 /// `str` is a live string.
-unsafe fn print_ex(str: *const ASN1_STRING, flags: c_ulong, sink: text::Sink<'_>) -> c_int {
+pub(crate) unsafe fn print_ex(
+    str: *const ASN1_STRING,
+    flags: c_ulong,
+    sink: text::Sink<'_>,
+) -> c_int {
     // SAFETY: the caller's guarantee.
     let string = unsafe { &*str };
     // SAFETY: the string's data holds its length.
