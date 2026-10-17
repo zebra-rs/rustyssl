@@ -4307,7 +4307,7 @@ chunking) is clean.
         - The probe's `pemwrite`, with `corpus/pemwrite.txt` and random sessions (1,500
           pass).
         - The PEM writers in `fuzz/fuzz_targets/encode_pkey.rs` (223k runs clean).
-  - [ ] **4.7d Encrypted keys**, in sub-steps:
+  - [x] **4.7d Encrypted keys**, in sub-steps:
     - [x] **4.7d1 The UI and the password-callback contract** (`ui/ui_lib.rs`, from
       `ui_lib.c`, `ui_util.c`, and `evp_key.c`; brought forward from 6.2):
       - `UI_new`, `UI_new_method`, and `UI_free`; the strings (input, verify, boolean, info,
@@ -4346,10 +4346,27 @@ chunking) is clean.
           back; the derivations called directly; the errors.
         - The probe's `pbe`, with `corpus/pbe.txt` and random sessions (1,000 pass).
         - `fuzz/fuzz_targets/pbe.rs` (1.2M runs clean).
-    - [ ] **4.7d3 Encrypted PKCS#8**: `PKCS8_encrypt`/`PKCS8_decrypt` and `PKCS8_set0_pbe`,
-      the EncryptedPrivateKeyInfo decoder's decryption (`epki2pki`), the encoders'
-      EncryptedPrivateKeyInfo, `PEM_write_bio_PKCS8PrivateKey` encrypted, and
-      `d2i_PKCS8PrivateKey_bio`/`_fp`.
+    - [x] **4.7d3 Encrypted PKCS#8** (`pkcs8_crypt.rs`, from `p12_decr.c`, `p12_p8e.c`,
+      `p12_p8d.c`, and `pem_pk8.c`'s reader):
+      - `PKCS12_pbe_crypt(_ex)`, which appends or checks a MAC-carrying cipher's tag.
+      - `PKCS12_item_i2d_encrypt(_ex)` and `PKCS12_item_decrypt_d2i(_ex)`.
+      - `PKCS8_encrypt(_ex)` (PBES2 of a cipher, a PRF's NID, or a PBE NID),
+        `PKCS8_set0_pbe(_ex)`, and `PKCS8_decrypt(_ex)`.
+      - `d2i_PKCS8PrivateKey_bio`/`_fp` and `d2i_PKCS8_bio`/`_fp`.
+      - The decryption in the `epki2pki` decoder (and `pem2der`'s ENCRYPTED PRIVATE KEY),
+        with the decoder's library context and properties.
+      - The encoders' EncryptedPrivateKeyInfo, the PEM and DER writers' encrypted PKCS#8
+        (by cipher or by PBE NID), and the legacy PEM reader's decryption.
+      - Tests: `tests/c/pkcs8_crypt.c` (72 checks), covering:
+        - EncryptedPrivateKeyInfos with fixed salts and IVs (their DER compared) and random
+          ones (decrypted back);
+        - the right, a wrong, an empty, and no password;
+        - the item functions;
+        - every encrypting writer, for provided and legacy keys, read back;
+        - the encoder's EncryptedPrivateKeyInfo decoded with the passphrase;
+        - the errors.
+
+        The PBE fuzz target covers the decryption.
   - [ ] **4.7e MSBLOB and PVK**: `encode_key2ms`, `decode_msblob2key`, `decode_pvk2key`,
     and `b2i_*`/`i2b_*`.
 - [ ] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD

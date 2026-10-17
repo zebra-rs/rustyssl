@@ -7,8 +7,8 @@
 //!
 //! As in OpenSSL, the password callback (the default one for none) is asked through a cache, so
 //! a key read in both ways asks once; a BIO that can't tell its position is read through a
-//! read buffer. Encrypted keys need the UI layer and PKCS#8 decryption (step 4.7d): until then
-//! asking for a passphrase through a `pem_password_cb` aborts.
+//! read buffer. An encrypted key (a traditional DEK-Info one, or an EncryptedPrivateKeyInfo)
+//! is decrypted with the password the callback gives.
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_uchar, c_ulong, c_void};
 use core::ptr;
@@ -259,7 +259,9 @@ unsafe fn read_legacy(
         // SAFETY: the block's octets.
         let p8 = unsafe { crate::x509::sig::d2i_X509_SIG(ptr::null_mut(), &raw mut p, len) };
         if !p8.is_null() {
-            let mut psbuf = [0 as c_char; PEM_BUFSIZE.unsigned_abs() as usize];
+            let mut psbuf = rustyssl_crypto::bn::Zeroizing::new(
+                [0 as c_char; PEM_BUFSIZE.unsigned_abs() as usize],
+            );
             let klen = match cb {
                 // SAFETY: the caller's callback with room for a passphrase.
                 Some(cb) => unsafe { cb(psbuf.as_mut_ptr(), PEM_BUFSIZE, 0, u) },
@@ -274,7 +276,19 @@ unsafe fn read_legacy(
                 unsafe { crate::x509::sig::X509_SIG_free(p8) };
                 raise_asn1 = false;
             } else {
-                crate::stub::unimplemented("PKCS8_decrypt of an encrypted PEM key (step 4.7d)");
+                // SAFETY: the structure; the passphrase's `klen` octets.
+                let p8inf = unsafe { crate::pkcs8_crypt::PKCS8_decrypt(p8, psbuf.as_ptr(), klen) };
+                // SAFETY: decoded above, freed once.
+                unsafe { crate::x509::sig::X509_SIG_free(p8) };
+                if !p8inf.is_null() {
+                    // SAFETY: the decrypted structure; the caller's library context and
+                    // properties.
+                    ret = unsafe { crate::evp::pkey::d2i::pkcs82pkey_legacy(p8inf, libctx, propq) };
+                    // SAFETY: the caller's guarantee.
+                    unsafe { give(x, ret) };
+                    // SAFETY: decrypted above, freed once.
+                    unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8inf) };
+                }
             }
         }
     } else if let Some(stem) = crate::pem_read::check_suffix(name, b"PRIVATE KEY") {
@@ -1355,8 +1369,8 @@ ffi_export! {
 }
 
 /// `do_pk8pkey` (and `do_pk8pkey_fp`'s body): the key's PrivateKeyInfo in DER or PEM, through
-/// the encoders when they can (no PBE `nid`), else through `EVP_PKEY2PKCS8`. Encrypting it
-/// (with `enc` or the PBE `nid`) comes with step 4.7d.
+/// the encoders when they can (no PBE `nid`), else through `EVP_PKEY2PKCS8` (encrypted with
+/// `PKCS8_encrypt` for `enc` or the PBE `nid`).
 ///
 /// # Safety
 /// As for `PEM_write_bio_PKCS8PrivateKey`, into the sink.
@@ -1417,8 +1431,9 @@ unsafe fn do_pk8pkey(
             ret = 0;
         } else {
             if !enc.is_null() || nid != -1 {
+                let mut buf = zeroize_buf();
+                let (mut pass, mut plen) = (kstr.cast::<c_char>(), klen);
                 if kstr.is_null() {
-                    let mut buf = zeroize_buf();
                     // SAFETY: room for `PEM_BUFSIZE` octets; the callback (set above) and its
                     // argument.
                     let n = cb.map_or(-1, |f| unsafe { f(buf.as_mut_ptr(), PEM_BUFSIZE, 1, u) });
@@ -1430,23 +1445,54 @@ unsafe fn do_pk8pkey(
                         unsafe { OSSL_ENCODER_CTX_free(ctx) };
                         return 0;
                     }
+                    (pass, plen) = (buf.as_ptr(), n);
                 }
-                crate::stub::unimplemented("PKCS8_encrypt (an EncryptedPrivateKeyInfo, step 4.7d)");
+                // SAFETY: the cipher or PBE NID; the passphrase; the PrivateKeyInfo.
+                let p8 = unsafe {
+                    crate::pkcs8_crypt::PKCS8_encrypt(
+                        nid,
+                        enc,
+                        pass,
+                        plen,
+                        ptr::null_mut(),
+                        0,
+                        0,
+                        p8inf,
+                    )
+                };
+                ret = if p8.is_null() {
+                    0
+                } else {
+                    let r = match (out, isder) {
+                        // SAFETY: the sink's BIO; the new structure.
+                        (Sink::Bio(b), true) => unsafe { crate::x509::sig::i2d_PKCS8_bio(b, p8) },
+                        // SAFETY: as above.
+                        (Sink::Bio(b), false) => unsafe { PEM_write_bio_PKCS8(b, p8) },
+                        // SAFETY: the sink's `FILE`; the new structure.
+                        (Sink::File(f), true) => unsafe { crate::x509::sig::i2d_PKCS8_fp(f, p8) },
+                        // SAFETY: as above.
+                        (Sink::File(f), false) => unsafe { PEM_write_PKCS8(f, p8) },
+                    };
+                    // SAFETY: made above.
+                    unsafe { crate::x509::sig::X509_SIG_free(p8) };
+                    r
+                };
+            } else {
+                ret = match (out, isder) {
+                    // SAFETY: the sink's BIO; the new structure.
+                    (Sink::Bio(b), true) => unsafe {
+                        crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_bio(b, p8inf)
+                    },
+                    // SAFETY: as above.
+                    (Sink::Bio(b), false) => unsafe { PEM_write_bio_PKCS8_PRIV_KEY_INFO(b, p8inf) },
+                    // SAFETY: the sink's `FILE`; the new structure.
+                    (Sink::File(f), true) => unsafe {
+                        crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_fp(f, p8inf)
+                    },
+                    // SAFETY: as above.
+                    (Sink::File(f), false) => unsafe { PEM_write_PKCS8_PRIV_KEY_INFO(f, p8inf) },
+                };
             }
-            ret = match (out, isder) {
-                // SAFETY: the sink's BIO; the new structure.
-                (Sink::Bio(b), true) => unsafe {
-                    crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_bio(b, p8inf)
-                },
-                // SAFETY: as above.
-                (Sink::Bio(b), false) => unsafe { PEM_write_bio_PKCS8_PRIV_KEY_INFO(b, p8inf) },
-                // SAFETY: the sink's `FILE`; the new structure.
-                (Sink::File(f), true) => unsafe {
-                    crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_fp(f, p8inf)
-                },
-                // SAFETY: as above.
-                (Sink::File(f), false) => unsafe { PEM_write_PKCS8_PRIV_KEY_INFO(f, p8inf) },
-            };
             // SAFETY: made above.
             unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8inf) };
         }

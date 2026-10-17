@@ -7,9 +7,8 @@
 //! As OpenSSL's:
 //! - An encoder writes the first of the private key, the public key, and the parameters the
 //!   selection asks for that its structure holds.
-//! - A PrivateKeyInfo encoder given a cipher writes an EncryptedPrivateKeyInfo (whose
-//!   encryption comes with step 4.7d), and an EncryptedPrivateKeyInfo encoder given none writes
-//!   nothing.
+//! - A PrivateKeyInfo encoder given a cipher writes an EncryptedPrivateKeyInfo (PBES2 of the
+//!   cipher), and an EncryptedPrivateKeyInfo encoder given none writes nothing.
 //! - A type-specific PEM private key given a cipher is a traditional encrypted PEM.
 //! - `import_object` makes a key of the encoder's type from another provider's key's parameters.
 //!
@@ -449,7 +448,7 @@ unsafe fn key_to_p8info(
 ///
 /// # Safety
 /// `c` is a live context.
-unsafe fn p8info_to_encp8(_p8info: *mut PKCS8_PRIV_KEY_INFO, c: *mut Key2Any) -> *mut X509_SIG {
+unsafe fn p8info_to_encp8(p8info: *mut PKCS8_PRIV_KEY_INFO, c: *mut Key2Any) -> *mut X509_SIG {
     // SAFETY: the caller's guarantee.
     let Some(cx) = (unsafe { c.as_mut() }) else {
         return ptr::null_mut();
@@ -477,7 +476,24 @@ unsafe fn p8info_to_encp8(_p8info: *mut PKCS8_PRIV_KEY_INFO, c: *mut Key2Any) ->
         );
         return ptr::null_mut();
     }
-    crate::stub::unimplemented("PKCS8_encrypt_ex (an EncryptedPrivateKeyInfo, step 4.7d)")
+    let klen = c_int::try_from(klen).unwrap_or(0);
+    // SAFETY: the provider's context.
+    let libctx = unsafe { libctx_of(cx.provctx) };
+    // SAFETY: the context's cipher; the passphrase; the caller's PrivateKeyInfo.
+    unsafe {
+        crate::pkcs8_crypt::PKCS8_encrypt_ex(
+            -1,
+            cx.cipher,
+            kstr.as_ptr(),
+            klen,
+            ptr::null_mut(),
+            0,
+            0,
+            p8info,
+            libctx,
+            ptr::null(),
+        )
+    }
 }
 
 /// `key_to_encp8`: an EncryptedPrivateKeyInfo of the key, freeing the parameters if no
