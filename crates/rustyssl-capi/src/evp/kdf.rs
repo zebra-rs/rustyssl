@@ -734,6 +734,43 @@ unsafe fn pbkdf2_hmac(
     keylen: c_int,
     out: *mut c_uchar,
 ) -> c_int {
+    // SAFETY: the caller's guarantee.
+    unsafe {
+        pbkdf2_hmac_ex(
+            pass,
+            passlen,
+            salt,
+            saltlen,
+            iter,
+            digest,
+            keylen,
+            out,
+            ptr::null_mut(),
+            ptr::null(),
+        )
+    }
+}
+
+/// `ossl_pkcs5_pbkdf2_hmac_ex`: `pbkdf2_hmac` with PBKDF2 fetched from `libctx` with `propq`.
+///
+/// # Safety
+/// As for `PKCS5_PBKDF2_HMAC`; `libctx` is NULL or live; `propq` is NULL or a C string.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the reference's function, one to one"
+)]
+pub(crate) unsafe fn pbkdf2_hmac_ex(
+    pass: *const c_char,
+    passlen: c_int,
+    salt: *const c_uchar,
+    saltlen: c_int,
+    iter: c_int,
+    digest: *const EVP_MD,
+    keylen: c_int,
+    out: *mut c_uchar,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> c_int {
     let empty = c"";
     let (mut pass, mut passlen) = (pass, passlen);
     if pass.is_null() {
@@ -758,8 +795,8 @@ unsafe fn pbkdf2_hmac(
     ) else {
         return 0;
     };
-    // SAFETY: a static name.
-    let kdf = unsafe { EVP_KDF_fetch(ptr::null_mut(), c"PBKDF2".as_ptr(), ptr::null()) };
+    // SAFETY: the caller's library context and properties; a static name.
+    let kdf = unsafe { EVP_KDF_fetch(libctx, c"PBKDF2".as_ptr(), propq) };
     if kdf.is_null() {
         return 0;
     }

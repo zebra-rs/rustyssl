@@ -5573,6 +5573,58 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
 const _: unsafe extern "C" fn(*mut EVP_MD) -> core::ffi::c_int = crate::evp::digest::EVP_MD_up_ref;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int = crate::evp::md_ctx::EVP_MD_xof;
 const _: unsafe extern "C" fn(
+    *mut ASN1_OBJECT,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *mut EVP_CIPHER_CTX,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_CipherInit;
+const _: unsafe extern "C" fn(
+    *mut ASN1_OBJECT,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *mut EVP_CIPHER_CTX,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_CipherInit_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    EVP_PBE_KEYGEN,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_alg_add;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    EVP_PBE_KEYGEN,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_alg_add_type;
+const _: unsafe extern "C" fn() = crate::evp::pbe::EVP_PBE_cleanup;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut EVP_PBE_KEYGEN,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_find;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut EVP_PBE_KEYGEN,
+    *mut EVP_PBE_KEYGEN_EX,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_find_ex;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    usize,
+) -> core::ffi::c_int = crate::evp::pbe::EVP_PBE_get;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     usize,
     *const core::ffi::c_uchar,
@@ -8685,6 +8737,18 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::version::OpenSSL_version;
 const _: unsafe extern "C" fn() -> core::ffi::c_ulong = crate::version::OpenSSL_version_num;
+const _: unsafe extern "C" fn(*mut PBE2PARAM) = crate::x509::pbe::PBE2PARAM_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::PBE2PARAM_it;
+const _: unsafe extern "C" fn() -> *mut PBE2PARAM = crate::x509::pbe::PBE2PARAM_new;
+const _: unsafe extern "C" fn(*mut PBEPARAM) = crate::x509::pbe::PBEPARAM_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::PBEPARAM_it;
+const _: unsafe extern "C" fn() -> *mut PBEPARAM = crate::x509::pbe::PBEPARAM_new;
+const _: unsafe extern "C" fn(*mut PBKDF2PARAM) = crate::x509::pbe::PBKDF2PARAM_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::PBKDF2PARAM_it;
+const _: unsafe extern "C" fn() -> *mut PBKDF2PARAM = crate::x509::pbe::PBKDF2PARAM_new;
+const _: unsafe extern "C" fn(*mut PBMAC1PARAM) = crate::x509::pbe::PBMAC1PARAM_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::PBMAC1PARAM_it;
+const _: unsafe extern "C" fn() -> *mut PBMAC1PARAM = crate::x509::pbe::PBMAC1PARAM_new;
 const _: unsafe extern "C" fn(
     d2i_of_void,
     *const core::ffi::c_char,
@@ -9232,6 +9296,27 @@ const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_RSA_PUBKEY;
 const _: unsafe extern "C" fn(*mut BIO, *const X509_PUBKEY) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_X509_PUBKEY;
+const _: unsafe extern "C" fn() = crate::evp::pbe::PKCS12_PBE_add;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS12_PBE_keyivgen;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS12_PBE_keyivgen_ex;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -9304,6 +9389,27 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_utf8_ex;
+const _: unsafe extern "C" fn() = crate::evp::pbe::PKCS5_PBE_add;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_PBE_keyivgen;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_PBE_keyivgen_ex;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -9323,6 +9429,121 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::evp::kdf::PKCS5_PBKDF2_HMAC_SHA1;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe2_set;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe2_set_iv;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe2_set_iv_ex;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    u64,
+    u64,
+    u64,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe2_set_scrypt;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe_set;
+const _: unsafe extern "C" fn(
+    *mut X509_ALGOR,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::pbe::PKCS5_pbe_set0_algor;
+const _: unsafe extern "C" fn(
+    *mut X509_ALGOR,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+) -> core::ffi::c_int = crate::x509::pbe::PKCS5_pbe_set0_algor_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbe_set_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbkdf2_set;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+) -> *mut X509_ALGOR = crate::x509::pbe::PKCS5_pbkdf2_set_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_v2_PBE_keyivgen;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_v2_PBE_keyivgen_ex;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_v2_scrypt_keyivgen;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut ASN1_TYPE,
+    *const EVP_CIPHER,
+    *const EVP_MD,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::pbe::PKCS5_v2_scrypt_keyivgen_ex;
 const _: unsafe extern "C" fn(*mut PKCS8_PRIV_KEY_INFO) = crate::x509::p8::PKCS8_PRIV_KEY_INFO_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::p8::PKCS8_PRIV_KEY_INFO_it;
 const _: unsafe extern "C" fn() -> *mut PKCS8_PRIV_KEY_INFO =
@@ -10091,6 +10312,9 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::rsa_ops::RSA_verify_PKCS1_PSS_mgf1;
+const _: unsafe extern "C" fn(*mut SCRYPT_PARAMS) = crate::x509::pbe::SCRYPT_PARAMS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::SCRYPT_PARAMS_it;
+const _: unsafe extern "C" fn() -> *mut SCRYPT_PARAMS = crate::x509::pbe::SCRYPT_PARAMS_new;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -10902,6 +11126,26 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(core::ffi::c_int, *mut *mut EVP_PKEY, *mut BIO) -> *mut EVP_PKEY =
     crate::evp::pkey::d2i::d2i_KeyParams_bio;
 const _: unsafe extern "C" fn(
+    *mut *mut PBE2PARAM,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PBE2PARAM = crate::x509::pbe::d2i_PBE2PARAM;
+const _: unsafe extern "C" fn(
+    *mut *mut PBEPARAM,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PBEPARAM = crate::x509::pbe::d2i_PBEPARAM;
+const _: unsafe extern "C" fn(
+    *mut *mut PBKDF2PARAM,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PBKDF2PARAM = crate::x509::pbe::d2i_PBKDF2PARAM;
+const _: unsafe extern "C" fn(
+    *mut *mut PBMAC1PARAM,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PBMAC1PARAM = crate::x509::pbe::d2i_PBMAC1PARAM;
+const _: unsafe extern "C" fn(
     *mut *mut PKCS8_PRIV_KEY_INFO,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -11013,6 +11257,11 @@ const _: unsafe extern "C" fn(*mut BIO, *mut *mut RSA) -> *mut RSA =
     crate::x509::pubkey::d2i_RSA_PUBKEY_bio;
 const _: unsafe extern "C" fn(*mut FILE, *mut *mut RSA) -> *mut RSA =
     crate::x509::pubkey::d2i_RSA_PUBKEY_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut SCRYPT_PARAMS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut SCRYPT_PARAMS = crate::x509::pbe::d2i_SCRYPT_PARAMS;
 const _: unsafe extern "C" fn(
     *mut *mut X509_ALGOR,
     *mut *const core::ffi::c_uchar,
@@ -11181,6 +11430,18 @@ const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> 
     crate::evp::pkey::i2d::i2d_KeyParams;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_KeyParams_bio;
+const _: unsafe extern "C" fn(*const PBE2PARAM, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pbe::i2d_PBE2PARAM;
+const _: unsafe extern "C" fn(*const PBEPARAM, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pbe::i2d_PBEPARAM;
+const _: unsafe extern "C" fn(
+    *const PBKDF2PARAM,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::pbe::i2d_PBKDF2PARAM;
+const _: unsafe extern "C" fn(
+    *const PBMAC1PARAM,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::pbe::i2d_PBMAC1PARAM;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
@@ -11273,6 +11534,10 @@ const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_RSA_PUBKEY_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_RSA_PUBKEY_fp;
+const _: unsafe extern "C" fn(
+    *const SCRYPT_PARAMS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::pbe::i2d_SCRYPT_PARAMS;
 const _: unsafe extern "C" fn(*const X509_ALGOR, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::asn1::tpl::items::i2d_X509_ALGOR;
 const _: unsafe extern "C" fn(

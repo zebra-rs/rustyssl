@@ -4326,9 +4326,26 @@ chunking) is clean.
       - Tests: `tests/c/ui.c`. A scripted method logs each call and answers from a list,
         exercising every function, the failures at each stage, the utilities, the wrapper,
         and an encoder asking a `pem_password_cb` or a UI method for a passphrase.
-    - [ ] **4.7d2 PBE**: the PBEPARAM, PBE2PARAM, PBKDF2PARAM, and SCRYPT_PARAMS types, the
-      `EVP_PBE_*` table, and PKCS#5 v1, v2, and scrypt, and PKCS#12's key and IV derivation
-      (`PKCS5_*_keyivgen`, `PKCS12_PBE_keyivgen`, `PKCS5_pbe*_set`).
+    - [x] **4.7d2 PBE**:
+      - The parameter types (`x509/pbe.rs`): PBEPARAM, PBE2PARAM, PBKDF2PARAM, PBMAC1PARAM,
+        and SCRYPT_PARAMS.
+      - Their builders: `PKCS5_pbe_set0_algor`, `PKCS5_pbe_set`, `PKCS5_pbe2_set`, `_set_iv`,
+        and `_set_scrypt`, and `PKCS5_pbkdf2_set`, with their `_ex` forms.
+      - The PBE table (`evp/pbe.rs`): `EVP_PBE_find(_ex)`, `_alg_add(_type)`, `_cleanup`, and
+        `_get`, with the built-in table in OpenSSL's order and an application's entries
+        overriding it.
+      - `EVP_PBE_CipherInit(_ex)` over the table.
+      - The key and IV derivations: PBES1 over PBKDF1, PBES2 over PBKDF2 (every PRF) or
+        scrypt, and PKCS#12's.
+
+      PBKDF1 and PBES1's ciphers are the legacy provider's (9.1): without it they fail as
+      the reference's does with only the default provider.
+      - Tests:
+        - `tests/c/pbe.c`: the table listed, searched, added to, and cleaned up; every
+          structure built with fixed salts and IVs; encryption through each algorithm and
+          back; the derivations called directly; the errors.
+        - The probe's `pbe`, with `corpus/pbe.txt` and random sessions (1,000 pass).
+        - `fuzz/fuzz_targets/pbe.rs` (1.2M runs clean).
     - [ ] **4.7d3 Encrypted PKCS#8**: `PKCS8_encrypt`/`PKCS8_decrypt` and `PKCS8_set0_pbe`,
       the EncryptedPrivateKeyInfo decoder's decryption (`epki2pki`), the encoders'
       EncryptedPrivateKeyInfo, `PEM_write_bio_PKCS8PrivateKey` encrypted, and

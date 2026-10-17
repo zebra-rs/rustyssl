@@ -419,6 +419,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("pemkey", pemkey_session),
     ("enckey", enckey_session),
     ("pemwrite", pemwrite_session),
+    ("pbe", pbe_session),
     ("decode", decode_session),
     ("string", string_session),
 ];
@@ -4048,6 +4049,47 @@ fn enckey_session(random: &mut Random, out: &mut String) -> Result {
         ]);
         let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();
         writeln!(out, "enckey {sel} {type_} {structure} {hex}")?;
+    }
+    Ok(())
+}
+
+/// A random session of password-based encryption: PBES2 algorithms of a cipher, PRF,
+/// iteration count, salt, and IV (now and then ones that don't fit), encrypting and decrypting a
+/// text with a password.
+fn pbe_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let cipher = random.pick(&[
+            "AES-128-CBC",
+            "AES-192-CBC",
+            "AES-256-CBC",
+            "DES-EDE3-CBC",
+            "AES-128-CTR",
+            "AES-256-OFB",
+            "ARIA-128-CBC",
+            "CAMELLIA-256-CBC",
+            "SM4-CBC",
+            "AES-128-GCM",
+            "NOPE",
+        ]);
+        let prf = random.pick(&[
+            "-1", "163", "798", "799", "800", "801", "1193", "1194", "1195", "1196", "1197",
+            "1198", "1281", "672", "4",
+        ]);
+        let iter = random.pick(&["1", "2", "100", "1000", "0", "-5"]);
+        let salt_len = usize::try_from(random.below(24)).unwrap_or(8);
+        let salt: String = (0..salt_len)
+            .map(|_| format!("{:02x}", random.below(256)))
+            .collect();
+        let iv: String = (0..16)
+            .map(|_| format!("{:02x}", random.below(256)))
+            .collect();
+        let pass = random.pick(&["password", "pw", "-", "a-longer-password-than-usual"]);
+        let salt = if salt.is_empty() {
+            "-".to_owned()
+        } else {
+            salt
+        };
+        writeln!(out, "pbe - {cipher} {prf} {iter} {salt} {iv} {pass}")?;
     }
     Ok(())
 }
