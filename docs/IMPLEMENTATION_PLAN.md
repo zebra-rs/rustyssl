@@ -4845,10 +4845,15 @@ Exit checks:
   - [ ] **5.4e The rest:** RFC 3779 resources (`X509v3_addr_validate_path`,
     `X509v3_asid_validate_path`, and the `_validate_resource_set` functions, deferred from
     5.2f), DANE (with libssl's), and raw public keys.
-- [ ] **5.5 Identity checks:** `X509_check_host` (every `X509_CHECK_FLAG_*`, the wildcard
-  rules, `peername`), `X509_check_email`, `X509_check_ip(_asc)`, the
-  `X509_VERIFY_PARAM_*` host, email, and IP setters, and `X509_get1_email`,
-  `X509_REQ_get1_email`, and `X509_email_free`.
+- [x] **5.5 Identity checks** (`x509v3/check.rs`, the matching in `rustyssl-pki`'s `identity`,
+  from `v3_utl.c`): `X509_check_host` (every `X509_CHECK_FLAG_*`, wildcards with OpenSSL's
+  rules, IDNA labels, leading-dot subdomains, `peername`), `X509_check_email` (domain case
+  folded, local part exact, SmtpUTF8Mailbox other names), `X509_check_ip` and `_ip_asc`, against
+  the alternative names and, as the flags say, the subject; `X509_get1_email`,
+  `X509_REQ_get1_email`, `X509_get1_ocsp`, and `X509_email_free`. The `X509_VERIFY_PARAM_*`
+  identity setters came with 5.3a; verification uses them in 5.4b. Tests:
+  `tests/c/x509_check.c` (wildcard, partial, IDNA, common-name-only, NUL, UTF-8 and BMP
+  names).
 - [ ] **5.6 Printing:** the `X509`, `X509_CRL`, `X509_REQ`, and `X509_NAME` `print_ex`
   functions, `X509_signature_print`, `X509_ocspid_print`, `X509_ACERT_print_ex`. All
   byte-exact. (`X509_signature_dump` and the signature printers came with 5.1f3.)

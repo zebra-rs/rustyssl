@@ -9191,11 +9191,6 @@ pub extern "C" fn X509_POLICY_NODE_print(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_REQ_get1_email(_: *mut X509_REQ) -> *mut stack_st_OPENSSL_STRING {
-    crate::stub::unimplemented("X509_REQ_get1_email")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_REQ_print(_: *mut BIO, _: *mut X509_REQ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509_REQ_print")
 }
@@ -9247,61 +9242,6 @@ pub extern "C" fn X509_build_chain(
     _: *const core::ffi::c_char,
 ) -> *mut stack_st_X509 {
     crate::stub::unimplemented("X509_build_chain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_check_email(
-    _: *mut X509,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_check_email")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_check_host(
-    _: *mut X509,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: core::ffi::c_uint,
-    _: *mut *mut core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_check_host")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_check_ip(
-    _: *mut X509,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_check_ip")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_check_ip_asc(
-    _: *mut X509,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_check_ip_asc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_email_free(_: *mut stack_st_OPENSSL_STRING) {
-    crate::stub::unimplemented("X509_email_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_get1_email(_: *mut X509) -> *mut stack_st_OPENSSL_STRING {
-    crate::stub::unimplemented("X509_get1_email")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_get1_ocsp(_: *mut X509) -> *mut stack_st_OPENSSL_STRING {
-    crate::stub::unimplemented("X509_get1_ocsp")
 }
 
 #[unsafe(no_mangle)]
