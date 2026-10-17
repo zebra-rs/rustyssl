@@ -4119,7 +4119,7 @@ chunking) is clean.
   Sub-steps (the structures and the legacy methods' codecs first, then each framework with
   its built-in implementations, decoders first as `d2i_X509_PUBKEY` and `EVP_PKCS82PKEY` use
   them, then encryption and Microsoft's formats):
-  - [ ] **4.7a SPKI and PKCS#8 structures**, in sub-steps:
+  - [x] **4.7a SPKI and PKCS#8 structures**, in sub-steps:
     - [x] **4.7a1 The structures** (`x509/algor.rs`, `x509/attrib.rs`, `x509/sig.rs`,
       `x509/p8.rs`; 59 exports): the rest of `X509_ALGOR` (`set0`, `get0`, `set_md`, `cmp`,
       `copy`, `dup`) and `X509_ALGORS`; `X509_ATTRIBUTE` (made by NID, object, or name, with
@@ -4133,16 +4133,25 @@ chunking) is clean.
         `corpus/p8der.txt` and random sessions (300 pass); `fuzz/fuzz_targets/pkcs8_der.rs`
         (which found that OpenSSL can't always decode its own encoding of an ANY holding a
         constructed end-of-contents; rustyssl matches).
-    - [ ] **4.7a2 `X509_PUBKEY` and the key types' codecs**: `X509_PUBKEY` (its template,
-      algorithm, and key bits; `X509_PUBKEY_set`, `get0`, `get`, `set0_param`, `get0_param`,
-      `eq`, `dup`; the legacy `d2i_RSA_PUBKEY` and the other typed ones, which decode with
-      the ASN.1 methods) and the built-in ASN.1 methods' public and private codecs (RSA,
-      RSA-PSS, DH, DHX, DSA, EC, the ECX types) with the rest of their functions
-      (`builtin_*` in `evp/pkey/ameth.rs` abort until then). Decoding a key with a decoder
-      (`d2i_X509_PUBKEY`'s) aborts until 4.7b.
-  - [ ] **4.7b Decoders**: the `OSSL_DECODER` framework (fetch, contexts, chains of
-    decoders, the construct callback), `pem2der`, `der2key`, `spki2typespki`, `epki2pki`,
-    and the post-quantum codecs' decoding; `d2i_X509_PUBKEY`'s key, `d2i_PUBKEY`,
+    - [x] **4.7a2 `X509_PUBKEY` and the key types' public codecs** (`x509/pubkey.rs` and
+      the `evp/pkey` modules; 34 exports): `X509_PUBKEY`, an extern item over its own
+      structure as OpenSSL's is (its internal SEQUENCE walked by the engine; new, new_ex, dup,
+      set, get0, get, set0_param, set0_public_key, get0_param, eq, `i2d_X509_PUBKEY`);
+      `i2d_PUBKEY` and its BIO and FILE forms; the typed `d2i_`/`i2d_RSA_PUBKEY`, `_DSA_PUBKEY`,
+      and `_EC_PUBKEY` with theirs (decoding through the ASN.1 methods, legacy decoding forced);
+      and the built-in ASN.1 methods' `pub_decode`/`pub_encode` for RSA (with RSA-PSS's
+      restrictions, as `ossl_rsa_param_decode`), DSA (parameters saved or not), DH and DHX, EC
+      (named or explicit curves), and the ECX types. A provided key's encoding (an encoder,
+      4.7c) and a key decoded otherwise than through the typed functions (a decoder, 4.7b) abort
+      until then. NULL arguments OpenSSL dereferences are refused (docs/DEVIATIONS.md).
+      - Tests: `tests/c/x509_pubkey.c` (19 checks); the probe's `spkider` with
+        `corpus/spkider.txt` and random sessions (300 pass); `fuzz/fuzz_targets/spki_der.rs`;
+        Rust tests of the ECX codecs (no API reaches a legacy ECX key yet).
+  - [ ] **4.7b Decoders**: the built-in ASN.1 methods' private codecs (`priv_decode`,
+    `priv_encode`, and the type-specific `ossl_*_key_from_pkcs8`), the `OSSL_DECODER`
+    framework (fetch, contexts, chains of decoders, the construct callback), `pem2der`,
+    `der2key`, `spki2typespki`, `epki2pki`, and the post-quantum codecs' decoding;
+    `d2i_X509_PUBKEY` (its key), `d2i_PUBKEY`,
     `d2i_PrivateKey`, `d2i_AutoPrivateKey`, `d2i_PublicKey`, `EVP_PKCS82PKEY`, and the PEM
     readers of keys (`PEM_read_bio_PrivateKey`, `_PUBKEY`, `_RSAPrivateKey`, ...).
   - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an

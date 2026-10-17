@@ -604,3 +604,125 @@ ffi_callback! {
         ret
     }
 }
+
+/// `ossl_ecx_key_op` with an AlgorithmIdentifier: its parameters must be absent, and its
+/// object must be the key type `id`'s (or, for `EVP_PKEY_NONE`, gives the type); then the key
+/// of `op` (a public or private key of the type's length). NULL with `EC_R_INVALID_ENCODING`.
+///
+/// # Safety
+/// `palg` is NULL or a live AlgorithmIdentifier; `libctx` is NULL or a live library context.
+pub(crate) unsafe fn key_op_algor(
+    palg: *const rustyssl_abi::X509_ALGOR,
+    p: Option<&[u8]>,
+    mut id: c_int,
+    private: bool,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+) -> *mut c_void {
+    use rustyssl_abi::{EC_R_INVALID_ENCODING, ERR_LIB_EC, EVP_PKEY_NONE, V_ASN1_UNDEF};
+    const F: &str = "ossl_ecx_key_op";
+    if !palg.is_null() {
+        let mut ptype = 0;
+        // SAFETY: the caller's AlgorithmIdentifier; a local.
+        unsafe {
+            crate::x509::algor::X509_ALGOR_get0(
+                ptr::null_mut(),
+                &raw mut ptype,
+                ptr::null_mut(),
+                palg,
+            )
+        };
+        if ptype != V_ASN1_UNDEF {
+            err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, F);
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's AlgorithmIdentifier.
+        let obj = unsafe { (*palg).algorithm };
+        // SAFETY: its object.
+        let nid = unsafe { crate::objects::OBJ_obj2nid(obj) };
+        if id == EVP_PKEY_NONE {
+            id = nid;
+        } else if id != nid {
+            err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, F);
+            return ptr::null_mut();
+        }
+    }
+    let (Some(kind), Some(p)) = (ecx::type_of(id), p) else {
+        err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, F);
+        return ptr::null_mut();
+    };
+    let op = if private {
+        KeyOp::Private(p)
+    } else {
+        KeyOp::Public(p)
+    };
+    ecx::key_op(libctx, kind, &op)
+}
+
+ffi_callback! {
+    /// `ecx_pub_encode`: the raw public key, with the type's object and no parameters.
+    ///
+    /// # Safety
+    /// `pk` is a live SubjectPublicKeyInfo; `pkey` is a live ECX key.
+    pub(crate) unsafe extern "C" fn ecx_pub_encode(pk: *mut rustyssl_abi::X509_PUBKEY, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_EC
+    {
+        use rustyssl_abi::{EC_R_INVALID_KEY, ERR_LIB_EC, ERR_R_X509_LIB, V_ASN1_UNDEF};
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { data(pkey) }) else {
+            err::raise(ERR_LIB_EC, EC_R_INVALID_KEY, "ecx_pub_encode");
+            return 0;
+        };
+        // SAFETY: as above.
+        let len = unsafe { keylen(pkey) };
+        let penc: *mut c_uchar = crate::mem::alloc(len.max(1)).cast();
+        if penc.is_null() {
+            return 0;
+        }
+        {
+            let s = k.lock();
+            let src = s.pubkey.get(..len).unwrap_or_default();
+            // SAFETY: a block of `len` octets; the key's.
+            unsafe { ptr::copy_nonoverlapping(src.as_ptr(), penc, src.len()) };
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        let n = c_int::try_from(len).unwrap_or(0);
+        // SAFETY: the caller's structure takes the object and octets.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_set0_param(pk, obj, V_ASN1_UNDEF, ptr::null_mut(), penc, n) } == 0 {
+            // SAFETY: made above.
+            unsafe { crate::mem::release(penc.cast()) };
+            err::raise(ERR_LIB_EC, ERR_R_X509_LIB, "ecx_pub_encode");
+            return 0;
+        }
+        1
+    }
+}
+
+ffi_callback! {
+    /// `ecx_pub_decode`: the raw public key of the key's type (the AlgorithmIdentifier
+    /// checked), assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed X25519, X448, ED25519, or ED448; `pubkey` is a live
+    /// SubjectPublicKeyInfo.
+    pub(crate) unsafe extern "C" fn ecx_pub_decode(pkey: *mut EVP_PKEY, pubkey: *const rustyssl_abi::X509_PUBKEY) -> c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_EC
+    {
+        let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null_mut());
+        // SAFETY: the caller's structure; locals.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_get0_param(ptr::null_mut(), &raw mut p, &raw mut pklen, &raw mut palg, pubkey) } == 0 {
+            return 0;
+        }
+        let len = usize::try_from(pklen).unwrap_or(0);
+        // SAFETY: the structure's `pklen` octets.
+        let key = unsafe { bytes(p, len) };
+        // SAFETY: the caller's key.
+        let id = unsafe { EVP_PKEY_get_id(pkey) };
+        // SAFETY: the structure's AlgorithmIdentifier.
+        let h = unsafe { key_op_algor(palg, key, id, false, ptr::null_mut()) };
+        // SAFETY: the caller's key; the new ECX key, or NULL.
+        unsafe { assign(pkey, h) }
+    }
+}

@@ -381,6 +381,9 @@
  *                              (numbers in hex, - for none, or RFC 6979's DSA-1024 key's parts
  *                              k:p, k:q, k:g, k:y, k:x; gx for g^priv mod p; the edit adds to
  *                              one, as for dhkey), then its sizes and every validation
+ *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
+ *                              octets: the result, the octets consumed, the key's size, and
+ *                              its SubjectPublicKeyInfo encoded again
  *   p8der <k|s|a|l> <hex>      d2i_PKCS8_PRIV_KEY_INFO (k), d2i_X509_SIG (s),
  *                              d2i_X509_ATTRIBUTE (a), or d2i_X509_ALGORS (l) of the octets: the
  *                              result, the octets consumed, what it holds, and its re-encoding
@@ -6345,6 +6348,48 @@ static int x509_command(const char *command, const char *line)
     void *v;
     int rn;
 
+    if (strcmp(command, "spkider") == 0) {
+        char k[4] = "r", hx[2100] = "";
+        long len = 0;
+        unsigned char *in, *out = NULL;
+        const unsigned char *q;
+        void *key;
+        int on;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %3s %2099s", k, hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        q = in;
+        key = in == NULL                ? NULL
+              : strcmp(k, "d") == 0     ? (void *)d2i_DSA_PUBKEY(NULL, &q, len)
+              : strcmp(k, "e") == 0     ? (void *)d2i_EC_PUBKEY(NULL, &q, len)
+                                        : (void *)d2i_RSA_PUBKEY(NULL, &q, len);
+        printf(" %s consumed %ld", key == NULL ? "fails" : "ok", in == NULL ? 0L : (long)(q - in));
+        print_asn_errors();
+        if (key != NULL) {
+            if (strcmp(k, "d") == 0) {
+                printf("  bits %d", DSA_bits(key));
+                on = i2d_DSA_PUBKEY(key, &out);
+            } else if (strcmp(k, "e") == 0) {
+                printf("  degree %d", EC_GROUP_get_degree(EC_KEY_get0_group(key)));
+                on = i2d_EC_PUBKEY(key, &out);
+            } else {
+                printf("  bits %d pss %d", RSA_bits(key), RSA_get0_pss_params(key) != NULL);
+                on = i2d_RSA_PUBKEY(key, &out);
+            }
+            printf(" re %d same %d", on, on == (int)len && out != NULL && memcmp(out, in, (size_t)len) == 0);
+            OPENSSL_free(out);
+            print_asn_errors();
+            if (strcmp(k, "d") == 0)
+                DSA_free(key);
+            else if (strcmp(k, "e") == 0)
+                EC_KEY_free(key);
+            else
+                RSA_free(key);
+        }
+        OPENSSL_free(in);
+        return 1;
+    }
     if (strcmp(command, "p8der") != 0)
         return 0;
     printf("%s:", line);

@@ -419,6 +419,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "spki_der"
+path = "fuzz_targets/spki_der.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "pkcs8_der"
 path = "fuzz_targets/pkcs8_der.rs"
 test = false

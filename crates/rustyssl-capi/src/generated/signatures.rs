@@ -9772,6 +9772,38 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::attrib::X509_ATTRIBUTE_set1_data;
 const _: unsafe extern "C" fn(*mut X509_ATTRIBUTE, *const ASN1_OBJECT) -> core::ffi::c_int =
     crate::x509::attrib::X509_ATTRIBUTE_set1_object;
+const _: unsafe extern "C" fn(*const X509_PUBKEY) -> *mut X509_PUBKEY =
+    crate::x509::pubkey::X509_PUBKEY_dup;
+const _: unsafe extern "C" fn(*const X509_PUBKEY, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::X509_PUBKEY_eq;
+const _: unsafe extern "C" fn(*mut X509_PUBKEY) = crate::x509::pubkey::X509_PUBKEY_free;
+const _: unsafe extern "C" fn(*const X509_PUBKEY) -> *mut EVP_PKEY =
+    crate::x509::pubkey::X509_PUBKEY_get;
+const _: unsafe extern "C" fn(*const X509_PUBKEY) -> *mut EVP_PKEY =
+    crate::x509::pubkey::X509_PUBKEY_get0;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_OBJECT,
+    *mut *const core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *mut *mut X509_ALGOR,
+    *const X509_PUBKEY,
+) -> core::ffi::c_int = crate::x509::pubkey::X509_PUBKEY_get0_param;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pubkey::X509_PUBKEY_it;
+const _: unsafe extern "C" fn() -> *mut X509_PUBKEY = crate::x509::pubkey::X509_PUBKEY_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509_PUBKEY =
+    crate::x509::pubkey::X509_PUBKEY_new_ex;
+const _: unsafe extern "C" fn(*mut *mut X509_PUBKEY, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::X509_PUBKEY_set;
+const _: unsafe extern "C" fn(
+    *mut X509_PUBKEY,
+    *mut ASN1_OBJECT,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::pubkey::X509_PUBKEY_set0_param;
+const _: unsafe extern "C" fn(*mut X509_PUBKEY, *mut core::ffi::c_uchar, core::ffi::c_int) =
+    crate::x509::pubkey::X509_PUBKEY_set0_public_key;
 const _: unsafe extern "C" fn(*mut X509_SIG) = crate::x509::sig::X509_SIG_free;
 const _: unsafe extern "C" fn(
     *const X509_SIG,
@@ -10007,6 +10039,15 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut DSA = crate::dsa_asn1::d2i_DSAPublicKey;
 const _: unsafe extern "C" fn(
+    *mut *mut DSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut DSA = crate::x509::pubkey::d2i_DSA_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut DSA) -> *mut DSA =
+    crate::x509::pubkey::d2i_DSA_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut DSA) -> *mut DSA =
+    crate::x509::pubkey::d2i_DSA_PUBKEY_fp;
+const _: unsafe extern "C" fn(
     *mut *mut DSA_SIG,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -10040,6 +10081,15 @@ const _: unsafe extern "C" fn(*mut BIO, *mut *mut EC_KEY) -> *mut EC_KEY =
     crate::ec::key_asn1::d2i_ECPrivateKey_bio;
 const _: unsafe extern "C" fn(*mut FILE, *mut *mut EC_KEY) -> *mut EC_KEY =
     crate::ec::key_asn1::d2i_ECPrivateKey_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut EC_KEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EC_KEY = crate::x509::pubkey::d2i_EC_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut EC_KEY) -> *mut EC_KEY =
+    crate::x509::pubkey::d2i_EC_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut EC_KEY) -> *mut EC_KEY =
+    crate::x509::pubkey::d2i_EC_PUBKEY_fp;
 const _: unsafe extern "C" fn(
     *mut *mut PKCS8_PRIV_KEY_INFO,
     *mut *const core::ffi::c_uchar,
@@ -10079,6 +10129,15 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut RSA_PSS_PARAMS = crate::rsa_asn1::d2i_RSA_PSS_PARAMS;
+const _: unsafe extern "C" fn(
+    *mut *mut RSA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut RSA = crate::x509::pubkey::d2i_RSA_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut RSA) -> *mut RSA =
+    crate::x509::pubkey::d2i_RSA_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut RSA) -> *mut RSA =
+    crate::x509::pubkey::d2i_RSA_PUBKEY_fp;
 const _: unsafe extern "C" fn(
     *mut *mut X509_ALGOR,
     *mut *const core::ffi::c_uchar,
@@ -10206,6 +10265,12 @@ const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
     crate::dsa_asn1::i2d_DSAPrivateKey_fp;
 const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::dsa_asn1::i2d_DSAPublicKey;
+const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_DSA_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_DSA_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_DSA_PUBKEY_fp;
 const _: unsafe extern "C" fn(*const DSA_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::dsa_ops::i2d_DSA_SIG;
 const _: unsafe extern "C" fn(*const DSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
@@ -10222,6 +10287,12 @@ const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
     crate::ec::key_asn1::i2d_ECPrivateKey_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
     crate::ec::key_asn1::i2d_ECPrivateKey_fp;
+const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_EC_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_EC_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_EC_PUBKEY_fp;
 const _: unsafe extern "C" fn(
     *const PKCS8_PRIV_KEY_INFO,
     *mut *mut core::ffi::c_uchar,
@@ -10230,6 +10301,12 @@ const _: unsafe extern "C" fn(*mut BIO, *const PKCS8_PRIV_KEY_INFO) -> core::ffi
     crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
     crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_fp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_PUBKEY_fp;
 const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::rsa_asn1::i2d_RSAPrivateKey;
 const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
@@ -10250,6 +10327,12 @@ const _: unsafe extern "C" fn(
     *const RSA_PSS_PARAMS,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::rsa_asn1::i2d_RSA_PSS_PARAMS;
+const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_RSA_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_RSA_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const RSA) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_RSA_PUBKEY_fp;
 const _: unsafe extern "C" fn(*const X509_ALGOR, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::asn1::tpl::items::i2d_X509_ALGOR;
 const _: unsafe extern "C" fn(
@@ -10260,6 +10343,10 @@ const _: unsafe extern "C" fn(
     *const X509_ATTRIBUTE,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509::attrib::i2d_X509_ATTRIBUTE;
+const _: unsafe extern "C" fn(
+    *const X509_PUBKEY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::pubkey::i2d_X509_PUBKEY;
 const _: unsafe extern "C" fn(*const X509_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509::sig::i2d_X509_SIG;
 const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =

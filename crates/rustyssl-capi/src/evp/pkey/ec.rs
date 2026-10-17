@@ -40,7 +40,7 @@ use crate::ec::key_asn1::{Print, d2i_ECParameters, d2i_ECPrivateKey, i2d_ECParam
 use crate::ec::params::{Kept, Target, group_todata};
 use crate::ec::point::EC_POINT_cmp;
 use crate::err;
-use crate::ffi::ffi_export;
+use crate::ffi::{ffi_callback, ffi_export};
 use crate::params::build::{OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_to_param};
 use crate::params::dup::OSSL_PARAM_free;
 
@@ -693,5 +693,207 @@ mod tests {
         unsafe { EC_KEY_free(ec) };
         // SAFETY: as above.
         unsafe { super::super::EVP_PKEY_free(k) };
+    }
+}
+
+/// `eckey_param2type`: the key's parameters as an AlgorithmIdentifier's parameter: its curve's
+/// OID for a named curve, else its ECParameters (a SEQUENCE). `None` with the error raised.
+///
+/// # Safety
+/// `ec` is NULL or a live key.
+unsafe fn param2type(ec: *const EC_KEY) -> Option<(c_int, *mut c_void)> {
+    use crate::ec::group::{EC_GROUP_get_asn1_flag, EC_GROUP_get_curve_name};
+    use rustyssl_abi::{
+        EC_R_MISSING_OID, EC_R_MISSING_PARAMETERS, V_ASN1_OBJECT, V_ASN1_OCTET_STRING,
+        V_ASN1_SEQUENCE,
+    };
+    const F: &str = "eckey_param2type";
+    let group = if ec.is_null() {
+        ptr::null()
+    } else {
+        // SAFETY: the caller's key.
+        unsafe { crate::ec::key::EC_KEY_get0_group(ec) }
+    };
+    if group.is_null() {
+        err::raise(ERR_LIB_EC, EC_R_MISSING_PARAMETERS, F);
+        return None;
+    }
+    // SAFETY: the key's group.
+    let named = unsafe { EC_GROUP_get_asn1_flag(group) } != 0;
+    let nid = if named {
+        // SAFETY: as above.
+        unsafe { EC_GROUP_get_curve_name(group) }
+    } else {
+        0
+    };
+    if nid != 0 {
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(nid) };
+        // SAFETY: the object, or NULL.
+        if obj.is_null() || unsafe { crate::objects::OBJ_length(obj) } == 0 {
+            err::raise(ERR_LIB_EC, EC_R_MISSING_OID, F);
+            return None;
+        }
+        return Some((V_ASN1_OBJECT, obj.cast()));
+    }
+    let i2d = |out: *mut *mut core::ffi::c_uchar| {
+        // SAFETY: the key; the caller's place for a new encoding.
+        unsafe { crate::ec::key_asn1::i2d_ECParameters(ec, out) }
+    };
+    // SAFETY: the closure writes a new buffer through its argument.
+    let s = unsafe { crate::x509::pubkey::sequence_param(V_ASN1_OCTET_STRING, i2d) };
+    let Some(s) = s else {
+        err::raise(ERR_LIB_EC, ERR_R_EC_LIB, F);
+        return None;
+    };
+    Some((V_ASN1_SEQUENCE, s.cast()))
+}
+
+/// `ossl_ec_key_param_from_x509_algor`: a new key in `libctx` with an AlgorithmIdentifier's
+/// parameters (ECParameters, or a named curve's OID), or NULL.
+///
+/// # Safety
+/// `palg` is a live AlgorithmIdentifier; `libctx` is NULL or a live library context; `propq` is
+/// NULL or a string.
+pub(crate) unsafe fn key_param_from_x509_algor(
+    palg: *const rustyssl_abi::X509_ALGOR,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: *const core::ffi::c_char,
+) -> *mut EC_KEY {
+    use crate::ec::group::{EC_GROUP_free, EC_GROUP_new_by_curve_name_ex, EC_GROUP_set_asn1_flag};
+    use crate::ec::key::{EC_KEY_free, EC_KEY_new_ex, EC_KEY_set_group};
+    use rustyssl_abi::{EC_R_DECODE_ERROR, OPENSSL_EC_NAMED_CURVE, V_ASN1_OBJECT, V_ASN1_SEQUENCE};
+    const F: &str = "ossl_ec_key_param_from_x509_algor";
+    let (mut ptype, mut pval) = (0, ptr::null());
+    // SAFETY: the caller's AlgorithmIdentifier; locals.
+    unsafe {
+        crate::x509::algor::X509_ALGOR_get0(ptr::null_mut(), &raw mut ptype, &raw mut pval, palg)
+    };
+    // SAFETY: the caller's guarantee.
+    let mut eckey = unsafe { EC_KEY_new_ex(libctx, propq) };
+    if eckey.is_null() {
+        err::raise(ERR_LIB_EC, ERR_R_EC_LIB, F);
+        return ptr::null_mut();
+    }
+    let fail = |eckey: *mut EC_KEY| {
+        // SAFETY: made here.
+        unsafe { EC_KEY_free(eckey) };
+        ptr::null_mut()
+    };
+    if ptype == V_ASN1_SEQUENCE {
+        // SAFETY: a SEQUENCE parameter is an `ASN1_STRING`.
+        let (mut pm, pmlen) = unsafe { crate::x509::pubkey::sequence_octets(pval) };
+        // SAFETY: the new key; the parameter's octets.
+        if unsafe { crate::ec::key_asn1::d2i_ECParameters(&raw mut eckey, &raw mut pm, pmlen) }
+            .is_null()
+        {
+            err::raise(ERR_LIB_EC, EC_R_DECODE_ERROR, F);
+            return fail(eckey);
+        }
+    } else if ptype == V_ASN1_OBJECT {
+        // SAFETY: an OBJECT parameter is an object.
+        let nid = unsafe { crate::objects::OBJ_obj2nid(pval.cast()) };
+        // SAFETY: the caller's guarantee.
+        let group = unsafe { EC_GROUP_new_by_curve_name_ex(libctx, propq, nid) };
+        if group.is_null() {
+            return fail(eckey);
+        }
+        // SAFETY: the new group.
+        unsafe { EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE) };
+        // SAFETY: the new key; the group, which it copies.
+        let ok = unsafe { EC_KEY_set_group(eckey, group) } != 0;
+        // SAFETY: made above.
+        unsafe { EC_GROUP_free(group) };
+        if !ok {
+            return fail(eckey);
+        }
+    } else {
+        err::raise(ERR_LIB_EC, EC_R_DECODE_ERROR, F);
+        return fail(eckey);
+    }
+    eckey
+}
+
+ffi_callback! {
+    /// `eckey_pub_encode`: the public point (`i2o_ECPublicKey`) with id-ecPublicKey and the
+    /// key's parameters.
+    ///
+    /// # Safety
+    /// `pk` is a live SubjectPublicKeyInfo; `pkey` is a live EC key.
+    pub(crate) unsafe extern "C" fn eckey_pub_encode(pk: *mut rustyssl_abi::X509_PUBKEY, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        use rustyssl_abi::V_ASN1_SEQUENCE;
+        // SAFETY: the caller's guarantee.
+        let ec = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let Some((ptype, pval)) = (unsafe { param2type(ec) }) else {
+            err::raise(ERR_LIB_EC, ERR_R_EC_LIB, "eckey_pub_encode");
+            return 0;
+        };
+        let fail = |penc: *mut core::ffi::c_uchar| {
+            if ptype == V_ASN1_SEQUENCE {
+                // SAFETY: the parameter made above.
+                unsafe { crate::asn1::string::ASN1_STRING_free(pval.cast()) };
+            }
+            // SAFETY: made here, or NULL.
+            unsafe { crate::mem::release(penc.cast()) };
+            0
+        };
+        // SAFETY: the key; a size query.
+        let n = unsafe { crate::ec::key_asn1::i2o_ECPublicKey(ec, ptr::null_mut()) };
+        let Some(len) = usize::try_from(n).ok().filter(|&l| l > 0) else { return fail(ptr::null_mut()) };
+        let penc: *mut core::ffi::c_uchar = crate::mem::alloc(len).cast();
+        if penc.is_null() {
+            return fail(penc);
+        }
+        let mut p = penc;
+        // SAFETY: the key; room for its encoding.
+        let penclen = unsafe { crate::ec::key_asn1::i2o_ECPublicKey(ec, &raw mut p) };
+        if penclen <= 0 {
+            return fail(penc);
+        }
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(EVP_PKEY_EC) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_set0_param(pk, obj, ptype, pval, penc, penclen) } != 0 {
+            return 1;
+        }
+        fail(penc)
+    }
+}
+
+ffi_callback! {
+    /// `eckey_pub_decode`: a key with the AlgorithmIdentifier's parameters (in the structure's
+    /// library context) and the public point, assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed EC; `pubkey` is a live SubjectPublicKeyInfo.
+    pub(crate) unsafe extern "C" fn eckey_pub_decode(pkey: *mut EVP_PKEY, pubkey: *const rustyssl_abi::X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        use rustyssl_abi::EC_R_DECODE_ERROR;
+        // SAFETY: the caller's structure.
+        let (libctx, propq) = unsafe { crate::x509::pubkey::libctx_of(pubkey) };
+        let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null_mut());
+        // SAFETY: as above; locals.
+        if unsafe { crate::x509::pubkey::X509_PUBKEY_get0_param(ptr::null_mut(), &raw mut p, &raw mut pklen, &raw mut palg, pubkey) } == 0 {
+            return 0;
+        }
+        // SAFETY: its AlgorithmIdentifier and library context.
+        let mut eckey = unsafe { key_param_from_x509_algor(palg, libctx, propq) };
+        if eckey.is_null() {
+            return 0;
+        }
+        // SAFETY: the new key; the structure's `pklen` octets.
+        if unsafe { crate::ec::key_asn1::o2i_ECPublicKey(&raw mut eckey, &raw mut p, c_long::from(pklen)) }.is_null() {
+            err::raise(ERR_LIB_EC, EC_R_DECODE_ERROR, "eckey_pub_decode");
+            // SAFETY: made above.
+            unsafe { crate::ec::key::EC_KEY_free(eckey) };
+            return 0;
+        }
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, EVP_PKEY_EC, eckey.cast()) };
+        1
     }
 }

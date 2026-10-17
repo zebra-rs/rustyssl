@@ -15246,86 +15246,6 @@ pub extern "C" fn X509_POLICY_NODE_print(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_dup(_: *const X509_PUBKEY) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("X509_PUBKEY_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_eq(_: *const X509_PUBKEY, _: *const X509_PUBKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_PUBKEY_eq")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_free(_: *mut X509_PUBKEY) {
-    crate::stub::unimplemented("X509_PUBKEY_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_get(_: *const X509_PUBKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("X509_PUBKEY_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_get0(_: *const X509_PUBKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("X509_PUBKEY_get0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_get0_param(
-    _: *mut *mut ASN1_OBJECT,
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: *mut *mut X509_ALGOR,
-    _: *const X509_PUBKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_PUBKEY_get0_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("X509_PUBKEY_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_new() -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("X509_PUBKEY_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_new_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("X509_PUBKEY_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_set(_: *mut *mut X509_PUBKEY, _: *mut EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_PUBKEY_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_set0_param(
-    _: *mut X509_PUBKEY,
-    _: *mut ASN1_OBJECT,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509_PUBKEY_set0_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_PUBKEY_set0_public_key(
-    _: *mut X509_PUBKEY,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("X509_PUBKEY_set0_public_key")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_PURPOSE_add(
     _: core::ffi::c_int,
     _: core::ffi::c_int,
@@ -18411,44 +18331,6 @@ pub extern "C" fn d2i_DIST_POINT_NAME(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSA_PUBKEY(
-    _: *mut *mut DSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSA_PUBKEY_bio(_: *mut BIO, _: *mut *mut DSA) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSA_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_DSA_PUBKEY_fp(_: *mut FILE, _: *mut *mut DSA) -> *mut DSA {
-    crate::stub::unimplemented("d2i_DSA_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_EC_PUBKEY(
-    _: *mut *mut EC_KEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EC_KEY {
-    crate::stub::unimplemented("d2i_EC_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_EC_PUBKEY_bio(_: *mut BIO, _: *mut *mut EC_KEY) -> *mut EC_KEY {
-    crate::stub::unimplemented("d2i_EC_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_EC_PUBKEY_fp(_: *mut FILE, _: *mut *mut EC_KEY) -> *mut EC_KEY {
-    crate::stub::unimplemented("d2i_EC_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_EDIPARTYNAME(
     _: *mut *mut EDIPARTYNAME,
     _: *mut *const core::ffi::c_uchar,
@@ -19610,25 +19492,6 @@ pub extern "C" fn d2i_PublicKey(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSA_PUBKEY(
-    _: *mut *mut RSA,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSA_PUBKEY_bio(_: *mut BIO, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSA_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_RSA_PUBKEY_fp(_: *mut FILE, _: *mut *mut RSA) -> *mut RSA {
-    crate::stub::unimplemented("d2i_RSA_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_SCRYPT_PARAMS(
     _: *mut *mut SCRYPT_PARAMS,
     _: *mut *const core::ffi::c_uchar,
@@ -20161,42 +20024,6 @@ pub extern "C" fn i2d_DIST_POINT_NAME(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_DIST_POINT_NAME")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSA_PUBKEY(
-    _: *const DSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSA_PUBKEY_bio(_: *mut BIO, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSA_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_DSA_PUBKEY_fp(_: *mut FILE, _: *const DSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_DSA_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_EC_PUBKEY(
-    _: *const EC_KEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_EC_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_EC_PUBKEY_bio(_: *mut BIO, _: *const EC_KEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_EC_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_EC_PUBKEY_fp(_: *mut FILE, _: *const EC_KEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_EC_PUBKEY_fp")
 }
 
 #[unsafe(no_mangle)]
@@ -21189,24 +21016,6 @@ pub extern "C" fn i2d_PROXY_POLICY(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PUBKEY(
-    _: *const EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PUBKEY_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PUBKEY_fp(_: *mut FILE, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PrivateKey(
     _: *const EVP_PKEY,
     _: *mut *mut core::ffi::c_uchar,
@@ -21230,24 +21039,6 @@ pub extern "C" fn i2d_PublicKey(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_PublicKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSA_PUBKEY(
-    _: *const RSA,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSA_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSA_PUBKEY_bio(_: *mut BIO, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSA_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_RSA_PUBKEY_fp(_: *mut FILE, _: *const RSA) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_RSA_PUBKEY_fp")
 }
 
 #[unsafe(no_mangle)]
@@ -21484,14 +21275,6 @@ pub extern "C" fn i2d_X509_NAME_ENTRY(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_X509_NAME_ENTRY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_X509_PUBKEY(
-    _: *const X509_PUBKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_X509_PUBKEY")
 }
 
 #[unsafe(no_mangle)]
