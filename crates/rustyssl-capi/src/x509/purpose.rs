@@ -71,7 +71,7 @@ use crate::stack::{
     OPENSSL_sk_find, OPENSSL_sk_insert, OPENSSL_sk_new, OPENSSL_sk_num, OPENSSL_sk_pop_free,
     OPENSSL_sk_push, OPENSSL_sk_set, OPENSSL_sk_value,
 };
-use crate::threads::{CRYPTO_THREAD_unlock, CRYPTO_THREAD_write_lock};
+use crate::threads::{CRYPTO_THREAD_read_lock, CRYPTO_THREAD_unlock, CRYPTO_THREAD_write_lock};
 use crate::x509::cert::{
     Cert, X509_digest, X509_free, X509_get_ext, X509_get_ext_by_NID, X509_get_ext_count,
     X509_get_issuer_name, X509_get_subject_name, X509_get_version, X509_get0_pubkey,
@@ -1884,6 +1884,35 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         unsafe { add_certs(sk, certs, flags) }
     }
+}
+
+/// The certificate's cached extension flags as they stand (OpenSSL's `x->ex_flags`, 0 before
+/// the cache is filled), read under its lock.
+///
+/// # Safety
+/// `xp` is NULL or a live certificate.
+pub(crate) unsafe fn raw_flags(xp: *const X509) -> u32 {
+    // SAFETY: the caller's guarantee.
+    let Some(x) = (unsafe { cert_of(xp) }) else {
+        return 0;
+    };
+    // SAFETY: its lock.
+    if unsafe { CRYPTO_THREAD_read_lock(x.lock) } == 0 {
+        return 0;
+    }
+    let flags = x.cache.flags;
+    // SAFETY: as above.
+    unsafe { CRYPTO_THREAD_unlock(x.lock) };
+    flags
+}
+
+/// Whether the certificate is self-issued by its cached flags as they stand (`EXFLAG_SI`).
+///
+/// # Safety
+/// `xp` is NULL or a live certificate.
+pub(crate) unsafe fn self_issued(xp: *const X509) -> bool {
+    // SAFETY: the caller's guarantee.
+    (unsafe { raw_flags(xp) } & f(EXFLAG_SI)) != 0
 }
 
 #[cfg(test)]

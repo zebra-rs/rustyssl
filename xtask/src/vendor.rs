@@ -59,6 +59,9 @@ const FILES: &[&str] = &[
     "crypto/ec/ec_curve.c",
     // The curves' names and NIST names (`OSSL_EC_curve_nid2name`, `EC_curve_nid2nist`).
     "crypto/evp/ec_support.c",
+    // The verification errors' text (`X509_verify_cert_error_string`), which codegen turns
+    // into rustyssl's table.
+    "crypto/x509/x509_txt.c",
     // Internal headers that declare functions libcrypto exports all the same (DSO_*,
     // conf_ssl_*, OPENSSL_DIR_*, ...). Codegen fails if an export has no prototype.
     "include/internal/asn1.h",

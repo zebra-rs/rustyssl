@@ -4,3 +4,4 @@ pub(crate) mod err_strings;
 mod libcrypto_stubs;
 mod libssl_stubs;
 mod signatures;
+pub(crate) mod verify_strings;

@@ -1556,6 +1556,15 @@ ffi_export! {
     }
 }
 
+/// Whether the lookup is to be skipped (`skip`).
+///
+/// # Safety
+/// `ctx` is NULL or a live lookup.
+pub(crate) unsafe fn skip_of(ctx: *const X509_LOOKUP) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { lookup(ctx) }.is_some_and(|l| l.skip != 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

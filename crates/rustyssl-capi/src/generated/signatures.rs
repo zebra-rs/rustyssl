@@ -12772,6 +12772,150 @@ const _: unsafe extern "C" fn(*mut X509_SIG, *mut *mut X509_ALGOR, *mut *mut ASN
     crate::x509::sig::X509_SIG_getm;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::sig::X509_SIG_it;
 const _: unsafe extern "C" fn() -> *mut X509_SIG = crate::x509::sig::X509_SIG_new;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) = crate::x509::ctx::X509_STORE_CTX_cleanup;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX) = crate::x509::ctx::X509_STORE_CTX_free;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509 =
+    crate::x509::ctx::X509_STORE_CTX_get0_cert;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut stack_st_X509 =
+    crate::x509::ctx::X509_STORE_CTX_get0_chain;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509_CRL =
+    crate::x509::ctx::X509_STORE_CTX_get0_current_crl;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509 =
+    crate::x509::ctx::X509_STORE_CTX_get0_current_issuer;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509_VERIFY_PARAM =
+    crate::x509::ctx::X509_STORE_CTX_get0_param;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509_STORE_CTX =
+    crate::x509::ctx::X509_STORE_CTX_get0_parent_ctx;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509_POLICY_TREE =
+    crate::x509::ctx::X509_STORE_CTX_get0_policy_tree;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut EVP_PKEY =
+    crate::x509::ctx::X509_STORE_CTX_get0_rpk;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509_STORE =
+    crate::x509::ctx::X509_STORE_CTX_get0_store;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut stack_st_X509 =
+    crate::x509::ctx::X509_STORE_CTX_get0_untrusted;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *const X509_NAME) -> *mut stack_st_X509 =
+    crate::x509::ctx::X509_STORE_CTX_get1_certs;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut stack_st_X509 =
+    crate::x509::ctx::X509_STORE_CTX_get1_chain;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX, *const X509_NAME) -> *mut stack_st_X509_CRL =
+    crate::x509::ctx::X509_STORE_CTX_get1_crls;
+const _: unsafe extern "C" fn(*mut *mut X509, *mut X509_STORE_CTX, *mut X509) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_get1_issuer;
+const _: unsafe extern "C" fn(
+    *const X509_STORE_CTX,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+    *mut X509_OBJECT,
+) -> core::ffi::c_int = crate::x509::ctx::X509_STORE_CTX_get_by_subject;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_cert_crl_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_cert_crl;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_check_crl_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_check_crl;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_check_issued_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_check_issued;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_check_policy_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_check_policy;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_check_revocation_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_check_revocation;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_cleanup_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_cleanup;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> *mut X509 =
+    crate::x509::ctx::X509_STORE_CTX_get_current_cert;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_get_error;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_get_error_depth;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::x509::ctx::X509_STORE_CTX_get_ex_data;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_get_explicit_policy;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_get_crl_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_get_crl;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_get_issuer_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_get_issuer;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_lookup_certs_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_lookup_certs;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_lookup_crls_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_lookup_crls;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_get_num_untrusted;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE_CTX,
+    X509_LOOKUP_TYPE,
+    *const X509_NAME,
+) -> *mut X509_OBJECT = crate::x509::ctx::X509_STORE_CTX_get_obj_by_subject;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_verify_fn =
+    crate::x509::ctx::X509_STORE_CTX_get_verify;
+const _: unsafe extern "C" fn(*const X509_STORE_CTX) -> X509_STORE_CTX_verify_cb =
+    crate::x509::ctx::X509_STORE_CTX_get_verify_cb;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE_CTX,
+    *mut X509_STORE,
+    *mut X509,
+    *mut stack_st_X509,
+) -> core::ffi::c_int = crate::x509::ctx::X509_STORE_CTX_init;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE_CTX,
+    *mut X509_STORE,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::x509::ctx::X509_STORE_CTX_init_rpk;
+const _: unsafe extern "C" fn() -> *mut X509_STORE_CTX = crate::x509::ctx::X509_STORE_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509_STORE_CTX =
+    crate::x509::ctx::X509_STORE_CTX_new_ex;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::ctx::X509_STORE_CTX_purpose_inherit;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut stack_st_X509_CRL) =
+    crate::x509::ctx::X509_STORE_CTX_set0_crls;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut SSL_DANE) =
+    crate::x509::ctx::X509_STORE_CTX_set0_dane;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut X509_VERIFY_PARAM) =
+    crate::x509::ctx::X509_STORE_CTX_set0_param;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut EVP_PKEY) =
+    crate::x509::ctx::X509_STORE_CTX_set0_rpk;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut stack_st_X509) =
+    crate::x509::ctx::X509_STORE_CTX_set0_trusted_stack;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut stack_st_X509) =
+    crate::x509::ctx::X509_STORE_CTX_set0_untrusted;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut stack_st_X509) =
+    crate::x509::ctx::X509_STORE_CTX_set0_verified_chain;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut X509) =
+    crate::x509::ctx::X509_STORE_CTX_set_cert;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut X509) =
+    crate::x509::ctx::X509_STORE_CTX_set_current_cert;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_uint) =
+    crate::x509::ctx::X509_STORE_CTX_set_current_reasons;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_set_default;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) =
+    crate::x509::ctx::X509_STORE_CTX_set_depth;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) =
+    crate::x509::ctx::X509_STORE_CTX_set_error;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) =
+    crate::x509::ctx::X509_STORE_CTX_set_error_depth;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE_CTX,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::x509::ctx::X509_STORE_CTX_set_ex_data;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_ulong) =
+    crate::x509::ctx::X509_STORE_CTX_set_flags;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_get_crl_fn) =
+    crate::x509::ctx::X509_STORE_CTX_set_get_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_set_purpose;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_ulong, time_t) =
+    crate::x509::ctx::X509_STORE_CTX_set_time;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::ctx::X509_STORE_CTX_set_trust;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_verify_fn) =
+    crate::x509::ctx::X509_STORE_CTX_set_verify;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_verify_cb) =
+    crate::x509::ctx::X509_STORE_CTX_set_verify_cb;
 const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509) -> core::ffi::c_int =
     crate::x509::store::X509_STORE_add_cert;
 const _: unsafe extern "C" fn(*mut X509_STORE, *mut X509_CRL) -> core::ffi::c_int =
@@ -13095,6 +13239,11 @@ const _: unsafe extern "C" fn(*const ASN1_TIME) -> core::ffi::c_int =
     crate::x509::cert::X509_cmp_current_time;
 const _: unsafe extern "C" fn(*const ASN1_TIME, *mut time_t) -> core::ffi::c_int =
     crate::x509::cert::X509_cmp_time;
+const _: unsafe extern "C" fn(
+    *const X509_VERIFY_PARAM,
+    *const ASN1_TIME,
+    *const ASN1_TIME,
+) -> core::ffi::c_int = crate::x509::ctx::X509_cmp_timeframe;
 const _: unsafe extern "C" fn(*mut X509, core::ffi::c_int) -> *mut X509_EXTENSION =
     crate::x509::cert::X509_delete_ext;
 const _: unsafe extern "C" fn(
@@ -13333,6 +13482,8 @@ const _: unsafe extern "C" fn(*const X509) -> core::ffi::c_int = crate::x509::tr
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_int = crate::x509::cert::X509_up_ref;
 const _: unsafe extern "C" fn(*mut X509, *mut EVP_PKEY) -> core::ffi::c_int =
     crate::x509::cert::X509_verify;
+const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
+    crate::x509::ctx::X509_verify_cert_error_string;
 const _: unsafe extern "C" fn(
     *mut *mut stack_st_X509_ATTRIBUTE,
     *mut X509_ATTRIBUTE,
