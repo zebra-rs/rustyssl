@@ -3,9 +3,9 @@
 //! DER, PEM, BIO, and `FILE` forms.
 //!
 //! The structures are public in `pkcs7.h`; their layouts are OpenSSL's. Signing, verifying,
-//! encrypting, and decrypting come with step 6.3b, streaming and S/MIME with 6.3c: until then the
-//! type's streaming callbacks abort (AGENTS.md rule 10). A NULL object, which OpenSSL reads
-//! through, fails (docs/DEVIATIONS.md).
+//! encrypting, and decrypting are in [`doit`] and [`smime`]; streaming and S/MIME come with step
+//! 6.3c, and until then the type's streaming callbacks abort (AGENTS.md rule 10). A NULL object,
+//! which OpenSSL reads through, fails (docs/DEVIATIONS.md).
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_void};
 use core::mem::offset_of;
@@ -79,6 +79,9 @@ use crate::x509::cert::{
 use crate::x509::crl::{X509_CRL_free, X509_CRL_it, X509_CRL_up_ref};
 use crate::x509::name::{X509_NAME_it, X509_NAME_set};
 use crate::x509::purpose::X509_add_cert;
+
+pub(crate) mod doit;
+pub(crate) mod smime;
 
 /// `OBJ_nid2obj`: the NID's static object, or NULL.
 fn nid_obj(nid: c_int) -> *mut ASN1_OBJECT {
@@ -168,8 +171,8 @@ unsafe extern "C" fn p7_adb() -> *const ASN1_ITEM {
 }
 
 ffi_callback! {
-    /// `pk7_cb`: streaming and detached encoding, which need PKCS#7's data functions (steps
-    /// 6.3b and 6.3c), and abort until then.
+    /// `pk7_cb`: streaming and detached encoding, which need the ASN.1 streaming BIOs (step
+    /// 6.3c), and abort until then.
     ///
     /// # Safety
     /// As the template engine calls it.
@@ -178,7 +181,7 @@ ffi_callback! {
     {
         match operation {
             ASN1_OP_STREAM_PRE | ASN1_OP_DETACHED_PRE | ASN1_OP_STREAM_POST | ASN1_OP_DETACHED_POST => {
-                crate::stub::unimplemented("PKCS#7 streaming (steps 6.3b and 6.3c)")
+                crate::stub::unimplemented("PKCS#7 streaming (step 6.3c)")
             }
             _ => 1,
         }
@@ -1056,6 +1059,13 @@ fn type_nid(p7: *const PKCS7) -> c_int {
     })
 }
 
+/// The NID of a borrowed object's content type, read through the borrow (reading it through
+/// the object's pointer instead would invalidate the borrow).
+fn nid_of(p: &PKCS7) -> c_int {
+    // SAFETY: its type, or NULL.
+    unsafe { OBJ_obj2nid(p.type_) }
+}
+
 /// The object behind a pointer.
 ///
 /// # Safety
@@ -1128,7 +1138,7 @@ ffi_export! {
         let _ = parg;
         // SAFETY: the caller's guarantee.
         let Some(p) = (unsafe { p7_of(p7) }) else { return 0 };
-        let nid = type_nid(p7);
+        let nid = nid_of(p);
         match cmd {
             n if n == PKCS7_OP_SET_DETACHED_SIGNATURE => {
                 if nid != NID_pkcs7_signed {
@@ -1304,7 +1314,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(p) = (unsafe { p7_of(p7) }) else { return 0 };
-        let slot = match type_nid(p7) {
+        let slot = match nid_of(p) {
             // SAFETY: the content of its type.
             n if n == NID_pkcs7_signed => sign_of(p).map(|s| &mut s.contents),
             // SAFETY: as above.
@@ -1436,7 +1446,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(p) = (unsafe { p7_of(p7) }) else { return 0 };
-        let sk = match type_nid(p7) {
+        let sk = match nid_of(p) {
             // SAFETY: the content of its type.
             n if n == NID_pkcs7_signed => sign_of(p).map(|s| &mut s.cert),
             // SAFETY: as above.
@@ -1472,7 +1482,7 @@ ffi_export! {
         const F: &str = "PKCS7_add_crl";
         // SAFETY: the caller's guarantee.
         let Some(p) = (unsafe { p7_of(p7) }) else { return 0 };
-        let sk = match type_nid(p7) {
+        let sk = match nid_of(p) {
             // SAFETY: the content of its type.
             n if n == NID_pkcs7_signed => sign_of(p).map(|s| &mut s.crl),
             // SAFETY: as above.

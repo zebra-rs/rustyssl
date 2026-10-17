@@ -10486,6 +10486,8 @@ const _: unsafe extern "C" fn(
     *mut EVP_PKEY,
     *const EVP_MD,
 ) -> core::ffi::c_int = crate::pkcs7::PKCS7_SIGNER_INFO_set;
+const _: unsafe extern "C" fn(*mut PKCS7_SIGNER_INFO) -> core::ffi::c_int =
+    crate::pkcs7::doit::PKCS7_SIGNER_INFO_sign;
 const _: unsafe extern "C" fn(*mut PKCS7_SIGN_ENVELOPE) = crate::pkcs7::PKCS7_SIGN_ENVELOPE_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs7::PKCS7_SIGN_ENVELOPE_it;
 const _: unsafe extern "C" fn() -> *mut PKCS7_SIGN_ENVELOPE = crate::pkcs7::PKCS7_SIGN_ENVELOPE_new;
@@ -10540,10 +10542,51 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
     *mut core::ffi::c_char,
 ) -> core::ffi::c_long = crate::pkcs7::PKCS7_ctrl;
+const _: unsafe extern "C" fn(*mut PKCS7, *mut EVP_PKEY, *mut BIO, *mut X509) -> *mut BIO =
+    crate::pkcs7::doit::PKCS7_dataDecode;
+const _: unsafe extern "C" fn(*mut PKCS7, *mut BIO) -> core::ffi::c_int =
+    crate::pkcs7::doit::PKCS7_dataFinal;
+const _: unsafe extern "C" fn(*mut PKCS7, *mut BIO) -> *mut BIO =
+    crate::pkcs7::doit::PKCS7_dataInit;
+const _: unsafe extern "C" fn(
+    *mut X509_STORE,
+    *mut X509_STORE_CTX,
+    *mut BIO,
+    *mut PKCS7,
+    *mut PKCS7_SIGNER_INFO,
+) -> core::ffi::c_int = crate::pkcs7::doit::PKCS7_dataVerify;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut BIO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs7::smime::PKCS7_decrypt;
 const _: unsafe extern "C" fn(*mut stack_st_X509_ATTRIBUTE) -> *mut ASN1_OCTET_STRING =
     crate::pkcs7::PKCS7_digest_from_attributes;
 const _: unsafe extern "C" fn(*const PKCS7) -> *mut PKCS7 = crate::pkcs7::PKCS7_dup;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut BIO,
+    *const EVP_CIPHER,
+    core::ffi::c_int,
+) -> *mut PKCS7 = crate::pkcs7::smime::PKCS7_encrypt;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut BIO,
+    *const EVP_CIPHER,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS7 = crate::pkcs7::smime::PKCS7_encrypt_ex;
+const _: unsafe extern "C" fn(*mut PKCS7, *mut BIO, core::ffi::c_int) -> core::ffi::c_int =
+    crate::pkcs7::smime::PKCS7_final;
 const _: unsafe extern "C" fn(*mut PKCS7) = crate::pkcs7::PKCS7_free;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *mut stack_st_X509,
+    core::ffi::c_int,
+) -> *mut stack_st_X509 = crate::pkcs7::smime::PKCS7_get0_signers;
 const _: unsafe extern "C" fn(*const PKCS7_SIGNER_INFO, core::ffi::c_int) -> *mut ASN1_TYPE =
     crate::pkcs7::PKCS7_get_attribute;
 const _: unsafe extern "C" fn(*mut PKCS7, core::ffi::c_int) -> *mut PKCS7_ISSUER_AND_SERIAL =
@@ -10585,11 +10628,48 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut PKCS7, core::ffi::c_int) -> core::ffi::c_int =
     crate::pkcs7::PKCS7_set_type;
 const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+    *mut BIO,
+    core::ffi::c_int,
+) -> *mut PKCS7 = crate::pkcs7::smime::PKCS7_sign;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *mut X509,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    core::ffi::c_int,
+) -> *mut PKCS7_SIGNER_INFO = crate::pkcs7::smime::PKCS7_sign_add_signer;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+    *mut BIO,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS7 = crate::pkcs7::smime::PKCS7_sign_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut PKCS7,
+    *mut PKCS7_SIGNER_INFO,
+    *mut X509,
+) -> core::ffi::c_int = crate::pkcs7::doit::PKCS7_signatureVerify;
+const _: unsafe extern "C" fn(
     *mut stack_st_X509_ALGOR,
     core::ffi::c_int,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::pkcs7::PKCS7_simple_smimecap;
 const _: unsafe extern "C" fn(*mut PKCS7) -> core::ffi::c_int = crate::pkcs7::PKCS7_type_is_other;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    *mut BIO,
+    *mut BIO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs7::smime::PKCS7_verify;
 const _: unsafe extern "C" fn(*mut PKCS8_PRIV_KEY_INFO) = crate::x509::p8::PKCS8_PRIV_KEY_INFO_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::p8::PKCS8_PRIV_KEY_INFO_it;
 const _: unsafe extern "C" fn() -> *mut PKCS8_PRIV_KEY_INFO =
@@ -11639,6 +11719,10 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::lowlevel::hash::SHA512_Update;
+const _: unsafe extern "C" fn(*mut BIO, *mut BIO, core::ffi::c_int) -> core::ffi::c_int =
+    crate::asn1::mime::SMIME_crlf_copy;
+const _: unsafe extern "C" fn(*mut BIO, *mut BIO) -> core::ffi::c_int =
+    crate::asn1::mime::SMIME_text;
 const _: unsafe extern "C" fn(*mut SXNETID) = crate::x509v3::misc::SXNETID_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::misc::SXNETID_it;
 const _: unsafe extern "C" fn() -> *mut SXNETID = crate::x509v3::misc::SXNETID_new;

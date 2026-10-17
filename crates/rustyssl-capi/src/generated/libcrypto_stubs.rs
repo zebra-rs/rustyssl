@@ -6671,134 +6671,6 @@ pub extern "C" fn PKCS1_MGF1(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_SIGNER_INFO_sign(_: *mut PKCS7_SIGNER_INFO) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_SIGNER_INFO_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_dataDecode(
-    _: *mut PKCS7,
-    _: *mut EVP_PKEY,
-    _: *mut BIO,
-    _: *mut X509,
-) -> *mut BIO {
-    crate::stub::unimplemented("PKCS7_dataDecode")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_dataFinal(_: *mut PKCS7, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_dataFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_dataInit(_: *mut PKCS7, _: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("PKCS7_dataInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_dataVerify(
-    _: *mut X509_STORE,
-    _: *mut X509_STORE_CTX,
-    _: *mut BIO,
-    _: *mut PKCS7,
-    _: *mut PKCS7_SIGNER_INFO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_dataVerify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_decrypt(
-    _: *mut PKCS7,
-    _: *mut EVP_PKEY,
-    _: *mut X509,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_decrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_encrypt(
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: *const EVP_CIPHER,
-    _: core::ffi::c_int,
-) -> *mut PKCS7 {
-    crate::stub::unimplemented("PKCS7_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_encrypt_ex(
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: *const EVP_CIPHER,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut PKCS7 {
-    crate::stub::unimplemented("PKCS7_encrypt_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_final(_: *mut PKCS7, _: *mut BIO, _: core::ffi::c_int) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_final")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_get0_signers(
-    _: *mut PKCS7,
-    _: *mut stack_st_X509,
-    _: core::ffi::c_int,
-) -> *mut stack_st_X509 {
-    crate::stub::unimplemented("PKCS7_get0_signers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_sign(
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> *mut PKCS7 {
-    crate::stub::unimplemented("PKCS7_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_sign_add_signer(
-    _: *mut PKCS7,
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-) -> *mut PKCS7_SIGNER_INFO {
-    crate::stub::unimplemented("PKCS7_sign_add_signer")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_sign_ex(
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut PKCS7 {
-    crate::stub::unimplemented("PKCS7_sign_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_signatureVerify(
-    _: *mut BIO,
-    _: *mut PKCS7,
-    _: *mut PKCS7_SIGNER_INFO,
-    _: *mut X509,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_signatureVerify")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PKCS7_stream(
     _: *mut *mut *mut core::ffi::c_uchar,
     _: *mut PKCS7,
@@ -6809,27 +6681,6 @@ pub extern "C" fn PKCS7_stream(
 #[unsafe(no_mangle)]
 pub extern "C" fn PKCS7_to_TS_TST_INFO(_: *mut PKCS7) -> *mut TS_TST_INFO {
     crate::stub::unimplemented("PKCS7_to_TS_TST_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS7_verify(
-    _: *mut PKCS7,
-    _: *mut stack_st_X509,
-    _: *mut X509_STORE,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS7_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_crlf_copy(
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_crlf_copy")
 }
 
 #[unsafe(no_mangle)]
@@ -6881,11 +6732,6 @@ pub extern "C" fn SMIME_read_PKCS7_ex(
     _: *mut *mut PKCS7,
 ) -> *mut PKCS7 {
     crate::stub::unimplemented("SMIME_read_PKCS7_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_text(_: *mut BIO, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_text")
 }
 
 #[unsafe(no_mangle)]
