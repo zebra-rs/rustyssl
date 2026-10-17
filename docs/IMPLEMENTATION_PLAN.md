@@ -4926,9 +4926,15 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   certificate attributes, which aborted until now. Tests: `tests/c/asn1_generate.c` (129
   strings with and without a configuration, and the three users), the `asn1_generate` fuzz
   target.
-- [ ] **6.2 UI:** `UI_OpenSSL` reading the tty (echo off, the verify check, the redo loop).
-  The rest of the UI came with 4.7d1: `UI_*`, `UI_UTIL_read_pw`, `PEM_def_callback`, and
-  `EVP_read_pw_string`.
+- [x] **6.2 UI** (`ui/console.rs`, from `ui_openssl.c`'s POSIX `termios` build): `UI_OpenSSL`
+  reading the terminal: `/dev/tty` (standard input and standard error without one, the
+  `tcgetattr` errors OpenSSL tolerates), echo off while reading unless asked for, every
+  catchable signal recorded meanwhile (an interrupt failing the read with -1), 1,023-octet
+  lines with the rest discarded, the verify check, booleans, and information and error strings.
+  The state is OpenSSL's, one terminal per process, behind a lock taken only briefly. The rest
+  of the UI came with 4.7d1: `UI_*`, `UI_UTIL_read_pw`, `PEM_def_callback`, and
+  `EVP_read_pw_string`. Tests: `tests/c/ui_console.c` (18 scenarios, each in a child on a
+  pseudo-terminal it controls, or on pipes, the parent typing and recording the screen).
 - [ ] **6.3 PKCS#7:** encode and decode, sign and verify (detached, S/MIME), encrypt and
   decrypt. `SMIME_read/write_PKCS7` uses a strict, bounded MIME parser.
   `PEM_write_bio_ASN1_stream` comes here (from 2.6), with the ASN.1 streaming BIO.

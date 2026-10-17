@@ -1353,7 +1353,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `ct`, `ec_group_point`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa_legacy`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `pkcs12_key`, `rand`, `rsa_print`, `stack`, `x509_check`, `x509_crlcheck`, `x509_policy`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509_vpm` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `crypto_str`, `ct`, `ec_group_point`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa_legacy`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `pem_crypt`, `pkcs12_key`, `rand`, `rsa_print`, `stack`, `ui_console`, `x509_check`, `x509_crlcheck`, `x509_policy`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509_vpm` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_item_sign`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `conf`, `conf_modules`, `crypto_secure_heap`, `d2i_pkey`, `d2i_pq`, `decoder`, `dh_asn1`, `dh_check`, `dh_lib`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `err_queue`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_ops`, `evp_kdf_more`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_pkey_ec`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `fetch`, `hpke`, `key2text`, `params`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs8_crypt`, `properties`, `provider`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `stack`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_name`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509_trust`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -2287,7 +2287,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_rc4` | libcrypto | `openssl/evp.h` | `evp_cipher_names`, `evp_pkey` |
 | `EVP_rc4_40` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_rc4_hmac_md5` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_read_pw_string` | libcrypto | `openssl/evp.h` | `ui` |
+| `EVP_read_pw_string` | libcrypto | `openssl/evp.h` | `ui`, `ui_console` |
 | `EVP_read_pw_string_min` | libcrypto | `openssl/evp.h` | `ui` |
 | `EVP_ripemd160` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names` |
 | `EVP_seed_cbc` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
@@ -3399,12 +3399,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `UI_UTIL_read_pw` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_UTIL_read_pw_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_UTIL_wrap_read_pem_callback` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_add_error_string` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_add_info_string` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_add_input_boolean` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_add_input_string` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_add_error_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
+| `UI_add_info_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
+| `UI_add_input_boolean` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
+| `UI_add_input_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_add_user_data` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_add_verify_string` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_add_verify_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_construct_prompt` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_create_method` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
 | `UI_ctrl` | libcrypto | `openssl/ui.h` | `ui` |
@@ -3415,7 +3415,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `UI_dup_input_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_dup_user_data` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_dup_verify_string` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_free` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_free` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_get0_action_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_get0_output_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_get0_result` | libcrypto | `openssl/ui.h` | `ui` |
@@ -3448,10 +3448,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `UI_method_set_prompt_constructor` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
 | `UI_method_set_reader` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
 | `UI_method_set_writer` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
-| `UI_new` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_new` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_new_method` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_null` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
-| `UI_process` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_process` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_set_default_method` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_set_ex_data` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_set_method` | libcrypto | `openssl/ui.h` | `ui` |

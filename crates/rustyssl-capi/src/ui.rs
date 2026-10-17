@@ -2,9 +2,7 @@
 //! method objects applications build their prompting on, `UI_null`, and `UI_OpenSSL`.
 //!
 //! The rest of the UI (`UI_new`, its strings, `UI_process`, and the utilities) is in `ui_lib`.
-//! `UI_OpenSSL`'s console functions read the terminal; until step 6.2 they abort when called, as
-//! an unimplemented export does (security rule 10): a prompt with the default method fails
-//! closed, and an application's own method (`UI_set_default_method`, `UI_new_method`) works.
+//! `UI_OpenSSL`'s console functions, which read the terminal, are in `console`.
 
 use core::cell::UnsafeCell;
 use core::ffi::{CStr, c_char, c_int, c_void};
@@ -23,6 +21,7 @@ use crate::ex_data::{
 };
 use crate::ffi::ffi_export;
 
+pub(crate) mod console;
 pub(crate) mod ui_lib;
 
 pub(crate) use ui_lib::{
@@ -107,15 +106,6 @@ pub(crate) unsafe fn funcs_of(m: *const UI_METHOD) -> Funcs {
     unsafe { method(m) }.map(|m| *m.funcs()).unwrap_or_default()
 }
 
-/// `UI_OpenSSL`'s console functions, until the terminal UI comes (6.2).
-unsafe extern "C" fn console_session(_ui: *mut UI) -> c_int {
-    crate::stub::unimplemented("UI_OpenSSL's console functions")
-}
-
-unsafe extern "C" fn console_string(_ui: *mut UI, _uis: *mut UI_STRING) -> c_int {
-    crate::stub::unimplemented("UI_OpenSSL's console functions")
-}
-
 static NULL_METHOD: OnceLock<Method> = OnceLock::new();
 static OPENSSL_METHOD: OnceLock<Method> = OnceLock::new();
 
@@ -143,10 +133,10 @@ ffi_export! {
     {
         let m = OPENSSL_METHOD.get_or_init(|| {
             let funcs = Funcs {
-                open: Some(console_session),
-                write: Some(console_string),
-                read: Some(console_string),
-                close: Some(console_session),
+                open: Some(console::open_console),
+                write: Some(console::write_string),
+                read: Some(console::read_string),
+                close: Some(console::close_console),
                 ..Funcs::default()
             };
             Method::new(c"OpenSSL default user interface".to_owned(), funcs, true)
