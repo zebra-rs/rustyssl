@@ -169,7 +169,7 @@ fn read_till_nl(input: *mut libc::FILE) -> bool {
         if buf
             .iter()
             .take_while(|&&c| c != 0)
-            .any(|&c| c == b'\n'.cast_signed())
+            .any(|&c| c.to_ne_bytes() == *b"\n")
         {
             return true;
         }
@@ -207,7 +207,7 @@ unsafe fn read_inner(ui: *mut UI, uis: *mut UI_STRING, echo: bool, strip_nl: boo
         let n = result.iter().position(|&c| c == 0).unwrap_or(LINE - 1);
         match result
             .get(..n)
-            .and_then(|r| r.iter().position(|&c| c == b'\n'.cast_signed()))
+            .and_then(|r| r.iter().position(|&c| c.to_ne_bytes() == *b"\n"))
         {
             Some(nl) => {
                 if strip_nl && let Some(c) = result.get_mut(nl) {
