@@ -1456,20 +1456,6 @@ pub(crate) unsafe fn free_internal(x: *mut X509_PUBKEY) {
     unsafe { free_struct(x.cast()) };
 }
 
-/// The NID of a SubjectPublicKeyInfo's algorithm (`NID_undef` for NULL).
-///
-/// # Safety
-/// `x` is NULL or a live structure.
-pub(crate) unsafe fn algorithm_nid(x: *const X509_PUBKEY) -> c_int {
-    // SAFETY: the caller's guarantee.
-    let algor = unsafe { x.cast::<Pubkey>().as_ref() }.map_or(ptr::null_mut(), |p| p.algor);
-    // SAFETY: its AlgorithmIdentifier, or NULL.
-    unsafe { algor.as_ref() }.map_or(0, |a| {
-        // SAFETY: its object.
-        unsafe { OBJ_obj2nid(a.algorithm) }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use core::ptr;

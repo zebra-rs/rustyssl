@@ -1,5 +1,4 @@
-//! Placeholders for the key decoders still to come: the post-quantum ones (ML-KEM, ML-DSA,
-//! SLH-DSA; `decode_der2key.c`, step 4.7b2b) and MSBLOB's and PVK's (`decode_msblob2key.c`,
+//! Placeholders for the key decoders still to come: MSBLOB's and PVK's (`decode_msblob2key.c`,
 //! `decode_pvk2key.c`, step 4.7e).
 //!
 //! Each selects what OpenSSL's does and reads its input as far as telling whether it's of its
@@ -7,26 +6,21 @@
 //! OpenSSL's decoders pass it over, and input of its kind aborts (AGENTS.md rule 10), since
 //! OpenSSL's would decode it.
 
-use core::ffi::{c_int, c_long, c_void};
+use core::ffi::{c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PEM, ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT, NID_ML_DSA_44, NID_ML_DSA_65,
-    NID_ML_DSA_87, NID_ML_KEM_512, NID_ML_KEM_768, NID_ML_KEM_1024, NID_SLH_DSA_SHA2_128f,
-    NID_SLH_DSA_SHA2_128s, NID_SLH_DSA_SHA2_192f, NID_SLH_DSA_SHA2_192s, NID_SLH_DSA_SHA2_256f,
-    NID_SLH_DSA_SHA2_256s, NID_SLH_DSA_SHAKE_128f, NID_SLH_DSA_SHAKE_128s, NID_SLH_DSA_SHAKE_192f,
-    NID_SLH_DSA_SHAKE_192s, NID_SLH_DSA_SHAKE_256f, NID_SLH_DSA_SHAKE_256s, OSSL_CALLBACK,
-    OSSL_CORE_BIO, OSSL_FUNC_DECODER_DECODE, OSSL_FUNC_DECODER_DOES_SELECTION,
-    OSSL_FUNC_DECODER_FREECTX, OSSL_FUNC_DECODER_NEWCTX, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_PASSPHRASE_CALLBACK, PEM_R_BAD_MAGIC_NUMBER,
-    PEM_R_EXPECTING_DSS_KEY_BLOB, PEM_R_EXPECTING_RSA_KEY_BLOB, PEM_R_INCONSISTENT_HEADER,
-    PEM_R_KEYBLOB_TOO_SHORT, PEM_R_PVK_DATA_TOO_SHORT, PEM_R_UNSUPPORTED_PVK_KEY_TYPE,
+    ERR_LIB_PEM, ERR_LIB_PROV, OSSL_CALLBACK, OSSL_CORE_BIO, OSSL_FUNC_DECODER_DECODE,
+    OSSL_FUNC_DECODER_DOES_SELECTION, OSSL_FUNC_DECODER_FREECTX, OSSL_FUNC_DECODER_NEWCTX,
+    OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_PASSPHRASE_CALLBACK,
+    PEM_R_BAD_MAGIC_NUMBER, PEM_R_EXPECTING_DSS_KEY_BLOB, PEM_R_EXPECTING_RSA_KEY_BLOB,
+    PEM_R_INCONSISTENT_HEADER, PEM_R_KEYBLOB_TOO_SHORT, PEM_R_PVK_DATA_TOO_SHORT,
+    PEM_R_UNSUPPORTED_PVK_KEY_TYPE,
 };
 
-use super::decoders::read_der;
 use super::tables::{Dispatch, END, entry};
 use crate::decoder::ctx::bio_new_from_core_bio;
-use crate::err::{self, ERR_pop_to_mark, ERR_set_mark};
+use crate::err;
 use crate::ffi::ffi_callback;
 
 type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -41,28 +35,6 @@ type DecodeFn = unsafe extern "C" fn(
     OSSL_PASSPHRASE_CALLBACK,
     *mut c_void,
 ) -> c_int;
-
-/// The post-quantum key types (`EVP_PKEY_ML_KEM_512` ...).
-const POST_QUANTUM: [c_int; 18] = [
-    NID_ML_KEM_512,
-    NID_ML_KEM_768,
-    NID_ML_KEM_1024,
-    NID_ML_DSA_44,
-    NID_ML_DSA_65,
-    NID_ML_DSA_87,
-    NID_SLH_DSA_SHA2_128s,
-    NID_SLH_DSA_SHA2_128f,
-    NID_SLH_DSA_SHA2_192s,
-    NID_SLH_DSA_SHA2_192f,
-    NID_SLH_DSA_SHA2_256s,
-    NID_SLH_DSA_SHA2_256f,
-    NID_SLH_DSA_SHAKE_128s,
-    NID_SLH_DSA_SHAKE_128f,
-    NID_SLH_DSA_SHAKE_192s,
-    NID_SLH_DSA_SHAKE_192f,
-    NID_SLH_DSA_SHAKE_256s,
-    NID_SLH_DSA_SHAKE_256f,
-];
 
 ffi_callback! {
     /// The placeholders' `newctx`: nothing to keep (a non-NULL token).
@@ -86,173 +58,6 @@ ffi_callback! {
     where failure = (), library = ERR_LIB_PROV
     {}
 }
-
-/// `der2key_check_selection` for a structure holding only `mask`'s part.
-fn der_selection(selection: c_int, mask: c_int) -> c_int {
-    if selection == 0 {
-        return 1;
-    }
-    for check in [
-        OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-        OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
-    ] {
-        if selection & check != 0 {
-            return c_int::from(mask & check != 0);
-        }
-    }
-    0
-}
-
-/// The algorithm of a PrivateKeyInfo (`private`) or SubjectPublicKeyInfo, or `NID_undef`;
-/// the decoding's errors dropped.
-fn algorithm_of(der: &[u8], private: bool) -> c_int {
-    let Ok(len) = c_long::try_from(der.len()) else {
-        return 0;
-    };
-    let mut p = der.as_ptr();
-    // SAFETY: no preconditions.
-    unsafe { ERR_set_mark() };
-    let nid = if private {
-        // SAFETY: the octets.
-        let p8 =
-            unsafe { crate::x509::p8::d2i_PKCS8_PRIV_KEY_INFO(ptr::null_mut(), &raw mut p, len) };
-        let mut alg = ptr::null();
-        // SAFETY: the decoded structure, or NULL; a local.
-        let nid = if !p8.is_null()
-            && unsafe {
-                crate::x509::p8::PKCS8_pkey_get0(
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                    &raw mut alg,
-                    p8,
-                )
-            } != 0
-        {
-            // SAFETY: the structure's AlgorithmIdentifier.
-            let obj = unsafe { (*alg).algorithm };
-            // SAFETY: its AlgorithmIdentifier's object.
-            unsafe { crate::objects::OBJ_obj2nid(obj) }
-        } else {
-            0
-        };
-        // SAFETY: decoded above, or NULL.
-        unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8) };
-        nid
-    } else {
-        // SAFETY: the octets.
-        let x = unsafe { crate::x509::pubkey::d2i_internal(&raw mut p, len) };
-        // SAFETY: the decoded structure, or NULL.
-        let nid = unsafe { crate::x509::pubkey::algorithm_nid(x) };
-        // SAFETY: as above.
-        unsafe { crate::x509::pubkey::free_internal(x) };
-        nid
-    };
-    // SAFETY: the mark set above.
-    unsafe { ERR_pop_to_mark() };
-    nid
-}
-
-/// A post-quantum placeholder's `decode`: aborts for a post-quantum key in its structure.
-///
-/// # Safety
-/// As for a decoder's `decode`.
-unsafe fn pq_decode(cin: *mut OSSL_CORE_BIO, selection: c_int, mask: c_int) -> c_int {
-    let selection = if selection == 0 { mask } else { selection };
-    if selection & mask == 0 {
-        err::raise(
-            ERR_LIB_PROV,
-            ERR_R_PASSED_INVALID_ARGUMENT,
-            "der2key_decode",
-        );
-        return 0;
-    }
-    // SAFETY: the caller's guarantee.
-    let Some(der) = (unsafe { read_der(cin) }) else {
-        return 1;
-    };
-    let nid = algorithm_of(&der, mask == OSSL_KEYMGMT_SELECT_PRIVATE_KEY);
-    if POST_QUANTUM.contains(&nid) {
-        crate::stub::unimplemented("decoding an ML-KEM, ML-DSA, or SLH-DSA key (step 4.7b2b)");
-    }
-    1
-}
-
-ffi_callback! {
-    /// The post-quantum PrivateKeyInfo placeholders' `does_selection`.
-    ///
-    /// # Safety
-    /// No preconditions.
-    pub(crate) unsafe extern "C" fn pq_p8_does_selection(_provctx: *mut c_void, selection: c_int) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        der_selection(selection, OSSL_KEYMGMT_SELECT_PRIVATE_KEY)
-    }
-}
-
-ffi_callback! {
-    /// The post-quantum SubjectPublicKeyInfo placeholders' `does_selection`.
-    ///
-    /// # Safety
-    /// No preconditions.
-    pub(crate) unsafe extern "C" fn pq_spki_does_selection(_provctx: *mut c_void, selection: c_int) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        der_selection(selection, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
-    }
-}
-
-ffi_callback! {
-    /// The post-quantum PrivateKeyInfo placeholders' `decode`.
-    ///
-    /// # Safety
-    /// As for a decoder's `decode`.
-    pub(crate) unsafe extern "C" fn pq_p8_decode(_vctx: *mut c_void, cin: *mut OSSL_CORE_BIO, selection: c_int, _data_cb: OSSL_CALLBACK, _data_cbarg: *mut c_void, _pw_cb: OSSL_PASSPHRASE_CALLBACK, _pw_cbarg: *mut c_void) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        // SAFETY: the caller's guarantee.
-        unsafe { pq_decode(cin, selection, OSSL_KEYMGMT_SELECT_PRIVATE_KEY) }
-    }
-}
-
-ffi_callback! {
-    /// The post-quantum SubjectPublicKeyInfo placeholders' `decode`.
-    ///
-    /// # Safety
-    /// As for a decoder's `decode`.
-    pub(crate) unsafe extern "C" fn pq_spki_decode(_vctx: *mut c_void, cin: *mut OSSL_CORE_BIO, selection: c_int, _data_cb: OSSL_CALLBACK, _data_cbarg: *mut c_void, _pw_cb: OSSL_PASSPHRASE_CALLBACK, _pw_cbarg: *mut c_void) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        // SAFETY: the caller's guarantee.
-        unsafe { pq_decode(cin, selection, OSSL_KEYMGMT_SELECT_PUBLIC_KEY) }
-    }
-}
-
-/// The post-quantum PrivateKeyInfo decoders' placeholder.
-pub(super) static PQ_P8: Dispatch<5> = Dispatch([
-    entry!(OSSL_FUNC_DECODER_NEWCTX, pending_newctx, NewCtxFn),
-    entry!(OSSL_FUNC_DECODER_FREECTX, pending_freectx, FreeCtxFn),
-    entry!(
-        OSSL_FUNC_DECODER_DOES_SELECTION,
-        pq_p8_does_selection,
-        DoesSelectionFn
-    ),
-    entry!(OSSL_FUNC_DECODER_DECODE, pq_p8_decode, DecodeFn),
-    END,
-]);
-
-/// The post-quantum SubjectPublicKeyInfo decoders' placeholder.
-pub(super) static PQ_SPKI: Dispatch<5> = Dispatch([
-    entry!(OSSL_FUNC_DECODER_NEWCTX, pending_newctx, NewCtxFn),
-    entry!(OSSL_FUNC_DECODER_FREECTX, pending_freectx, FreeCtxFn),
-    entry!(
-        OSSL_FUNC_DECODER_DOES_SELECTION,
-        pq_spki_does_selection,
-        DoesSelectionFn
-    ),
-    entry!(OSSL_FUNC_DECODER_DECODE, pq_spki_decode, DecodeFn),
-    END,
-]);
 
 // MSBLOB and PVK (`pvkfmt.c`'s format constants).
 const MS_PUBLICKEYBLOB: u8 = 0x6;
@@ -474,7 +279,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn headers_and_selections_are_told_apart() {
+    fn blob_headers_are_told_apart() {
         let mut h = [0u8; 16];
         h[0] = MS_PRIVATEKEYBLOB;
         h[1] = 2;
@@ -486,12 +291,5 @@ mod tests {
         assert_eq!(blob_header(&h), None);
         h[0] = 0x30;
         assert_eq!(blob_header(&h), None);
-        assert_eq!(
-            der_selection(
-                OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
-                OSSL_KEYMGMT_SELECT_PRIVATE_KEY
-            ),
-            0
-        );
     }
 }
