@@ -4639,8 +4639,19 @@ Exit checks:
       and `NETSCAPE_CERT_SEQUENCE` with its PEM forms.
     - Tests: `tests/c/x509_trust.c`, `x509_info.c`, `x509_spki.c`; the `pem_info` and `spki`
       fuzz targets.
-  - [ ] **5.1f2 Attribute certificates**: `X509_ACERT` with the attribute certificate
-    extensions and subject directory attributes left from 5.2.
+  - [x] **5.1f2 Attribute certificates** (`x509/acert.rs`, from `x509_acert.c`, `x509aset.c`,
+    and the attribute certificate parts of `x_all.c`): `X509_ACERT` and its parts
+    (`OSSL_ISSUER_SERIAL`, `OSSL_OBJECT_DIGEST_INFO`, the issuer's v2Form), the getters and
+    setters, attributes (also from configuration; `ASN1:` values wait for 6.1), extensions,
+    signing, verification, and the DER, BIO, `FILE`, and PEM forms. Printing
+    (`X509_ACERT_print_ex`) comes with 5.6. Setting the issuer's name of a v1Form issuer
+    replaces it, where OpenSSL corrupts memory (docs/DEVIATIONS.md). Tests:
+    `tests/c/x509_acert.c` and the `x509_acert` fuzz target.
+  - [ ] **5.1f3 Attribute certificate extensions**: targeting, attribute descriptors and
+    mappings, the authority attribute identifier, basic attribute constraints, group, indirect
+    issuer, issued on behalf of, no assertion, no revocation available, role specification,
+    subject directory attributes, single use, SOA identifier, time specification, user notice,
+    and allowed attribute assignments (`ossl_print_attribute_value`).
 - [x] **5.2 X509v3 extensions:**
   - [x] **5.2a The methods and the simple extensions** (`x509v3/registry.rs`,
     `x509v3/standard.rs`, `x509v3/simple.rs`, from `v3_lib.c`, `v3_prn.c`, `do_ext_i2d`,
