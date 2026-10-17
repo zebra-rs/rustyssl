@@ -4832,13 +4832,20 @@ Exit checks:
     default verification functions (`internal_verify`, revocation, CRL, and policy checks)
     abort until 5.4b–d; `X509_STORE_CTX_print_verify_cb` needs `X509_print_ex` and comes with
     5.6. Tests: `tests/c/x509_ctx.c`.
-  - [ ] **5.4b Chain building and the checks:** `X509_verify_cert`, `X509_STORE_CTX_verify`,
-    `X509_build_chain`; chain building over multiple candidate issuers (alternate chains, the
-    CVE-2015-1793 lesson), trusted-first, partial chains; trust (`X509_check_trust`), the
-    extensions and purposes, path and proxy path lengths, the security level of keys and
-    signatures, validity times, signatures (`internal_verify`), identities (`check_id`, with
-    5.5), Suite B, and name constraints (`NAME_CONSTRAINTS_check` and `_check_CN`, with
-    punycode and `OSSL_parse_url`).
+  - [x] **5.4b Chain building and the checks** (`x509/verify.rs`, `x509v3/ncons.rs`,
+    `http_lib.rs`, and `rustyssl-pki`'s `ncons` and `punycode`): `X509_verify_cert`,
+    `X509_STORE_CTX_verify`, `X509_build_chain`; chain building as OpenSSL's `build_chain`
+    (untrusted and trusted issuers, trusted first or last, alternate chains, partial chains,
+    maximum depth); trust (`X509_check_trust`, rejections); the extensions, purposes, CA and
+    path-length rules, proxy certificates, strict-mode checks, explicit EC parameters; the
+    security level of keys and signatures; identities (`check_id`, with 5.5); Suite B; the
+    signatures and validity times (`internal_verify`); name constraints
+    (`NAME_CONSTRAINTS_check`, `_check_CN`, punycode for SmtpUTF8Mailbox, `OSSL_parse_url` for
+    URIs). Revocation runs only with `X509_V_FLAG_CRL_CHECK` (5.4c), policies with
+    `X509_V_FLAG_POLICY_CHECK` (5.4d), RFC 3779 resources and DANE abort until 5.4e and libssl.
+    Tests: `tests/c/x509_verify.c` (33 chains with the callback's trace), unit tests (punycode
+    with the CVE-2022-3602 overflow, name constraints, URLs). The CVE-2015-1793 alternate-chain
+    regression waits for the `tests/cve/` suite.
   - [ ] **5.4c Revocation:** CRLs (scores, delta, indirect, IDP, the CRL issuer's path).
   - [ ] **5.4d Policies:** the policy tree (with a bound, the CVE-2023-0464 lesson) and the
     `X509_policy_*` exports.

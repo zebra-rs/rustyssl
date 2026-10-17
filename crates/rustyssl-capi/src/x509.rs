@@ -23,6 +23,7 @@ pub(crate) mod sig;
 pub(crate) mod spki;
 pub(crate) mod store;
 pub(crate) mod trust;
+pub(crate) mod verify;
 pub(crate) mod vpm;
 
 #[cfg(test)]

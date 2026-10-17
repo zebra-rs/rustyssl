@@ -5,9 +5,9 @@
 //! searches of the store; issuer lookup; validity-time checks; and the verification errors'
 //! text.
 //!
-//! The verification itself (`X509_verify_cert`, chain building, and the checks) comes with
-//! step 5.4b, revocation with 5.4c, and policies with 5.4d: until then the context's default
-//! functions for them abort (AGENTS.md rule 10).
+//! The verification itself is in `verify.rs`; revocation comes with step 5.4c and policies
+//! with 5.4d: until then the context's default functions for them abort when they'd have work
+//! to do (AGENTS.md rule 10).
 //!
 //! The type is opaque in OpenSSL's headers, so its layout is ours (OpenSSL's, in fact).
 
@@ -151,12 +151,26 @@ fn later(what: &str) -> ! {
     crate::stub::unimplemented(what)
 }
 
-unsafe extern "C" fn internal_verify(_ctx: *mut X509_STORE_CTX) -> c_int {
-    later("internal_verify (step 5.4b)")
-}
-
-pub(crate) unsafe extern "C" fn check_revocation(_ctx: *mut X509_STORE_CTX) -> c_int {
-    later("check_revocation (step 5.4c)")
+/// `check_revocation`: nothing to check without `X509_V_FLAG_CRL_CHECK`; CRLs come with step
+/// 5.4c.
+pub(crate) unsafe extern "C" fn check_revocation(ctx: *mut X509_STORE_CTX) -> c_int {
+    crate::ffi::guard(
+        ERR_LIB_X509,
+        "check_revocation",
+        || 0,
+        move || {
+            // SAFETY: the context the verification is called with.
+            let Some(c) = (unsafe { ctx_of(ctx) }) else {
+                return 0;
+            };
+            let crl_check =
+                param(c).is_some_and(|p| p.flags & flag(rustyssl_abi::X509_V_FLAG_CRL_CHECK) != 0);
+            if !crl_check {
+                return 1;
+            }
+            later("check_revocation (step 5.4c)")
+        },
+    )
 }
 
 pub(crate) unsafe extern "C" fn check_crl(_ctx: *mut X509_STORE_CTX, _crl: *mut X509_CRL) -> c_int {
@@ -1698,7 +1712,7 @@ ffi_export! {
         c.check_issued = cb.check_issued.or(Some(check_issued));
         c.get_issuer = cb.get_issuer.or(Some(X509_STORE_CTX_get1_issuer));
         c.verify_cb = cb.verify_cb.or(Some(null_callback));
-        c.verify = cb.verify.or(Some(internal_verify));
+        c.verify = cb.verify.or(Some(super::verify::internal_verify));
         c.check_revocation = cb.check_revocation.or(Some(check_revocation));
         c.get_crl = cb.get_crl;
         c.check_crl = cb.check_crl.or(Some(check_crl));

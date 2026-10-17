@@ -1915,6 +1915,59 @@ pub(crate) unsafe fn self_issued(xp: *const X509) -> bool {
     (unsafe { raw_flags(xp) } & f(EXFLAG_SI)) != 0
 }
 
+/// What verification reads of a certificate's cache as it stands (OpenSSL's `ex_flags`,
+/// `ex_kusage`, `ex_pathlen`, `ex_pcpathlen`, `akid`, `skid`, `altname`, `nc`).
+#[derive(Clone, Copy)]
+pub(crate) struct CacheView {
+    pub(crate) flags: u32,
+    pub(crate) kusage: u32,
+    pub(crate) pathlen: c_long,
+    pub(crate) pcpathlen: c_long,
+    pub(crate) akid: *mut AUTHORITY_KEYID,
+    pub(crate) skid: *mut ASN1_OCTET_STRING,
+    pub(crate) altname: *mut GENERAL_NAMES,
+    pub(crate) nc: *mut rustyssl_abi::NAME_CONSTRAINTS,
+}
+
+/// The certificate's cache as it stands, read under its lock; an empty one for NULL.
+///
+/// # Safety
+/// `xp` is NULL or a live certificate.
+pub(crate) unsafe fn cache_view(xp: *const X509) -> CacheView {
+    let empty = CacheView {
+        flags: 0,
+        kusage: 0,
+        pathlen: -1,
+        pcpathlen: -1,
+        akid: ptr::null_mut(),
+        skid: ptr::null_mut(),
+        altname: ptr::null_mut(),
+        nc: ptr::null_mut(),
+    };
+    // SAFETY: the caller's guarantee.
+    let Some(x) = (unsafe { cert_of(xp) }) else {
+        return empty;
+    };
+    // SAFETY: its lock.
+    if unsafe { CRYPTO_THREAD_read_lock(x.lock) } == 0 {
+        return empty;
+    }
+    let c = &x.cache;
+    let view = CacheView {
+        flags: c.flags,
+        kusage: c.kusage,
+        pathlen: c.pathlen,
+        pcpathlen: c.pcpathlen,
+        akid: c.akid,
+        skid: c.skid,
+        altname: c.altname,
+        nc: c.nc,
+    };
+    // SAFETY: as above.
+    unsafe { CRYPTO_THREAD_unlock(x.lock) };
+    view
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
