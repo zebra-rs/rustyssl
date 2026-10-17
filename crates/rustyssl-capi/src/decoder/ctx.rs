@@ -398,7 +398,7 @@ pub(crate) fn add_decoder_inst(c: &Ctx, inst: *mut OSSL_DECODER_INSTANCE) {
 ///
 /// # Safety
 /// `bio` is a live BIO.
-unsafe fn core_bio_new_from_bio(bio: *mut BIO) -> *mut OSSL_CORE_BIO {
+pub(crate) unsafe fn core_bio_new_from_bio(bio: *mut BIO) -> *mut OSSL_CORE_BIO {
     // SAFETY: the caller's guarantee.
     if unsafe { BIO_up_ref(bio) } == 0 {
         return ptr::null_mut();

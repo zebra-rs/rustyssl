@@ -63,6 +63,7 @@ pub(crate) mod dh;
 pub(crate) mod dsa;
 pub(crate) mod ec;
 pub(crate) mod ecx;
+pub(crate) mod i2d;
 pub(crate) mod params;
 pub(crate) mod print;
 pub(crate) mod raw;

@@ -1062,3 +1062,93 @@ ml_dsa_keymgmt!(
     ml_dsa_87_new_key,
     ml_dsa_87_gen
 );
+
+/// `ossl_ml_dsa_i2d_pubkey`: the public key's octets, or `None` (with `PROV_R_NOT_A_PUBLIC_KEY`).
+///
+/// # Safety
+/// `keydata` is NULL or live key data.
+pub(crate) unsafe fn i2d_pubkey(keydata: *const c_void) -> Option<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    let k = unsafe { key(keydata) }?;
+    let public = k.lock().public().map(|p| p.encode().to_vec());
+    if public.is_none() {
+        err::raise_with_text(
+            ERR_LIB_PROV,
+            rustyssl_abi::PROV_R_NOT_A_PUBLIC_KEY,
+            "ossl_ml_dsa_i2d_pubkey",
+            &format!("no {} public key data available", k.variant.name()),
+        );
+    }
+    public
+}
+
+/// `ossl_ml_dsa_i2d_prvkey`: the private key in the first output format (the provider's
+/// `ml-dsa.output_formats` order) the key can fill, or `None` with OpenSSL's errors.
+///
+/// # Safety
+/// `keydata` is NULL or live key data; `provctx` is the default provider's context.
+pub(crate) unsafe fn i2d_prvkey(keydata: *const c_void, provctx: *mut c_void) -> Option<Vec<u8>> {
+    use super::ml_codecs::{formats, order, output_format, write};
+    // SAFETY: the caller's guarantee.
+    let k = unsafe { key(keydata) }?;
+    let variant = k.variant;
+    let name = variant.name();
+    let parts = k.lock().private().map(|p| {
+        (
+            p.encoding().to_vec(),
+            p.seed().map(|s| s.to_vec()),
+            p.public().encode().to_vec(),
+        )
+    });
+    let Some((mut sk, mut seed, pk)) = parts else {
+        err::raise_with_text(
+            ERR_LIB_PROV,
+            rustyssl_abi::PROV_R_NOT_A_PRIVATE_KEY,
+            "ossl_ml_dsa_i2d_prvkey",
+            &format!("no {name} private key data available"),
+        );
+        return None;
+    };
+    let table = formats(
+        SEED_BYTES,
+        variant.private_key_bytes(),
+        variant.public_key_bytes(),
+    );
+    // SAFETY: the caller's guarantee.
+    let list = unsafe {
+        super::builtin::conf_param(provctx, rustyssl_abi::OSSL_PKEY_PARAM_ML_DSA_OUTPUT_FORMATS)
+    };
+    let out = order(name, &table, "output", list.as_deref()).and_then(|slots| {
+        let f = output_format(
+            &slots,
+            seed.is_some(),
+            SEED_BYTES,
+            variant.private_key_bytes(),
+            variant.public_key_bytes(),
+        );
+        let Some(f) = f else {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_ML_DSA_NO_FORMAT,
+                "ossl_ml_dsa_i2d_prvkey",
+                &format!("no matching enabled {name} private key output formats"),
+            );
+            return None;
+        };
+        let w = write(&f, seed.as_deref(), &sk, &pk);
+        if w.is_none() {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                rustyssl_abi::ERR_R_INTERNAL_ERROR,
+                "ossl_ml_dsa_i2d_prvkey",
+                &format!("error encoding {name} private key"),
+            );
+        }
+        w
+    });
+    wipe(&mut sk);
+    if let Some(s) = seed.as_mut() {
+        wipe(s);
+    }
+    out
+}

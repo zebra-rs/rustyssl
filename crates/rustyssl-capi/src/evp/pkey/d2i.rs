@@ -859,7 +859,8 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { pkey(pkey_) }) else { return ptr::null_mut() };
         if k.is_provided() {
-            crate::stub::unimplemented("EVP_PKEY2PKCS8 of a provided key (an encoder, step 4.7c)");
+            // SAFETY: the caller's key.
+            return unsafe { provided_pkcs8(pkey_) };
         }
         // SAFETY: no preconditions.
         let p8 = unsafe { PKCS8_PRIV_KEY_INFO_new() };
@@ -885,6 +886,45 @@ ffi_export! {
         }
         p8
     }
+}
+
+/// `EVP_PKEY2PKCS8` of a provided key: its PrivateKeyInfo from the encoders, decoded.
+///
+/// # Safety
+/// `pkey_` is a live provided key.
+unsafe fn provided_pkcs8(pkey_: *const EVP_PKEY) -> *mut PKCS8_PRIV_KEY_INFO {
+    use crate::encoder::ctx::{OSSL_ENCODER_CTX_free, OSSL_ENCODER_to_data};
+    use crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey;
+    // SAFETY: the caller's key; static strings.
+    let ctx = unsafe {
+        OSSL_ENCODER_CTX_new_for_pkey(
+            pkey_,
+            rustyssl_abi::OSSL_KEYMGMT_SELECT_ALL,
+            c"DER".as_ptr(),
+            c"PrivateKeyInfo".as_ptr(),
+            ptr::null(),
+        )
+    };
+    let mut p8 = ptr::null_mut();
+    let mut der: *mut c_uchar = ptr::null_mut();
+    let mut derlen = 0usize;
+    // SAFETY: the new context (or NULL); a new buffer into `der`.
+    if !ctx.is_null() && unsafe { OSSL_ENCODER_to_data(ctx, &raw mut der, &raw mut derlen) } != 0 {
+        let mut pp = der.cast_const();
+        // SAFETY: the encoding's `derlen` octets.
+        p8 = unsafe {
+            d2i_PKCS8_PRIV_KEY_INFO(
+                ptr::null_mut(),
+                &raw mut pp,
+                c_long::try_from(derlen).unwrap_or(c_long::MAX),
+            )
+        };
+        // SAFETY: the encoding, which holds the private key.
+        unsafe { crate::mem::release_clean(der.cast(), derlen) };
+    }
+    // SAFETY: made above, or NULL.
+    unsafe { OSSL_ENCODER_CTX_free(ctx) };
+    p8
 }
 
 #[cfg(test)]

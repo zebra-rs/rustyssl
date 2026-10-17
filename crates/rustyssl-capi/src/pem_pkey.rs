@@ -767,3 +767,67 @@ pem_read! {
     pub unsafe extern "C" fn PEM_read_bio_PKCS8_PRIV_KEY_INFO();
     pub unsafe extern "C" fn PEM_read_PKCS8_PRIV_KEY_INFO();
 }
+
+type I2dOfVoid = unsafe extern "C" fn(*const c_void, *mut *mut c_uchar) -> c_int;
+
+/// Single-structure PEM writers (`IMPLEMENT_PEM_write`, unencrypted): `PEM_ASN1_write_bio`
+/// and `PEM_ASN1_write` with the structure's `i2d` and PEM name.
+macro_rules! pem_write {
+    (
+        $ty:ty, $i2d:path, $name:expr, $void:ident;
+        pub unsafe extern "C" fn $bio:ident();
+        pub unsafe extern "C" fn $fp:ident();
+    ) => {
+        /// The structure's `i2d` as an `i2d_of_void`.
+        unsafe extern "C" fn $void(x: *const c_void, pp: *mut *mut c_uchar) -> c_int {
+            // SAFETY: the caller's guarantee.
+            unsafe { $i2d(x.cast_mut().cast(), pp) }
+        }
+
+        ffi_export! {
+            /// Writes the structure as a PEM block of its name. 1, or 0.
+            ///
+            /// # Safety
+            /// `bp` is a live BIO; `x` is a live value.
+            pub unsafe extern "C" fn $bio(bp: *mut BIO, x: *const $ty) -> c_int
+            where failure = 0, library = ERR_LIB_PEM
+            {
+                let f: I2dOfVoid = $void;
+                // SAFETY: the caller's guarantee; no encryption.
+                unsafe { crate::pem_cipher::PEM_ASN1_write_bio(Some(f), $name.as_ptr(), bp, x.cast(), ptr::null(), ptr::null(), 0, None, ptr::null_mut()) }
+            }
+        }
+
+        ffi_export! {
+            /// The writer to a `FILE`.
+            ///
+            /// # Safety
+            /// `fp` is an open `FILE`; `x` is a live value.
+            pub unsafe extern "C" fn $fp(fp: *mut FILE, x: *const $ty) -> c_int
+            where failure = 0, library = ERR_LIB_PEM
+            {
+                let f: I2dOfVoid = $void;
+                // SAFETY: the caller's guarantee; no encryption.
+                unsafe { crate::pem_cipher::PEM_ASN1_write(Some(f), $name.as_ptr(), fp, x.cast(), ptr::null(), ptr::null(), 0, None, ptr::null_mut()) }
+            }
+        }
+    };
+}
+
+pem_write! {
+    X509_PUBKEY, crate::x509::pubkey::i2d_X509_PUBKEY, PEM_STRING_PUBLIC, i2d_x509_pubkey_void;
+    pub unsafe extern "C" fn PEM_write_bio_X509_PUBKEY();
+    pub unsafe extern "C" fn PEM_write_X509_PUBKEY();
+}
+
+pem_write! {
+    X509_SIG, crate::x509::sig::i2d_X509_SIG, PEM_STRING_PKCS8, i2d_x509_sig_void;
+    pub unsafe extern "C" fn PEM_write_bio_PKCS8();
+    pub unsafe extern "C" fn PEM_write_PKCS8();
+}
+
+pem_write! {
+    PKCS8_PRIV_KEY_INFO, crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO, PEM_STRING_PKCS8INF, i2d_p8inf_void;
+    pub unsafe extern "C" fn PEM_write_bio_PKCS8_PRIV_KEY_INFO();
+    pub unsafe extern "C" fn PEM_write_PKCS8_PRIV_KEY_INFO();
+}

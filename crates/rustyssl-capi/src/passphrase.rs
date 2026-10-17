@@ -141,7 +141,7 @@ impl PwData {
     /// # Safety
     /// `pass` has room for `pass_size` octets; `pass_len` is writable; `params` is NULL or an
     /// array. A callback may be the application's, called with no lock held by this.
-    unsafe fn get(
+    pub(crate) unsafe fn get(
         this: *mut Self,
         pass: *mut c_char,
         pass_size: usize,

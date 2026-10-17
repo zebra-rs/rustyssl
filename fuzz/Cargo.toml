@@ -431,6 +431,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "encode_pkey"
+path = "fuzz_targets/encode_pkey.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "pem_pkey"
 path = "fuzz_targets/pem_pkey.rs"
 test = false

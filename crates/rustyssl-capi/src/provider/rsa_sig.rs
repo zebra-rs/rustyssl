@@ -529,9 +529,27 @@ fn alg_with_null(nid: c_int) -> Option<Vec<u8>> {
     Some(der(0x30, &content))
 }
 
-/// `ossl_DER_w_algorithmIdentifier_RSA_PSS` for a restricted key's parameters: the RSASSA-PSS
-/// OID and its parameters, each left out when it's the default.
-fn pss_aid(p: &Pss30) -> Option<Vec<u8>> {
+/// `ossl_DER_w_RSASSA_PSS_params`: a restricted key's RSASSA-PSS-params SEQUENCE, each field
+/// left out when it's the default; `None` (with `RSA_R_INVALID_SALT_LENGTH` or
+/// `RSA_R_INVALID_TRAILER`, or nothing for a digest it can't name) otherwise.
+pub(crate) fn pss_params(p: &Pss30) -> Option<Vec<u8>> {
+    const F: &str = "ossl_DER_w_RSASSA_PSS_params";
+    if p.salt_len < 0 {
+        err::raise(
+            rustyssl_abi::ERR_LIB_RSA,
+            rustyssl_abi::RSA_R_INVALID_SALT_LENGTH,
+            F,
+        );
+        return None;
+    }
+    if p.trailer != 1 {
+        err::raise(
+            rustyssl_abi::ERR_LIB_RSA,
+            rustyssl_abi::RSA_R_INVALID_TRAILER,
+            F,
+        );
+        return None;
+    }
     let encodable = |nid: c_int| oaeppss_nid2name(nid).is_some();
     if !encodable(p.hash) || !encodable(p.mask_gen_hash) {
         return None;
@@ -557,8 +575,15 @@ fn pss_aid(p: &Pss30) -> Option<Vec<u8>> {
         }
         params.extend(der(0xa2, &der(0x02, &v)));
     }
+    Some(der(0x30, &params))
+}
+
+/// `ossl_DER_w_algorithmIdentifier_RSA_PSS` for a restricted key's parameters: the RSASSA-PSS
+/// OID and its parameters, each left out when it's the default.
+fn pss_aid(p: &Pss30) -> Option<Vec<u8>> {
+    let params = pss_params(p)?;
     let mut content = der(0x06, objects::object(NID_rsassaPss)?.der);
-    content.extend(der(0x30, &params));
+    content.extend(params);
     Some(der(0x30, &content))
 }
 

@@ -660,6 +660,21 @@ ffi_export! {
     }
 }
 
+ffi_callback! {
+    /// `old_ec_priv_encode`: the key's ECPrivateKey.
+    ///
+    /// # Safety
+    /// `p` is NULL or a live key; `pder` as for an `i2d`.
+    pub(crate) unsafe extern "C" fn old_ec_priv_encode(p: *const EVP_PKEY, pder: *mut *mut core::ffi::c_uchar) -> c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let key = unsafe { data(p) };
+        // SAFETY: the key's data (or NULL); the caller's output.
+        unsafe { crate::ec::key_asn1::i2d_ECPrivateKey(key, pder) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

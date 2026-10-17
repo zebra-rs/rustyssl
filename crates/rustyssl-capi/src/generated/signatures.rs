@@ -8144,6 +8144,119 @@ const _: unsafe extern "C" fn(*mut OSSL_DECODER) -> core::ffi::c_int =
     crate::decoder::OSSL_DECODER_up_ref;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::ec::curves::OSSL_EC_curve_nid2name;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *mut OSSL_ENCODER) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_add_encoder;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_add_extra;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX) = crate::encoder::ctx::OSSL_ENCODER_CTX_free;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_get_num_encoders;
+const _: unsafe extern "C" fn() -> *mut OSSL_ENCODER_CTX =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_new;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut OSSL_ENCODER_CTX = crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_set_cipher;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, OSSL_ENCODER_CLEANUP) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_cleanup;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, OSSL_ENCODER_CONSTRUCT) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_construct;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_construct_data;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_output_structure;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_output_type;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_params;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_set_passphrase;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    OSSL_PASSPHRASE_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_set_passphrase_cb;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_set_passphrase_ui;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_CTX_set_pem_password_cb;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_CTX_set_selection;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_INSTANCE) -> *mut OSSL_ENCODER =
+    crate::encoder::ctx::OSSL_ENCODER_INSTANCE_get_encoder;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_INSTANCE) -> *mut core::ffi::c_void =
+    crate::encoder::ctx::OSSL_ENCODER_INSTANCE_get_encoder_ctx;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_INSTANCE) -> *const core::ffi::c_char =
+    crate::encoder::ctx::OSSL_ENCODER_INSTANCE_get_output_structure;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_INSTANCE) -> *const core::ffi::c_char =
+    crate::encoder::ctx::OSSL_ENCODER_INSTANCE_get_output_type;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(encoder: *mut OSSL_ENCODER, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::encoder::OSSL_ENCODER_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut OSSL_ENCODER = crate::encoder::OSSL_ENCODER_fetch;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER) = crate::encoder::OSSL_ENCODER_free;
+const _: unsafe extern "C" fn(*const OSSL_ENCODER) -> *const core::ffi::c_char =
+    crate::encoder::OSSL_ENCODER_get0_description;
+const _: unsafe extern "C" fn(*const OSSL_ENCODER) -> *const core::ffi::c_char =
+    crate::encoder::OSSL_ENCODER_get0_name;
+const _: unsafe extern "C" fn(*const OSSL_ENCODER) -> *const core::ffi::c_char =
+    crate::encoder::OSSL_ENCODER_get0_properties;
+const _: unsafe extern "C" fn(*const OSSL_ENCODER) -> *const OSSL_PROVIDER =
+    crate::encoder::OSSL_ENCODER_get0_provider;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::encoder::OSSL_ENCODER_get_params;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER) -> *const OSSL_PARAM =
+    crate::encoder::OSSL_ENCODER_gettable_params;
+const _: unsafe extern "C" fn(*const OSSL_ENCODER, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::encoder::OSSL_ENCODER_is_a;
+const _: unsafe extern "C" fn(
+    *const OSSL_ENCODER,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::encoder::OSSL_ENCODER_names_do_all;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER) -> *const OSSL_PARAM =
+    crate::encoder::OSSL_ENCODER_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *mut BIO) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_to_bio;
+const _: unsafe extern "C" fn(
+    *mut OSSL_ENCODER_CTX,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::encoder::ctx::OSSL_ENCODER_to_data;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER_CTX, *mut FILE) -> core::ffi::c_int =
+    crate::encoder::ctx::OSSL_ENCODER_to_fp;
+const _: unsafe extern "C" fn(*mut OSSL_ENCODER) -> core::ffi::c_int =
+    crate::encoder::OSSL_ENCODER_up_ref;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_free;
 const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_new;
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
@@ -8902,6 +9015,12 @@ const _: unsafe extern "C" fn(*mut FILE, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_DHxparams;
 const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
     crate::dsa_asn1::PEM_write_DSAparams;
+const _: unsafe extern "C" fn(*mut FILE, *const X509_SIG) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_PKCS8;
+const _: unsafe extern "C" fn(*mut FILE, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(*mut FILE, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_X509_PUBKEY;
 const _: unsafe extern "C" fn(
     *mut BIO,
     *const core::ffi::c_char,
@@ -8915,6 +9034,12 @@ const _: unsafe extern "C" fn(*mut BIO, *const DH) -> core::ffi::c_int =
     crate::dh_asn1::PEM_write_bio_DHxparams;
 const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
     crate::dsa_asn1::PEM_write_bio_DSAparams;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_SIG) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_PKCS8;
+const _: unsafe extern "C" fn(*mut BIO, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_PKCS8_PRIV_KEY_INFO;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::pem_pkey::PEM_write_bio_X509_PUBKEY;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -10718,6 +10843,14 @@ const _: unsafe extern "C" fn(*mut BIO, *const EC_KEY) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_EC_PUBKEY_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EC_KEY) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_EC_PUBKEY_fp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_KeyParams;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_KeyParams_bio;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_fp;
 const _: unsafe extern "C" fn(
     *const PKCS8_PRIV_KEY_INFO,
     *mut *mut core::ffi::c_uchar,
@@ -10726,12 +10859,24 @@ const _: unsafe extern "C" fn(*mut BIO, *const PKCS8_PRIV_KEY_INFO) -> core::ffi
     crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const PKCS8_PRIV_KEY_INFO) -> core::ffi::c_int =
     crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO_fp;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_SIG) -> core::ffi::c_int =
+    crate::x509::sig::i2d_PKCS8_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const X509_SIG) -> core::ffi::c_int =
+    crate::x509::sig::i2d_PKCS8_fp;
 const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_PUBKEY;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_PUBKEY_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
     crate::x509::pubkey::i2d_PUBKEY_fp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PrivateKey_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PrivateKey_fp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PublicKey;
 const _: unsafe extern "C" fn(*const RSA, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::rsa_asn1::i2d_RSAPrivateKey;
 const _: unsafe extern "C" fn(*mut BIO, *const RSA) -> core::ffi::c_int =
