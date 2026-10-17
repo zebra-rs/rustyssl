@@ -12657,6 +12657,102 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut X509_VAL) = crate::x509::cert::X509_VAL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::cert::X509_VAL_it;
 const _: unsafe extern "C" fn() -> *mut X509_VAL = crate::x509::cert::X509_VAL_new;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, *mut ASN1_OBJECT) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_add0_policy;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_add0_table;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_add1_host;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_clear_flags;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM) = crate::x509::vpm::X509_VERIFY_PARAM_free;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const X509_VERIFY_PARAM =
+    crate::x509::vpm::X509_VERIFY_PARAM_get0;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM) -> *mut core::ffi::c_char =
+    crate::x509::vpm::X509_VERIFY_PARAM_get0_email;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_int) -> *mut core::ffi::c_char =
+    crate::x509::vpm::X509_VERIFY_PARAM_get0_host;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> *const core::ffi::c_char =
+    crate::x509::vpm::X509_VERIFY_PARAM_get0_name;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> *mut core::ffi::c_char =
+    crate::x509::vpm::X509_VERIFY_PARAM_get0_peername;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM) -> *mut core::ffi::c_char =
+    crate::x509::vpm::X509_VERIFY_PARAM_get1_ip_asc;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_auth_level;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_get_count;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_depth;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> core::ffi::c_ulong =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_flags;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> core::ffi::c_uint =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_hostflags;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> u32 =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_inh_flags;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_purpose;
+const _: unsafe extern "C" fn(*const X509_VERIFY_PARAM) -> time_t =
+    crate::x509::vpm::X509_VERIFY_PARAM_get_time;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const X509_VERIFY_PARAM,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_inherit;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const X509_VERIFY_PARAM =
+    crate::x509::vpm::X509_VERIFY_PARAM_lookup;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, *mut X509_VERIFY_PARAM) =
+    crate::x509::vpm::X509_VERIFY_PARAM_move_peername;
+const _: unsafe extern "C" fn() -> *mut X509_VERIFY_PARAM = crate::x509::vpm::X509_VERIFY_PARAM_new;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const X509_VERIFY_PARAM,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_email;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_char,
+    usize,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_host;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_ip;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_ip_asc;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_name;
+const _: unsafe extern "C" fn(
+    *mut X509_VERIFY_PARAM,
+    *mut stack_st_ASN1_OBJECT,
+) -> core::ffi::c_int = crate::x509::vpm::X509_VERIFY_PARAM_set1_policies;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_int) =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_auth_level;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_int) =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_depth;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_flags;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_uint) =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_hostflags;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, u32) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_inh_flags;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_purpose;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, time_t) =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_time;
+const _: unsafe extern "C" fn(*mut X509_VERIFY_PARAM, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::vpm::X509_VERIFY_PARAM_set_trust;
+const _: unsafe extern "C" fn() = crate::x509::vpm::X509_VERIFY_PARAM_table_cleanup;
 const _: unsafe extern "C" fn(
     *mut X509,
     core::ffi::c_int,

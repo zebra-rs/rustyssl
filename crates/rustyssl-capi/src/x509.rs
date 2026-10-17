@@ -20,6 +20,7 @@ pub(crate) mod req;
 pub(crate) mod sig;
 pub(crate) mod spki;
 pub(crate) mod trust;
+pub(crate) mod vpm;
 
 #[cfg(test)]
 mod tests {
