@@ -1406,7 +1406,11 @@ pub(crate) unsafe fn check_private_key(x: *const EVP_PKEY, pkey: *const EVP_PKEY
 ///
 /// # Safety
 /// `pkey` is NULL or a live key.
-unsafe fn check_suite_b(pkey: *mut EVP_PKEY, sign_nid: c_int, pflags: &mut c_ulong) -> c_int {
+pub(crate) unsafe fn check_suite_b(
+    pkey: *mut EVP_PKEY,
+    sign_nid: c_int,
+    pflags: &mut c_ulong,
+) -> c_int {
     // SAFETY: the caller's key; a static name.
     if pkey.is_null() || unsafe { EVP_PKEY_is_a(pkey, c"EC".as_ptr()) } == 0 {
         return X509_V_ERR_SUITE_B_INVALID_ALGORITHM;

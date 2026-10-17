@@ -513,3 +513,21 @@ name = "rfc3779"
 path = "fuzz_targets/rfc3779.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "x509_crl"
+path = "fuzz_targets/x509_crl.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "pem_info"
+path = "fuzz_targets/pem_info.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "spki"
+path = "fuzz_targets/spki.rs"
+test = false
+doc = false
