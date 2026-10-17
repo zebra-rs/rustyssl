@@ -1,26 +1,22 @@
 //! The built-in methods (`standard_exts.h`): one for each extension OpenSSL knows. Those of
-//! the extensions whose types come later in step 5.2 have only their NIDs, and functions that
-//! abort when called (AGENTS.md rule 10).
+//! the OCSP extensions (step 6.6) and the certificate transparency ones (step 5.7) have only
+//! their NIDs, and functions that abort when called (AGENTS.md rule 10).
 
 use core::ffi::{c_char, c_int, c_long, c_uchar, c_void};
 
 use rustyssl_abi::{
-    BIO, NID_allowed_attribute_assignments, NID_associated_information, NID_attribute_descriptor,
-    NID_attribute_mappings, NID_authority_attribute_identifier, NID_basic_att_constraints,
-    NID_ct_cert_scts, NID_ct_precert_poison, NID_ct_precert_scts, NID_group_ac,
-    NID_id_aa_issuing_distribution_point, NID_id_pkix_OCSP_CrlID, NID_id_pkix_OCSP_Nonce,
-    NID_id_pkix_OCSP_archiveCutoff, NID_id_pkix_OCSP_noCheck, NID_id_pkix_OCSP_serviceLocator,
-    NID_indirect_issuer, NID_issued_on_behalf_of, NID_no_assertion, NID_no_rev_avail,
-    NID_role_spec_cert_identifier, NID_single_use, NID_soa_identifier,
-    NID_subject_directory_attributes, NID_target_information, NID_time_specification,
-    NID_user_notice, X509V3_CTX, X509V3_EXT_METHOD, X509V3_EXT_MULTILINE, stack_st_CONF_VALUE,
+    BIO, NID_ct_cert_scts, NID_ct_precert_poison, NID_ct_precert_scts, NID_id_pkix_OCSP_CrlID,
+    NID_id_pkix_OCSP_Nonce, NID_id_pkix_OCSP_archiveCutoff, NID_id_pkix_OCSP_noCheck,
+    NID_id_pkix_OCSP_serviceLocator, X509V3_CTX, X509V3_EXT_METHOD, stack_st_CONF_VALUE,
 };
 
 use super::registry::{Method, method};
-use super::{admission, akid, crld, info, misc, policy, rfc3779, san, simple};
+use super::{
+    acext, admission, akid, attrdesc, crld, info, misc, policy, rfc3779, san, simple, timespec,
+};
 
 fn later() -> ! {
-    crate::stub::unimplemented("an X509v3 extension method of a later part of step 5.2")
+    crate::stub::unimplemented("an X509v3 extension method of step 5.7 or 6.6")
 }
 
 extern "C" fn later_new() -> *mut c_void {
@@ -84,34 +80,15 @@ const fn placeholder(nid: c_int, flags: c_int) -> Method {
     Method(m)
 }
 
-static LATER: [Method; 27] = [
+static LATER: [Method; 8] = [
     placeholder(NID_id_pkix_OCSP_Nonce, 0),
     placeholder(NID_id_pkix_OCSP_CrlID, 0),
     placeholder(NID_id_pkix_OCSP_noCheck, 0),
     placeholder(NID_id_pkix_OCSP_archiveCutoff, 0),
     placeholder(NID_id_pkix_OCSP_serviceLocator, 0),
-    placeholder(NID_target_information, 0),
-    placeholder(NID_no_rev_avail, 0),
-    placeholder(NID_subject_directory_attributes, X509V3_EXT_MULTILINE),
     placeholder(NID_ct_precert_scts, 0),
     placeholder(NID_ct_precert_poison, 0),
     placeholder(NID_ct_cert_scts, 0),
-    placeholder(NID_authority_attribute_identifier, X509V3_EXT_MULTILINE),
-    placeholder(NID_role_spec_cert_identifier, X509V3_EXT_MULTILINE),
-    placeholder(NID_basic_att_constraints, 0),
-    placeholder(NID_time_specification, X509V3_EXT_MULTILINE),
-    placeholder(NID_attribute_descriptor, X509V3_EXT_MULTILINE),
-    placeholder(NID_user_notice, 0),
-    placeholder(NID_soa_identifier, 0),
-    placeholder(NID_indirect_issuer, 0),
-    placeholder(NID_no_assertion, 0),
-    placeholder(NID_id_aa_issuing_distribution_point, 0),
-    placeholder(NID_issued_on_behalf_of, 0),
-    placeholder(NID_single_use, 0),
-    placeholder(NID_group_ac, 0),
-    placeholder(NID_allowed_attribute_assignments, 0),
-    placeholder(NID_attribute_mappings, X509V3_EXT_MULTILINE),
-    placeholder(NID_associated_information, X509V3_EXT_MULTILINE),
 ];
 
 /// Every built-in method, in no order.
@@ -156,6 +133,25 @@ pub(crate) fn methods() -> impl Iterator<Item = &'static Method> {
         &rfc3779::ADDR,
         &rfc3779::ASID,
         &admission::ADMISSION,
+        &crld::AA_ISSUING_DIST_POINT,
+        &acext::INDIRECT_ISSUER,
+        &acext::NO_ASSERTION,
+        &acext::SOA_IDENTIFIER,
+        &acext::GROUP_AC,
+        &acext::NO_REV_AVAIL,
+        &acext::SINGLE_USE,
+        &acext::TARGETING_INFORMATION,
+        &acext::AUTHORITY_ATTRIBUTE_ID,
+        &acext::BASIC_ATTR_CONSTRAINTS,
+        &acext::ISSUED_ON_BEHALF_OF,
+        &acext::ROLE_SPEC_CERT_ID,
+        &acext::SUBJECT_DIRECTORY_ATTRIBUTES,
+        &acext::ASSOCIATED_INFORMATION,
+        &acext::USER_NOTICE,
+        &attrdesc::ATTRIBUTE_DESCRIPTOR,
+        &attrdesc::ATTRIBUTE_MAPPINGS,
+        &attrdesc::ALLOWED_ATTRIBUTE_ASSIGNMENTS,
+        &timespec::TIME_SPEC,
     ]
     .into_iter()
     .chain(simple::NS_IA5.iter())

@@ -8364,6 +8364,89 @@ const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_v
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(*mut OSSL_AA_DIST_POINT) =
+    crate::x509v3::crld::OSSL_AA_DIST_POINT_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::crld::OSSL_AA_DIST_POINT_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_AA_DIST_POINT =
+    crate::x509v3::crld::OSSL_AA_DIST_POINT_new;
+const _: unsafe extern "C" fn(*mut OSSL_ALLOWED_ATTRIBUTES_CHOICE) =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_CHOICE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_CHOICE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ALLOWED_ATTRIBUTES_CHOICE =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_CHOICE_new;
+const _: unsafe extern "C" fn(*mut OSSL_ALLOWED_ATTRIBUTES_ITEM) =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_ITEM_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_ITEM_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ALLOWED_ATTRIBUTES_ITEM =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_ITEM_new;
+const _: unsafe extern "C" fn(*mut OSSL_ALLOWED_ATTRIBUTES_SYNTAX) =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ALLOWED_ATTRIBUTES_SYNTAX =
+    crate::x509v3::attrdesc::OSSL_ALLOWED_ATTRIBUTES_SYNTAX_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATAV) = crate::x509v3::attrdesc::OSSL_ATAV_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::attrdesc::OSSL_ATAV_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATAV = crate::x509v3::attrdesc::OSSL_ATAV_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTES_SYNTAX) =
+    crate::x509v3::acext::OSSL_ATTRIBUTES_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_ATTRIBUTES_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTES_SYNTAX =
+    crate::x509v3::acext::OSSL_ATTRIBUTES_SYNTAX_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTE_DESCRIPTOR) =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_DESCRIPTOR_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_DESCRIPTOR_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTE_DESCRIPTOR =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_DESCRIPTOR_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTE_MAPPINGS) =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPINGS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPINGS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTE_MAPPINGS =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPINGS_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTE_MAPPING) =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPING_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPING_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTE_MAPPING =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_MAPPING_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTE_TYPE_MAPPING) =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_TYPE_MAPPING_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_TYPE_MAPPING_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTE_TYPE_MAPPING =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_TYPE_MAPPING_new;
+const _: unsafe extern "C" fn(*mut OSSL_ATTRIBUTE_VALUE_MAPPING) =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_VALUE_MAPPING_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_VALUE_MAPPING_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ATTRIBUTE_VALUE_MAPPING =
+    crate::x509v3::attrdesc::OSSL_ATTRIBUTE_VALUE_MAPPING_new;
+const _: unsafe extern "C" fn(*mut OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX) =
+    crate::x509v3::acext::OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX =
+    crate::x509v3::acext::OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX_new;
+const _: unsafe extern "C" fn(*mut OSSL_BASIC_ATTR_CONSTRAINTS) =
+    crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_BASIC_ATTR_CONSTRAINTS =
+    crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_new;
+const _: unsafe extern "C" fn(*mut OSSL_DAY_TIME_BAND) =
+    crate::x509v3::timespec::OSSL_DAY_TIME_BAND_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_DAY_TIME_BAND_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_DAY_TIME_BAND =
+    crate::x509v3::timespec::OSSL_DAY_TIME_BAND_new;
+const _: unsafe extern "C" fn(*mut OSSL_DAY_TIME) = crate::x509v3::timespec::OSSL_DAY_TIME_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::timespec::OSSL_DAY_TIME_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_DAY_TIME = crate::x509v3::timespec::OSSL_DAY_TIME_new;
 const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *mut OSSL_DECODER) -> core::ffi::c_int =
     crate::decoder::ctx::OSSL_DECODER_CTX_add_decoder;
 const _: unsafe extern "C" fn(
@@ -8611,6 +8694,9 @@ const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
 const _: unsafe extern "C" fn(*mut BIO, *mut GENERAL_NAMES, core::ffi::c_int) -> core::ffi::c_int =
     crate::x509v3::crld::OSSL_GENERAL_NAMES_print;
+const _: unsafe extern "C" fn(*mut OSSL_HASH) = crate::x509v3::attrdesc::OSSL_HASH_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::attrdesc::OSSL_HASH_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_HASH = crate::x509v3::attrdesc::OSSL_HASH_new;
 const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX) = crate::hpke::OSSL_HPKE_CTX_free;
 const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX, *mut u64) -> core::ffi::c_int =
     crate::hpke::OSSL_HPKE_CTX_get_seq;
@@ -8717,6 +8803,17 @@ const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_get_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_set_callback;
+const _: unsafe extern "C" fn(*mut OSSL_INFO_SYNTAX_POINTER) =
+    crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_POINTER_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_POINTER_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_INFO_SYNTAX_POINTER =
+    crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_POINTER_new;
+const _: unsafe extern "C" fn(*mut OSSL_INFO_SYNTAX) =
+    crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_INFO_SYNTAX =
+    crate::x509v3::attrdesc::OSSL_INFO_SYNTAX_new;
 const _: unsafe extern "C" fn(*mut OSSL_ISSUER_SERIAL) =
     crate::x509::acert::OSSL_ISSUER_SERIAL_free;
 const _: unsafe extern "C" fn(*const OSSL_ISSUER_SERIAL) -> *const X509_NAME =
@@ -8745,6 +8842,10 @@ const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_set0_default;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) =
     crate::libctx::OSSL_LIB_CTX_set_conf_diagnostics;
+const _: unsafe extern "C" fn(*mut OSSL_NAMED_DAY) = crate::x509v3::timespec::OSSL_NAMED_DAY_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::timespec::OSSL_NAMED_DAY_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_NAMED_DAY =
+    crate::x509v3::timespec::OSSL_NAMED_DAY_new;
 const _: unsafe extern "C" fn(*mut OSSL_OBJECT_DIGEST_INFO) =
     crate::x509::acert::OSSL_OBJECT_DIGEST_INFO_free;
 const _: unsafe extern "C" fn(
@@ -9016,6 +9117,12 @@ const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core
     crate::params::OSSL_PARAM_set_utf8_ptr;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_utf8_string;
+const _: unsafe extern "C" fn(*mut OSSL_PRIVILEGE_POLICY_ID) =
+    crate::x509v3::attrdesc::OSSL_PRIVILEGE_POLICY_ID_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::attrdesc::OSSL_PRIVILEGE_POLICY_ID_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_PRIVILEGE_POLICY_ID =
+    crate::x509v3::attrdesc::OSSL_PRIVILEGE_POLICY_ID_new;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
@@ -9088,6 +9195,18 @@ const _: unsafe extern "C" fn(*mut OSSL_PROVIDER) -> core::ffi::c_int =
     crate::provider::OSSL_PROVIDER_unload;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER, core::ffi::c_int, *const OSSL_ALGORITHM) =
     crate::provider::OSSL_PROVIDER_unquery_operation;
+const _: unsafe extern "C" fn(*mut OSSL_ROLE_SPEC_CERT_ID_SYNTAX) =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ROLE_SPEC_CERT_ID_SYNTAX =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_SYNTAX_new;
+const _: unsafe extern "C" fn(*mut OSSL_ROLE_SPEC_CERT_ID) =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_ROLE_SPEC_CERT_ID =
+    crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_new;
 const _: unsafe extern "C" fn(*mut stack_st_X509) = crate::x509::cert::OSSL_STACK_OF_X509_free;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) = crate::store::OSSL_STORE_LOADER_free;
 const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const ENGINE =
@@ -9120,6 +9239,69 @@ const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) -> core::ffi::c_int =
     crate::store::OSSL_STORE_register_loader;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut OSSL_STORE_LOADER =
     crate::store::OSSL_STORE_unregister_loader;
+const _: unsafe extern "C" fn(*mut OSSL_TARGETING_INFORMATION) =
+    crate::x509v3::acext::OSSL_TARGETING_INFORMATION_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_TARGETING_INFORMATION_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TARGETING_INFORMATION =
+    crate::x509v3::acext::OSSL_TARGETING_INFORMATION_new;
+const _: unsafe extern "C" fn(*mut OSSL_TARGETS) = crate::x509v3::acext::OSSL_TARGETS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::acext::OSSL_TARGETS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TARGETS = crate::x509v3::acext::OSSL_TARGETS_new;
+const _: unsafe extern "C" fn(*mut OSSL_TARGET) = crate::x509v3::acext::OSSL_TARGET_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::acext::OSSL_TARGET_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TARGET = crate::x509v3::acext::OSSL_TARGET_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_PERIOD) =
+    crate::x509v3::timespec::OSSL_TIME_PERIOD_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::timespec::OSSL_TIME_PERIOD_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_PERIOD =
+    crate::x509v3::timespec::OSSL_TIME_PERIOD_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_ABSOLUTE) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_ABSOLUTE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_ABSOLUTE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_ABSOLUTE =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_ABSOLUTE_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_DAY) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_DAY_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_DAY_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_DAY =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_DAY_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_MONTH) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_MONTH_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_MONTH_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_MONTH =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_MONTH_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_TIME) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_TIME_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_TIME_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_TIME =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_TIME_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_WEEKS) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_WEEKS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_WEEKS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_WEEKS =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_WEEKS_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC_X_DAY_OF) =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_X_DAY_OF_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_X_DAY_OF_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC_X_DAY_OF =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_X_DAY_OF_new;
+const _: unsafe extern "C" fn(*mut OSSL_TIME_SPEC) = crate::x509v3::timespec::OSSL_TIME_SPEC_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::timespec::OSSL_TIME_SPEC_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_TIME_SPEC =
+    crate::x509v3::timespec::OSSL_TIME_SPEC_new;
+const _: unsafe extern "C" fn(*mut OSSL_USER_NOTICE_SYNTAX) =
+    crate::x509v3::acext::OSSL_USER_NOTICE_SYNTAX_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509v3::acext::OSSL_USER_NOTICE_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_USER_NOTICE_SYNTAX =
+    crate::x509v3::acext::OSSL_USER_NOTICE_SYNTAX_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> u64 = crate::libctx::OSSL_get_max_threads;
 const _: unsafe extern "C" fn() -> u32 = crate::threads::OSSL_get_thread_support_flags;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, u64) -> core::ffi::c_int =
@@ -12475,6 +12657,13 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut X509_VAL) = crate::x509::cert::X509_VAL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::cert::X509_VAL_it;
 const _: unsafe extern "C" fn() -> *mut X509_VAL = crate::x509::cert::X509_VAL_new;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::x509::cert::X509_add1_ext_i2d;
 const _: unsafe extern "C" fn(*mut X509, *const ASN1_OBJECT) -> core::ffi::c_int =
     crate::x509::trust::X509_add1_reject_object;
 const _: unsafe extern "C" fn(*mut X509, *const ASN1_OBJECT) -> core::ffi::c_int =
@@ -12498,6 +12687,8 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::x509::trust::X509_alias_set1;
+const _: unsafe extern "C" fn(*const X509, *const EVP_PKEY) -> core::ffi::c_int =
+    crate::x509::cert::X509_certificate_type;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_int,
     *mut X509,
@@ -12707,6 +12898,8 @@ const _: unsafe extern "C" fn(*mut X509, *mut EVP_PKEY, *const EVP_MD) -> core::
     crate::x509::cert::X509_sign;
 const _: unsafe extern "C" fn(*mut X509, *mut EVP_MD_CTX) -> core::ffi::c_int =
     crate::x509::cert::X509_sign_ctx;
+const _: unsafe extern "C" fn(*mut BIO, *const ASN1_STRING, core::ffi::c_int) -> core::ffi::c_int =
+    crate::x509::print::X509_signature_dump;
 const _: unsafe extern "C" fn(*const X509, *const X509) -> core::ffi::c_int =
     crate::x509::cert::X509_subject_name_cmp;
 const _: unsafe extern "C" fn(*mut X509) -> core::ffi::c_ulong =
@@ -13286,6 +13479,179 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut NOTICEREF = crate::x509v3::policy::d2i_NOTICEREF;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_AA_DIST_POINT,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_AA_DIST_POINT = crate::x509v3::crld::d2i_OSSL_AA_DIST_POINT;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ALLOWED_ATTRIBUTES_CHOICE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ALLOWED_ATTRIBUTES_CHOICE =
+    crate::x509v3::attrdesc::d2i_OSSL_ALLOWED_ATTRIBUTES_CHOICE;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ALLOWED_ATTRIBUTES_ITEM,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ALLOWED_ATTRIBUTES_ITEM = crate::x509v3::attrdesc::d2i_OSSL_ALLOWED_ATTRIBUTES_ITEM;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ALLOWED_ATTRIBUTES_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ALLOWED_ATTRIBUTES_SYNTAX =
+    crate::x509v3::attrdesc::d2i_OSSL_ALLOWED_ATTRIBUTES_SYNTAX;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATAV,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATAV = crate::x509v3::attrdesc::d2i_OSSL_ATAV;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTES_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTES_SYNTAX = crate::x509v3::acext::d2i_OSSL_ATTRIBUTES_SYNTAX;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTE_DESCRIPTOR,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTE_DESCRIPTOR = crate::x509v3::attrdesc::d2i_OSSL_ATTRIBUTE_DESCRIPTOR;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTE_MAPPING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTE_MAPPING = crate::x509v3::attrdesc::d2i_OSSL_ATTRIBUTE_MAPPING;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTE_MAPPINGS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTE_MAPPINGS = crate::x509v3::attrdesc::d2i_OSSL_ATTRIBUTE_MAPPINGS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTE_TYPE_MAPPING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTE_TYPE_MAPPING = crate::x509v3::attrdesc::d2i_OSSL_ATTRIBUTE_TYPE_MAPPING;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ATTRIBUTE_VALUE_MAPPING,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ATTRIBUTE_VALUE_MAPPING = crate::x509v3::attrdesc::d2i_OSSL_ATTRIBUTE_VALUE_MAPPING;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX =
+    crate::x509v3::acext::d2i_OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_BASIC_ATTR_CONSTRAINTS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_BASIC_ATTR_CONSTRAINTS = crate::x509v3::acext::d2i_OSSL_BASIC_ATTR_CONSTRAINTS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_DAY_TIME,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_DAY_TIME = crate::x509v3::timespec::d2i_OSSL_DAY_TIME;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_DAY_TIME_BAND,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_DAY_TIME_BAND = crate::x509v3::timespec::d2i_OSSL_DAY_TIME_BAND;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_HASH,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_HASH = crate::x509v3::attrdesc::d2i_OSSL_HASH;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_INFO_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_INFO_SYNTAX = crate::x509v3::attrdesc::d2i_OSSL_INFO_SYNTAX;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_INFO_SYNTAX_POINTER,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_INFO_SYNTAX_POINTER = crate::x509v3::attrdesc::d2i_OSSL_INFO_SYNTAX_POINTER;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_NAMED_DAY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_NAMED_DAY = crate::x509v3::timespec::d2i_OSSL_NAMED_DAY;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_PRIVILEGE_POLICY_ID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_PRIVILEGE_POLICY_ID = crate::x509v3::attrdesc::d2i_OSSL_PRIVILEGE_POLICY_ID;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ROLE_SPEC_CERT_ID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ROLE_SPEC_CERT_ID = crate::x509v3::acext::d2i_OSSL_ROLE_SPEC_CERT_ID;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_ROLE_SPEC_CERT_ID_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_ROLE_SPEC_CERT_ID_SYNTAX = crate::x509v3::acext::d2i_OSSL_ROLE_SPEC_CERT_ID_SYNTAX;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TARGET,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TARGET = crate::x509v3::acext::d2i_OSSL_TARGET;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TARGETING_INFORMATION,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TARGETING_INFORMATION = crate::x509v3::acext::d2i_OSSL_TARGETING_INFORMATION;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TARGETS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TARGETS = crate::x509v3::acext::d2i_OSSL_TARGETS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_PERIOD,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_PERIOD = crate::x509v3::timespec::d2i_OSSL_TIME_PERIOD;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_ABSOLUTE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_ABSOLUTE = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_ABSOLUTE;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_DAY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_DAY = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_DAY;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_MONTH,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_MONTH = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_MONTH;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_TIME,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_TIME = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_TIME;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_WEEKS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_WEEKS = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_WEEKS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_TIME_SPEC_X_DAY_OF,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_TIME_SPEC_X_DAY_OF = crate::x509v3::timespec::d2i_OSSL_TIME_SPEC_X_DAY_OF;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_USER_NOTICE_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_USER_NOTICE_SYNTAX = crate::x509v3::acext::d2i_OSSL_USER_NOTICE_SYNTAX;
 const _: unsafe extern "C" fn(
     *mut *mut OTHERNAME,
     *mut *const core::ffi::c_uchar,
@@ -13878,6 +14244,138 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::spki::i2d_NETSCAPE_SPKI;
 const _: unsafe extern "C" fn(*const NOTICEREF, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::policy::i2d_NOTICEREF;
+const _: unsafe extern "C" fn(
+    *const OSSL_AA_DIST_POINT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::crld::i2d_OSSL_AA_DIST_POINT;
+const _: unsafe extern "C" fn(
+    *const OSSL_ALLOWED_ATTRIBUTES_CHOICE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ALLOWED_ATTRIBUTES_CHOICE;
+const _: unsafe extern "C" fn(
+    *const OSSL_ALLOWED_ATTRIBUTES_ITEM,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ALLOWED_ATTRIBUTES_ITEM;
+const _: unsafe extern "C" fn(
+    *const OSSL_ALLOWED_ATTRIBUTES_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ALLOWED_ATTRIBUTES_SYNTAX;
+const _: unsafe extern "C" fn(*const OSSL_ATAV, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509v3::attrdesc::i2d_OSSL_ATAV;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTES_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_ATTRIBUTES_SYNTAX;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTE_DESCRIPTOR,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ATTRIBUTE_DESCRIPTOR;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTE_MAPPING,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ATTRIBUTE_MAPPING;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTE_MAPPINGS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ATTRIBUTE_MAPPINGS;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTE_TYPE_MAPPING,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ATTRIBUTE_TYPE_MAPPING;
+const _: unsafe extern "C" fn(
+    *const OSSL_ATTRIBUTE_VALUE_MAPPING,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_ATTRIBUTE_VALUE_MAPPING;
+const _: unsafe extern "C" fn(
+    *const OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_AUTHORITY_ATTRIBUTE_ID_SYNTAX;
+const _: unsafe extern "C" fn(
+    *const OSSL_BASIC_ATTR_CONSTRAINTS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_BASIC_ATTR_CONSTRAINTS;
+const _: unsafe extern "C" fn(
+    *const OSSL_DAY_TIME,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_DAY_TIME;
+const _: unsafe extern "C" fn(
+    *const OSSL_DAY_TIME_BAND,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_DAY_TIME_BAND;
+const _: unsafe extern "C" fn(*const OSSL_HASH, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::x509v3::attrdesc::i2d_OSSL_HASH;
+const _: unsafe extern "C" fn(
+    *const OSSL_INFO_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_INFO_SYNTAX;
+const _: unsafe extern "C" fn(
+    *const OSSL_INFO_SYNTAX_POINTER,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_INFO_SYNTAX_POINTER;
+const _: unsafe extern "C" fn(
+    *const OSSL_NAMED_DAY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_NAMED_DAY;
+const _: unsafe extern "C" fn(
+    *const OSSL_PRIVILEGE_POLICY_ID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::attrdesc::i2d_OSSL_PRIVILEGE_POLICY_ID;
+const _: unsafe extern "C" fn(
+    *const OSSL_ROLE_SPEC_CERT_ID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_ROLE_SPEC_CERT_ID;
+const _: unsafe extern "C" fn(
+    *const OSSL_ROLE_SPEC_CERT_ID_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_ROLE_SPEC_CERT_ID_SYNTAX;
+const _: unsafe extern "C" fn(
+    *const OSSL_TARGET,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_TARGET;
+const _: unsafe extern "C" fn(
+    *const OSSL_TARGETING_INFORMATION,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_TARGETING_INFORMATION;
+const _: unsafe extern "C" fn(
+    *const OSSL_TARGETS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_TARGETS;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_PERIOD,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_PERIOD;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_ABSOLUTE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_ABSOLUTE;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_DAY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_DAY;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_MONTH,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_MONTH;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_TIME,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_TIME;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_WEEKS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_WEEKS;
+const _: unsafe extern "C" fn(
+    *const OSSL_TIME_SPEC_X_DAY_OF,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_TIME_SPEC_X_DAY_OF;
+const _: unsafe extern "C" fn(
+    *const OSSL_USER_NOTICE_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_USER_NOTICE_SYNTAX;
 const _: unsafe extern "C" fn(*const OTHERNAME, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::genn::i2d_OTHERNAME;
 const _: unsafe extern "C" fn(*const PBE2PARAM, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =

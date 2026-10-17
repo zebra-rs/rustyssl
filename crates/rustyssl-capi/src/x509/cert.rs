@@ -30,9 +30,13 @@ use rustyssl_abi::{
     ASN1_STRING_FLAG_MSTRING, ASN1_TFLG_EMBED, ASN1_TFLG_EXPLICIT, ASN1_TFLG_IMPLICIT,
     ASN1_TFLG_OPTIONAL, ASN1_TFLG_SEQUENCE_OF, ASN1_TIME, ASN1_VALUE, BIO, CRYPTO_EX_DATA,
     CRYPTO_EX_INDEX_X509, CRYPTO_RWLOCK, ERR_LIB_ASN1, ERR_LIB_X509, ERR_R_PASSED_NULL_PARAMETER,
-    EVP_MD, EVP_MD_CTX, EVP_PKEY, EVP_PKEY_RSA_PSS, NID_ED448, NID_ED25519, NID_X9_62_prime256v1,
-    NID_ecdsa_with_SHA256, NID_ecdsa_with_SHA384, NID_secp384r1, NID_undef, OSSL_LIB_CTX, SN_md5,
-    V_ASN1_GENERALIZEDTIME, V_ASN1_UTCTIME, X509, X509_ALGOR, X509_CERT_AUX, X509_CINF,
+    EVP_MD, EVP_MD_CTX, EVP_PK_DH, EVP_PK_DSA, EVP_PK_EC, EVP_PK_RSA, EVP_PKEY, EVP_PKEY_DH,
+    EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_ED448, EVP_PKEY_ED25519, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
+    EVP_PKS_DSA, EVP_PKS_EC, EVP_PKS_RSA, EVP_PKT_ENC, EVP_PKT_EXCH, EVP_PKT_SIGN, NID_ED448,
+    NID_ED25519, NID_X9_62_id_ecPublicKey, NID_X9_62_prime256v1, NID_dsa, NID_dsa_2,
+    NID_ecdsa_with_SHA256, NID_ecdsa_with_SHA384, NID_id_GostR3410_2001, NID_id_GostR3410_2012_256,
+    NID_id_GostR3410_2012_512, NID_rsa, NID_rsaEncryption, NID_secp384r1, NID_undef, OSSL_LIB_CTX,
+    SN_md5, V_ASN1_GENERALIZEDTIME, V_ASN1_UTCTIME, X509, X509_ALGOR, X509_CERT_AUX, X509_CINF,
     X509_EXTENSION, X509_NAME, X509_PUBKEY, X509_R_KEY_TYPE_MISMATCH, X509_R_KEY_VALUES_MISMATCH,
     X509_R_UNABLE_TO_FIND_PARAMETERS_IN_CHAIN, X509_R_UNABLE_TO_GET_CERTS_PUBLIC_KEY,
     X509_R_UNKNOWN_KEY_TYPE, X509_R_UNKNOWN_SIGID_ALGS, X509_R_UNSUPPORTED_ALGORITHM,
@@ -1172,6 +1176,76 @@ ffi_export! {
     }
 }
 
+ffi_export! {
+    /// Adds an extension of `nid` encoding `value` (`X509V3_add1_i2d`, which `flags`
+    /// direct): 1, 0, or -1.
+    ///
+    /// # Safety
+    /// `x` is NULL or a live certificate; `value` is NULL or a live value of the extension's
+    /// type.
+    pub unsafe extern "C" fn X509_add1_ext_i2d(x: *mut X509, nid: c_int, value: *mut c_void, crit: c_int, flags: c_ulong) -> c_int
+    where failure = 0, library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { cert_of(x) }) else { return 0 };
+        // SAFETY: the certificate's list; the caller's value.
+        unsafe { crate::x509v3::registry::X509V3_add1_i2d(&raw mut c.cert_info.extensions, nid, value, crit, flags) }
+    }
+}
+
+ffi_export! {
+    /// The certificate's type (`x509type.c`): what its key (`pkey`, or the certificate's) is
+    /// and does (`EVP_PK_*`, `EVP_PKT_*`), and what signed it (`EVP_PKS_*`); 0 for none.
+    ///
+    /// # Safety
+    /// `x` is NULL or a live certificate; `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn X509_certificate_type(x: *const X509, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_X509
+    {
+        if x.is_null() {
+            return 0;
+        }
+        let pk = if pkey.is_null() {
+            // SAFETY: the caller's certificate.
+            unsafe { X509_get0_pubkey(x) }.cast_const()
+        } else {
+            pkey
+        };
+        if pk.is_null() {
+            return 0;
+        }
+        // SAFETY: a live key.
+        let mut ret = match unsafe { crate::evp::pkey::EVP_PKEY_get_id(pk) } {
+            n if n == EVP_PKEY_RSA => EVP_PK_RSA | EVP_PKT_SIGN | EVP_PKT_ENC,
+            n if n == EVP_PKEY_RSA_PSS => EVP_PK_RSA | EVP_PKT_SIGN,
+            n if n == EVP_PKEY_DSA => EVP_PK_DSA | EVP_PKT_SIGN,
+            n if n == EVP_PKEY_EC => EVP_PK_EC | EVP_PKT_SIGN | EVP_PKT_EXCH,
+            n if n == EVP_PKEY_ED448 || n == EVP_PKEY_ED25519 => EVP_PKT_SIGN,
+            n if n == EVP_PKEY_DH => EVP_PK_DH | EVP_PKT_EXCH,
+            n if n == NID_id_GostR3410_2001
+                || n == NID_id_GostR3410_2012_256
+                || n == NID_id_GostR3410_2012_512 =>
+            {
+                EVP_PKT_EXCH | EVP_PKT_SIGN
+            }
+            _ => 0,
+        };
+        // SAFETY: the caller's certificate.
+        let sig = unsafe { X509_get_signature_nid(x) };
+        let mut pkey_nid = 0;
+        // SAFETY: a NID; no digest output; a local.
+        if sig != 0 && unsafe { OBJ_find_sigid_algs(sig, ptr::null_mut(), &raw mut pkey_nid) } != 0 {
+            ret |= match pkey_nid {
+                n if n == NID_rsaEncryption || n == NID_rsa => EVP_PKS_RSA,
+                n if n == NID_dsa || n == NID_dsa_2 => EVP_PKS_DSA,
+                n if n == NID_X9_62_id_ecPublicKey => EVP_PKS_EC,
+                _ => 0,
+            };
+        }
+        ret
+    }
+}
+
 // Comparisons, hashes, and lookups (`x509_cmp.c`).
 
 ffi_export! {
@@ -2193,6 +2267,8 @@ mod tests {
     #[test]
     fn null_certificates_are_safe() {
         let x: *mut X509 = ptr::null_mut();
+        // SAFETY: NULL where OpenSSL dereferences it.
+        assert_eq!(unsafe { X509_add1_ext_i2d(x, 0, ptr::null_mut(), 0, 0) }, 0);
         // SAFETY: NULL where OpenSSL dereferences it.
         assert!(unsafe { X509_get_subject_name(x) }.is_null());
         // SAFETY: as above.

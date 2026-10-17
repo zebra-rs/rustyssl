@@ -5,6 +5,7 @@
 pub(crate) mod acert;
 pub(crate) mod algor;
 pub(crate) mod attrib;
+pub(crate) mod attrval;
 pub(crate) mod cert;
 pub(crate) mod crl;
 pub(crate) mod ext;
@@ -12,6 +13,7 @@ pub(crate) mod info;
 pub(crate) mod name;
 pub(crate) mod p8;
 pub(crate) mod pbe;
+pub(crate) mod print;
 pub(crate) mod pubkey;
 pub(crate) mod purpose;
 pub(crate) mod req;

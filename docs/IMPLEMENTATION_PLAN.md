@@ -4501,7 +4501,8 @@ Exit checks:
 
 ## Phase 5: X.509 and certificate verification
 
-- [ ] **5.1 Objects:**
+- [x] **5.1 Objects:** (`PKCS7_ISSUER_AND_SERIAL` comes with PKCS#7, 6.3;
+  `X509_add1_ext_i2d` and `X509_certificate_type` came with 5.1f3)
   - `X509`
   - `X509_NAME` / `X509_NAME_ENTRY` (canonical-encoding cache; `X509_NAME_hash_ex` and
     `hash_old` byte-exact, for hashed-directory lookups; `oneline` and `print_ex` with every
@@ -4647,11 +4648,26 @@ Exit checks:
     (`X509_ACERT_print_ex`) comes with 5.6. Setting the issuer's name of a v1Form issuer
     replaces it, where OpenSSL corrupts memory (docs/DEVIATIONS.md). Tests:
     `tests/c/x509_acert.c` and the `x509_acert` fuzz target.
-  - [ ] **5.1f3 Attribute certificate extensions**: targeting, attribute descriptors and
-    mappings, the authority attribute identifier, basic attribute constraints, group, indirect
-    issuer, issued on behalf of, no assertion, no revocation available, role specification,
-    subject directory attributes, single use, SOA identifier, time specification, user notice,
-    and allowed attribute assignments (`ossl_print_attribute_value`).
+  - [x] **5.1f3 Attribute certificate extensions** (`x509v3/acext.rs`, `x509v3/attrdesc.rs`,
+    `x509v3/timespec.rs`, the AA issuing distribution point in `x509v3/crld.rs`, from
+    `v3_ac_tgt.c`, `v3_attrdesc.c`, `v3_attrmap.c`, `v3_aaa.c`, `v3_authattid.c`,
+    `v3_battcons.c`, `v3_iobo.c`, `v3_rolespec.c`, `v3_sda.c`, `v3_usernotice.c`,
+    `v3_timespec.c`, the NULL markers' files, and `v3_crld.c`): the types of targeting
+    information, attribute descriptors and mappings, the authority attribute identifier, basic
+    attribute constraints, role specification certificate identifiers, subject directory
+    attributes and associated information, user notices, allowed attribute assignments, time
+    specifications, and the AA issuing distribution point (170 exports), and their methods,
+    which print as OpenSSL's, quirks included (an absolute start time printed twice, a SET OF
+    named days that doesn't print, nothing at no indent for issued on behalf of and attribute
+    mappings). Basic attribute constraints, the AA issuing distribution point, and the NULL
+    markers (group, indirect issuer, no assertion, no revocation available, single use, SOA
+    identifier) are also made from configuration. Shared printing: `x509v3/text.rs` (an
+    extension's writes), `x509/attrval.rs` (`ossl_print_attribute_value`), the issuer and serial
+    and object digest info printers in `x509/acert.rs`, and the start of `t_x509.c` in
+    `x509/print.rs`: `X509_signature_dump`, the key types' signature printers (RSA's, RSA-PSS's,
+    DSA's), and `ossl_serial_number_print`. Tests: `tests/c/x509v3_acext.c`, the
+    `v3print_acext.txt` corpus and random `v3print` sessions, and the `x509v3_acext` fuzz
+    target. The OCSP extensions' methods come with 6.6, the SCTs' with 5.7.
 - [x] **5.2 X509v3 extensions:**
   - [x] **5.2a The methods and the simple extensions** (`x509v3/registry.rs`,
     `x509v3/standard.rs`, `x509v3/simple.rs`, from `v3_lib.c`, `v3_prn.c`, `do_ext_i2d`,
@@ -4769,14 +4785,16 @@ Exit checks:
       CA, issuers, comparisons, lists, the table); the probe's `x509cache` with the corpus
       `x509cache.txt` and the mutated certificates of `asnd2i` sessions; and the `x509_cert`
       fuzz target over the cache too.
-  - The methods still placeholders arrive with their types: the OCSP extensions (6.6), the
-    SCT lists and precertificate poison (5.7), and the attribute certificate extensions and
-    subject directory attributes (with `X509_ACERT`, 5.1f).
+  - The methods still placeholders arrive with their types: the OCSP extensions (6.6) and the
+    SCT lists and precertificate poison (5.7). The attribute certificate extensions and
+    subject directory attributes came with 5.1f3.
 - [ ] **5.3 Store and lookup:**
   - `X509_STORE`, `X509_OBJECT`
   - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store
   - `load_locations`, default paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`, OPENSSLDIR)
   - every store callback setter
+  - `X509_load_cert_file`, `X509_load_crl_file`, `X509_load_cert_crl_file` and their `_ex`
+    forms (`by_file.c`); `X509_load_http` and `X509_CRL_load_http` come with the HTTP client (6.8)
 - [ ] **5.4 Path validation** (core in `rustyssl-pki`):
   - chain building over multiple candidate issuers (alternate chains, the CVE-2015-1793
     lesson), trusted-first, partial chains
@@ -4793,11 +4811,14 @@ Exit checks:
     invoked per error with an override, and the error, depth, and current certificate are
     exact)
   - `X509_verify_cert_error_string`, byte-exact
+  - `X509_build_chain` and `X509_cmp_timeframe`
 - [ ] **5.5 Identity checks:** `X509_check_host` (every `X509_CHECK_FLAG_*`, the wildcard
-  rules, `peername`), `X509_check_email`, `X509_check_ip(_asc)`, and the
-  `X509_VERIFY_PARAM_*` host, email, and IP setters.
+  rules, `peername`), `X509_check_email`, `X509_check_ip(_asc)`, the
+  `X509_VERIFY_PARAM_*` host, email, and IP setters, and `X509_get1_email`,
+  `X509_REQ_get1_email`, and `X509_email_free`.
 - [ ] **5.6 Printing:** the `X509`, `X509_CRL`, `X509_REQ`, and `X509_NAME` `print_ex`
-  functions, `X509_signature_print`, `X509_ocspid_print`. All byte-exact.
+  functions, `X509_signature_print`, `X509_ocspid_print`, `X509_ACERT_print_ex`. All
+  byte-exact. (`X509_signature_dump` and the signature printers came with 5.1f3.)
 - [ ] **5.7 Certificate Transparency:** `SCT`, `CTLOG`, `CTLOG_STORE`,
   `CT_POLICY_EVAL_CTX`, SCT validation.
 

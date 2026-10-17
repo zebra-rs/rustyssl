@@ -537,3 +537,9 @@ name = "x509_acert"
 path = "fuzz_targets/x509_acert.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "x509v3_acext"
+path = "fuzz_targets/x509v3_acext.rs"
+test = false
+doc = false

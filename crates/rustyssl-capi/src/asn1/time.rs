@@ -720,7 +720,7 @@ const MONTHS: [&CStr; 12] = [
 ///
 /// # Safety
 /// `bp` is NULL or a live BIO; `tm` is a live string.
-unsafe fn print_time(bp: *mut BIO, tm: *const ASN1_STRING, flags: c_ulong) -> c_int {
+pub(crate) unsafe fn print_time(bp: *mut BIO, tm: *const ASN1_STRING, flags: c_ulong) -> c_int {
     // SAFETY: the caller's guarantee.
     let Some(stm) = (unsafe { time_to_tm(tm, true) }) else {
         // SAFETY: as above.
