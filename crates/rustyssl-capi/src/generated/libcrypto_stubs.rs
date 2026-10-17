@@ -431,21 +431,6 @@ pub extern "C" fn AUTHORITY_KEYID_new() -> *mut AUTHORITY_KEYID {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BASIC_CONSTRAINTS_free(_: *mut BASIC_CONSTRAINTS) {
-    crate::stub::unimplemented("BASIC_CONSTRAINTS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BASIC_CONSTRAINTS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("BASIC_CONSTRAINTS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BASIC_CONSTRAINTS_new() -> *mut BASIC_CONSTRAINTS {
-    crate::stub::unimplemented("BASIC_CONSTRAINTS_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_asn1_get_prefix(
     _: *mut BIO,
     _: *mut asn1_ps_func,
@@ -2993,21 +2978,6 @@ pub extern "C" fn EVP_SealInit(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_SealInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EXTENDED_KEY_USAGE_free(_: *mut EXTENDED_KEY_USAGE) {
-    crate::stub::unimplemented("EXTENDED_KEY_USAGE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EXTENDED_KEY_USAGE_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("EXTENDED_KEY_USAGE_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EXTENDED_KEY_USAGE_new() -> *mut EXTENDED_KEY_USAGE {
-    crate::stub::unimplemented("EXTENDED_KEY_USAGE_new")
 }
 
 #[unsafe(no_mangle)]
@@ -8965,21 +8935,6 @@ pub extern "C" fn PKCS7_verify(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PKEY_USAGE_PERIOD_free(_: *mut PKEY_USAGE_PERIOD) {
-    crate::stub::unimplemented("PKEY_USAGE_PERIOD_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKEY_USAGE_PERIOD_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PKEY_USAGE_PERIOD_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKEY_USAGE_PERIOD_new() -> *mut PKEY_USAGE_PERIOD {
-    crate::stub::unimplemented("PKEY_USAGE_PERIOD_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn POLICYINFO_free(_: *mut POLICYINFO) {
     crate::stub::unimplemented("POLICYINFO_free")
 }
@@ -10951,19 +10906,6 @@ pub extern "C" fn X509V3_EXT_REQ_add_nconf(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_add(_: *mut X509V3_EXT_METHOD) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_EXT_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_add_alias(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_EXT_add_alias")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509V3_EXT_add_conf(
     _: *mut lhash_st_CONF_VALUE,
     _: *mut X509V3_CTX,
@@ -10971,11 +10913,6 @@ pub extern "C" fn X509V3_EXT_add_conf(
     _: *mut X509,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509V3_EXT_add_conf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_add_list(_: *mut X509V3_EXT_METHOD) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_EXT_add_list")
 }
 
 #[unsafe(no_mangle)]
@@ -10999,11 +10936,6 @@ pub extern "C" fn X509V3_EXT_add_nconf_sk(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_cleanup() {
-    crate::stub::unimplemented("X509V3_EXT_cleanup")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509V3_EXT_conf(
     _: *mut lhash_st_CONF_VALUE,
     _: *mut X509V3_CTX,
@@ -11021,30 +10953,6 @@ pub extern "C" fn X509V3_EXT_conf_nid(
     _: *const core::ffi::c_char,
 ) -> *mut X509_EXTENSION {
     crate::stub::unimplemented("X509V3_EXT_conf_nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_d2i(_: *mut X509_EXTENSION) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("X509V3_EXT_d2i")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_get(_: *mut X509_EXTENSION) -> *const X509V3_EXT_METHOD {
-    crate::stub::unimplemented("X509V3_EXT_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_get_nid(_: core::ffi::c_int) -> *const X509V3_EXT_METHOD {
-    crate::stub::unimplemented("X509V3_EXT_get_nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_i2d(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> *mut X509_EXTENSION {
-    crate::stub::unimplemented("X509V3_EXT_i2d")
 }
 
 #[unsafe(no_mangle)]
@@ -11068,115 +10976,12 @@ pub extern "C" fn X509V3_EXT_nconf_nid(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_print(
-    _: *mut BIO,
-    _: *mut X509_EXTENSION,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_EXT_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_print_fp(
-    _: *mut FILE,
-    _: *mut X509_EXTENSION,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_EXT_print_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_EXT_val_prn(
-    _: *mut BIO,
-    _: *mut stack_st_CONF_VALUE,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) {
-    crate::stub::unimplemented("X509V3_EXT_val_prn")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509V3_NAME_from_section(
     _: *mut X509_NAME,
     _: *mut stack_st_CONF_VALUE,
     _: core::ffi::c_ulong,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("X509V3_NAME_from_section")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add1_i2d(
-    _: *mut *mut stack_st_X509_EXTENSION,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add1_i2d")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_standard_extensions() -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_standard_extensions")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_value_bool(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut *mut stack_st_CONF_VALUE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_value_bool")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_value_bool_nf(
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut *mut stack_st_CONF_VALUE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_value_bool_nf")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_value_int(
-    _: *const core::ffi::c_char,
-    _: *const ASN1_INTEGER,
-    _: *mut *mut stack_st_CONF_VALUE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_value_int")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_add_value_uchar(
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_uchar,
-    _: *mut *mut stack_st_CONF_VALUE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_add_value_uchar")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_extensions_print(
-    _: *mut BIO,
-    _: *const core::ffi::c_char,
-    _: *const stack_st_X509_EXTENSION,
-    _: core::ffi::c_ulong,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_extensions_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_get_d2i(
-    _: *const stack_st_X509_EXTENSION,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("X509V3_get_d2i")
 }
 
 #[unsafe(no_mangle)]
@@ -11194,14 +10999,6 @@ pub extern "C" fn X509V3_get_string(
     _: *const core::ffi::c_char,
 ) -> *mut core::ffi::c_char {
     crate::stub::unimplemented("X509V3_get_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509V3_get_value_int(
-    _: *const CONF_VALUE,
-    _: *mut *mut ASN1_INTEGER,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("X509V3_get_value_int")
 }
 
 #[unsafe(no_mangle)]
@@ -14435,15 +14232,6 @@ pub extern "C" fn d2i_AUTHORITY_KEYID(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_BASIC_CONSTRAINTS(
-    _: *mut *mut BASIC_CONSTRAINTS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut BASIC_CONSTRAINTS {
-    crate::stub::unimplemented("d2i_BASIC_CONSTRAINTS")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_CERTIFICATEPOLICIES(
     _: *mut *mut CERTIFICATEPOLICIES,
     _: *mut *const core::ffi::c_uchar,
@@ -14554,15 +14342,6 @@ pub extern "C" fn d2i_ESS_SIGNING_CERT_V2(
     _: core::ffi::c_long,
 ) -> *mut ESS_SIGNING_CERT_V2 {
     crate::stub::unimplemented("d2i_ESS_SIGNING_CERT_V2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_EXTENDED_KEY_USAGE(
-    _: *mut *mut EXTENDED_KEY_USAGE,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EXTENDED_KEY_USAGE {
-    crate::stub::unimplemented("d2i_EXTENDED_KEY_USAGE")
 }
 
 #[unsafe(no_mangle)]
@@ -15413,15 +15192,6 @@ pub extern "C" fn d2i_PKCS7_fp(_: *mut FILE, _: *mut *mut PKCS7) -> *mut PKCS7 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_PKEY_USAGE_PERIOD(
-    _: *mut *mut PKEY_USAGE_PERIOD,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PKEY_USAGE_PERIOD {
-    crate::stub::unimplemented("d2i_PKEY_USAGE_PERIOD")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_POLICYINFO(
     _: *mut *mut POLICYINFO,
     _: *mut *const core::ffi::c_uchar,
@@ -15750,14 +15520,6 @@ pub extern "C" fn i2d_AUTHORITY_KEYID(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_BASIC_CONSTRAINTS(
-    _: *const BASIC_CONSTRAINTS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_BASIC_CONSTRAINTS")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_CERTIFICATEPOLICIES(
     _: *const CERTIFICATEPOLICIES,
     _: *mut *mut core::ffi::c_uchar,
@@ -15866,14 +15628,6 @@ pub extern "C" fn i2d_ESS_SIGNING_CERT_V2(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_ESS_SIGNING_CERT_V2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_EXTENDED_KEY_USAGE(
-    _: *const EXTENDED_KEY_USAGE,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_EXTENDED_KEY_USAGE")
 }
 
 #[unsafe(no_mangle)]
@@ -16645,14 +16399,6 @@ pub extern "C" fn i2d_PKCS7_fp(_: *mut FILE, _: *const PKCS7) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKEY_USAGE_PERIOD(
-    _: *const PKEY_USAGE_PERIOD,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKEY_USAGE_PERIOD")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_POLICYINFO(
     _: *const POLICYINFO,
     _: *mut *mut core::ffi::c_uchar,
@@ -16889,31 +16635,6 @@ pub extern "C" fn i2o_SCT_LIST(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2s_ASN1_IA5STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut ASN1_IA5STRING,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("i2s_ASN1_IA5STRING")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2s_ASN1_UTF8STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut ASN1_UTF8STRING,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("i2s_ASN1_UTF8STRING")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2v_ASN1_BIT_STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut ASN1_BIT_STRING,
-    _: *mut stack_st_CONF_VALUE,
-) -> *mut stack_st_CONF_VALUE {
-    crate::stub::unimplemented("i2v_ASN1_BIT_STRING")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2v_GENERAL_NAME(
     _: *mut X509V3_EXT_METHOD,
     _: *mut GENERAL_NAME,
@@ -16947,33 +16668,6 @@ pub extern "C" fn o2i_SCT_LIST(
     _: usize,
 ) -> *mut stack_st_SCT {
     crate::stub::unimplemented("o2i_SCT_LIST")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn s2i_ASN1_IA5STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_IA5STRING {
-    crate::stub::unimplemented("s2i_ASN1_IA5STRING")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn s2i_ASN1_UTF8STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut ASN1_UTF8STRING {
-    crate::stub::unimplemented("s2i_ASN1_UTF8STRING")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn v2i_ASN1_BIT_STRING(
-    _: *mut X509V3_EXT_METHOD,
-    _: *mut X509V3_CTX,
-    _: *mut stack_st_CONF_VALUE,
-) -> *mut ASN1_BIT_STRING {
-    crate::stub::unimplemented("v2i_ASN1_BIT_STRING")
 }
 
 #[unsafe(no_mangle)]

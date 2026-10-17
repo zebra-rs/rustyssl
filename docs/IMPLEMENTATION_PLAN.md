@@ -4611,6 +4611,28 @@ Exit checks:
     certificate issuer), which are 5.2's types.
   - [ ] **5.1f The rest**: `X509_INFO`, `X509_AUX` trust, Netscape SPKI, `X509_ACERT`.
 - [ ] **5.2 X509v3 extensions:**
+  - [x] **5.2a The methods and the simple extensions** (`x509v3/registry.rs`,
+    `x509v3/standard.rs`, `x509v3/simple.rs`, from `v3_lib.c`, `v3_prn.c`, `do_ext_i2d`,
+    `v3_bitst.c`, `v3_ia5.c`, `v3_utf8.c`, `v3_int.c`, `v3_enum.c`, `v3_skid.c`, `v3_bcons.c`,
+    `v3_extku.c`, `v3_pku.c`, and the value helpers of `v3_utl.c`):
+    - The registry: all 73 built-in methods by NID, with OpenSSL's flags, then the
+      application's (`X509V3_EXT_add`, `_add_list`, `_add_alias`, `_cleanup`).
+    - `X509V3_EXT_d2i`, `X509V3_get_d2i` (`*crit` -2 for a repeat), `X509V3_EXT_i2d`, and
+      `X509V3_add1_i2d` under each flag.
+    - `X509V3_EXT_print` (`i2s`, `i2v` on one line or many, `i2r`; unknown extensions under each
+      flag), `_print_fp`, `X509V3_extensions_print`, and `X509V3_EXT_val_prn`.
+    - Methods: key usage and Netscape's certificate type (named bits), Netscape's strings, the
+      signing tool, the CRL number, delta, and reason, inhibitAnyPolicy, the subject key
+      identifier (`hash` from the context's subject), basic constraints, the extended key
+      usages (and the OCSP and attribute-certificate extensions of that type), and the private
+      key usage period.
+    - The other 52 methods are placeholders until their sub-steps: their NIDs and flags are
+      OpenSSL's, and their functions abort.
+    - Tests:
+      - `tests/c/x509v3_lib.c`.
+      - The probe's `v3print`, with the corpus `v3print.txt` and random mutations (2,000
+        sessions pass).
+      - `fuzz/fuzz_targets/x509v3_print.rs`.
   - the certificate's extension cache (`ossl_x509v3_cache_extensions`: the SHA-1 hash, the
     flags, and the decoded extensions) and what 5.1c2 left for it (listed there)
   - the public `X509V3_EXT_METHOD` registry (including `X509V3_EXT_add` for

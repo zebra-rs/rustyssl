@@ -423,6 +423,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("msblob", msblob_session),
     ("hpke", hpke_session),
     ("x509name", x509name_session),
+    ("v3print", v3print_session),
     ("decode", decode_session),
     ("string", string_session),
 ];
@@ -4269,6 +4270,40 @@ fn hpke_session(random: &mut Random, out: &mut String) -> Result {
         )?;
     }
     Ok(())
+}
+
+/// Values for `v3print` sessions to start from, by NID (only extensions whose methods are in):
+/// key usage, Netscape's certificate type and comment, the signing tool, the CRL number and
+/// reason, inhibitAnyPolicy, the subject key identifier, basic constraints, extended key usage,
+/// and the private key usage period.
+const V3PRINT_SEEDS: &[(u32, &[&str])] = &[
+    (83, &["030205a0", "0303070080"]),
+    (71, &["030200ff"]),
+    (78, &["160b48656c6c6f20776f726c64"]),
+    (1007, &["0c05746f6f6cc3"]),
+    (
+        88,
+        &["02020100", "0211010000000000000000000000000000000000"],
+    ),
+    (141, &["0a0101", "0a012a"]),
+    (748, &["020100"]),
+    (82, &["0404deadbeef"]),
+    (87, &["30060101ff020103", "3000"]),
+    (126, &["301406082b0601050507030106082b06010505070302"]),
+    (
+        84,
+        &["3022800f32303234303130313030303030305a810f32303235303130313030303030305a"],
+    ),
+];
+
+/// A random session of `v3print` commands: a NID's seeds with octets changed, removed, or
+/// added, cut short, or whole.
+fn v3print_session(random: &mut Random, out: &mut String) -> Result {
+    let i = usize::try_from(random.below(V3PRINT_SEEDS.len() as u64)).unwrap_or(0);
+    let Some(&(nid, seeds)) = V3PRINT_SEEDS.get(i) else {
+        return Ok(());
+    };
+    mutated_sessions_upto(random, out, &format!("v3print {nid}"), seeds, 480)
 }
 
 /// Names for `x509name` sessions to start from (tests/c/x509_name.c's): one with every string

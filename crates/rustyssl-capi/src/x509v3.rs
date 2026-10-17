@@ -5,6 +5,10 @@
 //! `rustyssl_asn1::number` rather than BIGNUM, with the same text: decimal below 128 bits, `0x`
 //! and hex above.
 
+pub(crate) mod registry;
+pub(crate) mod simple;
+mod standard;
+
 use core::ffi::{CStr, c_char, c_int, c_long};
 use core::ptr;
 
@@ -227,7 +231,7 @@ mod tests {
 ///
 /// # Safety
 /// `extlist` is valid for reads and writes, holding NULL or a stack of `CONF_VALUE`s.
-unsafe fn add_value(
+pub(crate) unsafe fn add_value(
     name: Option<&[u8]>,
     value: Option<&[u8]>,
     extlist: *mut *mut rustyssl_abi::stack_st_CONF_VALUE,
