@@ -5,6 +5,7 @@
 pub(crate) mod algor;
 pub(crate) mod attrib;
 pub(crate) mod p8;
+pub(crate) mod pbe;
 pub(crate) mod pubkey;
 pub(crate) mod sig;
 

@@ -471,3 +471,9 @@ name = "ecx_ops"
 path = "fuzz_targets/ecx_ops.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "pbe"
+path = "fuzz_targets/pbe.rs"
+test = false
+doc = false

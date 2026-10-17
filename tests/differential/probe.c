@@ -401,6 +401,11 @@
  *                              selection (hex), output type, and structure: the encoders, the
  *                              result, and the octets in hex; then the lengths of i2d_PrivateKey,
  *                              i2d_PublicKey, i2d_KeyParams, and i2d_PUBKEY of the key
+ *   pbe <alg-der-hex|-> <cipher> <prf> <iter> <salt-hex> <iv-hex> <pass>  a PBE AlgorithmIdentifier
+ *                              (the DER given, else PKCS5_pbe2_set_iv of the cipher's short name,
+ *                              the PRF NID, the iterations, salt, and IV; - for an empty salt or
+ *                              IV): its DER, then a fixed text encrypted and decrypted through
+ *                              EVP_PBE_CipherInit with the password (- for none)
  *   pemwrite <hex>             a key from the octets (d2i_AutoPrivateKey, else d2i_PUBKEY) through
  *                              the PEM writers (PEM_write_bio_PrivateKey, _PrivateKey_traditional,
  *                              _PKCS8PrivateKey, i2d_PKCS8PrivateKey_bio, _PUBKEY, _Parameters):
@@ -6582,6 +6587,73 @@ static int x509_command(const char *command, const char *line)
         print_asn_errors();
         EVP_PKEY_free(k);
         OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "pbe") == 0) {
+        char der_hx[4100] = "-", cname[64] = "", salt_hx[200] = "-", iv_hx[100] = "-", pass[100] = "-";
+        int prf = -1, iter = 1, n = 0, m = 0, k = 0, f = 0;
+        long len = 0;
+        unsigned char *der = NULL, *salt = NULL, *iv = NULL, *enc = NULL, out[512], back[512];
+        const unsigned char *q;
+        X509_ALGOR *a = NULL;
+        EVP_CIPHER_CTX *ctx;
+        static const unsigned char text[] = "a fixed text to encrypt, of some length";
+        const char *pw;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %4099s %63s %d %d %199s %99s %99s", der_hx, cname, &prf, &iter, salt_hx, iv_hx, pass);
+        pw = strcmp(pass, "-") == 0 ? NULL : pass;
+        if (strcmp(der_hx, "-") != 0) {
+            der = OPENSSL_hexstr2buf(der_hx, &len);
+            q = der;
+            a = der != NULL ? d2i_X509_ALGOR(NULL, &q, len) : NULL;
+        } else {
+            const EVP_CIPHER *c = EVP_get_cipherbyname(cname);
+            long sl = 0, il = 0;
+
+            salt = strcmp(salt_hx, "-") == 0 ? NULL : OPENSSL_hexstr2buf(salt_hx, &sl);
+            iv = strcmp(iv_hx, "-") == 0 ? NULL : OPENSSL_hexstr2buf(iv_hx, &il);
+            if (c != NULL && (iv != NULL || EVP_CIPHER_get_iv_length(c) == 0)
+                && (iv == NULL || il >= EVP_CIPHER_get_iv_length(c)) && salt != NULL)
+                a = PKCS5_pbe2_set_iv(c, iter, salt, (int)sl, iv, prf);
+            else
+                printf(" (no cipher, salt, or IV)");
+        }
+        if (a == NULL) {
+            printf(" no algorithm");
+            print_asn_errors();
+        } else {
+            n = i2d_X509_ALGOR(a, &enc);
+            printf(" der ");
+            for (k = 0; k < n; k++)
+                printf("%02x", enc[k]);
+            ctx = EVP_CIPHER_CTX_new();
+            n = m = 0;
+            if (EVP_PBE_CipherInit(a->algorithm, pw, pw == NULL ? 0 : -1, a->parameter, ctx, 1)
+                && EVP_CipherUpdate(ctx, out, &n, text, sizeof(text) - 1) && EVP_CipherFinal_ex(ctx, out + n, &m)) {
+                printf(" enc ");
+                for (k = 0; k < n + m; k++)
+                    printf("%02x", out[k]);
+            } else {
+                printf(" enc fails");
+            }
+            print_asn_errors();
+            EVP_CIPHER_CTX_free(ctx);
+            ctx = EVP_CIPHER_CTX_new();
+            k = f = 0;
+            if (n + m > 0 && EVP_PBE_CipherInit(a->algorithm, pw, pw == NULL ? 0 : -1, a->parameter, ctx, 0)
+                && EVP_CipherUpdate(ctx, back, &k, out, n + m) && EVP_CipherFinal_ex(ctx, back + k, &f))
+                printf(" dec %s", (size_t)(k + f) == sizeof(text) - 1 && memcmp(back, text, k + f) == 0 ? "same" : "differs");
+            else
+                printf(" dec fails");
+            print_asn_errors();
+            EVP_CIPHER_CTX_free(ctx);
+        }
+        X509_ALGOR_free(a);
+        OPENSSL_free(enc);
+        OPENSSL_free(der);
+        OPENSSL_free(salt);
+        OPENSSL_free(iv);
         return 1;
     }
     if (strcmp(command, "pemwrite") == 0) {

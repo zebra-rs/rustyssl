@@ -23,6 +23,7 @@ pub(crate) mod mac;
 pub(crate) mod md_ctx;
 pub(crate) mod md_meth;
 pub(crate) mod opmeth;
+pub(crate) mod pbe;
 pub(crate) mod pkey;
 pub(crate) mod pkey_ctx;
 pub(crate) mod pmeth;

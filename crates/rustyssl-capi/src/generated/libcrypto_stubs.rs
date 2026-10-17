@@ -3020,90 +3020,6 @@ pub extern "C" fn EVP_OpenInit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_CipherInit(
-    _: *mut ASN1_OBJECT,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *mut EVP_CIPHER_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_CipherInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_CipherInit_ex(
-    _: *mut ASN1_OBJECT,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *mut EVP_CIPHER_CTX,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_CipherInit_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_alg_add(
-    _: core::ffi::c_int,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: EVP_PBE_KEYGEN,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_alg_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_alg_add_type(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: EVP_PBE_KEYGEN,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_alg_add_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_cleanup() {
-    crate::stub::unimplemented("EVP_PBE_cleanup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_find(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut EVP_PBE_KEYGEN,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_find")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_find_ex(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: *mut EVP_PBE_KEYGEN,
-    _: *mut EVP_PBE_KEYGEN_EX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_find_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PBE_get(
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PBE_get")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_add1_attr(_: *mut EVP_PKEY, _: *mut X509_ATTRIBUTE) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_add1_attr")
 }
@@ -7837,66 +7753,6 @@ pub extern "C" fn OTHERNAME_new() -> *mut OTHERNAME {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PBE2PARAM_free(_: *mut PBE2PARAM) {
-    crate::stub::unimplemented("PBE2PARAM_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBE2PARAM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PBE2PARAM_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBE2PARAM_new() -> *mut PBE2PARAM {
-    crate::stub::unimplemented("PBE2PARAM_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBEPARAM_free(_: *mut PBEPARAM) {
-    crate::stub::unimplemented("PBEPARAM_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBEPARAM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PBEPARAM_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBEPARAM_new() -> *mut PBEPARAM {
-    crate::stub::unimplemented("PBEPARAM_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBKDF2PARAM_free(_: *mut PBKDF2PARAM) {
-    crate::stub::unimplemented("PBKDF2PARAM_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBKDF2PARAM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PBKDF2PARAM_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBKDF2PARAM_new() -> *mut PBKDF2PARAM {
-    crate::stub::unimplemented("PBKDF2PARAM_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBMAC1PARAM_free(_: *mut PBMAC1PARAM) {
-    crate::stub::unimplemented("PBMAC1PARAM_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBMAC1PARAM_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("PBMAC1PARAM_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBMAC1PARAM_new() -> *mut PBMAC1PARAM {
-    crate::stub::unimplemented("PBMAC1PARAM_new")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PBMAC1_get1_pbkdf2_param(_: *const X509_ALGOR) -> *mut PBKDF2PARAM {
     crate::stub::unimplemented("PBMAC1_get1_pbkdf2_param")
 }
@@ -8303,39 +8159,6 @@ pub extern "C" fn PKCS12_MAC_DATA_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn PKCS12_MAC_DATA_new() -> *mut PKCS12_MAC_DATA {
     crate::stub::unimplemented("PKCS12_MAC_DATA_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_PBE_add() {
-    crate::stub::unimplemented("PKCS12_PBE_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_PBE_keyivgen(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_PBE_keyivgen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS12_PBE_keyivgen_ex(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS12_PBE_keyivgen_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -9037,210 +8860,6 @@ pub extern "C" fn PKCS1_MGF1(
     _: *const EVP_MD,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PKCS1_MGF1")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_PBE_add() {
-    crate::stub::unimplemented("PKCS5_PBE_add")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_PBE_keyivgen(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_PBE_keyivgen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_PBE_keyivgen_ex(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_PBE_keyivgen_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe2_set(
-    _: *const EVP_CIPHER,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe2_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe2_set_iv(
-    _: *const EVP_CIPHER,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe2_set_iv")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe2_set_iv_ex(
-    _: *const EVP_CIPHER,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe2_set_iv_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe2_set_scrypt(
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: u64,
-    _: u64,
-    _: u64,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe2_set_scrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe_set(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe_set0_algor(
-    _: *mut X509_ALGOR,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_pbe_set0_algor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe_set0_algor_ex(
-    _: *mut X509_ALGOR,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_pbe_set0_algor_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbe_set_ex(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbe_set_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbkdf2_set(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbkdf2_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_pbkdf2_set_ex(
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("PKCS5_pbkdf2_set_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_v2_PBE_keyivgen(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_v2_PBE_keyivgen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_v2_PBE_keyivgen_ex(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_v2_PBE_keyivgen_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_v2_scrypt_keyivgen(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_v2_scrypt_keyivgen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS5_v2_scrypt_keyivgen_ex(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut ASN1_TYPE,
-    _: *const EVP_CIPHER,
-    _: *const EVP_MD,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS5_v2_scrypt_keyivgen_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -10105,21 +9724,6 @@ pub extern "C" fn PROXY_POLICY_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn PROXY_POLICY_new() -> *mut PROXY_POLICY {
     crate::stub::unimplemented("PROXY_POLICY_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SCRYPT_PARAMS_free(_: *mut SCRYPT_PARAMS) {
-    crate::stub::unimplemented("SCRYPT_PARAMS_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SCRYPT_PARAMS_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("SCRYPT_PARAMS_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SCRYPT_PARAMS_new() -> *mut SCRYPT_PARAMS {
-    crate::stub::unimplemented("SCRYPT_PARAMS_new")
 }
 
 #[unsafe(no_mangle)]
@@ -17496,42 +17100,6 @@ pub extern "C" fn d2i_OTHERNAME(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_PBE2PARAM(
-    _: *mut *mut PBE2PARAM,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PBE2PARAM {
-    crate::stub::unimplemented("d2i_PBE2PARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PBEPARAM(
-    _: *mut *mut PBEPARAM,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PBEPARAM {
-    crate::stub::unimplemented("d2i_PBEPARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PBKDF2PARAM(
-    _: *mut *mut PBKDF2PARAM,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PBKDF2PARAM {
-    crate::stub::unimplemented("d2i_PBKDF2PARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PBMAC1PARAM(
-    _: *mut *mut PBMAC1PARAM,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut PBMAC1PARAM {
-    crate::stub::unimplemented("d2i_PBMAC1PARAM")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_PKCS12(
     _: *mut *mut PKCS12,
     _: *mut *const core::ffi::c_uchar,
@@ -17759,15 +17327,6 @@ pub extern "C" fn d2i_PROXY_POLICY(
     _: core::ffi::c_long,
 ) -> *mut PROXY_POLICY {
     crate::stub::unimplemented("d2i_PROXY_POLICY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_SCRYPT_PARAMS(
-    _: *mut *mut SCRYPT_PARAMS,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut SCRYPT_PARAMS {
-    crate::stub::unimplemented("d2i_SCRYPT_PARAMS")
 }
 
 #[unsafe(no_mangle)]
@@ -18955,38 +18514,6 @@ pub extern "C" fn i2d_OTHERNAME(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PBE2PARAM(
-    _: *const PBE2PARAM,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PBE2PARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PBEPARAM(
-    _: *const PBEPARAM,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PBEPARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PBKDF2PARAM(
-    _: *const PBKDF2PARAM,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PBKDF2PARAM")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PBMAC1PARAM(
-    _: *const PBMAC1PARAM,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PBMAC1PARAM")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PKCS12(
     _: *const PKCS12,
     _: *mut *mut core::ffi::c_uchar,
@@ -19179,14 +18706,6 @@ pub extern "C" fn i2d_PROXY_POLICY(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_PROXY_POLICY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_SCRYPT_PARAMS(
-    _: *const SCRYPT_PARAMS,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_SCRYPT_PARAMS")
 }
 
 #[unsafe(no_mangle)]
