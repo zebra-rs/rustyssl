@@ -381,6 +381,9 @@
  *                              (numbers in hex, - for none, or RFC 6979's DSA-1024 key's parts
  *                              k:p, k:q, k:g, k:y, k:x; gx for g^priv mod p; the edit adds to
  *                              one, as for dhkey), then its sizes and every validation
+ *   p8der <k|s|a|l> <hex>      d2i_PKCS8_PRIV_KEY_INFO (k), d2i_X509_SIG (s),
+ *                              d2i_X509_ATTRIBUTE (a), or d2i_X509_ALGORS (l) of the octets: the
+ *                              result, the octets consumed, what it holds, and its re-encoding
  *   dsasig <priv> <how> <md|-> <nonce-type> <alg|-> <msg> <sig|->  DSA signatures with RFC
  *                              6979's DSA-1024 parameters and the private key (hex, or k:x;
  *                              its public key computed): a key from the key manager (p), a
@@ -460,6 +463,7 @@
 #include <openssl/rand.h>
 #include <openssl/rc2.h>
 #include <openssl/rc4.h>
+#include <openssl/x509.h>
 #include <openssl/ripemd.h>
 #include <openssl/rsa.h>
 #include <openssl/seed.h>
@@ -6330,6 +6334,62 @@ static void dsa_sig_command(const char *line)
     DSA_meth_free(meth);
 }
 
+/* p8der: one of PKCS#8's and X.509's structure decoders, then what it holds and its DER. */
+static int x509_command(const char *command, const char *line)
+{
+    char kind[4] = "k", hexs[2100] = "";
+    long n = 0;
+    unsigned char *der, *re = NULL;
+    const unsigned char *pp;
+    const ASN1_ITEM *it;
+    void *v;
+    int rn;
+
+    if (strcmp(command, "p8der") != 0)
+        return 0;
+    printf("%s:", line);
+    sscanf(line, "%*s %3s %2099s", kind, hexs);
+    der = OPENSSL_hexstr2buf(hexs, &n);
+    it = strcmp(kind, "s") == 0   ? ASN1_ITEM_rptr(X509_SIG)
+         : strcmp(kind, "a") == 0 ? ASN1_ITEM_rptr(X509_ATTRIBUTE)
+         : strcmp(kind, "l") == 0 ? ASN1_ITEM_rptr(X509_ALGORS)
+                                  : ASN1_ITEM_rptr(PKCS8_PRIV_KEY_INFO);
+    pp = der;
+    v = der == NULL ? NULL : ASN1_item_d2i(NULL, &pp, n, it);
+    printf(" %s consumed %ld", v == NULL ? "fails" : "ok", der == NULL ? 0L : (long)(pp - der));
+    print_asn_errors();
+    if (v != NULL) {
+        if (strcmp(kind, "k") == 0) {
+            const ASN1_OBJECT *o = NULL;
+            const unsigned char *pk = NULL;
+            int pklen = 0;
+
+            PKCS8_pkey_get0(&o, &pk, &pklen, NULL, v);
+            printf("  alg %d keylen %d attrs %d", OBJ_obj2nid(o), pklen,
+                   X509at_get_attr_count(PKCS8_pkey_get0_attrs(v)));
+        } else if (strcmp(kind, "a") == 0) {
+            printf("  nid %d count %d", OBJ_obj2nid(X509_ATTRIBUTE_get0_object(v)),
+                   X509_ATTRIBUTE_count(v));
+        } else if (strcmp(kind, "l") == 0) {
+            printf("  count %d", sk_X509_ALGOR_num(v));
+        }
+        rn = ASN1_item_i2d(v, &re, it);
+        printf(" re %d same %d", rn, rn == (int)n && re != NULL && memcmp(re, der, (size_t)n) == 0);
+        if (rn > 0) {
+            const unsigned char *rp = re;
+            void *back = ASN1_item_d2i(NULL, &rp, rn, it);
+
+            printf(" redecodes %d", back != NULL);
+            ASN1_item_free(back, it);
+        }
+        OPENSSL_free(re);
+        print_asn_errors();
+        ASN1_item_free(v, it);
+    }
+    OPENSSL_free(der);
+    return 1;
+}
+
 /* Runs a DH command; returns 0 if `command` isn't one. */
 static int dh_command(const char *command, const char *line)
 {
@@ -10138,7 +10198,8 @@ int main(void)
             || skey_command(command, line) || md_meth_command(command, line)
             || cipher_meth_command(command, line) || conf_command(command, line)
             || conf_modules_command(command, line) || ec_command(command, line)
-            || ml_kem_command(command, line) || dh_command(command, line)) {
+            || ml_kem_command(command, line) || dh_command(command, line)
+            || x509_command(command, line)) {
             fflush(stdout);
             continue;
         } else if (strcmp(command, "new") == 0) {

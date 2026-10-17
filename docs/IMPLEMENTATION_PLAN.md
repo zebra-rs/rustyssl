@@ -4115,6 +4115,48 @@ chunking) is clean.
   - `PEM_{read,write}_bio_{PrivateKey,PUBKEY,RSAPrivateKey,…}`,
     `d2i/i2d_{PrivateKey,PublicKey,PUBKEY}`, `d2i_AutoPrivateKey`
   - the password-callback contract
+
+  Sub-steps (the structures and the legacy methods' codecs first, then each framework with
+  its built-in implementations, decoders first as `d2i_X509_PUBKEY` and `EVP_PKCS82PKEY` use
+  them, then encryption and Microsoft's formats):
+  - [ ] **4.7a SPKI and PKCS#8 structures**, in sub-steps:
+    - [x] **4.7a1 The structures** (`x509/algor.rs`, `x509/attrib.rs`, `x509/sig.rs`,
+      `x509/p8.rs`; 59 exports): the rest of `X509_ALGOR` (`set0`, `get0`, `set_md`, `cmp`,
+      `copy`, `dup`) and `X509_ALGORS`; `X509_ATTRIBUTE` (made by NID, object, or name, with
+      strings, multibyte strings, or copies of values; read; DER) and the `X509at_*`
+      functions over stacks of them (adding refuses a second attribute of an object);
+      `X509_SIG`; and `PKCS8_PRIV_KEY_INFO` (DER with OpenSSL's version checks and the wipe
+      of the key's octets on free, the BIO and FILE forms, `PKCS8_pkey_set0`/`get0`, the
+      attribute functions, `PKCS8_get_attr`, `PKCS8_add_keyusage`). NULL arguments OpenSSL
+      dereferences are refused (docs/DEVIATIONS.md).
+      - Tests: `tests/c/x509_attr_p8.c` (30 checks); the probe's `p8der` with
+        `corpus/p8der.txt` and random sessions (300 pass); `fuzz/fuzz_targets/pkcs8_der.rs`
+        (which found that OpenSSL can't always decode its own encoding of an ANY holding a
+        constructed end-of-contents; rustyssl matches).
+    - [ ] **4.7a2 `X509_PUBKEY` and the key types' codecs**: `X509_PUBKEY` (its template,
+      algorithm, and key bits; `X509_PUBKEY_set`, `get0`, `get`, `set0_param`, `get0_param`,
+      `eq`, `dup`; the legacy `d2i_RSA_PUBKEY` and the other typed ones, which decode with
+      the ASN.1 methods) and the built-in ASN.1 methods' public and private codecs (RSA,
+      RSA-PSS, DH, DHX, DSA, EC, the ECX types) with the rest of their functions
+      (`builtin_*` in `evp/pkey/ameth.rs` abort until then). Decoding a key with a decoder
+      (`d2i_X509_PUBKEY`'s) aborts until 4.7b.
+  - [ ] **4.7b Decoders**: the `OSSL_DECODER` framework (fetch, contexts, chains of
+    decoders, the construct callback), `pem2der`, `der2key`, `spki2typespki`, `epki2pki`,
+    and the post-quantum codecs' decoding; `d2i_X509_PUBKEY`'s key, `d2i_PUBKEY`,
+    `d2i_PrivateKey`, `d2i_AutoPrivateKey`, `d2i_PublicKey`, `EVP_PKCS82PKEY`, and the PEM
+    readers of keys (`PEM_read_bio_PrivateKey`, `_PUBKEY`, `_RSAPrivateKey`, ...).
+  - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an
+    output type and structure), the default provider's `key2any` (DER and PEM:
+    PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures, parameters) and
+    `key2text` (so `EVP_PKEY_print_*` prints provided keys), and the post-quantum codecs'
+    encoding; `i2d_PrivateKey`, `i2d_PUBKEY`, `i2d_PublicKey`, `EVP_PKEY2PKCS8`, and the PEM
+    writers of keys.
+  - [ ] **4.7d Encrypted keys**: PKCS#5 PBES1 and PBES2 (PBKDF2, scrypt) and the PBE
+    table (`EVP_PBE_*`, `PKCS5_pbe2_set_iv`, ...), `PKCS8_encrypt`/`PKCS8_decrypt`,
+    EncryptedPrivateKeyInfo encoding and decoding, `PEM_write_bio_PKCS8PrivateKey`,
+    traditional PEM with DEK-Info for keys, and the password-callback contract.
+  - [ ] **4.7e MSBLOB and PVK**: `encode_key2ms`, `decode_msblob2key`, `decode_pvk2key`,
+    and `b2i_*`/`i2b_*`.
 - [ ] **4.8 HPKE** (`OSSL_HPKE_*`): the base, psk, auth, and authpsk modes, every KEM/KDF/AEAD
   combination, and GREASE.
 

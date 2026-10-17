@@ -85,4 +85,5 @@ mod threads;
 mod trace;
 mod ui;
 mod version;
+mod x509;
 mod x509v3;
