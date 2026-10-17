@@ -598,6 +598,27 @@ static void test_points_misc(void)
             printf("  %s: have %d, precompute %d, have %d\n", OBJ_nid2sn(nids[i]), before, ret,
                    EC_GROUP_have_precompute_mult(o));
             EC_GROUP_free(o);
+            /* A generator other than the standard one (2G), before any precomputation. */
+            o = EC_GROUP_new_by_curve_name(nids[i]);
+            {
+                EC_POINT *two = EC_POINT_new(o);
+                const BIGNUM *ord = EC_GROUP_get0_order(o), *cof = EC_GROUP_get0_cofactor(o);
+                BIGNUM *ordc = BN_dup(ord), *cofc = BN_dup(cof);
+
+                EC_POINT_dbl(o, two, EC_GROUP_get0_generator(o), NULL);
+                printf("    2G as the generator: %d, have %d",
+                       EC_GROUP_set_generator(o, two, ordc, cofc), EC_GROUP_have_precompute_mult(o));
+                printf(", precompute %d, have %d", EC_GROUP_precompute_mult(o, NULL),
+                       EC_GROUP_have_precompute_mult(o));
+                EC_POINT_copy(two, EC_GROUP_get0_generator(o));
+                EC_POINT_dbl(o, two, two, NULL);
+                printf(", 4G kept the table: %d, have %d\n",
+                       EC_GROUP_set_generator(o, two, ordc, cofc), EC_GROUP_have_precompute_mult(o));
+                EC_POINT_free(two);
+                BN_free(ordc);
+                BN_free(cofc);
+            }
+            EC_GROUP_free(o);
         }
     }
 

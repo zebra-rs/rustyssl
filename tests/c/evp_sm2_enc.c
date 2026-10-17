@@ -323,6 +323,21 @@ static void test_encrypt(EVP_PKEY *k, EVP_PKEY *pub)
         printf("  empty %d\n", EVP_PKEY_CTX_set_params(c, p));
     }
     EVP_PKEY_CTX_free(c);
+    {
+        /* Copies of a decryption context hold their own references to the key. */
+        int i, ok = 1;
+
+        for (i = 0; i < 4; i++) {
+            EVP_PKEY_CTX *e = EVP_PKEY_CTX_new_from_pkey(NULL, k, NULL), *f;
+
+            ok = ok && e != NULL && EVP_PKEY_decrypt_init_ex(e, NULL) == 1;
+            f = EVP_PKEY_CTX_dup(e);
+            ok = ok && f != NULL;
+            EVP_PKEY_CTX_free(f);
+            EVP_PKEY_CTX_free(e);
+        }
+        check(ok, "copied decryption contexts leave the key usable");
+    }
 }
 
 /* A legacy EC_KEY on SM2's curve encrypts and decrypts through the provider. */

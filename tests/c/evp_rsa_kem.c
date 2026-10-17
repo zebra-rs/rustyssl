@@ -144,6 +144,7 @@ static void test_round_trip(EVP_PKEY *k)
     c = EVP_PKEY_CTX_new(k, NULL);
     check(EVP_PKEY_decapsulate_init(c, NULL) == 1 && EVP_PKEY_CTX_set_kem_op(c, "rsasve") == 1,
           "decapsulate init, the operation in lower case");
+    glen = 0;
     check(EVP_PKEY_decapsulate(c, NULL, &glen, wrapped, wlen) == 1, "the size query");
     printf("  size %zu\n", glen);
     glen = sizeof(got);

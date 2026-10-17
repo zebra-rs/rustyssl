@@ -7,7 +7,8 @@
 //! aliasing rules and errors are OpenSSL's: `BN_mod_add` is `BN_add` then `BN_nnmod`, which
 //! refuses a result that is the modulus. The exponentiations compute their value with
 //! [`exp_mod`] (constant time for an odd modulus), after each function's own checks; the
-//! inverse and the gcd are always constant time.
+//! inverse and the gcd are always constant time. An inverse whose result aliases its modulus
+//! also replays OpenSSL's steps (`openssl_inverse_tail`), to fail where OpenSSL's does.
 
 use core::cmp::Ordering;
 use core::ffi::{c_int, c_uchar, c_ulong};
@@ -590,6 +591,26 @@ ffi_export! {
             raise(Error::NoInverse);
             return ptr::null_mut();
         };
+        if core::ptr::eq(in_.cast_const(), n) {
+            // OpenSSL's result aliasing the modulus: it fails where its steps leave a value it
+            // has to reduce (`BN_nnmod` refusing a result that is the modulus).
+            // SAFETY: the caller's number.
+            let a_flagged = unsafe { super::BN_get_flags(a, BN_FLG_CONSTTIME) } != 0;
+            // SAFETY: as above.
+            let n_flagged = unsafe { super::BN_get_flags(n, BN_FLG_CONSTTIME) } != 0;
+            let consttime = a_flagged || n_flagged;
+            match modular::openssl_inverse_tail(&x, &nv, consttime) {
+                Ok(Some((_, true))) => {}
+                Ok(_) => {
+                    err::raise(ERR_LIB_BN, ERR_R_PASSED_INVALID_ARGUMENT, "BN_nnmod");
+                    return ptr::null_mut();
+                }
+                Err(e) => {
+                    raise(e);
+                    return ptr::null_mut();
+                }
+            }
+        }
         if in_.is_null() {
             return new_bignum(v, false);
         }

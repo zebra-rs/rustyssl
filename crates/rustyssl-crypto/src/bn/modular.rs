@@ -176,6 +176,103 @@ fn trailing_zeros(a: &BigNum) -> usize {
     i
 }
 
+/// The value OpenSSL's `int_bn_mod_inverse` comes to before it stores its result, by the same
+/// steps: `Y` with `Y * a == 1 (mod |n|)`, and whether it's already in `[0, |n|)` (OpenSSL
+/// copies it then, else reduces it with `BN_nnmod`, which refuses a result that is the
+/// modulus); `None` when there's no inverse. The binary algorithm for an odd `n` of up to 2048
+/// bits, Euclid's otherwise, and `bn_mod_inverse_no_branch`'s divisions for `consttime`.
+///
+/// It branches on the values, as OpenSSL's does: it's only for telling what OpenSSL does with
+/// a result that aliases the modulus, never for computing an inverse.
+pub fn openssl_inverse_tail(
+    a: &BigNum,
+    n: &BigNum,
+    consttime: bool,
+) -> Result<Option<(BigNum, bool)>, Error> {
+    let mut x = BigNum::one();
+    let mut y = BigNum::zero();
+    let mut a_ = n.abs();
+    let mut b = a.clone();
+    if b.is_negative() || ucmp(&b, &a_) != Ordering::Less {
+        b = nnmod(&b, &a_)?;
+    }
+    let mut sign: i32 = -1;
+    if !consttime && n.is_odd() && n.num_bits() <= 2048 {
+        while !b.is_zero() {
+            let mut shift = 0;
+            while !b.is_bit_set(shift) {
+                shift = shift.saturating_add(1);
+                if x.is_odd() {
+                    x = super::uadd(&x, n)?;
+                }
+                x = super::rshift1(&x);
+            }
+            if shift > 0 {
+                b = rshift(&b, shift);
+            }
+            shift = 0;
+            while !a_.is_bit_set(shift) {
+                shift = shift.saturating_add(1);
+                if y.is_odd() {
+                    y = super::uadd(&y, n)?;
+                }
+                y = super::rshift1(&y);
+            }
+            if shift > 0 {
+                a_ = rshift(&a_, shift);
+            }
+            if ucmp(&b, &a_) != Ordering::Less {
+                x = super::uadd(&x, &y)?;
+                b = super::usub(&b, &a_)?;
+            } else {
+                y = super::uadd(&y, &x)?;
+                a_ = super::usub(&a_, &b)?;
+            }
+        }
+    } else {
+        while !b.is_zero() {
+            let (d, m) = if consttime {
+                div_rem(&a_, &b)?
+            } else if a_.num_bits() == b.num_bits() {
+                (BigNum::one(), sub(&a_, &b)?)
+            } else if a_.num_bits() == b.num_bits().saturating_add(1) {
+                let t = lshift1(&b)?;
+                if ucmp(&a_, &t) == Ordering::Less {
+                    (BigNum::one(), sub(&a_, &b)?)
+                } else {
+                    let m = sub(&a_, &t)?;
+                    let three_b = add(&t, &b)?;
+                    if ucmp(&a_, &three_b) == Ordering::Less {
+                        (BigNum::from_word(2), m)
+                    } else {
+                        (BigNum::from_word(3), sub(&m, &b)?)
+                    }
+                }
+            } else {
+                div_rem(&a_, &b)?
+            };
+            a_ = b;
+            b = m;
+            let tmp = if d.is_one() {
+                add(&x, &y)?
+            } else {
+                add(&mul(&d, &x)?, &y)?
+            };
+            y = x;
+            x = tmp;
+            sign = sign.saturating_neg();
+        }
+    }
+    if sign < 0 {
+        y = sub(n, &y)?;
+    }
+    if !a_.is_one() {
+        return Ok(None);
+    }
+    let reduced = !y.is_negative() && ucmp(&y, n) == Ordering::Less;
+    Ok(Some((y, reduced)))
+}
+
 /// `BN_kronecker`: the Kronecker symbol `(a | b)`, OpenSSL's way (negative `a` read from its
 /// magnitude's bits, as `BN_lsw` does).
 pub fn kronecker(a: &BigNum, b: &BigNum) -> Result<i32, Error> {
