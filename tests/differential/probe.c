@@ -396,6 +396,11 @@
  *                              (8), or d2i_X509_PUBKEY's key (x): the result, the octets
  *                              consumed, the key's type, sizes, public key, and whether it has
  *                              its private part
+ *   enckey <sel> <type> <structure|-> <hex>  a key from the octets (d2i_AutoPrivateKey, else
+ *                              d2i_PUBKEY) through OSSL_ENCODER_CTX_new_for_pkey with the
+ *                              selection (hex), output type, and structure: the encoders, the
+ *                              result, and the octets in hex; then the lengths of i2d_PrivateKey,
+ *                              i2d_PublicKey, i2d_KeyParams, and i2d_PUBKEY of the key
  *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
  *                              octets: the result, the octets consumed, the key's size, and
  *                              its SubjectPublicKeyInfo encoded again
@@ -463,6 +468,7 @@
 #include <openssl/crypto.h>
 #include <openssl/core_object.h>
 #include <openssl/decoder.h>
+#include <openssl/encoder.h>
 #include <openssl/des.h>
 #include <openssl/ec.h>
 #include <openssl/dh.h>
@@ -6519,6 +6525,55 @@ static int x509_command(const char *command, const char *line)
                    || EVP_PKEY_get_octet_string_param(k, OSSL_PKEY_PARAM_PRIV_KEY, buf,
                                                       sizeof(buf), &blen));
             BN_free(bn);
+        }
+        print_asn_errors();
+        EVP_PKEY_free(k);
+        OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "enckey") == 0) {
+        char type[16] = "DER", structure[40] = "-", hx[4100] = "";
+        unsigned int sel = 0;
+        long len = 0;
+        unsigned char *in;
+        const unsigned char *q;
+        EVP_PKEY *k = NULL;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %x %15s %39s %4099s", &sel, type, structure, hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        if (in != NULL) {
+            q = in;
+            k = d2i_AutoPrivateKey(NULL, &q, len);
+            if (k == NULL) {
+                q = in;
+                k = d2i_PUBKEY(NULL, &q, len);
+            }
+        }
+        ERR_clear_error();
+        if (k == NULL) {
+            printf(" no key");
+        } else {
+            OSSL_ENCODER_CTX *ectx =
+                OSSL_ENCODER_CTX_new_for_pkey(k, (int)sel, type,
+                                              strcmp(structure, "-") == 0 ? NULL : structure, NULL);
+            unsigned char *data = NULL;
+            size_t dlen = 0, i;
+
+            printf(" %s encoders %d", EVP_PKEY_get0_type_name(k) != NULL ? EVP_PKEY_get0_type_name(k) : "-",
+                   OSSL_ENCODER_CTX_get_num_encoders(ectx));
+            if (OSSL_ENCODER_to_data(ectx, &data, &dlen)) {
+                printf(" ok ");
+                for (i = 0; i < dlen; i++)
+                    printf("%02x", data[i]);
+            } else {
+                printf(" fails");
+            }
+            print_asn_errors();
+            OPENSSL_free(data);
+            OSSL_ENCODER_CTX_free(ectx);
+            printf(" i2d %d %d %d %d", i2d_PrivateKey(k, NULL), i2d_PublicKey(k, NULL),
+                   i2d_KeyParams(k, NULL), i2d_PUBKEY(k, NULL));
         }
         print_asn_errors();
         EVP_PKEY_free(k);

@@ -92,6 +92,9 @@ pub(crate) type Copy = unsafe extern "C" fn(*mut EVP_PKEY, *mut EVP_PKEY) -> c_i
 /// KEY` ...), which applications can't set.
 pub(crate) type OldPrivDecode =
     unsafe extern "C" fn(*mut EVP_PKEY, *mut *const c_uchar, c_int) -> c_int;
+/// The built-in methods' `old_priv_encode` (the traditional formats' DER), which applications
+/// can't set.
+pub(crate) type OldPrivEncode = unsafe extern "C" fn(*const EVP_PKEY, *mut *mut c_uchar) -> c_int;
 
 /// `dirty_cnt`: the legacy data's change count.
 pub(crate) type DirtyCnt = unsafe fn(*const EVP_PKEY) -> usize;
@@ -135,6 +138,7 @@ pub(crate) struct Funcs {
     pub(crate) get_pub_key: Option<GetRaw>,
     pub(crate) copy: Option<Copy>,
     pub(crate) old_priv_decode: Option<OldPrivDecode>,
+    pub(crate) old_priv_encode: Option<OldPrivEncode>,
     pub(crate) priv_decode_ex: Option<PrivDecodeEx>,
     /// The built-in methods' bridge to the providers (applications' methods have none).
     pub(crate) dirty_cnt: Option<DirtyCnt>,
@@ -326,6 +330,7 @@ impl Kind {
                 f.pkey_free = Some(d::int_dsa_free);
                 f.pkey_ctrl = Some(d::dsa_pkey_ctrl);
                 f.old_priv_decode = Some(d::old_dsa_priv_decode);
+                f.old_priv_encode = Some(d::old_dsa_priv_encode);
                 f.dirty_cnt = Some(d::dsa_pkey_dirty_cnt);
                 f.export_to = Some(d::dsa_pkey_export_to);
                 f.import_from = Some(d::dsa_pkey_import_from);
@@ -380,6 +385,7 @@ impl Kind {
                 f.pkey_free = Some(e::int_ec_free);
                 f.pkey_ctrl = Some(e::ec_pkey_ctrl);
                 f.old_priv_decode = Some(e::old_ec_priv_decode);
+                f.old_priv_encode = Some(e::old_ec_priv_encode);
                 f.pkey_check = Some(e::ec_pkey_check);
                 f.pkey_public_check = Some(e::ec_pkey_public_check);
                 f.pkey_param_check = Some(e::ec_pkey_param_check);
@@ -416,6 +422,7 @@ impl Kind {
         }
         if matches!(self, Self::Rsa) {
             f.old_priv_decode = Some(super::rsa::old_rsa_priv_decode);
+            f.old_priv_encode = Some(super::rsa::old_rsa_priv_encode);
         }
         f
     }

@@ -260,6 +260,59 @@ pub(crate) fn parse<'a>(
     Ok(Parts { seed, private })
 }
 
+/// `ossl_ml_*_i2d_prvkey`'s choice: the first enabled format the key can fill (one with a seed
+/// only when the key kept its seed), if its lengths are the key's.
+pub(crate) fn output_format(
+    slots: &[Fmt],
+    have_seed: bool,
+    seed_bytes: usize,
+    sk_bytes: usize,
+    pk_bytes: usize,
+) -> Option<Fmt> {
+    let f = slots.iter().find(|f| have_seed || f.seed_length == 0)?;
+    let fits = (f.seed_length == 0 || f.seed_length == seed_bytes)
+        && (f.priv_length == 0 || f.priv_length == sk_bytes)
+        && (f.pub_length == 0 || f.pub_length == pk_bytes);
+    fits.then_some(*f)
+}
+
+/// `ossl_ml_*_i2d_prvkey`'s layout: the format's magic, then the seed, expanded key, and
+/// public key it holds, each with its own magic where the format has one.
+pub(crate) fn write(f: &Fmt, seed: Option<&[u8]>, sk: &[u8], pk: &[u8]) -> Option<Vec<u8>> {
+    let mut buf = Vec::with_capacity(f.bytes);
+    match f.shift {
+        0 => buf.extend_from_slice(&f.magic.to_be_bytes()),
+        2 => buf.extend_from_slice(&u16::try_from(f.magic & 0xffff).ok()?.to_be_bytes()),
+        4 => {}
+        _ => return None,
+    }
+    if f.seed_length != 0 {
+        if buf.len() + 2 == f.seed_offset {
+            buf.extend_from_slice(&f.seed_magic.to_be_bytes());
+        }
+        if buf.len() != f.seed_offset {
+            return None;
+        }
+        buf.extend_from_slice(seed?);
+    }
+    if f.priv_length != 0 {
+        if buf.len() + 4 == f.priv_offset {
+            buf.extend_from_slice(&f.priv_magic.to_be_bytes());
+        }
+        if buf.len() != f.priv_offset {
+            return None;
+        }
+        buf.extend_from_slice(sk);
+    }
+    if f.pub_length != 0 {
+        if buf.len() != f.pub_offset {
+            return None;
+        }
+        buf.extend_from_slice(pk);
+    }
+    (buf.len() == f.bytes).then_some(buf)
+}
+
 /// The SubjectPublicKeyInfo prefix of a key type's public key of `pk` octets: the SEQUENCE,
 /// the AlgorithmIdentifier of the type's 9-octet OID without parameters, and the BIT STRING
 /// header with no unused bits.

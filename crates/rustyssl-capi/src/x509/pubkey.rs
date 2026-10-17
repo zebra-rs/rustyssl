@@ -655,7 +655,8 @@ ffi_export! {
                 return fail(pk);
             }
         } else if k.is_provided() {
-            crate::stub::unimplemented("X509_PUBKEY_set of a provided key (an encoder, step 4.7c)");
+            // SAFETY: the caller's live provided key.
+            pk = unsafe { provided_pubkey(pkey_) };
         }
         if pk.is_null() {
             err::raise(ERR_LIB_X509, X509_R_UNSUPPORTED_ALGORITHM, F);
@@ -1126,10 +1127,112 @@ ffi_export! {
             return ret;
         }
         if k.is_provided() {
-            crate::stub::unimplemented("i2d_PUBKEY of a provided key (an encoder, step 4.7c)");
+            // SAFETY: the caller's live provided key and output.
+            return unsafe { provided_i2d_pubkey(a, pp) };
         }
         -1
     }
+}
+
+/// The SubjectPublicKeyInfo encoder of a provided key's public key.
+///
+/// # Safety
+/// `a` is a live provided key.
+unsafe fn spki_encoder(a: *const EVP_PKEY) -> *mut rustyssl_abi::OSSL_ENCODER_CTX {
+    // SAFETY: the caller's key; static strings.
+    unsafe {
+        crate::encoder::pkey::OSSL_ENCODER_CTX_new_for_pkey(
+            a,
+            rustyssl_abi::EVP_PKEY_PUBLIC_KEY,
+            c"DER".as_ptr(),
+            c"SubjectPublicKeyInfo".as_ptr(),
+            ptr::null(),
+        )
+    }
+}
+
+/// `X509_PUBKEY_set` of a provided key: its SubjectPublicKeyInfo from the encoders, decoded
+/// (NULL if it can't be).
+///
+/// # Safety
+/// `a` is a live provided key.
+unsafe fn provided_pubkey(a: *const EVP_PKEY) -> *mut X509_PUBKEY {
+    use crate::encoder::ctx::{OSSL_ENCODER_CTX_free, OSSL_ENCODER_to_data};
+    // SAFETY: the caller's guarantee.
+    let ectx = unsafe { spki_encoder(a) };
+    let mut der: *mut c_uchar = ptr::null_mut();
+    let mut derlen = 0usize;
+    let mut pk = ptr::null_mut();
+    // SAFETY: the new context (or NULL); a new buffer into `der`.
+    if unsafe { OSSL_ENCODER_to_data(ectx, &raw mut der, &raw mut derlen) } != 0 {
+        let mut pder = der.cast_const();
+        // SAFETY: the encoding's `derlen` octets.
+        pk = unsafe {
+            d2i_X509_PUBKEY(
+                ptr::null_mut(),
+                &raw mut pder,
+                c_long::try_from(derlen).unwrap_or(c_long::MAX),
+            )
+        };
+    }
+    // SAFETY: made above, or NULL.
+    unsafe { OSSL_ENCODER_CTX_free(ectx) };
+    // SAFETY: the encoding, or NULL.
+    unsafe { crate::mem::release(der.cast()) };
+    pk
+}
+
+/// `i2d_PUBKEY` of a provided key: its SubjectPublicKeyInfo from the encoders, through a memory
+/// BIO whose buffer becomes the caller's when it asks for a new one. The length, or -1.
+///
+/// # Safety
+/// `a` is a live provided key; `pp` as for an `i2d`.
+unsafe fn provided_i2d_pubkey(a: *const EVP_PKEY, pp: *mut *mut c_uchar) -> c_int {
+    use crate::bio::{BIO_ctrl, BIO_free, BIO_new};
+    use crate::encoder::ctx::{
+        OSSL_ENCODER_CTX_free, OSSL_ENCODER_CTX_get_num_encoders, OSSL_ENCODER_to_bio,
+    };
+    // SAFETY: the caller's guarantee.
+    let ctx = unsafe { spki_encoder(a) };
+    // SAFETY: no preconditions.
+    let method = unsafe { crate::bio::mem::BIO_s_mem() };
+    // SAFETY: the memory method.
+    let out = unsafe { BIO_new(method) };
+    let mut buf: *mut rustyssl_abi::BUF_MEM = ptr::null_mut();
+    let mut ret = -1;
+    // SAFETY: the new context (or NULL) and BIO; the BIO's buffer into `buf`.
+    if unsafe { OSSL_ENCODER_CTX_get_num_encoders(ctx) } != 0
+        && !out.is_null()
+        // SAFETY: as above.
+        && unsafe { OSSL_ENCODER_to_bio(ctx, out) } != 0
+        // SAFETY: as above.
+        && unsafe { BIO_ctrl(out, rustyssl_abi::BIO_C_GET_BUF_MEM_PTR, 0, (&raw mut buf).cast()) } > 0
+        // SAFETY: the BIO's buffer.
+        && let Some(b) = unsafe { buf.as_mut() }
+    {
+        ret = c_int::try_from(b.length).unwrap_or(-1);
+        if ret >= 0 && !pp.is_null() {
+            // SAFETY: the caller's guarantee.
+            let at = unsafe { pp.read() };
+            if at.is_null() {
+                // The buffer (from `CRYPTO_malloc`) becomes the caller's.
+                // SAFETY: as above.
+                unsafe { pp.write(b.data.cast()) };
+                b.length = 0;
+                b.data = ptr::null_mut();
+            } else {
+                // SAFETY: the buffer's `length` octets; the caller's room for them.
+                unsafe { ptr::copy_nonoverlapping(b.data.cast::<c_uchar>(), at, b.length) };
+                // SAFETY: as above.
+                unsafe { pp.write(at.wrapping_add(b.length)) };
+            }
+        }
+    }
+    // SAFETY: made above, or NULL.
+    unsafe { BIO_free(out) };
+    // SAFETY: as above.
+    unsafe { OSSL_ENCODER_CTX_free(ctx) };
+    ret
 }
 
 ffi_export! {

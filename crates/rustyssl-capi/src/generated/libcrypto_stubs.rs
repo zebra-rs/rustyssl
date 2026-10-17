@@ -6435,286 +6435,6 @@ pub extern "C" fn OSSL_DAY_TIME_new() -> *mut OSSL_DAY_TIME {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_add_encoder(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *mut OSSL_ENCODER,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_add_encoder")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_add_extra(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_add_extra")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_free(_: *mut OSSL_ENCODER_CTX) {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_get_num_encoders(_: *mut OSSL_ENCODER_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_get_num_encoders")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_new() -> *mut OSSL_ENCODER_CTX {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_new_for_pkey(
-    _: *const EVP_PKEY,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_ENCODER_CTX {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_new_for_pkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_cipher(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_cipher")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_cleanup(
-    _: *mut OSSL_ENCODER_CTX,
-    _: OSSL_ENCODER_CLEANUP,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_cleanup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_construct(
-    _: *mut OSSL_ENCODER_CTX,
-    _: OSSL_ENCODER_CONSTRUCT,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_construct")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_construct_data(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_construct_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_output_structure(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_output_structure")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_output_type(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_output_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_params(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_passphrase(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_passphrase")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_passphrase_cb(
-    _: *mut OSSL_ENCODER_CTX,
-    _: OSSL_PASSPHRASE_CALLBACK,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_passphrase_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_passphrase_ui(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *const UI_METHOD,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_passphrase_ui")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_pem_password_cb(
-    _: *mut OSSL_ENCODER_CTX,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_pem_password_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_CTX_set_selection(
-    _: *mut OSSL_ENCODER_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_CTX_set_selection")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_INSTANCE_get_encoder(
-    _: *mut OSSL_ENCODER_INSTANCE,
-) -> *mut OSSL_ENCODER {
-    crate::stub::unimplemented("OSSL_ENCODER_INSTANCE_get_encoder")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_INSTANCE_get_encoder_ctx(
-    _: *mut OSSL_ENCODER_INSTANCE,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OSSL_ENCODER_INSTANCE_get_encoder_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_INSTANCE_get_output_structure(
-    _: *mut OSSL_ENCODER_INSTANCE,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_ENCODER_INSTANCE_get_output_structure")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_INSTANCE_get_output_type(
-    _: *mut OSSL_ENCODER_INSTANCE,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_ENCODER_INSTANCE_get_output_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_do_all_provided(
-    _: *mut OSSL_LIB_CTX,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(encoder: *mut OSSL_ENCODER, arg: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("OSSL_ENCODER_do_all_provided")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_fetch(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_ENCODER {
-    crate::stub::unimplemented("OSSL_ENCODER_fetch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_free(_: *mut OSSL_ENCODER) {
-    crate::stub::unimplemented("OSSL_ENCODER_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_get0_description(
-    _: *const OSSL_ENCODER,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_ENCODER_get0_description")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_get0_name(_: *const OSSL_ENCODER) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_ENCODER_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_get0_properties(_: *const OSSL_ENCODER) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("OSSL_ENCODER_get0_properties")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_get0_provider(_: *const OSSL_ENCODER) -> *const OSSL_PROVIDER {
-    crate::stub::unimplemented("OSSL_ENCODER_get0_provider")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_get_params(
-    _: *mut OSSL_ENCODER,
-    _: *mut OSSL_PARAM,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_get_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_gettable_params(_: *mut OSSL_ENCODER) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("OSSL_ENCODER_gettable_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_is_a(
-    _: *const OSSL_ENCODER,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_is_a")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_names_do_all(
-    _: *const OSSL_ENCODER,
-    _: ::core::option::Option<
-        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
-    >,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_names_do_all")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_settable_ctx_params(_: *mut OSSL_ENCODER) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("OSSL_ENCODER_settable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_to_bio(_: *mut OSSL_ENCODER_CTX, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_to_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_to_data(
-    _: *mut OSSL_ENCODER_CTX,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_to_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_to_fp(_: *mut OSSL_ENCODER_CTX, _: *mut FILE) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_to_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ENCODER_up_ref(_: *mut OSSL_ENCODER) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ENCODER_up_ref")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_ESS_check_signing_certs(
     _: *const ESS_SIGNING_CERT,
     _: *const ESS_SIGNING_CERT_V2,
@@ -8513,11 +8233,6 @@ pub extern "C" fn PEM_write_PKCS7(_: *mut FILE, _: *const PKCS7) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_PKCS8(_: *mut FILE, _: *const X509_SIG) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_PKCS8")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_PKCS8PrivateKey(
     _: *mut FILE,
     _: *const EVP_PKEY,
@@ -8541,14 +8256,6 @@ pub extern "C" fn PEM_write_PKCS8PrivateKey_nid(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_PKCS8PrivateKey_nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_PKCS8_PRIV_KEY_INFO(
-    _: *mut FILE,
-    _: *const PKCS8_PRIV_KEY_INFO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_PKCS8_PRIV_KEY_INFO")
 }
 
 #[unsafe(no_mangle)]
@@ -8635,11 +8342,6 @@ pub extern "C" fn PEM_write_X509_AUX(_: *mut FILE, _: *const X509) -> core::ffi:
 #[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_X509_CRL(_: *mut FILE, _: *const X509_CRL) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_X509_CRL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_X509_PUBKEY(_: *mut FILE, _: *const X509_PUBKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_X509_PUBKEY")
 }
 
 #[unsafe(no_mangle)]
@@ -8747,11 +8449,6 @@ pub extern "C" fn PEM_write_bio_PKCS7_stream(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_PKCS8(_: *mut BIO, _: *const X509_SIG) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_PKCS8")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_bio_PKCS8PrivateKey(
     _: *mut BIO,
     _: *const EVP_PKEY,
@@ -8775,14 +8472,6 @@ pub extern "C" fn PEM_write_bio_PKCS8PrivateKey_nid(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_PKCS8PrivateKey_nid")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_PKCS8_PRIV_KEY_INFO(
-    _: *mut BIO,
-    _: *const PKCS8_PRIV_KEY_INFO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_PKCS8_PRIV_KEY_INFO")
 }
 
 #[unsafe(no_mangle)]
@@ -8887,14 +8576,6 @@ pub extern "C" fn PEM_write_bio_X509_AUX(_: *mut BIO, _: *const X509) -> core::f
 #[unsafe(no_mangle)]
 pub extern "C" fn PEM_write_bio_X509_CRL(_: *mut BIO, _: *const X509_CRL) -> core::ffi::c_int {
     crate::stub::unimplemented("PEM_write_bio_X509_CRL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_X509_PUBKEY(
-    _: *mut BIO,
-    _: *const X509_PUBKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_X509_PUBKEY")
 }
 
 #[unsafe(no_mangle)]
@@ -19326,19 +19007,6 @@ pub extern "C" fn i2d_ISSUING_DIST_POINT(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_KeyParams(
-    _: *const EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_KeyParams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_KeyParams_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_KeyParams_bio")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_NAMING_AUTHORITY(
     _: *const NAMING_AUTHORITY,
     _: *mut *mut core::ffi::c_uchar,
@@ -20075,16 +19743,6 @@ pub extern "C" fn i2d_PKCS7_fp(_: *mut FILE, _: *const PKCS7) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS8PrivateKeyInfo_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS8PrivateKeyInfo_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS8PrivateKeyInfo_fp(_: *mut FILE, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS8PrivateKeyInfo_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PKCS8PrivateKey_bio(
     _: *mut BIO,
     _: *const EVP_PKEY,
@@ -20137,16 +19795,6 @@ pub extern "C" fn i2d_PKCS8PrivateKey_nid_fp(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS8_bio(_: *mut BIO, _: *const X509_SIG) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS8_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS8_fp(_: *mut FILE, _: *const X509_SIG) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS8_fp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn i2d_PKEY_USAGE_PERIOD(
     _: *const PKEY_USAGE_PERIOD,
     _: *mut *mut core::ffi::c_uchar,
@@ -20192,32 +19840,6 @@ pub extern "C" fn i2d_PROXY_POLICY(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_PROXY_POLICY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PrivateKey(
-    _: *const EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PrivateKey_bio(_: *mut BIO, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PrivateKey_fp(_: *mut FILE, _: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PublicKey(
-    _: *const EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PublicKey")
 }
 
 #[unsafe(no_mangle)]

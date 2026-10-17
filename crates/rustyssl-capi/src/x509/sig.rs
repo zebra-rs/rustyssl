@@ -95,3 +95,33 @@ ffi_export! {
         unsafe { get(sig, palg, pdigest) }
     }
 }
+
+ffi_export! {
+    /// Writes an `X509_SIG` (an EncryptedPrivateKeyInfo) to a BIO. 1, or 0.
+    ///
+    /// # Safety
+    /// `bp` is a live BIO; `p8` is a live `X509_SIG`.
+    pub unsafe extern "C" fn i2d_PKCS8_bio(bp: *mut rustyssl_abi::BIO, p8: *const X509_SIG) -> core::ffi::c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_ASN1
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_SIG_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { crate::asn1::tpl::io::ASN1_item_i2d_bio(it, bp, p8.cast()) }
+    }
+}
+
+ffi_export! {
+    /// Writes an `X509_SIG` to a `FILE`. 1, or 0.
+    ///
+    /// # Safety
+    /// `fp` is an open `FILE`; `p8` is a live `X509_SIG`.
+    pub unsafe extern "C" fn i2d_PKCS8_fp(fp: *mut libc::FILE, p8: *const X509_SIG) -> core::ffi::c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_ASN1
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_SIG_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { crate::asn1::tpl::io::ASN1_item_i2d_fp(it, fp, p8.cast()) }
+    }
+}

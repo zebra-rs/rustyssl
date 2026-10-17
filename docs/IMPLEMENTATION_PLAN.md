@@ -4234,12 +4234,45 @@ chunking) is clean.
         callback never asked for an unencrypted key; the errors); the probe's `pemkey` with
         `corpus/pemkey.txt` and random sessions (1,500 pass); `fuzz/fuzz_targets/pem_pkey.rs`
         (173k runs clean).
-  - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an
-    output type and structure), the default provider's `key2any` (DER and PEM:
-    PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures, parameters) and
-    `key2text` (so `EVP_PKEY_print_*` prints provided keys), and the post-quantum codecs'
-    encoding; `i2d_PrivateKey`, `i2d_PUBKEY`, `i2d_PublicKey`, `EVP_PKEY2PKCS8`, and the PEM
-    writers of keys.
+  - [ ] **4.7c Encoders**, in sub-steps:
+    - [x] **4.7c1 The framework and key2any**: the `OSSL_ENCODER` framework (fetch, names,
+      properties, listing; contexts, `encoder_process`'s chain, `OSSL_ENCODER_CTX_new_for_pkey`
+      and its construct, which imports a key into another provider's encoders; `to_bio`,
+      `to_fp`, `to_data`; the cipher and passphrase setters). The default and base providers'
+      encoders, all 241 of `encoders.inc` in its order (`provider/encoders.rs`):
+      - `key2any` (`encode_key2any.c`) for every type, classic and post-quantum, in DER and
+        PEM: EncryptedPrivateKeyInfo, PrivateKeyInfo, SubjectPublicKeyInfo, and the
+        type-specific structures under all their names. The parameters go into the
+        AlgorithmIdentifier: a named curve's OID or explicit ECParameters, DSA's only when
+        saving them, DH's always, RSA's NULL, and a restricted RSA-PSS key's parameters.
+        A type-specific PEM private key given a cipher is a traditional encrypted PEM.
+      - EC's and SM2's `key2blob`.
+      - The text encoders (4.7c2) and MSBLOB and PVK (`pending_encoders.rs`, 4.7e) as
+        placeholders: their contexts are real, and their encoding aborts.
+      - An EncryptedPrivateKeyInfo (4.7d) aborts once it has the passphrase.
+
+      Also: `i2d_PrivateKey`, `i2d_PublicKey`, and `i2d_KeyParams` (`evp/pkey/i2d.rs`, with the
+      methods' `old_priv_encode`), with their BIO and `FILE` forms, and
+      `i2d_PKCS8PrivateKeyInfo_bio`/`_fp`; the provided paths of `i2d_PUBKEY`,
+      `X509_PUBKEY_set`, and `EVP_PKEY2PKCS8`; `i2d_PKCS8_bio`/`_fp`; and the PEM writers of
+      the structures key2any writes (`PEM_write_bio_PKCS8_PRIV_KEY_INFO`, `_X509_PUBKEY`,
+      `_PKCS8`, and their `FILE` forms).
+      - Tests: `tests/c/encoder.c`, covering:
+        - fetching and listing encoders;
+        - every key type, decoded into a provided key, in every selection, output type, and
+          structure (about 2,300 encodings);
+        - a context built by hand, with a construct callback;
+        - traditional encrypted PEM, with an explicit passphrase or a callback, decrypting
+          back to the key;
+        - save-parameters; the outputs; the structures' writers; legacy keys.
+
+        The probe's `enckey` with `corpus/enckey.txt` and random sessions (3,000 pass);
+        `fuzz/fuzz_targets/encode_pkey.rs` (464k runs clean). A `pem_password_cb` asks through the UI layer
+        (4.7d), so it isn't tested here.
+    - [ ] **4.7c2 key2text**: the text encoders, so `EVP_PKEY_print_public`/`_private`/
+      `_params` print provided keys.
+    - [ ] **4.7c3 The PEM key writers**: `PEM_write_bio_PrivateKey`, `_PUBKEY`,
+      `_Parameters`, the type-specific ones, and `_PKCS8PrivateKey` unencrypted.
   - [ ] **4.7d Encrypted keys**: PKCS#5 PBES1 and PBES2 (PBKDF2, scrypt) and the PBE
     table (`EVP_PBE_*`, `PKCS5_pbe2_set_iv`, ...), `PKCS8_encrypt`/`PKCS8_decrypt`,
     EncryptedPrivateKeyInfo encoding and decoding, `PEM_write_bio_PKCS8PrivateKey`,

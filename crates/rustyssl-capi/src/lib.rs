@@ -38,6 +38,7 @@ mod ec;
 mod ec_pmeth;
 mod ecx;
 mod ecx_pmeth;
+mod encoder;
 mod engine;
 mod err;
 mod errno;
