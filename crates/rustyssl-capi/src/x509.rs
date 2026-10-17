@@ -19,6 +19,7 @@ pub(crate) mod print;
 pub(crate) mod pubkey;
 pub(crate) mod purpose;
 pub(crate) mod req;
+pub(crate) mod revoke;
 pub(crate) mod sig;
 pub(crate) mod spki;
 pub(crate) mod store;

@@ -278,6 +278,7 @@ OpenSSL never depends on them.
 | `X509_EXTENSION_set_data` with NULL data | dereferences NULL | returns 0, keeping the value | `x509::ext::tests::null_data_is_refused` |
 | The `X509_get*`, `X509_set*`, comparison, hash, and extension-list functions, `X509_up_ref`, `X509_verify`, and `X509_get0_signature` with a NULL certificate; `X509_find_by_issuer_and_serial` with a NULL serial number; `X509_cmp_time` with a NULL time | dereference NULL | answer NULL, 0 (-1 for `X509_verify`, -1 for an index), or do nothing; the comparisons sort NULL first | `x509::cert::tests::null_certificates_are_safe` |
 | The `X509_REQ_get*`, `X509_REQ_set*`, and attribute-reading functions, `X509_REQ_verify`, `X509_REQ_add_extensions`, and `X509_REQ_digest` with a NULL request | dereference NULL | answer NULL, 0, or -1 (an attribute count or index), or do nothing | `x509::req::tests::null_requests_are_safe` |
+| The default `check_crl` and `cert_crl` of a verification context (reachable through `X509_STORE_CTX_get_check_crl` and `_get_cert_crl`, or a custom `get_crl` that returns success without a CRL) with a NULL CRL | dereference NULL | fail (0) | `x509::revoke::tests::null_crls_fail` |
 
 ## Notes
 
