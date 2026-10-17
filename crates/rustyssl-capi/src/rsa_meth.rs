@@ -246,7 +246,7 @@ unsafe fn op_args<'a>(
     }
     // SAFETY: the caller's room for the key's size.
     let output = unsafe { core::slice::from_raw_parts_mut(to, num) };
-    Some((st, k.libctx.0, input, output))
+    Some((st, k.libctx.get(), input, output))
 }
 
 /// A length or -1, as the built-in operations return.

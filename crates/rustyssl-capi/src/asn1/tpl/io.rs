@@ -312,7 +312,7 @@ unsafe fn write_all(out: *mut BIO, data: &[u8]) -> c_int {
 ///
 /// # Safety
 /// `fp` is an open `FILE`.
-unsafe fn file_bio(fp: *mut FILE) -> *mut BIO {
+pub(crate) unsafe fn file_bio(fp: *mut FILE) -> *mut BIO {
     // SAFETY: the caller's guarantee.
     let b = unsafe { bio::file::BIO_new_fp(fp, BIO_NOCLOSE) };
     if b.is_null() {
@@ -581,4 +581,66 @@ ffi_export! {
 pub(crate) unsafe fn read_der(bio: *mut BIO) -> Option<Vec<u8>> {
     // SAFETY: the caller's guarantee.
     unsafe { read_bio(bio) }.map(|(b, _)| b.bytes().to_vec())
+}
+
+/// `asn1_d2i_read_bio` as the `_ex_bio` decoders use it: one element's octets (its length
+/// only), or `None` after raising an error.
+///
+/// # Safety
+/// `bio` is a live BIO.
+pub(crate) unsafe fn read_element_octets(bio: *mut BIO) -> Option<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    let (b, len) = unsafe { read_bio(bio) }?;
+    b.bytes().get(..len).map(<[u8]>::to_vec)
+}
+
+ffi_export! {
+    /// Reads one element (to its end-of-contents octets for an indefinite length) from `in_`
+    /// into a new buffer for `*pb`. Its length, or -1 with an error.
+    ///
+    /// # Safety
+    /// `in_` is a live BIO; `pb` is writable.
+    pub unsafe extern "C" fn asn1_d2i_read_bio(in_: *mut BIO, pb: *mut *mut BUF_MEM) -> c_int
+    where failure = -1, library = ERR_LIB_ASN1
+    {
+        if pb.is_null() {
+            raise(ERR_R_PASSED_NULL_PARAMETER);
+            return -1;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some((b, len)) = (unsafe { read_bio(in_) }) else { return -1 };
+        let Ok(n) = c_int::try_from(len) else {
+            raise(ASN1_R_TOO_LONG);
+            return -1;
+        };
+        let raw = b.0;
+        core::mem::forget(b);
+        // SAFETY: the caller's guarantee; the buffer passes to the caller.
+        unsafe { pb.write(raw) };
+        n
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// docs/DEVIATIONS.md: OpenSSL's writes the buffer through NULL and crashes.
+    #[test]
+    fn read_bio_into_null_is_refused() {
+        let der = [0x30u8, 0x00];
+        // SAFETY: the octets, read-only for the BIO's life.
+        let b = unsafe { crate::bio::mem::BIO_new_mem_buf(der.as_ptr().cast(), 2) };
+        // SAFETY: the BIO; NULL.
+        assert_eq!(unsafe { asn1_d2i_read_bio(b, ptr::null_mut()) }, -1);
+        let mut m: *mut BUF_MEM = ptr::null_mut();
+        // SAFETY: as above; a local.
+        assert_eq!(unsafe { asn1_d2i_read_bio(b, &raw mut m) }, 2);
+        // SAFETY: the buffer read, the caller's now.
+        unsafe { buffer::BUF_MEM_free(m) };
+        // SAFETY: made above, freed once.
+        unsafe { bio::BIO_free(b) };
+        // SAFETY: no preconditions.
+        unsafe { err::ERR_clear_error() };
+    }
 }

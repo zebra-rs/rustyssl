@@ -773,7 +773,7 @@ ffi_export! {
             // SAFETY: as above.
             unsafe { RSA_blinding_off(rsa) };
         }
-        let mut rng = private_random(k.libctx.0);
+        let mut rng = private_random(k.libctx.get());
         if !st.key.new_blinding(&mut rng) {
             err::raise(ERR_LIB_RSA, ERR_R_BN_LIB, "RSA_setup_blinding");
             return 0;
@@ -812,7 +812,7 @@ ffi_export! {
         };
         let own = ctx.is_null();
         // SAFETY: the key's library context.
-        let ctx = if own { unsafe { BN_CTX_new_ex(k.libctx.0) } } else { ctx };
+        let ctx = if own { unsafe { BN_CTX_new_ex(k.libctx.get()) } } else { ctx };
         let (eb, nb) = (new_bignum(e, false), new_bignum(n, false));
         // SAFETY: just made.
         unsafe { BN_set_flags(nb, BN_FLG_CONSTTIME) };

@@ -31,9 +31,12 @@ use crate::asn1::string::{ASN1_BIT_STRING_free, ASN1_BIT_STRING_new};
 use crate::asn1::tpl::decode::ASN1_item_d2i;
 use crate::asn1::tpl::decode::ASN1_item_ex_d2i;
 use crate::asn1::tpl::encode::ASN1_item_ex_i2d;
-use crate::asn1::tpl::io::{ASN1_d2i_bio, ASN1_d2i_fp, ASN1_i2d_bio, ASN1_i2d_fp};
+use crate::asn1::tpl::io::{
+    ASN1_d2i_bio, ASN1_d2i_fp, ASN1_i2d_bio, ASN1_i2d_fp, ASN1_item_d2i_bio, ASN1_item_d2i_fp,
+    ASN1_item_i2d_bio, ASN1_item_i2d_fp,
+};
 use crate::asn1::tpl::items::{
-    ASN1_BIT_STRING_it, X509_ALGOR_free, X509_ALGOR_it, X509_ALGOR_new, i2d, new_free,
+    ASN1_BIT_STRING_it, X509_ALGOR_free, X509_ALGOR_it, X509_ALGOR_new, d2i, i2d, new_free,
 };
 use crate::asn1::tpl::new::ASN1_item_new_ex;
 use crate::asn1::tpl::print::ASN1_item_print;
@@ -133,6 +136,71 @@ new_free! {
 i2d! {
     /// Encodes a SubjectPublicKeyInfo.
     pub unsafe extern "C" fn i2d_X509_PUBKEY(X509_PUBKEY) = X509_PUBKEY_it;
+}
+
+d2i! {
+    /// Decodes a SubjectPublicKeyInfo and its key (`ASN1_item_d2i`).
+    pub unsafe extern "C" fn d2i_X509_PUBKEY(X509_PUBKEY) = X509_PUBKEY_it;
+}
+
+ffi_export! {
+    /// Reads a SubjectPublicKeyInfo from a BIO.
+    ///
+    /// # Safety
+    /// `bp` is a live BIO; `xpk` is NULL or holds NULL or a live structure.
+    pub unsafe extern "C" fn d2i_X509_PUBKEY_bio(bp: *mut BIO, xpk: *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_PUBKEY_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { ASN1_item_d2i_bio(it, bp, xpk.cast()) }.cast()
+    }
+}
+
+ffi_export! {
+    /// Writes a SubjectPublicKeyInfo to a BIO. 1, or 0.
+    ///
+    /// # Safety
+    /// `bp` is a live BIO; `xpk` is a live structure.
+    pub unsafe extern "C" fn i2d_X509_PUBKEY_bio(bp: *mut BIO, xpk: *const X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_X509
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_PUBKEY_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { ASN1_item_i2d_bio(it, bp, xpk.cast()) }
+    }
+}
+
+ffi_export! {
+    /// Reads a SubjectPublicKeyInfo from a file.
+    ///
+    /// # Safety
+    /// `fp` is an open `FILE`; `xpk` is NULL or holds NULL or a live structure.
+    pub unsafe extern "C" fn d2i_X509_PUBKEY_fp(fp: *mut FILE, xpk: *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_PUBKEY_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { ASN1_item_d2i_fp(it, fp, xpk.cast()) }.cast()
+    }
+}
+
+ffi_export! {
+    /// Writes a SubjectPublicKeyInfo to a file. 1, or 0.
+    ///
+    /// # Safety
+    /// `fp` is an open `FILE`; `xpk` is a live structure.
+    pub unsafe extern "C" fn i2d_X509_PUBKEY_fp(fp: *mut FILE, xpk: *const X509_PUBKEY) -> c_int
+    where failure = 0, library = ERR_LIB_X509
+    {
+        // SAFETY: no preconditions.
+        let it = unsafe { X509_PUBKEY_it() };
+        // SAFETY: the caller's guarantee; the type's item.
+        unsafe { ASN1_item_i2d_fp(it, fp, xpk.cast()) }
+    }
 }
 
 /// The structure behind a pointer.
@@ -382,12 +450,81 @@ ffi_callback! {
         }
         x.pkey = pk;
         if r <= 0 && x.flag_force_legacy == 0 {
-            crate::stub::unimplemented("decoding an X509_PUBKEY's key with a decoder (step 4.7b)");
+            // SAFETY: the structure just decoded from the caller's `publen` octets.
+            if !unsafe { decode_with_decoder(x, in_saved, publen, aclass) } {
+                return 0;
+            }
         }
         // SAFETY: no preconditions.
         unsafe { ERR_pop_to_mark() };
         1
     }
+}
+
+/// `x509_pubkey_ex_d2i_ex`'s decoding of the key with the decoders of its algorithm's type
+/// (from the SubjectPublicKeyInfo's octets, retagged as a SEQUENCE when implicitly tagged),
+/// into the structure. False, with the error mark cleared, when the algorithm has no text or
+/// the decoders leave octets over; true otherwise, key or not.
+///
+/// # Safety
+/// `x` is a live structure; `der` holds its `publen` octets as decoded.
+unsafe fn decode_with_decoder(
+    x: &mut Pubkey,
+    der: *const c_uchar,
+    publen: usize,
+    aclass: c_int,
+) -> bool {
+    use rustyssl_abi::{
+        ASN1_R_DECODE_ERROR, EVP_PKEY_PUBLIC_KEY, V_ASN1_CONSTRUCTED, V_ASN1_SEQUENCE,
+        V_ASN1_UNIVERSAL,
+    };
+    // SAFETY: the caller's guarantee.
+    let mut octets = unsafe { core::slice::from_raw_parts(der, publen) }.to_vec();
+    if aclass != V_ASN1_UNIVERSAL
+        && let Some(first) = octets.first_mut()
+    {
+        *first = u8::try_from(V_ASN1_CONSTRUCTED | V_ASN1_SEQUENCE).unwrap_or(0x30);
+    }
+    let mut name = [0 as c_char; 50];
+    // SAFETY: its AlgorithmIdentifier.
+    let obj = unsafe { x.algor.as_ref() }.map_or(ptr::null(), |a| a.algorithm.cast_const());
+    // SAFETY: the object; the buffer's size.
+    if unsafe { crate::objects::OBJ_obj2txt(name.as_mut_ptr(), 50, obj, 0) } <= 0 {
+        // SAFETY: the caller's mark.
+        unsafe { ERR_clear_last_mark() };
+        return false;
+    }
+    // SAFETY: the structure's key slot, live while the context is; static strings; the name;
+    // the structure's library context and properties.
+    let dctx = unsafe {
+        crate::decoder::pkey::OSSL_DECODER_CTX_new_for_pkey(
+            &raw mut x.pkey,
+            c"DER".as_ptr(),
+            c"SubjectPublicKeyInfo".as_ptr(),
+            name.as_ptr(),
+            EVP_PKEY_PUBLIC_KEY,
+            x.libctx,
+            x.propq,
+        )
+    };
+    let mut ok = true;
+    if !dctx.is_null() {
+        let mut p = octets.as_ptr();
+        let mut slen = octets.len();
+        // SAFETY: the context; the octets.
+        if unsafe { crate::decoder::ctx::OSSL_DECODER_from_data(dctx, &raw mut p, &raw mut slen) }
+            != 0
+            && slen != 0
+        {
+            // SAFETY: the caller's mark.
+            unsafe { ERR_clear_last_mark() };
+            err::raise(ERR_LIB_ASN1, ASN1_R_DECODE_ERROR, "x509_pubkey_ex_d2i_ex");
+            ok = false;
+        }
+        // SAFETY: made above.
+        unsafe { crate::decoder::ctx::OSSL_DECODER_CTX_free(dctx) };
+    }
+    ok
 }
 
 ffi_export! {
@@ -699,25 +836,46 @@ ffi_export! {
     }
 }
 
-/// `d2i_PUBKEY_int` with legacy decoding forced (`ossl_d2i_PUBKEY_legacy`): a key from a
-/// SubjectPublicKeyInfo through its type's ASN.1 method; `*pp` moves past it.
+/// `d2i_PUBKEY_int`: a key from a SubjectPublicKeyInfo decoded in a library context (or only
+/// through its type's ASN.1 method, `force_legacy`), replacing `*a`; `*pp` moves past it.
 ///
 /// # Safety
-/// `pp` holds a pointer to `length` octets.
-unsafe fn d2i_pubkey_legacy(pp: *mut *const c_uchar, length: c_long) -> *mut EVP_PKEY {
-    let p = alloc();
-    // SAFETY: just made, or NULL.
-    let Some(x) = (unsafe { p.as_mut() }) else {
-        return ptr::null_mut();
-    };
-    x.flag_force_legacy = 1;
+/// `pp` holds a pointer to `length` octets; `a` is NULL or holds NULL or a live key; `libctx`
+/// is NULL or a live library context; `propq` is NULL or a string.
+pub(crate) unsafe fn d2i_pubkey_int(
+    a: *mut *mut EVP_PKEY,
+    pp: *mut *const c_uchar,
+    length: c_long,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+    force_legacy: bool,
+) -> *mut EVP_PKEY {
+    let mut slot: *mut ASN1_VALUE = ptr::null_mut();
+    if !libctx.is_null() || !propq.is_null() || force_legacy {
+        let p = alloc();
+        // SAFETY: just made, or NULL.
+        let Some(x) = (unsafe { p.as_mut() }) else {
+            return ptr::null_mut();
+        };
+        if !set0_libctx(x, libctx, propq) {
+            // SAFETY: made above.
+            unsafe { free_struct(p) };
+            return ptr::null_mut();
+        }
+        x.flag_force_legacy = c_uint::from(force_legacy);
+        slot = p.cast();
+    }
     // SAFETY: the caller's guarantee.
     let mut q = unsafe { pp.read() };
-    let mut slot: *mut ASN1_VALUE = p.cast();
     // SAFETY: no preconditions.
     let it = unsafe { X509_PUBKEY_it() };
-    // SAFETY: the structure to decode into; the caller's octets; the item.
-    let xpk = unsafe { ASN1_item_d2i(&raw mut slot, &raw mut q, length, it) };
+    let pslot = if slot.is_null() {
+        ptr::null_mut()
+    } else {
+        &raw mut slot
+    };
+    // SAFETY: the structure to decode into, or none; the caller's octets; the item.
+    let xpk = unsafe { ASN1_item_d2i(pslot, &raw mut q, length, it) };
     if xpk.is_null() {
         // SAFETY: the engine freed the structure and emptied the slot, or left it.
         unsafe { free_struct(slot.cast()) };
@@ -727,11 +885,134 @@ unsafe fn d2i_pubkey_legacy(pp: *mut *const c_uchar, length: c_long) -> *mut EVP
     let pktmp = unsafe { X509_PUBKEY_get(xpk.cast()) };
     // SAFETY: as above, freed once.
     unsafe { X509_PUBKEY_free(xpk.cast()) };
-    if !pktmp.is_null() {
-        // SAFETY: the caller's guarantee.
-        unsafe { pp.write(q) };
+    if pktmp.is_null() {
+        return ptr::null_mut();
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { pp.write(q) };
+    if !a.is_null() {
+        // SAFETY: as above.
+        let old = unsafe { a.read() };
+        // SAFETY: the caller's old key, or NULL.
+        unsafe { EVP_PKEY_free(old) };
+        // SAFETY: as above.
+        unsafe { a.write(pktmp) };
     }
     pktmp
+}
+
+/// `ossl_d2i_PUBKEY_legacy`: `d2i_PUBKEY_int` through the type's ASN.1 method only.
+///
+/// # Safety
+/// `pp` holds a pointer to `length` octets.
+pub(crate) unsafe fn d2i_pubkey_legacy(pp: *mut *const c_uchar, length: c_long) -> *mut EVP_PKEY {
+    // SAFETY: the caller's guarantee.
+    unsafe {
+        d2i_pubkey_int(
+            ptr::null_mut(),
+            pp,
+            length,
+            ptr::null_mut(),
+            ptr::null(),
+            true,
+        )
+    }
+}
+
+ffi_export! {
+    /// A key from a SubjectPublicKeyInfo in a library context, replacing `*a`; `*pp` moves
+    /// past it. NULL on failure.
+    ///
+    /// # Safety
+    /// `pp` holds a pointer to `length` octets; `a` is NULL or holds NULL or a live key;
+    /// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+    pub unsafe extern "C" fn d2i_PUBKEY_ex(a: *mut *mut EVP_PKEY, pp: *mut *const c_uchar, length: c_long, libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { d2i_pubkey_int(a, pp, length, libctx, propq, false) }
+    }
+}
+
+ffi_export! {
+    /// `d2i_PUBKEY_ex` in the default library context.
+    ///
+    /// # Safety
+    /// As for `d2i_PUBKEY_ex`.
+    pub unsafe extern "C" fn d2i_PUBKEY(a: *mut *mut EVP_PKEY, pp: *mut *const c_uchar, length: c_long) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { d2i_pubkey_int(a, pp, length, ptr::null_mut(), ptr::null(), false) }
+    }
+}
+
+ffi_export! {
+    /// Reads a key's SubjectPublicKeyInfo from a BIO.
+    ///
+    /// # Safety
+    /// `bp` is a live BIO; `a` is NULL or holds NULL or a live key.
+    pub unsafe extern "C" fn d2i_PUBKEY_bio(bp: *mut BIO, a: *mut *mut EVP_PKEY) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::evp::pkey::d2i::d2i_bio_of(bp, a, d2i_PUBKEY) }
+    }
+}
+
+ffi_export! {
+    /// Reads a key's SubjectPublicKeyInfo from a BIO in a library context.
+    ///
+    /// # Safety
+    /// As for `d2i_PUBKEY_bio`; `libctx` is NULL or a live library context; `propq` is NULL or
+    /// a string.
+    pub unsafe extern "C" fn d2i_PUBKEY_ex_bio(bp: *mut BIO, a: *mut *mut EVP_PKEY, libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(der) = (unsafe { crate::asn1::tpl::io::read_element_octets(bp) }) else {
+            return ptr::null_mut();
+        };
+        let Ok(len) = c_long::try_from(der.len()) else { return ptr::null_mut() };
+        let mut p = der.as_ptr();
+        // SAFETY: the element's octets; the caller's guarantee.
+        unsafe { d2i_PUBKEY_ex(a, &raw mut p, len, libctx, propq) }
+    }
+}
+
+ffi_export! {
+    /// Reads a key's SubjectPublicKeyInfo from a file.
+    ///
+    /// # Safety
+    /// `fp` is an open `FILE`; `a` is NULL or holds NULL or a live key.
+    pub unsafe extern "C" fn d2i_PUBKEY_fp(fp: *mut FILE, a: *mut *mut EVP_PKEY) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        let f = |b| {
+            // SAFETY: the file's BIO; the caller's guarantee.
+            unsafe { crate::evp::pkey::d2i::d2i_bio_of(b, a, d2i_PUBKEY) }
+        };
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::evp::pkey::d2i::with_file(fp, f) }
+    }
+}
+
+ffi_export! {
+    /// Reads a key's SubjectPublicKeyInfo from a file in a library context.
+    ///
+    /// # Safety
+    /// As for `d2i_PUBKEY_fp`; `libctx` is NULL or a live library context; `propq` is NULL or
+    /// a string.
+    pub unsafe extern "C" fn d2i_PUBKEY_ex_fp(fp: *mut FILE, a: *mut *mut EVP_PKEY, libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_X509
+    {
+        let f = |b| {
+            // SAFETY: the file's BIO; the caller's guarantee.
+            unsafe { d2i_PUBKEY_ex_bio(b, a, libctx, propq) }
+        };
+        // SAFETY: the caller's guarantee.
+        unsafe { crate::evp::pkey::d2i::with_file(fp, f) }
+    }
 }
 
 /// A typed key from a SubjectPublicKeyInfo: the key of a type `accept` takes, made by `get1`
@@ -883,7 +1164,8 @@ ffi_export! {
 
 type I2dPubkey = unsafe extern "C" fn(*const EVP_PKEY, *mut *mut c_uchar) -> c_int;
 type I2dVoid = unsafe extern "C" fn(*const c_void, *mut *mut c_uchar) -> c_int;
-type D2iVoid = unsafe extern "C" fn(*mut *mut c_void, *mut *const c_uchar, c_long) -> *mut c_void;
+pub(crate) type D2iVoid =
+    unsafe extern "C" fn(*mut *mut c_void, *mut *const c_uchar, c_long) -> *mut c_void;
 
 /// The typed functions of one key type: `d2i_`/`i2d_` of its SubjectPublicKeyInfo and their
 /// BIO and FILE forms.
@@ -1172,6 +1454,20 @@ pub(crate) unsafe fn d2i_internal(pp: *mut *const c_uchar, len: c_long) -> *mut 
 pub(crate) unsafe fn free_internal(x: *mut X509_PUBKEY) {
     // SAFETY: the caller's guarantee; its key is NULL.
     unsafe { free_struct(x.cast()) };
+}
+
+/// The NID of a SubjectPublicKeyInfo's algorithm (`NID_undef` for NULL).
+///
+/// # Safety
+/// `x` is NULL or a live structure.
+pub(crate) unsafe fn algorithm_nid(x: *const X509_PUBKEY) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let algor = unsafe { x.cast::<Pubkey>().as_ref() }.map_or(ptr::null_mut(), |p| p.algor);
+    // SAFETY: its AlgorithmIdentifier, or NULL.
+    unsafe { algor.as_ref() }.map_or(0, |a| {
+        // SAFETY: its object.
+        unsafe { OBJ_obj2nid(a.algorithm) }
+    })
 }
 
 #[cfg(test)]

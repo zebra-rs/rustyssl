@@ -230,6 +230,53 @@ unsafe fn new_decoder_ctx(d: &Decoder, input_structure: *const c_char) -> *mut c
     dctx
 }
 
+/// `ossl_decoder_instance_dup`: a copy of the instance with its own reference to the decoder
+/// and a new decoder context (made afresh, with none of the original's parameters), or NULL.
+///
+/// # Safety
+/// `src` is a live instance.
+pub(crate) unsafe fn instance_dup(src: *const OSSL_DECODER_INSTANCE) -> *mut OSSL_DECODER_INSTANCE {
+    // SAFETY: the caller's guarantee.
+    let Some(s) = (unsafe { instance(src) }) else {
+        return ptr::null_mut();
+    };
+    let d = s.decoder();
+    // SAFETY: the instance's live decoder; the copy holds the reference.
+    if !unsafe { OSSL_DECODER::up_ref(s.decoder.0) } {
+        err::raise(
+            ERR_LIB_OSSL_DECODER,
+            ERR_R_INTERNAL_ERROR,
+            "ossl_decoder_instance_dup",
+        );
+        return ptr::null_mut();
+    }
+    let dctx = match d.funcs.newctx {
+        // SAFETY: the decoder's function with its provider's context.
+        Some(newctx) => unsafe { newctx(d.provider_ctx()) },
+        None => ptr::null_mut(),
+    };
+    if dctx.is_null() {
+        err::raise(
+            ERR_LIB_OSSL_DECODER,
+            ERR_R_INTERNAL_ERROR,
+            "ossl_decoder_instance_dup",
+        );
+        // SAFETY: the reference taken above.
+        unsafe { OSSL_DECODER::free(s.decoder.0) };
+        return ptr::null_mut();
+    }
+    OSSL_DECODER_INSTANCE::new_handle(Instance {
+        decoder: s.decoder,
+        ctx: Ptr(dctx),
+        input_type: s.input_type.clone(),
+        input_structure: s.input_structure.clone(),
+        input_type_id: AtomicU32::new(s.input_type_id.load(Ordering::Relaxed)),
+        order: AtomicI32::new(s.order.load(Ordering::Relaxed)),
+        score: AtomicI32::new(s.score.load(Ordering::Relaxed)),
+        flag_input_structure_was_set: s.flag_input_structure_was_set,
+    })
+}
+
 /// `ossl_decoder_instance_new_forprov`: an instance of the decoder with a new context given the
 /// input structure, or NULL.
 ///
@@ -262,18 +309,17 @@ pub(crate) unsafe fn instance_new_forprov(
 pub(crate) struct State {
     /// The application's string (not copied, as OpenSSL keeps the pointer), or NULL; during a
     /// walk, a level's input type for the levels under it.
-    start_input_type: *const c_char,
+    pub(crate) start_input_type: *const c_char,
     /// The application's string, or NULL.
-    input_structure: *const c_char,
-    selection: c_int,
+    pub(crate) input_structure: *const c_char,
+    pub(crate) selection: c_int,
     pub(crate) insts: Vec<*mut OSSL_DECODER_INSTANCE>,
-    construct: OSSL_DECODER_CONSTRUCT,
-    cleanup: OSSL_DECODER_CLEANUP,
-    construct_data: *mut c_void,
-    #[allow(
-        dead_code,
-        reason = "the key decoders' construct (4.7b2) sets and reads it"
-    )]
+    pub(crate) construct: OSSL_DECODER_CONSTRUCT,
+    pub(crate) cleanup: OSSL_DECODER_CLEANUP,
+    pub(crate) construct_data: *mut c_void,
+    /// Set by the key construct when a key manager couldn't take a decoded key; OSSL_STORE
+    /// reads it.
+    #[allow(dead_code, reason = "OSSL_STORE (a later step) reads it")]
     pub(crate) harderr: bool,
 }
 

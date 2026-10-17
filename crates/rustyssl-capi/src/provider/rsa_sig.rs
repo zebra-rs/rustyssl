@@ -245,7 +245,7 @@ impl SigCtx {
     /// The key's library context (the context's without a key).
     fn key_libctx(&self) -> *mut OSSL_LIB_CTX {
         // SAFETY: as above.
-        unsafe { rsa(self.rsa) }.map_or(self.libctx, |r| r.libctx.0)
+        unsafe { rsa(self.rsa) }.map_or(self.libctx, |r| r.libctx.get())
     }
 
     /// `rsa_get_md_size`: the digest's size, 0 without one.

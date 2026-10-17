@@ -58,6 +58,7 @@ use crate::params::{
 use crate::provider::Ptr;
 
 pub(crate) mod ameth;
+pub(crate) mod d2i;
 pub(crate) mod dh;
 pub(crate) mod dsa;
 pub(crate) mod ec;
@@ -647,12 +648,12 @@ pub(crate) unsafe fn export(
 }
 
 /// What `evp_keymgmt_util_try_import` fills.
-struct TryImport {
-    keymgmt: keymgmt::Ref,
-    keydata: *mut c_void,
-    selection: c_int,
+pub(crate) struct TryImport {
+    pub(crate) keymgmt: keymgmt::Ref,
+    pub(crate) keydata: *mut c_void,
+    pub(crate) selection: c_int,
     /// Whether `keydata` was made here.
-    allocated: bool,
+    pub(crate) allocated: bool,
 }
 
 /// `evp_keymgmt_util_try_import`: imports the parameters into the key data (made first if
@@ -660,7 +661,7 @@ struct TryImport {
 ///
 /// # Safety
 /// `params` is a parameter array; `arg` is a `TryImport`.
-unsafe extern "C" fn try_import(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+pub(crate) unsafe extern "C" fn try_import(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
     // SAFETY: the caller's guarantee.
     let Some(data) = (unsafe { arg.cast::<TryImport>().as_mut() }) else {
         return 0;
@@ -1053,6 +1054,27 @@ fn keymgmt_copy(to: &Pkey, from: &Pkey, selection: c_int) -> bool {
     }
     cache_keyinfo(to);
     true
+}
+
+/// `evp_keymgmt_util_has`: whether a provided key's data has the selected parts (false for a
+/// key without a key manager).
+pub(crate) fn util_has(k: &Pkey, selection: c_int) -> bool {
+    let (Some(km), kd) = k.provided() else {
+        return false;
+    };
+    let ptr = kd.as_ref().map_or(ptr::null_mut(), |d| d.ptr());
+    // SAFETY: the key manager's own data.
+    unsafe { km.get().has(ptr, selection) != 0 }
+}
+
+/// The legacy data of a downgraded copy of a provided key (`evp_pkey_copy_downgraded`), taken
+/// from the copy; `None` with OpenSSL's errors.
+pub(crate) fn downgraded_legacy(k: &Pkey) -> Option<*mut c_void> {
+    let copy = copy_downgraded(k)?;
+    let mut c = copy.get().lock();
+    let legacy = c.legacy.0;
+    c.legacy = Ptr(ptr::null_mut());
+    Some(legacy)
 }
 
 /// `evp_pkey_copy_downgraded` of a provided key: a new key of its type whose legacy data the

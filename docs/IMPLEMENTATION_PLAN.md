@@ -4169,13 +4169,43 @@ chunking) is clean.
         structures, selections, `add_extra`'s 18-instance chain, from_data, from_fp, cleanup);
         the probe's `decode` with `corpus/decode.txt` and random sessions (400 pass);
         `fuzz/fuzz_targets/decoder.rs`.
-    - [ ] **4.7b2 Key decoders**: the built-in ASN.1 methods' private codecs (`priv_decode`,
-      `priv_encode`, the type-specific `ossl_*_key_from_pkcs8`), `der2key` for every key type
-      (PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures), the post-quantum
-      codecs' decoding, `OSSL_DECODER_CTX_new_for_pkey` and its construct, `d2i_X509_PUBKEY`
-      (its key), `d2i_PUBKEY`, `d2i_PrivateKey`, `d2i_AutoPrivateKey`, `d2i_PublicKey`,
-      `EVP_PKCS82PKEY`, and the PEM readers of keys (`PEM_read_bio_PrivateKey`, `_PUBKEY`,
-      `_RSAPrivateKey`, ...).
+    - [x] **4.7b2a The classic key types' decoders** (`provider/der2key.rs`,
+      `provider/pending_keys.rs`, `decoder/pkey.rs`, `evp/pkey/d2i.rs`, the key types' private
+      codecs; 27 exports): the built-in ASN.1 methods' `priv_decode` (`priv_decode_ex` for EC and
+      the ECX types), `priv_encode`, and RSA's `old_priv_decode`, over ports of each type's
+      `ossl_*_key_from_pkcs8`; `der2key` for RSA, RSA-PSS, DSA, DH, DHX, EC, SM2, X25519, X448,
+      ED25519, and ED448 in each structure `decoders.inc` gives them (the selection's structures
+      tried in order, the key checked — an RSA key's kind and factors, an EC key's SM2 range —
+      and given the provider's library context, which RSA, DSA, DH, and ECX keys can now take
+      afterwards; `export_object` for another provider's key manager); placeholders for the
+      post-quantum, MSBLOB, and PVK decoders that pass other input over and abort for theirs
+      (4.7b2b, 4.7e); `OSSL_DECODER_CTX_new_for_pkey` (the key managers and decoders collected
+      as OpenSSL does, the construct loading the key or exporting it to another provider, a
+      template copied as OpenSSL's cache copies it — instances with fresh contexts — though
+      without the cache); `d2i_PrivateKey`, `d2i_AutoPrivateKey` (decoders, then the legacy
+      fallbacks), their `_ex`, `_bio`, and `_fp` forms, `d2i_PUBKEY` and its forms, the
+      decoder path of `d2i_X509_PUBKEY` (and its `_bio`/`_fp` forms with `i2d`'s),
+      `d2i_PublicKey`, `d2i_KeyParams` (`_bio`), `EVP_PKCS82PKEY` (`_ex`), `EVP_PKEY2PKCS8` of
+      legacy keys (a provided key's needs 4.7c's encoders), and `asn1_d2i_read_bio`. Also fixed:
+      RSA's key manager `load` now detaches the reference (as OpenSSL's), and a legacy key's
+      parameters (`evp_pkey_get_params_to_ctrl`) now give DH's and DSA's numbers, with a
+      missing private or public key read as 0, as OpenSSL's translation does. Deviations: a
+      NULL buffer for `asn1_d2i_read_bio`, `*a` kept on a failed legacy decoding, and DH's
+      PKCS#8 without a private key (docs/DEVIATIONS.md).
+      - Tests: `tests/c/d2i_pkey.c` (154 checks: every classic type's PrivateKeyInfo and
+        SubjectPublicKeyInfo through each entry point, signed and verified; the traditional
+        formats; public keys and parameters; legacy keys to PKCS#8 against OpenSSL's encodings;
+        the failures and their errors; the decoder contexts' sizes and PEM through them; the BIO,
+        FILE, and library-context forms); the probe's `d2ikey` with `corpus/d2ikey.txt` and
+        random sessions (3,000 pass);
+        `fuzz/fuzz_targets/d2i_pkey.rs` (247k runs clean); Rust tests for the deviations.
+      - Later: OpenSSL's cache of templates (a cost, not a behavior).
+    - [ ] **4.7b2b Post-quantum key codecs**: ML-KEM's, ML-DSA's, and SLH-DSA's PrivateKeyInfo and
+      SubjectPublicKeyInfo decoding (`ml_kem_codecs.c`, `ml_dsa_codecs.c`, `der2key`'s SLH-DSA
+      functions), replacing their placeholders.
+    - [ ] **4.7b2c PEM key readers**: `PEM_read_bio_PrivateKey` (`_ex`), `_PUBKEY`,
+      `_Parameters`, the type-specific readers (`_RSAPrivateKey`, `_RSA_PUBKEY`, `_DSAparams`,
+      `_ECPrivateKey`, `_DHparams`, ...), and their `FILE` forms, through the decoders.
   - [ ] **4.7c Encoders**: the `OSSL_ENCODER` framework (fetch, contexts, the chain to an
     output type and structure), the default provider's `key2any` (DER and PEM:
     PrivateKeyInfo, SubjectPublicKeyInfo, the type-specific structures, parameters) and

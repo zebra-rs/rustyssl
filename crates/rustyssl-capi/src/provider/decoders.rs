@@ -1,9 +1,10 @@
 //! The default and base providers' decoders (`decoders.inc`; `decode_pem2der.c`,
-//! `decode_spki2typespki.c`, `decode_epki2pki.c`): so far the structural ones a key's decoding
-//! goes through — PEM to DER (`pem2der`, which also decrypts a traditional PEM's DEK-Info and
-//! names what each PEM type holds), SubjectPublicKeyInfo to its key type's
+//! `decode_spki2typespki.c`, `decode_epki2pki.c`): the key decoders (`der2key`, with
+//! placeholders for those still to come in `pending_keys`) and the structural ones a key's
+//! decoding goes through — PEM to DER (`pem2der`, which also decrypts a traditional PEM's
+//! DEK-Info and names what each PEM type holds), SubjectPublicKeyInfo to its key type's
 //! (`spki2typespki`), and EncryptedPrivateKeyInfo to PrivateKeyInfo (`epki2pki`, whose
-//! decryption comes with step 4.7d). The key decoders come with step 4.7b2.
+//! decryption comes with step 4.7d).
 //!
 //! As OpenSSL's, a decoder that doesn't recognize its input succeeds without passing anything
 //! on, so the walk tries the next one.
@@ -28,7 +29,8 @@ use rustyssl_abi::{
 };
 
 use super::builtin::libctx_of;
-use super::tables::{Algorithms, Dispatch, END, PARAM_END, Params, defn, entry, pending_with};
+use super::tables::{Algorithms, Dispatch, END, PARAM_END, Params, defn, entry};
+use super::{der2key, pending_keys};
 use crate::decoder::ctx::bio_new_from_core_bio;
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
 use crate::ffi::ffi_callback;
@@ -127,7 +129,7 @@ unsafe fn dctx<'a>(vctx: *mut c_void) -> Option<&'a mut DecCtx> {
 ///
 /// # Safety
 /// `params` is NULL or an array.
-unsafe fn read_into<const N: usize>(
+pub(super) unsafe fn read_into<const N: usize>(
     params: *const OSSL_PARAM,
     key: &CStr,
     buf: &mut [c_char; N],
@@ -467,7 +469,7 @@ unsafe fn epki2pki_der_decode(
 ///
 /// # Safety
 /// `cin` is a live core BIO.
-unsafe fn read_der(cin: *mut OSSL_CORE_BIO) -> Option<Vec<u8>> {
+pub(super) unsafe fn read_der(cin: *mut OSSL_CORE_BIO) -> Option<Vec<u8>> {
     // SAFETY: the caller's guarantee.
     let input = unsafe { bio_new_from_core_bio(cin) };
     if input.is_null() {
@@ -823,272 +825,372 @@ const fn decoder<const N: usize>(
 }
 
 /// The default provider's decoders, in `decoders.inc`'s order (the structural ones come last);
-/// the key decoders, which come with step 4.7b2, are pending (their names registered).
+/// the post-quantum, MSBLOB, and PVK ones are placeholders (`pending_keys`).
 static DEFAULT_DECODERS: Algorithms<77> = Algorithms([
-    pending_with(
+    decoder(
         c"DH",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DH,
     ),
-    pending_with(
+    decoder(
         c"DH",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DH,
     ),
-    pending_with(
+    decoder(
         c"DH",
         c"provider=default,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DH,
     ),
-    pending_with(c"DH", c"provider=default,fips=yes,input=der,structure=dh"),
-    pending_with(
+    decoder(
+        c"DH",
+        c"provider=default,fips=yes,input=der,structure=dh",
+        &der2key::DH_DH,
+    ),
+    decoder(
         c"DHX",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DHX,
     ),
-    pending_with(
+    decoder(
         c"DHX",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DHX,
     ),
-    pending_with(
+    decoder(
         c"DHX",
         c"provider=default,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DHX,
     ),
-    pending_with(c"DHX", c"provider=default,fips=yes,input=der,structure=dhx"),
-    pending_with(
+    decoder(
+        c"DHX",
+        c"provider=default,fips=yes,input=der,structure=dhx",
+        &der2key::DHX_DHX,
+    ),
+    decoder(
         c"DSA",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DSA,
     ),
-    pending_with(
+    decoder(
         c"DSA",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DSA,
     ),
-    pending_with(
+    decoder(
         c"DSA",
         c"provider=default,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DSA,
     ),
-    pending_with(c"DSA", c"provider=default,fips=yes,input=der,structure=dsa"),
-    pending_with(c"DSA", c"provider=default,fips=yes,input=msblob"),
-    pending_with(c"DSA", c"provider=default,fips=yes,input=pvk"),
-    pending_with(
+    decoder(
+        c"DSA",
+        c"provider=default,fips=yes,input=der,structure=dsa",
+        &der2key::DSA_DSA,
+    ),
+    decoder(
+        c"DSA",
+        c"provider=default,fips=yes,input=msblob",
+        &pending_keys::MSBLOB_DSA,
+    ),
+    decoder(
+        c"DSA",
+        c"provider=default,fips=yes,input=pvk",
+        &pending_keys::PVK_DSA,
+    ),
+    decoder(
         c"EC",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_EC,
     ),
-    pending_with(
+    decoder(
         c"EC",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_EC,
     ),
-    pending_with(
+    decoder(
         c"EC",
         c"provider=default,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_EC,
     ),
-    pending_with(c"EC", c"provider=default,fips=yes,input=der,structure=ec"),
-    pending_with(
+    decoder(
+        c"EC",
+        c"provider=default,fips=yes,input=der,structure=ec",
+        &der2key::EC_EC,
+    ),
+    decoder(
         c"ED25519",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_ED25519,
     ),
-    pending_with(
+    decoder(
         c"ED25519",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_ED25519,
     ),
-    pending_with(
+    decoder(
         c"ED448",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_ED448,
     ),
-    pending_with(
+    decoder(
         c"ED448",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_ED448,
     ),
-    pending_with(
+    decoder(
         c"X25519",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_X25519,
     ),
-    pending_with(
+    decoder(
         c"X25519",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_X25519,
     ),
-    pending_with(
+    decoder(
         c"X448",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_X448,
     ),
-    pending_with(
+    decoder(
         c"X448",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_X448,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=default,fips=no,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_SM2,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=default,fips=no,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_SM2,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=default,fips=no,input=der,structure=type-specific",
+        &der2key::TS_SM2,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-512",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-512",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-768",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-768",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-1024",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-1024",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256s",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256f",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256s",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256f",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_RSA,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_RSA,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=default,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_RSA,
     ),
-    pending_with(c"RSA", c"provider=default,fips=yes,input=der,structure=rsa"),
-    pending_with(
+    decoder(
+        c"RSA",
+        c"provider=default,fips=yes,input=der,structure=rsa",
+        &der2key::RSA_RSA,
+    ),
+    decoder(
         c"RSA-PSS",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_RSAPSS,
     ),
-    pending_with(
+    decoder(
         c"RSA-PSS",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_RSAPSS,
     ),
-    pending_with(c"RSA", c"provider=default,fips=yes,input=msblob"),
-    pending_with(c"RSA", c"provider=default,fips=yes,input=pvk"),
-    pending_with(
+    decoder(
+        c"RSA",
+        c"provider=default,fips=yes,input=msblob",
+        &pending_keys::MSBLOB_RSA,
+    ),
+    decoder(
+        c"RSA",
+        c"provider=default,fips=yes,input=pvk",
+        &pending_keys::PVK_RSA,
+    ),
+    decoder(
         c"ML-DSA-44",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-65",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-87",
         c"provider=default,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-44",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-65",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-87",
         c"provider=default,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
     decoder(
         c"DER",
@@ -1106,270 +1208,370 @@ static DEFAULT_DECODERS: Algorithms<77> = Algorithms([
 
 /// The base provider's, the same with its name.
 static BASE_DECODERS: Algorithms<77> = Algorithms([
-    pending_with(
+    decoder(
         c"DH",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DH,
     ),
-    pending_with(
+    decoder(
         c"DH",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DH,
     ),
-    pending_with(
+    decoder(
         c"DH",
         c"provider=base,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DH,
     ),
-    pending_with(c"DH", c"provider=base,fips=yes,input=der,structure=dh"),
-    pending_with(
+    decoder(
+        c"DH",
+        c"provider=base,fips=yes,input=der,structure=dh",
+        &der2key::DH_DH,
+    ),
+    decoder(
         c"DHX",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DHX,
     ),
-    pending_with(
+    decoder(
         c"DHX",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DHX,
     ),
-    pending_with(
+    decoder(
         c"DHX",
         c"provider=base,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DHX,
     ),
-    pending_with(c"DHX", c"provider=base,fips=yes,input=der,structure=dhx"),
-    pending_with(
+    decoder(
+        c"DHX",
+        c"provider=base,fips=yes,input=der,structure=dhx",
+        &der2key::DHX_DHX,
+    ),
+    decoder(
         c"DSA",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_DSA,
     ),
-    pending_with(
+    decoder(
         c"DSA",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_DSA,
     ),
-    pending_with(
+    decoder(
         c"DSA",
         c"provider=base,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_DSA,
     ),
-    pending_with(c"DSA", c"provider=base,fips=yes,input=der,structure=dsa"),
-    pending_with(c"DSA", c"provider=base,fips=yes,input=msblob"),
-    pending_with(c"DSA", c"provider=base,fips=yes,input=pvk"),
-    pending_with(
+    decoder(
+        c"DSA",
+        c"provider=base,fips=yes,input=der,structure=dsa",
+        &der2key::DSA_DSA,
+    ),
+    decoder(
+        c"DSA",
+        c"provider=base,fips=yes,input=msblob",
+        &pending_keys::MSBLOB_DSA,
+    ),
+    decoder(
+        c"DSA",
+        c"provider=base,fips=yes,input=pvk",
+        &pending_keys::PVK_DSA,
+    ),
+    decoder(
         c"EC",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_EC,
     ),
-    pending_with(
+    decoder(
         c"EC",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_EC,
     ),
-    pending_with(
+    decoder(
         c"EC",
         c"provider=base,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_EC,
     ),
-    pending_with(c"EC", c"provider=base,fips=yes,input=der,structure=ec"),
-    pending_with(
+    decoder(
+        c"EC",
+        c"provider=base,fips=yes,input=der,structure=ec",
+        &der2key::EC_EC,
+    ),
+    decoder(
         c"ED25519",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_ED25519,
     ),
-    pending_with(
+    decoder(
         c"ED25519",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_ED25519,
     ),
-    pending_with(
+    decoder(
         c"ED448",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_ED448,
     ),
-    pending_with(
+    decoder(
         c"ED448",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_ED448,
     ),
-    pending_with(
+    decoder(
         c"X25519",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_X25519,
     ),
-    pending_with(
+    decoder(
         c"X25519",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_X25519,
     ),
-    pending_with(
+    decoder(
         c"X448",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_X448,
     ),
-    pending_with(
+    decoder(
         c"X448",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_X448,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=base,fips=no,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_SM2,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=base,fips=no,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_SM2,
     ),
-    pending_with(
+    decoder(
         c"SM2",
         c"provider=base,fips=no,input=der,structure=type-specific",
+        &der2key::TS_SM2,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-512",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-512",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-768",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-768",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-1024",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-KEM-1024",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256s",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256f",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-128f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-192f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHA2-256f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-128f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-192f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256s",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"SLH-DSA-SHAKE-256f",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_RSA,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_RSA,
     ),
-    pending_with(
+    decoder(
         c"RSA",
         c"provider=base,fips=yes,input=der,structure=type-specific",
+        &der2key::TS_RSA,
     ),
-    pending_with(c"RSA", c"provider=base,fips=yes,input=der,structure=rsa"),
-    pending_with(
+    decoder(
+        c"RSA",
+        c"provider=base,fips=yes,input=der,structure=rsa",
+        &der2key::RSA_RSA,
+    ),
+    decoder(
         c"RSA-PSS",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &der2key::P8_RSAPSS,
     ),
-    pending_with(
+    decoder(
         c"RSA-PSS",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &der2key::SPKI_RSAPSS,
     ),
-    pending_with(c"RSA", c"provider=base,fips=yes,input=msblob"),
-    pending_with(c"RSA", c"provider=base,fips=yes,input=pvk"),
-    pending_with(
+    decoder(
+        c"RSA",
+        c"provider=base,fips=yes,input=msblob",
+        &pending_keys::MSBLOB_RSA,
+    ),
+    decoder(
+        c"RSA",
+        c"provider=base,fips=yes,input=pvk",
+        &pending_keys::PVK_RSA,
+    ),
+    decoder(
         c"ML-DSA-44",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-65",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-87",
         c"provider=base,fips=yes,input=der,structure=PrivateKeyInfo",
+        &pending_keys::PQ_P8,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-44",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-65",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
-    pending_with(
+    decoder(
         c"ML-DSA-87",
         c"provider=base,fips=yes,input=der,structure=SubjectPublicKeyInfo",
+        &pending_keys::PQ_SPKI,
     ),
     decoder(
         c"DER",

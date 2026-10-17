@@ -44,7 +44,7 @@ use crate::evp::md_ctx::{
     EVP_DigestFinal_ex, EVP_DigestInit_ex, EVP_DigestUpdate, EVP_MD_CTX_free, EVP_MD_CTX_new,
 };
 use crate::handle::{Handle, handle_type};
-use crate::provider::Ptr;
+use crate::provider::{KeyLibctx, Ptr};
 use crate::rand_lib::{RAND_bytes_ex, RAND_priv_bytes_ex};
 
 /// The kind of key (`RSA_FLAG_TYPE_*`): RSA, or RSA-PSS, whose key type allows only PSS
@@ -201,7 +201,7 @@ unsafe impl Sync for ExData {}
 
 /// An RSA key (`RSA`), shared by reference.
 pub(crate) struct Rsa {
-    pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    pub(crate) libctx: KeyLibctx,
     /// `*_up_ref` and `RSA_free`'s count: the method's `finish` and the ex_data's free run
     /// when it reaches zero, with the handle still live.
     references: AtomicI32,
@@ -248,7 +248,7 @@ impl Rsa {
         // SAFETY: the default method is live (built in, or the application's).
         let mflags = unsafe { crate::rsa_meth::flags(meth) };
         let h = RSA::new_handle(Rsa {
-            libctx: Ptr(libctx),
+            libctx: KeyLibctx::new(libctx),
             references: AtomicI32::new(1),
             dirty: AtomicUsize::new(0),
             state: Mutex::new(RsaState {

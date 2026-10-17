@@ -66,7 +66,7 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(id) = (unsafe { context(ctx) }).map(|c| c.lock().legacy_keytype()) else { return 0 };
         let Some(kind) = ecx::type_of(id) else { return 0 };
-        let h = ecx::key_op(ptr::null_mut(), kind, &KeyOp::Keygen);
+        let h = ecx::key_op(ptr::null_mut(), kind, &KeyOp::Keygen, None);
         if h.is_null() {
             return 0;
         }
@@ -269,7 +269,7 @@ ffi_callback! {
             return 0;
         };
         let propq = k.lock().propq.clone();
-        if !sha512_available(k.libctx.0, propq.as_deref()) {
+        if !sha512_available(k.libctx.get(), propq.as_deref()) {
             return 0;
         }
         c_int::from(rustyssl_crypto::ecx::ed25519_verify(tbs, sig, &q, &Dom::default()))
@@ -307,7 +307,7 @@ ffi_callback! {
             (d, q, s.propq.clone())
         };
         let signed = match (d.as_ref(), q) {
-            (Some(d), Some(q)) if digest_available(k.libctx.0, c"SHAKE256", propq.as_deref()) => {
+            (Some(d), Some(q)) if digest_available(k.libctx.get(), c"SHAKE256", propq.as_deref()) => {
                 rustyssl_crypto::ecx448::ed448_sign(tbs, &q, d, false, &[])
             }
             _ => None,
@@ -345,7 +345,7 @@ ffi_callback! {
         let Ok(sig) = <&[u8; ED448_SIGSIZE]>::try_from(sig) else { return 0 };
         let Ok(q) = <[u8; ED448_KEYLEN]>::try_from(k.public().as_slice()) else { return 0 };
         let propq = k.lock().propq.clone();
-        if !digest_available(k.libctx.0, c"SHAKE256", propq.as_deref()) {
+        if !digest_available(k.libctx.get(), c"SHAKE256", propq.as_deref()) {
             return 0;
         }
         c_int::from(rustyssl_crypto::ecx448::ed448_verify(tbs, sig, &q, false, &[]))

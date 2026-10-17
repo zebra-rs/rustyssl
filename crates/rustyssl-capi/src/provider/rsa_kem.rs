@@ -65,7 +65,7 @@ impl KemCtx {
     /// The key's state and library context, if there's a key.
     fn key(&self) -> Option<(RsaState, *mut OSSL_LIB_CTX)> {
         // SAFETY: the reference this holds, or NULL.
-        unsafe { rsa(self.rsa) }.map(|r| (r.snapshot(), r.libctx.0))
+        unsafe { rsa(self.rsa) }.map(|r| (r.snapshot(), r.libctx.get()))
     }
 }
 

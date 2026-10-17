@@ -471,7 +471,7 @@ unsafe fn key_dims(r: *const RSA) -> Option<(usize, usize, *mut rustyssl_abi::OS
     let k = unsafe { rsa(r) }?;
     let st = k.snapshot();
     st.key.n.as_ref()?;
-    Some((st.key.size(), st.key.bits(), k.libctx.0))
+    Some((st.key.size(), st.key.bits(), k.libctx.get()))
 }
 
 ffi_export! {
@@ -820,7 +820,7 @@ ffi_export! {
         let Some(k) = (unsafe { crate::rsa::rsa(rsa) }) else { return 0 };
         let mut key = k.snapshot().key;
         // SAFETY: as above.
-        let r = unsafe { x931_derive(k.libctx.0, &mut key, [[p1, p2], [q1, q2]], [[xp1, xp2, xp_], [xq1, xq2, xq_]], e, cb) };
+        let r = unsafe { x931_derive(k.libctx.get(), &mut key, [[p1, p2], [q1, q2]], [[xp1, xp2, xp_], [xq1, xq2, xq_]], e, cb) };
         k.update_key(|kk| set_numbers(kk, &key));
         r
     }
@@ -853,7 +853,7 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { crate::rsa::rsa(rsa) }) else { return 0 };
-        let libctx = k.libctx.0;
+        let libctx = k.libctx.get();
         // SAFETY: the key's library context.
         let ctx = unsafe { BN_CTX_new_ex(libctx) };
         if ctx.is_null() {
@@ -937,7 +937,7 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let e = unsafe { value(e_value) };
         // SAFETY: the key's library context; the caller's callback.
-        match unsafe { generate_key(k.libctx.0, bits, primes, e.as_ref(), cb) } {
+        match unsafe { generate_key(k.libctx.get(), bits, primes, e.as_ref(), cb) } {
             Some(key) => {
                 k.update_key(|kk| set_numbers(kk, &key));
                 1
@@ -1009,7 +1009,7 @@ ffi_export! {
         let Some(k) = (unsafe { rsa(r) }) else { return 0 };
         let st = k.snapshot();
         // SAFETY: the key's library context; the caller's callback.
-        unsafe { validate_keypair(k.libctx.0, &st.key, cb) }
+        unsafe { validate_keypair(k.libctx.get(), &st.key, cb) }
     }
 }
 

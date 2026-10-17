@@ -897,3 +897,109 @@ ffi_callback! {
         1
     }
 }
+
+/// `ossl_ec_key_from_pkcs8`: a PrivateKeyInfo's ECPrivateKey on the AlgorithmIdentifier's
+/// parameters, in `libctx`, or NULL.
+///
+/// # Safety
+/// `p8` is a live PrivateKeyInfo; `libctx` is NULL or a live library context; `propq` is NULL
+/// or a string.
+pub(crate) unsafe fn key_from_pkcs8(
+    p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: *const core::ffi::c_char,
+) -> *mut EC_KEY {
+    use rustyssl_abi::EC_R_DECODE_ERROR;
+    let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's structure; locals.
+    if unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut p,
+            &raw mut pklen,
+            &raw mut palg,
+            p8,
+        )
+    } == 0
+    {
+        return ptr::null_mut();
+    }
+    // SAFETY: its AlgorithmIdentifier; the caller's guarantee.
+    let mut eckey = unsafe { key_param_from_x509_algor(palg, libctx, propq) };
+    if eckey.is_null() {
+        return ptr::null_mut();
+    }
+    // SAFETY: the new key; the structure's `pklen` octets.
+    if unsafe { d2i_ECPrivateKey(&raw mut eckey, &raw mut p, c_long::from(pklen)) }.is_null() {
+        err::raise(ERR_LIB_EC, EC_R_DECODE_ERROR, "ossl_ec_key_from_pkcs8");
+        // SAFETY: made above.
+        unsafe { crate::ec::key::EC_KEY_free(eckey) };
+        return ptr::null_mut();
+    }
+    eckey
+}
+
+ffi_callback! {
+    /// `eckey_priv_decode_ex`: a PrivateKeyInfo's key, in a library context, assigned to the
+    /// key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed EC; `p8` is a live PrivateKeyInfo; `libctx` is NULL or a live
+    /// library context; `propq` is NULL or a string.
+    pub(crate) unsafe extern "C" fn eckey_priv_decode_ex(pkey: *mut EVP_PKEY, p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO, libctx: *mut rustyssl_abi::OSSL_LIB_CTX, propq: *const core::ffi::c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        // SAFETY: the caller's guarantee.
+        let eckey = unsafe { key_from_pkcs8(p8, libctx, propq) };
+        if eckey.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, EVP_PKEY_EC, eckey.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `eckey_priv_encode`: the key's ECPrivateKey without its parameters, which go in the
+    /// AlgorithmIdentifier with id-ecPublicKey.
+    ///
+    /// # Safety
+    /// `p8` is a live PrivateKeyInfo; `pkey` is a live EC key.
+    pub(crate) unsafe extern "C" fn eckey_priv_encode(p8: *mut rustyssl_abi::PKCS8_PRIV_KEY_INFO, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_EC
+    {
+        use rustyssl_abi::{EC_PKEY_NO_PARAMETERS, EC_R_DECODE_ERROR, ERR_R_ASN1_LIB, V_ASN1_SEQUENCE};
+        // SAFETY: the caller's guarantee.
+        let ec = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let Some((ptype, pval)) = (unsafe { param2type(ec) }) else {
+            err::raise(ERR_LIB_EC, EC_R_DECODE_ERROR, "eckey_priv_encode");
+            return 0;
+        };
+        let fail = || {
+            if ptype == V_ASN1_SEQUENCE {
+                // SAFETY: the parameter made above.
+                unsafe { crate::asn1::string::ASN1_STRING_free(pval.cast()) };
+            }
+            0
+        };
+        let mut ep = ptr::null_mut();
+        // SAFETY: the key; a place for a new encoding.
+        let eplen = unsafe { crate::ec::key_asn1::encode_private(ec, &raw mut ep, EC_PKEY_NO_PARAMETERS.cast_unsigned()) };
+        if eplen <= 0 {
+            err::raise(ERR_LIB_EC, ERR_R_EC_LIB, "eckey_priv_encode");
+            return fail();
+        }
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(EVP_PKEY_EC) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if unsafe { crate::x509::p8::PKCS8_pkey_set0(p8, obj, 0, ptype, pval, ep, eplen) } != 0 {
+            return 1;
+        }
+        err::raise(ERR_LIB_EC, ERR_R_ASN1_LIB, "eckey_priv_encode");
+        // SAFETY: made above, `eplen` octets.
+        unsafe { crate::mem::release_clean(ep.cast(), usize::try_from(eplen).unwrap_or(0)) };
+        fail()
+    }
+}

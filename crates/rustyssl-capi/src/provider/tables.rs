@@ -85,16 +85,6 @@ pub(crate) const fn pending(names: &'static CStr) -> OSSL_ALGORITHM {
     }
 }
 
-/// As [`pending`], with its own property definition (a decoder's or an encoder's).
-pub(crate) const fn pending_with(names: &'static CStr, props: &'static CStr) -> OSSL_ALGORITHM {
-    OSSL_ALGORITHM {
-        algorithm_names: names.as_ptr(),
-        property_definition: props.as_ptr(),
-        implementation: PENDING.0.as_ptr(),
-        algorithm_description: ptr::null(),
-    }
-}
-
 /// Whether an algorithm's dispatch table is [`PENDING`]'s.
 pub(crate) fn is_pending(implementation: *const OSSL_DISPATCH) -> bool {
     core::ptr::eq(implementation, PENDING.0.as_ptr())

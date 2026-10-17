@@ -21,7 +21,7 @@ use crate::err;
 use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free};
 use crate::ffi::bytes;
 use crate::params::OSSL_PARAM_get_octet_string;
-use crate::provider::Ptr;
+use crate::provider::KeyLibctx;
 use crate::provider::macs::{locate, wipe};
 use crate::rand_lib::RAND_priv_bytes_ex;
 
@@ -72,7 +72,7 @@ impl Drop for State {
 
 /// `ECX_KEY`.
 pub(crate) struct EcxKey {
-    pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    pub(crate) libctx: KeyLibctx,
     pub(crate) kind: EcxType,
     state: Mutex<State>,
 }
@@ -98,7 +98,7 @@ impl EcxKey {
 /// `ossl_ecx_key_new`: an empty key of `kind`, as key data (a reference).
 pub(crate) fn new(libctx: *mut OSSL_LIB_CTX, kind: EcxType, propq: Option<&CStr>) -> *mut c_void {
     let k = EcxKey {
-        libctx: Ptr(libctx),
+        libctx: KeyLibctx::new(libctx),
         kind,
         state: Mutex::new(State {
             propq: propq.map(CStr::to_owned),
@@ -153,7 +153,7 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
             Some(rustyssl_crypto::ecx::x25519_public_from_private(&p).to_vec())
         }
         EcxType::Ed25519 => {
-            if !sha512_available(k.libctx.0, s.propq.as_deref()) {
+            if !sha512_available(k.libctx.get(), s.propq.as_deref()) {
                 return false;
             }
             let Ok(p) = <[u8; 32]>::try_from(private) else {
@@ -166,7 +166,7 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
             .and_then(|p| rustyssl_crypto::ecx448::x448_public_from_private(&p))
             .map(|v| v.to_vec()),
         EcxType::Ed448 => {
-            if !digest_available(k.libctx.0, c"SHAKE256", s.propq.as_deref()) {
+            if !digest_available(k.libctx.get(), c"SHAKE256", s.propq.as_deref()) {
                 return false;
             }
             let Ok(p) = <[u8; 57]>::try_from(private) else {
@@ -186,7 +186,7 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
 /// `ossl_ecx_key_dup`: a new key with the selected parts.
 pub(crate) fn dup(k: &EcxKey, public: bool, private: bool) -> *mut c_void {
     let s = k.lock();
-    let n = new(k.libctx.0, k.kind, s.propq.as_deref());
+    let n = new(k.libctx.get(), k.kind, s.propq.as_deref());
     // SAFETY: the key just made.
     if let Some(d) = unsafe { key(n) } {
         let mut ds = d.lock();
@@ -305,11 +305,17 @@ pub(crate) enum KeyOp<'a> {
     Keygen,
 }
 
-/// `ossl_ecx_key_op` (without an algorithm identifier): a new key of `kind` from a public key
+/// `ossl_ecx_key_op` (without an algorithm identifier): a new key of `kind` (with `propq`) from a
+/// public key
 /// or a private key of the type's length, or with a random private key (clamped for X25519 and
 /// X448),
 /// the public key derived from a private one; NULL with an EC error.
-pub(crate) fn key_op(libctx: *mut OSSL_LIB_CTX, kind: EcxType, op: &KeyOp<'_>) -> *mut c_void {
+pub(crate) fn key_op(
+    libctx: *mut OSSL_LIB_CTX,
+    kind: EcxType,
+    op: &KeyOp<'_>,
+    propq: Option<&CStr>,
+) -> *mut c_void {
     const F: &str = "ossl_ecx_key_op";
     let keylen = kind.keylen();
     if let KeyOp::Public(p) | KeyOp::Private(p) = op
@@ -318,7 +324,7 @@ pub(crate) fn key_op(libctx: *mut OSSL_LIB_CTX, kind: EcxType, op: &KeyOp<'_>) -
         err::raise(ERR_LIB_EC, EC_R_INVALID_ENCODING, F);
         return ptr::null_mut();
     }
-    let h = new(libctx, kind, None);
+    let h = new(libctx, kind, propq);
     // SAFETY: the key just made.
     let Some(k) = (unsafe { key(h) }) else {
         return ptr::null_mut();

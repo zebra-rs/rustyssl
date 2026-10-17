@@ -503,7 +503,7 @@ pub(crate) unsafe fn dup(h: *const DH, selection: c_int) -> *mut DH {
     if selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0 {
         st.priv_key = src.priv_key.clone();
     }
-    let out = Dh::new_handle_in(k.libctx.0);
+    let out = Dh::new_handle_in(k.libctx.get());
     // SAFETY: just made, or NULL.
     let Some(d) = (unsafe { dh(out) }) else {
         return ptr::null_mut();
@@ -620,7 +620,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         return 0;
     };
     // SAFETY: the key's library context; the caller's callback.
-    let Some(env) = (unsafe { Env::new(k.libctx.0, cb) }) else {
+    let Some(env) = (unsafe { Env::new(k.libctx.get(), cb) }) else {
         return 0;
     };
     let mut st = k.snapshot();
@@ -629,7 +629,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         // SAFETY: the key's library context; the context made above.
         unsafe {
             ffc::generate_186_2(
-                k.libctx.0,
+                k.libctx.get(),
                 &env,
                 &mut st.params,
                 Type::Dh,
@@ -642,7 +642,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         // SAFETY: as above.
         unsafe {
             ffc::generate_186_4(
-                k.libctx.0,
+                k.libctx.get(),
                 &env,
                 &mut st.params,
                 Type::Dh,

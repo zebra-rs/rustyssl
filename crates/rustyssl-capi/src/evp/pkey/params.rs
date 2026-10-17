@@ -486,7 +486,8 @@ enum Payload {
     PubKey,
     EcPubXy,
     FfcP,
-    FfcQG,
+    FfcQ,
+    FfcG,
     EcDecoded,
     RsaN,
     RsaE,
@@ -513,8 +514,8 @@ fn payload(key: &[u8]) -> Option<Payload> {
         (OSSL_PKEY_PARAM_EC_PUB_X, Payload::EcPubXy),
         (OSSL_PKEY_PARAM_EC_PUB_Y, Payload::EcPubXy),
         (OSSL_PKEY_PARAM_FFC_P, Payload::FfcP),
-        (OSSL_PKEY_PARAM_FFC_Q, Payload::FfcQG),
-        (OSSL_PKEY_PARAM_FFC_G, Payload::FfcQG),
+        (OSSL_PKEY_PARAM_FFC_Q, Payload::FfcQ),
+        (OSSL_PKEY_PARAM_FFC_G, Payload::FfcG),
         (OSSL_PKEY_PARAM_RSA_N, Payload::RsaN),
         (OSSL_PKEY_PARAM_RSA_E, Payload::RsaE),
         (OSSL_PKEY_PARAM_RSA_D, Payload::RsaD),
@@ -550,6 +551,40 @@ unsafe fn put_bn(p: *mut OSSL_PARAM, bn: *const BIGNUM) -> c_int {
     unsafe { crate::params::bn::OSSL_PARAM_set_BN(p, bn) }
 }
 
+/// A private or public key's number into the parameter (an unsigned integer one), as
+/// `default_fixup_args` gives it: a missing one reads as 0. 1, or 0.
+///
+/// # Safety
+/// `p` is a parameter; `bn` is NULL or a live number.
+unsafe fn put_key_bn(p: *mut OSSL_PARAM, bn: *const BIGNUM) -> c_int {
+    if bn.is_null() {
+        // SAFETY: the caller's parameter.
+        return unsafe { crate::params::OSSL_PARAM_set_uint(p, 0) };
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { put_bn(p, bn) }
+}
+
+/// `get_payload_public_key`'s octets for a DH key: `ossl_dh_key2buf`'s padded public key
+/// (nothing, failing, without one). 1, or 0.
+///
+/// # Safety
+/// `p` is a parameter; `d` is NULL or a live `DH`.
+unsafe fn dh_public_octets(p: *mut OSSL_PARAM, d: *const rustyssl_abi::DH) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let st = unsafe { crate::dh::dh(d.cast_mut()) }.map(crate::dh::Dh::snapshot);
+    let buf = st.and_then(|st| {
+        let n = crate::dh_backend::key2buf(&st, None);
+        let mut v = vec![0u8; n];
+        (n > 0 && crate::dh_backend::key2buf(&st, Some(&mut v)) == n).then_some(v)
+    });
+    let (ptr_, len) = buf
+        .as_ref()
+        .map_or((ptr::null(), 0), |v| (v.as_ptr(), v.len()));
+    // SAFETY: the caller's parameter; the octets, or NULL.
+    unsafe { crate::params::OSSL_PARAM_set_octet_string(p, ptr_.cast(), len) }
+}
+
 /// `evp_pkey_get_params_to_ctrl`: each parameter from the key's legacy data through the payload
 /// table: the last one's result, or -2 for a parameter it doesn't name (the rest unread).
 ///
@@ -558,7 +593,7 @@ unsafe fn put_bn(p: *mut OSSL_PARAM, bn: *const BIGNUM) -> c_int {
 unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c_int {
     use crate::rsa_lib as r;
     use rustyssl_abi::{
-        EVP_PKEY_DH, EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
+        EVP_PKEY_DH, EVP_PKEY_DHX, EVP_PKEY_DSA, EVP_PKEY_EC, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,
         EVP_R_UNSUPPORTED_KEY_TYPE,
     };
     const F: &str = "evp_pkey_setget_params_to_ctrl";
@@ -595,8 +630,33 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
                 }
             }
             Payload::PubKey => {
-                if base == EVP_PKEY_EC {
-                    let octets = param.data_type == rustyssl_abi::OSSL_PARAM_OCTET_STRING as u32;
+                let octets = param.data_type == rustyssl_abi::OSSL_PARAM_OCTET_STRING as u32;
+                if base == EVP_PKEY_DH || base == EVP_PKEY_DHX {
+                    // SAFETY: the caller's key.
+                    let d = unsafe { super::dh::EVP_PKEY_get0_DH(pkey) };
+                    if octets {
+                        // SAFETY: the parameter; the key's `DH`.
+                        unsafe { dh_public_octets(param, d) }
+                    } else if bn_type {
+                        // SAFETY: the key's `DH`.
+                        let bn = unsafe { crate::dh::DH_get0_pub_key(d) };
+                        // SAFETY: the parameter; the number or NULL.
+                        unsafe { put_key_bn(param, bn) }
+                    } else {
+                        0
+                    }
+                } else if base == EVP_PKEY_DSA {
+                    if bn_type {
+                        // SAFETY: the caller's key.
+                        let d = unsafe { super::dsa::EVP_PKEY_get0_DSA(pkey) };
+                        // SAFETY: the key's `DSA`.
+                        let bn = unsafe { crate::dsa::DSA_get0_pub_key(d) };
+                        // SAFETY: the parameter; the number or NULL.
+                        unsafe { put_key_bn(param, bn) }
+                    } else {
+                        0
+                    }
+                } else if base == EVP_PKEY_EC {
                     if octets {
                         // SAFETY: the parameter; the key's EC_KEY.
                         unsafe { ec_public_key(param, ec()) }
@@ -629,11 +689,18 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
             Payload::PrivKey => {
                 if !bn_type {
                     0
+                } else if base == EVP_PKEY_DH {
+                    // SAFETY: the caller's key.
+                    let d = unsafe { super::dh::EVP_PKEY_get0_DH(pkey) };
+                    // SAFETY: the key's `DH`.
+                    let bn = unsafe { crate::dh::DH_get0_priv_key(d) };
+                    // SAFETY: the parameter; the number or NULL.
+                    unsafe { put_key_bn(param, bn) }
                 } else if base == EVP_PKEY_EC {
                     // SAFETY: the key's EC_KEY.
                     let bn = unsafe { crate::ec::key::EC_KEY_get0_private_key(ec()) };
                     // SAFETY: the parameter; the number or NULL.
-                    unsafe { put_bn(param, bn) }
+                    unsafe { put_key_bn(param, bn) }
                 } else {
                     unsupported()
                 }
@@ -649,13 +716,39 @@ unsafe fn legacy_get_params(pkey: *const EVP_PKEY, params: *mut OSSL_PARAM) -> c
                     unsafe { ec_public_xy(param, key, e) }
                 }
             }
-            Payload::FfcP => {
-                if base != EVP_PKEY_DH && base != EVP_PKEY_DSA {
-                    unsupported();
-                }
-                0
+            Payload::FfcP | Payload::FfcQ | Payload::FfcG => {
+                let bn = if base == EVP_PKEY_DH {
+                    // SAFETY: the caller's key.
+                    let d = unsafe { super::dh::EVP_PKEY_get0_DH(pkey) };
+                    match which {
+                        // SAFETY: the key's `DH`.
+                        Payload::FfcP => unsafe { crate::dh::DH_get0_p(d) },
+                        // SAFETY: as above.
+                        Payload::FfcQ => unsafe { crate::dh::DH_get0_q(d) },
+                        // SAFETY: as above.
+                        _ => unsafe { crate::dh::DH_get0_g(d) },
+                    }
+                } else if base == EVP_PKEY_DSA {
+                    // SAFETY: the caller's key.
+                    let d = unsafe { super::dsa::EVP_PKEY_get0_DSA(pkey) };
+                    match which {
+                        // SAFETY: the key's `DSA`.
+                        Payload::FfcP => unsafe { crate::dsa::DSA_get0_p(d) },
+                        // SAFETY: as above.
+                        Payload::FfcQ => unsafe { crate::dsa::DSA_get0_q(d) },
+                        // SAFETY: as above.
+                        _ => unsafe { crate::dsa::DSA_get0_g(d) },
+                    }
+                } else {
+                    // Only p's getter raises for another type.
+                    if matches!(which, Payload::FfcP) {
+                        unsupported();
+                    }
+                    ptr::null()
+                };
+                // SAFETY: the parameter; the number or NULL.
+                unsafe { put_bn(param, bn) }
             }
-            Payload::FfcQG => 0,
             Payload::RsaN | Payload::RsaE | Payload::RsaD => {
                 if is_rsa {
                     let k = rsa();

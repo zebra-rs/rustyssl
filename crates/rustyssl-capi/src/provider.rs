@@ -50,6 +50,7 @@ pub(crate) mod builtin;
 pub(crate) mod ciphers;
 pub(crate) mod conf;
 mod decoders;
+mod der2key;
 mod dh_exch;
 pub(crate) mod dh_kmgmt;
 pub(crate) mod digests;
@@ -74,6 +75,7 @@ mod mlx_kem;
 pub(crate) mod mlx_kmgmt;
 pub(crate) mod modes;
 mod module;
+mod pending_keys;
 pub(crate) mod rands;
 pub(crate) mod rsa_enc;
 pub(crate) mod rsa_kem;
@@ -112,6 +114,26 @@ impl<T> Default for Ptr<T> {
 unsafe impl<T> Send for Ptr<T> {}
 // SAFETY: as above.
 unsafe impl<T> Sync for Ptr<T> {}
+
+/// A library context a key keeps, which a provider's decoder can set afterwards
+/// (`ossl_*_set0_libctx`).
+#[derive(Default)]
+pub(crate) struct KeyLibctx(core::sync::atomic::AtomicPtr<rustyssl_abi::OSSL_LIB_CTX>);
+
+impl KeyLibctx {
+    pub(crate) fn new(libctx: *mut rustyssl_abi::OSSL_LIB_CTX) -> Self {
+        Self(core::sync::atomic::AtomicPtr::new(libctx))
+    }
+
+    /// The library context (NULL for the default one).
+    pub(crate) fn get(&self) -> *mut rustyssl_abi::OSSL_LIB_CTX {
+        self.0.load(core::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(crate) fn set(&self, libctx: *mut rustyssl_abi::OSSL_LIB_CTX) {
+        self.0.store(libctx, core::sync::atomic::Ordering::Release);
+    }
+}
 
 type TeardownFn = unsafe extern "C" fn(*mut c_void);
 type GettableParamsFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;

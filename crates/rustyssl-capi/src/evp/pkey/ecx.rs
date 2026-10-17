@@ -318,7 +318,7 @@ ffi_callback! {
                     err::raise(ERR_LIB_EC, rustyssl_abi::EC_R_INVALID_ENCODING, "ossl_ecx_key_op");
                     return 0;
                 };
-                let h = ecx::key_op(ptr::null_mut(), kind, &KeyOp::Public(q));
+                let h = ecx::key_op(ptr::null_mut(), kind, &KeyOp::Public(q), None);
                 // SAFETY: the caller's key; the new ECX key.
                 unsafe { assign(p, h) }
             }
@@ -383,7 +383,7 @@ unsafe fn set_raw(p: *mut EVP_PKEY, raw: *const c_uchar, len: usize, private: bo
     };
     // SAFETY: the caller's key.
     let libctx = unsafe { super::keymgmt_libctx(p) };
-    let h = ecx::key_op(libctx, kind, &op);
+    let h = ecx::key_op(libctx, kind, &op, None);
     // SAFETY: the caller's key; the new ECX key.
     unsafe { assign(p, h) }
 }
@@ -617,6 +617,7 @@ pub(crate) unsafe fn key_op_algor(
     mut id: c_int,
     private: bool,
     libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: Option<&CStr>,
 ) -> *mut c_void {
     use rustyssl_abi::{EC_R_INVALID_ENCODING, ERR_LIB_EC, EVP_PKEY_NONE, V_ASN1_UNDEF};
     const F: &str = "ossl_ecx_key_op";
@@ -655,7 +656,7 @@ pub(crate) unsafe fn key_op_algor(
     } else {
         KeyOp::Public(p)
     };
-    ecx::key_op(libctx, kind, &op)
+    ecx::key_op(libctx, kind, &op, propq)
 }
 
 ffi_callback! {
@@ -721,8 +722,149 @@ ffi_callback! {
         // SAFETY: the caller's key.
         let id = unsafe { EVP_PKEY_get_id(pkey) };
         // SAFETY: the structure's AlgorithmIdentifier.
-        let h = unsafe { key_op_algor(palg, key, id, false, ptr::null_mut()) };
+        let h = unsafe { key_op_algor(palg, key, id, false, ptr::null_mut(), None) };
         // SAFETY: the caller's key; the new ECX key, or NULL.
         unsafe { assign(pkey, h) }
     }
+}
+
+/// `ossl_ecx_key_from_pkcs8`: a PrivateKeyInfo's private key (an OCTET STRING of the type's
+/// length) as a key of the AlgorithmIdentifier's type, in `libctx` with `propq`, or NULL.
+///
+/// # Safety
+/// `p8` is a live PrivateKeyInfo; `libctx` is NULL or a live library context.
+pub(crate) unsafe fn key_from_pkcs8(
+    p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: Option<&CStr>,
+) -> *mut c_void {
+    use rustyssl_abi::EVP_PKEY_NONE;
+    let (mut p, mut plen, mut palg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's structure; locals.
+    if unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut p,
+            &raw mut plen,
+            &raw mut palg,
+            p8,
+        )
+    } == 0
+    {
+        return ptr::null_mut();
+    }
+    // SAFETY: the structure's `plen` octets.
+    let oct = unsafe {
+        crate::asn1::tpl::items::d2i_ASN1_OCTET_STRING(
+            ptr::null_mut(),
+            &raw mut p,
+            c_long::from(plen),
+        )
+    };
+    // SAFETY: the decoded string, or NULL.
+    let key = unsafe { oct.as_ref() }.map(|o| {
+        // SAFETY: the string's octets.
+        unsafe { bytes(o.data, usize::try_from(o.length).unwrap_or(0)) }.unwrap_or(&[])
+    });
+    // SAFETY: the structure's AlgorithmIdentifier; the caller's guarantee.
+    let h = unsafe { key_op_algor(palg, key, EVP_PKEY_NONE, true, libctx, propq) };
+    // SAFETY: decoded above, or NULL.
+    unsafe { crate::asn1::string::ASN1_STRING_clear_free(oct) };
+    h
+}
+
+ffi_callback! {
+    /// `ecx_priv_decode_ex`: a PrivateKeyInfo's key, in a library context, assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed X25519, X448, ED25519, or ED448; `p8` is a live
+    /// PrivateKeyInfo; `libctx` is NULL or a live library context; `propq` is NULL or a string.
+    pub(crate) unsafe extern "C" fn ecx_priv_decode_ex(pkey: *mut EVP_PKEY, p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO, libctx: *mut rustyssl_abi::OSSL_LIB_CTX, propq: *const core::ffi::c_char) -> c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_EC
+    {
+        // SAFETY: NULL or the caller's string.
+        let propq = (!propq.is_null()).then(|| unsafe { CStr::from_ptr(propq) });
+        // SAFETY: the caller's guarantee.
+        let h = unsafe { key_from_pkcs8(p8, libctx, propq) };
+        // SAFETY: the caller's key; the new ECX key, or NULL.
+        unsafe { assign(pkey, h) }
+    }
+}
+
+ffi_callback! {
+    /// `ecx_priv_encode`: the raw private key as an OCTET STRING, with the type's object and no
+    /// parameters.
+    ///
+    /// # Safety
+    /// `p8` is a live PrivateKeyInfo; `pkey` is a live ECX key.
+    pub(crate) unsafe extern "C" fn ecx_priv_encode(p8: *mut rustyssl_abi::PKCS8_PRIV_KEY_INFO, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = rustyssl_abi::ERR_LIB_EC
+    {
+        use rustyssl_abi::{EC_R_INVALID_PRIVATE_KEY, ERR_LIB_EC, ERR_R_ASN1_LIB, V_ASN1_UNDEF};
+        const F: &str = "ecx_priv_encode";
+        // SAFETY: the caller's guarantee.
+        let k = unsafe { data(pkey) };
+        let Some(mut privkey) = k.and_then(|k| k.lock().privkey.clone()) else {
+            err::raise(ERR_LIB_EC, EC_R_INVALID_PRIVATE_KEY, F);
+            return 0;
+        };
+        let penc = (|| {
+            let n = c_int::try_from(privkey.len()).ok()?;
+            // The DER OCTET STRING: its tag, a short-form length, and the key (at most 57 octets).
+            let mut der = vec![0x04, u8::try_from(n).ok().filter(|&l| l < 0x80)?];
+            der.extend_from_slice(&privkey);
+            let out: *mut c_uchar = mem::alloc(der.len()).cast();
+            if out.is_null() {
+                wipe(&mut der);
+                return None;
+            }
+            // SAFETY: room for the encoding.
+            unsafe { ptr::copy_nonoverlapping(der.as_ptr(), out, der.len()) };
+            let len = c_int::try_from(der.len()).ok();
+            wipe(&mut der);
+            Some((out, len?))
+        })();
+        wipe(&mut privkey);
+        let Some((penc, penclen)) = penc else {
+            err::raise(ERR_LIB_EC, ERR_R_ASN1_LIB, F);
+            return 0;
+        };
+        // SAFETY: the caller's key.
+        let id = unsafe { EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        // SAFETY: the caller's structure takes the object and octets.
+        if unsafe { crate::x509::p8::PKCS8_pkey_set0(p8, obj, 0, V_ASN1_UNDEF, ptr::null_mut(), penc, penclen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above, `penclen` octets.
+        unsafe { mem::release_clean(penc.cast(), usize::try_from(penclen).unwrap_or(0)) };
+        err::raise(ERR_LIB_EC, ERR_R_ASN1_LIB, F);
+        0
+    }
+}
+
+/// `evp_pkey_get1_ECX_KEY`: the key's ECX key with a new reference when the key's type is
+/// `type_` (`EVP_R_EXPECTING_A_ECX_KEY` otherwise), or NULL.
+///
+/// # Safety
+/// `p` is a live key.
+pub(crate) unsafe fn get1_ecx_key(p: *mut EVP_PKEY, type_: c_int) -> *mut c_void {
+    use rustyssl_abi::{ERR_LIB_EVP, EVP_R_EXPECTING_A_ECX_KEY};
+    // SAFETY: the caller's guarantee.
+    if unsafe { super::EVP_PKEY_get_base_id(p) } != type_ {
+        err::raise(
+            ERR_LIB_EVP,
+            EVP_R_EXPECTING_A_ECX_KEY,
+            "evp_pkey_get0_ECX_KEY",
+        );
+        return ptr::null_mut();
+    }
+    // SAFETY: as above.
+    let d = unsafe { super::pkey(p) }.map_or(ptr::null_mut(), super::get_legacy);
+    if !d.is_null() {
+        // SAFETY: the key's ECX key.
+        unsafe { ecx::up_ref(d) };
+    }
+    d
 }

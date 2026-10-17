@@ -3104,25 +3104,6 @@ pub extern "C" fn EVP_PBE_get(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKCS82PKEY(_: *const PKCS8_PRIV_KEY_INFO) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKCS82PKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKCS82PKEY_ex(
-    _: *const PKCS8_PRIV_KEY_INFO,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("EVP_PKCS82PKEY_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY2PKCS8(_: *const EVP_PKEY) -> *mut PKCS8_PRIV_KEY_INFO {
-    crate::stub::unimplemented("EVP_PKEY2PKCS8")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_PKEY_add1_attr(_: *mut EVP_PKEY, _: *mut X509_ATTRIBUTE) -> core::ffi::c_int {
     crate::stub::unimplemented("EVP_PKEY_add1_attr")
 }
@@ -6451,19 +6432,6 @@ pub extern "C" fn OSSL_DAY_TIME_it() -> *const ASN1_ITEM {
 #[unsafe(no_mangle)]
 pub extern "C" fn OSSL_DAY_TIME_new() -> *mut OSSL_DAY_TIME {
     crate::stub::unimplemented("OSSL_DAY_TIME_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_DECODER_CTX_new_for_pkey(
-    _: *mut *mut EVP_PKEY,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut OSSL_DECODER_CTX {
-    crate::stub::unimplemented("OSSL_DECODER_CTX_new_for_pkey")
 }
 
 #[unsafe(no_mangle)]
@@ -17793,11 +17761,6 @@ pub extern "C" fn a2i_IPADDRESS_NC(_: *const core::ffi::c_char) -> *mut ASN1_OCT
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn asn1_d2i_read_bio(_: *mut BIO, _: *mut *mut BUF_MEM) -> core::ffi::c_int {
-    crate::stub::unimplemented("asn1_d2i_read_bio")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn b2i_PVK_bio(
     _: *mut BIO,
     _: pem_password_cb,
@@ -17949,26 +17912,6 @@ pub extern "C" fn d2i_AUTHORITY_KEYID(
     _: core::ffi::c_long,
 ) -> *mut AUTHORITY_KEYID {
     crate::stub::unimplemented("d2i_AUTHORITY_KEYID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_AutoPrivateKey(
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_AutoPrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_AutoPrivateKey_ex(
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_AutoPrivateKey_ex")
 }
 
 #[unsafe(no_mangle)]
@@ -18172,25 +18115,6 @@ pub extern "C" fn d2i_ISSUING_DIST_POINT(
     _: core::ffi::c_long,
 ) -> *mut ISSUING_DIST_POINT {
     crate::stub::unimplemented("d2i_ISSUING_DIST_POINT")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_KeyParams(
-    _: core::ffi::c_int,
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_KeyParams")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_KeyParams_bio(
-    _: core::ffi::c_int,
-    _: *mut *mut EVP_PKEY,
-    _: *mut BIO,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_KeyParams_bio")
 }
 
 #[unsafe(no_mangle)]
@@ -19089,118 +19013,6 @@ pub extern "C" fn d2i_PROXY_POLICY(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY(
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY_bio(_: *mut BIO, _: *mut *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY_ex(
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY_ex_bio(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY_ex_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY_ex_fp(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY_ex_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PUBKEY_fp(_: *mut FILE, _: *mut *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PUBKEY_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey(
-    _: core::ffi::c_int,
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey_bio(_: *mut BIO, _: *mut *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey_ex(
-    _: core::ffi::c_int,
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey_ex_bio(
-    _: *mut BIO,
-    _: *mut *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey_ex_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey_ex_fp(
-    _: *mut FILE,
-    _: *mut *mut EVP_PKEY,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey_ex_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PrivateKey_fp(_: *mut FILE, _: *mut *mut EVP_PKEY) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PrivateKey_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_PublicKey(
-    _: core::ffi::c_int,
-    _: *mut *mut EVP_PKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("d2i_PublicKey")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_SCRYPT_PARAMS(
     _: *mut *mut SCRYPT_PARAMS,
     _: *mut *const core::ffi::c_uchar,
@@ -19462,25 +19274,6 @@ pub extern "C" fn d2i_X509_NAME_ENTRY(
     _: core::ffi::c_long,
 ) -> *mut X509_NAME_ENTRY {
     crate::stub::unimplemented("d2i_X509_NAME_ENTRY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_X509_PUBKEY(
-    _: *mut *mut X509_PUBKEY,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("d2i_X509_PUBKEY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_X509_PUBKEY_bio(_: *mut BIO, _: *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("d2i_X509_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_X509_PUBKEY_fp(_: *mut FILE, _: *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY {
-    crate::stub::unimplemented("d2i_X509_PUBKEY_fp")
 }
 
 #[unsafe(no_mangle)]
@@ -20984,16 +20777,6 @@ pub extern "C" fn i2d_X509_NAME_ENTRY(
     _: *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("i2d_X509_NAME_ENTRY")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_X509_PUBKEY_bio(_: *mut BIO, _: *const X509_PUBKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_X509_PUBKEY_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_X509_PUBKEY_fp(_: *mut FILE, _: *const X509_PUBKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_X509_PUBKEY_fp")
 }
 
 #[unsafe(no_mangle)]

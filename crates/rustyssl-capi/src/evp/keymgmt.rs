@@ -471,6 +471,23 @@ impl Keymgmt {
         self.funcs.dup.is_some()
     }
 
+    /// `evp_keymgmt_has_load`.
+    pub(crate) fn has_load(&self) -> bool {
+        self.funcs.load.is_some()
+    }
+
+    /// `evp_keymgmt_load`: the key data a reference holds, or NULL.
+    ///
+    /// # Safety
+    /// `reference` points to `reference_sz` octets of the provider's reference.
+    pub(crate) unsafe fn load(&self, reference: *const c_void, reference_sz: usize) -> *mut c_void {
+        match self.funcs.load {
+            // SAFETY: the provider's function with the caller's reference.
+            Some(load) => unsafe { load(reference, reference_sz) },
+            None => ptr::null_mut(),
+        }
+    }
+
     /// `evp_keymgmt_newdata`: new key data, or NULL.
     pub(crate) fn newdata(&self) -> *mut c_void {
         match self.funcs.new {

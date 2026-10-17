@@ -4,7 +4,7 @@
 //! `EC_KEY_print` and `ECParameters_print`. Each goes through the key, group, and point
 //! functions in OpenSSL's order, so the errors are the reference's.
 
-use core::ffi::{c_int, c_long, c_uchar, c_void};
+use core::ffi::{c_int, c_long, c_uchar, c_uint, c_void};
 use core::mem::offset_of;
 use core::ptr;
 
@@ -263,81 +263,101 @@ ffi_export! {
     pub unsafe extern "C" fn i2d_ECPrivateKey(a: *const EC_KEY, out: *mut *mut c_uchar) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
-        const F: &str = "i2d_ECPrivateKey";
         // SAFETY: the caller's guarantee.
-        let f = unsafe { key(a) }.map(super::key::EcKey::get);
-        let Some(f) = f.filter(|f| {
-            !f.group.0.is_null() && (f.enc_flag & NO_PUBKEY != 0 || !f.pub_key.0.is_null())
-        }) else {
-            raise(ERR_R_PASSED_NULL_PARAMETER, F);
-            return 0;
-        };
-        // SAFETY: the item.
-        let pk: *mut PrivateKey = unsafe { ASN1_item_new(private_key_it()) }.cast();
-        if pk.is_null() {
+        unsafe { encode_private(a, out, 0) }
+    }
+}
+
+/// `i2d_ECPrivateKey` with `extra` added to the key's encoding flags for this encoding only
+/// (as `eckey_priv_encode`'s copy of the key with `EC_PKEY_NO_PARAMETERS`).
+///
+/// # Safety
+/// As `i2d_ECPrivateKey`'s.
+pub(crate) unsafe fn encode_private(
+    a: *const EC_KEY,
+    out: *mut *mut c_uchar,
+    extra: c_uint,
+) -> c_int {
+    const F: &str = "i2d_ECPrivateKey";
+    // SAFETY: the caller's guarantee.
+    let f = unsafe { key(a) }.map(super::key::EcKey::get);
+    let Some(f) = f.filter(|f| {
+        !f.group.0.is_null() && ((f.enc_flag | extra) & NO_PUBKEY != 0 || !f.pub_key.0.is_null())
+    }) else {
+        raise(ERR_R_PASSED_NULL_PARAMETER, F);
+        return 0;
+    };
+    // SAFETY: the item.
+    let pk: *mut PrivateKey = unsafe { ASN1_item_new(private_key_it()) }.cast();
+    if pk.is_null() {
+        raise(ERR_R_EC_LIB, F);
+        return 0;
+    }
+    let mut priv_buf: *mut c_uchar = ptr::null_mut();
+    let mut priv_len = 0;
+    let mut pub_buf: *mut c_uchar = ptr::null_mut();
+    let ret = (|| {
+        // SAFETY: the structure made above.
+        let s = unsafe { &mut *pk };
+        s.version = f.version;
+        // SAFETY: the caller's key; a local.
+        priv_len = unsafe { EC_KEY_priv2buf(a, &raw mut priv_buf) };
+        if priv_len == 0 {
             raise(ERR_R_EC_LIB, F);
             return 0;
         }
-        let mut priv_buf: *mut c_uchar = ptr::null_mut();
-        let mut priv_len = 0;
-        let mut pub_buf: *mut c_uchar = ptr::null_mut();
-        let ret = (|| {
-            // SAFETY: the structure made above.
-            let s = unsafe { &mut *pk };
-            s.version = f.version;
-            // SAFETY: the caller's key; a local.
-            priv_len = unsafe { EC_KEY_priv2buf(a, &raw mut priv_buf) };
-            if priv_len == 0 {
+        let Ok(n) = c_int::try_from(priv_len) else {
+            return 0;
+        };
+        // SAFETY: the structure's string, taking the octets.
+        unsafe { ASN1_STRING_set0(s.private_key, priv_buf.cast(), n) };
+        priv_buf = ptr::null_mut();
+        if (f.enc_flag | extra) & NO_PARAMETERS == 0 {
+            // SAFETY: the key's group; the structure's field, NULL.
+            s.parameters =
+                unsafe { EC_GROUP_get_ecpkparameters(f.group.0, s.parameters.cast()) }.cast();
+            if s.parameters.is_null() {
                 raise(ERR_R_EC_LIB, F);
                 return 0;
             }
-            let Ok(n) = c_int::try_from(priv_len) else { return 0 };
-            // SAFETY: the structure's string, taking the octets.
-            unsafe { ASN1_STRING_set0(s.private_key, priv_buf.cast(), n) };
-            priv_buf = ptr::null_mut();
-            if f.enc_flag & NO_PARAMETERS == 0 {
-                // SAFETY: the key's group; the structure's field, NULL.
-                s.parameters = unsafe { EC_GROUP_get_ecpkparameters(f.group.0, s.parameters.cast()) }.cast();
-                if s.parameters.is_null() {
-                    raise(ERR_R_EC_LIB, F);
-                    return 0;
-                }
+        }
+        if (f.enc_flag | extra) & NO_PUBKEY == 0 {
+            // SAFETY: no preconditions.
+            s.public_key = unsafe { ASN1_BIT_STRING_new() };
+            if s.public_key.is_null() {
+                raise(ERR_R_ASN1_LIB, F);
+                return 0;
             }
-            if f.enc_flag & NO_PUBKEY == 0 {
-                // SAFETY: no preconditions.
-                s.public_key = unsafe { ASN1_BIT_STRING_new() };
-                if s.public_key.is_null() {
-                    raise(ERR_R_ASN1_LIB, F);
-                    return 0;
-                }
-                // SAFETY: the caller's key; a local.
-                let publen = unsafe { EC_KEY_key2buf(a, f.conv_form, &raw mut pub_buf, ptr::null_mut()) };
-                if publen == 0 {
-                    raise(ERR_R_EC_LIB, F);
-                    return 0;
-                }
-                // SAFETY: the structure's string.
-                unsafe { no_bits_left(s.public_key) };
-                let Ok(n) = c_int::try_from(publen) else { return 0 };
-                // SAFETY: as above, taking the octets.
-                unsafe { ASN1_STRING_set0(s.public_key, pub_buf.cast(), n) };
-                pub_buf = ptr::null_mut();
-            }
-            // SAFETY: the structure; the caller's buffer.
-            let r = unsafe { ASN1_item_i2d(pk.cast(), out, private_key_it()) };
-            if r == 0 {
+            // SAFETY: the caller's key; a local.
+            let publen =
+                unsafe { EC_KEY_key2buf(a, f.conv_form, &raw mut pub_buf, ptr::null_mut()) };
+            if publen == 0 {
                 raise(ERR_R_EC_LIB, F);
+                return 0;
             }
-            r
-        })();
-        // SAFETY: NULL or octets not taken by the structure.
-        unsafe { mem::release_clean(priv_buf.cast(), priv_len) };
-        // SAFETY: as above.
-        unsafe { mem::release(pub_buf.cast()) };
-        // SAFETY: the structure made above.
-        unsafe { ASN1_item_free(pk.cast(), private_key_it()) };
-        ret
-    }
+            // SAFETY: the structure's string.
+            unsafe { no_bits_left(s.public_key) };
+            let Ok(n) = c_int::try_from(publen) else {
+                return 0;
+            };
+            // SAFETY: as above, taking the octets.
+            unsafe { ASN1_STRING_set0(s.public_key, pub_buf.cast(), n) };
+            pub_buf = ptr::null_mut();
+        }
+        // SAFETY: the structure; the caller's buffer.
+        let r = unsafe { ASN1_item_i2d(pk.cast(), out, private_key_it()) };
+        if r == 0 {
+            raise(ERR_R_EC_LIB, F);
+        }
+        r
+    })();
+    // SAFETY: NULL or octets not taken by the structure.
+    unsafe { mem::release_clean(priv_buf.cast(), priv_len) };
+    // SAFETY: as above.
+    unsafe { mem::release(pub_buf.cast()) };
+    // SAFETY: the structure made above.
+    unsafe { ASN1_item_free(pk.cast(), private_key_it()) };
+    ret
 }
 
 ffi_export! {

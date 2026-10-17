@@ -374,7 +374,7 @@ unsafe fn do_sign_with(dgst: &[u8], h: *mut DSA, nonce: Nonce<'_>) -> *mut DSA_S
     let mut reason = ERR_R_BN_LIB;
     let result = (|| {
         // SAFETY: the key's library context; no callback.
-        let env = unsafe { Env::new(k.libctx.0, ptr::null_mut()) }?;
+        let env = unsafe { Env::new(k.libctx.get(), ptr::null_mut()) }?;
         let mut retries = 0u32;
         loop {
             // SAFETY: the caller's key and its state.
@@ -478,7 +478,7 @@ ffi_callback! {
         }
         let st = k.snapshot();
         // SAFETY: the key's library context; no callback.
-        let Some(env) = (unsafe { Env::new(k.libctx.0, ptr::null_mut()) }) else { return 0 };
+        let Some(env) = (unsafe { Env::new(k.libctx.get(), ptr::null_mut()) }) else { return 0 };
         // SAFETY: the caller's key and its state.
         let Some((kinv, r)) = (unsafe { sign_setup(dsa, k, &st, &env, Nonce::Random) }) else { return 0 };
         // SAFETY: the caller's pointer.
@@ -757,7 +757,7 @@ pub(crate) unsafe fn sign_int(
         put(unsafe { DSA_size(dsa) });
         return 1;
     }
-    let s = if !k.in_libctx || !is_default(k.meth()) {
+    let s = if !k.is_in_libctx() || !is_default(k.meth()) {
         // SAFETY: the caller's guarantee.
         unsafe { DSA_do_sign(dgst, dlen, dsa) }
     } else {
@@ -840,7 +840,7 @@ unsafe fn builtin_keygen(h: *mut DSA) -> c_int {
         return 0;
     };
     let mut st = k.snapshot();
-    let libctx = k.libctx.0;
+    let libctx = k.libctx.get();
     let ok = (|| {
         // SAFETY: the key's library context; no callback.
         let env = unsafe { Env::new(libctx, ptr::null_mut()) }?;
@@ -909,7 +909,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         return 0;
     };
     // SAFETY: the key's library context; the caller's callback.
-    let Some(env) = (unsafe { Env::new(k.libctx.0, cb) }) else {
+    let Some(env) = (unsafe { Env::new(k.libctx.get(), cb) }) else {
         return 0;
     };
     let mut st = k.snapshot();
@@ -918,7 +918,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         // SAFETY: the key's library context; the context made above.
         unsafe {
             ffc::generate_186_2(
-                k.libctx.0,
+                k.libctx.get(),
                 &env,
                 &mut st.params,
                 ffc::Type::Dsa,
@@ -931,7 +931,7 @@ pub(crate) unsafe fn generate_ffc_parameters(
         // SAFETY: as above.
         unsafe {
             ffc::generate_186_4(
-                k.libctx.0,
+                k.libctx.get(),
                 &env,
                 &mut st.params,
                 ffc::Type::Dsa,
