@@ -199,6 +199,17 @@ impl Pkey {
         self.lock().save_parameters
     }
 
+    /// The PEM name of the key's ASN.1 method (`ameth->pem_str`), if it has one.
+    pub(crate) fn ameth_pem_str(&self) -> Option<CString> {
+        let m = self.lock().ameth.clone();
+        m.and_then(|m| m.get().pem_str.clone())
+    }
+
+    /// Whether the key has data (`evp_pkey_is_assigned`).
+    pub(crate) fn assigned(&self) -> bool {
+        self.lock().is_assigned()
+    }
+
     /// The functions of the key's ASN.1 method, if it has one.
     pub(crate) fn ameth_funcs(&self) -> Option<ameth::Funcs> {
         let m = self.lock().ameth.clone();
@@ -1081,7 +1092,7 @@ pub(crate) fn downgraded_legacy(k: &Pkey) -> Option<*mut c_void> {
 /// `evp_pkey_copy_downgraded` of a provided key: a new key of its type whose legacy data the
 /// type's ASN.1 method's `import_from` made from the provider's export (in the key manager's
 /// library context). `None` with OpenSSL's errors.
-fn copy_downgraded(src: &Pkey) -> Option<PkeyRef> {
+pub(crate) fn copy_downgraded(src: &Pkey) -> Option<PkeyRef> {
     const F: &str = "evp_pkey_copy_downgraded";
     let (type_, assigned, keymgmt, keydata) = {
         let s = src.lock();

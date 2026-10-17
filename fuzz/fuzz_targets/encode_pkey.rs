@@ -2,7 +2,7 @@
 //! (d2i_AutoPrivateKey, else d2i_PUBKEY) through OSSL_ENCODER_CTX_new_for_pkey with a selection,
 //! output type (DER, PEM, a blob, or text), and structure the input picks, and through
 //! i2d_PrivateKey, i2d_PublicKey,
-//! i2d_KeyParams, and i2d_PUBKEY. Nothing may crash or write out of bounds (ASan), and each
+//! i2d_KeyParams, and i2d_PUBKEY, and the PEM key writers. Nothing may crash or write out of bounds (ASan), and each
 //! i2d's length must be the length it writes, into a new buffer or the caller's.
 
 #![no_main]
@@ -27,6 +27,13 @@ unsafe extern "C" {
     fn i2d_PUBKEY(a: *const EVP_PKEY, pp: *mut *mut c_uchar) -> c_int;
     fn CRYPTO_free(p: *mut core::ffi::c_void, file: *const c_char, line: c_int);
     fn EVP_PKEY_free(k: *mut EVP_PKEY);
+    fn BIO_s_mem() -> *const core::ffi::c_void;
+    fn BIO_new(m: *const core::ffi::c_void) -> *mut core::ffi::c_void;
+    fn BIO_free(b: *mut core::ffi::c_void) -> c_int;
+    fn PEM_write_bio_PrivateKey(b: *mut core::ffi::c_void, k: *const EVP_PKEY, enc: *const core::ffi::c_void, kstr: *const c_uchar, klen: c_int, cb: *const core::ffi::c_void, u: *mut core::ffi::c_void) -> c_int;
+    fn PEM_write_bio_PrivateKey_traditional(b: *mut core::ffi::c_void, k: *const EVP_PKEY, enc: *const core::ffi::c_void, kstr: *const c_uchar, klen: c_int, cb: *const core::ffi::c_void, u: *mut core::ffi::c_void) -> c_int;
+    fn PEM_write_bio_PUBKEY(b: *mut core::ffi::c_void, k: *const EVP_PKEY) -> c_int;
+    fn PEM_write_bio_Parameters(b: *mut core::ffi::c_void, k: *const EVP_PKEY) -> c_int;
     fn ERR_clear_error();
 }
 
@@ -91,6 +98,16 @@ fuzz_target!(|input: &[u8]| {
                 assert_eq!(core::slice::from_raw_parts(fresh, size), &buf[..], "two i2d encodings differ");
             }
             CRYPTO_free(fresh.cast(), ptr::null(), 0);
+        }
+        let b = BIO_new(BIO_s_mem());
+        if !b.is_null() {
+            core::hint::black_box((
+                PEM_write_bio_PrivateKey(b, k, ptr::null(), ptr::null(), 0, ptr::null(), ptr::null_mut()),
+                PEM_write_bio_PrivateKey_traditional(b, k, ptr::null(), ptr::null(), 0, ptr::null(), ptr::null_mut()),
+                PEM_write_bio_PUBKEY(b, k),
+                PEM_write_bio_Parameters(b, k),
+            ));
+            BIO_free(b);
         }
         EVP_PKEY_free(k);
         ERR_clear_error();

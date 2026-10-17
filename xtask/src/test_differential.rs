@@ -418,6 +418,7 @@ const SESSIONS: &[(&str, Session)] = &[
     ("d2ikey", d2ikey_session),
     ("pemkey", pemkey_session),
     ("enckey", enckey_session),
+    ("pemwrite", pemwrite_session),
     ("decode", decode_session),
     ("string", string_session),
 ];
@@ -4047,6 +4048,19 @@ fn enckey_session(random: &mut Random, out: &mut String) -> Result {
         ]);
         let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();
         writeln!(out, "enckey {sel} {type_} {structure} {hex}")?;
+    }
+    Ok(())
+}
+
+/// A random session of the PEM key writers: keys of each type (now and then changed) through
+/// each of them.
+fn pemwrite_session(random: &mut Random, out: &mut String) -> Result {
+    for _ in 0..random.below(4).saturating_add(1) {
+        let hex: String = mutated_seed(random)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        writeln!(out, "pemwrite {hex}")?;
     }
     Ok(())
 }

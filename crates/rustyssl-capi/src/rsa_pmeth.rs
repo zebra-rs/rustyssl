@@ -1156,7 +1156,7 @@ unsafe fn mgf1_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
 ///
 /// # Safety
 /// `md` and `mgf1md` are NULL or live digests.
-unsafe fn pss_params_create(
+pub(crate) unsafe fn pss_params_create(
     md: *const EVP_MD,
     mgf1md: *const EVP_MD,
     saltlen: c_int,
