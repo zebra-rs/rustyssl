@@ -54,6 +54,7 @@ mod decoders;
 mod der2key;
 mod dh_exch;
 pub(crate) mod dh_kmgmt;
+mod dhkem;
 pub(crate) mod digests;
 pub(crate) mod dsa_kmgmt;
 pub(crate) mod dsa_sig;

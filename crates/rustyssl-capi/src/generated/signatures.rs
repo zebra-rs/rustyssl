@@ -8329,6 +8329,108 @@ const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_n
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
+const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX) = crate::hpke::OSSL_HPKE_CTX_free;
+const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX, *mut u64) -> core::ffi::c_int =
+    crate::hpke::OSSL_HPKE_CTX_get_seq;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    OSSL_HPKE_SUITE,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut OSSL_HPKE_CTX = crate::hpke::OSSL_HPKE_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::hpke::OSSL_HPKE_CTX_set1_authpriv;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_CTX_set1_authpub;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_CTX_set1_ikme;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_CTX_set1_psk;
+const _: unsafe extern "C" fn(*mut OSSL_HPKE_CTX, u64) -> core::ffi::c_int =
+    crate::hpke::OSSL_HPKE_CTX_set_seq;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut EVP_PKEY,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_decap;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_encap;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_export;
+const _: unsafe extern "C" fn(OSSL_HPKE_SUITE, usize) -> usize =
+    crate::hpke::OSSL_HPKE_get_ciphertext_size;
+const _: unsafe extern "C" fn(
+    *const OSSL_HPKE_SUITE,
+    *mut OSSL_HPKE_SUITE,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_get_grease_value;
+const _: unsafe extern "C" fn(OSSL_HPKE_SUITE) -> usize =
+    crate::hpke::OSSL_HPKE_get_public_encap_size;
+const _: unsafe extern "C" fn(OSSL_HPKE_SUITE) -> usize =
+    crate::hpke::OSSL_HPKE_get_recommended_ikmelen;
+const _: unsafe extern "C" fn(
+    OSSL_HPKE_SUITE,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    *mut *mut EVP_PKEY,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_keygen;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_open;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HPKE_CTX,
+    *mut core::ffi::c_uchar,
+    *mut usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::hpke::OSSL_HPKE_seal;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut OSSL_HPKE_SUITE) -> core::ffi::c_int =
+    crate::hpke::OSSL_HPKE_str2suite;
+const _: unsafe extern "C" fn(OSSL_HPKE_SUITE) -> core::ffi::c_int =
+    crate::hpke::OSSL_HPKE_suite_check;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_get_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =

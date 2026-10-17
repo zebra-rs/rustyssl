@@ -21,7 +21,7 @@ use rustyssl_abi::{
 
 use super::builtin::libctx_of;
 use super::keymgmt::{kdf_data_up_ref, kdf_freedata};
-use super::tables::{ALG_END, Algorithms, Dispatch, END, alg, entry, pending};
+use super::tables::{ALG_END, Algorithms, Dispatch, END, alg, entry};
 use crate::err;
 use crate::evp::kdf::{
     EVP_KDF_CTX_dup, EVP_KDF_CTX_free, EVP_KDF_CTX_get_kdf_size, EVP_KDF_CTX_get_params,
@@ -375,15 +375,18 @@ static DEFAULT_ASYM_CIPHERS: Algorithms<3> = Algorithms([
     ALG_END,
 ]);
 
-/// The default provider's KEMs (`deflt_asym_kem`); those of later steps are pending.
+/// The default provider's KEMs (`deflt_asym_kem`).
 static DEFAULT_KEMS: Algorithms<12> = Algorithms([
     alg(
         c"RSA:rsaEncryption:1.2.840.113549.1.1.1",
         &super::rsa_kem::RSA_KEM,
     ),
-    pending(c"X25519:1.3.101.110"),
-    pending(c"X448:1.3.101.111"),
-    pending(c"EC:id-ecPublicKey:1.2.840.10045.2.1"),
+    alg(c"X25519:1.3.101.110", &super::dhkem::ECX_KEM),
+    alg(c"X448:1.3.101.111", &super::dhkem::ECX_KEM),
+    alg(
+        c"EC:id-ecPublicKey:1.2.840.10045.2.1",
+        &super::dhkem::EC_KEM,
+    ),
     alg(
         c"ML-KEM-512:MLKEM512:id-alg-ml-kem-512:2.16.840.1.101.3.4.4.1",
         &super::ml_kem_kem::ML_KEM_KEM,
