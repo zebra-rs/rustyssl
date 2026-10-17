@@ -42,6 +42,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "pkcs7_d2i"
+path = "fuzz_targets/pkcs7_d2i.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "stack"
 path = "fuzz_targets/stack.rs"
 test = false
