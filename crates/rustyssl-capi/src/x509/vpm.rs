@@ -1170,10 +1170,8 @@ mod tests {
         // SAFETY: as above.
         assert_eq!(unsafe { X509_VERIFY_PARAM_set_flags(p, 1) }, 0);
         // SAFETY: as above.
-        assert_eq!(
-            unsafe { X509_VERIFY_PARAM_set1_host(p, c"a".as_ptr(), 0) },
-            0
-        );
+        let r = unsafe { X509_VERIFY_PARAM_set1_host(p, c"a".as_ptr(), 0) };
+        assert_eq!(r, 0);
         // SAFETY: as above.
         assert!(unsafe { X509_VERIFY_PARAM_get0_name(p) }.is_null());
         // SAFETY: as above.
@@ -1193,10 +1191,8 @@ mod tests {
         // SAFETY: no preconditions.
         let p = unsafe { X509_VERIFY_PARAM_new() };
         // SAFETY: the new parameter; a static name.
-        assert_eq!(
-            unsafe { X509_VERIFY_PARAM_set1_name(p, c"twice".as_ptr()) },
-            1
-        );
+        let r = unsafe { X509_VERIFY_PARAM_set1_name(p, c"twice".as_ptr()) };
+        assert_eq!(r, 1);
         // SAFETY: the parameter, which the table takes.
         assert_eq!(unsafe { X509_VERIFY_PARAM_add0_table(p) }, 1);
         // SAFETY: as above, again.
@@ -1215,10 +1211,8 @@ mod tests {
         // SAFETY: no preconditions.
         let p = unsafe { X509_VERIFY_PARAM_new() };
         // SAFETY: the new parameter; a static name.
-        assert_eq!(
-            unsafe { X509_VERIFY_PARAM_set1_host(p, c"a.example".as_ptr(), 0) },
-            1
-        );
+        let r = unsafe { X509_VERIFY_PARAM_set1_host(p, c"a.example".as_ptr(), 0) };
+        assert_eq!(r, 1);
         // SAFETY: as above.
         assert_eq!(unsafe { X509_VERIFY_PARAM_set_flags(p, 4) }, 1);
         let inh = inh(X509_VP_FLAG_DEFAULT | X509_VP_FLAG_RESET_FLAGS);
