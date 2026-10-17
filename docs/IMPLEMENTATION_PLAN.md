@@ -4543,7 +4543,21 @@ Exit checks:
     - `X509_EXTENSION_set_data` refuses a NULL value, which OpenSSL reads through.
     - Tests: `tests/c/x509_ext.c` and the probe's `asnd2i` items 19 and 20 (corpus
       `asnd2i_x509.txt`). The attributes (`X509at_*`) came with 4.7a1.
-  - [ ] **5.1c Certificates**: `X509` (with its cached SHA-1 hash, flags, and ex_data),
+  - [x] **5.1c1 Signing items** (`asn1/sign.rs`, from `a_sign.c` and `a_verify.c`):
+    - `ASN1_item_sign`, `_ex` (with a distinguishing ID), and `_ctx`. The AlgorithmIdentifiers
+      come from the provider (`OSSL_SIGNATURE_PARAM_ALGORITHM_ID`) for a provided key; for a
+      legacy key, from its method's `item_sign` or named from the digest and key type.
+    - `ASN1_item_verify`, `_ex`, and `_ctx`. RSA-PSS's parameters go to the context
+      (`ossl_rsa_pss_to_ctx`), and a legacy key's method handles the algorithms without a
+      digest. Each error comes with OpenSSL's return value (-1 or 0) and reason.
+    - The deprecated `ASN1_sign` and `ASN1_verify`, over an `i2d` function.
+    - The built-in RSA and RSA-PSS methods' `item_sign`/`item_verify` (`rsa_ctx_to_pss`,
+      `ossl_rsa_ctx_to_pss_string`), and Ed25519's and Ed448's. The `siginf_set` hooks need
+      `X509_SIG_INFO` and come with 5.1c2.
+    - Tests: `tests/c/asn1_item_sign.c` covers RSA (PKCS #1 and PSS, provided and legacy
+      keys, each salt-length setting), RSA-PSS keys, EC, Ed25519, Ed448, SM2 with IDs, the
+      failure cases, and the deprecated forms.
+  - [ ] **5.1c2 Certificates**: `X509` (with its cached SHA-1 hash, flags, and ex_data),
     d2i/i2d/PEM, the getters and setters, sign/verify/digest, and the `cmp` family.
   - [ ] **5.1d Requests**: `X509_REQ`.
   - [ ] **5.1e CRLs**: `X509_CRL` and `X509_REVOKED`.

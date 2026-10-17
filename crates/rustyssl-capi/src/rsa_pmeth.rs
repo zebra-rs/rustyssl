@@ -1225,7 +1225,7 @@ pub(crate) unsafe fn md_of_algor(alg: *const X509_ALGOR) -> *const EVP_MD {
 ///
 /// # Safety
 /// `pss` is live parameters.
-unsafe fn pss_get_param(
+pub(crate) unsafe fn pss_get_param(
     pss: *const RSA_PSS_PARAMS,
 ) -> Option<(*const EVP_MD, *const EVP_MD, c_int)> {
     // SAFETY: the caller's guarantee.

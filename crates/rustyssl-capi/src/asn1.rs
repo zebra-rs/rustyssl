@@ -11,6 +11,7 @@ pub(crate) mod bit_string;
 pub(crate) mod hex;
 pub(crate) mod integer;
 pub(crate) mod parse;
+pub(crate) mod sign;
 pub(crate) mod string;
 pub(crate) mod text;
 pub(crate) mod time;
