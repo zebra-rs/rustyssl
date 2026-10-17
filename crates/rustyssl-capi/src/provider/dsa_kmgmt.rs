@@ -420,7 +420,7 @@ ffi_callback! {
         let mut ok = true;
         if selection & DOMAIN != 0 {
             // SAFETY: the key's library context.
-            ok = unsafe { check_params(k.libctx.0, &st, checktype) };
+            ok = unsafe { check_params(k.libctx.get(), &st, checktype) };
         }
         if ok && selection & PUBLIC != 0 {
             ok = st.pub_key.as_ref().is_some_and(|y| check_pub_key(&st, y));

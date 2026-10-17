@@ -737,3 +737,168 @@ ffi_callback! {
         0
     }
 }
+
+/// `ossl_dsa_key_from_pkcs8`: a PrivateKeyInfo's private key (a non-negative INTEGER) with the
+/// AlgorithmIdentifier's parameters and the public key made from them, or NULL.
+///
+/// # Safety
+/// `p8` is a live PrivateKeyInfo.
+pub(crate) unsafe fn key_from_pkcs8(p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> *mut DSA {
+    use rustyssl_abi::{
+        DSA_R_BN_ERROR, DSA_R_DECODE_ERROR, ERR_R_INTERNAL_ERROR, V_ASN1_NEG_INTEGER,
+        V_ASN1_SEQUENCE,
+    };
+    const F: &str = "ossl_dsa_key_from_pkcs8";
+    let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's structure; locals.
+    if unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut p,
+            &raw mut pklen,
+            &raw mut palg,
+            p8,
+        )
+    } == 0
+    {
+        return ptr::null_mut();
+    }
+    let (mut ptype, mut pval) = (0, ptr::null());
+    // SAFETY: its AlgorithmIdentifier; locals.
+    unsafe {
+        crate::x509::algor::X509_ALGOR_get0(ptr::null_mut(), &raw mut ptype, &raw mut pval, palg)
+    };
+    // SAFETY: the structure's `pklen` octets.
+    let privkey = unsafe {
+        crate::asn1::tpl::items::d2i_ASN1_INTEGER(ptr::null_mut(), &raw mut p, c_long::from(pklen))
+    };
+    let done = |d: *mut DSA| {
+        // SAFETY: decoded above, or NULL; wiped and freed once.
+        unsafe { crate::asn1::string::ASN1_STRING_clear_free(privkey) };
+        d
+    };
+    let decerr = || {
+        err::raise(ERR_LIB_DSA, DSA_R_DECODE_ERROR, F);
+        done(ptr::null_mut())
+    };
+    // SAFETY: the INTEGER, or NULL.
+    let Some(ai) = (unsafe { privkey.as_ref() }) else {
+        return decerr();
+    };
+    if ai.type_ == V_ASN1_NEG_INTEGER || ptype != V_ASN1_SEQUENCE {
+        return decerr();
+    }
+    // SAFETY: a SEQUENCE parameter is an `ASN1_STRING`.
+    let (mut pm, pmlen) = unsafe { crate::x509::pubkey::sequence_octets(pval) };
+    // SAFETY: its octets.
+    let d = unsafe { d2i_DSAparams(ptr::null_mut(), &raw mut pm, pmlen) };
+    if d.is_null() {
+        return decerr();
+    }
+    let dsaerr = |reason: c_int, privbn: *mut rustyssl_abi::BIGNUM| {
+        err::raise(ERR_LIB_DSA, reason, F);
+        // SAFETY: made here, or NULL.
+        unsafe { crate::bn::BN_free(privbn) };
+        // SAFETY: as above.
+        unsafe { free(d) };
+        done(ptr::null_mut())
+    };
+    // SAFETY: no preconditions.
+    let privbn = unsafe { crate::bn::BN_secure_new() };
+    // SAFETY: the INTEGER; the new number, or NULL.
+    if privbn.is_null() || unsafe { crate::bn::conv::ASN1_INTEGER_to_BN(privkey, privbn) }.is_null()
+    {
+        return dsaerr(DSA_R_BN_ERROR, privbn);
+    }
+    // SAFETY: the new number.
+    unsafe { crate::bn::BN_set_flags(privbn, rustyssl_abi::BN_FLG_CONSTTIME) };
+    // SAFETY: the parameters' key; the new number.
+    let (st, x) = (unsafe { dsa(d) }.map(Dsa::snapshot), unsafe {
+        crate::bn::value(privbn)
+    });
+    let y = st
+        .zip(x)
+        .and_then(|(st, x)| backend::generate_public_key(&st, &x));
+    let Some(y) = y else {
+        return dsaerr(DSA_R_BN_ERROR, privbn);
+    };
+    let pubbn = crate::bn::new_bignum(y, false);
+    if pubbn.is_null() {
+        return dsaerr(rustyssl_abi::ERR_R_BN_LIB, privbn);
+    }
+    // SAFETY: the key takes both numbers.
+    if unsafe { crate::dsa::DSA_set0_key(d, pubbn, privbn) } == 0 {
+        // SAFETY: made above, not taken.
+        unsafe { crate::bn::BN_free(pubbn) };
+        return dsaerr(ERR_R_INTERNAL_ERROR, privbn);
+    }
+    done(d)
+}
+
+ffi_callback! {
+    /// `dsa_priv_decode`: a PrivateKeyInfo's key assigned to the key.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed DSA; `p8` is a live PrivateKeyInfo.
+    pub(crate) unsafe extern "C" fn dsa_priv_decode(pkey: *mut EVP_PKEY, p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> c_int
+    where failure = 0, library = ERR_LIB_DSA
+    {
+        // SAFETY: the caller's guarantee.
+        let d = unsafe { key_from_pkcs8(p8) };
+        if d.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, EVP_PKEY_DSA, d.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `dsa_priv_encode`: the private key as an INTEGER with the parameters (a SEQUENCE).
+    ///
+    /// # Safety
+    /// `p8` is a live PrivateKeyInfo; `pkey` is a live DSA key.
+    pub(crate) unsafe extern "C" fn dsa_priv_encode(p8: *mut rustyssl_abi::PKCS8_PRIV_KEY_INFO, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DSA
+    {
+        use crate::x509::pubkey::{int_encode, sequence_param};
+        use rustyssl_abi::{DSA_R_BN_ERROR, DSA_R_MISSING_PARAMETERS, ERR_R_ASN1_LIB, V_ASN1_SEQUENCE};
+        const F: &str = "dsa_priv_encode";
+        // SAFETY: the caller's guarantee.
+        let d = unsafe { data(pkey) };
+        // SAFETY: the key's `DSA`, or NULL.
+        let x = if d.is_null() { ptr::null() } else { unsafe { crate::dsa::DSA_get0_priv_key(d) } };
+        if x.is_null() {
+            err::raise(ERR_LIB_DSA, DSA_R_MISSING_PARAMETERS, F);
+            return 0;
+        }
+        let i2d = |out: *mut *mut c_uchar| {
+            // SAFETY: the key; the caller's place for a new encoding.
+            unsafe { i2d_DSAparams(d, out) }
+        };
+        // SAFETY: the closure writes a new buffer through its argument.
+        let Some(params) = (unsafe { sequence_param(V_ASN1_SEQUENCE, i2d) }) else {
+            err::raise(ERR_LIB_DSA, ERR_R_ASN1_LIB, F);
+            return 0;
+        };
+        // SAFETY: the key's private key.
+        let Ok((dp, dplen)) = (unsafe { int_encode(x) }) else {
+            err::raise(ERR_LIB_DSA, DSA_R_BN_ERROR, F);
+            // SAFETY: made above.
+            unsafe { crate::asn1::string::ASN1_STRING_free(params) };
+            return 0;
+        };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(EVP_PKEY_DSA) };
+        // SAFETY: the caller's structure takes the object, parameters, and octets.
+        if unsafe { crate::x509::p8::PKCS8_pkey_set0(p8, obj, 0, V_ASN1_SEQUENCE, params.cast(), dp, dplen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above, `dplen` octets.
+        unsafe { crate::mem::release_clean(dp.cast(), usize::try_from(dplen).unwrap_or(0)) };
+        // SAFETY: as above.
+        unsafe { crate::asn1::string::ASN1_STRING_free(params) };
+        0
+    }
+}

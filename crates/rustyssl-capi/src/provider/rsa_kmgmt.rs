@@ -597,7 +597,7 @@ fn set_all(
 }
 
 /// `ossl_rsa_check_factors`: no number of the key longer than the modulus.
-fn check_factors(k: &Key) -> bool {
+pub(crate) fn check_factors(k: &Key) -> bool {
     let n = k.n.as_ref().map_or(0, BigNum::num_bits);
     let bits = |b: Option<&BigNum>| b.map_or(0, BigNum::num_bits);
     if bits(k.d.as_ref()) > n {
@@ -760,7 +760,7 @@ ffi_callback! {
             let mut defaults_set = false;
             let mut pss = st.pss;
             // SAFETY: the caller's guarantee; the key's library context.
-            ok = unsafe { pss_fromdata(&mut pss, &mut defaults_set, params, r.libctx.0) };
+            ok = unsafe { pss_fromdata(&mut pss, &mut defaults_set, params, r.libctx.get()) };
             st.pss = pss;
             // A plain RSA key takes no restrictions.
             if ok && st.kind != Kind::RsaPss && pss.restricted() {
@@ -1152,7 +1152,7 @@ ffi_callback! {
             return ptr::null_mut();
         }
         let st = r.snapshot();
-        let copy = Rsa::new_handle_in(r.libctx.0, st.kind);
+        let copy = Rsa::new_handle_in(r.libctx.get(), st.kind);
         // SAFETY: the handle just made.
         let Some(c) = (unsafe { rsa(copy) }) else { return ptr::null_mut() };
         {
@@ -1502,8 +1502,8 @@ ffi_callback! {
     }
 }
 
-/// `common_load`: the key the reference points to, if it's of `kind`; the caller's
-/// reference passes to the result.
+/// `common_load`: the key the reference points to, if it's of `kind`, detached from the
+/// reference (which then holds NULL).
 ///
 /// # Safety
 /// `reference` is NULL or points to `reference_sz` octets holding a live key's pointer.
@@ -1511,13 +1511,16 @@ unsafe fn common_load(reference: *const c_void, reference_sz: usize, kind: Kind)
     if reference.is_null() || reference_sz != size_of::<*mut RSA>() {
         return ptr::null_mut();
     }
+    let slot = reference.cast::<*mut RSA>().cast_mut();
     // SAFETY: the caller's guarantee: a key's pointer.
-    let h = unsafe { reference.cast::<*mut RSA>().read_unaligned() };
+    let h = unsafe { slot.read_unaligned() };
     // SAFETY: as above.
-    match unsafe { rsa(h) } {
-        Some(r) if r.lock().kind == kind => h.cast(),
-        _ => ptr::null_mut(),
+    if !unsafe { rsa(h) }.is_some_and(|r| r.lock().kind == kind) {
+        return ptr::null_mut();
     }
+    // SAFETY: as above: writable. The key is detached from the reference, as OpenSSL's.
+    unsafe { slot.write_unaligned(ptr::null_mut()) };
+    h.cast()
 }
 
 ffi_callback! {
@@ -1563,7 +1566,7 @@ ffi_callback! {
         let st = r.snapshot();
         if selection & KEYPAIR == KEYPAIR {
             // SAFETY: the key's library context; no callback.
-            return c_int::from(unsafe { validate_keypair(r.libctx.0, &st.key, ptr::null_mut()) } > 0);
+            return c_int::from(unsafe { validate_keypair(r.libctx.get(), &st.key, ptr::null_mut()) } > 0);
         }
         let mut ok = true;
         if selection & PRIVATE != 0 {
@@ -1571,7 +1574,7 @@ ffi_callback! {
         }
         if selection & PUBLIC != 0 {
             // SAFETY: the key's library context.
-            ok = ok && unsafe { validate_public(r.libctx.0, &st.key) };
+            ok = ok && unsafe { validate_public(r.libctx.get(), &st.key) };
         }
         c_int::from(ok)
     }

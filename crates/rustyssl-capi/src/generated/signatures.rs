@@ -5598,6 +5598,15 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::evp::kdf::EVP_PBE_scrypt_ex;
+const _: unsafe extern "C" fn(*const PKCS8_PRIV_KEY_INFO) -> *mut EVP_PKEY =
+    crate::evp::pkey::d2i::EVP_PKCS82PKEY;
+const _: unsafe extern "C" fn(
+    *const PKCS8_PRIV_KEY_INFO,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::EVP_PKCS82PKEY_ex;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> *mut PKCS8_PRIV_KEY_INFO =
+    crate::evp::pkey::d2i::EVP_PKEY2PKCS8;
 const _: unsafe extern "C" fn(
     *mut EVP_PKEY_CTX,
     *const core::ffi::c_uchar,
@@ -8026,6 +8035,15 @@ const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) -> core::ffi::c_int =
     crate::decoder::ctx::OSSL_DECODER_CTX_get_num_decoders;
 const _: unsafe extern "C" fn() -> *mut OSSL_DECODER_CTX =
     crate::decoder::ctx::OSSL_DECODER_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut OSSL_DECODER_CTX = crate::decoder::pkey::OSSL_DECODER_CTX_new_for_pkey;
 const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, OSSL_DECODER_CLEANUP) -> core::ffi::c_int =
     crate::decoder::ctx::OSSL_DECODER_CTX_set_cleanup;
 const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, OSSL_DECODER_CONSTRUCT) -> core::ffi::c_int =
@@ -10010,6 +10028,8 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_char,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::asn1::hex::a2i_ASN1_STRING;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut BUF_MEM) -> core::ffi::c_int =
+    crate::asn1::tpl::io::asn1_d2i_read_bio;
 const _: unsafe extern "C" fn(
     *mut *mut ASN1_BIT_STRING,
     *mut *const core::ffi::c_uchar,
@@ -10121,6 +10141,18 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut ASN1_VISIBLESTRING = crate::asn1::tpl::items::d2i_ASN1_VISIBLESTRING;
 const _: unsafe extern "C" fn(
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_AutoPrivateKey;
+const _: unsafe extern "C" fn(
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_AutoPrivateKey_ex;
+const _: unsafe extern "C" fn(
     *mut *mut DH,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -10207,6 +10239,14 @@ const _: unsafe extern "C" fn(*mut BIO, *mut *mut EC_KEY) -> *mut EC_KEY =
 const _: unsafe extern "C" fn(*mut FILE, *mut *mut EC_KEY) -> *mut EC_KEY =
     crate::x509::pubkey::d2i_EC_PUBKEY_fp;
 const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_KeyParams;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut *mut EVP_PKEY, *mut BIO) -> *mut EVP_PKEY =
+    crate::evp::pkey::d2i::d2i_KeyParams_bio;
+const _: unsafe extern "C" fn(
     *mut *mut PKCS8_PRIV_KEY_INFO,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -10217,6 +10257,70 @@ const _: unsafe extern "C" fn(
     *mut FILE,
     *mut *mut PKCS8_PRIV_KEY_INFO,
 ) -> *mut PKCS8_PRIV_KEY_INFO = crate::x509::p8::d2i_PKCS8_PRIV_KEY_INFO_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EVP_PKEY = crate::x509::pubkey::d2i_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut EVP_PKEY) -> *mut EVP_PKEY =
+    crate::x509::pubkey::d2i_PUBKEY_bio;
+const _: unsafe extern "C" fn(
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::x509::pubkey::d2i_PUBKEY_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::x509::pubkey::d2i_PUBKEY_ex_bio;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::x509::pubkey::d2i_PUBKEY_ex_fp;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut EVP_PKEY) -> *mut EVP_PKEY =
+    crate::x509::pubkey::d2i_PUBKEY_fp;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_PrivateKey;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut EVP_PKEY) -> *mut EVP_PKEY =
+    crate::evp::pkey::d2i::d2i_PrivateKey_bio;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_PrivateKey_ex;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_PrivateKey_ex_bio;
+const _: unsafe extern "C" fn(
+    *mut FILE,
+    *mut *mut EVP_PKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_PrivateKey_ex_fp;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut EVP_PKEY) -> *mut EVP_PKEY =
+    crate::evp::pkey::d2i::d2i_PrivateKey_fp;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut *mut EVP_PKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut EVP_PKEY = crate::evp::pkey::d2i::d2i_PublicKey;
 const _: unsafe extern "C" fn(
     *mut *mut RSA,
     *mut *const core::ffi::c_uchar,
@@ -10269,6 +10373,15 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut X509_ATTRIBUTE = crate::x509::attrib::d2i_X509_ATTRIBUTE;
+const _: unsafe extern "C" fn(
+    *mut *mut X509_PUBKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut X509_PUBKEY = crate::x509::pubkey::d2i_X509_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY =
+    crate::x509::pubkey::d2i_X509_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut X509_PUBKEY) -> *mut X509_PUBKEY =
+    crate::x509::pubkey::d2i_X509_PUBKEY_fp;
 const _: unsafe extern "C" fn(
     *mut *mut X509_SIG,
     *mut *const core::ffi::c_uchar,
@@ -10463,6 +10576,10 @@ const _: unsafe extern "C" fn(
     *const X509_PUBKEY,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509::pubkey::i2d_X509_PUBKEY;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_X509_PUBKEY_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::x509::pubkey::i2d_X509_PUBKEY_fp;
 const _: unsafe extern "C" fn(*const X509_SIG, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509::sig::i2d_X509_SIG;
 const _: unsafe extern "C" fn(*const EC_KEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =

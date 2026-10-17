@@ -28,7 +28,7 @@ use crate::ex_data::{
 use crate::ffc;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
-use crate::provider::Ptr;
+use crate::provider::{KeyLibctx, Ptr};
 
 /// A DH key's state: its parameters, private key length, and key pair.
 #[derive(Clone, Default)]
@@ -148,7 +148,7 @@ unsafe impl Sync for ExData {}
 
 /// A DH key (`DH`), shared by reference.
 pub(crate) struct Dh {
-    pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    pub(crate) libctx: KeyLibctx,
     references: AtomicI32,
     /// `dirty_cnt`.
     dirty: AtomicUsize,
@@ -182,7 +182,7 @@ impl Dh {
         // SAFETY: a live method.
         let mflags = unsafe { crate::dh_meth::flags(meth) };
         let h = DH::new_handle(Dh {
-            libctx: Ptr(libctx),
+            libctx: KeyLibctx::new(libctx),
             references: AtomicI32::new(1),
             dirty: AtomicUsize::new(0),
             state: Mutex::new(DhState::default()),

@@ -25,7 +25,7 @@ use crate::ex_data::{
 use crate::ffc;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
-use crate::provider::Ptr;
+use crate::provider::{KeyLibctx, Ptr};
 
 /// A DSA key's state: its parameters and key pair.
 #[derive(Clone, Default)]
@@ -145,10 +145,10 @@ unsafe impl Sync for ExData {}
 
 /// A DSA key (`DSA`), shared by reference.
 pub(crate) struct Dsa {
-    pub(crate) libctx: Ptr<OSSL_LIB_CTX>,
+    pub(crate) libctx: KeyLibctx,
     /// Made in a library context (OpenSSL's non-NULL `libctx`: by a provider, or from a key
     /// that was), which signs through OpenSSL's own code rather than the key's method.
-    pub(crate) in_libctx: bool,
+    pub(crate) in_libctx: core::sync::atomic::AtomicBool,
     references: AtomicI32,
     /// `dirty_cnt`.
     dirty: AtomicUsize,
@@ -175,6 +175,18 @@ impl Drop for Dsa {
 }
 
 impl Dsa {
+    /// Whether the key was made in a library context (OpenSSL's non-NULL `libctx`).
+    pub(crate) fn is_in_libctx(&self) -> bool {
+        self.in_libctx.load(core::sync::atomic::Ordering::Acquire)
+    }
+
+    /// `ossl_dsa_set0_libctx`: the key's library context, a provider's.
+    pub(crate) fn set0_libctx(&self, libctx: *mut OSSL_LIB_CTX) {
+        self.libctx.set(libctx);
+        self.in_libctx
+            .store(true, core::sync::atomic::Ordering::Release);
+    }
+
     /// `dsa_new_intern`: an empty key in `libctx` with the default method (whose `init` it
     /// runs) and its flags but `DSA_FLAG_NON_FIPS_ALLOW`, or NULL with the error raised.
     pub(crate) fn new_handle_in(libctx: *mut OSSL_LIB_CTX) -> *mut DSA {
@@ -192,8 +204,8 @@ impl Dsa {
         // SAFETY: a live method.
         let mflags = unsafe { crate::dsa_meth::flags(meth) };
         let h = DSA::new_handle(Dsa {
-            libctx: Ptr(libctx),
-            in_libctx,
+            libctx: KeyLibctx::new(libctx),
+            in_libctx: core::sync::atomic::AtomicBool::new(in_libctx),
             references: AtomicI32::new(1),
             dirty: AtomicUsize::new(0),
             state: Mutex::new(DsaState::default()),

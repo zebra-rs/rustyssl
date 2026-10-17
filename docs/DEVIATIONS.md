@@ -252,6 +252,9 @@ OpenSSL never depends on them.
 | The built-in DSA `EVP_PKEY_METHOD`'s ctrl (a legacy DSA context: a `DSA` with an application's method, or an application's copy of the method): the getter of the signature's digest with NULL; `EVP_PKEY_CTRL_MD` and `EVP_PKEY_CTRL_DSA_PARAMGEN_MD` with a NULL digest | writes through NULL and crashes; reads NULL's type and crashes | writes nothing; refuses NULL as no digest (`DSA_R_INVALID_DIGEST_TYPE`) | `dsa_pmeth::tests::ctrl_null_pointers_are_safe` |
 | `DSA_do_verify` and `DSA_verify` with a key that has no public key | read it through NULL and crash | -1 with `ERR_R_BN_LIB` | `dsa_ops::tests::verifying_without_a_public_key_fails` |
 | `DSA_sign_setup` (the built-in method's) with `*rp` NULL | writes r through NULL and crashes | makes r and stores it in `*rp` | `dsa_ops::tests::sign_setup_makes_r` |
+| `asn1_d2i_read_bio` with a NULL buffer pointer | reads the element, then writes the buffer through NULL and crashes | refuses it (-1, `ERR_R_PASSED_NULL_PARAMETER`) before reading | `asn1::tpl::io::tests::read_bio_into_null_is_refused` |
+| `d2i_PrivateKey` (and `d2i_AutoPrivateKey`, `_ex`) given a key in `*a`, when the decoders fail and the type's legacy decoding finds a PrivateKeyInfo of another type | frees `*a` before checking the type, then fails, leaving the application's pointer dangling | frees `*a` only once the new key is accepted; on failure `*a` is still the application's key (retyped, as OpenSSL's was before being freed) | `evp::pkey::d2i::tests::a_key_given_survives_a_failed_decoding` |
+| `EVP_PKEY2PKCS8` of a legacy DH or DHX key without a private key | encodes the private key from NULL and crashes | fails with `DH_R_BN_ERROR` | `evp::pkey::dh::tests::pkcs8_without_a_private_key_fails` |
 
 ## Notes
 

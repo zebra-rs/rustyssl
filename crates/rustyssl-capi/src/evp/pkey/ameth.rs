@@ -50,6 +50,14 @@ pub(crate) type PrivDecode =
     unsafe extern "C" fn(*mut EVP_PKEY, *const PKCS8_PRIV_KEY_INFO) -> c_int;
 pub(crate) type PrivEncode =
     unsafe extern "C" fn(*mut PKCS8_PRIV_KEY_INFO, *const EVP_PKEY) -> c_int;
+/// The built-in methods' `priv_decode_ex` (`priv_decode` in a library context), which
+/// applications can't set.
+pub(crate) type PrivDecodeEx = unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const PKCS8_PRIV_KEY_INFO,
+    *mut OSSL_LIB_CTX,
+    *const c_char,
+) -> c_int;
 /// The functions of a key alone (sizes, checks, `param_missing`).
 pub(crate) type KeyFn = unsafe extern "C" fn(*const EVP_PKEY) -> c_int;
 pub(crate) type ParamDecode =
@@ -127,6 +135,7 @@ pub(crate) struct Funcs {
     pub(crate) get_pub_key: Option<GetRaw>,
     pub(crate) copy: Option<Copy>,
     pub(crate) old_priv_decode: Option<OldPrivDecode>,
+    pub(crate) priv_decode_ex: Option<PrivDecodeEx>,
     /// The built-in methods' bridge to the providers (applications' methods have none).
     pub(crate) dirty_cnt: Option<DirtyCnt>,
     pub(crate) export_to: Option<ExportTo>,
@@ -211,10 +220,6 @@ extern "C" fn builtin_copy(_: *mut EVP_PKEY, _: *mut EVP_PKEY) -> c_int {
     crate::stub::unimplemented("copying a key through a built-in ASN.1 method")
 }
 
-extern "C" fn builtin_old_priv_decode(_: *mut EVP_PKEY, _: *mut *const c_uchar, _: c_int) -> c_int {
-    crate::stub::unimplemented("decoding a traditional private key through a built-in ASN.1 method")
-}
-
 extern "C" fn builtin_print(_: *mut BIO, _: *const EVP_PKEY, _: c_int, _: *mut ASN1_PCTX) -> c_int {
     crate::stub::unimplemented("printing a key through a built-in ASN.1 method")
 }
@@ -273,6 +278,8 @@ impl Kind {
                 use super::dh as d;
                 f.pub_decode = Some(d::dh_pub_decode);
                 f.pub_encode = Some(d::dh_pub_encode);
+                f.priv_decode = Some(d::dh_priv_decode);
+                f.priv_encode = Some(d::dh_priv_encode);
                 f.pub_cmp = Some(d::dh_pub_cmp);
                 f.pub_print = Some(d::dh_public_print);
                 f.priv_print = Some(d::dh_private_print);
@@ -302,6 +309,8 @@ impl Kind {
                 use super::dsa as d;
                 f.pub_decode = Some(d::dsa_pub_decode);
                 f.pub_encode = Some(d::dsa_pub_encode);
+                f.priv_decode = Some(d::dsa_priv_decode);
+                f.priv_encode = Some(d::dsa_priv_encode);
                 f.pub_cmp = Some(d::dsa_pub_cmp);
                 f.pub_print = Some(d::dsa_pub_print);
                 f.priv_print = Some(d::dsa_priv_print);
@@ -326,6 +335,8 @@ impl Kind {
                 use super::ecx as x;
                 f.pub_decode = Some(x::ecx_pub_decode);
                 f.pub_encode = Some(x::ecx_pub_encode);
+                f.priv_encode = Some(x::ecx_priv_encode);
+                f.priv_decode_ex = Some(x::ecx_priv_decode_ex);
                 f.pub_cmp = Some(x::ecx_pub_cmp);
                 f.pub_print = Some(x::ecx_pub_print);
                 f.priv_print = Some(x::ecx_priv_print);
@@ -352,6 +363,8 @@ impl Kind {
                 use super::ec as e;
                 f.pub_decode = Some(e::eckey_pub_decode);
                 f.pub_encode = Some(e::eckey_pub_encode);
+                f.priv_encode = Some(e::eckey_priv_encode);
+                f.priv_decode_ex = Some(e::eckey_priv_decode_ex);
                 f.pub_cmp = Some(e::eckey_pub_cmp);
                 f.pub_print = Some(e::eckey_pub_print);
                 f.priv_print = Some(e::eckey_priv_print);
@@ -379,6 +392,8 @@ impl Kind {
                 use super::rsa as r;
                 f.pub_decode = Some(r::rsa_pub_decode);
                 f.pub_encode = Some(r::rsa_pub_encode);
+                f.priv_decode = Some(r::rsa_priv_decode);
+                f.priv_encode = Some(r::rsa_priv_encode);
                 f.pub_cmp = Some(r::rsa_pub_cmp);
                 f.pkey_size = Some(r::int_rsa_size);
                 f.pkey_bits = Some(r::rsa_bits);
@@ -400,7 +415,7 @@ impl Kind {
             Self::Alias => {}
         }
         if matches!(self, Self::Rsa) {
-            f.old_priv_decode = Some(builtin_old_priv_decode);
+            f.old_priv_decode = Some(super::rsa::old_rsa_priv_decode);
         }
         f
     }

@@ -778,3 +778,37 @@ pub(crate) unsafe fn has_global_properties(libctx: *mut OSSL_LIB_CTX) -> bool {
     // SAFETY: the caller's guarantee.
     unsafe { libctx::resolve(libctx) }.is_some_and(|ctx| ctx.properties.lock().global.is_some())
 }
+
+/// `ossl_parse_query` (creating values) merged with the library context's global property
+/// query, as `OSSL_DECODER_CTX_new_for_pkey` matches decoders against: the query alone, the
+/// global one alone, or `None` for neither.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn query_with_global(
+    libctx: *mut OSSL_LIB_CTX,
+    propq: Option<&[u8]>,
+) -> Option<List> {
+    // SAFETY: the caller's guarantee.
+    let ctx = unsafe { libctx::resolve(libctx) }?;
+    let parsed = propq.map(|q| {
+        let mut properties = ctx.properties.lock();
+        property::parse_query(&mut properties.strings, q, true)
+    });
+    if let Some(p) = &parsed {
+        crate::property::raise_parse_errors(&p.errors, "ossl_parse_query");
+    }
+    let q = parsed.and_then(|p| p.list);
+    let g = ctx.properties.lock().global.clone();
+    match (q, g) {
+        (Some(q), Some(g)) => Some(property::merge(&q, &g)),
+        (Some(q), None) => Some(q),
+        (None, g) => g,
+    }
+}
+
+/// `ossl_property_match_count`: how many of the query's properties the definition matches, or
+/// -1 when it fails a required one.
+pub(crate) fn match_count(query: &List, defn: &List) -> c_int {
+    property::match_count(query, defn)
+}

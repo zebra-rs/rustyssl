@@ -592,24 +592,6 @@ pub(crate) unsafe fn is_foreign(key: *const DH) -> bool {
     unsafe { dh(key) }.is_some_and(backend::is_foreign)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// docs/DEVIATIONS.md: OpenSSL's dereferences the NULL key.
-    #[test]
-    fn set1_and_get0_of_null_fail() {
-        // SAFETY: no preconditions.
-        let k = unsafe { super::super::EVP_PKEY_new() };
-        // SAFETY: a live key; NULL.
-        assert_eq!(unsafe { EVP_PKEY_set1_DH(k, ptr::null_mut()) }, 0);
-        // SAFETY: NULL.
-        assert!(unsafe { EVP_PKEY_get0_DH(ptr::null()) }.is_null());
-        // SAFETY: made above, freed once.
-        unsafe { super::super::EVP_PKEY_free(k) };
-    }
-}
-
 ffi_callback! {
     /// `dh_pub_decode`: the key's parameters (a SEQUENCE: DHparams, or DHxparams for DHX) and
     /// its public key (an INTEGER), assigned to the key.
@@ -731,5 +713,226 @@ ffi_callback! {
         // SAFETY: as above.
         unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
         0
+    }
+}
+
+/// `ossl_dh_key_from_pkcs8`: a PrivateKeyInfo's private key (an INTEGER) with the
+/// AlgorithmIdentifier's parameters (DHparams for dhKeyAgreement, DHxparams for
+/// dhpublicnumber) and the public key made from them, or NULL.
+///
+/// # Safety
+/// `p8` is a live PrivateKeyInfo.
+pub(crate) unsafe fn key_from_pkcs8(p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> *mut DH {
+    use rustyssl_abi::{
+        DH_R_BN_ERROR, DH_R_DECODE_ERROR, NID_dhKeyAgreement, NID_dhpublicnumber, V_ASN1_SEQUENCE,
+    };
+    const F: &str = "ossl_dh_key_from_pkcs8";
+    let (mut p, mut pklen, mut palg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's structure; locals.
+    if unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut p,
+            &raw mut pklen,
+            &raw mut palg,
+            p8,
+        )
+    } == 0
+    {
+        return ptr::null_mut();
+    }
+    let (mut ptype, mut pval) = (0, ptr::null());
+    // SAFETY: its AlgorithmIdentifier; locals.
+    unsafe {
+        crate::x509::algor::X509_ALGOR_get0(ptr::null_mut(), &raw mut ptype, &raw mut pval, palg)
+    };
+    let decerr = |privkey: *mut rustyssl_abi::ASN1_INTEGER| {
+        err::raise(ERR_LIB_DH, DH_R_DECODE_ERROR, F);
+        // SAFETY: decoded here, or NULL; wiped and freed once.
+        unsafe { crate::asn1::string::ASN1_STRING_clear_free(privkey) };
+        ptr::null_mut()
+    };
+    if ptype != V_ASN1_SEQUENCE {
+        return decerr(ptr::null_mut());
+    }
+    // SAFETY: the structure's `pklen` octets.
+    let privkey = unsafe {
+        crate::asn1::tpl::items::d2i_ASN1_INTEGER(ptr::null_mut(), &raw mut p, c_long::from(pklen))
+    };
+    if privkey.is_null() {
+        return decerr(privkey);
+    }
+    // SAFETY: a SEQUENCE parameter is an `ASN1_STRING`.
+    let (mut pm, pmlen) = unsafe { crate::x509::pubkey::sequence_octets(pval) };
+    // SAFETY: the structure's AlgorithmIdentifier.
+    let obj = unsafe { (*palg).algorithm };
+    // SAFETY: the AlgorithmIdentifier's object.
+    let nid = unsafe { crate::objects::OBJ_obj2nid(obj) };
+    let d = if nid == NID_dhKeyAgreement {
+        // SAFETY: the parameter's octets.
+        unsafe { d2i_DHparams(ptr::null_mut(), &raw mut pm, pmlen) }
+    } else if nid == NID_dhpublicnumber {
+        // SAFETY: as above.
+        unsafe { d2i_DHxparams(ptr::null_mut(), &raw mut pm, pmlen) }
+    } else {
+        ptr::null_mut()
+    };
+    if d.is_null() {
+        return decerr(privkey);
+    }
+    let dherr = || {
+        // SAFETY: made above.
+        unsafe { free(d) };
+        // SAFETY: decoded above; wiped and freed once.
+        unsafe { crate::asn1::string::ASN1_STRING_clear_free(privkey) };
+        ptr::null_mut()
+    };
+    // SAFETY: no preconditions.
+    let privbn = unsafe { crate::bn::BN_secure_new() };
+    // SAFETY: the INTEGER; the new number, or NULL.
+    if privbn.is_null() || unsafe { crate::bn::conv::ASN1_INTEGER_to_BN(privkey, privbn) }.is_null()
+    {
+        err::raise(ERR_LIB_DH, DH_R_BN_ERROR, F);
+        // SAFETY: made above, or NULL.
+        unsafe { crate::bn::BN_clear_free(privbn) };
+        return dherr();
+    }
+    // SAFETY: the key takes the number.
+    if unsafe { crate::dh::DH_set0_key(d, ptr::null_mut(), privbn) } == 0 {
+        // SAFETY: not taken.
+        unsafe { crate::bn::BN_clear_free(privbn) };
+        return dherr();
+    }
+    // SAFETY: the key, with its private key.
+    if unsafe { crate::dh_meth::DH_generate_key(d) } == 0 {
+        return dherr();
+    }
+    // SAFETY: decoded above; wiped and freed once.
+    unsafe { crate::asn1::string::ASN1_STRING_clear_free(privkey) };
+    d
+}
+
+ffi_callback! {
+    /// `dh_priv_decode`: a PrivateKeyInfo's key assigned to the key, as its type.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed DH or DHX; `p8` is a live PrivateKeyInfo.
+    pub(crate) unsafe extern "C" fn dh_priv_decode(pkey: *mut EVP_PKEY, p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> c_int
+    where failure = 0, library = ERR_LIB_DH
+    {
+        // SAFETY: the caller's guarantee.
+        let d = unsafe { key_from_pkcs8(p8) };
+        if d.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, id, d.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `dh_priv_encode`: the private key as an INTEGER with the parameters (DHparams, or
+    /// DHxparams for DHX, as a SEQUENCE).
+    ///
+    /// # Safety
+    /// `p8` is a live PrivateKeyInfo; `pkey` is a live DH or DHX key.
+    pub(crate) unsafe extern "C" fn dh_priv_encode(p8: *mut rustyssl_abi::PKCS8_PRIV_KEY_INFO, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_DH
+    {
+        use crate::x509::pubkey::{int_encode, sequence_param};
+        use rustyssl_abi::{DH_R_BN_ERROR, ERR_R_ASN1_LIB, V_ASN1_SEQUENCE};
+        const F: &str = "dh_priv_encode";
+        // SAFETY: the caller's guarantee.
+        let dh = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let dhx = unsafe { is_dhx(pkey) };
+        let i2d = |out: *mut *mut c_uchar| {
+            if dhx {
+                // SAFETY: the key; the caller's place for a new encoding.
+                unsafe { i2d_DHxparams(dh, out) }
+            } else {
+                // SAFETY: as above.
+                unsafe { i2d_DHparams(dh, out) }
+            }
+        };
+        // SAFETY: the closure writes a new buffer through its argument.
+        let Some(params) = (unsafe { sequence_param(V_ASN1_SEQUENCE, i2d) }) else {
+            err::raise(ERR_LIB_DH, ERR_R_ASN1_LIB, F);
+            return 0;
+        };
+        // SAFETY: the key's private key, or NULL.
+        let x = if dh.is_null() { ptr::null() } else { unsafe { crate::dh::DH_get0_priv_key(dh) } };
+        // SAFETY: as above.
+        let encoded = if x.is_null() { Err(true) } else { unsafe { int_encode(x) } };
+        let Ok((dp, dplen)) = encoded else {
+            err::raise(ERR_LIB_DH, DH_R_BN_ERROR, F);
+            // SAFETY: made above.
+            unsafe { crate::asn1::string::ASN1_STRING_free(params) };
+            return 0;
+        };
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        // SAFETY: the caller's structure takes the object, parameters, and octets.
+        if unsafe { crate::x509::p8::PKCS8_pkey_set0(p8, obj, 0, V_ASN1_SEQUENCE, params.cast(), dp, dplen) } != 0 {
+            return 1;
+        }
+        // SAFETY: made above, `dplen` octets.
+        unsafe { mem::release_clean(dp.cast(), usize::try_from(dplen).unwrap_or(0)) };
+        // SAFETY: as above.
+        unsafe { crate::asn1::string::ASN1_STRING_free(params) };
+        0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// docs/DEVIATIONS.md: OpenSSL's dereferences the NULL key.
+    #[test]
+    fn set1_and_get0_of_null_fail() {
+        // SAFETY: no preconditions.
+        let k = unsafe { super::super::EVP_PKEY_new() };
+        // SAFETY: a live key; NULL.
+        assert_eq!(unsafe { EVP_PKEY_set1_DH(k, ptr::null_mut()) }, 0);
+        // SAFETY: NULL.
+        assert!(unsafe { EVP_PKEY_get0_DH(ptr::null()) }.is_null());
+        // SAFETY: made above, freed once.
+        unsafe { super::super::EVP_PKEY_free(k) };
+    }
+
+    /// docs/DEVIATIONS.md: OpenSSL's encodes the missing private key from NULL and crashes.
+    #[test]
+    fn pkcs8_without_a_private_key_fails() {
+        use crate::bn::{BN_new, BN_set_word};
+        // SAFETY: no preconditions.
+        let p = unsafe { BN_new() };
+        // SAFETY: no preconditions.
+        let g = unsafe { BN_new() };
+        // SAFETY: the new number.
+        assert_eq!(unsafe { BN_set_word(p, 23) }, 1);
+        // SAFETY: as above.
+        assert_eq!(unsafe { BN_set_word(g, 5) }, 1);
+        // SAFETY: no preconditions.
+        let d = unsafe { DH_new() };
+        // SAFETY: the new key takes the numbers.
+        let set = unsafe { crate::dh::DH_set0_pqg(d, p, ptr::null_mut(), g) };
+        assert_eq!(set, 1);
+        // SAFETY: no preconditions.
+        let k = unsafe { super::super::EVP_PKEY_new() };
+        // SAFETY: the key takes the `DH`.
+        assert_eq!(unsafe { EVP_PKEY_assign(k, EVP_PKEY_DH, d.cast()) }, 1);
+        // SAFETY: the legacy key.
+        let p8 = unsafe { crate::evp::pkey::d2i::EVP_PKEY2PKCS8(k) };
+        assert!(p8.is_null());
+        // SAFETY: made above, freed once.
+        unsafe { super::super::EVP_PKEY_free(k) };
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_clear_error() };
     }
 }

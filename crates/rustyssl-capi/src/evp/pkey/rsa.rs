@@ -900,3 +900,136 @@ ffi_callback! {
         1
     }
 }
+
+/// `ossl_rsa_key_from_pkcs8`: a PrivateKeyInfo's RSAPrivateKey with its RSA-PSS restrictions
+/// and the kind its algorithm names, or NULL.
+///
+/// # Safety
+/// `p8` is a live PrivateKeyInfo.
+pub(crate) unsafe fn key_from_pkcs8(p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> *mut RSA {
+    use rustyssl_abi::{
+        ERR_R_RSA_LIB, RSA_FLAG_TYPE_MASK, RSA_FLAG_TYPE_RSA, RSA_FLAG_TYPE_RSASSAPSS,
+    };
+    let (mut p, mut pklen, mut alg) = (ptr::null(), 0, ptr::null());
+    // SAFETY: the caller's structure; locals.
+    if unsafe {
+        crate::x509::p8::PKCS8_pkey_get0(
+            ptr::null_mut(),
+            &raw mut p,
+            &raw mut pklen,
+            &raw mut alg,
+            p8,
+        )
+    } == 0
+    {
+        return ptr::null_mut();
+    }
+    // SAFETY: the structure's `pklen` octets.
+    let r = unsafe {
+        crate::rsa_asn1::d2i_RSAPrivateKey(ptr::null_mut(), &raw mut p, c_long::from(pklen))
+    };
+    if r.is_null() {
+        err::raise(ERR_LIB_RSA, ERR_R_RSA_LIB, "ossl_rsa_key_from_pkcs8");
+        return ptr::null_mut();
+    }
+    // SAFETY: the new key; the structure's AlgorithmIdentifier.
+    let ok = unsafe { param_decode(r, alg) };
+    // SAFETY: the new key.
+    let Some(k) = (unsafe { rsa(r) }).filter(|_| ok) else {
+        // SAFETY: made above.
+        unsafe { free(r) };
+        return ptr::null_mut();
+    };
+    // SAFETY: the structure's AlgorithmIdentifier.
+    let obj = unsafe { (*alg).algorithm };
+    // SAFETY: the AlgorithmIdentifier's object.
+    let kind = match unsafe { crate::objects::OBJ_obj2nid(obj) } {
+        EVP_PKEY_RSA => RSA_FLAG_TYPE_RSA,
+        EVP_PKEY_RSA_PSS => RSA_FLAG_TYPE_RSASSAPSS,
+        _ => 0,
+    };
+    k.set_flags_to((k.flags() & !RSA_FLAG_TYPE_MASK) | kind);
+    r
+}
+
+ffi_callback! {
+    /// `rsa_priv_encode`: the key's RSAPrivateKey with its type's object and parameter.
+    ///
+    /// # Safety
+    /// `p8` is a live PrivateKeyInfo; `pkey` is a live RSA or RSA-PSS key.
+    pub(crate) unsafe extern "C" fn rsa_priv_encode(p8: *mut rustyssl_abi::PKCS8_PRIV_KEY_INFO, pkey: *const EVP_PKEY) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        use rustyssl_abi::ERR_R_ASN1_LIB;
+        const F: &str = "rsa_priv_encode";
+        // SAFETY: the caller's guarantee.
+        let r = unsafe { data(pkey) };
+        // SAFETY: as above.
+        let Some((strtype, str_)) = (unsafe { param_encode(r) }) else { return 0 };
+        let mut rk = ptr::null_mut();
+        // SAFETY: the key; a place for a new encoding.
+        let rklen = unsafe { crate::rsa_asn1::i2d_RSAPrivateKey(r, &raw mut rk) };
+        if rklen <= 0 {
+            err::raise(ERR_LIB_RSA, ERR_R_ASN1_LIB, F);
+            // SAFETY: made above, or NULL.
+            unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: no preconditions.
+        let obj = unsafe { crate::objects::OBJ_nid2obj(id) };
+        // SAFETY: the caller's structure takes the object, parameter, and octets.
+        if unsafe { crate::x509::p8::PKCS8_pkey_set0(p8, obj, 0, strtype, str_.cast(), rk, rklen) } != 0 {
+            return 1;
+        }
+        err::raise(ERR_LIB_RSA, ERR_R_ASN1_LIB, F);
+        // SAFETY: made above.
+        unsafe { crate::asn1::string::ASN1_STRING_free(str_) };
+        // SAFETY: as above, `rklen` octets.
+        unsafe { crate::mem::release_clean(rk.cast(), usize::try_from(rklen).unwrap_or(0)) };
+        0
+    }
+}
+
+ffi_callback! {
+    /// `rsa_priv_decode`: a PrivateKeyInfo's key assigned to the key, as its type.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed RSA or RSA-PSS; `p8` is a live PrivateKeyInfo.
+    pub(crate) unsafe extern "C" fn rsa_priv_decode(pkey: *mut EVP_PKEY, p8: *const rustyssl_abi::PKCS8_PRIV_KEY_INFO) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's guarantee.
+        let r = unsafe { key_from_pkcs8(p8) };
+        if r.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, id, r.cast()) };
+        1
+    }
+}
+
+ffi_callback! {
+    /// `old_rsa_priv_decode`: a traditional RSAPrivateKey assigned to the key, as its type.
+    ///
+    /// # Safety
+    /// `pkey` is a live key typed RSA or RSA-PSS; `pder` holds `derlen` readable octets.
+    pub(crate) unsafe extern "C" fn old_rsa_priv_decode(pkey: *mut EVP_PKEY, pder: *mut *const core::ffi::c_uchar, derlen: c_int) -> c_int
+    where failure = 0, library = ERR_LIB_RSA
+    {
+        // SAFETY: the caller's octets.
+        let r = unsafe { crate::rsa_asn1::d2i_RSAPrivateKey(ptr::null_mut(), pder, c_long::from(derlen)) };
+        if r.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's key.
+        let id = unsafe { super::EVP_PKEY_get_id(pkey) };
+        // SAFETY: the caller's key takes the new one.
+        unsafe { EVP_PKEY_assign(pkey, id, r.cast()) };
+        1
+    }
+}

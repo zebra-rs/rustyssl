@@ -425,6 +425,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "d2i_pkey"
+path = "fuzz_targets/d2i_pkey.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "spki_der"
 path = "fuzz_targets/spki_der.rs"
 test = false

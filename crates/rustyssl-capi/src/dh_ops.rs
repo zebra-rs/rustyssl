@@ -89,7 +89,7 @@ unsafe fn builtin_genparams(
             g => (12, 11, g),
         };
         // SAFETY: the key's library context; the caller's callback.
-        let env = unsafe { Env::new(k.libctx.0, cb) }?;
+        let env = unsafe { Env::new(k.libctx.get(), cb) }?;
         let p = env.generate_prime_with(
             usize::try_from(prime_len).ok()?,
             true,
@@ -187,7 +187,7 @@ unsafe fn set(ret: *mut c_int, v: c_int) {
 unsafe fn state(d: *const DH) -> Option<(crate::dh::DhState, *mut rustyssl_abi::OSSL_LIB_CTX)> {
     // SAFETY: the caller's guarantee.
     let k = unsafe { dh(d) }?;
-    Some((k.snapshot(), k.libctx.0))
+    Some((k.snapshot(), k.libctx.get()))
 }
 
 /// `DH_check_params` (outside the FIPS module): p odd, `1 < g < p - 1`, and p's size.

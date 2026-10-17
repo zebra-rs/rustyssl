@@ -8,6 +8,7 @@
 //! are `OSSL_DECODER`'s, naming the "Name".
 
 pub(crate) mod ctx;
+pub(crate) mod pkey;
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;

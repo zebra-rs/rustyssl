@@ -202,7 +202,7 @@ unsafe fn mod_exp(
         return core_bn::modular::exp_mod(a, e, m).ok();
     }
     // SAFETY: the key's library context (via the key), or NULL.
-    let libctx = unsafe { dh(d) }.map_or(ptr::null_mut(), |k| k.libctx.0);
+    let libctx = unsafe { dh(d) }.map_or(ptr::null_mut(), |k| k.libctx.get());
     // SAFETY: as above.
     let ctx = unsafe { BN_CTX_new_ex(libctx) };
     let (r, a, e, m) = (
@@ -332,7 +332,7 @@ ffi_callback! {
         }
         // SAFETY: the key's method, live.
         let f = unsafe { fns_of(k.meth()) }.and_then(|f| f.bn_mod_exp);
-        let libctx = k.libctx.0;
+        let libctx = k.libctx.get();
         let ok = (|| {
             // SAFETY: the key's library context; no callback.
             let env = unsafe { Env::new(libctx, ptr::null_mut()) }?;

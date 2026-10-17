@@ -386,6 +386,12 @@
  *                              the input type and structure (- for none), the selection (hex),
  *                              and a passphrase (- for none, so decryption fails): what each
  *                              construct got, the result, and the octets left
+ *   d2ikey <how> <hex>         a key from the octets through the decoders and the legacy
+ *                              fallbacks: d2i_AutoPrivateKey (a), d2i_PrivateKey of a key type
+ *                              (its number), d2i_PUBKEY (u), EVP_PKCS82PKEY of the PrivateKeyInfo
+ *                              (8), or d2i_X509_PUBKEY's key (x): the result, the octets
+ *                              consumed, the key's type, sizes, public key, and whether it has
+ *                              its private part
  *   spkider <r|d|e> <hex>      d2i_RSA_PUBKEY (r), d2i_DSA_PUBKEY (d), or d2i_EC_PUBKEY (e) of the
  *                              octets: the result, the octets consumed, the key's size, and
  *                              its SubjectPublicKeyInfo encoded again
@@ -6422,6 +6428,68 @@ static int x509_command(const char *command, const char *line)
         }
         print_asn_errors();
         OSSL_DECODER_CTX_free(dctx);
+        OPENSSL_free(in);
+        return 1;
+    }
+    if (strcmp(command, "d2ikey") == 0) {
+        char how[16] = "a", hx[4100] = "";
+        long len = 0;
+        unsigned char *in;
+        const unsigned char *q;
+        EVP_PKEY *k = NULL;
+
+        printf("%s:", line);
+        sscanf(line, "%*s %15s %4099s", how, hx);
+        in = OPENSSL_hexstr2buf(hx, &len);
+        q = in;
+        if (in != NULL) {
+            if (strcmp(how, "a") == 0) {
+                k = d2i_AutoPrivateKey(NULL, &q, len);
+            } else if (strcmp(how, "u") == 0) {
+                k = d2i_PUBKEY(NULL, &q, len);
+            } else if (strcmp(how, "8") == 0) {
+                PKCS8_PRIV_KEY_INFO *p8 = d2i_PKCS8_PRIV_KEY_INFO(NULL, &q, len);
+
+                k = EVP_PKCS82PKEY(p8);
+                PKCS8_PRIV_KEY_INFO_free(p8);
+            } else if (strcmp(how, "x") == 0) {
+                X509_PUBKEY *xpk = d2i_X509_PUBKEY(NULL, &q, len);
+
+                k = xpk != NULL ? X509_PUBKEY_get(xpk) : NULL;
+                X509_PUBKEY_free(xpk);
+            } else {
+                k = d2i_PrivateKey(atoi(how), NULL, &q, len);
+            }
+        }
+        printf(" %s %ld", k != NULL ? "decoded" : "refused", (long)(q - in));
+        if (k != NULL) {
+            unsigned char buf[1200];
+            size_t blen = 0;
+            BIGNUM *bn = NULL;
+
+            printf(" id %d bits %d sec %d size %d", EVP_PKEY_get_id(k), EVP_PKEY_get_bits(k),
+                   EVP_PKEY_get_security_bits(k), EVP_PKEY_get_size(k));
+            if (EVP_PKEY_get_octet_string_param(k, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, buf,
+                                                sizeof(buf), &blen)) {
+                size_t i;
+
+                printf(" pub ");
+                for (i = 0; i < blen && i < 24; i++)
+                    printf("%02x", buf[i]);
+            } else if (EVP_PKEY_get_bn_param(k, OSSL_PKEY_PARAM_RSA_N, &bn)
+                     || EVP_PKEY_get_bn_param(k, OSSL_PKEY_PARAM_PUB_KEY, &bn))
+                printf(" pubbits %d", BN_num_bits(bn));
+            BN_free(bn);
+            bn = NULL;
+            printf(" priv %d",
+                   EVP_PKEY_get_bn_param(k, OSSL_PKEY_PARAM_RSA_D, &bn)
+                   || EVP_PKEY_get_bn_param(k, OSSL_PKEY_PARAM_PRIV_KEY, &bn)
+                   || EVP_PKEY_get_octet_string_param(k, OSSL_PKEY_PARAM_PRIV_KEY, buf,
+                                                      sizeof(buf), &blen));
+            BN_free(bn);
+        }
+        print_asn_errors();
+        EVP_PKEY_free(k);
         OPENSSL_free(in);
         return 1;
     }
