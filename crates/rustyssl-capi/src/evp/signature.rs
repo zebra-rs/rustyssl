@@ -505,6 +505,7 @@ unsafe fn free(m: *mut c_void) {
 /// Signature algorithms to fetching.
 static SIGNATURES: Kind = Kind {
     operation: OSSL_OP_SIGNATURE,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

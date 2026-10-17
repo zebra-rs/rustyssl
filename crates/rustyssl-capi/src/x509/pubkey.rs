@@ -1145,6 +1145,35 @@ pub(crate) unsafe fn sequence_param(
     Some(s)
 }
 
+/// `ossl_d2i_X509_PUBKEY_INTERNAL`: a SubjectPublicKeyInfo decoded without its key (through the
+/// internal SEQUENCE), or NULL; free it with `free_internal`.
+///
+/// # Safety
+/// `pp` holds a pointer to `len` octets.
+pub(crate) unsafe fn d2i_internal(pp: *mut *const c_uchar, len: c_long) -> *mut X509_PUBKEY {
+    let p = alloc();
+    if p.is_null() {
+        return ptr::null_mut();
+    }
+    let mut slot: *mut ASN1_VALUE = p.cast();
+    // SAFETY: the structure to decode into; the caller's octets; the internal item.
+    let r = unsafe { ASN1_item_d2i(&raw mut slot, pp, len, internal_it()) };
+    if r.is_null() {
+        // SAFETY: the engine freed the structure and emptied the slot, or left it.
+        unsafe { free_struct(slot.cast()) };
+    }
+    r.cast()
+}
+
+/// `ossl_X509_PUBKEY_INTERNAL_free`.
+///
+/// # Safety
+/// `x` is NULL or from `d2i_internal`.
+pub(crate) unsafe fn free_internal(x: *mut X509_PUBKEY) {
+    // SAFETY: the caller's guarantee; its key is NULL.
+    unsafe { free_struct(x.cast()) };
+}
+
 #[cfg(test)]
 mod tests {
     use core::ptr;

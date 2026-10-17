@@ -99,6 +99,7 @@ pub(crate) type Ref = opmeth::Ref<EVP_KEYEXCH>;
 /// Key exchanges to fetching.
 static EXCHANGES: Kind = Kind {
     operation: OSSL_OP_KEYEXCH,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm: opmeth::from_algorithm::<EVP_KEYEXCH, Funcs>,
     up_ref: opmeth::up_ref::<EVP_KEYEXCH>,
     free: opmeth::free::<EVP_KEYEXCH>,

@@ -194,6 +194,7 @@ unsafe fn free(m: *mut c_void) {
 /// KDF methods to fetching.
 static KDFS: Kind = Kind {
     operation: OSSL_OP_KDF,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

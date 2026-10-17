@@ -419,6 +419,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "decoder"
+path = "fuzz_targets/decoder.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "spki_der"
 path = "fuzz_targets/spki_der.rs"
 test = false

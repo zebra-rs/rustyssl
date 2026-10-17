@@ -15,10 +15,11 @@ use rustyssl_abi::{
     OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_CORE_GET_LIBCTX,
     OSSL_FUNC_PROVIDER_GET_PARAMS, OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX,
-    OSSL_OP_ASYM_CIPHER, OSSL_OP_CIPHER, OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_KEM, OSSL_OP_KEYEXCH,
-    OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_OP_SIGNATURE, OSSL_OP_SKEYMGMT, OSSL_PARAM,
-    OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME,
-    OSSL_PROV_PARAM_STATUS, OSSL_PROV_PARAM_VERSION, OSSL_PROVIDER, OSSL_provider_init_fn,
+    OSSL_OP_ASYM_CIPHER, OSSL_OP_CIPHER, OSSL_OP_DECODER, OSSL_OP_DIGEST, OSSL_OP_KDF, OSSL_OP_KEM,
+    OSSL_OP_KEYEXCH, OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND, OSSL_OP_SIGNATURE,
+    OSSL_OP_SKEYMGMT, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
+    OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
+    OSSL_PROV_PARAM_VERSION, OSSL_PROVIDER, OSSL_provider_init_fn,
 };
 
 use crate::ffi::ffi_callback;
@@ -208,6 +209,7 @@ ffi_callback! {
         }
         match operation_id {
             OSSL_OP_RAND => super::rands::base_rands(),
+            OSSL_OP_DECODER => super::decoders::base_decoders(),
             _ => ptr::null(),
         }
     }
@@ -254,6 +256,7 @@ ffi_callback! {
             OSSL_OP_KEM => super::exchanges::default_kems(),
             OSSL_OP_RAND => super::rands::default_rands(),
             OSSL_OP_SKEYMGMT => super::skeymgmt::default_skeymgmt(),
+            OSSL_OP_DECODER => super::decoders::default_decoders(),
             _ => ptr::null(),
         }
     }

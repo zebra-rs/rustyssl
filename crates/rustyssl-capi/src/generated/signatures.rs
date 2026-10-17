@@ -8008,6 +8008,122 @@ const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_v
 const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::version::OPENSSL_version_patch;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::version::OPENSSL_version_pre_release;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *mut OSSL_DECODER) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_add_decoder;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_CTX_add_extra;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) = crate::decoder::ctx::OSSL_DECODER_CTX_free;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) -> OSSL_DECODER_CLEANUP =
+    crate::decoder::ctx::OSSL_DECODER_CTX_get_cleanup;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) -> OSSL_DECODER_CONSTRUCT =
+    crate::decoder::ctx::OSSL_DECODER_CTX_get_construct;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) -> *mut core::ffi::c_void =
+    crate::decoder::ctx::OSSL_DECODER_CTX_get_construct_data;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_get_num_decoders;
+const _: unsafe extern "C" fn() -> *mut OSSL_DECODER_CTX =
+    crate::decoder::ctx::OSSL_DECODER_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, OSSL_DECODER_CLEANUP) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_cleanup;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, OSSL_DECODER_CONSTRUCT) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_construct;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_construct_data;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_input_structure;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_input_type;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_params;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_CTX_set_passphrase;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    OSSL_PASSPHRASE_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_CTX_set_passphrase_cb;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_CTX_set_passphrase_ui;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    pem_password_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_CTX_set_pem_password_cb;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_CTX_set_selection;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_INSTANCE) -> *mut OSSL_DECODER =
+    crate::decoder::ctx::OSSL_DECODER_INSTANCE_get_decoder;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_INSTANCE) -> *mut core::ffi::c_void =
+    crate::decoder::ctx::OSSL_DECODER_INSTANCE_get_decoder_ctx;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_INSTANCE,
+    *mut core::ffi::c_int,
+) -> *const core::ffi::c_char = crate::decoder::ctx::OSSL_DECODER_INSTANCE_get_input_structure;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_INSTANCE) -> *const core::ffi::c_char =
+    crate::decoder::ctx::OSSL_DECODER_INSTANCE_get_input_type;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(encoder: *mut OSSL_DECODER, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::decoder::OSSL_DECODER_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_INSTANCE,
+    *mut core::ffi::c_void,
+    usize,
+    OSSL_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_export;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut OSSL_DECODER = crate::decoder::OSSL_DECODER_fetch;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER) = crate::decoder::OSSL_DECODER_free;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *mut BIO) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_from_bio;
+const _: unsafe extern "C" fn(
+    *mut OSSL_DECODER_CTX,
+    *mut *const core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::decoder::ctx::OSSL_DECODER_from_data;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER_CTX, *mut FILE) -> core::ffi::c_int =
+    crate::decoder::ctx::OSSL_DECODER_from_fp;
+const _: unsafe extern "C" fn(*const OSSL_DECODER) -> *const core::ffi::c_char =
+    crate::decoder::OSSL_DECODER_get0_description;
+const _: unsafe extern "C" fn(*const OSSL_DECODER) -> *const core::ffi::c_char =
+    crate::decoder::OSSL_DECODER_get0_name;
+const _: unsafe extern "C" fn(*const OSSL_DECODER) -> *const core::ffi::c_char =
+    crate::decoder::OSSL_DECODER_get0_properties;
+const _: unsafe extern "C" fn(*const OSSL_DECODER) -> *const OSSL_PROVIDER =
+    crate::decoder::OSSL_DECODER_get0_provider;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER, *mut OSSL_PARAM) -> core::ffi::c_int =
+    crate::decoder::OSSL_DECODER_get_params;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER) -> *const OSSL_PARAM =
+    crate::decoder::OSSL_DECODER_gettable_params;
+const _: unsafe extern "C" fn(*const OSSL_DECODER, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::decoder::OSSL_DECODER_is_a;
+const _: unsafe extern "C" fn(
+    *const OSSL_DECODER,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::decoder::OSSL_DECODER_names_do_all;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER) -> *const OSSL_PARAM =
+    crate::decoder::OSSL_DECODER_settable_ctx_params;
+const _: unsafe extern "C" fn(*mut OSSL_DECODER) -> core::ffi::c_int =
+    crate::decoder::OSSL_DECODER_up_ref;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
     crate::ec::curves::OSSL_EC_curve_nid2name;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_free;

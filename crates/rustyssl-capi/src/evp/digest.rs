@@ -485,6 +485,7 @@ unsafe fn free(md: *mut c_void) {
 /// Digest methods to fetching.
 static DIGESTS: Kind = Kind {
     operation: OSSL_OP_DIGEST,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

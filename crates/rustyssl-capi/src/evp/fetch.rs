@@ -36,12 +36,45 @@ use crate::{err, init, libctx};
 pub(crate) struct Kind {
     /// The operation (`OSSL_OP_DIGEST`, ...).
     pub(crate) operation: c_int,
+    /// Whose fetch it is: its errors and its handling of a method made under a name the context
+    /// doesn't know afterwards.
+    pub(crate) style: Style,
     /// `method_from_algorithm`: a method with one reference, or NULL (with an error).
     pub(crate) from_algorithm: unsafe fn(u32, &OSSL_ALGORITHM, *mut OSSL_PROVIDER) -> *mut c_void,
     /// Adds a reference.
     pub(crate) up_ref: unsafe fn(*mut c_void),
     /// Drops a reference.
     pub(crate) free: unsafe fn(*mut c_void),
+}
+
+/// Whose fetch a kind's is.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Style {
+    /// `inner_evp_generic_fetch`'s: EVP errors naming the "Algorithm".
+    Evp,
+    /// `inner_ossl_decoder_fetch`'s: `OSSL_DECODER` errors naming the "Name".
+    Decoder,
+    /// `inner_ossl_encoder_fetch`'s: `OSSL_ENCODER` errors naming the "Name".
+    Encoder,
+}
+
+impl Style {
+    /// The library, the function, and the label of the name in its errors.
+    fn errors(self) -> (c_int, &'static str, &'static str) {
+        match self {
+            Self::Evp => (ERR_LIB_EVP, "inner_evp_generic_fetch", "Algorithm"),
+            Self::Decoder => (
+                rustyssl_abi::ERR_LIB_OSSL_DECODER,
+                "inner_ossl_decoder_fetch",
+                "Name",
+            ),
+            Self::Encoder => (
+                rustyssl_abi::ERR_LIB_OSSL_ENCODER,
+                "inner_ossl_encoder_fetch",
+                "Name",
+            ),
+        }
+    }
 }
 
 /// A method in a store or cache, holding a reference.
@@ -409,13 +442,10 @@ unsafe fn inner_fetch(
     properties: Option<&CStr>,
     prov: Option<*mut OSSL_PROVIDER>,
 ) -> (Option<Method>, Option<MethodStore<Method, ProvKey>>) {
+    let (lib, func, label) = kind.style.errors();
     // SAFETY: the caller's guarantee.
     let Some(ctx) = (unsafe { libctx::resolve(libctx) }) else {
-        err::raise(
-            ERR_LIB_EVP,
-            ERR_R_PASSED_INVALID_ARGUMENT,
-            "inner_evp_generic_fetch",
-        );
+        err::raise(lib, ERR_R_PASSED_INVALID_ARGUMENT, func);
         return (None, None);
     };
     let propq = properties.map_or(&b""[..], CStr::to_bytes);
@@ -453,7 +483,11 @@ unsafe fn inner_fetch(
                     } else {
                         name_id
                     };
-                    if id_now == 0 {
+                    if id_now == 0 && kind.style != Style::Evp {
+                        // The decoders and encoders keep a method made under a name the
+                        // context doesn't know, uncached.
+                        Some(m)
+                    } else if id_now == 0 {
                         drop(state);
                         let text = name.map_or_else(
                             || "<NULL>".to_owned(),
@@ -497,10 +531,10 @@ unsafe fn inner_fetch(
         let props =
             properties.map_or_else(|| "<null>".to_owned(), |p| p.to_string_lossy().into_owned());
         let text = format!(
-            "{}, Algorithm ({shown} : {name_id}), Properties ({props})",
+            "{}, {label} ({shown} : {name_id}), Properties ({props})",
             descriptor(libctx, &ctx)
         );
-        err::raise_with_text(ERR_LIB_EVP, code, "inner_evp_generic_fetch", &text);
+        err::raise_with_text(lib, code, func, &text);
     }
     (method, tmp)
 }
@@ -698,4 +732,49 @@ pub(crate) unsafe fn names_in_libctx(libctx: *mut OSSL_LIB_CTX, name_id: u32) ->
         prefill(&ctx);
         ctx.evp.lock().names.names(name_id).to_vec()
     })
+}
+
+/// `ossl_parse_property`: a property definition parsed in the library context (its errors
+/// raised), or `None`.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn parse_definition_in(libctx: *mut OSSL_LIB_CTX, text: &[u8]) -> Option<List> {
+    // SAFETY: the caller's guarantee.
+    let ctx = unsafe { libctx::resolve(libctx) }?;
+    let parsed = {
+        let mut properties = ctx.properties.lock();
+        property::parse_definition(&mut properties.strings, text)
+    };
+    crate::property::raise_parse_errors(&parsed.errors, "ossl_parse_property");
+    parsed.list
+}
+
+/// `ossl_property_find_property` then `ossl_property_get_string_value`: the string value of
+/// the property `name` of `list`, or `None` (for no such property or a number).
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn string_property(
+    libctx: *mut OSSL_LIB_CTX,
+    list: &List,
+    name: &[u8],
+) -> Option<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    let ctx = unsafe { libctx::resolve(libctx) }?;
+    let mut properties = ctx.properties.lock();
+    let d = *property::find(&mut properties.strings, Some(list), name)?;
+    match d.value {
+        property::Value::String(v) => properties.strings.value_text(v).map(<[u8]>::to_vec),
+        _ => None,
+    }
+}
+
+/// Whether the library context has a global property query (`ossl_ctx_global_properties`).
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+pub(crate) unsafe fn has_global_properties(libctx: *mut OSSL_LIB_CTX) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { libctx::resolve(libctx) }.is_some_and(|ctx| ctx.properties.lock().global.is_some())
 }

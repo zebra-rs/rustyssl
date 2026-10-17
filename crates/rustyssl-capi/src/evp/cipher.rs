@@ -576,6 +576,7 @@ unsafe fn free(c: *mut c_void) {
 /// Cipher methods to fetching.
 static CIPHERS: Kind = Kind {
     operation: OSSL_OP_CIPHER,
+    style: crate::evp::fetch::Style::Evp,
     from_algorithm,
     up_ref,
     free,

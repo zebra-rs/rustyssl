@@ -572,3 +572,13 @@ ffi_export! {
         ret
     }
 }
+
+/// `ossl_read_der` (and `epki2pki`'s read): one element read from the BIO
+/// (`asn1_d2i_read_bio`), as the whole buffer read, or `None` (errors raised for a broken one).
+///
+/// # Safety
+/// `bio` is a live BIO.
+pub(crate) unsafe fn read_der(bio: *mut BIO) -> Option<Vec<u8>> {
+    // SAFETY: the caller's guarantee.
+    unsafe { read_bio(bio) }.map(|(b, _)| b.bytes().to_vec())
+}
