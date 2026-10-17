@@ -4789,12 +4789,22 @@ Exit checks:
     SCT lists and precertificate poison (5.7). The attribute certificate extensions and
     subject directory attributes came with 5.1f3.
 - [ ] **5.3 Store and lookup:**
-  - `X509_STORE`, `X509_OBJECT`
-  - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store
-  - `load_locations`, default paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`, OPENSSLDIR)
-  - every store callback setter
-  - `X509_load_cert_file`, `X509_load_crl_file`, `X509_load_cert_crl_file` and their `_ex`
-    forms (`by_file.c`); `X509_load_http` and `X509_CRL_load_http` come with the HTTP client (6.8)
+  - [x] **5.3a Verification parameters** (`x509/vpm.rs`, from `x509_vpm.c`): `X509_VERIFY_PARAM`
+    (39 exports): flags, inheritance flags, purpose, trust, depth, security level, time,
+    policies, host names (a NUL may end one but not be in it), host flags, the peer name, email
+    and IP addresses (also as text); inheritance as each `X509_VP_FLAG_*` says; and the table of
+    named parameters (the six built-in ones, those added, which a lookup sorts). The checks
+    that use the identities come with 5.5. Three deviations, for NULL parameters, adding a
+    parameter the table holds, and inheriting from itself (docs/DEVIATIONS.md). Tests:
+    `tests/c/x509_vpm.c`.
+  - [ ] **5.3b The store and its lookups:**
+    - `X509_STORE`, `X509_OBJECT`
+    - `X509_LOOKUP` methods: file, hash_dir (c_rehash naming, including CRLs), store
+    - `load_locations`, default paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`, OPENSSLDIR)
+    - every store callback setter
+    - `X509_load_cert_file`, `X509_load_crl_file`, `X509_load_cert_crl_file` and their `_ex`
+      forms (`by_file.c`); `X509_load_http` and `X509_CRL_load_http` come with the HTTP
+      client (6.8)
 - [ ] **5.4 Path validation** (core in `rustyssl-pki`):
   - chain building over multiple candidate issuers (alternate chains, the CVE-2015-1793
     lesson), trusted-first, partial chains
