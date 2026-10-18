@@ -6,10 +6,12 @@
 pub(crate) mod accessors;
 pub(crate) mod ca;
 pub(crate) mod cert;
+pub(crate) mod ciphers;
 pub(crate) mod conn;
 pub(crate) mod ctx;
 pub(crate) mod keys;
 pub(crate) mod method;
+pub(crate) mod tls_provider;
 pub(crate) mod types;
 
 use core::ffi::{c_int, c_long};

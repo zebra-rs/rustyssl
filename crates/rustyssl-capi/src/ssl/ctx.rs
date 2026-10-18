@@ -183,6 +183,10 @@ pub(crate) struct CtxState {
     /// `SSL_CTX_add_extra_chain_cert`'s certificates (owned), or NULL.
     pub(crate) extra_certs: *mut stack_st_X509,
     pub(crate) cert: Cert,
+    /// The cipher lists (`cipher_list`, `cipher_list_by_id`, `tls13_ciphersuites`).
+    pub(crate) ciphers: super::ciphers::CipherLists,
+    /// The algorithms the context's providers lack (`disabled_*_mask`, `ssl_load_ciphers`).
+    pub(crate) available: rustyssl_tls::cipherstring::Available,
 }
 
 impl Drop for CtxState {
@@ -454,6 +458,8 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         client_ca_names: ptr::null_mut(),
         extra_certs: ptr::null_mut(),
         cert: Cert::new(),
+        ciphers: super::ciphers::CipherLists::none(),
+        available: rustyssl_tls::cipherstring::Available::default(),
     }
 }
 
@@ -526,6 +532,17 @@ ffi_export! {
             unsafe { X509_VERIFY_PARAM_free(param) };
             return ptr::null_mut();
         }
+        // `ssl_load_ciphers`, then the default TLS 1.3 suites and cipher list.
+        let propq_ptr = propq.as_ref().map_or(ptr::null(), |p| p.as_ptr());
+        // SAFETY: the caller's library context; the property query, or NULL.
+        state.available = unsafe { super::ciphers::available(libctx, propq_ptr) };
+        let available = state.available;
+        let Some(lists) = super::ciphers::new_ctx_lists(&available, method, &mut state.cert) else {
+            // SAFETY: made above.
+            unsafe { X509_VERIFY_PARAM_free(param) };
+            return ptr::null_mut();
+        };
+        state.ciphers = lists;
         let c = SSL_CTX::new_handle(Ctx {
             references: AtomicI32::new(1),
             libctx,

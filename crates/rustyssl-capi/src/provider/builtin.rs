@@ -315,7 +315,14 @@ const END: OSSL_DISPATCH = OSSL_DISPATCH {
     function: None,
 };
 
-static DEFAULT_DISPATCH: [OSSL_DISPATCH; 5] = [
+type GetCapabilitiesFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const core::ffi::c_char,
+    rustyssl_abi::OSSL_CALLBACK,
+    *mut c_void,
+) -> c_int;
+
+static DEFAULT_DISPATCH: [OSSL_DISPATCH; 6] = [
     entry!(OSSL_FUNC_PROVIDER_TEARDOWN, teardown, TeardownFn),
     entry!(
         OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
@@ -328,6 +335,11 @@ static DEFAULT_DISPATCH: [OSSL_DISPATCH; 5] = [
         GetParamsFn
     ),
     entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, default_query, QueryFn),
+    entry!(
+        rustyssl_abi::OSSL_FUNC_PROVIDER_GET_CAPABILITIES,
+        super::capabilities::default_get_capabilities,
+        GetCapabilitiesFn
+    ),
     END,
 ];
 

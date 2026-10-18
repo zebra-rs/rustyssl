@@ -48,6 +48,7 @@ use crate::{err, init, libctx};
 pub(crate) mod aeads;
 mod blob2key;
 pub(crate) mod builtin;
+pub(crate) mod capabilities;
 pub(crate) mod ciphers;
 pub(crate) mod conf;
 mod decoders;
@@ -148,6 +149,12 @@ type SelfTestFn = unsafe extern "C" fn(*mut c_void) -> c_int;
 type QueryFn = unsafe extern "C" fn(*mut c_void, c_int, *mut c_int) -> *const OSSL_ALGORITHM;
 type UnqueryFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_ALGORITHM);
 type RandomBytesFn = unsafe extern "C" fn(*mut c_void, c_int, *mut c_void, usize, c_uint) -> c_int;
+type GetCapabilitiesFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const core::ffi::c_char,
+    rustyssl_abi::OSSL_CALLBACK,
+    *mut c_void,
+) -> c_int;
 
 /// The provider functions the core calls, from its dispatch table.
 #[derive(Default, Clone, Copy)]
@@ -159,6 +166,7 @@ struct Functions {
     query_operation: Option<QueryFn>,
     unquery_operation: Option<UnqueryFn>,
     random_bytes: Option<RandomBytesFn>,
+    get_capabilities: Option<GetCapabilitiesFn>,
 }
 
 /// What changes as a provider is initialized and activated.
@@ -581,8 +589,10 @@ impl Functions {
             }
             // SAFETY: as above.
             OSSL_FUNC_PROVIDER_RANDOM_BYTES => self.random_bytes = Some(unsafe { cast(f) }),
-            // Capabilities come with the TLS groups and signature algorithms they describe.
-            OSSL_FUNC_PROVIDER_GET_CAPABILITIES => {}
+            OSSL_FUNC_PROVIDER_GET_CAPABILITIES => {
+                // SAFETY: as above.
+                self.get_capabilities = Some(unsafe { cast(f) });
+            }
             _ => {}
         }
     }
@@ -1284,6 +1294,28 @@ ffi_export! {
             // SAFETY: the provider's function with its context and the caller's array.
             Some(get) => unsafe { get(provctx, params) },
             None => 0,
+        }
+    }
+}
+
+ffi_export! {
+    /// Gives each parameter set of the provider's `capability` (`TLS-GROUP`, `TLS-SIGALG`) to
+    /// `cb`. The provider's result, or 1 if it has no `get_capabilities`.
+    ///
+    /// # Safety
+    /// `prov` is NULL or a live provider; `capability` NULL or a NUL-terminated string; `cb`
+    /// takes `arg`.
+    pub unsafe extern "C" fn OSSL_PROVIDER_get_capabilities(prov: *const OSSL_PROVIDER, capability: *const core::ffi::c_char, cb: rustyssl_abi::OSSL_CALLBACK, arg: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(p) = (unsafe { provider(prov) }) else { return 0 };
+        let (provctx, f) = p.functions();
+        match f.get_capabilities {
+            // SAFETY: the provider's function with its context and the caller's arguments; no
+            // lock is held.
+            Some(get) => unsafe { get(provctx, capability, cb, arg) },
+            None => 1,
         }
     }
 }

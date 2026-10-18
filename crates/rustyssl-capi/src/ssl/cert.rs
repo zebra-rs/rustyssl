@@ -580,7 +580,7 @@ ffi_callback! {
     ///
     /// # Safety
     /// `s` and `ctx` are NULL or live (one of them is set).
-    pub(crate) unsafe extern "C" fn default_security_callback(s: *const SSL, ctx: *const SSL_CTX, op: c_int, bits: c_int, nid: c_int, _other: *mut c_void, _ex: *mut c_void) -> c_int
+    pub(crate) unsafe extern "C" fn default_security_callback(s: *const SSL, ctx: *const SSL_CTX, op: c_int, bits: c_int, nid: c_int, other: *mut c_void, _ex: *mut c_void) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
         let level = if ctx.is_null() {
@@ -598,9 +598,7 @@ ffi_callback! {
         }
         match op {
             SSL_SECOP_CIPHER_SUPPORTED | SSL_SECOP_CIPHER_SHARED | SSL_SECOP_CIPHER_CHECK => {
-                // The cipher operations look into the SSL_CIPHER, which comes with the cipher
-                // suites.
-                crate::stub::unimplemented("the default security callback's cipher operations")
+                c_int::from(super::ciphers::cipher_allowed(other, bits, minbits, level))
             }
             SSL_SECOP_VERSION => {
                 // SAFETY: the caller's guarantee.
