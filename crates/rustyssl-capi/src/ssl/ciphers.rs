@@ -785,6 +785,20 @@ ffi_export! {
     }
 }
 
+/// A server's stack of the ClientHello's known suites (`peer_ciphers`), signalling values
+/// left out; `None` if it couldn't be made.
+pub(crate) fn peer_list(raw: &[u8]) -> Option<CipherStack> {
+    let found: Vec<&'static Cipher> = raw
+        .chunks_exact(2)
+        .filter_map(|e| match e {
+            &[hi, lo] => suites::by_protocol_id(u16::from_be_bytes([hi, lo])),
+            _ => None,
+        })
+        .filter(|c| c.valid)
+        .collect();
+    CipherStack::of(&found)
+}
+
 ffi_export! {
     /// Sets a new method on the context and rebuilds its lists from the defaults: 1, or 0
     /// (`SSL_R_SSL_LIBRARY_HAS_NO_CIPHERS`).

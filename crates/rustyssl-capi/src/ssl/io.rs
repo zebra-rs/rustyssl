@@ -168,6 +168,9 @@ pub(crate) struct Driver {
     pub(crate) early_data_state: EarlyDataState,
     /// The core's peer CA names that `SslState::peer_ca_names` was last made from.
     pub(crate) peer_ca_names: Option<Vec<Vec<u8>>>,
+    /// The last ClientHello's cipher suites seen, and whether `CipherLists::peer` is yet to be
+    /// made from them (once the hello is processed and a TLS 1.2 resumption is known).
+    pub(crate) peer_ciphers_raw: (Vec<u8>, bool),
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -295,6 +298,21 @@ unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    // A server's `peer_ciphers` (`bytes_to_cipher_list` of each ClientHello), which outlast
+    // the handshake (`SSL_get_client_ciphers`, `SSL_get_shared_ciphers`). OpenSSL keeps the
+    // old list when it resumes a TLS 1.2 session.
+    if let Some(raw) = c.raw_cipherlist()
+        && raw != st.drv.peer_ciphers_raw.0.as_slice()
+    {
+        st.drv.peer_ciphers_raw = (raw.to_vec(), true);
+    }
+    if st.drv.peer_ciphers_raw.1 && c.state() != rustyssl_abi::TLS_ST_SR_CLNT_HELLO {
+        st.drv.peer_ciphers_raw.1 = false;
+        let resumed12 = c.negotiated().reused && !c.is_tls13();
+        if !resumed12 && let Some(list) = super::ciphers::peer_list(&st.drv.peer_ciphers_raw.0) {
+            st.ciphers.peer = list;
+        }
+    }
     st.drv.early_data_state = c.early_data_state();
     let marks = c.rtt_marks();
     if marks != st.drv.rtt_marks {

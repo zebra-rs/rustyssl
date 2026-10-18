@@ -346,6 +346,9 @@ static void names(struct link *l)
     /* A resumed TLS 1.2 handshake reports the original's group (the session's). */
     printf("  group %s / %s\n", OBJ_nid2sn(SSL_get_negotiated_group(l->c)),
            OBJ_nid2sn(SSL_get_negotiated_group(l->s)));
+    /* The server's view of the ClientHello's suites, after the handshake. */
+    printf("  client's suites %d, shared %s\n", sk_SSL_CIPHER_num(SSL_get_client_ciphers(l->s)),
+           SSL_get_shared_ciphers(l->s, buf, sizeof(buf)) != NULL ? buf : "(none)");
     printf("  states: %s / %s, read %s / %s\n", SSL_state_string_long(l->c),
            SSL_state_string_long(l->s), SSL_rstate_string_long(l->c), SSL_rstate_string_long(l->s));
     printf("  suite %s (%s, %s) %s\n", SSL_CIPHER_get_name(ci), SSL_CIPHER_standard_name(ci),
