@@ -789,6 +789,16 @@ impl Connection {
         Some(e)
     }
 
+    /// The next queued report for the message or info callback, if that's what comes next:
+    /// what a step outside [`Connection::step`] (a DTLS retransmission on a timeout) raised,
+    /// which OpenSSL reports as it happens.
+    pub fn take_report(&mut self) -> Option<Event> {
+        match self.events.front() {
+            Some((Event::Message { .. } | Event::Info { .. }, _)) => self.pop_event(),
+            _ => None,
+        }
+    }
+
     /// Whether events are queued.
     pub(crate) fn has_events(&self) -> bool {
         !self.events.is_empty() || self.pending.is_some() && self.answer.is_none()

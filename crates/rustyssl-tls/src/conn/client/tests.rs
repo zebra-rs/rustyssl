@@ -2500,6 +2500,96 @@ fn dtls_loopback() {
     }
 }
 
+/// A seeded fault schedule for [`pair::handshake_dtls_faults`]: per end, about 20% of datagrams
+/// dropped (at most two in a row), 10% duplicated and 15% held back (reordered).
+fn fault_schedule(
+    seed: u64,
+) -> impl FnMut(crate::conn::pair::End, usize) -> crate::conn::pair::Fate {
+    use crate::conn::pair::{End, Fate};
+    let mut state = [seed ^ 0x5151, seed ^ 0xa3a3];
+    let mut drops = [0u32; 2];
+    move |e: End, _n: usize| {
+        let i = usize::from(matches!(e, End::Server));
+        let s = &mut state[i];
+        *s = s.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = *s;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^= z >> 31;
+        let f = match z % 100 {
+            0..20 if drops[i] < 2 => Fate::Drop,
+            20..30 => Fate::Duplicate,
+            30..45 => Fate::Delay,
+            _ => Fate::Deliver,
+        };
+        drops[i] = if f == Fate::Drop { drops[i] + 1 } else { 0 };
+        f
+    }
+}
+
+#[test]
+fn dtls_survives_drops_duplicates_and_reordering() {
+    use crate::conn::pair::{self, End};
+    for (version, mtu, suite) in [
+        (v::DTLS1_2, 1400, 0xc02f),
+        (v::DTLS1_2, 256, 0xc02f),
+        (v::DTLS1, 1400, 0xc013),
+    ] {
+        for seed in 0..200u64 {
+            let p = TestProvider::new(b"dtls-faults");
+            let s = suites::by_protocol_id(suite).unwrap();
+            let mut ccfg = dtls(client12(), version);
+            ccfg.security_level = 0;
+            ccfg.dtls_mtu = mtu;
+            ccfg.ciphers = vec![s];
+            let mut scfg = dtls(server_config(&p), version);
+            scfg.security_level = 0;
+            scfg.dtls_mtu = mtu;
+            scfg.ciphers = vec![s];
+            let mut client = Connection::new(ccfg);
+            let mut server = Connection::new(scfg);
+            let mut log = pair::Log::default();
+            let mut answer = |_: End, r: &Request| accept(r);
+            let mut fate = fault_schedule(seed);
+            let r = pair::handshake_dtls_faults(
+                &p,
+                &mut client,
+                &mut server,
+                &mut answer,
+                &mut fate,
+                64,
+                &mut log,
+            );
+            assert!(
+                r.is_ok(),
+                "version {version:04x} mtu {mtu} seed {seed}: {r:?}: server state {}, client \
+                 state {}",
+                server.state(),
+                client.state(),
+            );
+            assert_eq!(
+                client.negotiated().client_finished,
+                server.negotiated().client_finished,
+                "seed {seed}"
+            );
+            client.write_app(&p, b"ping").unwrap();
+            for d in client.take_datagrams() {
+                server.feed_datagram(&d);
+            }
+            let mut got = Vec::new();
+            for _ in 0..8 {
+                if server.step(&p, true).unwrap() == Event::AppData {
+                    let mut buf = [0u8; 16];
+                    let n = server.read_app(&mut buf, false);
+                    got.extend_from_slice(&buf[..n]);
+                    break;
+                }
+            }
+            assert_eq!(got, b"ping", "version {version:04x} mtu {mtu} seed {seed}");
+        }
+    }
+}
+
 #[test]
 fn dtls_survives_lost_datagrams() {
     use crate::conn::pair::{self, End};
