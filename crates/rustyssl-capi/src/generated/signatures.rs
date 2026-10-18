@@ -9548,6 +9548,207 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_it;
 const _: unsafe extern "C" fn() -> *mut OSSL_BASIC_ATTR_CONSTRAINTS =
     crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_new;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ATTRIBUTETYPEANDVALUE,
+) -> *mut OSSL_CRMF_ATTRIBUTETYPEANDVALUE = crate::crmf::asn::OSSL_CRMF_ATTRIBUTETYPEANDVALUE_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_ATTRIBUTETYPEANDVALUE) =
+    crate::crmf::asn::OSSL_CRMF_ATTRIBUTETYPEANDVALUE_free;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTID) -> *mut OSSL_CRMF_CERTID =
+    crate::crmf::asn::OSSL_CRMF_CERTID_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_CERTID) = crate::crmf::asn::OSSL_CRMF_CERTID_free;
+const _: unsafe extern "C" fn(*const X509_NAME, *const ASN1_INTEGER) -> *mut OSSL_CRMF_CERTID =
+    crate::crmf::msg::OSSL_CRMF_CERTID_gen;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTID) -> *const X509_NAME =
+    crate::crmf::msg::OSSL_CRMF_CERTID_get0_issuer;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTID) -> *const ASN1_INTEGER =
+    crate::crmf::msg::OSSL_CRMF_CERTID_get0_serialNumber;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_CERTID_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_CERTID = crate::crmf::asn::OSSL_CRMF_CERTID_new;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *mut OSSL_CRMF_CERTTEMPLATE =
+    crate::crmf::asn::OSSL_CRMF_CERTTEMPLATE_dup;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_CERTTEMPLATE,
+    *mut EVP_PKEY,
+    *const X509_NAME,
+    *const X509_NAME,
+    *const ASN1_INTEGER,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_fill;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_CERTTEMPLATE) =
+    crate::crmf::asn::OSSL_CRMF_CERTTEMPLATE_free;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *mut X509_EXTENSIONS =
+    crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_get0_extensions;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *const X509_NAME =
+    crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_get0_issuer;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *mut X509_PUBKEY =
+    crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_get0_publicKey;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *const ASN1_INTEGER =
+    crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_get0_serialNumber;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_CERTTEMPLATE) -> *const X509_NAME =
+    crate::crmf::msg::OSSL_CRMF_CERTTEMPLATE_get0_subject;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_CERTTEMPLATE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_CERTTEMPLATE =
+    crate::crmf::asn::OSSL_CRMF_CERTTEMPLATE_new;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_ENCRYPTEDKEY) =
+    crate::crmf::asn::OSSL_CRMF_ENCRYPTEDKEY_free;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDKEY,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+    core::ffi::c_uint,
+) -> *mut X509 = crate::crmf::msg::OSSL_CRMF_ENCRYPTEDKEY_get1_encCert;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDKEY,
+    *mut X509_STORE,
+    *mut stack_st_X509,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut ASN1_OCTET_STRING,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut EVP_PKEY = crate::crmf::msg::OSSL_CRMF_ENCRYPTEDKEY_get1_pkey;
+const _: unsafe extern "C" fn(*mut CMS_EnvelopedData) -> *mut OSSL_CRMF_ENCRYPTEDKEY =
+    crate::crmf::msg::OSSL_CRMF_ENCRYPTEDKEY_init_envdata;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_ENCRYPTEDKEY_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_ENCRYPTEDKEY =
+    crate::crmf::asn::OSSL_CRMF_ENCRYPTEDKEY_new;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDVALUE,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_uchar = crate::crmf::msg::OSSL_CRMF_ENCRYPTEDVALUE_decrypt;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_ENCRYPTEDVALUE) =
+    crate::crmf::asn::OSSL_CRMF_ENCRYPTEDVALUE_free;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDVALUE,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+) -> *mut X509 = crate::crmf::msg::OSSL_CRMF_ENCRYPTEDVALUE_get1_encCert;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_ENCRYPTEDVALUE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_ENCRYPTEDVALUE =
+    crate::crmf::asn::OSSL_CRMF_ENCRYPTEDVALUE_new;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSGS) = crate::crmf::asn::OSSL_CRMF_MSGS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_MSGS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_MSGS = crate::crmf::asn::OSSL_CRMF_MSGS_new;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_MSGS,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSGS_verify_popo;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_PKIPUBLICATIONINFO,
+    *mut OSSL_CRMF_SINGLEPUBINFO,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_PKIPublicationInfo_push0_SinglePubInfo;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG, *const X509_REQ) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_centralkeygen_requested;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut OSSL_CRMF_MSG,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_create_popo;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut OSSL_CRMF_MSG =
+    crate::crmf::asn::OSSL_CRMF_MSG_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG) = crate::crmf::asn::OSSL_CRMF_MSG_free;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut ASN1_UTF8STRING =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regCtrl_authenticator;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut OSSL_CRMF_CERTID =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regCtrl_oldCertID;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut OSSL_CRMF_PKIPUBLICATIONINFO =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regCtrl_pkiPublicationInfo;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut X509_PUBKEY =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regCtrl_protocolEncrKey;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut ASN1_UTF8STRING =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regCtrl_regToken;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut OSSL_CRMF_CERTREQUEST =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regInfo_certReq;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut ASN1_UTF8STRING =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_regInfo_utf8Pairs;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> *mut OSSL_CRMF_CERTTEMPLATE =
+    crate::crmf::msg::OSSL_CRMF_MSG_get0_tmpl;
+const _: unsafe extern "C" fn(*const OSSL_CRMF_MSG) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_get_certReqId;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_MSG_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_MSG = crate::crmf::asn::OSSL_CRMF_MSG_new;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *mut X509_EXTENSION) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_push0_extension;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_SINGLEPUBINFO,
+    core::ffi::c_int,
+    *mut GENERAL_NAME,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_set0_SinglePubInfo;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *mut X509_EXTENSIONS) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set0_extensions;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_MSG,
+    *mut ASN1_TIME,
+    *mut ASN1_TIME,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_set0_validity;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *const ASN1_UTF8STRING) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set1_regCtrl_authenticator;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *const OSSL_CRMF_CERTID) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set1_regCtrl_oldCertID;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_MSG,
+    *const OSSL_CRMF_PKIPUBLICATIONINFO,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_set1_regCtrl_pkiPublicationInfo;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *const X509_PUBKEY) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set1_regCtrl_protocolEncrKey;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *const ASN1_UTF8STRING) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set1_regCtrl_regToken;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_MSG,
+    *const OSSL_CRMF_CERTREQUEST,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_set1_regInfo_certReq;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, *const ASN1_UTF8STRING) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set1_regInfo_utf8Pairs;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_PKIPUBLICATIONINFO,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::crmf::msg::OSSL_CRMF_MSG_set_PKIPublicationInfo_action;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_MSG, core::ffi::c_int) -> core::ffi::c_int =
+    crate::crmf::msg::OSSL_CRMF_MSG_set_certReqId;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_PBMPARAMETER) =
+    crate::crmf::asn::OSSL_CRMF_PBMPARAMETER_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_PBMPARAMETER_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_PBMPARAMETER =
+    crate::crmf::asn::OSSL_CRMF_PBMPARAMETER_new;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_PKIPUBLICATIONINFO) =
+    crate::crmf::asn::OSSL_CRMF_PKIPUBLICATIONINFO_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::crmf::asn::OSSL_CRMF_PKIPUBLICATIONINFO_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_PKIPUBLICATIONINFO =
+    crate::crmf::asn::OSSL_CRMF_PKIPUBLICATIONINFO_new;
+const _: unsafe extern "C" fn(*mut OSSL_CRMF_SINGLEPUBINFO) =
+    crate::crmf::asn::OSSL_CRMF_SINGLEPUBINFO_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::crmf::asn::OSSL_CRMF_SINGLEPUBINFO_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CRMF_SINGLEPUBINFO =
+    crate::crmf::asn::OSSL_CRMF_SINGLEPUBINFO_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const OSSL_CRMF_PBMPARAMETER,
+    *const core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::crmf::pbm::OSSL_CRMF_pbm_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    usize,
+    core::ffi::c_int,
+    usize,
+    core::ffi::c_int,
+) -> *mut OSSL_CRMF_PBMPARAMETER = crate::crmf::pbm::OSSL_CRMF_pbmp_new;
 const _: unsafe extern "C" fn(*mut OSSL_DAY_TIME_BAND) =
     crate::x509v3::timespec::OSSL_DAY_TIME_BAND_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
@@ -16950,6 +17151,51 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut OSSL_BASIC_ATTR_CONSTRAINTS = crate::x509v3::acext::d2i_OSSL_BASIC_ATTR_CONSTRAINTS;
 const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_CERTID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_CERTID = crate::crmf::asn::d2i_OSSL_CRMF_CERTID;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_CERTTEMPLATE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_CERTTEMPLATE = crate::crmf::asn::d2i_OSSL_CRMF_CERTTEMPLATE;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_ENCRYPTEDKEY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_ENCRYPTEDKEY = crate::crmf::asn::d2i_OSSL_CRMF_ENCRYPTEDKEY;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_ENCRYPTEDVALUE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_ENCRYPTEDVALUE = crate::crmf::asn::d2i_OSSL_CRMF_ENCRYPTEDVALUE;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_MSG,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_MSG = crate::crmf::asn::d2i_OSSL_CRMF_MSG;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_MSGS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_MSGS = crate::crmf::asn::d2i_OSSL_CRMF_MSGS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_PBMPARAMETER,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_PBMPARAMETER = crate::crmf::asn::d2i_OSSL_CRMF_PBMPARAMETER;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_PKIPUBLICATIONINFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_PKIPUBLICATIONINFO = crate::crmf::asn::d2i_OSSL_CRMF_PKIPUBLICATIONINFO;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CRMF_SINGLEPUBINFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CRMF_SINGLEPUBINFO = crate::crmf::asn::d2i_OSSL_CRMF_SINGLEPUBINFO;
+const _: unsafe extern "C" fn(
     *mut *mut OSSL_DAY_TIME,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -17926,6 +18172,42 @@ const _: unsafe extern "C" fn(
     *const OSSL_BASIC_ATTR_CONSTRAINTS,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_BASIC_ATTR_CONSTRAINTS;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_CERTID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_CERTID;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_CERTTEMPLATE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_CERTTEMPLATE;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDKEY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_ENCRYPTEDKEY;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_ENCRYPTEDVALUE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_ENCRYPTEDVALUE;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_MSG,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_MSG;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_MSGS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_MSGS;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_PBMPARAMETER,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_PBMPARAMETER;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_PKIPUBLICATIONINFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_PKIPUBLICATIONINFO;
+const _: unsafe extern "C" fn(
+    *const OSSL_CRMF_SINGLEPUBINFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::crmf::asn::i2d_OSSL_CRMF_SINGLEPUBINFO;
 const _: unsafe extern "C" fn(
     *const OSSL_DAY_TIME,
     *mut *mut core::ffi::c_uchar,

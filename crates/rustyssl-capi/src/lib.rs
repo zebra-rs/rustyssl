@@ -21,6 +21,7 @@ mod buffer;
 mod cmac;
 mod cms;
 mod conf;
+mod crmf;
 mod ct;
 mod decoder;
 mod dh;
