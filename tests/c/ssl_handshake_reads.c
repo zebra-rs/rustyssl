@@ -408,7 +408,12 @@ static void test_servername_resume(int version, const char *first, const char *s
     pair(cctx, sctx, &c, &s);
     if (first != NULL)
         SSL_set_tlsext_host_name(c, first);
+    /* A name set on the server stands until its handshake. */
+    SSL_set_tlsext_host_name(s, "set.example");
+    printf("  server before its first handshake: %s\n",
+           name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
     check(handshake(c, s), "the first handshake");
+    printf("  server after it: %s\n", name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
     /* The client takes its tickets. */
     SSL_read(c, &b, 1);
     SSL_shutdown(c);

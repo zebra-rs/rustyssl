@@ -1353,13 +1353,15 @@ ffi_export! {
             if st.hit != 0 && !tls13 {
                 return session_name();
             }
-            // Else the name the client's hello carried (it replaces the one set on the
-            // connection), or the one set.
+            // Else the name the client's hello carried: a handshake clears the one set on the
+            // connection (`init_server_name`), which stands until then.
+            let started = st.drv.tls.as_ref().is_some_and(|c| !c.before());
+            let set = if started { None } else { st.hostname.as_deref() };
             return st
                 .drv
                 .servername
                 .as_deref()
-                .or(st.hostname.as_deref())
+                .or(set)
                 .map_or(ptr::null(), core::ffi::CStr::as_ptr);
         }
         // `SSL_in_before`.
