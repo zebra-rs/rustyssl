@@ -137,6 +137,9 @@ pub enum Request {
     PskSession {
         /// The identity received (server); empty for the client.
         identity: Vec<u8>,
+        /// The client's handshake hash after a HelloRetryRequest (`ssl_handshake_md`), else
+        /// `None`.
+        md: Option<crate::crypto::HashAlg>,
     },
     /// The OCSP status callback (client: check the stapled response; server: provide one).
     Status,

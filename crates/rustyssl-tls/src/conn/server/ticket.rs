@@ -719,6 +719,7 @@ pub(crate) fn parse_psk(
         if c.cfg.callbacks.psk_session {
             let r = Request::PskSession {
                 identity: identity.clone(),
+                md: None,
             };
             match ask_once(c, r, id) {
                 None => return Ok(Step::Wait),

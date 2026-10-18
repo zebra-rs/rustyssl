@@ -285,6 +285,14 @@ pub(crate) unsafe fn handle(
                 )
             })
         }
+        Request::PskSession { identity, md } => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::psk::session(s, x, &identity, md) })
+        }
+        Request::Psk { hint_or_identity } => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::psk::key(s, x, &hint_or_identity) })
+        }
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {

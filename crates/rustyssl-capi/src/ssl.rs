@@ -27,6 +27,7 @@ pub(crate) mod lists;
 pub(crate) mod method;
 pub(crate) mod misc;
 pub(crate) mod npn;
+pub(crate) mod psk;
 pub(crate) mod requests;
 pub(crate) mod sess_asn1;
 pub(crate) mod sess_cache;

@@ -831,7 +831,7 @@ fn der_of(x: *mut rustyssl_abi::X509) -> Option<Vec<u8>> {
 }
 
 /// A session's fields as the core's session.
-fn to_core(d: &SessData) -> Session {
+pub(crate) fn to_core(d: &SessData) -> Session {
     let mut chain = Vec::new();
     if !d.peer.is_null()
         && let Some(v) = der_of(d.peer)
