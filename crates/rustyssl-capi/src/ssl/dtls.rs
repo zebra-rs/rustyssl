@@ -326,6 +326,9 @@ pub(crate) unsafe fn handle_timeout(s: *mut SSL, x: &Ssl) -> c_int {
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { super::io::flush(x) };
             }
+            // The retransmitted records' reports (`-msg` shows them as they go).
+            // SAFETY: as above.
+            unsafe { super::io::deliver_reports(s, x) };
             v
         }
         Err(e) => {

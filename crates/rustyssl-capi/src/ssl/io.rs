@@ -1172,6 +1172,20 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
                     Input::Got => {}
+                    Input::Retry if dtls && x.state().in_init && super::dtls::expired(x) => {
+                        // `dtls1_read_failed`: the read stopped because the timer fired (a
+                        // blocking BIO's receive timeout is the timer's): during a handshake
+                        // the flight goes again and the read goes on.
+                        // SAFETY: as above.
+                        match unsafe { super::dtls::handle_timeout(s, x) } {
+                            r if r > 0 => continue,
+                            r if r < 0 => break Stop::Failed,
+                            _ => {
+                                x.state().rwstate = SSL_READING;
+                                break Stop::Retry;
+                            }
+                        }
+                    }
                     Input::Retry => {
                         // Application data that arrived during a renegotiation is returned
                         // first (`ssl3_read_bytes` with `in_read_app_data`) (fork M).
@@ -1314,6 +1328,35 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         unsafe { info(s, x, snap.as_ref(), exit, -1) };
     }
     stop
+}
+
+/// Delivers the reports a step outside the drive loop queued (a DTLS retransmission on a
+/// timeout) to the message and info callbacks, with no lock held, as OpenSSL calls them while
+/// it writes.
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+pub(crate) unsafe fn deliver_reports(s: *mut SSL, x: &Ssl) {
+    let snap = config::snapshot(x);
+    loop {
+        let ev = x.state().drv.tls.as_mut().and_then(|c| c.take_report());
+        match ev {
+            Some(Event::Message {
+                write,
+                version,
+                content_type,
+                bytes,
+            }) => {
+                // SAFETY: the caller's guarantee.
+                unsafe { message(s, x, write, version, content_type, &bytes) };
+            }
+            Some(Event::Info { where_, ret }) => {
+                // SAFETY: as above.
+                unsafe { info(s, x, snap.as_ref(), where_, ret) };
+            }
+            _ => break,
+        }
+    }
 }
 
 /// Calls the message callback with no lock held.
