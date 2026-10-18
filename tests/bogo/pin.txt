@@ -1,0 +1,6 @@
+# The BoringSSL source `cargo xtask test-bogo` takes BoGo's runner (ssl/test/runner) from:
+# https://github.com/google/boringssl (Apache-2.0), the archive of the commit below, checked
+# against its SHA-256 before use. The runner's Go dependencies are checked against the
+# archive's go.sum. To move to a newer commit, fetch its archive and replace both lines.
+commit 5e1bfb45c353b2bb36bdf26b006ea8f5566c82d5
+sha256 70c7678524db47b799a9b92cabf39485e4f5819314629e68942452b6e6ba832a

@@ -16,6 +16,7 @@ mod json;
 mod reference;
 mod targets;
 mod test_apps;
+mod test_bogo;
 mod test_c;
 mod test_differential;
 mod test_interop;
@@ -40,6 +41,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("usage-scan", "rank exported functions by how many distro packages import them"),
     ("test-c", "run the C conformance tests against the reference and target/dist"),
     ("test-apps", "run the reference's openssl tool on rustyssl and compare its output"),
+    ("test-bogo", "BoringSSL's TLS test runner (BoGo) with an OpenSSL-API shim, on both libraries"),
     ("test-interop", "TLS between the reference's s_server/s_client and rustyssl, in four pairings"),
     ("test-differential", "compare results against the reference OpenSSL"),
     ("test-openssl-suite", "run the upstream OpenSSL test suite against our libraries"),
@@ -65,6 +67,7 @@ fn main() -> ExitCode {
         Some("dist") => report("dist", dist::run(&rest)),
         Some("ref-openssl") => report("ref-openssl", reference::run(&rest)),
         Some("test-apps") => report("test-apps", test_apps::run(&rest)),
+        Some("test-bogo") => report("test-bogo", test_bogo::run(&rest)),
         Some("test-interop") => report("test-interop", test_interop::run(&rest)),
         Some("test-c") => report("test-c", test_c::run(&rest)),
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
