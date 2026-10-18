@@ -1102,6 +1102,10 @@ struct Server12<'a> {
     dh: Option<Box<dyn KeyShare>>,
     ms: Vec<u8>,
     ems: bool,
+    /// AES-128-CBC with HMAC-SHA1 and encrypt-then-MAC instead of AES-128-GCM.
+    cbc: bool,
+    /// A plain PSK suite's key.
+    psk: Option<Vec<u8>>,
 }
 
 impl<'a> Server12<'a> {
@@ -1119,6 +1123,8 @@ impl<'a> Server12<'a> {
             dh: None,
             ms: Vec::new(),
             ems: false,
+            cbc: false,
+            psk: None,
         }
     }
 
@@ -1196,7 +1202,10 @@ impl<'a> Server12<'a> {
     /// secret.
     fn client_key_exchange(&mut self, cke: &[u8], rsa: bool) {
         let body = &cke[4..];
-        let pms = if rsa {
+        let pms = if let Some(psk) = &self.psk {
+            let n = u16::try_from(psk.len()).unwrap().to_be_bytes();
+            [&n[..], &vec![0; psk.len()], &n, psk].concat()
+        } else if rsa {
             let ct = &body[2..];
             self.p
                 .rsa_decrypt_pms(self.key, ct, v::TLS1_2)
@@ -1240,20 +1249,32 @@ impl<'a> Server12<'a> {
     fn change_and_finish(&mut self) -> Vec<u8> {
         let fin = self.finished(false);
         self.transcript.extend_from_slice(&fin);
+        let (mac, iv) = if self.cbc { (20, 16) } else { (0, 4) };
         let kb = KeyBlock::new(
             self.p,
             PrfHash::Sha256,
             &self.ms,
             &self.server_random,
             &self.client_random,
-            0,
+            mac,
             16,
-            4,
+            iv,
         )
         .unwrap();
         let mut w = RecordWriter::new(v::TLS1_2);
-        w.set_protection(
-            Mode::Tls12(v::TLS1_2),
+        let prot = if self.cbc {
+            Protection::cbc12(
+                self.p,
+                crate::crypto::CipherAlg::Aes128Cbc,
+                kb.server_key.bytes(),
+                kb.server_iv.bytes(),
+                HashAlg::Sha1,
+                kb.server_mac.bytes(),
+                v::TLS1_2,
+                true,
+                true,
+            )
+        } else {
             Protection::aead12(
                 self.p,
                 AeadAlg::Aes128Gcm,
@@ -1261,8 +1282,9 @@ impl<'a> Server12<'a> {
                 kb.server_iv.bytes(),
                 0,
             )
-            .unwrap(),
-        );
+        }
+        .unwrap();
+        w.set_protection(Mode::Tls12(v::TLS1_2), prot);
         let mut out = record(20, &[1]);
         w.write(self.p, 22, &fin, &mut out).unwrap();
         out
@@ -2028,4 +2050,138 @@ fn loopback_with_the_server() {
             server.negotiated().client_finished
         );
     }
+}
+
+#[test]
+fn tls12_cbc_with_encrypt_then_mac() {
+    let p = TestProvider::new(b"tls12-etm");
+    let mut cfg = client12();
+    cfg.max_version = v::TLS1_2;
+    cfg.ciphers = vec![suites::by_protocol_id(0xc013).unwrap()];
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    assert_eq!(hello_ext(&s.transcript[4..], 0x0016), Some(Vec::new()));
+    s.cbc = true;
+    let mut input = s.hello(0xc013, &[7; 32], &[RI, EMS, (0x0016, &[])]);
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let [cke, fin] = &seen.written[..] else {
+        panic!("{}", seen.written.len())
+    };
+    s.client_key_exchange(cke, false);
+    assert_eq!(*fin, s.finished(true));
+    s.transcript.extend_from_slice(fin);
+    c.feed(&s.change_and_finish());
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(c.negotiated().etm);
+}
+
+#[test]
+fn tls12_psk() {
+    let p = TestProvider::new(b"tls12-psk");
+    let mut cfg = client12();
+    cfg.max_version = v::TLS1_2;
+    cfg.ciphers = vec![suites::by_protocol_id(0x00a8).unwrap()];
+    cfg.callbacks.psk = true;
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    let key = vec![0x42; 16];
+    s.psk = Some(key.clone());
+    let mut input = s.hello(0x00a8, &[7; 32], &[RI, EMS]);
+    input.extend(s.msg(hm::SERVER_KEY_EXCHANGE, &[0, 4, b'h', b'i', b'n', b't']));
+    input.extend(s.done());
+    c.feed(&input);
+    let mut give = |r: &Request| match r {
+        Request::Psk { hint_or_identity } => {
+            assert_eq!(hint_or_identity, b"hint");
+            Answer::Psk(Some(crate::conn::ExternalPsk {
+                identity: b"me".to_vec(),
+                key: key.clone(),
+                cipher_id: 0,
+            }))
+        }
+        _ => accept(r),
+    };
+    drive(&mut c, &p, false, &mut give, &mut seen).unwrap();
+    let [cke, fin] = &seen.written[..] else {
+        panic!("{}", seen.written.len())
+    };
+    assert_eq!(cke[4..], [0, 2, b'm', b'e']);
+    s.client_key_exchange(cke, false);
+    assert_eq!(*fin, s.finished(true));
+    s.transcript.extend_from_slice(fin);
+    c.feed(&s.change_and_finish());
+    assert_eq!(
+        drive(&mut c, &p, false, &mut give, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    // Without an answer from the callback there is no identity to send.
+    let mut cfg = client12();
+    cfg.max_version = v::TLS1_2;
+    cfg.ciphers = vec![suites::by_protocol_id(0x00a8).unwrap()];
+    cfg.callbacks.psk = true;
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    let mut input = s.hello(0x00a8, &[7; 32], &[RI, EMS]);
+    input.extend(s.done());
+    c.feed(&input);
+    let mut none = |r: &Request| match r {
+        Request::Psk { .. } => Answer::Psk(None),
+        _ => accept(r),
+    };
+    let e = loop {
+        match drive(&mut c, &p, false, &mut none, &mut seen) {
+            Err(e) => break e,
+            Ok(Event::NeedInput) => panic!("no error"),
+            Ok(_) => {}
+        }
+    };
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_PSK_IDENTITY_NOT_FOUND
+        )
+    );
+}
+
+#[test]
+fn tls12_next_protocol_negotiation() {
+    let p = TestProvider::new(b"tls12-npn");
+    let mut cfg = client12();
+    cfg.callbacks.npn = true;
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    assert_eq!(hello_ext(&s.transcript[4..], 0x3374), Some(Vec::new()));
+    let mut input = s.hello(
+        0xc02f,
+        &[7; 32],
+        &[RI, EMS, (0x3374, b"\x02h2\x08http/1.1")],
+    );
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    let mut pick = |r: &Request| match r {
+        Request::Npn { protos } => {
+            assert_eq!(protos, b"\x02h2\x08http/1.1");
+            Answer::Npn(Some(b"h2".to_vec()))
+        }
+        _ => accept(r),
+    };
+    drive(&mut c, &p, false, &mut pick, &mut seen).unwrap();
+    let [cke, np, fin] = &seen.written[..] else {
+        panic!("{}", seen.written.len())
+    };
+    // The protocol, then padding to make the two vectors' contents and lengths a multiple of
+    // 32 octets (`32 - (len + 2) % 32`).
+    assert_eq!(np[..8], [hm::NEXT_PROTO, 0, 0, 32, 2, b'h', b'2', 28]);
+    s.client_key_exchange(cke, false);
+    s.transcript.extend_from_slice(np);
+    assert_eq!(*fin, s.finished(true));
+    assert_eq!(c.negotiated().npn.as_deref(), Some(&b"h2"[..]));
 }
