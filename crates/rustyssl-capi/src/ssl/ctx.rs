@@ -229,6 +229,8 @@ pub(crate) struct Ctx {
     /// The application's data, at a fixed address for the `CRYPTO_*_ex_data` functions.
     ex_data: UnsafeCell<CRYPTO_EX_DATA>,
     state: Mutex<CtxState>,
+    /// The session cache (`sessions`, the expiry list, `stats`).
+    pub(crate) cache: super::sess_cache::Cache,
 }
 
 // SAFETY: the settings are behind the mutex; the parameters and the application data are
@@ -551,6 +553,7 @@ ffi_export! {
             // SAFETY: an all-zero `CRYPTO_EX_DATA` is the empty one `CRYPTO_new_ex_data` fills.
             ex_data: UnsafeCell::new(unsafe { core::mem::zeroed() }),
             state: Mutex::new(state),
+            cache: super::sess_cache::Cache::new(),
         });
         // SAFETY: the new context.
         let Some(x) = (unsafe { ctx(c) }) else { return ptr::null_mut() };
@@ -607,6 +610,9 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(held) = (unsafe { SSL_CTX::hold(c) }) else { return };
         if held.references.fetch_sub(1, Ordering::AcqRel) == 1 {
+            // The cache goes first, while the removal callback can still use the context.
+            // SAFETY: the context's last reference.
+            unsafe { super::sess_cache::flush(c, &held, 0) };
             // SAFETY: the context's own application data; its last reference.
             unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, c.cast(), held.ex_data()) };
         }
@@ -827,12 +833,13 @@ ffi_export! {
                 c_long::from(old)
             }
             SSL_CTRL_GET_SESS_CACHE_MODE => c_long::from(st.session_cache_mode),
-            // The session cache and its statistics come with sessions; until then they are
-            // empty, and every count is zero.
+            // The session cache's statistics (`sess_cache`).
             SSL_CTRL_SESS_NUMBER | SSL_CTRL_SESS_CONNECT | SSL_CTRL_SESS_CONNECT_GOOD
             | SSL_CTRL_SESS_CONNECT_RENEGOTIATE | SSL_CTRL_SESS_ACCEPT | SSL_CTRL_SESS_ACCEPT_GOOD
             | SSL_CTRL_SESS_ACCEPT_RENEGOTIATE | SSL_CTRL_SESS_HIT | SSL_CTRL_SESS_CB_HIT
-            | SSL_CTRL_SESS_MISSES | SSL_CTRL_SESS_TIMEOUTS | SSL_CTRL_SESS_CACHE_FULL => 0,
+            | SSL_CTRL_SESS_MISSES | SSL_CTRL_SESS_TIMEOUTS | SSL_CTRL_SESS_CACHE_FULL => {
+                super::sess_cache::stat_ctrl(x, cmd).unwrap_or(0)
+            }
             SSL_CTRL_MODE => {
                 st.mode |= u32::try_from(larg & 0xffff_ffff).unwrap_or(0);
                 c_long::from(st.mode)

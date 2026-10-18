@@ -157,6 +157,8 @@ pub(crate) struct SslState {
     pub(crate) ciphers: super::ciphers::CipherLists,
     /// The protocol engine and what it hands the application (`super::io`).
     pub(crate) drv: super::io::Driver,
+    /// The session (`session`) and the one a server's lookup found (`super::sess_cache`).
+    pub(crate) sess: super::sess_cache::Slot,
 }
 
 // SAFETY: the raw pointers are owned references to OpenSSL objects (or the application's
@@ -165,6 +167,8 @@ unsafe impl Send for SslState {}
 
 impl Drop for SslState {
     fn drop(&mut self) {
+        // A bad session leaves the cache while the contexts are still held.
+        super::sess_cache::on_free(self);
         // SAFETY: our own lists and memory, each NULL or live.
         unsafe { OPENSSL_sk_pop_free(self.ca_names.cast(), Some(ctx::name_free)) };
         // SAFETY: as above.
@@ -390,6 +394,7 @@ ffi_export! {
                 peer_ca_names: ptr::null_mut(),
                 ciphers,
                 drv: super::io::Driver::default(),
+                sess: super::sess_cache::Slot::default(),
             };
             st.reset();
             st
@@ -577,6 +582,9 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_NO_METHOD_SPECIFIED, "SSL_clear");
             return 0;
         };
+        // A bad session goes (a good one stays, to be resumed).
+        // SAFETY: the live connection; no lock is held.
+        unsafe { super::sess_cache::on_clear(x) };
         // The engine goes with the handshake (the session's peer certificates and cipher stay);
         // it's freed with no lock held, since freeing what it holds may run ex_data callbacks.
         let old = {
