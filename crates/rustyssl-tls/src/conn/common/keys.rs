@@ -179,6 +179,15 @@ pub fn generate_handshake_secret(
 /// # Errors
 /// The schedule isn't at the handshake stage, or the provider failed.
 pub fn generate_master_secret(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    // A client that deferred its handshake write keys (early data, middlebox compatibility)
+    // installs them after this, so their secret is kept now (shared fix, fork F; OpenSSL keeps
+    // the handshake secret itself).
+    let k = &c.hs.sh.keys;
+    if !c.cfg.server && k.client_hs_secret.is_empty() && !k.handshake_traffic_hash.is_empty() {
+        let sched = k.schedule.as_ref().ok_or_else(Error::internal)?;
+        let s = sched.client_handshake_traffic(p, &k.handshake_traffic_hash)?;
+        c.hs.sh.keys.client_hs_secret = s;
+    }
     let sched = c.hs.sh.keys.schedule.as_mut().ok_or_else(Error::internal)?;
     sched.into_master(p)
 }
@@ -261,10 +270,15 @@ pub fn change_cipher_state13(
     let (secret, label) = if handshake {
         if client_side {
             let h = c.hs.sh.keys.handshake_traffic_hash.clone();
-            (
-                sched.client_handshake_traffic(p, &h)?,
-                keylog::CLIENT_HANDSHAKE_TRAFFIC_SECRET,
-            )
+            let secret = match sched.client_handshake_traffic(p, &h) {
+                Ok(s) => s,
+                // Past the handshake stage: the secret kept by `generate_master_secret`.
+                Err(_) if !c.hs.sh.keys.client_hs_secret.is_empty() => {
+                    c.hs.sh.keys.client_hs_secret.clone()
+                }
+                Err(e) => return Err(e),
+            };
+            (secret, keylog::CLIENT_HANDSHAKE_TRAFFIC_SECRET)
         } else {
             (
                 sched.server_handshake_traffic(p, &current)?,

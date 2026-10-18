@@ -134,6 +134,9 @@ pub struct State {
     /// whose extensions come in another order than OpenSSL's), once their state is made.
     #[cfg(test)]
     pub(super) hello_override: Vec<Vec<u8>>,
+    /// The ClientHellos made in their place.
+    #[cfg(test)]
+    pub(super) made: Vec<Vec<u8>>,
 }
 
 impl core::fmt::Debug for State {
@@ -368,13 +371,17 @@ pub(crate) fn x509err2alert(result: i64) -> c_int {
 pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
     #[cfg(test)]
     let overrides = match &mut c.hs.role {
-        RoleState::Client(s) => core::mem::take(&mut s.hello_override),
-        _ => Vec::new(),
+        RoleState::Client(s) => (
+            core::mem::take(&mut s.hello_override),
+            core::mem::take(&mut s.made),
+        ),
+        _ => (Vec::new(), Vec::new()),
     };
     c.hs.role = RoleState::Client(Box::default());
     #[cfg(test)]
     {
-        state(c)?.hello_override = overrides;
+        let st = state(c)?;
+        (st.hello_override, st.made) = overrides;
     }
     c.hs.sh.status_type = if c.cfg.status_request {
         abi::TLSEXT_STATUSTYPE_ocsp

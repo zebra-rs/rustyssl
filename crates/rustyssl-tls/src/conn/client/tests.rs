@@ -100,7 +100,13 @@ fn drive(
     seen: &mut Seen,
 ) -> Result<Event, Error> {
     for _ in 0..10_000 {
-        let e = c.step(p, reading)?;
+        let e = c.step(p, reading).inspect_err(|_| {
+            eprintln!(
+                "DEBUG state {} {:?}",
+                c.state(),
+                seen.written.iter().map(|m| m[0]).collect::<Vec<_>>()
+            )
+        })?;
         match e {
             Event::Request(r) => {
                 let a = answer(&r);
@@ -332,4 +338,228 @@ fn openssls_client_hello() {
         let theirs = rfc_exts.iter().find(|e| e.typ == t).unwrap();
         assert_eq!(ours.body, theirs.body, "extension {t:#06x}");
     }
+}
+
+/// A ClientHello's random.
+fn random_of(ch: &[u8]) -> &[u8] {
+    &ch[6..38]
+}
+
+/// A ServerHello's key share (its encoded public value).
+fn server_share(sh: &[u8]) -> Vec<u8> {
+    let m = crate::msgs::hello::ServerHello::parse(&sh[4..], false).unwrap();
+    let exts = crate::msgs::ext::split(&m.extensions.unwrap()).unwrap();
+    let ks = exts.iter().find(|e| e.typ == 0x0033).unwrap();
+    crate::msgs::ext::key_share::parse_server(&ks.body)
+        .unwrap()
+        .key
+}
+
+/// The shared secret of `group` from the client's private key (`private`, drawn as the
+/// provider generates it) and the server's share.
+fn shared_of(p: &TestProvider, group: u16, private: &str, server: &[u8]) -> Vec<u8> {
+    use crate::crypto::Provider;
+    p.queue_random(&h(private));
+    let share = p.key_share(group).unwrap();
+    share.derive(server).unwrap().bytes().to_vec()
+}
+
+/// An extension's body in a ClientHello's body.
+fn hello_ext(body: &[u8], typ: u16) -> Option<Vec<u8>> {
+    crate::msgs::hello::ClientHello::parse(body, false)
+        .unwrap()
+        .extensions()
+        .unwrap()
+        .into_iter()
+        .find(|e| e.typ == typ)
+        .map(|e| e.body)
+}
+
+const S5_X25519_PRIVATE: &str = "0ed02f8e8117efc75ca7ac32aa7e34eda64cdc0ddad154a5e85289f959f63204";
+const S5_P256_PRIVATE: &str = "ab5473467e19346ceb0a0414e41da21d4d2445bc3025afe97c4e8dc8d513da39";
+
+#[test]
+fn rfc8448_section5_hello_retry_request() {
+    let p = TestProvider::new(b"rfc8448-5");
+    let ch1 = rfc("5", "ClientHello", 0);
+    let hrr = rfc("5", "ServerHello", 0);
+    let ch2 = rfc("5", "ClientHello", 1);
+    let sh = rfc("5", "ServerHello", 1);
+    p.queue_random(random_of(ch1));
+    p.queue_random(&h(S5_X25519_PRIVATE));
+    let mut c = with_hellos(rfc_client(), &[ch1, ch2]);
+    let mut seen = Seen::default();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    assert_eq!(seen.written, [ch1.to_vec()]);
+    // The HelloRetryRequest asks for P-256 and gives a cookie.
+    p.queue_random(&h(S5_P256_PRIVATE));
+    c.feed(&record(22, hrr));
+    seen.written.clear();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    assert_eq!(seen.written, [ch2.to_vec()]);
+    assert_eq!(c.handshake().sh.hrr, Hrr::Pending);
+    // The ClientHello the client made itself has the RFC's new share, its cookie, and its
+    // random.
+    let made = super::state_ref(&c).unwrap().made.clone();
+    let ours = &made[1];
+    assert_eq!(ours[2..34], *random_of(ch2));
+    assert_eq!(hello_ext(ours, 0x0033), hello_ext(&ch2[4..], 0x0033));
+    assert_eq!(hello_ext(ours, 0x002c), hello_ext(&ch2[4..], 0x002c));
+    // The transcript starts again with the first ClientHello's hash.
+    let msghash = crate::msgs::message_hash(&sha256(&p, ch1)).unwrap();
+    let shared = shared_of(&p, 0x0017, S5_P256_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[&msghash, hrr, ch2, sh]);
+    let flight = server.flight(
+        &p,
+        &[
+            rfc("5", "EncryptedExtensions", 0),
+            rfc("5", "Certificate", 0),
+            rfc("5", "CertificateVerify", 0),
+            rfc("5", "Finished", 0),
+        ],
+    );
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    seen.written.clear();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert_eq!(seen.written, [rfc("5", "Finished", 1).to_vec()]);
+    assert_eq!(c.negotiated().group, Some(0x0017));
+}
+
+const S4_CLIENT_PRIVATE: &str = "bff91188283846dd6a2134ef7180ca2b0b14fb10dce707b5098c0dddc813b2df";
+
+/// Section 3's session, from its NewSessionTicket.
+fn section3_session(p: &TestProvider) -> Session {
+    let (mut c, mut seen, mut server) = section3(p, rfc_client());
+    drive(&mut c, p, false, &mut accept, &mut seen).unwrap();
+    let nst = server.app(p, &[rfc("3", "NewSessionTicket", 0)]);
+    c.feed(&nst);
+    while drive(&mut c, p, true, &mut accept, &mut seen).unwrap() != Event::NeedInput {}
+    c.negotiated().session.clone()
+}
+
+#[test]
+fn rfc8448_section4_resumption_with_early_data() {
+    let p = TestProvider::new(b"rfc8448-4");
+    let session = section3_session(&p);
+    let ch = rfc("4", "ClientHello", 0);
+    let sh = rfc("4", "ServerHello", 0);
+    p.queue_random(random_of(ch));
+    p.queue_random(&h(S4_CLIENT_PRIVATE));
+    let mut cfg = rfc_client();
+    cfg.session = Some(session.clone());
+    let mut c = with_hellos(cfg, &[ch]);
+    c.hs.sh.early_data_state = EarlyDataState::Connecting;
+    let mut seen = Seen::default();
+    // The ClientHello, then the handshake pauses for the early data.
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert_eq!(seen.written, [ch.to_vec()]);
+    assert_eq!(c.state(), abi::TLS_ST_EARLY_DATA);
+    // The client's own ClientHello offered the ticket with an early_data extension; its binder
+    // over the RFC's ClientHello is the RFC's.
+    let made = super::state_ref(&c).unwrap().made[0].clone();
+    assert_eq!(hello_ext(&made, 0x002a), Some(Vec::new()));
+    let ours = crate::msgs::ext::psk::Strict::parse(&hello_ext(&made, 0x0029).unwrap()).unwrap();
+    let theirs =
+        crate::msgs::ext::psk::Strict::parse(&hello_ext(&ch[4..], 0x0029).unwrap()).unwrap();
+    assert_eq!(ours.identities[0].identity, theirs.identities[0].identity);
+    let cut = ch.len() - theirs.binders_len();
+    let (_, binder) = crate::conn::common::ext::psk_do_binder(
+        &c,
+        &p,
+        HashAlg::Sha256,
+        &ch[..cut],
+        &session.master_key,
+        false,
+        None,
+    )
+    .unwrap();
+    assert_eq!(binder, theirs.binders[0]);
+    // The early data is written; the handshake goes on.
+    c.write_app(&p, b"early").unwrap();
+    c.hs.sh.early_data_state = EarlyDataState::FinishedWriting;
+    c.start();
+    let shared = x25519(S4_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, Some(&session.master_key), &shared, &[ch, sh]);
+    let flight = server.flight(
+        &p,
+        &[rfc("4", "EncryptedExtensions", 0), rfc("4", "Finished", 0)],
+    );
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    seen.written.clear();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    // EndOfEarlyData and the Finished, as the RFC's.
+    assert_eq!(
+        seen.written,
+        [
+            rfc("4", "EndOfEarlyData", 0).to_vec(),
+            rfc("4", "Finished", 1).to_vec()
+        ]
+    );
+    assert!(c.negotiated().reused);
+    assert_eq!(
+        c.negotiated().early_data_status,
+        abi::SSL_EARLY_DATA_ACCEPTED
+    );
+}
+
+const S7_CLIENT_PRIVATE: &str = "dea00b45695dc781f19d34a62c1afd31ab4369af1e855a3bbb258d8442cde6d7";
+
+#[test]
+fn rfc8448_section7_compatibility_mode() {
+    let p = TestProvider::new(b"rfc8448-7");
+    let ch = rfc("7", "ClientHello", 0);
+    let sh = rfc("7", "ServerHello", 0);
+    p.queue_random(random_of(ch));
+    // The legacy_session_id, then the key share.
+    p.queue_random(&ch[39..71]);
+    p.queue_random(&h(S7_CLIENT_PRIVATE));
+    let mut cfg = rfc_client();
+    cfg.options |= abi::SSL_OP_ENABLE_MIDDLEBOX_COMPAT;
+    let mut c = with_hellos(cfg, &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let made = super::state_ref(&c).unwrap().made[0].clone();
+    assert_eq!(made[34], 32);
+    assert_eq!(made[35..67], ch[39..71]);
+    let shared = x25519(S7_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    let flight = server.flight(
+        &p,
+        &[
+            rfc("7", "EncryptedExtensions", 0),
+            rfc("7", "Certificate", 0),
+            rfc("7", "CertificateVerify", 0),
+            rfc("7", "Finished", 0),
+        ],
+    );
+    c.feed(&record(22, sh));
+    // The server's compatibility ChangeCipherSpec is ignored.
+    c.feed(&record(20, &[1]));
+    c.feed(&flight);
+    seen.written.clear();
+    seen.output.clear();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert_eq!(seen.written, [rfc("7", "Finished", 1).to_vec()]);
+    // The client's ChangeCipherSpec went first, in plaintext.
+    assert_eq!(seen.output[..6], [20, 3, 3, 0, 1, 1]);
 }

@@ -142,7 +142,9 @@ pub(super) fn construct_client_hello(c: &mut Connection, p: &dyn Provider) -> Re
     fill_binders(c, p, &mut body)?;
     #[cfg(test)]
     if !state(c)?.hello_override.is_empty() {
-        return Ok(Construct::Send(state(c)?.hello_override.remove(0)));
+        let st = state(c)?;
+        st.made.push(body);
+        return Ok(Construct::Send(st.hello_override.remove(0)));
     }
     Ok(Construct::Send(body))
 }
