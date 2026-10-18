@@ -10,6 +10,7 @@ pub mod event;
 pub mod statem;
 
 pub(crate) mod client;
+mod requests;
 #[expect(
     dead_code,
     reason = "the shared code, used as the role state machines arrive"
@@ -200,6 +201,14 @@ pub struct Connection {
     pub(crate) first_handshake: bool,
     /// Whether a renegotiation was requested.
     pub(crate) renegotiate: bool,
+    /// Whether `SSL_renegotiate` asked for one that hasn't started (`s->s3.renegotiate`), and
+    /// the renegotiations started since `SSL_clear_num_renegotiations` and in all
+    /// (`num_renegotiations`, `total_renegotiations`). Shared addition (fork M).
+    pub(crate) s3_renegotiate: bool,
+    /// See `s3_renegotiate`.
+    pub(crate) num_renegotiations: u32,
+    /// See `s3_renegotiate`.
+    pub(crate) total_renegotiations: u32,
     /// Whether the next record read is the first of the handshake (`s->first_packet`).
     pub(crate) first_packet: bool,
     /// Whether the record being read was an SSLv2-format ClientHello.
@@ -277,6 +286,9 @@ impl Connection {
             failed: None,
             first_handshake: true,
             renegotiate: false,
+            s3_renegotiate: false,
+            num_renegotiations: 0,
+            total_renegotiations: 0,
             first_packet: false,
             sslv2_record: false,
             change_cipher_spec: false,

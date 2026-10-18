@@ -65,6 +65,7 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_CONNECTION_TYPE_NOT_SET, F);
             return -1;
         }
+        super::super::requests::renegotiate_check(x, false);
         if !in_init(x) {
             // The handshake is done; its last flight may still be waiting for the BIO.
             // SAFETY: the live connection.
@@ -151,6 +152,7 @@ unsafe fn read_internal(
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
+    super::super::requests::renegotiate_check(x, false);
     loop {
         {
             let mut st = x.state();
@@ -294,6 +296,7 @@ unsafe fn write_internal(
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
+    super::super::requests::renegotiate_check(x, false);
     if in_init(x) {
         // SAFETY: as above.
         match unsafe { drive(s, x, false, function) } {
