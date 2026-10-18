@@ -65,6 +65,9 @@ struct bytes {
 
 #define MAX_INTS 64
 
+/* The X.509 credentials (-new-x509-credential), each its own certificate slot in OpenSSL. */
+#define MAX_CREDS 8
+
 struct ints {
     int v[MAX_INTS];
     size_t n;
@@ -113,6 +116,10 @@ struct config {
     int expect_hrr, expect_no_hrr, use_old_client_cert_callback;
     int use_ticket_callback, renew_ticket, skip_ticket;
     int dtls, mtu;
+    /* -cert-file and -key-file after a -new-x509-credential set the newest credential's. */
+    struct bytes cred_cert[MAX_CREDS], cred_key[MAX_CREDS];
+    int ncreds, in_cred;
+    int expect_selected_credential, expect_selected_credential_set;
 };
 
 enum kind { BOOL, INT, STR, B64, INTS, UNSUPPORTED };
@@ -209,6 +216,7 @@ static const struct flag FLAGS[] = {
     F("-handshake-twice", BOOL, handshake_twice),
     F("-no-op-extra-handshake", BOOL, no_op_extra_handshake),
     F("-expect-peer-cert-file", STR, expect_peer_cert_file),
+    F("-expect-selected-credential", INT, expect_selected_credential),
     F("-expect-no-peer-cert", BOOL, expect_no_peer_cert),
     F("-fail-cert-callback", BOOL, fail_cert_callback),
     F("-use-early-callback", BOOL, use_early_callback),
@@ -304,6 +312,8 @@ static int set_flag(struct config *c, const struct flag *f, const char *param)
         *(int *)base = (int)v;
         if (f->offset == offsetof(struct config, max_version))
             c->max_version_set = 1;
+        if (f->offset == offsetof(struct config, expect_selected_credential))
+            c->expect_selected_credential_set = 1;
         return 1;
     case STR:
         set_bytes((struct bytes *)base, (const unsigned char *)param, strlen(param));
@@ -365,6 +375,78 @@ static const struct flag *find_flag(const char *name)
     return NULL;
 }
 
+/* The flags a credential may carry besides its files: none has a per-certificate equivalent in
+ * OpenSSL's API, so they are unimplemented on a credential. */
+static const char *const CREDENTIAL_ONLY_FLAGS[] = {
+    "-signing-prefs", "-delegated-credential", "-ocsp-response", "-signed-cert-timestamps",
+    "-must-match-issuer", "-pake-context", "-pake-client-id", "-pake-server-id",
+    "-pake-password", "-wrong-pake-role", "-psk-importer-key", "-psk-importer-identity", NULL,
+};
+
+static void new_credential(struct config *c)
+{
+    if (c->ncreds >= MAX_CREDS)
+        unimplemented("more credentials");
+    c->ncreds++;
+    c->in_cred = 1;
+}
+
+static void credential_file(struct config *c, int key, const char *param)
+{
+    struct bytes *b = key ? &c->cred_key[c->ncreds - 1] : &c->cred_cert[c->ncreds - 1];
+
+    set_bytes(b, (const unsigned char *)param, strlen(param));
+}
+
+/*
+ * BoringSSL's stateful credential flags: -new-x509-credential starts a credential, and the
+ * -cert-file and -key-file after it are the credential's. Other kinds of credential (delegated,
+ * SPAKE2+, PSK, raw public key) are unimplemented. Whether the flag was one of these.
+ */
+static int credential_flag(int argc, char **argv, int *i, const char *name, int skip,
+                           struct config *only, struct config *initial, struct config *resume,
+                           struct config *retry)
+{
+    struct config *targets[3] = { initial, resume, retry };
+    const struct config *probe = only != NULL ? only : initial;
+    const char *const *p;
+    int key, t;
+
+    if (strcmp(name, "-new-x509-credential") == 0) {
+        if (skip)
+            return 1;
+        for (t = 0; t < 3; t++)
+            if (only == NULL || only == targets[t])
+                new_credential(targets[t]);
+        return 1;
+    }
+    if (strncmp(name, "-new-", 5) == 0 && strlen(name) > 16
+        && strcmp(name + strlen(name) - 11, "-credential") == 0)
+        unimplemented(name);
+    if (!probe->in_cred)
+        return 0;
+    for (p = CREDENTIAL_ONLY_FLAGS; *p != NULL; p++)
+        if (strcmp(*p, name) == 0) {
+            static char what[128];
+
+            snprintf(what, sizeof(what), "%s on a credential", name);
+            unimplemented(what);
+        }
+    key = strcmp(name, "-key-file") == 0;
+    if (!key && strcmp(name, "-cert-file") != 0)
+        return 0;
+    if (++*i >= argc) {
+        fprintf(stderr, "Missing parameter for %s\n", name);
+        exit(1);
+    }
+    if (skip)
+        return 1;
+    for (t = 0; t < 3; t++)
+        if (only == NULL || only == targets[t])
+            credential_file(targets[t], key, argv[*i]);
+    return 1;
+}
+
 /* Parses the arguments into the three configurations; exits 89 on an unimplemented flag. */
 static void parse(int argc, char **argv, struct config *initial, struct config *resume,
                   struct config *retry)
@@ -396,6 +478,8 @@ static void parse(int argc, char **argv, struct config *initial, struct config *
             initial->shim_id = resume->shim_id = retry->shim_id = strtoull(argv[i], NULL, 10);
             continue;
         }
+        if (credential_flag(argc, argv, &i, name, skip, only, initial, resume, retry))
+            continue;
         f = find_flag(name);
         if (f == NULL) {
             const char *const *p;
@@ -1066,12 +1150,45 @@ static SSL_CTX *new_ctx(int dtls)
 
 static int load_credential(SSL *ssl, const struct config *c)
 {
+    int i;
+
     if (c->cert_file.set && SSL_use_certificate_chain_file(ssl, (char *)c->cert_file.data) != 1)
         return 0;
     if (c->key_file.set
         && SSL_use_PrivateKey_file(ssl, (char *)c->key_file.data, SSL_FILETYPE_PEM) != 1)
         return 0;
+    for (i = 0; i < c->ncreds; i++) {
+        if (!c->cred_cert[i].set || !c->cred_key[i].set)
+            unimplemented("a credential without a certificate and key");
+        if (SSL_use_certificate_chain_file(ssl, (char *)c->cred_cert[i].data) != 1
+            || SSL_use_PrivateKey_file(ssl, (char *)c->cred_key[i].data, SSL_FILETYPE_PEM) != 1)
+            return 0;
+    }
     return 1;
+}
+
+/*
+ * The credential this end used (-expect-selected-credential): the index of the credential whose
+ * certificate is the one SSL_get_certificate reports, else -1 (the legacy one, or none).
+ */
+static int selected_credential(SSL *ssl, const struct config *c)
+{
+    X509 *used = SSL_get_certificate(ssl);
+    int i;
+
+    if (used == NULL)
+        return -1;
+    for (i = 0; i < c->ncreds; i++) {
+        BIO *in = BIO_new_file((char *)c->cred_cert[i].data, "r");
+        X509 *x = in != NULL ? PEM_read_bio_X509(in, NULL, NULL, NULL) : NULL;
+        int same = x != NULL && X509_cmp(x, used) == 0;
+
+        X509_free(x);
+        BIO_free(in);
+        if (same)
+            return i;
+    }
+    return -1;
 }
 
 static SSL *new_ssl(SSL_CTX *ctx, const struct config *c, struct state *st, SSL_SESSION *session)
@@ -1409,6 +1526,15 @@ static int check_handshake(SSL *ssl, int is_resume)
     }
     if (c->expect_peer_cert_file.set && !check_peer_cert(ssl, c))
         return 0;
+    if (c->expect_selected_credential_set) {
+        int used = selected_credential(ssl, c);
+
+        if (used != c->expect_selected_credential) {
+            fprintf(stderr, "Credential %d was used, wanted %d\n", used,
+                    c->expect_selected_credential);
+            return 0;
+        }
+    }
     if (c->expect_no_peer_cert) {
         X509 *peer = SSL_get1_peer_certificate(ssl);
 
