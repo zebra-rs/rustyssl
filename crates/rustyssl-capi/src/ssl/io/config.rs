@@ -944,6 +944,8 @@ pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
             cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
         }),
         cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
+        // The settings are read afresh when a client renegotiates.
+        renegotiating: true,
         tmp_dh: st.cert.dh_tmp_cb.is_some(),
         srp_username: st.srp.username_cb_set(),
         psk: super::super::psk::flags(st).0,

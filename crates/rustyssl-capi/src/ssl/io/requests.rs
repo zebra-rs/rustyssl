@@ -252,6 +252,11 @@ pub(crate) unsafe fn handle(
         }
         // SAFETY: as above.
         Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
+        Request::Renegotiating => {
+            // SAFETY: as above.
+            unsafe { super::config::refresh_handshake_settings(s, x) };
+            Some(Answer::Continue)
+        }
         Request::SessionTicketExt { data } => {
             // SAFETY: as above.
             Some(unsafe { super::super::eap::ticket_ext(s, x, &data) })

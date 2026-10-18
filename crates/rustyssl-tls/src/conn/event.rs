@@ -65,6 +65,9 @@ pub struct Callbacks {
     pub tmp_dh: bool,
     /// `SSL_CTX_set_srp_username_callback` (a server's `TLS_ext_srp_username_callback`).
     pub srp_username: bool,
+    /// Whether the caller refreshes the settings when a server's renegotiation starts
+    /// ([`Request::Renegotiating`]).
+    pub renegotiating: bool,
 }
 
 /// A TLS 1.2 SRP server's parameters (RFC 5054): N, g, the salt, and B, each as
@@ -243,6 +246,11 @@ pub enum Request {
     /// OpenSSL's alert and reason, which stops the handshake only with `SSL_VERIFY_PEER`
     /// (shared addition, fork F).
     CtValidate,
+    /// A server's renegotiation is starting (the client's new ClientHello arrived): the
+    /// handshake reads the connection's settings as they are now, as OpenSSL reads them from
+    /// the connection (`SSL_set_options`, `SSL_set_cipher_list`, ... since the last
+    /// handshake), so the configuration is brought up to date. Answered [`Answer::Continue`].
+    Renegotiating,
     /// A TLS 1.2 SRP server's username callback once a suite is chosen
     /// (`ssl_srp_server_param_with_username`), with the client's login: the callback sets the
     /// user's N, g, salt and verifier (`SSL_set_srp_server_param`), and B is made from them.

@@ -1875,6 +1875,34 @@ fn tls12_client_renegotiation_refused_by_default() {
 }
 
 #[test]
+fn a_client_renegotiation_asks_for_fresh_settings() {
+    let p = TestProvider::new(b"reneg-refresh");
+    let mut cfg = server_config(&p);
+    cfg.options |= abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION;
+    cfg.callbacks.renegotiating = true;
+    let (mut c, mut client, _) = handshake12(&p, cfg, &hello12(&[0xc02f]));
+    let h = no_scsv(hello12(&[0xc02f])).with(
+        t::RENEGOTIATE,
+        crate::msgs::ext::renegotiate::encode(&client.c.neg.client_finished).unwrap(),
+    );
+    client
+        .c
+        .write_record(&p, record::content_type::handshake(), &h.msg())
+        .unwrap();
+    c.feed(&client.c.take_output());
+    assert_eq!(c.step(&p, true).unwrap(), Event::NeedInput);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::Request(Request::Renegotiating));
+    // Renegotiation turned off since the first handshake: the server now refuses it.
+    c.config_mut().options |= abi::SSL_OP_NO_RENEGOTIATION;
+    c.answer(crate::conn::Answer::Continue);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert!(!out.is_empty());
+    assert_eq!(c.alerts().0, Some((1, 100)));
+}
+
+#[test]
 fn cve_2021_3449_renegotiation_without_signature_algorithms() {
     // OpenSSL 1.1.1h-j crashed on a renegotiating ClientHello that left out
     // signature_algorithms but kept signature_algorithms_cert: the old list was freed, its
