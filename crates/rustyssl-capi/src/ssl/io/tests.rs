@@ -24,7 +24,7 @@ fn records_split_anywhere() {
 #[test]
 fn records_in_one_read() {
     let mut d = Driver::default();
-    track_records(&mut d, false, &[23, 3, 3, 0, 4, 9, 9, 23, 3, 3, 1]);
+    track_records(&mut d, false, &[23, 3, 3, 0, 2, 9, 9, 23, 3, 3, 1]);
     // The second record's header is still incomplete.
     assert_eq!(d.rec_left, 0);
     assert_eq!(d.rec_header, [23, 3, 3, 1]);

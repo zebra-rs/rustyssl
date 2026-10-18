@@ -36,14 +36,24 @@ fn alert(v: c_int) -> Option<u8> {
 ///
 /// # Safety
 /// `x` is a live connection.
-pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, req: Request) -> Option<Answer> {
+pub(crate) unsafe fn handle(
+    s: *mut SSL,
+    x: &Ssl,
+    snap: Option<&CtxSnapshot>,
+    req: Request,
+) -> Option<Answer> {
     match req {
         // SAFETY: the caller's guarantee.
         Request::Verify { .. } => unsafe { verify(s, x, snap) },
         Request::Servername => {
-            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.servername_cb, c.servername_arg));
+            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
+                (c.servername_cb, c.servername_arg)
+            });
             let Some(cb) = cb else {
-                return Some(Answer::Tlsext { ret: rustyssl_abi::SSL_TLSEXT_ERR_NOACK, alert: SSL_AD_UNRECOGNIZED_NAME });
+                return Some(Answer::Tlsext {
+                    ret: rustyssl_abi::SSL_TLSEXT_ERR_NOACK,
+                    alert: SSL_AD_UNRECOGNIZED_NAME,
+                });
             };
             // SAFETY: the servername callback's real type, as SSL_CTX_callback_ctrl stored it.
             let cb: unsafe extern "C" fn(*mut SSL, *mut c_int, *mut c_void) -> c_int =
@@ -56,15 +66,28 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
             Some(Answer::Tlsext { ret, alert: al })
         }
         Request::AlpnSelect { protos } => {
-            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.alpn_select_cb, c.alpn_select_cb_arg));
-            let Some(cb) = cb else { return Some(Answer::Alpn(None)) };
+            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
+                (c.alpn_select_cb, c.alpn_select_cb_arg)
+            });
+            let Some(cb) = cb else {
+                return Some(Answer::Alpn(None));
+            };
             let Ok(inlen) = u32::try_from(protos.len()) else {
                 return Some(Answer::Alpn(None));
             };
             let mut out: *const c_uchar = ptr::null();
             let mut outlen: c_uchar = 0;
             // SAFETY: the application's callback with the client's list; no lock is held.
-            let ret = unsafe { cb(s, &raw mut out, &raw mut outlen, protos.as_ptr(), inlen, arg) };
+            let ret = unsafe {
+                cb(
+                    s,
+                    &raw mut out,
+                    &raw mut outlen,
+                    protos.as_ptr(),
+                    inlen,
+                    arg,
+                )
+            };
             if ret == SSL_TLSEXT_ERR_OK && !out.is_null() {
                 // SAFETY: the protocol the callback chose, `outlen` octets.
                 let p = unsafe { core::slice::from_raw_parts(out, usize::from(outlen)) }.to_vec();
@@ -79,8 +102,12 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
             Some(Answer::Alpn(None))
         }
         Request::ClientHello => {
-            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.client_hello_cb, c.client_hello_cb_arg));
-            let Some(cb) = cb else { return Some(Answer::Continue) };
+            let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
+                (c.client_hello_cb, c.client_hello_cb_arg)
+            });
+            let Some(cb) = cb else {
+                return Some(Answer::Continue);
+            };
             let mut al = SSL_AD_INTERNAL_ERROR;
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, &raw mut al, arg) };
@@ -92,7 +119,10 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
                     None
                 }
                 SSL_CLIENT_HELLO_SUCCESS => Some(Answer::Continue),
-                _ => Some(Answer::Fail { alert: alert(al), reason: SSL_R_CALLBACK_FAILED }),
+                _ => Some(Answer::Fail {
+                    alert: alert(al),
+                    reason: SSL_R_CALLBACK_FAILED,
+                }),
             }
         }
         Request::Cert => {
@@ -100,7 +130,9 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
                 let st = x.state();
                 (st.cert.cert_cb, st.cert.cert_cb_arg)
             };
-            let Some(cb) = cb else { return Some(Answer::Continue) };
+            let Some(cb) = cb else {
+                return Some(Answer::Continue);
+            };
             // SAFETY: the application's callback; no lock is held.
             let rv = unsafe { cb(s, arg) };
             if rv < 0 {
@@ -108,14 +140,19 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
                 return None;
             }
             if rv == 0 {
-                return Some(Answer::Fail { alert: alert(SSL_AD_INTERNAL_ERROR), reason: SSL_R_CERT_CB_ERROR });
+                return Some(Answer::Fail {
+                    alert: alert(SSL_AD_INTERNAL_ERROR),
+                    reason: SSL_R_CERT_CB_ERROR,
+                });
             }
             // SAFETY: as above.
             unsafe { refresh_certs(x, snap) };
             Some(Answer::Continue)
         }
         Request::ClientCert => {
-            let Some(cb) = snap.and_then(|c| c.client_cert_cb) else { return Some(Answer::Continue) };
+            let Some(cb) = snap.and_then(|c| c.client_cert_cb) else {
+                return Some(Answer::Continue);
+            };
             let mut cert: *mut X509 = ptr::null_mut();
             let mut key: *mut EVP_PKEY = ptr::null_mut();
             // SAFETY: the application's callback with the slots; no lock is held.
@@ -148,26 +185,36 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
                 let st = x.state();
                 (st.record_padding_cb, st.record_padding_arg)
             };
-            let Some(cb) = cb else { return Some(Answer::Padding(0)) };
+            let Some(cb) = cb else {
+                return Some(Answer::Padding(0));
+            };
             // SAFETY: the application's callback; no lock is held.
-            Some(Answer::Padding(unsafe { cb(s, c_int::from(content_type), len, arg) }))
+            Some(Answer::Padding(unsafe {
+                cb(s, c_int::from(content_type), len, arg)
+            }))
         }
         Request::AllowEarlyData => {
             let (cb, arg) = {
                 let st = x.state();
                 (st.allow_early_data_cb, st.allow_early_data_cb_data)
             };
-            let Some(cb) = cb else { return Some(Answer::Allowed(true)) };
+            let Some(cb) = cb else {
+                return Some(Answer::Allowed(true));
+            };
             // SAFETY: the application's callback; no lock is held.
             Some(Answer::Allowed(unsafe { cb(s, arg) } != 0))
         }
         Request::Status => {
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.status_cb, c.status_arg));
             let Some(cb) = cb else {
-                return Some(Answer::Status { ret: 1, response: None });
+                return Some(Answer::Status {
+                    ret: 1,
+                    response: None,
+                });
             };
             // SAFETY: the status callback's real type, as SSL_CTX_callback_ctrl stored it.
-            let cb: unsafe extern "C" fn(*mut SSL, *mut c_void) -> c_int = unsafe { core::mem::transmute(cb) };
+            let cb: unsafe extern "C" fn(*mut SSL, *mut c_void) -> c_int =
+                unsafe { core::mem::transmute(cb) };
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, arg) };
             let response = {
@@ -196,8 +243,12 @@ pub(crate) unsafe fn handle(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, re
 unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
     // The context may have changed (`SSL_set_SSL_CTX` from the servername callback).
     let fresh = config::snapshot(x);
-    let Some(snap) = fresh.as_ref().or(snap) else { return };
-    let Some(prov) = x.state().drv.provider.clone() else { return };
+    let Some(snap) = fresh.as_ref().or(snap) else {
+        return;
+    };
+    let Some(prov) = x.state().drv.provider.clone() else {
+        return;
+    };
     // SAFETY: the connection; the context's snapshot.
     let (certs, current) = unsafe { config::certs(x, snap, &prov) };
     let mut st = x.state();
@@ -223,7 +274,9 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
         X509_STORE_CTX_get1_chain, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
         X509_STORE_CTX_set_default, X509_STORE_CTX_set_ex_data, X509_STORE_CTX_set_verify_cb,
     };
-    use crate::x509::vpm::{X509_VERIFY_PARAM_move_peername, X509_VERIFY_PARAM_set_auth_level, X509_VERIFY_PARAM_set1};
+    use crate::x509::vpm::{
+        X509_VERIFY_PARAM_move_peername, X509_VERIFY_PARAM_set_auth_level, X509_VERIFY_PARAM_set1,
+    };
     const F: &str = "ssl_verify_cert_chain";
     let Some(snap) = snap else {
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
@@ -232,8 +285,19 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
     let (chain, store, verify_cb, server, verify_mode, level) = {
         let mut st = x.state();
         st.rwstate = rustyssl_abi::SSL_NOTHING;
-        let store = if st.cert.verify_store.is_null() { snap.cert_store } else { st.cert.verify_store };
-        (st.drv.peer.chain, store, st.verify_callback, st.server, st.verify_mode, st.cert.sec_level)
+        let store = if st.cert.verify_store.is_null() {
+            snap.cert_store
+        } else {
+            st.cert.verify_store
+        };
+        (
+            st.drv.peer.chain,
+            store,
+            st.verify_callback,
+            st.server,
+            st.verify_mode,
+            st.cert.sec_level,
+        )
     };
     // SAFETY: our stack of the peer's certificates, or NULL (-1).
     let n = unsafe { OPENSSL_sk_num(chain.cast()) };
@@ -249,7 +313,11 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
     let ctx = unsafe { X509_STORE_CTX_new_ex(snap.libctx, snap.propq()) };
     if ctx.is_null() {
         err::raise(ERR_LIB_SSL, ERR_R_X509_LIB, F);
-        return Some(Answer::Verified { result: 0, proceed: false, verified_chain: Vec::new() });
+        return Some(Answer::Verified {
+            result: 0,
+            proceed: false,
+            verified_chain: Vec::new(),
+        });
     }
     // SAFETY: the chain's first certificate (index in range).
     let leaf: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), 0) }.cast();
@@ -258,7 +326,11 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
         err::raise(ERR_LIB_SSL, ERR_R_X509_LIB, F);
         // SAFETY: made above.
         unsafe { X509_STORE_CTX_free(ctx) };
-        return Some(Answer::Verified { result: 0, proceed: false, verified_chain: Vec::new() });
+        return Some(Answer::Verified {
+            result: 0,
+            proceed: false,
+            verified_chain: Vec::new(),
+        });
     }
     // SAFETY: the context's parameters.
     let param = unsafe { X509_STORE_CTX_get0_param(ctx) };
@@ -315,6 +387,8 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
     let old = {
         let mut st = x.state();
         st.verify_result = core::ffi::c_long::from(result);
+        // The peer's certificate is its own only once the chain is accepted.
+        st.drv.peer.accepted = i > 0 || proceed_anyway;
         core::mem::replace(&mut st.drv.peer.verified, verified)
     };
     // SAFETY: the previous verified chain, ours, freed with no lock held.

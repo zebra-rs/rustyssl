@@ -577,12 +577,13 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_NO_METHOD_SPECIFIED, "SSL_clear");
             return 0;
         };
-        // The engine (and the peer's certificates) go with the handshake; they're freed with no
-        // lock held, since freeing an X509 may run ex_data callbacks.
+        // The engine goes with the handshake (the session's peer certificates and cipher stay);
+        // it's freed with no lock held, since freeing what it holds may run ex_data callbacks.
         let old = {
             let mut st = x.state();
             st.reset();
-            core::mem::take(&mut st.drv)
+            let kept = st.drv.clear();
+            core::mem::replace(&mut st.drv, kept)
         };
         drop(old);
         // SAFETY: the connection's parameters.

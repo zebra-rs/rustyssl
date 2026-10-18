@@ -57,8 +57,12 @@ pub(crate) struct PeerCerts {
     pub(crate) from: usize,
     /// The chain, leaf first (owned stack and references), or NULL.
     pub(crate) chain: *mut stack_st_X509,
-    /// The chain without the leaf (a server's `SSL_get_peer_cert_chain`), or NULL.
+    /// What `SSL_get_peer_cert_chain` reports (owned): the chain on a client, the chain
+    /// without the leaf on a server; or NULL.
     pub(crate) chain_no_leaf: *mut stack_st_X509,
+    /// Whether verification accepted the chain, which makes its leaf the peer's certificate
+    /// (`SSL_get0_peer_certificate`).
+    pub(crate) accepted: bool,
     /// The chain verification built (owned), or NULL.
     pub(crate) verified: *mut stack_st_X509,
 }
@@ -69,6 +73,7 @@ impl Default for PeerCerts {
             from: 0,
             chain: ptr::null_mut(),
             chain_no_leaf: ptr::null_mut(),
+            accepted: false,
             verified: ptr::null_mut(),
         }
     }
@@ -89,6 +94,24 @@ impl Drop for PeerCerts {
 pub(crate) unsafe extern "C" fn x509_free(p: *mut c_void) {
     // SAFETY: a certificate of the stack, which the stack owned.
     unsafe { X509_free(p.cast()) };
+}
+
+impl Driver {
+    /// What `SSL_clear` leaves: the session's part (the peer's certificates and the cipher),
+    /// with everything else back to its start. `self` keeps the rest, to be freed with no lock
+    /// held.
+    pub(crate) fn clear(&mut self) -> Self {
+        let cipher = self
+            .tls
+            .as_ref()
+            .and_then(|c| c.negotiated().cipher)
+            .or(self.kept_cipher);
+        Self {
+            peer: core::mem::take(&mut self.peer),
+            kept_cipher: cipher,
+            ..Self::default()
+        }
+    }
 }
 
 /// The core connection and what the driver keeps beside it.
@@ -121,6 +144,9 @@ pub(crate) struct Driver {
     pub(crate) rec_left: usize,
     /// Whether any record has been read (only the first may be an SSLv2 ClientHello).
     pub(crate) first_record_done: bool,
+    /// The cipher of a connection `SSL_clear` reset: OpenSSL keeps the session, and
+    /// `SSL_get_current_cipher` reports its cipher until a new handshake replaces it.
+    pub(crate) kept_cipher: Option<&'static rustyssl_tls::suites::Cipher>,
 }
 
 // SAFETY: the raw pointers are owned references (stacks of certificates) used under the
@@ -144,7 +170,12 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
     let alert_reasons = SSL_AD_REASON_OFFSET..SSL_AD_REASON_OFFSET.saturating_add(256);
     if !e.library_reason && alert_reasons.contains(&e.reason) {
         let desc = e.reason.saturating_sub(SSL_AD_REASON_OFFSET);
-        err::raise_with_text(ERR_LIB_SSL, e.reason, function, &format!("SSL alert number {desc}"));
+        err::raise_with_text(
+            ERR_LIB_SSL,
+            e.reason,
+            function,
+            &format!("SSL alert number {desc}"),
+        );
     } else if let Some(d) = e.data {
         err::raise_with_text(ERR_LIB_SSL, e.reason, function, d);
     } else {
@@ -161,7 +192,8 @@ fn mirror(st: &mut SslState, c: &Connection) {
     if n.cipher.is_some() {
         st.version = c_int::from(n.version);
     }
-    st.shutdown = c_int::try_from(c.shutdown_state()).unwrap_or(0) | (st.shutdown & SSL_RECEIVED_SHUTDOWN);
+    st.shutdown =
+        c_int::try_from(c.shutdown_state()).unwrap_or(0) | (st.shutdown & SSL_RECEIVED_SHUTDOWN);
     st.verify_result = c_long::try_from(n.verify_result).unwrap_or(c_long::MAX);
     st.hit = c_int::from(n.reused);
     let h = c.handshake();
@@ -186,7 +218,11 @@ fn mirror(st: &mut SslState, c: &Connection) {
     }
     if st.server
         && let Some(name) = &n.servername
-        && st.drv.servername.as_ref().is_none_or(|old| old.as_bytes() != name.as_slice())
+        && st
+            .drv
+            .servername
+            .as_ref()
+            .is_none_or(|old| old.as_bytes() != name.as_slice())
     {
         st.drv.servername = CString::new(name.clone()).ok();
     }
@@ -199,13 +235,18 @@ fn peer_objects(c: &Connection, have: usize, server: bool) -> Option<PeerCerts> 
     if n.peer_chain.len() == have {
         return None;
     }
-    let mut p = PeerCerts { from: n.peer_chain.len(), ..PeerCerts::default() };
+    let mut p = PeerCerts {
+        from: n.peer_chain.len(),
+        ..PeerCerts::default()
+    };
     // SAFETY: no preconditions.
     p.chain = unsafe { OPENSSL_sk_new_null() }.cast();
     // SAFETY: as above.
     p.chain_no_leaf = unsafe { OPENSSL_sk_new_null() }.cast();
     for (i, der) in n.peer_chain.iter().enumerate() {
-        let Ok(len) = c_long::try_from(der.len()) else { continue };
+        let Ok(len) = c_long::try_from(der.len()) else {
+            continue;
+        };
         let mut q = der.as_ptr();
         // SAFETY: the certificate's octets.
         let x = unsafe { d2i_X509(ptr::null_mut(), &raw mut q, len) };
@@ -288,7 +329,9 @@ unsafe fn read_input(x: &Ssl) -> Input {
         return Input::Error;
     }
     let mut buf = vec![0u8; want];
-    let Ok(n) = c_int::try_from(buf.len()) else { return Input::Error };
+    let Ok(n) = c_int::try_from(buf.len()) else {
+        return Input::Error;
+    };
     // SAFETY: the connection's BIO; the room. No lock is held.
     let r = unsafe { BIO_read(rbio, buf.as_mut_ptr().cast(), n) };
     if r <= 0 {
@@ -330,15 +373,25 @@ fn track_records(d: &mut Driver, server: bool, mut data: &[u8]) {
             }
             continue;
         }
-        let sslv2 = !d.first_record_done && server && d.rec_header.first().or(data.first()).is_some_and(|b| b & 0x80 != 0);
+        let sslv2 = !d.first_record_done
+            && server
+            && d.rec_header
+                .first()
+                .or(data.first())
+                .is_some_and(|b| b & 0x80 != 0);
         let hdr_len = if sslv2 { SSL2_HEADER_LEN } else { HEADER_LEN };
         let need = hdr_len.saturating_sub(d.rec_header.len());
         let n = need.min(data.len());
-        d.rec_header.extend_from_slice(data.get(..n).unwrap_or_default());
+        d.rec_header
+            .extend_from_slice(data.get(..n).unwrap_or_default());
         data = data.get(n..).unwrap_or_default();
         if d.rec_header.len() == hdr_len {
             let b = |i: usize| usize::from(d.rec_header.get(i).copied().unwrap_or(0));
-            d.rec_left = if sslv2 { ((b(0) & 0x7f) << 8) | b(1) } else { (b(3) << 8) | b(4) };
+            d.rec_left = if sslv2 {
+                ((b(0) & 0x7f) << 8) | b(1)
+            } else {
+                (b(3) << 8) | b(4)
+            };
             if d.rec_left == 0 {
                 d.rec_header.clear();
                 d.first_record_done = true;
@@ -373,7 +426,13 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
         if wbio.is_null() {
             return Flush::Error;
         }
-        let Ok(n) = c_int::try_from(chunk.len().min(usize::try_from(c_int::MAX).unwrap_or(usize::MAX))) else { return Flush::Error };
+        let Ok(n) = c_int::try_from(
+            chunk
+                .len()
+                .min(usize::try_from(c_int::MAX).unwrap_or(usize::MAX)),
+        ) else {
+            return Flush::Error;
+        };
         // SAFETY: the connection's BIO; the octets. No lock is held.
         let r = unsafe { BIO_write(wbio, chunk.as_ptr().cast(), n) };
         if r <= 0 {
@@ -400,7 +459,9 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
     if x.state().drv.tls.is_some() {
         return true;
     }
-    let Some(snap) = config::snapshot(x) else { return false };
+    let Some(snap) = config::snapshot(x) else {
+        return false;
+    };
     let prov = {
         let mut st = x.state();
         match &st.drv.provider {
@@ -444,8 +505,17 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
 ///
 /// # Safety
 /// `s` is the live connection behind `x`.
-pub(crate) unsafe fn info(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>, where_: c_int, ret: c_int) {
-    let cb = x.state().info_callback.or_else(|| snap.and_then(|c| c.info_callback));
+pub(crate) unsafe fn info(
+    s: *mut SSL,
+    x: &Ssl,
+    snap: Option<&CtxSnapshot>,
+    where_: c_int,
+    ret: c_int,
+) {
+    let cb = x
+        .state()
+        .info_callback
+        .or_else(|| snap.and_then(|c| c.info_callback));
     if let Some(cb) = cb {
         // SAFETY: the application's callback with its connection; no lock is held.
         unsafe { cb(s, where_, ret) };
@@ -485,7 +555,11 @@ pub(crate) unsafe fn drive(s: *mut SSL, x: &Ssl, reading: bool, function: &str) 
 unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> Stop {
     let snap = config::snapshot(x);
     let server = x.state().server;
-    let exit = if server { SSL_CB_ACCEPT_EXIT } else { SSL_CB_CONNECT_EXIT };
+    let exit = if server {
+        SSL_CB_ACCEPT_EXIT
+    } else {
+        SSL_CB_CONNECT_EXIT
+    };
     let mut in_handshake = false;
     let stop = loop {
         // SAFETY: the caller's guarantee.
@@ -515,7 +589,11 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             st.drv.out.extend_from_slice(&out);
             mirror(&mut st, &conn);
             st.drv.tls = Some(conn);
-            peers.map(|p| core::mem::replace(&mut st.drv.peer, p))
+            peers.map(|mut p| {
+                // The verified chain stays until verification replaces it.
+                core::mem::swap(&mut p.verified, &mut st.drv.peer.verified);
+                core::mem::replace(&mut st.drv.peer, p)
+            })
         };
         // Freed with no lock held (ex_data callbacks).
         drop(old_peers);
@@ -534,7 +612,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 // SAFETY: the caller's guarantee.
                 unsafe { info(s, x, snap.as_ref(), where_, ret) };
             }
-            Event::Message { write, version, content_type, bytes } => {
+            Event::Message {
+                write,
+                version,
+                content_type,
+                bytes,
+            } => {
                 // SAFETY: as above.
                 unsafe { message(s, x, write, version, content_type, &bytes) };
             }
@@ -627,7 +710,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
 ///
 /// # Safety
 /// `s` is the live connection behind `x`.
-unsafe fn message(s: *mut SSL, x: &Ssl, write: bool, version: c_int, content_type: c_int, bytes: &[u8]) {
+unsafe fn message(
+    s: *mut SSL,
+    x: &Ssl,
+    write: bool,
+    version: c_int,
+    content_type: c_int,
+    bytes: &[u8],
+) {
     let (cb, arg) = {
         let st = x.state();
         (st.msg_callback, st.msg_callback_arg)
@@ -635,7 +725,17 @@ unsafe fn message(s: *mut SSL, x: &Ssl, write: bool, version: c_int, content_typ
     if let Some(cb) = cb {
         // SAFETY: the application's callback with the octets, its connection, and its
         // argument; no lock is held.
-        unsafe { cb(c_int::from(write), version, content_type, bytes.as_ptr().cast(), bytes.len(), s, arg) };
+        unsafe {
+            cb(
+                c_int::from(write),
+                version,
+                content_type,
+                bytes.as_ptr().cast(),
+                bytes.len(),
+                s,
+                arg,
+            )
+        };
     }
 }
 

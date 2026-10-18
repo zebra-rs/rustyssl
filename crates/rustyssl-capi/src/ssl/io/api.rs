@@ -10,12 +10,13 @@ use rustyssl_abi::{
     ERR_LIB_SSL, ERR_LIB_SYS, ERR_SYSTEM_FLAG, EVP_PKEY, NID_undef, SSL, SSL_AD_CLOSE_NOTIFY,
     SSL_CIPHER, SSL_CLIENT_HELLO_CB, SSL_ERROR_NONE, SSL_ERROR_SSL, SSL_ERROR_SYSCALL,
     SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_ASYNC, SSL_ERROR_WANT_CLIENT_HELLO_CB,
-    SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_RETRY_VERIFY,
-    SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_X509_LOOKUP, SSL_ERROR_ZERO_RETURN,
-    SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE, SSL_NOTHING, SSL_READING,
-    SSL_RECEIVED_SHUTDOWN, SSL_RETRY_VERIFY, SSL_R_BAD_LENGTH, SSL_R_BAD_WRITE_RETRY,
-    SSL_R_CONNECTION_TYPE_NOT_SET, SSL_R_PROTOCOL_IS_SHUTDOWN, SSL_R_SHUTDOWN_WHILE_IN_INIT,
-    SSL_R_UNINITIALIZED, SSL_SENT_SHUTDOWN, SSL_WRITING, SSL_X509_LOOKUP, X509, stack_st_X509,
+    SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_RETRY_VERIFY, SSL_ERROR_WANT_WRITE,
+    SSL_ERROR_WANT_X509_LOOKUP, SSL_ERROR_ZERO_RETURN, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER,
+    SSL_MODE_ENABLE_PARTIAL_WRITE, SSL_NOTHING, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY,
+    SSL_R_BAD_LENGTH, SSL_R_BAD_WRITE_RETRY, SSL_R_CONNECTION_TYPE_NOT_SET,
+    SSL_R_PROTOCOL_IS_SHUTDOWN, SSL_R_SHUTDOWN_WHILE_IN_INIT, SSL_R_UNINITIALIZED, SSL_READING,
+    SSL_RECEIVED_SHUTDOWN, SSL_RETRY_VERIFY, SSL_SENT_SHUTDOWN, SSL_WRITING, SSL_X509_LOOKUP, X509,
+    stack_st_X509,
 };
 
 use super::super::conn::{Ssl, ssl};
@@ -122,9 +123,18 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` has room for `num` octets.
-unsafe fn read_internal(s: *mut SSL, buf: *mut c_void, num: usize, peek: bool, readbytes: &mut usize, function: &str) -> c_int {
+unsafe fn read_internal(
+    s: *mut SSL,
+    buf: *mut c_void,
+    num: usize,
+    peek: bool,
+    readbytes: &mut usize,
+    function: &str,
+) -> c_int {
     // SAFETY: the caller's guarantee.
-    let Some(x) = (unsafe { ssl(s) }) else { return -1 };
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return -1;
+    };
     {
         let mut st = x.state();
         if st.handshake_func.is_none() {
@@ -255,9 +265,17 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` holds `num` octets.
-unsafe fn write_internal(s: *mut SSL, buf: *const c_void, num: usize, written: &mut usize, function: &str) -> c_int {
+unsafe fn write_internal(
+    s: *mut SSL,
+    buf: *const c_void,
+    num: usize,
+    written: &mut usize,
+    function: &str,
+) -> c_int {
     // SAFETY: the caller's guarantee.
-    let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return 0;
+    };
     {
         let mut st = x.state();
         if st.handshake_func.is_none() {
@@ -306,7 +324,11 @@ unsafe fn write_internal(s: *mut SSL, buf: *const c_void, num: usize, written: &
     if num == 0 {
         return 0;
     }
-    let chunk = if mode & SSL_MODE_ENABLE_PARTIAL_WRITE != 0 { num.min(max_frag.max(1)) } else { num };
+    let chunk = if mode & SSL_MODE_ENABLE_PARTIAL_WRITE != 0 {
+        num.min(max_frag.max(1))
+    } else {
+        num
+    };
     let r = {
         let mut st = x.state();
         let prov = st.drv.provider.clone();
@@ -465,8 +487,8 @@ ffi_export! {
 ffi_export! {
     /// Shuts the connection down (`ssl3_shutdown`): sends close_notify once, then (on a later
     /// call) waits for the peer's. 1 when both are done, 0 when ours is sent and the peer's not
-    /// yet received, -1 when the BIO would block or on error. Quiet shutdown, or a connection
-    /// that never started, only sets the flags.
+    /// yet received, -1 when the BIO would block or on error (`SSL_R_SHUTDOWN_WHILE_IN_INIT`
+    /// during a handshake). Quiet shutdown only sets the flags.
     ///
     /// # Safety
     /// `s` is NULL or a live connection.
@@ -483,19 +505,13 @@ ffi_export! {
                 err::raise(ERR_LIB_SSL, SSL_R_UNINITIALIZED, F);
                 return -1;
             }
-            // `SSL_in_before` connections and quiet shutdown only set the flags.
-            let before = st.flow_uninited;
-            if st.in_init && !before {
+            if st.in_init {
                 drop(st);
                 err::raise(ERR_LIB_SSL, SSL_R_SHUTDOWN_WHILE_IN_INIT, F);
                 return -1;
             }
-            if st.quiet_shutdown != 0 || before {
-                if before && st.in_init && st.drv.tls.is_none() && st.quiet_shutdown == 0 {
-                    drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_SHUTDOWN_WHILE_IN_INIT, F);
-                    return -1;
-                }
+            // Quiet shutdown (and a connection that never started) only sets the flags.
+            if st.quiet_shutdown != 0 || st.flow_uninited {
                 st.shutdown = SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN;
                 if let Some(c) = st.drv.tls.as_mut() {
                     c.set_shutdown_state(rustyssl_tls::conn::SENT_SHUTDOWN | rustyssl_tls::conn::RECEIVED_SHUTDOWN);
@@ -531,19 +547,18 @@ ffi_export! {
             }
         } else if x.state().shutdown & SSL_RECEIVED_SHUTDOWN == 0 {
             // Wait for the peer's close_notify (`ssl3_read_bytes` with no buffer): application
-            // data after our close_notify is ignored here.
+            // data after our close_notify is fatal (no alert: ours is already sent).
             loop {
+                let pending = x.state().drv.tls.as_ref().is_some_and(|c| c.pending_app() > 0);
+                if pending {
+                    err::raise(ERR_LIB_SSL, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY, F);
+                    x.state().drv.failed = true;
+                    return -1;
+                }
                 // SAFETY: as above.
                 match unsafe { drive(s, x, true, F) } {
                     Stop::Closed => break,
-                    Stop::AppData => {
-                        let mut st = x.state();
-                        if let Some(c) = st.drv.tls.as_mut() {
-                            let mut sink = vec![0u8; c.pending_app()];
-                            c.read_app(&mut sink, false);
-                        }
-                    }
-                    Stop::Done | Stop::Idle => {}
+                    Stop::AppData | Stop::Done | Stop::Idle => {}
                     Stop::Retry | Stop::Failed | Stop::Syscall => return -1,
                 }
             }
@@ -591,11 +606,12 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null() };
-        x.state()
-            .drv
+        let st = x.state();
+        st.drv
             .tls
             .as_ref()
             .and_then(|c| c.negotiated().cipher)
+            .or(st.drv.kept_cipher)
             .map_or(ptr::null(), super::super::ciphers::cipher_ptr)
     }
 }
@@ -647,6 +663,9 @@ ffi_export! {
 /// The peer's certificate (the connection keeps it), or NULL.
 fn peer_leaf(x: &Ssl) -> *mut X509 {
     let st = x.state();
+    if !st.drv.peer.accepted {
+        return ptr::null_mut();
+    }
     // SAFETY: our stack, or NULL (-1).
     if unsafe { OPENSSL_sk_num(st.drv.peer.chain.cast()) } <= 0 {
         return ptr::null_mut();
@@ -739,33 +758,93 @@ fn sigalg_info(code: u16) -> Option<(&'static CStr, c_int, c_int, c_int)> {
     use rustyssl_tls::consts::sigscheme as s;
     let ec = NID_X9_62_id_ecPublicKey;
     Some(match code {
-        s::ECDSA_SECP256R1_SHA256 => (c"ecdsa_secp256r1_sha256", NID_sha256, ec, NID_ecdsa_with_SHA256),
-        s::ECDSA_SECP384R1_SHA384 => (c"ecdsa_secp384r1_sha384", NID_sha384, ec, NID_ecdsa_with_SHA384),
-        s::ECDSA_SECP521R1_SHA512 => (c"ecdsa_secp521r1_sha512", NID_sha512, ec, NID_ecdsa_with_SHA512),
+        s::ECDSA_SECP256R1_SHA256 => (
+            c"ecdsa_secp256r1_sha256",
+            NID_sha256,
+            ec,
+            NID_ecdsa_with_SHA256,
+        ),
+        s::ECDSA_SECP384R1_SHA384 => (
+            c"ecdsa_secp384r1_sha384",
+            NID_sha384,
+            ec,
+            NID_ecdsa_with_SHA384,
+        ),
+        s::ECDSA_SECP521R1_SHA512 => (
+            c"ecdsa_secp521r1_sha512",
+            NID_sha512,
+            ec,
+            NID_ecdsa_with_SHA512,
+        ),
         s::ED25519 => (c"ed25519", NID_undef, NID_ED25519, NID_undef),
         s::ED448 => (c"ed448", NID_undef, NID_ED448, NID_undef),
         s::ECDSA_SHA224 => (c"ecdsa_sha224", NID_sha224, ec, NID_ecdsa_with_SHA224),
         s::ECDSA_SHA1 => (c"ecdsa_sha1", NID_sha1, ec, NID_ecdsa_with_SHA1),
-        s::ECDSA_BRAINPOOLP256R1_SHA256 => (c"ecdsa_brainpoolP256r1tls13_sha256", NID_sha256, ec, NID_ecdsa_with_SHA256),
-        s::ECDSA_BRAINPOOLP384R1_SHA384 => (c"ecdsa_brainpoolP384r1tls13_sha384", NID_sha384, ec, NID_ecdsa_with_SHA384),
-        s::ECDSA_BRAINPOOLP512R1_SHA512 => (c"ecdsa_brainpoolP512r1tls13_sha512", NID_sha512, ec, NID_ecdsa_with_SHA512),
+        s::ECDSA_BRAINPOOLP256R1_SHA256 => (
+            c"ecdsa_brainpoolP256r1tls13_sha256",
+            NID_sha256,
+            ec,
+            NID_ecdsa_with_SHA256,
+        ),
+        s::ECDSA_BRAINPOOLP384R1_SHA384 => (
+            c"ecdsa_brainpoolP384r1tls13_sha384",
+            NID_sha384,
+            ec,
+            NID_ecdsa_with_SHA384,
+        ),
+        s::ECDSA_BRAINPOOLP512R1_SHA512 => (
+            c"ecdsa_brainpoolP512r1tls13_sha512",
+            NID_sha512,
+            ec,
+            NID_ecdsa_with_SHA512,
+        ),
         s::RSA_PSS_RSAE_SHA256 => (c"rsa_pss_rsae_sha256", NID_sha256, NID_rsassaPss, NID_undef),
         s::RSA_PSS_RSAE_SHA384 => (c"rsa_pss_rsae_sha384", NID_sha384, NID_rsassaPss, NID_undef),
         s::RSA_PSS_RSAE_SHA512 => (c"rsa_pss_rsae_sha512", NID_sha512, NID_rsassaPss, NID_undef),
         s::RSA_PSS_PSS_SHA256 => (c"rsa_pss_pss_sha256", NID_sha256, NID_rsassaPss, NID_undef),
         s::RSA_PSS_PSS_SHA384 => (c"rsa_pss_pss_sha384", NID_sha384, NID_rsassaPss, NID_undef),
         s::RSA_PSS_PSS_SHA512 => (c"rsa_pss_pss_sha512", NID_sha512, NID_rsassaPss, NID_undef),
-        s::RSA_PKCS1_SHA256 => (c"rsa_pkcs1_sha256", NID_sha256, NID_rsaEncryption, NID_sha256WithRSAEncryption),
-        s::RSA_PKCS1_SHA384 => (c"rsa_pkcs1_sha384", NID_sha384, NID_rsaEncryption, NID_sha384WithRSAEncryption),
-        s::RSA_PKCS1_SHA512 => (c"rsa_pkcs1_sha512", NID_sha512, NID_rsaEncryption, NID_sha512WithRSAEncryption),
-        s::RSA_PKCS1_SHA224 => (c"rsa_pkcs1_sha224", NID_sha224, NID_rsaEncryption, NID_sha224WithRSAEncryption),
-        s::RSA_PKCS1_SHA1 => (c"rsa_pkcs1_sha1", NID_sha1, NID_rsaEncryption, NID_sha1WithRSAEncryption),
+        s::RSA_PKCS1_SHA256 => (
+            c"rsa_pkcs1_sha256",
+            NID_sha256,
+            NID_rsaEncryption,
+            NID_sha256WithRSAEncryption,
+        ),
+        s::RSA_PKCS1_SHA384 => (
+            c"rsa_pkcs1_sha384",
+            NID_sha384,
+            NID_rsaEncryption,
+            NID_sha384WithRSAEncryption,
+        ),
+        s::RSA_PKCS1_SHA512 => (
+            c"rsa_pkcs1_sha512",
+            NID_sha512,
+            NID_rsaEncryption,
+            NID_sha512WithRSAEncryption,
+        ),
+        s::RSA_PKCS1_SHA224 => (
+            c"rsa_pkcs1_sha224",
+            NID_sha224,
+            NID_rsaEncryption,
+            NID_sha224WithRSAEncryption,
+        ),
+        s::RSA_PKCS1_SHA1 => (
+            c"rsa_pkcs1_sha1",
+            NID_sha1,
+            NID_rsaEncryption,
+            NID_sha1WithRSAEncryption,
+        ),
         s::DSA_SHA256 => (c"dsa_sha256", NID_sha256, NID_dsa, NID_dsa_with_SHA256),
         s::DSA_SHA384 => (c"dsa_sha384", NID_sha384, NID_dsa, NID_undef),
         s::DSA_SHA512 => (c"dsa_sha512", NID_sha512, NID_dsa, NID_undef),
         s::DSA_SHA224 => (c"dsa_sha224", NID_sha224, NID_dsa, NID_undef),
         s::DSA_SHA1 => (c"dsa_sha1", NID_sha1, NID_dsa, NID_dsaWithSHA1),
-        s::RSA_PKCS1_MD5_SHA1 => (c"rsa_pkcs1_md5_sha1", NID_md5_sha1, NID_rsaEncryption, NID_undef),
+        s::RSA_PKCS1_MD5_SHA1 => (
+            c"rsa_pkcs1_md5_sha1",
+            NID_md5_sha1,
+            NID_rsaEncryption,
+            NID_undef,
+        ),
         s::MLDSA44 => (c"mldsa44", NID_undef, NID_ML_DSA_44, NID_undef),
         s::MLDSA65 => (c"mldsa65", NID_undef, NID_ML_DSA_65, NID_undef),
         s::MLDSA87 => (c"mldsa87", NID_undef, NID_ML_DSA_87, NID_undef),
@@ -818,7 +897,6 @@ ffi_export! {
 ///
 /// # Safety
 /// The output pointers are NULL or writable.
-#[expect(clippy::too_many_arguments, reason = "SSL_get_sigalgs' outputs")]
 unsafe fn sigalg_out(
     list: &[u16],
     idx: c_int,
@@ -827,7 +905,6 @@ unsafe fn sigalg_out(
     psignhash: *mut c_int,
     rsig: *mut c_uchar,
     rhash: *mut c_uchar,
-    with_raw: bool,
 ) -> c_int {
     let n = c_int::try_from(list.len()).unwrap_or(c_int::MAX);
     if idx < 0 {
@@ -836,28 +913,29 @@ unsafe fn sigalg_out(
     let Some(&code) = usize::try_from(idx).ok().and_then(|i| list.get(i)) else {
         return 0;
     };
-    let (_, hash, sig, sighash) = sigalg_info(code).unwrap_or((c"", NID_undef, NID_undef, NID_undef));
+    let (_, hash, sig, sighash) =
+        sigalg_info(code).unwrap_or((c"", NID_undef, NID_undef, NID_undef));
     let [hi, lo] = code.to_be_bytes();
-    // SAFETY: the caller's slots, each NULL or writable.
-    unsafe {
-        if !psign.is_null() {
-            psign.write(sig);
-        }
-        if !phash.is_null() {
-            phash.write(hash);
-        }
-        if !psignhash.is_null() {
-            psignhash.write(sighash);
-        }
-        if with_raw {
-            if !rsig.is_null() {
-                rsig.write(lo);
-            }
-            if !rhash.is_null() {
-                rhash.write(hi);
-            }
+    /// Stores `v` in `p` unless it is NULL.
+    ///
+    /// # Safety
+    /// `p` is NULL or writable.
+    unsafe fn put<T>(p: *mut T, v: T) {
+        if !p.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { p.write(v) };
         }
     }
+    // SAFETY: the caller's slots, each NULL or writable.
+    unsafe { put(psign, sig) };
+    // SAFETY: as above.
+    unsafe { put(phash, hash) };
+    // SAFETY: as above.
+    unsafe { put(psignhash, sighash) };
+    // SAFETY: as above.
+    unsafe { put(rsig, lo) };
+    // SAFETY: as above.
+    unsafe { put(rhash, hi) };
     n
 }
 
@@ -873,7 +951,7 @@ ffi_export! {
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let list = x.state().drv.tls.as_ref().map(|c| c.negotiated().peer_sigalgs.clone()).unwrap_or_default();
         // SAFETY: the caller's slots.
-        unsafe { sigalg_out(&list, idx, psign, phash, psignhash, rsig, rhash, true) }
+        unsafe { sigalg_out(&list, idx, psign, phash, psignhash, rsig, rhash) }
     }
 }
 
@@ -889,7 +967,7 @@ ffi_export! {
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let list = x.state().drv.tls.as_ref().map(|c| c.negotiated().shared_sigalgs.clone()).unwrap_or_default();
         // SAFETY: the caller's slots.
-        unsafe { sigalg_out(&list, idx, psign, phash, psignhash, rsig, rhash, true) }
+        unsafe { sigalg_out(&list, idx, psign, phash, psignhash, rsig, rhash) }
     }
 }
 
@@ -900,14 +978,16 @@ ffi_export! {
 /// `x` is a live connection; `parg` is what `cmd` documents.
 pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> Option<c_long> {
     use rustyssl_abi::{
-        SSL_CTRL_GET_EXTMS_SUPPORT, SSL_CTRL_GET_NEGOTIATED_GROUP, SSL_CTRL_GET_PEER_SIGNATURE_NAME,
-        SSL_CTRL_GET_PEER_SIGNATURE_NID, SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SIGNATURE_NAME,
-        SSL_CTRL_GET_SIGNATURE_NID,
+        SSL_CTRL_GET_EXTMS_SUPPORT, SSL_CTRL_GET_NEGOTIATED_GROUP,
+        SSL_CTRL_GET_PEER_SIGNATURE_NAME, SSL_CTRL_GET_PEER_SIGNATURE_NID,
+        SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SIGNATURE_NAME, SSL_CTRL_GET_SIGNATURE_NID,
     };
     let st = x.state();
     let tls = st.drv.tls.as_deref();
     let scheme_name = |code: Option<u16>| -> c_long {
-        let Some((name, ..)) = code.and_then(sigalg_info) else { return 0 };
+        let Some((name, ..)) = code.and_then(sigalg_info) else {
+            return 0;
+        };
         if parg.is_null() {
             return 0;
         }
@@ -916,7 +996,9 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         1
     };
     let scheme_hash = |code: Option<u16>| -> c_long {
-        let Some((_, hash, ..)) = code.and_then(sigalg_info) else { return 0 };
+        let Some((_, hash, ..)) = code.and_then(sigalg_info) else {
+            return 0;
+        };
         if !parg.is_null() {
             // SAFETY: the caller's slot for an int.
             unsafe { parg.cast::<c_int>().write(hash) };
@@ -924,9 +1006,13 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         1
     };
     Some(match cmd {
-        SSL_CTRL_GET_PEER_SIGNATURE_NAME => scheme_name(tls.and_then(|c| c.negotiated().peer_scheme)),
+        SSL_CTRL_GET_PEER_SIGNATURE_NAME => {
+            scheme_name(tls.and_then(|c| c.negotiated().peer_scheme))
+        }
         SSL_CTRL_GET_SIGNATURE_NAME => scheme_name(tls.and_then(|c| c.negotiated().own_scheme)),
-        SSL_CTRL_GET_PEER_SIGNATURE_NID => scheme_hash(tls.and_then(|c| c.negotiated().peer_scheme)),
+        SSL_CTRL_GET_PEER_SIGNATURE_NID => {
+            scheme_hash(tls.and_then(|c| c.negotiated().peer_scheme))
+        }
         SSL_CTRL_GET_SIGNATURE_NID => scheme_hash(tls.and_then(|c| c.negotiated().own_scheme)),
         SSL_CTRL_GET_NEGOTIATED_GROUP => {
             let id = tls.and_then(|c| c.negotiated().group);

@@ -262,7 +262,12 @@ pub(crate) unsafe fn curve_nid(pkey: *const EVP_PKEY) -> c_int {
     let mut len = 0usize;
     // SAFETY: as above; the room.
     let got = unsafe {
-        crate::evp::pkey::params::EVP_PKEY_get_group_name(pkey, name.as_mut_ptr(), name.len(), &raw mut len)
+        crate::evp::pkey::params::EVP_PKEY_get_group_name(
+            pkey,
+            name.as_mut_ptr(),
+            name.len(),
+            &raw mut len,
+        )
     };
     if got == 0 {
         return NID_undef;
@@ -314,7 +319,12 @@ fn group_of_nid(prov: &EvpProvider, nid: c_int) -> Option<u16> {
 ///
 /// # Safety
 /// The pointers in `src` are live (or NULL where allowed).
-unsafe fn cert_key(prov: &EvpProvider, r: &SlotRefs, src: &ChainSource, ocsp: Option<Vec<u8>>) -> Option<CertKey> {
+unsafe fn cert_key(
+    prov: &EvpProvider,
+    r: &SlotRefs,
+    src: &ChainSource,
+    ocsp: Option<Vec<u8>>,
+) -> Option<CertKey> {
     // SAFETY: our reference to the key.
     let key = unsafe { prov.add_key(r.pkey) }?;
     // SAFETY: the caller's guarantee.
@@ -409,7 +419,12 @@ fn slot_refs(x: &Ssl) -> (Vec<SlotRefs>, u32, *mut X509_STORE, Option<Vec<u8>>, 
             // SAFETY: the slot's chain.
             Some(unsafe { refs_of(cpk.chain) })
         };
-        slots.push(SlotRefs { slot, x509: cpk.x509, pkey: cpk.privatekey, chain });
+        slots.push(SlotRefs {
+            slot,
+            x509: cpk.x509,
+            pkey: cpk.privatekey,
+            chain,
+        });
     }
     let ocsp = if st.ocsp_resp.is_null() || st.ocsp_resp_len == 0 {
         None
@@ -424,7 +439,11 @@ fn slot_refs(x: &Ssl) -> (Vec<SlotRefs>, u32, *mut X509_STORE, Option<Vec<u8>>, 
 ///
 /// # Safety
 /// `snap` is the connection's context's snapshot.
-pub(crate) unsafe fn certs(x: &Ssl, snap: &CtxSnapshot, prov: &EvpProvider) -> (Vec<CertKey>, Option<usize>) {
+pub(crate) unsafe fn certs(
+    x: &Ssl,
+    snap: &CtxSnapshot,
+    prov: &EvpProvider,
+) -> (Vec<CertKey>, Option<usize>) {
     let (slots, mode, chain_store, ocsp, current) = slot_refs(x);
     let src = ChainSource {
         extra: snap.extra_certs,
@@ -463,11 +482,18 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         v => u16::try_from(v).unwrap_or(0),
     };
     let names = if st.server {
-        [st.client_ca_names, snap.client_ca_names, st.ca_names, snap.ca_names]
+        [
+            st.client_ca_names,
+            snap.client_ca_names,
+            st.ca_names,
+            snap.ca_names,
+        ]
+        .into_iter()
+        .find(|p| !p.is_null())
+    } else {
+        [st.ca_names, snap.ca_names]
             .into_iter()
             .find(|p| !p.is_null())
-    } else {
-        [st.ca_names, snap.ca_names].into_iter().find(|p| !p.is_null())
     };
     let ca_names = match names {
         // SAFETY: the connection's or context's names (no callbacks run while encoding).
@@ -504,7 +530,9 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         send_ca_names: !ca_names.is_empty(),
         ca_names,
         cert_flags: st.cert.cert_flags,
-        dh_tmp: !st.cert.dh_tmp.is_null() || st.cert.dh_tmp_cb.is_some() || st.cert.dh_tmp_auto != 0,
+        dh_tmp: !st.cert.dh_tmp.is_null()
+            || st.cert.dh_tmp_cb.is_some()
+            || st.cert.dh_tmp_auto != 0,
         callbacks: Callbacks {
             info: st.info_callback.is_some() || snap.info_callback.is_some(),
             msg: st.msg_callback.is_some(),
