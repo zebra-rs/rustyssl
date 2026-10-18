@@ -1134,12 +1134,24 @@ fn rpk_and_privkey(c: &Connection, slot: usize) -> bool {
             .is_some_and(|k| k.chain.is_empty() && k.raw_public_key.is_some())
 }
 
-/// `ssl_has_cert`: a certificate (or, with a raw public key negotiated, a key) in `slot`.
+/// `ssl_has_cert_type(s, TLSEXT_cert_type_rpk)`: this end offers raw public keys for its own
+/// certificate (configured, whatever is negotiated).
+fn rpk_configured(c: &Connection) -> bool {
+    let types = if c.cfg.server {
+        &c.cfg.server_cert_types
+    } else {
+        &c.cfg.client_cert_types
+    };
+    types.contains(&crate::conn::statem::msgs_type(abi::TLSEXT_cert_type_rpk))
+}
+
+/// `ssl_has_cert`: a certificate in `slot` (or, with raw public keys configured for this end,
+/// a key alone).
 #[must_use]
 pub fn has_cert(c: &Connection, slot: usize) -> bool {
     cert_in_slot(c, slot)
         .and_then(|i| c.cfg.certs.get(i))
-        .is_some_and(|k| !k.chain.is_empty() || (own_rpk(c) && k.raw_public_key.is_some()))
+        .is_some_and(|k| !k.chain.is_empty() || (rpk_configured(c) && k.raw_public_key.is_some()))
 }
 
 /// The client's current certificate's slot (`s->cert->key`).
