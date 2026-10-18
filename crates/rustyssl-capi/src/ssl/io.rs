@@ -233,6 +233,31 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
     }
 }
 
+/// A client's copy of the OCSP response the server stapled (`s->ext.ocsp.resp`), which
+/// `SSL_get_tlsext_status_ocsp_resp` returns (to the status callback too), unless it already
+/// holds it.
+///
+/// # Safety
+/// `st.ocsp_resp` is NULL or the connection's own `st.ocsp_resp_len` octets (C memory).
+unsafe fn set_peer_ocsp(st: &mut SslState, resp: &[u8]) {
+    if !st.ocsp_resp.is_null()
+        // SAFETY: the caller's guarantee.
+        && unsafe { core::slice::from_raw_parts(st.ocsp_resp, st.ocsp_resp_len) } == resp
+    {
+        return;
+    }
+    let copy: *mut u8 = crate::mem::alloc(resp.len().max(1)).cast();
+    if copy.is_null() {
+        return;
+    }
+    // SAFETY: a fresh block of at least `resp.len()` octets.
+    unsafe { core::ptr::copy_nonoverlapping(resp.as_ptr(), copy, resp.len()) };
+    let old = core::mem::replace(&mut st.ocsp_resp, copy);
+    st.ocsp_resp_len = resp.len();
+    // SAFETY: the response the connection owned (C memory), or NULL.
+    unsafe { crate::mem::release(old.cast()) };
+}
+
 /// `parse_ca_names`'s list, as `X509_NAME`s: the names the peer sent (NULL when it sent no
 /// list, empty when it sent an empty one), replacing the connection's.
 ///
@@ -308,6 +333,12 @@ fn mirror(st: &mut SslState, c: &Connection) {
     own.clone_into(&mut st.finish_md);
     peer.clone_into(&mut st.peer_finish_md);
     st.drv.warn_alert = c.alerts().2;
+    if !st.server
+        && let Some(r) = &n.ocsp_response
+    {
+        // SAFETY: the connection's own response, or NULL.
+        unsafe { set_peer_ocsp(st, r) };
+    }
     if n.peer_ca_names != st.drv.peer_ca_names {
         n.peer_ca_names.clone_into(&mut st.drv.peer_ca_names);
         // SAFETY: the connection's own list, or NULL, replaced (no callbacks run).
