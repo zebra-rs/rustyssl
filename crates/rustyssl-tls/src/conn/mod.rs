@@ -332,8 +332,10 @@ impl Connection {
         };
         let server = cfg.server;
         let mut rw = RecordWriter::new(record_version);
-        // `ssl_get_max_send_fragment`.
-        rw.max_frag_len = cfg.max_send_fragment.clamp(1, rw.max_frag_len);
+        // `ssl_get_max_send_fragment` (0: unset, the default).
+        if cfg.max_send_fragment > 0 {
+            rw.max_frag_len = cfg.max_send_fragment.min(rw.max_frag_len);
+        }
         Self {
             cfg,
             st: Statem::default(),
