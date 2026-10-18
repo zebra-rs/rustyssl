@@ -44,7 +44,7 @@ use super::tls_provider::EvpProvider;
 use crate::bio::{BIO_ctrl, BIO_read, BIO_test_flags, BIO_write};
 use crate::err;
 use crate::stack::{OPENSSL_sk_new_null, OPENSSL_sk_pop_free, OPENSSL_sk_push};
-use crate::x509::cert::{X509_free, X509_up_ref, d2i_X509};
+use crate::x509::cert::{X509_free, X509_up_ref};
 
 /// A TLS record header's length, and an SSLv2 ClientHello's.
 const HEADER_LEN: usize = 5;
@@ -292,7 +292,16 @@ fn mirror(st: &mut SslState, c: &Connection) {
 
 /// The peer's chain as objects, made with no lock held (`d2i_X509` runs the application's
 /// ex_data callbacks): `None` if the objects already made are of the core's chain.
-fn peer_objects(c: &Connection, have: usize, server: bool) -> Option<PeerCerts> {
+///
+/// # Safety
+/// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+unsafe fn peer_objects(
+    c: &Connection,
+    have: usize,
+    server: bool,
+    libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+    propq: *const core::ffi::c_char,
+) -> Option<PeerCerts> {
     let n = c.negotiated();
     if n.peer_chain.len() == have {
         return None;
@@ -306,12 +315,9 @@ fn peer_objects(c: &Connection, have: usize, server: bool) -> Option<PeerCerts> 
     // SAFETY: as above.
     p.chain_no_leaf = unsafe { OPENSSL_sk_new_null() }.cast();
     for (i, der) in n.peer_chain.iter().enumerate() {
-        let Ok(len) = c_long::try_from(der.len()) else {
-            continue;
-        };
-        let mut q = der.as_ptr();
-        // SAFETY: the certificate's octets.
-        let x = unsafe { d2i_X509(ptr::null_mut(), &raw mut q, len) };
+        // Decoded in the connection's library context (`tls_process_server_certificate`).
+        // SAFETY: the caller's guarantee.
+        let x = unsafe { crate::x509::cert::decode_in(der, libctx, propq) };
         if x.is_null() {
             continue;
         }
@@ -778,7 +784,11 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         }
         let out = conn.take_output();
         let have = x.state().drv.peer.from;
-        let peers = peer_objects(&conn, have, server);
+        let (libctx, propq) = snap
+            .as_ref()
+            .map_or((ptr::null_mut(), ptr::null()), |c| (c.libctx, c.propq()));
+        // SAFETY: the snapshot's library context and properties, alive with it.
+        let peers = unsafe { peer_objects(&conn, have, server, libctx, propq) };
         let old_peers = {
             let mut st = x.state();
             st.drv.out.extend_from_slice(&out);

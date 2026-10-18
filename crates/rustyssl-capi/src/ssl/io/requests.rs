@@ -491,7 +491,8 @@ unsafe fn verify(
         return None;
     };
     // The chain as the core received it (a server records it only after verification).
-    let owned = Chain::of(peer);
+    // SAFETY: the snapshot's library context and properties, alive with it.
+    let owned = unsafe { Chain::of(peer, snap.libctx, snap.propq()) };
     let chain = owned.0;
     let (store, verify_cb, server, verify_mode, level) = {
         let mut st = x.state();
@@ -632,17 +633,20 @@ unsafe fn verify(
 struct Chain(*mut stack_st_X509);
 
 impl Chain {
-    /// The certificates that decode, in order (`d2i_X509` runs with no lock held).
-    fn of(ders: &[Vec<u8>]) -> Self {
+    /// The certificates that decode in `libctx`, in order (`d2i_X509` runs with no lock held).
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+    unsafe fn of(
+        ders: &[Vec<u8>],
+        libctx: *mut rustyssl_abi::OSSL_LIB_CTX,
+        propq: *const core::ffi::c_char,
+    ) -> Self {
         // SAFETY: no preconditions.
         let sk: *mut stack_st_X509 = unsafe { crate::stack::OPENSSL_sk_new_null() }.cast();
         for der in ders {
-            let Ok(len) = core::ffi::c_long::try_from(der.len()) else {
-                continue;
-            };
-            let mut q = der.as_ptr();
-            // SAFETY: the certificate's octets.
-            let c = unsafe { crate::x509::cert::d2i_X509(ptr::null_mut(), &raw mut q, len) };
+            // SAFETY: the caller's guarantee.
+            let c = unsafe { crate::x509::cert::decode_in(der, libctx, propq) };
             if c.is_null() {
                 continue;
             }
