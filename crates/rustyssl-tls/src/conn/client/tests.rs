@@ -100,13 +100,7 @@ fn drive(
     seen: &mut Seen,
 ) -> Result<Event, Error> {
     for _ in 0..10_000 {
-        let e = c.step(p, reading).inspect_err(|_| {
-            eprintln!(
-                "DEBUG state {} {:?}",
-                c.state(),
-                seen.written.iter().map(|m| m[0]).collect::<Vec<_>>()
-            )
-        })?;
+        let e = c.step(p, reading)?;
         match e {
             Event::Request(r) => {
                 let a = answer(&r);
