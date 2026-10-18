@@ -17,6 +17,7 @@ pub(crate) mod ctx;
 pub(crate) mod dane;
 pub(crate) mod io;
 pub(crate) mod keys;
+pub(crate) mod ktls;
 pub(crate) mod lists;
 pub(crate) mod method;
 pub(crate) mod misc;

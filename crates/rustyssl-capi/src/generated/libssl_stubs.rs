@@ -8,7 +8,7 @@
 // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.
 #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
 
-use libc::{off_t, timeval};
+use libc::timeval;
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
@@ -372,17 +372,6 @@ pub extern "C" fn rustyssl_private_SSL_rstate_string_long(
     _: *const SSL,
 ) -> *const core::ffi::c_char {
     crate::stub::unimplemented("SSL_rstate_string_long")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_sendfile(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-    _: off_t,
-    _: usize,
-    _: core::ffi::c_int,
-) -> isize {
-    crate::stub::unimplemented("SSL_sendfile")
 }
 
 #[unsafe(no_mangle)]
