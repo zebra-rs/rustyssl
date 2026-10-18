@@ -1980,3 +1980,52 @@ fn server_share_for(ch: &[u8], group: u16) -> Option<Vec<u8>> {
         .find(|e| e.group == group)
         .map(|e| e.key)
 }
+
+/// A server configuration with an RSA certificate.
+fn server_config(p: &TestProvider) -> Config {
+    let (key, cert) = server_cert(p);
+    Config {
+        server: true,
+        ciphers: client12().ciphers,
+        certs: vec![crate::conn::CertKey {
+            chain: vec![cert],
+            key,
+            slot: crate::conn::common::sigalgs::PKEY_RSA,
+            schemes: vec![0x0804, 0x0401],
+            auth: crate::suites::masks::SSL_aRSA,
+            ec_group: None,
+            curve_nid: abi::NID_undef,
+            can_sign: true,
+            cert_sig: None,
+            raw_public_key: None,
+            ocsp_response: None,
+        }],
+        max_cert_list: 102_400,
+        max_send_fragment: 16384,
+        num_tickets: 2,
+        now: Some(1_700_000_000),
+        ..Config::default()
+    }
+}
+
+#[test]
+#[ignore = "needs the server's state machine (step 7.3)"]
+fn loopback_with_the_server() {
+    use crate::conn::pair::{self, End};
+    for (max, suite) in [(v::TLS1_3, 0x1301), (v::TLS1_2, 0xc02f)] {
+        let p = TestProvider::new(b"loopback");
+        let mut ccfg = client12();
+        ccfg.max_version = max;
+        let mut client = Connection::new(ccfg);
+        let mut server = Connection::new(server_config(&p));
+        let mut log = pair::Log::default();
+        let mut answer = |_: End, r: &Request| accept(r);
+        pair::handshake(&p, &mut client, &mut server, true, &mut answer, &mut log).unwrap();
+        assert_eq!(client.negotiated().version, max);
+        assert_eq!(client.negotiated().cipher.unwrap().protocol_id(), suite);
+        assert_eq!(
+            client.negotiated().client_finished,
+            server.negotiated().client_finished
+        );
+    }
+}

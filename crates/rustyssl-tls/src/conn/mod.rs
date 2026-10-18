@@ -15,6 +15,8 @@ pub(crate) mod client;
     reason = "the shared code, used as the role state machines arrive"
 )]
 pub(crate) mod common;
+#[cfg(test)]
+pub(crate) mod pair;
 pub(crate) mod server;
 
 use std::collections::VecDeque;
