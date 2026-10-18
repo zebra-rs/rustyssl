@@ -239,6 +239,8 @@ static const char *cn(X509 *x, char *buf, int len)
     return buf;
 }
 
+#include <openssl/comp.h>
+
 static int hello_calls;
 
 /* Prints what the client hello getters report, then lets the handshake go on. */
@@ -431,6 +433,13 @@ static void test_surface(void)
     check(SSL_COMP_set0_compression_methods(old) == NULL, "and puts it back");
     printf("  add without a method: %d\n", SSL_COMP_add_compression_method(200, NULL));
     printf("  SSL_COMP_get_name(NULL): %s\n", SSL_COMP_get_name(NULL) == NULL ? "NULL" : "?");
+    printf("  zlib: %s\n", COMP_zlib() == NULL ? "none" : "a method");
+    printf("  add zlib: %d, methods %d\n", SSL_COMP_add_compression_method(200, COMP_zlib()), sk_SSL_COMP_num(meths));
+    if (sk_SSL_COMP_num(meths) > 0) {
+        SSL_COMP *m = sk_SSL_COMP_value(meths, 0);
+
+        printf("  first: %d %s\n", SSL_COMP_get_id(m), SSL_COMP_get0_name(m));
+    }
     errors();
     connect_pair(cctx, sctx, &c, &s);
     check(SSL_get_current_compression(c) == NULL && SSL_get_current_expansion(c) == NULL, "none before");
