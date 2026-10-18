@@ -9,8 +9,20 @@
 //! peer certificate, signature, temporary key).
 //!
 //! A case line is `name | server arguments | client arguments`, with `{rsa}`, `{ec}`,
-//! `{ed25519}` (a server's `-cert`/`-key` pair), `{ca}` (the root to verify with), and
-//! `{dir}` substituted. Lines starting with `#` are comments.
+//! `{p521}`, `{ed25519}` (a server's `-cert`/`-key` pair), `{client}` (a client's), `{ca}` (the
+//! root to verify with), and `{dir}` substituted. Lines starting with `#` are comments. Client
+//! arguments starting with `+` direct the harness:
+//!
+//! - `+full`: the client runs without `-brief`, and the summary takes its session lines
+//!   (`New,`/`Reused,`, ALPN, secure renegotiation) from its standard output.
+//! - `+resume`: two connections, the first saving its session (`-sess_out`) and the second, a
+//!   `+full` one, resuming it (`-sess_in`); the summary says whether it was reused.
+//! - `+cmd=X`: the client first sends the command line `X` (`R` renegotiates, `k`/`K` update
+//!   the keys), then the data a second later; commands need it to run without `-ign_eof`, so
+//!   its input stays open until it exits.
+//!
+//! The server's report of the client (its certificate, the ALPN list and the host name it
+//! sent) joins the summary.
 
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -28,6 +40,46 @@ const MISSING_CONFIG: &str = "/nonexistent/rustyssl-tests/openssl.cnf";
 
 /// How long a server may take to start, and a connection to finish.
 const TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The client's handshake summary lines on standard error (`-brief`); the rest (verify depth
+/// lines, DONE) is the same or timing-dependent.
+const CLIENT_SUMMARY: [&str; 12] = [
+    "CONNECTION ESTABLISHED",
+    "Protocol version",
+    "Ciphersuite",
+    "Peer certificate",
+    "Hash used",
+    "Signature type",
+    "Verification",
+    "Peer Temp Key",
+    "Negotiated TLS1.3 group",
+    "Peer signature",
+    "Supported",
+    "Shared",
+];
+
+/// The client's session lines on standard output without `-brief` (`print_stuff`).
+const CLIENT_SESSION: [&str; 6] = [
+    "New, ",
+    "Reused, ",
+    "ALPN protocol",
+    "No ALPN",
+    "Secure Renegotiation",
+    "Server public key",
+];
+
+/// The client's lines for a command (`user_data_execute`).
+const CLIENT_COMMAND: [&str; 3] = ["RENEGOTIATING", "KEYUPDATE", "ERROR"];
+
+/// The server's lines about the client.
+const SERVER_SUMMARY: [&str; 6] = [
+    "SSL_accept:",
+    "Peer certificate",
+    "No peer certificate",
+    "ALPN protocols advertised",
+    "Hostname in TLS extension",
+    "Switching server context",
+];
 
 /// Which library each side uses.
 #[derive(Clone, Copy)]
@@ -101,7 +153,8 @@ impl Tool<'_> {
     }
 }
 
-/// A test PKI: a root and three servers (RSA, ECDSA P-256, Ed25519) it issued.
+/// A test PKI: a root, four servers (RSA, ECDSA P-256 and P-521, Ed25519), and an RSA client
+/// it issued.
 fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
     let d = |f: &str| dir.join(f).display().to_string();
     t.setup(&[
@@ -123,7 +176,13 @@ fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
         "-addext",
         "keyUsage=critical,keyCertSign,cRLSign",
     ])?;
-    for (name, alg) in [("rsa", "rsa:2048"), ("ec", "ec"), ("ed25519", "ed25519")] {
+    for (name, alg) in [
+        ("rsa", "rsa:2048"),
+        ("ec", "P-256"),
+        ("p521", "P-521"),
+        ("ed25519", "ed25519"),
+        ("client", "rsa:2048"),
+    ] {
         let mut req = vec![
             "req".to_owned(),
             "-new".to_owned(),
@@ -135,22 +194,24 @@ fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
             "-subj".to_owned(),
             format!("/O=rustyssl interop/CN=localhost-{name}"),
         ];
-        if alg == "ec" {
+        if let Some(curve) = alg.strip_prefix("P-") {
             req.extend([
                 "-newkey".to_owned(),
                 "ec".to_owned(),
                 "-pkeyopt".to_owned(),
-                "ec_paramgen_curve:P-256".to_owned(),
+                format!("ec_paramgen_curve:P-{curve}"),
             ]);
         } else {
             req.extend(["-newkey".to_owned(), alg.to_owned()]);
         }
         let args: Vec<&str> = req.iter().map(String::as_str).collect();
         t.setup(&args)?;
-        fs::write(
-            dir.join("ext.cnf"),
-            "subjectAltName=DNS:localhost\nbasicConstraints=CA:false\n",
-        )?;
+        let ext = if name == "client" {
+            "basicConstraints=CA:false\nextendedKeyUsage=clientAuth\n"
+        } else {
+            "subjectAltName=DNS:localhost\nbasicConstraints=CA:false\n"
+        };
+        fs::write(dir.join("ext.cnf"), ext)?;
         t.setup(&[
             "x509",
             "-req",
@@ -178,7 +239,7 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     for a in args.split_whitespace() {
         match a {
-            "{rsa}" | "{ec}" | "{ed25519}" => {
+            "{rsa}" | "{ec}" | "{p521}" | "{ed25519}" | "{client}" => {
                 let n = a.trim_matches(|c| c == '{' || c == '}');
                 out.extend([
                     "-cert".to_owned(),
@@ -205,6 +266,7 @@ fn start_server(
     t: &Tool<'_>,
     ours: bool,
     port: u16,
+    naccept: usize,
     args: &[String],
 ) -> Result<(Child, mpsc::Receiver<String>)> {
     let mut all = vec![
@@ -212,7 +274,7 @@ fn start_server(
         "-accept".to_owned(),
         format!("127.0.0.1:{port}"),
         "-naccept".to_owned(),
-        "1".to_owned(),
+        naccept.to_string(),
         "-rev".to_owned(),
     ];
     if !args.iter().any(|a| a == "-cert") {
@@ -266,87 +328,185 @@ fn start_server(
     }
 }
 
-/// One connection: the client's summary (stderr's handshake lines) and the echo it got.
-fn connect(
+/// How a case's client runs (its `+` directives).
+#[derive(Default)]
+struct Mode {
+    full: bool,
+    resume: bool,
+    cmd: Option<String>,
+}
+
+/// The client arguments without the directives, and the directives.
+fn mode(args: &[String]) -> (Vec<String>, Mode) {
+    let mut m = Mode::default();
+    let mut rest = Vec::new();
+    for a in args {
+        match a.as_str() {
+            "+full" => m.full = true,
+            "+resume" => m.resume = true,
+            _ => match a.strip_prefix("+cmd=") {
+                Some(c) => m.cmd = Some(c.to_owned()),
+                None => rest.push(a.clone()),
+            },
+        }
+    }
+    (rest, m)
+}
+
+/// One `s_client` run: its summary, or why it failed.
+fn client(
     t: &Tool<'_>,
-    p: Pairing,
-    server_args: &[String],
-    client_args: &[String],
+    ours: bool,
+    port: u16,
+    args: &[String],
+    full: bool,
+    cmd: Option<&str>,
 ) -> Result<String> {
-    let port = free_port()?;
-    let (mut server, lines) = start_server(t, p.server_ours, port, server_args)?;
     let mut all = vec![
         "s_client".to_owned(),
         "-connect".to_owned(),
         format!("127.0.0.1:{port}"),
-        "-brief".to_owned(),
-        "-ign_eof".to_owned(),
     ];
-    all.extend(client_args.iter().cloned());
-    let mut client = t
-        .command(p.client_ours, &all)
+    if !full {
+        all.push("-brief".to_owned());
+    }
+    // `-ign_eof` turns the commands off (`USER_DATA_MODE_NONE`).
+    if cmd.is_none() {
+        all.push("-ign_eof".to_owned());
+    }
+    all.extend(args.iter().cloned());
+    let mut child = t
+        .command(ours, &all)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("cannot start s_client: {e}"))?;
-    if let Some(mut stdin) = client.stdin.take() {
+    let pid = child.id();
+    let mut stdin = child.stdin.take();
+    if let Some(input) = stdin.as_mut() {
+        if let Some(c) = cmd {
+            // A command takes the whole read: the data follows once it has run.
+            let _ = writeln!(input, "{c}");
+            let _ = input.flush();
+            std::thread::sleep(Duration::from_secs(1));
+        }
         // `-rev` reverses each line and ends the connection on CLOSE.
-        let _ = stdin.write_all(b"hello rustyssl\nCLOSE\n");
+        let _ = input.write_all(b"hello rustyssl\nCLOSE\n");
+        let _ = input.flush();
+    }
+    if cmd.is_none() {
+        drop(stdin.take());
     }
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(client.wait_with_output());
+        let _ = tx.send(child.wait_with_output());
     });
-    let out = match rx.recv_timeout(TIMEOUT) {
+    let got = rx.recv_timeout(TIMEOUT);
+    drop(stdin);
+    let out = match got {
         Ok(Ok(o)) => o,
         Ok(Err(e)) => return Err(format!("s_client failed: {e}").into()),
         Err(_) => {
-            let _ = server.kill();
+            let _ = Command::new("kill").arg(pid.to_string()).status();
             return Err("s_client timed out".into());
         }
     };
-    let _ = server.kill();
-    let _ = server.wait();
-    let server_out: Vec<String> = lines.try_iter().collect();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
     let mut summary = String::new();
-    for line in String::from_utf8_lossy(&out.stderr).lines() {
-        // Only the handshake's summary: the rest (verify depth lines, DONE) is the same or
-        // timing-dependent.
-        if [
-            "CONNECTION ESTABLISHED",
-            "Protocol version",
-            "Ciphersuite",
-            "Peer certificate",
-            "Hash used",
-            "Signature type",
-            "Verification",
-            "Peer Temp Key",
-            "Negotiated TLS1.3 group",
-            "Peer signature",
-            "Supported",
-            "Shared",
-        ]
-        .iter()
-        .any(|k| line.starts_with(k))
-        {
-            summary.push_str(line);
-            summary.push('\n');
-        }
+    let mut lines = if full {
+        stdout
+            .lines()
+            .filter(|l| CLIENT_SESSION.iter().any(|k| l.starts_with(k)))
+            .collect::<Vec<_>>()
+    } else {
+        stderr
+            .lines()
+            .filter(|l| CLIENT_SUMMARY.iter().any(|k| l.starts_with(k)))
+            .collect()
+    };
+    // What a command did (`ERROR` when it failed).
+    lines.extend(stderr.lines().filter(|l| CLIENT_COMMAND.contains(l)));
+    for line in lines {
+        summary.push_str(line);
+        summary.push('\n');
     }
-    let echo = String::from_utf8_lossy(&out.stdout);
-    let echoed = echo.lines().any(|l| l == "lssytsur olleh");
+    let echoed = stdout.lines().any(|l| l == "lssytsur olleh");
     summary.push_str(if echoed {
         "echo: ok\n"
     } else {
         "echo: MISSING\n"
     });
     if !echoed {
-        summary.push_str(&format!(
-            "client stderr: {}\nserver: {}\n",
-            String::from_utf8_lossy(&out.stderr),
-            server_out.join(" / ")
-        ));
+        summary.push_str(&format!("client stderr: {stderr}\n"));
+    }
+    Ok(summary)
+}
+
+/// One case in one pairing: the clients' summaries and what the server said of them.
+fn connect(
+    t: &Tool<'_>,
+    p: Pairing,
+    server_args: &[String],
+    client_args: &[String],
+) -> Result<String> {
+    let (args, m) = mode(client_args);
+    let port = free_port()?;
+    let naccept = if m.resume { 2 } else { 1 };
+    let (mut server, lines) = start_server(t, p.server_ours, port, naccept, server_args)?;
+    let sess = t.work.join("session.pem").display().to_string();
+    let mut runs = Vec::new();
+    if m.resume {
+        let _ = fs::remove_file(&sess);
+        let mut first = args.clone();
+        first.extend(["-sess_out".to_owned(), sess.clone()]);
+        runs.push((first, m.full));
+        let mut second = args.clone();
+        second.extend(["-sess_in".to_owned(), sess.clone()]);
+        runs.push((second, true));
+    } else {
+        runs.push((args, m.full));
+    }
+    let mut summary = String::new();
+    for (args, full) in &runs {
+        match client(t, p.client_ours, port, args, *full, m.cmd.as_deref()) {
+            Ok(s) => summary.push_str(&s),
+            Err(e) => {
+                let _ = server.kill();
+                let _ = server.wait();
+                return Err(e);
+            }
+        }
+    }
+    // The server exits after its connections (`-naccept`); its output is complete then.
+    let spid = server.id();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(server.wait());
+    });
+    let exited = rx.recv_timeout(Duration::from_secs(5)).is_ok();
+    if !exited {
+        let _ = Command::new("kill").arg(spid.to_string()).status();
+    }
+    let server_out: Vec<String> = if exited {
+        lines.iter().collect()
+    } else {
+        lines.try_iter().collect()
+    };
+    // Standard output, then standard error: the two streams arrive in no fixed order.
+    let (errs, outs): (Vec<&String>, Vec<&String>) =
+        server_out.iter().partition(|l| l.starts_with("stderr: "));
+    for line in outs.into_iter().chain(errs) {
+        let line = line.strip_prefix("stderr: ").unwrap_or(line);
+        if SERVER_SUMMARY.iter().any(|k| line.starts_with(k)) {
+            summary.push_str("server: ");
+            summary.push_str(line);
+            summary.push('\n');
+        }
+    }
+    if summary.contains("echo: MISSING") {
+        summary.push_str(&format!("server: {}\n", server_out.join(" / ")));
     }
     Ok(summary)
 }

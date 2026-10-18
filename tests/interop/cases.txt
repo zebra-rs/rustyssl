@@ -1,5 +1,8 @@
 # TLS interop cases (cargo xtask test-interop): name | s_server arguments | s_client arguments.
-# Placeholders: {rsa} {ec} {ed25519} (the server's certificate and key), {ca} (the root).
+# Placeholders: {rsa} {ec} {p521} {ed25519} (the server's certificate and key), {client} (the
+# client's), {ca} (the root), {dir} (the PKI's directory).
+# Client directives: +full (no -brief; the session lines), +resume (a second connection
+# resuming the first's session), +cmd=X (send the command line X, R or k or K, first).
 # Each case runs in four pairings (reference/reference is the expectation; the server echoes
 # lines reversed and closes on CLOSE).
 
@@ -24,3 +27,19 @@ tls12-dhe-rsa | -dhparam ffdhe2048 | {ca} -tls1_2 -cipher DHE-RSA-AES128-GCM-SHA
 tls12-rsa-kx | | {ca} -tls1_2 -cipher AES128-GCM-SHA256
 tls12-no-ems | | {ca} -tls1_2 -no_ems
 tls12-ed25519 | {ed25519} | {ca} -tls1_2
+tls13-resume | | {ca} +resume
+tls12-resume | | {ca} -tls1_2 +resume
+tls13-client-cert | -Verify 1 {ca} | {ca} {client}
+tls12-client-cert | -Verify 1 {ca} | {ca} {client} -tls1_2
+tls13-alpn | -alpn h2,http/1.1 | {ca} -alpn http/1.1 +full
+tls12-alpn | -alpn h2,http/1.1 | {ca} -alpn h2 -tls1_2 +full
+tls13-servername | -servername localhost -cert2 {dir}/ec.pem -key2 {dir}/ec.key | {ca} -servername localhost
+tls12-renegotiation | -client_renegotiation -state | {ca} -tls1_2 +full +cmd=R
+tls13-keyupdate | | {ca} +cmd=k
+tls13-keyupdate-requested | | {ca} +cmd=K
+tls13-no-middlebox | | {ca} -no_middlebox
+tls12-legacy-server-connect | | {ca} -tls1_2 -legacy_server_connect +full
+tls13-p521-cert | {p521} | {ca}
+tls12-ecdhe-ecdsa-chacha | {ec} | {ca} -tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305
+tls12-aes128-sha256 | | {ca} -tls1_2 -cipher AES128-SHA256
+tls11 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher DEFAULT@SECLEVEL=0
