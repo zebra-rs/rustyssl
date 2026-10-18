@@ -192,6 +192,9 @@ pub struct Config {
     pub mtu: usize,
     /// The certificate flags (`SSL_CERT_FLAG_*`: the Suite B modes and strict checking).
     pub cert_flags: u32,
+    /// `SSL_set_session_ticket_ext`: the client's session_ticket extension contents (`Some(None)`:
+    /// set with no data, and none is sent).
+    pub session_ticket_ext: Option<Option<Vec<u8>>>,
     /// The key of a stateless server's cookie HMAC (`cookie_hmac_key` of the session
     /// context).
     pub cookie_hmac_key: crate::crypto::Secret,

@@ -628,6 +628,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         session_cache_mode: i64::from(snap.session_cache_mode),
         session_timeout: snap.session_timeout,
         ticket_keys: Some(snap.ticket_keys.clone()),
+        session_ticket_ext: st.eap.ticket_ext.clone(),
         custom_exts: st
             .cert
             .custext
@@ -652,6 +653,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             record_padding: st.record_padding_cb.is_some(),
             allow_early_data: st.allow_early_data_cb.is_some(),
             cookie: snap.verify_stateless_cookie_cb.is_some(),
+            session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
+            session_secret: st.eap.secret_cb.is_some(),
             // SAFETY: the connection's session context, which it keeps alive.
             ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
                 .is_some_and(|c| c.state().generate_ticket_cb.is_some()),

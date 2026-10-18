@@ -149,33 +149,6 @@ pub extern "C" fn rustyssl_private_SSL_set_quic_tls_transport_params(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_session_secret_cb(
-    _: *mut SSL,
-    _: tls_session_secret_cb_fn,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_session_secret_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_session_ticket_ext(
-    _: *mut SSL,
-    _: *mut core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_session_ticket_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_session_ticket_ext_cb(
-    _: *mut SSL,
-    _: tls_session_ticket_ext_cb_fn,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_session_ticket_ext_cb")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_set_srp_server_param(
     _: *mut SSL,
     _: *const BIGNUM,

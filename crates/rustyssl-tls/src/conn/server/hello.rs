@@ -41,16 +41,18 @@ mod stage {
     pub const EXTENSIONS: u8 = 4;
     /// The server's random and signature algorithms.
     pub const RANDOM: u8 = 5;
+    /// The session secret callback (EAP-FAST).
+    pub const SECRET: u8 = 6;
     /// The certificate callback.
-    pub const CERT_CB: u8 = 6;
+    pub const CERT_CB: u8 = 7;
     /// TLS 1.2's suite choice, and the signature algorithm.
-    pub const CHOOSE: u8 = 7;
+    pub const CHOOSE: u8 = 8;
     /// The status request callback.
-    pub const STATUS: u8 = 8;
+    pub const STATUS: u8 = 9;
     /// TLS 1.2's ALPN callback.
-    pub const ALPN: u8 = 9;
+    pub const ALPN: u8 = 10;
     /// Done.
-    pub const DONE: u8 = 10;
+    pub const DONE: u8 = 11;
 }
 
 /// `RENEG_OPTIONS_OK`: the options allow a client to renegotiate.
@@ -221,8 +223,57 @@ fn early_post_process(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
                 abi::SSL_R_INVALID_COMPRESSION_ALGORITHM,
             ));
         }
+        set_stage(c, stage::SECRET)?;
+    }
+    if stage_of(c) == stage::SECRET {
+        if !session_secret(c)? {
+            return Ok(false);
+        }
         set_stage(c, stage::CERT_CB)?;
     }
+    Ok(true)
+}
+
+/// `SSL_set_session_secret_cb` (EAP-FAST): a TLS 1.0-1.2 server not resuming may resume with
+/// the callback's master secret, with its preferred suite (or one chosen from the client's).
+/// `false` while waiting.
+fn session_secret(c: &mut Connection) -> Result<bool> {
+    if c.neg.reused || c.neg.version < v::TLS1 || c.is_tls13() || !c.cfg.callbacks.session_secret {
+        return Ok(true);
+    }
+    let peer = state_ref(c)
+        .map(|s| s.peer_ciphers.clone())
+        .unwrap_or_default();
+    let r = Request::SessionSecret {
+        peer_ciphers: Some(peer.iter().map(|x| x.id).collect()),
+    };
+    let (master, pref) = match ask_once(c, r, 0) {
+        None => return Ok(false),
+        Some(Answer::SessionSecret(Some(x))) => x,
+        Some(_) => return Ok(true),
+    };
+    c.neg.session.master_key = master;
+    c.neg.reused = true;
+    c.neg.session.verify_result = i64::from(abi::X509_V_OK);
+    // RFC 4851 3.2.2: the client's session ID is echoed.
+    let sid = client_session_id(c)?;
+    if !sid.is_empty() {
+        c.neg.session.session_id = sid;
+    }
+    let cp = match pref.and_then(crate::suites::by_id) {
+        Some(cp) => Some(cp),
+        None => {
+            let server = c.cfg.ciphers.clone();
+            ciphers::choose(c, &peer, &server)
+        }
+    };
+    let Some(cp) = cp else {
+        return Err(Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_NO_SHARED_CIPHER,
+        ));
+    };
+    c.neg.session.cipher_id = cp.id;
     Ok(true)
 }
 

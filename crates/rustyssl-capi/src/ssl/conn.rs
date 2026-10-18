@@ -148,6 +148,8 @@ pub(crate) struct SslState {
     pub(crate) num_renegotiations: c_int,
     pub(crate) total_renegotiations: c_int,
     pub(crate) s3_flags: c_int,
+    /// The EAP-FAST hooks (`super::eap`).
+    pub(crate) eap: super::eap::Eap,
     pub(crate) send_connection_binding: c_int,
     pub(crate) client_random: [u8; 32],
     pub(crate) server_random: [u8; 32],
@@ -397,6 +399,7 @@ ffi_export! {
                 num_renegotiations: 0,
                 total_renegotiations: 0,
                 s3_flags: 0,
+                eap: super::eap::Eap::default(),
                 send_connection_binding: 0,
                 client_random: [0; 32],
                 server_random: [0; 32],

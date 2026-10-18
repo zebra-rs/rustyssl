@@ -135,11 +135,21 @@ pub(crate) fn ext_parse_supported_groups(
 /// `tls_parse_ctos_session_ticket`: the ticket is read by the session lookup; the
 /// `SSL_set_session_ticket_ext_cb` callback (EAP-FAST) has no request yet.
 pub(crate) fn ext_parse_session_ticket(
-    _c: &mut Connection,
+    c: &mut Connection,
     _p: &dyn Provider,
-    _body: &[u8],
+    body: &[u8],
     _x: &Ctx,
 ) -> Result<Step> {
+    if c.cfg.callbacks.session_ticket_ext {
+        let r = Request::SessionTicketExt {
+            data: body.to_vec(),
+        };
+        match ask_once(c, r, 0) {
+            None => return Ok(Step::Wait),
+            Some(Answer::Allowed(true)) => {}
+            Some(_) => return Err(Error::internal()),
+        }
+    }
     Ok(Step::Done)
 }
 

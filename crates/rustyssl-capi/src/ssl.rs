@@ -18,6 +18,7 @@ pub(crate) mod ctx;
 pub(crate) mod custom;
 pub(crate) mod dane;
 pub(crate) mod dup;
+pub(crate) mod eap;
 pub(crate) mod early;
 pub(crate) mod io;
 pub(crate) mod keys;

@@ -506,6 +506,20 @@ fn read_transition12(c: &mut Connection, mt: u8) -> bool {
     let to = if is(abi::TLS_ST_CW_CLNT_HELLO) || is(abi::TLS_ST_EARLY_DATA) {
         (mt == hm::SERVER_HELLO && !ccs).then_some(abi::TLS_ST_CR_SRVR_HELLO)
     } else if is(abi::TLS_ST_CR_SRVR_HELLO) {
+        if !c.neg.reused
+            && ccs
+            && c.neg.version >= crate::consts::version::TLS1
+            && c.cfg.callbacks.session_secret
+            && c.neg.session.ticket.is_some()
+        {
+            // EAP-FAST: the server resumes with the session secret if its next message is a
+            // ChangeCipherSpec.
+            c.neg.reused = true;
+            c.neg.master_secret = c.neg.session.master_key.clone();
+            c.neg.ems = c.neg.session.ems;
+            go(c, abi::TLS_ST_CR_CHANGE);
+            return true;
+        }
         if c.neg.reused {
             if c.hs.sh.ticket_expected {
                 (mt == hm::NEW_SESSION_TICKET && !ccs).then_some(abi::TLS_ST_CR_SESSION_TICKET)

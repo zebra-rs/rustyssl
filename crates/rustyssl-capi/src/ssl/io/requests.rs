@@ -239,6 +239,14 @@ pub(crate) unsafe fn handle(
         }
         // SAFETY: as above.
         Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
+        Request::SessionTicketExt { data } => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::eap::ticket_ext(s, x, &data) })
+        }
+        Request::SessionSecret { peer_ciphers } => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::eap::secret(s, x, peer_ciphers.as_deref()) })
+        }
         // SAFETY: as above.
         Request::TicketGenerate => Some(unsafe { ticket_generate(s, x) }),
         Request::TicketDecrypt {

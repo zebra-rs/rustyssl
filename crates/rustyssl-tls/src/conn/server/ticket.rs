@@ -286,7 +286,9 @@ pub(crate) fn decrypt_ticket(
     } else {
         r
     };
-    if matches!(r, Ticket::NoDecrypt | Ticket::Renew(_) | Ticket::Empty) {
+    if (!c.cfg.callbacks.session_secret || c.is_tls13())
+        && matches!(r, Ticket::NoDecrypt | Ticket::Renew(_) | Ticket::Empty)
+    {
         c.hs.sh.ticket_expected = true;
     }
     Ok(Some(r))
@@ -345,6 +347,10 @@ fn decrypt_inner(
 ) -> Result<Option<Ticket>> {
     if etick.is_empty() {
         return Ok(Some(Ticket::Empty));
+    }
+    if !c.is_tls13() && c.cfg.callbacks.session_secret {
+        // The master secret comes from the session secret callback later (EAP-FAST).
+        return Ok(Some(Ticket::NoDecrypt));
     }
     let header = KEYNAME_LEN.saturating_add(IV_LEN);
     let (Some(name), Some(iv)) = (etick.get(..KEYNAME_LEN), etick.get(KEYNAME_LEN..header)) else {

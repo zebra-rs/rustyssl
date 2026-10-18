@@ -51,6 +51,10 @@ pub struct Callbacks {
     pub ticket_gen: bool,
     /// See `ticket_gen`: decrypt.
     pub ticket_dec: bool,
+    /// `SSL_set_session_ticket_ext_cb`.
+    pub session_ticket_ext: bool,
+    /// `SSL_set_session_secret_cb`.
+    pub session_secret: bool,
     /// `SSL_CTX_set_record_padding_callback`.
     pub record_padding: bool,
     /// `SSL_CTX_set_allow_early_data_cb`.
@@ -143,6 +147,18 @@ pub enum Request {
     },
     /// Whether to accept the client's early data (`allow_early_data_cb`).
     AllowEarlyData,
+    /// The session_ticket extension's contents for `SSL_set_session_ticket_ext_cb`'s callback:
+    /// answered [`Answer::Allowed`].
+    SessionTicketExt {
+        /// The extension's contents.
+        data: Vec<u8>,
+    },
+    /// `SSL_set_session_secret_cb`'s callback (EAP-FAST): the master secret to resume with,
+    /// given (on a server) the client's suites' ids; answered [`Answer::SessionSecret`].
+    SessionSecret {
+        /// The client's suites (server side), or `None` (client side).
+        peer_ciphers: Option<Vec<u32>>,
+    },
     /// A server's ticket is about to be made (`generate_ticket_cb`): answered
     /// [`Answer::TicketAppData`] with the application data to put in it, or [`Answer::Fail`].
     TicketGenerate,
@@ -234,6 +250,9 @@ pub enum Answer {
     Cookie(Option<Vec<u8>>),
     /// The application data for a ticket being made.
     TicketAppData(Option<Vec<u8>>),
+    /// The session secret callback's master secret and preferred suite's id, or `None` when it
+    /// gave none.
+    SessionSecret(Option<(Vec<u8>, Option<u32>)>),
     /// The ticket decryption callback's `SSL_TICKET_RETURN_*`.
     TicketDecrypt(i32),
     /// The record padding callback's padding length.

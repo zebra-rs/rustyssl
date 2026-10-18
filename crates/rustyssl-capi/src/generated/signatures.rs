@@ -20975,6 +20975,21 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_uint,
 ) -> core::ffi::c_int = crate::ssl::conn::rustyssl_private_SSL_set_session_id_context;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    tls_session_secret_cb_fn,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::eap::rustyssl_private_SSL_set_session_secret_cb;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ssl::eap::rustyssl_private_SSL_set_session_ticket_ext;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    tls_session_ticket_ext_cb_fn,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::eap::rustyssl_private_SSL_set_session_ticket_ext_cb;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) =
     crate::ssl::accessors::rustyssl_private_SSL_set_shutdown;
 const _: unsafe extern "C" fn(*mut SSL, *const SSL_METHOD) -> core::ffi::c_int =
