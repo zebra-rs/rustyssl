@@ -609,3 +609,9 @@ name = "ts_d2i"
 path = "fuzz_targets/ts_d2i.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "http_response"
+path = "fuzz_targets/http_response.rs"
+test = false
+doc = false

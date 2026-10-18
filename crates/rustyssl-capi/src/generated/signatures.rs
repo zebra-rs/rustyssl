@@ -9211,6 +9211,17 @@ const _: unsafe extern "C" fn(*mut OCSP_RESPONSE) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
     crate::ocsp::prn::OCSP_response_status_str;
 const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *mut OCSP_REQUEST,
+) -> *mut OCSP_RESPONSE = crate::ocsp::http::OCSP_sendreq_bio;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *const OCSP_REQUEST,
+    core::ffi::c_int,
+) -> *mut OSSL_HTTP_REQ_CTX = crate::ocsp::http::OCSP_sendreq_new;
+const _: unsafe extern "C" fn(
     *mut OCSP_SINGLERESP,
     *mut core::ffi::c_int,
     *mut *mut ASN1_GENERALIZEDTIME,
@@ -9915,6 +9926,146 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut OSSL_HPKE_SUITE) ->
     crate::hpke::OSSL_HPKE_str2suite;
 const _: unsafe extern "C" fn(OSSL_HPKE_SUITE) -> core::ffi::c_int =
     crate::hpke::OSSL_HPKE_suite_check;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_REQ_CTX_add1_header;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX) -> *mut BIO =
+    crate::http_client::OSSL_HTTP_REQ_CTX_exchange;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX) = crate::http_client::OSSL_HTTP_REQ_CTX_free;
+const _: unsafe extern "C" fn(*const OSSL_HTTP_REQ_CTX) -> *mut BIO =
+    crate::http_client::OSSL_HTTP_REQ_CTX_get0_mem_bio;
+const _: unsafe extern "C" fn(*const OSSL_HTTP_REQ_CTX) -> usize =
+    crate::http_client::OSSL_HTTP_REQ_CTX_get_resp_len;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX) -> core::ffi::c_int =
+    crate::http_client::OSSL_HTTP_REQ_CTX_nbio;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    *mut *mut ASN1_VALUE,
+    *const ASN1_ITEM,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_REQ_CTX_nbio_d2i;
+const _: unsafe extern "C" fn(*mut BIO, *mut BIO, core::ffi::c_int) -> *mut OSSL_HTTP_REQ_CTX =
+    crate::http_client::OSSL_HTTP_REQ_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    *const core::ffi::c_char,
+    *const ASN1_ITEM,
+    *const ASN1_VALUE,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_REQ_CTX_set1_req;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_REQ_CTX_set_expected;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX, usize) =
+    crate::http_client::OSSL_HTTP_REQ_CTX_set_max_response_hdr_lines;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX, core::ffi::c_ulong) =
+    crate::http_client::OSSL_HTTP_REQ_CTX_set_max_response_length;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_REQ_CTX_set_request_line;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *const core::ffi::c_char = crate::http_lib::OSSL_HTTP_adapt_proxy;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::http_client::OSSL_HTTP_close;
+const _: unsafe extern "C" fn(*mut OSSL_HTTP_REQ_CTX, *mut *mut core::ffi::c_char) -> *mut BIO =
+    crate::http_client::OSSL_HTTP_exchange;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *mut BIO,
+    OSSL_HTTP_bio_cb_t,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    *const stack_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    usize,
+    core::ffi::c_int,
+) -> *mut BIO = crate::http_client::OSSL_HTTP_get;
+const _: unsafe extern "C" fn(*const OSSL_HTTP_REQ_CTX) -> core::ffi::c_int =
+    crate::http_client::OSSL_HTTP_is_alive;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut BIO,
+    *mut BIO,
+    OSSL_HTTP_bio_cb_t,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut OSSL_HTTP_REQ_CTX = crate::http_client::OSSL_HTTP_open;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut core::ffi::c_int,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::http_lib::OSSL_HTTP_parse_url;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut BIO,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_proxy_connect;
+const _: unsafe extern "C" fn(
+    *mut OSSL_HTTP_REQ_CTX,
+    *const core::ffi::c_char,
+    *const stack_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    usize,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::http_client::OSSL_HTTP_set1_request;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_HTTP_REQ_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *mut BIO,
+    OSSL_HTTP_bio_cb_t,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    *const stack_st_CONF_VALUE,
+    *const core::ffi::c_char,
+    *mut BIO,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    usize,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut BIO = crate::http_client::OSSL_HTTP_transfer;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_get_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =
@@ -14414,6 +14565,12 @@ const _: unsafe extern "C" fn(*const X509_CRL) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(*const X509_CRL) -> core::ffi::c_long =
     crate::x509::crl::X509_CRL_get_version;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::crl::X509_CRL_it;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut BIO,
+    *mut BIO,
+    core::ffi::c_int,
+) -> *mut X509_CRL = crate::http_client::X509_CRL_load_http;
 const _: unsafe extern "C" fn(*const X509_CRL, *const X509_CRL) -> core::ffi::c_int =
     crate::x509::crl::X509_CRL_match;
 const _: unsafe extern "C" fn() -> *mut X509_CRL = crate::x509::crl::X509_CRL_new;
@@ -15752,6 +15909,12 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::x509::lookup::X509_load_crl_file;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut BIO,
+    *mut BIO,
+    core::ffi::c_int,
+) -> *mut X509 = crate::http_client::X509_load_http;
 const _: unsafe extern "C" fn() -> *mut X509 = crate::x509::cert::X509_new;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut X509 =
     crate::x509::cert::X509_new_ex;

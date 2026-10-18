@@ -88,7 +88,7 @@ struct Arg {
 
 /// `strtoul(s, &end, 10)`: the value (wrapped as C's is) and how many octets it read (0 if no
 /// digits).
-fn strtoul10(s: &[u8]) -> (u64, usize) {
+pub(crate) fn strtoul10(s: &[u8]) -> (u64, usize) {
     let mut i = s
         .iter()
         .take_while(|c| matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r'))

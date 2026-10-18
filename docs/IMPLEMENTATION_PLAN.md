@@ -5044,9 +5044,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   none). Tests: `tests/c/ts.c` (176 checks: the reference tool's request, reply, and token;
   responses made with fixed times and serials; rejections and verification failures with
   their error texts; a configured TSA), the `ts_d2i` fuzz target.
-- [ ] **6.8 HTTP client** (`OSSL_HTTP_*`): get and transfer, proxies and `no_proxy` (the
-  CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits;
-  then `OCSP_sendreq_new` and `OCSP_sendreq_bio` over it.
+- [x] **6.8 HTTP client** (`http_client.rs` from `http_client.c`, `http_lib.rs` from
+  `http_lib.c`, `ocsp/http.rs` from `ocsp_http.c`; 29 exports): `OSSL_HTTP_REQ_CTX` and its
+  non-blocking exchange (the response parsed line by line within the buffer's size, header-line
+  and content limits, ASN.1 lengths checked against `Content-Length`, CR and LF refused in what
+  goes into a request), `OSSL_HTTP_open`/`_set1_request`/`_exchange`/`_get` (redirections:
+  GET only, at most 50, never HTTPS to HTTP)/`_transfer`/`_close`, the TLS callback,
+  `OSSL_HTTP_proxy_connect`, `OSSL_HTTP_parse_url`, `OSSL_HTTP_adapt_proxy` (the `no_proxy`
+  check bounded, CVE-2025-9232), `OCSP_sendreq_new`/`_bio`, and `X509_load_http` and
+  `X509_CRL_load_http`. As in OpenSSL's default build there is no tracing, so a failed
+  response's error content is not read. Tests: `tests/c/http.c` (canned responses over memory
+  BIOs, and a server forked on the loopback interface for GET, redirections, a proxy,
+  `CONNECT`, OCSP, and loading by URL), the `http_response` fuzz target.
 - [ ] **6.9 OSSL_STORE:** the `file:` loader (PEM bundles, DER, PKCS#12, directories),
   `OSSL_STORE_INFO`, search, and custom `OSSL_STORE_LOADER` registration; then the URIs of
   `X509_LOOKUP_store` and `X509_STORE_load_store`, which abort until then (5.3b).
