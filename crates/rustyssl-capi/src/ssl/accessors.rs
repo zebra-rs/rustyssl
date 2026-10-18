@@ -28,6 +28,16 @@ ffi_export! {
     }
 }
 
+/// The connection's options, given to its core too: OpenSSL reads them where it uses them
+/// (`SSL_OP_NO_EXTENDED_MASTER_SECRET` set before `SSL_renegotiate`, say).
+fn sync_options(st: &mut conn::SslState) -> u64 {
+    let options = st.options;
+    if let Some(c) = st.drv.tls.as_mut() {
+        c.config_mut().options = options;
+    }
+    options
+}
+
 ffi_export! {
     /// Removes `a` from the options; returns them.
     ///
@@ -72,7 +82,7 @@ ffi_export! {
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.options |= a;
-        st.options
+        sync_options(&mut st)
     }
 }
 
@@ -89,7 +99,7 @@ ffi_export! {
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.options &= !a;
-        st.options
+        sync_options(&mut st)
     }
 }
 
@@ -1114,6 +1124,7 @@ ffi_export! {
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
         st.record_padding_arg = a;
+        st.padding_cell.lock().unwrap_or_else(std::sync::PoisonError::into_inner).1 = a;
     }
 }
 

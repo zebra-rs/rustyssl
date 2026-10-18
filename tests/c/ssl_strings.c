@@ -172,9 +172,10 @@ static void info_cb(const SSL *x, int where, int ret)
                SSL_alert_type_string_long(ret), SSL_alert_desc_string_long(ret));
         return;
     }
-    printf("    %s %s: %s [%s] %s/%s\n", SSL_is_server(x) ? "server" : "client",
+    printf("    %s %s: %s [%s] %s/%s%s\n", SSL_is_server(x) ? "server" : "client",
            where_name(where), SSL_state_string_long(x), SSL_state_string(x),
-           SSL_rstate_string(x), SSL_rstate_string_long(x));
+           SSL_rstate_string(x), SSL_rstate_string_long(x),
+           SSL_in_init((SSL *)x) ? "" : " (not in init)");
 }
 
 static int accept_any(int ok, X509_STORE_CTX *ctx)
@@ -343,6 +344,12 @@ static void names(struct link *l)
            SSL_get_version(l->c), (unsigned)SSL_version(l->c), (unsigned)SSL_version(l->s),
            (unsigned)SSL_client_version(l->s),
            sess != NULL ? (unsigned)SSL_SESSION_get_protocol_version(sess) : 0u);
+    /* A resumed TLS 1.2 handshake reports the original's group (the session's). */
+    printf("  group %s / %s\n", OBJ_nid2sn(SSL_get_negotiated_group(l->c)),
+           OBJ_nid2sn(SSL_get_negotiated_group(l->s)));
+    /* The server's view of the ClientHello's suites, after the handshake. */
+    printf("  client's suites %d, shared %s\n", sk_SSL_CIPHER_num(SSL_get_client_ciphers(l->s)),
+           SSL_get_shared_ciphers(l->s, buf, sizeof(buf)) != NULL ? buf : "(none)");
     printf("  states: %s / %s, read %s / %s\n", SSL_state_string_long(l->c),
            SSL_state_string_long(l->s), SSL_rstate_string_long(l->c), SSL_rstate_string_long(l->s));
     printf("  suite %s (%s, %s) %s\n", SSL_CIPHER_get_name(ci), SSL_CIPHER_standard_name(ci),
@@ -497,12 +504,18 @@ static void test_post_handshake(void)
     /* No application data in flight: OpenSSL takes it during a renegotiation only in SSL_read. */
     contexts(&c, &s, TLS1_2_VERSION, TLS1_2_VERSION);
     SSL_CTX_set_options(s, SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
+    SSL_CTX_set_cipher_list(c, "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256");
     printf("# TLS 1.2 renegotiation\n");
     link_up(&l, c, s);
     check(pump(&l), "the first handshake");
+    printf("  suite %s\n", SSL_CIPHER_get_name(SSL_get_current_cipher(l.c)));
+    /* The renegotiation offers the cipher list set since. */
+    check(SSL_set_cipher_list(l.c, "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"),
+          "a new cipher list");
     check(SSL_renegotiate(l.c) == 1, "SSL_renegotiate");
     check(pump(&l), "the renegotiation");
     check(SSL_num_renegotiations(l.c) == 1, "renegotiated");
+    printf("  suite %s\n", SSL_CIPHER_get_name(SSL_get_current_cipher(l.c)));
     exchange(&l);
     printf("# a HelloRequest\n");
     check(SSL_renegotiate(l.s) == 1, "the server's SSL_renegotiate");

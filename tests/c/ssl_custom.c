@@ -494,6 +494,33 @@ static void test_serverinfo(void)
     SSL_CTX_free(cctx);
     SSL_CTX_free(sctx);
     SSL_CTX_free(empty);
+
+    /* Without CT, a custom extension takes the SCT type: the server has no parser of its own
+     * for it, so the client's empty one is the custom extension's, and the server answers
+     * from its information. */
+    {
+        static const unsigned char sct[] = { 0x00, 0x12, 0x00, 0x03, 's', 'c', 't' };
+        static const unsigned char sct13[] = { 0x00, 0x00, 0x10, 0x81, 0x00, 0x12, 0x00, 0x03,
+                                               't', '1', '3' };
+
+        printf("# the SCT extension as a custom one\n");
+        cctx = client_ctx();
+        sctx = server_ctx();
+        SSL_CTX_use_serverinfo(sctx, sct, sizeof(sct));
+        SSL_CTX_add_custom_ext(cctx, 18, SSL_EXT_TLS1_2_AND_BELOW_ONLY | SSL_EXT_CLIENT_HELLO
+                               | SSL_EXT_TLS1_2_SERVER_HELLO, NULL, NULL, NULL, new_parse, "c");
+        check(handshake(cctx, sctx, TLS1_2_VERSION) == 0, "a TLS 1.2 handshake");
+        SSL_CTX_free(cctx);
+        SSL_CTX_free(sctx);
+        cctx = client_ctx();
+        sctx = server_ctx();
+        SSL_CTX_use_serverinfo_ex(sctx, SSL_SERVERINFOV2, sct13, sizeof(sct13));
+        SSL_CTX_add_custom_ext(cctx, 18, SSL_EXT_CLIENT_HELLO | SSL_EXT_TLS1_3_CERTIFICATE
+                               | SSL_EXT_TLS1_2_SERVER_HELLO, NULL, NULL, NULL, new_parse, "c");
+        check(handshake(cctx, sctx, TLS1_3_VERSION) == 0, "a TLS 1.3 handshake");
+        SSL_CTX_free(cctx);
+        SSL_CTX_free(sctx);
+    }
 }
 
 int main(void)

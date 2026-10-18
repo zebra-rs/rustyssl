@@ -114,6 +114,8 @@ pub struct State {
     psk_hint: Option<Vec<u8>>,
     /// TLS 1.2's PSK (`s->s3.tmp.psk`).
     psk: Option<Secret>,
+    /// An SRP client's A (`s->srp_ctx.A`), made at the ServerHelloDone.
+    srp_a: Option<Vec<u8>>,
     /// The early data the session allows (`s->max_early_data`).
     max_early_data: u32,
     /// The suite of the session that early data is sent under.

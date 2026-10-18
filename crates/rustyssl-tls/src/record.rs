@@ -1059,6 +1059,24 @@ pub enum Padding {
     Exact(usize),
 }
 
+/// The application's record padding callback, as capi wraps it.
+#[derive(Clone)]
+pub struct PaddingHook {
+    /// A TLS 1.3 record's content type and length (with the type octet) to the padding to
+    /// add; `None` when there is no callback now.
+    pub pad: std::sync::Arc<dyn Fn(ContentType, usize) -> Option<usize> + Send + Sync>,
+    /// Whether there is a callback now: asked when a write epoch starts, which pads with the
+    /// callback for its lifetime if so (OpenSSL's record layer takes the padding function
+    /// when it is made).
+    pub present: std::sync::Arc<dyn Fn() -> bool + Send + Sync>,
+}
+
+impl core::fmt::Debug for PaddingHook {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("PaddingHook")
+    }
+}
+
 /// The write side of the record layer.
 #[derive(Debug)]
 pub struct RecordWriter {
@@ -1072,6 +1090,11 @@ pub struct RecordWriter {
     pub max_frag_len: usize,
     /// TLS 1.3's padding.
     pub padding: Padding,
+    /// The record padding callback, which takes the place of `padding` in an epoch that
+    /// started with it set (`tls13_add_record_padding`).
+    pub pad_hook: Option<PaddingHook>,
+    /// Whether this epoch pads with the callback.
+    pad_with_hook: bool,
     /// TLS 1.0 CBC's empty-fragment countermeasure (off with `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS`).
     pub empty_fragments: bool,
     /// TLS 1.3: send alerts in the clear (before the keys are known).
@@ -1089,6 +1112,8 @@ impl RecordWriter {
             version,
             max_frag_len: MAX_PLAIN,
             padding: Padding::None,
+            pad_hook: None,
+            pad_with_hook: false,
             empty_fragments: false,
             plain_alerts: false,
         }
@@ -1099,6 +1124,7 @@ impl RecordWriter {
         self.mode = mode;
         self.protection = protection;
         self.seq = 0;
+        self.pad_with_hook = self.pad_hook.as_ref().is_some_and(|h| (h.present)());
     }
 
     /// The current protection's mode.
@@ -1162,7 +1188,9 @@ impl RecordWriter {
                 } else {
                     let mut inner = data.to_vec();
                     inner.push(ty);
-                    pad13(&mut inner, ty, self.padding, self.max_frag_len);
+                    let hook = self.pad_hook.as_ref().filter(|_| self.pad_with_hook);
+                    let pad = padding_for(hook, self.padding, ty, inner.len(), self.max_frag_len);
+                    pad13(&mut inner, ty, pad, self.max_frag_len);
                     let seq = next_seq(&mut self.seq)?;
                     let nonce = xor_nonce(iv.bytes(), seq);
                     let len = inner.len().saturating_add(*tag_len);
@@ -1174,7 +1202,9 @@ impl RecordWriter {
             Protection::Tls13Integrity { hash, key, iv } => {
                 let mut inner = data.to_vec();
                 inner.push(ty);
-                pad13(&mut inner, ty, self.padding, self.max_frag_len);
+                let hook = self.pad_hook.as_ref().filter(|_| self.pad_with_hook);
+                let pad = padding_for(hook, self.padding, ty, inner.len(), self.max_frag_len);
+                pad13(&mut inner, ty, pad, self.max_frag_len);
                 let seq = next_seq(&mut self.seq)?;
                 let nonce = xor_nonce(iv.bytes(), seq);
                 let header = header_bytes(
@@ -1296,6 +1326,25 @@ fn cbc_seal(
             }
             Ok(body)
         }
+    }
+}
+
+/// A record's padding: the callback's answer (asked only while the record has room for
+/// padding, as OpenSSL asks), else the configured padding.
+fn padding_for(
+    hook: Option<&PaddingHook>,
+    padding: Padding,
+    ty: ContentType,
+    rlen: usize,
+    max_frag_len: usize,
+) -> Padding {
+    if rlen >= max_frag_len {
+        return padding;
+    }
+    match hook.map(|h| (h.pad)(ty, rlen)) {
+        // An epoch made with the callback calls it (none now: no padding).
+        Some(n) => Padding::Exact(n.unwrap_or(0)),
+        None => padding,
     }
 }
 

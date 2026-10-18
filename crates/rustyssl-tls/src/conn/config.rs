@@ -88,6 +88,9 @@ pub struct Session {
     pub ext_flags: u32,
     /// The application's data carried in its ticket (`SSL_SESSION_set1_ticket_appdata`).
     pub ticket_appdata: Option<Vec<u8>>,
+    /// The group of its key exchange (`kex_group`; 0: none, as for TLS 1.2's FFDHE), which a
+    /// resumed TLS 1.2 handshake reports (`SSL_get_negotiated_group`).
+    pub kex_group: u16,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the
@@ -124,6 +127,9 @@ pub struct Config {
     /// The groups in preference order (`SSL_set1_groups_list`), with those that get an initial
     /// key share marked (3.5's `*` syntax; the default's first of each tuple).
     pub groups: Vec<u16>,
+    /// Whether the application set an empty group list (no groups at all; an empty `groups`
+    /// otherwise means the default list).
+    pub no_groups: bool,
     /// The groups a client sends key shares for in its first ClientHello.
     pub key_share_groups: Vec<u16>,
     /// The 3.5 group list's tuples (indices into `groups` where each tuple starts), for the
@@ -176,6 +182,10 @@ pub struct Config {
     pub post_handshake_auth: bool,
     /// `SSL_set_tlsext_status_type` (client asks for OCSP).
     pub status_request: bool,
+    /// `SSL_set_tlsext_status_ids`: the responder IDs a client sends, DER each.
+    pub ocsp_ids: Vec<Vec<u8>>,
+    /// `SSL_set_tlsext_status_exts`: the request extensions a client sends, DER (empty: none).
+    pub ocsp_exts: Vec<u8>,
     /// `SSL_enable_ct`'s request for SCTs.
     pub request_scts: bool,
     /// The certificate compression algorithms allowed, in preference order (RFC 8879 ids).
@@ -213,6 +223,12 @@ pub struct Config {
     /// Whether SRP is configured (a client's `SSL_set_srp_username`, so `srp_Mask` has
     /// `SSL_kSRP`); without it SRP suites are disabled.
     pub srp: bool,
+    /// A client's SRP login (`s->srp_ctx.login`, at most 255 octets), sent in the srp
+    /// extension.
+    pub srp_login: Option<Vec<u8>>,
+    /// A client's minimum SRP prime size in bits (`s->srp_ctx.strength`, `SRP_MINIMAL_N` by
+    /// default).
+    pub srp_strength: i32,
     /// Whether a server can do DHE: DH parameters set (`SSL_set0_tmp_dh_pkey`), a
     /// `tmp_dh_callback`, or `SSL_set_dh_auto`.
     pub dh_tmp: bool,

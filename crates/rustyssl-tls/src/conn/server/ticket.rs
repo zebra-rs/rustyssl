@@ -599,6 +599,10 @@ pub(crate) fn construct_new_session_ticket(
         (s, 0, [0; TICKET_NONCE_SIZE])
     };
     let mut session = session;
+    // `kex_group`: this handshake's, or (a resumption without a key exchange) the original's.
+    if let Some(g) = c.neg.group {
+        session.kex_group = g;
+    }
     if c.cfg.callbacks.ticket_gen {
         // One answer per ticket.
         let tag = usize::try_from(state(c)?.next_ticket_nonce).unwrap_or(usize::MAX);
@@ -906,7 +910,10 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     w.vec(1, &s.master_key).map_err(e)?;
     w.u8(u8::from(s.ems));
     w.u32(s.ticket_age_add);
-    w.u64(s.ticket_lifetime_hint);
+    // Four octets (the NewSessionTicket's), and the group in two: the format-1 ticket's
+    // length stays the reference's.
+    w.u32(u32::try_from(s.ticket_lifetime_hint).unwrap_or(u32::MAX));
+    w.u16(s.kex_group);
     w.u64(u64::from_ne_bytes(s.time.to_ne_bytes()));
     w.u64(u64::from_ne_bytes(s.timeout.to_ne_bytes()));
     w.u32(s.max_early_data);
@@ -955,7 +962,8 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         _ => return None,
     };
     let ticket_age_add = rd.u32().ok()?;
-    let ticket_lifetime_hint = rd.u64().ok()?;
+    let ticket_lifetime_hint = u64::from(rd.u32().ok()?);
+    let kex_group = rd.u16().ok()?;
     let time = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let timeout = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let max_early_data = rd.u32().ok()?;
@@ -1013,6 +1021,7 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         verify_result,
         max_fragment_len_mode,
         ext_flags,
+        kex_group,
         ticket_appdata,
     })
 }

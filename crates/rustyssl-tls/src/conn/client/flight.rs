@@ -302,9 +302,16 @@ pub(super) fn process_key_exchange(
     let mut signer = None;
     if mkey & (SSL_kPSK | SSL_kRSAPSK) != 0 {
     } else if mkey & SSL_kSRP != 0 {
-        // SRP suites are disabled without a username (`SSL_set_srp_username`), which this
-        // configuration can't give: never negotiated.
-        return Err(Error::internal());
+        let crate::msgs::kx::ServerParams::Srp { n, g, s, b } = ske::srp(&mut rd)? else {
+            return Err(Error::internal());
+        };
+        let params = crate::conn::SrpParams { n, g, s, b };
+        if !crate::conn::common::srp::verify_server_param(c, &params)? {
+            return Ok(MsgProcess::Ask);
+        }
+        if auth & (SSL_aRSA | SSL_aDSS) != 0 {
+            signer = peer_pkey(c, p);
+        }
     } else if mkey & (SSL_kDHE | SSL_kDHEPSK) != 0 {
         let crate::msgs::kx::ServerParams::Dhe { p: prime, g, ys } = ske::dhe(&mut rd)? else {
             return Err(Error::internal());
@@ -473,6 +480,18 @@ pub(super) fn process_server_done(
     if !body.is_empty() {
         return Err(Error::decode(abi::SSL_R_LENGTH_MISMATCH));
     }
+    if c.hs.new_cipher.is_some_and(|cp| cp.mkey & SSL_kSRP != 0) {
+        match ask_once(c, Request::SrpClientA, 0) {
+            None => return Ok(MsgProcess::Ask),
+            Some(Answer::SrpValue(Some(a))) => state(c)?.srp_a = Some(a),
+            Some(_) => {
+                return Err(Error::alert(
+                    abi::SSL_AD_INTERNAL_ERROR,
+                    abi::SSL_R_SRP_A_CALC,
+                ));
+            }
+        }
+    }
     if !initial_server_flight(c, p)? {
         return Ok(MsgProcess::Ask);
     }
@@ -549,7 +568,11 @@ fn status_result(a: &Answer) -> Result<()> {
 pub(super) fn initial_server_flight(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
     check_cert_and_algorithm(c, p)?;
     if status_wanted(c) {
-        let Some(a) = ask_once(c, Request::Status, 0) else {
+        let req = Request::Status {
+            ocsp_ids: Vec::new(),
+            ocsp_exts: Vec::new(),
+        };
+        let Some(a) = ask_once(c, req, 0) else {
             return Ok(false);
         };
         status_result(&a)?;
@@ -615,7 +638,11 @@ pub(super) fn initial_flight_answers(
         return Ok(true);
     }
     if status_wanted(c) {
-        match ask_once(c, Request::Status, 0) {
+        let req = Request::Status {
+            ocsp_ids: Vec::new(),
+            ocsp_exts: Vec::new(),
+        };
+        match ask_once(c, req, 0) {
             None => return Ok(false),
             Some(a) if status_result(&a).is_err() => return Ok(true),
             Some(_) => {}

@@ -25,7 +25,7 @@ use std::collections::VecDeque;
 use rustyssl_abi as abi;
 
 pub use config::{CertKey, Config, ExternalPsk, Session, TicketKeys};
-pub use event::{Answer, Callbacks, Event, Request};
+pub use event::{Answer, Callbacks, Event, Request, SrpParams};
 
 use self::statem::{HsBytes, MsgFlow, Statem, msgs_type, st};
 use crate::crypto::Provider;
@@ -153,6 +153,9 @@ pub struct Negotiated {
     pub exporter_master: Vec<u8>,
     /// See `exporter_master`.
     pub early_exporter_master: Vec<u8>,
+    /// The suite the early secrets were made for (the PSK's), whose hash the early exporter
+    /// uses until a suite is negotiated.
+    pub early_cipher: Option<&'static Cipher>,
 }
 
 /// A ClientHello and its collected extensions (type, body) in received order
@@ -232,7 +235,10 @@ pub struct Connection {
     /// answer.
     pub(crate) cur_msg: Option<(u8, Vec<u8>)>,
     /// Events to report before anything else happens.
-    events: VecDeque<Event>,
+    events: VecDeque<(Event, bool)>,
+    /// Whether the connection was in init when the event [`Connection::step`] last returned from
+    /// the queue was raised (`None`: the last event is current).
+    event_in_init: Option<bool>,
     /// The request waiting for an answer.
     pending: Option<Request>,
     /// The answer, waiting for the code that asked.
@@ -328,11 +334,21 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        let mut rw = RecordWriter::new(record_version);
+        // `ssl_get_max_send_fragment` (0: unset, the default).
+        if cfg.max_send_fragment > 0 {
+            rw.max_frag_len = cfg.max_send_fragment.min(rw.max_frag_len);
+        }
+        // `SSL_CTX_set_block_padding_ex`, for TLS 1.3's protected records.
+        let (app, hs) = cfg.block_padding;
+        if app > 0 || hs > 0 {
+            rw.padding = record::Padding::Block(app, hs);
+        }
         Self {
             cfg,
             st: Statem::default(),
             rr: RecordReader::new(server),
-            rw: RecordWriter::new(record_version),
+            rw,
             hs: Handshake {
                 // `SSL_new`'s `key_update`: none pending, on either side (fork M).
                 sh: common::Shared {
@@ -350,6 +366,7 @@ impl Connection {
             hs_in: Vec::new(),
             cur_msg: None,
             events: VecDeque::new(),
+            event_in_init: None,
             pending: None,
             answer: None,
             pending_construct: false,
@@ -417,12 +434,30 @@ impl Connection {
         &mut self.cfg
     }
 
+    /// `SSL_set_max_send_fragment` on a running connection: the records written from now on
+    /// carry at most `n` octets, or the negotiated maximum fragment length if that's less.
+    pub fn set_max_send_fragment(&mut self, n: usize) {
+        self.cfg.max_send_fragment = n;
+        let negotiated =
+            crate::conn::common::ext::max_fragment_length(self.neg.session.max_fragment_len_mode);
+        self.rw.max_frag_len = negotiated
+            .map_or(n, |len| n.min(len))
+            .clamp(1, crate::record::MAX_PLAIN);
+    }
+
     /// Installs the application's security callback (`SSL_CTX_set_security_callback`), which
     /// the core calls in place, synchronously, wherever OpenSSL calls `ssl_security`; it is
     /// used while the configuration's `custom_security_callback` is set. The hook must not
     /// call back into this connection.
     pub fn set_security_hook(&mut self, hook: Option<common::SecurityHook>) {
         self.security_hook = hook;
+    }
+
+    /// Installs the application's record padding callback
+    /// (`SSL_CTX_set_record_padding_callback`), which the record layer calls in place for
+    /// each protected TLS 1.3 record. The hook must not call back into this connection.
+    pub fn set_padding_hook(&mut self, hook: Option<record::PaddingHook>) {
+        self.rw.pad_hook = hook;
     }
 
     /// What was negotiated so far.
@@ -476,6 +511,14 @@ impl Connection {
     #[must_use]
     pub fn in_init(&self) -> bool {
         self.st.in_init || self.st.state == MsgFlow::Uninited
+    }
+
+    /// [`Connection::in_init`] as of the event [`Connection::step`] last returned: an event
+    /// raised before the state machine moved on (`SSL_CB_HANDSHAKE_DONE` out of init, the
+    /// tickets after it back in) reports the state it was raised in, as OpenSSL's callbacks see.
+    #[must_use]
+    pub fn event_in_init(&self) -> bool {
+        self.event_in_init.unwrap_or_else(|| self.in_init())
     }
 
     /// Whether no handshake has started (`SSL_in_before`).
@@ -589,7 +632,8 @@ impl Connection {
     /// # Errors
     /// The connection failed: the alert (if any) is in the output, and the error says why.
     pub fn step(&mut self, p: &dyn Provider, reading: bool) -> Result<Event> {
-        if let Some(e) = self.events.pop_front() {
+        self.event_in_init = None;
+        if let Some(e) = self.pop_event() {
             return Ok(e);
         }
         if let Some(e) = self.failed {
@@ -604,17 +648,23 @@ impl Connection {
         let r = self.advance(p);
         match r {
             Ok(Some(e)) => {
-                if let Some(q) = self.events.pop_front() {
-                    self.events.push_back(e);
+                if let Some(q) = self.pop_event() {
+                    let in_init = self.in_init();
+                    self.events.push_back((e, in_init));
                     return Ok(q);
                 }
                 Ok(e)
             }
             Ok(None) => {
-                if let Some(q) = self.events.pop_front() {
+                if let Some(q) = self.pop_event() {
                     return Ok(q);
                 }
-                if let Some(r) = &self.pending {
+                if self.answer.is_some() {
+                    // The machine moved on without taking the answer (the callback's flag
+                    // changed while it waited): the request is stale. Asking again would loop.
+                    self.pending = None;
+                    self.answer = None;
+                } else if let Some(r) = &self.pending {
                     return Ok(Event::Request(r.clone()));
                 }
                 if !self.output.is_empty() {
@@ -628,7 +678,7 @@ impl Connection {
             }
             Err(e) => {
                 self.fatal(p, e);
-                match self.events.pop_front() {
+                match self.pop_event() {
                     Some(q) => Ok(q),
                     None => Err(e),
                 }
@@ -680,7 +730,15 @@ impl Connection {
 
     /// Queues an event.
     pub(crate) fn notify(&mut self, e: Event) {
-        self.events.push_back(e);
+        let in_init = self.in_init();
+        self.events.push_back((e, in_init));
+    }
+
+    /// The next queued event, noting whether the connection was in init when it was raised.
+    fn pop_event(&mut self) -> Option<Event> {
+        let (e, in_init) = self.events.pop_front()?;
+        self.event_in_init = Some(in_init);
+        Some(e)
     }
 
     /// Whether events are queued.
@@ -908,6 +966,19 @@ impl Connection {
                 self.interrupted = true;
                 return Err(Error::quiet(0));
             }
+            // Only while the version is undecided: a renegotiation has one (fork M). Before the
+            // alert is processed: a server takes no alert before the ClientHello
+            // (`ssl3_read_bytes`).
+            if self.cfg.method_version == 0
+                && self.first_handshake
+                && (self.cfg.server || ty != alert())
+                && self.before_version()
+            {
+                return Err(Error::alert(
+                    abi::SSL_AD_UNEXPECTED_MESSAGE,
+                    abi::SSL_R_UNEXPECTED_MESSAGE,
+                ));
+            }
             if ty == ccs() && !self.is_tls13() {
                 if !self.hs_in.is_empty() {
                     return Err(Error::alert(
@@ -934,17 +1005,6 @@ impl Connection {
                         return Ok(HsBytes::Yield);
                     }
                 }
-            }
-            // Only while the version is undecided: a renegotiation has one (fork M).
-            if self.cfg.method_version == 0
-                && self.first_handshake
-                && (self.cfg.server || ty != alert())
-                && self.before_version()
-            {
-                return Err(Error::alert(
-                    abi::SSL_AD_UNEXPECTED_MESSAGE,
-                    abi::SSL_R_UNEXPECTED_MESSAGE,
-                ));
             }
             if ty == app_data() && self.skip_early_data() {
                 // Early data sent before a HelloRetryRequest arrives where the second
@@ -1431,4 +1491,43 @@ fn ccs() -> u8 {
 
 fn app_data() -> u8 {
     msgs_type(abi::SSL3_RT_APPLICATION_DATA)
+}
+
+#[cfg(test)]
+mod stale_answer_tests {
+    use super::{Answer, Config, Connection, Event, Request};
+    use crate::testprov::TestProvider;
+
+    /// An answer the machine never takes (its callback's flag went off while it waited) is
+    /// dropped: the connection waits for input instead of asking again forever.
+    #[test]
+    fn an_unconsumed_answer_is_dropped() {
+        let p = TestProvider::new(b"stale-answer");
+        let cfg = Config {
+            min_version: crate::consts::version::TLS1_3,
+            max_version: crate::consts::version::TLS1_3,
+            ciphers: vec![crate::suites::by_protocol_id(0x1301).unwrap()],
+            groups: vec![0x001d],
+            key_share_groups: vec![0x001d],
+            max_send_fragment: 16384,
+            ..Config::default()
+        };
+        let mut c = Connection::new(cfg);
+        let mut steps = 0;
+        loop {
+            steps += 1;
+            assert!(steps < 100, "no progress");
+            match c.step(&p, false).unwrap() {
+                Event::Output => drop(c.take_output()),
+                Event::NeedInput => break,
+                _ => {}
+            }
+        }
+        // A request answered after the machine stopped needing it.
+        c.pending = Some(Request::AllowEarlyData);
+        c.answer(Answer::Allowed(true));
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+        assert!(c.pending.is_none() && c.answer.is_none());
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+    }
 }

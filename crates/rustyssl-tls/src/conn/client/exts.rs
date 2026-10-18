@@ -146,17 +146,21 @@ pub(crate) fn ext_construct_maxfragmentlen(
     Ok(ExtReturn::Sent(vec![mode]))
 }
 
-/// `tls_construct_ctos_srp`: the configuration carries no SRP username, so SRP suites are
-/// disabled and nothing is sent.
+/// `tls_construct_ctos_srp`: the SRP login, when one is set.
 ///
 /// # Errors
-/// Never; `Result` for the dispatch.
+/// A login over 255 octets (internal-error).
 pub(crate) fn ext_construct_srp(
-    _c: &mut Connection,
+    c: &mut Connection,
     _p: &dyn Provider,
     _x: &ext::Ctx,
 ) -> Result<ExtReturn> {
-    Ok(ExtReturn::NotSent)
+    let Some(login) = &c.cfg.srp_login else {
+        return Ok(ExtReturn::NotSent);
+    };
+    let mut w = crate::codec::Writer::new();
+    w.vec(1, login).map_err(|_| Error::internal())?;
+    Ok(ExtReturn::Sent(w.into_bytes()))
 }
 
 /// `tls_construct_ctos_ec_pt_formats`.
@@ -230,8 +234,8 @@ pub(crate) fn ext_construct_session_ticket(
     }
 }
 
-/// `tls_construct_ctos_status_request`: an OCSP request with no responder IDs or extensions
-/// (the configuration has none), not for a client Certificate entry.
+/// `tls_construct_ctos_status_request`: an OCSP request with the configured responder IDs and
+/// extensions, not for a client Certificate entry.
 ///
 /// # Errors
 /// Never; `Result` for the dispatch.
@@ -246,8 +250,8 @@ pub(crate) fn ext_construct_status_request(
     }
     Ok(ExtReturn::Sent(mx::status_request::encode(
         &mx::status_request::Request::Ocsp {
-            responder_ids: Vec::new(),
-            extensions: Vec::new(),
+            responder_ids: c.cfg.ocsp_ids.clone(),
+            extensions: c.cfg.ocsp_exts.clone(),
         },
     )?))
 }
@@ -1013,7 +1017,13 @@ pub(crate) fn ext_parse_sct(
             abi::SSL_R_BAD_EXTENSION,
         ));
     }
-    Ok(Step::Done)
+    ext::custom_parse(
+        c,
+        x.context,
+        t::SIGNED_CERTIFICATE_TIMESTAMP,
+        body,
+        x.chainidx,
+    )
 }
 
 /// `tls_parse_stoc_npn`: the server's protocols, from which the NPN callback selects

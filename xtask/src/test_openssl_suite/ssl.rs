@@ -78,7 +78,8 @@ pub struct List {
     lines: Vec<Line>,
     /// Programs not run, and why.
     skips: Vec<(String, String)>,
-    /// Each program's tests that read libssl's private structures.
+    /// Each program's tests that read libssl's private structures: a program (or an `ssl_test`
+    /// file, as `ssl_test/<file>`) and a test, or one iteration of it (`<test>#<iteration>`).
     internal: Vec<(String, String)>,
 }
 
@@ -136,8 +137,13 @@ impl List {
         self.lines.iter().any(|l| l.named(name))
     }
 
-    fn is_internal(&self, program: &str, test: &str) -> bool {
-        self.internal.iter().any(|(p, t)| p == program && t == test)
+    fn is_internal(&self, line: &Line, test: &str, iteration: Option<usize>) -> bool {
+        let label = line.label();
+        let one = iteration.map(|i| format!("{test}#{i}"));
+        self.internal.iter().any(|(p, t)| {
+            (*p == line.program || p.replace('/', " ") == label)
+                && (t == test || one.as_deref() == Some(t.as_str()))
+        })
     }
 }
 
@@ -611,11 +617,11 @@ pub fn run(
             Outcome::Skip if done.theirs == Outcome::Skip => *our_skip += 1,
             other => {
                 *our_fail += 1;
-                let internal = list.is_internal(&line.program, &unit.test);
+                let internal = list.is_internal(line, &unit.test, unit.iteration);
                 let key = (
                     category(other, internal),
                     if internal {
-                        format!("{} {}", line.program, unit.test)
+                        format!("{label} {}", unit.test)
                     } else {
                         cause(other, &label, &unit.test)
                     },

@@ -551,7 +551,7 @@ pub fn parse_all(
 }
 
 /// `custom_ext_parse`.
-fn custom_parse(
+pub(crate) fn custom_parse(
     c: &mut Connection,
     context: u32,
     typ: u16,
@@ -707,7 +707,9 @@ fn parse_one(c: &mut Connection, p: &dyn Provider, typ: u16, body: &[u8], x: &Ct
             t::COOKIE => server::ext_parse_cookie(c, p, body, x),
             t::EARLY_DATA => server::ext_parse_early_data(c, p, body, x),
             t::PRE_SHARED_KEY => server::ext_parse_psk(c, p, body, x),
-            _ => Ok(Step::Done),
+            // No parser for the role: a custom extension may take it (`tls_parse_extension`;
+            // the server's signed_certificate_timestamp, say).
+            _ => custom_parse(c, x.context, typ, body, x.chainidx).in_func("custom_ext_parse"),
         }
     } else {
         match typ {
@@ -730,7 +732,7 @@ fn parse_one(c: &mut Connection, p: &dyn Provider, typ: u16, body: &[u8], x: &Ct
             t::COOKIE => client::ext_parse_cookie(c, p, body, x),
             t::EARLY_DATA => client::ext_parse_early_data(c, p, body, x),
             t::PRE_SHARED_KEY => client::ext_parse_psk(c, p, body, x),
-            _ => Ok(Step::Done),
+            _ => custom_parse(c, x.context, typ, body, x.chainidx).in_func("custom_ext_parse"),
         }
     }
 }

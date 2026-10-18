@@ -19475,6 +19475,8 @@ const _: unsafe extern "C" fn(*mut FILE, *const SSL_SESSION) -> core::ffi::c_int
     crate::ssl::sess_asn1::rustyssl_private_PEM_write_SSL_SESSION;
 const _: unsafe extern "C" fn(*mut BIO, *const SSL_SESSION) -> core::ffi::c_int =
     crate::ssl::sess_asn1::rustyssl_private_PEM_write_bio_SSL_SESSION;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SRP_Calc_A_param;
 const _: unsafe extern "C" fn(
     *const SSL_CIPHER,
     *mut core::ffi::c_char,
@@ -19546,6 +19548,10 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::conf::rustyssl_private_SSL_CONF_cmd_argv;
 const _: unsafe extern "C" fn(*mut SSL_CONF_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::ssl::conf::rustyssl_private_SSL_CONF_cmd_value_type;
+const _: unsafe extern "C" fn(*mut SSL_CTX) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SSL_CTX_SRP_CTX_free;
+const _: unsafe extern "C" fn(*mut SSL_CTX) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SSL_CTX_SRP_CTX_init;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *const X509) -> core::ffi::c_int =
     crate::ssl::ca::rustyssl_private_SSL_CTX_add1_to_CA_list;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *mut X509) -> core::ffi::c_int =
@@ -20270,6 +20276,10 @@ const _: unsafe extern "C" fn(*mut SSL_SESSION, core::ffi::c_long) -> core::ffi:
 const _: unsafe extern "C" fn(*mut SSL_SESSION) -> core::ffi::c_int =
     crate::ssl::session::rustyssl_private_SSL_SESSION_up_ref;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SSL_SRP_CTX_free;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SSL_SRP_CTX_init;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_accept;
 const _: unsafe extern "C" fn(*mut SSL, u64) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_accept_connection;
@@ -20647,6 +20657,14 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_get_sigalgs;
 const _: unsafe extern "C" fn(*const SSL, *mut core::ffi::c_int) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_get_signature_type_nid;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut BIGNUM =
+    crate::ssl::srp::rustyssl_private_SSL_get_srp_N;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut BIGNUM =
+    crate::ssl::srp::rustyssl_private_SSL_get_srp_g;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut core::ffi::c_char =
+    crate::ssl::srp::rustyssl_private_SSL_get_srp_userinfo;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut core::ffi::c_char =
+    crate::ssl::srp::rustyssl_private_SSL_get_srp_username;
 const _: unsafe extern "C" fn(*mut SSL) -> *mut stack_st_SRTP_PROTECTION_PROFILE =
     crate::ssl::srtp::rustyssl_private_SSL_get_srtp_profiles;
 const _: unsafe extern "C" fn(*const SSL) -> *const SSL_METHOD =
@@ -20998,6 +21016,20 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::eap::rustyssl_private_SSL_set_session_ticket_ext_cb;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) =
     crate::ssl::accessors::rustyssl_private_SSL_set_shutdown;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut BIGNUM,
+    *mut BIGNUM,
+    *mut core::ffi::c_char,
+) -> core::ffi::c_int = crate::ssl::srp::rustyssl_private_SSL_set_srp_server_param;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ssl::srp::rustyssl_private_SSL_set_srp_server_param_pw;
 const _: unsafe extern "C" fn(*mut SSL, *const SSL_METHOD) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_set_ssl_method;
 const _: unsafe extern "C" fn(*mut SSL, u8) -> core::ffi::c_int =
@@ -21034,6 +21066,8 @@ const _: unsafe extern "C" fn(
     *const SSL_SHUTDOWN_EX_ARGS,
     usize,
 ) -> core::ffi::c_int = crate::ssl::misc::rustyssl_private_SSL_shutdown_ex;
+const _: unsafe extern "C" fn(*mut SSL, *mut core::ffi::c_int) -> core::ffi::c_int =
+    crate::ssl::srp::rustyssl_private_SSL_srp_server_param_with_username;
 const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
     crate::ssl::io::strings::rustyssl_private_SSL_state_string;
 const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =

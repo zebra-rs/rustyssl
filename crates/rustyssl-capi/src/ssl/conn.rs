@@ -64,6 +64,14 @@ pub(crate) enum Role {
 }
 
 /// A connection's settings and state, with OpenSSL's field names.
+/// A connection's record padding callback and its argument apart from its state's lock: the
+/// core's padding hook reads them while a record is written, which may be under that lock.
+#[derive(Debug)]
+pub(crate) struct PaddingCell(pub(crate) RecordPaddingCb, pub(crate) *mut c_void);
+
+// SAFETY: the application's function and argument, only handed back to it.
+unsafe impl Send for PaddingCell {}
+
 #[derive(Debug)]
 pub(crate) struct SslState {
     /// The context (a reference held); `SSL_set_SSL_CTX` changes it.
@@ -97,6 +105,8 @@ pub(crate) struct SslState {
     pub(crate) info_callback: InfoCb,
     pub(crate) record_padding_cb: RecordPaddingCb,
     pub(crate) record_padding_arg: *mut c_void,
+    /// The same two, for the core's padding hook.
+    pub(crate) padding_cell: std::sync::Arc<Mutex<PaddingCell>>,
     pub(crate) block_padding: usize,
     pub(crate) hs_padding: usize,
     pub(crate) max_fragment_len_mode: u8,
@@ -117,6 +127,8 @@ pub(crate) struct SslState {
     pub(crate) psk_find_session_cb: rustyssl_abi::SSL_psk_find_session_cb_func,
     pub(crate) psk_use_session_cb: rustyssl_abi::SSL_psk_use_session_cb_func,
     pub(crate) allow_early_data_cb: rustyssl_abi::SSL_allow_early_data_cb_fn,
+    /// The SRP state (`s->srp_ctx`), from the context's settings.
+    pub(crate) srp: super::srp::ConnSrp,
     pub(crate) allow_early_data_cb_data: *mut c_void,
     pub(crate) async_cb: rustyssl_abi::SSL_async_callback_fn,
     pub(crate) async_cb_arg: *mut c_void,
@@ -183,6 +195,8 @@ impl Drop for SslState {
         unsafe { OPENSSL_sk_pop_free(self.peer_ca_names.cast(), Some(ctx::name_free)) };
         // SAFETY: as above.
         unsafe { crate::mem::release(self.ocsp_resp.cast()) };
+        // SAFETY: as above.
+        unsafe { super::ocsp_req::free(self) };
         // The write BIO first, then the read BIO (BIO_free_all frees a chain only when its
         // first BIO's last reference goes).
         // SAFETY: our references, each NULL or live.
@@ -351,6 +365,10 @@ ffi_export! {
                 info_callback: None,
                 record_padding_cb: cs.record_padding_cb,
                 record_padding_arg: cs.record_padding_arg,
+                padding_cell: std::sync::Arc::new(Mutex::new(PaddingCell(
+                    cs.record_padding_cb,
+                    cs.record_padding_arg,
+                ))),
                 block_padding: cs.block_padding,
                 hs_padding: cs.hs_padding,
                 max_fragment_len_mode: cs.max_fragment_len_mode,
@@ -373,6 +391,7 @@ ffi_export! {
                 psk_find_session_cb: cs.psk_find_session_cb,
                 psk_use_session_cb: cs.psk_use_session_cb,
                 allow_early_data_cb: cs.allow_early_data_cb,
+                srp: super::srp::ConnSrp::from_ctx(&cs.srp),
                 allow_early_data_cb_data: cs.allow_early_data_cb_data,
                 async_cb: cs.async_cb,
                 async_cb_arg: cs.async_cb_arg,
@@ -544,12 +563,30 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
-        let mut st = x.state();
-        st.server = false;
-        st.shutdown = 0;
-        st.statem_clear();
-        st.handshake_func = Some(Role::Connect);
+        let old = {
+            let mut st = x.state();
+            st.server = false;
+            st.shutdown = 0;
+            st.statem_clear();
+            st.handshake_func = Some(Role::Connect);
+            restart(&mut st)
+        };
+        // Freed with no lock held (ex_data callbacks).
+        drop(old);
     }
+}
+
+/// `RECORD_LAYER_reset` after a handshake: the engine goes, with the records it buffered, so the
+/// next handshake starts afresh (the session stays, to be resumed). What it held, to be freed
+/// with no lock held.
+fn restart(st: &mut SslState) -> Option<super::io::Driver> {
+    // An engine still before its first handshake stays (`SSL_accept` sets the role on the one
+    // `SSL_stateless` set up).
+    if st.drv.tls.as_ref()?.before() {
+        return None;
+    }
+    let kept = st.drv.clear();
+    Some(core::mem::replace(&mut st.drv, kept))
 }
 
 ffi_export! {
@@ -562,11 +599,16 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
-        let mut st = x.state();
-        st.server = true;
-        st.shutdown = 0;
-        st.statem_clear();
-        st.handshake_func = Some(Role::Accept);
+        let old = {
+            let mut st = x.state();
+            st.server = true;
+            st.shutdown = 0;
+            st.statem_clear();
+            st.handshake_func = Some(Role::Accept);
+            restart(&mut st)
+        };
+        // Freed with no lock held (ex_data callbacks).
+        drop(old);
     }
 }
 
@@ -1188,7 +1230,9 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
-        x.state().record_padding_cb = cb;
+        let mut st = x.state();
+        st.record_padding_cb = cb;
+        st.padding_cell.lock().unwrap_or_else(PoisonError::into_inner).0 = cb;
         1
     }
 }
@@ -1308,11 +1352,50 @@ ffi_export! {
         if type_ != TLSEXT_NAMETYPE_host_name {
             return ptr::null();
         }
-        // Without sessions, both sides report the connection's name, as OpenSSL does when no
-        // session was resumed: on a server, the one the client's hello carried.
         let st = x.state();
-        let received = if st.server { st.drv.servername.as_deref() } else { None };
-        received.or(st.hostname.as_deref()).map_or(ptr::null(), core::ffi::CStr::as_ptr)
+        // An end whose role isn't known yet counts as a client.
+        let server = st.handshake_func.is_some() && st.server;
+        // `SSL_CONNECTION_IS_TLS13`: the negotiated version's method, else the method's own.
+        let method_version = st
+            .drv
+            .tls
+            .as_ref()
+            .map(|c| c.negotiated())
+            .filter(|n| n.cipher.is_some())
+            .map_or(st.method.version, |n| c_int::from(n.version));
+        let tls13 = method_version >= rustyssl_abi::TLS1_3_VERSION && method_version != rustyssl_abi::TLS_ANY_VERSION;
+        let session = st.sess.session;
+        // SAFETY: the connection's session, alive while it holds it, or NULL.
+        let session_name = || unsafe { super::session::rustyssl_private_SSL_SESSION_get0_hostname(session) };
+        if server {
+            // A TLS 1.2 resumption reports the name the original handshake accepted.
+            if st.hit != 0 && !tls13 {
+                return session_name();
+            }
+            // Else the name the client's hello carried: a handshake clears the one set on the
+            // connection (`init_server_name`), which stands until then.
+            let started = st.drv.tls.as_ref().is_some_and(|c| !c.before());
+            let set = if started { None } else { st.hostname.as_deref() };
+            return st
+                .drv
+                .servername
+                .as_deref()
+                .or(set)
+                .map_or(ptr::null(), core::ffi::CStr::as_ptr);
+        }
+        // `SSL_in_before`.
+        let before = st.hand_state == TLS_ST_BEFORE && st.flow_uninited;
+        if before {
+            // A TLS 1.2 session about to be resumed names the server it was made with.
+            // SAFETY: as above.
+            let version = unsafe { super::session::rustyssl_private_SSL_SESSION_get_protocol_version(session) };
+            if st.hostname.is_none() && !session.is_null() && version != rustyssl_abi::TLS1_3_VERSION {
+                return session_name();
+            }
+        } else if !tls13 && st.hit != 0 && !session_name().is_null() {
+            return session_name();
+        }
+        st.hostname.as_deref().map_or(ptr::null(), core::ffi::CStr::as_ptr)
     }
 }
 
@@ -1748,6 +1831,10 @@ ffi_export! {
                 st.max_send_fragment = usize::try_from(larg).unwrap_or(512);
                 if st.max_send_fragment < st.split_send_fragment {
                     st.split_send_fragment = st.max_send_fragment;
+                }
+                let n = st.max_send_fragment;
+                if let Some(c) = st.drv.tls.as_mut() {
+                    c.set_max_send_fragment(n);
                 }
                 1
             }

@@ -88,9 +88,14 @@ pub(crate) unsafe fn handle(
                     arg,
                 )
             };
-            if ret == SSL_TLSEXT_ERR_OK && !out.is_null() {
-                // SAFETY: the protocol the callback chose, `outlen` octets.
-                let p = unsafe { core::slice::from_raw_parts(out, usize::from(outlen)) }.to_vec();
+            if ret == SSL_TLSEXT_ERR_OK {
+                // An empty choice (or none) stays empty: `OPENSSL_memdup` fails on it.
+                let p = if out.is_null() {
+                    Vec::new()
+                } else {
+                    // SAFETY: the protocol the callback chose, `outlen` octets.
+                    unsafe { core::slice::from_raw_parts(out, usize::from(outlen)) }.to_vec()
+                };
                 return Some(Answer::Alpn(Some(p)));
             }
             if ret == SSL_TLSEXT_ERR_ALERT_FATAL {
@@ -206,7 +211,15 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             Some(Answer::Allowed(unsafe { cb(s, arg) } != 0))
         }
-        Request::Status => {
+        Request::Status {
+            ocsp_ids,
+            ocsp_exts,
+        } => {
+            if x.state().server {
+                // `tls_parse_ctos_status_request` keeps what the client sent on the connection.
+                // SAFETY: the connection's stacks.
+                unsafe { super::super::ocsp_req::install(&mut x.state(), &ocsp_ids, &ocsp_exts) };
+            }
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.status_cb, c.status_arg));
             let Some(cb) = cb else {
                 return Some(Answer::Status {
@@ -304,6 +317,23 @@ pub(crate) unsafe fn handle(
         Request::Psk { hint_or_identity } => {
             // SAFETY: as above.
             Some(unsafe { super::super::psk::key(s, x, &hint_or_identity) })
+        }
+        // SRP (`ssl::srp`).
+        Request::SrpUsername { login } => {
+            // SAFETY: as above.
+            unsafe { super::super::srp::username(s, x, snap, &login) }
+        }
+        Request::SrpServerParams => Some(super::super::srp::server_params(x)),
+        Request::SrpServerSecret { a } => Some(super::super::srp::server_secret(x, snap, &a)),
+        Request::SrpVerifyParams(p) => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::srp::verify_params(s, x, &p) })
+        }
+        // SAFETY: as above.
+        Request::SrpClientA => Some(unsafe { super::super::srp::client_a(x, snap) }),
+        Request::SrpClientSecret => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::srp::client_secret(s, x, snap) })
         }
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
@@ -559,10 +589,21 @@ unsafe fn verify(
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
-    // The chain as the core received it (a server records it only after verification), or
-    // the raw public key (`ssl_verify_rpk`).
-    // SAFETY: the snapshot's library context and properties, alive with it.
-    let owned = unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) };
+    // A client verifies the session's peer chain (`SSL_get_peer_cert_chain`, which a callback
+    // asking for a retry may have added to); otherwise the chain as the core received it (a
+    // server records it only after verification), or the raw public key (`ssl_verify_rpk`).
+    let session_chain = {
+        let st = x.state();
+        (!rpk && !st.server && st.drv.peer.from == peer.len())
+            .then_some(st.drv.peer.chain_no_leaf)
+            .filter(|p| !p.is_null())
+    };
+    let owned = match session_chain {
+        // SAFETY: the connection's stack, alive while it holds it (no callback runs meanwhile).
+        Some(sk) => unsafe { Chain::dup(sk) },
+        // SAFETY: the snapshot's library context and properties, alive with it.
+        None => unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) },
+    };
     let chain = owned.0;
     let key = Key(if rpk {
         // SAFETY: the context's library context and property query.
@@ -772,6 +813,31 @@ impl Chain {
             // SAFETY: the caller's guarantee.
             let c = unsafe { crate::x509::cert::decode_in(der, libctx, propq) };
             if c.is_null() {
+                continue;
+            }
+            // SAFETY: the new stack, which takes the reference.
+            if unsafe { crate::stack::OPENSSL_sk_push(sk.cast(), c.cast()) } == 0 {
+                // SAFETY: not taken.
+                unsafe { X509_free(c) };
+            }
+        }
+        Self(sk)
+    }
+
+    /// A copy of `from`, with a reference to each certificate.
+    ///
+    /// # Safety
+    /// `from` is a live stack of certificates.
+    unsafe fn dup(from: *mut stack_st_X509) -> Self {
+        // SAFETY: no preconditions.
+        let sk: *mut stack_st_X509 = unsafe { crate::stack::OPENSSL_sk_new_null() }.cast();
+        // SAFETY: the caller's stack.
+        let n = unsafe { crate::stack::OPENSSL_sk_num(from.cast()) };
+        for i in 0..n {
+            // SAFETY: an index in range.
+            let c: *mut X509 = unsafe { crate::stack::OPENSSL_sk_value(from.cast(), i) }.cast();
+            // SAFETY: a live certificate of the stack.
+            if c.is_null() || unsafe { crate::x509::cert::X509_up_ref(c) } == 0 {
                 continue;
             }
             // SAFETY: the new stack, which takes the reference.

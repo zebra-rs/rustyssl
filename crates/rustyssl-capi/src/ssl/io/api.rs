@@ -380,18 +380,24 @@ pub(crate) unsafe fn write_internal(
     } else {
         num
     };
-    let r = {
+    // The core is written to out of the lock: the record padding callback may run.
+    let taken = {
         let mut st = x.state();
-        let prov = st.drv.provider.clone();
-        match (st.drv.tls.as_mut(), prov) {
-            (Some(c), Some(p)) => {
-                // SAFETY: the caller's `num` octets, of which `chunk` are taken.
-                let data = unsafe { core::slice::from_raw_parts(buf.cast::<u8>(), chunk) };
-                Some(c.write_app(&*p, data))
-            }
-            _ => None,
+        match st.drv.provider.clone() {
+            Some(p) => st.drv.tls.take().map(|c| (c, p)),
+            None => None,
         }
     };
+    let r = taken.map(|(mut c, p)| {
+        // SAFETY: the caller's `num` octets, of which `chunk` are taken.
+        let data = unsafe { core::slice::from_raw_parts(buf.cast::<u8>(), chunk) };
+        let r = c.write_app(&*p, data);
+        let mut st = x.state();
+        if st.drv.tls.is_none() {
+            st.drv.tls = Some(c);
+        }
+        r
+    });
     match r {
         Some(Ok(_)) => {}
         Some(Err(e)) => {
@@ -1079,7 +1085,17 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         }
         SSL_CTRL_GET_SIGNATURE_NID => scheme_hash(tls.and_then(|c| c.negotiated().own_scheme)),
         SSL_CTRL_GET_NEGOTIATED_GROUP => {
-            let id = tls.and_then(|c| c.negotiated().group);
+            // TLS 1.3's group when the handshake made a key exchange, else the session's
+            // (`kex_group`: a resumed TLS 1.2 handshake reports the original's).
+            let id = tls
+                .filter(|c| c.is_tls13())
+                .and_then(|c| c.negotiated().group)
+                .or_else(|| {
+                    // SAFETY: the connection's session, or NULL, alive under its lock.
+                    let k = unsafe { crate::ssl::session::sess(st.sess.session) }
+                        .map_or(0, |d| d.data().kex_group);
+                    u16::try_from(k).ok().filter(|&k| k != 0)
+                });
             let prov = st.drv.provider.clone();
             match (id, prov) {
                 (Some(id), Some(p)) => c_long::from(super::config::group_nid(&p, id)),

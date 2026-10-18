@@ -283,6 +283,7 @@ fn change_cipher_state13_inner(
         let eem = sched.early_exporter_master(p, &hash_ch)?;
         let secret = sched.client_early_traffic(p, &hash_ch)?;
         c.neg.early_exporter_master = eem.bytes().to_vec();
+        c.neg.early_cipher = Some(cp);
         log_secret(c, keylog::EARLY_EXPORTER_SECRET, eem.bytes());
         log_secret(c, keylog::CLIENT_EARLY_TRAFFIC_SECRET, secret.bytes());
         if !read {
@@ -616,6 +617,7 @@ pub fn export_early(
         .neg
         .cipher
         .or(c.hs.new_cipher)
+        .or(c.neg.early_cipher)
         .ok_or_else(Error::internal)?;
     let hash = hashes(crate::conn::common::version::of(abi::TLS1_3_VERSION), cp).0;
     keysched::export_13(p, hash, &c.neg.early_exporter_master, label, context, len)

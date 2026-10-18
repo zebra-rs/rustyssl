@@ -45,51 +45,6 @@ pub extern "C" fn rustyssl_private_OSSL_QUIC_server_method() -> *const SSL_METHO
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SRP_Calc_A_param(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SRP_Calc_A_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_SRP_CTX_free(_: *mut SSL_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_SRP_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_SRP_CTX_init(_: *mut SSL_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_SRP_CTX_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_SRP_CTX_free(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_SRP_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_SRP_CTX_init(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_SRP_CTX_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srp_N(_: *mut SSL) -> *mut BIGNUM {
-    crate::stub::unimplemented("SSL_get_srp_N")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srp_g(_: *mut SSL) -> *mut BIGNUM {
-    crate::stub::unimplemented("SSL_get_srp_g")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srp_userinfo(_: *mut SSL) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("SSL_get_srp_userinfo")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srp_username(_: *mut SSL) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("SSL_get_srp_username")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
     _: *mut SSL,
     _: *const core::ffi::c_uchar,
@@ -136,34 +91,4 @@ pub extern "C" fn rustyssl_private_SSL_set_quic_tls_transport_params(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_set_quic_tls_transport_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_srp_server_param(
-    _: *mut SSL,
-    _: *const BIGNUM,
-    _: *const BIGNUM,
-    _: *mut BIGNUM,
-    _: *mut BIGNUM,
-    _: *mut core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_srp_server_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_srp_server_param_pw(
-    _: *mut SSL,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_srp_server_param_pw")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_srp_server_param_with_username(
-    _: *mut SSL,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_srp_server_param_with_username")
 }

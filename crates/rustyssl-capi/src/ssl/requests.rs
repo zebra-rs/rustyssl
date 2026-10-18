@@ -122,6 +122,9 @@ unsafe fn renegotiate(s: *mut SSL, new_session: bool, function: &str) -> c_int {
     let Some(x) = (unsafe { ssl(s) }) else {
         return 0;
     };
+    // The renegotiation reads the connection's settings as they are now.
+    // SAFETY: the caller's guarantee; no lock is held.
+    unsafe { super::io::config::refresh_handshake_settings(s, x) };
     let mut st = x.state();
     let options = st.options;
     let r = match st.drv.tls.as_mut() {
@@ -309,7 +312,8 @@ ffi_export! {
         let (Some(c), Some(p)) = (st.drv.tls.as_ref(), prov) else {
             return 0;
         };
-        if !c.is_tls13() {
+        // `s->version`: a client sending early data has it at its highest version already.
+        if c_int::from(c.negotiated().version) != rustyssl_abi::TLS1_3_VERSION {
             return 0;
         }
         let r = c.export_keying_material_early(&*p, label, ctx, olen);

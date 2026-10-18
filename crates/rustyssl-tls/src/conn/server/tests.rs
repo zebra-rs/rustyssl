@@ -1209,6 +1209,7 @@ fn ticket_session_encoding_round_trips() {
         max_fragment_len_mode: 2,
         ext_flags: 1,
         ticket_appdata: Some(b"app".to_vec()),
+        kex_group: 0x001d,
     };
     let enc = ticket::encode_session(&s).unwrap();
     assert_eq!(enc.first(), Some(&7));
@@ -1962,7 +1963,7 @@ fn ocsp_stapling_tls12_and_tls13() {
     let mut c = Connection::new(cfg.clone());
     c.feed(&plain_record(22, &hello.msg()));
     let (out, last) = drive_answering(&mut c, &p, &mut |r| {
-        assert_eq!(r, &Request::Status);
+        assert!(matches!(r, Request::Status { .. }));
         Answer::Status {
             ret: abi::SSL_TLSEXT_ERR_OK,
             response: Some(response.clone()),

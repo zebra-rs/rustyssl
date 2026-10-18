@@ -1669,7 +1669,7 @@ fn tls12_ocsp_stapling() {
     input.extend(s.done());
     c.feed(&input);
     let mut reject = |r: &Request| match r {
-        Request::Status => Answer::Status {
+        Request::Status { .. } => Answer::Status {
             ret: 0,
             response: None,
         },
@@ -1683,7 +1683,11 @@ fn tls12_ocsp_stapling() {
         }
     };
     assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 1, 0]));
-    assert!(seen.requests.contains(&Request::Status));
+    assert!(
+        seen.requests
+            .iter()
+            .any(|r| matches!(r, Request::Status { .. }))
+    );
     assert_eq!(
         e,
         Error::alert(
@@ -1919,7 +1923,7 @@ fn ocsp_and_scts_in_tls13() {
     c.feed(&flight);
     // The status callback is asked before the Finished is processed, and accepts.
     let mut ok = |r: &Request| match r {
-        Request::Status => Answer::Status {
+        Request::Status { .. } => Answer::Status {
             ret: 1,
             response: None,
         },
@@ -1929,7 +1933,11 @@ fn ocsp_and_scts_in_tls13() {
         drive(&mut c, &p, false, &mut ok, &mut seen).unwrap(),
         Event::HandshakeDone
     );
-    assert!(seen.requests.contains(&Request::Status));
+    assert!(
+        seen.requests
+            .iter()
+            .any(|r| matches!(r, Request::Status { .. }))
+    );
     assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 0]));
 }
 
@@ -2334,4 +2342,94 @@ fn tls12_resumption_must_agree() {
         e,
         Error::alert(abi::SSL_AD_HANDSHAKE_FAILURE, abi::SSL_R_INCONSISTENT_EXTMS)
     );
+}
+
+/// SRP's numbers for the loopback test: the requests carry them between the ends and the
+/// application's side (the math is libcrypto's, so made-up values stand in).
+fn srp_answer(end: crate::conn::pair::End, r: &Request, b: &[u8]) -> Answer {
+    use crate::conn::SrpParams;
+    use crate::conn::pair::End;
+    let params = SrpParams {
+        n: vec![0xff; 64],
+        g: vec![2],
+        s: vec![1, 2, 3],
+        b: b.to_vec(),
+    };
+    match (end, r) {
+        (End::Server, Request::SrpUsername { login }) => {
+            assert_eq!(login, b"user");
+            Answer::SrpUsername { ret: 0, alert: 0 }
+        }
+        (End::Server, Request::SrpServerParams) => Answer::SrpParams(Some(params)),
+        (End::Client, Request::SrpVerifyParams(p)) => {
+            assert_eq!(*p, params);
+            Answer::SrpVerified(1)
+        }
+        (End::Client, Request::SrpClientA) => Answer::SrpValue(Some(vec![7; 32])),
+        (End::Server, Request::SrpServerSecret { a }) => {
+            assert_eq!(a, &vec![7; 32]);
+            Answer::SrpValue(Some(vec![9; 32]))
+        }
+        (End::Client, Request::SrpClientSecret) => Answer::SrpValue(Some(vec![9; 32])),
+        _ => accept(r),
+    }
+}
+
+/// Client and server configurations for SRP-AES-128-CBC-SHA, the client with login "user".
+fn srp_configs(p: &TestProvider) -> (Config, Config) {
+    let srp = vec![suites::by_protocol_id(0xc01d).unwrap()];
+    let mut ccfg = client12();
+    ccfg.max_version = v::TLS1_2;
+    ccfg.ciphers.clone_from(&srp);
+    ccfg.srp = true;
+    ccfg.srp_login = Some(b"user".to_vec());
+    let mut scfg = server_config(p);
+    scfg.ciphers = srp;
+    scfg.max_version = v::TLS1_2;
+    scfg.srp = true;
+    scfg.callbacks.srp_username = true;
+    (ccfg, scfg)
+}
+
+#[test]
+fn loopback_srp() {
+    use crate::conn::pair::{self, End};
+    let p = TestProvider::new(b"loopback-srp");
+    let (ccfg, scfg) = srp_configs(&p);
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(scfg);
+    let mut log = pair::Log::default();
+    let mut answer = |end: End, r: &Request| srp_answer(end, r, &[5; 32]);
+    let r = pair::handshake(&p, &mut client, &mut server, false, &mut answer, &mut log);
+    assert!(r.is_ok(), "{r:?}");
+    assert_eq!(client.negotiated().cipher.unwrap().protocol_id(), 0xc01d);
+    // Without a certificate: none was sent.
+    assert!(client.negotiated().peer_chain.is_empty());
+
+    // B not below N: illegal-parameter.
+    let (ccfg, scfg) = srp_configs(&p);
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(scfg);
+    let mut answer = |end: End, r: &Request| srp_answer(end, r, &[0xff; 64]);
+    let r = pair::handshake(&p, &mut client, &mut server, false, &mut answer, &mut log);
+    let Err((End::Client, e)) = r else {
+        panic!("{r:?}")
+    };
+    assert_eq!(
+        e,
+        Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_DATA)
+            .in_func("srp_verify_server_param")
+    );
+
+    // Without a login the server refuses.
+    let (mut ccfg, scfg) = srp_configs(&p);
+    ccfg.srp_login = None;
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(scfg);
+    let mut answer = |end: End, r: &Request| srp_answer(end, r, &[5; 32]);
+    let r = pair::handshake(&p, &mut client, &mut server, false, &mut answer, &mut log);
+    let Err((End::Server, e)) = r else {
+        panic!("{r:?}")
+    };
+    assert_eq!(e.reason, abi::SSL_R_PSK_IDENTITY_NOT_FOUND);
 }

@@ -4,7 +4,8 @@
  * SSL_get_error(3), SSL_CTX_set_mode(3)): reads and writes in both directions over a BIO pair,
  * TLS 1.3 and 1.2, peeking and partial reads, empty and negative lengths, I/O that runs the
  * handshake, writes larger than the BIO takes (retries with the same buffer, a different one,
- * SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE), and a non-blocking
+ * SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE), one BIO write per record
+ * after SSL_set_max_send_fragment(3) on a connected client, and a non-blocking
  * socketpair whose peer goes away without close_notify (with and without
  * SSL_OP_IGNORE_UNEXPECTED_EOF).
  *
@@ -442,6 +443,46 @@ static void test_socketpair(long options)
     SSL_CTX_free(sctx);
 }
 
+static int bio_writes = 0;
+
+static long count_writes(BIO *b, int oper, const char *argp, size_t len, int argi, long argl,
+                         int ret, size_t *processed)
+{
+    (void)b;
+    (void)argp;
+    (void)argi;
+    (void)argl;
+    (void)processed;
+    if (oper == (BIO_CB_WRITE | BIO_CB_RETURN)) {
+        bio_writes++;
+        printf("  BIO write %d: %zu octet(s)\n", bio_writes, len);
+    }
+    return ret;
+}
+
+/* After SSL_set_max_send_fragment, a write goes out as records of that size, one BIO write each. */
+static void test_record_writes(int max)
+{
+    SSL_CTX *cctx, *sctx;
+    SSL *c, *s;
+    unsigned char buf[1200], in[1300];
+    size_t got = 0;
+    int n;
+
+    printf("# one BIO write per record, %s\n", max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    connected(max, 0, &cctx, &sctx, &c, &s);
+    memset(buf, 'r', sizeof(buf));
+    check(SSL_set_max_send_fragment(c, 512) == 1, "SSL_set_max_send_fragment");
+    bio_writes = 0;
+    BIO_set_callback_ex(SSL_get_wbio(c), count_writes);
+    check(SSL_write(c, buf, sizeof(buf)) == (int)sizeof(buf), "the write");
+    BIO_set_callback_ex(SSL_get_wbio(c), NULL);
+    while ((n = SSL_read(s, in + got, (int)(sizeof(in) - got))) > 0)
+        got += (size_t)n;
+    printf("  the server reads %zu octet(s)\n", got);
+    done(cctx, sctx, c, s);
+}
+
 int main(void)
 {
     /* A write to the closed socket must fail, not kill the test. */
@@ -450,6 +491,8 @@ int main(void)
     test_basic(TLS1_2_VERSION);
     test_write_starts_handshake();
     test_big_writes();
+    test_record_writes(TLS1_3_VERSION);
+    test_record_writes(TLS1_2_VERSION);
     test_socketpair(0);
     test_socketpair(SSL_OP_IGNORE_UNEXPECTED_EOF);
     printf("1..%d\n", number);
