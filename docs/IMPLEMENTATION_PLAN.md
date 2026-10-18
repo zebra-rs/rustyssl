@@ -5317,6 +5317,15 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - temporary/auto DH, the CA-subject loaders, the early-data callback
   - `SSL_CTX_compress_certs`, `SSL_COMP_*`, SRP, the status callbacks, the CT callback
   - `SSL_dane_*`, `OPENSSL_init_ssl`, …
+  - Status (2026-10-18): 592 of 603 libssl exports are implemented; everything above landed in
+    Phase 7. Of the 11 left, 3 are DTLS (`DTLSv1_listen`, `DTLS_set_timer_cb`,
+    `DTLS_get_data_mtu`, with 8.1) and 8 are the QUIC API (`OSSL_QUIC_client_method`,
+    `_client_thread_method`, `_server_method`, `SSL_poll`, `SSL_inject_net_dgram`,
+    `SSL_set_quic_tls_cbs`, `_early_data_enabled`, `_transport_params`).
+  - Decision: the QUIC exports stay aborting stubs until Phase 10, which builds the QUIC
+    transport they need. Implementing them as failures now would break rule 10 (a QUIC
+    method that can't make connections reports success for work it didn't do). So the
+    exit's "100%" is everything outside the QUIC API.
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.
