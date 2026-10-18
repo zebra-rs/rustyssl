@@ -376,7 +376,10 @@ fn mode(args: &[String]) -> (Vec<String>, Mode) {
 }
 
 /// One `s_client` run: its summary, or why it failed.
-#[expect(clippy::too_many_arguments, reason = "one per s_client mode the cases combine")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one per s_client mode the cases combine"
+)]
 fn client(
     t: &Tool<'_>,
     ours: bool,

@@ -9,8 +9,7 @@ use core::ptr;
 
 use rustyssl_abi::{
     ENGINE, ERR_LIB_ENGINE, ERR_LIB_SSL, ERR_R_ENGINE_LIB, ERR_R_PASSED_NULL_PARAMETER,
-    ERR_R_UNSUPPORTED, EVP_PKEY, SSL, SSL_CTX, SSL_R_PROTOCOL_IS_SHUTDOWN, SSL_R_UNINITIALIZED,
-    SSL_SENT_SHUTDOWN, SSL_new_pending_conn_cb_fn,
+    ERR_R_UNSUPPORTED, EVP_PKEY, SSL, SSL_CTX, SSL_new_pending_conn_cb_fn,
 };
 
 use super::conn::ssl;
@@ -45,40 +44,6 @@ ffi_export! {
     }
 }
 
-/// Whether the record layer is in the middle of a record's body (`SSL_ST_READ_BODY`).
-fn reading_body(s: *const SSL) -> bool {
-    // SAFETY: the caller's connection, NULL or live.
-    let Some(x) = (unsafe { ssl(s) }) else {
-        return false;
-    };
-    let st = x.state();
-    st.drv.rec_left > 0
-}
-
-ffi_export! {
-    /// The record layer's state, short form (`RH` reading a header, `RB` a body).
-    ///
-    /// # Safety
-    /// `s` is NULL or a live connection.
-    pub unsafe extern "C" fn rustyssl_private_SSL_rstate_string(s: *const SSL) -> *const c_char
-    where failure = c"unknown".as_ptr(), library = ERR_LIB_SSL
-    {
-        if reading_body(s) { c"RB".as_ptr() } else { c"RH".as_ptr() }
-    }
-}
-
-ffi_export! {
-    /// The record layer's state, long form.
-    ///
-    /// # Safety
-    /// `s` is NULL or a live connection.
-    pub unsafe extern "C" fn rustyssl_private_SSL_rstate_string_long(s: *const SSL) -> *const c_char
-    where failure = c"unknown".as_ptr(), library = ERR_LIB_SSL
-    {
-        if reading_body(s) { c"read body".as_ptr() } else { c"read header".as_ptr() }
-    }
-}
-
 ffi_export! {
     /// Allocates the record layer's buffers: 1 (buffers are allocated as needed), 0 for NULL.
     ///
@@ -107,36 +72,6 @@ ffi_export! {
         let d = &st.drv;
         let app = d.tls.as_ref().is_some_and(|c| c.pending_app() > 0 || c.buffered_input() > 0);
         c_int::from(!(d.rec_left > 0 || app || !d.out.is_empty() || d.wpend.is_some()))
-    }
-}
-
-ffi_export! {
-    /// `SSL_sendfile`: kTLS isn't in the default build, so this fails (after OpenSSL's checks).
-    ///
-    /// # Safety
-    /// `s` is NULL or a live connection.
-    pub unsafe extern "C" fn rustyssl_private_SSL_sendfile(s: *mut SSL, _fd: c_int, _offset: libc::off_t, _size: usize, _flags: c_int) -> isize
-    where failure = -1, library = ERR_LIB_SSL
-    {
-        const F: &str = "SSL_sendfile";
-        // SAFETY: the caller's guarantee.
-        let Some(x) = (unsafe { ssl(s) }) else { return 0 };
-        let mut st = x.state();
-        if st.handshake_func.is_none() {
-            drop(st);
-            err::raise(ERR_LIB_SSL, SSL_R_UNINITIALIZED, F);
-            return -1;
-        }
-        if st.shutdown & SSL_SENT_SHUTDOWN != 0 {
-            st.rwstate = rustyssl_abi::SSL_NOTHING;
-            drop(st);
-            err::raise(ERR_LIB_SSL, SSL_R_PROTOCOL_IS_SHUTDOWN, F);
-            return -1;
-        }
-        drop(st);
-        // `BIO_get_ktls_send` is 0 for every BIO without kTLS.
-        err::raise(ERR_LIB_SSL, SSL_R_UNINITIALIZED, F);
-        -1
     }
 }
 

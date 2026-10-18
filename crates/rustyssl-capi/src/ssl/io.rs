@@ -715,6 +715,9 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
     // Whether a handshake message arrived after the handshake (see `Event::HandshakeDone`).
     let mut post_handshake = false;
     let mut cleared = false;
+    // Whether the connection had failed when this call began (the core reports the alert
+    // and the exit before the failure, so a later step sees its own error).
+    let mut failed_at_entry = None;
     let stop = loop {
         // SAFETY: the caller's guarantee.
         match unsafe { flush(x) } {
@@ -740,7 +743,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let was_init = conn.in_init();
         // A connection that already failed fails again with no new entry, and the queue is
         // kept (`state_machine` returns at once in `MSG_FLOW_ERROR`).
-        let failed_before = conn.error().is_some();
+        let failed_before = *failed_at_entry.get_or_insert_with(|| conn.error().is_some());
         if was_init {
             in_handshake = true;
             if !cleared && !failed_before {

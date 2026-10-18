@@ -876,7 +876,9 @@ fn binder_prefix(c: &Connection, offer: &mx::psk::Offer) -> Result<Vec<u8>> {
 pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     let mut w = Writer::new();
     let e = |_| Error::internal();
-    w.u8(1);
+    // Format 2 adds the application data; a ticket without it keeps format 1, so its length
+    // (which the trace shows) stays the reference's.
+    w.u8(if s.ticket_appdata.is_some() { 2 } else { 1 });
     w.u16(s.version);
     w.u32(s.cipher_id);
     w.vec(1, &s.session_id).map_err(e)?;
@@ -905,12 +907,8 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     w.u64(u64::from_ne_bytes(s.verify_result.to_ne_bytes()));
     w.u8(s.max_fragment_len_mode);
     w.u32(s.ext_flags);
-    match &s.ticket_appdata {
-        None => w.u8(0),
-        Some(b) => {
-            w.u8(1);
-            w.vec(2, b).map_err(e)?;
-        }
+    if let Some(b) = &s.ticket_appdata {
+        w.vec(2, b).map_err(e)?;
     }
     Ok(w.into_bytes())
 }
@@ -919,7 +917,8 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
 #[must_use]
 pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let mut rd = Reader::new(b);
-    if rd.u8().ok()? != 1 {
+    let format = rd.u8().ok()?;
+    if format != 1 && format != 2 {
         return None;
     }
     let version = rd.u16().ok()?;
@@ -957,10 +956,9 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let verify_result = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let max_fragment_len_mode = rd.u8().ok()?;
     let ext_flags = rd.u32().ok()?;
-    let ticket_appdata = match rd.u8().ok()? {
-        0 => None,
-        1 => Some(rd.vec16().ok()?.rest().to_vec()),
-        _ => return None,
+    let ticket_appdata = match format {
+        2 => Some(rd.vec16().ok()?.rest().to_vec()),
+        _ => None,
     };
     rd.end().ok()?;
     if session_id.len() > 32 || sid_ctx.len() > 32 {
