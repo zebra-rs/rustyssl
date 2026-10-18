@@ -1036,16 +1036,6 @@ pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PROVIDER_get_capabilities(
-    _: *const OSSL_PROVIDER,
-    _: *const core::ffi::c_char,
-    _: OSSL_CALLBACK,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PROVIDER_get_capabilities")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PBMAC1_get1_pbkdf2_param(_: *const X509_ALGOR) -> *mut PBKDF2PARAM {
     crate::stub::unimplemented("PBMAC1_get1_pbkdf2_param")
 }

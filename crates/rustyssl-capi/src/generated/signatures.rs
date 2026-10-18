@@ -11111,6 +11111,12 @@ const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *const core::ffi::c_char 
     crate::provider::OSSL_PROVIDER_get0_name;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER) -> *mut core::ffi::c_void =
     crate::provider::OSSL_PROVIDER_get0_provider_ctx;
+const _: unsafe extern "C" fn(
+    *const OSSL_PROVIDER,
+    *const core::ffi::c_char,
+    OSSL_CALLBACK,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::provider::OSSL_PROVIDER_get_capabilities;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER, *mut OSSL_PARAM) -> core::ffi::c_int =
     crate::provider::OSSL_PROVIDER_get_conf_parameters;
 const _: unsafe extern "C" fn(*const OSSL_PROVIDER, *mut OSSL_PARAM) -> core::ffi::c_int =
