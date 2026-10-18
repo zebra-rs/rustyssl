@@ -1140,12 +1140,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     Flush::Error => break Stop::Syscall,
                 }
                 // `dtls1_read_bytes`: a timer that fired retransmits before reading.
-                // SAFETY: as above.
-                if dtls
-                    && super::dtls::expired(x)
-                    && unsafe { super::dtls::handle_timeout(s, x) } > 0
-                {
-                    continue;
+                if dtls && super::dtls::expired(x) {
+                    // SAFETY: as above.
+                    let r = unsafe { super::dtls::handle_timeout(s, x) };
+                    if r > 0 {
+                        continue;
+                    }
                 }
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
