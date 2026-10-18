@@ -7,16 +7,16 @@ use core::ptr;
 
 use rustyssl_abi::{
     BIO_FLAGS_IO_SPECIAL, BIO_FLAGS_READ, BIO_FLAGS_WRITE, BIO_RR_ACCEPT, BIO_RR_CONNECT,
-    ERR_LIB_SSL, ERR_LIB_SYS, ERR_SYSTEM_FLAG, EVP_PKEY, NID_undef, SSL, SSL_AD_CLOSE_NOTIFY,
-    SSL_CIPHER, SSL_CLIENT_HELLO_CB, SSL_ERROR_NONE, SSL_ERROR_SSL, SSL_ERROR_SYSCALL,
-    SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_ASYNC, SSL_ERROR_WANT_CLIENT_HELLO_CB,
-    SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_RETRY_VERIFY, SSL_ERROR_WANT_WRITE,
-    SSL_ERROR_WANT_X509_LOOKUP, SSL_ERROR_ZERO_RETURN, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER,
-    SSL_MODE_ENABLE_PARTIAL_WRITE, SSL_NOTHING, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY,
-    SSL_R_BAD_LENGTH, SSL_R_BAD_WRITE_RETRY, SSL_R_CONNECTION_TYPE_NOT_SET,
-    SSL_R_PROTOCOL_IS_SHUTDOWN, SSL_R_SHUTDOWN_WHILE_IN_INIT, SSL_R_UNINITIALIZED, SSL_READING,
-    SSL_RECEIVED_SHUTDOWN, SSL_RETRY_VERIFY, SSL_SENT_SHUTDOWN, SSL_WRITING, SSL_X509_LOOKUP, X509,
-    stack_st_X509,
+    ERR_LIB_SSL, ERR_LIB_SYS, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, ERR_SYSTEM_FLAG, EVP_PKEY,
+    NID_undef, SSL, SSL_AD_CLOSE_NOTIFY, SSL_CIPHER, SSL_CLIENT_HELLO_CB, SSL_ERROR_NONE,
+    SSL_ERROR_SSL, SSL_ERROR_SYSCALL, SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_ASYNC,
+    SSL_ERROR_WANT_CLIENT_HELLO_CB, SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ,
+    SSL_ERROR_WANT_RETRY_VERIFY, SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_X509_LOOKUP,
+    SSL_ERROR_ZERO_RETURN, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE,
+    SSL_NOTHING, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY, SSL_R_BAD_LENGTH,
+    SSL_R_BAD_WRITE_RETRY, SSL_R_CONNECTION_TYPE_NOT_SET, SSL_R_PROTOCOL_IS_SHUTDOWN,
+    SSL_R_SHUTDOWN_WHILE_IN_INIT, SSL_R_UNINITIALIZED, SSL_READING, SSL_RECEIVED_SHUTDOWN,
+    SSL_RETRY_VERIFY, SSL_SENT_SHUTDOWN, SSL_WRITING, SSL_X509_LOOKUP, X509, stack_st_X509,
 };
 
 use super::super::conn::{Ssl, ssl};
@@ -27,6 +27,7 @@ use crate::ffi::ffi_export;
 use crate::stack::{OPENSSL_sk_num, OPENSSL_sk_value};
 use crate::x509::cert::X509_up_ref;
 use rustyssl_tls::conn::Connection;
+use rustyssl_tls::conn::common::EarlyDataState;
 
 /// Runs (or finishes) the handshake: 1, or -1 (`SSL_get_error` says why).
 ///
@@ -66,6 +67,7 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_CONNECTION_TYPE_NOT_SET, F);
             return -1;
         }
+        super::check_finish_init(x, -1);
         super::super::requests::renegotiate_check(x, false);
         if !in_init(x) {
             // The handshake is done; its last flight may still be waiting for the BIO.
@@ -148,12 +150,23 @@ pub(crate) unsafe fn read_internal(
             st.rwstate = SSL_NOTHING;
             return 0;
         }
+        if matches!(
+            st.drv.early_data_state,
+            EarlyDataState::ConnectRetry | EarlyDataState::AcceptRetry
+        ) {
+            drop(st);
+            err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, function);
+            return 0;
+        }
     }
+    super::check_finish_init(x, 0);
     // SAFETY: as above.
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
     super::super::requests::renegotiate_check(x, false);
+    // Reading early data: a handshake message (the EndOfEarlyData) ends it (`ssl3_read_bytes`).
+    let reading_early = x.state().drv.early_data_state == EarlyDataState::Reading;
     loop {
         {
             let mut st = x.state();
@@ -174,7 +187,11 @@ pub(crate) unsafe fn read_internal(
             }
         }
         // SAFETY: as above.
-        match unsafe { drive(s, x, true, function) } {
+        let stop = unsafe { drive(s, x, true, function) };
+        if reading_early && x.state().drv.early_data_state == EarlyDataState::FinishedReading {
+            return -1;
+        }
+        match stop {
             Stop::AppData | Stop::Done | Stop::Idle => {}
             Stop::Closed => {
                 x.state().rwstate = SSL_NOTHING;
@@ -294,14 +311,25 @@ pub(crate) unsafe fn write_internal(
             err::raise(ERR_LIB_SSL, SSL_R_PROTOCOL_IS_SHUTDOWN, function);
             return -1;
         }
+        if matches!(
+            st.drv.early_data_state,
+            EarlyDataState::ConnectRetry | EarlyDataState::AcceptRetry | EarlyDataState::ReadRetry
+        ) {
+            drop(st);
+            err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, function);
+            return 0;
+        }
     }
+    super::check_finish_init(x, 1);
     // SAFETY: as above.
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
     super::super::requests::renegotiate_check(x, false);
     super::super::requests::post_handshake_write(x);
-    if in_init(x) {
+    // A server writing early to an unauthenticated client doesn't run the handshake.
+    let unauth = x.state().drv.early_data_state == EarlyDataState::UnauthWriting;
+    if in_init(x) && !unauth {
         // SAFETY: as above.
         match unsafe { drive(s, x, false, function) } {
             Stop::Done | Stop::Idle | Stop::AppData => {}

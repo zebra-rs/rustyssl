@@ -158,6 +158,51 @@ pub struct Negotiated {
 /// ([`Connection::client_hello_exts`]).
 pub type ClientHelloView<'a> = (&'a crate::msgs::hello::ClientHello, Vec<(u16, &'a [u8])>);
 
+/// TLS 1.3 early data's ciphertext allowance for a record that is skipped
+/// (`EARLY_DATA_CIPHERTEXT_OVERHEAD`, `ssl_local.h`).
+fn early_data_ciphertext_overhead() -> u64 {
+    let tag = u64::try_from(abi::EVP_GCM_TLS_TAG_LEN).unwrap_or(0);
+    tag.saturating_add(1).saturating_mul(6).saturating_add(2)
+}
+
+/// The early data accounting of a server's read keys (the record layer's).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EarlyRead {
+    /// Whether these are the early keys (their application data is counted as it is read).
+    pub(crate) early: bool,
+    /// The limit (`max_early_data`; 0: none may arrive).
+    pub(crate) max: u32,
+    /// What has been counted.
+    pub(crate) count: u64,
+}
+
+/// `rlayer_early_data_count_ok` / `ossl_early_data_count_ok`: `length` more octets (plus
+/// `overhead` for ciphertext) within `max`, counted in `count`.
+fn early_data_count_ok(
+    count: &mut u64,
+    max: u32,
+    length: usize,
+    overhead: u64,
+    send: bool,
+) -> Result<()> {
+    let alert = if send {
+        abi::SSL_AD_INTERNAL_ERROR
+    } else {
+        abi::SSL_AD_UNEXPECTED_MESSAGE
+    };
+    let too_much = Error::alert(alert, abi::SSL_R_TOO_MUCH_EARLY_DATA);
+    if max == 0 {
+        return Err(too_much);
+    }
+    let limit = u64::from(max).saturating_add(overhead);
+    let total = count.saturating_add(u64::try_from(length).unwrap_or(u64::MAX));
+    if total > limit {
+        return Err(too_much);
+    }
+    *count = total;
+    Ok(())
+}
+
 /// A TLS connection.
 pub struct Connection {
     /// The settings.
@@ -229,6 +274,12 @@ pub struct Connection {
     pub(crate) rtt_write: u32,
     /// See `rtt_write`.
     pub(crate) rtt_read: u32,
+    /// The early data counted against the limit outside the record layer (`s->early_data_count`:
+    /// a client's early writes, a server's skipped plaintext records after a HelloRetryRequest).
+    pub(crate) early_data_count: u64,
+    /// A server's early data accounting for the read keys in force (the record layer's
+    /// `max_early_data` and `early_data_count`, set with the early and handshake keys).
+    pub(crate) early_read: Option<EarlyRead>,
     /// Whether the record layer needs more input to make progress.
     needs_input: bool,
     /// Whether the caller wants application data (an `SSL_read` is in progress).
@@ -310,6 +361,8 @@ impl Connection {
             sent_alert: None,
             rtt_write: 0,
             rtt_read: 0,
+            early_data_count: 0,
+            early_read: None,
             needs_input: false,
             reading: false,
             security_hook: None,
@@ -555,10 +608,24 @@ impl Connection {
 
     /// One advance: `Some` event, or `None` to report what's queued or wait.
     fn advance(&mut self, p: &dyn Provider) -> Result<Option<Event>> {
+        if self.hs.sh.early_data_state == common::EarlyDataState::UnauthWriting {
+            // A server writing to an unauthenticated client between its Finished and the
+            // client's doesn't run the handshake (`ssl3_write_bytes`).
+            if !self.output.is_empty() {
+                return Ok(Some(Event::Output));
+            }
+            return Ok(Some(Event::Idle));
+        }
         if self.in_init() {
             if self.state_machine(p)? {
                 self.st.in_init = false;
-                self.first_handshake = false;
+                // A stop for early data isn't the handshake's end (`SSL_IS_FIRST_HANDSHAKE`
+                // goes by the Finished messages).
+                let early_stop = self.st.hand_state == st(abi::TLS_ST_EARLY_DATA)
+                    || self.st.hand_state == st(abi::TLS_ST_PENDING_EARLY_DATA_END);
+                if !early_stop {
+                    self.first_handshake = false;
+                }
                 if !self.output.is_empty() {
                     self.notify(Event::Output);
                 }
@@ -675,10 +742,39 @@ impl Connection {
     /// content type) to the message callback. `None`: more input is needed.
     fn fetch_record(&mut self, p: &dyn Provider) -> Result<Option<record::Record>> {
         loop {
-            match self.rr.read(p, &self.input)? {
+            self.rr.skip_undecryptable = self.skip_early_data();
+            match self
+                .rr
+                .read(p, &self.input)
+                .map_err(Error::in_record_layer)?
+            {
                 Read::NeedMore(_) => {
                     self.needs_input = true;
                     return Ok(None);
+                }
+                Read::Skipped {
+                    consumed,
+                    header,
+                    len,
+                } => {
+                    self.input.drain(..consumed.min(self.input.len()));
+                    let v = i32::from(u16::from_be_bytes([
+                        header.get(1).copied().unwrap_or(0),
+                        header.get(2).copied().unwrap_or(0),
+                    ]));
+                    self.report_message_v(false, v, abi::SSL3_RT_HEADER, &header);
+                    let (mut count, max) = self.early_read.map_or((0, 0), |e| (e.count, e.max));
+                    early_data_count_ok(
+                        &mut count,
+                        max,
+                        len,
+                        early_data_ciphertext_overhead(),
+                        false,
+                    )
+                    .map_err(Error::in_record_layer)?;
+                    if let Some(e) = self.early_read.as_mut() {
+                        e.count = count;
+                    }
                 }
                 Read::IgnoredCcs { consumed, header } => {
                     self.input.drain(..consumed.min(self.input.len()));
@@ -710,6 +806,13 @@ impl Connection {
                             abi::SSL3_RT_INNER_CONTENT_TYPE,
                             &[record.content_type],
                         );
+                    }
+                    if let Some(e) = self.early_read.as_mut()
+                        && e.early
+                        && record.content_type == app_data()
+                    {
+                        early_data_count_ok(&mut e.count, e.max, record.data.len(), 0, false)
+                            .map_err(Error::in_record_layer)?;
                     }
                     return Ok(Some(record));
                 }
@@ -788,6 +891,22 @@ impl Connection {
                     abi::SSL_AD_UNEXPECTED_MESSAGE,
                     abi::SSL_R_UNEXPECTED_MESSAGE,
                 ));
+            }
+            if ty == app_data() && self.skip_early_data() {
+                // Early data sent before a HelloRetryRequest arrives where the second
+                // ClientHello should: in plaintext it looks like application data, and is
+                // skipped (`ssl3_read_bytes`).
+                let max = self.max_early_data();
+                let mut count = self.early_data_count;
+                early_data_count_ok(
+                    &mut count,
+                    max,
+                    rec.data.len(),
+                    early_data_ciphertext_overhead(),
+                    false,
+                )?;
+                self.early_data_count = count;
+                continue;
             }
             if ty == app_data() {
                 if self.first_handshake {
@@ -877,6 +996,7 @@ impl Connection {
                 reason: abi::SSL_AD_REASON_OFFSET.saturating_add(i32::from(desc)),
                 library_reason: false,
                 data: None,
+                record_layer: false,
             });
         }
         if desc == msgs_type(abi::SSL_AD_NO_RENEGOTIATION) {
@@ -964,11 +1084,87 @@ impl Connection {
         if self.shutdown & SENT_SHUTDOWN != 0 {
             return Err(Error::quiet(abi::SSL_R_PROTOCOL_IS_SHUTDOWN));
         }
-        if self.in_init() {
+        let eds = self.hs.sh.early_data_state;
+        if self.in_init() && eds != common::EarlyDataState::UnauthWriting {
             return Err(Error::internal());
+        }
+        if eds == common::EarlyDataState::Writing {
+            let max = self.max_early_data();
+            let mut count = self.early_data_count;
+            if let Err(e) = early_data_count_ok(&mut count, max, data.len(), 0, true) {
+                self.fatal(p, e);
+                return Err(e);
+            }
+            self.early_data_count = count;
         }
         self.write_record(p, app_data(), data)?;
         Ok(data.len())
+    }
+
+    /// TLS 1.3's early data state (`s->early_data_state`), which `SSL_write_early_data` and
+    /// `SSL_read_early_data` move along.
+    #[must_use]
+    pub fn early_data_state(&self) -> common::EarlyDataState {
+        self.hs.sh.early_data_state
+    }
+
+    /// Sets the early data state (see [`Connection::early_data_state`]).
+    pub fn set_early_data_state(&mut self, s: common::EarlyDataState) {
+        self.hs.sh.early_data_state = s;
+    }
+
+    /// `ossl_statem_check_finish_init`: before a read (`sending` 0), a write (1), or a
+    /// handshake call (-1), whether a handshake stopped for early data goes on.
+    pub fn check_finish_init(&mut self, sending: i32) {
+        use common::EarlyDataState as E;
+        let hs = self.st.hand_state;
+        let early = hs == st(abi::TLS_ST_EARLY_DATA);
+        let pending_end = hs == st(abi::TLS_ST_PENDING_EARLY_DATA_END);
+        let eds = self.hs.sh.early_data_state;
+        if sending == -1 {
+            if pending_end || early {
+                self.st.in_init = true;
+                if eds == E::WriteRetry {
+                    // The handshake was called directly: no more early data.
+                    self.hs.sh.early_data_state = E::FinishedWriting;
+                }
+            }
+        } else if !self.cfg.server {
+            let sending = sending != 0;
+            if (sending && (pending_end || early) && eds != E::Writing) || (!sending && early) {
+                self.st.in_init = true;
+                if sending && eds == E::WriteRetry {
+                    // A plain write: no more early data.
+                    self.hs.sh.early_data_state = E::FinishedWriting;
+                }
+            }
+        } else if eds == E::FinishedReading && early {
+            self.st.in_init = true;
+        }
+    }
+
+    /// `ossl_get_max_early_data`: a client's limit is its session's; a server's is
+    /// `recv_max_early_data`, or with early data accepted the smaller of that and the
+    /// session's.
+    pub(crate) fn max_early_data(&self) -> u32 {
+        if !self.cfg.server {
+            return client::early_limit(self);
+        }
+        let recv = self.cfg.recv_max_early_data;
+        if self.neg.early_data_status == abi::SSL_EARLY_DATA_ACCEPTED {
+            recv.min(self.neg.session.max_early_data)
+        } else {
+            recv
+        }
+    }
+
+    /// `ossl_statem_skip_early_data`: a server that rejected early data, waiting for the rest
+    /// of the client's flight (and not after a second ClientHello), skips what it can't read.
+    fn skip_early_data(&self) -> bool {
+        self.neg.early_data_status == abi::SSL_EARLY_DATA_REJECTED
+            && self.cfg.server
+            && self.st.hand_state == st(abi::TLS_ST_EARLY_DATA)
+            && self.hs.sh.hrr != common::Hrr::Complete
     }
 
     /// Sends close_notify (`ssl3_shutdown`'s first part), once.

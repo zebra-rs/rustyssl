@@ -22,6 +22,10 @@ pub struct Error {
     pub library_reason: bool,
     /// The error's data string (`ERR_raise_data`'s text), if OpenSSL adds one.
     pub data: Option<&'static str>,
+    /// Whether the record layer failed: with an alert, OpenSSL's libssl adds
+    /// `SSL_R_RECORD_LAYER_FAILURE` after the record layer's own entry
+    /// (`ossl_tls_handle_rlayer_return`).
+    pub record_layer: bool,
 }
 
 impl Error {
@@ -33,6 +37,7 @@ impl Error {
             reason,
             library_reason: false,
             data: None,
+            record_layer: false,
         }
     }
 
@@ -45,6 +50,7 @@ impl Error {
             reason,
             library_reason: true,
             data: None,
+            record_layer: false,
         }
     }
 
@@ -56,7 +62,21 @@ impl Error {
             reason,
             library_reason: false,
             data: None,
+            record_layer: false,
         }
+    }
+
+    /// A fatal alert with no ERR entry (`SSLfatal_alert`: the cause was recorded, or none is).
+    #[must_use]
+    pub const fn alert_only(alert: c_int) -> Self {
+        Self::alert(alert, 0)
+    }
+
+    /// The same error, raised by the record layer (see [`Error::record_layer`]).
+    #[must_use]
+    pub const fn in_record_layer(mut self) -> Self {
+        self.record_layer = true;
+        self
     }
 
     /// The same error with OpenSSL's data string.
@@ -74,6 +94,7 @@ impl Error {
             reason: rustyssl_abi::ERR_R_INTERNAL_ERROR,
             library_reason: true,
             data: None,
+            record_layer: false,
         }
     }
 

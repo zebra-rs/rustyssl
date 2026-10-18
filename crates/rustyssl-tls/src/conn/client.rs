@@ -175,6 +175,12 @@ fn state_ref(c: &Connection) -> Option<&State> {
     }
 }
 
+/// The early data the session (or PSK) allows, as offered in the ClientHello
+/// (`ossl_get_max_early_data` for a client).
+pub(crate) fn early_limit(c: &Connection) -> u32 {
+    state_ref(c).map_or(0, |s| s.max_early_data)
+}
+
 /// The time in seconds since the epoch: the configuration's (`Config::now`, which capi sets
 /// when a handshake starts; the core reads no clock).
 pub(crate) fn now(c: &Connection) -> i64 {
@@ -906,6 +912,16 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
         st.ext_memo.clear();
         st.binders.clear();
         let max_early = state(c)?.max_early_data;
+        if c.hs.sh.early_data_state == EarlyDataState::Connecting {
+            // The records after the ClientHello (the compatibility ChangeCipherSpec, early
+            // data) carry the connection's version, TLS 1.3's as TLS 1.2 (`ssl3_write_bytes`).
+            let v = c.neg.version;
+            c.rw.version = if v >= crate::consts::version::TLS1_3 {
+                crate::consts::version::TLS1_2
+            } else {
+                v
+            };
+        }
         if c.hs.sh.early_data_state == EarlyDataState::Connecting && max_early > 0 {
             if !middlebox(c) {
                 install_early_keys(c, p)?;

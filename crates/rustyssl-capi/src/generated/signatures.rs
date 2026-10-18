@@ -20718,6 +20718,12 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
     usize,
     *mut usize,
+) -> core::ffi::c_int = crate::ssl::early::rustyssl_private_SSL_read_early_data;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *mut core::ffi::c_void,
+    usize,
+    *mut usize,
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_read_ex;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::requests::rustyssl_private_SSL_renegotiate;
@@ -21039,7 +21045,20 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
     *mut usize,
+) -> core::ffi::c_int = crate::ssl::early::rustyssl_private_SSL_write_early_data;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const core::ffi::c_void,
+    usize,
+    *mut usize,
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_write_ex;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const core::ffi::c_void,
+    usize,
+    u64,
+    *mut usize,
+) -> core::ffi::c_int = crate::ssl::early::rustyssl_private_SSL_write_ex2;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_TLS_client_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =

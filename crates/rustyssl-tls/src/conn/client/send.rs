@@ -283,6 +283,7 @@ pub(super) fn construct_client_certificate(
             reason: abi::SSL_R_CANNOT_CHANGE_CIPHER,
             library_reason: false,
             data: None,
+            record_layer: false,
         })?;
     }
     Ok(Construct::Send(w.into_bytes()))

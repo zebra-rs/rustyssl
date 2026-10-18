@@ -210,16 +210,6 @@ pub extern "C" fn rustyssl_private_SSL_poll(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_read_early_data(
-    _: *mut SSL,
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_read_early_data")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_set_quic_tls_cbs(
     _: *mut SSL,
     _: *const OSSL_DISPATCH,
@@ -318,25 +308,4 @@ pub extern "C" fn rustyssl_private_SSL_trace(
     _: *mut core::ffi::c_void,
 ) {
     crate::stub::unimplemented("SSL_trace")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_write_early_data(
-    _: *mut SSL,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_write_early_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_write_ex2(
-    _: *mut SSL,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: u64,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_write_ex2")
 }

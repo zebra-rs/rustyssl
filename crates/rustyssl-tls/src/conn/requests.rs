@@ -160,6 +160,7 @@ impl Connection {
                     reason: abi::ERR_R_INTERNAL_ERROR,
                     library_reason: true,
                     data: None,
+                    record_layer: false,
                 });
             }
             Pha::ExtReceived => {}
@@ -195,6 +196,7 @@ impl Connection {
             reason: 0,
             library_reason: false,
             data: None,
+            record_layer: false,
         };
         if self.is_tls13() {
             if self.neg.server_finished.is_empty()
@@ -211,6 +213,7 @@ impl Connection {
                     reason: abi::ERR_R_PASSED_INVALID_ARGUMENT,
                     library_reason: true,
                     data: None,
+                    record_layer: false,
                 });
             }
             // The PRF's input as OpenSSL builds it, checked against the reserved labels.
@@ -261,6 +264,7 @@ impl Connection {
                 reason: 0,
                 library_reason: false,
                 data: None,
+                record_layer: false,
             });
         }
         let out = keys::export_early(self, p, label, context, len)?;

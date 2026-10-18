@@ -126,6 +126,7 @@ fn install13(c: &mut Connection, read: bool, prot: Protection) -> Result<()> {
     if read {
         check_boundary(c)?;
         c.rr.set_protection(Mode::Tls13, prot);
+        c.early_read = None;
     } else {
         c.rw.set_protection(Mode::Tls13, prot);
     }
@@ -165,8 +166,11 @@ pub fn generate_handshake_secret(
     shared: Option<&[u8]>,
 ) -> Result<()> {
     let hash = handshake_md(c)?;
+    // Shared fix (fork O): without resumption the early secret is made again with no PSK
+    // (`ssl_gensecret`): a PSK accepted in a first ClientHello may be refused in the second,
+    // after a HelloRetryRequest (anti-replay takes the session out of the cache).
     let mut sched = match c.hs.sh.keys.schedule.take() {
-        Some(s) if s.hash() == hash => s,
+        Some(s) if s.hash() == hash && c.neg.reused => s,
         _ => Schedule13::new(p, hash, None)?,
     };
     sched.into_handshake(p, shared)?;
@@ -260,7 +264,16 @@ pub fn change_cipher_state13(
             c.rw.plain_alerts = !c.cfg.server;
         }
         let prot = protection13(p, cp, hash, secret.bytes())?;
-        return install13(c, read, prot);
+        install13(c, read, prot)?;
+        if read {
+            // The early read keys count the early data they read (`ossl_get_max_early_data`).
+            c.early_read = Some(crate::conn::EarlyRead {
+                early: true,
+                max: c.max_early_data(),
+                count: 0,
+            });
+        }
+        return Ok(());
     }
     let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
     let hash = handshake_md(c)?;
@@ -320,7 +333,16 @@ pub fn change_cipher_state13(
         c.rw.plain_alerts = false;
     }
     let prot = protection13(p, cp, hash, secret.bytes())?;
-    install13(c, read, prot)
+    install13(c, read, prot)?;
+    if read && handshake && c.cfg.server {
+        // A server's handshake read keys skip early data it rejected, within the limit.
+        c.early_read = Some(crate::conn::EarlyRead {
+            early: false,
+            max: c.max_early_data(),
+            count: 0,
+        });
+    }
+    Ok(())
 }
 
 /// Shared addition (tls-server): derives the client's handshake traffic secret now (from the
@@ -416,7 +438,11 @@ pub fn setup_key_block(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     if c.hs.sh.keys.key_block.is_some() {
         return Ok(());
     }
-    let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
+    // No suite yet (`ssl_cipher_get_evp` fails): the alert goes out with no ERR entry
+    // (`SSLfatal_alert`).
+    let cp =
+        c.hs.new_cipher
+            .ok_or(Error::alert_only(abi::SSL_AD_INTERNAL_ERROR))?;
     let (_, prf) = hashes(c.neg.version, cp);
     let (mac_len, key_len, iv_len, _) = key_block_lengths(cp)?;
     let kb = KeyBlock::new(
