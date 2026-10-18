@@ -298,6 +298,19 @@ unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
     st.peer_ca_names = sk;
 }
 
+/// Whether a failure takes the session out of the cache: a fatal alert received
+/// (`ssl3_read_bytes`), or one sent (`ssl3_send_alert`), which isn't once this end has sent
+/// close_notify. A failure with no alert (`SSL_AD_NO_ALERT`) keeps it.
+fn fatal_drops_session(c: &Connection, e: &TlsError, sent_shutdown: bool) -> bool {
+    if e.alert.is_some() {
+        return !sent_shutdown;
+    }
+    let (_, fatal, _) = c.alerts();
+    fatal != 0
+        && !e.library_reason
+        && e.reason == SSL_AD_REASON_OFFSET.saturating_add(c_int::from(fatal))
+}
+
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
@@ -905,10 +918,15 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
         }
         let (was_before, was_in_init) = (conn.before(), conn.in_init());
+        let sent_shutdown = conn.shutdown_state() & rustyssl_tls::conn::SENT_SHUTDOWN != 0;
         let skipped = conn.skipped_records();
         // SAFETY: no preconditions.
         unsafe { crate::err::ERR_set_mark() };
         let r = conn.step(&*prov, reading);
+        let removes_session = r
+            .as_ref()
+            .err()
+            .is_some_and(|e| fatal_drops_session(&conn, e, sent_shutdown));
         // A skipped early data record's failed decryption leaves nothing on the queue.
         if conn.skipped_records() == skipped {
             // SAFETY: the mark set above.
@@ -972,9 +990,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 if !failed_before {
                     raise_core(&e, function);
                 }
-                // A fatal alert (sent or received) takes the session out of the cache.
-                // SAFETY: as above.
-                unsafe { super::sess_cache::on_fatal(x) };
+                if removes_session {
+                    // SAFETY: as above.
+                    unsafe { super::sess_cache::on_fatal(x) };
+                }
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { flush(x) };
