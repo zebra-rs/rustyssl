@@ -309,10 +309,79 @@ static void test_client_hello(int max)
     SSL_CTX_free(sctx);
 }
 
+static void test_surface(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    STACK_OF(SSL_COMP) *meths, *old;
+    struct timeval tv = { 0, 0 };
+    int inf = 0;
+    size_t n = 5;
+    uint64_t v = 7;
+    BIO_ADDR *addr = BIO_ADDR_new();
+
+    printf("# compression, async, QUIC calls on TLS\n");
+    meths = SSL_COMP_get_compression_methods();
+    check(meths != NULL, "a compression method list");
+    printf("  methods: %d\n", sk_SSL_COMP_num(meths));
+    check(SSL_COMP_get_compression_methods() == meths, "the same list");
+    old = SSL_COMP_set0_compression_methods(NULL);
+    check(old == meths && SSL_COMP_get_compression_methods() == NULL, "set0 replaces it");
+    check(SSL_COMP_set0_compression_methods(old) == NULL, "and puts it back");
+    printf("  add without a method: %d\n", SSL_COMP_add_compression_method(200, NULL));
+    printf("  SSL_COMP_get_name(NULL): %s\n", SSL_COMP_get_name(NULL) == NULL ? "NULL" : "?");
+    errors();
+    connect_pair(cctx, sctx, &c, &s);
+    check(SSL_get_current_compression(c) == NULL && SSL_get_current_expansion(c) == NULL, "none before");
+    printf("  net read %d write %d\n", SSL_net_read_desired(c), SSL_net_write_desired(c));
+    SSL_do_handshake(c);
+    printf("  after a first try: net read %d write %d\n", SSL_net_read_desired(c), SSL_net_write_desired(c));
+    check(run(c, s, 0) == 0, "the handshake");
+    check(SSL_get_current_compression(c) == NULL && SSL_get_current_expansion(s) == NULL, "none after");
+    check(SSL_waiting_for_async(c) == 0, "no async job");
+    printf("  async fds: %d %zu\n", SSL_get_all_async_fds(c, NULL, &n), n);
+    printf("  changed async fds: %d\n", SSL_get_changed_async_fds(c, NULL, &n, NULL, &n));
+    printf("  async status: %d\n", SSL_get_async_status(c, &inf));
+    printf("  handle events: %d\n", SSL_handle_events(c));
+    printf("  event timeout: %d %ld %ld %d\n", SSL_get_event_timeout(c, &tv, &inf), (long)tv.tv_sec,
+        (long)tv.tv_usec, inf);
+    printf("  blocking mode: %d %d\n", SSL_set_blocking_mode(c, 1), SSL_get_blocking_mode(c));
+    printf("  initial peer addr: %d\n", SSL_set1_initial_peer_addr(c, addr));
+    printf("  stream conclude: %d\n", SSL_stream_conclude(c, 0));
+    printf("  new stream: %s, accept stream: %s, queue %zu\n", SSL_new_stream(c, 0) == NULL ? "NULL" : "?",
+        SSL_accept_stream(c, 0) == NULL ? "NULL" : "?", SSL_get_accept_stream_queue_len(c));
+    printf("  connection: %d %d, listener: %d %s, domain: %d %s\n", SSL_get0_connection(c) == c,
+        SSL_is_connection(c), SSL_is_listener(c), SSL_get0_listener(c) == NULL ? "NULL" : "?",
+        SSL_is_domain(c), SSL_get0_domain(c) == NULL ? "NULL" : "?");
+    printf("  stream type %d, id %llu, local %d\n", SSL_get_stream_type(c),
+        (unsigned long long)SSL_get_stream_id(c), SSL_is_stream_local(c));
+    printf("  stream mode %d, policy %d, reset %d\n", SSL_set_default_stream_mode(c, 0),
+        SSL_set_incoming_stream_policy(c, 0, 0), SSL_stream_reset(c, NULL, 0));
+    printf("  stream states %d %d, error codes %d %d\n", SSL_get_stream_read_state(c),
+        SSL_get_stream_write_state(c), SSL_get_stream_read_error_code(c, &v),
+        SSL_get_stream_write_error_code(c, &v));
+    printf("  close info %d\n", SSL_get_conn_close_info(c, NULL, 0));
+    printf("  listeners: %s %s %s %s %zu %d, domain %s\n", SSL_new_listener(cctx, 0) == NULL ? "NULL" : "?",
+        SSL_new_listener_from(c, 0) == NULL ? "NULL" : "?", SSL_new_from_listener(c, 0) == NULL ? "NULL" : "?",
+        SSL_accept_connection(c, 0) == NULL ? "NULL" : "?", SSL_get_accept_connection_queue_len(c),
+        SSL_listen(c), SSL_new_domain(cctx, 0) == NULL ? "NULL" : "?");
+    printf("  value uint: %d %d\n", SSL_get_value_uint(c, 0, 0, &v), SSL_set_value_uint(c, 0, 0, 1));
+    errors();
+    printf("  shutdown_ex: %d\n", SSL_shutdown_ex(c, 0, NULL, 0));
+    check((SSL_get_shutdown(c) & SSL_SENT_SHUTDOWN) != 0, "close_notify sent");
+    errors();
+    BIO_ADDR_free(addr);
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     test_client_hello(TLS1_3_VERSION);
     test_client_hello(TLS1_2_VERSION);
+    test_surface();
     (void)CLIENT_PEM;
     (void)CLIENT_KEY_PEM;
     (void)trust_root;
