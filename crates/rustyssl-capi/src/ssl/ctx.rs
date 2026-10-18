@@ -187,6 +187,8 @@ pub(crate) struct CtxState {
     pub(crate) ciphers: super::ciphers::CipherLists,
     /// The algorithms the context's providers lack (`disabled_*_mask`, `ssl_load_ciphers`).
     pub(crate) available: rustyssl_tls::cipherstring::Available,
+    /// The group and certificate type lists (`ctx->ext.supportedgroups`, ...; `super::lists`).
+    pub(crate) lists: super::lists::Lists,
 }
 
 impl Drop for CtxState {
@@ -460,6 +462,7 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         cert: Cert::new(),
         ciphers: super::ciphers::CipherLists::none(),
         available: rustyssl_tls::cipherstring::Available::default(),
+        lists: super::lists::Lists::default(),
     }
 }
 
@@ -749,25 +752,11 @@ pub(crate) unsafe fn cert_ctrl(
 /// 10) rather than report a failure OpenSSL wouldn't.
 pub(crate) fn unimplemented_ctrl(cmd: c_int) -> bool {
     use rustyssl_abi::{
-        SSL_CTRL_BUILD_CERT_CHAIN, SSL_CTRL_GET0_IMPLEMENTED_GROUPS,
-        SSL_CTRL_SET_CLIENT_CERT_TYPES, SSL_CTRL_SET_CLIENT_SIGALGS,
-        SSL_CTRL_SET_CLIENT_SIGALGS_LIST, SSL_CTRL_SET_GROUPS, SSL_CTRL_SET_GROUPS_LIST,
-        SSL_CTRL_SET_SIGALGS, SSL_CTRL_SET_SIGALGS_LIST, SSL_CTRL_SET_TMP_DH,
-        SSL_CTRL_SET_TMP_ECDH,
+        SSL_CTRL_BUILD_CERT_CHAIN, SSL_CTRL_SET_CLIENT_CERT_TYPES, SSL_CTRL_SET_TMP_DH,
     };
     matches!(
         cmd,
-        SSL_CTRL_SET_TMP_DH
-            | SSL_CTRL_SET_TMP_ECDH
-            | SSL_CTRL_SET_GROUPS
-            | SSL_CTRL_SET_GROUPS_LIST
-            | SSL_CTRL_GET0_IMPLEMENTED_GROUPS
-            | SSL_CTRL_SET_SIGALGS
-            | SSL_CTRL_SET_SIGALGS_LIST
-            | SSL_CTRL_SET_CLIENT_SIGALGS
-            | SSL_CTRL_SET_CLIENT_SIGALGS_LIST
-            | SSL_CTRL_SET_CLIENT_CERT_TYPES
-            | SSL_CTRL_BUILD_CERT_CHAIN
+        SSL_CTRL_SET_TMP_DH | SSL_CTRL_SET_CLIENT_CERT_TYPES | SSL_CTRL_BUILD_CERT_CHAIN
     )
 }
 
@@ -782,16 +771,13 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         const F: &str = "SSL_CTX_ctrl";
-        if cmd == rustyssl_abi::SSL_CTRL_SET_GROUPS_LIST && larg == 1 {
-            crate::stub::unimplemented("SSL_CTX_ctrl(SSL_CTRL_SET_GROUPS_LIST)");
+        // SAFETY: the caller's guarantee (the group and signature algorithm lists, with the
+        // syntax checks made with no context).
+        if let Some(r) = unsafe { super::lists::ctx_ctrl(c, cmd, larg, parg) } {
+            return r;
         }
         // SAFETY: the caller's guarantee.
-        let Some(x) = (unsafe { ctx(c) }) else {
-            if matches!(cmd, rustyssl_abi::SSL_CTRL_SET_SIGALGS_LIST | rustyssl_abi::SSL_CTRL_SET_CLIENT_SIGALGS_LIST) {
-                crate::stub::unimplemented("SSL_CTX_ctrl(SSL_CTRL_SET_SIGALGS_LIST)");
-            }
-            return 0;
-        };
+        let Some(x) = (unsafe { ctx(c) }) else { return 0 };
         if unimplemented_ctrl(cmd) {
             crate::stub::unimplemented(&format!("SSL_CTX_ctrl command {cmd}"));
         }

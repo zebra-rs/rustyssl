@@ -10,11 +10,10 @@ pub mod event;
 pub mod statem;
 
 pub(crate) mod client;
-#[expect(
-    dead_code,
-    reason = "the shared code, used as the role state machines arrive"
-)]
-pub(crate) mod common;
+/// What the client and server share (`statem_lib.c`, `t1_lib.c`, ...): public for
+/// `rustyssl-capi`'s configuration functions (the group and signature algorithm tables, the
+/// security framework).
+pub mod common;
 #[cfg(test)]
 pub(crate) mod pair;
 pub(crate) mod server;

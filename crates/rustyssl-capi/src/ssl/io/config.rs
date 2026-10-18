@@ -520,9 +520,25 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         Some(n) => unsafe { names_der(n) },
         None => Vec::new(),
     };
+    let (groups, key_share_groups, group_tuples) = match &st.lists.groups {
+        // The core takes an empty list for the default one; OpenSSL would offer no groups.
+        Some(g) if g.groups.is_empty() => {
+            crate::stub::unimplemented("a handshake with an empty group list")
+        }
+        Some(g) => g.for_core(),
+        None => (Vec::new(), Vec::new(), Vec::new()),
+    };
+    let cert_types = |t: &Option<Box<[u8]>>| t.as_deref().map(<[u8]>::to_vec).unwrap_or_default();
     Config {
         server: st.server,
         method_version,
+        groups,
+        key_share_groups,
+        group_tuples,
+        sigalgs: st.cert.conf_sigalgs.clone().unwrap_or_default(),
+        client_sigalgs: st.cert.client_sigalgs.clone().unwrap_or_default(),
+        client_cert_types: cert_types(&st.lists.client_cert_type),
+        server_cert_types: cert_types(&st.lists.server_cert_type),
         min_version: u16::try_from(st.min_proto_version).unwrap_or(0),
         max_version: u16::try_from(st.max_proto_version).unwrap_or(0),
         options: st.options,
@@ -556,7 +572,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         dh_auto: st.cert.dh_tmp_auto != 0,
         now: now(),
         session_cache_mode: i64::from(snap.session_cache_mode),
-        session_timeout: i64::from(snap.session_timeout),
+        session_timeout: snap.session_timeout,
         ticket_keys: Some(snap.ticket_keys.clone()),
         callbacks: Callbacks {
             info: st.info_callback.is_some() || snap.info_callback.is_some(),

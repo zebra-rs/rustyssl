@@ -155,6 +155,8 @@ pub(crate) struct SslState {
     pub(crate) peer_ca_names: *mut stack_st_X509_NAME,
     /// The cipher lists, and the client's suites on a server (`cipher_list`, `peer_ciphers`, ...).
     pub(crate) ciphers: super::ciphers::CipherLists,
+    /// The group and certificate type lists, copied from the context (`super::lists`).
+    pub(crate) lists: super::lists::Lists,
     /// The protocol engine and what it hands the application (`super::io`).
     pub(crate) drv: super::io::Driver,
 }
@@ -389,6 +391,7 @@ ffi_export! {
                 peer_finish_md: Vec::new(),
                 peer_ca_names: ptr::null_mut(),
                 ciphers,
+                lists: cs.lists.clone(),
                 drv: super::io::Driver::default(),
             };
             st.reset();
@@ -1659,6 +1662,10 @@ ffi_export! {
         if let Some(r) = unsafe { super::io::api::handshake_ctrl(x, cmd, parg) } {
             return r;
         }
+        // SAFETY: as above (the group and signature algorithm lists).
+        if let Some(r) = unsafe { super::lists::ssl_ctrl(x, cmd, larg, parg) } {
+            return r;
+        }
         if unimplemented_ctrl(cmd) || handshake_ctrl(cmd) || (cmd == SSL_CTRL_GET_RAW_CIPHERLIST && !parg.is_null()) {
             crate::stub::unimplemented(&format!("SSL_ctrl command {cmd}"));
         }
@@ -1828,9 +1835,8 @@ ffi_export! {
 fn handshake_ctrl(cmd: c_int) -> bool {
     use rustyssl_abi::{
         SSL_CTRL_GET_CLIENT_CERT_TYPES, SSL_CTRL_GET_EC_POINT_FORMATS, SSL_CTRL_GET_EXTMS_SUPPORT,
-        SSL_CTRL_GET_GROUPS, SSL_CTRL_GET_IANA_GROUPS, SSL_CTRL_GET_NEGOTIATED_GROUP,
-        SSL_CTRL_GET_PEER_SIGNATURE_NAME, SSL_CTRL_GET_PEER_SIGNATURE_NID,
-        SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SHARED_GROUP, SSL_CTRL_GET_SIGNATURE_NAME,
+        SSL_CTRL_GET_IANA_GROUPS, SSL_CTRL_GET_NEGOTIATED_GROUP, SSL_CTRL_GET_PEER_SIGNATURE_NAME,
+        SSL_CTRL_GET_PEER_SIGNATURE_NID, SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SIGNATURE_NAME,
         SSL_CTRL_GET_SIGNATURE_NID, SSL_CTRL_GET_TMP_KEY,
     };
     matches!(
@@ -1838,13 +1844,11 @@ fn handshake_ctrl(cmd: c_int) -> bool {
         SSL_CTRL_GET_CLIENT_CERT_TYPES
             | SSL_CTRL_GET_EC_POINT_FORMATS
             | SSL_CTRL_GET_EXTMS_SUPPORT
-            | SSL_CTRL_GET_GROUPS
             | SSL_CTRL_GET_IANA_GROUPS
             | SSL_CTRL_GET_NEGOTIATED_GROUP
             | SSL_CTRL_GET_PEER_SIGNATURE_NAME
             | SSL_CTRL_GET_PEER_SIGNATURE_NID
             | SSL_CTRL_GET_PEER_TMP_KEY
-            | SSL_CTRL_GET_SHARED_GROUP
             | SSL_CTRL_GET_SIGNATURE_NAME
             | SSL_CTRL_GET_SIGNATURE_NID
             | SSL_CTRL_GET_TMP_KEY

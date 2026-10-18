@@ -11,6 +11,7 @@ pub(crate) mod conn;
 pub(crate) mod ctx;
 pub(crate) mod io;
 pub(crate) mod keys;
+pub(crate) mod lists;
 pub(crate) mod method;
 pub(crate) mod tls_provider;
 pub(crate) mod types;
