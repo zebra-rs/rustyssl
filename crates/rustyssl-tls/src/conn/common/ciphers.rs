@@ -15,7 +15,7 @@ use super::sigalgs::{
 use super::{groups, version};
 use crate::codec::{Reader, Writer};
 use crate::conn::Connection;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::suites::masks::{
     SSL_CHACHA20POLY1305, SSL_PSK, SSL_aDSS, SSL_aECDSA, SSL_aNULL, SSL_aPSK, SSL_aRSA, SSL_aSRP,
     SSL_kDHE, SSL_kDHEPSK, SSL_kECDHE, SSL_kECDHEPSK, SSL_kPSK, SSL_kRSA, SSL_kRSAPSK, SSL_kSRP,
@@ -113,6 +113,11 @@ pub fn supported(
 /// No version (`SSL_R_NO_PROTOCOLS_AVAILABLE`), or no suite for the highest version
 /// (`SSL_R_NO_CIPHERS_AVAILABLE`), both with internal_error.
 pub fn cipher_list_to_bytes(c: &mut Connection) -> Result<Vec<u8>> {
+    cipher_list_to_bytes_inner(c).in_func("ssl_cipher_list_to_bytes")
+}
+
+/// See [`cipher_list_to_bytes`].
+fn cipher_list_to_bytes_inner(c: &mut Connection) -> Result<Vec<u8>> {
     let reneg_scsv = !c.renegotiate
         && security::check(
             c,
@@ -187,6 +192,15 @@ pub fn bytes_to_cipher_list(
     sslv2: bool,
     fatal: bool,
 ) -> Result<(Vec<&'static Cipher>, Vec<&'static Cipher>)> {
+    bytes_to_cipher_list_inner(raw, sslv2, fatal).in_func("ossl_bytes_to_cipher_list")
+}
+
+/// See [`bytes_to_cipher_list`].
+fn bytes_to_cipher_list_inner(
+    raw: &[u8],
+    sslv2: bool,
+    fatal: bool,
+) -> Result<(Vec<&'static Cipher>, Vec<&'static Cipher>)> {
     let n = if sslv2 { 3 } else { 2 };
     let err = |alert: c_int, reason: c_int| {
         if fatal {
@@ -234,6 +248,11 @@ pub fn bytes_to_cipher_list(
 /// Empty (`SSL_R_NO_CIPHERS_SPECIFIED`), partial entries
 /// (`SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST`), all with decode_error.
 pub fn cache_cipherlist(raw: &[u8], sslv2: bool) -> Result<Vec<u8>> {
+    cache_cipherlist_inner(raw, sslv2).in_func("ssl_cache_cipherlist")
+}
+
+/// See [`cache_cipherlist`].
+fn cache_cipherlist_inner(raw: &[u8], sslv2: bool) -> Result<Vec<u8>> {
     let n = if sslv2 { 3 } else { 2 };
     if raw.is_empty() {
         return Err(Error::decode(abi::SSL_R_NO_CIPHERS_SPECIFIED));

@@ -577,7 +577,7 @@ ffi_export! {
             loop {
                 let pending = x.state().drv.tls.as_ref().is_some_and(|c| c.pending_app() > 0);
                 if pending {
-                    err::raise(ERR_LIB_SSL, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY, F);
+                    err::raise(ERR_LIB_SSL, SSL_R_APPLICATION_DATA_AFTER_CLOSE_NOTIFY, "ssl3_read_bytes");
                     x.state().drv.failed = true;
                     return -1;
                 }

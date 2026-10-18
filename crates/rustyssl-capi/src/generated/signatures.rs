@@ -20676,6 +20676,10 @@ const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::requests::rustyssl_private_SSL_renegotiate_abbreviated;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::requests::rustyssl_private_SSL_renegotiate_pending;
+const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_rstate_string;
+const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_rstate_string_long;
 const _: unsafe extern "C" fn(
     *mut *mut core::ffi::c_uchar,
     *mut core::ffi::c_uchar,

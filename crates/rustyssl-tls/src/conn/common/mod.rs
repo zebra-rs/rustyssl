@@ -24,7 +24,7 @@ use rustyssl_abi as abi;
 use super::statem::{MsgFlow, ReadState, st};
 use super::{Answer, Connection, Request};
 use crate::crypto::{GroupInfo, HashAlg, Provider};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::Transcript;
 
 pub use security::SecurityHook;
@@ -268,6 +268,11 @@ pub(crate) fn ask_once(c: &mut Connection, r: Request, tag: usize) -> Option<Ans
 /// `SSL_R_NO_PROTOCOLS_AVAILABLE` (protocol-version), `SSL_R_NO_SUITABLE_DIGEST_ALGORITHM` or
 /// `SSL_R_NO_CIPHERS_AVAILABLE` (handshake-failure), or the role's.
 pub(crate) fn setup_handshake(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    setup_handshake_inner(c, p).in_func("tls_setup_handshake")
+}
+
+/// See [`setup_handshake`].
+fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     c.hs.transcript = Transcript::new();
     c.hs.sh.ext = ext::Flags::new(c.cfg.custom_exts.len());
     if c.hs.sh.groups.is_empty() {
@@ -339,11 +344,20 @@ pub(crate) fn take_mac(c: &mut Connection, p: &dyn Provider) -> Result<()> {
 /// Before TLS 1.3, as `ossl_statem_set_in_init` before `handshake_func`: the state machine
 /// starts again from `MSG_FLOW_FINISHED` (the start notification, a write transition with
 /// nothing to write, then the read), so a renegotiation is set up and traced as OpenSSL's is
-/// (fork M). TLS 1.3's post-handshake messages go straight to the read.
+/// (fork M). TLS 1.3's post-handshake messages go to the read after the write transition's
+/// loop notification (`TLS_ST_OK` has nothing to write), with no start notification.
 pub(crate) fn enter_post_handshake(c: &mut Connection) {
     c.st.in_init = true;
     if c.is_tls13() {
         c.st.state = MsgFlow::Reading;
+        if c.cfg.callbacks.info {
+            let w = if c.cfg.server {
+                abi::SSL_CB_ACCEPT_LOOP
+            } else {
+                abi::SSL_CB_CONNECT_LOOP
+            };
+            c.notify(super::Event::Info { where_: w, ret: 1 });
+        }
     } else if c.st.state != MsgFlow::Uninited {
         c.st.state = MsgFlow::Finished;
     }

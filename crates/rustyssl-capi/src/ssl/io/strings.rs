@@ -288,3 +288,47 @@ ffi_export! {
         s.as_ptr()
     }
 }
+
+/// The record layer's read state: "RB" (`SSL_ST_READ_BODY`) between a record's header and the
+/// rest of it, "RH" (`SSL_ST_READ_HEADER`) otherwise, as (short, long).
+fn rstate(x: &Ssl) -> (&'static CStr, &'static CStr) {
+    let body = x
+        .state()
+        .drv
+        .tls
+        .as_ref()
+        .is_some_and(|c| c.reading_record_body());
+    if body {
+        (c"RB", c"read body")
+    } else {
+        (c"RH", c"read header")
+    }
+}
+
+ffi_export! {
+    /// The record layer's read state, in words ("read header", "read body").
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_rstate_string_long(s: *const SSL) -> *const c_char
+    where failure = core::ptr::null(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return core::ptr::null() };
+        rstate(x).1.as_ptr()
+    }
+}
+
+ffi_export! {
+    /// The record layer's read state, abbreviated ("RH", "RB").
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_rstate_string(s: *const SSL) -> *const c_char
+    where failure = core::ptr::null(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return core::ptr::null() };
+        rstate(x).0.as_ptr()
+    }
+}

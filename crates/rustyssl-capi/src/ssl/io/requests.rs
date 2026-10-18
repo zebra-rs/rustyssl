@@ -295,7 +295,8 @@ unsafe fn verify(
     use crate::x509::vpm::{
         X509_VERIFY_PARAM_move_peername, X509_VERIFY_PARAM_set_auth_level, X509_VERIFY_PARAM_set1,
     };
-    const F: &str = "ssl_verify_cert_chain";
+    // OpenSSL raises these from `ssl_verify_cert_chain`'s worker.
+    const F: &str = "ssl_verify_internal";
     let Some(snap) = snap else {
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;

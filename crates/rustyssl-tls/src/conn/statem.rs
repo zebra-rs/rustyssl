@@ -9,9 +9,10 @@
 
 use rustyssl_abi as abi;
 
+use super::funcs::{self, Phase};
 use super::{Connection, client, server};
 use crate::crypto::Provider;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::msgs;
 
 /// The message flow (`MSG_FLOW_*`).
@@ -189,7 +190,7 @@ impl Connection {
                 });
             }
             if self.before() || self.renegotiate {
-                self.setup_handshake(p)?;
+                self.setup_handshake(p).in_func("tls_setup_handshake")?;
                 if self.first_handshake {
                     self.st.read_state_first_init = true;
                 }
@@ -264,9 +265,17 @@ impl Connection {
                     }
                     let mt = self.st.message_type;
                     if self.cfg.server {
-                        server::read_transition(self, mt)?;
+                        server::read_transition(self, mt).in_func(funcs::of(
+                            true,
+                            Phase::ReadTransition,
+                            self.st.hand_state,
+                        ))?;
                     } else {
-                        client::read_transition(self, mt)?;
+                        client::read_transition(self, mt).in_func(funcs::of(
+                            false,
+                            Phase::ReadTransition,
+                            self.st.hand_state,
+                        ))?;
                     }
                     let max = if self.cfg.server {
                         server::max_message_size(self)
@@ -277,7 +286,8 @@ impl Connection {
                         return Err(Error::alert(
                             abi::SSL_AD_ILLEGAL_PARAMETER,
                             abi::SSL_R_EXCESSIVE_MESSAGE_SIZE,
-                        ));
+                        )
+                        .in_func("read_state_machine"));
                     }
                     self.st.read_state = ReadState::Body;
                 }
@@ -294,9 +304,17 @@ impl Connection {
                     }
                     let body = self.cur_msg.clone().map(|m| m.1).unwrap_or_default();
                     let r = if self.cfg.server {
-                        server::process_message(self, p, &body)?
+                        server::process_message(self, p, &body).in_func(funcs::of(
+                            true,
+                            Phase::Process,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::process_message(self, p, &body)?
+                        client::process_message(self, p, &body).in_func(funcs::of(
+                            false,
+                            Phase::Process,
+                            self.st.hand_state,
+                        ))?
                     };
                     if r == MsgProcess::Ask {
                         return Ok(Sub::Yield);
@@ -319,9 +337,17 @@ impl Connection {
                 ReadState::PostProcess => {
                     let wst = self.st.read_state_work;
                     let w = if self.cfg.server {
-                        server::post_process_message(self, p, wst)?
+                        server::post_process_message(self, p, wst).in_func(funcs::of(
+                            true,
+                            Phase::PostProcess,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::post_process_message(self, p, wst)?
+                        client::post_process_message(self, p, wst).in_func(funcs::of(
+                            false,
+                            Phase::PostProcess,
+                            self.st.hand_state,
+                        ))?
                     };
                     self.st.read_state_work = w;
                     match w {
@@ -352,9 +378,17 @@ impl Connection {
                         return Ok(Sub::Yield);
                     }
                     let t = if self.cfg.server {
-                        server::write_transition(self)?
+                        server::write_transition(self).in_func(funcs::of(
+                            true,
+                            Phase::WriteTransition,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::write_transition(self)?
+                        client::write_transition(self).in_func(funcs::of(
+                            false,
+                            Phase::WriteTransition,
+                            self.st.hand_state,
+                        ))?
                     };
                     self.st.loop_reported = false;
                     match t {
@@ -368,9 +402,17 @@ impl Connection {
                 WriteState::PreWork => {
                     let wst = self.st.write_state_work;
                     let w = if self.cfg.server {
-                        server::pre_work(self, p, wst)?
+                        server::pre_work(self, p, wst).in_func(funcs::of(
+                            true,
+                            Phase::PreWork,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::pre_work(self, p, wst)?
+                        client::pre_work(self, p, wst).in_func(funcs::of(
+                            false,
+                            Phase::PreWork,
+                            self.st.hand_state,
+                        ))?
                     };
                     self.st.write_state_work = w;
                     match w {
@@ -381,9 +423,17 @@ impl Connection {
                         Work::FinishedStop => return Ok(Sub::EndHandshake),
                     }
                     let (mt, c) = if self.cfg.server {
-                        server::construct_message(self, p)?
+                        server::construct_message(self, p).in_func(funcs::of(
+                            true,
+                            Phase::Construct,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::construct_message(self, p)?
+                        client::construct_message(self, p).in_func(funcs::of(
+                            false,
+                            Phase::Construct,
+                            self.st.hand_state,
+                        ))?
                     };
                     if c != Construct::Ask {
                         self.hs.sh.answers.clear();
@@ -411,9 +461,17 @@ impl Connection {
                     // Only reached to retry a construction that asked for an answer.
                     if self.pending_construct {
                         let (mt, c) = if self.cfg.server {
-                            server::construct_message(self, p)?
+                            server::construct_message(self, p).in_func(funcs::of(
+                                true,
+                                Phase::Construct,
+                                self.st.hand_state,
+                            ))?
                         } else {
-                            client::construct_message(self, p)?
+                            client::construct_message(self, p).in_func(funcs::of(
+                                false,
+                                Phase::Construct,
+                                self.st.hand_state,
+                            ))?
                         };
                         if c != Construct::Ask {
                             self.hs.sh.answers.clear();
@@ -431,9 +489,17 @@ impl Connection {
                 WriteState::PostWork => {
                     let wst = self.st.write_state_work;
                     let w = if self.cfg.server {
-                        server::post_work(self, p, wst)?
+                        server::post_work(self, p, wst).in_func(funcs::of(
+                            true,
+                            Phase::PostWork,
+                            self.st.hand_state,
+                        ))?
                     } else {
-                        client::post_work(self, p, wst)?
+                        client::post_work(self, p, wst).in_func(funcs::of(
+                            false,
+                            Phase::PostWork,
+                            self.st.hand_state,
+                        ))?
                     };
                     self.st.write_state_work = w;
                     match w {
@@ -487,6 +553,12 @@ impl Connection {
     /// well-formed HelloRequests mid-handshake, takes a ChangeCipherSpec as a message of its
     /// own.
     fn get_message_header(&mut self, p: &dyn Provider) -> Result<Got> {
+        self.get_message_header_inner(p)
+            .in_func("tls_get_message_header")
+    }
+
+    /// See [`Connection::get_message_header`].
+    fn get_message_header_inner(&mut self, p: &dyn Provider) -> Result<Got> {
         loop {
             while self.hs_in.len() < msgs::HEADER_LEN {
                 match self.read_handshake_bytes(p)? {
@@ -547,6 +619,12 @@ impl Connection {
     /// post-handshake KeyUpdate and NewSessionTicket, and a HelloRetryRequest, which the
     /// client adds while processing it).
     fn get_message_body(&mut self, p: &dyn Provider) -> Result<Got> {
+        self.get_message_body_inner(p)
+            .in_func("tls_get_message_body")
+    }
+
+    /// See [`Connection::get_message_body`].
+    fn get_message_body_inner(&mut self, p: &dyn Provider) -> Result<Got> {
         if self.st.message_type == msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC)
             && self.cur_msg.is_some()
         {

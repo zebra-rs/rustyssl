@@ -194,6 +194,11 @@ impl core::fmt::Debug for Driver {
 /// gets OpenSSL's data, `SSL alert number <n>`.
 #[track_caller]
 pub(crate) fn raise_core(e: &TlsError, function: &str) {
+    // OpenSSL's raising function when the core named it, else the API function's.
+    let function = e.func.unwrap_or(function);
+    if let Some(c) = e.cause {
+        err::raise(c.lib, c.reason, c.func);
+    }
     let alert_reasons = SSL_AD_REASON_OFFSET..SSL_AD_REASON_OFFSET.saturating_add(256);
     if !e.library_reason && alert_reasons.contains(&e.reason) {
         let desc = e.reason.saturating_sub(SSL_AD_REASON_OFFSET);
@@ -207,6 +212,10 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
         err::raise_with_text(ERR_LIB_SSL, e.reason, function, d);
     } else {
         err::raise(ERR_LIB_SSL, e.reason, function);
+    }
+    // `ossl_tls_handle_rlayer_return`'s entry after a record-layer failure that sent an alert.
+    if let Some(r) = e.follow_up {
+        err::raise(ERR_LIB_SSL, r, "");
     }
 }
 
@@ -835,7 +844,8 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                         // `ossl_tls_handle_rlayer_return`: an unexpected EOF is fatal, with a
                         // decode_error alert (which the closed transport usually refuses), and a
                         // read reports it by returning 0.
-                        err::raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_EOF_WHILE_READING, function);
+                        // Raised there with no function (`ERR_set_debug(file, line, 0)`).
+                        err::raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_EOF_WHILE_READING, "");
                         {
                             let mut st = x.state();
                             st.drv.failed = true;

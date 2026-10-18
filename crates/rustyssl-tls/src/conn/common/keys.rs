@@ -8,7 +8,7 @@ use rustyssl_abi as abi;
 
 use crate::conn::{Connection, Event};
 use crate::crypto::{HashAlg, Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::{self, KeyBlock, PrfHash, Schedule13, keylog};
 use crate::record::{Mode, Protection};
 use crate::suites::{self, Cipher};
@@ -164,6 +164,15 @@ pub fn generate_handshake_secret(
     p: &dyn Provider,
     shared: Option<&[u8]>,
 ) -> Result<()> {
+    generate_handshake_secret_inner(c, p, shared).in_func("tls13_generate_handshake_secret")
+}
+
+/// See [`generate_handshake_secret`].
+fn generate_handshake_secret_inner(
+    c: &mut Connection,
+    p: &dyn Provider,
+    shared: Option<&[u8]>,
+) -> Result<()> {
     let hash = handshake_md(c)?;
     let mut sched = match c.hs.sh.keys.schedule.take() {
         Some(s) if s.hash() == hash => s,
@@ -179,6 +188,11 @@ pub fn generate_handshake_secret(
 /// # Errors
 /// The schedule isn't at the handshake stage, or the provider failed.
 pub fn generate_master_secret(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    generate_master_secret_inner(c, p).in_func("tls13_generate_master_secret")
+}
+
+/// See [`generate_master_secret`].
+fn generate_master_secret_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     // A client that deferred its handshake write keys (early data, middlebox compatibility)
     // installs them after this, so their secret is kept now (shared fix, fork F; OpenSSL keeps
     // the handshake secret itself).
@@ -224,6 +238,16 @@ fn has(which: c_int, f: c_int) -> bool {
 /// # Errors
 /// Missing state, the provider failed, or handshake data waits under the old read keys.
 pub fn change_cipher_state13(
+    c: &mut Connection,
+    p: &dyn Provider,
+    which: c_int,
+    early_cipher: Option<&'static Cipher>,
+) -> Result<()> {
+    change_cipher_state13_inner(c, p, which, early_cipher).in_func("tls13_change_cipher_state")
+}
+
+/// See [`change_cipher_state13`].
+fn change_cipher_state13_inner(
     c: &mut Connection,
     p: &dyn Provider,
     which: c_int,
@@ -341,6 +365,11 @@ pub fn keep_client_handshake_secret(c: &mut Connection, p: &dyn Provider) -> Res
 /// # Errors
 /// Missing state, or the provider failed.
 pub fn update_key(c: &mut Connection, p: &dyn Provider, sending: bool) -> Result<()> {
+    update_key_inner(c, p, sending).in_func("tls13_update_key")
+}
+
+/// See [`update_key`].
+fn update_key_inner(c: &mut Connection, p: &dyn Provider, sending: bool) -> Result<()> {
     let cp =
         c.hs.new_cipher
             .or(c.neg.cipher)
@@ -413,6 +442,11 @@ fn key_block_lengths(cp: &Cipher) -> Result<(usize, usize, usize, suites::Protec
 /// # Errors
 /// An unsupported suite, or the provider failed.
 pub fn setup_key_block(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    setup_key_block_inner(c, p).in_func("tls1_setup_key_block")
+}
+
+/// See [`setup_key_block`].
+fn setup_key_block_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     if c.hs.sh.keys.key_block.is_some() {
         return Ok(());
     }
@@ -440,6 +474,11 @@ pub fn setup_key_block(c: &mut Connection, p: &dyn Provider) -> Result<()> {
 /// # Errors
 /// No key block, or the provider failed.
 pub fn change_cipher_state12(c: &mut Connection, p: &dyn Provider, which: c_int) -> Result<()> {
+    change_cipher_state12_inner(c, p, which).in_func("tls1_change_cipher_state")
+}
+
+/// See [`change_cipher_state12`].
+fn change_cipher_state12_inner(c: &mut Connection, p: &dyn Provider, which: c_int) -> Result<()> {
     let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
     let kb =
         c.hs.sh

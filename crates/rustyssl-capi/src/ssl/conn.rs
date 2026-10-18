@@ -297,7 +297,7 @@ ffi_export! {
         // SAFETY: no preconditions.
         let param = unsafe { X509_VERIFY_PARAM_new() };
         if param.is_null() {
-            err::raise(ERR_LIB_SSL, ERR_R_ASN1_LIB, F);
+            err::raise(ERR_LIB_SSL, ERR_R_ASN1_LIB, "ossl_ssl_connection_new_int");
             return ptr::null_mut();
         }
         // SAFETY: the new parameters; the context's.
@@ -306,7 +306,7 @@ ffi_export! {
             let cs = c.state();
             let Some(cert) = cs.cert.dup() else {
                 drop(cs);
-                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, F);
+                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, "ossl_ssl_connection_new_int");
                 // SAFETY: made above.
                 unsafe { X509_VERIFY_PARAM_free(param) };
                 return ptr::null_mut();
@@ -314,7 +314,7 @@ ffi_export! {
             let method = cs.method;
             let Some(ciphers) = super::ciphers::CipherLists::for_ssl(&cs.ciphers) else {
                 drop(cs);
-                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, F);
+                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, "ossl_ssl_connection_new_int");
                 // SAFETY: made above.
                 unsafe { X509_VERIFY_PARAM_free(param) };
                 return ptr::null_mut();
@@ -684,7 +684,13 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(0, |x| x.state().client_version)
+        let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        let st = x.state();
+        // The ClientHello's version once there is one, the method's before.
+        match st.drv.tls.as_ref().map(|c| c.client_version()) {
+            Some(v) if v != 0 => c_int::from(v),
+            _ => st.client_version,
+        }
     }
 }
 
@@ -1672,7 +1678,8 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_ctrl(s: *mut SSL, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_SSL
     {
-        const F: &str = "SSL_ctrl";
+        // The commands' errors come from OpenSSL's `ssl3_ctrl`.
+        const F: &str = "ssl3_ctrl";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         // SAFETY: the live connection; `parg` as `cmd` documents.

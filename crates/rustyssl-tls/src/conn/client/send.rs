@@ -10,7 +10,7 @@ use crate::conn::common::{EarlyDataState, Pha, ask_once, cert, finished, keys, s
 use crate::conn::statem::{Construct, Work};
 use crate::conn::{Answer, Event, Request};
 use crate::crypto::{Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::keylog;
 use crate::suites::masks::{
     SSL_PSK, SSL_kDHE, SSL_kDHEPSK, SSL_kECDHE, SSL_kECDHEPSK, SSL_kPSK, SSL_kRSA, SSL_kRSAPSK,
@@ -26,6 +26,11 @@ fn psk_limits() -> (usize, usize) {
 
 /// `tls_construct_cke_psk_preamble`: the PSK callback's identity (written) and key (kept).
 fn psk_preamble(c: &mut Connection, w: &mut Writer) -> Result<Option<Construct>> {
+    psk_preamble_inner(c, w).in_func("tls_construct_cke_psk_preamble")
+}
+
+/// See [`psk_preamble`].
+fn psk_preamble_inner(c: &mut Connection, w: &mut Writer) -> Result<Option<Construct>> {
     if !c.cfg.callbacks.psk {
         return Err(Error::alert(
             abi::SSL_AD_INTERNAL_ERROR,
@@ -283,6 +288,9 @@ pub(super) fn construct_client_certificate(
             reason: abi::SSL_R_CANNOT_CHANGE_CIPHER,
             library_reason: false,
             data: None,
+            func: None,
+            follow_up: None,
+            cause: None,
         })?;
     }
     Ok(Construct::Send(w.into_bytes()))
