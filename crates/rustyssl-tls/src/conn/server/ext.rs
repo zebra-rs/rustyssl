@@ -542,19 +542,130 @@ pub(crate) fn ext_parse_key_share(
     Ok(Step::Done)
 }
 
-/// `tls_parse_ctos_cookie`: only a stateless server (`SSL_stateless`) reads its cookie,
-/// which this port doesn't do yet: it fails closed (an internal error) rather than accept an
-/// unchecked cookie.
+/// `COOKIE_STATE_FORMAT_VERSION` (`extensions_srvr.c`): the stateless cookie's layout.
+const COOKIE_STATE_FORMAT_VERSION: u16 = 1;
+
+/// The SHA-256 HMAC that ends a stateless cookie.
+const COOKIE_HMAC_LEN: usize = 32;
+
+/// `tls_parse_ctos_cookie`: a stateless server (`SSL_stateless`) with a verify callback checks
+/// its cookie (HMAC, version, group and suite, age, the application's part), then rebuilds the
+/// transcript as if it had sent the HelloRetryRequest itself. A stale cookie or one of an
+/// unknown format is ignored.
 pub(crate) fn ext_parse_cookie(
     c: &mut Connection,
-    _p: &dyn Provider,
-    _body: &[u8],
+    p: &dyn Provider,
+    body: &[u8],
     _x: &Ctx,
 ) -> Result<Step> {
+    use crate::crypto::HashAlg;
     if !c.cfg.callbacks.cookie || c.hs.sh.flags & abi::TLS1_FLAGS_STATELESS == 0 {
         return Ok(Step::Done);
     }
-    Err(Error::internal())
+    let len_mismatch = || Error::decode(abi::SSL_R_LENGTH_MISMATCH);
+    let mut r = Reader::new(body);
+    let raw = r.vec16().map_err(|_| len_mismatch())?;
+    if !r.is_empty() {
+        return Err(len_mismatch());
+    }
+    let raw = raw.rest();
+    let split = raw
+        .len()
+        .checked_sub(COOKIE_HMAC_LEN)
+        .ok_or_else(len_mismatch)?;
+    let (data, mac) = raw.split_at_checked(split).ok_or_else(len_mismatch)?;
+    let want = crate::keysched::hmac(p, HashAlg::Sha256, c.cfg.cookie_hmac_key.bytes(), &[data])
+        .map_err(|_| Error::internal())?;
+    if !bool::from(subtle::ConstantTimeEq::ct_eq(want.as_slice(), mac)) {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_COOKIE_MISMATCH,
+        ));
+    }
+    let mut ck = Reader::new(data);
+    if ck.u16().map_err(|_| len_mismatch())? != COOKIE_STATE_FORMAT_VERSION {
+        return Ok(Step::Done);
+    }
+    if ck.u16().map_err(|_| len_mismatch())? != v::TLS1_3 {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_BAD_PROTOCOL_VERSION_NUMBER,
+        ));
+    }
+    let group = ck.u16().map_err(|_| len_mismatch())?;
+    let suite = ck.u16().map_err(|_| len_mismatch())?;
+    let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
+    if group != c.hs.sh.group_id || suite != cp.protocol_id() {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_BAD_CIPHER,
+        ));
+    }
+    let key_share = ck.u8().map_err(|_| len_mismatch())?;
+    let tm = ck.u64().map_err(|_| len_mismatch())?;
+    let chhash = ck.vec16().map_err(|_| len_mismatch())?.rest().to_vec();
+    let appcookie = ck.vec8().map_err(|_| len_mismatch())?.rest().to_vec();
+    if !ck.is_empty() {
+        return Err(len_mismatch());
+    }
+    // A cookie up to ten minutes old is good; an older one (or one from the future) is ignored.
+    let now = u64::try_from(c.cfg.now).unwrap_or(0);
+    if tm > now || now.saturating_sub(tm) > 600 {
+        return Ok(Step::Done);
+    }
+    let ok = match ask_once(c, Request::StatelessCookieVerify { cookie: appcookie }, 0) {
+        None => return Ok(Step::Wait),
+        Some(Answer::Allowed(ok)) => ok,
+        Some(_) => false,
+    };
+    if !ok {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_COOKIE_MISMATCH,
+        ));
+    }
+    // The HelloRetryRequest the first ClientHello would have had (custom extensions aside).
+    let mut exts = crate::codec::Writer::new();
+    exts.u16(crate::consts::ext::SUPPORTED_VERSIONS);
+    exts.vec(2, &v::TLS1_3.to_be_bytes())
+        .map_err(|_| Error::internal())?;
+    if key_share != 0 {
+        exts.u16(crate::consts::ext::KEY_SHARE);
+        exts.vec(2, &c.hs.sh.group_id.to_be_bytes())
+            .map_err(|_| Error::internal())?;
+    }
+    let mut cookie_ext = crate::codec::Writer::new();
+    cookie_ext.vec(2, raw).map_err(|_| Error::internal())?;
+    exts.u16(crate::consts::ext::COOKIE);
+    exts.vec(2, &cookie_ext.into_bytes())
+        .map_err(|_| Error::internal())?;
+    let hrr = crate::msgs::hello::ServerHello {
+        legacy_version: v::TLS1_2,
+        random: crate::consts::HRR_RANDOM,
+        session_id: state_ref(c)
+            .map(|s| s.tmp_session_id.clone())
+            .unwrap_or_default(),
+        cipher_suite: cp.protocol_id(),
+        compression: 0,
+        extensions: Some(exts.into_bytes()),
+        hrr: true,
+    }
+    .encode()?;
+    let hrr = crate::msgs::frame(crate::consts::handshake::SERVER_HELLO, &hrr)?;
+    // `create_synthetic_message_hash`: message_hash of the first ClientHello, the
+    // HelloRetryRequest, then this ClientHello.
+    let ch2 = state_ref(c)
+        .map(|s| s.hello_body.clone())
+        .ok_or_else(Error::internal)?;
+    let ch2 = crate::msgs::frame(crate::consts::handshake::CLIENT_HELLO, &ch2)?;
+    let mut fresh = crate::keysched::Transcript::new();
+    fresh.add(&crate::msgs::message_hash(&chhash)?);
+    fresh.add(&hrr);
+    fresh.add(&ch2);
+    c.hs.transcript = fresh;
+    c.hs.sh.hrr = Hrr::Pending;
+    c.hs.sh.cookie_ok = true;
+    Ok(Step::Done)
 }
 
 /// `tls_parse_ctos_early_data`: empty, and not after a HelloRetryRequest
@@ -900,20 +1011,61 @@ pub(crate) fn ext_construct_key_share(
     Ok(ExtReturn::Sent(body))
 }
 
-/// `tls_construct_stoc_cookie`: only a stateless server sends one, which this port doesn't do
-/// yet (fails closed).
+/// `tls_construct_stoc_cookie`: a stateless server's HelloRetryRequest carries its state
+/// (version, group, suite, whether it asked for a key share, the time, the first ClientHello's
+/// hash) and the application's cookie, under an HMAC.
 pub(crate) fn ext_construct_cookie(
     c: &mut Connection,
-    _p: &dyn Provider,
+    p: &dyn Provider,
     _x: &Ctx,
 ) -> Result<ExtReturn> {
+    use crate::crypto::HashAlg;
     if c.hs.sh.flags & abi::TLS1_FLAGS_STATELESS == 0 {
         return Ok(ExtReturn::NotSent);
     }
-    Err(Error::alert(
-        abi::SSL_AD_INTERNAL_ERROR,
-        abi::SSL_R_NO_COOKIE_CALLBACK_SET,
-    ))
+    if !c.cfg.callbacks.cookie_gen {
+        return Err(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_NO_COOKIE_CALLBACK_SET,
+        ));
+    }
+    let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
+    let alg = common::keys::handshake_md(c)?;
+    let chhash = match c.hs.transcript.buffered() {
+        Some(b) => crate::keysched::hash_of(p, alg, b)?,
+        None => c.hs.transcript.current()?,
+    };
+    let app = match ask_once(c, Request::StatelessCookieGen, 0) {
+        None => return Ok(ExtReturn::Wait),
+        Some(Answer::Cookie(Some(a))) => a,
+        Some(_) => {
+            return Err(Error::alert(
+                abi::SSL_AD_INTERNAL_ERROR,
+                abi::SSL_R_COOKIE_GEN_CALLBACK_FAILURE,
+            ));
+        }
+    };
+    let mut w = crate::codec::Writer::new();
+    w.u16(COOKIE_STATE_FORMAT_VERSION);
+    w.u16(v::TLS1_3);
+    w.u16(c.hs.sh.group_id);
+    w.u16(cp.protocol_id());
+    w.u8(u8::from(c.hs.sh.peer_tmp.is_none()));
+    w.u64(u64::try_from(c.cfg.now).unwrap_or(0));
+    w.vec(2, &chhash).map_err(|_| Error::internal())?;
+    w.vec(1, &app).map_err(|_| Error::internal())?;
+    let mut cookie = w.into_bytes();
+    let mac = crate::keysched::hmac(
+        p,
+        HashAlg::Sha256,
+        c.cfg.cookie_hmac_key.bytes(),
+        &[&cookie],
+    )
+    .map_err(|_| Error::internal())?;
+    cookie.extend_from_slice(&mac);
+    let mut body = crate::codec::Writer::new();
+    body.vec(2, &cookie).map_err(|_| Error::internal())?;
+    Ok(ExtReturn::Sent(body.into_bytes()))
 }
 
 /// The CryptoPro bug's extension body (`cryptopro_ext` without its type and length).

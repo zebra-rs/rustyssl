@@ -239,6 +239,12 @@ pub(crate) unsafe fn handle(
         }
         // SAFETY: as above.
         Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
+        // SAFETY: as above.
+        Request::StatelessCookieGen => Some(unsafe { stateless_cookie_gen(s, snap) }),
+        Request::StatelessCookieVerify { cookie } => {
+            // SAFETY: as above.
+            Some(unsafe { stateless_cookie_verify(s, snap, &cookie) })
+        }
         Request::CustomExt {
             index,
             typ,
@@ -268,6 +274,45 @@ pub(crate) unsafe fn handle(
             None
         }
     }
+}
+
+/// `gen_stateless_cookie_cb`: the application's cookie (at most `SSL_COOKIE_LENGTH` octets), or
+/// `None` when it failed.
+///
+/// # Safety
+/// `s` is a live connection; no lock is held.
+unsafe fn stateless_cookie_gen(s: *mut SSL, snap: Option<&CtxSnapshot>) -> Answer {
+    let Some(cb) = snap.and_then(|c| c.gen_stateless_cookie_cb) else {
+        return Answer::Cookie(None);
+    };
+    let mut buf = vec![0u8; usize::try_from(rustyssl_abi::SSL_COOKIE_LENGTH).unwrap_or(4096)];
+    let mut len = 0usize;
+    // SAFETY: the application's callback with its connection and a buffer of
+    // `SSL_COOKIE_LENGTH` octets.
+    if unsafe { cb(s, buf.as_mut_ptr(), &raw mut len) } == 0 {
+        return Answer::Cookie(None);
+    }
+    if len > buf.len() {
+        return Answer::Cookie(None);
+    }
+    buf.truncate(len);
+    Answer::Cookie(Some(buf))
+}
+
+/// `verify_stateless_cookie_cb`: whether the application's cookie is good.
+///
+/// # Safety
+/// `s` is a live connection; no lock is held.
+unsafe fn stateless_cookie_verify(
+    s: *mut SSL,
+    snap: Option<&CtxSnapshot>,
+    cookie: &[u8],
+) -> Answer {
+    let Some(cb) = snap.and_then(|c| c.verify_stateless_cookie_cb) else {
+        return Answer::Allowed(false);
+    };
+    // SAFETY: the application's callback with its connection and the cookie's octets.
+    Answer::Allowed(unsafe { cb(s, cookie.as_ptr(), cookie.len()) } != 0)
 }
 
 /// After a callback that may have changed the connection's certificates (or moved it to

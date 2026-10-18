@@ -372,3 +372,47 @@ ffi_export! {
         1
     }
 }
+
+ffi_export! {
+    /// A TLS 1.3 server's handshake keeping no state across a HelloRetryRequest: the connection
+    /// is cleared, then accepts. 1 when the ClientHello carried a good cookie (the handshake goes
+    /// on with `SSL_accept`), 0 when a HelloRetryRequest with a cookie was sent (call again for
+    /// the next ClientHello), -1 on an error.
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_stateless(s: *mut SSL) -> c_int
+    where failure = -1, library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        // SAFETY: as above.
+        if unsafe { super::conn::rustyssl_private_SSL_clear(s) } == 0 {
+            return 0;
+        }
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_clear_error() };
+        // SAFETY: as above.
+        if !unsafe { super::io::ensure_core(s, x) } {
+            return -1;
+        }
+        let set = |on: bool| {
+            if let Some(c) = x.state().drv.tls.as_mut() {
+                c.set_stateless(on);
+            }
+        };
+        set(true);
+        // SAFETY: as above.
+        let ret = unsafe { super::io::api::rustyssl_private_SSL_accept(s) };
+        set(false);
+        let st = x.state();
+        let Some(c) = st.drv.tls.as_ref() else { return -1 };
+        if ret > 0 && c.cookie_ok() {
+            return 1;
+        }
+        if c.hrr_pending() && c.error().is_none() && !st.drv.failed {
+            return 0;
+        }
+        -1
+    }
+}

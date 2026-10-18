@@ -21015,6 +21015,8 @@ const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
     crate::ssl::io::strings::rustyssl_private_SSL_state_string;
 const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
     crate::ssl::io::strings::rustyssl_private_SSL_state_string_long;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::apis::rustyssl_private_SSL_stateless;
 const _: unsafe extern "C" fn(*mut SSL, u64) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_stream_conclude;
 const _: unsafe extern "C" fn(*mut SSL, *const SSL_STREAM_RESET_ARGS, usize) -> core::ffi::c_int =

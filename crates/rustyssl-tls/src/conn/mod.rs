@@ -274,6 +274,8 @@ pub struct Connection {
     pub(crate) rtt_write: u32,
     /// See `rtt_write`.
     pub(crate) rtt_read: u32,
+    /// Whether the step failing now only interrupts the call ([`Event::Interrupted`]).
+    interrupted: bool,
     /// The certificate whose TLS 1.3 Certificate entry extensions are being made or read (for
     /// the custom extension callbacks' `x`).
     pub(crate) ext_cert: Option<Vec<u8>>,
@@ -365,6 +367,7 @@ impl Connection {
             rtt_write: 0,
             rtt_read: 0,
             ext_cert: None,
+            interrupted: false,
             early_data_count: 0,
             early_read: None,
             needs_input: false,
@@ -599,6 +602,10 @@ impl Connection {
                     return Ok(Event::Output);
                 }
                 Ok(Event::NeedInput)
+            }
+            Err(_) if self.interrupted => {
+                self.interrupted = false;
+                Ok(Event::Interrupted)
             }
             Err(e) => {
                 self.fatal(p, e);
@@ -858,6 +865,19 @@ impl Connection {
                 }
                 return Ok(HsBytes::Got);
             }
+            if ty == ccs()
+                && self.cfg.server
+                && self.hs.sh.flags & abi::TLS1_FLAGS_STATELESS != 0
+                && self.st.hand_state == st(abi::TLS_ST_BEFORE)
+                && self.hs_in.is_empty()
+                && rec.data == [msgs_type(abi::SSL3_MT_CCS)]
+            {
+                // A stateless server reading the client's ChangeCipherSpec between its two
+                // ClientHellos: ignored, but the call fails (with no error recorded) until the
+                // second ClientHello comes (`tls_get_message_header`).
+                self.interrupted = true;
+                return Err(Error::quiet(0));
+            }
             if ty == ccs() && !self.is_tls13() {
                 if !self.hs_in.is_empty() {
                     return Err(Error::alert(
@@ -1103,6 +1123,28 @@ impl Connection {
         }
         self.write_record(p, app_data(), data)?;
         Ok(data.len())
+    }
+
+    /// Sets or clears `TLS1_FLAGS_STATELESS` (`SSL_stateless`): a TLS 1.3 server that keeps no
+    /// state across a HelloRetryRequest, sending its state in a cookie.
+    pub fn set_stateless(&mut self, on: bool) {
+        if on {
+            self.hs.sh.flags |= abi::TLS1_FLAGS_STATELESS;
+        } else {
+            self.hs.sh.flags &= !abi::TLS1_FLAGS_STATELESS;
+        }
+    }
+
+    /// Whether a stateless server's cookie checked out (`s->ext.cookieok`).
+    #[must_use]
+    pub fn cookie_ok(&self) -> bool {
+        self.hs.sh.cookie_ok
+    }
+
+    /// Whether a HelloRetryRequest is pending (`SSL_HRR_PENDING`).
+    #[must_use]
+    pub fn hrr_pending(&self) -> bool {
+        self.hs.sh.hrr == common::Hrr::Pending
     }
 
     /// TLS 1.3's early data state (`s->early_data_state`), which `SSL_write_early_data` and

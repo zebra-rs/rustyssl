@@ -995,6 +995,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
             }
             Event::Closed => break Stop::Closed,
+            Event::Interrupted => break Stop::Failed,
         }
     };
     if in_handshake && stop != Stop::Done {

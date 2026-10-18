@@ -190,6 +190,9 @@ pub struct Config {
     pub mtu: usize,
     /// The certificate flags (`SSL_CERT_FLAG_*`: the Suite B modes and strict checking).
     pub cert_flags: u32,
+    /// The key of a stateless server's cookie HMAC (`cookie_hmac_key` of the session
+    /// context).
+    pub cookie_hmac_key: crate::crypto::Secret,
     /// The application's custom extensions (`SSL_CTX_add_custom_ext` and the older
     /// `_add_client_custom_ext` / `_add_server_custom_ext`), in registration order.
     pub custom_exts: Vec<CustomExt>,

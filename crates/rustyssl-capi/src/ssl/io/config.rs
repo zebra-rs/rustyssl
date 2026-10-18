@@ -23,6 +23,8 @@ use crate::x509::cert::{X509_free, X509_get0_pubkey, X509_up_ref, i2d_X509};
 
 /// The context's pieces the driver reads, copied out under its lock.
 pub(crate) struct CtxSnapshot {
+    pub(crate) gen_stateless_cookie_cb: super::super::types::StatelessCookieGenCb,
+    pub(crate) verify_stateless_cookie_cb: super::super::types::StatelessCookieVerifyCb,
     pub(crate) info_callback: InfoCb,
     pub(crate) keylog_callback: rustyssl_abi::SSL_CTX_keylog_cb_func,
     pub(crate) servername_cb: AnyCb,
@@ -65,6 +67,8 @@ impl CtxSnapshot {
 pub(crate) fn ctx_snapshot(c: &Ctx) -> CtxSnapshot {
     let cs = c.state();
     CtxSnapshot {
+        gen_stateless_cookie_cb: cs.gen_stateless_cookie_cb,
+        verify_stateless_cookie_cb: cs.verify_stateless_cookie_cb,
         info_callback: cs.info_callback,
         keylog_callback: cs.keylog_callback,
         servername_cb: cs.servername_cb,
@@ -630,6 +634,11 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             .iter()
             .map(super::super::custom::Method::for_core)
             .collect(),
+        // SAFETY: the connection's session context, which it keeps alive.
+        cookie_hmac_key: unsafe { super::super::ctx::ctx(st.session_ctx) }.map_or_else(
+            || rustyssl_tls::crypto::Secret::new(Vec::new()),
+            |c| rustyssl_tls::crypto::Secret::new(c.state().cookie_hmac_key.to_vec()),
+        ),
         callbacks: Callbacks {
             info: st.info_callback.is_some() || snap.info_callback.is_some(),
             msg: st.msg_callback.is_some(),
@@ -642,6 +651,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             status: snap.status_cb.is_some(),
             record_padding: st.record_padding_cb.is_some(),
             allow_early_data: st.allow_early_data_cb.is_some(),
+            cookie: snap.verify_stateless_cookie_cb.is_some(),
+            cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
             // The client's select callback, or the server's advertisement callback.
             npn: if st.server {
                 snap.npn_advertised_cb.is_some()

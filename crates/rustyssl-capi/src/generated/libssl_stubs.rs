@@ -211,11 +211,6 @@ pub extern "C" fn rustyssl_private_SSL_srp_server_param_with_username(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_stateless")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_trace(
     _: core::ffi::c_int,
     _: core::ffi::c_int,

@@ -48,7 +48,11 @@ fn run(
                 out.extend(c.take_output());
                 log.push(Event::HandshakeDone);
             }
-            Event::NeedInput | Event::Idle | Event::AppData | Event::Closed => {
+            Event::NeedInput
+            | Event::Idle
+            | Event::AppData
+            | Event::Closed
+            | Event::Interrupted => {
                 out.extend(c.take_output());
                 return Ok(done);
             }

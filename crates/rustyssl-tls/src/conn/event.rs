@@ -42,8 +42,11 @@ pub struct Callbacks {
     pub psk: bool,
     /// `SSL_CTX_set_psk_use_session_callback` / `_find_session_callback` (TLS 1.3).
     pub psk_session: bool,
-    /// `SSL_CTX_set_cookie_generate_cb` and friends (stateless and DTLS cookies).
+    /// `SSL_CTX_set_cookie_generate_cb` and friends (stateless and DTLS cookies): the verify
+    /// callback.
     pub cookie: bool,
+    /// The stateless cookie's generate callback (`SSL_CTX_set_stateless_cookie_generate_cb`).
+    pub cookie_gen: bool,
     /// `SSL_CTX_set_record_padding_callback`.
     pub record_padding: bool,
     /// `SSL_CTX_set_allow_early_data_cb`.
@@ -136,6 +139,15 @@ pub enum Request {
     },
     /// Whether to accept the client's early data (`allow_early_data_cb`).
     AllowEarlyData,
+    /// A stateless server's application cookie for its HelloRetryRequest
+    /// (`gen_stateless_cookie_cb`), answered [`Answer::Cookie`].
+    StatelessCookieGen,
+    /// Whether the application cookie in a returned cookie is good
+    /// (`verify_stateless_cookie_cb`), answered [`Answer::Allowed`].
+    StatelessCookieVerify {
+        /// The application's cookie.
+        cookie: Vec<u8>,
+    },
     /// A custom extension to add (`add_cb`) or parse (`parse_cb`).
     CustomExt {
         /// The extension's index in [`crate::conn::Config::custom_exts`].
@@ -201,6 +213,8 @@ pub enum Answer {
     },
     /// A yes-or-no callback's verdict (the security callback, `allow_early_data_cb`).
     Allowed(bool),
+    /// An application cookie, or `None` when the callback failed.
+    Cookie(Option<Vec<u8>>),
     /// The record padding callback's padding length.
     Padding(usize),
     /// A session (lookup result, PSK session), or `None`.
@@ -289,4 +303,7 @@ pub enum Event {
     Idle,
     /// The peer sent close_notify (`SSL_ERROR_ZERO_RETURN` for a reader).
     Closed,
+    /// The call fails with nothing recorded, and the connection carries on: a stateless server
+    /// read the client's ChangeCipherSpec between its ClientHellos.
+    Interrupted,
 }
