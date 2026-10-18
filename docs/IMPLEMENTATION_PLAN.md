@@ -5070,6 +5070,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   `tests/c/store.c` (53 checks), the `store_attach` fuzz target.
 - [ ] **6.10 CMP/CRMF** (RFC 4210/4211/9480): the structures, the `OSSL_CMP_CTX` client, and
   the server/mock APIs. Large and seldom used, so it's scheduled last in this phase.
+  - [x] **6.10a CRMF** (`crmf.rs`, `crmf/{asn,msg,pbm}.rs` from `crmf_asn.c`, `crmf_lib.c`,
+    `crmf_pbm.c`; all 92 exports of `crmf.h`): the structures with OpenSSL's layouts (which CMP
+    reaches into), the controls and registration info (whose `get0_regInfo` getters, as in
+    OpenSSL, search the controls and so never find what `set1_regInfo` adds), the template,
+    validity, and extensions, proof-of-possession made and checked (RA-verified, signature, key
+    encipherment), central key generation, encrypted values and keys decrypted (the unwrapped
+    key's size checked in constant time; EnvelopedData through CMS), and the password-based MAC.
+    Tests: `tests/c/crmf.c` (86 checks), the `crmf_d2i` fuzz target.
+  - [ ] **6.10b CMP messages:** the ASN.1 types, `OSSL_CMP_CTX`, headers, PKIStatusInfo,
+    message creation, protection, and validation.
+  - [ ] **6.10c CMP client and server:** `OSSL_CMP_exec_*`, the general messages, HTTP
+    transfer, and `OSSL_CMP_SRV_CTX` with the mock server.
 - [ ] **6.11 Remainder:**
   - `TXT_DB`, SRP (deprecated)
   - `COMP_*`, matching the default build (no zlib, brotli, or zstd)

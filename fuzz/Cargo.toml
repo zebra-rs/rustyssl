@@ -621,3 +621,9 @@ name = "store_attach"
 path = "fuzz_targets/store_attach.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "crmf_d2i"
+path = "fuzz_targets/crmf_d2i.rs"
+test = false
+doc = false
