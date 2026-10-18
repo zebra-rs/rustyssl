@@ -8,8 +8,8 @@ use core::ptr;
 use rustyssl_abi::{
     BIO_FLAGS_IO_SPECIAL, BIO_FLAGS_READ, BIO_FLAGS_WRITE, BIO_RR_ACCEPT, BIO_RR_CONNECT,
     ERR_LIB_SSL, ERR_LIB_SYS, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, ERR_SYSTEM_FLAG, EVP_PKEY,
-    NID_undef, SSL, SSL_AD_CLOSE_NOTIFY, SSL_CIPHER, SSL_CLIENT_HELLO_CB, SSL_ERROR_NONE,
-    SSL_ERROR_SSL, SSL_ERROR_SYSCALL, SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_ASYNC,
+    NID_undef, SSL, SSL_AD_CLOSE_NOTIFY, SSL_AD_REASON_OFFSET, SSL_CIPHER, SSL_CLIENT_HELLO_CB,
+    SSL_ERROR_NONE, SSL_ERROR_SSL, SSL_ERROR_SYSCALL, SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_ASYNC,
     SSL_ERROR_WANT_CLIENT_HELLO_CB, SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ,
     SSL_ERROR_WANT_RETRY_VERIFY, SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_X509_LOOKUP,
     SSL_ERROR_ZERO_RETURN, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER, SSL_MODE_ENABLE_PARTIAL_WRITE,
@@ -186,6 +186,8 @@ pub(crate) unsafe fn read_internal(
                 return 0;
             }
         }
+        // A failure marks the connection in init (`ossl_statem_fatal`): whether it was before.
+        let was_init = x.state().drv.tls.as_ref().is_none_or(|c| c.in_init());
         // SAFETY: as above.
         let stop = unsafe { drive(s, x, true, function) };
         if reading_early && x.state().drv.early_data_state == EarlyDataState::FinishedReading {
@@ -197,9 +199,25 @@ pub(crate) unsafe fn read_internal(
                 x.state().rwstate = SSL_NOTHING;
                 return 0;
             }
+            Stop::Failed if !was_init && read_fatal_alert(x) => return 0,
             Stop::Retry | Stop::Failed | Stop::Syscall => return -1,
         }
     }
+}
+
+/// Whether the read failed on a fatal alert from the peer: after the handshake,
+/// `ssl3_read_bytes` returns 0 then (setting `SSL_RECEIVED_SHUTDOWN`), so `SSL_read` does; in
+/// a handshake the handshake function's failure is -1.
+fn read_fatal_alert(x: &Ssl) -> bool {
+    let st = x.state();
+    st.drv.tls.as_ref().is_some_and(|c| {
+        let (_, fatal, _) = c.alerts();
+        fatal != 0
+            && c.error().is_some_and(|e| {
+                !e.library_reason
+                    && e.reason == SSL_AD_REASON_OFFSET.saturating_add(c_int::from(fatal))
+            })
+    })
 }
 
 ffi_export! {

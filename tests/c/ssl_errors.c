@@ -569,6 +569,35 @@ static void test_unexpected_eof(void)
     SSL_CTX_free(s);
 }
 
+/*
+ * A TLS 1.3 ChangeCipherSpec after the client's Finished: the server's application-key
+ * record layer takes none (RFC 8446, section 5; found by tlsfuzzer's test-tls13-ccs).
+ */
+static void test_late_ccs(void)
+{
+    static const unsigned char ccs[] = { 0x14, 0x03, 0x03, 0x00, 0x01, 0x01 };
+    SSL_CTX *c = client_ctx(1), *s = server_ctx();
+    struct link l;
+    unsigned char buf[16];
+    int r;
+
+    printf("# TLS 1.3 ChangeCipherSpec after the handshake\n");
+    SSL_CTX_set_min_proto_version(c, TLS1_3_VERSION);
+    link_up(&l, c, s, NULL);
+    check(handshake(&l), "handshake");
+    BIO_write(l.s_in, ccs, sizeof(ccs));
+    r = SSL_read(l.s, buf, sizeof(buf));
+    printf("  server: SSL_read %d, SSL_get_error %d\n", r, SSL_get_error(l.s, r));
+    errors("server");
+    relay(&l, 1);
+    r = SSL_read(l.c, buf, sizeof(buf));
+    printf("  client: SSL_read %d, SSL_get_error %d\n", r, SSL_get_error(l.c, r));
+    errors("client");
+    link_down(&l);
+    SSL_CTX_free(c);
+    SSL_CTX_free(s);
+}
+
 static void test_configuration(void)
 {
     SSL_CTX *ctx = SSL_CTX_new(TLS_method());
@@ -661,6 +690,7 @@ int main(void)
     test_handshakes();
     test_renegotiation_refused();
     test_unexpected_eof();
+    test_late_ccs();
     test_configuration();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
