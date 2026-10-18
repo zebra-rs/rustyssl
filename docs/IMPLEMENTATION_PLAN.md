@@ -5009,11 +5009,19 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     nothing to an oracle without a certificate or `CMS_DEBUG_DECRYPT`; `CMS_encrypt(_ex)`,
     `CMS_decrypt` and its key, password, and peer setters, and `CMS_EnvelopedData_decrypt`.
     Tests: `tests/c/cms_env.c`, the `cms_decrypt` fuzz target.
-- [ ] **6.5 PKCS#12:**
-  - `PKCS12_parse`/`PKCS12_create(_ex)`
-  - MACs: HMAC and PBMAC1 (3.4)
-  - safe bags, PBES2/AES by default, legacy RC2/3DES through the legacy provider
-  - the `PKCS12_SAFEBAG_*` and `PKCS8_PRIV_KEY_INFO` APIs
+- [x] **6.5 PKCS#12** (`pkcs12/{asn,bags,add,mutl,crt,kiss,npas}.rs` from `p12_asn.c`,
+  `p12_sbag.c`, `p12_attr.c`, `p12_add.c`, `p12_mutl.c`, `p12_crt.c`, `p12_init.c`,
+  `p12_kiss.c`, and `p12_npas.c`, over the key derivation and PBE from 4.x; with a key's
+  attributes, `evp/pkey/attrs.rs`; 99 exports):
+  - `PKCS12_parse`, `PKCS12_create(_ex,_ex2)` with its bag callback, `PKCS12_newpass` (which,
+    as in OpenSSL, fails for PBES2 contents)
+  - MACs: HMAC with the PKCS#12 KDF (and GOST's PBKDF2), and PBMAC1 (RFC 9879, its key length
+    checked), compared in constant time
+  - safe bags, PBES2/AES by default, legacy RC2/3DES PBEs (RC2 through the legacy provider)
+  - the `PKCS12_SAFEBAG_*`, attribute, packing (CVE-2024-0727's missing data refused), and
+    `EVP_PKEY_*_attr` APIs
+  - Tests: `tests/c/pkcs12.c` (87 checks; PFXs made without randomness compared by their
+    DER), the `pkcs12_parse` fuzz target.
 - [ ] **6.6 OCSP:** the request and response structures, `OCSP_basic_verify`,
   `OCSP_check_validity`, `OCSP_resp_find_status`, the responder APIs, nonces, printing, and
   `OCSP_sendreq_*`.

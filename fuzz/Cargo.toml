@@ -48,6 +48,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "pkcs12_parse"
+path = "fuzz_targets/pkcs12_parse.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ct_sct"
 path = "fuzz_targets/ct_sct.rs"
 test = false
