@@ -162,6 +162,10 @@ pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
         // `SSL_KEY_UPDATE_NOT_REQUESTED`).
         c.hs.sh.key_update = abi::SSL_KEY_UPDATE_NONE;
     }
+    // Fork M: a flexible method isn't TLS 1.3 until a version is chosen.
+    if c.first_handshake && c.cfg.method_version == 0 {
+        c.version_pending = true;
+    }
     let s = state(c)?;
     s.hello = None;
     s.hello_body.clear();

@@ -447,6 +447,17 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
                 x.state().rwstate = SSL_WRITING;
                 return Flush::Retry;
             }
+            // `tls_retry_write_records`: a failed write that won't be retried is a system
+            // error (a zero return isn't, as it may come from a custom BIO).
+            if r < 0 {
+                let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+                err::raise_with_text(
+                    rustyssl_abi::ERR_LIB_SYS,
+                    errno,
+                    "tls_retry_write_records",
+                    "tls_retry_write_records failure",
+                );
+            }
             return Flush::Error;
         }
         let done = usize::try_from(r).unwrap_or(0).min(chunk.len());
@@ -562,6 +573,19 @@ pub(crate) unsafe fn drive(s: *mut SSL, x: &Ssl, reading: bool, function: &str) 
     stop
 }
 
+/// Whether the info, message, and key log callbacks are installed now: the application may
+/// set them at any time, and the core reports to them as OpenSSL calls them when set.
+pub(crate) fn notify_flags(
+    st: &SslState,
+    snap: Option<&config::CtxSnapshot>,
+) -> (bool, bool, bool) {
+    (
+        st.info_callback.is_some() || snap.is_some_and(|c| c.info_callback.is_some()),
+        st.msg_callback.is_some(),
+        snap.is_some_and(|c| c.keylog_callback.is_some()),
+    )
+}
+
 /// The step loop of [`drive`].
 ///
 /// # Safety
@@ -585,7 +609,13 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let taken = {
             let mut st = x.state();
             let prov = st.drv.provider.clone();
-            st.drv.tls.take().zip(prov)
+            let notify = notify_flags(&st, snap.as_ref());
+            st.drv.tls.take().zip(prov).map(|(mut c, p)| {
+                c.config_mut().callbacks.info = notify.0;
+                c.config_mut().callbacks.msg = notify.1;
+                c.config_mut().callbacks.keylog = notify.2;
+                (c, p)
+            })
         };
         let Some((mut conn, prov)) = taken else {
             err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, function);
@@ -680,8 +710,32 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                             }
                             break Stop::Closed;
                         }
+                        // `ossl_tls_handle_rlayer_return`: an unexpected EOF is fatal, with a
+                        // decode_error alert (which the closed transport usually refuses), and a
+                        // read reports it by returning 0.
                         err::raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_EOF_WHILE_READING, function);
-                        x.state().drv.failed = true;
+                        {
+                            let mut st = x.state();
+                            st.drv.failed = true;
+                            let prov = st.drv.provider.clone();
+                            if let (Some(c), Some(p)) = (st.drv.tls.as_mut(), prov) {
+                                c.fail(
+                                    &*p,
+                                    TlsError::alert(
+                                        rustyssl_abi::SSL_AD_DECODE_ERROR,
+                                        SSL_R_UNEXPECTED_EOF_WHILE_READING,
+                                    ),
+                                );
+                                let out = c.take_output();
+                                st.drv.out.extend_from_slice(&out);
+                            }
+                        }
+                        // SAFETY: the caller's guarantee.
+                        let _ = unsafe { flush(x) };
+                        if reading && !in_handshake {
+                            x.state().rwstate = SSL_NOTHING;
+                            break Stop::Closed;
+                        }
                         break Stop::Failed;
                     }
                     Input::Error => break Stop::Syscall,

@@ -307,7 +307,20 @@ unsafe fn write_internal(
     };
     if let Some((tot, addr)) = pending {
         let moving = mode & SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER != 0;
-        if tot > num || (!moving && addr != buf.addr()) {
+        if tot > num {
+            // `ssl3_write_bytes`: a retry with less than was pending is fatal
+            // (`SSLfatal(SSL_AD_INTERNAL_ERROR, SSL_R_BAD_LENGTH)`; its alert waits behind the
+            // pending write, so none goes out here).
+            err::raise(ERR_LIB_SSL, SSL_R_BAD_LENGTH, function);
+            let mut st = x.state();
+            st.drv.failed = true;
+            let prov = st.drv.provider.clone();
+            if let (Some(c), Some(p)) = (st.drv.tls.as_mut(), prov) {
+                c.fail(&*p, rustyssl_tls::error::Error::quiet(SSL_R_BAD_LENGTH));
+            }
+            return -1;
+        }
+        if !moving && addr != buf.addr() {
             err::raise(ERR_LIB_SSL, SSL_R_BAD_WRITE_RETRY, function);
             return -1;
         }
@@ -521,12 +534,18 @@ ffi_export! {
         }
         let sent = x.state().shutdown & SSL_SENT_SHUTDOWN != 0;
         if !sent {
+            let snap = super::config::snapshot(x);
             let r = {
                 let mut st = x.state();
                 let prov = st.drv.provider.clone();
+                let notify = super::notify_flags(&st, snap.as_ref());
                 st.shutdown |= SSL_SENT_SHUTDOWN;
                 match (st.drv.tls.as_mut(), prov) {
-                    (Some(c), Some(p)) => c.send_close_notify(&*p),
+                    (Some(c), Some(p)) => {
+                        c.config_mut().callbacks.info = notify.0;
+                        c.config_mut().callbacks.msg = notify.1;
+                        c.send_close_notify(&*p)
+                    }
                     _ => Ok(()),
                 }
             };

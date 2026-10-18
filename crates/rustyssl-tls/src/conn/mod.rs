@@ -154,6 +154,10 @@ pub struct Negotiated {
     pub early_exporter_master: Vec<u8>,
 }
 
+/// A ClientHello and its collected extensions (type, body) in received order
+/// ([`Connection::client_hello_exts`]).
+pub type ClientHelloView<'a> = (&'a crate::msgs::hello::ClientHello, Vec<(u16, &'a [u8])>);
+
 /// A TLS connection.
 pub struct Connection {
     /// The settings.
@@ -245,7 +249,7 @@ impl Connection {
         // then (the method isn't switched yet); its first records carry TLS 1.0.
         let flexible = cfg.method_version == 0;
         let (version, record_version) = if flexible {
-            (tls1_3(), tls1_0())
+            (if cfg.server { tls1_3() } else { tls1_0() }, tls1_0())
         } else {
             (cfg.method_version, cfg.method_version)
         };
@@ -283,7 +287,7 @@ impl Connection {
             needs_input: false,
             reading: false,
             security_hook: None,
-            version_pending: flexible,
+            version_pending: false,
         }
     }
 
@@ -298,9 +302,7 @@ impl Connection {
     /// custom ones, not unknown ones), in received order; for the client hello callback's
     /// getters (`SSL_client_hello_get0_*`). Shared addition (fork M).
     #[must_use]
-    pub fn client_hello_exts(
-        &self,
-    ) -> Option<(&crate::msgs::hello::ClientHello, Vec<(u16, &[u8])>)> {
+    pub fn client_hello_exts(&self) -> Option<ClientHelloView<'_>> {
         let RoleState::Server(s) = &self.hs.role else {
             return None;
         };
@@ -1017,6 +1019,14 @@ impl Connection {
             abi::SSL_AD_NO_APPLICATION_PROTOCOL,
         ];
         known.contains(&d).then_some(desc)
+    }
+
+    /// Fails the connection from outside the state machine, as OpenSSL's `SSLfatal` does in
+    /// the record layer and the I/O functions (an unexpected EOF, a bad write retry): sends the
+    /// error's alert (if any) into the output, and every later step reports the error. Shared
+    /// addition (fork M).
+    pub fn fail(&mut self, p: &dyn Provider, e: Error) {
+        self.fatal(p, e);
     }
 
     /// Fails the connection (`ossl_statem_fatal`): sends the alert, once.
