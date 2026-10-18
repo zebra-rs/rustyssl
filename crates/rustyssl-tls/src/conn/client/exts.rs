@@ -218,7 +218,15 @@ pub(crate) fn ext_construct_session_ticket(
         Some(tk) if !c.hs.sh.new_session && s.version != v::TLS1_3 => {
             Ok(ExtReturn::Sent(tk.clone()))
         }
-        _ => Ok(empty()),
+        // `SSL_set_session_ticket_ext`'s contents become the session's ticket.
+        _ => match c.cfg.session_ticket_ext.clone() {
+            Some(Some(d)) if !d.is_empty() => {
+                c.neg.session.ticket = Some(d.clone());
+                Ok(ExtReturn::Sent(d))
+            }
+            Some(None) => Ok(ExtReturn::NotSent),
+            _ => Ok(empty()),
+        },
     }
 }
 
@@ -908,6 +916,21 @@ pub(crate) fn ext_parse_session_ticket(
     body: &[u8],
     _x: &ext::Ctx,
 ) -> Result<Step> {
+    if c.cfg.callbacks.session_ticket_ext {
+        let r = Request::SessionTicketExt {
+            data: body.to_vec(),
+        };
+        match ask_once(c, r, 0) {
+            None => return Ok(Step::Wait),
+            Some(Answer::Allowed(true)) => {}
+            Some(_) => {
+                return Err(Error::alert(
+                    abi::SSL_AD_HANDSHAKE_FAILURE,
+                    abi::SSL_R_BAD_EXTENSION,
+                ));
+            }
+        }
+    }
     if !security::use_ticket(c) {
         return Err(Error::alert(
             abi::SSL_AD_UNSUPPORTED_EXTENSION,

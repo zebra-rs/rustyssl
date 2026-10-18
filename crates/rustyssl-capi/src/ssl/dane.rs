@@ -94,6 +94,9 @@ impl Drop for Tlsa {
     }
 }
 
+/// A TLSA record's usage, selector, matching type, and data.
+pub(crate) type TlsaRecord = (u8, u8, u8, Vec<u8>);
+
 /// A connection's DANE state (`ssl_dane_st`), at a stable address for `SSL_get0_dane`.
 #[derive(Debug)]
 pub(crate) struct Dane {
@@ -194,6 +197,33 @@ impl Dane {
         self.mdpth = -1;
         self.pdpth = -1;
         core::mem::replace(&mut self.mcert, ptr::null_mut())
+    }
+
+    /// Whether `SSL_dane_enable` was called (`dane->dctx != NULL`).
+    pub(crate) fn has_ctx(&self) -> bool {
+        self.trecs.is_some()
+    }
+
+    /// `ssl_dane_dup`'s source: the flags and each record, or `None` when DANE isn't enabled.
+    pub(crate) fn dup_records(&self) -> Option<(c_ulong, Vec<TlsaRecord>)> {
+        if !self.enabled() {
+            return None;
+        }
+        let t = self.trecs.as_ref()?;
+        let recs = t
+            .iter()
+            .map(|r| (r.usage, r.selector, r.mtype, r.data.clone()))
+            .collect();
+        Some((self.flags, recs))
+    }
+
+    /// `ssl_dane_dup`'s target: a fresh enabled state with `flags`, its records to be added.
+    pub(crate) fn reset_enabled(&mut self, flags: c_ulong) {
+        // `Dane` has a destructor, so the fresh state is built field by field.
+        let mut fresh = Self::default();
+        fresh.trecs = Some(Vec::new());
+        fresh.flags = flags;
+        *self = fresh;
     }
 }
 

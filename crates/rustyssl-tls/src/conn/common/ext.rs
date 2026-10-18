@@ -283,6 +283,14 @@ pub fn construct(
     Ok(Some(out.into_bytes()))
 }
 
+/// The certificate a Certificate entry's extensions belong to (the `x` of the callbacks).
+fn cert_of(c: &Connection, context: u32) -> Option<Vec<u8>> {
+    if context & cx::TLS1_3_CERTIFICATE == 0 {
+        return None;
+    }
+    c.ext_cert.clone()
+}
+
 /// `custom_ext_add`. `false` while waiting for an answer.
 fn custom_add(
     c: &mut Connection,
@@ -308,9 +316,12 @@ fn custom_add(
         let mut body = Vec::new();
         if m.has_add {
             let r = Request::CustomExt {
+                index: i,
                 typ: m.typ,
                 context,
                 body: None,
+                chainidx,
+                cert: cert_of(c, context),
             };
             match ask_once(c, r, chainidx) {
                 None => return Ok(false),
@@ -581,9 +592,12 @@ fn custom_parse(
         return Ok(Step::Done);
     }
     let r = Request::CustomExt {
+        index: i,
         typ,
         context,
         body: Some(body.to_vec()),
+        chainidx,
+        cert: cert_of(c, context),
     };
     match ask_once(c, r, chainidx) {
         None => Ok(Step::Wait),
@@ -1424,9 +1438,12 @@ mod tests {
         c.hs.sh.ext = Flags::new(1);
         let mut w = Writer::new();
         let r = Request::CustomExt {
+            index: 0,
             typ: 1000,
             context: cx::CLIENT_HELLO,
             body: None,
+            chainidx: 0,
+            cert: None,
         };
         let tls13 = super::super::version::of(abi::TLS1_3_VERSION);
         assert!(!custom_add(&mut c, cx::CLIENT_HELLO, 0, tls13, &mut w).unwrap());

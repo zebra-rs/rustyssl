@@ -872,7 +872,20 @@ fn to_core(d: &SessData) -> Session {
         verify_result: d.verify_result,
         max_fragment_len_mode: d.max_fragment_len_mode,
         ext_flags: d.ext_flags,
+        ticket_appdata: d.ticket_appdata.as_ref().map(|a| a.to_vec()),
     }
+}
+
+/// A new session object (one reference) from a core session, for a callback; NULL on failure.
+///
+/// # Safety
+/// `x` is a live connection; no lock is held.
+pub(crate) unsafe fn session_from_core(x: &Ssl, c: &Session) -> *mut SSL_SESSION {
+    let d = {
+        let st = x.state();
+        from_core(&st, c, None, super::method::DEFAULT_TIMEOUT)
+    };
+    session::new_session(d)
 }
 
 /// A session's fields from the core's session, the connection's peer certificates, and the
@@ -910,6 +923,10 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
     d.verify_result = c_long::try_from(c.verify_result).unwrap_or(c_long::MAX);
     d.max_fragment_len_mode = c.max_fragment_len_mode;
     d.ext_flags = c.ext_flags;
+    d.ticket_appdata = c
+        .ticket_appdata
+        .as_ref()
+        .map(|a| a.clone().into_boxed_slice());
     d.kex_group = group.map_or(0, u32::from);
     let p = &st.drv.peer;
     if p.from > 0 {
@@ -1182,6 +1199,34 @@ pub(crate) unsafe fn on_remove_session(x: &Ssl) {
         // SAFETY: the connection's context and session.
         unsafe { remove(c, sp) };
     }
+}
+
+/// The core's `Event::SessionRenewed`: the old session leaves a client cache (and can't be
+/// resumed any more), and the connection's session is a new one with the new ticket.
+///
+/// # Safety
+/// `x` is a live connection; no lock is held.
+pub(crate) unsafe fn on_session_renewed(x: &Ssl) {
+    let (c, sp, core) = {
+        let st = x.state();
+        let core = st.drv.tls.as_ref().map(|t| t.negotiated().session.clone());
+        (st.session_ctx, st.sess.session, core)
+    };
+    // SAFETY: the connection's context.
+    let mode = unsafe { ctx::ctx(c) }.map_or(0, |cx| cx.state().session_cache_mode);
+    if mode & SSL_SESS_CACHE_CLIENT.cast_unsigned() != 0 && !sp.is_null() {
+        // SAFETY: the connection's context and session.
+        unsafe { remove(c, sp) };
+    }
+    let Some(core) = core else { return };
+    // SAFETY: the caller's guarantee.
+    let new = unsafe { session_from_core(x, &core) };
+    if new.is_null() {
+        return;
+    }
+    let old = core::mem::replace(&mut x.state().sess.session, new);
+    // SAFETY: the connection's old reference.
+    unsafe { session::free(old) };
 }
 
 /// A finished TLS 1.3 server handshake (no event of its own): the session is settled and

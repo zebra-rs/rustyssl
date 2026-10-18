@@ -52,6 +52,26 @@ impl Connection {
         Ok(())
     }
 
+    /// `SSL_new_session_ticket`: one more TLS 1.3 ticket from a server once the first handshake
+    /// is done (or while tickets are being sent); `write_pending` says whether a write waits
+    /// for the BIO (the ticket then goes out after it). Whether it was arranged.
+    pub fn request_new_session_ticket(&mut self, write_pending: bool) -> bool {
+        let first = super::common::finished::is_first_handshake(self);
+        let tls13 = self.is_tls13();
+        let in_init = self.in_init();
+        let super::RoleState::Server(s) = &mut self.hs.role else {
+            return false;
+        };
+        if (in_init && s.extra_tickets_expected == 0) || first || !tls13 {
+            return false;
+        }
+        s.extra_tickets_expected = s.extra_tickets_expected.saturating_add(1);
+        if !write_pending && !in_init {
+            self.enter_init();
+        }
+        true
+    }
+
     /// `ssl3_write_bytes`' check before a write with nothing pending: a KeyUpdate or a
     /// NewSessionTicket waiting to be sent puts the connection back in init, so the write
     /// sends it first. Whether it did.

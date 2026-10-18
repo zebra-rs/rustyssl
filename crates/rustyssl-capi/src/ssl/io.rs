@@ -33,8 +33,8 @@ use rustyssl_abi::{
     SSL_NOTHING, SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING,
     SSL_RECEIVED_SHUTDOWN, SSL_WRITING, stack_st_X509,
 };
-use rustyssl_tls::conn::common::SecurityHook;
 use rustyssl_tls::conn::common::security::SecOther;
+use rustyssl_tls::conn::common::{EarlyDataState, SecurityHook};
 use rustyssl_tls::conn::{Connection, Event};
 use rustyssl_tls::error::Error as TlsError;
 
@@ -157,6 +157,14 @@ pub(crate) struct Driver {
     pub(crate) group_names: Vec<CString>,
     /// The peer's raw public key (RFC 7250) as an object, decoded on first use.
     pub(crate) peer_rpk: PeerRpk,
+    /// The core's round-trip marks last seen, and when each last moved (`ts_msg_write`,
+    /// `ts_msg_read`), for `SSL_get_handshake_rtt`.
+    pub(crate) rtt_marks: (u32, u32),
+    /// See `rtt_marks`.
+    pub(crate) rtt_times: (Option<std::time::Instant>, Option<std::time::Instant>),
+    /// TLS 1.3's early data state (`early_data_state`), kept here before the core exists and
+    /// mirrored from it after.
+    pub(crate) early_data_state: EarlyDataState,
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -199,6 +207,10 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
     if let Some(c) = e.cause {
         err::raise(c.lib, c.reason, c.func);
     }
+    // An alert sent with `SSLfatal_alert` has no entry of its own.
+    if e.reason == 0 && !e.library_reason {
+        return;
+    }
     let alert_reasons = SSL_AD_REASON_OFFSET..SSL_AD_REASON_OFFSET.saturating_add(256);
     if !e.library_reason && alert_reasons.contains(&e.reason) {
         let desc = e.reason.saturating_sub(SSL_AD_REASON_OFFSET);
@@ -222,6 +234,18 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    st.drv.early_data_state = c.early_data_state();
+    let marks = c.rtt_marks();
+    if marks != st.drv.rtt_marks {
+        let now = std::time::Instant::now();
+        if marks.0 != st.drv.rtt_marks.0 {
+            st.drv.rtt_times.0 = Some(now);
+        }
+        if marks.1 != st.drv.rtt_marks.1 {
+            st.drv.rtt_times.1 = Some(now);
+        }
+        st.drv.rtt_marks = marks;
+    }
     st.in_init = c.in_init();
     st.flow_uninited = c.before();
     let n = c.negotiated();
@@ -584,10 +608,30 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
     c.start();
     let mut st = x.state();
     if st.drv.tls.is_none() {
+        c.set_early_data_state(st.drv.early_data_state);
         mirror(&mut st, &c);
         st.drv.tls = Some(c);
     }
     true
+}
+
+/// Sets the early data state, in the core too once it exists.
+pub(crate) fn set_early_data_state(st: &mut SslState, e: EarlyDataState) {
+    st.drv.early_data_state = e;
+    if let Some(c) = st.drv.tls.as_mut() {
+        c.set_early_data_state(e);
+    }
+}
+
+/// `ossl_statem_check_finish_init` (`sending`: 0 for a read, 1 for a write, -1 for a
+/// handshake call): a handshake stopped for early data goes on. Nothing before the core exists.
+pub(crate) fn check_finish_init(x: &Ssl, sending: c_int) {
+    let mut st = x.state();
+    let Some(c) = st.drv.tls.as_mut() else { return };
+    c.check_finish_init(sending);
+    let (in_init, e) = (c.in_init(), c.early_data_state());
+    st.in_init = in_init;
+    st.drv.early_data_state = e;
 }
 
 /// Calls the info callback (the connection's, else its context's) with no lock held.
@@ -694,9 +738,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             break Stop::Failed;
         };
         let was_init = conn.in_init();
+        // A connection that already failed fails again with no new entry, and the queue is
+        // kept (`state_machine` returns at once in `MSG_FLOW_ERROR`).
+        let failed_before = conn.error().is_some();
         if was_init {
             in_handshake = true;
-            if !cleared {
+            if !cleared && !failed_before {
                 // `state_machine` starts with `ERR_clear_error` and `clear_sys_error` (fork M).
                 cleared = true;
                 // SAFETY: no preconditions.
@@ -713,7 +760,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         } else {
             (!was_in_init && conn.in_init() && !conn.is_tls13()).then_some(false)
         };
-        let tls13_server_done = server && was_in_init && !conn.in_init() && conn.is_tls13();
+        // (A stop for early data isn't the end.)
+        let tls13_server_done = server
+            && was_in_init
+            && !conn.in_init()
+            && conn.is_tls13()
+            && conn.state() != rustyssl_abi::TLS_ST_EARLY_DATA;
         // A handshake message after the handshake took the connection back into init: the
         // next step runs it, with no more input needed (fork M).
         let entered = !was_init && conn.in_init();
@@ -749,7 +801,9 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let ev = match r {
             Ok(ev) => ev,
             Err(e) => {
-                raise_core(&e, function);
+                if !failed_before {
+                    raise_core(&e, function);
+                }
                 // A fatal alert (sent or received) takes the session out of the cache.
                 // SAFETY: as above.
                 unsafe { super::sess_cache::on_fatal(x) };
@@ -937,6 +991,11 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
             }
             Event::Closed => break Stop::Closed,
+            Event::Interrupted => break Stop::Failed,
+            Event::SessionRenewed => {
+                // SAFETY: as above.
+                unsafe { super::sess_cache::on_session_renewed(x) };
+            }
         }
     };
     if in_handshake && stop != Stop::Done {

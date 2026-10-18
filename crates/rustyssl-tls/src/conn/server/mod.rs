@@ -447,9 +447,13 @@ fn write_transition13(c: &mut Connection) -> Result<WriteTran> {
         }
         abi::TLS_ST_SW_COMP_CERT | abi::TLS_ST_SW_CERT => abi::TLS_ST_SW_CERT_VRFY,
         abi::TLS_ST_SW_CERT_VRFY => abi::TLS_ST_SW_FINISHED,
-        abi::TLS_ST_SW_FINISHED => abi::TLS_ST_EARLY_DATA,
+        abi::TLS_ST_SW_FINISHED => {
+            c.rtt_write = c.rtt_write.wrapping_add(1);
+            abi::TLS_ST_EARLY_DATA
+        }
         abi::TLS_ST_EARLY_DATA => return Ok(WriteTran::Finished),
         abi::TLS_ST_SR_FINISHED => {
+            c.rtt_read = c.rtt_read.wrapping_add(1);
             if c.hs.sh.pha == Pha::Requested {
                 c.hs.sh.pha = Pha::ExtReceived;
             } else if !c.hs.sh.ticket_expected {
@@ -556,8 +560,12 @@ fn write_transition12(c: &mut Connection) -> Result<WriteTran> {
             }
         }
         abi::TLS_ST_SW_CERT_REQ => abi::TLS_ST_SW_SRVR_DONE,
-        abi::TLS_ST_SW_SRVR_DONE => return Ok(WriteTran::Finished),
+        abi::TLS_ST_SW_SRVR_DONE => {
+            c.rtt_write = c.rtt_write.wrapping_add(1);
+            return Ok(WriteTran::Finished);
+        }
         abi::TLS_ST_SR_FINISHED => {
+            c.rtt_read = c.rtt_read.wrapping_add(1);
             if c.neg.reused {
                 abi::TLS_ST_OK
             } else if c.hs.sh.ticket_expected {

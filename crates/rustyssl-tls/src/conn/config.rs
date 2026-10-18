@@ -77,6 +77,8 @@ pub struct Session {
     pub max_fragment_len_mode: u8,
     /// The client's TLS 1.3 key exchange modes allowed with it.
     pub ext_flags: u32,
+    /// The application's data carried in its ticket (`SSL_SESSION_set1_ticket_appdata`).
+    pub ticket_appdata: Option<Vec<u8>>,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the
@@ -190,6 +192,12 @@ pub struct Config {
     pub mtu: usize,
     /// The certificate flags (`SSL_CERT_FLAG_*`: the Suite B modes and strict checking).
     pub cert_flags: u32,
+    /// `SSL_set_session_ticket_ext`: the client's session_ticket extension contents (`Some(None)`:
+    /// set with no data, and none is sent).
+    pub session_ticket_ext: Option<Option<Vec<u8>>>,
+    /// The key of a stateless server's cookie HMAC (`cookie_hmac_key` of the session
+    /// context).
+    pub cookie_hmac_key: crate::crypto::Secret,
     /// The application's custom extensions (`SSL_CTX_add_custom_ext` and the older
     /// `_add_client_custom_ext` / `_add_server_custom_ext`), in registration order.
     pub custom_exts: Vec<CustomExt>,

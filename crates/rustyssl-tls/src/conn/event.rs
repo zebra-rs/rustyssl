@@ -42,8 +42,19 @@ pub struct Callbacks {
     pub psk: bool,
     /// `SSL_CTX_set_psk_use_session_callback` / `_find_session_callback` (TLS 1.3).
     pub psk_session: bool,
-    /// `SSL_CTX_set_cookie_generate_cb` and friends (stateless and DTLS cookies).
+    /// `SSL_CTX_set_cookie_generate_cb` and friends (stateless and DTLS cookies): the verify
+    /// callback.
     pub cookie: bool,
+    /// The stateless cookie's generate callback (`SSL_CTX_set_stateless_cookie_generate_cb`).
+    pub cookie_gen: bool,
+    /// The ticket application data callbacks (`SSL_CTX_set_session_ticket_cb`): generate.
+    pub ticket_gen: bool,
+    /// See `ticket_gen`: decrypt.
+    pub ticket_dec: bool,
+    /// `SSL_set_session_ticket_ext_cb`.
+    pub session_ticket_ext: bool,
+    /// `SSL_set_session_secret_cb`.
+    pub session_secret: bool,
     /// `SSL_CTX_set_record_padding_callback`.
     pub record_padding: bool,
     /// `SSL_CTX_set_allow_early_data_cb`.
@@ -136,14 +147,54 @@ pub enum Request {
     },
     /// Whether to accept the client's early data (`allow_early_data_cb`).
     AllowEarlyData,
+    /// The session_ticket extension's contents for `SSL_set_session_ticket_ext_cb`'s callback:
+    /// answered [`Answer::Allowed`].
+    SessionTicketExt {
+        /// The extension's contents.
+        data: Vec<u8>,
+    },
+    /// `SSL_set_session_secret_cb`'s callback (EAP-FAST): the master secret to resume with,
+    /// given (on a server) the client's suites' ids; answered [`Answer::SessionSecret`].
+    SessionSecret {
+        /// The client's suites (server side), or `None` (client side).
+        peer_ciphers: Option<Vec<u32>>,
+    },
+    /// A server's ticket is about to be made (`generate_ticket_cb`): answered
+    /// [`Answer::TicketAppData`] with the application data to put in it, or [`Answer::Fail`].
+    TicketGenerate,
+    /// A ticket was decrypted, or couldn't be (`decrypt_ticket_cb`): answered
+    /// [`Answer::TicketDecrypt`] with the callback's `SSL_TICKET_RETURN_*`.
+    TicketDecrypt {
+        /// The ticket's key name (at most its first 16 octets).
+        keyname: Vec<u8>,
+        /// The decryption's `SSL_TICKET_*` status.
+        status: i32,
+        /// The session in it, when it decrypted.
+        session: Option<Box<crate::conn::Session>>,
+    },
+    /// A stateless server's application cookie for its HelloRetryRequest
+    /// (`gen_stateless_cookie_cb`), answered [`Answer::Cookie`].
+    StatelessCookieGen,
+    /// Whether the application cookie in a returned cookie is good
+    /// (`verify_stateless_cookie_cb`), answered [`Answer::Allowed`].
+    StatelessCookieVerify {
+        /// The application's cookie.
+        cookie: Vec<u8>,
+    },
     /// A custom extension to add (`add_cb`) or parse (`parse_cb`).
     CustomExt {
+        /// The extension's index in [`crate::conn::Config::custom_exts`].
+        index: usize,
         /// The extension type.
         typ: u16,
         /// The message context (`SSL_EXT_*`).
         context: u32,
         /// The received body, for parsing; `None` to add.
         body: Option<Vec<u8>>,
+        /// The certificate's index in its chain (a TLS 1.3 Certificate's entries), else 0.
+        chainidx: usize,
+        /// That certificate (DER) for a Certificate entry's extensions (sent or received).
+        cert: Option<Vec<u8>>,
     },
     /// The DH parameters for a TLS 1.2 DHE server (`tmp_dh_callback`), at this size.
     TmpDh {
@@ -195,6 +246,15 @@ pub enum Answer {
     },
     /// A yes-or-no callback's verdict (the security callback, `allow_early_data_cb`).
     Allowed(bool),
+    /// An application cookie, or `None` when the callback failed.
+    Cookie(Option<Vec<u8>>),
+    /// The application data for a ticket being made.
+    TicketAppData(Option<Vec<u8>>),
+    /// The session secret callback's master secret and preferred suite's id, or `None` when it
+    /// gave none.
+    SessionSecret(Option<(Vec<u8>, Option<u32>)>),
+    /// The ticket decryption callback's `SSL_TICKET_RETURN_*`.
+    TicketDecrypt(i32),
     /// The record padding callback's padding length.
     Padding(usize),
     /// A session (lookup result, PSK session), or `None`.
@@ -283,4 +343,11 @@ pub enum Event {
     Idle,
     /// The peer sent close_notify (`SSL_ERROR_ZERO_RETURN` for a reader).
     Closed,
+    /// A TLS 1.2 client got a new ticket for a session that had an ID: the old session is out
+    /// of date (it leaves a client cache and can't be resumed), and the connection's session is
+    /// a new one (`tls_process_new_session_ticket`).
+    SessionRenewed,
+    /// The call fails with nothing recorded, and the connection carries on: a stateless server
+    /// read the client's ChangeCipherSpec between its ClientHellos.
+    Interrupted,
 }

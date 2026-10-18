@@ -637,14 +637,17 @@ unsafe fn install(
     unsafe { X509_up_ref(x509) };
     // SAFETY: the key chosen above.
     unsafe { EVP_PKEY_up_ref(key) };
-    let new = cert::CertPkey {
+    let mut new = cert::CertPkey {
         x509,
         privatekey: key,
         chain: dup_chain,
+        serverinfo: None,
     };
     let mut rel = cert::Released::default();
     let f = |c: &mut cert::Cert| match c.pkeys.get_mut(i) {
         Some(slot) => {
+            // The slot's server information stays.
+            new.serverinfo = slot.serverinfo.take();
             rel.slot(core::mem::replace(slot, new));
             c.key = i;
             true

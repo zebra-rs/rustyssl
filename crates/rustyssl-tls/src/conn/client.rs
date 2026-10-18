@@ -175,6 +175,12 @@ fn state_ref(c: &Connection) -> Option<&State> {
     }
 }
 
+/// The early data the session (or PSK) allows, as offered in the ClientHello
+/// (`ossl_get_max_early_data` for a client).
+pub(crate) fn early_limit(c: &Connection) -> u32 {
+    state_ref(c).map_or(0, |s| s.max_early_data)
+}
+
 /// The time in seconds since the epoch: the configuration's (`Config::now`, which capi sets
 /// when a handshake starts; the core reads no clock).
 pub(crate) fn now(c: &Connection) -> i64 {
@@ -500,6 +506,20 @@ fn read_transition12(c: &mut Connection, mt: u8) -> bool {
     let to = if is(abi::TLS_ST_CW_CLNT_HELLO) || is(abi::TLS_ST_EARLY_DATA) {
         (mt == hm::SERVER_HELLO && !ccs).then_some(abi::TLS_ST_CR_SRVR_HELLO)
     } else if is(abi::TLS_ST_CR_SRVR_HELLO) {
+        if !c.neg.reused
+            && ccs
+            && c.neg.version >= crate::consts::version::TLS1
+            && c.cfg.callbacks.session_secret
+            && c.neg.session.ticket.is_some()
+        {
+            // EAP-FAST: the server resumes with the session secret if its next message is a
+            // ChangeCipherSpec.
+            c.neg.reused = true;
+            c.neg.master_secret = c.neg.session.master_key.clone();
+            c.neg.ems = c.neg.session.ems;
+            go(c, abi::TLS_ST_CR_CHANGE);
+            return true;
+        }
         if c.neg.reused {
             if c.hs.sh.ticket_expected {
                 (mt == hm::NEW_SESSION_TICKET && !ccs).then_some(abi::TLS_ST_CR_SESSION_TICKET)
@@ -714,6 +734,7 @@ fn write_transition13(c: &mut Connection) -> Result<WriteTran> {
             return Err(Error::internal());
         }
     } else if is(abi::TLS_ST_CR_FINISHED) {
+        c.rtt_read = c.rtt_read.wrapping_add(1);
         let eds = c.hs.sh.early_data_state;
         if eds == EarlyDataState::WriteRetry || eds == EarlyDataState::FinishedWriting {
             abi::TLS_ST_PENDING_EARLY_DATA_END
@@ -788,6 +809,7 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
                 abi::TLS_ST_EARLY_DATA
             }
         } else {
+            c.rtt_write = c.rtt_write.wrapping_add(1);
             return Ok(WriteTran::Finished);
         }
     } else if is(abi::TLS_ST_CR_SRVR_HELLO) {
@@ -798,8 +820,10 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
             abi::TLS_ST_CW_CLNT_HELLO
         }
     } else if is(abi::TLS_ST_EARLY_DATA) {
+        c.rtt_write = c.rtt_write.wrapping_add(1);
         return Ok(WriteTran::Finished);
     } else if is(abi::TLS_ST_CR_SRVR_DONE) {
+        c.rtt_read = c.rtt_read.wrapping_add(1);
         if c.hs.sh.cert_req != 0 {
             abi::TLS_ST_CW_CERT
         } else {
@@ -902,6 +926,16 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
         st.ext_memo.clear();
         st.binders.clear();
         let max_early = state(c)?.max_early_data;
+        if c.hs.sh.early_data_state == EarlyDataState::Connecting {
+            // The records after the ClientHello (the compatibility ChangeCipherSpec, early
+            // data) carry the connection's version, TLS 1.3's as TLS 1.2 (`ssl3_write_bytes`).
+            let v = c.neg.version;
+            c.rw.version = if v >= crate::consts::version::TLS1_3 {
+                crate::consts::version::TLS1_2
+            } else {
+                v
+            };
+        }
         if c.hs.sh.early_data_state == EarlyDataState::Connecting && max_early > 0 {
             if !middlebox(c) {
                 install_early_keys(c, p)?;

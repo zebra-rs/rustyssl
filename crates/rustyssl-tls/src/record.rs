@@ -338,6 +338,17 @@ pub enum Read {
         /// The record.
         record: Record,
     },
+    /// A TLS 1.3 record that didn't decrypt while [`RecordReader::skip_undecryptable`] was set
+    /// (rejected early data, treated as an empty record): its header and protected length,
+    /// from the first `consumed` octets. The sequence number starts again at 0.
+    Skipped {
+        /// The octets of input the record took.
+        consumed: usize,
+        /// The header as received.
+        header: Vec<u8>,
+        /// The record's protected length.
+        len: usize,
+    },
     /// A TLS 1.3 compatibility ChangeCipherSpec (ignored, but given to the message callback),
     /// from the first `consumed` octets.
     IgnoredCcs {
@@ -367,6 +378,9 @@ pub struct RecordReader {
     pub allow_plain_alerts: bool,
     /// Whether a record's header is in and its body isn't yet (`SSL_ST_READ_BODY`).
     reading_body: bool,
+    /// Whether a TLS 1.3 record that doesn't decrypt is skipped rather than fatal (a server
+    /// skipping early data it rejected: `skip_early_data`).
+    pub skip_undecryptable: bool,
 }
 
 impl RecordReader {
@@ -385,6 +399,7 @@ impl RecordReader {
             reading_body: false,
             first_handshake: true,
             allow_plain_alerts: false,
+            skip_undecryptable: false,
         }
     }
 
@@ -535,7 +550,23 @@ impl RecordReader {
             data: body.to_vec(),
             inner: false,
         };
-        self.unprotect(p, &mut record)?;
+        let tls13 = matches!(
+            self.protection,
+            Protection::Tls13 { .. } | Protection::Tls13Integrity { .. }
+        );
+        if let Err(e) = self.unprotect(p, &mut record) {
+            if self.skip_undecryptable && tls13 && ty == application_data() {
+                // Valid early data that can't be decrypted fails here: it is skipped like an
+                // empty record, and the sequence starts again (`tls_get_more_records`).
+                self.seq = 0;
+                return Ok(Read::Skipped {
+                    consumed: total,
+                    header: record.header,
+                    len,
+                });
+            }
+            return Err(e);
+        }
         self.post_process(&mut record)
             .in_func(self.method_func(false))?;
         if self.max_frag_len != MAX_PLAIN && record.data.len() > self.max_frag_len {

@@ -56,7 +56,10 @@ fn output_cert_chain_inner(
     for (i, der) in chain.iter().enumerate() {
         w.vec(3, der).map_err(|_| Error::internal())?;
         if c.is_tls13() {
-            let Some(block) = ext::construct(c, p, cx::TLS1_3_CERTIFICATE, i)? else {
+            c.ext_cert = Some(der.clone());
+            let block = ext::construct(c, p, cx::TLS1_3_CERTIFICATE, i);
+            c.ext_cert = None;
+            let Some(block) = block? else {
                 return Ok(None);
             };
             w.put(&block);

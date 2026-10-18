@@ -43,6 +43,8 @@ pub(crate) struct CertPkey {
     pub(crate) privatekey: *mut EVP_PKEY,
     /// The chain sent after it (owned), or NULL.
     pub(crate) chain: *mut stack_st_X509,
+    /// Its server information (`SSL_CTX_use_serverinfo_ex`, version 2 form), or `None`.
+    pub(crate) serverinfo: Option<Vec<u8>>,
 }
 
 impl Default for CertPkey {
@@ -51,6 +53,7 @@ impl Default for CertPkey {
             x509: ptr::null_mut(),
             privatekey: ptr::null_mut(),
             chain: ptr::null_mut(),
+            serverinfo: None,
         }
     }
 }
@@ -162,6 +165,8 @@ pub(crate) struct Cert {
     /// The certificate types a TLS 1.2 CertificateRequest lists (`ctype`,
     /// `SSL_set1_client_certificate_types`), or `None` for the defaults.
     pub(crate) ctype: Option<Vec<u8>>,
+    /// The custom extensions (`custext`), in registration order.
+    pub(crate) custext: Vec<super::custom::Method>,
 }
 
 impl Cert {
@@ -186,6 +191,7 @@ impl Cert {
             conf_sigalgs: None,
             client_sigalgs: None,
             ctype: None,
+            custext: Vec::new(),
         }
     }
 
@@ -213,6 +219,7 @@ impl Cert {
                     return None;
                 }
             }
+            to.serverinfo.clone_from(&from.serverinfo);
         }
         if !self.dh_tmp.is_null() {
             // SAFETY: the original's live key.
@@ -241,6 +248,7 @@ impl Cert {
         ret.conf_sigalgs.clone_from(&self.conf_sigalgs);
         ret.client_sigalgs.clone_from(&self.client_sigalgs);
         ret.ctype.clone_from(&self.ctype);
+        ret.custext.clone_from(&self.custext);
         Some(ret)
     }
 

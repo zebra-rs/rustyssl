@@ -93,7 +93,10 @@ pub(super) fn process_server_certificate(
             let exts = rd.extensions()?;
             ext::collect(c, exts, cx::TLS1_3_CERTIFICATE, idx, idx == 0)?;
             let last = rd.is_empty();
-            if ext::parse_all(c, p, cx::TLS1_3_CERTIFICATE, idx, last)? == ext::Step::Wait {
+            c.ext_cert = Some(der.to_vec());
+            let step = ext::parse_all(c, p, cx::TLS1_3_CERTIFICATE, idx, last);
+            c.ext_cert = None;
+            if step? == ext::Step::Wait {
                 return Ok(MsgProcess::Ask);
             }
         }
@@ -646,6 +649,7 @@ pub(super) fn process_new_session_ticket(
         return Ok(MsgProcess::ContinueReading);
     }
     let now = super::now(c);
+    let renewed = !tls13 && !c.neg.session.session_id.is_empty();
     {
         let s = &mut c.neg.session;
         s.time = now;
@@ -677,6 +681,9 @@ pub(super) fn process_new_session_ticket(
         }
         c.notify(Event::UpdateCache { server: false });
         return Ok(MsgProcess::FinishedReading);
+    }
+    if renewed {
+        c.notify(super::super::Event::SessionRenewed);
     }
     Ok(MsgProcess::ContinueReading)
 }
