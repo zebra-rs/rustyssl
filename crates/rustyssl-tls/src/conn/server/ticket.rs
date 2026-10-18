@@ -133,8 +133,11 @@ fn new_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     Ok(())
 }
 
-/// A random 32-octet session ID.
-fn random_id(p: &dyn Provider) -> Result<Vec<u8>> {
+/// A random 32-octet session ID (`def_generate_session_id`).
+///
+/// # Errors
+/// The random generator failed.
+pub(crate) fn random_id(p: &dyn Provider) -> Result<Vec<u8>> {
     let n = usize::try_from(abi::SSL3_SSL_SESSION_ID_LENGTH).map_err(|_| Error::internal())?;
     let mut id = vec![0u8; n];
     p.random(&mut id, false)

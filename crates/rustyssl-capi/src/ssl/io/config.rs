@@ -14,7 +14,7 @@ use rustyssl_tls::conn::common::sigalgs;
 use rustyssl_tls::conn::{Callbacks, CertKey, Config};
 use rustyssl_tls::crypto::Provider;
 
-use super::super::conn::{Ssl, ctx_of};
+use super::super::conn::{Ssl, SslState, ctx_of};
 use super::super::ctx::Ctx;
 use super::super::tls_provider::EvpProvider;
 use super::super::types::{AnyCb, AppVerifyCb, ClientCertCb, InfoCb};
@@ -225,26 +225,52 @@ struct ChainSource {
     ctx_store: *mut X509_STORE,
     libctx: *mut OSSL_LIB_CTX,
     propq: *const c_char,
+    /// The connection, for its security checks.
+    owner: super::super::cert::Owner,
+}
+
+/// `ssl_security_cert_chain`: 1 when the end-entity certificate and the CAs pass the security
+/// level, else the first one's `SSL_R_*` reason.
+///
+/// # Safety
+/// The owner is live; the certificates are.
+unsafe fn chain_security(src: &ChainSource, ee: *mut X509, cas: &[*mut X509]) -> c_int {
+    use super::super::cert::security_cert;
+    // SAFETY: the caller's guarantee.
+    let rv = unsafe { security_cert(src.owner, ee, true) };
+    if rv != 1 {
+        return rv;
+    }
+    for &c in cas {
+        // SAFETY: as above.
+        let rv = unsafe { security_cert(src.owner, c, false) };
+        if rv != 1 {
+            return rv;
+        }
+    }
+    1
 }
 
 /// The chain `ssl_add_cert_chain` sends, leaf first: the slot's chain, else the context's
 /// extra certificates, else (unless `SSL_MODE_NO_AUTO_CHAIN`) what the chain store (or the
 /// context's store) builds, root included if it finds one. Built with no lock held: the
-/// store's verification callback may run.
+/// store's verification callback may run. With it, the chain's security check
+/// (`ssl_security_cert_chain`: 1, or the reason).
 ///
 /// # Safety
 /// The pointers in `src` are live (or NULL where allowed).
-unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
+unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> (Vec<Vec<u8>>, c_int) {
     use crate::x509::ctx::{
         X509_STORE_CTX_free, X509_STORE_CTX_get0_chain, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
     };
     let mut out = Vec::new();
     if r.x509.is_null() {
-        return out;
+        // A raw public key alone: no chain to check.
+        return (out, 1);
     }
     // SAFETY: our reference.
     let Some(leaf) = (unsafe { der_of(r.x509) }) else {
-        return out;
+        return (out, 1);
     };
     if let Some(chain) = &r.chain {
         out.push(leaf);
@@ -252,19 +278,24 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
             // SAFETY: our references.
             out.extend(unsafe { der_of(c) });
         }
-        return out;
+        // SAFETY: the caller's guarantee; our references.
+        return (out, unsafe { chain_security(src, r.x509, chain) });
     }
     if !src.extra.is_null() {
         out.push(leaf);
         // SAFETY: the context's stack.
         let v = unsafe { refs_of(src.extra) };
-        for c in v {
+        for &c in &v {
             // SAFETY: the references taken above.
             out.extend(unsafe { der_of(c) });
+        }
+        // SAFETY: as above.
+        let sec = unsafe { chain_security(src, r.x509, &v) };
+        for c in v {
             // SAFETY: as above, released once.
             unsafe { X509_free(c) };
         }
-        return out;
+        return (out, sec);
     }
     let store = if src.mode & SSL_MODE_NO_AUTO_CHAIN != 0 {
         ptr::null_mut()
@@ -275,7 +306,8 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
     };
     if store.is_null() {
         out.push(leaf);
-        return out;
+        // SAFETY: the caller's guarantee; our reference.
+        return (out, unsafe { chain_security(src, r.x509, &[]) });
     }
     // SAFETY: the library context and property query of the connection's context.
     let xs = unsafe { X509_STORE_CTX_new_ex(src.libctx, src.propq) };
@@ -284,7 +316,8 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
         // SAFETY: made above, or NULL.
         unsafe { X509_STORE_CTX_free(xs) };
         out.push(leaf);
-        return out;
+        // SAFETY: as above.
+        return (out, unsafe { chain_security(src, r.x509, &[]) });
     }
     // The chain needn't be complete (the root usually isn't known): the result is ignored and
     // the errors cleared, as OpenSSL does.
@@ -299,17 +332,26 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
     if n <= 0 {
         out.push(leaf);
     }
+    let mut built = Vec::new();
     for i in 0..n.max(0) {
         // SAFETY: an index in range.
         let x: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), i) }.cast();
         if !x.is_null() {
             // SAFETY: a certificate of the chain.
             out.extend(unsafe { der_of(x) });
+            built.push(x);
         }
     }
+    // The chain built, its first certificate the end entity's.
+    let sec = match built.split_first() {
+        // SAFETY: the context's chain, alive until it's freed below.
+        Some((&ee, cas)) => unsafe { chain_security(src, ee, cas) },
+        // SAFETY: the caller's guarantee; our reference.
+        None => unsafe { chain_security(src, r.x509, &[]) },
+    };
     // SAFETY: made above.
     unsafe { X509_STORE_CTX_free(xs) };
-    out
+    (out, sec)
 }
 
 /// An EC key's curve as a NID (`ssl_get_EC_curve_nid`), or `NID_undef`.
@@ -392,7 +434,7 @@ unsafe fn cert_key(
     // SAFETY: our reference to the key.
     let key = unsafe { prov.add_key(r.pkey) }?;
     // SAFETY: the caller's guarantee.
-    let chain = unsafe { send_chain(r, src) };
+    let (chain, chain_security) = unsafe { send_chain(r, src) };
     if chain.is_empty() && !r.x509.is_null() {
         return None;
     }
@@ -441,6 +483,9 @@ unsafe fn cert_key(
         cert_sig: (!r.x509.is_null()).then_some((mdnid, pknid)),
         raw_public_key,
         ocsp_response: ocsp,
+        chain_security: (chain_security != 1).then_some(chain_security),
+        // SAFETY: our reference to the key; the context's library context and properties.
+        unsupported_digests: unsafe { unsupported_digests(r.pkey, src) },
     })
 }
 
@@ -501,6 +546,47 @@ unsafe fn usable_schemes(
         }
         out.push(lu.sigalg);
     }
+    out
+}
+
+/// The digests of TLS's signature algorithms (`NID_undef` for those without one) that the key
+/// won't sign with (`EVP_PKEY_digestsign_supports_digest`, as `check_cert_usable` asks).
+///
+/// # Safety
+/// `pkey` is a live key; the pointers in `src` are live (or NULL where allowed).
+unsafe fn unsupported_digests(pkey: *mut EVP_PKEY, src: &ChainSource) -> Vec<c_int> {
+    use rustyssl_abi::{NID_md5_sha1, NID_sha1, NID_sha224, NID_sha256, NID_sha384, NID_sha512};
+    let mut out = Vec::new();
+    // What it answers isn't an error of the handshake's.
+    // SAFETY: no preconditions.
+    unsafe { crate::err::ERR_set_mark() };
+    for nid in [
+        NID_undef,
+        NID_md5_sha1,
+        NID_sha1,
+        NID_sha224,
+        NID_sha256,
+        NID_sha384,
+        NID_sha512,
+    ] {
+        let name = if nid == NID_undef {
+            ptr::null()
+        } else {
+            // SAFETY: no preconditions.
+            unsafe { crate::objects::OBJ_nid2sn(nid) }
+        };
+        // SAFETY: the caller's key; the digest's name (or NULL); the library context.
+        let ok = unsafe {
+            crate::evp::sigver::EVP_PKEY_digestsign_supports_digest(
+                pkey, src.libctx, name, src.propq,
+            )
+        };
+        if ok <= 0 {
+            out.push(nid);
+        }
+    }
+    // SAFETY: the mark set above.
+    unsafe { crate::err::ERR_pop_to_mark() };
     out
 }
 
@@ -576,6 +662,7 @@ fn slot_refs(x: &Ssl) -> (Vec<SlotRefs>, u32, *mut X509_STORE, Option<Vec<u8>>, 
 /// # Safety
 /// `snap` is the connection's context's snapshot.
 pub(crate) unsafe fn certs(
+    s: *const SSL,
     x: &Ssl,
     snap: &CtxSnapshot,
     prov: &EvpProvider,
@@ -588,6 +675,7 @@ pub(crate) unsafe fn certs(
         ctx_store: snap.cert_store,
         libctx: snap.libctx,
         propq: snap.propq(),
+        owner: super::super::cert::Owner::Ssl(s),
     };
     let mut out = Vec::new();
     // The algorithms a key's schemes come from (only made when there is a key).
@@ -646,25 +734,24 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     // SAFETY: the connection's parameters.
     let verify_depth = unsafe { crate::x509::vpm::X509_VERIFY_PARAM_get_depth(x.param) };
     // SAFETY: the snapshot's context is alive.
-    let (certs, current_cert) = unsafe { certs(x, snap, prov) };
+    let (certs, current_cert) = unsafe { certs(s, x, snap, prov) };
     let st = x.state();
     let method_version = match st.method.version {
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
         v => u16::try_from(v).unwrap_or(0),
     };
-    let names = if st.server {
-        [
-            st.client_ca_names,
-            snap.client_ca_names,
-            st.ca_names,
-            snap.ca_names,
-        ]
-        .into_iter()
-        .find(|p| !p.is_null())
+    // `get_ca_names`: a server's client CA names (`SSL_get_client_CA_list`) unless they're
+    // missing or empty, else the CA names (`SSL_get0_CA_list`); each the connection's, else
+    // its context's.
+    let first = |a: *mut stack_st_X509_NAME, b: *mut stack_st_X509_NAME| {
+        if a.is_null() { b } else { a }
+    };
+    let client = first(st.client_ca_names, snap.client_ca_names);
+    // SAFETY: the connection's or context's list, or NULL (-1).
+    let names = if st.server && unsafe { OPENSSL_sk_num(client.cast()) } > 0 {
+        Some(client)
     } else {
-        [st.ca_names, snap.ca_names]
-            .into_iter()
-            .find(|p| !p.is_null())
+        Some(first(st.ca_names, snap.ca_names)).filter(|p| !p.is_null())
     };
     let ca_names = match names {
         // SAFETY: the connection's or context's names (no callbacks run while encoding).
@@ -749,44 +836,50 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             || rustyssl_tls::crypto::Secret::new(Vec::new()),
             |c| rustyssl_tls::crypto::Secret::new(c.state().cookie_hmac_key.to_vec()),
         ),
-        callbacks: Callbacks {
-            info: st.info_callback.is_some() || snap.info_callback.is_some(),
-            msg: st.msg_callback.is_some(),
-            keylog: snap.keylog_callback.is_some(),
-            servername: snap.servername_cb.is_some(),
-            client_hello: snap.client_hello_cb.is_some(),
-            cert: st.cert.cert_cb.is_some(),
-            client_cert: snap.client_cert_cb.is_some(),
-            alpn_select: snap.alpn_select_cb.is_some(),
-            status: snap.status_cb.is_some(),
-            record_padding: st.record_padding_cb.is_some(),
-            allow_early_data: st.allow_early_data_cb.is_some(),
-            cookie: snap.verify_stateless_cookie_cb.is_some(),
-            session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
-            session_secret: st.eap.secret_cb.is_some(),
-            // SAFETY: the connection's session context, which it keeps alive.
-            ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
-                .is_some_and(|c| c.state().generate_ticket_cb.is_some()),
-            // SAFETY: as above.
-            ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
-                .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
-            // SAFETY: as above.
-            ticket_key: unsafe { super::super::ctx::ctx(st.session_ctx) }.is_some_and(|c| {
-                let cs = c.state();
-                cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
-            }),
-            cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
-            tmp_dh: st.cert.dh_tmp_cb.is_some(),
-            psk: super::super::psk::flags(&st).0,
-            psk_session: super::super::psk::flags(&st).1,
-            // The client's select callback, or the server's advertisement callback.
-            npn: if st.server {
-                snap.npn_advertised_cb.is_some()
-            } else {
-                snap.npn_select_cb.is_some()
-            },
-            ..Callbacks::default()
-        },
+        callbacks: callbacks(&st, snap),
         ..Config::default()
+    }
+}
+
+/// Which of the connection's and its context's callbacks are set, for the core (again after
+/// the servername callback, which may switch the context).
+pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
+    Callbacks {
+        info: st.info_callback.is_some() || snap.info_callback.is_some(),
+        msg: st.msg_callback.is_some(),
+        keylog: snap.keylog_callback.is_some(),
+        servername: snap.servername_cb.is_some(),
+        client_hello: snap.client_hello_cb.is_some(),
+        cert: st.cert.cert_cb.is_some(),
+        client_cert: snap.client_cert_cb.is_some(),
+        alpn_select: snap.alpn_select_cb.is_some(),
+        status: snap.status_cb.is_some(),
+        record_padding: st.record_padding_cb.is_some(),
+        allow_early_data: st.allow_early_data_cb.is_some(),
+        cookie: snap.verify_stateless_cookie_cb.is_some(),
+        session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
+        session_secret: st.eap.secret_cb.is_some(),
+        // SAFETY: the connection's session context, which it keeps alive.
+        ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
+            .is_some_and(|c| c.state().generate_ticket_cb.is_some()),
+        // SAFETY: as above.
+        ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
+            .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
+        // SAFETY: as above.
+        ticket_key: unsafe { super::super::ctx::ctx(st.session_ctx) }.is_some_and(|c| {
+            let cs = c.state();
+            cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
+        }),
+        cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
+        tmp_dh: st.cert.dh_tmp_cb.is_some(),
+        psk: super::super::psk::flags(st).0,
+        psk_session: super::super::psk::flags(st).1,
+        // The client's select callback, or the server's advertisement callback.
+        npn: if st.server {
+            snap.npn_advertised_cb.is_some()
+        } else {
+            snap.npn_select_cb.is_some()
+        },
+        ..Callbacks::default()
     }
 }

@@ -798,7 +798,7 @@ fn init_one(c: &mut Connection, idx: usize, _context: u32) {
         t::SIGNATURE_ALGORITHMS => sh.peer_sigalgs = None,
         t::PSK_KEY_EXCHANGE_MODES => sh.psk_kex_mode = KEX_MODE_FLAG_NONE,
         t::COMPRESS_CERTIFICATE => sh.compress_certificate_from_peer.clear(),
-        t::CERTIFICATE_AUTHORITIES => c.neg.peer_ca_names.clear(),
+        t::CERTIFICATE_AUTHORITIES => c.neg.peer_ca_names = None,
         _ => {}
     }
 }
@@ -859,8 +859,8 @@ fn final_renegotiate(c: &Connection, sent: bool) -> Result<()> {
 
 /// `final_server_name`: the servername callback ([`Request::Servername`], answered with
 /// [`Answer::Tlsext`]); a server records the name in a new session when the callback
-/// accepted it, and stops a TLS 1.2 ticket the callback turned off (a new session then needs a
-/// new session ID: [`super::Shared::regenerate_session_id`]). A fatal result fails with
+/// accepted it, and stops a TLS 1.2 ticket the callback turned off (a new session then gets a
+/// new session ID). A fatal result fails with
 /// `SSL_R_CALLBACK_FAILED` and the callback's alert; a warning is sent below TLS 1.3.
 fn final_server_name(c: &mut Connection, p: &dyn Provider, sent: bool) -> Result<Step> {
     let no_ticket = |c: &Connection| c.cfg.options & abi::SSL_OP_NO_TICKET != 0;
@@ -890,7 +890,8 @@ fn final_server_name(c: &mut Connection, p: &dyn Provider, sent: bool) -> Result
             s.ticket = None;
             s.ticket_lifetime_hint = 0;
             s.ticket_age_add = 0;
-            c.hs.sh.regenerate_session_id = true;
+            // `ssl_generate_session_id`: without a ticket coming, the session needs an ID.
+            s.session_id = crate::conn::server::random_id(p)?;
         }
     }
     match ret {

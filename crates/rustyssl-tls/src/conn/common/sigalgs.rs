@@ -1312,14 +1312,18 @@ fn check_peer_sigalg_inner(c: &mut Connection, sig: u16, key: &PeerKey) -> Resul
 }
 
 /// `check_cert_usable`: whether the certificate in `idx` can sign with `lu`: its key can
-/// (`EVP_PKEY_digestsign_supports_digest` and the RSA-PSS size check, which capi folds into
-/// [`crate::conn::CertKey::schemes`]), and its own signature meets the peer's
+/// (`EVP_PKEY_digestsign_supports_digest`, which capi gives as
+/// [`crate::conn::CertKey::unsupported_digests`], and the RSA-PSS size check, which it folds
+/// into [`crate::conn::CertKey::schemes`]), and its own signature meets the peer's
 /// signature_algorithms_cert, if sent.
 fn cert_usable(c: &Connection, lu: &SigAlg, idx: usize) -> bool {
     let Some(k) = cert_in_slot(c, idx).and_then(|i| c.cfg.certs.get(i)) else {
         return false;
     };
     if !k.schemes.is_empty() && !k.schemes.contains(&lu.sigalg) {
+        return false;
+    }
+    if k.unsupported_digests.contains(&lu.hash) {
         return false;
     }
     if own_rpk(c) {
@@ -1791,7 +1795,8 @@ pub fn check_chain(c: &Connection, cand: &ChainCandidate) -> u32 {
         {
             rv |= flag(abi::CERT_PKEY_CERT_TYPE);
         }
-        let names = &c.neg.peer_ca_names;
+        // None (nothing sent) and an empty list both match (`!sk_X509_NAME_num(ca_dn)`).
+        let names = c.neg.peer_ca_names.as_deref().unwrap_or_default();
         if names.is_empty()
             || core::iter::once(&cand.leaf)
                 .chain(cand.chain.iter())

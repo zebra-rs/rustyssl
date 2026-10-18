@@ -22,6 +22,7 @@ use rustyssl_abi as abi;
 
 pub(crate) use self::ext::*;
 pub(crate) use self::hello::handle_alpn;
+pub(crate) use self::ticket::random_id;
 
 use super::common::{self, EarlyDataState, Hrr, Pha, finished};
 use super::statem::{Construct, MsgProcess, Work, WriteTran, msgs_type, st};

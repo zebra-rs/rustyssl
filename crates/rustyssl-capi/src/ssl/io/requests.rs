@@ -62,7 +62,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, &raw mut al, arg) };
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Tlsext { ret, alert: al })
         }
         Request::AlpnSelect { protos } => {
@@ -114,7 +114,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, &raw mut al, arg) };
             // SAFETY: the caller's guarantee.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             match ret {
                 SSL_CLIENT_HELLO_RETRY => {
                     x.state().rwstate = SSL_CLIENT_HELLO_CB;
@@ -148,7 +148,7 @@ pub(crate) unsafe fn handle(
                 });
             }
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Continue)
         }
         Request::ClientCert => {
@@ -179,7 +179,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             unsafe { crate::evp::pkey::EVP_PKEY_free(key) };
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Continue)
         }
         Request::RecordPadding { content_type, len } => {
@@ -491,7 +491,7 @@ unsafe fn stateless_cookie_verify(
 ///
 /// # Safety
 /// `x` is a live connection.
-unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
+unsafe fn refresh_certs(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) {
     // The context may have changed (`SSL_set_SSL_CTX` from the servername callback).
     let fresh = config::snapshot(x);
     let Some(snap) = fresh.as_ref().or(snap) else {
@@ -501,15 +501,34 @@ unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
         return;
     };
     // SAFETY: the connection; the context's snapshot.
-    let (certs, current) = unsafe { config::certs(x, snap, &prov) };
+    let (certs, current) = unsafe { config::certs(s, x, snap, &prov) };
     let mut st = x.state();
     let (verify_mode, sid_ctx) = (st.verify_mode, st.sid_ctx.clone());
+    // What the callback may have set on the connection, read where OpenSSL reads it later
+    // (`SSL_set_max_proto_version` from the ClientHello callback, `SSL_set_options`).
+    let (min, max, options) = (st.min_proto_version, st.max_proto_version, st.options);
     if let Some(c) = st.drv.tls.as_mut() {
         let cfg = c.config_mut();
         cfg.certs = certs;
         cfg.current_cert = current;
         cfg.verify_mode = verify_mode;
         cfg.sid_ctx = sid_ctx;
+        cfg.min_version = u16::try_from(min).unwrap_or(0);
+        cfg.max_version = u16::try_from(max).unwrap_or(0);
+        cfg.options = options;
+    }
+    // The new context's callbacks; the notification flags are set before each step, and the
+    // callbacks that may switch the context have run (the core is still waiting for theirs).
+    let mut fresh_cbs = config::callbacks(&st, snap);
+    if let Some(c) = st.drv.tls.as_mut() {
+        let cfg = c.config_mut();
+        fresh_cbs.servername = cfg.callbacks.servername;
+        fresh_cbs.client_hello = cfg.callbacks.client_hello;
+        fresh_cbs.cert = cfg.callbacks.cert;
+        fresh_cbs.info = cfg.callbacks.info;
+        fresh_cbs.msg = cfg.callbacks.msg;
+        fresh_cbs.keylog = cfg.callbacks.keylog;
+        cfg.callbacks = fresh_cbs;
     }
 }
 
@@ -664,8 +683,10 @@ unsafe fn verify(
     unsafe { X509_VERIFY_PARAM_move_peername(x.param, param) };
     // SAFETY: made above.
     unsafe { X509_STORE_CTX_free(ctx) };
+    // A verification that succeeded with `SSL_set_retry_verify` called suspends the handshake
+    // (`SSL_ERROR_WANT_RETRY_VERIFY`); the next call verifies again. A failure stays one.
     let retry = x.state().rwstate == SSL_RETRY_VERIFY;
-    if i <= 0 && retry {
+    if i > 0 && retry {
         // SAFETY: our copy of the chain, or NULL.
         unsafe { OPENSSL_sk_pop_free(verified.cast(), Some(x509_free)) };
         return None;

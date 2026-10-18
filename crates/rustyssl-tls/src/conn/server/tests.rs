@@ -140,6 +140,8 @@ fn rsa_cert(p: &TestProvider) -> CertKey {
         cert_sig: Some((abi::NID_sha256, abi::NID_rsaEncryption)),
         raw_public_key: None,
         ocsp_response: None,
+        chain_security: None,
+        unsupported_digests: Vec::new(),
     }
 }
 

@@ -36,7 +36,7 @@ use rustyssl_abi::{
 };
 use rustyssl_tls::conn::common::security::SecOther;
 use rustyssl_tls::conn::common::{EarlyDataState, SecurityHook};
-use rustyssl_tls::conn::{Connection, Event};
+use rustyssl_tls::conn::{Connection, Event, Request};
 use rustyssl_tls::error::Error as TlsError;
 
 use self::config::CtxSnapshot;
@@ -166,6 +166,8 @@ pub(crate) struct Driver {
     /// TLS 1.3's early data state (`early_data_state`), kept here before the core exists and
     /// mirrored from it after.
     pub(crate) early_data_state: EarlyDataState,
+    /// The core's peer CA names that `SslState::peer_ca_names` was last made from.
+    pub(crate) peer_ca_names: Option<Vec<Vec<u8>>>,
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -232,6 +234,64 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
     }
 }
 
+/// A client's copy of the OCSP response the server stapled (`s->ext.ocsp.resp`), which
+/// `SSL_get_tlsext_status_ocsp_resp` returns (to the status callback too), unless it already
+/// holds it.
+///
+/// # Safety
+/// `st.ocsp_resp` is NULL or the connection's own `st.ocsp_resp_len` octets (C memory).
+unsafe fn set_peer_ocsp(st: &mut SslState, resp: &[u8]) {
+    if !st.ocsp_resp.is_null()
+        // SAFETY: the caller's guarantee.
+        && unsafe { core::slice::from_raw_parts(st.ocsp_resp, st.ocsp_resp_len) } == resp
+    {
+        return;
+    }
+    let copy: *mut u8 = crate::mem::alloc(resp.len().max(1)).cast();
+    if copy.is_null() {
+        return;
+    }
+    // SAFETY: a fresh block of at least `resp.len()` octets.
+    unsafe { core::ptr::copy_nonoverlapping(resp.as_ptr(), copy, resp.len()) };
+    let old = core::mem::replace(&mut st.ocsp_resp, copy);
+    st.ocsp_resp_len = resp.len();
+    // SAFETY: the response the connection owned (C memory), or NULL.
+    unsafe { crate::mem::release(old.cast()) };
+}
+
+/// `parse_ca_names`'s list, as `X509_NAME`s: the names the peer sent (NULL when it sent no
+/// list, empty when it sent an empty one), replacing the connection's.
+///
+/// # Safety
+/// `st.peer_ca_names` is NULL or the connection's own list.
+unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
+    // SAFETY: the caller's guarantee.
+    unsafe { OPENSSL_sk_pop_free(st.peer_ca_names.cast(), Some(super::ctx::name_free)) };
+    st.peer_ca_names = ptr::null_mut();
+    let Some(names) = names else {
+        return;
+    };
+    // SAFETY: no preconditions.
+    let sk: *mut rustyssl_abi::stack_st_X509_NAME = unsafe { OPENSSL_sk_new_null() }.cast();
+    if sk.is_null() {
+        return;
+    }
+    for der in names {
+        let Ok(len) = c_long::try_from(der.len()) else {
+            continue;
+        };
+        let mut p = der.as_ptr();
+        // SAFETY: the name's octets (the core checked that they decode).
+        let nm = unsafe { crate::x509::name::d2i_X509_NAME(ptr::null_mut(), &raw mut p, len) };
+        // SAFETY: our stack, which takes the name.
+        if !nm.is_null() && unsafe { OPENSSL_sk_push(sk.cast(), nm.cast()) } == 0 {
+            // SAFETY: not taken.
+            unsafe { crate::x509::name::X509_NAME_free(nm) };
+        }
+    }
+    st.peer_ca_names = sk;
+}
+
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
@@ -274,6 +334,17 @@ fn mirror(st: &mut SslState, c: &Connection) {
     own.clone_into(&mut st.finish_md);
     peer.clone_into(&mut st.peer_finish_md);
     st.drv.warn_alert = c.alerts().2;
+    if !st.server
+        && let Some(r) = &n.ocsp_response
+    {
+        // SAFETY: the connection's own response, or NULL.
+        unsafe { set_peer_ocsp(st, r) };
+    }
+    if n.peer_ca_names != st.drv.peer_ca_names {
+        n.peer_ca_names.clone_into(&mut st.drv.peer_ca_names);
+        // SAFETY: the connection's own list, or NULL, replaced (no callbacks run).
+        unsafe { set_peer_ca_names(st, n.peer_ca_names.as_deref()) };
+    }
     if let Some(a) = &n.alpn
         && *a != st.drv.alpn
     {
@@ -711,7 +782,7 @@ fn auto_retry(x: &Ssl) -> bool {
 /// # Safety
 /// As for [`drive`].
 unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> Stop {
-    let snap = config::snapshot(x);
+    let mut snap = config::snapshot(x);
     let server = x.state().server;
     let exit = if server {
         SSL_CB_ACCEPT_EXIT
@@ -870,8 +941,15 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 unsafe { super::sess_cache::on_remove_session(x) };
             }
             Event::Request(req) => {
+                let servername = matches!(req, Request::Servername);
                 // SAFETY: as above.
-                match unsafe { requests::handle(s, x, snap.as_ref(), req) } {
+                let answer = unsafe { requests::handle(s, x, snap.as_ref(), req) };
+                if servername {
+                    // The servername callback may have switched the context
+                    // (`SSL_set_SSL_CTX`): the later callbacks are the new context's.
+                    snap = config::snapshot(x);
+                }
+                match answer {
                     Some(a) => {
                         if let Some(c) = x.state().drv.tls.as_mut() {
                             c.answer(a);

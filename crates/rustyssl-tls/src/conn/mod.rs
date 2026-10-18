@@ -145,8 +145,8 @@ pub struct Negotiated {
     /// The peer's supported groups (`SSL_get1_groups`, server side).
     pub peer_groups: Vec<u16>,
     /// The CA names the peer sent (`SSL_get0_peer_CA_list`, `SSL_get_client_CA_list` on a
-    /// client).
-    pub peer_ca_names: Vec<Vec<u8>>,
+    /// client): `None` until a list arrives (NULL there), maybe an empty one.
+    pub peer_ca_names: Option<Vec<Vec<u8>>>,
     /// TLS 1.2's master secret (`SSL_SESSION_get_master_key`).
     pub master_secret: Vec<u8>,
     /// The exporter secrets (TLS 1.3), for `SSL_export_keying_material(_early)`.
