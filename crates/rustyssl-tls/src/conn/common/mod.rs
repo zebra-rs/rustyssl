@@ -347,24 +347,15 @@ pub(crate) fn take_mac(c: &mut Connection, p: &dyn Provider) -> Result<()> {
 /// Goes back into the state machine to read a handshake message after the handshake
 /// (renegotiation, or TLS 1.3's NewSessionTicket, KeyUpdate, and CertificateRequest).
 ///
-/// Before TLS 1.3, as `ossl_statem_set_in_init` before `handshake_func`: the state machine
-/// starts again from `MSG_FLOW_FINISHED` (the start notification, a write transition with
-/// nothing to write, then the read), so a renegotiation is set up and traced as OpenSSL's is
-/// (fork M). TLS 1.3's post-handshake messages go to the read after the write transition's
-/// loop notification (`TLS_ST_OK` has nothing to write), with no start notification.
+/// As `ossl_statem_set_in_init` before `handshake_func`: the state machine starts again from
+/// `MSG_FLOW_FINISHED`, so a renegotiation is set up and traced as OpenSSL's is (fork M), and
+/// in TLS 1.3 the write transition from `TLS_ST_OK` first sends what is owed (the reply to an
+/// earlier KeyUpdate request, a post-handshake CertificateRequest, extra tickets) and ends
+/// there; the message is read when the read path comes back. So each of several requested
+/// KeyUpdates in a row gets its reply, as OpenSSL's does.
 pub(crate) fn enter_post_handshake(c: &mut Connection) {
     c.st.in_init = true;
-    if c.is_tls13() {
-        c.st.state = MsgFlow::Reading;
-        if c.cfg.callbacks.info {
-            let w = if c.cfg.server {
-                abi::SSL_CB_ACCEPT_LOOP
-            } else {
-                abi::SSL_CB_CONNECT_LOOP
-            };
-            c.notify(super::Event::Info { where_: w, ret: 1 });
-        }
-    } else if c.st.state != MsgFlow::Uninited {
+    if c.st.state != MsgFlow::Uninited {
         c.st.state = MsgFlow::Finished;
     }
     c.st.read_state = ReadState::Header;
