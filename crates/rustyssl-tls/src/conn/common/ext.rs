@@ -1095,11 +1095,14 @@ fn final_early_data(
     }
     if accept {
         c.neg.early_data_status = abi::SSL_EARLY_DATA_ACCEPTED;
+        // Shared fix (tls-server): the early keys are the resumed session's suite's
+        // (`tls13_change_cipher_state` uses `s->session->cipher` for early data).
+        let early_cipher = crate::suites::by_id(c.neg.session.cipher_id);
         keys::change_cipher_state13(
             c,
             p,
             abi::SSL3_CC_EARLY | abi::SSL3_CHANGE_CIPHER_SERVER_READ,
-            None,
+            early_cipher,
         )?;
     } else {
         c.neg.early_data_status = abi::SSL_EARLY_DATA_REJECTED;

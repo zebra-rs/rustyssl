@@ -195,6 +195,44 @@ pub struct Config {
     /// Whether a server can do DHE: DH parameters set (`SSL_set0_tmp_dh_pkey`), a
     /// `tmp_dh_callback`, or `SSL_set_dh_auto`.
     pub dh_tmp: bool,
+    // Shared addition (tls-server): what the server's handshake reads beyond the above.
+    /// The time the handshake started, in seconds since the epoch (`ossl_time_now`, which the
+    /// core can't read itself): sessions' times, ticket ages, and session expiry.
+    pub now: i64,
+    /// `SSL_CTX_set_session_cache_mode` (`SSL_SESS_CACHE_*`; OpenSSL's default is
+    /// `SSL_SESS_CACHE_SERVER`): without `SSL_SESS_CACHE_SERVER` a TLS 1.2 server sends no
+    /// session ID for a new session.
+    pub session_cache_mode: i64,
+    /// The session timeout in seconds (`SSL_CTX_set_timeout`; 0: the method's default, 7200).
+    pub session_timeout: i64,
+    /// The default session ticket keys: `SSL_CTX_set_tlsext_ticket_keys`, or the random ones
+    /// OpenSSL makes for every `SSL_CTX` (capi makes them the same way, once per `SSL_CTX`, and
+    /// keeps them for the session context's lifetime). Used when no ticket key callback is
+    /// installed ([`super::Callbacks::ticket_key`]); `None` makes tickets that can't be
+    /// encrypted fail with an internal error, as a missing key would in OpenSSL.
+    pub ticket_keys: Option<TicketKeys>,
+    /// The PSK identity hint (`SSL_CTX_use_psk_identity_hint`), sent in a TLS 1.2 PSK
+    /// ServerKeyExchange.
+    pub psk_identity_hint: Option<Vec<u8>>,
+    /// DH parameters (`p`, `g`, big-endian) set with `SSL_set0_tmp_dh_pkey`, for TLS 1.2's DHE.
+    pub dh_params: Option<(Vec<u8>, Vec<u8>)>,
+    /// `SSL_set_dh_auto`: DHE parameters chosen by the suite's strength (RFC 7919's groups).
+    pub dh_auto: bool,
+    /// The SRTP protection profiles (`SSL_set_tlsext_use_srtp`), in preference order.
+    pub srtp_profiles: Vec<u16>,
+}
+
+/// Session ticket keys (`SSL_CTX_set_tlsext_ticket_keys`' 80 octets: the key name, the HMAC
+/// key, and the AES-256 key). Tickets are AES-256-CBC with HMAC-SHA256 over the name, IV, and
+/// ciphertext, as OpenSSL makes them.
+#[derive(Clone, Debug, Default)]
+pub struct TicketKeys {
+    /// The key name (16 octets), sent at the start of each ticket.
+    pub name: [u8; 16],
+    /// The HMAC-SHA256 key (32 octets).
+    pub hmac_key: crate::crypto::Secret,
+    /// The AES-256-CBC key (32 octets).
+    pub aes_key: crate::crypto::Secret,
 }
 
 /// A registered custom extension (`custom_ext_method`).
