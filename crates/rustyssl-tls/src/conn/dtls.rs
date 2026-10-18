@@ -32,6 +32,9 @@ pub enum Timer {
     Start,
     /// `dtls1_stop_timer`: disarm it and reset the duration and the timeout count.
     Stop,
+    /// `dtls1_stop_timer` then `dtls1_start_timer` in one step (a flight read, the next one
+    /// written): armed again from the first duration, not the doubled one.
+    Restart,
 }
 
 /// A received message being reassembled, or a whole one buffered ahead of its turn
@@ -219,9 +222,13 @@ impl Connection {
         self.dtls.timer.take()
     }
 
-    /// `dtls1_start_timer`.
+    /// `dtls1_start_timer`; after a stop the caller hasn't made yet, both (the stop resets
+    /// the duration the start arms).
     pub(crate) fn dtls_start_timer(&mut self) {
-        self.dtls.timer = Some(Timer::Start);
+        self.dtls.timer = Some(match self.dtls.timer {
+            Some(Timer::Stop | Timer::Restart) => Timer::Restart,
+            _ => Timer::Start,
+        });
     }
 
     /// `dtls1_stop_timer`: the timer stops and the flight sent is forgotten.

@@ -242,6 +242,12 @@ pub(crate) unsafe fn apply_timer(s: *mut SSL, x: &Ssl, t: Timer) {
         Timer::Start => unsafe { start_timer(s, x) },
         // SAFETY: as above.
         Timer::Stop => unsafe { stop_timer(x) },
+        Timer::Restart => {
+            // SAFETY: as above.
+            unsafe { stop_timer(x) };
+            // SAFETY: as above.
+            unsafe { start_timer(s, x) };
+        }
     }
 }
 

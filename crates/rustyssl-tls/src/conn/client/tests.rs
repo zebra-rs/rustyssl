@@ -2590,6 +2590,64 @@ fn dtls_survives_drops_duplicates_and_reordering() {
     }
 }
 
+/// The timer changes one end makes in a step, until it waits for input.
+fn dtls_timer_changes(
+    c: &mut Connection,
+    p: &TestProvider,
+    reading: bool,
+    out: &mut Vec<Vec<u8>>,
+) -> Vec<crate::conn::dtls::Timer> {
+    let mut timers = Vec::new();
+    for _ in 0..1000 {
+        let ev = c.step(p, reading).unwrap();
+        timers.extend(c.take_dtls_timer());
+        match ev {
+            Event::Request(r) => c.answer(accept(&r)),
+            Event::Output => out.extend(c.take_datagrams()),
+            Event::NeedInput | Event::Idle | Event::HandshakeDone => {
+                out.extend(c.take_datagrams());
+                if !matches!(ev, Event::HandshakeDone) {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    timers
+}
+
+/// A flight read and the next one written in one step stop the timer and start it again
+/// (`dtls1_stop_timer` resets the duration), rather than only re-arming it: otherwise the
+/// next flight's timer keeps the previous one's doubled duration.
+#[test]
+fn dtls_next_flight_restarts_the_timer() {
+    use crate::conn::dtls::Timer;
+    let p = TestProvider::new(b"dtls-timer");
+    let mut client = Connection::new(dtls(client12(), v::DTLS1_2));
+    let mut server = Connection::new(dtls(server_config(&p), v::DTLS1_2));
+    let mut to_server = Vec::new();
+    assert_eq!(
+        dtls_timer_changes(&mut client, &p, false, &mut to_server),
+        [Timer::Start]
+    );
+    let mut to_client = Vec::new();
+    for d in to_server.drain(..) {
+        server.feed_datagram(&d);
+    }
+    dtls_timer_changes(&mut server, &p, true, &mut to_client);
+    for d in to_client.drain(..) {
+        client.feed_datagram(&d);
+    }
+    // The server's flight read, the client's next one written: a restart, then only re-arms
+    // as the flight's further messages go (each `dtls1_start_timer` keeps the duration).
+    let changes = dtls_timer_changes(&mut client, &p, true, &mut to_server);
+    assert_eq!(changes.first(), Some(&Timer::Restart), "{changes:?}");
+    assert!(
+        changes.iter().skip(1).all(|t| *t == Timer::Start),
+        "{changes:?}"
+    );
+}
+
 #[test]
 fn dtls_survives_lost_datagrams() {
     use crate::conn::pair::{self, End};
