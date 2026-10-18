@@ -136,6 +136,19 @@ pub fn lookup(c: &Connection, id: u16) -> Option<&GroupInfo> {
     c.hs.sh.groups.iter().find(|g| g.id == id)
 }
 
+/// `tls13_set_encoded_pub_key`'s check of a TLS 1.3 key share before it is decoded: an EC
+/// group's share must be an uncompressed point (RFC 8446, section 4.2.8.2), whatever the
+/// provider would accept.
+#[must_use]
+pub fn tls13_share_ok(c: &Connection, id: u16, share: &[u8]) -> bool {
+    match lookup(c, id) {
+        Some(g) if g.algorithm.eq_ignore_ascii_case("EC") => {
+            share.len() >= 3 && share.first() == Some(&0x04)
+        }
+        _ => true,
+    }
+}
+
 /// `tls1_get_supported_groups`: Suite B's curves in a Suite B mode, otherwise the configured
 /// list (or the default).
 #[must_use]

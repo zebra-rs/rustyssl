@@ -444,6 +444,12 @@ fn accept_ksgroup(c: &mut Connection, p: &dyn Provider, group: u16, key: &[u8]) 
     c.hs.sh.group_id_candidate = group;
     c.neg.group = Some(group);
     c.hs.sh.peer_tmp = Some((group, key.to_vec()));
+    if !groups::tls13_share_ok(c, group, key) {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_BAD_ECPOINT,
+        ));
+    }
     let share = p
         .respond(group, key)
         .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_ECPOINT))?;
