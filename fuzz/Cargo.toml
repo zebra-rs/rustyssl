@@ -603,3 +603,9 @@ name = "x509v3_acext"
 path = "fuzz_targets/x509v3_acext.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ts_d2i"
+path = "fuzz_targets/ts_d2i.rs"
+test = false
+doc = false

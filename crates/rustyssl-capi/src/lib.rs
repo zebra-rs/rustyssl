@@ -96,6 +96,7 @@ mod string;
 mod stub;
 mod threads;
 mod trace;
+mod ts;
 mod ui;
 mod version;
 mod x509;

@@ -12086,6 +12086,8 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::pkcs7::PKCS7_simple_smimecap;
 const _: unsafe extern "C" fn(*mut *mut *mut core::ffi::c_uchar, *mut PKCS7) -> core::ffi::c_int =
     crate::pkcs7::mime::PKCS7_stream;
+const _: unsafe extern "C" fn(*mut PKCS7) -> *mut TS_TST_INFO =
+    crate::ts::asn::PKCS7_to_TS_TST_INFO;
 const _: unsafe extern "C" fn(*mut PKCS7) -> core::ffi::c_int = crate::pkcs7::PKCS7_type_is_other;
 const _: unsafe extern "C" fn(
     *mut PKCS7,
@@ -13237,6 +13239,394 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::misc::SXNET
 const _: unsafe extern "C" fn() -> *mut SXNET = crate::x509v3::misc::SXNET_new;
 const _: unsafe extern "C" fn(*mut TLS_FEATURE) = crate::x509v3::misc::TLS_FEATURE_free;
 const _: unsafe extern "C" fn() -> *mut TLS_FEATURE = crate::x509v3::misc::TLS_FEATURE_new;
+const _: unsafe extern "C" fn(*const TS_ACCURACY) -> *mut TS_ACCURACY =
+    crate::ts::asn::TS_ACCURACY_dup;
+const _: unsafe extern "C" fn(*mut TS_ACCURACY) = crate::ts::asn::TS_ACCURACY_free;
+const _: unsafe extern "C" fn(*const TS_ACCURACY) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_ACCURACY_get_micros;
+const _: unsafe extern "C" fn(*const TS_ACCURACY) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_ACCURACY_get_millis;
+const _: unsafe extern "C" fn(*const TS_ACCURACY) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_ACCURACY_get_seconds;
+const _: unsafe extern "C" fn() -> *mut TS_ACCURACY = crate::ts::asn::TS_ACCURACY_new;
+const _: unsafe extern "C" fn(*mut TS_ACCURACY, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_ACCURACY_set_micros;
+const _: unsafe extern "C" fn(*mut TS_ACCURACY, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_ACCURACY_set_millis;
+const _: unsafe extern "C" fn(*mut TS_ACCURACY, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_ACCURACY_set_seconds;
+const _: unsafe extern "C" fn(*mut BIO, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::prn::TS_ASN1_INTEGER_print_bio;
+const _: unsafe extern "C" fn(*mut CONF, *const core::ffi::c_char) -> *const core::ffi::c_char =
+    crate::ts::conf::TS_CONF_get_tsa_section;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut X509 =
+    crate::ts::conf::TS_CONF_load_cert;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut stack_st_X509 =
+    crate::ts::conf::TS_CONF_load_certs;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *const core::ffi::c_char) -> *mut EVP_PKEY =
+    crate::ts::conf::TS_CONF_load_key;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_accuracy;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_certs;
+const _: unsafe extern "C" fn(
+    *const CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_clock_precision_digits;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_crypto_device;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_def_policy;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ts::conf::TS_CONF_set_default_engine;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_digests;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_ess_cert_id_chain;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_ess_cert_id_digest;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_ordering;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_policies;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    TS_serial_cb,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_serial;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_signer_cert;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_signer_digest;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_signer_key;
+const _: unsafe extern "C" fn(
+    *mut CONF,
+    *const core::ffi::c_char,
+    *mut TS_RESP_CTX,
+) -> core::ffi::c_int = crate::ts::conf::TS_CONF_set_tsa_name;
+const _: unsafe extern "C" fn(*const TS_MSG_IMPRINT) -> *mut TS_MSG_IMPRINT =
+    crate::ts::asn::TS_MSG_IMPRINT_dup;
+const _: unsafe extern "C" fn(*mut TS_MSG_IMPRINT) = crate::ts::asn::TS_MSG_IMPRINT_free;
+const _: unsafe extern "C" fn(*mut TS_MSG_IMPRINT) -> *mut X509_ALGOR =
+    crate::ts::utils::TS_MSG_IMPRINT_get_algo;
+const _: unsafe extern "C" fn(*mut TS_MSG_IMPRINT) -> *mut ASN1_OCTET_STRING =
+    crate::ts::utils::TS_MSG_IMPRINT_get_msg;
+const _: unsafe extern "C" fn() -> *mut TS_MSG_IMPRINT = crate::ts::asn::TS_MSG_IMPRINT_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut TS_MSG_IMPRINT) -> core::ffi::c_int =
+    crate::ts::prn::TS_MSG_IMPRINT_print_bio;
+const _: unsafe extern "C" fn(*mut TS_MSG_IMPRINT, *mut X509_ALGOR) -> core::ffi::c_int =
+    crate::ts::utils::TS_MSG_IMPRINT_set_algo;
+const _: unsafe extern "C" fn(
+    *mut TS_MSG_IMPRINT,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_MSG_IMPRINT_set_msg;
+const _: unsafe extern "C" fn(*mut BIO, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::ts::prn::TS_OBJ_print_bio;
+const _: unsafe extern "C" fn(
+    *mut TS_REQ,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_REQ_add_ext;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ts::utils::TS_REQ_delete_ext;
+const _: unsafe extern "C" fn(*const TS_REQ) -> *mut TS_REQ = crate::ts::asn::TS_REQ_dup;
+const _: unsafe extern "C" fn(*mut TS_REQ) = crate::ts::utils::TS_REQ_ext_free;
+const _: unsafe extern "C" fn(*mut TS_REQ) = crate::ts::asn::TS_REQ_free;
+const _: unsafe extern "C" fn(*const TS_REQ) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_get_cert_req;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ts::utils::TS_REQ_get_ext;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut TS_REQ,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_REQ_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut TS_REQ) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_get_ext_count;
+const _: unsafe extern "C" fn(
+    *mut TS_REQ,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ts::utils::TS_REQ_get_ext_d2i;
+const _: unsafe extern "C" fn(*mut TS_REQ) -> *mut stack_st_X509_EXTENSION =
+    crate::ts::utils::TS_REQ_get_exts;
+const _: unsafe extern "C" fn(*mut TS_REQ) -> *mut TS_MSG_IMPRINT =
+    crate::ts::utils::TS_REQ_get_msg_imprint;
+const _: unsafe extern "C" fn(*const TS_REQ) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_REQ_get_nonce;
+const _: unsafe extern "C" fn(*mut TS_REQ) -> *mut ASN1_OBJECT =
+    crate::ts::utils::TS_REQ_get_policy_id;
+const _: unsafe extern "C" fn(*const TS_REQ) -> core::ffi::c_long =
+    crate::ts::utils::TS_REQ_get_version;
+const _: unsafe extern "C" fn() -> *mut TS_REQ = crate::ts::asn::TS_REQ_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut TS_REQ) -> core::ffi::c_int =
+    crate::ts::prn::TS_REQ_print_bio;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_set_cert_req;
+const _: unsafe extern "C" fn(*mut TS_REQ, *mut TS_MSG_IMPRINT) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_set_msg_imprint;
+const _: unsafe extern "C" fn(*mut TS_REQ, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_set_nonce;
+const _: unsafe extern "C" fn(*mut TS_REQ, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_set_policy_id;
+const _: unsafe extern "C" fn(*mut TS_REQ, core::ffi::c_long) -> core::ffi::c_int =
+    crate::ts::utils::TS_REQ_set_version;
+const _: unsafe extern "C" fn(*mut TS_REQ, *mut TS_VERIFY_CTX) -> *mut TS_VERIFY_CTX =
+    crate::ts::vfy::TS_REQ_to_TS_VERIFY_CTX;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_add_failure_info;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, core::ffi::c_int) =
+    crate::ts::sign::TS_RESP_CTX_add_flags;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *const EVP_MD) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_add_md;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_add_policy;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX) = crate::ts::sign::TS_RESP_CTX_free;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX) -> *mut TS_REQ =
+    crate::ts::sign::TS_RESP_CTX_get_request;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX) -> *mut TS_TST_INFO =
+    crate::ts::sign::TS_RESP_CTX_get_tst_info;
+const _: unsafe extern "C" fn() -> *mut TS_RESP_CTX = crate::ts::sign::TS_RESP_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut TS_RESP_CTX =
+    crate::ts::sign::TS_RESP_CTX_new_ex;
+const _: unsafe extern "C" fn(
+    *mut TS_RESP_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::sign::TS_RESP_CTX_set_accuracy;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *mut stack_st_X509) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_certs;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, core::ffi::c_uint) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_clock_precision_digits;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *const ASN1_OBJECT) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_def_policy;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *const EVP_MD) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_ess_cert_id_digest;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, TS_extension_cb, *mut core::ffi::c_void) =
+    crate::ts::sign::TS_RESP_CTX_set_extension_cb;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, TS_serial_cb, *mut core::ffi::c_void) =
+    crate::ts::sign::TS_RESP_CTX_set_serial_cb;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *mut X509) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_signer_cert;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *const EVP_MD) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_signer_digest;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::ts::sign::TS_RESP_CTX_set_signer_key;
+const _: unsafe extern "C" fn(
+    *mut TS_RESP_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ts::sign::TS_RESP_CTX_set_status_info;
+const _: unsafe extern "C" fn(
+    *mut TS_RESP_CTX,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ts::sign::TS_RESP_CTX_set_status_info_cond;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, TS_time_cb, *mut core::ffi::c_void) =
+    crate::ts::sign::TS_RESP_CTX_set_time_cb;
+const _: unsafe extern "C" fn(*mut TS_RESP_CTX, *mut BIO) -> *mut TS_RESP =
+    crate::ts::sign::TS_RESP_create_response;
+const _: unsafe extern "C" fn(*const TS_RESP) -> *mut TS_RESP = crate::ts::asn::TS_RESP_dup;
+const _: unsafe extern "C" fn(*mut TS_RESP) = crate::ts::asn::TS_RESP_free;
+const _: unsafe extern "C" fn(*mut TS_RESP) -> *mut TS_STATUS_INFO =
+    crate::ts::utils::TS_RESP_get_status_info;
+const _: unsafe extern "C" fn(*mut TS_RESP) -> *mut PKCS7 = crate::ts::utils::TS_RESP_get_token;
+const _: unsafe extern "C" fn(*mut TS_RESP) -> *mut TS_TST_INFO =
+    crate::ts::utils::TS_RESP_get_tst_info;
+const _: unsafe extern "C" fn() -> *mut TS_RESP = crate::ts::asn::TS_RESP_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut TS_RESP) -> core::ffi::c_int =
+    crate::ts::prn::TS_RESP_print_bio;
+const _: unsafe extern "C" fn(*mut TS_RESP, *mut TS_STATUS_INFO) -> core::ffi::c_int =
+    crate::ts::utils::TS_RESP_set_status_info;
+const _: unsafe extern "C" fn(*mut TS_RESP, *mut PKCS7, *mut TS_TST_INFO) =
+    crate::ts::utils::TS_RESP_set_tst_info;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut TS_RESP) -> core::ffi::c_int =
+    crate::ts::vfy::TS_RESP_verify_response;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    *mut *mut X509,
+) -> core::ffi::c_int = crate::ts::vfy::TS_RESP_verify_signature;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut PKCS7) -> core::ffi::c_int =
+    crate::ts::vfy::TS_RESP_verify_token;
+const _: unsafe extern "C" fn(*const TS_STATUS_INFO) -> *mut TS_STATUS_INFO =
+    crate::ts::asn::TS_STATUS_INFO_dup;
+const _: unsafe extern "C" fn(*mut TS_STATUS_INFO) = crate::ts::asn::TS_STATUS_INFO_free;
+const _: unsafe extern "C" fn(*const TS_STATUS_INFO) -> *const ASN1_BIT_STRING =
+    crate::ts::utils::TS_STATUS_INFO_get0_failure_info;
+const _: unsafe extern "C" fn(*const TS_STATUS_INFO) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_STATUS_INFO_get0_status;
+const _: unsafe extern "C" fn(*const TS_STATUS_INFO) -> *const stack_st_ASN1_UTF8STRING =
+    crate::ts::utils::TS_STATUS_INFO_get0_text;
+const _: unsafe extern "C" fn() -> *mut TS_STATUS_INFO = crate::ts::asn::TS_STATUS_INFO_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut TS_STATUS_INFO) -> core::ffi::c_int =
+    crate::ts::prn::TS_STATUS_INFO_print_bio;
+const _: unsafe extern "C" fn(*mut TS_STATUS_INFO, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::utils::TS_STATUS_INFO_set_status;
+const _: unsafe extern "C" fn(
+    *mut TS_TST_INFO,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_TST_INFO_add_ext;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ts::utils::TS_TST_INFO_delete_ext;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> *mut TS_TST_INFO =
+    crate::ts::asn::TS_TST_INFO_dup;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) = crate::ts::utils::TS_TST_INFO_ext_free;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) = crate::ts::asn::TS_TST_INFO_free;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> *mut TS_ACCURACY =
+    crate::ts::utils::TS_TST_INFO_get_accuracy;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ts::utils::TS_TST_INFO_get_ext;
+const _: unsafe extern "C" fn(
+    *mut TS_TST_INFO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_TST_INFO_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut TS_TST_INFO,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_TST_INFO_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut TS_TST_INFO,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ts::utils::TS_TST_INFO_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_get_ext_count;
+const _: unsafe extern "C" fn(
+    *mut TS_TST_INFO,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ts::utils::TS_TST_INFO_get_ext_d2i;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> *mut stack_st_X509_EXTENSION =
+    crate::ts::utils::TS_TST_INFO_get_exts;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> *mut TS_MSG_IMPRINT =
+    crate::ts::utils::TS_TST_INFO_get_msg_imprint;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_TST_INFO_get_nonce;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_get_ordering;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> *mut ASN1_OBJECT =
+    crate::ts::utils::TS_TST_INFO_get_policy_id;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> *const ASN1_INTEGER =
+    crate::ts::utils::TS_TST_INFO_get_serial;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> *const ASN1_GENERALIZEDTIME =
+    crate::ts::utils::TS_TST_INFO_get_time;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO) -> *mut GENERAL_NAME =
+    crate::ts::utils::TS_TST_INFO_get_tsa;
+const _: unsafe extern "C" fn(*const TS_TST_INFO) -> core::ffi::c_long =
+    crate::ts::utils::TS_TST_INFO_get_version;
+const _: unsafe extern "C" fn() -> *mut TS_TST_INFO = crate::ts::asn::TS_TST_INFO_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut TS_TST_INFO) -> core::ffi::c_int =
+    crate::ts::prn::TS_TST_INFO_print_bio;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *mut TS_ACCURACY) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_accuracy;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *mut TS_MSG_IMPRINT) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_msg_imprint;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_nonce;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_ordering;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *mut ASN1_OBJECT) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_policy_id;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_serial;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *const ASN1_GENERALIZEDTIME) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_time;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, *mut GENERAL_NAME) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_tsa;
+const _: unsafe extern "C" fn(*mut TS_TST_INFO, core::ffi::c_long) -> core::ffi::c_int =
+    crate::ts::utils::TS_TST_INFO_set_version;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::vfy::TS_VERIFY_CTX_add_flags;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX) = crate::ts::vfy::TS_VERIFY_CTX_cleanup;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX) = crate::ts::vfy::TS_VERIFY_CTX_free;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX) = crate::ts::vfy::TS_VERIFY_CTX_init;
+const _: unsafe extern "C" fn() -> *mut TS_VERIFY_CTX = crate::ts::vfy::TS_VERIFY_CTX_new;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut stack_st_X509) -> core::ffi::c_int =
+    crate::ts::vfy::TS_VERIFY_CTX_set0_certs;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut BIO) -> core::ffi::c_int =
+    crate::ts::vfy::TS_VERIFY_CTX_set0_data;
+const _: unsafe extern "C" fn(
+    *mut TS_VERIFY_CTX,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::ts::vfy::TS_VERIFY_CTX_set0_imprint;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut X509_STORE) -> core::ffi::c_int =
+    crate::ts::vfy::TS_VERIFY_CTX_set0_store;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut stack_st_X509) -> *mut stack_st_X509 =
+    crate::ts::vfy::TS_VERIFY_CTX_set_certs;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut BIO) -> *mut BIO =
+    crate::ts::vfy::TS_VERIFY_CTX_set_data;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::ts::vfy::TS_VERIFY_CTX_set_flags;
+const _: unsafe extern "C" fn(
+    *mut TS_VERIFY_CTX,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut core::ffi::c_uchar = crate::ts::vfy::TS_VERIFY_CTX_set_imprint;
+const _: unsafe extern "C" fn(*mut TS_VERIFY_CTX, *mut X509_STORE) -> *mut X509_STORE =
+    crate::ts::vfy::TS_VERIFY_CTX_set_store;
+const _: unsafe extern "C" fn(*mut BIO, *const X509_ALGOR) -> core::ffi::c_int =
+    crate::ts::prn::TS_X509_ALGOR_print_bio;
+const _: unsafe extern "C" fn(*mut BIO, *const stack_st_X509_EXTENSION) -> core::ffi::c_int =
+    crate::ts::prn::TS_ext_print_bio;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn() -> *mut UI_METHOD = crate::ui::UI_OpenSSL;
@@ -16614,6 +17004,52 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut SXNETID = crate::x509v3::misc::d2i_SXNETID;
 const _: unsafe extern "C" fn(
+    *mut *mut TS_ACCURACY,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_ACCURACY = crate::ts::asn::d2i_TS_ACCURACY;
+const _: unsafe extern "C" fn(
+    *mut *mut TS_MSG_IMPRINT,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_MSG_IMPRINT = crate::ts::asn::d2i_TS_MSG_IMPRINT;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut TS_MSG_IMPRINT) -> *mut TS_MSG_IMPRINT =
+    crate::ts::asn::d2i_TS_MSG_IMPRINT_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut TS_MSG_IMPRINT) -> *mut TS_MSG_IMPRINT =
+    crate::ts::asn::d2i_TS_MSG_IMPRINT_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut TS_REQ,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_REQ = crate::ts::asn::d2i_TS_REQ;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut TS_REQ) -> *mut TS_REQ =
+    crate::ts::asn::d2i_TS_REQ_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut TS_REQ) -> *mut TS_REQ =
+    crate::ts::asn::d2i_TS_REQ_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut TS_RESP,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_RESP = crate::ts::asn::d2i_TS_RESP;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut TS_RESP) -> *mut TS_RESP =
+    crate::ts::asn::d2i_TS_RESP_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut TS_RESP) -> *mut TS_RESP =
+    crate::ts::asn::d2i_TS_RESP_fp;
+const _: unsafe extern "C" fn(
+    *mut *mut TS_STATUS_INFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_STATUS_INFO = crate::ts::asn::d2i_TS_STATUS_INFO;
+const _: unsafe extern "C" fn(
+    *mut *mut TS_TST_INFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut TS_TST_INFO = crate::ts::asn::d2i_TS_TST_INFO;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut TS_TST_INFO) -> *mut TS_TST_INFO =
+    crate::ts::asn::d2i_TS_TST_INFO_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut TS_TST_INFO) -> *mut TS_TST_INFO =
+    crate::ts::asn::d2i_TS_TST_INFO_fp;
+const _: unsafe extern "C" fn(
     *mut *mut USERNOTICE,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -17448,6 +17884,42 @@ const _: unsafe extern "C" fn(*const SXNET, *mut *mut core::ffi::c_uchar) -> cor
     crate::x509v3::misc::i2d_SXNET;
 const _: unsafe extern "C" fn(*const SXNETID, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::misc::i2d_SXNETID;
+const _: unsafe extern "C" fn(
+    *const TS_ACCURACY,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ts::asn::i2d_TS_ACCURACY;
+const _: unsafe extern "C" fn(
+    *const TS_MSG_IMPRINT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ts::asn::i2d_TS_MSG_IMPRINT;
+const _: unsafe extern "C" fn(*mut BIO, *const TS_MSG_IMPRINT) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_MSG_IMPRINT_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const TS_MSG_IMPRINT) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_MSG_IMPRINT_fp;
+const _: unsafe extern "C" fn(*const TS_REQ, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_REQ;
+const _: unsafe extern "C" fn(*mut BIO, *const TS_REQ) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_REQ_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const TS_REQ) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_REQ_fp;
+const _: unsafe extern "C" fn(*const TS_RESP, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_RESP;
+const _: unsafe extern "C" fn(*mut BIO, *const TS_RESP) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_RESP_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const TS_RESP) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_RESP_fp;
+const _: unsafe extern "C" fn(
+    *const TS_STATUS_INFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ts::asn::i2d_TS_STATUS_INFO;
+const _: unsafe extern "C" fn(
+    *const TS_TST_INFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ts::asn::i2d_TS_TST_INFO;
+const _: unsafe extern "C" fn(*mut BIO, *const TS_TST_INFO) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_TST_INFO_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const TS_TST_INFO) -> core::ffi::c_int =
+    crate::ts::asn::i2d_TS_TST_INFO_fp;
 const _: unsafe extern "C" fn(*const USERNOTICE, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::policy::i2d_USERNOTICE;
 const _: unsafe extern "C" fn(*const X509, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =

@@ -334,7 +334,7 @@ fn engine_load_failed(file: &[u8]) {
 
 /// `ENGINE_by_id` of an engine there isn't: the dynamic engine's attempt to load it from the
 /// engines directory, then `ENGINE_R_NO_SUCH_ENGINE`.
-fn engine_by_id_failed(id: &[u8]) {
+pub(crate) fn engine_by_id_failed(id: &[u8]) {
     let dir = crate::init::safe_getenv(c"OPENSSL_ENGINES")
         .unwrap_or_else(|| crate::version::enginesdir().to_owned());
     #[cfg(target_os = "macos")]

@@ -5031,8 +5031,19 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   extension methods (replacing 5.2's placeholders). A ResponderID's old value is freed as what
   it is (docs/DEVIATIONS.md). `OCSP_sendreq_new` and `OCSP_sendreq_bio` come with the HTTP
   client (6.8). Tests: `tests/c/ocsp.c`, the `ocsp_d2i` fuzz target.
-- [ ] **6.7 TS (RFC 3161) and ESS:** request, response, verify, `TS_RESP_CTX`, and
-  signing-certificate v1/v2 (ESS itself came with 6.4b).
+- [x] **6.7 TS (RFC 3161)** (`ts.rs`, `ts/{asn,utils,prn,vfy,sign,conf}.rs` from `ts_asn1.c`,
+  `ts_req_utils.c`, `ts_rsp_utils.c`, `ts_lib.c`, `ts_req_print.c`, `ts_rsp_print.c`,
+  `ts_verify_ctx.c`, `ts_rsp_verify.c`, `ts_rsp_sign.c`, and `ts_conf.c`; 184 exports; ESS
+  itself came with 6.4b): the request, response, TSTInfo, accuracy, and status structures and
+  their accessors and extension functions; printing; `TS_VERIFY_CTX` and
+  `TS_RESP_verify_signature`/`_response`/`_token` (the signing-certificate v1/v2 check of the
+  chain, the version, policy, imprint, data, nonce, and TSA name); `TS_RESP_CTX` and
+  `TS_RESP_create_response` with the serial, time, and extension callbacks (re-entrant: no
+  reference to the context is held across them) and the clock's precision; and the
+  `TS_CONF_*` setup of `openssl ts -reply` (engines other than `builtin` fail, as there are
+  none). Tests: `tests/c/ts.c` (176 checks: the reference tool's request, reply, and token;
+  responses made with fixed times and serials; rejections and verification failures with
+  their error texts; a configured TSA), the `ts_d2i` fuzz target.
 - [ ] **6.8 HTTP client** (`OSSL_HTTP_*`): get and transfer, proxies and `no_proxy` (the
   CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits;
   then `OCSP_sendreq_new` and `OCSP_sendreq_bio` over it.
