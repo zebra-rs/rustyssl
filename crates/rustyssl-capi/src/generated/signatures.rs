@@ -19420,6 +19420,17 @@ const _: unsafe extern "C" fn(
     *mut CONF_VALUE,
     core::ffi::c_int,
 ) -> *mut GENERAL_NAME = crate::x509v3::san::v2i_GENERAL_NAME_ex;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD =
+    crate::ssl::bio_ssl::rustyssl_private_BIO_f_ssl;
+const _: unsafe extern "C" fn(*mut SSL_CTX) -> *mut BIO =
+    crate::ssl::bio_ssl::rustyssl_private_BIO_new_buffer_ssl_connect;
+const _: unsafe extern "C" fn(*mut SSL_CTX, core::ffi::c_int) -> *mut BIO =
+    crate::ssl::bio_ssl::rustyssl_private_BIO_new_ssl;
+const _: unsafe extern "C" fn(*mut SSL_CTX) -> *mut BIO =
+    crate::ssl::bio_ssl::rustyssl_private_BIO_new_ssl_connect;
+const _: unsafe extern "C" fn(*mut BIO, *mut BIO) -> core::ffi::c_int =
+    crate::ssl::bio_ssl::rustyssl_private_BIO_ssl_copy_session_id;
+const _: unsafe extern "C" fn(*mut BIO) = crate::ssl::bio_ssl::rustyssl_private_BIO_ssl_shutdown;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLS_client_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
@@ -20168,6 +20179,8 @@ const _: unsafe extern "C" fn(*const SSL) -> u32 =
     crate::ssl::accessors::rustyssl_private_SSL_get_recv_max_early_data;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_get_rfd;
+const _: unsafe extern "C" fn(*mut SSL, *mut BIO_POLL_DESCRIPTOR) -> core::ffi::c_int =
+    crate::ssl::bio_ssl::rustyssl_private_SSL_get_rpoll_descriptor;
 const _: unsafe extern "C" fn(
     *const SSL,
 ) -> ::core::option::Option<
@@ -20234,6 +20247,8 @@ const _: unsafe extern "C" fn(*const SSL) -> *mut BIO =
     crate::ssl::conn::rustyssl_private_SSL_get_wbio;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_get_wfd;
+const _: unsafe extern "C" fn(*mut SSL, *mut BIO_POLL_DESCRIPTOR) -> core::ffi::c_int =
+    crate::ssl::bio_ssl::rustyssl_private_SSL_get_wpoll_descriptor;
 const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) -> *const core::ffi::c_char =
     crate::ssl::io::api::rustyssl_private_SSL_group_to_name;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =

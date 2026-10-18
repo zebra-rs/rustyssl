@@ -124,7 +124,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` has room for `num` octets.
-unsafe fn read_internal(
+pub(crate) unsafe fn read_internal(
     s: *mut SSL,
     buf: *mut c_void,
     num: usize,
@@ -267,7 +267,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` holds `num` octets.
-unsafe fn write_internal(
+pub(crate) unsafe fn write_internal(
     s: *mut SSL,
     buf: *const c_void,
     num: usize,

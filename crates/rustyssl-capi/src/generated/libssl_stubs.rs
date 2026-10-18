@@ -12,39 +12,6 @@ use libc::{FILE, off_t, time_t, timeval};
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_f_ssl() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_ssl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_buffer_ssl_connect(_: *mut SSL_CTX) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_buffer_ssl_connect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_ssl(_: *mut SSL_CTX, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_ssl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_ssl_connect(_: *mut SSL_CTX) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_ssl_connect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_ssl_copy_session_id(
-    _: *mut BIO,
-    _: *mut BIO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_ssl_copy_session_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_ssl_shutdown(_: *mut BIO) {
-    crate::stub::unimplemented("BIO_ssl_shutdown")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_DTLS_get_data_mtu(_: *const SSL) -> usize {
     crate::stub::unimplemented("DTLS_get_data_mtu")
 }
@@ -1231,14 +1198,6 @@ pub extern "C" fn rustyssl_private_SSL_get_psk_identity_hint(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_rpoll_descriptor(
-    _: *mut SSL,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_rpoll_descriptor")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_selected_srtp_profile(
     _: *mut SSL,
 ) -> *mut SRTP_PROTECTION_PROFILE {
@@ -1321,14 +1280,6 @@ pub extern "C" fn rustyssl_private_SSL_get_value_uint(
     _: *mut u64,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_get_value_uint")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_wpoll_descriptor(
-    _: *mut SSL,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_wpoll_descriptor")
 }
 
 #[unsafe(no_mangle)]
