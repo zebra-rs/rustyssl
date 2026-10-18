@@ -1438,9 +1438,16 @@ impl Connection {
         // (`tls13_alert_code` / `tls1_alert_code`): an alert the version doesn't have isn't
         // sent, TLS 1.3's certificate_required and missing_extension become handshake_failure
         // before TLS 1.3; after close_notify, only close_notify goes out.
-        let Some(desc) = self.alert_value(desc) else {
+        let Some(mut desc) = self.alert_value(desc) else {
             return Ok(());
         };
+        // SSL 3.0 has no protocol_version alert: a server refusing an SSL 3.0 ClientHello
+        // (whose version it took for the alert) sends handshake_failure.
+        if i32::from(self.neg.version) == abi::SSL3_VERSION
+            && desc == msgs_type(abi::SSL_AD_PROTOCOL_VERSION)
+        {
+            desc = msgs_type(abi::SSL_AD_HANDSHAKE_FAILURE);
+        }
         if self.shutdown & SENT_SHUTDOWN != 0 && desc != msgs_type(abi::SSL_AD_CLOSE_NOTIFY) {
             return Ok(());
         }

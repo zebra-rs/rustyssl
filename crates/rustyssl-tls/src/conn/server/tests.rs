@@ -1380,6 +1380,24 @@ fn post_handshake_authentication() {
 
 /// A TLS 1.2 ClientHello offering `ciphers`, X25519 and P-256, the RSA schemes, Extended
 /// Master Secret, the renegotiation SCSV, and an empty session ticket.
+/// An SSL 3.0 ClientHello: refused with `SSL_R_VERSION_TOO_LOW`, and, as SSL 3.0 has no
+/// protocol_version alert, a handshake_failure on the wire (`ssl3_send_alert`; BoGo's
+/// `NoSSL3-Server`).
+#[test]
+fn ssl3_client_hello_gets_handshake_failure() {
+    let p = TestProvider::new(b"ssl3-hello");
+    let mut hello = hello12(&[0xc02f]);
+    hello.legacy_version = v::SSL3;
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(abi::SSL_AD_PROTOCOL_VERSION, abi::SSL_R_VERSION_TOO_LOW)
+    );
+    assert_eq!(last_alert(&out), (2, octet(abi::SSL_AD_HANDSHAKE_FAILURE)));
+}
+
 fn hello12(ciphers: &[u16]) -> Hello {
     use crate::msgs::ext as mx;
     let mut cs = ciphers.to_vec();
