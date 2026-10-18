@@ -852,14 +852,21 @@ unsafe fn spki_der(k: *mut rustyssl_abi::EVP_PKEY) -> Option<Vec<u8>> {
     Some(v)
 }
 
-/// A key decoded from its SubjectPublicKeyInfo DER, or NULL.
-fn spki_key(der: &[u8]) -> *mut rustyssl_abi::EVP_PKEY {
+/// A key decoded from its SubjectPublicKeyInfo DER in the connection's context's library
+/// context (`tls_process_rpk`), or NULL.
+fn spki_key(st: &SslState, der: &[u8]) -> *mut rustyssl_abi::EVP_PKEY {
     let Ok(len) = c_long::try_from(der.len()) else {
         return ptr::null_mut();
     };
     let mut p = der.as_ptr();
-    // SAFETY: the key's octets (decoding runs no callbacks).
-    unsafe { crate::x509::pubkey::d2i_PUBKEY(ptr::null_mut(), &raw mut p, len) }
+    // SAFETY: the connection's live context, or NULL.
+    let (libctx, propq) = unsafe { ctx::ctx(st.ctx.cast_const()) }
+        .map_or((ptr::null_mut(), ptr::null()), |c| {
+            (c.libctx, c.propq_ptr())
+        });
+    // SAFETY: the key's octets (decoding runs no callbacks); the library context and
+    // properties.
+    unsafe { crate::x509::pubkey::d2i_PUBKEY_ex(ptr::null_mut(), &raw mut p, len, libctx, propq) }
 }
 
 /// A session's fields as the core's session.
@@ -963,7 +970,7 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
         .map(|a| a.clone().into_boxed_slice());
     d.kex_group = group.map_or(0, u32::from);
     if let Some(k) = &c.peer_rpk {
-        d.peer_rpk = spki_key(k);
+        d.peer_rpk = spki_key(st, k);
     }
     let p = &st.drv.peer;
     if p.from > 0 {
