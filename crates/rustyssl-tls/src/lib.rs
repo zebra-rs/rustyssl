@@ -11,3 +11,12 @@
 pub mod codec;
 pub mod crypto;
 pub mod error;
+pub mod keysched;
+pub mod record;
+
+/// A [`crypto::Provider`] over `rustyssl-crypto` directly, for the crate's tests and the fuzz
+/// targets (the non-default `test-provider` feature). Its randomness is deterministic: never
+/// use it outside tests.
+#[cfg(any(test, feature = "test-provider"))]
+#[doc(hidden)]
+pub mod testprov;

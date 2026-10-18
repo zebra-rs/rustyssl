@@ -148,7 +148,11 @@ impl<'a> Reader<'a> {
     /// # Errors
     /// Octets are left.
     pub fn end(&self) -> Result<(), DecodeError> {
-        if self.rest.is_empty() { Ok(()) } else { Err(DecodeError) }
+        if self.rest.is_empty() {
+            Ok(())
+        } else {
+            Err(DecodeError)
+        }
     }
 }
 
@@ -258,7 +262,10 @@ impl Writer {
         }
         let be = u64::try_from(len).map_err(|_| TooLong)?.to_be_bytes();
         let src = be.get(8usize.saturating_sub(open.width)..).ok_or(TooLong)?;
-        self.buf.get_mut(open.at..start).ok_or(TooLong)?.copy_from_slice(src);
+        self.buf
+            .get_mut(open.at..start)
+            .ok_or(TooLong)?
+            .copy_from_slice(src);
         Ok(())
     }
 

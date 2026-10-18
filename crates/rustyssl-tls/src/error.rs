@@ -26,13 +26,21 @@ impl Error {
     /// A fatal alert `alert` with the reason `reason` (`SSL_R_*`).
     #[must_use]
     pub const fn alert(alert: c_int, reason: c_int) -> Self {
-        Self { alert: Some(alert_octet(alert)), reason, library_reason: false }
+        Self {
+            alert: Some(alert_octet(alert)),
+            reason,
+            library_reason: false,
+        }
     }
 
     /// A failure that sends no alert, with the reason `reason` (`SSL_R_*`).
     #[must_use]
     pub const fn quiet(reason: c_int) -> Self {
-        Self { alert: None, reason, library_reason: false }
+        Self {
+            alert: None,
+            reason,
+            library_reason: false,
+        }
     }
 
     /// An internal error (OpenSSL's `SSL_AD_INTERNAL_ERROR` with `ERR_R_INTERNAL_ERROR`).
