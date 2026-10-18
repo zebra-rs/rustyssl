@@ -5137,6 +5137,15 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - `SSL_MODE_*` (partial write, moving buffer, auto-retry, release buffers)
   - `SSL_shutdown` (bidirectional, quiet shutdown), `SSL_clear`, `SSL_do_handshake`,
     `SSL_connect`, `SSL_accept`
+  - Progress: the driver (`rustyssl-capi/src/ssl/io*`) runs the core's step loop behind these
+    entry points. It takes the core connection out of the lock for each step and puts it back
+    (with the mirrored state) before any callback or BIO call, so the getters work from
+    callbacks; a nested drive from a callback fails with `ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED`.
+    Without read-ahead it reads exactly one record at a time, as `ssl3_read_n` does. The
+    handshake getters, `SSL_state_string(_long)`, the alert strings, `SSL_select_next_proto`
+    and `SSL_group_to_name` are done. `tests/c/ssl_io_idle.c` passes on both libraries;
+    `ssl_handshake.c`, `ssl_io.c` and `ssl_shutdown.c` pass on the reference and wait for the
+    client and server state machines (7.3, 7.4).
 - [ ] **7.3 TLS 1.3:**
   - the full handshake, HRR, and the default 3.5 groups and key shares (hybrid
     **X25519MLKEM768** and X25519), including the 3.5 group-list syntax (tuples and key-share
