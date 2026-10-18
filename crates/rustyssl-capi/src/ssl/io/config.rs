@@ -520,6 +520,9 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         Some(n) => unsafe { names_der(n) },
         None => Vec::new(),
     };
+    if st.lists.dane.enabled() {
+        crate::stub::unimplemented("a handshake verifying the peer with DANE (TLSA records)");
+    }
     let (groups, key_share_groups, group_tuples) = match &st.lists.groups {
         // The core takes an empty list for the default one; OpenSSL would offer no groups.
         Some(g) if g.groups.is_empty() => {

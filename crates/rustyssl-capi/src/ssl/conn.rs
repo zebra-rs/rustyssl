@@ -391,7 +391,7 @@ ffi_export! {
                 peer_finish_md: Vec::new(),
                 peer_ca_names: ptr::null_mut(),
                 ciphers,
-                lists: cs.lists.clone(),
+                lists: cs.lists.for_ssl(),
                 drv: super::io::Driver::default(),
             };
             st.reset();

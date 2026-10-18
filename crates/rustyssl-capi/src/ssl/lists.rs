@@ -100,8 +100,9 @@ pub(crate) struct GroupEntry {
     maxtls: i32,
 }
 
-/// The lists a context holds and a connection copies from it (`SSL_new`).
-#[derive(Clone, Debug, Default)]
+/// The lists a context holds and a connection copies from it (`SSL_new`), with the DANE
+/// settings (`super::dane`).
+#[derive(Debug, Default)]
 pub(crate) struct Lists {
     /// The configured groups, or `None` for the default list.
     pub(crate) groups: Option<GroupLists>,
@@ -112,6 +113,24 @@ pub(crate) struct Lists {
     pub(crate) server_cert_type: Option<Box<[u8]>>,
     /// The context's providers' groups (`group_list`), made on first use.
     pub(crate) implemented: Option<Arc<Vec<GroupEntry>>>,
+    /// A context's DANE matching types (`ctx->dane`).
+    pub(crate) dane_ctx: super::dane::DaneCtx,
+    /// A connection's DANE state (`s->dane`), boxed for `SSL_get0_dane`.
+    pub(crate) dane: Box<super::dane::Dane>,
+}
+
+impl Lists {
+    /// A new connection's copy of its context's lists (`SSL_new`).
+    pub(crate) fn for_ssl(&self) -> Self {
+        Self {
+            groups: self.groups.clone(),
+            client_cert_type: self.client_cert_type.clone(),
+            server_cert_type: self.server_cert_type.clone(),
+            implemented: self.implemented.clone(),
+            dane_ctx: super::dane::DaneCtx::default(),
+            dane: super::dane::Dane::for_ssl(&self.dane_ctx),
+        }
+    }
 }
 
 impl GroupLists {

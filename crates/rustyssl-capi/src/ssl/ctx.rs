@@ -360,21 +360,6 @@ pub(crate) fn store_ctx_index() -> c_int {
     })
 }
 
-/// `ssl_ctx_system_config`: the configuration's `system_default` set of SSL commands, which
-/// `SSL_CONF_cmd` applies. rustyssl doesn't have `SSL_CONF` yet, so a configuration that has
-/// such a set aborts (security rule 10) rather than be ignored.
-fn system_config() {
-    let names = crate::conf::builtin::SSL_NAMES
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    if names.iter().any(|n| n.name.as_bytes() == b"system_default") {
-        drop(names);
-        crate::stub::unimplemented(
-            "SSL_CTX_new with a system_default ssl_conf section (SSL_CONF_cmd)",
-        );
-    }
-}
-
 /// A new context's settings for `method`.
 fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
     CtxState {
@@ -564,7 +549,13 @@ ffi_export! {
             unsafe { SSL_CTX::free(c) };
             return ptr::null_mut();
         }
-        system_config();
+        // SAFETY: the new context.
+        if !unsafe { super::conf::system_config(c) } {
+            err::raise(ERR_LIB_SSL, rustyssl_abi::SSL_R_ERROR_IN_SYSTEM_DEFAULT_CONFIG, F);
+            // SAFETY: the new context's only reference.
+            unsafe { SSL_CTX::free(c) };
+            return ptr::null_mut();
+        }
         c
     }
 }
