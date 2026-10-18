@@ -364,6 +364,17 @@ impl Connection {
         &self.hs
     }
 
+    /// The client's cipher list as it sent it, in TLS form (a server's
+    /// `s->s3.tmp.ciphers_raw`, for `SSL_get0_raw_cipherlist`); `None` on a client or before a
+    /// ClientHello.
+    #[must_use]
+    pub fn raw_cipherlist(&self) -> Option<&[u8]> {
+        match &self.hs.role {
+            RoleState::Server(s) if !s.ciphers_raw.is_empty() => Some(&s.ciphers_raw),
+            _ => None,
+        }
+    }
+
     /// The handshake state (`SSL_get_state`).
     #[must_use]
     pub fn state(&self) -> u32 {

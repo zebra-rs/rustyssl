@@ -155,6 +155,25 @@ pub(crate) struct Driver {
     pub(crate) kept_cipher: Option<&'static rustyssl_tls::suites::Cipher>,
     /// The group names `SSL_group_to_name` handed out, kept for the connection's lifetime.
     pub(crate) group_names: Vec<CString>,
+    /// The peer's raw public key (RFC 7250) as an object, decoded on first use.
+    pub(crate) peer_rpk: PeerRpk,
+}
+
+/// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
+#[derive(Debug)]
+pub(crate) struct PeerRpk(pub(crate) *mut rustyssl_abi::EVP_PKEY);
+
+impl Default for PeerRpk {
+    fn default() -> Self {
+        Self(ptr::null_mut())
+    }
+}
+
+impl Drop for PeerRpk {
+    fn drop(&mut self) {
+        // SAFETY: our key, or NULL.
+        unsafe { crate::evp::pkey::EVP_PKEY_free(self.0) };
+    }
 }
 
 // SAFETY: the raw pointers are owned references (stacks of certificates) used under the

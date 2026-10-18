@@ -20371,6 +20371,8 @@ const _: unsafe extern "C" fn(*const SSL) -> *const stack_st_X509_NAME =
     crate::ssl::ca::rustyssl_private_SSL_get0_peer_CA_list;
 const _: unsafe extern "C" fn(*const SSL) -> *mut X509 =
     crate::ssl::io::api::rustyssl_private_SSL_get0_peer_certificate;
+const _: unsafe extern "C" fn(*const SSL) -> *mut EVP_PKEY =
+    crate::ssl::io::api::rustyssl_private_SSL_get0_peer_rpk;
 const _: unsafe extern "C" fn(*mut SSL) -> *const stack_st_SCT =
     crate::ssl::ct::rustyssl_private_SSL_get0_peer_scts;
 const _: unsafe extern "C" fn(*mut SSL) -> *const core::ffi::c_char =
@@ -20460,6 +20462,10 @@ const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::requests::rustyssl_private_SSL_get_key_update_type;
 const _: unsafe extern "C" fn(*const SSL) -> u32 =
     crate::ssl::accessors::rustyssl_private_SSL_get_max_early_data;
+const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
+    crate::ssl::io::api::rustyssl_private_SSL_get_negotiated_client_cert_type;
+const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
+    crate::ssl::io::api::rustyssl_private_SSL_get_negotiated_server_cert_type;
 const _: unsafe extern "C" fn(*const SSL) -> usize =
     crate::ssl::accessors::rustyssl_private_SSL_get_num_tickets;
 const _: unsafe extern "C" fn(*const SSL) -> u64 =

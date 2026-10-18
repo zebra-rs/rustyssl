@@ -9,8 +9,8 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
 | libcrypto | 5876 | 5700 | 176 | 97.0% |
-| libssl | 603 | 535 | 68 | 88.7% |
-| **Total** | **6479** | **6235** | **244** | **96.2%** |
+| libssl | 603 | 538 | 65 | 89.2% |
+| **Total** | **6479** | **6238** | **241** | **96.3%** |
 
 ## By header
 
@@ -84,7 +84,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/sha.h` | libcrypto | 23 | 23 | 100.0% |
 | `openssl/srp.h` | libcrypto | 29 | 29 | 100.0% |
 | `openssl/srtp.h` | libssl | 4 | 4 | 100.0% |
-| `openssl/ssl.h` | libssl | 582 | 518 | 89.0% |
+| `openssl/ssl.h` | libssl | 582 | 521 | 89.5% |
 | `openssl/sslerr_legacy.h` | libssl | 1 | 1 | 100.0% |
 | `openssl/stack.h` | libcrypto | 25 | 25 | 100.0% |
 | `openssl/store.h` | libcrypto | 75 | 75 | 100.0% |
@@ -6108,6 +6108,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get0_param` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get0_peer_CA_list` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get0_peer_certificate` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle`, `ssl_shutdown` |
+| `SSL_get0_peer_rpk` | libssl | `openssl/ssl.h` | `ssl_io_idle` |
 | `SSL_get0_peer_scts` | libssl | `openssl/ssl.h` | `ssl_ct` |
 | `SSL_get0_peername` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get0_security_ex_data` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6147,6 +6148,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get_info_callback` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get_key_update_type` | libssl | `openssl/ssl.h` | `ssl_requests` |
 | `SSL_get_max_early_data` | libssl | `openssl/ssl.h` | `ssl_ctx` |
+| `SSL_get_negotiated_client_cert_type` | libssl | `openssl/ssl.h` | `ssl_io_idle` |
+| `SSL_get_negotiated_server_cert_type` | libssl | `openssl/ssl.h` | `ssl_io_idle` |
 | `SSL_get_num_tickets` | libssl | `openssl/ssl.h` | `ssl_conf`, `ssl_ctx` |
 | `SSL_get_options` | libssl | `openssl/ssl.h` | `ssl_conf`, `ssl_ctx` |
 | `SSL_get_peer_cert_chain` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle` |

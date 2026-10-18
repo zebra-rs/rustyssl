@@ -279,11 +279,6 @@ pub extern "C" fn rustyssl_private_SSL_free_buffers(_: *mut SSL) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY {
-    crate::stub::unimplemented("SSL_get0_peer_rpk")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get1_compressed_cert(
     _: *mut SSL,
     _: core::ffi::c_int,
@@ -307,20 +302,6 @@ pub extern "C" fn rustyssl_private_SSL_get_handshake_rtt(
     _: *mut u64,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_get_handshake_rtt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_negotiated_client_cert_type(
-    _: *const SSL,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_negotiated_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_negotiated_server_cert_type(
-    _: *const SSL,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_negotiated_server_cert_type")
 }
 
 #[unsafe(no_mangle)]

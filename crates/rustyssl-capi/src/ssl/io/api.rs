@@ -26,6 +26,7 @@ use crate::err;
 use crate::ffi::ffi_export;
 use crate::stack::{OPENSSL_sk_num, OPENSSL_sk_value};
 use crate::x509::cert::X509_up_ref;
+use rustyssl_tls::conn::Connection;
 
 /// Runs (or finishes) the handshake: 1, or -1 (`SSL_get_error` says why).
 ///
@@ -1045,6 +1046,29 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
                 _ => c_long::from(NID_undef),
             }
         }
+        // The client's raw cipher list (a server's), or the length of one suite's code.
+        rustyssl_abi::SSL_CTRL_GET_RAW_CIPHERLIST => {
+            if parg.is_null() {
+                return Some(2);
+            }
+            let Some(raw) = tls.and_then(Connection::raw_cipherlist) else {
+                return Some(0);
+            };
+            // SAFETY: the caller's slot for a pointer; the list stays with the connection.
+            unsafe { parg.cast::<*const u8>().write(raw.as_ptr()) };
+            c_long::try_from(raw.len()).unwrap_or(0)
+        }
+        // The peer's ec_point_formats extension, as received.
+        rustyssl_abi::SSL_CTRL_GET_EC_POINT_FORMATS => {
+            let Some(f) = tls.and_then(|c| c.handshake().sh.peer_ecpointformats.as_ref()) else {
+                return Some(0);
+            };
+            if !parg.is_null() {
+                // SAFETY: as above.
+                unsafe { parg.cast::<*const u8>().write(f.as_ptr()) };
+            }
+            c_long::try_from(f.len()).unwrap_or(0)
+        }
         SSL_CTRL_GET_EXTMS_SUPPORT => match tls {
             Some(c) if !st.in_init => c_long::from(c.negotiated().ems),
             _ => -1,
@@ -1108,5 +1132,76 @@ ffi_export! {
         let p = name.as_ptr();
         names.push(name);
         p
+    }
+}
+
+ffi_export! {
+    /// The peer's raw public key (RFC 7250), owned by the connection; NULL when the peer sent a
+    /// certificate or nothing.
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_get0_peer_rpk(s: *const SSL) -> *mut EVP_PKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
+        let mut st = x.state();
+        if !st.drv.peer_rpk.0.is_null() {
+            return st.drv.peer_rpk.0;
+        }
+        let Some(der) = st.drv.tls.as_ref().and_then(|c| c.negotiated().peer_rpk.clone()) else {
+            return ptr::null_mut();
+        };
+        let Ok(len) = c_long::try_from(der.len()) else { return ptr::null_mut() };
+        let mut p = der.as_ptr();
+        // SAFETY: the key's SubjectPublicKeyInfo octets (decoding runs no callbacks).
+        let k = unsafe { crate::x509::pubkey::d2i_PUBKEY(ptr::null_mut(), &raw mut p, len) };
+        st.drv.peer_rpk.0 = k;
+        k
+    }
+}
+
+/// A negotiated certificate type (RFC 7250) of the connection.
+fn cert_type(s: *const SSL, client: bool) -> c_int {
+    // SAFETY: the caller's connection, NULL or live.
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return rustyssl_abi::TLSEXT_cert_type_x509;
+    };
+    let st = x.state();
+    st.drv
+        .tls
+        .as_ref()
+        .map_or(rustyssl_abi::TLSEXT_cert_type_x509, |c| {
+            let n = c.negotiated();
+            c_int::from(if client {
+                n.client_cert_type
+            } else {
+                n.server_cert_type
+            })
+        })
+}
+
+ffi_export! {
+    /// The certificate type the client authenticates with (`TLSEXT_cert_type_*`).
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_negotiated_client_cert_type(s: *const SSL) -> c_int
+    where failure = rustyssl_abi::TLSEXT_cert_type_x509, library = ERR_LIB_SSL
+    {
+        cert_type(s, true)
+    }
+}
+
+ffi_export! {
+    /// The certificate type the server authenticates with (`TLSEXT_cert_type_*`).
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_negotiated_server_cert_type(s: *const SSL) -> c_int
+    where failure = rustyssl_abi::TLSEXT_cert_type_x509, library = ERR_LIB_SSL
+    {
+        cert_type(s, false)
     }
 }

@@ -103,6 +103,9 @@ static void test_no_role(void)
 
     printf("# a connection with no role\n");
     getters(x);
+    check(SSL_get0_peer_rpk(x) == NULL, "no peer raw public key");
+    printf("  cert types: client %d, server %d\n", SSL_get_negotiated_client_cert_type(x),
+           SSL_get_negotiated_server_cert_type(x));
     r = SSL_do_handshake(x);
     said("SSL_do_handshake", x, r);
     r = SSL_read(x, buf, sizeof(buf));
