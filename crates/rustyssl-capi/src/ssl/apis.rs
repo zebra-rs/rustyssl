@@ -416,3 +416,26 @@ ffi_export! {
         -1
     }
 }
+
+ffi_export! {
+    /// Asks a TLS 1.3 server for one more session ticket, sent with the next write or
+    /// handshake call: 1, or 0 (a client, before the first handshake's end, or not TLS 1.3).
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_new_session_ticket(s: *mut SSL) -> c_int
+    where failure = 0, library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        let mut st = x.state();
+        let pending = st.drv.wpend.is_some();
+        let Some(c) = st.drv.tls.as_mut() else { return 0 };
+        if !c.request_new_session_ticket(pending) {
+            return 0;
+        }
+        let in_init = c.in_init();
+        st.in_init = in_init;
+        1
+    }
+}

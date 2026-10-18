@@ -644,6 +644,7 @@ pub(super) fn process_new_session_ticket(
         return Ok(MsgProcess::ContinueReading);
     }
     let now = super::now(c);
+    let renewed = !tls13 && !c.neg.session.session_id.is_empty();
     {
         let s = &mut c.neg.session;
         s.time = now;
@@ -675,6 +676,9 @@ pub(super) fn process_new_session_ticket(
         }
         c.notify(Event::UpdateCache { server: false });
         return Ok(MsgProcess::FinishedReading);
+    }
+    if renewed {
+        c.notify(super::super::Event::SessionRenewed);
     }
     Ok(MsgProcess::ContinueReading)
 }

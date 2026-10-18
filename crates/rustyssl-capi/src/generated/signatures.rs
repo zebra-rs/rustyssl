@@ -20735,6 +20735,8 @@ const _: unsafe extern "C" fn(*mut SSL_CTX, u64) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_new_listener;
 const _: unsafe extern "C" fn(*mut SSL, u64) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_new_listener_from;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::apis::rustyssl_private_SSL_new_session_ticket;
 const _: unsafe extern "C" fn(*mut SSL, u64) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_new_stream;
 const _: unsafe extern "C" fn(

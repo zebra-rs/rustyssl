@@ -278,10 +278,61 @@ pub(crate) fn decrypt_ticket(
     let Some(r) = r else {
         return Ok(None);
     };
+    let r = if c.cfg.callbacks.ticket_dec {
+        match decrypt_cb(c, etick, r, tag) {
+            Some(r) => r,
+            None => return Ok(None),
+        }
+    } else {
+        r
+    };
     if matches!(r, Ticket::NoDecrypt | Ticket::Renew(_) | Ticket::Empty) {
         c.hs.sh.ticket_expected = true;
     }
     Ok(Some(r))
+}
+
+/// `decrypt_ticket_cb`, unless a fatal error happened: what the application makes of the
+/// result (`SSL_TICKET_RETURN_*`). `None` while waiting.
+fn decrypt_cb(c: &mut Connection, etick: &[u8], r: Ticket, tag: usize) -> Option<Ticket> {
+    let (status, session) = match &r {
+        Ticket::Empty => (abi::SSL_TICKET_EMPTY, None),
+        Ticket::NoDecrypt => (abi::SSL_TICKET_NO_DECRYPT, None),
+        Ticket::Success(s) => (abi::SSL_TICKET_SUCCESS, Some(s.clone())),
+        Ticket::Renew(s) => (abi::SSL_TICKET_SUCCESS_RENEW, Some(s.clone())),
+        Ticket::None | Ticket::Fatal => return Some(r),
+    };
+    let keyname = etick
+        .get(..etick.len().min(KEYNAME_LEN))
+        .unwrap_or_default()
+        .to_vec();
+    let req = Request::TicketDecrypt {
+        keyname,
+        status,
+        session,
+    };
+    let ret = match ask_once(c, req, tag)? {
+        Answer::TicketDecrypt(v) => v,
+        _ => abi::SSL_TICKET_RETURN_ABORT,
+    };
+    Some(match ret {
+        abi::SSL_TICKET_RETURN_IGNORE => Ticket::None,
+        abi::SSL_TICKET_RETURN_IGNORE_RENEW => match r {
+            Ticket::Empty => Ticket::Empty,
+            _ => Ticket::NoDecrypt,
+        },
+        abi::SSL_TICKET_RETURN_USE | abi::SSL_TICKET_RETURN_USE_RENEW => match r {
+            Ticket::Success(s) | Ticket::Renew(s) => {
+                if ret == abi::SSL_TICKET_RETURN_USE {
+                    Ticket::Success(s)
+                } else {
+                    Ticket::Renew(s)
+                }
+            }
+            _ => Ticket::Fatal,
+        },
+        _ => Ticket::Fatal,
+    })
 }
 
 /// [`decrypt_ticket`]'s work.
@@ -534,6 +585,25 @@ pub(crate) fn construct_new_session_ticket(
         s.master_key.clone_from(&c.neg.master_secret);
         (s, 0, [0; TICKET_NONCE_SIZE])
     };
+    let mut session = session;
+    if c.cfg.callbacks.ticket_gen {
+        // One answer per ticket.
+        let tag = usize::try_from(state(c)?.next_ticket_nonce).unwrap_or(usize::MAX);
+        match ask_once(c, Request::TicketGenerate, tag) {
+            None => return Ok(Construct::Ask),
+            Some(Answer::TicketAppData(a)) => {
+                // The application set it on the connection's session (`SSL_get_session`).
+                c.neg.session.ticket_appdata.clone_from(&a);
+                session.ticket_appdata = a;
+            }
+            Some(_) => {
+                return Err(Error::alert_lib(
+                    abi::SSL_AD_INTERNAL_ERROR,
+                    abi::ERR_R_INTERNAL_ERROR,
+                ));
+            }
+        }
+    }
     let o = c.cfg.options;
     let stateful = tls13
         && (o & abi::SSL_OP_NO_TICKET != 0
@@ -819,6 +889,13 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     w.u64(u64::from_ne_bytes(s.verify_result.to_ne_bytes()));
     w.u8(s.max_fragment_len_mode);
     w.u32(s.ext_flags);
+    match &s.ticket_appdata {
+        None => w.u8(0),
+        Some(b) => {
+            w.u8(1);
+            w.vec(2, b).map_err(e)?;
+        }
+    }
     Ok(w.into_bytes())
 }
 
@@ -864,6 +941,11 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let verify_result = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let max_fragment_len_mode = rd.u8().ok()?;
     let ext_flags = rd.u32().ok()?;
+    let ticket_appdata = match rd.u8().ok()? {
+        0 => None,
+        1 => Some(rd.vec16().ok()?.rest().to_vec()),
+        _ => return None,
+    };
     rd.end().ok()?;
     if session_id.len() > 32 || sid_ctx.len() > 32 {
         return None;
@@ -887,5 +969,6 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         verify_result,
         max_fragment_len_mode,
         ext_flags,
+        ticket_appdata,
     })
 }

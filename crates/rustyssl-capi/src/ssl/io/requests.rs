@@ -240,6 +240,16 @@ pub(crate) unsafe fn handle(
         // SAFETY: as above.
         Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
         // SAFETY: as above.
+        Request::TicketGenerate => Some(unsafe { ticket_generate(s, x) }),
+        Request::TicketDecrypt {
+            keyname,
+            status,
+            session,
+        } => {
+            // SAFETY: as above.
+            Some(unsafe { ticket_decrypt(s, x, &keyname, status, session.as_deref()) })
+        }
+        // SAFETY: as above.
         Request::StatelessCookieGen => Some(unsafe { stateless_cookie_gen(s, snap) }),
         Request::StatelessCookieVerify { cookie } => {
             // SAFETY: as above.
@@ -274,6 +284,110 @@ pub(crate) unsafe fn handle(
             None
         }
     }
+}
+
+/// The session context's ticket callbacks and their argument.
+fn ticket_cbs(
+    x: &Ssl,
+) -> (
+    rustyssl_abi::SSL_CTX_generate_session_ticket_fn,
+    rustyssl_abi::SSL_CTX_decrypt_session_ticket_fn,
+    *mut c_void,
+) {
+    let sctx = x.state().session_ctx;
+    // SAFETY: the connection's session context, which it keeps alive.
+    unsafe { super::super::ctx::ctx(sctx) }.map_or((None, None, ptr::null_mut()), |c| {
+        let cs = c.state();
+        (
+            cs.generate_ticket_cb,
+            cs.decrypt_ticket_cb,
+            cs.ticket_cb_data,
+        )
+    })
+}
+
+/// `generate_ticket_cb`: the application may set the ticket's application data on the
+/// connection's session (`SSL_get_session`), made here from the core's for the call. 0 fails
+/// the handshake.
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+unsafe fn ticket_generate(s: *mut SSL, x: &Ssl) -> Answer {
+    let fail = Answer::Fail {
+        alert: alert(SSL_AD_INTERNAL_ERROR),
+        reason: ERR_R_INTERNAL_ERROR,
+    };
+    let (gen_cb, _, arg) = ticket_cbs(x);
+    let Some(cb) = gen_cb else {
+        return Answer::TicketAppData(None);
+    };
+    let Some(core) = x
+        .state()
+        .drv
+        .tls
+        .as_ref()
+        .map(|c| c.negotiated().session.clone())
+    else {
+        return fail;
+    };
+    // The connection's session, or one made from the core's for the call.
+    let current = x.state().sess.session;
+    let tmp = if current.is_null() {
+        // SAFETY: the caller's guarantee.
+        let t = unsafe { super::super::sess_cache::session_from_core(x, &core) };
+        if t.is_null() {
+            return fail;
+        }
+        x.state().sess.session = t;
+        t
+    } else {
+        ptr::null_mut()
+    };
+    // SAFETY: the application's callback with its connection and argument; no lock is held.
+    let ok = unsafe { cb(s, arg) } != 0;
+    let cur = x.state().sess.session;
+    // SAFETY: the session the callback saw (or one it set), or NULL.
+    let appdata = unsafe {
+        super::super::session::with(cur, None, |d| d.ticket_appdata.as_ref().map(|a| a.to_vec()))
+    };
+    if !tmp.is_null() {
+        let t = core::mem::replace(&mut x.state().sess.session, ptr::null_mut());
+        // SAFETY: our temporary reference (or what replaced it).
+        unsafe { super::super::session::free(t) };
+    }
+    if !ok {
+        return fail;
+    }
+    Answer::TicketAppData(appdata)
+}
+
+/// `decrypt_ticket_cb`: the application's verdict on a ticket (`SSL_TICKET_RETURN_*`), given
+/// the decryption's status and the session in it (as an object for the call).
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+unsafe fn ticket_decrypt(
+    s: *mut SSL,
+    x: &Ssl,
+    keyname: &[u8],
+    status: c_int,
+    session: Option<&rustyssl_tls::conn::Session>,
+) -> Answer {
+    let (_, dec_cb, arg) = ticket_cbs(x);
+    let Some(cb) = dec_cb else {
+        return Answer::TicketDecrypt(rustyssl_abi::SSL_TICKET_RETURN_ABORT);
+    };
+    let sess = match session {
+        // SAFETY: the caller's guarantee.
+        Some(c) => unsafe { super::super::sess_cache::session_from_core(x, c) },
+        None => ptr::null_mut(),
+    };
+    // SAFETY: the application's callback with its connection, the session (or NULL), and the
+    // key name's octets; no lock is held.
+    let r = unsafe { cb(s, sess, keyname.as_ptr(), keyname.len(), status, arg) };
+    // SAFETY: our reference, or NULL.
+    unsafe { super::super::session::free(sess) };
+    Answer::TicketDecrypt(r)
 }
 
 /// `gen_stateless_cookie_cb`: the application's cookie (at most `SSL_COOKIE_LENGTH` octets), or

@@ -77,6 +77,8 @@ pub struct Session {
     pub max_fragment_len_mode: u8,
     /// The client's TLS 1.3 key exchange modes allowed with it.
     pub ext_flags: u32,
+    /// The application's data carried in its ticket (`SSL_SESSION_set1_ticket_appdata`).
+    pub ticket_appdata: Option<Vec<u8>>,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the

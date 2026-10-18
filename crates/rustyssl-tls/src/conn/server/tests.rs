@@ -1204,6 +1204,7 @@ fn ticket_session_encoding_round_trips() {
         verify_result: 10,
         max_fragment_len_mode: 2,
         ext_flags: 1,
+        ticket_appdata: Some(b"app".to_vec()),
     };
     let enc = ticket::encode_session(&s).unwrap();
     assert_eq!(ticket::decode_session(&enc), Some(s));

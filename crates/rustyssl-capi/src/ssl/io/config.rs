@@ -652,6 +652,12 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             record_padding: st.record_padding_cb.is_some(),
             allow_early_data: st.allow_early_data_cb.is_some(),
             cookie: snap.verify_stateless_cookie_cb.is_some(),
+            // SAFETY: the connection's session context, which it keeps alive.
+            ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
+                .is_some_and(|c| c.state().generate_ticket_cb.is_some()),
+            // SAFETY: as above.
+            ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
+                .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
             cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
             // The client's select callback, or the server's advertisement callback.
             npn: if st.server {

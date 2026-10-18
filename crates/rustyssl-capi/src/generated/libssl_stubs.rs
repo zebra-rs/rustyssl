@@ -111,11 +111,6 @@ pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_session_ticket(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_new_session_ticket")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_poll(
     _: *mut SSL_POLL_ITEM,
     _: usize,

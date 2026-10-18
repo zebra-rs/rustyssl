@@ -47,6 +47,10 @@ pub struct Callbacks {
     pub cookie: bool,
     /// The stateless cookie's generate callback (`SSL_CTX_set_stateless_cookie_generate_cb`).
     pub cookie_gen: bool,
+    /// The ticket application data callbacks (`SSL_CTX_set_session_ticket_cb`): generate.
+    pub ticket_gen: bool,
+    /// See `ticket_gen`: decrypt.
+    pub ticket_dec: bool,
     /// `SSL_CTX_set_record_padding_callback`.
     pub record_padding: bool,
     /// `SSL_CTX_set_allow_early_data_cb`.
@@ -139,6 +143,19 @@ pub enum Request {
     },
     /// Whether to accept the client's early data (`allow_early_data_cb`).
     AllowEarlyData,
+    /// A server's ticket is about to be made (`generate_ticket_cb`): answered
+    /// [`Answer::TicketAppData`] with the application data to put in it, or [`Answer::Fail`].
+    TicketGenerate,
+    /// A ticket was decrypted, or couldn't be (`decrypt_ticket_cb`): answered
+    /// [`Answer::TicketDecrypt`] with the callback's `SSL_TICKET_RETURN_*`.
+    TicketDecrypt {
+        /// The ticket's key name (at most its first 16 octets).
+        keyname: Vec<u8>,
+        /// The decryption's `SSL_TICKET_*` status.
+        status: i32,
+        /// The session in it, when it decrypted.
+        session: Option<Box<crate::conn::Session>>,
+    },
     /// A stateless server's application cookie for its HelloRetryRequest
     /// (`gen_stateless_cookie_cb`), answered [`Answer::Cookie`].
     StatelessCookieGen,
@@ -215,6 +232,10 @@ pub enum Answer {
     Allowed(bool),
     /// An application cookie, or `None` when the callback failed.
     Cookie(Option<Vec<u8>>),
+    /// The application data for a ticket being made.
+    TicketAppData(Option<Vec<u8>>),
+    /// The ticket decryption callback's `SSL_TICKET_RETURN_*`.
+    TicketDecrypt(i32),
     /// The record padding callback's padding length.
     Padding(usize),
     /// A session (lookup result, PSK session), or `None`.
@@ -303,6 +324,10 @@ pub enum Event {
     Idle,
     /// The peer sent close_notify (`SSL_ERROR_ZERO_RETURN` for a reader).
     Closed,
+    /// A TLS 1.2 client got a new ticket for a session that had an ID: the old session is out
+    /// of date (it leaves a client cache and can't be resumed), and the connection's session is
+    /// a new one (`tls_process_new_session_ticket`).
+    SessionRenewed,
     /// The call fails with nothing recorded, and the connection carries on: a stateless server
     /// read the client's ChangeCipherSpec between its ClientHellos.
     Interrupted,

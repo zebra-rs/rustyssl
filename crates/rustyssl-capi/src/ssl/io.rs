@@ -996,6 +996,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
             Event::Closed => break Stop::Closed,
             Event::Interrupted => break Stop::Failed,
+            Event::SessionRenewed => {
+                // SAFETY: as above.
+                unsafe { super::sess_cache::on_session_renewed(x) };
+            }
         }
     };
     if in_handshake && stop != Stop::Done {
