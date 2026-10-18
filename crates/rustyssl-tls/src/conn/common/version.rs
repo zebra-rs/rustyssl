@@ -1,8 +1,8 @@
 //! Protocol versions (`statem_lib.c`): which versions the configuration enables, the client's
 //! and server's choice, and the TLS 1.3 downgrade sentinels.
 //!
-//! The default build has TLS 1.0 through 1.3 and no SSLv3 (`OPENSSL_NO_SSL3`); DTLS comes in a
-//! later phase, so a DTLS method enables nothing here yet.
+//! The default build has TLS 1.0 through 1.3 and no SSLv3 (`OPENSSL_NO_SSL3`), and DTLS 1.0 and
+//! 1.2 (`DTLS1_BAD_VER` only through `SSL_OP_CISCO_ANYCONNECT`, which isn't supported).
 
 use core::cmp::Ordering;
 use core::ffi::c_int;
@@ -23,6 +23,39 @@ const TABLE: [(u16, u64); 4] = [
     (version::TLS1, abi::SSL_OP_NO_TLSv1),
 ];
 
+/// The DTLS versions, highest first, with the option that disables each
+/// (`dtls_version_table`).
+const DTLS_TABLE: [(u16, u64); 3] = [
+    (version::DTLS1_2, abi::SSL_OP_NO_DTLSv1_2),
+    (version::DTLS1, abi::SSL_OP_NO_DTLSv1),
+    // A client only (it has no server method).
+    (version::DTLS1_BAD, abi::SSL_OP_NO_DTLSv1),
+];
+
+/// The version table of the connection's kind.
+fn table(c: &Connection) -> &'static [(u16, u64)] {
+    if c.cfg.dtls { &DTLS_TABLE } else { &TABLE }
+}
+
+/// Whether `v` is a DTLS version number.
+#[must_use]
+pub fn is_dtls(v: u16) -> bool {
+    v >> 8 == version::DTLS1 >> 8 || v == version::DTLS1_BAD
+}
+
+/// The TLS version a DTLS version is built on (DTLS 1.0 on TLS 1.1, DTLS 1.2 on TLS 1.2, the
+/// pre-standard version on TLS 1.0), and a TLS version itself: what decides the features a
+/// version has (`SSL_USE_SIGALGS`, `SSL_USE_EXPLICIT_IV`, the PRF).
+#[must_use]
+pub fn tls_level(v: u16) -> u16 {
+    match v {
+        version::DTLS1_2 => version::TLS1_2,
+        version::DTLS1 => version::TLS1_1,
+        version::DTLS1_BAD => version::TLS1,
+        _ => v,
+    }
+}
+
 /// `TLS_ANY_VERSION`'s value in [`crate::conn::Config::method_version`].
 pub const ANY: u16 = 0;
 
@@ -38,9 +71,14 @@ pub enum Downgrade {
     To11,
 }
 
-/// `ssl_version_cmp` for TLS (DTLS's decreasing numbers come with DTLS).
+/// `ssl_version_cmp`: TLS versions count up, DTLS versions down (`DTLS1_BAD_VER` below
+/// DTLS 1.0).
 #[must_use]
 pub fn cmp(a: u16, b: u16) -> Ordering {
+    if is_dtls(a) || is_dtls(b) {
+        let rank = |v: u16| if v == version::DTLS1_BAD { 0xff00 } else { v };
+        return rank(b).cmp(&rank(a));
+    }
     a.cmp(&b)
 }
 
@@ -65,7 +103,7 @@ fn method_error(c: &Connection, v: u16, mask: u64) -> Option<c_int> {
         return Some(abi::SSL_R_UNSUPPORTED_PROTOCOL);
     }
     // Only TLS 1.2 and later have Suite B (`SSL_METHOD_NO_SUITEB` on the older methods).
-    if v < version::TLS1_2 && suiteb(c) != 0 {
+    if tls_level(v) < version::TLS1_2 && suiteb(c) != 0 {
         return Some(abi::SSL_R_AT_LEAST_TLS_1_2_NEEDED_IN_SUITEB_MODE);
     }
     None
@@ -95,7 +133,7 @@ pub fn min_max(c: &Connection) -> core::result::Result<(u16, u16, u16), c_int> {
     let mut hole = true;
     let mut real_max = 0;
     let mut tmp_real_max = 0;
-    for &(v, mask) in &TABLE {
+    for &(v, mask) in table(c) {
         if hole && tmp_real_max == 0 {
             tmp_real_max = v;
         }
@@ -145,8 +183,9 @@ pub fn supported(c: &Connection, v: u16) -> bool {
     if c.cfg.method_version != ANY {
         return v == c.neg.version;
     }
-    TABLE.iter().any(|&(tv, mask)| {
+    table(c).iter().any(|&(tv, mask)| {
         tv == v
+            && !(c.cfg.server && tv == version::DTLS1_BAD)
             && method_error(c, tv, mask).is_none()
             && (!c.cfg.server || v != version::TLS1_3 || tls13_capable(c))
     })
@@ -159,7 +198,7 @@ pub fn is_highest(c: &Connection) -> bool {
     if c.cfg.method_version != ANY {
         return c.neg.version == c.cfg.method_version;
     }
-    TABLE
+    table(c)
         .iter()
         .find(|&&(v, mask)| method_error(c, v, mask).is_none())
         .is_some_and(|&(v, _)| v == c.neg.version)
@@ -167,6 +206,10 @@ pub fn is_highest(c: &Connection) -> bool {
 
 /// `check_for_downgrade`: the sentinel a server negotiating `v` must put in its random.
 fn downgrade_for(c: &Connection, v: u16) -> Downgrade {
+    if c.cfg.dtls {
+        // No TLS 1.3 sentinels in DTLS 1.2 (`check_for_downgrade` has none for DTLS).
+        return Downgrade::None;
+    }
     if v == version::TLS1_2 && supported(c, version::TLS1_3) {
         Downgrade::To12
     } else if v < version::TLS1_2 && supported(c, version::TLS1_2) {
@@ -180,7 +223,7 @@ fn downgrade_for(c: &Connection, v: u16) -> Downgrade {
 /// records must carry and what this end writes (TLS 1.3 records say TLS 1.2).
 pub fn set_record_version(c: &mut Connection, v: u16) {
     c.rr.set_plain_version(Some(v));
-    c.rw.version = if v >= version::TLS1_3 {
+    c.rw.version = if !is_dtls(v) && v >= version::TLS1_3 {
         version::TLS1_2
     } else {
         v
@@ -208,6 +251,8 @@ pub fn choose_server(
         }
         return Ok(Downgrade::None);
     }
+    // DTLS has no supported_versions (`ssl_choose_server_version`).
+    let supported_versions = supported_versions.filter(|_| !c.cfg.dtls);
     if supported_versions.is_none() && hrr {
         return Err(abi::SSL_R_UNSUPPORTED_PROTOCOL);
     }
@@ -250,14 +295,14 @@ pub fn choose_server(
         return Ok(d);
     }
     // Without supported_versions, TLS 1.2 is the most a client can get.
-    let client_version = if cmp(legacy_version, version::TLS1_3) != Ordering::Less {
+    let client_version = if !c.cfg.dtls && cmp(legacy_version, version::TLS1_3) != Ordering::Less {
         version::TLS1_2
     } else {
         legacy_version
     };
     let mut disabled = false;
-    for &(v, mask) in &TABLE {
-        if cmp(client_version, v) == Ordering::Less {
+    for &(v, mask) in table(c) {
+        if cmp(client_version, v) == Ordering::Less || v == version::DTLS1_BAD {
             continue;
         }
         if method_error(c, v, mask).is_none() {
@@ -330,7 +375,7 @@ fn choose_client_inner(c: &mut Connection, version_chosen: u16, hrr: bool) -> Re
     }
     let fallback = c.cfg.mode & u64::from(abi::SSL_MODE_SEND_FALLBACK_SCSV) != 0;
     let real_max = if fallback { real_max } else { max };
-    if real_max > version_chosen {
+    if !c.cfg.dtls && real_max > version_chosen {
         let tail = c.hs.server_random.get(24..).unwrap_or_default();
         if tail == TLS11_DOWNGRADE {
             return fail(
@@ -347,7 +392,7 @@ fn choose_client_inner(c: &mut Connection, version_chosen: u16, hrr: bool) -> Re
             );
         }
     }
-    if TABLE.iter().any(|&(v, _)| v == version_chosen) {
+    if table(c).iter().any(|&(v, _)| v == version_chosen) {
         set_record_version(c, version_chosen);
         return Ok(());
     }
@@ -370,7 +415,12 @@ pub fn set_client_hello_version(c: &mut Connection) -> core::result::Result<(), 
     }
     let (_, max, _) = min_max(c)?;
     c.neg.version = max;
-    c.hs.sh.client_version = if max > version::TLS1_2 {
+    if max == version::DTLS1_BAD {
+        // Nothing else can be negotiated, and the ServerHello's record carries it: the
+        // record layer learns it now (`ssl_set_client_hello_version`).
+        set_record_version(c, max);
+    }
+    c.hs.sh.client_version = if !c.cfg.dtls && max > version::TLS1_2 {
         version::TLS1_2
     } else {
         max

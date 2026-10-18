@@ -507,7 +507,8 @@ fn client(
         "echo: MISSING\n"
     });
     if !echoed {
-        summary.push_str(&format!("client stderr: {stderr}\n"));
+        let stderr: Vec<String> = stderr.lines().map(mask_err_location).collect();
+        summary.push_str(&format!("client stderr: {}\n", stderr.join("\n")));
     }
     Ok(summary)
 }
@@ -522,7 +523,17 @@ fn connect(
     let (args, m) = mode(client_args);
     let port = free_port()?;
     let naccept = if m.resume { 2 } else { 1 };
-    let (mut server, lines) = start_server(t, p.server_ours, port, naccept, server_args, !m.early)?;
+    // `-rev` can't be used with DTLS: no echo then (the summaries and the server's output are
+    // compared).
+    let dtls = server_args.iter().any(|a| a.starts_with("-dtls"));
+    let (mut server, lines) = start_server(
+        t,
+        p.server_ours,
+        port,
+        naccept,
+        server_args,
+        !m.early && !dtls,
+    )?;
     let sess = t.work.join("session.pem").display().to_string();
     let mut runs = Vec::new();
     if m.resume {
@@ -549,7 +560,7 @@ fn connect(
             port,
             args,
             *full,
-            *early || m.early,
+            *early || m.early || dtls,
             m.cmd.as_deref(),
             m.trace,
         ) {
@@ -590,7 +601,8 @@ fn connect(
         }
     }
     if summary.contains("echo: MISSING") {
-        summary.push_str(&format!("server: {}\n", server_out.join(" / ")));
+        let lines: Vec<String> = server_out.iter().map(|l| mask_err_location(l)).collect();
+        summary.push_str(&format!("server: {}\n", lines.join(" / ")));
     }
     Ok(summary)
 }
@@ -698,6 +710,29 @@ fn mask_trace(line: &str) -> String {
         }
     }
     line.to_owned()
+}
+
+/// An `ERR_print_errors` line with its source location masked (`…:reason:FILE:LINE:data`): the
+/// file and line are the implementation's, not behavior.
+fn mask_err_location(line: &str) -> String {
+    let Some(at) = line.find(":error:") else {
+        return line.to_owned();
+    };
+    // thread id, "error", code, library, function, reason, file, line, data
+    let fields: Vec<&str> = line[at + 1..].splitn(8, ':').collect();
+    match fields.as_slice() {
+        [e, code, lib, func, reason, _file, rest @ ..] => {
+            let data = rest
+                .first()
+                .and_then(|r| r.split_once(':'))
+                .map_or("", |(_, d)| d);
+            format!(
+                "{}:{e}:{code}:{lib}:{func}:{reason}:*:*:{data}",
+                &line[..at]
+            )
+        }
+        _ => line.to_owned(),
+    }
 }
 
 fn indent(s: &str) -> String {

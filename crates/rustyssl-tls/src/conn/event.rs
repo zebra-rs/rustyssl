@@ -68,6 +68,10 @@ pub struct Callbacks {
     /// Whether the caller refreshes the settings when a server's renegotiation starts
     /// ([`Request::Renegotiating`]).
     pub renegotiating: bool,
+    /// `SSL_CTX_set_cookie_generate_cb` (DTLS).
+    pub dtls_cookie_gen: bool,
+    /// `SSL_CTX_set_cookie_verify_cb` (DTLS).
+    pub dtls_cookie_verify: bool,
 }
 
 /// A TLS 1.2 SRP server's parameters (RFC 5054): N, g, the salt, and B, each as
@@ -217,6 +221,15 @@ pub enum Request {
     /// (`verify_stateless_cookie_cb`), answered [`Answer::Allowed`].
     StatelessCookieVerify {
         /// The application's cookie.
+        cookie: Vec<u8>,
+    },
+    /// A DTLS server's cookie for a HelloVerifyRequest (`app_gen_cookie_cb`), answered
+    /// [`Answer::Cookie`] (`None`: the callback failed).
+    DtlsCookieGenerate,
+    /// Whether a DTLS ClientHello's cookie is good (`app_verify_cookie_cb`), answered
+    /// [`Answer::Allowed`].
+    DtlsCookieVerify {
+        /// The cookie.
         cookie: Vec<u8>,
     },
     /// A custom extension to add (`add_cb`) or parse (`parse_cb`).

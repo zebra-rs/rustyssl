@@ -195,16 +195,23 @@ pub fn valid(c: &Connection, id: u16, min: u16, max: u16, isec: bool) -> (bool, 
     let Some(g) = lookup(c, id) else {
         return (false, false);
     };
-    let (gmin, gmax) = (g.min_tls, g.max_tls);
+    let (gmin, gmax) = if c.cfg.dtls {
+        (g.min_dtls, g.max_dtls)
+    } else {
+        (g.min_tls, g.max_tls)
+    };
     if gmin < 0 || gmax < 0 {
         return (false, false);
     }
-    let mut ok = gmax == 0 || i32::from(min) <= gmax;
+    let vc = super::ciphers::vcmp;
+    let mut ok = gmax == 0 || vc(i32::from(min), gmax).is_le();
     if gmin > 0 {
-        ok &= i32::from(max) >= gmin;
+        ok &= vc(i32::from(max), gmin).is_ge();
     }
-    let ok13 =
-        ok && max == version::of(abi::TLS1_3_VERSION) && (gmax == 0 || gmax >= abi::TLS1_3_VERSION);
+    let ok13 = !c.cfg.dtls
+        && ok
+        && max == version::of(abi::TLS1_3_VERSION)
+        && (gmax == 0 || gmax >= abi::TLS1_3_VERSION);
     ok &= !isec || g.algorithm == "EC" || g.algorithm == "X25519" || g.algorithm == "X448";
     (ok, ok13)
 }
@@ -272,13 +279,17 @@ pub fn shared_group(c: &Connection, nmatch: i32) -> u16 {
         let Some(g) = lookup(c, id) else {
             return 0;
         };
-        if g.max_tls == -1 {
+        let (gmin, gmax) = if c.cfg.dtls {
+            (g.min_dtls, g.max_dtls)
+        } else {
+            (g.min_tls, g.max_tls)
+        };
+        if gmax == -1 {
             continue;
         }
-        let v = c.neg.version;
-        if (g.min_tls != 0 && i32::from(v) < g.min_tls)
-            || (g.max_tls != 0 && i32::from(v) > g.max_tls)
-        {
+        let v = i32::from(c.neg.version);
+        let vc = super::ciphers::vcmp;
+        if (gmin != 0 && vc(v, gmin).is_lt()) || (gmax != 0 && vc(v, gmax).is_gt()) {
             continue;
         }
         if nmatch == k {

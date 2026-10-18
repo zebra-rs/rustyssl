@@ -115,3 +115,119 @@ pub(crate) fn handshake(
         Err((End::Client, Error::internal()))
     }
 }
+
+/// Steps a DTLS end like [`run`], collecting its datagrams.
+fn run_dtls(
+    c: &mut Connection,
+    p: &dyn Provider,
+    end: End,
+    reading: bool,
+    answer: &mut dyn FnMut(End, &Request) -> Answer,
+    out: &mut Vec<Vec<u8>>,
+    log: &mut Vec<Event>,
+) -> Result<bool, Error> {
+    let mut done = false;
+    for _ in 0..100_000 {
+        match c.step(p, reading)? {
+            Event::Request(r) => {
+                let a = answer(end, &r);
+                c.answer(a);
+            }
+            Event::Output => out.extend(c.take_datagrams()),
+            Event::HandshakeDone => {
+                done = true;
+                out.extend(c.take_datagrams());
+                log.push(Event::HandshakeDone);
+            }
+            Event::NeedInput
+            | Event::Idle
+            | Event::AppData
+            | Event::Closed
+            | Event::Interrupted => {
+                out.extend(c.take_datagrams());
+                return Ok(done);
+            }
+            e => log.push(e),
+        }
+    }
+    Ok(done)
+}
+
+/// A DTLS handshake between `client` and `server`; `keep` decides which datagrams arrive
+/// (the end that sent it and its number in that end's output); when nothing moves, both
+/// ends' timers fire, as many times as `timeouts` allows.
+///
+/// # Errors
+/// The end that failed, and why.
+#[allow(clippy::too_many_arguments, reason = "the run's knobs")]
+pub(crate) fn handshake_dtls(
+    p: &dyn Provider,
+    client: &mut Connection,
+    server: &mut Connection,
+    answer: &mut dyn FnMut(End, &Request) -> Answer,
+    keep: &mut dyn FnMut(End, usize) -> bool,
+    timeouts: usize,
+    log: &mut Log,
+) -> Result<(), (End, Error)> {
+    let (mut cdone, mut sdone) = (false, false);
+    let (mut cn, mut sn) = (0usize, 0usize);
+    let mut fired = 0usize;
+    for _ in 0..256 {
+        let mut to_server = Vec::new();
+        cdone |= run_dtls(
+            client,
+            p,
+            End::Client,
+            false,
+            answer,
+            &mut to_server,
+            &mut log.client,
+        )
+        .map_err(|e| (End::Client, e))?;
+        let sent_c = !to_server.is_empty();
+        for d in to_server {
+            if keep(End::Client, cn) {
+                server.feed_datagram(&d);
+            }
+            cn = cn.saturating_add(1);
+        }
+        let mut to_client = Vec::new();
+        sdone |= run_dtls(
+            server,
+            p,
+            End::Server,
+            false,
+            answer,
+            &mut to_client,
+            &mut log.server,
+        )
+        .map_err(|e| (End::Server, e))?;
+        let sent_s = !to_client.is_empty();
+        for d in to_client {
+            if keep(End::Server, sn) {
+                client.feed_datagram(&d);
+            }
+            sn = sn.saturating_add(1);
+        }
+        if cdone && sdone && !sent_c && !sent_s {
+            return Ok(());
+        }
+        if !sent_c && !sent_s {
+            if fired >= timeouts {
+                break;
+            }
+            fired = fired.saturating_add(1);
+            client
+                .dtls_retransmit_on_timeout(p)
+                .map_err(|e| (End::Client, e))?;
+            server
+                .dtls_retransmit_on_timeout(p)
+                .map_err(|e| (End::Server, e))?;
+        }
+    }
+    if cdone && sdone {
+        Ok(())
+    } else {
+        Err((End::Client, Error::internal()))
+    }
+}

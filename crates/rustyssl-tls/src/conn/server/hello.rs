@@ -96,6 +96,11 @@ pub(crate) fn process_client_hello(
         common::setup_handshake(c, p)?;
         if !c.sslv2_record {
             let msg = crate::msgs::frame(ht::CLIENT_HELLO, body)?;
+            let msg = if c.cfg.dtls {
+                c.dtls_full_form(&msg)
+            } else {
+                msg
+            };
             c.hs.transcript.add(&msg);
         }
     }
@@ -127,8 +132,15 @@ pub(crate) fn process_client_hello(
             ));
         }
         ClientHello::parse_v2(body)?
+    } else if c.cfg.dtls && c.cfg.options & abi::SSL_OP_COOKIE_EXCHANGE != 0 {
+        // A ClientHello without a cookie gets a HelloVerifyRequest (`tls_process_client_hello`
+        // stops here).
+        if ClientHello::dtls_cookie(body)?.is_empty() {
+            return Ok(MsgProcess::FinishedReading);
+        }
+        ClientHello::parse(body, true)?
     } else {
-        ClientHello::parse(body, false)?
+        ClientHello::parse(body, c.cfg.dtls)?
     };
     let contents = hello.extensions.clone().unwrap_or_default();
     ext::collect(c, &contents, cx::CLIENT_HELLO, 0, true)?;
@@ -191,7 +203,9 @@ fn early_post_process_inner(c: &mut Connection, p: &dyn Provider) -> Result<bool
         set_stage(c, stage::VERSION)?;
     }
     if stage_of(c) == stage::VERSION {
-        choose_version_and_suite(c, p)?;
+        if !choose_version_and_suite(c, p)? {
+            return Ok(false);
+        }
         set_stage(c, stage::SESSION)?;
     }
     if stage_of(c) == stage::SESSION {
@@ -292,7 +306,7 @@ fn session_secret(c: &mut Connection) -> Result<bool> {
 
 /// The version, the suites, the signalling values, and TLS 1.3's suite (the first part of
 /// `tls_early_post_process_client_hello`).
-fn choose_version_and_suite(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+fn choose_version_and_suite(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
     let h = hello(c)?.clone();
     c.hs.client_random = h.random;
     if h.sslv2 {
@@ -324,6 +338,29 @@ fn choose_version_and_suite(c: &mut Connection, p: &dyn Provider) -> Result<()> 
             abi::SSL_AD_UNEXPECTED_MESSAGE,
             abi::SSL_R_NOT_ON_RECORD_BOUNDARY,
         ));
+    }
+    if c.cfg.dtls && c.cfg.options & abi::SSL_OP_COOKIE_EXCHANGE != 0 {
+        let cookie = h.cookie.clone().unwrap_or_default();
+        let ok = if c.cfg.callbacks.dtls_cookie_verify {
+            match ask_once(c, Request::DtlsCookieVerify { cookie }, 0) {
+                None => return Ok(false),
+                Some(Answer::Allowed(ok)) => ok,
+                Some(_) => false,
+            }
+        } else {
+            c.dtls.cookie.len() == cookie.len()
+                && bool::from(subtle::ConstantTimeEq::ct_eq(
+                    c.dtls.cookie.as_slice(),
+                    cookie.as_slice(),
+                ))
+        };
+        if !ok {
+            return Err(Error::alert(
+                abi::SSL_AD_HANDSHAKE_FAILURE,
+                abi::SSL_R_COOKIE_MISMATCH,
+            ));
+        }
+        c.dtls.cookie_verified = true;
     }
     c.neg.reused = false;
     let raw = ciphers::cache_cipherlist(&h.cipher_suites, h.sslv2)?;
@@ -376,7 +413,7 @@ fn choose_version_and_suite(c: &mut Connection, p: &dyn Provider) -> Result<()> 
     if ext::parse_extension(c, p, ems, cx::CLIENT_HELLO, 0)? == Step::Wait {
         return Err(Error::internal());
     }
-    Ok(())
+    Ok(true)
 }
 
 /// The checks after the session lookup: a resumed TLS 1.2 session's suite must be offered
@@ -702,6 +739,29 @@ fn handle_alpn_inner(c: &mut Connection, _p: &dyn Provider) -> Result<Step> {
 ///
 /// # Errors
 /// An extension failed, or the transcript couldn't be started.
+/// `dtls_construct_hello_verify_request`: DTLS 1.0's version and the application's cookie.
+///
+/// # Errors
+/// No cookie (`SSL_R_COOKIE_GEN_CALLBACK_FAILURE`, no alert).
+pub(crate) fn construct_hello_verify_request(c: &mut Connection) -> Result<Construct> {
+    let fail = || Error::quiet(abi::SSL_R_COOKIE_GEN_CALLBACK_FAILURE);
+    if !c.cfg.callbacks.dtls_cookie_gen {
+        return Err(fail());
+    }
+    let cookie = match ask_once(c, Request::DtlsCookieGenerate, 0) {
+        None => return Ok(Construct::Ask),
+        Some(Answer::Cookie(Some(k))) if k.len() <= crate::conn::dtls::COOKIE_LEN => k,
+        Some(_) => return Err(fail()),
+    };
+    c.dtls.cookie.clone_from(&cookie);
+    let body = crate::msgs::HelloVerifyRequest {
+        server_version: crate::consts::version::DTLS1,
+        cookie,
+    }
+    .encode()?;
+    Ok(Construct::Send(body))
+}
+
 pub(crate) fn construct_server_hello(c: &mut Connection, p: &dyn Provider) -> Result<Construct> {
     let hrr = c.hs.sh.hrr == Hrr::Pending;
     let tls13 = c.is_tls13();

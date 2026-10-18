@@ -19433,10 +19433,14 @@ const _: unsafe extern "C" fn(*mut BIO, *mut BIO) -> core::ffi::c_int =
 const _: unsafe extern "C" fn(*mut BIO) = crate::ssl::bio_ssl::rustyssl_private_BIO_ssl_shutdown;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLS_client_method;
+const _: unsafe extern "C" fn(*const SSL) -> usize =
+    crate::ssl::dtls::rustyssl_private_DTLS_get_data_mtu;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLS_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLS_server_method;
+const _: unsafe extern "C" fn(*mut SSL, DTLS_timer_cb) =
+    crate::ssl::dtls::rustyssl_private_DTLS_set_timer_cb;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLSv1_2_client_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
@@ -19445,6 +19449,8 @@ const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLSv1_2_server_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLSv1_client_method;
+const _: unsafe extern "C" fn(*mut SSL, *mut BIO_ADDR) -> core::ffi::c_int =
+    crate::ssl::dtls::rustyssl_private_DTLSv1_listen;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =
     crate::ssl::method::rustyssl_private_DTLSv1_method;
 const _: unsafe extern "C" fn() -> *const SSL_METHOD =

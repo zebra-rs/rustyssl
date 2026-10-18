@@ -56,6 +56,8 @@ mod limits {
     pub const ENCRYPTED_EXTENSIONS: usize = 20000;
     /// `KEY_UPDATE_MAX_LENGTH`.
     pub const KEY_UPDATE: usize = 1;
+    /// `HELLO_VERIFY_REQUEST_MAX_LENGTH`.
+    pub const HELLO_VERIFY_REQUEST: usize = 258;
 }
 
 /// A TLS 1.2 key exchange's outcome, made when the ServerKeyExchange is read (the server's
@@ -203,6 +205,9 @@ fn go(c: &mut Connection, s: abi::OSSL_HANDSHAKE_STATE) {
 /// `SSL3_MT_CHANGE_CIPHER_SPEC`, whose octet is HelloRequest's: a CCS comes with its body
 /// already taken, and OpenSSL's size of 1).
 fn is_ccs(c: &Connection) -> bool {
+    if c.cfg.dtls {
+        return c.st.ccs;
+    }
     c.st.message_type == msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC)
         && c.st.message_size == 1
         && c.cur_msg.as_ref().is_some_and(|m| m.1.is_empty())
@@ -400,6 +405,9 @@ pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
     if c.first_handshake {
         c.hs.sh.hrr = Hrr::None;
     }
+    if c.cfg.dtls {
+        c.dtls.use_timer = true;
+    }
     Ok(())
 }
 
@@ -491,6 +499,10 @@ pub(crate) fn read_transition(c: &mut Connection, mt: u8) -> Result<()> {
     };
     if ok {
         Ok(())
+    } else if c.cfg.dtls && is_ccs(c) {
+        // An unexpected ChangeCipherSpec is dropped (reordered or retransmitted): the read
+        // is retried.
+        Err(super::dtls_retry_read())
     } else {
         Err(Error::alert(
             abi::SSL3_AD_UNEXPECTED_MESSAGE,
@@ -505,12 +517,20 @@ fn read_transition12(c: &mut Connection, mt: u8) -> bool {
     let ccs = is_ccs(c);
     let hs = c.st.hand_state;
     let is = |s: abi::OSSL_HANDSHAKE_STATE| hs == st(s);
+    let hvr = c.cfg.dtls && mt == hm::HELLO_VERIFY_REQUEST && !ccs;
     let to = if is(abi::TLS_ST_CW_CLNT_HELLO) || is(abi::TLS_ST_EARLY_DATA) {
-        (mt == hm::SERVER_HELLO && !ccs).then_some(abi::TLS_ST_CR_SRVR_HELLO)
+        if is(abi::TLS_ST_CW_CLNT_HELLO) && hvr {
+            Some(abi::DTLS_ST_CR_HELLO_VERIFY_REQUEST)
+        } else {
+            (mt == hm::SERVER_HELLO && !ccs).then_some(abi::TLS_ST_CR_SRVR_HELLO)
+        }
+    } else if is(abi::TLS_ST_CR_SRVR_HELLO) && !c.neg.reused && hvr {
+        Some(abi::DTLS_ST_CR_HELLO_VERIFY_REQUEST)
     } else if is(abi::TLS_ST_CR_SRVR_HELLO) {
         if !c.neg.reused
             && ccs
-            && c.neg.version >= crate::consts::version::TLS1
+            && crate::conn::common::version::tls_level(c.neg.version)
+                >= crate::consts::version::TLS1
             && c.cfg.callbacks.session_secret
             && c.neg.session.ticket.is_some()
         {
@@ -615,6 +635,8 @@ pub(crate) fn max_message_size(c: &Connection) -> usize {
     let is = |x: abi::OSSL_HANDSHAKE_STATE| s == st(x);
     if is(abi::TLS_ST_CR_SRVR_HELLO) {
         limits::SERVER_HELLO
+    } else if is(abi::DTLS_ST_CR_HELLO_VERIFY_REQUEST) {
+        limits::HELLO_VERIFY_REQUEST
     } else if is(abi::TLS_ST_CR_CERT) || is(abi::TLS_ST_CR_COMP_CERT) || is(abi::TLS_ST_CR_CERT_REQ)
     {
         c.cfg.max_cert_list
@@ -627,7 +649,11 @@ pub(crate) fn max_message_size(c: &Connection) -> usize {
     } else if is(abi::TLS_ST_CR_SRVR_DONE) {
         limits::SERVER_HELLO_DONE
     } else if is(abi::TLS_ST_CR_CHANGE) {
-        limits::CCS
+        if c.cfg.dtls && c.neg.version == crate::consts::version::DTLS1_BAD {
+            3
+        } else {
+            limits::CCS
+        }
     } else if is(abi::TLS_ST_CR_SESSION_TICKET) {
         if c.is_tls13() {
             limits::SESSION_TICKET_13
@@ -658,6 +684,8 @@ pub(crate) fn process_message(
     let is = |x: abi::OSSL_HANDSHAKE_STATE| s == st(x);
     if is(abi::TLS_ST_CR_SRVR_HELLO) {
         hello::process_server_hello(c, p, body)
+    } else if is(abi::DTLS_ST_CR_HELLO_VERIFY_REQUEST) {
+        hello::process_hello_verify(c, body)
     } else if is(abi::TLS_ST_CR_CERT) {
         flight::process_server_certificate(c, p, body)
     } else if is(abi::TLS_ST_CR_CERT_VRFY) {
@@ -824,6 +852,8 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
     } else if is(abi::TLS_ST_EARLY_DATA) {
         c.rtt_write = c.rtt_write.wrapping_add(1);
         return Ok(WriteTran::Finished);
+    } else if is(abi::DTLS_ST_CR_HELLO_VERIFY_REQUEST) {
+        abi::TLS_ST_CW_CLNT_HELLO
     } else if is(abi::TLS_ST_CR_SRVR_DONE) {
         c.rtt_read = c.rtt_read.wrapping_add(1);
         if c.hs.sh.cert_req != 0 {
@@ -893,12 +923,19 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
             common::setup_handshake(c, p)?;
         }
         c.shutdown = 0;
-        if c.neg.early_data_status == abi::SSL_EARLY_DATA_REJECTED {
+        if c.cfg.dtls {
+            // Every DTLS ClientHello starts the transcript again (`ssl3_init_finished_mac`).
+            c.hs.transcript = crate::keysched::Transcript::new();
+        } else if c.neg.early_data_status == abi::SSL_EARLY_DATA_REJECTED {
             // A second ClientHello after early data was refused goes out in plaintext.
             c.rw.set_protection(
                 crate::record::Mode::Plain(None),
                 crate::record::Protection::Null,
             );
+        }
+    } else if is(abi::TLS_ST_CW_CHANGE) {
+        if c.cfg.dtls && c.neg.reused {
+            c.dtls.use_timer = false;
         }
     } else if is(abi::TLS_ST_PENDING_EARLY_DATA_END) {
         let eds = c.hs.sh.early_data_state;
@@ -932,7 +969,7 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
             // The records after the ClientHello (the compatibility ChangeCipherSpec, early
             // data) carry the connection's version, TLS 1.3's as TLS 1.2 (`ssl3_write_bytes`).
             let v = c.neg.version;
-            c.rw.version = if v >= crate::consts::version::TLS1_3 {
+            c.rw.version = if !c.cfg.dtls && v >= crate::consts::version::TLS1_3 {
                 crate::consts::version::TLS1_2
             } else {
                 v
@@ -944,6 +981,9 @@ pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Res
             }
         } else if !c.flushed() {
             return Ok(Work::MoreA);
+        }
+        if c.cfg.dtls {
+            c.first_packet = true;
         }
     } else if is(abi::TLS_ST_CW_KEY_EXCH) {
         send::key_exchange_post_work(c, p)?;

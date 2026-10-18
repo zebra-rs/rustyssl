@@ -5301,15 +5301,45 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - MTU handling and `BIO_dgram` ctrls
   - the SRTP extension
   - SCTP as in the default build (disabled)
-  - DTLS 1.3 if the target ABI includes it
-- [ ] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
+  - DTLS 1.3 if the target ABI includes it: it doesn't. OpenSSL 3.5's
+    `DTLS_MAX_VERSION_INTERNAL` is `DTLS1_2_VERSION`, so there is none (decided).
+  - Progress (ADR 0002's DTLS section): the core's record layer (`record/dtls.rs`: epochs,
+    48-bit sequence numbers, the replay window, the next epoch's records held and read again
+    after the rest of the datagram, silent drops) and handshake layer (`conn/dtls.rs`:
+    numbered and MTU-fragmented messages packed into datagrams, bounded reassembly and
+    reordering, the flight kept for retransmission, HelloVerifyRequest cookies, the
+    `DTLS1_BAD_VER` client); capi's datagram I/O, MTU queries, timer (`DTLS_set_timer_cb`,
+    `BIO_CTRL_DGRAM_SET_NEXT_TIMEOUT`), the DTLS controls, `DTLS_get_data_mtu` and
+    `DTLSv1_listen` (`ssl/dtls.rs`). Upstream: dtlstest 40/40, dtlsv1listentest 9/9,
+    bad_dtls_test 1/1, dtls_mtu_test 1/2 (the other reads libssl's internals), every DTLS
+    `ssl-tests/*.cnf` iteration, and sslapitest's DTLS iterations. Tests:
+    `tests/c/ssl_dtls.c`, core loopbacks with lost datagrams, six DTLS interop cases over UDP
+    in all four pairings, the fuzz target `dtls`. Left: GnuTLS interop and injected loss and
+    reordering outside the test BIOs.
+- [x] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
   present, but the default security level makes it effectively unusable unless
   `@SECLEVEL=0`. SSLv3 is compiled out, as in the default build.
+  - Done (the version code came with 7.4): upstream `ssl_test 02-protocol-version` passes all
+    678 iterations (every min/max pairing of SSLv3 through TLS 1.3, SSLv3 refused as the
+    default build refuses it). Interop cases `tls10`, `tls10-resume`, `tls11`,
+    `tls11-cbc-no-etm` at `@SECLEVEL=0`, and `tls10-default-seclevel`/`tls11-default-seclevel`,
+    where both libraries fail the same way at the default level (`no protocols available` on
+    the client, `unexpected message` on the server). `test-interop` masks the source file and
+    line in `ERR_print_errors` lines, which are the implementation's, not behavior.
 - [ ] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
   - async fds, record padding, `SSL_stateless`, the remaining `tlsext` ctrls
   - temporary/auto DH, the CA-subject loaders, the early-data callback
   - `SSL_CTX_compress_certs`, `SSL_COMP_*`, SRP, the status callbacks, the CT callback
   - `SSL_dane_*`, `OPENSSL_init_ssl`, …
+  - Status (2026-10-18): 592 of 603 libssl exports are implemented; everything above landed in
+    Phase 7. Of the 11 left, 3 are DTLS (`DTLSv1_listen`, `DTLS_set_timer_cb`,
+    `DTLS_get_data_mtu`, with 8.1) and 8 are the QUIC API (`OSSL_QUIC_client_method`,
+    `_client_thread_method`, `_server_method`, `SSL_poll`, `SSL_inject_net_dgram`,
+    `SSL_set_quic_tls_cbs`, `_early_data_enabled`, `_transport_params`).
+  - Decision: the QUIC exports stay aborting stubs until Phase 10, which builds the QUIC
+    transport they need. Implementing them as failures now would break rule 10 (a QUIC
+    method that can't make connections reports success for work it didn't do). So the
+    exit's "100%" is everything outside the QUIC API.
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.

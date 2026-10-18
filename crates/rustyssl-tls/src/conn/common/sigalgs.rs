@@ -134,6 +134,10 @@ pub struct SigAlg {
     pub mintls: c_int,
     /// See `mintls`.
     pub maxtls: c_int,
+    /// The DTLS versions it may be used with (0: any; -1: none).
+    pub mindtls: c_int,
+    /// See `mindtls`.
+    pub maxdtls: c_int,
     /// Whether the providers can do it (`available`).
     pub available: bool,
     /// The security bits a provider gave it (0: from the hash).
@@ -723,6 +727,8 @@ impl Cache {
                 curve: b.curve,
                 mintls: b.mintls,
                 maxtls: b.maxtls,
+                mindtls: dtls_of(b.mintls),
+                maxdtls: dtls_of(b.maxtls),
                 available: !matches!(b.sig, SigKindConst::Gost),
                 provider_bits: 0,
             })
@@ -766,6 +772,9 @@ impl Cache {
                 curve: abi::NID_undef,
                 mintls: T13,
                 maxtls: T13,
+                // Provider algorithms are TLS 1.3 only, so never DTLS 1.2.
+                mindtls: -1,
+                maxdtls: -1,
                 available: true,
                 provider_bits: info.security_bits,
             });
@@ -813,7 +822,7 @@ impl Cache {
 /// `SSL_USE_SIGALGS`: TLS 1.2 and later carry signature algorithms.
 #[must_use]
 pub fn use_sigalgs(c: &Connection) -> bool {
-    c.neg.version >= version::of(abi::TLS1_2_VERSION)
+    version::tls_level(c.neg.version) >= version::of(abi::TLS1_2_VERSION)
 }
 
 /// `sigalg_security_bits`: half the hash's bits (SHA-1 64, MD5+SHA-1 67, MD5 39), EdDSA's
@@ -862,6 +871,7 @@ pub fn allowed(c: &Connection, op: c_int, lu: &SigAlg) -> bool {
         return false;
     }
     if !c.cfg.server
+        && !c.cfg.dtls
         && c.hs.sh.min_ver >= version::of(T13)
         && (lu.sig == Sig::Dsa
             || lu.hash_idx == ix(SSL_MD_SHA1_IDX)
@@ -884,6 +894,16 @@ pub fn allowed(c: &Connection, op: c_int, lu: &SigAlg) -> bool {
     )
 }
 
+/// The built-in table's DTLS column from its TLS column: TLS 1.2 (or any) is DTLS 1.2 (or
+/// any), and the TLS 1.3-only schemes have no DTLS (`sigalg_lookup_tbl`).
+const fn dtls_of(tls: c_int) -> c_int {
+    match tls {
+        0 => 0,
+        abi::TLS1_2_VERSION => abi::DTLS1_2_VERSION,
+        _ => -1,
+    }
+}
+
 /// `tls_sigalg_compat`: whether `lu` fits the versions this end may negotiate.
 #[must_use]
 pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
@@ -898,10 +918,16 @@ pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
     } else {
         (c_int::from(c.neg.version), c_int::from(c.neg.version))
     };
-    !(lu.mintls == -1
-        || lu.maxtls == -1
-        || (lu.mintls != 0 && maxproto != 0 && lu.mintls > maxproto)
-        || (lu.maxtls != 0 && minproto != 0 && lu.maxtls < minproto)
+    let (minv, maxv) = if c.cfg.dtls {
+        (lu.mindtls, lu.maxdtls)
+    } else {
+        (lu.mintls, lu.maxtls)
+    };
+    let vc = super::ciphers::vcmp;
+    !(minv == -1
+        || maxv == -1
+        || (minv != 0 && maxproto != 0 && vc(minv, maxproto).is_gt())
+        || (maxv != 0 && minproto != 0 && vc(maxv, minproto).is_lt())
         || !allowed(c, abi::SSL_SECOP_SIGALG_SUPPORTED, lu))
 }
 
@@ -1644,7 +1670,7 @@ fn check_slot_strict(c: &Connection, cand: &ChainCandidate, idx: usize) -> u32 {
         return 0;
     }
     let mut rv = 0u32;
-    if c.neg.version >= crate::consts::version::TLS1_2 || c.is_tls13() {
+    if super::version::tls_level(c.neg.version) >= crate::consts::version::TLS1_2 || c.is_tls13() {
         let (default_nid, rsign) =
             if c.hs.sh.peer_cert_sigalgs.is_some() || c.hs.sh.peer_sigalgs.is_some() {
                 (0, None)
@@ -1853,7 +1879,8 @@ pub fn check_chain(c: &Connection, cand: &ChainCandidate) -> u32 {
         check_flags |= flag(abi::CERT_PKEY_SUITEB);
     }
     let mut rv = 0u32;
-    let tls12 = c.neg.version >= crate::consts::version::TLS1_2 || c.is_tls13();
+    let tls12 =
+        super::version::tls_level(c.neg.version) >= crate::consts::version::TLS1_2 || c.is_tls13();
     if tls12 {
         let (default_nid, rsign) =
             if c.hs.sh.peer_cert_sigalgs.is_some() || c.hs.sh.peer_sigalgs.is_some() {

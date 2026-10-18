@@ -97,14 +97,15 @@ pub(crate) fn ext_construct_renegotiate(
 ) -> Result<ExtReturn> {
     if !c.renegotiate {
         let min = c_int::from(c.cfg.min_version);
-        if min >= abi::TLS1_3_VERSION
-            || (security::check(
-                c,
-                abi::SSL_SECOP_VERSION,
-                0,
-                abi::TLS1_VERSION,
-                security::SecOther::None,
-            ) && min <= abi::TLS1_VERSION)
+        if !c.cfg.dtls
+            && (min >= abi::TLS1_3_VERSION
+                || (security::check(
+                    c,
+                    abi::SSL_SECOP_VERSION,
+                    0,
+                    abi::TLS1_VERSION,
+                    security::SecOther::None,
+                ) && min <= abi::TLS1_VERSION))
         {
             return Ok(ExtReturn::NotSent);
         }
@@ -191,11 +192,11 @@ pub(crate) fn ext_construct_supported_groups(
     _x: &ext::Ctx,
 ) -> Result<ExtReturn> {
     let (min, max) = min_max(c)?;
-    if !use_ecc(c, min, max) && max < v::TLS1_3 {
+    if !use_ecc(c, min, max) && (c.cfg.dtls || max < v::TLS1_3) {
         return Ok(ExtReturn::NotSent);
     }
     let (list, any13) = groups::offerable(c, min, max);
-    if list.is_empty() || (!any13 && max == v::TLS1_3) {
+    if list.is_empty() || (!any13 && !c.cfg.dtls && max == v::TLS1_3) {
         return Err(
             Error::alert(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_NO_SUITABLE_GROUPS)
                 .with_data("No groups enabled for max supported SSL/TLS version"),
@@ -418,7 +419,7 @@ pub(crate) fn ext_construct_supported_versions(
     _x: &ext::Ctx,
 ) -> Result<ExtReturn> {
     let (min, max) = min_max(c)?;
-    if max < v::TLS1_3 {
+    if c.cfg.dtls || max < v::TLS1_3 {
         return Ok(ExtReturn::NotSent);
     }
     let list: Vec<u16> = (min..=max).rev().collect();

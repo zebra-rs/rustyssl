@@ -4,6 +4,8 @@
 # "password"), {dir} (the PKI's directory).
 # Client directives: +full (no -brief; the session lines), +resume (a second connection
 # resuming the first's session), +early (with +resume: early data on the second), +cmd=X (send the command line X, R or k or K, first).
+# A DTLS case (a server argument -dtls*) runs over UDP without -rev: no echo, the summaries and
+# the server's output are compared.
 # Each case runs in four pairings (reference/reference is the expectation; the server echoes
 # lines reversed and closes on CLOSE).
 
@@ -48,7 +50,18 @@ tls13-p521-cert | {p521} | {ca}
 tls12-ecdhe-ecdsa-chacha | {ec} | {ca} -tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305
 tls12-aes128-sha256 | | {ca} -tls1_2 -cipher AES128-SHA256
 tls11 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher DEFAULT@SECLEVEL=0
+tls10 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1 -cipher DEFAULT@SECLEVEL=0
+tls10-resume | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1 -cipher DEFAULT@SECLEVEL=0 +resume
+tls11-cbc-no-etm | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher ECDHE-RSA-AES128-SHA@SECLEVEL=0 -no_etm
+tls11-default-seclevel | | {ca} -tls1_1
+tls10-default-seclevel | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1
 tls13-trace | -num_tickets 0 | {ca} +trace
 tls12-trace | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256 +trace
 tls12-srp | {srpvfile} | -tls1_2 -cipher SRP-AES-128-CBC-SHA -srpuser user -srppass password
 tls12-srp-rsa | {srpvfile} | {ca} -tls1_2 -cipher SRP-RSA-AES-256-CBC-SHA -srpuser user -srppass password
+dtls12-default | -dtls | {ca} -dtls
+dtls12-ecdsa | {ec} -dtls1_2 | {ca} -dtls1_2 -cipher ECDHE-ECDSA-AES128-GCM-SHA256
+dtls1-cbc | -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 | {ca} -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0
+dtls12-listen | -dtls -listen | {ca} -dtls
+dtls12-mtu | -dtls -mtu 512 | {ca} -dtls -mtu 512
+dtls12-resume | -dtls | {ca} -dtls +resume

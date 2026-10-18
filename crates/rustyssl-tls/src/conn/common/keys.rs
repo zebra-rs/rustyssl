@@ -57,7 +57,9 @@ impl core::fmt::Debug for State {
 /// replacing the default MD5+SHA-1 by SHA-256.
 #[must_use]
 pub fn hashes(version: u16, cp: &Cipher) -> (HashAlg, PrfHash) {
-    if version < crate::conn::common::version::of(abi::TLS1_2_VERSION) {
+    if crate::conn::common::version::tls_level(version)
+        < crate::conn::common::version::of(abi::TLS1_2_VERSION)
+    {
         return (HashAlg::Md5Sha1, PrfHash::Md5Sha1);
     }
     let hs = match cp.handshake_hash() {
