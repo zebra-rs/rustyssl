@@ -591,6 +591,33 @@ static void test_configuration(void)
     SSL_set_connect_state(x);
     check(SSL_write(x, "x", 1) <= 0, "a write with no BIO");
     errors("ssl");
+
+    /* The ctrl commands' errors come from ssl3_ctrl and ssl3_ctx_ctrl. */
+    {
+        char longname[300];
+        unsigned char keys[10] = {0};
+
+        memset(longname, 'a', sizeof(longname) - 1);
+        longname[sizeof(longname) - 1] = '\0';
+        check(SSL_ctrl(x, SSL_CTRL_SET_TLSEXT_HOSTNAME, 99, (void *)"a") == 0,
+              "a host name of an unknown type");
+        errors("ssl");
+        check(SSL_set_tlsext_host_name(x, longname) == 0, "a host name over 255 octets");
+        errors("ssl");
+        check(SSL_set_tlsext_host_name(x, "") == 0, "an empty host name");
+        errors("ssl");
+        check(SSL_ctrl(x, SSL_CTRL_SET_TMP_DH_CB, 0, NULL) == 0, "SSL_CTRL_SET_TMP_DH_CB");
+        errors("ssl");
+        check(SSL_CTX_ctrl(ctx, SSL_CTRL_SET_TMP_DH_CB, 0, NULL) == 0,
+              "SSL_CTX's SSL_CTRL_SET_TMP_DH_CB");
+        errors("ctx");
+        check(SSL_CTX_set_tlsext_ticket_keys(ctx, keys, sizeof(keys)) == 0,
+              "ticket keys of the wrong length");
+        errors("ctx");
+        check(SSL_CTX_get_tlsext_ticket_keys(ctx, keys, sizeof(keys)) == 0,
+              "a ticket-key buffer of the wrong length");
+        errors("ctx");
+    }
     SSL_free(x);
     SSL_CTX_free(ctx);
     X509_free(crt);

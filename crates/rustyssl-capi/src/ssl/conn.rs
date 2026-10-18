@@ -297,7 +297,7 @@ ffi_export! {
         // SAFETY: no preconditions.
         let param = unsafe { X509_VERIFY_PARAM_new() };
         if param.is_null() {
-            err::raise(ERR_LIB_SSL, ERR_R_ASN1_LIB, F);
+            err::raise(ERR_LIB_SSL, ERR_R_ASN1_LIB, "ossl_ssl_connection_new_int");
             return ptr::null_mut();
         }
         // SAFETY: the new parameters; the context's.
@@ -306,7 +306,7 @@ ffi_export! {
             let cs = c.state();
             let Some(cert) = cs.cert.dup() else {
                 drop(cs);
-                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, F);
+                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, "ossl_ssl_connection_new_int");
                 // SAFETY: made above.
                 unsafe { X509_VERIFY_PARAM_free(param) };
                 return ptr::null_mut();
@@ -314,7 +314,7 @@ ffi_export! {
             let method = cs.method;
             let Some(ciphers) = super::ciphers::CipherLists::for_ssl(&cs.ciphers) else {
                 drop(cs);
-                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, F);
+                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, "ossl_ssl_connection_new_int");
                 // SAFETY: made above.
                 unsafe { X509_VERIFY_PARAM_free(param) };
                 return ptr::null_mut();
@@ -1776,13 +1776,13 @@ ffi_export! {
             SSL_CTRL_GET_FLAGS => c_long::from(st.s3_flags),
             SSL_CTRL_SET_TMP_DH_CB => {
                 drop(st);
-                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, F);
+                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, "ssl3_ctrl");
                 0
             }
             SSL_CTRL_SET_TLSEXT_HOSTNAME => {
                 if larg != c_long::from(TLSEXT_NAMETYPE_host_name) {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, F);
+                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, "ssl3_ctrl");
                     return 0;
                 }
                 st.hostname = None;
@@ -1793,7 +1793,7 @@ ffi_export! {
                 let name = unsafe { core::ffi::CStr::from_ptr(parg.cast::<c_char>()) };
                 if name.is_empty() || name.count_bytes() > usize::try_from(TLSEXT_MAXLEN_host_name).unwrap_or(255) {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME, F);
+                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME, "ssl3_ctrl");
                     return 0;
                 }
                 st.hostname = Some(name.to_owned());
