@@ -116,6 +116,7 @@ struct config {
     int expect_hrr, expect_no_hrr, use_old_client_cert_callback;
     int use_ticket_callback, renew_ticket, skip_ticket;
     int dtls, mtu;
+    struct bytes srtp_profiles;
     /* -cert-file and -key-file after a -new-x509-credential set the newest credential's. */
     struct bytes cred_cert[MAX_CREDS], cred_key[MAX_CREDS];
     int ncreds, in_cred;
@@ -217,6 +218,7 @@ static const struct flag FLAGS[] = {
     F("-no-op-extra-handshake", BOOL, no_op_extra_handshake),
     F("-expect-peer-cert-file", STR, expect_peer_cert_file),
     F("-expect-selected-credential", INT, expect_selected_credential),
+    F("-srtp-profiles", STR, srtp_profiles),
     F("-expect-no-peer-cert", BOOL, expect_no_peer_cert),
     F("-fail-cert-callback", BOOL, fail_cert_callback),
     F("-use-early-callback", BOOL, use_early_callback),
@@ -1251,6 +1253,9 @@ static SSL *new_ssl(SSL_CTX *ctx, const struct config *c, struct state *st, SSL_
         SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
     if (!c->check_close_notify)
         SSL_set_quiet_shutdown(ssl, 1);
+    /* SSL_set_tlsext_use_srtp is 0 on success. */
+    if (c->srtp_profiles.set && SSL_set_tlsext_use_srtp(ssl, (char *)c->srtp_profiles.data) != 0)
+        return NULL;
     if (c->curves.n > 0) {
         char *list = list_of(GROUPS, &c->curves);
         int ok = SSL_set1_groups_list(ssl, list);
