@@ -202,11 +202,25 @@ fn current_slot(c: &Connection) -> Option<usize> {
     })
 }
 
-/// `ssl3_check_client_certificate`: a certificate with a usable signature scheme.
+/// `ssl3_check_client_certificate`: a certificate with a usable signature scheme, and in
+/// strict mode a chain that suits the server (`tls1_check_chain`).
 fn check_client_certificate(c: &mut Connection) -> Result<bool> {
     sigalgs::set_cert_validity(c);
     sigalgs::choose(c, false)?;
-    Ok(c.hs.sh.sigalg.is_some() && c.hs.sh.cert.is_some())
+    if c.hs.sh.sigalg.is_none() || c.hs.sh.cert.is_none() {
+        return Ok(false);
+    }
+    if c.cfg.cert_flags & abi::SSL_CERT_FLAG_TLS_STRICT != 0
+        && !current_slot(c).is_some_and(|i| {
+            c.cfg
+                .certs
+                .get(i)
+                .is_some_and(|k| sigalgs::slot_valid(c, k.slot))
+        })
+    {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 /// `tls_prepare_client_certificate`: the certificate callback (`cert_cb`, at `MoreA`), then

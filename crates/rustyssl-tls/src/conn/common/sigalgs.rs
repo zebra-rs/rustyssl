@@ -1564,11 +1564,13 @@ pub fn sig_mask(c: &Connection, op: c_int) -> u32 {
     disabled
 }
 
-/// `tls1_set_cert_validity` (non-strict mode, the default): each slot's certificate is valid
-/// unless an EC certificate's curve is unacceptable (`tls1_check_cert_param`); a key-only slot
-/// with a raw public key negotiated is `CERT_PKEY_RPK`. TLS 1.2's explicit-sign flags are kept,
-/// earlier versions sign implicitly.
+/// `tls1_set_cert_validity`: in the default mode each slot's certificate is valid unless an EC
+/// certificate's curve is unacceptable (`tls1_check_cert_param`); in strict mode
+/// ([`check_slot_strict`]) the chain's signatures, parameters, certificate type, and issuer
+/// names must suit the peer too. A key-only slot with a raw public key negotiated is
+/// `CERT_PKEY_RPK`. TLS 1.2's explicit-sign flags are kept, earlier versions sign implicitly.
 pub fn set_cert_validity(c: &mut Connection) {
+    let strict = c.cfg.cert_flags & abi::SSL_CERT_FLAG_TLS_STRICT != 0;
     for slot in 0..slots(c) {
         let prev = valid_flag(c, slot);
         let Some(k) = cert_in_slot(c, slot).and_then(|i| c.cfg.certs.get(i)) else {
@@ -1589,6 +1591,22 @@ pub fn set_cert_validity(c: &mut Connection) {
                 slot,
                 prev & (flag(abi::CERT_PKEY_EXPLICIT_SIGN) | flag(abi::CERT_PKEY_SIGN)),
             );
+            continue;
+        }
+        if strict {
+            let v = k
+                .strict
+                .as_ref()
+                .map_or(0, |cand| check_slot_strict(c, cand, slot));
+            let sign = flag(abi::CERT_PKEY_EXPLICIT_SIGN) | flag(abi::CERT_PKEY_SIGN);
+            let signs = if use_sigalgs(c) { prev & sign } else { sign };
+            // An invalid chain keeps only the signing flags (`*pvalid &= ...`).
+            let v = if v & flag(abi::CERT_PKEY_VALID) != 0 {
+                v | signs
+            } else {
+                prev & sign
+            };
+            set_valid_flag(c, slot, v);
             continue;
         }
         let param_ok = k.slot != PKEY_ECC
@@ -1616,6 +1634,92 @@ pub fn set_cert_validity(c: &mut Connection) {
         }
         set_valid_flag(c, slot, rv);
     }
+}
+
+/// `tls1_check_chain` on a slot in strict mode (`check_flags` 0): the `CERT_PKEY_*` flags,
+/// with `CERT_PKEY_VALID` only when every check passed (the first failure ends it). Suite B's
+/// chain check isn't made: with Suite B flags no chain is valid.
+fn check_slot_strict(c: &Connection, cand: &ChainCandidate, idx: usize) -> u32 {
+    if c.cfg.cert_flags & abi::SSL_CERT_FLAG_SUITEB_128_LOS.cast_unsigned() != 0 {
+        return 0;
+    }
+    let mut rv = 0u32;
+    if c.neg.version >= crate::consts::version::TLS1_2 || c.is_tls13() {
+        let (default_nid, rsign) =
+            if c.hs.sh.peer_cert_sigalgs.is_some() || c.hs.sh.peer_sigalgs.is_some() {
+                (0, None)
+            } else {
+                match idx {
+                    PKEY_RSA => (abi::NID_sha1WithRSAEncryption, Some(Sig::Rsa)),
+                    PKEY_DSA_SIGN => (abi::NID_dsaWithSHA1, Some(Sig::Dsa)),
+                    PKEY_ECC => (abi::NID_ecdsa_with_SHA1, Some(Sig::Ec)),
+                    _ => (-1, None),
+                }
+            };
+        // With no signature_algorithms, configured schemes must include the SHA-1 one.
+        if default_nid > 0
+            && !c.cfg.sigalgs.is_empty()
+            && !c.cfg.sigalgs.iter().any(|&code| {
+                c.hs.sh
+                    .sigalgs
+                    .lookup(code)
+                    .is_some_and(|lu| lu.hash == abi::NID_sha1 && Some(lu.sig.clone()) == rsign)
+            })
+        {
+            return 0;
+        }
+        if c.is_tls13() {
+            if find_sig_alg_for(c, cand) {
+                rv |= flag(abi::CERT_PKEY_EE_SIGNATURE);
+            }
+        } else if check_sig_alg(c, &cand.leaf, default_nid) {
+            rv |= flag(abi::CERT_PKEY_EE_SIGNATURE);
+        } else {
+            return 0;
+        }
+        if !cand.chain.iter().all(|x| check_sig_alg(c, x, default_nid)) {
+            return 0;
+        }
+        rv |= flag(abi::CERT_PKEY_CA_SIGNATURE);
+    }
+    if !check_cert_param(c, &cand.leaf) {
+        return 0;
+    }
+    rv |= flag(abi::CERT_PKEY_EE_PARAM);
+    if c.cfg.server && !cand.chain.iter().all(|x| check_cert_param(c, x)) {
+        return 0;
+    }
+    rv |= flag(abi::CERT_PKEY_CA_PARAM);
+    if c.cfg.server {
+        rv |= flag(abi::CERT_PKEY_ISSUER_NAME) | flag(abi::CERT_PKEY_CERT_TYPE);
+    } else {
+        // An RSA, DSA, or ECDSA key must be of a type the CertificateRequest listed (TLS 1.3's
+        // has none).
+        if cand.cert_type != 0
+            && !c
+                .certificate_types()
+                .is_some_and(|t| t.contains(&cand.cert_type))
+        {
+            return 0;
+        }
+        rv |= flag(abi::CERT_PKEY_CERT_TYPE);
+        let names = c.neg.peer_ca_names.as_deref().unwrap_or_default();
+        if !names.is_empty()
+            && !core::iter::once(&cand.leaf)
+                .chain(cand.chain.iter())
+                .any(|x| names.contains(&x.issuer))
+        {
+            return 0;
+        }
+        rv |= flag(abi::CERT_PKEY_ISSUER_NAME);
+    }
+    rv | flag(abi::CERT_PKEY_VALID)
+}
+
+/// Whether a slot's certificate passed [`set_cert_validity`] (`CERT_PKEY_VALID`).
+#[must_use]
+pub fn slot_valid(c: &Connection, slot: usize) -> bool {
+    valid_flag(c, slot) & flag(abi::CERT_PKEY_VALID) != 0
 }
 
 /// One certificate of what [`check_chain`] checks.

@@ -42,6 +42,10 @@ pub struct CertKey {
     /// (`EVP_PKEY_digestsign_supports_digest`: an RSA-PSS key's restriction, say), which
     /// rule out the signature algorithms using them.
     pub unsupported_digests: Vec<i32>,
+    /// The certificate, its key, and its configured chain as strict mode
+    /// (`SSL_CERT_FLAG_TLS_STRICT`) checks them (`tls1_check_chain` on a slot); `None` without
+    /// a certificate.
+    pub strict: Option<crate::conn::common::sigalgs::ChainCandidate>,
 }
 
 /// A session to resume, or one just established (what `SSL_SESSION` holds that the handshake

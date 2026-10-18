@@ -486,6 +486,17 @@ unsafe fn cert_key(
         chain_security: (chain_security != 1).then_some(chain_security),
         // SAFETY: our reference to the key; the context's library context and properties.
         unsupported_digests: unsafe { unsupported_digests(r.pkey, src) },
+        // The slot's own chain only (`cpk->chain`).
+        // SAFETY: our references.
+        strict: (!r.x509.is_null()).then(|| unsafe {
+            super::super::check_chain::candidate(
+                Some(prov),
+                r.x509,
+                r.pkey,
+                r.chain.as_deref().unwrap_or_default(),
+                r.slot,
+            )
+        }),
     })
 }
 
