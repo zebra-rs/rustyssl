@@ -2222,3 +2222,95 @@ fn tls12_certificate_transparency() {
         }
     }
 }
+
+#[test]
+fn client_hello_padding() {
+    let p = TestProvider::new(b"padding");
+    let mut cfg = rfc_client();
+    cfg.key_share_groups = vec![0x001d, 0x0017];
+    cfg.options |= abi::SSL_OP_TLSEXT_PADDING;
+    let mut c = Connection::new(cfg.clone());
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let ch = &seen.written[0];
+    // Between 256 and 511 octets without it, so padded to 512 (the padding extension last).
+    assert_eq!(ch.len(), 512);
+    let pad = hello_ext(&ch[4..], 0x0015).unwrap();
+    assert!(pad.iter().all(|&b| b == 0));
+    let mut plain = cfg;
+    plain.options &= !abi::SSL_OP_TLSEXT_PADDING;
+    let mut c = Connection::new(plain);
+    let mut seen2 = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen2).unwrap();
+    assert_eq!(seen2.written[0].len(), 512 - 4 - pad.len());
+}
+
+#[test]
+fn a_hello_waiting_for_an_answer_is_made_once() {
+    let p = TestProvider::new(b"rerun");
+    let mut cfg = rfc_client();
+    cfg.callbacks.psk_session = true;
+    let mut c = Connection::new(cfg);
+    let mut written = Vec::new();
+    // The PSK session callback suspends twice before answering.
+    let mut asked = 0;
+    loop {
+        match c.step(&p, false).unwrap() {
+            Event::Request(Request::PskSession { .. }) => {
+                asked += 1;
+                if asked == 3 {
+                    c.answer(Answer::Session(None));
+                }
+            }
+            Event::Message {
+                write: true,
+                content_type: 22,
+                bytes,
+                ..
+            } => written.push(bytes),
+            Event::NeedInput => break,
+            Event::Output => {
+                c.take_output();
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(asked, 3);
+    let [ch] = &written[..] else { panic!() };
+    // One key share, made once: the one the state holds.
+    let st = super::state_ref(&c).unwrap();
+    assert_eq!(st.ks.len(), 1);
+    assert_eq!(
+        server_share_for(ch, 0x001d),
+        Some(st.ks[0].1.public().to_vec())
+    );
+}
+
+#[test]
+fn tls12_resumption_must_agree() {
+    let p = TestProvider::new(b"tls12-agree");
+    let (c, _) = full12(&p, client12(), 0xc02f, false);
+    let session = c.negotiated().session.clone();
+    let resume = |f: &dyn Fn(&mut Server12<'_>, &Session) -> Vec<u8>| -> Error {
+        let mut cfg = client12();
+        cfg.session = Some(session.clone());
+        let (mut c, mut seen, mut s) = hello12(&p, cfg);
+        c.feed(&f(&mut s, &session));
+        loop {
+            match drive(&mut c, &p, false, &mut accept, &mut seen) {
+                Err(e) => return e,
+                Ok(Event::NeedInput) => panic!("no error"),
+                Ok(_) => {}
+            }
+        }
+    };
+    // Another suite for the session.
+    let e = resume(&|s, sess| s.hello(0x009c, &sess.session_id, &[RI, EMS]));
+    assert_eq!(e, ill(abi::SSL_R_OLD_SESSION_CIPHER_NOT_RETURNED));
+    // The session used the Extended Master Secret; the resumption doesn't.
+    let e = resume(&|s, sess| s.hello(0xc02f, &sess.session_id, &[RI]));
+    assert_eq!(
+        e,
+        Error::alert(abi::SSL_AD_HANDSHAKE_FAILURE, abi::SSL_R_INCONSISTENT_EXTMS)
+    );
+}
