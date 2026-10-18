@@ -375,6 +375,17 @@ impl Connection {
         }
     }
 
+    /// The certificate types of the server's TLS 1.2 CertificateRequest
+    /// (`SSL_get0_certificate_types`): `None` on a server or when no certificate was requested;
+    /// empty in TLS 1.3, whose request carries none.
+    #[must_use]
+    pub fn certificate_types(&self) -> Option<&[u8]> {
+        match &self.hs.role {
+            RoleState::Client(s) if self.hs.sh.cert_req != 0 => Some(s.certificate_types()),
+            _ => None,
+        }
+    }
+
     /// The handshake state (`SSL_get_state`).
     #[must_use]
     pub fn state(&self) -> u32 {

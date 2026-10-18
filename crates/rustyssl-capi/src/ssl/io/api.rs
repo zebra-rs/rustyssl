@@ -1075,10 +1075,12 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         },
         SSL_CTRL_GET_PEER_TMP_KEY => {
             let share = tls.and_then(|c| c.handshake().sh.peer_tmp.clone());
+            let dh = tls.and_then(|c| c.handshake().sh.peer_dh.clone());
             let prov = st.drv.provider.clone();
             drop(st);
-            let key = match (share, prov) {
-                (Some((id, octets)), Some(p)) => p.peer_share_key(id, &octets),
+            let key = match (share, dh, prov) {
+                (Some((id, octets)), _, Some(p)) => p.peer_share_key(id, &octets),
+                (None, Some((dp, dg, ys)), Some(p)) => p.peer_dh_key(&dp, &dg, &ys),
                 _ => None,
             };
             match key {

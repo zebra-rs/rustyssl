@@ -461,6 +461,15 @@ impl EvpProvider {
         Some(KeyId(keys.len().saturating_sub(1)))
     }
 
+    /// A TLS 1.2 DHE server's key from its parameters and public value (`s->s3.peer_tmp`): a
+    /// new key the caller owns, or `None`.
+    pub(crate) fn peer_dh_key(&self, p: &[u8], g: &[u8], public: &[u8]) -> Option<*mut EVP_PKEY> {
+        let k = self.env.dh_key(p, g, Some(public)).ok()?;
+        let p = k.0;
+        core::mem::forget(k);
+        Some(p)
+    }
+
     /// The peer's key share for group `id` as a key (`s->s3.peer_tmp`, which
     /// `SSL_get_peer_tmp_key` returns): a new key the caller owns, or `None` if the group or
     /// the share doesn't make one (a KEM's ciphertext, say).

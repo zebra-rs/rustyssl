@@ -1117,7 +1117,9 @@ unsafe fn dh_parameters(t: Target, v: *const c_char) -> c_int {
         return 1;
     }
     // SAFETY: no preconditions.
-    let input = unsafe { BIO_new(BIO_s_file()) };
+    let method = unsafe { BIO_s_file() };
+    // SAFETY: the static file method.
+    let input = unsafe { BIO_new(method) };
     if input.is_null() {
         return 0;
     }

@@ -159,6 +159,9 @@ pub(crate) struct Cert {
     pub(crate) conf_sigalgs: Option<Vec<u16>>,
     /// The signature algorithms for client authentication (`client_sigalgs`), or `None`.
     pub(crate) client_sigalgs: Option<Vec<u16>>,
+    /// The certificate types a TLS 1.2 CertificateRequest lists (`ctype`,
+    /// `SSL_set1_client_certificate_types`), or `None` for the defaults.
+    pub(crate) ctype: Option<Vec<u8>>,
 }
 
 impl Cert {
@@ -182,6 +185,7 @@ impl Cert {
             psk_identity_hint: None,
             conf_sigalgs: None,
             client_sigalgs: None,
+            ctype: None,
         }
     }
 
@@ -236,6 +240,7 @@ impl Cert {
         ret.psk_identity_hint.clone_from(&self.psk_identity_hint);
         ret.conf_sigalgs.clone_from(&self.conf_sigalgs);
         ret.client_sigalgs.clone_from(&self.client_sigalgs);
+        ret.ctype.clone_from(&self.ctype);
         Some(ret)
     }
 

@@ -1261,6 +1261,9 @@ pub(crate) fn ext_parse_key_share(
     }
     let (_, share) = st.ks.swap_remove(i);
     st.ks.clear();
+    // Shared addition (fork N): the client's own share stays its temporary key
+    // (`SSL_get_tmp_key`), a KEM's encapsulation key included.
+    c.hs.sh.own_tmp = Some((group, share.public().to_vec()));
     let shared = share.derive(&entry.key).map_err(|_| {
         if info.is_kem {
             Error::internal()

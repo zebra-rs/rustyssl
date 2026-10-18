@@ -496,6 +496,38 @@ pub(crate) unsafe fn certs(
 ///
 /// # Safety
 /// `s` is the live connection behind `x`; `snap` its context's snapshot.
+/// A DH key's prime and generator, big-endian (`SSL_set0_tmp_dh_pkey`'s parameters for a DHE
+/// ServerKeyExchange), or `None`.
+///
+/// # Safety
+/// `pkey` is NULL or a live key.
+unsafe fn dh_params(pkey: *const EVP_PKEY) -> Option<(Vec<u8>, Vec<u8>)> {
+    use crate::bn::conv::BN_bn2bin;
+    use crate::bn::{BN_free, BN_num_bits};
+    use crate::evp::pkey::params::EVP_PKEY_get_bn_param;
+    use rustyssl_abi::{OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P};
+    if pkey.is_null() {
+        return None;
+    }
+    let get = |name: &core::ffi::CStr| {
+        let mut bn = ptr::null_mut();
+        // SAFETY: the caller's live key; a parameter name; the slot above.
+        if unsafe { EVP_PKEY_get_bn_param(pkey, name.as_ptr(), &raw mut bn) } == 0 {
+            return None;
+        }
+        // SAFETY: the number made above.
+        let bits = unsafe { BN_num_bits(bn) };
+        let len = usize::try_from(bits).ok()?.div_ceil(8);
+        let mut out = vec![0u8; len];
+        // SAFETY: as above; room for its octets.
+        let n = unsafe { BN_bn2bin(bn, out.as_mut_ptr()) };
+        // SAFETY: made above.
+        unsafe { BN_free(bn) };
+        (usize::try_from(n).ok() == Some(len)).then_some(out)
+    };
+    Some((get(OSSL_PKEY_PARAM_FFC_P)?, get(OSSL_PKEY_PARAM_FFC_G)?))
+}
+
 pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpProvider) -> Config {
     // SAFETY: the caller's connection.
     let cipher_stack = unsafe { super::super::ciphers::ssl_ciphers(s) };
@@ -548,6 +580,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         group_tuples,
         sigalgs: st.cert.conf_sigalgs.clone().unwrap_or_default(),
         client_sigalgs: st.cert.client_sigalgs.clone().unwrap_or_default(),
+        req_cert_types: st.cert.ctype.clone(),
         client_cert_types: cert_types(&st.lists.client_cert_type),
         server_cert_types: cert_types(&st.lists.server_cert_type),
         min_version: u16::try_from(st.min_proto_version).unwrap_or(0),
@@ -584,6 +617,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         dh_tmp: !st.cert.dh_tmp.is_null()
             || st.cert.dh_tmp_cb.is_some()
             || st.cert.dh_tmp_auto != 0,
+        // SAFETY: the configuration's DH key (a reference held), or NULL.
+        dh_params: unsafe { dh_params(st.cert.dh_tmp) },
         dh_auto: st.cert.dh_tmp_auto != 0,
         now: now(),
         session_cache_mode: i64::from(snap.session_cache_mode),
