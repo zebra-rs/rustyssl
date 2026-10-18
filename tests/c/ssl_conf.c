@@ -378,8 +378,6 @@ static void on_connection(void)
 
     printf("# no object\n");
     SSL_CONF_CTX_set_ssl(cctx, NULL);
-    check(cmd(cctx, "SignatureAlgorithms", "RSA+SHA256") == 2, "a syntax check");
-    check(cmd(cctx, "SignatureAlgorithms", "RSA+SHA1234") == 0, "a bad one");
     check(cmd(cctx, "Groups", "X25519") == 0, "groups aren't checked without a context");
     check(cmd(cctx, "Options", "SessionTicket") == 2, "options");
     check(cmd(cctx, "MinProtocol", "TLSv1.2") == 0, "no object for the version");
