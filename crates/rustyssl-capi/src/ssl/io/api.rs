@@ -370,7 +370,10 @@ pub(crate) unsafe fn write_internal(
         };
     }
     if num == 0 {
-        return 0;
+        // `ssl3_write_bytes`: nothing to write is done (`SSL_write` then returns 0, and
+        // `SSL_write_ex` 1).
+        *written = 0;
+        return 1;
     }
     let chunk = if mode & SSL_MODE_ENABLE_PARTIAL_WRITE != 0 {
         num.min(max_frag.max(1))

@@ -502,6 +502,10 @@ static void test_misuse(void)
     check(SSL_write_ex2(c, "abc", 3, 0, &n) == 1 && n == 3, "no flags");
     expect_data(s, "abc", "arrives");
     n = 9;
+    printf("  empty: SSL_write_ex %d (%zu), SSL_write %d\n", SSL_write_ex(c, "", 0, &n), n,
+           SSL_write(c, "", 0));
+    errors();
+    n = 9;
     printf("  CONCLUDE: %d (%zu)\n", SSL_write_ex2(c, "abc", 3, SSL_WRITE_FLAG_CONCLUDE, &n), n);
     errors();
     SSL_shutdown(c);

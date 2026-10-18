@@ -166,11 +166,13 @@ pub fn generate_handshake_secret(
     shared: Option<&[u8]>,
 ) -> Result<()> {
     let hash = handshake_md(c)?;
-    // Shared fix (fork O): without resumption the early secret is made again with no PSK
+    // Shared fix (fork O): a server not resuming makes the early secret again with no PSK
     // (`ssl_gensecret`): a PSK accepted in a first ClientHello may be refused in the second,
-    // after a HelloRetryRequest (anti-replay takes the session out of the cache).
+    // after a HelloRetryRequest (anti-replay takes the session out of the cache). A client does
+    // that itself when the ServerHello chose no PSK.
+    let keep = c.neg.reused || !c.cfg.server;
     let mut sched = match c.hs.sh.keys.schedule.take() {
-        Some(s) if s.hash() == hash && c.neg.reused => s,
+        Some(s) if s.hash() == hash && keep => s,
         _ => Schedule13::new(p, hash, None)?,
     };
     sched.into_handshake(p, shared)?;

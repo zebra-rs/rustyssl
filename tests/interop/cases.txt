@@ -2,7 +2,7 @@
 # Placeholders: {rsa} {ec} {p521} {ed25519} (the server's certificate and key), {client} (the
 # client's), {ca} (the root), {dir} (the PKI's directory).
 # Client directives: +full (no -brief; the session lines), +resume (a second connection
-# resuming the first's session), +cmd=X (send the command line X, R or k or K, first).
+# resuming the first's session), +early (with +resume: early data on the second), +cmd=X (send the command line X, R or k or K, first).
 # Each case runs in four pairings (reference/reference is the expectation; the server echoes
 # lines reversed and closes on CLOSE).
 
@@ -29,6 +29,8 @@ tls12-no-ems | | {ca} -tls1_2 -no_ems
 tls12-ed25519 | {ed25519} | {ca} -tls1_2
 tls13-resume | | {ca} +resume
 tls12-resume | | {ca} -tls1_2 +resume
+tls13-early-data | -early_data | {ca} +resume +early
+tls13-early-data-rejected | -early_data -no_anti_replay -max_early_data 0 | {ca} +resume +early
 tls13-client-cert | -Verify 1 {ca} | {ca} {client}
 tls12-client-cert | -Verify 1 {ca} | {ca} {client} -tls1_2
 tls13-alpn | -alpn h2,http/1.1 | {ca} -alpn http/1.1 +full
