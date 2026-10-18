@@ -125,14 +125,18 @@ fn tls13_capable(c: &Connection) -> bool {
     if cb.servername || cb.psk || cb.psk_session || cb.cert {
         return true;
     }
-    c.cfg.certs.iter().any(|k| match k.slot {
-        super::sigalgs::PKEY_DSA_SIGN
-        | super::sigalgs::PKEY_GOST01
-        | super::sigalgs::PKEY_GOST12_256
-        | super::sigalgs::PKEY_GOST12_512 => false,
-        super::sigalgs::PKEY_ECC => super::sigalgs::check_sigalg_curve(c, k.curve_nid),
-        _ => true,
-    })
+    c.cfg
+        .certs
+        .iter()
+        .filter(|k| super::sigalgs::has_cert(c, k.slot))
+        .any(|k| match k.slot {
+            super::sigalgs::PKEY_DSA_SIGN
+            | super::sigalgs::PKEY_GOST01
+            | super::sigalgs::PKEY_GOST12_256
+            | super::sigalgs::PKEY_GOST12_512 => false,
+            super::sigalgs::PKEY_ECC => super::sigalgs::check_sigalg_curve(c, k.curve_nid),
+            _ => true,
+        })
 }
 
 /// `ssl_version_supported`: whether this end could use `v`.

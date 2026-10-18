@@ -1125,12 +1125,33 @@ fn own_rpk(c: &Connection) -> bool {
     t == crate::conn::statem::msgs_type(abi::TLSEXT_cert_type_rpk)
 }
 
-/// `ssl_has_cert`: a certificate (or, with a raw public key negotiated, a key) in `slot`.
+/// `tls12_rpk_and_privkey`: a raw public key negotiated for this end, and a key with no
+/// certificate in `slot`.
+fn rpk_and_privkey(c: &Connection, slot: usize) -> bool {
+    own_rpk(c)
+        && cert_in_slot(c, slot)
+            .and_then(|i| c.cfg.certs.get(i))
+            .is_some_and(|k| k.chain.is_empty() && k.raw_public_key.is_some())
+}
+
+/// `ssl_has_cert_type(s, TLSEXT_cert_type_rpk)`: this end offers raw public keys for its own
+/// certificate (configured, whatever is negotiated).
+fn rpk_configured(c: &Connection) -> bool {
+    let types = if c.cfg.server {
+        &c.cfg.server_cert_types
+    } else {
+        &c.cfg.client_cert_types
+    };
+    types.contains(&crate::conn::statem::msgs_type(abi::TLSEXT_cert_type_rpk))
+}
+
+/// `ssl_has_cert`: a certificate in `slot` (or, with raw public keys configured for this end,
+/// a key alone).
 #[must_use]
 pub fn has_cert(c: &Connection, slot: usize) -> bool {
     cert_in_slot(c, slot)
         .and_then(|i| c.cfg.certs.get(i))
-        .is_some_and(|k| !k.chain.is_empty() || (own_rpk(c) && k.raw_public_key.is_some()))
+        .is_some_and(|k| !k.chain.is_empty() || (rpk_configured(c) && k.raw_public_key.is_some()))
 }
 
 /// The client's current certificate's slot (`s->cert->key`).
@@ -1291,14 +1312,18 @@ fn check_peer_sigalg_inner(c: &mut Connection, sig: u16, key: &PeerKey) -> Resul
 }
 
 /// `check_cert_usable`: whether the certificate in `idx` can sign with `lu`: its key can
-/// (`EVP_PKEY_digestsign_supports_digest` and the RSA-PSS size check, which capi folds into
-/// [`crate::conn::CertKey::schemes`]), and its own signature meets the peer's
+/// (`EVP_PKEY_digestsign_supports_digest`, which capi gives as
+/// [`crate::conn::CertKey::unsupported_digests`], and the RSA-PSS size check, which it folds
+/// into [`crate::conn::CertKey::schemes`]), and its own signature meets the peer's
 /// signature_algorithms_cert, if sent.
 fn cert_usable(c: &Connection, lu: &SigAlg, idx: usize) -> bool {
     let Some(k) = cert_in_slot(c, idx).and_then(|i| c.cfg.certs.get(i)) else {
         return false;
     };
     if !k.schemes.is_empty() && !k.schemes.contains(&lu.sigalg) {
+        return false;
+    }
+    if k.unsupported_digests.contains(&lu.hash) {
         return false;
     }
     if own_rpk(c) {
@@ -1380,7 +1405,7 @@ fn cert_sigalg_idx(c: &Connection, lu: &SigAlg) -> Option<usize> {
         return None;
     }
     let f = valid_flag(c, idx);
-    let want = if own_rpk(c) && has_cert(c, idx) {
+    let want = if rpk_and_privkey(c, idx) {
         flag(abi::CERT_PKEY_RPK)
     } else {
         flag(abi::CERT_PKEY_VALID)
@@ -1547,7 +1572,7 @@ pub fn set_cert_validity(c: &mut Connection) {
             );
             continue;
         };
-        if own_rpk(c) && k.raw_public_key.is_some() && k.chain.is_empty() {
+        if rpk_and_privkey(c, slot) {
             set_valid_flag(c, slot, flag(abi::CERT_PKEY_RPK));
             continue;
         }
@@ -1584,6 +1609,212 @@ pub fn set_cert_validity(c: &mut Connection) {
         }
         set_valid_flag(c, slot, rv);
     }
+}
+
+/// One certificate of what [`check_chain`] checks.
+#[derive(Clone, Debug, Default)]
+pub struct ChainCert {
+    /// `X509_get_signature_nid`.
+    pub sig_nid: c_int,
+    /// `OBJ_find_sigid_algs` of that: the digest's and the key's NIDs, if known.
+    pub sig_algs: Option<(c_int, c_int)>,
+    /// `X509_self_signed(x, 0)`.
+    pub self_signed: bool,
+    /// The issuer name (DER).
+    pub issuer: Vec<u8>,
+    /// Whether its public key decodes (`X509_get0_pubkey`).
+    pub has_key: bool,
+    /// An EC key's group (`tls1_get_group_id`: 0 for a curve without one); `None` for other
+    /// keys.
+    pub ec_group: Option<u16>,
+}
+
+/// A certificate, its key, and its chain, as `SSL_check_chain` gets them.
+#[derive(Clone, Debug, Default)]
+pub struct ChainCandidate {
+    /// The certificate.
+    pub leaf: ChainCert,
+    /// The rest of the chain.
+    pub chain: Vec<ChainCert>,
+    /// The private key's slot (`ssl_cert_lookup_by_pkey`), `None` for a key no slot takes.
+    pub slot: Option<usize>,
+    /// The key's `TLS_CT_*` certificate type (RSA, DSS, or ECDSA sign), 0 for others.
+    pub cert_type: u8,
+    /// The key's curve (`ssl_get_EC_curve_nid`), or `NID_undef`.
+    pub curve_nid: c_int,
+    /// The certificate's `X509_get_signature_info` (digest and key NIDs).
+    pub sig_info: Option<(c_int, c_int)>,
+}
+
+/// `tls1_check_sig_alg`: whether a certificate's signature is one the peer accepts (a
+/// self-signed one always is; with no signature_algorithms the RFC 5246 default; RSA PKCS #1
+/// is accepted where RSA-PSS with its digest is).
+fn check_sig_alg(c: &Connection, x: &ChainCert, default_nid: c_int) -> bool {
+    if default_nid == -1 || x.self_signed {
+        return true;
+    }
+    if default_nid != 0 {
+        return x.sig_nid == default_nid;
+    }
+    let list: Vec<u16> = match &c.hs.sh.peer_cert_sigalgs {
+        Some(pc) if c.is_tls13() => pc.clone(),
+        _ => c.neg.shared_sigalgs.clone(),
+    };
+    list.iter()
+        .filter_map(|&code| c.hs.sh.sigalgs.lookup(code))
+        .any(|lu| {
+            lu.sigandhash == x.sig_nid
+                || (lu.sig == Sig::RsaPss
+                    && x.sig_algs
+                        .is_some_and(|(md, pk)| pk == abi::NID_rsaEncryption && md == lu.hash))
+        })
+}
+
+/// `tls1_check_cert_param` (no Suite B digest check): an EC key's group must be one in use.
+fn check_cert_param(c: &Connection, x: &ChainCert) -> bool {
+    if !x.has_key {
+        return false;
+    }
+    match x.ec_group {
+        None => true,
+        Some(g) => groups::check_group_id(c, g, !c.cfg.server),
+    }
+}
+
+/// `find_sig_alg` for a given certificate and key (TLS 1.3): whether a shared scheme (not
+/// SHA-1, SHA-224, DSA, or PKCS #1) can sign with them, within the peer's
+/// signature_algorithms_cert.
+fn find_sig_alg_for(c: &Connection, cand: &ChainCandidate) -> bool {
+    c.neg.shared_sigalgs.iter().any(|&code| {
+        let Some(lu) = c.hs.sh.sigalgs.lookup(code) else {
+            return false;
+        };
+        if lu.hash == abi::NID_sha1
+            || lu.hash == abi::NID_sha224
+            || lu.sig == Sig::Dsa
+            || lu.sig == Sig::Rsa
+            || !compat(c, lu)
+            || cand.slot != Some(lu.sig_idx)
+        {
+            return false;
+        }
+        if !own_rpk(c)
+            && let Some(peer) = &c.hs.sh.peer_cert_sigalgs
+        {
+            let Some((mdnid, pknid)) = cand.sig_info else {
+                return false;
+            };
+            let ok = peer
+                .iter()
+                .filter_map(|&x| c.hs.sh.sigalgs.lookup(x))
+                .any(|l| l.hash == mdnid && sig_nid(&l.sig) == pknid);
+            if !ok {
+                return false;
+            }
+        }
+        !(lu.sig == Sig::Ec && lu.curve != abi::NID_undef && cand.curve_nid != lu.curve)
+    })
+}
+
+/// `tls1_check_chain` as `SSL_check_chain` runs it (`idx == -1`): the `CERT_PKEY_*` flags of
+/// a certificate, key, and chain against what the handshake negotiated so far, with
+/// `CERT_PKEY_VALID` when the flags strict mode (`SSL_CERT_FLAG_TLS_STRICT`) or the default
+/// requires are all there. Suite B's chain check isn't made: with Suite B flags set the chain
+/// never has `CERT_PKEY_SUITEB`, so it isn't valid.
+#[must_use]
+pub fn check_chain(c: &Connection, cand: &ChainCandidate) -> u32 {
+    let Some(idx) = cand.slot else {
+        return 0;
+    };
+    let suiteb = c.cfg.cert_flags & abi::SSL_CERT_FLAG_SUITEB_128_LOS.cast_unsigned() != 0;
+    let strict_flags = flag(abi::CERT_PKEY_EE_SIGNATURE)
+        | flag(abi::CERT_PKEY_EE_PARAM)
+        | flag(abi::CERT_PKEY_CA_SIGNATURE)
+        | flag(abi::CERT_PKEY_CA_PARAM)
+        | flag(abi::CERT_PKEY_ISSUER_NAME)
+        | flag(abi::CERT_PKEY_CERT_TYPE);
+    let mut check_flags = if c.cfg.cert_flags & abi::SSL_CERT_FLAG_TLS_STRICT != 0 || suiteb {
+        strict_flags
+    } else {
+        flag(abi::CERT_PKEY_EE_SIGNATURE) | flag(abi::CERT_PKEY_EE_PARAM)
+    };
+    if suiteb {
+        check_flags |= flag(abi::CERT_PKEY_SUITEB);
+    }
+    let mut rv = 0u32;
+    let tls12 = c.neg.version >= crate::consts::version::TLS1_2 || c.is_tls13();
+    if tls12 {
+        let (default_nid, rsign) =
+            if c.hs.sh.peer_cert_sigalgs.is_some() || c.hs.sh.peer_sigalgs.is_some() {
+                (0, None)
+            } else {
+                match idx {
+                    PKEY_RSA => (abi::NID_sha1WithRSAEncryption, Some(Sig::Rsa)),
+                    PKEY_DSA_SIGN => (abi::NID_dsaWithSHA1, Some(Sig::Dsa)),
+                    PKEY_ECC => (abi::NID_ecdsa_with_SHA1, Some(Sig::Ec)),
+                    _ => (-1, None),
+                }
+            };
+        // With no signature_algorithms, configured schemes must include the SHA-1 one.
+        let skip_sigs = default_nid > 0
+            && !c.cfg.sigalgs.is_empty()
+            && !c.cfg.sigalgs.iter().any(|&code| {
+                c.hs.sh
+                    .sigalgs
+                    .lookup(code)
+                    .is_some_and(|lu| lu.hash == abi::NID_sha1 && Some(lu.sig.clone()) == rsign)
+            });
+        if !skip_sigs {
+            let ee = if c.is_tls13() {
+                find_sig_alg_for(c, cand)
+            } else {
+                check_sig_alg(c, &cand.leaf, default_nid)
+            };
+            if ee {
+                rv |= flag(abi::CERT_PKEY_EE_SIGNATURE);
+            }
+            if cand.chain.iter().all(|x| check_sig_alg(c, x, default_nid)) {
+                rv |= flag(abi::CERT_PKEY_CA_SIGNATURE);
+            }
+        }
+    } else {
+        rv |= flag(abi::CERT_PKEY_EE_SIGNATURE) | flag(abi::CERT_PKEY_CA_SIGNATURE);
+    }
+    if check_cert_param(c, &cand.leaf) {
+        rv |= flag(abi::CERT_PKEY_EE_PARAM);
+    }
+    if !c.cfg.server || cand.chain.iter().all(|x| check_cert_param(c, x)) {
+        rv |= flag(abi::CERT_PKEY_CA_PARAM);
+    }
+    if c.cfg.server {
+        rv |= flag(abi::CERT_PKEY_ISSUER_NAME) | flag(abi::CERT_PKEY_CERT_TYPE);
+    } else {
+        if cand.cert_type == 0
+            || c.certificate_types()
+                .is_some_and(|t| t.contains(&cand.cert_type))
+        {
+            rv |= flag(abi::CERT_PKEY_CERT_TYPE);
+        }
+        // None (nothing sent) and an empty list both match (`!sk_X509_NAME_num(ca_dn)`).
+        let names = c.neg.peer_ca_names.as_deref().unwrap_or_default();
+        if names.is_empty()
+            || core::iter::once(&cand.leaf)
+                .chain(cand.chain.iter())
+                .any(|x| names.contains(&x.issuer))
+        {
+            rv |= flag(abi::CERT_PKEY_ISSUER_NAME);
+        }
+    }
+    if rv & check_flags == check_flags {
+        rv |= flag(abi::CERT_PKEY_VALID);
+    }
+    let sign = flag(abi::CERT_PKEY_EXPLICIT_SIGN) | flag(abi::CERT_PKEY_SIGN);
+    if tls12 {
+        rv |= valid_flag(c, idx) & sign;
+    } else {
+        rv |= sign;
+    }
+    rv
 }
 
 #[cfg(test)]

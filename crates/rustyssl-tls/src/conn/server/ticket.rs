@@ -74,8 +74,8 @@ pub(crate) struct Found {
     pub(crate) session: Session,
 }
 
-/// The ticket keys from the ticket key callback or the configuration: the name, the IV
-/// (encrypting), the cipher key, and the HMAC key.
+/// The configuration's ticket keys: the name, the IV (encrypting), the cipher key, and the
+/// HMAC key.
 struct Keys {
     name: Vec<u8>,
     iv: Vec<u8>,
@@ -133,8 +133,11 @@ fn new_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     Ok(())
 }
 
-/// A random 32-octet session ID.
-fn random_id(p: &dyn Provider) -> Result<Vec<u8>> {
+/// A random 32-octet session ID (`def_generate_session_id`).
+///
+/// # Errors
+/// The random generator failed.
+pub(crate) fn random_id(p: &dyn Provider) -> Result<Vec<u8>> {
     let n = usize::try_from(abi::SSL3_SSL_SESSION_ID_LENGTH).map_err(|_| Error::internal())?;
     let mut id = vec![0u8; n];
     p.random(&mut id, false)
@@ -366,43 +369,31 @@ fn decrypt_inner(
     let (Some(name), Some(iv)) = (etick.get(..KEYNAME_LEN), etick.get(KEYNAME_LEN..header)) else {
         return Ok(Some(Ticket::NoDecrypt));
     };
-    let mut renew = false;
-    let (aes, hmac) = if c.cfg.callbacks.ticket_key {
+    if c.cfg.callbacks.ticket_key {
+        // The callback's contexts check and decrypt the ticket.
         let r = Request::TicketKey {
-            name: name.to_vec(),
+            ticket: etick.to_vec(),
+            session: Secret::default(),
             encrypt: false,
         };
-        match ask_once(c, r, tag) {
-            None => return Ok(None),
-            Some(Answer::TicketKey {
-                ret,
-                aes_key,
-                hmac_key,
-                ..
-            }) => {
-                if ret < 0 {
-                    return Ok(Some(Ticket::Fatal));
-                }
-                if ret == 0 {
-                    return Ok(Some(Ticket::NoDecrypt));
-                }
-                renew = ret == 2;
-                (Secret::new(aes_key), Secret::new(hmac_key))
-            }
-            Some(_) => return Ok(Some(Ticket::Fatal)),
-        }
-    } else {
-        let Some(k) = &c.cfg.ticket_keys else {
-            return Ok(Some(Ticket::Fatal));
-        };
-        if k.name[..] != *name {
-            return Ok(Some(Ticket::NoDecrypt));
-        }
-        if c.is_tls13() {
-            renew = true;
-        }
-        (k.aes_key.clone(), k.hmac_key.clone())
+        return Ok(match ask_once(c, r, tag) {
+            None => None,
+            Some(Answer::TicketKey { ret, data }) => Some(match data {
+                _ if ret < 0 => Ticket::Fatal,
+                Some(plain) if ret > 0 => opened(plain.bytes(), sess_id, ret == 2),
+                _ => Ticket::NoDecrypt,
+            }),
+            Some(_) => Some(Ticket::Fatal),
+        });
+    }
+    let Some(k) = &c.cfg.ticket_keys else {
+        return Ok(Some(Ticket::Fatal));
     };
+    if k.name[..] != *name {
+        return Ok(Some(Ticket::NoDecrypt));
+    }
+    let renew = c.is_tls13();
+    let (aes, hmac) = (k.aes_key.clone(), k.hmac_key.clone());
     let Ok(alg) = cbc_for(aes.bytes()) else {
         return Ok(Some(Ticket::Fatal));
     };
@@ -433,17 +424,23 @@ fn decrypt_inner(
     let Some(plain) = unpad(data.bytes()) else {
         return Ok(Some(Ticket::NoDecrypt));
     };
+    Ok(Some(opened(plain, sess_id, renew)))
+}
+
+/// A decrypted ticket's session, with the session ID the client sent (if any): what
+/// `d2i_SSL_SESSION` makes of the plaintext, `SSL_TICKET_NO_DECRYPT` if nothing.
+fn opened(plain: &[u8], sess_id: &[u8], renew: bool) -> Ticket {
     let Some(mut sess) = decode_session(plain) else {
-        return Ok(Some(Ticket::NoDecrypt));
+        return Ticket::NoDecrypt;
     };
     if !sess_id.is_empty() {
         sess.session_id = sess_id.to_vec();
     }
-    Ok(Some(if renew {
+    if renew {
         Ticket::Renew(Box::new(sess))
     } else {
         Ticket::Success(Box::new(sess))
-    }))
+    }
 }
 
 /// PKCS #7 padding's removal (`EVP_DecryptFinal`), after the HMAC is checked.
@@ -456,57 +453,57 @@ fn unpad(b: &[u8]) -> Option<&[u8]> {
     pad.iter().all(|&x| usize::from(x) == n).then_some(data)
 }
 
-/// The ticket keys for a new ticket. `None` while waiting; `Some(None)` when the callback
-/// declines (`0`: an empty TLS 1.2 ticket, or no TLS 1.3 ticket).
-fn encrypt_keys(c: &mut Connection, p: &dyn Provider) -> Result<Option<Option<Keys>>> {
-    if c.cfg.callbacks.ticket_key {
-        let r = Request::TicketKey {
-            name: Vec::new(),
-            encrypt: true,
+/// The ticket for `session`: sealed by the ticket key callback's contexts, or with the
+/// configuration's keys. `None` while waiting; `Some(None)` when the callback declines (`0`: an
+/// empty TLS 1.2 ticket, or no TLS 1.3 ticket).
+///
+/// # Errors
+/// The callback failed (`SSL_R_CALLBACK_FAILED`), or its contexts or the keys did (internal).
+fn sealed(
+    c: &mut Connection,
+    p: &dyn Provider,
+    session: &Session,
+    tag: usize,
+) -> Result<Option<Option<Vec<u8>>>> {
+    if !c.cfg.callbacks.ticket_key {
+        let k = c.cfg.ticket_keys.clone().ok_or_else(Error::internal)?;
+        let mut iv = vec![0u8; IV_LEN];
+        p.random(&mut iv, false).map_err(|_| Error::internal())?;
+        let keys = Keys {
+            name: k.name.to_vec(),
+            iv,
+            aes: k.aes_key,
+            hmac: k.hmac_key,
         };
-        return match ask_once(c, r, 0) {
-            None => Ok(None),
-            Some(Answer::TicketKey {
-                ret,
-                name,
-                aes_key,
-                hmac_key,
-                iv,
-            }) => {
-                if ret == 0 {
-                    return Ok(Some(None));
-                }
-                if ret < 0 {
-                    return Err(Error::alert(
-                        abi::SSL_AD_INTERNAL_ERROR,
-                        abi::SSL_R_CALLBACK_FAILED,
-                    ));
-                }
-                if name.len() != KEYNAME_LEN || iv.len() != IV_LEN {
-                    return Err(Error::internal());
-                }
-                Ok(Some(Some(Keys {
-                    name,
-                    iv,
-                    aes: Secret::new(aes_key),
-                    hmac: Secret::new(hmac_key),
-                })))
-            }
-            Some(_) => Err(Error::alert(
-                abi::SSL_AD_INTERNAL_ERROR,
-                abi::SSL_R_CALLBACK_FAILED,
-            )),
-        };
+        return seal(p, &keys, session).map(|t| Some(Some(t)));
     }
-    let k = c.cfg.ticket_keys.clone().ok_or_else(Error::internal)?;
-    let mut iv = vec![0u8; IV_LEN];
-    p.random(&mut iv, false).map_err(|_| Error::internal())?;
-    Ok(Some(Some(Keys {
-        name: k.name.to_vec(),
-        iv,
-        aes: k.aes_key,
-        hmac: k.hmac_key,
-    })))
+    let senc = Secret::new(encode_session(session)?);
+    if senc.is_empty() || senc.len() > 0xff00 {
+        return Err(Error::internal());
+    }
+    let r = Request::TicketKey {
+        ticket: Vec::new(),
+        session: senc,
+        encrypt: true,
+    };
+    match ask_once(c, r, tag) {
+        None => Ok(None),
+        Some(Answer::TicketKey { ret: 0, .. }) => Ok(Some(None)),
+        Some(Answer::TicketKey { ret, data }) => {
+            if ret < 0 {
+                return Err(Error::alert(
+                    abi::SSL_AD_INTERNAL_ERROR,
+                    abi::SSL_R_CALLBACK_FAILED,
+                ));
+            }
+            let t = data.ok_or_else(Error::internal)?;
+            Ok(Some(Some(t.bytes().to_vec())))
+        }
+        Some(_) => Err(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_CALLBACK_FAILED,
+        )),
+    }
 }
 
 /// `construct_stateless_ticket`'s ticket: the key name, the IV, the session encrypted, and the
@@ -605,12 +602,17 @@ pub(crate) fn construct_new_session_ticket(
     if c.cfg.callbacks.ticket_gen {
         // One answer per ticket.
         let tag = usize::try_from(state(c)?.next_ticket_nonce).unwrap_or(usize::MAX);
-        match ask_once(c, Request::TicketGenerate, tag) {
+        let r = Request::TicketGenerate {
+            session: Box::new(session.clone()),
+        };
+        match ask_once(c, r, tag) {
             None => return Ok(Construct::Ask),
-            Some(Answer::TicketAppData(a)) => {
-                // The application set it on the connection's session (`SSL_get_session`).
-                c.neg.session.ticket_appdata.clone_from(&a);
-                session.ticket_appdata = a;
+            Some(Answer::TicketGenerated { appdata, time }) => {
+                // The application changed the connection's session (`SSL_get_session`).
+                c.neg.session.ticket_appdata.clone_from(&appdata);
+                c.neg.session.time = time;
+                session.ticket_appdata = appdata;
+                session.time = time;
             }
             Some(_) => {
                 return Err(Error::alert_lib(
@@ -635,7 +637,9 @@ pub(crate) fn construct_new_session_ticket(
     let ticket = if stateful {
         session.session_id.clone()
     } else {
-        match encrypt_keys(c, p)? {
+        // One answer per ticket.
+        let tag = usize::try_from(state(c)?.next_ticket_nonce).unwrap_or(usize::MAX);
+        match sealed(c, p, &session, tag)? {
             None => return Ok(Construct::Ask),
             Some(None) => {
                 if tls13 {
@@ -648,7 +652,7 @@ pub(crate) fn construct_new_session_ticket(
                 w.u16(0);
                 return Ok(Construct::Send(w.into_bytes()));
             }
-            Some(Some(k)) => seal(p, &k, &session)?,
+            Some(Some(t)) => t,
         }
     };
     let mut w = Writer::new();
@@ -719,6 +723,7 @@ pub(crate) fn parse_psk(
         if c.cfg.callbacks.psk_session {
             let r = Request::PskSession {
                 identity: identity.clone(),
+                md: None,
             };
             match ask_once(c, r, id) {
                 None => return Ok(Step::Wait),
@@ -868,6 +873,13 @@ fn binder_prefix(c: &Connection, offer: &mx::psk::Offer) -> Result<Vec<u8>> {
         .ok_or_else(Error::internal)
 }
 
+/// [`encode_session`]'s format octet: always set.
+const FORMAT_BASE: u8 = 1;
+/// The format octet's flag for the application data.
+const FORMAT_APPDATA: u8 = 2;
+/// The format octet's flag for the peer's raw public key.
+const FORMAT_RPK: u8 = 4;
+
 /// The session's encoding inside a ticket (this crate's, versioned): every field of
 /// [`Session`] but the ticket itself.
 ///
@@ -876,9 +888,17 @@ fn binder_prefix(c: &Connection, offer: &mx::psk::Offer) -> Result<Vec<u8>> {
 pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     let mut w = Writer::new();
     let e = |_| Error::internal();
-    // Format 2 adds the application data; a ticket without it keeps format 1, so its length
-    // (which the trace shows) stays the reference's.
-    w.u8(if s.ticket_appdata.is_some() { 2 } else { 1 });
+    // The format octet's bits beyond the first say which optional fields follow (the
+    // application data, the peer's raw public key): a ticket with neither keeps format 1, so
+    // its length (which the trace shows) stays the reference's.
+    let mut format = FORMAT_BASE;
+    if s.ticket_appdata.is_some() {
+        format |= FORMAT_APPDATA;
+    }
+    if s.peer_rpk.is_some() {
+        format |= FORMAT_RPK;
+    }
+    w.u8(format);
     w.u16(s.version);
     w.u32(s.cipher_id);
     w.vec(1, &s.session_id).map_err(e)?;
@@ -910,6 +930,9 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     if let Some(b) = &s.ticket_appdata {
         w.vec(2, b).map_err(e)?;
     }
+    if let Some(k) = &s.peer_rpk {
+        w.vec(3, k).map_err(e)?;
+    }
     Ok(w.into_bytes())
 }
 
@@ -918,7 +941,7 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
 pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let mut rd = Reader::new(b);
     let format = rd.u8().ok()?;
-    if format != 1 && format != 2 {
+    if format & FORMAT_BASE == 0 || format & !(FORMAT_BASE | FORMAT_APPDATA | FORMAT_RPK) != 0 {
         return None;
     }
     let version = rd.u16().ok()?;
@@ -956,9 +979,15 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let verify_result = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let max_fragment_len_mode = rd.u8().ok()?;
     let ext_flags = rd.u32().ok()?;
-    let ticket_appdata = match format {
-        2 => Some(rd.vec16().ok()?.rest().to_vec()),
-        _ => None,
+    let ticket_appdata = if format & FORMAT_APPDATA != 0 {
+        Some(rd.vec16().ok()?.rest().to_vec())
+    } else {
+        None
+    };
+    let peer_rpk = if format & FORMAT_RPK != 0 {
+        Some(rd.vec24().ok()?.rest().to_vec())
+    } else {
+        None
     };
     rd.end().ok()?;
     if session_id.len() > 32 || sid_ctx.len() > 32 {
@@ -980,6 +1009,7 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         hostname,
         alpn,
         peer_chain,
+        peer_rpk,
         verify_result,
         max_fragment_len_mode,
         ext_flags,

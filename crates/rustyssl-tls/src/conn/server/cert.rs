@@ -280,8 +280,8 @@ fn check_context(c: &Connection, ctx: &[u8]) -> Result<()> {
 }
 
 /// The verification of the client's chain ([`Request::Verify`]): `None` while waiting.
-fn verify(c: &mut Connection, chain: Vec<Vec<u8>>) -> Result<Option<i64>> {
-    let r = ask_once(c, Request::Verify { chain }, 0);
+fn verify(c: &mut Connection, chain: Vec<Vec<u8>>, rpk: bool) -> Result<Option<i64>> {
+    let r = ask_once(c, Request::Verify { chain, rpk }, 0);
     match r {
         None => Ok(None),
         Some(Answer::Verified {
@@ -313,6 +313,7 @@ fn finish_peer(
 ) -> Result<()> {
     c.neg.session.peer_chain.clone_from(&chain);
     c.neg.peer_chain = chain;
+    c.neg.session.peer_rpk.clone_from(&rpk);
     c.neg.peer_rpk = rpk;
     c.neg.session.verify_result = c.neg.verify_result;
     if c.is_tls13() {
@@ -399,7 +400,7 @@ pub(crate) fn process_client_certificate(
             digest_cached_records(c, p, false)?;
         }
     } else {
-        if verify(c, chain.clone())?.is_none() {
+        if verify(c, chain.clone(), false)?.is_none() {
             return Ok(MsgProcess::Ask);
         }
         if chain
@@ -417,8 +418,7 @@ pub(crate) fn process_client_certificate(
 }
 
 /// `tls_process_client_rpk`: the client's raw public key (RFC 7250), verified as a chain of
-/// one SubjectPublicKeyInfo ([`Request::Verify`], with the client certificate type telling
-/// capi it is a key).
+/// one SubjectPublicKeyInfo ([`Request::Verify`] with `rpk`).
 ///
 /// # Errors
 /// The message doesn't decode, a key is required and missing, or verification failed.
@@ -443,7 +443,7 @@ fn process_client_rpk(c: &mut Connection, p: &dyn Provider, body: &[u8]) -> Resu
             return Ok(MsgProcess::Ask);
         }
     }
-    if verify(c, vec![spki.clone()])?.is_none() {
+    if verify(c, vec![spki.clone()], true)?.is_none() {
         return Ok(MsgProcess::Ask);
     }
     finish_peer(c, p, Vec::new(), Some(spki))?;

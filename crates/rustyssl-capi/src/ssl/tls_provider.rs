@@ -97,8 +97,8 @@ use crate::params::{
 };
 use crate::provider::{OSSL_PROVIDER_do_all, OSSL_PROVIDER_get_capabilities};
 use crate::rand_lib::{RAND_bytes_ex, RAND_priv_bytes_ex};
-use crate::x509::cert::{X509_free, X509_get0_pubkey, d2i_X509};
-use crate::x509::pubkey::d2i_PUBKEY;
+use crate::x509::cert::{X509_free, X509_get0_pubkey, decode_in};
+use crate::x509::pubkey::d2i_PUBKEY_ex;
 
 /// TLS 1.0 and 1.1's RSA signature over MD5 and SHA-1, which has no code point: OpenSSL's
 /// `legacy_rsa_sigalg`, passed as this pseudo-scheme (the core's test provider uses the same).
@@ -632,15 +632,14 @@ impl EvpProvider {
         Ok(ctx)
     }
 
-    /// The public key of a certificate's DER.
-    fn cert_key(cert: &[u8]) -> Result<(KeyOwner, *mut EVP_PKEY)> {
+    /// The public key of a certificate's DER, decoded in the provider's library context.
+    fn cert_key(&self, cert: &[u8]) -> Result<(KeyOwner, *mut EVP_PKEY)> {
         let len = core::ffi::c_long::try_from(cert.len()).map_err(|_| fail())?;
-        let mut p = cert.as_ptr();
         // A certificate, or (for a raw public key) a SubjectPublicKeyInfo.
         // SAFETY: no preconditions.
         unsafe { ERR_set_mark() };
-        // SAFETY: the certificate's octets.
-        let x = X509Ptr(unsafe { d2i_X509(ptr::null_mut(), &raw mut p, len) });
+        // SAFETY: the library context and the property query, alive with the provider.
+        let x = X509Ptr(unsafe { decode_in(cert, self.libctx(), self.propq()) });
         // SAFETY: no preconditions.
         unsafe { ERR_pop_to_mark() };
         if !x.0.is_null() {
@@ -653,7 +652,15 @@ impl EvpProvider {
         }
         let mut p = cert.as_ptr();
         // SAFETY: the key's octets.
-        let k = PkeyPtr(unsafe { d2i_PUBKEY(ptr::null_mut(), &raw mut p, len) });
+        let k = PkeyPtr(unsafe {
+            d2i_PUBKEY_ex(
+                ptr::null_mut(),
+                &raw mut p,
+                len,
+                self.libctx(),
+                self.propq(),
+            )
+        });
         if k.0.is_null() {
             return Err(fail());
         }
@@ -912,7 +919,7 @@ unsafe extern "C" fn discover_sigalgs_cb(prov: *mut OSSL_PROVIDER, arg: *mut c_v
 }
 
 /// A hash's EVP name.
-fn hash_name(alg: HashAlg) -> &'static CStr {
+pub(crate) fn hash_name(alg: HashAlg) -> &'static CStr {
     match alg {
         HashAlg::Md5Sha1 => c"MD5-SHA1",
         HashAlg::Md5 => c"MD5",
@@ -1601,7 +1608,7 @@ impl Provider for EvpProvider {
     }
 
     fn peer_key(&self, der: &[u8], _spki: bool) -> Result<PeerKey> {
-        let (_owner, pkey) = Self::cert_key(der)?;
+        let (_owner, pkey) = self.cert_key(der)?;
         let is = |name: &CStr| {
             // SAFETY: the key decoded above; a NUL-terminated name.
             (unsafe { EVP_PKEY_is_a(pkey, name.as_ptr()) }) != 0
@@ -1658,7 +1665,7 @@ impl Provider for EvpProvider {
     }
 
     fn verify(&self, cert: &[u8], scheme: u16, msg: &[u8], sig: &[u8]) -> Result<bool> {
-        let (_x, pkey) = Self::cert_key(cert)?;
+        let (_x, pkey) = self.cert_key(cert)?;
         // SAFETY: the certificate's key, which `_x` keeps alive.
         let ctx = unsafe { self.sig_ctx(pkey, scheme, false) }?;
         // SAFETY: the verifying context; the signature; the message.
@@ -1669,7 +1676,7 @@ impl Provider for EvpProvider {
     }
 
     fn rsa_encrypt(&self, cert: &[u8], pms: &[u8]) -> Result<Vec<u8>> {
-        let (_x, pkey) = Self::cert_key(cert)?;
+        let (_x, pkey) = self.cert_key(cert)?;
         // SAFETY: the library context; the certificate's key; the property query.
         let ctx = PkeyCtx(unsafe { EVP_PKEY_CTX_new_from_pkey(self.libctx(), pkey, self.propq()) });
         if ctx.0.is_null() {

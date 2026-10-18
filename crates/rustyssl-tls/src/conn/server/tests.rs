@@ -140,6 +140,8 @@ fn rsa_cert(p: &TestProvider) -> CertKey {
         cert_sig: Some((abi::NID_sha256, abi::NID_rsaEncryption)),
         raw_public_key: None,
         ocsp_response: None,
+        chain_security: None,
+        unsupported_digests: Vec::new(),
     }
 }
 
@@ -871,7 +873,8 @@ fn tls13_client_authentication() {
     assert_eq!(
         asked,
         [Request::Verify {
-            chain: vec![der.clone()]
+            chain: vec![der.clone()],
+            rpk: false,
         }]
     );
     assert_eq!(c.neg.peer_chain, std::slice::from_ref(&der));
@@ -1201,18 +1204,38 @@ fn ticket_session_encoding_round_trips() {
         hostname: Some(b"a".to_vec()),
         alpn: None,
         peer_chain: vec![vec![3; 10], vec![4; 3]],
+        peer_rpk: Some(vec![5; 4]),
         verify_result: 10,
         max_fragment_len_mode: 2,
         ext_flags: 1,
         ticket_appdata: Some(b"app".to_vec()),
     };
     let enc = ticket::encode_session(&s).unwrap();
-    assert_eq!(ticket::decode_session(&enc), Some(s));
+    assert_eq!(enc.first(), Some(&7));
+    assert_eq!(ticket::decode_session(&enc), Some(s.clone()));
     assert_eq!(ticket::decode_session(&enc[..enc.len() - 1]), None);
     let mut over = enc.clone();
     over.push(0);
     assert_eq!(ticket::decode_session(&over), None);
     assert_eq!(ticket::decode_session(&[2]), None);
+    // Each optional field alone, and neither (format 1, the length the trace shows).
+    for (appdata, rpk, format) in [(false, false, 1), (true, false, 3), (false, true, 5)] {
+        let mut t = s.clone();
+        if !appdata {
+            t.ticket_appdata = None;
+        }
+        if !rpk {
+            t.peer_rpk = None;
+        }
+        let enc = ticket::encode_session(&t).unwrap();
+        assert_eq!(enc.first(), Some(&format));
+        assert_eq!(ticket::decode_session(&enc), Some(t));
+    }
+    let mut unknown = enc;
+    if let Some(f) = unknown.first_mut() {
+        *f |= 8;
+    }
+    assert_eq!(ticket::decode_session(&unknown), None);
 }
 
 #[test]
@@ -2252,7 +2275,8 @@ fn tls13_external_psk() {
     assert_eq!(
         asked,
         [Request::PskSession {
-            identity: b"client1".to_vec()
+            identity: b"client1".to_vec(),
+            md: None,
         }]
     );
     assert!(c.neg.reused);

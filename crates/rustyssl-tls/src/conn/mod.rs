@@ -145,8 +145,8 @@ pub struct Negotiated {
     /// The peer's supported groups (`SSL_get1_groups`, server side).
     pub peer_groups: Vec<u16>,
     /// The CA names the peer sent (`SSL_get0_peer_CA_list`, `SSL_get_client_CA_list` on a
-    /// client).
-    pub peer_ca_names: Vec<Vec<u8>>,
+    /// client): `None` until a list arrives (NULL there), maybe an empty one.
+    pub peer_ca_names: Option<Vec<Vec<u8>>>,
     /// TLS 1.2's master secret (`SSL_SESSION_get_master_key`).
     pub master_secret: Vec<u8>,
     /// The exporter secrets (TLS 1.3), for `SSL_export_keying_material(_early)`.
@@ -220,6 +220,9 @@ pub struct Connection {
     pub(crate) neg: Negotiated,
     /// Network input not yet read into records.
     input: Vec<u8>,
+    /// How many undecryptable early data records were skipped (see
+    /// [`Connection::skipped_records`]).
+    skipped: u64,
     /// Network output not yet taken.
     output: Vec<u8>,
     /// Handshake octets read from records and not yet taken as messages
@@ -371,6 +374,7 @@ impl Connection {
             interrupted: false,
             early_data_count: 0,
             early_read: None,
+            skipped: 0,
             needs_input: false,
             reading: false,
             security_hook: None,
@@ -788,6 +792,7 @@ impl Connection {
                     len,
                 } => {
                     self.input.drain(..consumed.min(self.input.len()));
+                    self.skipped = self.skipped.wrapping_add(1);
                     let v = i32::from(u16::from_be_bytes([
                         header.get(1).copied().unwrap_or(0),
                         header.get(2).copied().unwrap_or(0),
@@ -1178,6 +1183,14 @@ impl Connection {
     #[must_use]
     pub fn hrr_pending(&self) -> bool {
         self.hs.sh.hrr == common::Hrr::Pending
+    }
+
+    /// How many early data records the server skipped because they didn't decrypt (the early
+    /// data it rejected). A decryption failure is normal then, and the caller drops what the
+    /// failed decryption reported (`ERR_pop_to_mark` in OpenSSL's record layer).
+    #[must_use]
+    pub fn skipped_records(&self) -> u64 {
+        self.skipped
     }
 
     /// TLS 1.3's early data state (`s->early_data_state`), which `SSL_write_early_data` and
