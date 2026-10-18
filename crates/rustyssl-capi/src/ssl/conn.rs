@@ -64,6 +64,14 @@ pub(crate) enum Role {
 }
 
 /// A connection's settings and state, with OpenSSL's field names.
+/// A connection's record padding callback and its argument apart from its state's lock: the
+/// core's padding hook reads them while a record is written, which may be under that lock.
+#[derive(Debug)]
+pub(crate) struct PaddingCell(pub(crate) RecordPaddingCb, pub(crate) *mut c_void);
+
+// SAFETY: the application's function and argument, only handed back to it.
+unsafe impl Send for PaddingCell {}
+
 #[derive(Debug)]
 pub(crate) struct SslState {
     /// The context (a reference held); `SSL_set_SSL_CTX` changes it.
@@ -97,6 +105,8 @@ pub(crate) struct SslState {
     pub(crate) info_callback: InfoCb,
     pub(crate) record_padding_cb: RecordPaddingCb,
     pub(crate) record_padding_arg: *mut c_void,
+    /// The same two, for the core's padding hook.
+    pub(crate) padding_cell: std::sync::Arc<Mutex<PaddingCell>>,
     pub(crate) block_padding: usize,
     pub(crate) hs_padding: usize,
     pub(crate) max_fragment_len_mode: u8,
@@ -355,6 +365,10 @@ ffi_export! {
                 info_callback: None,
                 record_padding_cb: cs.record_padding_cb,
                 record_padding_arg: cs.record_padding_arg,
+                padding_cell: std::sync::Arc::new(Mutex::new(PaddingCell(
+                    cs.record_padding_cb,
+                    cs.record_padding_arg,
+                ))),
                 block_padding: cs.block_padding,
                 hs_padding: cs.hs_padding,
                 max_fragment_len_mode: cs.max_fragment_len_mode,
@@ -1216,7 +1230,9 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
-        x.state().record_padding_cb = cb;
+        let mut st = x.state();
+        st.record_padding_cb = cb;
+        st.padding_cell.lock().unwrap_or_else(PoisonError::into_inner).0 = cb;
         1
     }
 }

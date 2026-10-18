@@ -153,6 +153,9 @@ pub struct Negotiated {
     pub exporter_master: Vec<u8>,
     /// See `exporter_master`.
     pub early_exporter_master: Vec<u8>,
+    /// The suite the early secrets were made for (the PSK's), whose hash the early exporter
+    /// uses until a suite is negotiated.
+    pub early_cipher: Option<&'static Cipher>,
 }
 
 /// A ClientHello and its collected extensions (type, body) in received order
@@ -336,6 +339,11 @@ impl Connection {
         if cfg.max_send_fragment > 0 {
             rw.max_frag_len = cfg.max_send_fragment.min(rw.max_frag_len);
         }
+        // `SSL_CTX_set_block_padding_ex`, for TLS 1.3's protected records.
+        let (app, hs) = cfg.block_padding;
+        if app > 0 || hs > 0 {
+            rw.padding = record::Padding::Block(app, hs);
+        }
         Self {
             cfg,
             st: Statem::default(),
@@ -443,6 +451,13 @@ impl Connection {
     /// call back into this connection.
     pub fn set_security_hook(&mut self, hook: Option<common::SecurityHook>) {
         self.security_hook = hook;
+    }
+
+    /// Installs the application's record padding callback
+    /// (`SSL_CTX_set_record_padding_callback`), which the record layer calls in place for
+    /// each protected TLS 1.3 record. The hook must not call back into this connection.
+    pub fn set_padding_hook(&mut self, hook: Option<record::PaddingHook>) {
+        self.rw.pad_hook = hook;
     }
 
     /// What was negotiated so far.
@@ -951,6 +966,19 @@ impl Connection {
                 self.interrupted = true;
                 return Err(Error::quiet(0));
             }
+            // Only while the version is undecided: a renegotiation has one (fork M). Before the
+            // alert is processed: a server takes no alert before the ClientHello
+            // (`ssl3_read_bytes`).
+            if self.cfg.method_version == 0
+                && self.first_handshake
+                && (self.cfg.server || ty != alert())
+                && self.before_version()
+            {
+                return Err(Error::alert(
+                    abi::SSL_AD_UNEXPECTED_MESSAGE,
+                    abi::SSL_R_UNEXPECTED_MESSAGE,
+                ));
+            }
             if ty == ccs() && !self.is_tls13() {
                 if !self.hs_in.is_empty() {
                     return Err(Error::alert(
@@ -967,18 +995,6 @@ impl Connection {
                 // TLS doesn't report a received ChangeCipherSpec to the message callback (only
                 // DTLS does).
                 return Ok(HsBytes::Ccs);
-            }
-            // Only while the version is undecided: a renegotiation has one (fork M). Before the
-            // alerts: a server's first record must be a ClientHello, even an alert fails here.
-            if self.cfg.method_version == 0
-                && self.first_handshake
-                && (self.cfg.server || ty != alert())
-                && self.before_version()
-            {
-                return Err(Error::alert(
-                    abi::SSL_AD_UNEXPECTED_MESSAGE,
-                    abi::SSL_R_UNEXPECTED_MESSAGE,
-                ));
             }
             if ty == alert() {
                 match self.process_alert(&rec.data)? {

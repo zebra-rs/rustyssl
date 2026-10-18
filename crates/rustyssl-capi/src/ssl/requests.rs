@@ -312,7 +312,8 @@ ffi_export! {
         let (Some(c), Some(p)) = (st.drv.tls.as_ref(), prov) else {
             return 0;
         };
-        if !c.is_tls13() {
+        // `s->version`: a client sending early data has it at its highest version already.
+        if c_int::from(c.negotiated().version) != rustyssl_abi::TLS1_3_VERSION {
             return 0;
         }
         let r = c.export_keying_material_early(&*p, label, ctx, olen);

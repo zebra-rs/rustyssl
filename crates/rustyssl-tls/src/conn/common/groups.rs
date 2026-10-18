@@ -150,6 +150,9 @@ pub fn supported(c: &Connection) -> Vec<u16> {
     if sb == u32::try_from(abi::SSL_CERT_FLAG_SUITEB_192_LOS).unwrap_or(0) {
         return SUITEB_CURVES.get(1..).unwrap_or_default().to_vec();
     }
+    if c.cfg.no_groups {
+        return Vec::new();
+    }
     if c.cfg.groups.is_empty() {
         return default_list(&c.hs.sh.groups).0;
     }
@@ -160,6 +163,9 @@ pub fn supported(c: &Connection) -> Vec<u16> {
 /// for, in the configured (or default) order.
 #[must_use]
 pub fn keyshare_groups(c: &Connection) -> Vec<u16> {
+    if c.cfg.no_groups {
+        return Vec::new();
+    }
     if c.cfg.groups.is_empty() {
         return default_list(&c.hs.sh.groups).1;
     }
@@ -169,6 +175,9 @@ pub fn keyshare_groups(c: &Connection) -> Vec<u16> {
 /// `tls1_get_group_tuples`: where each preference tuple starts in [`supported`]'s list.
 #[must_use]
 pub fn tuples(c: &Connection) -> Vec<usize> {
+    if c.cfg.no_groups {
+        return Vec::new();
+    }
     if c.cfg.groups.is_empty() {
         return default_list(&c.hs.sh.groups).2;
     }

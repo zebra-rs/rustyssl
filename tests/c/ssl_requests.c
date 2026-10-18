@@ -398,6 +398,17 @@ static void test_renegotiate(void)
     SSL_free(c);
     SSL_free(s);
 
+    /* An option set after the handshake applies to the renegotiation: a client dropping the
+     * Extended Master Secret it used is refused (RFC 7627). */
+    connected(cctx, sctx, &c, &s);
+    printf("  extms: %ld\n", SSL_get_extms_support(c));
+    SSL_set_options(c, SSL_OP_NO_EXTENDED_MASTER_SECRET);
+    check(SSL_renegotiate(c) == 1, "the client renegotiates without EMS");
+    check(!renegotiation(c, s), "the server refuses it");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+
     SSL_CTX_set_options(sctx, SSL_OP_NO_RENEGOTIATION);
     connected(cctx, sctx, &c, &s);
     check(SSL_renegotiate(s) == 0, "SSL_OP_NO_RENEGOTIATION refuses");

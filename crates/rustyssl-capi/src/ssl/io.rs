@@ -25,7 +25,7 @@ pub(crate) mod ticket_key;
 use core::ffi::{c_int, c_long, c_void};
 use core::ptr;
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use rustyssl_abi::{
     BIO, BIO_CTRL_EOF, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY, ERR_LIB_SSL,
@@ -38,6 +38,7 @@ use rustyssl_tls::conn::common::security::SecOther;
 use rustyssl_tls::conn::common::{EarlyDataState, SecurityHook};
 use rustyssl_tls::conn::{Connection, Event, Request};
 use rustyssl_tls::error::Error as TlsError;
+use rustyssl_tls::record::PaddingHook;
 
 use self::config::CtxSnapshot;
 use super::conn::{Ssl, SslState};
@@ -170,6 +171,9 @@ pub(crate) struct Driver {
     pub(crate) early_data_state: EarlyDataState,
     /// The core's peer CA names that `SslState::peer_ca_names` was last made from.
     pub(crate) peer_ca_names: Option<Vec<Vec<u8>>>,
+    /// The last ClientHello's cipher suites seen, and whether `CipherLists::peer` is yet to be
+    /// made from them (once the hello is processed and a TLS 1.2 resumption is known).
+    pub(crate) peer_ciphers_raw: (Vec<u8>, bool),
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -297,6 +301,21 @@ unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    // A server's `peer_ciphers` (`bytes_to_cipher_list` of each ClientHello), which outlast
+    // the handshake (`SSL_get_client_ciphers`, `SSL_get_shared_ciphers`). OpenSSL keeps the
+    // old list when it resumes a TLS 1.2 session.
+    if let Some(raw) = c.raw_cipherlist()
+        && raw != st.drv.peer_ciphers_raw.0.as_slice()
+    {
+        st.drv.peer_ciphers_raw = (raw.to_vec(), true);
+    }
+    if st.drv.peer_ciphers_raw.1 && c.state() != rustyssl_abi::TLS_ST_SR_CLNT_HELLO {
+        st.drv.peer_ciphers_raw.1 = false;
+        let resumed12 = c.negotiated().reused && !c.is_tls13();
+        if !resumed12 && let Some(list) = super::ciphers::peer_list(&st.drv.peer_ciphers_raw.0) {
+            st.ciphers.peer = list;
+        }
+    }
     st.drv.early_data_state = c.early_data_state();
     let marks = c.rtt_marks();
     if marks != st.drv.rtt_marks {
@@ -682,6 +701,34 @@ pub(crate) unsafe fn security_hook(s: *mut SSL, x: &Ssl) -> Option<SecurityHook>
     }))
 }
 
+/// The core's hook for the record padding callback (`rlayer_padding_wrapper`): the
+/// connection's callback and argument when a record is written, read from its padding cell.
+/// The core asks whether there is a callback when it makes a write epoch's record layer, as
+/// OpenSSL decides there whether to pad with it.
+///
+/// # Safety
+/// `s` is a live connection; the hook is used while it lives.
+unsafe fn padding_hook(s: *mut SSL, st: &SslState) -> PaddingHook {
+    let current = |cell: &Mutex<super::conn::PaddingCell>| {
+        let c = cell.lock().unwrap_or_else(PoisonError::into_inner);
+        (c.0, c.1)
+    };
+    let cell = Arc::clone(&st.padding_cell);
+    let present = Arc::clone(&cell);
+    // The connection's pointer travels as an address: the hook must be `Send + Sync`, and the
+    // connection outlives its core connection.
+    let s_addr = s.expose_provenance();
+    PaddingHook {
+        pad: Arc::new(move |ty, len| {
+            let s = ptr::with_exposed_provenance_mut::<SSL>(s_addr);
+            let (cb, arg) = current(&cell);
+            // SAFETY: the application's callback with its arguments.
+            cb.map(|f| unsafe { f(s, c_int::from(ty), len, arg) })
+        }),
+        present: Arc::new(move || current(&present).0.is_some()),
+    }
+}
+
 /// Starts the core connection if there isn't one (`SSL_do_handshake`'s first call, or the
 /// first `SSL_read`/`SSL_write`), with a configuration from the connection and its context.
 ///
@@ -704,6 +751,8 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
     cfg.custom_security_callback = hook.is_some();
     let mut c = Box::new(Connection::new(cfg));
     c.set_security_hook(hook);
+    // SAFETY: as above.
+    c.set_padding_hook(Some(unsafe { padding_hook(s, &x.state()) }));
     c.start();
     let mut st = x.state();
     if st.drv.tls.is_none() {

@@ -69,8 +69,13 @@ dtls_mtu_test
 bad_dtls_test
 
 # Tests that read libssl's private structures (ssl/ssl_local.h, SSL_CONNECTION_FROM_SSL): they
-# can't pass on rustyssl, whose objects have another layout, and are reported apart. (ssl_test
-# does too, for the ForcePHA cases of 26-tls13_client_auth.cnf.)
+# can't pass on rustyssl, whose objects have another layout, and are reported apart. An
+# `ssl_test/<file>` entry names iterations (`<test>#<iteration>`) of that file's run.
+# 26-tls13_client_auth's post-handshake-auth iterations (HandshakeMode = PostHandshakeAuth):
+# test/helpers/handshake.c takes the server's SSL_CONNECTION from the SSL to request it (and
+# for ForcePHA writes post_handshake_auth into it), so the server fails on another layout; 7
+# and 8 expect that failure anyway.
+internal ssl_test/26-tls13_client_auth test_handshake#7 test_handshake#8 test_handshake#9 test_handshake#10 test_handshake#11 test_handshake#12 test_handshake#13 test_handshake#14
 internal sslapitest test_ciphersuite_change test_session_timeout test_session_cache_overflow test_cleanse_plaintext test_unknown_sigalgs_groups test_configuration_of_groups test_sigalg_ctx_switch test_sigalg_ctx_switch_cert_cb test_sigalg_ctx_switch_reneg
 internal sslbuffertest test_func
 internal dtls_mtu_test run_mtu_tests
