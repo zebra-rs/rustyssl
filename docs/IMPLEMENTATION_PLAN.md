@@ -5093,12 +5093,19 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     instead, and `ossl_cmp_hdr_set_implicitConfirm`'s double free on a failed push is avoided.
     Tests: `tests/c/cmp.c` (236 checks: an in-process client and server, every export), the
     `cmp_msg` fuzz target (decoding, validation with a MAC, and a server without handlers).
-- [ ] **6.11 Remainder:**
-  - `TXT_DB`, SRP (deprecated)
-  - `COMP_*`, matching the default build (no zlib, brotli, or zstd)
-  - `ASYNC_*`: jobs run synchronously to completion unless a consumer needs pausing; log it in
-    DEVIATIONS.md
-  - `OSSL_SELF_TEST_*` callbacks, the `OSSL_INDICATOR` callback
+- [x] **6.11 Remainder** (`txt_db.rs`, `srp.rs`, `comp.rs`, `async_job.rs`, `self_test.rs`; 81
+  exports):
+  - `TXT_DB_*`, with the public layout of the database and its rows (`openssl ca` reads them),
+    and the reader's piecewise lines (a long comment continues as a data row, as in OpenSSL).
+  - SRP (deprecated): the computations, the RFC 5054 groups, verifiers in SRP's base64, users,
+    and the verifier base read from a TXT_DB file.
+  - `COMP_*` and `BIO_f_zlib`/`_brotli`/`_zstd`: NULL, as in the default build (no zlib, brotli,
+    or zstd), so no compression context can exist.
+  - `ASYNC_*` and the wait contexts: jobs run synchronously to completion, and
+    `ASYNC_is_capable()` is 0 (docs/DEVIATIONS.md); `OPENSSL_INIT_ASYNC` no longer aborts.
+  - `OSSL_SELF_TEST_*`, with the self-test callback per library context.
+  - Tests: `tests/c/txt_db.c` (19 checks), `srp.c` (45), `async.c` (28), `self_test.c` (11),
+    `comp.c` (10); the `txt_db_read` fuzz target (also SRP's verifier file and base64).
 
 **Exit:** differential tests on the PKCS#7, CMS, PKCS#12, OCSP, and TS corpora pass. Interop
 holds both ways: we read what the reference writes and the reference reads what we write.

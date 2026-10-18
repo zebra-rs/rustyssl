@@ -41,6 +41,9 @@ pub(crate) struct LibCtx {
     pub(crate) rand: crate::rand_lib::Global,
     /// `OSSL_INDICATOR_set_callback`'s callback (only a FIPS provider calls it; there's none).
     indicator: std::sync::Mutex<rustyssl_abi::OSSL_INDICATOR_CALLBACK>,
+    /// `OSSL_SELF_TEST_set_callback`'s callback and its argument (an address: the context
+    /// is shared between threads).
+    self_test: std::sync::Mutex<(rustyssl_abi::OSSL_CALLBACK, usize)>,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
@@ -300,5 +303,43 @@ ffi_export! {
             .and_then(|c| *c.indicator.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
         // SAFETY: the caller's guarantee.
         unsafe { cb.write(current) };
+    }
+}
+
+ffi_export! {
+    /// Sets the self-test callback of `libctx` (the thread's default for NULL) and its argument.
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `cb` is NULL or a callback taking `cbarg`.
+    pub unsafe extern "C" fn OSSL_SELF_TEST_set_callback(libctx: *mut OSSL_LIB_CTX, cb: rustyssl_abi::OSSL_CALLBACK, cbarg: *mut core::ffi::c_void)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { resolve(libctx) } {
+            *c.self_test.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = (cb, cbarg.expose_provenance());
+        }
+    }
+}
+
+ffi_export! {
+    /// The self-test callback of `libctx` (the thread's default for NULL) in `*cb` and its
+    /// argument in `*cbarg`, where they aren't NULL (NULL for a context that isn't one).
+    ///
+    /// # Safety
+    /// `libctx` is NULL or a live library context; `cb` and `cbarg` NULL or writable.
+    pub unsafe extern "C" fn OSSL_SELF_TEST_get_callback(libctx: *mut OSSL_LIB_CTX, cb: *mut rustyssl_abi::OSSL_CALLBACK, cbarg: *mut *mut core::ffi::c_void)
+    where failure = (), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        let (f, a) = unsafe { resolve(libctx) }
+            .map_or((None, 0), |c| *c.self_test.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
+        if !cb.is_null() {
+            // SAFETY: the caller's slot.
+            unsafe { cb.write(f) };
+        }
+        if !cbarg.is_null() {
+            // SAFETY: as above; the address stored by the setter.
+            unsafe { cbarg.write(core::ptr::with_exposed_provenance_mut(a)) };
+        }
     }
 }
