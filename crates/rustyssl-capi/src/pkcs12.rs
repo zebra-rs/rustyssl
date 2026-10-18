@@ -1,5 +1,7 @@
-//! PKCS #12 (step 6.5), so far its password strings and key derivation (`p12_utl.c`,
-//! `p12_key.c`): passwords as the big-endian UTF-16 PKCS #12 hashes (`OPENSSL_asc2uni`,
+//! PKCS #12 (step 6.5): its structures ([`asn`]), safe bags ([`bags`]), packing them into
+//! contents ([`add`]), the MAC ([`mutl`]), making ([`crt`]) and reading ([`kiss`]) a PFX, and
+//! changing its password ([`npas`]); here, its password strings and key derivation
+//! (`p12_utl.c`, `p12_key.c`): passwords as the big-endian UTF-16 PKCS #12 hashes (`OPENSSL_asc2uni`,
 //! `OPENSSL_utf82uni`) and back (`OPENSSL_uni2asc`, `OPENSSL_uni2utf8`), over
 //! `rustyssl_asn1::text`, and `PKCS12_key_gen_*`, the PKCS12KDF of RFC 7292 appendix B through
 //! the provider's KDF.
@@ -8,6 +10,14 @@
 //! as a huge `size_t`) or overflows an `int`, these fail instead (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_uchar};
+
+pub(crate) mod add;
+pub(crate) mod asn;
+pub(crate) mod bags;
+pub(crate) mod crt;
+pub(crate) mod kiss;
+pub(crate) mod mutl;
+pub(crate) mod npas;
 use core::ptr;
 
 use rustyssl_abi::{

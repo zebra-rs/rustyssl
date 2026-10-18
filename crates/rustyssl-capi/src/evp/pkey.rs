@@ -58,6 +58,7 @@ use crate::params::{
 use crate::provider::Ptr;
 
 pub(crate) mod ameth;
+pub(crate) mod attrs;
 pub(crate) mod d2i;
 pub(crate) mod dh;
 pub(crate) mod dsa;
@@ -116,6 +117,8 @@ pub(crate) struct Pkey {
     ex_data: ExData,
     /// The key's own handle, which the ASN.1 method's functions are given.
     this: AtomicPtr<EVP_PKEY>,
+    /// The key's attributes (`EVP_PKEY_add1_attr` ...), as PKCS#8 and PKCS#12 carry them.
+    attributes: AtomicPtr<rustyssl_abi::stack_st_X509_ATTRIBUTE>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -171,6 +174,11 @@ impl Pkey {
 
     fn ex_data(&self) -> *mut CRYPTO_EX_DATA {
         self.ex_data.0.get()
+    }
+
+    /// The slot of the key's attributes, as the `X509at_*` functions take it.
+    pub(crate) fn attributes_slot(&self) -> *mut *mut rustyssl_abi::stack_st_X509_ATTRIBUTE {
+        self.attributes.as_ptr()
     }
 
     /// The key manager and data (each with a reference), as they are now.
@@ -390,6 +398,7 @@ pub(crate) fn new() -> *mut EVP_PKEY {
             sk: ptr::null_mut(),
         })),
         this: AtomicPtr::new(ptr::null_mut()),
+        attributes: AtomicPtr::new(ptr::null_mut()),
     });
     // SAFETY: just made.
     let Some(k) = (unsafe { pkey(p) }) else {
@@ -421,6 +430,9 @@ pub(crate) unsafe fn free(p: *mut EVP_PKEY) {
     clear(&held);
     // SAFETY: the key's own ex_data; its last reference.
     unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, p.cast(), held.ex_data()) };
+    let attrs = held.attributes.swap(ptr::null_mut(), Ordering::AcqRel);
+    // SAFETY: the key's own attributes, or NULL.
+    unsafe { crate::stack::OPENSSL_sk_pop_free(attrs.cast(), Some(attrs::attribute_free)) };
     // SAFETY: the last reference; the hold keeps the object until this returns.
     unsafe { EVP_PKEY::free(p) };
 }
@@ -1846,6 +1858,15 @@ ffi_export! {
         // SAFETY: both keys' own ex_data.
         if unsafe { CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_EVP_PKEY, dup.get().ex_data(), k.ex_data()) } == 0 {
             return ptr::null_mut();
+        }
+        let attrs = k.attributes.load(Ordering::Acquire);
+        if !attrs.is_null() {
+            // SAFETY: the key's attributes.
+            let copy = unsafe { attrs::deep_copy(attrs) };
+            if copy.is_null() {
+                return ptr::null_mut();
+            }
+            dup.get().attributes.store(copy, Ordering::Release);
         }
         dup.into_raw()
     }

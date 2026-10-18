@@ -6816,6 +6816,29 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     ...
 ) -> *mut EVP_PKEY = crate::evp::pkey_ctx::EVP_PKEY_Q_keygen;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut X509_ATTRIBUTE) -> core::ffi::c_int =
+    crate::evp::pkey::attrs::EVP_PKEY_add1_attr;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::attrs::EVP_PKEY_add1_attr_by_NID;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::attrs::EVP_PKEY_add1_attr_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::attrs::EVP_PKEY_add1_attr_by_txt;
 const _: unsafe extern "C" fn(*const EVP_PKEY_ASN1_METHOD) -> core::ffi::c_int =
     crate::evp::pkey::ameth::EVP_PKEY_asn1_add0;
 const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> core::ffi::c_int =
@@ -7077,6 +7100,8 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut EVP_PKEY,
 ) -> core::ffi::c_int = crate::evp::asymcipher::EVP_PKEY_decrypt_old;
+const _: unsafe extern "C" fn(*mut EVP_PKEY, core::ffi::c_int) -> *mut X509_ATTRIBUTE =
+    crate::evp::pkey::attrs::EVP_PKEY_delete_attr;
 const _: unsafe extern "C" fn(
     *mut EVP_PKEY_CTX,
     *mut core::ffi::c_uchar,
@@ -7182,6 +7207,20 @@ const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut rsa_st =
     crate::evp::pkey::rsa::EVP_PKEY_get1_RSA;
 const _: unsafe extern "C" fn(*mut EVP_PKEY, *mut *mut core::ffi::c_uchar) -> usize =
     crate::evp::pkey::params::EVP_PKEY_get1_encoded_public_key;
+const _: unsafe extern "C" fn(*const EVP_PKEY, core::ffi::c_int) -> *mut X509_ATTRIBUTE =
+    crate::evp::pkey::attrs::EVP_PKEY_get_attr;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::attrs::EVP_PKEY_get_attr_by_NID;
+const _: unsafe extern "C" fn(
+    *const EVP_PKEY,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::pkey::attrs::EVP_PKEY_get_attr_by_OBJ;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::attrs::EVP_PKEY_get_attr_count;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_get_base_id;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
@@ -10773,6 +10812,13 @@ const _: unsafe extern "C" fn(*mut BIO, *const X509_REQ) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_X509_REQ;
 const _: unsafe extern "C" fn(*mut BIO, *const X509_REQ) -> core::ffi::c_int =
     crate::pem_pkey::PEM_write_bio_X509_REQ_NEW;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_AUTHSAFES_it;
+const _: unsafe extern "C" fn(*mut PKCS12_BAGS) = crate::pkcs12::asn::PKCS12_BAGS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_BAGS_it;
+const _: unsafe extern "C" fn() -> *mut PKCS12_BAGS = crate::pkcs12::asn::PKCS12_BAGS_new;
+const _: unsafe extern "C" fn(*mut PKCS12_MAC_DATA) = crate::pkcs12::asn::PKCS12_MAC_DATA_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_MAC_DATA_it;
+const _: unsafe extern "C" fn() -> *mut PKCS12_MAC_DATA = crate::pkcs12::asn::PKCS12_MAC_DATA_new;
 const _: unsafe extern "C" fn() = crate::evp::pbe::PKCS12_PBE_add;
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
@@ -10794,6 +10840,251 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::evp::pbe::PKCS12_PBE_keyivgen_ex;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_SAFEBAGS_it;
+const _: unsafe extern "C" fn(*mut PKCS8_PRIV_KEY_INFO) -> *mut PKCS12_SAFEBAG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_create0_p8inf;
+const _: unsafe extern "C" fn(*mut X509_SIG) -> *mut PKCS12_SAFEBAG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_create0_pkcs8;
+const _: unsafe extern "C" fn(*mut X509) -> *mut PKCS12_SAFEBAG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_create_cert;
+const _: unsafe extern "C" fn(*mut X509_CRL) -> *mut PKCS12_SAFEBAG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_create_crl;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut PKCS8_PRIV_KEY_INFO,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::bags::PKCS12_SAFEBAG_create_pkcs8_encrypt;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut PKCS8_PRIV_KEY_INFO,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::bags::PKCS12_SAFEBAG_create_pkcs8_encrypt_ex;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::bags::PKCS12_SAFEBAG_create_secret;
+const _: unsafe extern "C" fn(*mut PKCS12_SAFEBAG) = crate::pkcs12::asn::PKCS12_SAFEBAG_free;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG, core::ffi::c_int) -> *const ASN1_TYPE =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_attr;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const stack_st_X509_ATTRIBUTE =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_attrs;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const ASN1_TYPE =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_bag_obj;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const ASN1_OBJECT =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_bag_type;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const PKCS8_PRIV_KEY_INFO =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_p8inf;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const X509_SIG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_pkcs8;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const stack_st_PKCS12_SAFEBAG =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_safes;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *const ASN1_OBJECT =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get0_type;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *mut X509 =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get1_cert;
+const _: unsafe extern "C" fn(
+    *const PKCS12_SAFEBAG,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut X509 = crate::pkcs12::bags::PKCS12_SAFEBAG_get1_cert_ex;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> *mut X509_CRL =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get1_crl;
+const _: unsafe extern "C" fn(
+    *const PKCS12_SAFEBAG,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut X509_CRL = crate::pkcs12::bags::PKCS12_SAFEBAG_get1_crl_ex;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> core::ffi::c_int =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get_bag_nid;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG) -> core::ffi::c_int =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_get_nid;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_SAFEBAG_it;
+const _: unsafe extern "C" fn() -> *mut PKCS12_SAFEBAG = crate::pkcs12::asn::PKCS12_SAFEBAG_new;
+const _: unsafe extern "C" fn(*mut PKCS12_SAFEBAG, *mut stack_st_X509_ATTRIBUTE) =
+    crate::pkcs12::bags::PKCS12_SAFEBAG_set0_attrs;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add1_attr_by_NID;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add1_attr_by_txt;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add_CSPName_asc;
+const _: unsafe extern "C" fn(*mut *mut stack_st_PKCS12_SAFEBAG, *mut X509) -> *mut PKCS12_SAFEBAG =
+    crate::pkcs12::crt::PKCS12_add_cert;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add_friendlyname_asc;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add_friendlyname_uni;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add_friendlyname_utf8;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_PKCS12_SAFEBAG,
+    *mut EVP_PKEY,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::crt::PKCS12_add_key;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_PKCS12_SAFEBAG,
+    *mut EVP_PKEY,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::crt::PKCS12_add_key_ex;
+const _: unsafe extern "C" fn(
+    *mut PKCS12_SAFEBAG,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::bags::PKCS12_add_localkeyid;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_PKCS7,
+    *mut stack_st_PKCS12_SAFEBAG,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::crt::PKCS12_add_safe;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_PKCS7,
+    *mut stack_st_PKCS12_SAFEBAG,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::crt::PKCS12_add_safe_ex;
+const _: unsafe extern "C" fn(*mut stack_st_PKCS7, core::ffi::c_int) -> *mut PKCS12 =
+    crate::pkcs12::crt::PKCS12_add_safes;
+const _: unsafe extern "C" fn(
+    *mut stack_st_PKCS7,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_add_safes_ex;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_PKCS12_SAFEBAG,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::crt::PKCS12_add_secret;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut stack_st_X509,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_create;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut stack_st_X509,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_create_ex;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut stack_st_X509,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    PKCS12_create_cb,
+    *mut core::ffi::c_void,
+) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_create_ex2;
+const _: unsafe extern "C" fn(
+    *const PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut PKCS8_PRIV_KEY_INFO = crate::pkcs12::add::PKCS12_decrypt_skey;
+const _: unsafe extern "C" fn(
+    *const PKCS12_SAFEBAG,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS8_PRIV_KEY_INFO = crate::pkcs12::add::PKCS12_decrypt_skey_ex;
+const _: unsafe extern "C" fn(*mut PKCS12) = crate::pkcs12::asn::PKCS12_free;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_gen_mac;
+const _: unsafe extern "C" fn(
+    *mut *const ASN1_OCTET_STRING,
+    *mut *const X509_ALGOR,
+    *mut *const ASN1_OCTET_STRING,
+    *mut *const ASN1_INTEGER,
+    *const PKCS12,
+) = crate::pkcs12::mutl::PKCS12_get0_mac;
+const _: unsafe extern "C" fn(*const PKCS12_SAFEBAG, core::ffi::c_int) -> *mut ASN1_TYPE =
+    crate::pkcs12::bags::PKCS12_get_attr;
+const _: unsafe extern "C" fn(*const stack_st_X509_ATTRIBUTE, core::ffi::c_int) -> *mut ASN1_TYPE =
+    crate::pkcs12::bags::PKCS12_get_attr_gen;
+const _: unsafe extern "C" fn(*mut PKCS12_SAFEBAG) -> *mut core::ffi::c_char =
+    crate::pkcs12::bags::PKCS12_get_friendlyname;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_init;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS12 = crate::pkcs12::crt::PKCS12_init_ex;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::pkcs12::asn::PKCS12_it;
 const _: unsafe extern "C" fn(
     *const X509_ALGOR,
     *const ASN1_ITEM,
@@ -10830,6 +11121,12 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> *mut ASN1_OCTET_STRING = crate::pkcs8_crypt::PKCS12_item_i2d_encrypt_ex;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    *const ASN1_ITEM,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::bags::PKCS12_item_pack_safebag;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
@@ -10902,6 +11199,45 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::pkcs12::PKCS12_key_gen_utf8_ex;
+const _: unsafe extern "C" fn(*const PKCS12) -> core::ffi::c_int =
+    crate::pkcs12::mutl::PKCS12_mac_present;
+const _: unsafe extern "C" fn() -> *mut PKCS12 = crate::pkcs12::asn::PKCS12_new;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::npas::PKCS12_newpass;
+const _: unsafe extern "C" fn(*mut PKCS12, *mut stack_st_PKCS7) -> core::ffi::c_int =
+    crate::pkcs12::add::PKCS12_pack_authsafes;
+const _: unsafe extern "C" fn(*mut stack_st_PKCS12_SAFEBAG) -> *mut PKCS7 =
+    crate::pkcs12::add::PKCS12_pack_p7data;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut stack_st_PKCS12_SAFEBAG,
+) -> *mut PKCS7 = crate::pkcs12::add::PKCS12_pack_p7encdata;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut stack_st_PKCS12_SAFEBAG,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut PKCS7 = crate::pkcs12::add::PKCS12_pack_p7encdata_ex;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    *mut *mut EVP_PKEY,
+    *mut *mut X509,
+    *mut *mut stack_st_X509,
+) -> core::ffi::c_int = crate::pkcs12::kiss::PKCS12_parse;
 const _: unsafe extern "C" fn(
     *const X509_ALGOR,
     *const core::ffi::c_char,
@@ -10924,6 +11260,46 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> *mut core::ffi::c_uchar = crate::pkcs8_crypt::PKCS12_pbe_crypt_ex;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_set_mac;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const EVP_MD,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_set_pbmac1_pbkdf2;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_setup_mac;
+const _: unsafe extern "C" fn(*const PKCS12) -> *mut stack_st_PKCS7 =
+    crate::pkcs12::add::PKCS12_unpack_authsafes;
+const _: unsafe extern "C" fn(*mut PKCS7) -> *mut stack_st_PKCS12_SAFEBAG =
+    crate::pkcs12::add::PKCS12_unpack_p7data;
+const _: unsafe extern "C" fn(
+    *mut PKCS7,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut stack_st_PKCS12_SAFEBAG = crate::pkcs12::add::PKCS12_unpack_p7encdata;
+const _: unsafe extern "C" fn(
+    *mut PKCS12,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_verify_mac;
 const _: unsafe extern "C" fn() = crate::evp::pbe::PKCS5_PBE_add;
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
@@ -15503,6 +15879,30 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut PBMAC1PARAM = crate::x509::pbe::d2i_PBMAC1PARAM;
 const _: unsafe extern "C" fn(
+    *mut *mut PKCS12,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PKCS12 = crate::pkcs12::asn::d2i_PKCS12;
+const _: unsafe extern "C" fn(
+    *mut *mut PKCS12_BAGS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PKCS12_BAGS = crate::pkcs12::asn::d2i_PKCS12_BAGS;
+const _: unsafe extern "C" fn(
+    *mut *mut PKCS12_MAC_DATA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PKCS12_MAC_DATA = crate::pkcs12::asn::d2i_PKCS12_MAC_DATA;
+const _: unsafe extern "C" fn(
+    *mut *mut PKCS12_SAFEBAG,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut PKCS12_SAFEBAG = crate::pkcs12::asn::d2i_PKCS12_SAFEBAG;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut PKCS12) -> *mut PKCS12 =
+    crate::pkcs12::asn::d2i_PKCS12_bio;
+const _: unsafe extern "C" fn(*mut FILE, *mut *mut PKCS12) -> *mut PKCS12 =
+    crate::pkcs12::asn::d2i_PKCS12_fp;
+const _: unsafe extern "C" fn(
     *mut *mut PKCS7,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -16317,6 +16717,24 @@ const _: unsafe extern "C" fn(
     *const PBMAC1PARAM,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509::pbe::i2d_PBMAC1PARAM;
+const _: unsafe extern "C" fn(*const PKCS12, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::pkcs12::asn::i2d_PKCS12;
+const _: unsafe extern "C" fn(
+    *const PKCS12_BAGS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::pkcs12::asn::i2d_PKCS12_BAGS;
+const _: unsafe extern "C" fn(
+    *const PKCS12_MAC_DATA,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::pkcs12::asn::i2d_PKCS12_MAC_DATA;
+const _: unsafe extern "C" fn(
+    *const PKCS12_SAFEBAG,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::pkcs12::asn::i2d_PKCS12_SAFEBAG;
+const _: unsafe extern "C" fn(*mut BIO, *const PKCS12) -> core::ffi::c_int =
+    crate::pkcs12::asn::i2d_PKCS12_bio;
+const _: unsafe extern "C" fn(*mut FILE, *const PKCS12) -> core::ffi::c_int =
+    crate::pkcs12::asn::i2d_PKCS12_fp;
 const _: unsafe extern "C" fn(*const PKCS7, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::pkcs7::i2d_PKCS7;
 const _: unsafe extern "C" fn(
