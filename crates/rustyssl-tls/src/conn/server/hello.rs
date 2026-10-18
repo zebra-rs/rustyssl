@@ -615,6 +615,8 @@ fn handle_alpn_inner(c: &mut Connection, _p: &dyn Provider) -> Result<Step> {
     {
         match ask_once(c, Request::AlpnSelect { protos }, 0) {
             None => return Ok(Step::Wait),
+            // Copying an empty selection fails (`OPENSSL_memdup` of nothing).
+            Some(Answer::Alpn(Some(sel))) if sel.is_empty() => return Err(Error::internal()),
             Some(Answer::Alpn(Some(sel))) => {
                 c.neg.alpn = Some(sel.clone());
                 c.hs.sh.npn_seen = false;

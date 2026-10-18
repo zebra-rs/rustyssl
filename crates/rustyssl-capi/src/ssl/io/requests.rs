@@ -88,9 +88,14 @@ pub(crate) unsafe fn handle(
                     arg,
                 )
             };
-            if ret == SSL_TLSEXT_ERR_OK && !out.is_null() {
-                // SAFETY: the protocol the callback chose, `outlen` octets.
-                let p = unsafe { core::slice::from_raw_parts(out, usize::from(outlen)) }.to_vec();
+            if ret == SSL_TLSEXT_ERR_OK {
+                // An empty choice (or none) stays empty: `OPENSSL_memdup` fails on it.
+                let p = if out.is_null() {
+                    Vec::new()
+                } else {
+                    // SAFETY: the protocol the callback chose, `outlen` octets.
+                    unsafe { core::slice::from_raw_parts(out, usize::from(outlen)) }.to_vec()
+                };
                 return Some(Answer::Alpn(Some(p)));
             }
             if ret == SSL_TLSEXT_ERR_ALERT_FATAL {
