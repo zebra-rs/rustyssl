@@ -167,7 +167,9 @@ pub(crate) unsafe fn read_internal(
                 *readbytes = c.read_app(out, peek);
                 return 1;
             }
-            if num == 0 && !(st.in_init || st.flow_uninited) {
+            // `ssl3_read_bytes` with no room: records are read (and handshake messages, a
+            // ticket, handled) until application data is there, which stays for later.
+            if num == 0 && st.drv.tls.as_ref().is_some_and(|c| c.pending_app() > 0) {
                 return 0;
             }
         }
@@ -687,6 +689,13 @@ ffi_export! {
 /// The peer's certificate (the connection keeps it), or NULL.
 fn peer_leaf(x: &Ssl) -> *mut X509 {
     let st = x.state();
+    // A resumed handshake sends no certificate: the peer is the session's (`s->session->peer`).
+    if st.hit != 0 && st.drv.peer.from == 0 && !st.sess.session.is_null() {
+        // SAFETY: the connection's session, which it holds a reference to.
+        return unsafe {
+            crate::ssl::session::rustyssl_private_SSL_SESSION_get0_peer(st.sess.session)
+        };
+    }
     if !st.drv.peer.accepted {
         return ptr::null_mut();
     }

@@ -6,7 +6,7 @@
  * (OpenSSL's default and a configured list), none in TLS 1.3, each end's ephemeral keys after
  * TLS 1.3 and 1.2 handshakes, the peer's supported groups, DH parameters for DHE, and chains
  * built from the store (with each flag, and the errors), and reads ending at a ticket without
- * SSL_MODE_AUTO_RETRY.
+ * SSL_MODE_AUTO_RETRY, and a resumed handshake's peer certificate and renegotiation support.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
@@ -414,6 +414,50 @@ static void auto_retry(void)
     SSL_CTX_free(sctx);
 }
 
+/*
+ * A resumed handshake: the peer's certificate is the session's, and the secure renegotiation
+ * support (renegotiation_info) is reported by both ends in TLS 1.2.
+ */
+static void resumed(const char *what, int version)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    SSL_SESSION *sess;
+    SSL *c, *s;
+    int round, r;
+
+    printf("# resumption, %s\n", what);
+    SSL_CTX_set_max_proto_version(cctx, version);
+    for (round = 0, sess = NULL; round < 2; round++) {
+        c = SSL_new(cctx);
+        s = SSL_new(sctx);
+        if (sess != NULL)
+            SSL_set_session(c, sess);
+        check(run(c, s) == 0, "the handshake");
+        /*
+         * A read with no room handles what came after the handshake (a TLS 1.3 ticket) and
+         * then waits.
+         */
+        r = SSL_read(c, NULL, 0);
+        printf("  empty read: %d error %d\n", r, SSL_get_error(c, r));
+        printf("  reused %d %d\n", SSL_session_reused(c), SSL_session_reused(s));
+        printf("  secure renegotiation %ld %ld\n", SSL_get_secure_renegotiation_support(c),
+            SSL_get_secure_renegotiation_support(s));
+        printf("  client's peer certificate %s\n", SSL_get0_peer_certificate(c) != NULL ? "set" : "none");
+        if (sess == NULL)
+            sess = SSL_get1_session(c);
+        /* Freed without a shutdown, a connection's session is no longer resumable. */
+        SSL_shutdown(c);
+        SSL_shutdown(s);
+        printf("  resumable %d\n", SSL_SESSION_is_resumable(sess));
+        SSL_free(c);
+        SSL_free(s);
+    }
+    errors();
+    SSL_SESSION_free(sess);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     static const unsigned char types[] = { TLS_CT_ECDSA_SIGN, TLS_CT_RSA_SIGN };
@@ -428,6 +472,8 @@ int main(void)
     dh();
     chains();
     auto_retry();
+    resumed("TLS 1.2", TLS1_2_VERSION);
+    resumed("TLS 1.3", TLS1_3_VERSION);
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

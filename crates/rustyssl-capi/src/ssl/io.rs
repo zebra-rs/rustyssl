@@ -223,6 +223,8 @@ fn mirror(st: &mut SslState, c: &Connection) {
         c_int::try_from(c.shutdown_state()).unwrap_or(0) | (st.shutdown & SSL_RECEIVED_SHUTDOWN);
     st.verify_result = c_long::try_from(n.verify_result).unwrap_or(c_long::MAX);
     st.hit = c_int::from(n.reused);
+    // `s->s3.send_connection_binding`: the peer's renegotiation_info (or SCSV) was seen.
+    st.send_connection_binding = c_int::from(n.secure_renegotiation);
     let h = c.handshake();
     if h.client_random != [0; 32] {
         st.client_random = h.client_random;
