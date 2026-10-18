@@ -1673,11 +1673,17 @@ impl Provider for EvpProvider {
         let size = usize::try_from(unsafe { EVP_PKEY_get_size(pkey) }).unwrap_or(0);
         // SAFETY: as above.
         let security_bits = unsafe { EVP_PKEY_get_security_bits(pkey) };
+        let key_usage = match &_owner {
+            // SAFETY: the certificate decoded above.
+            KeyOwner::Cert(x) => unsafe { crate::x509::purpose::X509_get_key_usage(x.0) },
+            KeyOwner::Key(_) => u32::MAX,
+        };
         Ok(PeerKey {
             kind,
             curve_nid,
             size,
             security_bits,
+            key_usage,
         })
     }
 

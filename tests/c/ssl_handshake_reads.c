@@ -26,6 +26,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
+#include <openssl/x509v3.h>
 
 static int failures = 0;
 static int number = 0;
@@ -512,6 +513,53 @@ static void test_request_sigalgs(int version)
     done(c, s, cctx, sctx);
 }
 
+/*
+ * A TLS 1.2 ECDSA server certificate whose key usage leaves out digitalSignature (here only
+ * keyAgreement, or with it): the client refuses the first (ssl3_check_cert_and_algorithm).
+ */
+static void test_ecdsa_key_usage(const char *usage)
+{
+    SSL_CTX *cctx = SSL_CTX_new(TLS_client_method()), *sctx = SSL_CTX_new(TLS_server_method());
+    EVP_PKEY *k = EVP_EC_gen("P-256");
+    X509 *x = X509_new();
+    X509_EXTENSION *ext;
+    SSL *c, *s;
+    int ok;
+
+    printf("# a TLS 1.2 ECDSA certificate with key usage %s\n", usage);
+    if (cctx == NULL || sctx == NULL || k == NULL || x == NULL) {
+        printf("Bail out! key usage setup\n");
+        exit(1);
+    }
+    ASN1_INTEGER_set(X509_get_serialNumber(x), 1);
+    X509_gmtime_adj(X509_getm_notBefore(x), 0);
+    X509_gmtime_adj(X509_getm_notAfter(x), 3600);
+    X509_NAME_add_entry_by_txt(X509_get_subject_name(x), "CN", MBSTRING_ASC,
+                               (const unsigned char *)"ku", -1, -1, 0);
+    X509_set_issuer_name(x, X509_get_subject_name(x));
+    X509_set_pubkey(x, k);
+    ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, usage);
+    if (ext == NULL || !X509_add_ext(x, ext, -1) || !X509_sign(x, k, EVP_sha256())) {
+        printf("Bail out! key usage certificate\n");
+        exit(1);
+    }
+    X509_EXTENSION_free(ext);
+    SSL_CTX_use_certificate(sctx, x);
+    SSL_CTX_use_PrivateKey(sctx, k);
+    SSL_CTX_set_max_proto_version(cctx, TLS1_2_VERSION);
+    SSL_CTX_set_cipher_list(cctx, "ECDHE-ECDSA-AES128-GCM-SHA256");
+    pair(cctx, sctx, &c, &s);
+    ok = handshake(c, s);
+    printf("  handshake %d\n", ok);
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+    X509_free(x);
+    EVP_PKEY_free(k);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -601,6 +649,8 @@ int main(void)
     test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
+    test_ecdsa_key_usage("keyAgreement");
+    test_ecdsa_key_usage("digitalSignature,keyAgreement");
     test_request_sigalgs(TLS1_3_VERSION);
     test_request_sigalgs(TLS1_2_VERSION);
     test_soft_fail_resume(TLS1_3_VERSION);
