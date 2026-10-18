@@ -1258,7 +1258,11 @@ impl EvpAead {
                 EVP_CipherUpdate(ctx.0, ptr::null_mut(), &raw mut outl, aad.as_ptr(), alen)
             } != 0;
         let mut out = vec![0u8; data.len().saturating_add(16)];
-        if ok && !data.is_empty() {
+        // What the AAD's update reported isn't output.
+        outl = 0;
+        // CCM authenticates in this update, so it runs for an empty record too: skipping it
+        // would take the record unverified.
+        if ok && (!data.is_empty() || is_ccm(self.alg)) {
             // SAFETY: as above; room for the data and a block.
             ok = unsafe {
                 EVP_CipherUpdate(ctx.0, out.as_mut_ptr(), &raw mut outl, data.as_ptr(), dlen)
