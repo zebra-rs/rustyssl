@@ -5302,9 +5302,16 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - the SRTP extension
   - SCTP as in the default build (disabled)
   - DTLS 1.3 if the target ABI includes it
-- [ ] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
+- [x] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
   present, but the default security level makes it effectively unusable unless
   `@SECLEVEL=0`. SSLv3 is compiled out, as in the default build.
+  - Done (the version code came with 7.4): upstream `ssl_test 02-protocol-version` passes all
+    678 iterations (every min/max pairing of SSLv3 through TLS 1.3, SSLv3 refused as the
+    default build refuses it). Interop cases `tls10`, `tls10-resume`, `tls11`,
+    `tls11-cbc-no-etm` at `@SECLEVEL=0`, and `tls10-default-seclevel`/`tls11-default-seclevel`,
+    where both libraries fail the same way at the default level (`no protocols available` on
+    the client, `unexpected message` on the server). `test-interop` masks the source file and
+    line in `ERR_print_errors` lines, which are the implementation's, not behavior.
 - [ ] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
   - async fds, record padding, `SSL_stateless`, the remaining `tlsext` ctrls
   - temporary/auto DH, the CA-subject loaders, the early-data callback

@@ -507,7 +507,8 @@ fn client(
         "echo: MISSING\n"
     });
     if !echoed {
-        summary.push_str(&format!("client stderr: {stderr}\n"));
+        let stderr: Vec<String> = stderr.lines().map(mask_err_location).collect();
+        summary.push_str(&format!("client stderr: {}\n", stderr.join("\n")));
     }
     Ok(summary)
 }
@@ -590,7 +591,8 @@ fn connect(
         }
     }
     if summary.contains("echo: MISSING") {
-        summary.push_str(&format!("server: {}\n", server_out.join(" / ")));
+        let lines: Vec<String> = server_out.iter().map(|l| mask_err_location(l)).collect();
+        summary.push_str(&format!("server: {}\n", lines.join(" / ")));
     }
     Ok(summary)
 }
@@ -698,6 +700,29 @@ fn mask_trace(line: &str) -> String {
         }
     }
     line.to_owned()
+}
+
+/// An `ERR_print_errors` line with its source location masked (`…:reason:FILE:LINE:data`): the
+/// file and line are the implementation's, not behavior.
+fn mask_err_location(line: &str) -> String {
+    let Some(at) = line.find(":error:") else {
+        return line.to_owned();
+    };
+    // thread id, "error", code, library, function, reason, file, line, data
+    let fields: Vec<&str> = line[at + 1..].splitn(8, ':').collect();
+    match fields.as_slice() {
+        [e, code, lib, func, reason, _file, rest @ ..] => {
+            let data = rest
+                .first()
+                .and_then(|r| r.split_once(':'))
+                .map_or("", |(_, d)| d);
+            format!(
+                "{}:{e}:{code}:{lib}:{func}:{reason}:*:*:{data}",
+                &line[..at]
+            )
+        }
+        _ => line.to_owned(),
+    }
 }
 
 fn indent(s: &str) -> String {
