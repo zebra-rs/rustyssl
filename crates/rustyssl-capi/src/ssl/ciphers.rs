@@ -122,7 +122,7 @@ unsafe impl Send for CipherStack {}
 /// The suites of a `STACK_OF(SSL_CIPHER)` (entries not ours are skipped).
 ///
 /// The stack is NULL or a live stack.
-fn ciphers_of(st: *const OPENSSL_STACK) -> Vec<&'static Cipher> {
+pub(crate) fn ciphers_of(st: *const OPENSSL_STACK) -> Vec<&'static Cipher> {
     // SAFETY: NULL or a live stack (-1 for NULL).
     let n = unsafe { OPENSSL_sk_num(st) };
     (0..n)

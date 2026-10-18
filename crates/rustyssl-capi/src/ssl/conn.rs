@@ -155,6 +155,8 @@ pub(crate) struct SslState {
     pub(crate) peer_ca_names: *mut stack_st_X509_NAME,
     /// The cipher lists, and the client's suites on a server (`cipher_list`, `peer_ciphers`, ...).
     pub(crate) ciphers: super::ciphers::CipherLists,
+    /// The protocol engine and what it hands the application (`super::io`).
+    pub(crate) drv: super::io::Driver,
 }
 
 // SAFETY: the raw pointers are owned references to OpenSSL objects (or the application's
@@ -387,6 +389,7 @@ ffi_export! {
                 peer_finish_md: Vec::new(),
                 peer_ca_names: ptr::null_mut(),
                 ciphers,
+                drv: super::io::Driver::default(),
             };
             st.reset();
             st
@@ -574,7 +577,14 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_NO_METHOD_SPECIFIED, "SSL_clear");
             return 0;
         };
-        x.state().reset();
+        // The engine (and the peer's certificates) go with the handshake; they're freed with no
+        // lock held, since freeing an X509 may run ex_data callbacks.
+        let old = {
+            let mut st = x.state();
+            st.reset();
+            core::mem::take(&mut st.drv)
+        };
+        drop(old);
         // SAFETY: the connection's parameters.
         unsafe { crate::x509::vpm::X509_VERIFY_PARAM_move_peername(x.param, ptr::null_mut()) };
         1
@@ -1264,9 +1274,11 @@ ffi_export! {
         if type_ != TLSEXT_NAMETYPE_host_name {
             return ptr::null();
         }
-        // Without sessions (they come with the handshake), both sides report the name set
-        // for this connection, as OpenSSL does when no session was resumed.
-        x.state().hostname.as_deref().map_or(ptr::null(), core::ffi::CStr::as_ptr)
+        // Without sessions, both sides report the connection's name, as OpenSSL does when no
+        // session was resumed: on a server, the one the client's hello carried.
+        let st = x.state();
+        let received = if st.server { st.drv.servername.as_deref() } else { None };
+        received.or(st.hostname.as_deref()).map_or(ptr::null(), core::ffi::CStr::as_ptr)
     }
 }
 
@@ -1642,6 +1654,10 @@ ffi_export! {
         const F: &str = "SSL_ctrl";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        // SAFETY: the live connection; `parg` as `cmd` documents.
+        if let Some(r) = unsafe { super::io::api::handshake_ctrl(x, cmd, parg) } {
+            return r;
+        }
         if unimplemented_ctrl(cmd) || handshake_ctrl(cmd) || (cmd == SSL_CTRL_GET_RAW_CIPHERLIST && !parg.is_null()) {
             crate::stub::unimplemented(&format!("SSL_ctrl command {cmd}"));
         }

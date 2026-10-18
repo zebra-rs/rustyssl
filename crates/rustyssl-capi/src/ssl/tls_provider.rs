@@ -461,6 +461,17 @@ impl EvpProvider {
         Some(KeyId(keys.len().saturating_sub(1)))
     }
 
+    /// The peer's key share for group `id` as a key (`s->s3.peer_tmp`, which
+    /// `SSL_get_peer_tmp_key` returns): a new key the caller owns, or `None` if the group or
+    /// the share doesn't make one (a KEM's ciphertext, say).
+    pub(crate) fn peer_share_key(&self, id: u16, share: &[u8]) -> Option<*mut EVP_PKEY> {
+        let g = self.group(id).ok()?;
+        let k = self.env.peer_key(&g, share).ok()?;
+        let p = k.0;
+        core::mem::forget(k);
+        Some(p)
+    }
+
     /// The key registered as `id`.
     fn key(&self, id: KeyId) -> Result<*mut EVP_PKEY> {
         let keys = self.keys.lock().unwrap_or_else(PoisonError::into_inner);
