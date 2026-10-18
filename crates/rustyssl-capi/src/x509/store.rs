@@ -1418,8 +1418,7 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Adds an OSSL_STORE URI to the store's store lookup (OSSL_STORE comes with step 6.9): 1,
-    /// or 0.
+    /// Adds an OSSL_STORE URI to the store's store lookup (checking it opens): 1, or 0.
     ///
     /// # Safety
     /// `xs` is NULL or a live store; `uri` and `propq` are NULL or C strings.

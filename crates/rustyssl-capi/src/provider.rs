@@ -66,6 +66,7 @@ mod ecx_kmgmt;
 mod eddsa_sig;
 mod encoders;
 pub(crate) mod exchanges;
+mod file_store;
 pub(crate) mod kdfs;
 mod kdfs_more;
 mod key2ms;

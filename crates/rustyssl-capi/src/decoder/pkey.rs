@@ -183,7 +183,7 @@ ffi_callback! {
 ///
 /// # Safety
 /// `keydata` is key data of `km`, which the key takes.
-unsafe fn make_pkey(km: &keymgmt::Ref, keydata: *mut c_void) -> *mut EVP_PKEY {
+pub(crate) unsafe fn make_pkey(km: &keymgmt::Ref, keydata: *mut c_void) -> *mut EVP_PKEY {
     let Some(kd) = crate::evp::pkey::KeyData::adopt(km.clone(), keydata) else {
         return ptr::null_mut();
     };

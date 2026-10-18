@@ -11,8 +11,8 @@
 //! - The default file and directory are `SSL_CERT_FILE` and `SSL_CERT_DIR` from the
 //!   environment (not when setuid), or OPENSSLDIR's `cert.pem` and `certs`.
 //!
-//! OSSL_STORE comes with step 6.9: until then the store lookup works without URIs (as the
-//! default paths use it) and aborts on one.
+//! - The store lookup checks a URI opens when it's added, and loads it (and the names it
+//!   gives, one level down) into the store when searched.
 //!
 //! The types are opaque in OpenSSL's headers, so their layouts are ours (OpenSSL's, in fact).
 
@@ -23,9 +23,10 @@ use std::sync::Mutex;
 
 use rustyssl_abi::{
     ASN1_INTEGER, BIO, ERR_LIB_X509, ERR_R_ASN1_LIB, ERR_R_BIO_LIB, ERR_R_PASSED_NULL_PARAMETER,
-    ERR_R_PEM_LIB, OSSL_LIB_CTX, PEM_R_NO_START_LINE, X509_CRL, X509_FILETYPE_ASN1,
-    X509_FILETYPE_DEFAULT, X509_FILETYPE_PEM, X509_L_ADD_DIR, X509_L_ADD_STORE, X509_L_FILE_LOAD,
-    X509_L_LOAD_STORE, X509_LOOKUP, X509_LOOKUP_METHOD, X509_LOOKUP_TYPE, X509_LOOKUP_ctrl_fn,
+    ERR_R_PEM_LIB, OSSL_LIB_CTX, OSSL_STORE_INFO_CERT, OSSL_STORE_INFO_CRL, OSSL_STORE_INFO_NAME,
+    OSSL_STORE_SEARCH, PEM_R_NO_START_LINE, X509_CRL, X509_FILETYPE_ASN1, X509_FILETYPE_DEFAULT,
+    X509_FILETYPE_PEM, X509_L_ADD_DIR, X509_L_ADD_STORE, X509_L_FILE_LOAD, X509_L_LOAD_STORE,
+    X509_LOOKUP, X509_LOOKUP_METHOD, X509_LOOKUP_TYPE, X509_LOOKUP_ctrl_fn,
     X509_LOOKUP_get_by_alias_fn, X509_LOOKUP_get_by_fingerprint_fn,
     X509_LOOKUP_get_by_issuer_serial_fn, X509_LOOKUP_get_by_subject_fn, X509_LU_CRL, X509_LU_X509,
     X509_NAME, X509_OBJECT, X509_R_BAD_X509_FILETYPE, X509_R_INVALID_DIRECTORY,
@@ -1470,21 +1471,117 @@ ffi_export! {
 
 // OSSL_STORE URIs (`by_store.c`).
 
-/// OSSL_STORE comes with step 6.9.
-fn store_later() -> ! {
-    crate::stub::unimplemented("OSSL_STORE, for an X509_LOOKUP_store URI (step 6.9)")
+/// `cached_store_st`: a URI to load from, its library context and properties.
+struct CachedStore {
+    uri: std::ffi::CString,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: Option<std::ffi::CString>,
 }
 
-/// `by_store_ctrl_ex`: `X509_L_ADD_STORE` (nothing for NULL) and `X509_L_LOAD_STORE` of a
-/// URI, which need OSSL_STORE; a NULL URI to load fails as OSSL_STORE's open does.
+/// `cache_objects`: adds what the store at the URI holds (matching the search, if any) to the
+/// lookup's store, following names `depth` levels down: whether the last object was added.
+///
+/// # Safety
+/// `lctx` is a live lookup; `search` NULL or a live search.
+unsafe fn cache_objects(
+    lctx: *mut X509_LOOKUP,
+    uri: *const c_char,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+    search: *const OSSL_STORE_SEARCH,
+    depth: c_int,
+) -> c_int {
+    use crate::store::ctx::{
+        OSSL_STORE_close, OSSL_STORE_find, OSSL_STORE_load, OSSL_STORE_open_ex,
+    };
+    use crate::store::info::{
+        OSSL_STORE_INFO_free, OSSL_STORE_INFO_get_type, OSSL_STORE_INFO_get0_CERT,
+        OSSL_STORE_INFO_get0_CRL, OSSL_STORE_INFO_get0_NAME,
+    };
+    // SAFETY: the caller's lookup.
+    let xstore = unsafe { store_of(lctx) };
+    // SAFETY: the URI; the context and properties; no UI, parameters, or post-processing.
+    let ctx = unsafe {
+        OSSL_STORE_open_ex(
+            uri,
+            libctx,
+            propq,
+            ptr::null(),
+            ptr::null_mut(),
+            ptr::null(),
+            None,
+            ptr::null_mut(),
+        )
+    };
+    if ctx.is_null() {
+        return 0;
+    }
+    if !search.is_null() {
+        // SAFETY: the store opened here; the caller's search.
+        unsafe { OSSL_STORE_find(ctx, search) };
+    }
+    let mut ok = 0;
+    loop {
+        // SAFETY: as above.
+        let info = unsafe { OSSL_STORE_load(ctx) };
+        if info.is_null() {
+            break;
+        }
+        // SAFETY: the information loaded.
+        // SAFETY: the information loaded.
+        let t = unsafe { OSSL_STORE_INFO_get_type(info) };
+        ok = match t {
+            OSSL_STORE_INFO_NAME if depth > 0 => {
+                // SAFETY: as above.
+                let name = unsafe { OSSL_STORE_INFO_get0_NAME(info) };
+                // SAFETY: the lookup; its name, a C string.
+                unsafe { cache_objects(lctx, name, libctx, propq, search, depth - 1) }
+            }
+            OSSL_STORE_INFO_CERT => {
+                // SAFETY: as above.
+                let x = unsafe { OSSL_STORE_INFO_get0_CERT(info) };
+                // SAFETY: the lookup's store; the certificate.
+                unsafe { X509_STORE_add_cert(xstore, x) }
+            }
+            OSSL_STORE_INFO_CRL => {
+                // SAFETY: as above.
+                let x = unsafe { OSSL_STORE_INFO_get0_CRL(info) };
+                // SAFETY: the lookup's store; the CRL.
+                unsafe { X509_STORE_add_crl(xstore, x) }
+            }
+            _ => 0,
+        };
+        // SAFETY: loaded here.
+        unsafe { OSSL_STORE_INFO_free(info) };
+        if ok == 0 {
+            break;
+        }
+    }
+    // SAFETY: opened here.
+    unsafe { OSSL_STORE_close(ctx) };
+    ok
+}
+
+/// The lookup's URIs.
+///
+/// # Safety
+/// `ctx` is NULL or a live store lookup.
+unsafe fn stores_of<'a>(ctx: *const X509_LOOKUP) -> Option<&'a mut Vec<CachedStore>> {
+    // SAFETY: the caller's guarantee: the method data is the lookup's list, or NULL.
+    unsafe { lookup(ctx) }
+        .and_then(|l| unsafe { l.method_data.cast::<Vec<CachedStore>>().as_mut() })
+}
+
+/// `by_store_ctrl_ex`: `X509_L_ADD_STORE` (a URI that opens, kept; nothing for NULL) and
+/// `X509_L_LOAD_STORE` (the URI's objects added now).
 unsafe extern "C" fn store_ctrl_ex(
-    _ctx: *mut X509_LOOKUP,
+    ctx: *mut X509_LOOKUP,
     cmd: c_int,
     argp: *const c_char,
     _argl: c_long,
     _retp: *mut *mut c_char,
-    _libctx: *mut OSSL_LIB_CTX,
-    _propq: *const c_char,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
 ) -> c_int {
     crate::ffi::guard(
         ERR_LIB_X509,
@@ -1492,15 +1589,56 @@ unsafe extern "C" fn store_ctrl_ex(
         || 0,
         move || match cmd {
             X509_L_ADD_STORE if argp.is_null() => 1,
-            X509_L_LOAD_STORE if argp.is_null() => {
-                err::raise(
-                    rustyssl_abi::ERR_LIB_OSSL_STORE,
-                    ERR_R_PASSED_NULL_PARAMETER,
-                    "OSSL_STORE_open_ex",
-                );
-                0
+            X509_L_ADD_STORE => {
+                use crate::store::ctx::{OSSL_STORE_close, OSSL_STORE_open_ex};
+                // SAFETY: the caller's URI; the context and properties.
+                let sctx = unsafe {
+                    OSSL_STORE_open_ex(
+                        argp,
+                        libctx,
+                        propq,
+                        ptr::null(),
+                        ptr::null_mut(),
+                        ptr::null(),
+                        None,
+                        ptr::null_mut(),
+                    )
+                };
+                if sctx.is_null() {
+                    return 0;
+                }
+                // SAFETY: opened here.
+                unsafe { OSSL_STORE_close(sctx) };
+                // SAFETY: the caller's C string.
+                let uri = unsafe { CStr::from_ptr(argp) }.to_owned();
+                // SAFETY: as above, or NULL.
+                let propq = (!propq.is_null()).then(|| unsafe { CStr::from_ptr(propq) }.to_owned());
+                let store = CachedStore { uri, libctx, propq };
+                // SAFETY: the caller's lookup.
+                match unsafe { stores_of(ctx) } {
+                    Some(v) => v.push(store),
+                    None => {
+                        // SAFETY: as above.
+                        let Some(l) = (unsafe { lookup(ctx) }) else {
+                            return 0;
+                        };
+                        l.method_data = Box::into_raw(Box::new(vec![store])).cast();
+                    }
+                }
+                1
             }
-            X509_L_ADD_STORE | X509_L_LOAD_STORE => store_later(),
+            X509_L_LOAD_STORE => {
+                if argp.is_null() {
+                    err::raise(
+                        rustyssl_abi::ERR_LIB_OSSL_STORE,
+                        ERR_R_PASSED_NULL_PARAMETER,
+                        "OSSL_STORE_open_ex",
+                    );
+                    return 0;
+                }
+                // SAFETY: the caller's lookup and URI.
+                unsafe { cache_objects(ctx, argp, libctx, propq, ptr::null(), 0) }
+            }
             _ => 0,
         },
     )
@@ -1518,18 +1656,95 @@ unsafe extern "C" fn store_ctrl(
     unsafe { store_ctrl_ex(ctx, cmd, argp, argl, retp, ptr::null_mut(), ptr::null()) }
 }
 
-/// `by_store_subject`: nothing to find without URIs (adding one waits for OSSL_STORE).
+/// `by_store_subject`: the URIs' objects with the subject added to the store, then the store's
+/// object of the type and subject into `ret` (not up-referenced, as by_dir's): 1, or 0.
 unsafe extern "C" fn store_subject(
-    _ctx: *mut X509_LOOKUP,
-    _type: X509_LOOKUP_TYPE,
-    _name: *const X509_NAME,
-    _ret: *mut X509_OBJECT,
+    ctx: *mut X509_LOOKUP,
+    type_: X509_LOOKUP_TYPE,
+    name: *const X509_NAME,
+    ret: *mut X509_OBJECT,
 ) -> c_int {
-    0
+    crate::ffi::guard(
+        ERR_LIB_X509,
+        "by_store_subject",
+        || 0,
+        move || {
+            use crate::store::info::{OSSL_STORE_SEARCH_by_name, OSSL_STORE_SEARCH_free};
+            // SAFETY: the caller's name, not changed by the search.
+            let search = unsafe { OSSL_STORE_SEARCH_by_name(name.cast_mut()) };
+            // A copy, so loading (which may use the lookup) holds no reference to the list.
+            // SAFETY: the caller's lookup.
+            let uris: Vec<(
+                std::ffi::CString,
+                *mut OSSL_LIB_CTX,
+                Option<std::ffi::CString>,
+            )> = unsafe { stores_of(ctx) }
+                .map(|v| {
+                    v.iter()
+                        .map(|s| (s.uri.clone(), s.libctx, s.propq.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut ok = 0;
+            for (uri, libctx, propq) in &uris {
+                let p = propq.as_deref().map_or(ptr::null(), CStr::as_ptr);
+                // SAFETY: the lookup; a C string; the search.
+                ok = unsafe { cache_objects(ctx, uri.as_ptr(), *libctx, p, search, 1) };
+                if ok != 0 {
+                    break;
+                }
+            }
+            // SAFETY: made here.
+            unsafe { OSSL_STORE_SEARCH_free(search) };
+            if ok == 0 {
+                return 0;
+            }
+            // SAFETY: the caller's lookup.
+            let xs = unsafe { store_of(ctx) };
+            // SAFETY: its store.
+            let Some(s) = (unsafe { store(xs) }) else {
+                return 0;
+            };
+            // SAFETY: the store's lock.
+            if unsafe { CRYPTO_THREAD_write_lock(s.lock) } == 0 {
+                return 0;
+            }
+            let probe = key(type_, name);
+            let pp: *const Object = &raw const probe;
+            // SAFETY: the store's objects, under its lock; a pointer to the key.
+            let j = unsafe { crate::stack::OPENSSL_sk_find(s.objs.cast(), pp.cast()) };
+            // SAFETY: as above; an index within the stack, or -1.
+            let tmp: *mut Object = unsafe { OPENSSL_sk_value(s.objs.cast(), j) }.cast();
+            // SAFETY: as above.
+            unsafe { CRYPTO_THREAD_unlock(s.lock) };
+            // SAFETY: an object of the store, or NULL.
+            let Some(t) = (unsafe { tmp.as_ref() }) else {
+                return 0;
+            };
+            if t.type_ != X509_LU_X509 && t.type_ != X509_LU_CRL {
+                return 0;
+            }
+            // SAFETY: the caller's object.
+            if let Some(r) = unsafe { ret.cast::<Object>().as_mut() } {
+                r.type_ = t.type_;
+                r.data = t.data;
+            }
+            1
+        },
+    )
 }
 
-/// `by_store_free`: frees the URIs (there are none without OSSL_STORE).
-unsafe extern "C" fn store_free(_ctx: *mut X509_LOOKUP) {}
+/// `by_store_free`: frees the URIs.
+unsafe extern "C" fn store_free(ctx: *mut X509_LOOKUP) {
+    // SAFETY: the caller's lookup.
+    if let Some(l) = unsafe { lookup(ctx) }
+        && !l.method_data.is_null()
+    {
+        // SAFETY: the list `store_ctrl_ex` made, freed once.
+        drop(unsafe { Box::from_raw(l.method_data.cast::<Vec<CachedStore>>()) });
+        l.method_data = ptr::null_mut();
+    }
+}
 
 static STORE_LOOKUP: Builtin = Builtin(UnsafeCell::new(Method {
     free: Some(store_free),

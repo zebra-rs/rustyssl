@@ -56,6 +56,9 @@ pub(crate) enum Style {
     Decoder,
     /// `inner_ossl_encoder_fetch`'s: `OSSL_ENCODER` errors naming the "Name".
     Encoder,
+    /// `inner_loader_fetch`'s: `OSSL_STORE` errors naming the "Scheme", with a hint when no
+    /// provider has one.
+    Store,
 }
 
 impl Style {
@@ -72,6 +75,11 @@ impl Style {
                 rustyssl_abi::ERR_LIB_OSSL_ENCODER,
                 "inner_ossl_encoder_fetch",
                 "Name",
+            ),
+            Self::Store => (
+                rustyssl_abi::ERR_LIB_OSSL_STORE,
+                "inner_loader_fetch",
+                "Scheme",
             ),
         }
     }
@@ -530,8 +538,14 @@ unsafe fn inner_fetch(
         };
         let props =
             properties.map_or_else(|| "<null>".to_owned(), |p| p.to_string_lossy().into_owned());
+        let hint = if unsupported && kind.style == Style::Store {
+            "No store loader found. For standard store loaders you need at least one of the \
+             default or base providers available. Did you forget to load them? Info: "
+        } else {
+            ""
+        };
         let text = format!(
-            "{}, {label} ({shown} : {name_id}), Properties ({props})",
+            "{hint}{}, {label} ({shown} : {name_id}), Properties ({props})",
             descriptor(libctx, &ctx)
         );
         err::raise_with_text(lib, code, func, &text);

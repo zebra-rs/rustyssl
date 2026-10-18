@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 5306 | 570 | 90.3% |
+| libcrypto | 5876 | 5365 | 511 | 91.3% |
 | libssl | 603 | 2 | 601 | 0.3% |
-| **Total** | **6479** | **5308** | **1171** | **81.9%** |
+| **Total** | **6479** | **5367** | **1112** | **82.8%** |
 
 ## By header
 
@@ -87,7 +87,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `openssl/ssl.h` | libssl | 582 | 1 | 0.2% |
 | `openssl/sslerr_legacy.h` | libssl | 1 | 1 | 100.0% |
 | `openssl/stack.h` | libcrypto | 25 | 25 | 100.0% |
-| `openssl/store.h` | libcrypto | 75 | 16 | 21.3% |
+| `openssl/store.h` | libcrypto | 75 | 75 | 100.0% |
 | `openssl/thread.h` | libcrypto | 3 | 3 | 100.0% |
 | `openssl/tls1.h` | libssl | 13 | 0 | 0.0% |
 | `openssl/trace.h` | libcrypto | 10 | 10 | 100.0% |
@@ -420,7 +420,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_closesocket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_connect` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_copy_next_retry` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `trace`, `x509_cert`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `store`, `trace`, `x509_cert`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_dgram_pair`, `bio_pair` |
 | `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_mem`, `rand` |
@@ -452,7 +452,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_fd_non_fatal_error` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_fd_should_retry` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_find_type` | libcrypto | `openssl/bio.h` | `bio_mem` |
-| `BIO_free` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_item_sign`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `trace`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `BIO_free` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_item_sign`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `store`, `trace`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `BIO_free_all` | libcrypto | `openssl/bio.h` | `asn1_parse`, `bio_base64`, `bio_evp`, `bio_filter`, `bio_mem`, `bio_sock`, `cms_data`, `cms_sign`, `evp_pkey_print`, `http`, `pkcs7_smime`, `rand` |
 | `BIO_get_accept_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_get_callback` | libcrypto | `openssl/bio.h` | `bio_meth` |
@@ -506,7 +506,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_meth_set_write_ex` | libcrypto | `openssl/bio.h` | `bio_meth` |
 | `BIO_method_name` | libcrypto | `openssl/bio.h` | `bio_base64`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth` |
 | `BIO_method_type` | libcrypto | `openssl/bio.h` | `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bio_sock` |
-| `BIO_new` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `trace`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `BIO_new` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `store`, `trace`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `BIO_new_CMS` | libcrypto | `openssl/cms.h` | `cms_data` |
 | `BIO_new_NDEF` | libcrypto | `openssl/asn1.h` | `pkcs7_stream` |
 | `BIO_new_PKCS7` | libcrypto | `openssl/pkcs7.h` | `pkcs7_stream` |
@@ -519,7 +519,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_new_fd` | libcrypto | `openssl/bio.h` | `bio_dump`, `bio_file`, `pem_pkey` |
 | `BIO_new_file` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_new_fp` | libcrypto | `openssl/bio.h` | `bio_file`, `bn`, `ts` |
-| `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `asn1_generate`, `asn1_hex`, `asn1_item_io`, `asn1_item_sign`, `bio_base64`, `bio_evp`, `bio_filter`, `bio_mem`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `d2i_pkey`, `decoder`, `encoder`, `evp_pkey_print`, `http`, `ocsp`, `pem`, `pem_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `ts`, `ui`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_acext`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_policy`, `x509v3_san` |
+| `BIO_new_mem_buf` | libcrypto | `openssl/bio.h` | `asn1_generate`, `asn1_hex`, `asn1_item_io`, `asn1_item_sign`, `bio_base64`, `bio_evp`, `bio_filter`, `bio_mem`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `d2i_pkey`, `decoder`, `encoder`, `evp_pkey_print`, `http`, `ocsp`, `pem`, `pem_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `store`, `ts`, `ui`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_acext`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_policy`, `x509v3_san` |
 | `BIO_new_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
 | `BIO_next` | libcrypto | `openssl/bio.h` | `bio_evp`, `bio_mem`, `bio_sock`, `evp_pkey_print` |
 | `BIO_nread` | libcrypto | `openssl/bio.h` | `bio_pair` |
@@ -533,7 +533,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_printf` | libcrypto | `openssl/bio.h` | `asn1_print`, `bio_filter`, `bio_print`, `evp_pkey_print` |
 | `BIO_ptr_ctrl` | libcrypto | `openssl/bio.h` | `bio_connect`, `bio_mem`, `bio_sock` |
 | `BIO_push` | libcrypto | `openssl/bio.h` | `asn1_parse`, `bio_base64`, `bio_evp`, `bio_filter`, `bio_mem`, `evp_pkey_print`, `pkcs7_stream`, `rand` |
-| `BIO_puts` | libcrypto | `openssl/bio.h` | `asn1_integer`, `asn1_parse`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `conf`, `err_bio`, `evp_pkey_print`, `http`, `objects`, `pkcs7_stream`, `rand`, `trace` |
+| `BIO_puts` | libcrypto | `openssl/bio.h` | `asn1_integer`, `asn1_parse`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dump`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `conf`, `err_bio`, `evp_pkey_print`, `http`, `objects`, `pkcs7_stream`, `rand`, `store`, `trace` |
 | `BIO_read` | libcrypto | `openssl/bio.h` | `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `cms_sign`, `http`, `pem_crypt`, `pkcs7_smime`, `rand` |
 | `BIO_read_ex` | libcrypto | `openssl/bio.h` | `bio_mem`, `bio_meth` |
 | `BIO_recvmmsg` | libcrypto | `openssl/bio.h` | `bio_dgram`, `bio_dgram_pair`, `bio_meth` |
@@ -545,7 +545,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_s_dgram_pair` | libcrypto | `openssl/bio.h` | `bio_dgram_pair` |
 | `BIO_s_fd` | libcrypto | `openssl/bio.h` | `bio_file` |
 | `BIO_s_file` | libcrypto | `openssl/bio.h` | `bio_file` |
-| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `bio_sock`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `trace`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `BIO_s_mem` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_print`, `bio_sock`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `store`, `trace`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `BIO_s_null` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_s_secmem` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BIO_s_socket` | libcrypto | `openssl/bio.h` | `bio_sock` |
@@ -1019,7 +1019,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_cts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_cts128_encrypt_block` | libcrypto | `openssl/modes.h` | `lowlevel_aes` |
 | `CRYPTO_dup_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
-| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_generate`, `asn1_header`, `asn1_item_sign`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_evp`, `bio_sock`, `bn`, `bn_mod`, `bn_prime`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_group_point`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `evp_cipher_asn1`, `evp_derive`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_mac`, `evp_ml_kem_kmgmt`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_legacy`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `http`, `key2text`, `lowlevel_aead`, `ocsp`, `params`, `pbe`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs12_key`, `pkcs7`, `pkcs7_smime`, `pkcs8_crypt`, `properties`, `pvkfmt`, `rsa_asn1`, `rsa_ops`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_ext`, `x509_name`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509_vpm`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `CRYPTO_free` | libcrypto | `openssl/crypto.h` | `asn1_d2i`, `asn1_generate`, `asn1_header`, `asn1_item_sign`, `asn1_print`, `asn1_template`, `asn1_text`, `asn1_type`, `bio_addr`, `bio_evp`, `bio_sock`, `bn`, `bn_mod`, `bn_prime`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_mem`, `crypto_mem_hooks`, `crypto_str`, `ct`, `d2i_pkey`, `decoder`, `dh_asn1`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_group_point`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `evp_cipher_asn1`, `evp_derive`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_mac`, `evp_ml_kem_kmgmt`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_legacy`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `http`, `key2text`, `lowlevel_aead`, `ocsp`, `params`, `pbe`, `pem`, `pem_crypt`, `pem_write_pkey`, `pkcs12`, `pkcs12_key`, `pkcs7`, `pkcs7_smime`, `pkcs8_crypt`, `properties`, `pvkfmt`, `rsa_asn1`, `rsa_ops`, `store`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_ext`, `x509_name`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509_vpm`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `CRYPTO_free_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_free_ex_index` | libcrypto | `openssl/crypto.h` | `ex_data`, `lib_ctx` |
 | `CRYPTO_gcm128_aad` | libcrypto | `openssl/modes.h` | `lowlevel_aead` |
@@ -1068,7 +1068,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `CRYPTO_secure_zalloc` | libcrypto | `openssl/crypto.h` | `crypto_secure_heap` |
 | `CRYPTO_set_ex_data` | libcrypto | `openssl/crypto.h` | `ex_data` |
 | `CRYPTO_set_mem_functions` | libcrypto | `openssl/crypto.h` | `crypto_mem`, `crypto_mem_hooks` |
-| `CRYPTO_strdup` | libcrypto | `openssl/crypto.h` | `cms_env`, `crypto_str`, `encoder`, `pem_crypt`, `pkcs8_crypt`, `ui` |
+| `CRYPTO_strdup` | libcrypto | `openssl/crypto.h` | `cms_env`, `crypto_str`, `encoder`, `pem_crypt`, `pkcs8_crypt`, `store`, `ui` |
 | `CRYPTO_strndup` | libcrypto | `openssl/crypto.h` | `crypto_str`, `evp_ecx448_legacy`, `evp_ecx_legacy` |
 | `CRYPTO_xts128_encrypt` | libcrypto | `openssl/modes.h` | `lowlevel_aead` |
 | `CRYPTO_zalloc` | libcrypto | `openssl/crypto.h` | `asn1_print`, `asn1_type`, `crypto_mem`, `crypto_mem_hooks`, `err_queue`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_skey`, `pvkfmt` |
@@ -1494,7 +1494,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `cms_env`, `crypto_str`, `ct`, `ec_group_point`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa_legacy`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `ocsp`, `pem_crypt`, `pkcs12`, `pkcs12_key`, `pkcs7`, `rand`, `rsa_print`, `stack`, `ui_console`, `x509_check`, `x509_crlcheck`, `x509_policy`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509_vpm` |
-| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_item_sign`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `cms_data`, `cms_sign`, `conf`, `conf_modules`, `crypto_secure_heap`, `d2i_pkey`, `d2i_pq`, `decoder`, `dh_asn1`, `dh_check`, `dh_lib`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `err_queue`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_ops`, `evp_kdf_more`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_pkey_ec`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `fetch`, `hpke`, `http`, `key2text`, `params`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `properties`, `provider`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `stack`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_name`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509_trust`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
+| `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_item_sign`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `cms_data`, `cms_sign`, `conf`, `conf_modules`, `crypto_secure_heap`, `d2i_pkey`, `d2i_pq`, `decoder`, `dh_asn1`, `dh_check`, `dh_lib`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `err_queue`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_ops`, `evp_kdf_more`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_pkey_ec`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `fetch`, `hpke`, `http`, `key2text`, `params`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `properties`, `provider`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `stack`, `store`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_name`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509_trust`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_next_error_library` | libcrypto | `openssl/err.h` | `err_queue`, `provider` |
@@ -2011,7 +2011,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_CTX_set_tls1_prf_md` | libcrypto | `openssl/kdf.h` | `evp_derive` |
 | `EVP_PKEY_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_dsa_sig`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx_ops`, `evp_ml_dsa_ops`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_signature`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_sig` |
 | `EVP_PKEY_CTX_str2ctrl` | libcrypto | `openssl/evp.h` | `evp_pkey_meth` |
-| `EVP_PKEY_Q_keygen` | libcrypto | `openssl/evp.h` | `dhkem`, `evp_ec_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_slh_dsa_kmgmt`, `x509_purpose` |
+| `EVP_PKEY_Q_keygen` | libcrypto | `openssl/evp.h` | `dhkem`, `evp_ec_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_slh_dsa_kmgmt`, `store`, `x509_purpose` |
 | `EVP_PKEY_add1_attr` | libcrypto | `openssl/x509.h` | `pkcs12` |
 | `EVP_PKEY_add1_attr_by_NID` | libcrypto | `openssl/x509.h` | `pkcs12` |
 | `EVP_PKEY_add1_attr_by_OBJ` | libcrypto | `openssl/x509.h` | `pkcs12` |
@@ -2071,7 +2071,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_encrypt_old` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_pkey_ops` |
 | `EVP_PKEY_eq` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `d2i_pq`, `encoder`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_rsa`, `evp_rsa`, `evp_slh_dsa_kmgmt`, `evp_sm2_kmgmt`, `pem_write_pkey`, `pkcs8_crypt`, `pvkfmt`, `ui`, `x509_cert`, `x509_req`, `x509_spki` |
 | `EVP_PKEY_export` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_PKEY_free` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `cms_env`, `cms_sign`, `d2i_pkey`, `d2i_pq`, `dhkem`, `encoder`, `evp_derive`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_names_kept`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `hpke`, `key2text`, `ocsp`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rsa_lib`, `rsa_ops`, `rsa_print`, `ts`, `ui`, `x509_acert`, `x509_cert`, `x509_crl`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509v3_crld`, `x509v3_san` |
+| `EVP_PKEY_free` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `cms_env`, `cms_sign`, `d2i_pkey`, `d2i_pq`, `dhkem`, `encoder`, `evp_derive`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_legacy`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ecx_ops`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_names_kept`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `hpke`, `key2text`, `ocsp`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `pvkfmt`, `rsa_lib`, `rsa_ops`, `rsa_print`, `store`, `ts`, `ui`, `x509_acert`, `x509_cert`, `x509_crl`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509v3_crld`, `x509v3_san` |
 | `EVP_PKEY_fromdata` | libcrypto | `openssl/evp.h` | `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig` |
 | `EVP_PKEY_fromdata_init` | libcrypto | `openssl/evp.h` | `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig` |
 | `EVP_PKEY_fromdata_settable` | libcrypto | `openssl/evp.h` | `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_pkey` |
@@ -2088,7 +2088,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_get0_poly1305` | libcrypto | `openssl/evp.h` | `evp_pkey` |
 | `EVP_PKEY_get0_provider` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `evp_ec_legacy`, `evp_pkey` |
 | `EVP_PKEY_get0_siphash` | libcrypto | `openssl/evp.h` | `evp_pkey` |
-| `EVP_PKEY_get0_type_name` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `d2i_pq`, `evp_derive`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_kmgmt`, `pem_pkey`, `pvkfmt`, `x509_cert`, `x509_info`, `x509_req` |
+| `EVP_PKEY_get0_type_name` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `d2i_pq`, `evp_derive`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_kmgmt`, `pem_pkey`, `pvkfmt`, `store`, `x509_cert`, `x509_info`, `x509_req` |
 | `EVP_PKEY_get1_DH` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `evp_dh_exch`, `evp_dh_kmgmt` |
 | `EVP_PKEY_get1_DSA` | libcrypto | `openssl/evp.h` | `evp_dsa_kmgmt` |
 | `EVP_PKEY_get1_EC_KEY` | libcrypto | `openssl/evp.h` | `evp_pkey_ec` |
@@ -2099,7 +2099,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_get_attr_by_OBJ` | libcrypto | `openssl/x509.h` | `pkcs12` |
 | `EVP_PKEY_get_attr_count` | libcrypto | `openssl/x509.h` | `pkcs12` |
 | `EVP_PKEY_get_base_id` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_rsa`, `pkcs12` |
-| `EVP_PKEY_get_bits` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `d2i_pq`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecx448_legacy`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_slh_dsa_kmgmt`, `evp_sm2_kmgmt`, `pem_pkey`, `pvkfmt`, `rsa_lib`, `x509_cert`, `x509_req` |
+| `EVP_PKEY_get_bits` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `d2i_pq`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecx448_legacy`, `evp_ecx_kmgmt`, `evp_ecx_legacy`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_slh_dsa_kmgmt`, `evp_sm2_kmgmt`, `pem_pkey`, `pvkfmt`, `rsa_lib`, `store`, `x509_cert`, `x509_req` |
 | `EVP_PKEY_get_bn_param` | libcrypto | `openssl/evp.h` | `d2i_pkey`, `evp_ec_kmgmt`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_sm2_kmgmt`, `pem_pkey`, `rsa_lib` |
 | `EVP_PKEY_get_default_digest_name` | libcrypto | `openssl/evp.h` | `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth`, `evp_pkey_rsa`, `evp_rsa`, `evp_slh_dsa_kmgmt`, `evp_sm2_kmgmt` |
 | `EVP_PKEY_get_default_digest_nid` | libcrypto | `openssl/evp.h` | `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey`, `evp_pkey_ec`, `evp_pkey_meth` |
@@ -2221,7 +2221,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_PKEY_todata` | libcrypto | `openssl/evp.h` | `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_ec_kmgmt`, `evp_ecx_kmgmt`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_mlx_kem`, `evp_pkey`, `evp_rsa`, `evp_slh_dsa_kmgmt`, `evp_sm2_kmgmt` |
 | `EVP_PKEY_type` | libcrypto | `openssl/evp.h` | `evp_dh_kmgmt`, `evp_pkey`, `evp_pkey_meth` |
 | `EVP_PKEY_type_names_do_all` | libcrypto | `openssl/evp.h` | `evp_names_kept`, `evp_pkey` |
-| `EVP_PKEY_up_ref` | libcrypto | `openssl/evp.h` | `cms_env`, `evp_pkey` |
+| `EVP_PKEY_up_ref` | libcrypto | `openssl/evp.h` | `cms_env`, `evp_pkey`, `store` |
 | `EVP_PKEY_verify` | libcrypto | `openssl/evp.h` | `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdsa_sig`, `evp_ecx448_ops`, `evp_ecx_ops`, `evp_ml_dsa_ops`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_ops`, `evp_sm2_sig` |
 | `EVP_PKEY_verify_init` | libcrypto | `openssl/evp.h` | `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdsa_sig`, `evp_ml_dsa_ops`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_ops`, `evp_sm2_sig` |
 | `EVP_PKEY_verify_init_ex` | libcrypto | `openssl/evp.h` | `evp_signature` |
@@ -2462,9 +2462,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_seed_ofb` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_set_default_properties` | libcrypto | `openssl/evp.h` | `fetch`, `properties` |
 | `EVP_set_pw_prompt` | libcrypto | `openssl/evp.h` | `ui` |
-| `EVP_sha1` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `dh_check`, `ecdsa`, `evp_derive`, `evp_dsa_sig`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `ocsp`, `pbe`, `pem_crypt`, `pkcs12`, `pkcs7`, `rsa_ops`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_name`, `x509_purpose` |
+| `EVP_sha1` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `dh_check`, `ecdsa`, `evp_derive`, `evp_dsa_sig`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `ocsp`, `pbe`, `pem_crypt`, `pkcs12`, `pkcs7`, `rsa_ops`, `store`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_name`, `x509_purpose` |
 | `EVP_sha224` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names` |
-| `EVP_sha256` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `cms_data`, `cms_env`, `cms_sign`, `d2i_pkey`, `dh_asn1`, `dh_check`, `dh_lib`, `dsa_asn1`, `dsa_lib`, `ecdsa`, `evp_derive`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `hpke`, `ocsp`, `pbe`, `pem_crypt`, `pkcs12`, `pkcs12_key`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rsa_ops`, `ts`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_name`, `x509_purpose`, `x509_req`, `x509_spki` |
+| `EVP_sha256` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `cms_data`, `cms_env`, `cms_sign`, `d2i_pkey`, `dh_asn1`, `dh_check`, `dh_lib`, `dsa_asn1`, `dsa_lib`, `ecdsa`, `evp_derive`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_mac`, `evp_md_meth`, `evp_md_names`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_pkey_rsa`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_legacy`, `evp_signature`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `hpke`, `ocsp`, `pbe`, `pem_crypt`, `pkcs12`, `pkcs12_key`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rsa_ops`, `store`, `ts`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_name`, `x509_purpose`, `x509_req`, `x509_spki` |
 | `EVP_sha384` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `bio_evp`, `cms_data`, `cms_sign`, `evp_dh_exch`, `evp_dsa_sig`, `evp_ec_legacy`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa_legacy`, `ocsp`, `pkcs7`, `pkcs7_smime`, `x509_req` |
 | `EVP_sha3_224` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_sha3_256` | libcrypto | `openssl/evp.h` | `asn1_item_sign`, `evp_md_names`, `evp_rsa_legacy`, `x509_attr_p8` |
@@ -2840,7 +2840,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OPENSSL_sk_new` | libcrypto | `openssl/stack.h` | `stack` |
 | `OPENSSL_sk_new_null` | libcrypto | `openssl/stack.h` | `asn1_template`, `cms_data`, `cms_env`, `cms_sign`, `ct`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `rsa_asn1`, `stack`, `ts`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crlcheck`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_verify`, `x509_vpm`, `x509v3_admission`, `x509v3_lib`, `x509v3_rfc3779`, `x509v3_san` |
 | `OPENSSL_sk_new_reserve` | libcrypto | `openssl/stack.h` | `stack` |
-| `OPENSSL_sk_num` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `ex_data`, `http`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `rsa_asn1`, `stack`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_rfc3779`, `x509v3_san` |
+| `OPENSSL_sk_num` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `conf_modules`, `ct`, `ex_data`, `http`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `rsa_asn1`, `stack`, `store`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_rfc3779`, `x509v3_san` |
 | `OPENSSL_sk_pop` | libcrypto | `openssl/stack.h` | `cms_env`, `pkcs12`, `stack`, `x509v3_lib` |
 | `OPENSSL_sk_pop_free` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_template`, `cms_data`, `cms_sign`, `conf_modules`, `http`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `stack`, `ts`, `x509_attr_p8`, `x509_check`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_policy`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_vpm`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `OPENSSL_sk_push` | libcrypto | `openssl/stack.h` | `asn1_d2i`, `asn1_print`, `asn1_template`, `cms_data`, `cms_env`, `cms_sign`, `ct`, `ocsp`, `pkcs12`, `pkcs7_smime`, `pkcs7_stream`, `rsa_asn1`, `stack`, `ts`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_policy`, `x509_print`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_verify`, `x509_vpm`, `x509v3_admission`, `x509v3_lib`, `x509v3_san` |
@@ -3168,7 +3168,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PROVIDER_do_all` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get0_default_search_path` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get0_dispatch` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_get0_name` | libcrypto | `openssl/provider.h` | `d2i_pkey`, `decoder`, `encoder`, `evp_derive`, `evp_dsa_sig`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_kdf`, `evp_mac`, `evp_pkey`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_sig`, `fetch`, `provider` |
+| `OSSL_PROVIDER_get0_name` | libcrypto | `openssl/provider.h` | `d2i_pkey`, `decoder`, `encoder`, `evp_derive`, `evp_dsa_sig`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_kdf`, `evp_mac`, `evp_pkey`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_sig`, `fetch`, `provider`, `store` |
 | `OSSL_PROVIDER_get0_provider_ctx` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get_conf_parameters` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get_params` | libcrypto | `openssl/provider.h` | `provider` |
@@ -3189,22 +3189,81 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_ROLE_SPEC_CERT_ID_it` | libcrypto | `openssl/x509v3.h` | `x509v3_acext` |
 | `OSSL_ROLE_SPEC_CERT_ID_new` | libcrypto | `openssl/x509v3.h` | `x509v3_acext` |
 | `OSSL_STACK_OF_X509_free` | libcrypto | `openssl/x509.h` | `cms_data`, `x509_cert`, `x509_ctx`, `x509_purpose`, `x509_store`, `x509_verify` |
-| `OSSL_STORE_LOADER_free` | libcrypto | `openssl/store.h` | `app_startup` |
+| `OSSL_STORE_INFO_free` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_CERT` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_CRL` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_NAME` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_NAME_description` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_PARAMS` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_PKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_PUBKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get0_data` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_CERT` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_CRL` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_NAME` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_NAME_description` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_PARAMS` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_PKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get1_PUBKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_get_type` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_CERT` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_CRL` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_NAME` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_PARAMS` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_PKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_new_PUBKEY` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_set0_NAME_description` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_INFO_type_string` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_do_all_provided` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_fetch` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_free` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_get0_description` | libcrypto | `openssl/store.h` | `store` |
 | `OSSL_STORE_LOADER_get0_engine` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_get0_scheme` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_new` | libcrypto | `openssl/store.h` | `app_startup` |
+| `OSSL_STORE_LOADER_get0_properties` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_get0_provider` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_get0_scheme` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_is_a` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_names_do_all` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_LOADER_new` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
 | `OSSL_STORE_LOADER_set_attach` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_close` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_ctrl` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_eof` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_error` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_expect` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_find` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_load` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_LOADER_set_open` | libcrypto | `openssl/store.h` | `app_startup` |
+| `OSSL_STORE_LOADER_set_close` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_ctrl` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_eof` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_error` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_expect` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_find` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_load` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_LOADER_set_open` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
 | `OSSL_STORE_LOADER_set_open_ex` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_register_loader` | libcrypto | `openssl/store.h` | `app_startup` |
-| `OSSL_STORE_unregister_loader` | libcrypto | `openssl/store.h` | `app_startup` |
+| `OSSL_STORE_LOADER_up_ref` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_by_alias` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_by_issuer_serial` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_by_key_fingerprint` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_by_name` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_free` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get0_bytes` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get0_digest` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get0_name` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get0_serial` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get0_string` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_SEARCH_get_type` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_attach` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_close` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_ctrl` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_delete` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_do_all_loaders` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_eof` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_error` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_expect` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_find` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_load` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_open` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_open_ex` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_register_loader` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_supports_search` | libcrypto | `openssl/store.h` | `store` |
+| `OSSL_STORE_unregister_loader` | libcrypto | `openssl/store.h` | `app_startup`, `store` |
+| `OSSL_STORE_vctrl` | libcrypto | `openssl/store.h` | `store` |
 | `OSSL_TARGETING_INFORMATION_free` | libcrypto | `openssl/x509_acert.h` | `x509v3_acext` |
 | `OSSL_TARGETING_INFORMATION_it` | libcrypto | `openssl/x509_acert.h` | `x509v3_acext` |
 | `OSSL_TARGETING_INFORMATION_new` | libcrypto | `openssl/x509_acert.h` | `x509v3_acext` |
@@ -3339,10 +3398,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `PEM_read_bio_RSAPrivateKey` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_RSAPublicKey` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_RSA_PUBKEY` | libcrypto | `openssl/pem.h` | `pem_pkey` |
-| `PEM_read_bio_X509` | libcrypto | `openssl/pem.h` | `cms_data`, `cms_env`, `cms_sign`, `ct`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `ts`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_san` |
+| `PEM_read_bio_X509` | libcrypto | `openssl/pem.h` | `cms_data`, `cms_env`, `cms_sign`, `ct`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `store`, `ts`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_spki`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_san` |
 | `PEM_read_bio_X509_ACERT` | libcrypto | `openssl/x509_acert.h` | `x509_acert`, `x509_print` |
 | `PEM_read_bio_X509_AUX` | libcrypto | `openssl/pem.h` | `x509_cert`, `x509_print` |
-| `PEM_read_bio_X509_CRL` | libcrypto | `openssl/pem.h` | `pkcs7`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_print`, `x509_store` |
+| `PEM_read_bio_X509_CRL` | libcrypto | `openssl/pem.h` | `pkcs7`, `store`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_print`, `x509_store` |
 | `PEM_read_bio_X509_PUBKEY` | libcrypto | `openssl/pem.h` | `pem_pkey` |
 | `PEM_read_bio_X509_REQ` | libcrypto | `openssl/pem.h` | `x509_print`, `x509_req` |
 | `PEM_read_bio_ex` | libcrypto | `openssl/pem.h` | `pem` |
@@ -4073,7 +4132,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `UI_OpenSSL` | libcrypto | `openssl/ui.h` | `app_startup`, `decoder` |
 | `UI_UTIL_read_pw` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_UTIL_read_pw_string` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_UTIL_wrap_read_pem_callback` | libcrypto | `openssl/ui.h` | `ui` |
+| `UI_UTIL_wrap_read_pem_callback` | libcrypto | `openssl/ui.h` | `store`, `ui` |
 | `UI_add_error_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_add_info_string` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
 | `UI_add_input_boolean` | libcrypto | `openssl/ui.h` | `ui`, `ui_console` |
@@ -4083,7 +4142,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `UI_construct_prompt` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_create_method` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
 | `UI_ctrl` | libcrypto | `openssl/ui.h` | `ui` |
-| `UI_destroy_method` | libcrypto | `openssl/ui.h` | `app_startup`, `ui` |
+| `UI_destroy_method` | libcrypto | `openssl/ui.h` | `app_startup`, `store`, `ui` |
 | `UI_dup_error_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_dup_info_string` | libcrypto | `openssl/ui.h` | `ui` |
 | `UI_dup_input_boolean` | libcrypto | `openssl/ui.h` | `ui` |
@@ -4277,7 +4336,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_CRL_diff` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_digest` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_dup` | libcrypto | `openssl/x509.h` | `x509_crl` |
-| `X509_CRL_free` | libcrypto | `openssl/x509.h` | `cms_data`, `http`, `pkcs12`, `pkcs7`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_print`, `x509_store`, `x509v3_conf` |
+| `X509_CRL_free` | libcrypto | `openssl/x509.h` | `cms_data`, `http`, `pkcs12`, `pkcs7`, `store`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_print`, `x509_store`, `x509v3_conf` |
 | `X509_CRL_get0_by_cert` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_get0_by_serial` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_get0_extensions` | libcrypto | `openssl/x509.h` | `x509_crl`, `x509v3_conf` |
@@ -4291,7 +4350,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_CRL_get_ext_by_critical` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_get_ext_count` | libcrypto | `openssl/x509.h` | `x509_crl`, `x509v3_conf` |
 | `X509_CRL_get_ext_d2i` | libcrypto | `openssl/x509.h` | `x509_crl` |
-| `X509_CRL_get_issuer` | libcrypto | `openssl/x509.h` | `x509_crl`, `x509_crlcheck`, `x509_store` |
+| `X509_CRL_get_issuer` | libcrypto | `openssl/x509.h` | `store`, `x509_crl`, `x509_crlcheck`, `x509_store` |
 | `X509_CRL_get_lastUpdate` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_get_meth_data` | libcrypto | `openssl/x509.h` | `x509_crl` |
 | `X509_CRL_get_nextUpdate` | libcrypto | `openssl/x509.h` | `x509_crl` |
@@ -4336,7 +4395,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_LOOKUP_by_issuer_serial` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_by_subject` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_by_subject_ex` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_LOOKUP_ctrl` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
+| `X509_LOOKUP_ctrl` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
 | `X509_LOOKUP_ctrl_ex` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_file` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_free` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
@@ -4367,7 +4426,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_LOOKUP_new` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_set_method_data` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_LOOKUP_shutdown` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_LOOKUP_store` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
+| `X509_LOOKUP_store` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
 | `X509_NAME_ENTRY_create_by_NID` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_ENTRY_create_by_OBJ` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_ENTRY_create_by_txt` | libcrypto | `openssl/x509.h` | `x509_name` |
@@ -4396,14 +4455,14 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_NAME_get_index_by_OBJ` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_get_text_by_NID` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_get_text_by_OBJ` | libcrypto | `openssl/x509.h` | `x509_name` |
-| `X509_NAME_hash_ex` | libcrypto | `openssl/x509.h` | `x509_name`, `x509_store` |
+| `X509_NAME_hash_ex` | libcrypto | `openssl/x509.h` | `store`, `x509_name`, `x509_store` |
 | `X509_NAME_hash_old` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_it` | libcrypto | `openssl/x509.h` | `asn1_item_sign`, `x509_name` |
 | `X509_NAME_new` | libcrypto | `openssl/x509.h` | `asn1_item_sign`, `x509_cert`, `x509_check`, `x509_crl`, `x509_name`, `x509_purpose`, `x509_req`, `x509_verify`, `x509v3_crld`, `x509v3_san` |
 | `X509_NAME_oneline` | libcrypto | `openssl/x509.h` | `ocsp`, `pkcs12`, `x509_acert`, `x509_cert`, `x509_crl`, `x509_crlcheck`, `x509_info`, `x509_name`, `x509_policy`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509v3_crld`, `x509v3_san` |
 | `X509_NAME_print` | libcrypto | `openssl/x509.h` | `x509_name` |
 | `X509_NAME_print_ex` | libcrypto | `openssl/x509.h` | `ts`, `x509_name` |
-| `X509_NAME_print_ex_fp` | libcrypto | `openssl/x509.h` | `http`, `x509_name` |
+| `X509_NAME_print_ex_fp` | libcrypto | `openssl/x509.h` | `http`, `store`, `x509_name` |
 | `X509_NAME_set` | libcrypto | `openssl/x509.h` | `pkcs7`, `x509_name` |
 | `X509_OBJECT_free` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx`, `x509_store` |
 | `X509_OBJECT_get0_X509` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx`, `x509_store` |
@@ -4517,7 +4576,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_SIG_it` | libcrypto | `openssl/x509.h` | `x509_attr_p8` |
 | `X509_SIG_new` | libcrypto | `openssl/x509.h` | `x509_attr_p8` |
 | `X509_STORE_CTX_cleanup` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
-| `X509_STORE_CTX_free` | libcrypto | `openssl/x509_vfy.h` | `pkcs7_smime`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
+| `X509_STORE_CTX_free` | libcrypto | `openssl/x509_vfy.h` | `pkcs7_smime`, `store`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_get0_cert` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get0_chain` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_get0_current_crl` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx` |
@@ -4540,7 +4599,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_STORE_CTX_get_check_revocation` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get_cleanup` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get_current_cert` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
-| `X509_STORE_CTX_get_error` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
+| `X509_STORE_CTX_get_error` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_get_error_depth` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_get_ex_data` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get_explicit_policy` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx`, `x509_policy` |
@@ -4552,9 +4611,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_STORE_CTX_get_obj_by_subject` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get_verify` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_get_verify_cb` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
-| `X509_STORE_CTX_init` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
+| `X509_STORE_CTX_init` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_init_rpk` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
-| `X509_STORE_CTX_new` | libcrypto | `openssl/x509_vfy.h` | `pkcs7_smime`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
+| `X509_STORE_CTX_new` | libcrypto | `openssl/x509_vfy.h` | `pkcs7_smime`, `store`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
 | `X509_STORE_CTX_new_ex` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_print_verify_cb` | libcrypto | `openssl/x509_vfy.h` | `x509_print` |
 | `X509_STORE_CTX_purpose_inherit` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
@@ -4583,9 +4642,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_STORE_CTX_verify` | libcrypto | `openssl/x509_vfy.h` | `x509_verify` |
 | `X509_STORE_add_cert` | libcrypto | `openssl/x509_vfy.h` | `cms_sign`, `ocsp`, `pkcs7_smime`, `pkcs7_stream`, `ts`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_store`, `x509_verify` |
 | `X509_STORE_add_crl` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_ctx`, `x509_store` |
-| `X509_STORE_add_lookup` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_STORE_free` | libcrypto | `openssl/x509_vfy.h` | `cms_sign`, `ocsp`, `pkcs7_smime`, `pkcs7_stream`, `ts`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_store`, `x509_verify` |
-| `X509_STORE_get0_objects` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
+| `X509_STORE_add_lookup` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
+| `X509_STORE_free` | libcrypto | `openssl/x509_vfy.h` | `cms_sign`, `ocsp`, `pkcs7_smime`, `pkcs7_stream`, `store`, `ts`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_store`, `x509_verify` |
+| `X509_STORE_get0_objects` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
 | `X509_STORE_get0_param` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_get1_all_certs` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_get1_objects` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
@@ -4607,10 +4666,10 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_STORE_load_locations` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_load_locations_ex` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_load_path` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_STORE_load_store` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_STORE_load_store_ex` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
+| `X509_STORE_load_store` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
+| `X509_STORE_load_store_ex` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_store` |
 | `X509_STORE_lock` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
-| `X509_STORE_new` | libcrypto | `openssl/x509_vfy.h` | `cms_sign`, `ocsp`, `pkcs7_smime`, `pkcs7_stream`, `ts`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_store`, `x509_verify` |
+| `X509_STORE_new` | libcrypto | `openssl/x509_vfy.h` | `cms_sign`, `ocsp`, `pkcs7_smime`, `pkcs7_stream`, `store`, `ts`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_store`, `x509_verify` |
 | `X509_STORE_set1_param` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_set_cert_crl` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
 | `X509_STORE_set_check_crl` | libcrypto | `openssl/x509_vfy.h` | `x509_store` |
@@ -4719,7 +4778,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_email_free` | libcrypto | `openssl/x509v3.h` | `x509_check` |
 | `X509_find_by_issuer_and_serial` | libcrypto | `openssl/x509.h` | `x509_cert` |
 | `X509_find_by_subject` | libcrypto | `openssl/x509.h` | `x509_cert` |
-| `X509_free` | libcrypto | `openssl/x509.h` | `cms_data`, `cms_env`, `cms_sign`, `ct`, `http`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `ts`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_san` |
+| `X509_free` | libcrypto | `openssl/x509.h` | `cms_data`, `cms_env`, `cms_sign`, `ct`, `http`, `ocsp`, `pkcs12`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `store`, `ts`, `x509_acert`, `x509_cert`, `x509_check`, `x509_crl`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_print`, `x509_purpose`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_trust`, `x509_verify`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_san` |
 | `X509_get0_authority_issuer` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
 | `X509_get0_authority_key_id` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
 | `X509_get0_authority_serial` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
@@ -4730,7 +4789,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_get0_pubkey` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_crl`, `x509v3_conf` |
 | `X509_get0_pubkey_bitstr` | libcrypto | `openssl/x509.h` | `ocsp`, `x509_cert` |
 | `X509_get0_reject_objects` | libcrypto | `openssl/x509_vfy.h` | `x509_trust` |
-| `X509_get0_serialNumber` | libcrypto | `openssl/x509.h` | `x509_acert`, `x509_cert` |
+| `X509_get0_serialNumber` | libcrypto | `openssl/x509.h` | `store`, `x509_acert`, `x509_cert` |
 | `X509_get0_signature` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_print`, `x509_purpose` |
 | `X509_get0_subject_key_id` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
 | `X509_get0_tbs_sigalg` | libcrypto | `openssl/x509.h` | `x509_cert` |
@@ -4754,7 +4813,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_get_ext_d2i` | libcrypto | `openssl/x509.h` | `ct`, `x509_purpose`, `x509_rfc3779`, `x509_verify` |
 | `X509_get_extended_key_usage` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
 | `X509_get_extension_flags` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
-| `X509_get_issuer_name` | libcrypto | `openssl/x509.h` | `x509_acert`, `x509_cert`, `x509_req` |
+| `X509_get_issuer_name` | libcrypto | `openssl/x509.h` | `store`, `x509_acert`, `x509_cert`, `x509_req` |
 | `X509_get_key_usage` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
 | `X509_get_pathlen` | libcrypto | `openssl/x509.h` | `x509_purpose` |
 | `X509_get_proxy_pathlen` | libcrypto | `openssl/x509v3.h` | `x509_purpose` |
@@ -4764,7 +4823,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_get_signature_info` | libcrypto | `openssl/x509.h` | `x509_purpose` |
 | `X509_get_signature_nid` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_req` |
 | `X509_get_signature_type` | libcrypto | `openssl/x509.h` | `x509_cert` |
-| `X509_get_subject_name` | libcrypto | `openssl/x509.h` | `http`, `ocsp`, `pkcs12`, `pkcs7`, `ts`, `x509_acert`, `x509_cert`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_verify` |
+| `X509_get_subject_name` | libcrypto | `openssl/x509.h` | `http`, `ocsp`, `pkcs12`, `pkcs7`, `store`, `ts`, `x509_acert`, `x509_cert`, `x509_crlcheck`, `x509_ctx`, `x509_info`, `x509_policy`, `x509_req`, `x509_rfc3779`, `x509_store`, `x509_verify` |
 | `X509_get_version` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_req` |
 | `X509_getm_notAfter` | libcrypto | `openssl/x509.h` | `x509_cert` |
 | `X509_getm_notBefore` | libcrypto | `openssl/x509.h` | `x509_cert` |
@@ -4830,8 +4889,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_trusted` | libcrypto | `openssl/x509_vfy.h` | `x509_info`, `x509_trust` |
 | `X509_up_ref` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_ctx`, `x509_store` |
 | `X509_verify` | libcrypto | `openssl/x509.h` | `x509_cert`, `x509_req` |
-| `X509_verify_cert` | libcrypto | `openssl/x509_vfy.h` | `x509_crlcheck`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
-| `X509_verify_cert_error_string` | libcrypto | `openssl/x509.h` | `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
+| `X509_verify_cert` | libcrypto | `openssl/x509_vfy.h` | `store`, `x509_crlcheck`, `x509_policy`, `x509_print`, `x509_rfc3779`, `x509_verify` |
+| `X509_verify_cert_error_string` | libcrypto | `openssl/x509.h` | `store`, `x509_crlcheck`, `x509_ctx`, `x509_policy`, `x509_rfc3779`, `x509_verify` |
 | `X509at_add1_attr` | libcrypto | `openssl/x509.h` | `x509_attr_p8` |
 | `X509at_add1_attr_by_NID` | libcrypto | `openssl/x509.h` | `x509_attr_p8` |
 | `X509at_add1_attr_by_OBJ` | libcrypto | `openssl/x509.h` | `x509_attr_p8` |

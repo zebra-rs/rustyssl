@@ -615,3 +615,9 @@ name = "http_response"
 path = "fuzz_targets/http_response.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "store_attach"
+path = "fuzz_targets/store_attach.rs"
+test = false
+doc = false

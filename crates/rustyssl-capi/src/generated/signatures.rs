@@ -10475,11 +10475,91 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
 const _: unsafe extern "C" fn() -> *mut OSSL_ROLE_SPEC_CERT_ID =
     crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_new;
 const _: unsafe extern "C" fn(*mut stack_st_X509) = crate::x509::cert::OSSL_STACK_OF_X509_free;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_INFO) = crate::store::info::OSSL_STORE_INFO_free;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut X509 =
+    crate::store::info::OSSL_STORE_INFO_get0_CERT;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut X509_CRL =
+    crate::store::info::OSSL_STORE_INFO_get0_CRL;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *const core::ffi::c_char =
+    crate::store::info::OSSL_STORE_INFO_get0_NAME;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *const core::ffi::c_char =
+    crate::store::info::OSSL_STORE_INFO_get0_NAME_description;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get0_PARAMS;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get0_PKEY;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get0_PUBKEY;
+const _: unsafe extern "C" fn(core::ffi::c_int, *const OSSL_STORE_INFO) -> *mut core::ffi::c_void =
+    crate::store::info::OSSL_STORE_INFO_get0_data;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut X509 =
+    crate::store::info::OSSL_STORE_INFO_get1_CERT;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut X509_CRL =
+    crate::store::info::OSSL_STORE_INFO_get1_CRL;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut core::ffi::c_char =
+    crate::store::info::OSSL_STORE_INFO_get1_NAME;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut core::ffi::c_char =
+    crate::store::info::OSSL_STORE_INFO_get1_NAME_description;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get1_PARAMS;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get1_PKEY;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut EVP_PKEY =
+    crate::store::info::OSSL_STORE_INFO_get1_PUBKEY;
+const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> core::ffi::c_int =
+    crate::store::info::OSSL_STORE_INFO_get_type;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut core::ffi::c_void) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new;
+const _: unsafe extern "C" fn(*mut X509) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_CERT;
+const _: unsafe extern "C" fn(*mut X509_CRL) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_CRL;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_NAME;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_PARAMS;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_PKEY;
+const _: unsafe extern "C" fn(*mut EVP_PKEY) -> *mut OSSL_STORE_INFO =
+    crate::store::info::OSSL_STORE_INFO_new_PUBKEY;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_INFO, *mut core::ffi::c_char) -> core::ffi::c_int =
+    crate::store::info::OSSL_STORE_INFO_set0_NAME_description;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::store::info::OSSL_STORE_INFO_type_string;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    ::core::option::Option<
+        unsafe extern "C" fn(loader: *mut OSSL_STORE_LOADER, arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) = crate::store::meth::OSSL_STORE_LOADER_do_all_provided;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut OSSL_STORE_LOADER = crate::store::meth::OSSL_STORE_LOADER_fetch;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) = crate::store::OSSL_STORE_LOADER_free;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const core::ffi::c_char =
+    crate::store::meth::OSSL_STORE_LOADER_get0_description;
 const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const ENGINE =
     crate::store::OSSL_STORE_LOADER_get0_engine;
 const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const core::ffi::c_char =
+    crate::store::meth::OSSL_STORE_LOADER_get0_properties;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const OSSL_PROVIDER =
+    crate::store::meth::OSSL_STORE_LOADER_get0_provider;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const core::ffi::c_char =
     crate::store::OSSL_STORE_LOADER_get0_scheme;
+const _: unsafe extern "C" fn(
+    *const OSSL_STORE_LOADER,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::store::meth::OSSL_STORE_LOADER_is_a;
+const _: unsafe extern "C" fn(
+    *const OSSL_STORE_LOADER,
+    ::core::option::Option<
+        unsafe extern "C" fn(name: *const core::ffi::c_char, data: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::store::meth::OSSL_STORE_LOADER_names_do_all;
 const _: unsafe extern "C" fn(*mut ENGINE, *const core::ffi::c_char) -> *mut OSSL_STORE_LOADER =
     crate::store::OSSL_STORE_LOADER_new;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_attach_fn) -> core::ffi::c_int =
@@ -10503,9 +10583,98 @@ const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_fn) -> cor
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_ex_fn) -> core::ffi::c_int =
     crate::store::OSSL_STORE_LOADER_set_open_ex;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) -> core::ffi::c_int =
+    crate::store::meth::OSSL_STORE_LOADER_up_ref;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut OSSL_STORE_SEARCH =
+    crate::store::info::OSSL_STORE_SEARCH_by_alias;
+const _: unsafe extern "C" fn(*mut X509_NAME, *const ASN1_INTEGER) -> *mut OSSL_STORE_SEARCH =
+    crate::store::info::OSSL_STORE_SEARCH_by_issuer_serial;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+    *const core::ffi::c_uchar,
+    usize,
+) -> *mut OSSL_STORE_SEARCH = crate::store::info::OSSL_STORE_SEARCH_by_key_fingerprint;
+const _: unsafe extern "C" fn(*mut X509_NAME) -> *mut OSSL_STORE_SEARCH =
+    crate::store::info::OSSL_STORE_SEARCH_by_name;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_SEARCH) = crate::store::info::OSSL_STORE_SEARCH_free;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH, *mut usize) -> *const core::ffi::c_uchar =
+    crate::store::info::OSSL_STORE_SEARCH_get0_bytes;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH) -> *const EVP_MD =
+    crate::store::info::OSSL_STORE_SEARCH_get0_digest;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH) -> *mut X509_NAME =
+    crate::store::info::OSSL_STORE_SEARCH_get0_name;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH) -> *const ASN1_INTEGER =
+    crate::store::info::OSSL_STORE_SEARCH_get0_serial;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH) -> *const core::ffi::c_char =
+    crate::store::info::OSSL_STORE_SEARCH_get0_string;
+const _: unsafe extern "C" fn(*const OSSL_STORE_SEARCH) -> core::ffi::c_int =
+    crate::store::info::OSSL_STORE_SEARCH_get_type;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+    *const OSSL_PARAM,
+    OSSL_STORE_post_process_info_fn,
+    *mut core::ffi::c_void,
+) -> *mut OSSL_STORE_CTX = crate::store::ctx::OSSL_STORE_attach;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_close;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX, core::ffi::c_int, ...) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_ctrl;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+    *const OSSL_PARAM,
+) -> core::ffi::c_int = crate::store::ctx::OSSL_STORE_delete;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<
+        unsafe extern "C" fn(loader: *const OSSL_STORE_LOADER, do_arg: *mut core::ffi::c_void),
+    >,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::store::OSSL_STORE_do_all_loaders;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_eof;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_error;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_expect;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX, *const OSSL_STORE_SEARCH) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_find;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX) -> *mut OSSL_STORE_INFO =
+    crate::store::ctx::OSSL_STORE_load;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+    OSSL_STORE_post_process_info_fn,
+    *mut core::ffi::c_void,
+) -> *mut OSSL_STORE_CTX = crate::store::ctx::OSSL_STORE_open;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+    *const UI_METHOD,
+    *mut core::ffi::c_void,
+    *const OSSL_PARAM,
+    OSSL_STORE_post_process_info_fn,
+    *mut core::ffi::c_void,
+) -> *mut OSSL_STORE_CTX = crate::store::ctx::OSSL_STORE_open_ex;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) -> core::ffi::c_int =
     crate::store::OSSL_STORE_register_loader;
+const _: unsafe extern "C" fn(*mut OSSL_STORE_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::store::ctx::OSSL_STORE_supports_search;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut OSSL_STORE_LOADER =
     crate::store::OSSL_STORE_unregister_loader;
+const _: for<'a> unsafe extern "C" fn(
+    *mut OSSL_STORE_CTX,
+    core::ffi::c_int,
+    core::ffi::VaList<'a>,
+) -> core::ffi::c_int = crate::store::ctx::OSSL_STORE_vctrl;
 const _: unsafe extern "C" fn(*mut OSSL_TARGETING_INFORMATION) =
     crate::x509v3::acext::OSSL_TARGETING_INFORMATION_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM =

@@ -282,7 +282,6 @@ pub(crate) unsafe fn instance_dup(src: *const OSSL_DECODER_INSTANCE) -> *mut OSS
 ///
 /// # Safety
 /// `decoder` is a live decoder; `input_structure` is NULL or a string.
-#[allow(dead_code)]
 pub(crate) unsafe fn instance_new_forprov(
     decoder_h: *mut OSSL_DECODER,
     input_structure: *const c_char,
@@ -319,7 +318,6 @@ pub(crate) struct State {
     pub(crate) construct_data: *mut c_void,
     /// Set by the key construct when a key manager couldn't take a decoded key; OSSL_STORE
     /// reads it.
-    #[allow(dead_code, reason = "OSSL_STORE (a later step) reads it")]
     pub(crate) harderr: bool,
 }
 
