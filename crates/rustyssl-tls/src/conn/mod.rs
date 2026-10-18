@@ -153,6 +153,9 @@ pub struct Negotiated {
     pub exporter_master: Vec<u8>,
     /// See `exporter_master`.
     pub early_exporter_master: Vec<u8>,
+    /// The suite the early secrets were made for (the PSK's), whose hash the early exporter
+    /// uses until a suite is negotiated.
+    pub early_cipher: Option<&'static Cipher>,
 }
 
 /// A ClientHello and its collected extensions (type, body) in received order

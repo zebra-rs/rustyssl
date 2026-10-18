@@ -275,6 +275,15 @@ static void test_accepted(void)
     printf("  in init %d, finished %d, state %s\n", SSL_in_init(c), SSL_is_init_finished(c),
            SSL_state_string(c));
     check(read_early(s, "server reads") == SSL_READ_EARLY_DATA_SUCCESS, "the server reads it");
+    {
+        /* The early exporter, with the client still before the ServerHello: both ends agree. */
+        unsigned char ck[32], sk[32];
+
+        check(SSL_export_keying_material_early(c, ck, sizeof(ck), "label", 5, NULL, 0) == 1
+                  && SSL_export_keying_material_early(s, sk, sizeof(sk), "label", 5, NULL, 0) == 1
+                  && memcmp(ck, sk, sizeof(ck)) == 0,
+              "the early exporter during early data");
+    }
     read_early(s, "server reads again");
     printf("  server state %s, in init %d\n", SSL_state_string(s), SSL_in_init(s));
     r = SSL_write_early_data(s, "srv", 3, &w);
