@@ -542,9 +542,12 @@ ffi_export! {
             n if n == NID_pkcs7_digest => unsafe { digested_init_bio(cms) },
             // SAFETY: a live EncryptedData object.
             n if n == NID_pkcs7_encrypted => unsafe { enc::encrypted_data_init_bio(cms) },
-            n if n == NID_pkcs7_enveloped || n == NID_id_smime_ct_authEnvelopedData => {
-                crate::stub::unimplemented("CMS (Auth)EnvelopedData's data path (step 6.4c)")
-            }
+            // SAFETY: a live EnvelopedData object.
+            n if n == NID_pkcs7_enveloped => unsafe { super::env::enveloped_init_bio(cms) },
+            // SAFETY: a live AuthEnvelopedData object.
+            n if n == NID_id_smime_ct_authEnvelopedData => unsafe {
+                super::env::auth_enveloped_init_bio(cms)
+            },
             _ => {
                 raise(CMS_R_UNSUPPORTED_TYPE, F);
                 ptr::null_mut()
@@ -608,7 +611,9 @@ pub(crate) unsafe fn data_final(
         let mut cont: *mut c_char = ptr::null_mut();
         // SAFETY: a live memory BIO; room for the pointer.
         let len = unsafe { BIO_ctrl(mbio, BIO_CTRL_INFO, 0, (&raw mut cont).cast()) };
-        let n = c_int::try_from(len).unwrap_or(0);
+        let Ok(n) = c_int::try_from(len) else {
+            return 0;
+        };
         // SAFETY: the BIO's `len` octets, copied into the string.
         if unsafe { ASN1_STRING_set(os.cast(), cont.cast(), n) } == 0 {
             return 0;
@@ -627,9 +632,12 @@ pub(crate) unsafe fn data_final(
         {
             1
         }
-        n if n == NID_pkcs7_enveloped || n == NID_id_smime_ct_authEnvelopedData => {
-            crate::stub::unimplemented("CMS (Auth)EnvelopedData's final (step 6.4c)")
-        }
+        // SAFETY: a live object and its chain.
+        n if n == NID_pkcs7_enveloped => unsafe { super::env::enveloped_final(cms, cmsbio) },
+        // SAFETY: as above.
+        n if n == NID_id_smime_ct_authEnvelopedData => unsafe {
+            super::env::auth_enveloped_final(cms, cmsbio)
+        },
         // SAFETY: a live SignedData object and its chain.
         n if n == NID_pkcs7_signed => unsafe {
             super::sd::signed_data_final(cms, cmsbio, precomp_md)

@@ -42,6 +42,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "cms_decrypt"
+path = "fuzz_targets/cms_decrypt.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ct_sct"
 path = "fuzz_targets/ct_sct.rs"
 test = false

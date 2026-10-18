@@ -8,17 +8,22 @@ use core::ptr;
 use rustyssl_abi::{
     ASN1_OCTET_STRING, BIO, BIO_C_GET_CIPHER_CTX, BIO_C_GET_CIPHER_STATUS, BIO_CTRL_INFO,
     BIO_TYPE_CIPHER, BIO_TYPE_MEM, CMS_ASCIICRLF, CMS_BINARY, CMS_CADES, CMS_ContentInfo,
-    CMS_DETACHED, CMS_NO_ATTR_VERIFY, CMS_NO_CONTENT_VERIFY, CMS_NO_SIGNER_CERT_VERIFY, CMS_NOCRL,
-    CMS_PARTIAL, CMS_R_ADD_SIGNER_ERROR, CMS_R_CERTIFICATE_VERIFY_ERROR, CMS_R_CMS_DATAFINAL_ERROR,
-    CMS_R_CMS_LIB, CMS_R_CONTENT_VERIFY_ERROR, CMS_R_NO_CIPHER, CMS_R_NO_CONTENT,
-    CMS_R_NO_KEY_OR_CERT, CMS_R_NO_SIGNERS, CMS_R_SIGNER_CERTIFICATE_NOT_FOUND,
-    CMS_R_SMIME_TEXT_ERROR, CMS_R_STORE_INIT_ERROR, CMS_R_TYPE_NOT_DATA,
-    CMS_R_TYPE_NOT_DIGESTED_DATA, CMS_R_TYPE_NOT_ENCRYPTED_DATA,
-    CMS_R_UNSUPPORTED_COMPRESSION_ALGORITHM, CMS_STREAM, CMS_SignerInfo, CMS_TEXT, ERR_LIB_CMS,
-    ERR_R_BIO_LIB, ERR_R_CMS_LIB, ERR_R_X509_LIB, EVP_CIPH_FLAG_AEAD_CIPHER, EVP_CIPHER,
-    EVP_CIPHER_CTX, EVP_MD, EVP_PKEY, NID_id_ct_asciiTextWithCRLF, NID_id_smime_ct_receipt,
-    NID_pkcs7_data, NID_pkcs7_digest, NID_pkcs7_encrypted, OSSL_LIB_CTX, SMIME_BINARY, SMIME_TEXT,
-    X509, X509_ADD_FLAG_NO_DUP, X509_ADD_FLAG_UP_REF, X509_STORE, stack_st_X509, stack_st_X509_CRL,
+    CMS_DEBUG_DECRYPT, CMS_DETACHED, CMS_NO_ATTR_VERIFY, CMS_NO_CONTENT_VERIFY,
+    CMS_NO_SIGNER_CERT_VERIFY, CMS_NOCRL, CMS_PARTIAL, CMS_R_ADD_SIGNER_ERROR,
+    CMS_R_CERTIFICATE_VERIFY_ERROR, CMS_R_CMS_DATAFINAL_ERROR, CMS_R_CMS_LIB,
+    CMS_R_CONTENT_VERIFY_ERROR, CMS_R_DECRYPT_ERROR, CMS_R_NO_CIPHER, CMS_R_NO_CONTENT,
+    CMS_R_NO_KEY_OR_CERT, CMS_R_NO_MATCHING_RECIPIENT, CMS_R_NO_SIGNERS,
+    CMS_R_NOT_SUPPORTED_FOR_THIS_KEY_TYPE, CMS_R_RECIPIENT_ERROR,
+    CMS_R_SIGNER_CERTIFICATE_NOT_FOUND, CMS_R_SMIME_TEXT_ERROR, CMS_R_STORE_INIT_ERROR,
+    CMS_R_TYPE_NOT_DATA, CMS_R_TYPE_NOT_DIGESTED_DATA, CMS_R_TYPE_NOT_ENCRYPTED_DATA,
+    CMS_R_TYPE_NOT_ENVELOPED_DATA, CMS_R_UNSUPPORTED_COMPRESSION_ALGORITHM, CMS_RECIPINFO_AGREE,
+    CMS_RECIPINFO_KEK, CMS_RECIPINFO_NONE, CMS_RECIPINFO_PASS, CMS_RECIPINFO_TRANS,
+    CMS_RecipientInfo, CMS_STREAM, CMS_SignerInfo, CMS_TEXT, ERR_LIB_CMS, ERR_R_BIO_LIB,
+    ERR_R_CMS_LIB, ERR_R_X509_LIB, EVP_CIPH_FLAG_AEAD_CIPHER, EVP_CIPHER, EVP_CIPHER_CTX, EVP_MD,
+    EVP_PKEY, NID_id_ct_asciiTextWithCRLF, NID_id_smime_ct_authEnvelopedData,
+    NID_id_smime_ct_receipt, NID_pkcs7_data, NID_pkcs7_digest, NID_pkcs7_encrypted,
+    NID_pkcs7_enveloped, OSSL_LIB_CTX, SMIME_BINARY, SMIME_TEXT, X509, X509_ADD_FLAG_NO_DUP,
+    X509_ADD_FLAG_UP_REF, X509_STORE, stack_st_X509, stack_st_X509_CRL,
 };
 
 use super::att::CMS_signed_get_attr_count;
@@ -38,7 +43,7 @@ use crate::evp::cipher::EVP_CIPHER_get_flags;
 use crate::evp::cipher_ctx::EVP_CIPHER_CTX_get0_cipher;
 use crate::evp::legacy_md::EVP_sha1;
 use crate::ffi::ffi_export;
-use crate::stack::OPENSSL_sk_pop_free;
+use crate::stack::{OPENSSL_sk_num, OPENSSL_sk_pop_free, OPENSSL_sk_value};
 use crate::x509::cert::{OSSL_STACK_OF_X509_free, X509_free};
 use crate::x509::crl::X509_CRL_free;
 use crate::x509::ctx::{
@@ -968,5 +973,362 @@ ffi_export! {
         // SAFETY: as above.
         unsafe { crate::asn1::string::ASN1_OCTET_STRING_free(os) };
         ptr::null_mut()
+    }
+}
+
+ffi_export! {
+    /// Encrypts `data` to each certificate in a new EnvelopedData (AuthEnvelopedData for an
+    /// AEAD cipher) in a library context. NULL on failure.
+    ///
+    /// # Safety
+    /// `certs` is NULL or a live list; `data` NULL or a live BIO; `cipher` NULL or live;
+    /// `libctx` NULL or live; `propq` NULL or a C string.
+    pub unsafe extern "C" fn CMS_encrypt_ex(certs: *mut stack_st_X509, data: *mut BIO, cipher: *const EVP_CIPHER, flags: c_uint, libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> *mut CMS_ContentInfo
+    where failure = ptr::null_mut(), library = ERR_LIB_CMS
+    {
+        const F: &str = "CMS_encrypt_ex";
+        let cms = if !cipher.is_null() && super::enc::is_aead(cipher) {
+            // SAFETY: the caller's guarantee.
+            unsafe { super::env::CMS_AuthEnvelopedData_create_ex(cipher, libctx, propq) }
+        } else {
+            // SAFETY: as above.
+            unsafe { super::env::CMS_EnvelopedData_create_ex(cipher, libctx, propq) }
+        };
+        let ok = 'err: {
+            if cms.is_null() {
+                raise(ERR_R_CMS_LIB, F);
+                break 'err false;
+            }
+            // SAFETY: the caller's list, or NULL.
+            for i in 0..unsafe { OPENSSL_sk_num(certs.cast()) } {
+                // SAFETY: an index within it.
+                let recip = unsafe { OPENSSL_sk_value(certs.cast(), i) }.cast::<X509>();
+                // SAFETY: the new object; a certificate of the list.
+                if unsafe { super::env::CMS_add1_recipient_cert(cms, recip, flags) }.is_null() {
+                    raise(CMS_R_RECIPIENT_ERROR, F);
+                    break 'err false;
+                }
+            }
+            if flags & CMS_DETACHED.cast_unsigned() == 0 {
+                // SAFETY: the new object.
+                unsafe { CMS_set_detached(cms, 0) };
+            }
+            // SAFETY: as above; the caller's data.
+            if flags & (CMS_STREAM | CMS_PARTIAL).cast_unsigned() != 0 || unsafe { CMS_final(cms, data, ptr::null_mut(), flags) } != 0 {
+                break 'err true;
+            }
+            raise(ERR_R_CMS_LIB, F);
+            false
+        };
+        if ok {
+            return cms;
+        }
+        // SAFETY: the object made here, or NULL.
+        unsafe { CMS_ContentInfo_free(cms) };
+        ptr::null_mut()
+    }
+}
+
+ffi_export! {
+    /// Encrypts `data` to each certificate in a new EnvelopedData (AuthEnvelopedData for an
+    /// AEAD cipher). NULL on failure.
+    ///
+    /// # Safety
+    /// `certs` is NULL or a live list; `data` NULL or a live BIO; `cipher` NULL or live.
+    pub unsafe extern "C" fn CMS_encrypt(certs: *mut stack_st_X509, data: *mut BIO, cipher: *const EVP_CIPHER, flags: c_uint) -> *mut CMS_ContentInfo
+    where failure = ptr::null_mut(), library = ERR_LIB_CMS
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { CMS_encrypt_ex(certs, data, cipher, flags, ptr::null_mut(), ptr::null()) }
+    }
+}
+
+/// `cms_kari_set1_pkey_and_peer`: the content key from the key-agreement recipient's
+/// encrypted key for `cert` (or each, without one). 1 when decrypted, 0 to go on, -1 to stop.
+///
+/// # Safety
+/// `cms` is a live object; `ri` one of its key-agreement recipient infos; the others NULL or
+/// live.
+unsafe fn kari_set1_pkey_and_peer(
+    cms: *mut CMS_ContentInfo,
+    ri: *mut CMS_RecipientInfo,
+    pk: *mut EVP_PKEY,
+    cert: *mut X509,
+    peer: *mut X509,
+) -> c_int {
+    use super::kari::{
+        CMS_RecipientEncryptedKey_cert_cmp, CMS_RecipientInfo_kari_decrypt,
+        CMS_RecipientInfo_kari_get0_reks, CMS_RecipientInfo_kari_set0_pkey,
+        CMS_RecipientInfo_kari_set0_pkey_and_peer,
+    };
+    // SAFETY: the caller's guarantee.
+    let reks = unsafe { CMS_RecipientInfo_kari_get0_reks(ri) };
+    // SAFETY: its encrypted keys, or NULL.
+    for i in 0..unsafe { OPENSSL_sk_num(reks.cast()) } {
+        // SAFETY: an index within them.
+        let rek = unsafe { OPENSSL_sk_value(reks.cast(), i) }.cast();
+        // SAFETY: an encrypted key; the caller's certificate.
+        if !cert.is_null() && unsafe { CMS_RecipientEncryptedKey_cert_cmp(rek, cert) } != 0 {
+            continue;
+        }
+        // SAFETY: the recipient info; the caller's key and peer.
+        unsafe { CMS_RecipientInfo_kari_set0_pkey_and_peer(ri, pk, peer) };
+        // SAFETY: the object; its recipient info and encrypted key.
+        let rv = unsafe { CMS_RecipientInfo_kari_decrypt(cms, ri, rek) };
+        // SAFETY: the recipient info.
+        unsafe { CMS_RecipientInfo_kari_set0_pkey(ri, ptr::null_mut()) };
+        if rv > 0 {
+            return 1;
+        }
+        return if cert.is_null() { 0 } else { -1 };
+    }
+    0
+}
+
+ffi_export! {
+    /// Decrypts the content key with a private key (and the originator's certificate, for key
+    /// agreement), from the recipient `cert` names or each it can be. 1, or 0; without a
+    /// certificate or debugging, key transport always reports success, so as to say nothing
+    /// to an oracle.
+    ///
+    /// # Safety
+    /// `cms` is NULL or a live object; the others NULL or live.
+    pub unsafe extern "C" fn CMS_decrypt_set1_pkey_and_peer(cms: *mut CMS_ContentInfo, pk: *mut EVP_PKEY, cert: *mut X509, peer: *mut X509) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        use super::env::{
+            CMS_RecipientInfo_decrypt, CMS_RecipientInfo_ktri_cert_cmp, CMS_RecipientInfo_set0_pkey,
+            pkey_get_ri_type, pkey_is_ri_type_supported,
+        };
+        const F: &str = "CMS_decrypt_set1_pkey_and_peer";
+        // SAFETY: the caller's guarantee.
+        let ris = unsafe { super::base::CMS_get0_RecipientInfos(cms) };
+        let mut debug = false;
+        // Free the key of an earlier call.
+        if let Some(ec) = super::env::env_enc_content(cms) {
+            super::enc::drop_key(ec);
+            ec.keylen = 0;
+            debug = !ris.is_null() && ec.debug != 0;
+        }
+        let pkey_ri_type = pkey_get_ri_type(pk);
+        if pkey_ri_type == CMS_RECIPINFO_NONE {
+            raise(CMS_R_NOT_SUPPORTED_FOR_THIS_KEY_TYPE, F);
+            return 0;
+        }
+        let mut match_ri = false;
+        // SAFETY: the object's recipient infos, or NULL.
+        for i in 0..unsafe { OPENSSL_sk_num(ris.cast()) } {
+            // SAFETY: an index within them.
+            let ri = unsafe { OPENSSL_sk_value(ris.cast(), i) }.cast::<CMS_RecipientInfo>();
+            // SAFETY: a recipient info.
+            let ri_type = unsafe { super::env::CMS_RecipientInfo_type(ri) };
+            if !pkey_is_ri_type_supported(pk, ri_type) {
+                continue;
+            }
+            match_ri = true;
+            if ri_type == CMS_RECIPINFO_AGREE {
+                // SAFETY: the object; its recipient info; the caller's key and certificates.
+                let r = unsafe { kari_set1_pkey_and_peer(cms, ri, pk, cert, peer) };
+                if r > 0 {
+                    return 1;
+                }
+                if r < 0 {
+                    return 0;
+                }
+            // With a certificate, the recipient it names; else each.
+            // SAFETY: as above.
+            } else if cert.is_null() || unsafe { CMS_RecipientInfo_ktri_cert_cmp(ri, cert) } == 0 {
+                // SAFETY: the caller's key.
+                if unsafe { crate::evp::pkey::EVP_PKEY_up_ref(pk) } == 0 {
+                    return 0;
+                }
+                // SAFETY: the recipient info, taking the reference.
+                unsafe { CMS_RecipientInfo_set0_pkey(ri, pk) };
+                // SAFETY: the object; its recipient info.
+                let r = unsafe { CMS_RecipientInfo_decrypt(cms, ri) };
+                // SAFETY: the recipient info, dropping the reference.
+                unsafe { CMS_RecipientInfo_set0_pkey(ri, ptr::null_mut()) };
+                if !cert.is_null() {
+                    // Without debugging, clear any error and report success, so as to say
+                    // nothing to an oracle.
+                    if !debug {
+                        // SAFETY: no preconditions.
+                        unsafe { err::ERR_clear_error() };
+                        return 1;
+                    }
+                    if r > 0 {
+                        return 1;
+                    }
+                    raise(CMS_R_DECRYPT_ERROR, F);
+                    return 0;
+                }
+                // Without a certificate or debugging, try every recipient, so as not to leak
+                // the timing of a successful decryption.
+                if r > 0 && (debug || pkey_ri_type != CMS_RECIPINFO_TRANS) {
+                    return 1;
+                }
+            }
+        }
+        // Without a certificate or debugging, key transport always reports success.
+        if cert.is_null() && pkey_ri_type == CMS_RECIPINFO_TRANS && match_ri && !debug {
+            // SAFETY: no preconditions.
+            unsafe { err::ERR_clear_error() };
+            return 1;
+        }
+        if !match_ri {
+            raise(CMS_R_NO_MATCHING_RECIPIENT, F);
+        }
+        0
+    }
+}
+
+ffi_export! {
+    /// Decrypts the content key with a private key, from the recipient `cert` names or each
+    /// it can be: 1, or 0.
+    ///
+    /// # Safety
+    /// `cms` is NULL or a live object; the others NULL or live.
+    pub unsafe extern "C" fn CMS_decrypt_set1_pkey(cms: *mut CMS_ContentInfo, pk: *mut EVP_PKEY, cert: *mut X509) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { CMS_decrypt_set1_pkey_and_peer(cms, pk, cert, ptr::null_mut()) }
+    }
+}
+
+ffi_export! {
+    /// Decrypts the content key with a KEK, from the recipient `id` names or each: 1, or 0.
+    ///
+    /// # Safety
+    /// `cms` is NULL or a live object; `key` holds `keylen` octets; `id` NULL or holding
+    /// `idlen`.
+    pub unsafe extern "C" fn CMS_decrypt_set1_key(cms: *mut CMS_ContentInfo, key: *mut c_uchar, keylen: usize, id: *const c_uchar, idlen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        use super::env::{CMS_RecipientInfo_decrypt, CMS_RecipientInfo_kekri_id_cmp, CMS_RecipientInfo_set0_key, CMS_RecipientInfo_type};
+        const F: &str = "CMS_decrypt_set1_key";
+        // SAFETY: the caller's guarantee.
+        let ris = unsafe { super::base::CMS_get0_RecipientInfos(cms) };
+        let mut match_ri = false;
+        // SAFETY: the object's recipient infos, or NULL.
+        for i in 0..unsafe { OPENSSL_sk_num(ris.cast()) } {
+            // SAFETY: an index within them.
+            let ri = unsafe { OPENSSL_sk_value(ris.cast(), i) }.cast::<CMS_RecipientInfo>();
+            // SAFETY: a recipient info.
+            if unsafe { CMS_RecipientInfo_type(ri) } != CMS_RECIPINFO_KEK {
+                continue;
+            }
+            // With an identifier, the recipient it names; else each.
+            // SAFETY: as above; the caller's identifier.
+            if id.is_null() || unsafe { CMS_RecipientInfo_kekri_id_cmp(ri, id, idlen) } == 0 {
+                match_ri = true;
+                // SAFETY: as above; the caller's key, lent.
+                unsafe { CMS_RecipientInfo_set0_key(ri, key, keylen) };
+                // SAFETY: the object; its recipient info.
+                let r = unsafe { CMS_RecipientInfo_decrypt(cms, ri) };
+                // SAFETY: the recipient info, giving the key back.
+                unsafe { CMS_RecipientInfo_set0_key(ri, ptr::null_mut(), 0) };
+                if r > 0 {
+                    return 1;
+                }
+                if !id.is_null() {
+                    raise(CMS_R_DECRYPT_ERROR, F);
+                    return 0;
+                }
+                // SAFETY: no preconditions.
+                unsafe { err::ERR_clear_error() };
+            }
+        }
+        if !match_ri {
+            raise(CMS_R_NO_MATCHING_RECIPIENT, F);
+        }
+        0
+    }
+}
+
+ffi_export! {
+    /// Decrypts the content key with a password (a C string if `passlen` is negative), from
+    /// each password recipient: 1, or 0.
+    ///
+    /// # Safety
+    /// `cms` is NULL or a live object; `pass` NULL or holding `passlen` octets.
+    pub unsafe extern "C" fn CMS_decrypt_set1_password(cms: *mut CMS_ContentInfo, pass: *mut c_uchar, passlen: isize) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        use super::env::{CMS_RecipientInfo_decrypt, CMS_RecipientInfo_type};
+        use super::pwri::CMS_RecipientInfo_set0_password;
+        // SAFETY: the caller's guarantee.
+        let ris = unsafe { super::base::CMS_get0_RecipientInfos(cms) };
+        // Free the key of an earlier call.
+        if let Some(ec) = super::env::env_enc_content(cms) {
+            super::enc::drop_key(ec);
+            ec.keylen = 0;
+        }
+        let mut match_ri = false;
+        // SAFETY: the object's recipient infos, or NULL.
+        for i in 0..unsafe { OPENSSL_sk_num(ris.cast()) } {
+            // SAFETY: an index within them.
+            let ri = unsafe { OPENSSL_sk_value(ris.cast(), i) }.cast::<CMS_RecipientInfo>();
+            // SAFETY: a recipient info.
+            if unsafe { CMS_RecipientInfo_type(ri) } != CMS_RECIPINFO_PASS {
+                continue;
+            }
+            // Each password recipient must be tried.
+            match_ri = true;
+            // SAFETY: as above; the caller's password, lent.
+            unsafe { CMS_RecipientInfo_set0_password(ri, pass, passlen) };
+            // SAFETY: the object; its recipient info.
+            let r = unsafe { CMS_RecipientInfo_decrypt(cms, ri) };
+            // SAFETY: the recipient info, giving the password back.
+            unsafe { CMS_RecipientInfo_set0_password(ri, ptr::null_mut(), 0) };
+            if r > 0 {
+                return 1;
+            }
+        }
+        if !match_ri {
+            raise(CMS_R_NO_MATCHING_RECIPIENT, "CMS_decrypt_set1_password");
+        }
+        0
+    }
+}
+
+ffi_export! {
+    /// Decrypts (Auth)EnvelopedData's content (detached in `dcont`, if so) into `out`, with
+    /// a private key and the recipient's certificate (if known), or a key or password set
+    /// first: 1, or 0.
+    ///
+    /// # Safety
+    /// `cms` is NULL or a live object; the others NULL or live.
+    pub unsafe extern "C" fn CMS_decrypt(cms: *mut CMS_ContentInfo, pk: *mut EVP_PKEY, cert: *mut X509, dcont: *mut BIO, out: *mut BIO, flags: c_uint) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        let nid = type_nid(cms);
+        if nid != NID_pkcs7_enveloped && nid != NID_id_smime_ct_authEnvelopedData {
+            raise(CMS_R_TYPE_NOT_ENVELOPED_DATA, "CMS_decrypt");
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        if dcont.is_null() && !unsafe { check_content(cms) } {
+            return 0;
+        }
+        let Some(ec) = super::env::env_enc_content(cms) else { return 0 };
+        ec.debug = c_int::from(flags & CMS_DEBUG_DECRYPT.cast_unsigned() != 0);
+        ec.havenocert = c_int::from(cert.is_null());
+        if pk.is_null() && cert.is_null() && dcont.is_null() && out.is_null() {
+            return 1;
+        }
+        // SAFETY: as above.
+        if !pk.is_null() && unsafe { CMS_decrypt_set1_pkey(cms, pk, cert) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let cont = unsafe { CMS_dataInit(cms, dcont) };
+        if cont.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's output, or NULL; the chain.
+        let r = unsafe { copy_content(out, cont, flags) };
+        free_upto(cont, dcont);
+        c_int::from(r)
     }
 }

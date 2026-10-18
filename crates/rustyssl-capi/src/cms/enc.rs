@@ -42,13 +42,13 @@ use crate::objects::{OBJ_nid2sn, OBJ_obj2nid};
 use crate::rand_lib::RAND_bytes_ex;
 use rustyssl_crypto::bn::Zeroizing;
 
-fn is_aead(cipher: *const EVP_CIPHER) -> bool {
+pub(crate) fn is_aead(cipher: *const EVP_CIPHER) -> bool {
     // SAFETY: a live cipher.
     (unsafe { EVP_CIPHER_get_flags(cipher) }) & EVP_CIPH_FLAG_AEAD_CIPHER as core::ffi::c_ulong != 0
 }
 
 /// A copy of `data` from CRYPTO_malloc (cleared when freed), or NULL.
-fn c_copy(data: &[u8]) -> *mut c_uchar {
+pub(crate) fn c_copy(data: &[u8]) -> *mut c_uchar {
     let p = mem::alloc(data.len()).cast::<c_uchar>();
     if !p.is_null() && !data.is_empty() {
         // SAFETY: room for `data.len()` octets, fresh.
@@ -58,7 +58,7 @@ fn c_copy(data: &[u8]) -> *mut c_uchar {
 }
 
 /// Clears and frees the content key.
-fn drop_key(ec: &mut EncryptedContentInfo) {
+pub(crate) fn drop_key(ec: &mut EncryptedContentInfo) {
     // SAFETY: the key, from CRYPTO_malloc, of its length, or NULL.
     unsafe { mem::release_clean(ec.key.cast(), ec.keylen) };
     ec.key = ptr::null_mut();

@@ -49,8 +49,12 @@ use crate::x509v3::genn::GENERAL_NAMES_it;
 pub(crate) mod att;
 pub(crate) mod base;
 pub(crate) mod enc;
+pub(crate) mod env;
 pub(crate) mod ess;
 pub(crate) mod io;
+pub(crate) mod kari;
+pub(crate) mod pkey;
+pub(crate) mod pwri;
 pub(crate) mod sd;
 pub(crate) mod smime;
 
