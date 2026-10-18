@@ -1199,8 +1199,15 @@ ffi_export! {
         };
         let Ok(len) = c_long::try_from(der.len()) else { return ptr::null_mut() };
         let mut p = der.as_ptr();
-        // SAFETY: the key's SubjectPublicKeyInfo octets (decoding runs no callbacks).
-        let k = unsafe { crate::x509::pubkey::d2i_PUBKEY(ptr::null_mut(), &raw mut p, len) };
+        // Decoded in the context's library context (`tls_process_rpk`).
+        // SAFETY: the connection's live context, or NULL.
+        let (libctx, propq) = unsafe { crate::ssl::ctx::ctx(st.ctx.cast_const()) }
+            .map_or((ptr::null_mut(), ptr::null()), |c| (c.libctx, c.propq_ptr()));
+        // SAFETY: the key's SubjectPublicKeyInfo octets (decoding runs no callbacks); the
+        // library context and properties.
+        let k = unsafe {
+            crate::x509::pubkey::d2i_PUBKEY_ex(ptr::null_mut(), &raw mut p, len, libctx, propq)
+        };
         st.drv.peer_rpk.0 = k;
         k
     }
