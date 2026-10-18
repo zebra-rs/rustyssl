@@ -27,6 +27,7 @@ pub(crate) mod sess_cache;
 pub(crate) mod session;
 pub(crate) mod srtp;
 pub(crate) mod tls_provider;
+pub(crate) mod trace;
 pub(crate) mod types;
 
 use core::ffi::{c_int, c_long};

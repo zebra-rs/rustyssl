@@ -20907,6 +20907,15 @@ const _: unsafe extern "C" fn(*mut SSL, u64) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_stream_conclude;
 const _: unsafe extern "C" fn(*mut SSL, *const SSL_STREAM_RESET_ARGS, usize) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_stream_reset;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_void,
+    usize,
+    *mut SSL,
+    *mut core::ffi::c_void,
+) = crate::ssl::trace::rustyssl_private_SSL_trace;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_up_ref;
 const _: unsafe extern "C" fn(*mut SSL, *mut EVP_PKEY) -> core::ffi::c_int =

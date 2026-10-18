@@ -494,19 +494,6 @@ pub extern "C" fn rustyssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_trace(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut SSL,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("SSL_trace")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_write_early_data(
     _: *mut SSL,
     _: *const core::ffi::c_void,
