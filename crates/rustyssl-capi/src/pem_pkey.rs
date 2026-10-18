@@ -821,6 +821,12 @@ pem_read! {
 }
 
 pem_read! {
+    rustyssl_abi::CMS_ContentInfo, crate::cms::base::d2i_CMS_ContentInfo, rustyssl_abi::PEM_STRING_CMS, d2i_cms_void;
+    pub unsafe extern "C" fn PEM_read_bio_CMS();
+    pub unsafe extern "C" fn PEM_read_CMS();
+}
+
+pem_read! {
     X509_REQ, crate::x509::req::d2i_X509_REQ, PEM_STRING_X509_REQ, d2i_x509_req_void;
     pub unsafe extern "C" fn PEM_read_bio_X509_REQ();
     pub unsafe extern "C" fn PEM_read_X509_REQ();
@@ -924,6 +930,12 @@ pem_write! {
     rustyssl_abi::PKCS7, crate::pkcs7::i2d_PKCS7, rustyssl_abi::PEM_STRING_PKCS7, i2d_pkcs7_void;
     pub unsafe extern "C" fn PEM_write_bio_PKCS7();
     pub unsafe extern "C" fn PEM_write_PKCS7();
+}
+
+pem_write! {
+    rustyssl_abi::CMS_ContentInfo, crate::cms::base::i2d_CMS_ContentInfo, rustyssl_abi::PEM_STRING_CMS, i2d_cms_void;
+    pub unsafe extern "C" fn PEM_write_bio_CMS();
+    pub unsafe extern "C" fn PEM_write_CMS();
 }
 
 pem_write! {

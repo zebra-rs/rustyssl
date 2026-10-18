@@ -128,6 +128,84 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
+        unsafe { param_to_asn1_ex(c, type_, None) }
+    }
+}
+
+/// `evp_cipher_aead_asn1_params`: GCM's IV and tag length, which CMS's AuthEnvelopedData
+/// carries in the algorithm's parameters.
+#[derive(Clone, Copy)]
+pub(crate) struct AeadParams {
+    pub(crate) iv: [u8; MAX_IV],
+    pub(crate) iv_len: u32,
+    pub(crate) tag_len: u32,
+}
+
+impl Default for AeadParams {
+    fn default() -> Self {
+        Self {
+            iv: [0; MAX_IV],
+            iv_len: 0,
+            tag_len: 0,
+        }
+    }
+}
+
+/// `evp_cipher_set_asn1_aead_params`.
+///
+/// # Safety
+/// `type_` is NULL or a live `ASN1_TYPE`.
+unsafe fn set_aead(type_: *mut ASN1_TYPE, aead: Option<&mut AeadParams>) -> c_int {
+    let Some(p) = aead.filter(|_| !type_.is_null()) else {
+        return 0;
+    };
+    let n = usize::try_from(p.iv_len).unwrap_or(0).min(MAX_IV);
+    let len = c_int::try_from(n).unwrap_or(0);
+    // SAFETY: the caller's type; the IV's `n` octets.
+    c_int::from(unsafe {
+        crate::asn1::tpl::util::set_octetstring_int(
+            type_,
+            c_long::from(p.tag_len),
+            p.iv.as_mut_ptr(),
+            len,
+        )
+    })
+}
+
+/// `evp_cipher_get_asn1_aead_params`: the IV (the tag length isn't kept, as in OpenSSL).
+///
+/// # Safety
+/// `type_` is NULL or a live `ASN1_TYPE`.
+unsafe fn get_aead(type_: *mut ASN1_TYPE, aead: Option<&mut AeadParams>) -> c_int {
+    let Some(p) = aead.filter(|_| !type_.is_null()) else {
+        return 0;
+    };
+    let mut iv = [0u8; MAX_IV];
+    let mut tl: c_long = 0;
+    // SAFETY: the caller's type.
+    let i = unsafe { crate::asn1::tpl::util::get_octetstring_int(type_, &mut tl, &mut iv) };
+    let Some(n) = usize::try_from(i).ok().filter(|&n| n > 0 && n <= MAX_IV) else {
+        return -1;
+    };
+    let (dst, src) = (p.iv.get_mut(..n), iv.get(..n));
+    if let (Some(d), Some(s)) = (dst, src) {
+        d.copy_from_slice(s);
+    }
+    p.iv_len = u32::try_from(n).unwrap_or(0);
+    i
+}
+
+/// `evp_cipher_param_to_asn1_ex`: [`EVP_CIPHER_param_to_asn1`], GCM's parameters from `aead`.
+///
+/// # Safety
+/// As for [`EVP_CIPHER_param_to_asn1`].
+pub(crate) unsafe fn param_to_asn1_ex(
+    c: *mut EVP_CIPHER_CTX,
+    type_: *mut ASN1_TYPE,
+    aead: Option<&mut AeadParams>,
+) -> c_int {
+    {
+        // SAFETY: the caller's guarantee.
         let cipher = unsafe { EVP_CIPHER_CTX_get0_cipher(c) };
         if cipher.is_null() {
             return conclude(-1);
@@ -153,8 +231,8 @@ ffi_export! {
                     }
                     1
                 }
-                // GCM's needs the CMS layer's tag length (`evp_cipher_set_asn1_aead_params`).
-                EVP_CIPH_GCM_MODE => 0,
+                // SAFETY: the caller's guarantee.
+                EVP_CIPH_GCM_MODE => unsafe { set_aead(type_, aead) },
                 EVP_CIPH_CCM_MODE | EVP_CIPH_XTS_MODE | EVP_CIPH_OCB_MODE => -2,
                 // SAFETY: the caller's guarantee.
                 _ => unsafe { EVP_CIPHER_set_asn1_iv(c, type_) },
@@ -178,6 +256,21 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
+        unsafe { asn1_to_param_ex(c, type_, None) }
+    }
+}
+
+/// `evp_cipher_asn1_to_param_ex`: [`EVP_CIPHER_asn1_to_param`], GCM's parameters into `aead`.
+///
+/// # Safety
+/// As for [`EVP_CIPHER_asn1_to_param`].
+pub(crate) unsafe fn asn1_to_param_ex(
+    c: *mut EVP_CIPHER_CTX,
+    type_: *mut ASN1_TYPE,
+    aead: Option<&mut AeadParams>,
+) -> c_int {
+    {
+        // SAFETY: the caller's guarantee.
         let cipher = unsafe { EVP_CIPHER_CTX_get0_cipher(c) };
         if cipher.is_null() {
             return conclude(-1);
@@ -194,13 +287,18 @@ ffi_export! {
             // SAFETY: as above.
             match unsafe { EVP_CIPHER_get_mode(cipher) } {
                 EVP_CIPH_WRAP_MODE => 1,
-                EVP_CIPH_GCM_MODE => 0,
+                // SAFETY: the caller's guarantee.
+                EVP_CIPH_GCM_MODE => unsafe { get_aead(type_, aead) },
                 EVP_CIPH_CCM_MODE | EVP_CIPH_XTS_MODE | EVP_CIPH_OCB_MODE => -2,
                 _ => {
                     // SAFETY: the caller's guarantee.
                     let r = unsafe { EVP_CIPHER_get_asn1_iv(c, type_) };
                     // SAFETY: as above.
-                    if r == 0 && unsafe { EVP_CIPHER_CTX_get_iv_length(c) } == 0 { 1 } else { r }
+                    if r == 0 && unsafe { EVP_CIPHER_CTX_get_iv_length(c) } == 0 {
+                        1
+                    } else {
+                        r
+                    }
                 }
             }
         } else {

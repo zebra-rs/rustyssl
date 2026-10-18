@@ -36,6 +36,12 @@ doc = false
 bench = false
 
 [[bin]]
+name = "cms_d2i"
+path = "fuzz_targets/cms_d2i.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "ct_sct"
 path = "fuzz_targets/ct_sct.rs"
 test = false
