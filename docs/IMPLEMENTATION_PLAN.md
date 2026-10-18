@@ -5301,7 +5301,21 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - MTU handling and `BIO_dgram` ctrls
   - the SRTP extension
   - SCTP as in the default build (disabled)
-  - DTLS 1.3 if the target ABI includes it
+  - DTLS 1.3 if the target ABI includes it: it doesn't. OpenSSL 3.5's
+    `DTLS_MAX_VERSION_INTERNAL` is `DTLS1_2_VERSION`, so there is none (decided).
+  - Progress (ADR 0002's DTLS section): the core's record layer (`record/dtls.rs`: epochs,
+    48-bit sequence numbers, the replay window, the next epoch's records held and read again
+    after the rest of the datagram, silent drops) and handshake layer (`conn/dtls.rs`:
+    numbered and MTU-fragmented messages packed into datagrams, bounded reassembly and
+    reordering, the flight kept for retransmission, HelloVerifyRequest cookies, the
+    `DTLS1_BAD_VER` client); capi's datagram I/O, MTU queries, timer (`DTLS_set_timer_cb`,
+    `BIO_CTRL_DGRAM_SET_NEXT_TIMEOUT`), the DTLS controls, `DTLS_get_data_mtu` and
+    `DTLSv1_listen` (`ssl/dtls.rs`). Upstream: dtlstest 40/40, dtlsv1listentest 9/9,
+    bad_dtls_test 1/1, dtls_mtu_test 1/2 (the other reads libssl's internals), every DTLS
+    `ssl-tests/*.cnf` iteration, and sslapitest's DTLS iterations. Tests:
+    `tests/c/ssl_dtls.c`, core loopbacks with lost datagrams, six DTLS interop cases over UDP
+    in all four pairings, the fuzz target `dtls`. Left: GnuTLS interop and injected loss and
+    reordering outside the test BIOs.
 - [ ] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
   present, but the default security level makes it effectively unusable unless
   `@SECLEVEL=0`. SSLv3 is compiled out, as in the default build.
