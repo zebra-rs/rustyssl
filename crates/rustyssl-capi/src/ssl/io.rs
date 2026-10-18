@@ -599,6 +599,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         SSL_CB_CONNECT_EXIT
     };
     let mut in_handshake = false;
+    let mut cleared = false;
     let stop = loop {
         // SAFETY: the caller's guarantee.
         match unsafe { flush(x) } {
@@ -624,6 +625,13 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let was_init = conn.in_init();
         if was_init {
             in_handshake = true;
+            if !cleared {
+                // `state_machine` starts with `ERR_clear_error` and `clear_sys_error` (fork M).
+                cleared = true;
+                // SAFETY: no preconditions.
+                unsafe { crate::err::ERR_clear_error() };
+                crate::errno::set(0);
+            }
         }
         let r = conn.step(&*prov, reading);
         // A handshake message after the handshake took the connection back into init: the

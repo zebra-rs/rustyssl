@@ -17,9 +17,9 @@ use rustyssl_abi::{
     BIO_CTRL_POP, BIO_CTRL_PUSH, BIO_CTRL_RESET, BIO_CTRL_SET_CALLBACK, BIO_CTRL_SET_CLOSE,
     BIO_CTRL_WPENDING, BIO_FLAGS_IO_SPECIAL, BIO_FLAGS_READ, BIO_FLAGS_SHOULD_RETRY,
     BIO_FLAGS_WRITE, BIO_METHOD, BIO_POLL_DESCRIPTOR, BIO_RR_ACCEPT, BIO_RR_CONNECT,
-    BIO_RR_SSL_X509_LOOKUP, BIO_TYPE_SSL, BIO_info_cb, ERR_LIB_SSL, SSL, SSL_CTX,
-    SSL_ERROR_NONE, SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ,
-    SSL_ERROR_WANT_WRITE, SSL_ERROR_WANT_X509_LOOKUP,
+    BIO_RR_SSL_X509_LOOKUP, BIO_TYPE_SSL, BIO_info_cb, ERR_LIB_SSL, SSL, SSL_CTX, SSL_ERROR_NONE,
+    SSL_ERROR_WANT_ACCEPT, SSL_ERROR_WANT_CONNECT, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_WRITE,
+    SSL_ERROR_WANT_X509_LOOKUP,
 };
 
 use super::conn::{
@@ -92,7 +92,9 @@ fn ssl_of(b: &bio::Bio) -> *mut SSL {
 /// # Safety
 /// `s` is a live connection.
 unsafe fn after_io(b: &bio::Bio, s: *mut SSL, n: usize) {
-    let Some(st) = state::get::<BioSsl>(b) else { return };
+    let Some(st) = state::get::<BioSsl>(b) else {
+        return;
+    };
     let mut renegotiate = false;
     {
         let mut bs = lock(&st);
@@ -315,8 +317,10 @@ unsafe fn set_ssl(b: *mut BIO, o: &bio::Bio, close: c_long, s: *mut SSL) -> c_lo
         unsafe { release(o) };
         state::install(o, BioSsl::default());
     }
-    o.shutdown
-        .store(c_int::try_from(close).unwrap_or(BIO_CLOSE), Ordering::Relaxed);
+    o.shutdown.store(
+        c_int::try_from(close).unwrap_or(BIO_CLOSE),
+        Ordering::Relaxed,
+    );
     if let Some(st) = state::get::<BioSsl>(o) {
         lock(&st).ssl = SslPtr(s);
     }
@@ -378,7 +382,9 @@ unsafe fn do_handshake(b: *mut BIO, o: &bio::Bio, s: *mut SSL) -> c_long {
 /// `b` is a live BIO; `s` is a live connection.
 unsafe fn reset(b: *mut BIO, s: *mut SSL, cmd: c_int, num: c_long, p: *mut c_void) -> c_long {
     // SAFETY: the caller's guarantee.
-    let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return 0;
+    };
     // SAFETY: as above.
     unsafe { rustyssl_private_SSL_shutdown(s) };
     let role = x.state().handshake_func;
@@ -414,7 +420,9 @@ unsafe fn reset(b: *mut BIO, s: *mut SSL, cmd: c_int, num: c_long, p: *mut c_voi
 /// `s` is a live connection; `dup` is the live copy, an SSL BIO.
 unsafe fn dup(o: &bio::Bio, s: *mut SSL, dup: *mut BIO) -> c_long {
     // SAFETY: the caller's guarantee.
-    let Some(d) = (unsafe { object(dup) }) else { return 0 };
+    let Some(d) = (unsafe { object(dup) }) else {
+        return 0;
+    };
     let (Some(from), Some(to)) = (state::get::<BioSsl>(o), state::get::<BioSsl>(d)) else {
         return 0;
     };
@@ -659,8 +667,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_BIO_new_ssl_connect(ctx: *mut SSL_CTX) -> *mut BIO
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: no preconditions.
+        let method = unsafe { bio::connect::BIO_s_connect() };
         // SAFETY: the built-in method.
-        let con = unsafe { bio::BIO_new(bio::connect::BIO_s_connect()) };
+        let con = unsafe { bio::BIO_new(method) };
         if con.is_null() {
             return ptr::null_mut();
         }
@@ -684,8 +694,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_BIO_new_buffer_ssl_connect(ctx: *mut SSL_CTX) -> *mut BIO
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: no preconditions.
+        let method = unsafe { bio::buffer::BIO_f_buffer() };
         // SAFETY: the built-in method.
-        let buf = unsafe { bio::BIO_new(bio::buffer::BIO_f_buffer()) };
+        let buf = unsafe { bio::BIO_new(method) };
         if buf.is_null() {
             return ptr::null_mut();
         }
