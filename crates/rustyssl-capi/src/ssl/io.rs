@@ -35,7 +35,7 @@ use rustyssl_abi::{
 };
 use rustyssl_tls::conn::common::security::SecOther;
 use rustyssl_tls::conn::common::{EarlyDataState, SecurityHook};
-use rustyssl_tls::conn::{Connection, Event};
+use rustyssl_tls::conn::{Connection, Event, Request};
 use rustyssl_tls::error::Error as TlsError;
 
 use self::config::CtxSnapshot;
@@ -750,7 +750,7 @@ fn auto_retry(x: &Ssl) -> bool {
 /// # Safety
 /// As for [`drive`].
 unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> Stop {
-    let snap = config::snapshot(x);
+    let mut snap = config::snapshot(x);
     let server = x.state().server;
     let exit = if server {
         SSL_CB_ACCEPT_EXIT
@@ -898,8 +898,15 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 unsafe { super::sess_cache::on_remove_session(x) };
             }
             Event::Request(req) => {
+                let servername = matches!(req, Request::Servername);
                 // SAFETY: as above.
-                match unsafe { requests::handle(s, x, snap.as_ref(), req) } {
+                let answer = unsafe { requests::handle(s, x, snap.as_ref(), req) };
+                if servername {
+                    // The servername callback may have switched the context
+                    // (`SSL_set_SSL_CTX`): the later callbacks are the new context's.
+                    snap = config::snapshot(x);
+                }
+                match answer {
                     Some(a) => {
                         if let Some(c) = x.state().drv.tls.as_mut() {
                             c.answer(a);

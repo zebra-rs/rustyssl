@@ -455,12 +455,31 @@ unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
     let (certs, current) = unsafe { config::certs(x, snap, &prov) };
     let mut st = x.state();
     let (verify_mode, sid_ctx) = (st.verify_mode, st.sid_ctx.clone());
+    // What the callback may have set on the connection, read where OpenSSL reads it later
+    // (`SSL_set_max_proto_version` from the ClientHello callback, `SSL_set_options`).
+    let (min, max, options) = (st.min_proto_version, st.max_proto_version, st.options);
     if let Some(c) = st.drv.tls.as_mut() {
         let cfg = c.config_mut();
         cfg.certs = certs;
         cfg.current_cert = current;
         cfg.verify_mode = verify_mode;
         cfg.sid_ctx = sid_ctx;
+        cfg.min_version = u16::try_from(min).unwrap_or(0);
+        cfg.max_version = u16::try_from(max).unwrap_or(0);
+        cfg.options = options;
+    }
+    // The new context's callbacks; the notification flags are set before each step, and the
+    // callbacks that may switch the context have run (the core is still waiting for theirs).
+    let mut fresh_cbs = config::callbacks(&st, snap);
+    if let Some(c) = st.drv.tls.as_mut() {
+        let cfg = c.config_mut();
+        fresh_cbs.servername = cfg.callbacks.servername;
+        fresh_cbs.client_hello = cfg.callbacks.client_hello;
+        fresh_cbs.cert = cfg.callbacks.cert;
+        fresh_cbs.info = cfg.callbacks.info;
+        fresh_cbs.msg = cfg.callbacks.msg;
+        fresh_cbs.keylog = cfg.callbacks.keylog;
+        cfg.callbacks = fresh_cbs;
     }
 }
 

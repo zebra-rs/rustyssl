@@ -13,7 +13,7 @@ use rustyssl_abi::{
 use rustyssl_tls::conn::{Callbacks, CertKey, Config};
 use rustyssl_tls::crypto::Provider;
 
-use super::super::conn::{Ssl, ctx_of};
+use super::super::conn::{Ssl, SslState, ctx_of};
 use super::super::ctx::Ctx;
 use super::super::tls_provider::EvpProvider;
 use super::super::types::{AnyCb, AppVerifyCb, ClientCertCb, InfoCb};
@@ -636,36 +636,42 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             || rustyssl_tls::crypto::Secret::new(Vec::new()),
             |c| rustyssl_tls::crypto::Secret::new(c.state().cookie_hmac_key.to_vec()),
         ),
-        callbacks: Callbacks {
-            info: st.info_callback.is_some() || snap.info_callback.is_some(),
-            msg: st.msg_callback.is_some(),
-            keylog: snap.keylog_callback.is_some(),
-            servername: snap.servername_cb.is_some(),
-            client_hello: snap.client_hello_cb.is_some(),
-            cert: st.cert.cert_cb.is_some(),
-            client_cert: snap.client_cert_cb.is_some(),
-            alpn_select: snap.alpn_select_cb.is_some(),
-            status: snap.status_cb.is_some(),
-            record_padding: st.record_padding_cb.is_some(),
-            allow_early_data: st.allow_early_data_cb.is_some(),
-            cookie: snap.verify_stateless_cookie_cb.is_some(),
-            session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
-            session_secret: st.eap.secret_cb.is_some(),
-            // SAFETY: the connection's session context, which it keeps alive.
-            ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
-                .is_some_and(|c| c.state().generate_ticket_cb.is_some()),
-            // SAFETY: as above.
-            ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
-                .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
-            cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
-            // The client's select callback, or the server's advertisement callback.
-            npn: if st.server {
-                snap.npn_advertised_cb.is_some()
-            } else {
-                snap.npn_select_cb.is_some()
-            },
-            ..Callbacks::default()
-        },
+        callbacks: callbacks(&st, snap),
         ..Config::default()
+    }
+}
+
+/// Which of the connection's and its context's callbacks are set, for the core (again after
+/// the servername callback, which may switch the context).
+pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
+    Callbacks {
+        info: st.info_callback.is_some() || snap.info_callback.is_some(),
+        msg: st.msg_callback.is_some(),
+        keylog: snap.keylog_callback.is_some(),
+        servername: snap.servername_cb.is_some(),
+        client_hello: snap.client_hello_cb.is_some(),
+        cert: st.cert.cert_cb.is_some(),
+        client_cert: snap.client_cert_cb.is_some(),
+        alpn_select: snap.alpn_select_cb.is_some(),
+        status: snap.status_cb.is_some(),
+        record_padding: st.record_padding_cb.is_some(),
+        allow_early_data: st.allow_early_data_cb.is_some(),
+        cookie: snap.verify_stateless_cookie_cb.is_some(),
+        session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
+        session_secret: st.eap.secret_cb.is_some(),
+        // SAFETY: the connection's session context, which it keeps alive.
+        ticket_gen: unsafe { super::super::ctx::ctx(st.session_ctx) }
+            .is_some_and(|c| c.state().generate_ticket_cb.is_some()),
+        // SAFETY: as above.
+        ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
+            .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
+        cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
+        // The client's select callback, or the server's advertisement callback.
+        npn: if st.server {
+            snap.npn_advertised_cb.is_some()
+        } else {
+            snap.npn_select_cb.is_some()
+        },
+        ..Callbacks::default()
     }
 }
