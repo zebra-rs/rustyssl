@@ -1383,6 +1383,27 @@ fn full12(p: &TestProvider, cfg: Config, suite: u16, ticket: bool) -> (Connectio
     (c, seen)
 }
 
+/// A server's ec_point_formats without uncompressed is accepted with an ECDHE suite: OpenSSL
+/// checks it only against a list of the client's own, which nothing sets (BoGo's
+/// `PointFormat-Client-MissingUncompressed` fails on the reference too).
+#[test]
+fn tls12_server_point_formats_without_uncompressed() {
+    let p = TestProvider::new(b"tls12-point-formats");
+    let (mut c, mut seen, mut s) = hello12(&p, client12());
+    // ansiX962_compressed_prime alone.
+    let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS, (0x000b, &[1, 1])]);
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    assert_eq!(seen.written.len(), 2, "the ClientKeyExchange and Finished");
+}
+
 #[test]
 fn tls12_ecdhe_rsa() {
     let p = TestProvider::new(b"tls12-ecdhe");
