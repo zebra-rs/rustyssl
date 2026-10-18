@@ -828,3 +828,849 @@ fn key_update_requested_by_the_server() {
         next.bytes()
     );
 }
+
+/// Section 3's ServerHello, changed by `f`.
+fn sh3(f: impl FnOnce(&mut crate::msgs::hello::ServerHello)) -> Vec<u8> {
+    let mut m =
+        crate::msgs::hello::ServerHello::parse(&rfc("3", "ServerHello", 0)[4..], false).unwrap();
+    f(&mut m);
+    crate::msgs::frame(hm::SERVER_HELLO, &m.encode().unwrap()).unwrap()
+}
+
+/// An extension block's contents.
+fn ext_block(exts: &[(u16, &[u8])]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (t, b) in exts {
+        out.extend_from_slice(&t.to_be_bytes());
+        out.extend_from_slice(&u16::try_from(b.len()).unwrap().to_be_bytes());
+        out.extend_from_slice(b);
+    }
+    out
+}
+
+/// The error a section 3 client stops with after its ClientHello, given `input`.
+fn hello_error(cfg: Config, input: &[u8]) -> Error {
+    let p = TestProvider::new(b"negative");
+    p.queue_random(&h(S3_CLIENT_RANDOM));
+    p.queue_random(&h(S3_CLIENT_PRIVATE));
+    let mut c = with_hellos(cfg, &[rfc("3", "ClientHello", 0)]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    c.feed(input);
+    let e = loop {
+        match drive(&mut c, &p, false, &mut accept, &mut seen) {
+            Err(e) => break e,
+            Ok(Event::NeedInput) => panic!("no error"),
+            Ok(_) => {}
+        }
+    };
+    // The alert went out.
+    if let Some(a) = e.alert {
+        assert_eq!(c.alerts().0, Some((2, a)));
+    }
+    e
+}
+
+fn ill(r: core::ffi::c_int) -> Error {
+    Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, r)
+}
+
+#[test]
+fn malformed_and_unacceptable_server_hellos() {
+    let sh = rfc("3", "ServerHello", 0);
+    let rec = |m: &[u8]| record(22, m);
+    // Truncated.
+    let short = crate::msgs::frame(hm::SERVER_HELLO, &sh[4..20]).unwrap();
+    assert_eq!(
+        hello_error(rfc_client(), &rec(&short)),
+        Error::decode(abi::SSL_R_LENGTH_MISMATCH)
+    );
+    // A suite nobody knows, one not offered, a session ID that isn't the echo, compression.
+    let e = hello_error(rfc_client(), &rec(&sh3(|m| m.cipher_suite = 0x13ff)));
+    assert_eq!(e, ill(abi::SSL_R_UNKNOWN_CIPHER_RETURNED));
+    let mut only = rfc_client();
+    only.ciphers.truncate(1);
+    let e = hello_error(only, &rec(&sh3(|m| m.cipher_suite = 0x1302)));
+    assert_eq!(e, ill(abi::SSL_R_WRONG_CIPHER_RETURNED));
+    let e = hello_error(rfc_client(), &rec(&sh3(|m| m.session_id = vec![1; 32])));
+    assert_eq!(e, ill(abi::SSL_R_INVALID_SESSION_ID));
+    let e = hello_error(rfc_client(), &rec(&sh3(|m| m.compression = 1)));
+    assert_eq!(e, ill(abi::SSL_R_INVALID_COMPRESSION_ALGORITHM));
+    // TLS 1.2 from a TLS 1.3-only client; a supported_versions other than TLS 1.3.
+    let e = hello_error(
+        rfc_client(),
+        &rec(&sh3(|m| m.extensions = Some(Vec::new()))),
+    );
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_PROTOCOL_VERSION,
+            abi::SSL_R_UNSUPPORTED_PROTOCOL
+        )
+    );
+    let e = hello_error(
+        rfc_client(),
+        &rec(&sh3(|m| {
+            m.extensions = Some(ext_block(&[(0x002b, &[3, 3])]));
+        })),
+    );
+    assert_eq!(e, ill(abi::SSL_R_BAD_PROTOCOL_VERSION_NUMBER));
+    // A share for a group no share was sent for; no share at all.
+    let p256 = [&[0x00, 0x17, 0x00, 0x41, 0x04][..], &[7; 64][..]].concat();
+    let e = hello_error(
+        rfc_client(),
+        &rec(&sh3(|m| {
+            m.extensions = Some(ext_block(&[(0x0033, &p256), (0x002b, &[3, 4])]));
+        })),
+    );
+    assert_eq!(e, ill(abi::SSL_R_BAD_KEY_SHARE));
+    let e = hello_error(
+        rfc_client(),
+        &rec(&sh3(|m| {
+            m.extensions = Some(ext_block(&[(0x002b, &[3, 4])]));
+        })),
+    );
+    assert_eq!(e, ill(abi::SSL_R_NO_SUITABLE_KEY_SHARE));
+    // An extension the client didn't offer.
+    let e = hello_error(
+        rfc_client(),
+        &rec(&sh3(|m| {
+            let mut x = m.extensions.clone().unwrap();
+            x.extend_from_slice(&ext_block(&[(0x0010, &[0, 3, 2, b'h', b'2'])]));
+            m.extensions = Some(x);
+        })),
+    );
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_UNSUPPORTED_EXTENSION,
+            abi::SSL_R_UNSOLICITED_EXTENSION
+        )
+    );
+    // Not a ServerHello at all.
+    let e = hello_error(rfc_client(), &rec(rfc("3", "Certificate", 0)));
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL3_AD_UNEXPECTED_MESSAGE,
+            abi::SSL_R_UNEXPECTED_MESSAGE
+        )
+    );
+}
+
+#[test]
+fn unacceptable_hello_retry_requests() {
+    let hrr = rfc("5", "ServerHello", 0);
+    let hrr_with = |exts: Vec<u8>| {
+        let mut m = crate::msgs::hello::ServerHello::parse(&hrr[4..], true).unwrap();
+        m.extensions = Some(exts);
+        crate::msgs::frame(hm::SERVER_HELLO, &m.encode().unwrap()).unwrap()
+    };
+    // Asking for the group a share was sent for.
+    let again = hrr_with(ext_block(&[(0x0033, &[0, 0x1d]), (0x002b, &[3, 4])]));
+    let e = hello_error(rfc_client(), &record(22, &again));
+    assert_eq!(e, ill(abi::SSL_R_BAD_KEY_SHARE));
+    // Asking for nothing new.
+    let nothing = hrr_with(ext_block(&[(0x002b, &[3, 4])]));
+    let e = hello_error(rfc_client(), &record(22, &nothing));
+    assert_eq!(e, ill(abi::SSL_R_NO_CHANGE_FOLLOWING_HRR));
+    // Without supported_versions.
+    let bare = hrr_with(ext_block(&[(0x0033, &[0, 0x17])]));
+    let e = hello_error(rfc_client(), &record(22, &bare));
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::TLS13_AD_MISSING_EXTENSION,
+            abi::SSL_R_MISSING_SUPPORTED_VERSIONS_EXTENSION
+        )
+    );
+    // A second HelloRetryRequest.
+    let ok = hrr_with(ext_block(&[(0x0033, &[0, 0x17]), (0x002b, &[3, 4])]));
+    let e = hello_error(rfc_client(), &[record(22, &ok), record(22, &ok)].concat());
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_UNEXPECTED_MESSAGE,
+            abi::SSL_R_UNEXPECTED_MESSAGE
+        )
+    );
+}
+
+/// The error a section 3 client stops with when the server's encrypted flight is `msgs`,
+/// with requests answered by `answer`.
+fn flight_error(msgs: &[&[u8]], answer: &mut dyn FnMut(&Request) -> Answer) -> (Error, Connection) {
+    let p = TestProvider::new(b"negative-flight");
+    let ch = rfc("3", "ClientHello", 0);
+    let sh = rfc("3", "ServerHello", 0);
+    p.queue_random(&h(S3_CLIENT_RANDOM));
+    p.queue_random(&h(S3_CLIENT_PRIVATE));
+    let mut c = with_hellos(rfc_client(), &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, answer, &mut seen).unwrap();
+    let shared = x25519(S3_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    let flight = server.flight(&p, msgs);
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    let e = loop {
+        match drive(&mut c, &p, false, answer, &mut seen) {
+            Err(e) => break e,
+            Ok(Event::NeedInput) => panic!("no error"),
+            Ok(_) => {}
+        }
+    };
+    (e, c)
+}
+
+#[test]
+fn bad_server_flights() {
+    let ee = rfc("3", "EncryptedExtensions", 0);
+    let cert = rfc("3", "Certificate", 0);
+    let cv = rfc("3", "CertificateVerify", 0);
+    let fin = rfc("3", "Finished", 0);
+    // A Finished that doesn't check out.
+    let mut bad_fin = fin.to_vec();
+    bad_fin[10] ^= 1;
+    let (e, _) = flight_error(&[ee, cert, cv, &bad_fin], &mut accept);
+    assert_eq!(
+        e,
+        Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_DIGEST_CHECK_FAILED)
+    );
+    // A CertificateVerify whose signature doesn't verify.
+    let mut bad_cv = cv.to_vec();
+    let last = bad_cv.len() - 1;
+    bad_cv[last] ^= 1;
+    let (e, _) = flight_error(&[ee, cert, &bad_cv, fin], &mut accept);
+    assert_eq!(
+        e,
+        Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_BAD_SIGNATURE)
+    );
+    // A scheme the client didn't offer.
+    let mut odd_cv = cv.to_vec();
+    odd_cv[4..6].copy_from_slice(&[0x02, 0x01]);
+    let (e, _) = flight_error(&[ee, cert, &odd_cv, fin], &mut accept);
+    assert_eq!(e.reason, abi::SSL_R_WRONG_SIGNATURE_TYPE);
+    // A chain that doesn't verify.
+    let mut expired = |r: &Request| match r {
+        Request::Verify { .. } => Answer::Verified {
+            result: i64::from(abi::X509_V_ERR_CERT_HAS_EXPIRED),
+            proceed: false,
+            verified_chain: Vec::new(),
+        },
+        _ => Answer::Continue,
+    };
+    let (e, c) = flight_error(&[ee, cert, cv, fin], &mut expired);
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_CERTIFICATE_EXPIRED,
+            abi::SSL_R_CERTIFICATE_VERIFY_FAILED
+        )
+    );
+    assert_eq!(
+        c.negotiated().verify_result,
+        i64::from(abi::X509_V_ERR_CERT_HAS_EXPIRED)
+    );
+    // Malformed EncryptedExtensions; a Certificate that isn't one; messages out of order.
+    let bad_ee = [8, 0, 0, 2, 0, 1];
+    let (e, _) = flight_error(&[&bad_ee, cert, cv, fin], &mut accept);
+    assert_eq!(e, Error::decode(abi::SSL_R_LENGTH_MISMATCH));
+    let junk_cert = [11, 0, 0, 9, 0, 0, 0, 5, 0, 0, 2, 0x31, 0x00];
+    let (e, _) = flight_error(&[ee, &junk_cert, cv, fin], &mut accept);
+    assert_eq!(
+        e,
+        Error::alert_lib(abi::SSL_AD_BAD_CERTIFICATE, abi::ERR_R_ASN1_LIB)
+    );
+    let long_cert = [11, 0, 0, 9, 0, 0, 0, 5, 0, 0, 9, 0x30, 0x00];
+    let (e, _) = flight_error(&[ee, &long_cert, cv, fin], &mut accept);
+    assert_eq!(e, Error::decode(abi::SSL_R_CERT_LENGTH_MISMATCH));
+    let (e, _) = flight_error(&[ee, cv, cert, fin], &mut accept);
+    assert_eq!(e.reason, abi::SSL_R_UNEXPECTED_MESSAGE);
+    let (e, _) = flight_error(&[ee, cert, fin], &mut accept);
+    assert_eq!(e.reason, abi::SSL_R_UNEXPECTED_MESSAGE);
+}
+
+// TLS 1.2: a scripted server (its messages made here with the test provider), the client's
+// messages checked against what the server computes.
+
+use crate::crypto::{KeyId, KeyShare, Provider};
+use crate::keysched::{KeyBlock, PrfHash};
+
+/// A TLS 1.2 server, scripted.
+struct Server12<'a> {
+    p: &'a TestProvider,
+    transcript: Vec<u8>,
+    client_random: Vec<u8>,
+    server_random: [u8; 32],
+    key: KeyId,
+    cert: Vec<u8>,
+    share: Option<Box<dyn KeyShare>>,
+    dh: Option<Box<dyn KeyShare>>,
+    ms: Vec<u8>,
+    ems: bool,
+}
+
+impl<'a> Server12<'a> {
+    fn new(p: &'a TestProvider, ch: &[u8]) -> Self {
+        let k = crate::testprov::keys_rsa::rfc8448_server();
+        let cert = k.public(p).unwrap().cert("server");
+        Self {
+            cert,
+            p,
+            transcript: ch.to_vec(),
+            client_random: ch[6..38].to_vec(),
+            server_random: [0x5a; 32],
+            key: p.add_key(k),
+            share: None,
+            dh: None,
+            ms: Vec::new(),
+            ems: false,
+        }
+    }
+
+    /// Adds a message to the transcript and frames it into a record.
+    fn msg(&mut self, typ: u8, body: &[u8]) -> Vec<u8> {
+        let m = crate::msgs::frame(typ, body).unwrap();
+        self.transcript.extend_from_slice(&m);
+        record(22, &m)
+    }
+
+    fn hello(&mut self, suite: u16, session_id: &[u8], exts: &[(u16, &[u8])]) -> Vec<u8> {
+        self.ems = exts.iter().any(|e| e.0 == 0x0017);
+        let mut b = vec![3, 3];
+        b.extend_from_slice(&self.server_random);
+        b.push(u8::try_from(session_id.len()).unwrap());
+        b.extend_from_slice(session_id);
+        b.extend_from_slice(&suite.to_be_bytes());
+        b.push(0);
+        let block = ext_block(exts);
+        b.extend_from_slice(&u16::try_from(block.len()).unwrap().to_be_bytes());
+        b.extend_from_slice(&block);
+        self.msg(hm::SERVER_HELLO, &b)
+    }
+
+    fn certificate(&mut self) -> Vec<u8> {
+        let cert = self.cert.clone();
+        let n = cert.len();
+        let mut b = (u32::try_from(n + 3).unwrap().to_be_bytes()[1..]).to_vec();
+        b.extend_from_slice(&u32::try_from(n).unwrap().to_be_bytes()[1..]);
+        b.extend_from_slice(&cert);
+        self.msg(hm::CERTIFICATE, &b)
+    }
+
+    /// A signed ServerKeyExchange over `params`.
+    fn ske(&mut self, params: &[u8], scheme: u16) -> Vec<u8> {
+        let tbs = [&self.client_random[..], &self.server_random, params].concat();
+        let sig = self.p.sign(self.key, scheme, &tbs).unwrap();
+        let mut b = params.to_vec();
+        b.extend_from_slice(&scheme.to_be_bytes());
+        b.extend_from_slice(&u16::try_from(sig.len()).unwrap().to_be_bytes());
+        b.extend_from_slice(&sig);
+        self.msg(hm::SERVER_KEY_EXCHANGE, &b)
+    }
+
+    fn ecdhe_params(&mut self, group: u16) -> Vec<u8> {
+        let share = self.p.key_share(group).unwrap();
+        let mut params = vec![3];
+        params.extend_from_slice(&group.to_be_bytes());
+        params.push(u8::try_from(share.public().len()).unwrap());
+        params.extend_from_slice(share.public());
+        self.share = Some(share);
+        params
+    }
+
+    fn dhe_params(&mut self) -> Vec<u8> {
+        use rustyssl_crypto::bn::Endian;
+        let g = rustyssl_crypto::ffc::by_name("ffdhe2048").unwrap();
+        let pb = g.p.to_bin(None, Endian::Big, false).unwrap().to_vec();
+        let gb = g.g.to_bin(None, Endian::Big, false).unwrap().to_vec();
+        let share = self.p.dh_share(&pb, &gb).unwrap();
+        let mut params = Vec::new();
+        for v in [&pb[..], &gb[..], share.public()] {
+            params.extend_from_slice(&u16::try_from(v.len()).unwrap().to_be_bytes());
+            params.extend_from_slice(v);
+        }
+        self.dh = Some(share);
+        params
+    }
+
+    fn done(&mut self) -> Vec<u8> {
+        self.msg(hm::SERVER_HELLO_DONE, &[])
+    }
+
+    /// Takes the client's ClientKeyExchange (with its key exchange) and makes the master
+    /// secret.
+    fn client_key_exchange(&mut self, cke: &[u8], rsa: bool) {
+        let body = &cke[4..];
+        let pms = if rsa {
+            let ct = &body[2..];
+            self.p
+                .rsa_decrypt_pms(self.key, ct, v::TLS1_2)
+                .unwrap()
+                .bytes()
+                .to_vec()
+        } else if let Some(dh) = self.dh.take() {
+            let s = dh.derive(&body[2..]).unwrap();
+            let lead = s.bytes().iter().take_while(|&&b| b == 0).count();
+            s.bytes()[lead..].to_vec()
+        } else {
+            let share = self.share.take().unwrap();
+            share.derive(&body[1..]).unwrap().bytes().to_vec()
+        };
+        self.transcript.extend_from_slice(cke);
+        self.ms = if self.ems {
+            let h = sha256(self.p, &self.transcript);
+            keysched::extended_master_secret(self.p, PrfHash::Sha256, &pms, &h)
+        } else {
+            keysched::master_secret(
+                self.p,
+                PrfHash::Sha256,
+                &pms,
+                &self.client_random,
+                &self.server_random,
+            )
+        }
+        .unwrap()
+        .bytes()
+        .to_vec();
+    }
+
+    /// The Finished `client` (or the server) sends now.
+    fn finished(&self, client: bool) -> Vec<u8> {
+        let h = sha256(self.p, &self.transcript);
+        let vd = keysched::verify_data_12(self.p, PrfHash::Sha256, &self.ms, client, &h).unwrap();
+        crate::msgs::frame(hm::FINISHED, &vd).unwrap()
+    }
+
+    /// The server's ChangeCipherSpec and Finished, protected with AES-128-GCM.
+    fn change_and_finish(&mut self) -> Vec<u8> {
+        let fin = self.finished(false);
+        self.transcript.extend_from_slice(&fin);
+        let kb = KeyBlock::new(
+            self.p,
+            PrfHash::Sha256,
+            &self.ms,
+            &self.server_random,
+            &self.client_random,
+            0,
+            16,
+            4,
+        )
+        .unwrap();
+        let mut w = RecordWriter::new(v::TLS1_2);
+        w.set_protection(
+            Mode::Tls12(v::TLS1_2),
+            Protection::aead12(
+                self.p,
+                AeadAlg::Aes128Gcm,
+                kb.server_key.bytes(),
+                kb.server_iv.bytes(),
+                0,
+            )
+            .unwrap(),
+        );
+        let mut out = record(20, &[1]);
+        w.write(self.p, 22, &fin, &mut out).unwrap();
+        out
+    }
+}
+
+/// A client offering TLS 1.2 and 1.3 with TLS 1.2 suites.
+fn client12() -> Config {
+    Config {
+        ciphers: [0x1301, 0xc02f, 0x009e, 0x009c]
+            .iter()
+            .map(|&id| suites::by_protocol_id(id).unwrap())
+            .collect(),
+        hostname: Some(b"server".to_vec()),
+        max_cert_list: 102_400,
+        max_send_fragment: 16384,
+        verify_mode: abi::SSL_VERIFY_PEER,
+        now: Some(1_700_000_000),
+        callbacks: crate::conn::Callbacks {
+            msg: true,
+            ..Default::default()
+        },
+        ..Config::default()
+    }
+}
+
+/// A client's first flight, and the scripted server that got it.
+fn hello12<'a>(p: &'a TestProvider, cfg: Config) -> (Connection, Seen, Server12<'a>) {
+    let mut c = Connection::new(cfg);
+    let mut seen = Seen::default();
+    assert_eq!(
+        drive(&mut c, p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    let ch = seen.written.remove(0);
+    let server = Server12::new(p, &ch);
+    (c, seen, server)
+}
+
+/// The extensions a TLS 1.2 server answers a fresh client with.
+const RI: (u16, &[u8]) = (0xff01, &[0]);
+const EMS: (u16, &[u8]) = (0x0017, &[]);
+
+/// A full TLS 1.2 handshake with `suite`'s key exchange; returns the client after it.
+fn full12(p: &TestProvider, cfg: Config, suite: u16, ticket: bool) -> (Connection, Seen) {
+    let (mut c, mut seen, mut s) = hello12(p, cfg);
+    let mut exts = vec![RI, EMS];
+    if ticket {
+        exts.push((0x0023, &[]));
+    }
+    let mut input = s.hello(suite, &[7; 32], &exts);
+    input.extend(s.certificate());
+    let rsa = suite == 0x009c;
+    if suite == 0xc02f {
+        let params = s.ecdhe_params(0x001d);
+        input.extend(s.ske(&params, 0x0804));
+    } else if suite == 0x009e {
+        let params = s.dhe_params();
+        input.extend(s.ske(&params, 0x0804));
+    }
+    input.extend(s.done());
+    c.feed(&input);
+    assert_eq!(
+        drive(&mut c, p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    let [cke, fin] = &seen.written[..] else {
+        panic!("{}", seen.written.len())
+    };
+    s.client_key_exchange(cke, rsa);
+    assert_eq!(*fin, s.finished(true), "the client's Finished");
+    s.transcript.extend_from_slice(fin);
+    let mut tail = Vec::new();
+    if ticket {
+        let nst = crate::msgs::frame(
+            hm::NEW_SESSION_TICKET,
+            &[0, 0, 0x1c, 0x20, 0, 4, 1, 2, 3, 4],
+        )
+        .unwrap();
+        s.transcript.extend_from_slice(&nst);
+        tail.extend(record(22, &nst));
+    }
+    tail.extend(s.change_and_finish());
+    c.feed(&tail);
+    seen.written.clear();
+    assert_eq!(
+        drive(&mut c, p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(c.negotiated().ems);
+    assert!(c.negotiated().secure_renegotiation);
+    assert_eq!(c.negotiated().version, v::TLS1_2);
+    (c, seen)
+}
+
+#[test]
+fn tls12_ecdhe_rsa() {
+    let p = TestProvider::new(b"tls12-ecdhe");
+    let (c, seen) = full12(&p, client12(), 0xc02f, false);
+    assert_eq!(c.negotiated().cipher.unwrap().protocol_id(), 0xc02f);
+    assert_eq!(c.negotiated().group, Some(0x001d));
+    assert_eq!(c.negotiated().peer_scheme, Some(0x0804));
+    assert_eq!(c.negotiated().session.session_id, [7; 32]);
+    assert!(seen.events.contains(&Event::UpdateCache { server: false }));
+}
+
+#[test]
+fn tls12_rsa_and_dhe_key_exchange() {
+    let p = TestProvider::new(b"tls12-rsa");
+    let (c, _) = full12(&p, client12(), 0x009c, false);
+    assert_eq!(c.negotiated().cipher.unwrap().protocol_id(), 0x009c);
+    let p = TestProvider::new(b"tls12-dhe");
+    let (c, _) = full12(&p, client12(), 0x009e, false);
+    assert_eq!(c.negotiated().cipher.unwrap().protocol_id(), 0x009e);
+}
+
+#[test]
+fn tls12_resumption_by_session_id_and_ticket() {
+    let p = TestProvider::new(b"tls12-resume");
+    let (c, _) = full12(&p, client12(), 0xc02f, true);
+    let session = c.negotiated().session.clone();
+    assert_eq!(session.ticket.as_deref(), Some(&[1, 2, 3, 4][..]));
+    assert_eq!(session.ticket_lifetime_hint, 0x1c20);
+    // The ticket's hash is the session's ID now.
+    assert_eq!(session.session_id, sha256(&p, &[1, 2, 3, 4]));
+    let mut cfg = client12();
+    cfg.session = Some(session.clone());
+    let (mut c2, mut seen, mut s) = hello12(&p, cfg);
+    // The ClientHello offers the ticket and the session ID.
+    let ch = s.transcript.clone();
+    assert_eq!(ch[38], 32);
+    assert_eq!(ch[39..71], session.session_id[..]);
+    let body = &ch[4..];
+    assert_eq!(hello_ext(body, 0x0023), Some(vec![1, 2, 3, 4]));
+    // The server resumes: its ChangeCipherSpec and Finished come first.
+    s.ms.clone_from(&session.master_key);
+    let mut input = s.hello(0xc02f, &session.session_id, &[RI, EMS]);
+    input.extend(s.change_and_finish());
+    c2.feed(&input);
+    assert_eq!(
+        drive(&mut c2, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(c2.negotiated().reused);
+    assert_eq!(seen.written, [s.finished(true)]);
+}
+
+#[test]
+fn tls12_client_certificate() {
+    let p = TestProvider::new(b"tls12-cert");
+    let mut cfg = client12();
+    cfg.certs = vec![client_cert(&p)];
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS]);
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    // CertificateRequest: ECDSA and RSA signing, ecdsa_secp256r1_sha256, no CA names.
+    input.extend(s.msg(hm::CERTIFICATE_REQUEST, &[2, 1, 64, 0, 2, 4, 3, 0, 0]));
+    input.extend(s.done());
+    c.feed(&input);
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let [cert, cke, cv, fin] = &seen.written[..] else {
+        panic!("{}", seen.written.len())
+    };
+    assert_eq!(cert[0], hm::CERTIFICATE);
+    assert_eq!(cv[0], hm::CERTIFICATE_VERIFY);
+    s.transcript.extend_from_slice(cert);
+    s.client_key_exchange(cke, false);
+    // The CertificateVerify signs the messages through the ClientKeyExchange.
+    let sig = &cv[8..];
+    let ok = p
+        .verify(&c.config().certs[0].chain[0], 0x0403, &s.transcript, sig)
+        .unwrap();
+    assert!(ok);
+    s.transcript.extend_from_slice(cv);
+    assert_eq!(*fin, s.finished(true));
+}
+
+#[test]
+fn tls12_renegotiation() {
+    let p = TestProvider::new(b"tls12-reneg");
+    let (mut c, mut seen) = full12(&p, client12(), 0xc02f, false);
+    let client_fin = c.negotiated().client_finished.clone();
+    assert_eq!(client_fin.len(), 12);
+    // A HelloRequest under the connection's keys: the client renegotiates, binding the new
+    // handshake to the old one's Finished.
+    let ms = c.negotiated().master_secret.clone();
+    let kb = KeyBlock::new(
+        &p,
+        PrfHash::Sha256,
+        &ms,
+        &c.handshake().server_random,
+        &c.handshake().client_random,
+        0,
+        16,
+        4,
+    )
+    .unwrap();
+    let mut w = RecordWriter::new(v::TLS1_2);
+    w.set_protection(
+        Mode::Tls12(v::TLS1_2),
+        Protection::aead12(
+            &p,
+            AeadAlg::Aes128Gcm,
+            kb.server_key.bytes(),
+            kb.server_iv.bytes(),
+            1,
+        )
+        .unwrap(),
+    );
+    // The record sequence continues after the server's Finished.
+    let mut skip = Vec::new();
+    w.write(&p, 22, &[20, 0, 0, 0], &mut skip).unwrap();
+    let mut hr = Vec::new();
+    w.write(&p, 22, &[0, 0, 0, 0], &mut hr).unwrap();
+    c.feed(&hr);
+    seen.written.clear();
+    loop {
+        let e = drive(&mut c, &p, true, &mut accept, &mut seen).unwrap();
+        if e == Event::NeedInput {
+            break;
+        }
+    }
+    let [ch] = &seen.written[..] else {
+        panic!("{:?}", seen.written.len())
+    };
+    assert_eq!(ch[0], hm::CLIENT_HELLO);
+    let ri = hello_ext(&ch[4..], 0xff01).unwrap();
+    assert_eq!(ri, [&[12][..], &client_fin].concat());
+}
+
+#[test]
+fn tls12_refuses_renegotiation_when_told_to() {
+    let p = TestProvider::new(b"tls12-noreneg");
+    let mut cfg = client12();
+    cfg.options |= abi::SSL_OP_NO_RENEGOTIATION;
+    let (mut c, mut seen) = full12(&p, cfg, 0xc02f, false);
+    let ms = c.negotiated().master_secret.clone();
+    let kb = KeyBlock::new(
+        &p,
+        PrfHash::Sha256,
+        &ms,
+        &c.handshake().server_random,
+        &c.handshake().client_random,
+        0,
+        16,
+        4,
+    )
+    .unwrap();
+    let mut w = RecordWriter::new(v::TLS1_2);
+    w.set_protection(
+        Mode::Tls12(v::TLS1_2),
+        Protection::aead12(
+            &p,
+            AeadAlg::Aes128Gcm,
+            kb.server_key.bytes(),
+            kb.server_iv.bytes(),
+            1,
+        )
+        .unwrap(),
+    );
+    let mut skip = Vec::new();
+    w.write(&p, 22, &[20, 0, 0, 0], &mut skip).unwrap();
+    let mut hr = Vec::new();
+    w.write(&p, 22, &[0, 0, 0, 0], &mut hr).unwrap();
+    c.feed(&hr);
+    loop {
+        if drive(&mut c, &p, true, &mut accept, &mut seen).unwrap() == Event::NeedInput {
+            break;
+        }
+    }
+    // A no_renegotiation warning.
+    assert_eq!(c.alerts().0, Some((1, 100)));
+}
+
+#[test]
+fn tls12_bad_server_messages() {
+    let fail = |f: &dyn Fn(&mut Server12<'_>) -> Vec<u8>, cfg: Config| -> Error {
+        let p = TestProvider::new(b"tls12-bad");
+        let (mut c, mut seen, mut s) = hello12(&p, cfg);
+        c.feed(&f(&mut s));
+        loop {
+            match drive(&mut c, &p, false, &mut accept, &mut seen) {
+                Err(e) => return e,
+                Ok(Event::NeedInput) => panic!("no error"),
+                Ok(_) => {}
+            }
+        }
+    };
+    // No renegotiation_info.
+    let e = fail(&|s| s.hello(0xc02f, &[], &[EMS]), client12());
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_UNSAFE_LEGACY_RENEGOTIATION_DISABLED
+        )
+    );
+    // A TLS 1.3 server's downgrade sentinel.
+    let e = fail(
+        &|s| {
+            s.server_random[24..].copy_from_slice(&crate::consts::TLS12_DOWNGRADE);
+            s.hello(0xc02f, &[], &[RI, EMS])
+        },
+        client12(),
+    );
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_INAPPROPRIATE_FALLBACK
+        )
+    );
+    // A curve the client didn't offer, and a signature that doesn't verify.
+    let e = fail(
+        &|s| {
+            let mut m = s.hello(0xc02f, &[], &[RI, EMS]);
+            m.extend(s.certificate());
+            let mut params = s.ecdhe_params(0x001d);
+            params[1..3].copy_from_slice(&0x0019u16.to_be_bytes());
+            m.extend(s.ske(&params, 0x0804));
+            m
+        },
+        Config {
+            groups: vec![0x001d, 0x0017],
+            ..client12()
+        },
+    );
+    assert_eq!(e, ill(abi::SSL_R_WRONG_CURVE));
+    let e = fail(
+        &|s| {
+            let mut m = s.hello(0xc02f, &[], &[RI, EMS]);
+            m.extend(s.certificate());
+            let params = s.ecdhe_params(0x001d);
+            let mut ske = s.ske(&params, 0x0804);
+            let last = ske.len() - 1;
+            ske[last] ^= 1;
+            m.extend(ske);
+            m
+        },
+        client12(),
+    );
+    assert_eq!(
+        e,
+        Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_BAD_SIGNATURE)
+    );
+    // A ServerHelloDone straight after the Certificate of an ECDHE suite.
+    let e = fail(
+        &|s| {
+            let mut m = s.hello(0xc02f, &[], &[RI, EMS]);
+            m.extend(s.certificate());
+            m.extend(s.done());
+            m
+        },
+        client12(),
+    );
+    assert_eq!(e.reason, abi::SSL_R_UNEXPECTED_MESSAGE);
+    // A suite the session had to resume with, and didn't.
+    let e = fail(&|s| s.hello(0x1399, &[], &[RI, EMS]), client12());
+    assert_eq!(e, ill(abi::SSL_R_UNKNOWN_CIPHER_RETURNED));
+}
+
+#[test]
+fn tls12_ocsp_stapling() {
+    let p = TestProvider::new(b"tls12-ocsp");
+    let mut cfg = client12();
+    cfg.status_request = true;
+    cfg.callbacks.status = true;
+    let (mut c, mut seen, mut s) = hello12(&p, cfg);
+    assert_eq!(
+        hello_ext(&s.transcript[4..], 0x0005),
+        Some(vec![1, 0, 0, 0, 0])
+    );
+    let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS, (0x0005, &[])]);
+    input.extend(s.certificate());
+    input.extend(s.msg(hm::CERTIFICATE_STATUS, &[1, 0, 0, 3, 0x30, 1, 0]));
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    let mut reject = |r: &Request| match r {
+        Request::Status => Answer::Status {
+            ret: 0,
+            response: None,
+        },
+        _ => accept(r),
+    };
+    let e = loop {
+        match drive(&mut c, &p, false, &mut reject, &mut seen) {
+            Err(e) => break e,
+            Ok(Event::NeedInput) => panic!("no error"),
+            Ok(_) => {}
+        }
+    };
+    assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 1, 0]));
+    assert!(seen.requests.contains(&Request::Status));
+    assert_eq!(
+        e,
+        Error::alert(
+            abi::SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE,
+            abi::SSL_R_INVALID_STATUS_RESPONSE
+        )
+    );
+}
