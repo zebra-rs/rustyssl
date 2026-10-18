@@ -6,18 +6,18 @@
 //! OpenSSL's does. Its lock is never held while a command runs: commands call setters that may
 //! call the application (a password callback, say).
 
-use core::ffi::{CStr, c_char, c_int, c_uint, c_ulong};
+use core::ffi::{CStr, c_char, c_int, c_long, c_uint, c_ulong};
 use core::ptr;
 use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    BIO_CTRL_EOF, DTLS1_2_VERSION, DTLS1_VERSION, ERR_LIB_SSL, ERR_R_PASSED_NULL_PARAMETER,
-    EVP_PKEY, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_LIB_CTX, SSL, SSL_CERT_FLAG_TLS_STRICT,
-    SSL_CONF_CTX, SSL_CONF_FLAG_CERTIFICATE, SSL_CONF_FLAG_CLIENT, SSL_CONF_FLAG_CMDLINE,
-    SSL_CONF_FLAG_FILE, SSL_CONF_FLAG_REQUIRE_PRIVATE, SSL_CONF_FLAG_SERVER,
-    SSL_CONF_FLAG_SHOW_ERRORS, SSL_CONF_TYPE_DIR, SSL_CONF_TYPE_FILE, SSL_CONF_TYPE_NONE,
-    SSL_CONF_TYPE_STORE, SSL_CONF_TYPE_STRING, SSL_CONF_TYPE_UNKNOWN,
+    BIO_C_SET_FILENAME, BIO_CLOSE, BIO_CTRL_EOF, BIO_FP_READ, DTLS1_2_VERSION, DTLS1_VERSION,
+    ERR_LIB_SSL, ERR_R_PASSED_NULL_PARAMETER, EVP_PKEY, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
+    OSSL_LIB_CTX, SSL, SSL_CERT_FLAG_TLS_STRICT, SSL_CONF_CTX, SSL_CONF_FLAG_CERTIFICATE,
+    SSL_CONF_FLAG_CLIENT, SSL_CONF_FLAG_CMDLINE, SSL_CONF_FLAG_FILE, SSL_CONF_FLAG_REQUIRE_PRIVATE,
+    SSL_CONF_FLAG_SERVER, SSL_CONF_FLAG_SHOW_ERRORS, SSL_CONF_TYPE_DIR, SSL_CONF_TYPE_FILE,
+    SSL_CONF_TYPE_NONE, SSL_CONF_TYPE_STORE, SSL_CONF_TYPE_STRING, SSL_CONF_TYPE_UNKNOWN,
     SSL_CTRL_SET_CLIENT_SIGALGS_LIST, SSL_CTRL_SET_GROUPS_LIST, SSL_CTRL_SET_SIGALGS_LIST, SSL_CTX,
     SSL_FILETYPE_PEM, SSL_OP_ALL, SSL_OP_ALLOW_CLIENT_RENEGOTIATION, SSL_OP_ALLOW_NO_DHE_KEX,
     SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION, SSL_OP_CIPHER_SERVER_PREFERENCE,
@@ -60,7 +60,7 @@ use super::keys::{
     rustyssl_private_SSL_use_PrivateKey_file, rustyssl_private_SSL_use_certificate_chain_file,
 };
 use super::types::SSL_PKEY_NUM;
-use crate::bio::{BIO_ctrl, BIO_free, file::BIO_new_file};
+use crate::bio::{BIO_ctrl, BIO_free, BIO_new, file::BIO_s_file};
 use crate::decoder::ctx::{OSSL_DECODER_CTX_free, OSSL_DECODER_from_bio};
 use crate::decoder::pkey::OSSL_DECODER_CTX_new_for_pkey;
 use crate::err::{self, ERR_clear_last_mark, ERR_pop_to_mark, ERR_set_mark};
@@ -1116,9 +1116,16 @@ unsafe fn dh_parameters(t: Target, v: *const c_char) -> c_int {
     if t.ctx.is_null() && t.ssl.is_null() {
         return 1;
     }
-    // SAFETY: the file name and a mode.
-    let input = unsafe { BIO_new_file(v, c"r".as_ptr()) };
+    // SAFETY: no preconditions.
+    let input = unsafe { BIO_new(BIO_s_file()) };
     if input.is_null() {
+        return 0;
+    }
+    let mode = c_long::from(BIO_CLOSE | BIO_FP_READ);
+    // SAFETY: our BIO and the file name (`BIO_read_filename`).
+    if unsafe { BIO_ctrl(input, BIO_C_SET_FILENAME, mode, v.cast_mut().cast()) } <= 0 {
+        // SAFETY: as above.
+        unsafe { BIO_free(input) };
         return 0;
     }
     let (libctx, propq) = t.libctx();
@@ -1560,7 +1567,7 @@ unsafe fn do_config(s: *mut SSL, c: *mut SSL_CTX, name: Option<&CStr>, system: b
     });
     let Some(cmds) = cmds else {
         if !system {
-            let n = name.map_or_else(|| "(null)".into(), CStr::to_string_lossy);
+            let n = name.map_or_else(|| "<NULL>".into(), CStr::to_string_lossy);
             let text = format!("name={n}");
             err::raise_with_text(
                 ERR_LIB_SSL,
