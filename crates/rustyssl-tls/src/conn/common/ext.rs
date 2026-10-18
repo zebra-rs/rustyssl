@@ -1166,7 +1166,7 @@ fn final_psk(c: &Connection, sent: bool) -> Result<()> {
 pub fn construct_sig_algs(c: &Connection) -> Result<ExtReturn> {
     let tls12 = super::version::of(abi::TLS1_2_VERSION);
     if c.hs.sh.client_version < tls12
-        || (c.cfg.method_version != super::version::ANY && c.neg.version < tls12)
+        || (super::version::method_fixed(c) && c.neg.version < tls12)
     {
         return Ok(ExtReturn::NotSent);
     }

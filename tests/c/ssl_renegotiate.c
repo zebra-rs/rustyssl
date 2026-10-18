@@ -172,7 +172,7 @@ static void test(const char *name, EVP_PKEY *k, X509 *x, const char *cipher, lon
  * A renegotiation the server asks for with a HelloRequest: the client's read starts it, and
  * both ends count it (SSL_num_renegotiations, SSL_total_renegotiations).
  */
-static void test_hello_request(EVP_PKEY *k, X509 *x)
+static void test_hello_request(EVP_PKEY *k, X509 *x, int version)
 {
     SSL_CTX *cctx = SSL_CTX_new(TLS_client_method()), *sctx = SSL_CTX_new(TLS_server_method());
     SSL *c, *s;
@@ -180,13 +180,25 @@ static void test_hello_request(EVP_PKEY *k, X509 *x)
     unsigned char buf[16];
     int round, r, e;
 
-    printf("# the server asks with a HelloRequest\n");
+    printf("# the server asks with a HelloRequest, %s\n",
+           version == TLS1_VERSION ? "TLS 1.0" : "TLS 1.2");
     if (cctx == NULL || sctx == NULL || SSL_CTX_use_certificate(sctx, x) != 1
         || SSL_CTX_use_PrivateKey(sctx, k) != 1)
         bail("contexts");
-    SSL_CTX_set_max_proto_version(cctx, TLS1_2_VERSION);
+    /* The server caps the version: the client's hellos still offer TLS 1.2 (and 1.3). */
+    if (version == TLS1_VERSION)
+        SSL_CTX_set_max_proto_version(sctx, version);
+    else
+        SSL_CTX_set_max_proto_version(cctx, version);
     SSL_CTX_set_options(cctx, SSL_OP_NO_TICKET);
     SSL_CTX_set_options(sctx, SSL_OP_NO_TICKET);
+    /* TLS 1.0 needs security level 0; its renegotiation sends no signature_algorithms. */
+    if (version == TLS1_VERSION
+        && (SSL_CTX_set_cipher_list(cctx, "DEFAULT:@SECLEVEL=0") != 1
+            || SSL_CTX_set_cipher_list(sctx, "DEFAULT:@SECLEVEL=0") != 1
+            || SSL_CTX_set_min_proto_version(cctx, TLS1_VERSION) != 1
+            || SSL_CTX_set_min_proto_version(sctx, TLS1_VERSION) != 1))
+        bail("TLS 1.0");
     c = SSL_new(cctx);
     s = SSL_new(sctx);
     if (c == NULL || s == NULL || BIO_new_bio_pair(&a, 0, &b, 0) != 1)
@@ -237,7 +249,8 @@ int main(void)
     test("nothing changed", k, x, NULL, 0);
     test("the server's cipher list changed", k, x, "AES256-GCM-SHA384", 0);
     test("the server turned renegotiation off", k, x, NULL, SSL_OP_NO_RENEGOTIATION);
-    test_hello_request(k, x);
+    test_hello_request(k, x, TLS1_2_VERSION);
+    test_hello_request(k, x, TLS1_VERSION);
     X509_free(x);
     EVP_PKEY_free(k);
     printf("1..%d\n", number);
