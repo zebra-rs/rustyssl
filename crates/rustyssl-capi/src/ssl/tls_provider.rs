@@ -25,16 +25,17 @@ use rustyssl_abi::{
     OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, OSSL_CAPABILITY_TLS_GROUP_MIN_TLS,
     OSSL_CAPABILITY_TLS_GROUP_NAME, OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL,
     OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT,
-    OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME, OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS,
-    OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, OSSL_LIB_CTX,
+    OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME, OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE,
+    OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS, OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS,
+    OSSL_CAPABILITY_TLS_SIGALG_NAME, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, OSSL_LIB_CTX,
     OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_PARAM, OSSL_PARAM_UTF8_STRING,
     OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PROVIDER,
     RSA_PKCS1_PADDING, RSA_PKCS1_PSS_PADDING, RSA_PKCS1_WITH_TLS_PADDING, RSA_PSS_SALTLEN_DIGEST,
 };
 use rustyssl_tls::consts::sigscheme;
 use rustyssl_tls::crypto::{
-    Aead, AeadAlg, Cipher, CipherAlg, GroupInfo, Hash, HashAlg, KeyId, KeyShare, Mac, Provider,
-    Secret, SigalgInfo,
+    Aead, AeadAlg, Cipher, CipherAlg, GroupInfo, Hash, HashAlg, KeyId, KeyKind, KeyShare, Mac,
+    PeerKey, Provider, Secret, SigalgInfo,
 };
 use rustyssl_tls::error::{Error, Result};
 
@@ -64,10 +65,13 @@ use crate::evp::md_ctx::{
     EVP_DigestFinal_ex, EVP_DigestInit_ex, EVP_DigestUpdate, EVP_MD_CTX_copy_ex, EVP_MD_CTX_free,
     EVP_MD_CTX_new,
 };
+use crate::evp::pkey::params::EVP_PKEY_get_group_name;
 use crate::evp::pkey::params::{
     EVP_PKEY_get1_encoded_public_key, EVP_PKEY_set1_encoded_public_key,
 };
-use crate::evp::pkey::{EVP_PKEY_free, EVP_PKEY_is_a, EVP_PKEY_up_ref};
+use crate::evp::pkey::{
+    EVP_PKEY_free, EVP_PKEY_get_security_bits, EVP_PKEY_get_size, EVP_PKEY_is_a, EVP_PKEY_up_ref,
+};
 use crate::evp::pkey_ctx::{
     EVP_PKEY_CTX_free, EVP_PKEY_CTX_new_from_name, EVP_PKEY_CTX_new_from_pkey,
     EVP_PKEY_CTX_set_params, EVP_PKEY_fromdata, EVP_PKEY_fromdata_init, EVP_PKEY_keygen,
@@ -81,6 +85,7 @@ use crate::evp::sigver::{
     EVP_DigestSign, EVP_DigestSignInit_ex, EVP_DigestVerify, EVP_DigestVerifyInit_ex,
 };
 use crate::mem;
+use crate::objects::{OBJ_sn2nid, OBJ_txt2nid};
 use crate::params::build::{
     OSSL_PARAM_BLD_free, OSSL_PARAM_BLD_new, OSSL_PARAM_BLD_push_BN, OSSL_PARAM_BLD_to_param,
 };
@@ -93,6 +98,7 @@ use crate::params::{
 use crate::provider::{OSSL_PROVIDER_do_all, OSSL_PROVIDER_get_capabilities};
 use crate::rand_lib::{RAND_bytes_ex, RAND_priv_bytes_ex};
 use crate::x509::cert::{X509_free, X509_get0_pubkey, d2i_X509};
+use crate::x509::pubkey::d2i_PUBKEY;
 
 /// TLS 1.0 and 1.1's RSA signature over MD5 and SHA-1, which has no code point: OpenSSL's
 /// `legacy_rsa_sigalg`, passed as this pseudo-scheme (the core's test provider uses the same).
@@ -607,20 +613,32 @@ impl EvpProvider {
     }
 
     /// The public key of a certificate's DER.
-    fn cert_key(cert: &[u8]) -> Result<(X509Ptr, *mut EVP_PKEY)> {
-        let mut p = cert.as_ptr();
+    fn cert_key(cert: &[u8]) -> Result<(KeyOwner, *mut EVP_PKEY)> {
         let len = core::ffi::c_long::try_from(cert.len()).map_err(|_| fail())?;
+        let mut p = cert.as_ptr();
+        // A certificate, or (for a raw public key) a SubjectPublicKeyInfo.
+        // SAFETY: no preconditions.
+        unsafe { ERR_set_mark() };
         // SAFETY: the certificate's octets.
         let x = X509Ptr(unsafe { d2i_X509(ptr::null_mut(), &raw mut p, len) });
-        if x.0.is_null() {
+        // SAFETY: no preconditions.
+        unsafe { ERR_pop_to_mark() };
+        if !x.0.is_null() {
+            // SAFETY: the certificate decoded above; the key stays its own.
+            let pkey = unsafe { X509_get0_pubkey(x.0) };
+            if pkey.is_null() {
+                return Err(fail());
+            }
+            return Ok((KeyOwner::Cert(x), pkey));
+        }
+        let mut p = cert.as_ptr();
+        // SAFETY: the key's octets.
+        let k = PkeyPtr(unsafe { d2i_PUBKEY(ptr::null_mut(), &raw mut p, len) });
+        if k.0.is_null() {
             return Err(fail());
         }
-        // SAFETY: the certificate decoded above; the key stays its own.
-        let pkey = unsafe { X509_get0_pubkey(x.0) };
-        if pkey.is_null() {
-            return Err(fail());
-        }
-        Ok((x, pkey))
+        let pkey = k.0;
+        Ok((KeyOwner::Key(k), pkey))
     }
 }
 
@@ -791,6 +809,7 @@ unsafe extern "C" fn add_group_cb(params: *const OSSL_PARAM, arg: *mut c_void) -
             min_dtls,
             max_dtls,
             is_kem: is_kem == 1,
+            algorithm: algorithm.to_string_lossy().into_owned(),
         },
         algorithm,
         realname,
@@ -843,7 +862,15 @@ unsafe extern "C" fn add_sigalg_cb(params: *const OSSL_PARAM, arg: *mut c_void) 
         );
         return 0;
     };
+    // `inferred_keytype`: the capability's key type, else its signature algorithm's name.
+    // SAFETY: the caller's array.
+    let key_type = unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE) }
+        // SAFETY: as above.
+        .or_else(|| unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) })
+        .map(|k| k.to_string_lossy().into_owned())
+        .unwrap_or_default();
     d.sigalgs.push(SigalgInfo {
+        key_type,
         name: name.to_string_lossy().into_owned(),
         id,
         security_bits: bits,
@@ -1002,6 +1029,18 @@ owner!(
     /// An owned `X509`.
     X509Ptr(rustyssl_abi::X509) = X509_free
 );
+owner!(
+    /// An owned `EVP_PKEY`.
+    PkeyPtr(EVP_PKEY) = EVP_PKEY_free
+);
+
+/// What keeps a peer's public key alive: its certificate, or the key itself (a raw public key).
+enum KeyOwner {
+    /// The certificate the key belongs to.
+    Cert(X509Ptr),
+    /// The key, decoded from a SubjectPublicKeyInfo.
+    Key(PkeyPtr),
+}
 owner!(
     /// An owned `OSSL_PARAM_BLD`.
     ParamBld(rustyssl_abi::OSSL_PARAM_BLD) = OSSL_PARAM_BLD_free
@@ -1539,6 +1578,63 @@ impl Provider for EvpProvider {
         }
         sig.truncate(len);
         Ok(sig)
+    }
+
+    fn peer_key(&self, der: &[u8], _spki: bool) -> Result<PeerKey> {
+        let (_owner, pkey) = Self::cert_key(der)?;
+        let is = |name: &CStr| {
+            // SAFETY: the key decoded above; a NUL-terminated name.
+            (unsafe { EVP_PKEY_is_a(pkey, name.as_ptr()) }) != 0
+        };
+        let kind = if is(c"RSA") {
+            KeyKind::Rsa
+        } else if is(c"RSA-PSS") {
+            KeyKind::RsaPss
+        } else if is(c"DSA") {
+            KeyKind::Dsa
+        } else if is(c"EC") {
+            KeyKind::Ec
+        } else if is(c"ED25519") {
+            KeyKind::Ed25519
+        } else if is(c"ED448") {
+            KeyKind::Ed448
+        } else {
+            // SAFETY: as above; the name is the key management's, static.
+            let n = unsafe { crate::evp::pkey::EVP_PKEY_get0_type_name(pkey) };
+            let name = if n.is_null() {
+                String::new()
+            } else {
+                // SAFETY: a NUL-terminated name.
+                unsafe { CStr::from_ptr(n) }.to_string_lossy().into_owned()
+            };
+            KeyKind::Other(name)
+        };
+        let mut curve_nid = rustyssl_abi::NID_undef;
+        if kind == KeyKind::Ec {
+            let mut name = [0 as c_char; 80];
+            let mut len = 0usize;
+            // SAFETY: as above; the room.
+            if unsafe { EVP_PKEY_get_group_name(pkey, name.as_mut_ptr(), name.len(), &raw mut len) }
+                != 0
+            {
+                // SAFETY: the name written, NUL-terminated.
+                curve_nid = unsafe { OBJ_sn2nid(name.as_ptr()) };
+                if curve_nid == rustyssl_abi::NID_undef {
+                    // SAFETY: as above.
+                    curve_nid = unsafe { OBJ_txt2nid(name.as_ptr()) };
+                }
+            }
+        }
+        // SAFETY: as above.
+        let size = usize::try_from(unsafe { EVP_PKEY_get_size(pkey) }).unwrap_or(0);
+        // SAFETY: as above.
+        let security_bits = unsafe { EVP_PKEY_get_security_bits(pkey) };
+        Ok(PeerKey {
+            kind,
+            curve_nid,
+            size,
+            security_bits,
+        })
     }
 
     fn verify(&self, cert: &[u8], scheme: u16, msg: &[u8], sig: &[u8]) -> Result<bool> {
