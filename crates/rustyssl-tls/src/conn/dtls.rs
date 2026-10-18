@@ -86,8 +86,12 @@ pub struct State {
     pub(crate) buffering: bool,
     /// Where the output's datagrams end.
     marks: Vec<usize>,
-    /// Datagrams received and not yet read (the rest of each).
+    /// Datagrams received and not yet read.
     input: VecDeque<Vec<u8>>,
+    /// The rest of the datagram (or held record) being read.
+    cur: Vec<u8>,
+    /// The read epoch last seen.
+    read_epoch: u16,
     /// The timer change to report.
     timer: Option<Timer>,
     /// Whether messages written start the timer (`statem.use_timer`).
@@ -166,7 +170,15 @@ impl Connection {
     /// Whether DTLS input is waiting (datagrams, or held records to read again).
     #[must_use]
     pub fn dtls_input_pending(&self) -> bool {
-        !self.dtls.input.is_empty() || self.rr.dtls.as_ref().is_some_and(|d| !d.replay.is_empty())
+        !self.dtls.input.is_empty()
+            || !self.dtls.cur.is_empty()
+            || self.rr.dtls.as_ref().is_some_and(|d| !d.replay.is_empty())
+    }
+
+    /// The octets of the records held between a ChangeCipherSpec and the Finished, which
+    /// `SSL_pending` counts (`ssl3_pending`).
+    pub(crate) fn dtls_held_len(&self) -> usize {
+        self.dtls.held_app.iter().map(|r| r.data.len()).sum()
     }
 
     /// DTLS: takes the finished datagrams of the output.
@@ -473,18 +485,22 @@ impl Connection {
             d.in_init = in_init;
         }
         loop {
-            let replay = self.rr.take_replay();
-            let from_replay = replay.is_some();
-            let buf = match replay {
-                Some(r) => r,
-                None => match self.dtls.input.pop_front() {
-                    Some(d) => d,
-                    None => {
-                        self.needs_input = true;
-                        return Ok(None);
-                    }
-                },
-            };
+            // The rest of the datagram being read, then the records held for the epoch that
+            // started, then the next datagram (OpenSSL's read buffer, its record layer's
+            // `prev` BIO, the transport).
+            if self.dtls.cur.is_empty() {
+                self.dtls.cur = match self.rr.take_replay() {
+                    Some(r) => r,
+                    None => match self.dtls.input.pop_front() {
+                        Some(d) => d,
+                        None => {
+                            self.needs_input = true;
+                            return Ok(None);
+                        }
+                    },
+                };
+            }
+            let buf = core::mem::take(&mut self.dtls.cur);
             let read = self.rr.read_dtls(p, &buf).map_err(|mut e| {
                 if e.alert.is_some() {
                     e.follow_up = Some(abi::SSL_R_RECORD_LAYER_FAILURE);
@@ -504,8 +520,13 @@ impl Connection {
                 ]));
                 self.report_message_v(false, v, abi::SSL3_RT_HEADER, &h);
             }
-            if !from_replay && let Some(rest) = buf.get(consumed..).filter(|r| !r.is_empty()) {
-                self.dtls.input.push_front(rest.to_vec());
+            self.dtls.cur = buf.get(consumed..).unwrap_or_default().to_vec();
+            // A new read epoch drops the messages buffered for the old one
+            // (`dtls1_increment_epoch`).
+            let epoch = self.rr.dtls.as_ref().map_or(0, |d| d.epoch);
+            if epoch != self.dtls.read_epoch {
+                self.dtls.read_epoch = epoch;
+                self.dtls_clear_received();
             }
             if let Some(r) = record {
                 return Ok(Some(r));

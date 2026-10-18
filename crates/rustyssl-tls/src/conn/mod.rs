@@ -593,6 +593,9 @@ impl Connection {
     /// How much network input is buffered (`SSL_has_pending` counts it).
     #[must_use]
     pub fn buffered_input(&self) -> usize {
+        if self.cfg.dtls {
+            return usize::from(self.dtls_input_pending());
+        }
         self.input.len()
     }
 
@@ -624,12 +627,21 @@ impl Connection {
     /// Application data received and not yet read (`SSL_pending`).
     #[must_use]
     pub fn pending_app(&self) -> usize {
-        self.app_in.len()
+        self.app_in.len().saturating_add(self.dtls_held_len())
     }
 
     /// Copies up to `buf.len()` octets of received application data into `buf`, removing them
     /// unless `peek`; returns how many.
     pub fn read_app(&mut self, buf: &mut [u8], peek: bool) -> usize {
+        if self.cfg.dtls && self.app_in.is_empty() {
+            // Application data held during the handshake is read once it's over.
+            while let Some(r) = self.dtls_take_held_app() {
+                if r.content_type == app_data() {
+                    self.app_in.extend(r.data.iter());
+                    break;
+                }
+            }
+        }
         let n = buf.len().min(self.app_in.len());
         for (d, s) in buf.iter_mut().zip(self.app_in.iter()) {
             *d = *s;

@@ -322,8 +322,10 @@ pub(crate) unsafe fn handle_timeout(s: *mut SSL, x: &Ssl) -> c_int {
     };
     match r {
         Ok(v) => {
-            // SAFETY: the caller's guarantee.
-            let _ = unsafe { super::io::flush(x) };
+            if v > 0 {
+                // SAFETY: the caller's guarantee.
+                let _ = unsafe { super::io::flush(x) };
+            }
             v
         }
         Err(e) => {
