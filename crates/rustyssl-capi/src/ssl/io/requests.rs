@@ -248,7 +248,7 @@ pub(crate) unsafe fn handle(
             Some(unsafe { super::super::eap::secret(s, x, peer_ciphers.as_deref()) })
         }
         // SAFETY: as above.
-        Request::TicketGenerate => Some(unsafe { ticket_generate(s, x) }),
+        Request::TicketGenerate { session } => Some(unsafe { ticket_generate(s, x, &session) }),
         Request::TicketDecrypt {
             keyname,
             status,
@@ -322,59 +322,49 @@ fn ticket_cbs(
     })
 }
 
-/// `generate_ticket_cb`: the application may set the ticket's application data on the
-/// connection's session (`SSL_get_session`), made here from the core's for the call. 0 fails
-/// the handshake.
+/// `generate_ticket_cb`: the application may change the session the ticket will hold (its
+/// application data, its time), which is the connection's (`SSL_get_session`) during the call,
+/// made here from the core's. 0 fails the handshake.
 ///
 /// # Safety
 /// `s` is the live connection behind `x`; no lock is held.
-unsafe fn ticket_generate(s: *mut SSL, x: &Ssl) -> Answer {
+unsafe fn ticket_generate(s: *mut SSL, x: &Ssl, session: &rustyssl_tls::conn::Session) -> Answer {
     let fail = Answer::Fail {
         alert: alert(SSL_AD_INTERNAL_ERROR),
         reason: ERR_R_INTERNAL_ERROR,
     };
     let (gen_cb, _, arg) = ticket_cbs(x);
     let Some(cb) = gen_cb else {
-        return Answer::TicketAppData(None);
+        return Answer::TicketGenerated {
+            appdata: session.ticket_appdata.clone(),
+            time: session.time,
+        };
     };
-    let Some(core) = x
-        .state()
-        .drv
-        .tls
-        .as_ref()
-        .map(|c| c.negotiated().session.clone())
-    else {
+    // SAFETY: the caller's guarantee.
+    let tmp = unsafe { super::super::sess_cache::session_from_core(x, session) };
+    if tmp.is_null() {
         return fail;
-    };
-    // The connection's session, or one made from the core's for the call.
-    let current = x.state().sess.session;
-    let tmp = if current.is_null() {
-        // SAFETY: the caller's guarantee.
-        let t = unsafe { super::super::sess_cache::session_from_core(x, &core) };
-        if t.is_null() {
-            return fail;
-        }
-        x.state().sess.session = t;
-        t
-    } else {
-        ptr::null_mut()
-    };
+    }
+    let previous = core::mem::replace(&mut x.state().sess.session, tmp);
     // SAFETY: the application's callback with its connection and argument; no lock is held.
     let ok = unsafe { cb(s, arg) } != 0;
-    let cur = x.state().sess.session;
+    let cur = core::mem::replace(&mut x.state().sess.session, previous);
     // SAFETY: the session the callback saw (or one it set), or NULL.
-    let appdata = unsafe {
-        super::super::session::with(cur, None, |d| d.ticket_appdata.as_ref().map(|a| a.to_vec()))
+    let found = unsafe {
+        super::super::session::with(cur, None, |d| {
+            Some((
+                d.ticket_appdata.as_ref().map(|a| a.to_vec()),
+                super::super::session::to_time_t(d.time),
+            ))
+        })
     };
-    if !tmp.is_null() {
-        let t = core::mem::replace(&mut x.state().sess.session, ptr::null_mut());
-        // SAFETY: our temporary reference (or what replaced it).
-        unsafe { super::super::session::free(t) };
-    }
+    // SAFETY: our temporary reference (or what replaced it).
+    unsafe { super::super::session::free(cur) };
     if !ok {
         return fail;
     }
-    Answer::TicketAppData(appdata)
+    let (appdata, time) = found.unwrap_or((None, session.time));
+    Answer::TicketGenerated { appdata, time }
 }
 
 /// `decrypt_ticket_cb`: the application's verdict on a ticket (`SSL_TICKET_RETURN_*`), given

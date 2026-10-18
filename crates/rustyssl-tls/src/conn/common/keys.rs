@@ -279,15 +279,7 @@ fn change_cipher_state13_inner(
                 ));
             }
         };
-        // A client sending early data under an external PSK uses that PSK's early secret
-        // (`psksession->early_secret`), not the resumption one.
-        let keys = &c.hs.sh.keys;
-        let sched = if !c.cfg.server && c.neg.session.max_early_data == 0 {
-            keys.psk_early.as_ref()
-        } else {
-            keys.schedule.as_ref()
-        }
-        .ok_or_else(Error::internal)?;
+        let sched = c.hs.sh.keys.schedule.as_ref().ok_or_else(Error::internal)?;
         let eem = sched.early_exporter_master(p, &hash_ch)?;
         let secret = sched.client_early_traffic(p, &hash_ch)?;
         c.neg.early_exporter_master = eem.bytes().to_vec();

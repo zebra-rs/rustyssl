@@ -761,7 +761,18 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
         }
         let (was_before, was_in_init) = (conn.before(), conn.in_init());
+        let skipped = conn.skipped_records();
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_set_mark() };
         let r = conn.step(&*prov, reading);
+        // A skipped early data record's failed decryption leaves nothing on the queue.
+        if conn.skipped_records() == skipped {
+            // SAFETY: the mark set above.
+            unsafe { crate::err::ERR_clear_last_mark() };
+        } else {
+            // SAFETY: as above.
+            unsafe { crate::err::ERR_pop_to_mark() };
+        }
         // A handshake's start (`tls_setup_handshake`) and a TLS 1.3 server's end, which the
         // session cache counts.
         let started = if was_before && !conn.before() {

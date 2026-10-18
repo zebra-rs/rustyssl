@@ -55,9 +55,14 @@ unsafe fn take(
 /// # Safety
 /// `s` is the live connection behind `x`; no lock is held.
 pub(crate) unsafe fn session(s: *mut SSL, x: &Ssl, identity: &[u8], md: Option<HashAlg>) -> Answer {
-    let (server, use_cb, find_cb) = {
+    let (server, use_cb, find_cb, ctx) = {
         let st = x.state();
-        (st.server, st.psk_use_session_cb, st.psk_find_session_cb)
+        (
+            st.server,
+            st.psk_use_session_cb,
+            st.psk_find_session_cb,
+            st.ctx,
+        )
     };
     let mut sess: *mut SSL_SESSION = ptr::null_mut();
     if server {
@@ -75,14 +80,16 @@ pub(crate) unsafe fn session(s: *mut SSL, x: &Ssl, identity: &[u8], md: Option<H
     let Some(cb) = use_cb else {
         return Answer::Continue;
     };
+    // `ssl_handshake_md`: fetched in the context's library context.
+    // SAFETY: the connection's context, which it keeps alive.
+    let (libctx, propq) = unsafe { super::ctx::ctx(ctx.cast_const()) }
+        .map_or((ptr::null_mut(), ptr::null()), |c| {
+            (c.libctx, c.propq_ptr())
+        });
     let evp: *mut EVP_MD = match md {
-        // SAFETY: a NUL-terminated name; the default context and properties.
+        // SAFETY: the library context (or NULL), a NUL-terminated name, the properties.
         Some(h) => unsafe {
-            EVP_MD_fetch(
-                ptr::null_mut(),
-                super::tls_provider::hash_name(h).as_ptr(),
-                ptr::null(),
-            )
+            EVP_MD_fetch(libctx, super::tls_provider::hash_name(h).as_ptr(), propq)
         },
         None => ptr::null_mut(),
     };

@@ -162,9 +162,13 @@ pub enum Request {
         /// The client's suites (server side), or `None` (client side).
         peer_ciphers: Option<Vec<u32>>,
     },
-    /// A server's ticket is about to be made (`generate_ticket_cb`): answered
-    /// [`Answer::TicketAppData`] with the application data to put in it, or [`Answer::Fail`].
-    TicketGenerate,
+    /// A server's ticket is about to be made (`generate_ticket_cb`), for this session (the
+    /// connection's while the callback runs): answered [`Answer::TicketGenerated`] with what
+    /// the callback left in it, or [`Answer::Fail`].
+    TicketGenerate {
+        /// The session the ticket will hold.
+        session: Box<super::Session>,
+    },
     /// A ticket was decrypted, or couldn't be (`decrypt_ticket_cb`): answered
     /// [`Answer::TicketDecrypt`] with the callback's `SSL_TICKET_RETURN_*`.
     TicketDecrypt {
@@ -251,8 +255,13 @@ pub enum Answer {
     Allowed(bool),
     /// An application cookie, or `None` when the callback failed.
     Cookie(Option<Vec<u8>>),
-    /// The application data for a ticket being made.
-    TicketAppData(Option<Vec<u8>>),
+    /// What the generate callback left in a ticket's session: its application data and time.
+    TicketGenerated {
+        /// The application data (`SSL_SESSION_set1_ticket_appdata`).
+        appdata: Option<Vec<u8>>,
+        /// The session's time (`SSL_SESSION_set_time_ex`), in seconds.
+        time: i64,
+    },
     /// The session secret callback's master secret and preferred suite's id, or `None` when it
     /// gave none.
     SessionSecret(Option<(Vec<u8>, Option<u32>)>),
