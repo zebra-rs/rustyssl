@@ -312,10 +312,14 @@ pub fn restore_handshake_digest_for_pha(c: &mut Connection) -> Result<()> {
 pub fn finish_handshake(
     c: &mut Connection,
     _wst: Work,
-    _clearbufs: bool,
+    clearbufs: bool,
     stop: bool,
 ) -> Result<Work> {
     let cleanuphand = c.st.cleanuphand;
+    if c.cfg.dtls {
+        // `ssl_free_wbio_buffer`, and DTLS's sequence numbers restart for the next handshake.
+        c.dtls_finish(cleanuphand, clearbufs);
+    }
     if c.is_tls13() && !c.cfg.server && c.hs.sh.pha == Pha::Requested {
         c.hs.sh.pha = Pha::ExtSent;
     }

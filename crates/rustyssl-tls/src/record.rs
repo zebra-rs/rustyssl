@@ -103,6 +103,15 @@ fn next_seq(seq: &mut u64) -> Result<u64> {
     Ok(cur)
 }
 
+/// The record's sequence number for the MAC and nonce: DTLS's `epoch || sequence` from its
+/// header when given, else the next of TLS's counter.
+fn take_seq(fixed: Option<u64>, seq: &mut u64) -> Result<u64> {
+    match fixed {
+        Some(s) => Ok(s),
+        None => next_seq(seq),
+    }
+}
+
 /// `iv XOR seq`, the sequence number right-aligned (TLS 1.3, and TLS 1.2's ChaCha20-Poly1305).
 fn xor_nonce(iv: &[u8], seq: u64) -> Vec<u8> {
     let s = seq_bytes(seq);
@@ -381,6 +390,12 @@ pub struct RecordReader {
     /// Whether a TLS 1.3 record that doesn't decrypt is skipped rather than fatal (a server
     /// skipping early data it rejected: `skip_early_data`).
     pub skip_undecryptable: bool,
+    /// DTLS's read state (`None` for TLS).
+    pub dtls: Option<dtls::ReadState>,
+    /// The sequence number of the DTLS record being unprotected (`epoch || sequence`).
+    dtls_seq: Option<u64>,
+    /// Whether the last unprotection failed an encrypt-then-MAC check (fatal in DTLS too).
+    etm_failed: bool,
 }
 
 impl RecordReader {
@@ -400,6 +415,18 @@ impl RecordReader {
             first_handshake: true,
             allow_plain_alerts: false,
             skip_undecryptable: false,
+            dtls: None,
+            dtls_seq: None,
+            etm_failed: false,
+        }
+    }
+
+    /// A DTLS reader.
+    #[must_use]
+    pub fn new_dtls(server: bool) -> Self {
+        Self {
+            dtls: Some(dtls::ReadState::default()),
+            ..Self::new(server)
         }
     }
 
@@ -416,11 +443,15 @@ impl RecordReader {
         }
     }
 
-    /// Starts new protection (a new epoch: the sequence number restarts at 0).
+    /// Starts new protection (a new epoch: the sequence number restarts at 0; DTLS's epoch
+    /// counts up, and the next epoch's buffered records are read again).
     pub fn set_protection(&mut self, mode: Mode, protection: Protection) {
         self.mode = mode;
         self.protection = protection;
         self.seq = 0;
+        if let Some(d) = self.dtls.as_mut() {
+            d.next_epoch();
+        }
     }
 
     /// The next sequence number.
@@ -694,6 +725,7 @@ impl RecordReader {
 
     /// Removes the protection of `record` in place.
     fn unprotect(&mut self, p: &dyn Provider, record: &mut Record) -> Result<()> {
+        let fixed = self.dtls_seq;
         match &mut self.protection {
             Protection::Null => Ok(()),
             Protection::Tls13 { aead, iv, tag_len } => {
@@ -704,7 +736,7 @@ impl RecordReader {
                 if record.data.len() < tag_len.saturating_add(1) {
                     return Err(bad_mac());
                 }
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let nonce = xor_nonce(iv.bytes(), seq);
                 aead.open(&nonce, &record.header, &mut record.data)
                     .map_err(|_| bad_mac())?;
@@ -719,7 +751,7 @@ impl RecordReader {
                 let Some(n) = record.data.len().checked_sub(tag_len).filter(|&n| n >= 1) else {
                     return Err(bad_mac());
                 };
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let nonce = xor_nonce(iv.bytes(), seq);
                 let tag = record.data.split_off(n);
                 let want = crate::keysched::hmac(
@@ -746,7 +778,7 @@ impl RecordReader {
                 if record.data.len() < eiv.saturating_add(*tag_len) {
                     return Err(bad_mac());
                 }
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let nonce = if *explicit {
                     [iv.bytes(), record.data.get(..8).unwrap_or_default()].concat()
                 } else {
@@ -777,10 +809,11 @@ impl RecordReader {
                 etm,
             } => {
                 let mac_len = mac_hash.len();
-                let seq = self.seq;
+                let seq = fixed.unwrap_or(self.seq);
                 if *etm {
                     // Encrypt-then-MAC: the MAC covers the ciphertext, all public.
                     let Some(n) = record.data.len().checked_sub(mac_len) else {
+                        self.etm_failed = true;
                         return Err(fatal(abi::SSL_AD_DECODE_ERROR, abi::SSL_R_LENGTH_TOO_SHORT));
                     };
                     let tag = record.data.split_off(n);
@@ -792,13 +825,14 @@ impl RecordReader {
                         &[&header, &record.data],
                     )?;
                     if !bool::from(want.ct_eq(&tag)) {
+                        self.etm_failed = true;
                         return Err(bad_mac());
                     }
                 }
                 let bs = *block_len;
                 let Some(c) = cipher else {
                     // The NULL cipher: only a MAC.
-                    next_seq(&mut self.seq)?;
+                    take_seq(fixed, &mut self.seq)?;
                     if *etm {
                         return Ok(());
                     }
@@ -825,7 +859,7 @@ impl RecordReader {
                 if record.data.is_empty() || !record.data.len().is_multiple_of(bs) {
                     return Err(bad_mac());
                 }
-                next_seq(&mut self.seq)?;
+                take_seq(fixed, &mut self.seq)?;
                 let (chain_iv, mut ct) = if *explicit_iv {
                     if record.data.len() < bs {
                         return Err(bad_mac());
@@ -1099,6 +1133,8 @@ pub struct RecordWriter {
     pub empty_fragments: bool,
     /// TLS 1.3: send alerts in the clear (before the keys are known).
     pub plain_alerts: bool,
+    /// DTLS's write state (`None` for TLS).
+    pub dtls: Option<dtls::WriteState>,
 }
 
 impl RecordWriter {
@@ -1116,11 +1152,29 @@ impl RecordWriter {
             pad_with_hook: false,
             empty_fragments: false,
             plain_alerts: false,
+            dtls: None,
         }
     }
 
-    /// Starts new protection (a new epoch).
+    /// A DTLS writer.
+    #[must_use]
+    pub fn new_dtls(version: u16) -> Self {
+        Self {
+            dtls: Some(dtls::WriteState::default()),
+            ..Self::new(version)
+        }
+    }
+
+    /// Starts new protection (a new epoch). DTLS keeps the previous epoch's state for
+    /// retransmitting the flight that changed it.
     pub fn set_protection(&mut self, mode: Mode, protection: Protection) {
+        if let Some(d) = self.dtls.as_mut() {
+            let old_mode = core::mem::replace(&mut self.mode, mode);
+            let old = core::mem::replace(&mut self.protection, protection);
+            d.next_epoch(old_mode, old);
+            self.pad_with_hook = false;
+            return;
+        }
         self.mode = mode;
         self.protection = protection;
         self.seq = 0;
@@ -1180,6 +1234,11 @@ impl RecordWriter {
         data: &[u8],
         out: &mut Vec<u8>,
     ) -> Result<()> {
+        // DTLS: every record, protected or not, takes the next sequence number of its epoch.
+        let fixed = match self.dtls.as_mut() {
+            Some(d) => Some(d.take_seq()?),
+            None => None,
+        };
         let (outer_ty, version, body) = match &mut self.protection {
             Protection::Null => (ty, self.version, data.to_vec()),
             Protection::Tls13 { aead, iv, tag_len } => {
@@ -1191,7 +1250,7 @@ impl RecordWriter {
                     let hook = self.pad_hook.as_ref().filter(|_| self.pad_with_hook);
                     let pad = padding_for(hook, self.padding, ty, inner.len(), self.max_frag_len);
                     pad13(&mut inner, ty, pad, self.max_frag_len);
-                    let seq = next_seq(&mut self.seq)?;
+                    let seq = take_seq(fixed, &mut self.seq)?;
                     let nonce = xor_nonce(iv.bytes(), seq);
                     let len = inner.len().saturating_add(*tag_len);
                     let header = header_bytes(application_data(), tls1_2(), len)?;
@@ -1205,7 +1264,7 @@ impl RecordWriter {
                 let hook = self.pad_hook.as_ref().filter(|_| self.pad_with_hook);
                 let pad = padding_for(hook, self.padding, ty, inner.len(), self.max_frag_len);
                 pad13(&mut inner, ty, pad, self.max_frag_len);
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let nonce = xor_nonce(iv.bytes(), seq);
                 let header = header_bytes(
                     application_data(),
@@ -1223,7 +1282,7 @@ impl RecordWriter {
                 next_explicit,
                 ..
             } => {
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let (nonce, prefix) = if *explicit {
                     let e = next_explicit.to_be_bytes();
                     *next_explicit = next_explicit.wrapping_add(1);
@@ -1245,7 +1304,7 @@ impl RecordWriter {
                 explicit_iv,
                 etm,
             } => {
-                let seq = next_seq(&mut self.seq)?;
+                let seq = take_seq(fixed, &mut self.seq)?;
                 let mac = |data: &[u8]| -> Result<Vec<u8>> {
                     let header = mac_header(seq, ty, self.version, data.len())?;
                     crate::keysched::hmac(p, *mac_hash, mac_key.bytes(), &[&header, data])
@@ -1271,9 +1330,88 @@ impl RecordWriter {
                 }
             }
         };
-        out.extend_from_slice(&header_bytes(outer_ty, version, body.len())?);
+        match fixed {
+            Some(seq) => out.extend_from_slice(&dtls::header(outer_ty, version, seq, body.len())?),
+            None => out.extend_from_slice(&header_bytes(outer_ty, version, body.len())?),
+        }
         out.extend_from_slice(&body);
         Ok(())
+    }
+
+    /// DTLS: writes one record of `data` (which must fit one) in `epoch`: the current one, or
+    /// the previous one while retransmitting the flight that changed it. Returns `false` (and
+    /// writes nothing) when that epoch's state is gone.
+    ///
+    /// # Errors
+    /// The provider failed, or the sequence number wrapped.
+    pub fn write_dtls(
+        &mut self,
+        p: &dyn Provider,
+        ty: ContentType,
+        data: &[u8],
+        epoch: u16,
+        out: &mut Vec<u8>,
+    ) -> Result<bool> {
+        let Some(d) = self.dtls.as_mut() else {
+            return Err(Error::internal());
+        };
+        if d.epoch == epoch {
+            self.write_one(p, ty, data, out)?;
+            return Ok(true);
+        }
+        let Some(mut prev) = d.take_prev(epoch) else {
+            return Ok(false);
+        };
+        core::mem::swap(&mut self.mode, &mut prev.mode);
+        core::mem::swap(&mut self.protection, &mut prev.protection);
+        if let Some(d) = self.dtls.as_mut() {
+            d.swap_counters(&mut prev);
+        }
+        let r = self.write_one(p, ty, data, out);
+        core::mem::swap(&mut self.mode, &mut prev.mode);
+        core::mem::swap(&mut self.protection, &mut prev.protection);
+        if let Some(d) = self.dtls.as_mut() {
+            d.swap_counters(&mut prev);
+            d.put_prev(prev);
+        }
+        r.map(|()| true)
+    }
+
+    /// DTLS: the current write epoch.
+    #[must_use]
+    pub fn epoch(&self) -> u16 {
+        self.dtls.as_ref().map_or(0, |d| d.epoch)
+    }
+
+    /// The largest record overhead of the current protection (`dtls_get_max_record_overhead`:
+    /// header, explicit IV, CBC padding, and the MAC or tag).
+    #[must_use]
+    pub fn max_overhead(&self) -> usize {
+        let header = if self.dtls.is_some() {
+            dtls::HEADER_LEN
+        } else {
+            HEADER_LEN
+        };
+        let extra = match &self.protection {
+            Protection::Null => 0,
+            Protection::Tls13 { tag_len, .. } => tag_len.saturating_add(1),
+            Protection::Tls13Integrity { hash, .. } => hash.len().saturating_add(1),
+            Protection::Aead12 {
+                explicit, tag_len, ..
+            } => tag_len.saturating_add(if *explicit { 8 } else { 0 }),
+            Protection::Cbc12 {
+                cipher,
+                block_len,
+                mac_hash,
+                explicit_iv,
+                ..
+            } => {
+                let bs = if cipher.is_some() { *block_len } else { 0 };
+                let eiv = if *explicit_iv { bs } else { 0 };
+                eiv.saturating_add(bs).saturating_add(mac_hash.len())
+            }
+        };
+        header.saturating_add(extra)
     }
 }
 
@@ -1399,6 +1537,8 @@ fn header_bytes(ty: ContentType, version: u16, len: usize) -> Result<[u8; 5]> {
 pub fn tls10_version() -> u16 {
     tls1_0()
 }
+
+pub mod dtls;
 
 #[cfg(test)]
 mod tests;

@@ -72,15 +72,31 @@ pub fn disabled(c: &Connection, cp: &Cipher, op: c_int, ecdhe: bool) -> bool {
             return true;
         }
     }
-    let mut minv = cp.min_tls;
-    let maxv = cp.max_tls;
+    let (mut minv, maxv) = range(c, cp);
     if minv == abi::TLS1_VERSION && ecdhe && cp.mkey & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
         minv = abi::SSL3_VERSION;
     }
-    if minv > c_int::from(sh.max_ver) || maxv < c_int::from(sh.min_ver) {
+    if vcmp(minv, c_int::from(sh.max_ver)) == Ordering::Greater
+        || vcmp(maxv, c_int::from(sh.min_ver)) == Ordering::Less
+    {
         return true;
     }
     !security::check(c, op, cp.strength_bits, 0, SecOther::Cipher(cp))
+}
+
+/// A suite's versions on this kind of connection (`min_dtls`/`max_dtls` in DTLS).
+pub(crate) fn range(c: &Connection, cp: &Cipher) -> (c_int, c_int) {
+    if c.cfg.dtls {
+        (cp.min_dtls, cp.max_dtls)
+    } else {
+        (cp.min_tls, cp.max_tls)
+    }
+}
+
+/// `ssl_version_cmp` on `int` versions.
+pub(crate) fn vcmp(a: c_int, b: c_int) -> Ordering {
+    let v = |x: c_int| u16::try_from(x).unwrap_or(0);
+    super::version::cmp(v(a), v(b))
 }
 
 /// Shared addition (fork K, `SSL_get1_supported_ciphers`): the configured suites this end can
@@ -152,7 +168,11 @@ fn cipher_list_to_bytes_inner(c: &mut Connection) -> Result<Vec<u8>> {
             continue;
         }
         w.u16(cp.protocol_id());
-        if !maxverok && cp.max_tls >= max_ver && cp.min_tls <= max_ver {
+        let (minv, maxv) = range(c, cp);
+        if !maxverok
+            && vcmp(maxv, max_ver) != Ordering::Less
+            && vcmp(minv, max_ver) != Ordering::Greater
+        {
             maxverok = true;
         }
     }
@@ -402,7 +422,8 @@ pub fn choose(
     let v = c_int::from(c.neg.version);
     let mut ret: Option<&'static Cipher> = None;
     for cp in prio {
-        if v.cmp(&cp.min_tls) == Ordering::Less || v.cmp(&cp.max_tls) == Ordering::Greater {
+        let (minv, maxv) = range(c, cp);
+        if vcmp(v, minv) == Ordering::Less || vcmp(v, maxv) == Ordering::Greater {
             continue;
         }
         let (alg_k, alg_a) = (cp.mkey, cp.auth);

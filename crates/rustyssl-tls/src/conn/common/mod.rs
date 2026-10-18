@@ -290,7 +290,12 @@ fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
         )
     })?;
     if p.hash(HashAlg::Md5Sha1).is_err() {
-        if version::cmp(max, version::of(abi::TLS1_1_VERSION)).is_le() {
+        let md5sha1_max = if c.cfg.dtls {
+            version::of(abi::DTLS1_VERSION)
+        } else {
+            version::of(abi::TLS1_1_VERSION)
+        };
+        if version::cmp(max, md5sha1_max).is_le() {
             return Err(Error::alert(
                 abi::SSL_AD_HANDSHAKE_FAILURE,
                 abi::SSL_R_NO_SUITABLE_DIGEST_ALGORITHM,
@@ -308,11 +313,10 @@ fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     }
     if c.cfg.server {
         let max_i = c_int::from(max);
-        let ok = c
-            .cfg
-            .ciphers
-            .iter()
-            .any(|cp| max_i >= cp.min_tls && (cp.max_tls == 0 || max_i <= cp.max_tls));
+        let ok = c.cfg.ciphers.iter().any(|cp| {
+            let (minv, maxv) = ciphers::range(c, cp);
+            ciphers::vcmp(max_i, minv).is_ge() && ciphers::vcmp(max_i, maxv).is_le()
+        });
         if !ok {
             return Err(Error::alert(
                 abi::SSL_AD_HANDSHAKE_FAILURE,

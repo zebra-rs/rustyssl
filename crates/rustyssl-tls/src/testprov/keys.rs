@@ -67,8 +67,17 @@ pub fn groups() -> Vec<GroupInfo> {
         security_bits: bits,
         min_tls,
         max_tls: 0,
-        min_dtls: 0,
-        max_dtls: 0,
+        // As the default provider's: the TLS 1.3-only groups have no DTLS.
+        min_dtls: if min_tls == rustyssl_abi::TLS1_3_VERSION {
+            -1
+        } else {
+            0
+        },
+        max_dtls: if min_tls == rustyssl_abi::TLS1_3_VERSION {
+            -1
+        } else {
+            0
+        },
         is_kem,
         algorithm: match id {
             X25519 => "X25519",

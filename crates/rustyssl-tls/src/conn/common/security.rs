@@ -79,8 +79,15 @@ pub fn default_policy(level: i32, op: c_int, bits: c_int, nid: c_int, other: Sec
             }
             true
         }
-        // TLS only (DTLS 1.0 is likewise only allowed at level 0).
-        abi::SSL_SECOP_VERSION => !(nid <= abi::TLS1_1_VERSION && level > 0),
+        // SSLv3 to TLS 1.1, and DTLS 1.0, only at level 0.
+        abi::SSL_SECOP_VERSION => {
+            let v = u16::try_from(nid).unwrap_or(0);
+            if super::version::is_dtls(v) {
+                !(super::version::cmp(v, crate::consts::version::DTLS1_2).is_lt() && level > 0)
+            } else {
+                !(nid <= abi::TLS1_1_VERSION && level > 0)
+            }
+        }
         abi::SSL_SECOP_COMPRESSION => level < 2,
         abi::SSL_SECOP_TICKET => level < 3,
         _ => bits >= minbits,
