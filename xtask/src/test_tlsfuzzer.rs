@@ -360,6 +360,18 @@ fn run_script(env: &Env, s: &Script, ours: bool) -> Result<Outcome> {
     Ok(outcome)
 }
 
+/// The conversation a line starts: `<name> ...`, or `"<name>" repeat <n>...` in the scripts
+/// that run each conversation several times (the `*-random.py` ones).
+fn conversation(line: &str) -> Option<&str> {
+    if let Some(rest) = line.strip_prefix('"')
+        && let Some((name, tail)) = rest.split_once("\" repeat ")
+        && tail.ends_with("...")
+    {
+        return Some(name);
+    }
+    line.strip_suffix(" ...")
+}
+
 /// The failed conversations and the total from a script's output.
 fn summary(text: &str) -> Outcome {
     let mut ran = BTreeSet::new();
@@ -371,7 +383,7 @@ fn summary(text: &str) -> Outcome {
         if line == "Test end" {
             finished = true;
         }
-        if !finished && let Some(name) = line.strip_suffix(" ...") {
+        if !finished && let Some(name) = conversation(line) {
             ran.insert(name.to_owned());
         }
         if let Some(n) = line.strip_prefix("TOTAL: ") {
@@ -721,6 +733,21 @@ mod tests {
         assert_eq!(
             o.failed.into_iter().collect::<Vec<_>>(),
             ["one".to_owned(), "two's".to_owned()]
+        );
+    }
+
+    #[test]
+    fn reads_repeated_conversations() {
+        let out = "\"sanity\" repeat 0...\nOK\n\"Protocol (3, 1)\" repeat 0...\n\
+                   \"Protocol (3, 1)\" repeat 1...\nTest end\nFAILED:\n\t'Protocol (3, 1)'\n";
+        let o = summary(out);
+        assert_eq!(
+            o.ran.into_iter().collect::<Vec<_>>(),
+            ["Protocol (3, 1)".to_owned(), "sanity".to_owned()]
+        );
+        assert_eq!(
+            o.failed.into_iter().collect::<Vec<_>>(),
+            ["Protocol (3, 1)".to_owned()]
         );
     }
 
