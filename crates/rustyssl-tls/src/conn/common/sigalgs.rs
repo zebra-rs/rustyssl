@@ -890,7 +890,10 @@ pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
     if !lu.available {
         return false;
     }
-    let (minproto, maxproto) = if c.cfg.method_version == version::ANY {
+    // Once the hellos chose the version, OpenSSL's connection has the version's own method
+    // (`ssl_choose_server_version`, `ssl_choose_client_version`), so only that version counts.
+    let flexible = c.cfg.method_version == version::ANY && (c.before() || !c.version_decided());
+    let (minproto, maxproto) = if flexible {
         (
             c_int::from(c.cfg.min_version),
             c_int::from(c.cfg.max_version),

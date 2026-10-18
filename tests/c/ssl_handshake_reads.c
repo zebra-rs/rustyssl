@@ -476,6 +476,42 @@ static void test_soft_fail_resume(int version)
     done(c, s, cctx, sctx);
 }
 
+static int request_cb(int ok, X509_STORE_CTX *ctx)
+{
+    (void)ok;
+    (void)ctx;
+    return 1;
+}
+
+/*
+ * The signature algorithms a server's CertificateRequest lists, as its client reads them
+ * (SSL_get_sigalgs): only those the negotiated version may use, so none of TLS 1.3's alone
+ * (ML-DSA) in TLS 1.2.
+ */
+static void test_request_sigalgs(int version)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    int i, n;
+
+    printf("# the CertificateRequest's signature algorithms, %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_verify(sctx, SSL_VERIFY_PEER, request_cb);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the handshake");
+    n = SSL_get_sigalgs(c, -1, NULL, NULL, NULL, NULL, NULL);
+    printf("  %d:", n);
+    for (i = 0; i < n; i++) {
+        unsigned char rsig = 0, rhash = 0;
+
+        SSL_get_sigalgs(c, i, NULL, NULL, NULL, &rsig, &rhash);
+        printf(" %02x%02x", rhash, rsig);
+    }
+    printf("\n");
+    done(c, s, cctx, sctx);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -565,6 +601,8 @@ int main(void)
     test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
+    test_request_sigalgs(TLS1_3_VERSION);
+    test_request_sigalgs(TLS1_2_VERSION);
     test_soft_fail_resume(TLS1_3_VERSION);
     test_soft_fail_resume(TLS1_2_VERSION);
     test_retry_verify();
