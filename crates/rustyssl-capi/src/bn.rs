@@ -801,3 +801,15 @@ ffi_export! {
 
 #[cfg(test)]
 mod tests;
+
+/// A read-only number for a static table (`BN_FLG_STATIC_DATA`), never freed.
+pub(crate) fn new_static(value: BigNum) -> *mut BIGNUM {
+    let h = new_handle(Owner::Static, 0);
+    // SAFETY: just made, not yet static data.
+    unsafe { store(h, value) };
+    // SAFETY: as above.
+    if let Some(b) = unsafe { bignum(h) } {
+        b.lock().flags = BN_FLG_STATIC_DATA;
+    }
+    h
+}

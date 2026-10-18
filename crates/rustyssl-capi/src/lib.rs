@@ -15,12 +15,14 @@
 //! Exports that aren't implemented yet are generated stubs that abort (see [`stub`]).
 
 mod asn1;
+mod async_job;
 mod bio;
 mod bn;
 mod buffer;
 mod cmac;
 mod cmp;
 mod cms;
+mod comp;
 mod conf;
 mod crmf;
 mod ct;
@@ -91,7 +93,9 @@ mod rsa_meth;
 mod rsa_ops;
 mod rsa_pmeth;
 mod secure;
+mod self_test;
 mod sleep;
+mod srp;
 mod ssl;
 mod stack;
 mod store;
@@ -100,6 +104,7 @@ mod stub;
 mod threads;
 mod trace;
 mod ts;
+mod txt_db;
 mod ui;
 mod version;
 mod x509;

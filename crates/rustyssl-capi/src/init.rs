@@ -9,9 +9,8 @@
 //! - `OPENSSL_cleanup` runs the `OPENSSL_atexit` handlers, newest first, once; after it, every
 //!   `OPENSSL_init_crypto` fails.
 //!
-//! Flags whose subsystem rustyssl doesn't have yet abort, as an unimplemented export does
-//! (security rule 10): `OPENSSL_INIT_ADD_ALL_CIPHERS` (step 3.4) and `OPENSSL_INIT_ASYNC`.
-//! The `OPENSSL_INIT_ENGINE_*` flags load no engines: rustyssl has none. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
+//! `OPENSSL_INIT_ASYNC` needs nothing set up: the job state is per thread, made on first use
+//! ([`crate::async_job`]). The `OPENSSL_INIT_ENGINE_*` flags load no engines: rustyssl has none. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
 //! file into the default library context and runs its modules ([`crate::conf::modules`]).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
@@ -22,16 +21,16 @@ use std::sync::{Mutex, OnceLock};
 use rustyssl_abi::{
     CONF_MFLAGS_DEFAULT_SECTION, CONF_MFLAGS_IGNORE_MISSING_FILE, CONF_MFLAGS_IGNORE_RETURN_CODES,
     ERR_LIB_CRYPTO, ERR_R_INIT_FAIL, OPENSSL_INIT_ADD_ALL_CIPHERS, OPENSSL_INIT_ADD_ALL_DIGESTS,
-    OPENSSL_INIT_ASYNC, OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS,
-    OPENSSL_INIT_LOAD_SSL_STRINGS, OPENSSL_INIT_NO_ADD_ALL_CIPHERS,
-    OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT, OPENSSL_INIT_NO_LOAD_CONFIG,
-    OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
+    OPENSSL_INIT_LOAD_CONFIG, OPENSSL_INIT_LOAD_CRYPTO_STRINGS, OPENSSL_INIT_LOAD_SSL_STRINGS,
+    OPENSSL_INIT_NO_ADD_ALL_CIPHERS, OPENSSL_INIT_NO_ADD_ALL_DIGESTS, OPENSSL_INIT_NO_ATEXIT,
+    OPENSSL_INIT_NO_LOAD_CONFIG, OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS,
+    OPENSSL_INIT_NO_LOAD_SSL_STRINGS, OPENSSL_INIT_SETTINGS,
 };
 
 use crate::err;
 use crate::ffi::ffi_export;
 use crate::handle::{Handle, handle_type};
-use crate::{mem, stub};
+use crate::mem;
 
 /// The flags `OPENSSL_init_crypto` takes, as `u64`.
 fn flag(value: c_long) -> u64 {
@@ -57,11 +56,6 @@ static CONFIG: OnceLock<c_int> = OnceLock::new();
 
 /// The `OPENSSL_atexit` handlers, oldest first.
 static HANDLERS: Mutex<Vec<unsafe extern "C" fn()>> = Mutex::new(Vec::new());
-
-/// Aborts for a flag whose subsystem doesn't exist yet.
-fn unavailable(flag: &str) -> ! {
-    stub::unimplemented(&format!("OPENSSL_init_crypto with {flag}"))
-}
 
 /// Keeps the library that contains `address` loaded for good, as OpenSSL does before
 /// registering exit handlers: if it were unloaded, the process would jump into unmapped
@@ -201,9 +195,6 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
         } else if *CONFIG.get_or_init(|| load_config(settings)) <= 0 {
             return None;
         }
-    }
-    if opts & flag(OPENSSL_INIT_ASYNC) != 0 {
-        unavailable("OPENSSL_INIT_ASYNC");
     }
     // The `OPENSSL_INIT_ENGINE_*` flags load OpenSSL's built-in engines; rustyssl has none
     // (docs/DEVIATIONS.md), so they load none. The ENGINE functions themselves still abort.

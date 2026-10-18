@@ -820,6 +820,78 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut ASRange) = crate::x509v3::rfc3779::ASRange_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::rfc3779::ASRange_it;
 const _: unsafe extern "C" fn() -> *mut ASRange = crate::x509v3::rfc3779::ASRange_new;
+const _: unsafe extern "C" fn(*mut ASYNC_WAIT_CTX, *const core::ffi::c_void) -> core::ffi::c_int =
+    crate::async_job::ASYNC_WAIT_CTX_clear_fd;
+const _: unsafe extern "C" fn(*mut ASYNC_WAIT_CTX) = crate::async_job::ASYNC_WAIT_CTX_free;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    *mut core::ffi::c_int,
+    *mut usize,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_get_all_fds;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    *mut ASYNC_callback_fn,
+    *mut *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_get_callback;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    *mut core::ffi::c_int,
+    *mut usize,
+    *mut core::ffi::c_int,
+    *mut usize,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_get_changed_fds;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    *const core::ffi::c_void,
+    *mut core::ffi::c_int,
+    *mut *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_get_fd;
+const _: unsafe extern "C" fn(*mut ASYNC_WAIT_CTX) -> core::ffi::c_int =
+    crate::async_job::ASYNC_WAIT_CTX_get_status;
+const _: unsafe extern "C" fn() -> *mut ASYNC_WAIT_CTX = crate::async_job::ASYNC_WAIT_CTX_new;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    ASYNC_callback_fn,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_set_callback;
+const _: unsafe extern "C" fn(*mut ASYNC_WAIT_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::async_job::ASYNC_WAIT_CTX_set_status;
+const _: unsafe extern "C" fn(
+    *mut ASYNC_WAIT_CTX,
+    *const core::ffi::c_void,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    ::core::option::Option<
+        unsafe extern "C" fn(
+            arg1: *mut ASYNC_WAIT_CTX,
+            arg2: *const core::ffi::c_void,
+            arg3: core::ffi::c_int,
+            arg4: *mut core::ffi::c_void,
+        ),
+    >,
+) -> core::ffi::c_int = crate::async_job::ASYNC_WAIT_CTX_set_wait_fd;
+const _: unsafe extern "C" fn() = crate::async_job::ASYNC_block_pause;
+const _: unsafe extern "C" fn() = crate::async_job::ASYNC_cleanup_thread;
+const _: unsafe extern "C" fn() -> *mut ASYNC_JOB = crate::async_job::ASYNC_get_current_job;
+const _: unsafe extern "C" fn(*mut ASYNC_stack_alloc_fn, *mut ASYNC_stack_free_fn) =
+    crate::async_job::ASYNC_get_mem_functions;
+const _: unsafe extern "C" fn(*mut ASYNC_JOB) -> *mut ASYNC_WAIT_CTX =
+    crate::async_job::ASYNC_get_wait_ctx;
+const _: unsafe extern "C" fn(usize, usize) -> core::ffi::c_int =
+    crate::async_job::ASYNC_init_thread;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::async_job::ASYNC_is_capable;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::async_job::ASYNC_pause_job;
+const _: unsafe extern "C" fn(ASYNC_stack_alloc_fn, ASYNC_stack_free_fn) -> core::ffi::c_int =
+    crate::async_job::ASYNC_set_mem_functions;
+const _: unsafe extern "C" fn(
+    *mut *mut ASYNC_JOB,
+    *mut ASYNC_WAIT_CTX,
+    *mut core::ffi::c_int,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut core::ffi::c_void) -> core::ffi::c_int>,
+    *mut core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::async_job::ASYNC_start_job;
+const _: unsafe extern "C" fn() = crate::async_job::ASYNC_unblock_pause;
 const _: unsafe extern "C" fn(*mut AUTHORITY_INFO_ACCESS) =
     crate::x509v3::info::AUTHORITY_INFO_ACCESS_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::info::AUTHORITY_INFO_ACCESS_it;
@@ -1028,6 +1100,7 @@ const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
     crate::bio::dgram::BIO_err_is_non_fatal;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::asn1::bio_asn1::BIO_f_asn1;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::base64::BIO_f_base64;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::comp::BIO_f_brotli;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_buffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_cipher;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_linebuffer;
@@ -1037,6 +1110,8 @@ const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_f_n
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::prefix::BIO_f_prefix;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::buffer::BIO_f_readbuffer;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::evp::BIO_f_reliable;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::comp::BIO_f_zlib;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::comp::BIO_f_zstd;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
     crate::bio::fd::BIO_fd_non_fatal_error;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> core::ffi::c_int =
@@ -2974,6 +3049,34 @@ const _: unsafe extern "C" fn(
     *mut X509_STORE,
     core::ffi::c_uint,
 ) -> core::ffi::c_int = crate::cms::smime::CMS_verify_receipt;
+const _: unsafe extern "C" fn(*mut COMP_CTX) = crate::comp::COMP_CTX_free;
+const _: unsafe extern "C" fn(*const COMP_CTX) -> *const COMP_METHOD =
+    crate::comp::COMP_CTX_get_method;
+const _: unsafe extern "C" fn(*const COMP_CTX) -> core::ffi::c_int = crate::comp::COMP_CTX_get_type;
+const _: unsafe extern "C" fn(*mut COMP_METHOD) -> *mut COMP_CTX = crate::comp::COMP_CTX_new;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_brotli;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_brotli_oneshot;
+const _: unsafe extern "C" fn(
+    *mut COMP_CTX,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::comp::COMP_compress_block;
+const _: unsafe extern "C" fn(
+    *mut COMP_CTX,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::comp::COMP_expand_block;
+const _: unsafe extern "C" fn(*const COMP_METHOD) -> *const core::ffi::c_char =
+    crate::comp::COMP_get_name;
+const _: unsafe extern "C" fn(*const COMP_METHOD) -> core::ffi::c_int = crate::comp::COMP_get_type;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_zlib;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_zlib_oneshot;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_zstd;
+const _: unsafe extern "C" fn() -> *mut COMP_METHOD = crate::comp::COMP_zstd_oneshot;
 const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut BIO) -> core::ffi::c_int =
     crate::conf::CONF_dump_bio;
 const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut FILE) -> core::ffi::c_int =
@@ -11057,6 +11160,22 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_it;
 const _: unsafe extern "C" fn() -> *mut OSSL_ROLE_SPEC_CERT_ID =
     crate::x509v3::acext::OSSL_ROLE_SPEC_CERT_ID_new;
+const _: unsafe extern "C" fn(*mut OSSL_SELF_TEST) = crate::self_test::OSSL_SELF_TEST_free;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_CALLBACK, *mut *mut core::ffi::c_void) =
+    crate::libctx::OSSL_SELF_TEST_get_callback;
+const _: unsafe extern "C" fn(OSSL_CALLBACK, *mut core::ffi::c_void) -> *mut OSSL_SELF_TEST =
+    crate::self_test::OSSL_SELF_TEST_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_SELF_TEST,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) = crate::self_test::OSSL_SELF_TEST_onbegin;
+const _: unsafe extern "C" fn(*mut OSSL_SELF_TEST, *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::self_test::OSSL_SELF_TEST_oncorrupt_byte;
+const _: unsafe extern "C" fn(*mut OSSL_SELF_TEST, core::ffi::c_int) =
+    crate::self_test::OSSL_SELF_TEST_onend;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_CALLBACK, *mut core::ffi::c_void) =
+    crate::libctx::OSSL_SELF_TEST_set_callback;
 const _: unsafe extern "C" fn(*mut stack_st_X509) = crate::x509::cert::OSSL_STACK_OF_X509_free;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_INFO) = crate::store::info::OSSL_STORE_INFO_free;
 const _: unsafe extern "C" fn(*const OSSL_STORE_INFO) -> *mut X509 =
@@ -14110,6 +14229,133 @@ const _: unsafe extern "C" fn(
     *mut BIO,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::pkcs7::mime::SMIME_write_PKCS7;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM, *const BIGNUM) -> *mut BIGNUM =
+    crate::srp::SRP_Calc_A;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_B;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_B_ex;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_client_key;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_client_key_ex;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_server_key;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM, *const BIGNUM) -> *mut BIGNUM =
+    crate::srp::SRP_Calc_u;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_u_ex;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_x;
+const _: unsafe extern "C" fn(
+    *const BIGNUM,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIGNUM = crate::srp::SRP_Calc_x_ex;
+const _: unsafe extern "C" fn(*mut SRP_VBASE, *mut SRP_user_pwd) -> core::ffi::c_int =
+    crate::srp::SRP_VBASE_add0_user;
+const _: unsafe extern "C" fn(*mut SRP_VBASE) = crate::srp::SRP_VBASE_free;
+const _: unsafe extern "C" fn(*mut SRP_VBASE, *mut core::ffi::c_char) -> *mut SRP_user_pwd =
+    crate::srp::SRP_VBASE_get1_by_user;
+const _: unsafe extern "C" fn(*mut SRP_VBASE, *mut core::ffi::c_char) -> *mut SRP_user_pwd =
+    crate::srp::SRP_VBASE_get_by_user;
+const _: unsafe extern "C" fn(*mut SRP_VBASE, *mut core::ffi::c_char) -> core::ffi::c_int =
+    crate::srp::SRP_VBASE_init;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char) -> *mut SRP_VBASE = crate::srp::SRP_VBASE_new;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::srp::SRP_Verify_A_mod_N;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM) -> core::ffi::c_int =
+    crate::srp::SRP_Verify_B_mod_N;
+const _: unsafe extern "C" fn(*const BIGNUM, *const BIGNUM) -> *mut core::ffi::c_char =
+    crate::srp::SRP_check_known_gN_param;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::srp::SRP_create_verifier;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+) -> core::ffi::c_int = crate::srp::SRP_create_verifier_BN;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut *mut BIGNUM,
+    *mut *mut BIGNUM,
+    *const BIGNUM,
+    *const BIGNUM,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::srp::SRP_create_verifier_BN_ex;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::srp::SRP_create_verifier_ex;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut SRP_gN =
+    crate::srp::SRP_get_default_gN;
+const _: unsafe extern "C" fn(*mut SRP_user_pwd) = crate::srp::SRP_user_pwd_free;
+const _: unsafe extern "C" fn() -> *mut SRP_user_pwd = crate::srp::SRP_user_pwd_new;
+const _: unsafe extern "C" fn(*mut SRP_user_pwd, *mut BIGNUM, *mut BIGNUM) -> core::ffi::c_int =
+    crate::srp::SRP_user_pwd_set0_sv;
+const _: unsafe extern "C" fn(
+    *mut SRP_user_pwd,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::srp::SRP_user_pwd_set1_ids;
+const _: unsafe extern "C" fn(*mut SRP_user_pwd, *const BIGNUM, *const BIGNUM) =
+    crate::srp::SRP_user_pwd_set_gN;
 const _: unsafe extern "C" fn(*mut SXNETID) = crate::x509v3::misc::SXNETID_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::misc::SXNETID_it;
 const _: unsafe extern "C" fn() -> *mut SXNETID = crate::x509v3::misc::SXNETID_new;
@@ -14530,6 +14776,25 @@ const _: unsafe extern "C" fn(*mut BIO, *const X509_ALGOR) -> core::ffi::c_int =
     crate::ts::prn::TS_X509_ALGOR_print_bio;
 const _: unsafe extern "C" fn(*mut BIO, *const stack_st_X509_EXTENSION) -> core::ffi::c_int =
     crate::ts::prn::TS_ext_print_bio;
+const _: unsafe extern "C" fn(
+    *mut TXT_DB,
+    core::ffi::c_int,
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut OPENSSL_STRING) -> core::ffi::c_int>,
+    OPENSSL_LH_HASHFUNC,
+    OPENSSL_LH_COMPFUNC,
+) -> core::ffi::c_int = crate::txt_db::TXT_DB_create_index;
+const _: unsafe extern "C" fn(*mut TXT_DB) = crate::txt_db::TXT_DB_free;
+const _: unsafe extern "C" fn(
+    *mut TXT_DB,
+    core::ffi::c_int,
+    *mut OPENSSL_STRING,
+) -> *mut OPENSSL_STRING = crate::txt_db::TXT_DB_get_by_index;
+const _: unsafe extern "C" fn(*mut TXT_DB, *mut OPENSSL_STRING) -> core::ffi::c_int =
+    crate::txt_db::TXT_DB_insert;
+const _: unsafe extern "C" fn(*mut BIO, core::ffi::c_int) -> *mut TXT_DB =
+    crate::txt_db::TXT_DB_read;
+const _: unsafe extern "C" fn(*mut BIO, *mut TXT_DB) -> core::ffi::c_long =
+    crate::txt_db::TXT_DB_write;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT32_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::ints::UINT64_it;
 const _: unsafe extern "C" fn() -> *mut UI_METHOD = crate::ui::UI_OpenSSL;

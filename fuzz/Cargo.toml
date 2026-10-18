@@ -633,3 +633,9 @@ name = "cmp_msg"
 path = "fuzz_targets/cmp_msg.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "txt_db_read"
+path = "fuzz_targets/txt_db_read.rs"
+test = false
+doc = false

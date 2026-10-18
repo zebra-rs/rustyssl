@@ -292,6 +292,7 @@ OpenSSL never depends on them.
 | `CMS_RecipientInfo_encrypt`, `CMS_final`, and the other encrypting functions with a password recipient and a content key shorter than 3 octets (or none) | reads its check octets past the key | fails, as for a key too short to wrap | `cms::pwri::tests::a_key_too_short_for_its_check_octets_is_not_wrapped` |
 | `CMS_get0_content`, `CMS_dataInit`, `CMS_is_detached`, and the functions over them with an object that has no content type (`CMS_ContentInfo_new`'s) | read its NULL content as an ANY | fail with `CMS_R_UNSUPPORTED_CONTENT_TYPE` | `cms::base::tests::an_empty_object_has_no_content` |
 | The `PKCS7_*` building, reading, and attribute functions with a NULL object | dereference NULL | fail (0 or NULL; `PKCS7_type_is_other` answers 1), or do nothing | `pkcs7::tests::null_objects_are_refused` |
+| `OSSL_CMP_exec_certreq`, `OSSL_CMP_try_certreq`, and the server's certificate responses with implicit confirmation, when adding the `implicitConfirm` item to the header fails (out of memory) | frees the item's NULL value and then the item that holds it (a double free) | frees each once and fails | `tests/c/cmp.c` (the successful path; the failure needs an allocation failure) |
 
 ## Notes
 
@@ -342,3 +343,17 @@ OpenSSL never depends on them.
   returns, rustyssl splits the text exactly as it does, separator quirks included (the
   differential probe compares them). The probe's random text never contains a piece that
   long, because the reference would hang.
+
+- **ASYNC jobs run synchronously** (checked against OpenSSL 3.5.9). OpenSSL switches stacks for
+  a job (`makecontext`/`swapcontext`, its "fibres"), which can't be done in safe Rust. In
+  rustyssl, `ASYNC_start_job` runs the job to completion on the caller's stack and returns
+  `ASYNC_FINISH`, never `ASYNC_PAUSE`. `ASYNC_pause_job` inside a job returns 1 at once, as if
+  the job had been resumed straight away, and the wait context's change counts reset as after a
+  real resume. `ASYNC_is_capable()` and `ASYNC_set_mem_functions` return 0, as in OpenSSL builds
+  without an async backend (`ASYNC_NULL`), which can't start a job at all (`ASYNC_NO_JOBS`);
+  rustyssl runs it. Everything else matches: the thread's pool and its limits,
+  `ASYNC_get_current_job`, blocked pauses, the wait contexts, and the caller's default library
+  context being restored. Nothing in rustyssl pauses (it has no engines), so `SSL_MODE_ASYNC`
+  and other job users get correct results; only code that waits in a job for an outside event,
+  such as an asynchronous hardware provider, sees the difference: its pause returns without
+  waiting, so it polls. Test: `tests/c/async.c`.
