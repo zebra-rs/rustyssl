@@ -1218,6 +1218,14 @@ impl Connection {
             }
         };
         let ty = rec.content_type;
+        // Part of a post-handshake message (shorter than its header), then another record
+        // type: TLS 1.3 doesn't interleave them, here as in the handshake (`ssl3_read_bytes`).
+        if !self.hs_in.is_empty() && ty != handshake() && self.is_tls13() {
+            return Err(Error::alert(
+                abi::SSL_AD_UNEXPECTED_MESSAGE,
+                abi::SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA,
+            ));
+        }
         if ty != alert() && !rec.data.is_empty() {
             self.alert_count = 0;
         }
