@@ -10,7 +10,6 @@ pub mod event;
 pub mod statem;
 
 pub(crate) mod client;
-mod requests;
 #[expect(
     dead_code,
     reason = "the shared code, used as the role state machines arrive"
@@ -18,6 +17,7 @@ mod requests;
 pub(crate) mod common;
 #[cfg(test)]
 pub(crate) mod pair;
+mod requests;
 pub(crate) mod server;
 
 use std::collections::VecDeque;
@@ -268,7 +268,14 @@ impl Connection {
             st: Statem::default(),
             rr: RecordReader::new(server),
             rw: RecordWriter::new(record_version),
-            hs: Handshake::default(),
+            hs: Handshake {
+                // `SSL_new`'s `key_update`: none pending, on either side (fork M).
+                sh: common::Shared {
+                    key_update: abi::SSL_KEY_UPDATE_NONE,
+                    ..common::Shared::default()
+                },
+                ..Handshake::default()
+            },
             neg: Negotiated {
                 version,
                 ..Negotiated::default()
@@ -735,7 +742,9 @@ impl Connection {
                     }
                 }
             }
+            // Only while the version is undecided: a renegotiation has one (fork M).
             if self.cfg.method_version == 0
+                && self.first_handshake
                 && (self.cfg.server || ty != alert())
                 && self.before_version()
             {
@@ -855,9 +864,7 @@ impl Connection {
     fn read_application_data(&mut self, p: &dyn Provider) -> Result<Option<Event>> {
         // A handshake message that arrived with the record before (TLS 1.3 post-handshake).
         if self.hs_in.len() >= msgs::HEADER_LEN {
-            self.st.in_init = true;
-            self.st.state = MsgFlow::Reading;
-            self.st.read_state = statem::ReadState::Header;
+            common::enter_post_handshake(self);
             return Ok(None);
         }
         let Some(rec) = self.fetch_record(p)? else {
@@ -891,7 +898,8 @@ impl Connection {
         if ty == handshake() {
             self.hs_in.extend_from_slice(&rec.data);
             if self.hs_in.len() >= msgs::HEADER_LEN {
-                // Back into the handshake (renegotiation, or TLS 1.3 post-handshake messages).
+                // Back into the handshake (renegotiation, or TLS 1.3 post-handshake messages);
+                // the next step runs it.
                 common::enter_post_handshake(self);
             }
             return Ok(None);

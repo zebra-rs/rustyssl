@@ -52,6 +52,21 @@ impl Connection {
         Ok(())
     }
 
+    /// `ssl3_write_bytes`' check before a write with nothing pending: a KeyUpdate or a
+    /// NewSessionTicket waiting to be sent puts the connection back in init, so the write
+    /// sends it first. Whether it did.
+    pub fn post_handshake_write(&mut self) -> bool {
+        let tickets = match &self.hs.role {
+            super::RoleState::Server(s) => s.extra_tickets_expected > 0,
+            _ => false,
+        };
+        if self.hs.sh.key_update == abi::SSL_KEY_UPDATE_NONE && !tickets {
+            return false;
+        }
+        self.enter_init();
+        true
+    }
+
     /// `SSL_get_key_update_type`: the KeyUpdate waiting to be sent, or `SSL_KEY_UPDATE_NONE`.
     #[must_use]
     pub fn key_update_type(&self) -> i32 {

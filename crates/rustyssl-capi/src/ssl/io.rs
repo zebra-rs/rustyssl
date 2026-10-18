@@ -621,10 +621,17 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, function);
             break Stop::Failed;
         };
-        if conn.in_init() {
+        let was_init = conn.in_init();
+        if was_init {
             in_handshake = true;
         }
         let r = conn.step(&*prov, reading);
+        // A handshake message after the handshake took the connection back into init: the
+        // next step runs it, with no more input needed (fork M).
+        let entered = !was_init && conn.in_init();
+        if entered {
+            in_handshake = true;
+        }
         let out = conn.take_output();
         let have = x.state().drv.peer.from;
         let peers = peer_objects(&conn, have, server);
@@ -690,11 +697,30 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
             }
             Event::Output => {}
+            Event::NeedInput if entered => {}
             Event::NeedInput => {
+                // What was written goes out before waiting for the peer (`statem_flush`).
+                // SAFETY: as above.
+                match unsafe { flush(x) } {
+                    Flush::Done => {}
+                    Flush::Retry => break Stop::Retry,
+                    Flush::Error => break Stop::Syscall,
+                }
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
                     Input::Got => {}
                     Input::Retry => {
+                        // Application data that arrived during a renegotiation is returned
+                        // first (`ssl3_read_bytes` with `in_read_app_data`) (fork M).
+                        if reading
+                            && x.state()
+                                .drv
+                                .tls
+                                .as_ref()
+                                .is_some_and(|c| c.pending_app() > 0)
+                        {
+                            break Stop::AppData;
+                        }
                         x.state().rwstate = SSL_READING;
                         break Stop::Retry;
                     }

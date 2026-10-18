@@ -297,6 +297,7 @@ unsafe fn write_internal(
         return -1;
     }
     super::super::requests::renegotiate_check(x, false);
+    super::super::requests::post_handshake_write(x);
     if in_init(x) {
         // SAFETY: as above.
         match unsafe { drive(s, x, false, function) } {

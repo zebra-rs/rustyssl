@@ -992,33 +992,6 @@ pub extern "C" fn rustyssl_private_SSL_enable_ct(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_export_keying_material(
-    _: *mut SSL,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_export_keying_material")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_export_keying_material_early(
-    _: *mut SSL,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_export_keying_material_early")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_extension_supported(
     _: core::ffi::c_uint,
 ) -> core::ffi::c_int {
@@ -1232,11 +1205,6 @@ pub extern "C" fn rustyssl_private_SSL_get_handshake_rtt(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_key_update_type(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_key_update_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_negotiated_client_cert_type(
     _: *const SSL,
 ) -> core::ffi::c_int {
@@ -1409,14 +1377,6 @@ pub extern "C" fn rustyssl_private_SSL_is_stream_local(_: *mut SSL) -> core::ffi
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_key_update(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_key_update")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_listen(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_listen")
 }
@@ -1481,21 +1441,6 @@ pub extern "C" fn rustyssl_private_SSL_read_early_data(
     _: *mut usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_read_early_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate_abbreviated(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate_abbreviated")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate_pending(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate_pending")
 }
 
 #[unsafe(no_mangle)]
@@ -1750,13 +1695,6 @@ pub extern "C" fn rustyssl_private_SSL_trace(
     _: *mut core::ffi::c_void,
 ) {
     crate::stub::unimplemented("SSL_trace")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_verify_client_post_handshake(
-    _: *mut SSL,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_verify_client_post_handshake")
 }
 
 #[unsafe(no_mangle)]

@@ -6,7 +6,9 @@
 use core::ffi::{c_char, c_int, c_uchar};
 use core::ptr;
 
-use rustyssl_abi::{ERR_LIB_SSL, SSL, SSL_KEY_UPDATE_NONE, SSL_R_BAD_WRITE_RETRY, SSL_R_WRONG_SSL_VERSION};
+use rustyssl_abi::{
+    ERR_LIB_SSL, SSL, SSL_KEY_UPDATE_NONE, SSL_R_BAD_WRITE_RETRY, SSL_R_WRONG_SSL_VERSION,
+};
 use rustyssl_tls::error::Error as TlsError;
 
 use super::conn::{Ssl, ssl};
@@ -35,6 +37,23 @@ pub(crate) fn renegotiate_check(x: &Ssl, initok: bool) {
         st.in_init = true;
         st.num_renegotiations = st.num_renegotiations.saturating_add(1);
         st.total_renegotiations = st.total_renegotiations.saturating_add(1);
+    }
+}
+
+/// Before a write with nothing pending: a KeyUpdate or NewSessionTicket waiting to be sent puts
+/// the connection back in init (`ssl3_write_bytes`).
+pub(crate) fn post_handshake_write(x: &Ssl) {
+    let mut st = x.state();
+    if st.drv.wpend.is_some() {
+        return;
+    }
+    if st
+        .drv
+        .tls
+        .as_mut()
+        .is_some_and(|c| c.post_handshake_write())
+    {
+        st.in_init = true;
     }
 }
 
@@ -100,7 +119,9 @@ ffi_export! {
 /// `s` is NULL or a live connection.
 unsafe fn renegotiate(s: *mut SSL, new_session: bool, function: &str) -> c_int {
     // SAFETY: the caller's guarantee.
-    let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return 0;
+    };
     let mut st = x.state();
     let options = st.options;
     let r = match st.drv.tls.as_mut() {
@@ -173,8 +194,14 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let mut st = x.state();
+        // The verify mode as now set (`SSL_set_verify` after the handshake decides the
+        // request).
+        let mode = st.verify_mode;
         let r = match st.drv.tls.as_mut() {
-            Some(c) => c.request_post_handshake_auth(),
+            Some(c) => {
+                c.config_mut().verify_mode = mode;
+                c.request_post_handshake_auth()
+            }
             None => Err(TlsError::quiet(SSL_R_WRONG_SSL_VERSION)),
         };
         match r {
