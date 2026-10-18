@@ -240,6 +240,8 @@ pub fn choose_server(
         }
         let d = downgrade_for(c, best);
         c.neg.version = best;
+        // Shared fix (fork M): the version is decided (OpenSSL switches the method here).
+        c.version_pending = false;
         set_record_version(c, best);
         return Ok(d);
     }
@@ -257,6 +259,7 @@ pub fn choose_server(
         if method_error(c, v, mask).is_none() {
             let d = downgrade_for(c, v);
             c.neg.version = v;
+            c.version_pending = false;
             set_record_version(c, v);
             return Ok(d);
         }

@@ -36,6 +36,10 @@ pub(crate) struct CtxSnapshot {
     pub(crate) app_verify_arg: *mut c_void,
     pub(crate) status_cb: AnyCb,
     pub(crate) status_arg: *mut c_void,
+    pub(crate) npn_select_cb: rustyssl_abi::SSL_CTX_npn_select_cb_func,
+    pub(crate) npn_select_cb_arg: *mut c_void,
+    pub(crate) npn_advertised_cb: rustyssl_abi::SSL_CTX_npn_advertised_cb_func,
+    pub(crate) npn_advertised_cb_arg: *mut c_void,
     pub(crate) cert_store: *mut X509_STORE,
     pub(crate) extra_certs: *mut stack_st_X509,
     pub(crate) ca_names: *mut stack_st_X509_NAME,
@@ -74,6 +78,10 @@ pub(crate) fn ctx_snapshot(c: &Ctx) -> CtxSnapshot {
         app_verify_arg: cs.app_verify_arg,
         status_cb: cs.status_cb,
         status_arg: cs.status_arg,
+        npn_select_cb: cs.npn_select_cb,
+        npn_select_cb_arg: cs.npn_select_cb_arg,
+        npn_advertised_cb: cs.npn_advertised_cb,
+        npn_advertised_cb_arg: cs.npn_advertised_cb_arg,
         cert_store: cs.cert_store,
         extra_certs: cs.extra_certs,
         ca_names: cs.ca_names,
@@ -567,6 +575,9 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         verify_depth,
         post_handshake_auth: st.pha_enabled != 0,
         status_request: st.status_type == rustyssl_abi::TLSEXT_STATUSTYPE_ocsp,
+        request_scts: st.ct.callback.is_some(),
+        // SAFETY: the connection's context, which it keeps alive.
+        srtp_profiles: super::super::srtp::ids(&st, unsafe { super::super::conn::ctx_of(&st) }),
         send_ca_names: !ca_names.is_empty(),
         ca_names,
         cert_flags: st.cert.cert_flags,
@@ -590,6 +601,12 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             status: snap.status_cb.is_some(),
             record_padding: st.record_padding_cb.is_some(),
             allow_early_data: st.allow_early_data_cb.is_some(),
+            // The client's select callback, or the server's advertisement callback.
+            npn: if st.server {
+                snap.npn_advertised_cb.is_some()
+            } else {
+                snap.npn_select_cb.is_some()
+            },
             ..Callbacks::default()
         },
         ..Config::default()

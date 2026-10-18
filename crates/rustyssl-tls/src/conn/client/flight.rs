@@ -343,6 +343,8 @@ pub(super) fn process_key_exchange(
             .derive(&point)
             .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_ECPOINT))?;
         state(c)?.kx12 = Some(Kx12 { public, pms });
+        // Fork M: the server's point is the peer's temporary key (`SSL_get_peer_tmp_key`).
+        c.hs.sh.peer_tmp = Some((group, point.to_vec()));
         if auth & (SSL_aECDSA | SSL_aRSA) != 0 {
             signer = peer_pkey(c, p);
         }
@@ -551,8 +553,12 @@ pub(super) fn initial_server_flight(c: &mut Connection, p: &dyn Provider) -> Res
     Ok(true)
 }
 
-/// The CT validation's verdict on its answer: a failure counts with `SSL_VERIFY_PEER`.
-fn ct_result(c: &Connection, a: &Answer) -> Result<()> {
+/// The CT validation's verdict on its answer: a failure counts with `SSL_VERIFY_PEER`, and
+/// is recorded as the verification result either way (`ssl_validate_ct`, fork M).
+fn ct_result(c: &mut Connection, a: &Answer) -> Result<()> {
+    if matches!(a, Answer::Fail { .. } | Answer::Allowed(false)) {
+        c.neg.verify_result = i64::from(abi::X509_V_ERR_NO_VALID_SCTS);
+    }
     match a {
         Answer::Continue | Answer::Allowed(true) => Ok(()),
         Answer::Fail { alert, reason } => {

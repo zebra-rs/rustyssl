@@ -44,7 +44,7 @@ pub(crate) unsafe fn handle(
 ) -> Option<Answer> {
     match req {
         // SAFETY: the caller's guarantee.
-        Request::Verify { .. } => unsafe { verify(s, x, snap) },
+        Request::Verify { chain } => unsafe { verify(s, x, snap, &chain) },
         Request::Servername => {
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
                 (c.servername_cb, c.servername_arg)
@@ -101,6 +101,8 @@ pub(crate) unsafe fn handle(
             }
             Some(Answer::Alpn(None))
         }
+        // SAFETY: as above.
+        Request::Npn { protos } => Some(unsafe { super::super::npn::answer(s, x, snap, &protos) }),
         Request::ClientHello => {
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
                 (c.client_hello_cb, c.client_hello_cb_arg)
@@ -235,8 +237,8 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             Some(unsafe { super::super::sess_cache::on_remove_request(x, &id) })
         }
-        // CT validation isn't enabled yet (`SSL_enable_ct` comes with step 7.4).
-        Request::CtValidate => Some(Answer::Continue),
+        // SAFETY: as above.
+        Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {
@@ -279,7 +281,12 @@ unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
 ///
 /// # Safety
 /// `x` is a live connection.
-unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Answer> {
+unsafe fn verify(
+    s: *mut SSL,
+    x: &Ssl,
+    snap: Option<&CtxSnapshot>,
+    peer: &[Vec<u8>],
+) -> Option<Answer> {
     use crate::x509::ctx::{
         X509_STORE_CTX_free, X509_STORE_CTX_get_error, X509_STORE_CTX_get0_param,
         X509_STORE_CTX_get1_chain, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
@@ -293,7 +300,10 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
-    let (chain, store, verify_cb, server, verify_mode, level) = {
+    // The chain as the core received it (a server records it only after verification).
+    let owned = Chain::of(peer);
+    let chain = owned.0;
+    let (store, verify_cb, server, verify_mode, level) = {
         let mut st = x.state();
         st.rwstate = rustyssl_abi::SSL_NOTHING;
         let store = if st.cert.verify_store.is_null() {
@@ -302,7 +312,6 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
             st.cert.verify_store
         };
         (
-            st.drv.peer.chain,
             store,
             st.verify_callback,
             st.server,
@@ -409,4 +418,39 @@ unsafe fn verify(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) -> Option<Ans
         proceed: i > 0 || proceed_anyway,
         verified_chain: der,
     })
+}
+
+/// A certificate stack made from DER encodings, freed when dropped.
+struct Chain(*mut stack_st_X509);
+
+impl Chain {
+    /// The certificates that decode, in order (`d2i_X509` runs with no lock held).
+    fn of(ders: &[Vec<u8>]) -> Self {
+        // SAFETY: no preconditions.
+        let sk: *mut stack_st_X509 = unsafe { crate::stack::OPENSSL_sk_new_null() }.cast();
+        for der in ders {
+            let Ok(len) = core::ffi::c_long::try_from(der.len()) else {
+                continue;
+            };
+            let mut q = der.as_ptr();
+            // SAFETY: the certificate's octets.
+            let c = unsafe { crate::x509::cert::d2i_X509(ptr::null_mut(), &raw mut q, len) };
+            if c.is_null() {
+                continue;
+            }
+            // SAFETY: the new stack, which takes the reference.
+            if unsafe { crate::stack::OPENSSL_sk_push(sk.cast(), c.cast()) } == 0 {
+                // SAFETY: not taken.
+                unsafe { X509_free(c) };
+            }
+        }
+        Self(sk)
+    }
+}
+
+impl Drop for Chain {
+    fn drop(&mut self) {
+        // SAFETY: our stack and its references, freed with no lock held.
+        unsafe { OPENSSL_sk_pop_free(self.0.cast(), Some(x509_free)) };
+    }
 }

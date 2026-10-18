@@ -449,6 +449,17 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
                 x.state().rwstate = SSL_WRITING;
                 return Flush::Retry;
             }
+            // `tls_retry_write_records`: a failed write that won't be retried is a system
+            // error (a zero return isn't, as it may come from a custom BIO).
+            if r < 0 {
+                let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+                err::raise_with_text(
+                    rustyssl_abi::ERR_LIB_SYS,
+                    errno,
+                    "tls_retry_write_records",
+                    "tls_retry_write_records failure",
+                );
+            }
             return Flush::Error;
         }
         let done = usize::try_from(r).unwrap_or(0).min(chunk.len());
@@ -596,6 +607,19 @@ pub(crate) unsafe fn drive(s: *mut SSL, x: &Ssl, reading: bool, function: &str) 
     stop
 }
 
+/// Whether the info, message, and key log callbacks are installed now: the application may
+/// set them at any time, and the core reports to them as OpenSSL calls them when set.
+pub(crate) fn notify_flags(
+    st: &SslState,
+    snap: Option<&config::CtxSnapshot>,
+) -> (bool, bool, bool) {
+    (
+        st.info_callback.is_some() || snap.is_some_and(|c| c.info_callback.is_some()),
+        st.msg_callback.is_some(),
+        snap.is_some_and(|c| c.keylog_callback.is_some()),
+    )
+}
+
 /// The step loop of [`drive`].
 ///
 /// # Safety
@@ -609,6 +633,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         SSL_CB_CONNECT_EXIT
     };
     let mut in_handshake = false;
+    let mut cleared = false;
     let stop = loop {
         // SAFETY: the caller's guarantee.
         match unsafe { flush(x) } {
@@ -619,14 +644,28 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let taken = {
             let mut st = x.state();
             let prov = st.drv.provider.clone();
-            st.drv.tls.take().zip(prov)
+            let notify = notify_flags(&st, snap.as_ref());
+            st.drv.tls.take().zip(prov).map(|(mut c, p)| {
+                c.config_mut().callbacks.info = notify.0;
+                c.config_mut().callbacks.msg = notify.1;
+                c.config_mut().callbacks.keylog = notify.2;
+                (c, p)
+            })
         };
         let Some((mut conn, prov)) = taken else {
             err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, function);
             break Stop::Failed;
         };
-        if conn.in_init() {
+        let was_init = conn.in_init();
+        if was_init {
             in_handshake = true;
+            if !cleared {
+                // `state_machine` starts with `ERR_clear_error` and `clear_sys_error` (fork M).
+                cleared = true;
+                // SAFETY: no preconditions.
+                unsafe { crate::err::ERR_clear_error() };
+                crate::errno::set(0);
+            }
         }
         let (was_before, was_in_init) = (conn.before(), conn.in_init());
         let r = conn.step(&*prov, reading);
@@ -638,6 +677,12 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             (!was_in_init && conn.in_init() && !conn.is_tls13()).then_some(false)
         };
         let tls13_server_done = server && was_in_init && !conn.in_init() && conn.is_tls13();
+        // A handshake message after the handshake took the connection back into init: the
+        // next step runs it, with no more input needed (fork M).
+        let entered = !was_init && conn.in_init();
+        if entered {
+            in_handshake = true;
+        }
         let out = conn.take_output();
         let have = x.state().drv.peer.from;
         let peers = peer_objects(&conn, have, server);
@@ -650,8 +695,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 super::sess_cache::on_start(&mut st, first);
             }
             peers.map(|mut p| {
-                // The verified chain stays until verification replaces it.
+                // The verified chain and the verdict stay until verification replaces them (a
+                // server records the chain only after verifying it).
                 core::mem::swap(&mut p.verified, &mut st.drv.peer.verified);
+                p.accepted = st.drv.peer.accepted;
                 core::mem::replace(&mut st.drv.peer, p)
             })
         };
@@ -717,11 +764,30 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
             }
             Event::Output => {}
+            Event::NeedInput if entered => {}
             Event::NeedInput => {
+                // What was written goes out before waiting for the peer (`statem_flush`).
+                // SAFETY: as above.
+                match unsafe { flush(x) } {
+                    Flush::Done => {}
+                    Flush::Retry => break Stop::Retry,
+                    Flush::Error => break Stop::Syscall,
+                }
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
                     Input::Got => {}
                     Input::Retry => {
+                        // Application data that arrived during a renegotiation is returned
+                        // first (`ssl3_read_bytes` with `in_read_app_data`) (fork M).
+                        if reading
+                            && x.state()
+                                .drv
+                                .tls
+                                .as_ref()
+                                .is_some_and(|c| c.pending_app() > 0)
+                        {
+                            break Stop::AppData;
+                        }
                         x.state().rwstate = SSL_READING;
                         break Stop::Retry;
                     }
@@ -737,8 +803,32 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                             }
                             break Stop::Closed;
                         }
+                        // `ossl_tls_handle_rlayer_return`: an unexpected EOF is fatal, with a
+                        // decode_error alert (which the closed transport usually refuses), and a
+                        // read reports it by returning 0.
                         err::raise(ERR_LIB_SSL, SSL_R_UNEXPECTED_EOF_WHILE_READING, function);
-                        x.state().drv.failed = true;
+                        {
+                            let mut st = x.state();
+                            st.drv.failed = true;
+                            let prov = st.drv.provider.clone();
+                            if let (Some(c), Some(p)) = (st.drv.tls.as_mut(), prov) {
+                                c.fail(
+                                    &*p,
+                                    TlsError::alert(
+                                        rustyssl_abi::SSL_AD_DECODE_ERROR,
+                                        SSL_R_UNEXPECTED_EOF_WHILE_READING,
+                                    ),
+                                );
+                                let out = c.take_output();
+                                st.drv.out.extend_from_slice(&out);
+                            }
+                        }
+                        // SAFETY: the caller's guarantee.
+                        let _ = unsafe { flush(x) };
+                        if reading && !in_handshake {
+                            x.state().rwstate = SSL_NOTHING;
+                            break Stop::Closed;
+                        }
                         break Stop::Failed;
                     }
                     Input::Error => break Stop::Syscall,

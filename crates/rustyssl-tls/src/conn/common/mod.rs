@@ -328,9 +328,18 @@ pub(crate) fn take_mac(c: &mut Connection, p: &dyn Provider) -> Result<()> {
 
 /// Goes back into the state machine to read a handshake message after the handshake
 /// (renegotiation, or TLS 1.3's NewSessionTicket, KeyUpdate, and CertificateRequest).
+///
+/// Before TLS 1.3, as `ossl_statem_set_in_init` before `handshake_func`: the state machine
+/// starts again from `MSG_FLOW_FINISHED` (the start notification, a write transition with
+/// nothing to write, then the read), so a renegotiation is set up and traced as OpenSSL's is
+/// (fork M). TLS 1.3's post-handshake messages go straight to the read.
 pub(crate) fn enter_post_handshake(c: &mut Connection) {
     c.st.in_init = true;
-    c.st.state = MsgFlow::Reading;
+    if c.is_tls13() {
+        c.st.state = MsgFlow::Reading;
+    } else if c.st.state != MsgFlow::Uninited {
+        c.st.state = MsgFlow::Finished;
+    }
     c.st.read_state = ReadState::Header;
     c.st.loop_reported = false;
     c.st.header_done = false;

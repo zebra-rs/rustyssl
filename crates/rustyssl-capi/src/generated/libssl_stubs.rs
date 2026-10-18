@@ -12,39 +12,6 @@ use libc::{off_t, timeval};
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_f_ssl() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_f_ssl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_buffer_ssl_connect(_: *mut SSL_CTX) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_buffer_ssl_connect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_ssl(_: *mut SSL_CTX, _: core::ffi::c_int) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_ssl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_new_ssl_connect(_: *mut SSL_CTX) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_ssl_connect")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_ssl_copy_session_id(
-    _: *mut BIO,
-    _: *mut BIO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("BIO_ssl_copy_session_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_BIO_ssl_shutdown(_: *mut BIO) {
-    crate::stub::unimplemented("BIO_ssl_shutdown")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_DTLS_get_data_mtu(_: *const SSL) -> usize {
     crate::stub::unimplemented("DTLS_get_data_mtu")
 }
@@ -90,45 +57,6 @@ pub extern "C" fn rustyssl_private_OSSL_default_ciphersuites() -> *const core::f
 #[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SRP_Calc_A_param(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SRP_Calc_A_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_add_compression_method(
-    _: core::ffi::c_int,
-    _: *mut COMP_METHOD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_COMP_add_compression_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_get0_name(
-    _: *const SSL_COMP,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_COMP_get0_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_get_compression_methods() -> *mut stack_st_SSL_COMP {
-    crate::stub::unimplemented("SSL_COMP_get_compression_methods")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_get_id(_: *const SSL_COMP) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_COMP_get_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_get_name(
-    _: *const COMP_METHOD,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_COMP_get_name")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_COMP_set0_compression_methods(
-    _: *mut stack_st_SSL_COMP,
-) -> *mut stack_st_SSL_COMP {
-    crate::stub::unimplemented("SSL_COMP_set0_compression_methods")
 }
 
 #[unsafe(no_mangle)]
@@ -190,26 +118,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_compress_certs(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_ct_is_enabled(_: *const SSL_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_enable_ct(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_enable_ct")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_get0_ctlog_store(
-    _: *const SSL_CTX,
-) -> *const CTLOG_STORE {
-    crate::stub::unimplemented("SSL_CTX_get0_ctlog_store")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_get1_compressed_cert(
     _: *mut SSL_CTX,
     _: core::ffi::c_int,
@@ -233,11 +141,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_has_client_custom_ext(
     _: core::ffi::c_uint,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_has_client_custom_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set0_ctlog_store(_: *mut SSL_CTX, _: *mut CTLOG_STORE) {
-    crate::stub::unimplemented("SSL_CTX_set0_ctlog_store")
 }
 
 #[unsafe(no_mangle)]
@@ -269,30 +172,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set_client_cert_engine(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_ct_validation_callback(
-    _: *mut SSL_CTX,
-    _: ssl_ct_validation_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_ct_validation_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_ctlog_list_file(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_ctlog_list_file")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_default_ctlog_list_file(
-    _: *mut SSL_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_default_ctlog_list_file")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_set_domain_flags(
     _: *mut SSL_CTX,
     _: u64,
@@ -307,14 +186,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set_new_pending_conn_cb(
     _: *mut core::ffi::c_void,
 ) {
     crate::stub::unimplemented("SSL_CTX_set_new_pending_conn_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_tlsext_use_srtp(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_tlsext_use_srtp")
 }
 
 #[unsafe(no_mangle)]
@@ -355,16 +226,6 @@ pub extern "C" fn rustyssl_private_SSL_SRP_CTX_init(_: *mut SSL) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_accept_connection(_: *mut SSL, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_accept_connection")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_accept_stream(_: *mut SSL, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_accept_stream")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_add_expected_rpk(
     _: *mut SSL,
     _: *mut EVP_PKEY,
@@ -393,78 +254,6 @@ pub extern "C" fn rustyssl_private_SSL_check_chain(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_ciphers(
-    _: *mut SSL,
-    _: *mut *const core::ffi::c_uchar,
-) -> usize {
-    crate::stub::unimplemented("SSL_client_hello_get0_ciphers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_compression_methods(
-    _: *mut SSL,
-    _: *mut *const core::ffi::c_uchar,
-) -> usize {
-    crate::stub::unimplemented("SSL_client_hello_get0_compression_methods")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_ext(
-    _: *mut SSL,
-    _: core::ffi::c_uint,
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_client_hello_get0_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_legacy_version(
-    _: *mut SSL,
-) -> core::ffi::c_uint {
-    crate::stub::unimplemented("SSL_client_hello_get0_legacy_version")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_random(
-    _: *mut SSL,
-    _: *mut *const core::ffi::c_uchar,
-) -> usize {
-    crate::stub::unimplemented("SSL_client_hello_get0_random")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get0_session_id(
-    _: *mut SSL,
-    _: *mut *const core::ffi::c_uchar,
-) -> usize {
-    crate::stub::unimplemented("SSL_client_hello_get0_session_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get1_extensions_present(
-    _: *mut SSL,
-    _: *mut *mut core::ffi::c_int,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_client_hello_get1_extensions_present")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_get_extension_order(
-    _: *mut SSL,
-    _: *mut u16,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_client_hello_get_extension_order")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_client_hello_isv2(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_client_hello_isv2")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_compress_certs(
     _: *mut SSL,
     _: core::ffi::c_int,
@@ -473,48 +262,8 @@ pub extern "C" fn rustyssl_private_SSL_compress_certs(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_ct_is_enabled(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_dup(_: *mut SSL) -> *mut SSL {
     crate::stub::unimplemented("SSL_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_enable_ct(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_enable_ct")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_export_keying_material(
-    _: *mut SSL,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_export_keying_material")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_export_keying_material_early(
-    _: *mut SSL,
-    _: *mut core::ffi::c_uchar,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: usize,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_export_keying_material_early")
 }
 
 #[unsafe(no_mangle)]
@@ -530,37 +279,8 @@ pub extern "C" fn rustyssl_private_SSL_free_buffers(_: *mut SSL) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_connection(_: *mut SSL) -> *mut SSL {
-    crate::stub::unimplemented("SSL_get0_connection")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_domain(_: *mut SSL) -> *mut SSL {
-    crate::stub::unimplemented("SSL_get0_domain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_listener(_: *mut SSL) -> *mut SSL {
-    crate::stub::unimplemented("SSL_get0_listener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_next_proto_negotiated(
-    _: *const SSL,
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-) {
-    crate::stub::unimplemented("SSL_get0_next_proto_negotiated")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY {
     crate::stub::unimplemented("SSL_get0_peer_rpk")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_peer_scts(_: *mut SSL) -> *const stack_st_SCT {
-    crate::stub::unimplemented("SSL_get0_peer_scts")
 }
 
 #[unsafe(no_mangle)]
@@ -574,70 +294,6 @@ pub extern "C" fn rustyssl_private_SSL_get1_compressed_cert(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_accept_connection_queue_len(_: *mut SSL) -> usize {
-    crate::stub::unimplemented("SSL_get_accept_connection_queue_len")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_accept_stream_queue_len(_: *mut SSL) -> usize {
-    crate::stub::unimplemented("SSL_get_accept_stream_queue_len")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_all_async_fds(
-    _: *mut SSL,
-    _: *mut core::ffi::c_int,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_all_async_fds")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_async_status(
-    _: *mut SSL,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_async_status")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_blocking_mode(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_blocking_mode")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_changed_async_fds(
-    _: *mut SSL,
-    _: *mut core::ffi::c_int,
-    _: *mut usize,
-    _: *mut core::ffi::c_int,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_changed_async_fds")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_conn_close_info(
-    _: *mut SSL,
-    _: *mut SSL_CONN_CLOSE_INFO,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_conn_close_info")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_current_compression(
-    _: *const SSL,
-) -> *const COMP_METHOD {
-    crate::stub::unimplemented("SSL_get_current_compression")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_current_expansion(_: *const SSL) -> *const COMP_METHOD {
-    crate::stub::unimplemented("SSL_get_current_expansion")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_domain_flags(
     _: *const SSL,
     _: *mut u64,
@@ -646,25 +302,11 @@ pub extern "C" fn rustyssl_private_SSL_get_domain_flags(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_event_timeout(
-    _: *mut SSL,
-    _: *mut timeval,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_event_timeout")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_handshake_rtt(
     _: *const SSL,
     _: *mut u64,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_get_handshake_rtt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_key_update_type(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_key_update_type")
 }
 
 #[unsafe(no_mangle)]
@@ -679,21 +321,6 @@ pub extern "C" fn rustyssl_private_SSL_get_negotiated_server_cert_type(
     _: *const SSL,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_get_negotiated_server_cert_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_rpoll_descriptor(
-    _: *mut SSL,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_rpoll_descriptor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_selected_srtp_profile(
-    _: *mut SSL,
-) -> *mut SRTP_PROTECTION_PROFILE {
-    crate::stub::unimplemented("SSL_get_selected_srtp_profile")
 }
 
 #[unsafe(no_mangle)]
@@ -717,72 +344,6 @@ pub extern "C" fn rustyssl_private_SSL_get_srp_username(_: *mut SSL) -> *mut cor
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srtp_profiles(
-    _: *mut SSL,
-) -> *mut stack_st_SRTP_PROTECTION_PROFILE {
-    crate::stub::unimplemented("SSL_get_srtp_profiles")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_id(_: *mut SSL) -> u64 {
-    crate::stub::unimplemented("SSL_get_stream_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_read_error_code(
-    _: *mut SSL,
-    _: *mut u64,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_stream_read_error_code")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_read_state(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_stream_read_state")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_type(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_stream_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_write_error_code(
-    _: *mut SSL,
-    _: *mut u64,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_stream_write_error_code")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_stream_write_state(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_stream_write_state")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_value_uint(
-    _: *mut SSL,
-    _: u32,
-    _: u32,
-    _: *mut u64,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_value_uint")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_wpoll_descriptor(
-    _: *mut SSL,
-    _: *mut BIO_POLL_DESCRIPTOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get_wpoll_descriptor")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_handle_events(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_handle_events")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
     _: *mut SSL,
     _: *const core::ffi::c_uchar,
@@ -794,76 +355,8 @@ pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_is_connection(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_is_connection")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_is_domain(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_is_domain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_is_listener(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_is_listener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_is_stream_local(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_is_stream_local")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_key_update(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_key_update")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_listen(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_listen")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_net_read_desired(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_net_read_desired")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_net_write_desired(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_net_write_desired")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_domain(_: *mut SSL_CTX, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_new_domain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_from_listener(_: *mut SSL, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_new_from_listener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_listener(_: *mut SSL_CTX, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_new_listener")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_listener_from(_: *mut SSL, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_new_listener_from")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_new_session_ticket(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_new_session_ticket")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_new_stream(_: *mut SSL, _: u64) -> *mut SSL {
-    crate::stub::unimplemented("SSL_new_stream")
 }
 
 #[unsafe(no_mangle)]
@@ -886,21 +379,6 @@ pub extern "C" fn rustyssl_private_SSL_read_early_data(
     _: *mut usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_read_early_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate_abbreviated(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate_abbreviated")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_renegotiate_pending(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_renegotiate_pending")
 }
 
 #[unsafe(no_mangle)]
@@ -944,48 +422,6 @@ pub extern "C" fn rustyssl_private_SSL_set1_compressed_cert(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_set1_compressed_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set1_initial_peer_addr(
-    _: *mut SSL,
-    _: *const BIO_ADDR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set1_initial_peer_addr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_blocking_mode(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_blocking_mode")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_ct_validation_callback(
-    _: *mut SSL,
-    _: ssl_ct_validation_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_ct_validation_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_default_stream_mode(
-    _: *mut SSL,
-    _: u32,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_default_stream_mode")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_incoming_stream_policy(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-    _: u64,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_incoming_stream_policy")
 }
 
 #[unsafe(no_mangle)]
@@ -1064,34 +500,6 @@ pub extern "C" fn rustyssl_private_SSL_set_srp_server_param_pw(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_tlsext_use_srtp(
-    _: *mut SSL,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_tlsext_use_srtp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_value_uint(
-    _: *mut SSL,
-    _: u32,
-    _: u32,
-    _: u64,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_value_uint")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_shutdown_ex(
-    _: *mut SSL,
-    _: u64,
-    _: *const SSL_SHUTDOWN_EX_ARGS,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_shutdown_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_srp_server_param_with_username(
     _: *mut SSL,
     _: *mut core::ffi::c_int,
@@ -1105,20 +513,6 @@ pub extern "C" fn rustyssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_in
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_stream_conclude(_: *mut SSL, _: u64) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_stream_conclude")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_stream_reset(
-    _: *mut SSL,
-    _: *const SSL_STREAM_RESET_ARGS,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_stream_reset")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_trace(
     _: core::ffi::c_int,
     _: core::ffi::c_int,
@@ -1129,18 +523,6 @@ pub extern "C" fn rustyssl_private_SSL_trace(
     _: *mut core::ffi::c_void,
 ) {
     crate::stub::unimplemented("SSL_trace")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_verify_client_post_handshake(
-    _: *mut SSL,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_verify_client_post_handshake")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_waiting_for_async(_: *mut SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_waiting_for_async")
 }
 
 #[unsafe(no_mangle)]

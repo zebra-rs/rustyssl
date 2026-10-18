@@ -65,6 +65,7 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_CONNECTION_TYPE_NOT_SET, F);
             return -1;
         }
+        super::super::requests::renegotiate_check(x, false);
         if !in_init(x) {
             // The handshake is done; its last flight may still be waiting for the BIO.
             // SAFETY: the live connection.
@@ -123,7 +124,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` has room for `num` octets.
-unsafe fn read_internal(
+pub(crate) unsafe fn read_internal(
     s: *mut SSL,
     buf: *mut c_void,
     num: usize,
@@ -151,6 +152,7 @@ unsafe fn read_internal(
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
+    super::super::requests::renegotiate_check(x, false);
     loop {
         {
             let mut st = x.state();
@@ -265,7 +267,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `s` is NULL or a live connection; `buf` holds `num` octets.
-unsafe fn write_internal(
+pub(crate) unsafe fn write_internal(
     s: *mut SSL,
     buf: *const c_void,
     num: usize,
@@ -294,6 +296,8 @@ unsafe fn write_internal(
     if !unsafe { ensure_core(s, x) } {
         return -1;
     }
+    super::super::requests::renegotiate_check(x, false);
+    super::super::requests::post_handshake_write(x);
     if in_init(x) {
         // SAFETY: as above.
         match unsafe { drive(s, x, false, function) } {
@@ -307,7 +311,20 @@ unsafe fn write_internal(
     };
     if let Some((tot, addr)) = pending {
         let moving = mode & SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER != 0;
-        if tot > num || (!moving && addr != buf.addr()) {
+        if tot > num {
+            // `ssl3_write_bytes`: a retry with less than was pending is fatal
+            // (`SSLfatal(SSL_AD_INTERNAL_ERROR, SSL_R_BAD_LENGTH)`; its alert waits behind the
+            // pending write, so none goes out here).
+            err::raise(ERR_LIB_SSL, SSL_R_BAD_LENGTH, function);
+            let mut st = x.state();
+            st.drv.failed = true;
+            let prov = st.drv.provider.clone();
+            if let (Some(c), Some(p)) = (st.drv.tls.as_mut(), prov) {
+                c.fail(&*p, rustyssl_tls::error::Error::quiet(SSL_R_BAD_LENGTH));
+            }
+            return -1;
+        }
+        if !moving && addr != buf.addr() {
             err::raise(ERR_LIB_SSL, SSL_R_BAD_WRITE_RETRY, function);
             return -1;
         }
@@ -521,12 +538,18 @@ ffi_export! {
         }
         let sent = x.state().shutdown & SSL_SENT_SHUTDOWN != 0;
         if !sent {
+            let snap = super::config::snapshot(x);
             let r = {
                 let mut st = x.state();
                 let prov = st.drv.provider.clone();
+                let notify = super::notify_flags(&st, snap.as_ref());
                 st.shutdown |= SSL_SENT_SHUTDOWN;
                 match (st.drv.tls.as_mut(), prov) {
-                    (Some(c), Some(p)) => c.send_close_notify(&*p),
+                    (Some(c), Some(p)) => {
+                        c.config_mut().callbacks.info = notify.0;
+                        c.config_mut().callbacks.msg = notify.1;
+                        c.send_close_notify(&*p)
+                    }
                     _ => Ok(()),
                 }
             };
