@@ -563,6 +563,9 @@ ffi_export! {
             return ptr::null_mut();
         };
         state.ciphers = lists;
+        // `ssl_load_sigalgs`: a slot per provider key type.
+        // SAFETY: as above.
+        state.cert.set_provider_types(unsafe { super::cert::provider_types(libctx, propq_ptr) });
         let c = SSL_CTX::new_handle(Ctx {
             references: AtomicI32::new(1),
             libctx,

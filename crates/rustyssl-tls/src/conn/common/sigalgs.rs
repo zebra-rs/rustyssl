@@ -749,15 +749,20 @@ impl Cache {
                     PKEY_NUM.saturating_add(provider_key_types.len().saturating_sub(1))
                 }
             };
+            // `ssl_get_md_idx` of the hash: a built-in algorithm's index for the same hash.
+            let hash_idx = BUILTIN
+                .iter()
+                .find(|b| info.hash_nid != abi::NID_undef && b.hash == info.hash_nid)
+                .map_or(-1, |b| b.hash_idx);
             table.push(SigAlg {
                 name: std::borrow::Cow::Owned(info.name.clone()),
                 name12: None,
                 sigalg: info.id,
-                hash: abi::NID_undef,
-                hash_idx: -1,
+                hash: info.hash_nid,
+                hash_idx,
                 sig: Sig::Other(info.key_type),
                 sig_idx: slot,
-                sigandhash: abi::NID_undef,
+                sigandhash: info.sig_nid,
                 curve: abi::NID_undef,
                 mintls: T13,
                 maxtls: T13,
@@ -986,6 +991,8 @@ pub fn save(c: &mut Connection, body: &[u8], cert: bool) -> bool {
     if cert {
         c.hs.sh.peer_cert_sigalgs = Some(list);
     } else {
+        // `SSL_get_sigalgs` reads it (`s3.tmp.peer_sigalgs`).
+        c.neg.peer_sigalgs.clone_from(&list);
         c.hs.sh.peer_sigalgs = Some(list);
     }
     true

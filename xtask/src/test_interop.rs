@@ -9,7 +9,7 @@
 //! peer certificate, signature, temporary key).
 //!
 //! A case line is `name | server arguments | client arguments`, with `{rsa}`, `{ec}`,
-//! `{p521}`, `{ed25519}` (a server's `-cert`/`-key` pair), `{client}` (a client's), `{ca}` (the
+//! `{p521}`, `{ed25519}`, `{mldsa65}` (a server's `-cert`/`-key` pair), `{client}` (a client's), `{ca}` (the
 //! root to verify with), `{srpvfile}` (an SRP verifier file with the user `user`, password
 //! `password`), and `{dir}` substituted. Lines starting with `#` are comments. Client
 //! arguments starting with `+` direct the harness:
@@ -166,8 +166,8 @@ impl Tool<'_> {
     }
 }
 
-/// A test PKI: a root, four servers (RSA, ECDSA P-256 and P-521, Ed25519), and an RSA client
-/// it issued.
+/// A test PKI: a root, five servers (RSA, ECDSA P-256 and P-521, Ed25519, ML-DSA-65), and an
+/// RSA client it issued.
 fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
     let d = |f: &str| dir.join(f).display().to_string();
     t.setup(&[
@@ -194,6 +194,7 @@ fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
         ("ec", "P-256"),
         ("p521", "P-521"),
         ("ed25519", "ed25519"),
+        ("mldsa65", "ML-DSA-65"),
         ("client", "rsa:2048"),
     ] {
         let mut req = vec![
@@ -265,7 +266,7 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     for a in args.split_whitespace() {
         match a {
-            "{rsa}" | "{ec}" | "{p521}" | "{ed25519}" | "{client}" => {
+            "{rsa}" | "{ec}" | "{p521}" | "{ed25519}" | "{mldsa65}" | "{client}" => {
                 let n = a.trim_matches(|c| c == '{' || c == '}');
                 out.extend([
                     "-cert".to_owned(),

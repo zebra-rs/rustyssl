@@ -114,8 +114,9 @@ ffi_export! {
         if x.is_null() || pk.is_null() {
             return 0;
         }
+        let types = c.state().cert.provider_types.clone();
         // SAFETY: the caller's key.
-        let Some(slot) = (unsafe { super::cert::lookup_by_pkey(pk) }) else { return 0 };
+        let Some(slot) = (unsafe { super::cert::lookup_by_pkey(pk, &types) }) else { return 0 };
         // SAFETY: the caller's connection.
         if !unsafe { super::io::ensure_core(s, c) } {
             return 0;
