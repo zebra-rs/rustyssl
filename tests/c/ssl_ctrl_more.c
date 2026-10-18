@@ -5,7 +5,8 @@
  * SSL_CTX_build_cert_chain(3)): the certificate types a TLS 1.2 CertificateRequest carries
  * (OpenSSL's default and a configured list), none in TLS 1.3, each end's ephemeral keys after
  * TLS 1.3 and 1.2 handshakes, the peer's supported groups, DH parameters for DHE, and chains
- * built from the store (with each flag, and the errors).
+ * built from the store (with each flag, and the errors), and reads ending at a ticket without
+ * SSL_MODE_AUTO_RETRY.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
@@ -379,6 +380,40 @@ static void chains(void)
     }
 }
 
+/*
+ * Without SSL_MODE_AUTO_RETRY, a read that handles a handshake message after the handshake (a
+ * TLS 1.3 ticket) returns -1 with SSL_ERROR_WANT_READ once no more of the record layer's input
+ * is buffered, as blocking callers that select (s_client) rely on, before the data behind it.
+ */
+static void auto_retry(void)
+{
+    SSL_CTX *sctx = server_ctx(), *cctx = client_ctx();
+    SSL *c, *s;
+    char buf[16];
+    int i, r = 0;
+
+    printf("# reads without SSL_MODE_AUTO_RETRY\n");
+    SSL_CTX_set_max_proto_version(cctx, TLS1_3_VERSION);
+    SSL_CTX_clear_mode(cctx, SSL_MODE_AUTO_RETRY);
+    c = SSL_new(cctx);
+    s = SSL_new(sctx);
+    check(run(c, s) == 0, "the handshake");
+    check(SSL_write(s, "hi", 2) == 2, "the server's write");
+    for (i = 0; i < 6 && r <= 0; i++) {
+        r = SSL_read(c, buf, sizeof(buf));
+        printf("  read: %d", r);
+        if (r <= 0)
+            printf(" error %d", SSL_get_error(c, r));
+        printf("\n");
+    }
+    check(r == 2 && memcmp(buf, "hi", 2) == 0, "the data after the tickets");
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     static const unsigned char types[] = { TLS_CT_ECDSA_SIGN, TLS_CT_RSA_SIGN };
@@ -392,6 +427,7 @@ int main(void)
     types_errors();
     dh();
     chains();
+    auto_retry();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

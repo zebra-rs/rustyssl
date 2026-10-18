@@ -27,11 +27,11 @@ use std::ffi::CString;
 use std::sync::Arc;
 
 use rustyssl_abi::{
-    BIO, BIO_CTRL_EOF, BIO_FLAGS_SHOULD_RETRY, ERR_LIB_SSL, ERR_R_INTERNAL_ERROR,
-    ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY, SSL_AD_REASON_OFFSET,
-    SSL_CB_ACCEPT_EXIT, SSL_CB_CONNECT_EXIT, SSL_NOTHING, SSL_OP_IGNORE_UNEXPECTED_EOF,
-    SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING, SSL_RECEIVED_SHUTDOWN, SSL_WRITING,
-    stack_st_X509,
+    BIO, BIO_CTRL_EOF, BIO_FLAGS_READ, BIO_FLAGS_RWS, BIO_FLAGS_SHOULD_RETRY, ERR_LIB_SSL,
+    ERR_R_INTERNAL_ERROR, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, SSL, SSL_AD_CLOSE_NOTIFY,
+    SSL_AD_REASON_OFFSET, SSL_CB_ACCEPT_EXIT, SSL_CB_CONNECT_EXIT, SSL_MODE_AUTO_RETRY,
+    SSL_NOTHING, SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING,
+    SSL_RECEIVED_SHUTDOWN, SSL_WRITING, stack_st_X509,
 };
 use rustyssl_tls::conn::common::SecurityHook;
 use rustyssl_tls::conn::common::security::SecOther;
@@ -639,6 +639,11 @@ pub(crate) fn notify_flags(
     )
 }
 
+/// Whether the connection has `SSL_MODE_AUTO_RETRY` (the default).
+fn auto_retry(x: &Ssl) -> bool {
+    x.state().mode & SSL_MODE_AUTO_RETRY != 0
+}
+
 /// The step loop of [`drive`].
 ///
 /// # Safety
@@ -652,6 +657,8 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         SSL_CB_CONNECT_EXIT
     };
     let mut in_handshake = false;
+    // Whether a handshake message arrived after the handshake (see `Event::HandshakeDone`).
+    let mut post_handshake = false;
     let mut cleared = false;
     let stop = loop {
         // SAFETY: the caller's guarantee.
@@ -701,6 +708,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let entered = !was_init && conn.in_init();
         if entered {
             in_handshake = true;
+            post_handshake = true;
         }
         let out = conn.take_output();
         let have = x.state().drv.peer.from;
@@ -867,6 +875,44 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 }
                 if !reading {
                     break Stop::Done;
+                }
+                // `ssl3_read_bytes`: a handshake message after the handshake (a ticket, a
+                // KeyUpdate) ends a read without SSL_MODE_AUTO_RETRY when no more input is
+                // buffered, so a blocking caller can go back to select (s_client does).
+                if post_handshake && !auto_retry(x) {
+                    let rbio = {
+                        let mut st = x.state();
+                        let idle = st
+                            .drv
+                            .tls
+                            .as_ref()
+                            .is_some_and(|c| c.buffered_input() == 0 && c.pending_app() == 0);
+                        if !idle || st.drv.rec_left > 0 || !st.drv.rec_header.is_empty() {
+                            None
+                        } else {
+                            st.rwstate = SSL_READING;
+                            Some(st.rbio)
+                        }
+                    };
+                    if let Some(b) = rbio {
+                        if !b.is_null() {
+                            // SAFETY: the connection's BIO; no lock is held.
+                            unsafe {
+                                crate::bio::BIO_clear_flags(
+                                    b,
+                                    BIO_FLAGS_RWS | BIO_FLAGS_SHOULD_RETRY,
+                                )
+                            };
+                            // SAFETY: as above.
+                            unsafe {
+                                crate::bio::BIO_set_flags(
+                                    b,
+                                    BIO_FLAGS_READ | BIO_FLAGS_SHOULD_RETRY,
+                                )
+                            };
+                        }
+                        break Stop::Retry;
+                    }
                 }
             }
             Event::AppData => break Stop::AppData,
