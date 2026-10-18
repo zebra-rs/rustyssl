@@ -5137,7 +5137,7 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     messages in OpenSSL's extension order, as the RFC's server is NSS), and a client/server
     loopback runs TLS 1.3 and 1.2.
   - Tests: 145 unit tests; fuzz targets `tls_msgs` and `tls_record`.
-- [ ] **7.2 SSL objects in capi:**
+- [x] **7.2 SSL objects in capi:**
   - the `SSL_METHOD` set
   - `SSL_CTX` and `SSL` lifecycle and refcounts, CTX → SSL inheritance, `SSL_set_SSL_CTX`,
     ex_data
@@ -5157,9 +5157,13 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     Without read-ahead it reads exactly one record at a time, as `ssl3_read_n` does. The
     handshake getters, `SSL_state_string(_long)`, the alert strings, `SSL_select_next_proto`
     and `SSL_group_to_name` are done. `tests/c/ssl_io_idle.c` passes on both libraries;
-    `ssl_handshake.c`, `ssl_io.c` and `ssl_shutdown.c` pass on the reference and wait for the
-    client and server state machines (7.3, 7.4).
-- [ ] **7.3 TLS 1.3:**
+    `ssl_handshake.c`, `ssl_io.c` and `ssl_shutdown.c` pass on both libraries.
+  - Done: the library context of the `SSL_CTX` decodes peer certificates, chains and keys
+    (`X509_new_ex`, `d2i_PUBKEY_ex`); `SSL_clear` and `set_connect_state`/`set_accept_state`
+    after a handshake start afresh; records reach the BIO one write each, with
+    `max_send_fragment`; a failed connection's entries are raised once; a stale request's
+    answer is dropped rather than re-asked. `SSL_write` runs the core with no lock held.
+- [x] **7.3 TLS 1.3:**
   - the full handshake, HRR, and the default 3.5 groups and key shares (hybrid
     **X25519MLKEM768** and X25519), including the 3.5 group-list syntax (tuples and key-share
     markers); the default provider's `TLS-GROUP` and `TLS-SIGALG` capabilities
@@ -5170,7 +5174,13 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - KeyUpdate, post-handshake authentication, stateless cookies, middlebox compatibility mode
   - certificate compression (3.2), raw public keys (3.2; the CVE-2024-12797 lesson)
   - signature-algorithm negotiation and certificate selection across several key types
-- [ ] **7.4 TLS 1.2:**
+  - Done, including: certificates with provider key types (ML-DSA-44/65/87, one slot per
+    provider key type after the built-in ones); raw public keys (key-only slots, verification
+    with `X509_STORE_CTX_init_rpk` and DANE, the peer's key in sessions); the ticket-key and
+    ticket callbacks; external PSKs with early data; the early exporter; record padding;
+    `SSL_get_negotiated_group` on resumption; an empty group list. Interop cases
+    `tls13-mldsa65-cert`, `tls13-rsa-and-mldsa65`.
+- [x] **7.4 TLS 1.2:**
   - ECDHE, DHE, and RSA key exchange
   - AEAD suites, and CBC suites with constant-time MAC-then-encrypt processing (Lucky13) and
     encrypt-then-MAC
@@ -5181,7 +5191,11 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     (present but excluded by the default cipher list)
   - OCSP stapling, CT validation in the handshake
   - no heartbeat (removed upstream)
-- [ ] **7.5 Configuration and introspection surface:**
+  - Done, including SRP (RFC 5054: the key exchange in `conn/common/srp.rs`, the numbers in
+    capi `ssl/srp.rs`, the username in sessions; interop `tls12-srp`, `tls12-srp-rsa`), the
+    tmp_dh callback and `SSL_get_tmp_key`, renegotiation that picks up settings changed since
+    the handshake on either side, and Finished over a resumed handshake's buffered messages.
+- [x] **7.5 Configuration and introspection surface:**
   - the **cipher-string parser**, with exact semantics for `DEFAULT`, `HIGH`, `!`, `+`, `-`,
     `@STRENGTH`, `@SECLEVEL=n`, and the aliases; the oracle is the reference's
     `SSL_get_ciphers` order
@@ -5201,11 +5215,16 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     (done: `ssl/session.rs`, `sess_asn1.rs`, `sess_cache.rs`; `tests/c/ssl_session.c` and
     `ssl_sess_cache.c` match the reference byte for byte, resumption by ID and ticket in
     TLS 1.2 and by ticket in TLS 1.3; `SSL_set_session_secret_cb`, `SSL_set_session_ticket_ext`
-    and `SSL_new_session_ticket` remain)
+    and `SSL_new_session_ticket` are done too)
   - `SSL_export_keying_material(_early)`, `get_finished`, `client_random`/`server_random`,
     `master_key`
   - `SSL_get_shared_ciphers` buffer semantics, the get0 vs. get1 peer-certificate ownership
     rules
+  - Done, including `SSL_check_chain` and strict mode (`SSL_CERT_FLAG_TLS_STRICT`: the strict
+    half of `tls1_check_chain`), CA names in both directions, the servername callback's
+    `SSL_set_SSL_CTX` switching every later callback, `SSL_set_retry_verify`, the chain's
+    security level, PSK callbacks, OCSP responder IDs, and `SSL_set_options` on a running
+    connection. libssl: 592 of 603 exports implemented (the rest are DTLS and QUIC).
 - [x] **7.6 Errors and strings:**
   - the exact `SSL_R_*` reasons where applications branch on them (for example,
     `UNEXPECTED_EOF_WHILE_READING` together with `SSL_OP_IGNORE_UNEXPECTED_EOF`)
@@ -5256,6 +5275,21 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
 (including the Bleichenbacher/Marvin and Lucky13 timing scripts) pass. The interop matrix is
 green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
 `cipherlist_test` pass.
+
+**Exit status (2026-10-18):** Steps 7.1–7.7 are done.
+- **Upstream libssl suite:** `cargo xtask test-openssl-suite --ssl` passes 4122 of the 4349
+  subtests that pass on the reference. `cipherlist_test`, `tls13ccstest`, `tls13ticket_test`,
+  `tls13groupselection_test`, `rpktest` and every non-DTLS `ssl-tests/*.cnf` iteration pass.
+  What fails is:
+  - DTLS (Phase 8): about 190 subtests, including sslapitest's DTLS iterations;
+  - QUIC (`SSL_set_quic_tls_cbs`, `OSSL_QUIC_client_method`);
+  - ENGINE (`test_pipelining`, step 9.3);
+  - third-party C providers (`test_pluggable_*`, `test_sigalgs_available`);
+  - the tests that read or write OpenSSL's private structures, listed as `internal` in
+    `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
+- **Interop matrix:** green, 45 cases in all four pairings (`cargo xtask test-interop`).
+- **Not met yet:** the BoGo shim and the tlsfuzzer scripts aren't built, so M2 and M4's
+  external checks remain open; `test-consumers` (curl, nginx) arrives later.
 
 ## Phase 8: libssl breadth → M5
 
