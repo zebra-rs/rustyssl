@@ -18,6 +18,11 @@
 //! other programs must succeed on both with the same numbers of `ok` and `not ok` lines.
 //! `evp_test`'s one look inside OpenSSL's private `EVP_PKEY` (whether a generated key is a
 //! provider's) is replaced with the public `EVP_PKEY_get0_provider` before it's built.
+//!
+//! With `--ssl`, or the name of one of them, it runs libssl's test programs instead
+//! (`tests/openssl-suite/ssl.txt`; see [`ssl`]), and writes a report of what fails on rustyssl.
+
+mod ssl;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,17 +34,54 @@ use crate::test_c::{LOADER_PATH, prepare};
 use crate::util::{Result, fresh_dir, run_logged, target_dir, workspace_root};
 use crate::vendor::CONFIGURE_OPTIONS;
 
-/// The test programs built, as `make` targets.
-const PROGRAMS: &[&str] = &[
-    "test/evp_test",
-    "test/bntest",
-    "test/ectest",
-    "test/rsa_test",
-];
+/// One build of upstream test programs from the reference's source.
+pub struct Build {
+    /// Its directory under `target/ref-suite/`, after `openssl-<version>`.
+    pub suffix: &'static str,
+    /// The `make` targets, copied into that directory under their file names.
+    pub targets: Vec<String>,
+    /// The changes made to the source before configuring: a file, a text it must contain, and
+    /// what replaces it.
+    pub patches: Vec<(&'static str, &'static str, &'static str)>,
+}
 
-/// The programs upstream links with the static `libcrypto.a`, relinked with the shared one (a
-/// change to `test/build.info` before configuring).
-const DYNAMIC: &[&str] = &["ectest", "rsa_test"];
+/// The build of `evp_test`, `bntest`, `ectest`, and `rsa_test`.
+fn crypto_build() -> Build {
+    Build {
+        suffix: "",
+        targets: [
+            "test/evp_test",
+            "test/bntest",
+            "test/ectest",
+            "test/rsa_test",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        patches: vec![
+            // Upstream links these two with the static `libcrypto.a`; relinked with the shared
+            // one.
+            (
+                "test/build.info",
+                "DEPEND[ectest]=../libcrypto.a libtestutil.a",
+                "DEPEND[ectest]=../libcrypto libtestutil.a",
+            ),
+            (
+                "test/build.info",
+                "DEPEND[rsa_test]=../libcrypto.a libtestutil.a",
+                "DEPEND[rsa_test]=../libcrypto libtestutil.a",
+            ),
+            // `evp_test` tells a provided key from a legacy one by reading `keymgmt` out of
+            // OpenSSL's private `struct evp_pkey_st` (`evp_pkey_is_provided`, from an internal
+            // header), which no application can (the type is opaque); rustyssl's keys have
+            // another layout, so the public equivalent goes in its place, for both libraries.
+            (
+                "test/evp_test.c",
+                "if (!evp_pkey_is_provided(pkey)) {",
+                "if (EVP_PKEY_get0_provider(pkey) == NULL) {",
+            ),
+        ],
+    }
+}
 
 /// The other programs' runs: each program with the arguments of one run, a data file of
 /// `test/recipes/` or none.
@@ -62,61 +104,42 @@ const STAMP: &str = ".rustyssl-build";
 /// `evp_test` loads its own (`-config`).
 const MISSING_CONFIG: &str = "/nonexistent/rustyssl-tests/openssl.cnf";
 
-/// Builds the test programs for reference OpenSSL `version` (whose install prefix is
+/// Builds `build`'s test programs for reference OpenSSL `version` (whose install prefix is
 /// `reference`) unless an up-to-date build exists, and returns the directory holding them.
-fn ensure(root: &Path, version: &str, reference: &Path) -> Result<PathBuf> {
+pub fn ensure(root: &Path, version: &str, reference: &Path, build: &Build) -> Result<PathBuf> {
     let (_, target) = host()?;
     let suite = target_dir(root)
         .join("ref-suite")
-        .join(format!("openssl-{version}"));
+        .join(format!("openssl-{version}{}", build.suffix));
     // Configured as `reference::ensure` configures the reference.
     let mut options: Vec<&str> = CONFIGURE_OPTIONS.to_vec();
     options.push("-g");
     let inputs = format!(
-        "version = {version}\ntarget = {}\noptions = {}\nprograms = {}\ndynamic = {}\npublic provided-key check\n",
+        "version = {version}\ntarget = {}\noptions = {}\nprograms = {}\npatches = {:?}\n",
         target.configure,
         options.join(" "),
-        PROGRAMS.join(" "),
-        DYNAMIC.join(" ")
+        build.targets.join(" "),
+        build.patches
     );
     if fs::read_to_string(suite.join(STAMP)).is_ok_and(|built| built == inputs) {
         return Ok(suite);
     }
 
-    let work = target_dir(root).join("xtask/ref-suite");
+    let work = target_dir(root).join(format!("xtask/ref-suite{}", build.suffix));
     fresh_dir(&work)?;
     let log = work.join("build.log");
     let src = work.join(format!("openssl-{version}"));
     let mut copy = Command::new("cp");
     copy.arg("-R").arg(reference.join("src")).arg(&src);
     run_logged(&mut copy, &log)?;
-    let build_info = src.join("test/build.info");
-    let mut rules = fs::read_to_string(&build_info)?;
-    for program in DYNAMIC {
-        let from = format!("DEPEND[{program}]=../libcrypto.a libtestutil.a");
-        if !rules.contains(&from) {
-            return Err(format!("test/build.info has no rule {from}").into());
+    for (file, from, to) in &build.patches {
+        let path = src.join(file);
+        let text = fs::read_to_string(&path)?;
+        if !text.contains(from) {
+            return Err(format!("{file} has no `{from}`").into());
         }
-        rules = rules.replace(
-            &from,
-            &format!("DEPEND[{program}]=../libcrypto libtestutil.a"),
-        );
+        fs::write(&path, text.replace(from, to))?;
     }
-    fs::write(&build_info, rules)?;
-    // `evp_test` tells a provided key from a legacy one by reading `keymgmt` out of OpenSSL's
-    // private `struct evp_pkey_st` (`evp_pkey_is_provided`, from an internal header), which
-    // no application can (the type is opaque); rustyssl's keys have another layout, so the
-    // public equivalent goes in its place, for both libraries.
-    let evp_test_c = src.join("test/evp_test.c");
-    let program = fs::read_to_string(&evp_test_c)?;
-    let internal = "if (!evp_pkey_is_provided(pkey)) {";
-    if !program.contains(internal) {
-        return Err(format!("test/evp_test.c has no `{internal}`").into());
-    }
-    fs::write(
-        &evp_test_c,
-        program.replace(internal, "if (EVP_PKEY_get0_provider(pkey) == NULL) {"),
-    )?;
     println!(
         "Building upstream OpenSSL {version}'s test programs for {} (log: {})...",
         target.configure,
@@ -145,14 +168,14 @@ fn ensure(root: &Path, version: &str, reference: &Path) -> Result<PathBuf> {
     run_logged(&mut make, &log)?;
     let mut make = Command::new("make");
     make.arg(format!("-j{jobs}"))
-        .args(PROGRAMS)
+        .args(&build.targets)
         .current_dir(&src)
         .env_clear()
         .env("PATH", &path);
     run_logged(&mut make, &log)?;
 
     fresh_dir(&suite)?;
-    for program in PROGRAMS {
+    for program in &build.targets {
         let name = Path::new(program)
             .file_name()
             .ok_or("a program without a name")?;
@@ -231,13 +254,15 @@ fn failure_lines(text: &str) -> String {
 
 pub fn run(args: &[String]) -> Result {
     let root = workspace_root();
+    // `--ssl` (or the name of one of its programs or `ssl_test` files) selects libssl's
+    // programs, which run apart from the others.
+    let ssl_all = args.iter().any(|a| a == "--ssl");
+    let args: Vec<String> = args.iter().filter(|a| *a != "--ssl").cloned().collect();
+    let ssl_list = ssl::List::load(&root)?;
+    let (ssl_args, args): (Vec<String>, Vec<String>) =
+        args.into_iter().partition(|a| ssl_list.names(a));
     let (reference, dist) = prepare(&root)?;
     let version = reference::vendored_version(&root)?;
-    let suite = ensure(&root, &version, &reference)?;
-    let evp_test = suite.join("evp_test");
-    let src = reference.join("src");
-    let config = src.join("test/default.cnf");
-    let data = src.join("test/recipes/30-test_evp_data");
 
     // Guard: a missing library falls back to the one the program was linked with.
     let ours = dist.join("lib");
@@ -246,6 +271,33 @@ pub fn run(args: &[String]) -> Result {
     {
         return Err(format!("no libcrypto in {}", ours.display()).into());
     }
+
+    if ssl_all || !ssl_args.is_empty() {
+        let suite = ensure(&root, &version, &reference, &ssl::build(&ssl_list))?;
+        let ssl = ssl::run(&root, &suite, &reference, &ours, &ssl_list, &ssl_args);
+        if args.is_empty() {
+            return ssl;
+        }
+        let crypto = run_crypto(&root, &version, &reference, &ours, &args);
+        return ssl.and(crypto);
+    }
+    run_crypto(&root, &version, &reference, &ours, &args)
+}
+
+/// The runs of `evp_test`, `bntest`, `ectest`, and `rsa_test` that `args` selects (all, without
+/// any).
+fn run_crypto(
+    root: &Path,
+    version: &str,
+    reference: &Path,
+    ours: &Path,
+    args: &[String],
+) -> Result {
+    let suite = ensure(root, version, reference, &crypto_build())?;
+    let evp_test = suite.join("evp_test");
+    let src = reference.join("src");
+    let config = src.join("test/default.cnf");
+    let data = src.join("test/recipes/30-test_evp_data");
 
     let list = fs::read_to_string(root.join("tests/openssl-suite/evp_test.txt"))?;
     let files: Vec<&str> = list
@@ -266,7 +318,7 @@ pub fn run(args: &[String]) -> Result {
         let file = data.join(name);
         let (theirs_ok, theirs, theirs_text) =
             run_evp_test(&evp_test, &config, &file, &reference.join("lib"))?;
-        let (ours_ok, ours, ours_text) = run_evp_test(&evp_test, &config, &file, &ours)?;
+        let (ours_ok, ours, ours_text) = run_evp_test(&evp_test, &config, &file, ours)?;
         let verdict = if !theirs_ok {
             Err(format!(
                 "fails on the reference:\n{}",
@@ -300,7 +352,7 @@ pub fn run(args: &[String]) -> Result {
         let files: Vec<PathBuf> = run_args.iter().map(|a| recipes.join(a)).collect();
         let label = format!("{program} {}", run_args.join(" "));
         let (theirs_ok, theirs, theirs_text) = run_program(&exe, &files, &reference.join("lib"))?;
-        let (ours_ok, ours, ours_text) = run_program(&exe, &files, &ours)?;
+        let (ours_ok, ours, ours_text) = run_program(&exe, &files, ours)?;
         let verdict = if !theirs_ok {
             Err(format!(
                 "fails on the reference:\n{}",

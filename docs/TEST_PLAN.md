@@ -178,6 +178,13 @@ rustyssl itself**. You can only regenerate golden files with
   "Completed N tests with E errors and S skipped" counts and the same number of `ERROR` lines,
   so a file whose tests rustyssl skips (a key it can't load yet) fails, and so does one whose
   tests fail to start (`evp_test` counts a key generation it can't start as passed).
+- **libssl's programs** (`--ssl`, or by name; not in CI's default run yet): `sslapitest`,
+  `ssl_test` on each `test/ssl-tests/*.cnf`, and the other C programs of the `*ssl*`, `*tls*`,
+  and `*dtls*` recipes, listed with their recipes' arguments in `tests/openssl-suite/ssl.txt`
+  (with the programs not run and why, and the tests that read libssl's private structures).
+  Each test, and each iteration of an iterated one, runs in its own process with a timeout, on
+  the reference and then on rustyssl, so a stub's abort or a crash costs one subtest; the
+  failures are classified and ranked by root cause in `target/ssl-suite-report.md`.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
   - **(a) Public API** → must pass.
   - **(b) Needs internal symbols or headers** → excluded, with the reason.
