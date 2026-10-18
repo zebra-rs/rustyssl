@@ -16,7 +16,7 @@ use crate::conn::{Answer, Event, Request};
 use crate::consts::context as cx;
 use crate::consts::version as v;
 use crate::crypto::{HashAlg, PeerKey, Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched;
 use crate::msgs::cert::{CertificateReader, CertificateStatus, RpkReader};
 use crate::msgs::kx::ske;
@@ -480,6 +480,11 @@ pub(super) fn process_server_done(
 /// # Errors
 /// `SSL_R_MISSING_SIGNING_CERT`, `SSL_R_MISSING_RSA_ENCRYPTING_CERT` (handshake-failure).
 fn check_cert_and_algorithm(c: &Connection, p: &dyn Provider) -> Result<()> {
+    check_cert_and_algorithm_inner(c, p).in_func("ssl3_check_cert_and_algorithm")
+}
+
+/// See [`check_cert_and_algorithm`].
+fn check_cert_and_algorithm_inner(c: &Connection, p: &dyn Provider) -> Result<()> {
     let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
     if cp.auth & SSL_aCERT == 0 {
         return Ok(());

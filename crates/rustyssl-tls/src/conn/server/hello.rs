@@ -23,7 +23,7 @@ use crate::consts::ext as t;
 use crate::consts::handshake as ht;
 use crate::consts::{HRR_RANDOM, RANDOM_LEN, version as v};
 use crate::crypto::Provider;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::{Transcript, hash_of};
 use crate::msgs::hello::{ClientHello, ServerHello};
 
@@ -161,6 +161,11 @@ pub(crate) fn received_body(c: &Connection, typ: u16) -> Option<Vec<u8>> {
 
 /// `tls_early_post_process_client_hello`, in stages. `false` while waiting for an answer.
 fn early_post_process(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
+    early_post_process_inner(c, p).in_func("tls_early_post_process_client_hello")
+}
+
+/// See [`early_post_process`].
+fn early_post_process_inner(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
     if stage_of(c) == stage::CALLBACK {
         if c.cfg.callbacks.client_hello {
             match ask_once(c, Request::ClientHello, 0) {
@@ -497,6 +502,11 @@ pub(crate) fn post_process_client_hello(
 /// ([`Request::Status`]) decides whether the OCSP response it set is sent. `false` while
 /// waiting for the answer.
 fn handle_status_request(c: &mut Connection) -> Result<bool> {
+    handle_status_request_inner(c).in_func("tls_handle_status_request")
+}
+
+/// See [`handle_status_request`].
+fn handle_status_request_inner(c: &mut Connection) -> Result<bool> {
     state(c)?.status_expected = false;
     if c.hs.sh.status_type == STATUSTYPE_NOTHING || !c.cfg.callbacks.status {
         return Ok(true);
@@ -537,6 +547,11 @@ fn handle_status_request(c: &mut Connection) -> Result<bool> {
 /// # Errors
 /// As above.
 pub(crate) fn handle_alpn(c: &mut Connection, _p: &dyn Provider) -> Result<Step> {
+    handle_alpn_inner(c, _p).in_func("tls_handle_alpn")
+}
+
+/// See [`handle_alpn`].
+fn handle_alpn_inner(c: &mut Connection, _p: &dyn Provider) -> Result<Step> {
     if c.cfg.callbacks.alpn_select
         && let Some(protos) = c.hs.sh.alpn_proposed.clone()
     {

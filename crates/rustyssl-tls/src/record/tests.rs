@@ -836,3 +836,66 @@ fn constant_time_masks() {
         assert_eq!(ct_eq_s(a, b) == usize::MAX, a == b);
     }
 }
+
+#[test]
+fn errors_name_the_record_layer_function_openssl_raises_them_from() {
+    let p = TestProvider::new(b"f");
+    let first = |input: &[u8]| RecordReader::new(true).read(&p, input).unwrap_err();
+    // The plaintext method's header checks (`tlsany_meth`).
+    assert_eq!(
+        first(b"GET / HTTP/1.1").func,
+        Some("tls_validate_record_header")
+    );
+    assert_eq!(
+        first(&[22, 3, 1, 0x40, 0x01]).func,
+        Some("tls_validate_record_header")
+    );
+    // SSLv2's version in a TLS header is the driver's.
+    let e = RecordReader::new(false)
+        .read(&p, &[22, 0, 2, 0, 1, 1])
+        .unwrap_err();
+    assert_eq!(e.func, Some("tls_get_more_records"));
+    // TLS 1.2's and TLS 1.3's header checks.
+    let make = |_| Protection::aead12(&p, AeadAlg::Aes128Gcm, &[1; 16], &[2; 4], 0).unwrap();
+    let (_, mut r) = pair12(&p, &make, 0x0303);
+    let e = r.read(&p, &[23, 3, 1, 0, 1, 0]).unwrap_err();
+    assert_eq!(e.func, Some("tls_default_validate_record_header"));
+    let mut r = tls13_reader(&p, &[1; 16], &[2; 12]);
+    let e = r.read(&p, &[23, 3, 1, 0, 1, 0]).unwrap_err();
+    assert_eq!(e.func, Some("tls13_validate_record_header"));
+    // A bad tag is the driver's, under the provider's entry for GCM and CCM (TLS 1.2) only.
+    for (alg, cause) in [
+        (AeadAlg::Aes128Gcm, Some("ossl_gcm_stream_update")),
+        (AeadAlg::Aes128Ccm, Some("ossl_ccm_stream_update")),
+        (AeadAlg::ChaCha20Poly1305, None),
+    ] {
+        let key = vec![3u8; alg.key_len()];
+        let iv = vec![
+            4u8;
+            if alg == AeadAlg::ChaCha20Poly1305 {
+                12
+            } else {
+                4
+            }
+        ];
+        let make = |_| Protection::aead12(&p, alg, &key, &iv, 7).unwrap();
+        let (mut w, mut r) = pair12(&p, &make, 0x0303);
+        let mut out = Vec::new();
+        w.write(&p, application_data(), b"data", &mut out).unwrap();
+        *out.last_mut().unwrap() ^= 1;
+        let e = r.read(&p, &out).unwrap_err();
+        assert_eq!(e.func, Some("tls_get_more_records"), "{alg:?}");
+        let want = cause.map(|func| Cause {
+            lib: abi::ERR_LIB_PROV,
+            reason: abi::PROV_R_CIPHER_OPERATION_FAILED,
+            func,
+        });
+        assert_eq!(e.cause, want, "{alg:?}");
+    }
+    // TLS 1.3 checks the tag in the final step, which raises nothing of its own.
+    let mut r = tls13_reader(&p, &[1; 16], &[2; 12]);
+    let mut bad = vec![23, 3, 3, 0, 17];
+    bad.resize(22, 0);
+    let e = r.read(&p, &bad).unwrap_err();
+    assert_eq!((e.func, e.cause), (Some("tls_get_more_records"), None));
+}

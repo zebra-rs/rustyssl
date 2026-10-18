@@ -13,7 +13,7 @@ use super::version;
 use crate::conn::Connection;
 use crate::consts::sigscheme as s;
 use crate::crypto::{KeyKind, PeerKey, Provider};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::suites::masks::{
     SSL_MD_GOST12_256_IDX, SSL_MD_GOST12_512_IDX, SSL_MD_GOST94_IDX, SSL_MD_MD5_IDX,
     SSL_MD_MD5_SHA1_IDX, SSL_MD_SHA1_IDX, SSL_MD_SHA224_IDX, SSL_MD_SHA256_IDX, SSL_MD_SHA384_IDX,
@@ -930,6 +930,11 @@ pub fn psigalgs(c: &Connection, sent: bool) -> Vec<u16> {
 /// None usable: `SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM`, raised without an alert (the caller
 /// decides).
 pub fn copy_sigalgs(c: &Connection, list: &[u16]) -> Result<Vec<u16>> {
+    copy_sigalgs_inner(c, list).in_func("tls12_copy_sigalgs")
+}
+
+/// See [`copy_sigalgs`].
+fn copy_sigalgs_inner(c: &Connection, list: &[u16]) -> Result<Vec<u16>> {
     let mut out = Vec::new();
     let mut ok = false;
     for &code in list {
@@ -1075,6 +1080,11 @@ pub fn process(c: &mut Connection) {
 /// # Errors
 /// No shared algorithms: `SSL_R_NO_SHARED_SIGNATURE_ALGORITHMS` with handshake_failure.
 pub fn set_server_sigalgs(c: &mut Connection) -> Result<()> {
+    set_server_sigalgs_inner(c).in_func("tls1_set_server_sigalgs")
+}
+
+/// See [`set_server_sigalgs`].
+fn set_server_sigalgs_inner(c: &mut Connection) -> Result<()> {
     c.neg.shared_sigalgs.clear();
     c.hs.sh.valid_flags = vec![0; slots(c)];
     if c.hs.sh.peer_cert_sigalgs.is_none() && c.hs.sh.peer_sigalgs.is_none() {
@@ -1177,6 +1187,11 @@ pub fn set_peer_legacy_sigalg(c: &mut Connection, kind: &KeyKind) -> bool {
 /// OpenSSL's alert and reason (`SSL_R_WRONG_SIGNATURE_TYPE`, `SSL_R_WRONG_CURVE`,
 /// `SSL_R_UNKNOWN_DIGEST`).
 pub fn check_peer_sigalg(c: &mut Connection, sig: u16, key: &PeerKey) -> Result<()> {
+    check_peer_sigalg_inner(c, sig, key).in_func("tls12_check_peer_sigalg")
+}
+
+/// See [`check_peer_sigalg`].
+fn check_peer_sigalg_inner(c: &mut Connection, sig: u16, key: &PeerKey) -> Result<()> {
     let wrong = Error::alert(
         abi::SSL_AD_ILLEGAL_PARAMETER,
         abi::SSL_R_WRONG_SIGNATURE_TYPE,
@@ -1380,6 +1395,11 @@ fn cert_sigalg_idx(c: &Connection, lu: &SigAlg) -> Option<usize> {
 /// # Errors
 /// No suitable scheme or certificate (OpenSSL's alert and reason).
 pub fn choose(c: &mut Connection, fatal: bool) -> Result<()> {
+    choose_inner(c, fatal).in_func("tls_choose_sigalg")
+}
+
+/// See [`choose`].
+fn choose_inner(c: &mut Connection, fatal: bool) -> Result<()> {
     c.hs.sh.cert = None;
     c.hs.sh.sigalg = None;
     let fail = |a, r| {

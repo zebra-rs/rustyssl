@@ -11,7 +11,7 @@ use super::{EarlyDataState, Pha};
 use crate::conn::statem::{MsgProcess, Work};
 use crate::conn::{Connection, Event};
 use crate::crypto::Provider;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched;
 
 /// `final_finish_mac`: the Finished value for this end's (`server_label`: the server's) side:
@@ -21,6 +21,11 @@ use crate::keysched;
 /// # Errors
 /// Missing state, or the provider failed.
 pub fn final_finish_mac(c: &Connection, p: &dyn Provider, server_label: bool) -> Result<Vec<u8>> {
+    final_finish_mac_inner(c, p, server_label).in_func("tls1_final_finish_mac")
+}
+
+/// See [`final_finish_mac`].
+fn final_finish_mac_inner(c: &Connection, p: &dyn Provider, server_label: bool) -> Result<Vec<u8>> {
     let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
     let (hash, prf) = keys::hashes(c.neg.version, cp);
     let transcript = c.hs.transcript.current()?;

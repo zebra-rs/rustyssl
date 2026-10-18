@@ -13,7 +13,7 @@ use crate::conn::common::{ask_once, groups, keys, sigalgs};
 use crate::conn::statem::{Construct, MsgProcess, Work};
 use crate::conn::{Answer, Connection, Request};
 use crate::crypto::{Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::suites::masks::{
     SSL_PSK, SSL_aNULL, SSL_aSRP, SSL_kDHE, SSL_kDHEPSK, SSL_kECDHE, SSL_kECDHEPSK, SSL_kPSK,
     SSL_kRSA, SSL_kRSAPSK,
@@ -220,6 +220,11 @@ pub(crate) fn construct_server_key_exchange(
 /// unknown identity is `SSL_R_PSK_IDENTITY_NOT_FOUND` with unknown-psk-identity. `None` while
 /// waiting.
 fn psk_preamble(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<Secret>> {
+    psk_preamble_inner(c, rd).in_func("tls_process_cke_psk_preamble")
+}
+
+/// See [`psk_preamble`].
+fn psk_preamble_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<Secret>> {
     let id = rd
         .vec16()
         .map_err(|_| Error::decode(abi::SSL_R_LENGTH_MISMATCH))?;
@@ -363,6 +368,16 @@ pub(crate) fn process_client_key_exchange(
 /// secret (with the Extended Master Secret's session hash when negotiated), kept in the
 /// session.
 fn generate_master_secret(
+    c: &mut Connection,
+    p: &dyn Provider,
+    pms: Option<Secret>,
+    psk: Option<Secret>,
+) -> Result<()> {
+    generate_master_secret_inner(c, p, pms, psk).in_func("ssl_generate_master_secret")
+}
+
+/// See [`generate_master_secret`].
+fn generate_master_secret_inner(
     c: &mut Connection,
     p: &dyn Provider,
     pms: Option<Secret>,

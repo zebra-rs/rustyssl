@@ -14,6 +14,7 @@ pub(crate) mod client;
 /// `rustyssl-capi`'s configuration functions (the group and signature algorithm tables, the
 /// security framework).
 pub mod common;
+pub(crate) mod funcs;
 #[cfg(test)]
 pub(crate) mod pair;
 mod requests;
@@ -28,7 +29,7 @@ pub use event::{Answer, Callbacks, Event, Request};
 
 use self::statem::{HsBytes, MsgFlow, Statem, msgs_type, st};
 use crate::crypto::Provider;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::Transcript;
 use crate::record::{self, Read, RecordReader, RecordWriter};
 use crate::suites::Cipher;
@@ -660,7 +661,15 @@ impl Connection {
     /// content type) to the message callback. `None`: more input is needed.
     fn fetch_record(&mut self, p: &dyn Provider) -> Result<Option<record::Record>> {
         loop {
-            match self.rr.read(p, &self.input)? {
+            // A fatal record-layer error that sends an alert is followed by
+            // `SSL_R_RECORD_LAYER_FAILURE` (`ossl_tls_handle_rlayer_return`).
+            let read = self.rr.read(p, &self.input).map_err(|mut e| {
+                if e.alert.is_some() {
+                    e.follow_up = Some(abi::SSL_R_RECORD_LAYER_FAILURE);
+                }
+                e
+            });
+            match read? {
                 Read::NeedMore(_) => {
                     self.needs_input = true;
                     return Ok(None);
@@ -705,6 +714,12 @@ impl Connection {
     /// Reads handshake octets into `hs_in` during a handshake (`ssl3_read_bytes` for
     /// `SSL3_RT_HANDSHAKE`): handles alerts and the record types that may arrive instead.
     pub(crate) fn read_handshake_bytes(&mut self, p: &dyn Provider) -> Result<HsBytes> {
+        self.read_handshake_bytes_inner(p)
+            .in_func("ssl3_read_bytes")
+    }
+
+    /// See [`Connection::read_handshake_bytes`].
+    fn read_handshake_bytes_inner(&mut self, p: &dyn Provider) -> Result<HsBytes> {
         loop {
             let Some(rec) = self.fetch_record(p)? else {
                 return Ok(HsBytes::Yield);
@@ -862,6 +877,9 @@ impl Connection {
                 reason: abi::SSL_AD_REASON_OFFSET.saturating_add(i32::from(desc)),
                 library_reason: false,
                 data: None,
+                func: Some("ssl3_read_bytes"),
+                follow_up: None,
+                cause: None,
             });
         }
         if desc == msgs_type(abi::SSL_AD_NO_RENEGOTIATION) {
@@ -883,6 +901,12 @@ impl Connection {
     /// is buffered, a post-handshake message goes back into the state machine, alerts are
     /// handled.
     fn read_application_data(&mut self, p: &dyn Provider) -> Result<Option<Event>> {
+        self.read_application_data_inner(p)
+            .in_func("ssl3_read_bytes")
+    }
+
+    /// See [`Connection::read_application_data`].
+    fn read_application_data_inner(&mut self, p: &dyn Provider) -> Result<Option<Event>> {
         // A handshake message that arrived with the record before (TLS 1.3 post-handshake).
         if self.hs_in.len() >= msgs::HEADER_LEN {
             common::enter_post_handshake(self);

@@ -12,7 +12,7 @@ use rustyssl_abi as abi;
 use subtle::ConstantTimeEq;
 
 use crate::crypto::{Aead, AeadAlg, Cipher, CipherAlg, HashAlg, Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Cause, Error, InFunc, Result};
 
 /// A content type, as the record header carries it (`SSL3_RT_*`).
 pub type ContentType = u8;
@@ -96,9 +96,10 @@ fn seq_bytes(seq: u64) -> [u8; 8] {
 /// The next sequence number, or OpenSSL's `SSL_R_SEQUENCE_CTR_WRAPPED`.
 fn next_seq(seq: &mut u64) -> Result<u64> {
     let cur = *seq;
-    *seq = cur
-        .checked_add(1)
-        .ok_or_else(|| fatal(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_SEQUENCE_CTR_WRAPPED))?;
+    *seq = cur.checked_add(1).ok_or_else(|| {
+        fatal(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_SEQUENCE_CTR_WRAPPED)
+            .in_func("tls_increment_sequence_ctr")
+    })?;
     Ok(cur)
 }
 
@@ -168,6 +169,9 @@ pub enum Protection {
         tag_len: usize,
         /// The next explicit nonce to send (OpenSSL starts it at random and counts up).
         next_explicit: u64,
+        /// The provider function that raises an error under a bad tag, if OpenSSL's does
+        /// (GCM's and CCM's TLS mode; ChaCha20-Poly1305's raises none).
+        tag_error_func: Option<&'static str>,
     },
     /// TLS 1.0–1.2's CBC (or NULL) cipher with an HMAC.
     Cbc12 {
@@ -232,6 +236,15 @@ impl Protection {
             explicit: alg != AeadAlg::ChaCha20Poly1305,
             tag_len: alg.tag_len(),
             next_explicit: first_explicit,
+            tag_error_func: match alg {
+                AeadAlg::ChaCha20Poly1305 => None,
+                AeadAlg::Aes128Ccm
+                | AeadAlg::Aes256Ccm
+                | AeadAlg::Aes128Ccm8
+                | AeadAlg::Aes256Ccm8
+                | AeadAlg::Sm4Ccm => Some("ossl_ccm_stream_update"),
+                _ => Some("ossl_gcm_stream_update"),
+            },
         })
     }
 
@@ -413,6 +426,11 @@ impl RecordReader {
     /// # Errors
     /// A fatal error, with OpenSSL's alert and reason.
     pub fn read(&mut self, p: &dyn Provider, buf: &[u8]) -> Result<Read> {
+        self.read_record(p, buf).in_func("tls_get_more_records")
+    }
+
+    /// See [`RecordReader::read`].
+    fn read_record(&mut self, p: &dyn Provider, buf: &[u8]) -> Result<Read> {
         let Some(head) = buf.get(..HEADER_LEN) else {
             return Ok(Read::NeedMore(HEADER_LEN));
         };
@@ -427,7 +445,8 @@ impl RecordReader {
         {
             let len = sslv2len & 0x7fff;
             if len < MIN_SSL2_RECORD_LEN {
-                return Err(fatal(abi::SSL_AD_DECODE_ERROR, abi::SSL_R_LENGTH_TOO_SHORT));
+                return Err(fatal(abi::SSL_AD_DECODE_ERROR, abi::SSL_R_LENGTH_TOO_SHORT)
+                    .in_func("tls_validate_record_header"));
             }
             if len > self.buffer_len().saturating_sub(SSL2_HEADER_LEN) {
                 return Err(fatal(
@@ -460,7 +479,8 @@ impl RecordReader {
                 abi::SSL_R_WRONG_VERSION_NUMBER,
             ));
         }
-        self.validate_header(ty, version, len, head)?;
+        self.validate_header(ty, version, len, head)
+            .in_func(self.method_func(true))?;
         if len > self.buffer_len().saturating_sub(HEADER_LEN) {
             return Err(fatal(
                 abi::SSL_AD_RECORD_OVERFLOW,
@@ -502,7 +522,8 @@ impl RecordReader {
             inner: false,
         };
         self.unprotect(p, &mut record)?;
-        self.post_process(&mut record)?;
+        self.post_process(&mut record)
+            .in_func(self.method_func(false))?;
         if self.max_frag_len != MAX_PLAIN && record.data.len() > self.max_frag_len {
             return Err(fatal(
                 abi::SSL_AD_RECORD_OVERFLOW,
@@ -518,6 +539,17 @@ impl RecordReader {
             consumed: total,
             record,
         })
+    }
+
+    /// The current method's `validate_record_header` (`header`) or `post_process_record`.
+    fn method_func(&self, header: bool) -> &'static str {
+        match (self.mode, header) {
+            (Mode::Tls13, true) => "tls13_validate_record_header",
+            (Mode::Tls13, false) => "tls13_post_process_record",
+            (Mode::Tls12(_), true) => "tls_default_validate_record_header",
+            (Mode::Plain(_), true) => "tls_validate_record_header",
+            (_, false) => "tls_default_post_process_record",
+        }
     }
 
     /// One more empty record; too many in a row is fatal.
@@ -662,6 +694,7 @@ impl RecordReader {
                 iv,
                 explicit,
                 tag_len,
+                tag_error_func,
                 ..
             } => {
                 let eiv: usize = if *explicit { 8 } else { 0 };
@@ -677,7 +710,15 @@ impl RecordReader {
                 let mut ct = record.data.split_off(eiv);
                 let plain_len = ct.len().saturating_sub(*tag_len);
                 let aad = mac_header(seq, record.content_type, record.version, plain_len)?;
-                aead.open(&nonce, &aad, &mut ct).map_err(|_| bad_mac())?;
+                aead.open(&nonce, &aad, &mut ct)
+                    .map_err(|_| match tag_error_func {
+                        Some(func) => bad_mac().caused_by(Cause {
+                            lib: abi::ERR_LIB_PROV,
+                            reason: abi::PROV_R_CIPHER_OPERATION_FAILED,
+                            func,
+                        }),
+                        None => bad_mac(),
+                    })?;
                 record.data = ct;
                 Ok(())
             }
@@ -817,14 +858,17 @@ impl RecordReader {
                 ));
             }
             let t = record.content_type;
+            let common = "tls13_common_post_process_record";
             if t != application_data() && t != alert() && t != handshake() {
-                return Err(fatal(
-                    abi::SSL_AD_UNEXPECTED_MESSAGE,
-                    abi::SSL_R_BAD_RECORD_TYPE,
-                ));
+                return Err(
+                    fatal(abi::SSL_AD_UNEXPECTED_MESSAGE, abi::SSL_R_BAD_RECORD_TYPE)
+                        .in_func(common),
+                );
             }
             if (t == handshake() || t == alert()) && record.data.is_empty() {
-                return Err(fatal(abi::SSL_AD_UNEXPECTED_MESSAGE, abi::SSL_R_BAD_LENGTH));
+                return Err(
+                    fatal(abi::SSL_AD_UNEXPECTED_MESSAGE, abi::SSL_R_BAD_LENGTH).in_func(common)
+                );
             }
             return Ok(());
         }

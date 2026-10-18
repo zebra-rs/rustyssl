@@ -27,7 +27,7 @@ use crate::consts::context as cx;
 use crate::consts::ext as t;
 use crate::consts::version as v;
 use crate::crypto::{CipherAlg, HashAlg, Provider, Secret};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched;
 use crate::msgs::ext as mx;
 
@@ -104,6 +104,11 @@ fn expires(s: &Session) -> i64 {
 /// # Errors
 /// The random generator failed.
 pub(crate) fn new_session(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    new_session_inner(c, p).in_func("ssl_get_new_session")
+}
+
+/// See [`new_session`].
+fn new_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     let timeout = if c.cfg.session_timeout == 0 {
         DEFAULT_TIMEOUT
     } else {
@@ -156,6 +161,11 @@ fn lookup(c: &mut Connection, id: &[u8], tag: usize) -> Option<Option<Session>> 
 /// A fatal ticket error, verification without a session ID context
 /// (`SSL_R_SESSION_ID_CONTEXT_UNINITIALIZED`), or inconsistent Extended Master Secret.
 pub(crate) fn get_prev_session(c: &mut Connection, p: &dyn Provider) -> Result<Option<bool>> {
+    get_prev_session_inner(c, p).in_func("ssl_get_prev_session")
+}
+
+/// See [`get_prev_session`].
+fn get_prev_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<Option<bool>> {
     let mut try_cache = false;
     let found = if c.is_tls13() {
         c.neg.session = Session::default();

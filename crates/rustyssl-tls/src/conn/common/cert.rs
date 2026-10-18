@@ -15,7 +15,7 @@ use crate::conn::Connection;
 use crate::conn::statem::MsgProcess;
 use crate::consts::context as cx;
 use crate::crypto::{PeerKey, Provider};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::msgs::cert::CertificateVerify;
 use crate::msgs::ext::certificate_authorities;
 
@@ -34,6 +34,15 @@ const CLIENT_CONTEXT: &[u8] = b"TLS 1.3, client CertificateVerify\0";
 /// # Errors
 /// A certificate is too long, or an extension failed.
 pub fn output_cert_chain(
+    c: &mut Connection,
+    p: &dyn Provider,
+    cert: Option<usize>,
+) -> Result<Option<Vec<u8>>> {
+    output_cert_chain_inner(c, p, cert).in_func("ssl3_output_cert_chain")
+}
+
+/// See [`output_cert_chain`].
+fn output_cert_chain_inner(
     c: &mut Connection,
     p: &dyn Provider,
     cert: Option<usize>,
@@ -144,6 +153,11 @@ fn check_name(der: &[u8]) -> core::result::Result<(), bool> {
 /// # Errors
 /// As above.
 pub fn parse_ca_names(c: &mut Connection, rd: &mut Reader<'_>) -> Result<()> {
+    parse_ca_names_inner(c, rd).in_func("parse_ca_names")
+}
+
+/// See [`parse_ca_names`].
+fn parse_ca_names_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<()> {
     let names = certificate_authorities::read(rd)?;
     for n in &names {
         match check_name(n) {
@@ -167,6 +181,11 @@ pub fn parse_ca_names(c: &mut Connection, rd: &mut Reader<'_>) -> Result<()> {
 /// # Errors
 /// The list is too long.
 pub fn construct_ca_names(c: &Connection, names: &[Vec<u8>]) -> Result<Vec<u8>> {
+    construct_ca_names_inner(c, names).in_func("construct_ca_names")
+}
+
+/// See [`construct_ca_names`].
+fn construct_ca_names_inner(c: &Connection, names: &[Vec<u8>]) -> Result<Vec<u8>> {
     let mut w = Writer::new();
     let none: &[Vec<u8>] = &[];
     let list = if c.cfg.options & abi::SSL_OP_DISABLE_TLSEXT_CA_NAMES != 0 {
@@ -195,6 +214,11 @@ pub fn save_cert_verify_hash(c: &mut Connection) -> Result<()> {
 /// # Errors
 /// No transcript.
 pub fn cert_verify_tbs(c: &Connection, signer_is_server: bool, reading: bool) -> Result<Vec<u8>> {
+    cert_verify_tbs_inner(c, signer_is_server, reading).in_func("get_cert_verify_tbs_data")
+}
+
+/// See [`cert_verify_tbs`].
+fn cert_verify_tbs_inner(c: &Connection, signer_is_server: bool, reading: bool) -> Result<Vec<u8>> {
     if c.is_tls13() {
         let hash = if reading {
             c.hs.sh.cert_verify_hash.clone()
@@ -219,6 +243,11 @@ pub fn cert_verify_tbs(c: &Connection, signer_is_server: bool, reading: bool) ->
 /// `ssl3_digest_cached_records(s, 0)`: the transcript is hashed from now on and the buffer
 /// dropped.
 fn digest_cached_records(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    digest_cached_records_inner(c, p).in_func("ssl3_digest_cached_records")
+}
+
+/// See [`digest_cached_records`].
+fn digest_cached_records_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     if c.hs.transcript.alg().is_some() {
         c.hs.transcript.drop_buffer();
         return Ok(());

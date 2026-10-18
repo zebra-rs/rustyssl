@@ -24,7 +24,7 @@ use rustyssl_abi as abi;
 use super::statem::{MsgFlow, ReadState, st};
 use super::{Answer, Connection, Request};
 use crate::crypto::{GroupInfo, HashAlg, Provider};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::Transcript;
 
 pub use security::SecurityHook;
@@ -268,6 +268,11 @@ pub(crate) fn ask_once(c: &mut Connection, r: Request, tag: usize) -> Option<Ans
 /// `SSL_R_NO_PROTOCOLS_AVAILABLE` (protocol-version), `SSL_R_NO_SUITABLE_DIGEST_ALGORITHM` or
 /// `SSL_R_NO_CIPHERS_AVAILABLE` (handshake-failure), or the role's.
 pub(crate) fn setup_handshake(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    setup_handshake_inner(c, p).in_func("tls_setup_handshake")
+}
+
+/// See [`setup_handshake`].
+fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
     c.hs.transcript = Transcript::new();
     c.hs.sh.ext = ext::Flags::new(c.cfg.custom_exts.len());
     if c.hs.sh.groups.is_empty() {
