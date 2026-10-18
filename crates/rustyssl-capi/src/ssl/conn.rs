@@ -1872,7 +1872,13 @@ ffi_export! {
             SSL_CTRL_GET_MAX_PROTO_VERSION => c_long::from(st.max_proto_version),
             SSL_CTRL_GET_CLIENT_CERT_REQUEST => 0,
             SSL_CTRL_GET_NUM_RENEGOTIATIONS => c_long::from(st.num_renegotiations),
-            SSL_CTRL_CLEAR_NUM_RENEGOTIATIONS => c_long::from(core::mem::replace(&mut st.num_renegotiations, 0)),
+            SSL_CTRL_CLEAR_NUM_RENEGOTIATIONS => {
+                // The core keeps the count the mirror copies.
+                if let Some(c) = st.drv.tls.as_mut() {
+                    c.clear_num_renegotiations();
+                }
+                c_long::from(core::mem::replace(&mut st.num_renegotiations, 0))
+            }
             SSL_CTRL_GET_TOTAL_RENEGOTIATIONS => c_long::from(st.total_renegotiations),
             SSL_CTRL_GET_FLAGS => c_long::from(st.s3_flags),
             SSL_CTRL_SET_TMP_DH_CB => {

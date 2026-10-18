@@ -301,6 +301,9 @@ unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    let (num, total) = c.renegotiations();
+    st.num_renegotiations = c_int::try_from(num).unwrap_or(c_int::MAX);
+    st.total_renegotiations = c_int::try_from(total).unwrap_or(c_int::MAX);
     // A server's `peer_ciphers` (`bytes_to_cipher_list` of each ClientHello), which outlast
     // the handshake (`SSL_get_client_ciphers`, `SSL_get_shared_ciphers`). OpenSSL keeps the
     // old list when it resumes a TLS 1.2 session.

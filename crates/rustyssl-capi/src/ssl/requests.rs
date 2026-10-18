@@ -35,8 +35,12 @@ pub(crate) fn renegotiate_check(x: &Ssl, initok: bool) {
         .is_some_and(|c| c.renegotiate_check(initok, pending || c.pending_app() > 0));
     if started {
         st.in_init = true;
-        st.num_renegotiations = st.num_renegotiations.saturating_add(1);
-        st.total_renegotiations = st.total_renegotiations.saturating_add(1);
+        // The core counts it (`renegotiations`), as it does one a HelloRequest starts.
+        if let Some(c) = st.drv.tls.as_ref() {
+            let (num, total) = c.renegotiations();
+            st.num_renegotiations = c_int::try_from(num).unwrap_or(c_int::MAX);
+            st.total_renegotiations = c_int::try_from(total).unwrap_or(c_int::MAX);
+        }
     }
 }
 
