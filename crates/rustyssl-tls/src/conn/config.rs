@@ -127,6 +127,9 @@ pub struct Config {
     /// The groups in preference order (`SSL_set1_groups_list`), with those that get an initial
     /// key share marked (3.5's `*` syntax; the default's first of each tuple).
     pub groups: Vec<u16>,
+    /// Whether the application set an empty group list (no groups at all; an empty `groups`
+    /// otherwise means the default list).
+    pub no_groups: bool,
     /// The groups a client sends key shares for in its first ClientHello.
     pub key_share_groups: Vec<u16>,
     /// The 3.5 group list's tuples (indices into `groups` where each tuple starts), for the

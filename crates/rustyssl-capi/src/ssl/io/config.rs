@@ -758,11 +758,12 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         Some(n) => unsafe { names_der(n) },
         None => Vec::new(),
     };
+    let no_groups = st
+        .lists
+        .groups
+        .as_ref()
+        .is_some_and(|g| g.groups.is_empty());
     let (groups, key_share_groups, group_tuples) = match &st.lists.groups {
-        // The core takes an empty list for the default one; OpenSSL would offer no groups.
-        Some(g) if g.groups.is_empty() => {
-            crate::stub::unimplemented("a handshake with an empty group list")
-        }
         Some(g) => g.for_core(),
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
@@ -771,6 +772,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         server: st.server,
         method_version,
         groups,
+        no_groups,
         key_share_groups,
         group_tuples,
         sigalgs: st.cert.conf_sigalgs.clone().unwrap_or_default(),

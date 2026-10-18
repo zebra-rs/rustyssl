@@ -400,6 +400,18 @@ static void test_handshakes(void)
     SSL_CTX_set1_groups_list(s, "X25519");
     scenario("no shared group", c, s, NULL);
 
+    /* An empty list is no groups at all: the client has none to offer, and its alert
+     * reaches a server that hasn't chosen a version yet. */
+    c = client_ctx(1);
+    s = server_ctx();
+    printf("  empty list: %ld\n", SSL_CTX_set1_groups_list(c, ""));
+    scenario("a client with no groups", c, s, NULL);
+
+    c = client_ctx(1);
+    s = server_ctx();
+    printf("  empty list: %ld\n", SSL_CTX_set1_groups_list(s, ""));
+    scenario("a server with no groups", c, s, NULL);
+
     c = client_ctx(0);
     s = server_ctx();
     scenario("unknown CA (TLS 1.3)", c, s, NULL);
