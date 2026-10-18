@@ -3,19 +3,20 @@
 //! security level and its callback; and the temporary DH key. A connection starts with a copy
 //! of its context's (`ssl_cert_dup`), sharing the objects by reference.
 
-use core::ffi::{c_int, c_long, c_void};
+use core::ffi::{c_char, c_int, c_long, c_void};
 use core::ptr;
 use std::ffi::CString;
 
 use rustyssl_abi::{
     DTLS1_2_VERSION, ERR_LIB_SSL, ERR_R_PASSED_NULL_PARAMETER, ERR_R_X509_LIB, EVP_PKEY, NID_ED448,
     NID_ED25519, NID_X9_62_id_ecPublicKey, NID_dsa, NID_id_GostR3410_2001,
-    NID_id_GostR3410_2012_256, NID_id_GostR3410_2012_512, NID_rsaEncryption, NID_rsassaPss, SSL,
-    SSL_CERT_SET_FIRST, SSL_CERT_SET_NEXT, SSL_CTX, SSL_R_CA_KEY_TOO_SMALL,
-    SSL_R_ECC_CERT_NOT_FOR_SIGNING, SSL_R_EE_KEY_TOO_SMALL, SSL_R_UNKNOWN_CERTIFICATE_TYPE,
-    SSL_R_X509_LIB, SSL_SECOP_CA_KEY, SSL_SECOP_CIPHER_CHECK, SSL_SECOP_CIPHER_SHARED,
-    SSL_SECOP_CIPHER_SUPPORTED, SSL_SECOP_COMPRESSION, SSL_SECOP_EE_KEY, SSL_SECOP_TICKET,
-    SSL_SECOP_TMP_DH, SSL_SECOP_VERSION, TLS1_1_VERSION, X509, X509_STORE, stack_st_X509,
+    NID_id_GostR3410_2012_256, NID_id_GostR3410_2012_512, NID_rsaEncryption, NID_rsassaPss,
+    NID_undef, OSSL_LIB_CTX, SSL, SSL_CERT_SET_FIRST, SSL_CERT_SET_NEXT, SSL_CTX,
+    SSL_R_CA_KEY_TOO_SMALL, SSL_R_ECC_CERT_NOT_FOR_SIGNING, SSL_R_EE_KEY_TOO_SMALL,
+    SSL_R_UNKNOWN_CERTIFICATE_TYPE, SSL_R_X509_LIB, SSL_SECOP_CA_KEY, SSL_SECOP_CIPHER_CHECK,
+    SSL_SECOP_CIPHER_SHARED, SSL_SECOP_CIPHER_SUPPORTED, SSL_SECOP_COMPRESSION, SSL_SECOP_EE_KEY,
+    SSL_SECOP_TICKET, SSL_SECOP_TMP_DH, SSL_SECOP_VERSION, TLS1_1_VERSION, X509, X509_STORE,
+    stack_st_X509,
 };
 
 use super::types::{CertCb, SSL_PKEY_ECC, SSL_PKEY_NUM, SSL_PKEY_RSA, SecCb, TmpDhCb};
@@ -130,8 +131,11 @@ impl Drop for Released {
 /// The certificate configuration (`CERT`).
 #[derive(Debug)]
 pub(crate) struct Cert {
-    /// The slots, indexed by `SSL_PKEY_*`.
-    pub(crate) pkeys: [CertPkey; SSL_PKEY_NUM],
+    /// The slots, indexed by `SSL_PKEY_*`, then one per provider key type
+    /// (`ssl_cert_new(SSL_PKEY_NUM + sigalg_list_len)`).
+    pub(crate) pkeys: Vec<CertPkey>,
+    /// The providers' key types (`ssl_cert_info`), whose slots follow the built-in ones.
+    pub(crate) provider_types: Vec<CString>,
     /// The current slot (`key`).
     pub(crate) key: usize,
     /// `cert_flags` (`SSL_CERT_FLAG_*`).
@@ -174,7 +178,8 @@ impl Cert {
     /// level.
     pub(crate) fn new() -> Self {
         Self {
-            pkeys: Default::default(),
+            pkeys: (0..SSL_PKEY_NUM).map(|_| CertPkey::default()).collect(),
+            provider_types: Vec::new(),
             key: SSL_PKEY_RSA,
             cert_flags: 0,
             sec_cb: Some(default_security_callback),
@@ -195,10 +200,18 @@ impl Cert {
         }
     }
 
+    /// Slots for the providers' key types, after the built-in ones.
+    pub(crate) fn set_provider_types(&mut self, types: Vec<CString>) {
+        self.pkeys
+            .resize_with(SSL_PKEY_NUM.saturating_add(types.len()), CertPkey::default);
+        self.provider_types = types;
+    }
+
     /// `ssl_cert_dup`: the same settings, sharing every certificate, key, chain member, and
     /// store by reference; `None` if a chain couldn't be copied.
     pub(crate) fn dup(&self) -> Option<Self> {
         let mut ret = Self::new();
+        ret.set_provider_types(self.provider_types.clone());
         ret.key = self.key;
         for (to, from) in ret.pkeys.iter_mut().zip(self.pkeys.iter()) {
             if !from.x509.is_null() {
@@ -306,7 +319,7 @@ impl Cert {
             0
         } else if op == c_long::from(SSL_CERT_SET_NEXT) {
             match self.key.checked_add(1) {
-                Some(i) if i < SSL_PKEY_NUM => i,
+                Some(i) if i < self.pkeys.len() => i,
                 _ => return 0,
             }
         } else {
@@ -394,29 +407,45 @@ unsafe fn is_type(pk: *const EVP_PKEY, nid: c_int) -> bool {
     !ln.is_null() && unsafe { EVP_PKEY_is_a(pk, ln) } != 0
 }
 
-/// `ssl_cert_lookup_by_pkey`: the slot for `pk`'s type. Keys whose signature algorithms come
-/// from the providers' `TLS-SIGALG` capability (ML-DSA in the default provider) have slots of
-/// their own in OpenSSL, which rustyssl doesn't build yet: those abort rather than be refused
-/// (security rule 10).
+/// `ssl_cert_lookup_by_pkey`: the slot for `pk`'s type, a built-in one or, after them, one of
+/// the providers' key types (`types`, a [`Cert`]'s).
 ///
 /// # Safety
 /// `pk` is a live key.
-pub(crate) unsafe fn lookup_by_pkey(pk: *const EVP_PKEY) -> Option<usize> {
+pub(crate) unsafe fn lookup_by_pkey(pk: *const EVP_PKEY, types: &[CString]) -> Option<usize> {
     if let Some(i) = PKEY_NIDS.iter().position(|&nid| {
         // SAFETY: the caller's key.
         unsafe { is_type(pk, nid) }
     }) {
         return Some(i);
     }
-    for name in [c"ML-DSA-44", c"ML-DSA-65", c"ML-DSA-87"] {
-        // SAFETY: the caller's key; a static name.
-        if unsafe { EVP_PKEY_is_a(pk, name.as_ptr()) } != 0 {
-            crate::stub::unimplemented(
-                "certificates with providers' TLS-SIGALG key types (ML-DSA)",
-            );
-        }
-    }
-    None
+    types
+        .iter()
+        .position(|t| {
+            // SAFETY: no preconditions; a string.
+            let nid = unsafe { crate::objects::OBJ_txt2nid(t.as_ptr()) };
+            // SAFETY: the caller's key.
+            nid != NID_undef && unsafe { is_type(pk, nid) }
+        })
+        .map(|i| SSL_PKEY_NUM.saturating_add(i))
+}
+
+/// The providers' key types for a context's library context (`ssl_load_sigalgs`'s
+/// `ssl_cert_info`), in slot order.
+///
+/// # Safety
+/// `libctx` is NULL or live; `propq` NULL or a string.
+pub(crate) unsafe fn provider_types(
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> Vec<CString> {
+    // SAFETY: the caller's guarantee.
+    let prov = unsafe { super::tls_provider::EvpProvider::new(libctx, propq) };
+    rustyssl_tls::conn::common::sigalgs::Cache::new(&prov)
+        .provider_key_types
+        .into_iter()
+        .filter_map(|t| CString::new(t).ok())
+        .collect()
 }
 
 /// `ssl_set_cert`: `x` goes into its key type's slot, which becomes current; a key already
@@ -434,7 +463,7 @@ pub(crate) unsafe fn set_cert(c: &mut Cert, x: *mut X509, rel: &mut Released) ->
         return 0;
     }
     // SAFETY: the certificate's key.
-    let Some(i) = (unsafe { lookup_by_pkey(pkey) }) else {
+    let Some(i) = (unsafe { lookup_by_pkey(pkey, &c.provider_types) }) else {
         err::raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE, F);
         return 0;
     };
@@ -477,7 +506,7 @@ pub(crate) unsafe fn set_cert(c: &mut Cert, x: *mut X509, rel: &mut Released) ->
 /// `pkey` is a live key.
 pub(crate) unsafe fn set_pkey(c: &mut Cert, pkey: *mut EVP_PKEY, rel: &mut Released) -> c_int {
     // SAFETY: the caller's key.
-    let Some(i) = (unsafe { lookup_by_pkey(pkey) }) else {
+    let Some(i) = (unsafe { lookup_by_pkey(pkey, &c.provider_types) }) else {
         err::raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE, "ssl_set_pkey");
         return 0;
     };

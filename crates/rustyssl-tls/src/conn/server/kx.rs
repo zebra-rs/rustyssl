@@ -417,7 +417,11 @@ fn srp_secret_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<Se
     }
     match ask_once(c, Request::SrpServerSecret { a }, 0) {
         None => Ok(None),
-        Some(Answer::SrpValue(Some(k))) => Ok(Some(Secret::new(k))),
+        Some(Answer::SrpValue(Some(k))) => {
+            // The session's `srp_username`: the client's login.
+            c.neg.session.srp_username.clone_from(&c.hs.sh.srp_login);
+            Ok(Some(Secret::new(k)))
+        }
         Some(_) => Err(Error::alert_lib(
             abi::SSL_AD_INTERNAL_ERROR,
             abi::ERR_R_INTERNAL_ERROR,

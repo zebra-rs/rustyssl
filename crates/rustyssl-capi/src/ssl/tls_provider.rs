@@ -25,12 +25,13 @@ use rustyssl_abi::{
     OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, OSSL_CAPABILITY_TLS_GROUP_MIN_TLS,
     OSSL_CAPABILITY_TLS_GROUP_NAME, OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL,
     OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT,
-    OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME, OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE,
-    OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS, OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS,
-    OSSL_CAPABILITY_TLS_SIGALG_NAME, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, OSSL_LIB_CTX,
-    OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_PARAM, OSSL_PARAM_UTF8_STRING,
-    OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PROVIDER,
-    RSA_PKCS1_PADDING, RSA_PKCS1_PSS_PADDING, RSA_PKCS1_WITH_TLS_PADDING, RSA_PSS_SALTLEN_DIGEST,
+    OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME, OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME,
+    OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE, OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS,
+    OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS, OSSL_CAPABILITY_TLS_SIGALG_NAME,
+    OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, OSSL_LIB_CTX, OSSL_MAC_PARAM_DIGEST,
+    OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_PARAM, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_FFC_G,
+    OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PROVIDER, RSA_PKCS1_PADDING,
+    RSA_PKCS1_PSS_PADDING, RSA_PKCS1_WITH_TLS_PADDING, RSA_PSS_SALTLEN_DIGEST,
 };
 use rustyssl_tls::consts::sigscheme;
 use rustyssl_tls::crypto::{
@@ -896,7 +897,20 @@ unsafe extern "C" fn add_sigalg_cb(params: *const OSSL_PARAM, arg: *mut c_void) 
         .or_else(|| unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) })
         .map(|k| k.to_string_lossy().into_owned())
         .unwrap_or_default();
+    // `OBJ_txt2nid` of the sigalg name (the cache's `sig` and `sigandhash`) and of the hash.
+    let nid_of = |s: Option<std::ffi::CString>| {
+        // SAFETY: a NUL-terminated name from the caller's array.
+        s.map_or(rustyssl_abi::NID_undef, |s| unsafe {
+            crate::objects::OBJ_txt2nid(s.as_ptr())
+        })
+    };
+    // SAFETY: the caller's array.
+    let sig_nid = nid_of(unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) });
+    // SAFETY: as above.
+    let hash_nid = nid_of(unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME) });
     d.sigalgs.push(SigalgInfo {
+        sig_nid,
+        hash_nid,
         key_type,
         name: name.to_string_lossy().into_owned(),
         id,

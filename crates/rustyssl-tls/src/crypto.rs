@@ -250,6 +250,11 @@ pub struct SigalgInfo {
     /// The key type it signs with (the capability's key type, or its signature or sigalg name:
     /// `inferred_keytype`), as [`KeyKind::Other`] names it.
     pub key_type: String,
+    /// Its signature algorithm's NID (`OBJ_txt2nid` of the capability's sigalg name: what a
+    /// certificate signed with it reports), or `NID_undef`.
+    pub sig_nid: i32,
+    /// Its hash's NID (the capability's hash name), or `NID_undef` for none.
+    pub hash_nid: i32,
 }
 
 /// A public key's algorithm, as the signature-algorithm checks tell them apart

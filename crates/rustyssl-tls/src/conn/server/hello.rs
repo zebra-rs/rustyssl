@@ -83,6 +83,14 @@ pub(crate) fn process_client_hello(
     body: &[u8],
 ) -> Result<MsgProcess> {
     if state(c)?.setup_pending {
+        // A renegotiation reads the settings as they are now (`tls_setup_handshake` and the
+        // ClientHello's processing read them from the connection).
+        if !c.first_handshake
+            && c.cfg.callbacks.renegotiating
+            && ask_once(c, Request::Renegotiating, 0).is_none()
+        {
+            return Ok(MsgProcess::Ask);
+        }
         // The `TLS_ST_OK` write transition's `tls_setup_handshake`, which starts a fresh
         // transcript: this ClientHello is its first message.
         common::setup_handshake(c, p)?;

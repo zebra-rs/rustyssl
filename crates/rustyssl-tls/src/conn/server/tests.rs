@@ -142,6 +142,7 @@ fn rsa_cert(p: &TestProvider) -> CertKey {
         ocsp_response: None,
         chain_security: None,
         unsupported_digests: Vec::new(),
+        strict: None,
     }
 }
 
@@ -1210,17 +1211,23 @@ fn ticket_session_encoding_round_trips() {
         ext_flags: 1,
         ticket_appdata: Some(b"app".to_vec()),
         kex_group: 0x001d,
+        srp_username: Some(b"user".to_vec()),
     };
     let enc = ticket::encode_session(&s).unwrap();
-    assert_eq!(enc.first(), Some(&7));
+    assert_eq!(enc.first(), Some(&15));
     assert_eq!(ticket::decode_session(&enc), Some(s.clone()));
     assert_eq!(ticket::decode_session(&enc[..enc.len() - 1]), None);
     let mut over = enc.clone();
     over.push(0);
     assert_eq!(ticket::decode_session(&over), None);
     assert_eq!(ticket::decode_session(&[2]), None);
-    // Each optional field alone, and neither (format 1, the length the trace shows).
-    for (appdata, rpk, format) in [(false, false, 1), (true, false, 3), (false, true, 5)] {
+    // Each optional field alone, and none (format 1, the length the trace shows).
+    for (appdata, rpk, srp, format) in [
+        (false, false, false, 1),
+        (true, false, false, 3),
+        (false, true, false, 5),
+        (false, false, true, 9),
+    ] {
         let mut t = s.clone();
         if !appdata {
             t.ticket_appdata = None;
@@ -1228,13 +1235,16 @@ fn ticket_session_encoding_round_trips() {
         if !rpk {
             t.peer_rpk = None;
         }
+        if !srp {
+            t.srp_username = None;
+        }
         let enc = ticket::encode_session(&t).unwrap();
         assert_eq!(enc.first(), Some(&format));
         assert_eq!(ticket::decode_session(&enc), Some(t));
     }
     let mut unknown = enc;
     if let Some(f) = unknown.first_mut() {
-        *f |= 8;
+        *f |= 16;
     }
     assert_eq!(ticket::decode_session(&unknown), None);
 }
@@ -1861,6 +1871,34 @@ fn tls12_client_renegotiation_refused_by_default() {
     assert!(!out.is_empty());
     assert!(c.error().is_none());
     assert_eq!(c.state(), abi::TLS_ST_OK);
+    assert_eq!(c.alerts().0, Some((1, 100)));
+}
+
+#[test]
+fn a_client_renegotiation_asks_for_fresh_settings() {
+    let p = TestProvider::new(b"reneg-refresh");
+    let mut cfg = server_config(&p);
+    cfg.options |= abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION;
+    cfg.callbacks.renegotiating = true;
+    let (mut c, mut client, _) = handshake12(&p, cfg, &hello12(&[0xc02f]));
+    let h = no_scsv(hello12(&[0xc02f])).with(
+        t::RENEGOTIATE,
+        crate::msgs::ext::renegotiate::encode(&client.c.neg.client_finished).unwrap(),
+    );
+    client
+        .c
+        .write_record(&p, record::content_type::handshake(), &h.msg())
+        .unwrap();
+    c.feed(&client.c.take_output());
+    assert_eq!(c.step(&p, true).unwrap(), Event::NeedInput);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::Request(Request::Renegotiating));
+    // Renegotiation turned off since the first handshake: the server now refuses it.
+    c.config_mut().options |= abi::SSL_OP_NO_RENEGOTIATION;
+    c.answer(crate::conn::Answer::Continue);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert!(!out.is_empty());
     assert_eq!(c.alerts().0, Some((1, 100)));
 }
 

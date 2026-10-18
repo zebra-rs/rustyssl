@@ -619,6 +619,7 @@ fn client_cert(p: &TestProvider) -> crate::conn::CertKey {
         ocsp_response: None,
         chain_security: None,
         unsupported_digests: Vec::new(),
+        strict: None,
     }
 }
 
@@ -2033,6 +2034,7 @@ fn server_config(p: &TestProvider) -> Config {
             ocsp_response: None,
             chain_security: None,
             unsupported_digests: Vec::new(),
+            strict: None,
         }],
         max_cert_list: 102_400,
         max_send_fragment: 16384,

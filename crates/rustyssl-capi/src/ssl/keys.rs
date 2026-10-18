@@ -604,8 +604,10 @@ unsafe fn install(
         }
         privatekey
     };
+    // SAFETY: the live owner.
+    let types = unsafe { with_cert(owner, |c| c.provider_types.clone()) }.unwrap_or_default();
     // SAFETY: the certificate's key.
-    let Some(i) = (unsafe { cert::lookup_by_pkey(pubkey) }) else {
+    let Some(i) = (unsafe { cert::lookup_by_pkey(pubkey, &types) }) else {
         err::raise(ERR_LIB_SSL, SSL_R_UNKNOWN_CERTIFICATE_TYPE, f);
         return 0;
     };

@@ -331,7 +331,9 @@ fn mirror(st: &mut SslState, c: &Connection) {
     st.in_init = c.event_in_init();
     st.flow_uninited = c.before();
     let n = c.negotiated();
-    if n.cipher.is_some() {
+    // Once the hellos chose it (`ssl_choose_server_version` sets `s->version` before the
+    // certificate callback runs), or with a suite.
+    if n.cipher.is_some() || (!c.before() && c.version_decided()) {
         st.version = c_int::from(n.version);
     }
     st.shutdown =

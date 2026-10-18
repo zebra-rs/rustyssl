@@ -797,7 +797,10 @@ fn init_one(c: &mut Connection, idx: usize, _context: u32) {
                 c.neg.server_cert_type = x509();
             }
         }
-        t::SIGNATURE_ALGORITHMS => sh.peer_sigalgs = None,
+        t::SIGNATURE_ALGORITHMS => {
+            sh.peer_sigalgs = None;
+            c.neg.peer_sigalgs.clear();
+        }
         t::PSK_KEY_EXCHANGE_MODES => sh.psk_kex_mode = KEX_MODE_FLAG_NONE,
         t::COMPRESS_CERTIFICATE => sh.compress_certificate_from_peer.clear(),
         t::CERTIFICATE_AUTHORITIES => c.neg.peer_ca_names = None,

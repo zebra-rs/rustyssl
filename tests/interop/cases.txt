@@ -1,5 +1,5 @@
 # TLS interop cases (cargo xtask test-interop): name | s_server arguments | s_client arguments.
-# Placeholders: {rsa} {ec} {p521} {ed25519} (the server's certificate and key), {client} (the
+# Placeholders: {rsa} {ec} {p521} {ed25519} {mldsa65} (the server's certificate and key), {client} (the
 # client's), {ca} (the root), {srpvfile} (an SRP verifier file: user "user", password
 # "password"), {dir} (the PKI's directory).
 # Client directives: +full (no -brief; the session lines), +resume (a second connection
@@ -18,6 +18,8 @@ tls13-ffdhe2048 | | {ca} -groups ffdhe2048
 tls13-hrr | -groups P-384 | {ca} -groups X25519:P-384
 tls13-ec-cert | {ec} | {ca}
 tls13-ed25519-cert | {ed25519} | {ca}
+tls13-mldsa65-cert | {mldsa65} | {ca}
+tls13-rsa-and-mldsa65 | -dcert {dir}/mldsa65.pem -dkey {dir}/mldsa65.key | {ca} -sigalgs mldsa65:rsa_pss_rsae_sha256
 tls13-pss | | {ca} -sigalgs rsa_pss_rsae_sha384
 tls12-ecdhe-rsa-gcm | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256
 tls12-ecdhe-rsa-cbc | | {ca} -tls1_2 -cipher ECDHE-RSA-AES256-SHA384

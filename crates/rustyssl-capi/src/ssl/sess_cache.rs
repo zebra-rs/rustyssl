@@ -915,6 +915,7 @@ pub(crate) fn to_core(d: &SessData) -> Session {
         ext_flags: d.ext_flags,
         ticket_appdata: d.ticket_appdata.as_ref().map(|a| a.to_vec()),
         kex_group: u16::try_from(d.kex_group).unwrap_or(0),
+        srp_username: d.srp_username.as_ref().map(|u| u.as_bytes().to_vec()),
     }
 }
 
@@ -971,6 +972,10 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
         .map(|a| a.clone().into_boxed_slice());
     // This handshake's group, or (a resumption without a key exchange) the session's.
     d.kex_group = u32::from(group.unwrap_or(c.kex_group));
+    d.srp_username = c
+        .srp_username
+        .as_ref()
+        .and_then(|u| CString::new(u.clone()).ok());
     if let Some(k) = &c.peer_rpk {
         d.peer_rpk = spki_key(st, k);
     }

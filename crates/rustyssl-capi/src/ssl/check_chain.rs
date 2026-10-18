@@ -99,6 +99,49 @@ unsafe fn cert_type(pk: *const EVP_PKEY) -> u8 {
     0
 }
 
+/// What the core checks of a certificate, its key, and its chain (`chain`, the certificates
+/// after the leaf), for the key's slot `slot`.
+///
+/// # Safety
+/// `x` and `pk` are live; `chain` holds live certificates (NULL entries are skipped).
+pub(crate) unsafe fn candidate(
+    prov: Option<&EvpProvider>,
+    x: *mut X509,
+    pk: *mut EVP_PKEY,
+    chain: &[*mut X509],
+    slot: usize,
+) -> ChainCandidate {
+    // SAFETY: the caller's certificate.
+    let leaf = unsafe { cert_of(prov, x) };
+    let rest = chain
+        .iter()
+        .filter(|y| !y.is_null())
+        // SAFETY: a certificate of the caller's chain.
+        .map(|&y| unsafe { cert_of(prov, y) })
+        .collect();
+    let (mut md, mut pknid) = (NID_undef, NID_undef);
+    // SAFETY: the caller's certificate; our slots.
+    let info = unsafe {
+        X509_get_signature_info(
+            x,
+            &raw mut md,
+            &raw mut pknid,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    } != 0;
+    ChainCandidate {
+        leaf,
+        chain: rest,
+        slot: Some(slot),
+        // SAFETY: the caller's key.
+        cert_type: unsafe { cert_type(pk) },
+        // SAFETY: as above.
+        curve_nid: unsafe { super::io::config::curve_nid(pk) },
+        sig_info: info.then_some((md, pknid)),
+    }
+}
+
 ffi_export! {
     /// The `CERT_PKEY_*` flags of `x` with `pk` and `chain` for the connection's handshake
     /// (`CERT_PKEY_VALID` when usable); 0 for a NULL certificate or key, or a key of no slot.
@@ -114,42 +157,24 @@ ffi_export! {
         if x.is_null() || pk.is_null() {
             return 0;
         }
+        let types = c.state().cert.provider_types.clone();
         // SAFETY: the caller's key.
-        let Some(slot) = (unsafe { super::cert::lookup_by_pkey(pk) }) else { return 0 };
+        let Some(slot) = (unsafe { super::cert::lookup_by_pkey(pk, &types) }) else { return 0 };
         // SAFETY: the caller's connection.
         if !unsafe { super::io::ensure_core(s, c) } {
             return 0;
         }
         let prov = c.state().drv.provider.clone();
         let prov = prov.as_deref();
-        // SAFETY: the caller's certificate.
-        let leaf = unsafe { cert_of(prov, x) };
         let mut rest = Vec::new();
         // SAFETY: the caller's stack, or NULL (-1).
         let n = unsafe { OPENSSL_sk_num(chain.cast()) };
         for i in 0..n.max(0) {
             // SAFETY: an index in range.
-            let y: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), i) }.cast();
-            if !y.is_null() {
-                // SAFETY: a certificate of the stack.
-                rest.push(unsafe { cert_of(prov, y) });
-            }
+            rest.push(unsafe { OPENSSL_sk_value(chain.cast(), i) }.cast::<X509>());
         }
-        let (mut md, mut pknid) = (NID_undef, NID_undef);
-        // SAFETY: the caller's certificate; our slots.
-        let info = unsafe {
-            X509_get_signature_info(x, &raw mut md, &raw mut pknid, ptr::null_mut(), ptr::null_mut())
-        } != 0;
-        let cand = ChainCandidate {
-            leaf,
-            chain: rest,
-            slot: Some(slot),
-            // SAFETY: the caller's key.
-            cert_type: unsafe { cert_type(pk) },
-            // SAFETY: as above.
-            curve_nid: unsafe { super::io::config::curve_nid(pk) },
-            sig_info: info.then_some((md, pknid)),
-        };
+        // SAFETY: the caller's certificate, key, and stack's certificates.
+        let cand = unsafe { candidate(prov, x, pk, &rest, slot) };
         let st = c.state();
         let Some(core) = st.drv.tls.as_deref() else { return 0 };
         c_int::try_from(check_chain(core, &cand)).unwrap_or(0)
