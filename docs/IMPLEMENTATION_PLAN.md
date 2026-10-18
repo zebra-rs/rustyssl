@@ -5115,15 +5115,28 @@ The upstream cms, pkcs12, ocsp, ts, and cmp recipes pass.
 
 Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 → 7.5 → 7.6 (**M4**).
 
-- [ ] **7.1 Sans-IO TLS core** (`rustyssl-tls`):
-  - the record layer: version-specific protection, fragmentation, the
-    `max_fragment_length` and `record_size_limit` extensions, padding
-  - a typed codec for every handshake message and extension (unknown extensions are kept for
-    the callbacks)
-  - client and server state machines (typestate internally, mapped to OpenSSL's observable
-    `SSL_ST_*` and `SSL_state_string(_long)` values)
-  - the key schedule and transcript hash
-  - crypto calls into `rustyssl-crypto`
+- [x] **7.1 Sans-IO TLS core** (`rustyssl-tls`; ADR 0002: a sans-IO, crypto-agnostic core that
+  yields at every observable event):
+  - `codec` (the presentation language), `error` (an alert plus OpenSSL's `SSL_R_*` reason),
+    `crypto::Provider` (the cryptography a connection needs; `rustyssl-capi` implements it with
+    EVP fetches on the `SSL_CTX`'s library context, `testprov` with `rustyssl-crypto` for tests)
+  - `suites` (OpenSSL's cipher table, `SSL_CIPHER_description` byte-exact) and `cipherstring`
+    (the cipher-string language, golden-tested against the reference's `openssl ciphers`)
+  - `msgs` (every handshake message and extension, OpenSSL's `ext_defs` order and collection
+    rules; RFC 8448's 41 vectors round-trip byte-exactly)
+  - `record` (TLS 1.0–1.3 protection, constant-time CBC padding and MAC checks, EtM,
+    fragmentation, padding) and `keysched` (TLS 1.3 schedule, TLS 1.0–1.2 PRFs and EMS,
+    exporters, keylog lines, the transcript)
+  - `conn` (the state machine's driver ported from `statem.c`; the read path from
+    `ssl3_read_bytes`; `common` from `statem_lib.c`, `t1_lib.c`, `tls13_enc.c`, `t1_enc.c`,
+    `extensions.c`; `client` and `server` from `statem_clnt.c`/`statem_srvr.c` and their
+    extension files): TLS 1.3 and 1.2 handshakes, HRR, resumption by session ID, tickets, and
+    PSK binders, external PSKs, early data, KeyUpdate, post-handshake authentication, secure
+    renegotiation, OCSP stapling, EMS, EtM. Callbacks are requests answered by the caller (no
+    C runs inside the core). RFC 8448's traces are replayed against both roles (the server's
+    messages in OpenSSL's extension order, as the RFC's server is NSS), and a client/server
+    loopback runs TLS 1.3 and 1.2.
+  - Tests: 145 unit tests; fuzz targets `tls_msgs` and `tls_record`.
 - [ ] **7.2 SSL objects in capi:**
   - the `SSL_METHOD` set
   - `SSL_CTX` and `SSL` lifecycle and refcounts, CTX → SSL inheritance, `SSL_set_SSL_CTX`,
@@ -5137,6 +5150,15 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - `SSL_MODE_*` (partial write, moving buffer, auto-retry, release buffers)
   - `SSL_shutdown` (bidirectional, quiet shutdown), `SSL_clear`, `SSL_do_handshake`,
     `SSL_connect`, `SSL_accept`
+  - Progress: the driver (`rustyssl-capi/src/ssl/io*`) runs the core's step loop behind these
+    entry points. It takes the core connection out of the lock for each step and puts it back
+    (with the mirrored state) before any callback or BIO call, so the getters work from
+    callbacks; a nested drive from a callback fails with `ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED`.
+    Without read-ahead it reads exactly one record at a time, as `ssl3_read_n` does. The
+    handshake getters, `SSL_state_string(_long)`, the alert strings, `SSL_select_next_proto`
+    and `SSL_group_to_name` are done. `tests/c/ssl_io_idle.c` passes on both libraries;
+    `ssl_handshake.c`, `ssl_io.c` and `ssl_shutdown.c` pass on the reference and wait for the
+    client and server state machines (7.3, 7.4).
 - [ ] **7.3 TLS 1.3:**
   - the full handshake, HRR, and the default 3.5 groups and key shares (hybrid
     **X25519MLKEM768** and X25519), including the 3.5 group-list syntax (tuples and key-share
@@ -5176,6 +5198,10 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - the info, msg, and keylog callbacks, with exact argument values
   - `SSL_SESSION`: the full API, a **wire-compatible `i2d`/`d2i_SSL_SESSION`** so external
     session caches interoperate, the cache modes and callbacks, and `flush_sessions(_ex)`
+    (done: `ssl/session.rs`, `sess_asn1.rs`, `sess_cache.rs`; `tests/c/ssl_session.c` and
+    `ssl_sess_cache.c` match the reference byte for byte, resumption by ID and ticket in
+    TLS 1.2 and by ticket in TLS 1.3; `SSL_set_session_secret_cb`, `SSL_set_session_ticket_ext`
+    and `SSL_new_session_ticket` remain)
   - `SSL_export_keying_material(_early)`, `get_finished`, `client_random`/`server_random`,
     `master_key`
   - `SSL_get_shared_ciphers` buffer semantics, the get0 vs. get1 peer-certificate ownership

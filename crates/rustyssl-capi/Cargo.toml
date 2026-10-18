@@ -18,5 +18,8 @@ rustyssl-pki.workspace = true
 rustyssl-tls.workspace = true
 subtle.workspace = true
 
+[dev-dependencies]
+rustyssl-tls = { workspace = true, features = ["test-provider"] }
+
 [lints]
 workspace = true

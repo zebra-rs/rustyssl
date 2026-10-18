@@ -1,0 +1,26 @@
+# TLS interop cases (cargo xtask test-interop): name | s_server arguments | s_client arguments.
+# Placeholders: {rsa} {ec} {ed25519} (the server's certificate and key), {ca} (the root).
+# Each case runs in four pairings (reference/reference is the expectation; the server echoes
+# lines reversed and closes on CLOSE).
+
+tls13-default | | {ca}
+tls13-aes256 | -ciphersuites TLS_AES_256_GCM_SHA384 | {ca}
+tls13-chacha | | {ca} -ciphersuites TLS_CHACHA20_POLY1305_SHA256
+tls13-x25519 | | {ca} -groups X25519
+tls13-p256 | | {ca} -groups P-256
+tls13-p384 | | {ca} -groups P-384
+tls13-x25519mlkem768 | | {ca} -groups X25519MLKEM768
+tls13-ffdhe2048 | | {ca} -groups ffdhe2048
+tls13-hrr | -groups P-384 | {ca} -groups X25519:P-384
+tls13-ec-cert | {ec} | {ca}
+tls13-ed25519-cert | {ed25519} | {ca}
+tls13-pss | | {ca} -sigalgs rsa_pss_rsae_sha384
+tls12-ecdhe-rsa-gcm | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256
+tls12-ecdhe-rsa-cbc | | {ca} -tls1_2 -cipher ECDHE-RSA-AES256-SHA384
+tls12-ecdhe-rsa-cbc-no-etm | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-SHA -no_etm
+tls12-ecdhe-ecdsa | {ec} | {ca} -tls1_2 -cipher ECDHE-ECDSA-AES256-GCM-SHA384
+tls12-ecdhe-chacha | | {ca} -tls1_2 -cipher ECDHE-RSA-CHACHA20-POLY1305
+tls12-dhe-rsa | -dhparam ffdhe2048 | {ca} -tls1_2 -cipher DHE-RSA-AES128-GCM-SHA256
+tls12-rsa-kx | | {ca} -tls1_2 -cipher AES128-GCM-SHA256
+tls12-no-ems | | {ca} -tls1_2 -no_ems
+tls12-ed25519 | {ed25519} | {ca} -tls1_2

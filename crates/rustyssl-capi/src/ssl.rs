@@ -1,5 +1,32 @@
 //! libssl's functions, written as `rustyssl_private_*` twins that libssl's generated
-//! forwarders call (ADR 0001). So far, library initialization (`ssl_init.c`).
+//! forwarders call (ADR 0001): library initialization (`ssl_init.c`) here; the methods, the
+//! context and connection objects, their certificates and keys, and the CA lists in the
+//! modules. The handshake (ADR 0002) plugs into [`conn::SslState`].
+
+pub(crate) mod accessors;
+pub(crate) mod bio_ssl;
+pub(crate) mod ca;
+pub(crate) mod cert;
+pub(crate) mod ciphers;
+pub(crate) mod clienthello;
+pub(crate) mod conf;
+pub(crate) mod conn;
+pub(crate) mod ct;
+pub(crate) mod ctx;
+pub(crate) mod dane;
+pub(crate) mod io;
+pub(crate) mod keys;
+pub(crate) mod lists;
+pub(crate) mod method;
+pub(crate) mod misc;
+pub(crate) mod npn;
+pub(crate) mod requests;
+pub(crate) mod sess_asn1;
+pub(crate) mod sess_cache;
+pub(crate) mod session;
+pub(crate) mod srtp;
+pub(crate) mod tls_provider;
+pub(crate) mod types;
 
 use core::ffi::{c_int, c_long};
 
