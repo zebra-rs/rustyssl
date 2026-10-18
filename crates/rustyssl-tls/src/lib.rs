@@ -8,13 +8,15 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::arithmetic_side_effects)]
 
+pub mod cipherstring;
 pub mod codec;
 pub mod consts;
 pub mod crypto;
 pub mod error;
-pub mod msgs;
 pub mod keysched;
+pub mod msgs;
 pub mod record;
+pub mod suites;
 
 /// A [`crypto::Provider`] over `rustyssl-crypto` directly, for the crate's tests and the fuzz
 /// targets (the non-default `test-provider` feature). Its randomness is deterministic: never
