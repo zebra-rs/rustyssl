@@ -101,10 +101,6 @@ pub struct State {
     hello_ready: bool,
     /// The ClientHello's octets before its extension block, for the padding extension.
     hello_prefix_len: usize,
-    /// Whether the session offered was loaded (`SSL_set_session`) rather than made new.
-    resuming: bool,
-    /// `s->version` when the ClientHello was made: the highest version offered.
-    hello_version: u16,
     /// Whether a CertificateStatus may follow the server's Certificate
     /// (`s->ext.status_expected`).
     status_expected: bool,
@@ -148,6 +144,15 @@ impl core::fmt::Debug for State {
             )
             .field("tick_identity", &self.tick_identity)
             .finish_non_exhaustive()
+    }
+}
+
+impl State {
+    /// The certificate types of the server's TLS 1.2 CertificateRequest
+    /// (`SSL_get0_certificate_types`); none in TLS 1.3.
+    #[must_use]
+    pub fn certificate_types(&self) -> &[u8] {
+        &self.ctype
     }
 }
 
@@ -1036,8 +1041,8 @@ pub(crate) fn construct_message(c: &mut Connection, p: &dyn Provider) -> Result<
 
 /// `tls_process_initial_server_flight`: the client's checks once the server's first flight is
 /// complete (after its TLS 1.3 Finished, or TLS 1.2's ServerHelloDone): the certificate suits
-/// the suite, and the OCSP status callback accepts the stapled response. In TLS 1.3 the
-/// callback's answer was asked for before the Finished was processed
+/// the suite, the OCSP status callback accepts the stapled response, and CT validation passes.
+/// In TLS 1.3 the answers were asked for before the Finished was processed
 /// ([`flight::initial_flight_answers`]), as `tls_process_finished` can't wait.
 ///
 /// # Errors

@@ -49,19 +49,11 @@ fn prepare(c: &mut Connection, p: &dyn Provider) -> Result<()> {
         Some(c.neg.session.clone())
     };
     let usable = offered.filter(|s| version::supported(c, s.version) && resumable(s));
-    match usable {
-        Some(s) => {
-            if hrr == Hrr::None {
-                c.neg.session = s;
-                state(c)?.resuming = true;
-            }
-        }
-        None => {
-            if hrr == Hrr::None {
-                c.neg.session = new_session(c);
-                state(c)?.resuming = false;
-            }
-        }
+    if hrr == Hrr::None {
+        c.neg.session = match usable {
+            Some(s) => s,
+            None => new_session(c),
+        };
     }
     if hrr == Hrr::None {
         let mut r = [0u8; 32];
@@ -86,10 +78,7 @@ fn prepare(c: &mut Connection, p: &dyn Provider) -> Result<()> {
         let id = c.neg.session.session_id.clone();
         state(c)?.tmp_session_id = id;
     }
-    let ver = c.neg.version;
-    let st = state(c)?;
-    st.hello_ready = true;
-    st.hello_version = ver;
+    state(c)?.hello_ready = true;
     Ok(())
 }
 

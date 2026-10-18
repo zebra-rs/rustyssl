@@ -143,6 +143,13 @@ pub enum Request {
         /// The key size the callback is given.
         bits: i32,
     },
+    /// A client's CT validation once the server's first flight is in (`ssl_validate_ct` with
+    /// `SSL_set_ct_validation_callback`'s callback): the SCTs received (the extension's in
+    /// the negotiated `scts`, the stapled OCSP response's, the leaf's) checked against the
+    /// verified chain. Answered [`Answer::Continue`] when they pass, or [`Answer::Fail`] with
+    /// OpenSSL's alert and reason, which stops the handshake only with `SSL_VERIFY_PEER`
+    /// (shared addition, fork F).
+    CtValidate,
 }
 
 /// The application's answer to a [`Request`].

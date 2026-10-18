@@ -2185,3 +2185,40 @@ fn tls12_next_protocol_negotiation() {
     assert_eq!(*fin, s.finished(true));
     assert_eq!(c.negotiated().npn.as_deref(), Some(&b"h2"[..]));
 }
+
+#[test]
+fn tls12_certificate_transparency() {
+    for (verify, fails) in [(abi::SSL_VERIFY_PEER, true), (abi::SSL_VERIFY_NONE, false)] {
+        let p = TestProvider::new(b"tls12-ct");
+        let mut cfg = client12();
+        cfg.request_scts = true;
+        cfg.verify_mode = verify;
+        let (mut c, mut seen, mut s) = hello12(&p, cfg);
+        assert_eq!(hello_ext(&s.transcript[4..], 0x0012), Some(Vec::new()));
+        let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS, (0x0012, &[0, 2, 0, 0])]);
+        input.extend(s.certificate());
+        let params = s.ecdhe_params(0x001d);
+        input.extend(s.ske(&params, 0x0804));
+        input.extend(s.done());
+        c.feed(&input);
+        let mut refuse = |r: &Request| match r {
+            Request::CtValidate => Answer::Fail {
+                alert: Some(40),
+                reason: abi::SSL_R_CALLBACK_FAILED,
+            },
+            _ => accept(r),
+        };
+        let r = drive(&mut c, &p, false, &mut refuse, &mut seen);
+        assert!(seen.requests.contains(&Request::CtValidate));
+        assert_eq!(c.negotiated().scts, Some(vec![0, 2, 0, 0]));
+        if fails {
+            assert_eq!(
+                r.unwrap_err(),
+                Error::alert(abi::SSL_AD_HANDSHAKE_FAILURE, abi::SSL_R_CALLBACK_FAILED)
+            );
+        } else {
+            assert_eq!(r.unwrap(), Event::NeedInput);
+            assert_eq!(seen.written.len(), 2);
+        }
+    }
+}

@@ -528,8 +528,9 @@ fn status_result(a: &Answer) -> Result<()> {
     Ok(())
 }
 
-/// `tls_process_initial_server_flight`: `Ok(false)` while the status callback's answer is
-/// awaited.
+/// `tls_process_initial_server_flight`: the certificate suits the suite, the OCSP status
+/// callback accepts the stapled response ([`Request::Status`]), and the SCTs pass CT
+/// validation ([`Request::CtValidate`]). `Ok(false)` while an answer is awaited.
 ///
 /// # Errors
 /// OpenSSL's alert and reason.
@@ -541,12 +542,43 @@ pub(super) fn initial_server_flight(c: &mut Connection, p: &dyn Provider) -> Res
         };
         status_result(&a)?;
     }
+    if c.cfg.request_scts {
+        let Some(a) = ask_once(c, Request::CtValidate, 0) else {
+            return Ok(false);
+        };
+        ct_result(c, &a)?;
+    }
     Ok(true)
 }
 
-/// Before a TLS 1.3 server Finished is processed: asks the status callback when processing
-/// it will (a Finished that checks out, a certificate that suits the suite), as the
-/// Finished's processing can't wait for the answer. `Ok(false)` while it is awaited.
+/// The CT validation's verdict on its answer: a failure counts with `SSL_VERIFY_PEER`.
+fn ct_result(c: &Connection, a: &Answer) -> Result<()> {
+    match a {
+        Answer::Continue | Answer::Allowed(true) => Ok(()),
+        Answer::Fail { alert, reason } => {
+            if c.cfg.verify_mode & abi::SSL_VERIFY_PEER == 0 {
+                return Ok(());
+            }
+            let al = alert.map_or(abi::SSL_AD_HANDSHAKE_FAILURE, c_int::from);
+            Err(Error::alert(al, *reason))
+        }
+        Answer::Allowed(false) => {
+            if c.cfg.verify_mode & abi::SSL_VERIFY_PEER == 0 {
+                return Ok(());
+            }
+            Err(Error::alert(
+                abi::SSL_AD_HANDSHAKE_FAILURE,
+                abi::SSL_R_CALLBACK_FAILED,
+            ))
+        }
+        _ => Err(Error::internal()),
+    }
+}
+
+/// Before a TLS 1.3 server Finished is processed: asks the status callback and the CT
+/// validation when processing it will (a Finished that checks out, a certificate that suits
+/// the suite), as the Finished's processing can't wait for the answers. `Ok(false)` while one
+/// is awaited.
 ///
 /// # Errors
 /// Never; `Result` for the caller.
@@ -556,7 +588,7 @@ pub(super) fn initial_flight_answers(
     body: &[u8],
 ) -> Result<bool> {
     use subtle::ConstantTimeEq;
-    if !status_wanted(c) || !c.hs_in.is_empty() {
+    if !(status_wanted(c) || c.cfg.request_scts) || !c.hs_in.is_empty() {
         return Ok(true);
     }
     let md = &c.hs.peer_finish_md;
@@ -566,7 +598,17 @@ pub(super) fn initial_flight_answers(
     if check_cert_and_algorithm(c, p).is_err() {
         return Ok(true);
     }
-    Ok(ask_once(c, Request::Status, 0).is_some())
+    if status_wanted(c) {
+        match ask_once(c, Request::Status, 0) {
+            None => return Ok(false),
+            Some(a) if status_result(&a).is_err() => return Ok(true),
+            Some(_) => {}
+        }
+    }
+    if c.cfg.request_scts {
+        return Ok(ask_once(c, Request::CtValidate, 0).is_some());
+    }
+    Ok(true)
 }
 
 /// `tls_process_new_session_ticket`: a TLS 1.2 ticket, or a TLS 1.3 ticket with its PSK
