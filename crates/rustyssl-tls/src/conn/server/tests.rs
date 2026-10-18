@@ -1626,6 +1626,40 @@ fn tls12_ecdhe_rsa_handshake_with_ticket() {
 }
 
 #[test]
+fn ssl3_legacy_version_fails_with_handshake_failure() {
+    // A TLS 1.3 ClientHello whose legacy_version is SSL 3.0: the version choice fails with
+    // protocol_version, which SSL 3.0 doesn't have, so the alert sent at that version is
+    // handshake_failure (`ssl3_send_alert`; tlsfuzzer's test-tls13-legacy-version
+    // "version (3, 0)").
+    let p = TestProvider::new(b"ssl3-legacy");
+    let x = p.key_share(group::X25519).unwrap();
+    let mut hello = Hello::tls13(&[group::X25519], &[(group::X25519, x.public().to_vec())]);
+    hello.legacy_version = v::SSL3;
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(abi::SSL_AD_PROTOCOL_VERSION, abi::SSL_R_BAD_LEGACY_VERSION)
+    );
+    assert_eq!(last_alert(&out).1, octet(abi::SSL_AD_HANDSHAKE_FAILURE));
+}
+
+#[test]
+fn tls12_from_a_legacy_version_in_the_dtls_range() {
+    // A TLS ClientHello's 0xfefe (or 0xfeff) is a version above TLS 1.2, not a DTLS one: the
+    // server negotiates TLS 1.2 (`ssl_version_cmp` goes by the connection; tlsfuzzer's
+    // test-version-numbers "very high version (254, 254)").
+    let p = TestProvider::new(b"tls12-fefe");
+    for legacy in [0xfefe, 0xfeff] {
+        let mut hello = hello12(&[0xc02f]);
+        hello.legacy_version = legacy;
+        let (c, _, _) = handshake12(&p, server_config(&p), &hello);
+        assert_eq!(c.neg.version, v::TLS1_2, "{legacy:#x}");
+    }
+}
+
+#[test]
 fn tls12_server_hello_extensions_in_openssl_order() {
     let p = TestProvider::new(b"tls12-sh");
     let mut c = Connection::new(server_config(&p));

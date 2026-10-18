@@ -1446,9 +1446,16 @@ impl Connection {
         // (`tls13_alert_code` / `tls1_alert_code`): an alert the version doesn't have isn't
         // sent, TLS 1.3's certificate_required and missing_extension become handshake_failure
         // before TLS 1.3; after close_notify, only close_notify goes out.
-        let Some(desc) = self.alert_value(desc) else {
+        let Some(mut desc) = self.alert_value(desc) else {
             return Ok(());
         };
+        // SSL 3.0 has no protocol_version alert: an alert sent at that version (a ClientHello
+        // whose legacy_version is SSL 3.0 failing the version choice) is handshake_failure.
+        if self.neg.version == crate::consts::version::SSL3
+            && desc == msgs_type(abi::SSL_AD_PROTOCOL_VERSION)
+        {
+            desc = msgs_type(abi::SSL_AD_HANDSHAKE_FAILURE);
+        }
         if self.shutdown & SENT_SHUTDOWN != 0 && desc != msgs_type(abi::SSL_AD_CLOSE_NOTIFY) {
             return Ok(());
         }

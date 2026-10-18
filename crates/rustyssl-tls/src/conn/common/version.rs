@@ -71,11 +71,12 @@ pub enum Downgrade {
     To11,
 }
 
-/// `ssl_version_cmp`: TLS versions count up, DTLS versions down (`DTLS1_BAD_VER` below
-/// DTLS 1.0).
+/// `ssl_version_cmp`: on a TLS connection versions count up, on a DTLS one down
+/// (`DTLS1_BAD_VER` below DTLS 1.0). The connection decides, not the values: a TLS peer's
+/// 0xfefe is just a high version.
 #[must_use]
-pub fn cmp(a: u16, b: u16) -> Ordering {
-    if is_dtls(a) || is_dtls(b) {
+pub fn cmp(dtls: bool, a: u16, b: u16) -> Ordering {
+    if dtls {
         let rank = |v: u16| if v == version::DTLS1_BAD { 0xff00 } else { v };
         return rank(b).cmp(&rank(a));
     }
@@ -91,12 +92,12 @@ fn v16(v: c_int) -> u16 {
 /// enabled, else the reason it isn't.
 fn method_error(c: &Connection, v: u16, mask: u64) -> Option<c_int> {
     let cfg = &c.cfg;
-    if (cfg.min_version != 0 && cmp(v, cfg.min_version) == Ordering::Less)
+    if (cfg.min_version != 0 && cmp(c.cfg.dtls, v, cfg.min_version) == Ordering::Less)
         || !security::check(c, abi::SSL_SECOP_VERSION, 0, c_int::from(v), SecOther::None)
     {
         return Some(abi::SSL_R_VERSION_TOO_LOW);
     }
-    if cfg.max_version != 0 && cmp(v, cfg.max_version) == Ordering::Greater {
+    if cfg.max_version != 0 && cmp(c.cfg.dtls, v, cfg.max_version) == Ordering::Greater {
         return Some(abi::SSL_R_VERSION_TOO_HIGH);
     }
     if cfg.options & mask != 0 {
@@ -255,7 +256,7 @@ pub fn choose_server(
 ) -> core::result::Result<Downgrade, c_int> {
     c.hs.sh.client_version = legacy_version;
     if c.cfg.method_version != ANY && !c.is_tls13() {
-        if cmp(legacy_version, c.neg.version) == Ordering::Less {
+        if cmp(c.cfg.dtls, legacy_version, c.neg.version) == Ordering::Less {
             return Err(abi::SSL_R_WRONG_SSL_VERSION);
         }
         return Ok(Downgrade::None);
@@ -277,7 +278,7 @@ pub fn choose_server(
         let mut best = 0u16;
         let mut l = list;
         while let Ok(cand) = l.u16() {
-            if cmp(cand, best) != Ordering::Greater {
+            if cmp(c.cfg.dtls, cand, best) != Ordering::Greater {
                 continue;
             }
             if supported(c, cand) {
@@ -304,14 +305,15 @@ pub fn choose_server(
         return Ok(d);
     }
     // Without supported_versions, TLS 1.2 is the most a client can get.
-    let client_version = if !c.cfg.dtls && cmp(legacy_version, version::TLS1_3) != Ordering::Less {
-        version::TLS1_2
-    } else {
-        legacy_version
-    };
+    let client_version =
+        if !c.cfg.dtls && cmp(c.cfg.dtls, legacy_version, version::TLS1_3) != Ordering::Less {
+            version::TLS1_2
+        } else {
+            legacy_version
+        };
     let mut disabled = false;
     for &(v, mask) in table(c) {
-        if cmp(client_version, v) == Ordering::Less || v == version::DTLS1_BAD {
+        if cmp(c.cfg.dtls, client_version, v) == Ordering::Less || v == version::DTLS1_BAD {
             continue;
         }
         if method_error(c, v, mask).is_none() {
@@ -375,7 +377,9 @@ fn choose_client_inner(c: &mut Connection, version_chosen: u16, hrr: bool) -> Re
         Ok(v) => v,
         Err(r) => return fail(c, abi::SSL_AD_PROTOCOL_VERSION, r),
     };
-    if cmp(version_chosen, min) == Ordering::Less || cmp(version_chosen, max) == Ordering::Greater {
+    if cmp(c.cfg.dtls, version_chosen, min) == Ordering::Less
+        || cmp(c.cfg.dtls, version_chosen, max) == Ordering::Greater
+    {
         return fail(
             c,
             abi::SSL_AD_PROTOCOL_VERSION,
