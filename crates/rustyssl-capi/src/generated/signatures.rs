@@ -20320,6 +20320,12 @@ const _: unsafe extern "C" fn(
     ::core::option::Option<unsafe extern "C" fn()>,
 ) -> core::ffi::c_long = crate::ssl::conn::rustyssl_private_SSL_callback_ctrl;
 const _: unsafe extern "C" fn(*mut SSL) = crate::ssl::conn::rustyssl_private_SSL_certs_clear;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+) -> core::ffi::c_int = crate::ssl::check_chain::rustyssl_private_SSL_check_chain;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::keys::rustyssl_private_SSL_check_private_key;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
