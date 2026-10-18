@@ -121,7 +121,8 @@ int main(void)
     errors();
     db = read_text(text, (int)(strstr(text, "V\tfour") - text), 3);
     check(db != NULL && sk_OPENSSL_PSTRING_num(db->data) == 3, "three rows");
-    printf("  fields %d, error %ld\n", db->num_fields, db->error);
+    /* TXT_DB_read leaves db->error uninitialized (OpenSSL_malloc'd), so it isn't printed. */
+    printf("  fields %d\n", db->num_fields);
     for (i = 0; i < (size_t)sk_OPENSSL_PSTRING_num(db->data); i++)
         show("row", sk_OPENSSL_PSTRING_value(db->data, (int)i), 3);
     dump(db);
