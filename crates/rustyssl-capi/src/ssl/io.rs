@@ -594,7 +594,16 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         if conn.in_init() {
             in_handshake = true;
         }
+        let (was_before, was_in_init) = (conn.before(), conn.in_init());
         let r = conn.step(&*prov, reading);
+        // A handshake's start (`tls_setup_handshake`) and a TLS 1.3 server's end, which the
+        // session cache counts.
+        let started = if was_before && !conn.before() {
+            Some(true)
+        } else {
+            (!was_in_init && conn.in_init() && !conn.is_tls13()).then_some(false)
+        };
+        let tls13_server_done = server && was_in_init && !conn.in_init() && conn.is_tls13();
         let out = conn.take_output();
         let have = x.state().drv.peer.from;
         let peers = peer_objects(&conn, have, server);
@@ -603,6 +612,9 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             st.drv.out.extend_from_slice(&out);
             mirror(&mut st, &conn);
             st.drv.tls = Some(conn);
+            if let Some(first) = started {
+                super::sess_cache::on_start(&mut st, first);
+            }
             peers.map(|mut p| {
                 // The verified chain stays until verification replaces it.
                 core::mem::swap(&mut p.verified, &mut st.drv.peer.verified);
@@ -611,10 +623,17 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         };
         // Freed with no lock held (ex_data callbacks).
         drop(old_peers);
+        if tls13_server_done {
+            // SAFETY: the caller's guarantee; no lock is held.
+            unsafe { super::sess_cache::on_finish_tls13_server(x) };
+        }
         let ev = match r {
             Ok(ev) => ev,
             Err(e) => {
                 raise_core(&e, function);
+                // A fatal alert (sent or received) takes the session out of the cache.
+                // SAFETY: as above.
+                unsafe { super::sess_cache::on_fatal(x) };
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { flush(x) };
@@ -644,8 +663,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     unsafe { cb(s, l.as_ptr()) };
                 }
             }
-            // Sessions and their cache arrive with `SSL_SESSION`: nothing to update yet.
-            Event::UpdateCache { .. } | Event::RemoveSession => {}
+            Event::UpdateCache { server } => {
+                // SAFETY: as above.
+                unsafe { super::sess_cache::on_update_cache(s, x, server) };
+            }
+            Event::RemoveSession => {
+                // SAFETY: as above.
+                unsafe { super::sess_cache::on_remove_session(x) };
+            }
             Event::Request(req) => {
                 // SAFETY: as above.
                 match unsafe { requests::handle(s, x, snap.as_ref(), req) } {
