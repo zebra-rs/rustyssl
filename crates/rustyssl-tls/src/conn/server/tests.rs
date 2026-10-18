@@ -177,6 +177,7 @@ struct Client {
     c: Connection,
     input: Vec<u8>,
     hs: Vec<u8>,
+    ccs: usize,
 }
 
 impl Client {
@@ -189,6 +190,7 @@ impl Client {
             c,
             input: Vec::new(),
             hs: Vec::new(),
+            ccs: 0,
         }
     }
 
@@ -198,10 +200,17 @@ impl Client {
             match self.c.rr.read(p, &self.input).unwrap() {
                 Read::NeedMore(_) => return None,
                 Read::IgnoredCcs { consumed, .. } => {
+                    self.ccs = self.ccs.saturating_add(1);
                     self.input.drain(..consumed);
                 }
                 Read::Record { consumed, record } => {
                     self.input.drain(..consumed);
+                    if record.content_type == record::content_type::change_cipher_spec() {
+                        // The middlebox compatibility ChangeCipherSpec.
+                        assert_eq!(record.data, [1]);
+                        self.ccs = self.ccs.saturating_add(1);
+                        continue;
+                    }
                     return Some((record.content_type, record.data));
                 }
             }
@@ -1160,4 +1169,94 @@ fn x509_errors_become_openssls_alerts() {
         abi::SSL_AD_UNKNOWN_CA
     );
     assert_eq!(x509err2alert(12345), abi::SSL_AD_CERTIFICATE_UNKNOWN);
+}
+
+#[test]
+fn middlebox_compatibility_change_cipher_spec() {
+    let p = TestProvider::new(b"middlebox");
+    let mut cfg = server_config(&p);
+    cfg.options |= abi::SSL_OP_ENABLE_MIDDLEBOX_COMPAT;
+    let (mut c, mut client, _) = handshake13(&p, cfg, |share| {
+        let mut h = x25519_hello(share);
+        h.session_id = vec![0x5a; 32];
+        h
+    });
+    // One ChangeCipherSpec, after the ServerHello; the session ID is echoed.
+    assert_eq!(client.ccs, 1);
+    assert_eq!(super::state_ref(&c).unwrap().tmp_session_id, [0x5a; 32]);
+    client.application_read(&p);
+    c.feed(&client.finished(&p));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+}
+
+#[test]
+fn post_handshake_authentication() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"pha");
+    let mut cfg = server_config(&p);
+    cfg.verify_mode = abi::SSL_VERIFY_PEER | abi::SSL_VERIFY_POST_HANDSHAKE;
+    let (mut c, mut client, flight) = handshake13(&p, cfg, |share| {
+        x25519_hello(share).with(t::POST_HANDSHAKE_AUTH, Vec::new())
+    });
+    // No CertificateRequest during the handshake.
+    assert!(flight.iter().all(|m| m[0] != ht::CERTIFICATE_REQUEST));
+    assert_eq!(c.hs.sh.pha, Pha::ExtReceived);
+    client.application_read(&p);
+    let fin = client.finished(&p);
+    client.application_write(&p);
+    c.feed(&fin);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    client.input.extend_from_slice(&out);
+    for _ in 0..2 {
+        assert_eq!(client.message(&p)[0], ht::NEW_SESSION_TICKET);
+    }
+    // `SSL_verify_client_post_handshake`.
+    c.hs.sh.pha = Pha::RequestPending;
+    c.start();
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.hs.sh.pha, Pha::Requested);
+    client.input.extend_from_slice(&out);
+    let cr = client.message(&p);
+    assert_eq!(cr[0], ht::CERTIFICATE_REQUEST);
+    assert_eq!(cr[4], 32, "a 32-octet context");
+    let context = cr[5..37].to_vec();
+    assert_eq!(c.hs.sh.pha_context.as_deref(), Some(&context[..]));
+    // The client answers: Certificate (with the context), CertificateVerify, and Finished
+    // (keyed with its application secret), continuing from its Finished.
+    client.c.hs.transcript.add(&cr);
+    let (der, key) = client_cert(&p);
+    let mut body = vec![32];
+    body.extend_from_slice(&context);
+    body.extend_from_slice(&certificate13(std::slice::from_ref(&der))[1..]);
+    let mut out = client.send(&p, ht::CERTIFICATE, &body);
+    let cv = client_cert_verify(&p, &client, key);
+    out.extend(client.send(&p, ht::CERTIFICATE_VERIFY, &cv));
+    let th = client.c.hs.transcript.current().unwrap();
+    let md = crate::keysched::verify_data_13(
+        &p,
+        HashAlg::Sha256,
+        client.c.hs.sh.keys.client_app_secret.bytes(),
+        &th,
+    )
+    .unwrap();
+    out.extend(client.send(&p, ht::FINISHED, &md));
+    c.feed(&out);
+    assert_eq!(c.step(&p, true).unwrap(), Event::NeedInput);
+    let (out, last) = drive_answering(&mut c, &p, &mut |_| crate::conn::Answer::Verified {
+        result: 0,
+        proceed: true,
+        verified_chain: Vec::new(),
+    });
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.hs.sh.pha, Pha::ExtReceived);
+    assert_eq!(c.neg.peer_chain, std::slice::from_ref(&der));
+    // New tickets follow, for the session with the client's certificate.
+    client.input.extend_from_slice(&out);
+    for _ in 0..2 {
+        assert_eq!(client.message(&p)[0], ht::NEW_SESSION_TICKET);
+    }
+    assert_eq!(c.neg.session.peer_chain, [der]);
 }

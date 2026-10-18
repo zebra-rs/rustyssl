@@ -158,6 +158,9 @@ fn flag(c: &Connection, f: impl Fn(&State) -> bool) -> bool {
 pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
     if !matches!(c.hs.role, RoleState::Server(_)) {
         c.hs.role = RoleState::Server(Box::default());
+        // `SSL_new`'s `key_update`: none pending (the shared state's default, 0, would be
+        // `SSL_KEY_UPDATE_NOT_REQUESTED`).
+        c.hs.sh.key_update = abi::SSL_KEY_UPDATE_NONE;
     }
     let s = state(c)?;
     s.hello = None;
