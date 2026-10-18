@@ -798,7 +798,7 @@ fn init_one(c: &mut Connection, idx: usize, _context: u32) {
         t::SIGNATURE_ALGORITHMS => sh.peer_sigalgs = None,
         t::PSK_KEY_EXCHANGE_MODES => sh.psk_kex_mode = KEX_MODE_FLAG_NONE,
         t::COMPRESS_CERTIFICATE => sh.compress_certificate_from_peer.clear(),
-        t::CERTIFICATE_AUTHORITIES => c.neg.peer_ca_names.clear(),
+        t::CERTIFICATE_AUTHORITIES => c.neg.peer_ca_names = None,
         _ => {}
     }
 }

@@ -545,19 +545,18 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
         v => u16::try_from(v).unwrap_or(0),
     };
-    let names = if st.server {
-        [
-            st.client_ca_names,
-            snap.client_ca_names,
-            st.ca_names,
-            snap.ca_names,
-        ]
-        .into_iter()
-        .find(|p| !p.is_null())
+    // `get_ca_names`: a server's client CA names (`SSL_get_client_CA_list`) unless they're
+    // missing or empty, else the CA names (`SSL_get0_CA_list`); each the connection's, else
+    // its context's.
+    let first = |a: *mut stack_st_X509_NAME, b: *mut stack_st_X509_NAME| {
+        if a.is_null() { b } else { a }
+    };
+    let client = first(st.client_ca_names, snap.client_ca_names);
+    // SAFETY: the connection's or context's list, or NULL (-1).
+    let names = if st.server && unsafe { OPENSSL_sk_num(client.cast()) } > 0 {
+        Some(client)
     } else {
-        [st.ca_names, snap.ca_names]
-            .into_iter()
-            .find(|p| !p.is_null())
+        Some(first(st.ca_names, snap.ca_names)).filter(|p| !p.is_null())
     };
     let ca_names = match names {
         // SAFETY: the connection's or context's names (no callbacks run while encoding).

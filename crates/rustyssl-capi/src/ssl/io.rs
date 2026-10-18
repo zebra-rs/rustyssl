@@ -165,6 +165,8 @@ pub(crate) struct Driver {
     /// TLS 1.3's early data state (`early_data_state`), kept here before the core exists and
     /// mirrored from it after.
     pub(crate) early_data_state: EarlyDataState,
+    /// The core's peer CA names that `SslState::peer_ca_names` was last made from.
+    pub(crate) peer_ca_names: Option<Vec<Vec<u8>>>,
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -231,6 +233,39 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
     }
 }
 
+/// `parse_ca_names`'s list, as `X509_NAME`s: the names the peer sent (NULL when it sent no
+/// list, empty when it sent an empty one), replacing the connection's.
+///
+/// # Safety
+/// `st.peer_ca_names` is NULL or the connection's own list.
+unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
+    // SAFETY: the caller's guarantee.
+    unsafe { OPENSSL_sk_pop_free(st.peer_ca_names.cast(), Some(super::ctx::name_free)) };
+    st.peer_ca_names = ptr::null_mut();
+    let Some(names) = names else {
+        return;
+    };
+    // SAFETY: no preconditions.
+    let sk: *mut rustyssl_abi::stack_st_X509_NAME = unsafe { OPENSSL_sk_new_null() }.cast();
+    if sk.is_null() {
+        return;
+    }
+    for der in names {
+        let Ok(len) = c_long::try_from(der.len()) else {
+            continue;
+        };
+        let mut p = der.as_ptr();
+        // SAFETY: the name's octets (the core checked that they decode).
+        let nm = unsafe { crate::x509::name::d2i_X509_NAME(ptr::null_mut(), &raw mut p, len) };
+        // SAFETY: our stack, which takes the name.
+        if !nm.is_null() && unsafe { OPENSSL_sk_push(sk.cast(), nm.cast()) } == 0 {
+            // SAFETY: not taken.
+            unsafe { crate::x509::name::X509_NAME_free(nm) };
+        }
+    }
+    st.peer_ca_names = sk;
+}
+
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
@@ -273,6 +308,11 @@ fn mirror(st: &mut SslState, c: &Connection) {
     own.clone_into(&mut st.finish_md);
     peer.clone_into(&mut st.peer_finish_md);
     st.drv.warn_alert = c.alerts().2;
+    if n.peer_ca_names != st.drv.peer_ca_names {
+        n.peer_ca_names.clone_into(&mut st.drv.peer_ca_names);
+        // SAFETY: the connection's own list, or NULL, replaced (no callbacks run).
+        unsafe { set_peer_ca_names(st, n.peer_ca_names.as_deref()) };
+    }
     if let Some(a) = &n.alpn
         && *a != st.drv.alpn
     {

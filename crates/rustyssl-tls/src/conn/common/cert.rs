@@ -174,7 +174,7 @@ fn parse_ca_names_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<()> {
             }
         }
     }
-    c.neg.peer_ca_names = names;
+    c.neg.peer_ca_names = Some(names);
     Ok(())
 }
 
