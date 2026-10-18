@@ -146,17 +146,21 @@ pub(crate) fn ext_construct_maxfragmentlen(
     Ok(ExtReturn::Sent(vec![mode]))
 }
 
-/// `tls_construct_ctos_srp`: the configuration carries no SRP username, so SRP suites are
-/// disabled and nothing is sent.
+/// `tls_construct_ctos_srp`: the SRP login, when one is set.
 ///
 /// # Errors
-/// Never; `Result` for the dispatch.
+/// A login over 255 octets (internal-error).
 pub(crate) fn ext_construct_srp(
-    _c: &mut Connection,
+    c: &mut Connection,
     _p: &dyn Provider,
     _x: &ext::Ctx,
 ) -> Result<ExtReturn> {
-    Ok(ExtReturn::NotSent)
+    let Some(login) = &c.cfg.srp_login else {
+        return Ok(ExtReturn::NotSent);
+    };
+    let mut w = crate::codec::Writer::new();
+    w.vec(1, login).map_err(|_| Error::internal())?;
+    Ok(ExtReturn::Sent(w.into_bytes()))
 }
 
 /// `tls_construct_ctos_ec_pt_formats`.

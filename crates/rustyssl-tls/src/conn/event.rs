@@ -63,6 +63,22 @@ pub struct Callbacks {
     pub custom_ext: bool,
     /// `SSL_CTX_set_tmp_dh_callback`.
     pub tmp_dh: bool,
+    /// `SSL_CTX_set_srp_username_callback` (a server's `TLS_ext_srp_username_callback`).
+    pub srp_username: bool,
+}
+
+/// A TLS 1.2 SRP server's parameters (RFC 5054): N, g, the salt, and B, each as
+/// `BN_bn2bin` writes it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SrpParams {
+    /// The prime N.
+    pub n: Vec<u8>,
+    /// The generator g.
+    pub g: Vec<u8>,
+    /// The salt.
+    pub s: Vec<u8>,
+    /// The server's public value B.
+    pub b: Vec<u8>,
 }
 
 /// A decision the core needs from the application (or from capi on its behalf). The core stays
@@ -222,6 +238,35 @@ pub enum Request {
     /// OpenSSL's alert and reason, which stops the handshake only with `SSL_VERIFY_PEER`
     /// (shared addition, fork F).
     CtValidate,
+    /// A TLS 1.2 SRP server's username callback once a suite is chosen
+    /// (`ssl_srp_server_param_with_username`), with the client's login: the callback sets the
+    /// user's N, g, salt and verifier (`SSL_set_srp_server_param`), and B is made from them.
+    /// Answered [`Answer::SrpUsername`].
+    SrpUsername {
+        /// The login the client sent (the srp extension).
+        login: Vec<u8>,
+    },
+    /// A TLS 1.2 SRP server's ServerKeyExchange parameters (`s->srp_ctx` N, g, s and B).
+    /// Answered [`Answer::SrpParams`].
+    SrpServerParams,
+    /// A TLS 1.2 SRP server's premaster secret from the client's A
+    /// (`srp_generate_server_master_secret`). Answered [`Answer::SrpValue`].
+    SrpServerSecret {
+        /// A, as the ClientKeyExchange carried it.
+        a: Vec<u8>,
+    },
+    /// A TLS 1.2 SRP client's check of the server's parameters (`srp_verify_server_param`'s
+    /// verify-parameter callback, or `SRP_check_known_gN_param` without one), made after
+    /// the core's own checks; the parameters become the connection's (`SSL_get_srp_N`).
+    /// Answered [`Answer::SrpVerified`].
+    SrpVerifyParams(SrpParams),
+    /// A TLS 1.2 SRP client's A at the ServerHelloDone (`ssl_srp_calc_a_param_intern`).
+    /// Answered [`Answer::SrpValue`].
+    SrpClientA,
+    /// A TLS 1.2 SRP client's premaster secret (`srp_generate_client_master_secret`: the
+    /// password callback, then the client key). Answered [`Answer::SrpValue`], or
+    /// [`Answer::Fail`] when the callback gives no password.
+    SrpClientSecret,
 }
 
 /// The application's answer to a [`Request`].
@@ -310,6 +355,22 @@ pub enum Answer {
     CustomExt(Option<Vec<u8>>),
     /// DH parameters (`p`, `g`, big-endian), or none.
     TmpDh(Option<(Vec<u8>, Vec<u8>)>),
+    /// [`Request::SrpUsername`]'s result: `ssl_srp_server_param_with_username`'s return
+    /// (`SSL_ERROR_NONE`, `SSL3_AL_FATAL`, or the callback's other value) and the alert it
+    /// chose.
+    SrpUsername {
+        /// The return value.
+        ret: i32,
+        /// The alert (`*ad`).
+        alert: i32,
+    },
+    /// [`Request::SrpServerParams`]'s parameters, `None` when one is missing.
+    SrpParams(Option<SrpParams>),
+    /// A computed SRP value (A, or a premaster secret), `None` when it couldn't be made.
+    SrpValue(Option<Vec<u8>>),
+    /// [`Request::SrpVerifyParams`]'s verdict: 1 accepted, 0 the callback refused, -1 not a
+    /// known group (without a callback).
+    SrpVerified(i32),
 }
 
 /// What [`super::Connection::step`] reports.

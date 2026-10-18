@@ -25,7 +25,7 @@ use std::collections::VecDeque;
 use rustyssl_abi as abi;
 
 pub use config::{CertKey, Config, ExternalPsk, Session, TicketKeys};
-pub use event::{Answer, Callbacks, Event, Request};
+pub use event::{Answer, Callbacks, Event, Request, SrpParams};
 
 use self::statem::{HsBytes, MsgFlow, Statem, msgs_type, st};
 use crate::crypto::Provider;

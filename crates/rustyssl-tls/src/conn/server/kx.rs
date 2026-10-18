@@ -16,7 +16,7 @@ use crate::crypto::{Provider, Secret};
 use crate::error::{Error, InFunc, Result};
 use crate::suites::masks::{
     SSL_PSK, SSL_aNULL, SSL_aSRP, SSL_kDHE, SSL_kDHEPSK, SSL_kECDHE, SSL_kECDHEPSK, SSL_kPSK,
-    SSL_kRSA, SSL_kRSAPSK,
+    SSL_kRSA, SSL_kRSAPSK, SSL_kSRP,
 };
 
 /// `NAMED_CURVE_TYPE`.
@@ -181,6 +181,23 @@ pub(crate) fn construct_server_key_exchange(
         let s = state(c)?;
         s.kx_key = Some(share);
         s.kx_group = curve;
+    } else if k & SSL_kSRP != 0 {
+        let sp = match ask_once(c, Request::SrpServerParams, 0) {
+            None => return Ok(Construct::Ask),
+            Some(Answer::SrpParams(Some(sp))) => sp,
+            Some(_) => {
+                return Err(Error::alert(
+                    abi::SSL_AD_INTERNAL_ERROR,
+                    abi::SSL_R_MISSING_SRP_PARAM,
+                ));
+            }
+        };
+        // The salt has a one-octet length, the others two.
+        params.vec(2, &sp.n).map_err(tl)?;
+        params.vec(2, &sp.g).map_err(tl)?;
+        params.vec(1, &sp.s).map_err(tl)?;
+        params.vec(2, &sp.b).map_err(tl)?;
+        state(c)?.srp_n = Some(sp.n);
     } else {
         return Err(Error::alert(
             abi::SSL_AD_INTERNAL_ERROR,
@@ -358,6 +375,11 @@ pub(crate) fn process_client_key_exchange(
             .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE))?;
         c.hs.sh.own_tmp = None;
         Some(secret)
+    } else if k & SSL_kSRP != 0 {
+        match srp_secret(c, &mut rd)? {
+            None => return Ok(MsgProcess::Ask),
+            Some(s) => Some(s),
+        }
     } else {
         return Err(Error::alert(
             abi::SSL_AD_INTERNAL_ERROR,
@@ -366,6 +388,41 @@ pub(crate) fn process_client_key_exchange(
     };
     generate_master_secret(c, p, pms, psk)?;
     Ok(MsgProcess::ContinueProcessing)
+}
+
+/// `tls_process_cke_srp`: the client's A (a broken vector is `SSL_R_BAD_SRP_A_LENGTH`,
+/// decode-error; zero, or not below N, `SSL_R_BAD_SRP_PARAMETERS`, illegal-parameter), then
+/// the premaster secret from it ([`Request::SrpServerSecret`]). Octets after A are ignored,
+/// as OpenSSL ignores them. `None` while waiting.
+fn srp_secret(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<Secret>> {
+    srp_secret_inner(c, rd).in_func("tls_process_cke_srp")
+}
+
+/// See [`srp_secret`].
+fn srp_secret_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<Option<Secret>> {
+    use crate::conn::common::srp;
+    let a = rd
+        .vec16()
+        .map_err(|_| Error::decode(abi::SSL_R_BAD_SRP_A_LENGTH))?
+        .rest()
+        .to_vec();
+    let n = state_ref(c)
+        .and_then(|s| s.srp_n.clone())
+        .ok_or_else(Error::internal)?;
+    if srp::cmp(&a, &n) != core::cmp::Ordering::Less || srp::is_zero(&a) {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_BAD_SRP_PARAMETERS,
+        ));
+    }
+    match ask_once(c, Request::SrpServerSecret { a }, 0) {
+        None => Ok(None),
+        Some(Answer::SrpValue(Some(k))) => Ok(Some(Secret::new(k))),
+        Some(_) => Err(Error::alert_lib(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::ERR_R_INTERNAL_ERROR,
+        )),
+    }
 }
 
 /// `ssl_generate_master_secret`: a PSK suite's premaster secret is the other secret (the key
