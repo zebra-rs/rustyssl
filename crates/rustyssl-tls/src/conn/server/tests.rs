@@ -203,6 +203,9 @@ impl Client {
                     self.ccs = self.ccs.saturating_add(1);
                     self.input.drain(..consumed);
                 }
+                Read::Skipped { consumed, .. } => {
+                    self.input.drain(..consumed);
+                }
                 Read::Record { consumed, record } => {
                     self.input.drain(..consumed);
                     if record.content_type == record::content_type::change_cipher_spec() {
@@ -1201,6 +1204,7 @@ fn ticket_session_encoding_round_trips() {
         verify_result: 10,
         max_fragment_len_mode: 2,
         ext_flags: 1,
+        ticket_appdata: Some(b"app".to_vec()),
     };
     let enc = ticket::encode_session(&s).unwrap();
     assert_eq!(ticket::decode_session(&enc), Some(s));
@@ -1386,7 +1390,7 @@ impl Client12 {
             }
             match self.c.rr.read(p, &self.input).unwrap() {
                 Read::NeedMore(_) => return None,
-                Read::IgnoredCcs { .. } => panic!("TLS 1.2"),
+                Read::IgnoredCcs { .. } | Read::Skipped { .. } => panic!("TLS 1.2"),
                 Read::Record { consumed, record } => {
                     self.input.drain(..consumed);
                     if record.content_type == record::content_type::change_cipher_spec() {
@@ -2279,6 +2283,7 @@ fn tls13_early_data_accepted() {
     let p = TestProvider::new(b"early-data");
     let mut cfg = server_config(&p);
     cfg.max_early_data = 16384;
+    cfg.recv_max_early_data = 16384;
     cfg.options |= abi::SSL_OP_NO_ANTI_REPLAY;
     let (ticket, psk) = first_ticket(&p, cfg.clone());
     // The ticket allows early data.
@@ -2360,6 +2365,7 @@ fn tls13_early_data_rejected_without_the_server_allowing_it() {
     let p = TestProvider::new(b"early-rejected");
     let mut cfg = server_config(&p);
     cfg.max_early_data = 16384;
+    cfg.recv_max_early_data = 16384;
     cfg.options |= abi::SSL_OP_NO_ANTI_REPLAY;
     let (ticket, psk) = first_ticket(&p, cfg.clone());
     let x = p.key_share(group::X25519).unwrap();
@@ -2400,6 +2406,7 @@ fn tls13_single_use_tickets_with_anti_replay() {
     let p = TestProvider::new(b"anti-replay");
     let mut cfg = server_config(&p);
     cfg.max_early_data = 16384;
+    cfg.recv_max_early_data = 16384;
     // Anti-replay (the default): stateful tickets, each a session ID in the cache.
     let (mut c, mut client, _) = handshake13(&p, cfg.clone(), x25519_hello);
     client.application_read(&p);

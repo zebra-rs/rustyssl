@@ -28,6 +28,7 @@ use super::conn::{
     rustyssl_private_SSL_set_accept_state, rustyssl_private_SSL_set_bio,
     rustyssl_private_SSL_set_connect_state, ssl,
 };
+use super::dup::rustyssl_private_SSL_dup;
 use super::io::api::{
     read_internal, rustyssl_private_SSL_do_handshake, rustyssl_private_SSL_get_error,
     rustyssl_private_SSL_pending, rustyssl_private_SSL_shutdown, write_internal,
@@ -40,7 +41,6 @@ use crate::ffi::{ffi_callback, ffi_export};
 
 // Functions another part of libssl provides (they may still be generated stubs, which abort).
 unsafe extern "C" {
-    fn rustyssl_private_SSL_dup(ssl: *mut SSL) -> *mut SSL;
     fn rustyssl_private_SSL_copy_session_id(to: *mut SSL, from: *const SSL) -> c_int;
 }
 

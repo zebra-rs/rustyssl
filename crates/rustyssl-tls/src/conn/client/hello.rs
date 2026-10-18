@@ -335,8 +335,26 @@ pub(super) fn process_server_hello(
             if ext::parse_extension(c, p, idx, context, 0)? == ext::Step::Wait {
                 return Err(Error::internal());
             }
-        } else if !sh.session_id.is_empty() && sh.session_id == c.neg.session.session_id {
-            c.neg.reused = true;
+        } else {
+            if c.neg.version >= v::TLS1
+                && c.cfg.callbacks.session_secret
+                && c.neg.session.ticket.is_some()
+            {
+                // EAP-FAST: the master secret (and suite) to resume with, should the server.
+                let r = crate::conn::Request::SessionSecret { peer_ciphers: None };
+                match crate::conn::common::ask_once(c, r, 0) {
+                    None => return Ok(MsgProcess::Ask),
+                    Some(crate::conn::Answer::SessionSecret(Some((master, pref)))) => {
+                        c.neg.session.master_key = master;
+                        let id = crate::suites::by_protocol_id(sh.cipher_suite).map_or(0, |x| x.id);
+                        c.neg.session.cipher_id = pref.unwrap_or(id);
+                    }
+                    Some(_) => return Err(Error::internal()),
+                }
+            }
+            if !sh.session_id.is_empty() && sh.session_id == c.neg.session.session_id {
+                c.neg.reused = true;
+            }
         }
         session_after_hello(c, &sh)?;
         set_client_ciphersuite(c, sh.cipher_suite)?;

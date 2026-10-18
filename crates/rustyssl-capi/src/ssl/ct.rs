@@ -163,9 +163,13 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctxs::ctx(ctx) }) else { return 0 };
-        // No custom extension can be registered for the SCT type (custom extensions are
-        // refused), so OpenSSL's SSL_R_CUSTOM_EXT_HANDLER_ALREADY_INSTALLED can't arise.
         let mut st = c.state();
+        // The application's own SCT extension and CT validation don't mix.
+        if callback.is_some() && super::custom::has_client_sct(&st.cert.custext) {
+            drop(st);
+            err::raise(ERR_LIB_SSL, rustyssl_abi::SSL_R_CUSTOM_EXT_HANDLER_ALREADY_INSTALLED, "SSL_CTX_set_ct_validation_callback");
+            return 0;
+        }
         st.ct.callback = callback;
         st.ct.arg = arg;
         1
@@ -183,6 +187,13 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let mut st = x.state();
+        // SAFETY: the connection holds a reference to its context.
+        let sct = unsafe { ctx_of(&st) }.is_some_and(|c| super::custom::has_client_sct(&c.state().cert.custext));
+        if callback.is_some() && sct {
+            drop(st);
+            err::raise(ERR_LIB_SSL, rustyssl_abi::SSL_R_CUSTOM_EXT_HANDLER_ALREADY_INSTALLED, "SSL_set_ct_validation_callback");
+            return 0;
+        }
         if callback.is_some() {
             st.status_type = TLSEXT_STATUSTYPE_ocsp;
         }

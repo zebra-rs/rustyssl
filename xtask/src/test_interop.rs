@@ -19,6 +19,8 @@
 //!   `+full` one, resuming it (`-sess_in`); the summary says whether it was reused.
 //! - `+trace`: the client also runs with `-trace`, and the summary takes the trace (its random
 //!   octets masked) from its standard output.
+//! - `+early`: with `+resume`, the second connection sends a line as TLS 1.3 early data
+//!   (`-early_data`).
 //! - `+cmd=X`: the client first sends the command line `X` (`R` renegotiates, `k`/`K` update
 //!   the keys), then the data a second later; commands need it to run without `-ign_eof`, so
 //!   its input stays open until it exits.
@@ -74,6 +76,14 @@ const CLIENT_SESSION: [&str; 6] = [
 const CLIENT_COMMAND: [&str; 3] = ["RENEGOTIATING", "KEYUPDATE", "ERROR"];
 
 /// The server's lines about the client.
+/// The lines of an `-early_data` server (no `-rev`) that say what it received.
+const SERVER_EARLY: [&str; 4] = [
+    "Early data received:",
+    "early data",
+    "End of early data",
+    "hello rustyssl",
+];
+
 const SERVER_SUMMARY: [&str; 6] = [
     "SSL_accept:",
     "Peer certificate",
@@ -270,6 +280,7 @@ fn start_server(
     port: u16,
     naccept: usize,
     args: &[String],
+    rev: bool,
 ) -> Result<(Child, mpsc::Receiver<String>)> {
     let mut all = vec![
         "s_server".to_owned(),
@@ -277,15 +288,20 @@ fn start_server(
         format!("127.0.0.1:{port}"),
         "-naccept".to_owned(),
         naccept.to_string(),
-        "-rev".to_owned(),
     ];
+    // `-rev` echoes; it can't be combined with `-early_data`, whose server prints what it got.
+    if rev {
+        all.push("-rev".to_owned());
+    }
     if !args.iter().any(|a| a == "-cert") {
         all.extend(substitute("{rsa}", t.work));
     }
     all.extend(args.iter().cloned());
+    // Without `-rev` the server quits at the end of its input: it stays open (in the child).
+    let stdin = if rev { Stdio::null() } else { Stdio::piped() };
     let mut child = t
         .command(ours, &all)
-        .stdin(Stdio::null())
+        .stdin(stdin)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -335,6 +351,7 @@ fn start_server(
 struct Mode {
     full: bool,
     resume: bool,
+    early: bool,
     cmd: Option<String>,
     trace: bool,
 }
@@ -348,6 +365,7 @@ fn mode(args: &[String]) -> (Vec<String>, Mode) {
             "+full" => m.full = true,
             "+resume" => m.resume = true,
             "+trace" => m.trace = true,
+            "+early" => m.early = true,
             _ => match a.strip_prefix("+cmd=") {
                 Some(c) => m.cmd = Some(c.to_owned()),
                 None => rest.push(a.clone()),
@@ -358,12 +376,17 @@ fn mode(args: &[String]) -> (Vec<String>, Mode) {
 }
 
 /// One `s_client` run: its summary, or why it failed.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one per s_client mode the cases combine"
+)]
 fn client(
     t: &Tool<'_>,
     ours: bool,
     port: u16,
     args: &[String],
     full: bool,
+    no_echo: bool,
     cmd: Option<&str>,
     trace: bool,
 ) -> Result<String> {
@@ -378,8 +401,9 @@ fn client(
     if trace {
         all.push("-trace".to_owned());
     }
-    // `-ign_eof` turns the commands off (`USER_DATA_MODE_NONE`).
-    if cmd.is_none() {
+    // `-ign_eof` turns the commands off (`USER_DATA_MODE_NONE`). With no echo coming, the end of
+    // the input ends the client.
+    if cmd.is_none() && !no_echo {
         all.push("-ign_eof".to_owned());
     }
     all.extend(args.iter().cloned());
@@ -402,6 +426,10 @@ fn client(
         // `-rev` reverses each line and ends the connection on CLOSE.
         let _ = input.write_all(b"hello rustyssl\nCLOSE\n");
         let _ = input.flush();
+        if no_echo {
+            // No echo ends the connection: the session's tickets arrive first.
+            std::thread::sleep(Duration::from_secs(1));
+        }
     }
     if cmd.is_none() {
         drop(stdin.take());
@@ -440,6 +468,10 @@ fn client(
         summary.push_str(line);
         summary.push('\n');
     }
+    if no_echo {
+        summary.push_str("echo: none\n");
+        return Ok(summary);
+    }
     // `-trace`'s lines (on standard output), with the random octets masked. The echo is written
     // to the descriptor directly while the trace is buffered, so it lands anywhere in it.
     let echo = "lssytsur olleh\n";
@@ -474,28 +506,34 @@ fn connect(
     let (args, m) = mode(client_args);
     let port = free_port()?;
     let naccept = if m.resume { 2 } else { 1 };
-    let (mut server, lines) = start_server(t, p.server_ours, port, naccept, server_args)?;
+    let (mut server, lines) = start_server(t, p.server_ours, port, naccept, server_args, !m.early)?;
     let sess = t.work.join("session.pem").display().to_string();
     let mut runs = Vec::new();
     if m.resume {
         let _ = fs::remove_file(&sess);
         let mut first = args.clone();
         first.extend(["-sess_out".to_owned(), sess.clone()]);
-        runs.push((first, m.full));
+        runs.push((first, m.full, false));
         let mut second = args.clone();
         second.extend(["-sess_in".to_owned(), sess.clone()]);
-        runs.push((second, true));
+        if m.early {
+            let early = t.work.join("early.txt");
+            fs::write(&early, "early data\n")?;
+            second.extend(["-early_data".to_owned(), early.display().to_string()]);
+        }
+        runs.push((second, true, m.early));
     } else {
-        runs.push((args, m.full));
+        runs.push((args, m.full, false));
     }
     let mut summary = String::new();
-    for (args, full) in &runs {
+    for (args, full, early) in &runs {
         match client(
             t,
             p.client_ours,
             port,
             args,
             *full,
+            *early || m.early,
             m.cmd.as_deref(),
             m.trace,
         ) {
@@ -527,7 +565,9 @@ fn connect(
         server_out.iter().partition(|l| l.starts_with("stderr: "));
     for line in outs.into_iter().chain(errs) {
         let line = line.strip_prefix("stderr: ").unwrap_or(line);
-        if SERVER_SUMMARY.iter().any(|k| line.starts_with(k)) {
+        if SERVER_SUMMARY.iter().any(|k| line.starts_with(k))
+            || (m.early && SERVER_EARLY.contains(&line))
+        {
             summary.push_str("server: ");
             summary.push_str(line);
             summary.push('\n');

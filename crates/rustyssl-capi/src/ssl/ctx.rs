@@ -130,6 +130,11 @@ pub(crate) struct CtxState {
     pub(crate) app_verify_arg: *mut c_void,
     pub(crate) client_hello_cb: rustyssl_abi::SSL_client_hello_cb_fn,
     pub(crate) client_hello_cb_arg: *mut c_void,
+    /// QUIC's new-pending-connection callback and its argument (stored only: never called for
+    /// TLS).
+    pub(crate) new_pending_conn_cb: rustyssl_abi::SSL_new_pending_conn_cb_fn,
+    /// See `new_pending_conn_cb`.
+    pub(crate) new_pending_conn_arg: *mut c_void,
     pub(crate) alpn_select_cb: rustyssl_abi::SSL_CTX_alpn_select_cb_func,
     pub(crate) alpn_select_cb_arg: *mut c_void,
     pub(crate) npn_select_cb: rustyssl_abi::SSL_CTX_npn_select_cb_func,
@@ -403,6 +408,8 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         app_verify_arg: ptr::null_mut(),
         client_hello_cb: None,
         client_hello_cb_arg: ptr::null_mut(),
+        new_pending_conn_cb: None,
+        new_pending_conn_arg: ptr::null_mut(),
         alpn_select_cb: None,
         alpn_select_cb_arg: ptr::null_mut(),
         npn_select_cb: None,

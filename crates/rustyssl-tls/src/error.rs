@@ -121,6 +121,21 @@ impl Error {
         self
     }
 
+    /// A fatal alert with no ERR entry (`SSLfatal_alert`: the cause was recorded, or none is).
+    #[must_use]
+    pub const fn alert_only(alert: c_int) -> Self {
+        Self::alert(alert, 0)
+    }
+
+    /// The same error, raised by the record layer: with an alert, libssl adds
+    /// `SSL_R_RECORD_LAYER_FAILURE` after the record layer's own entry
+    /// (`ossl_tls_handle_rlayer_return`).
+    #[must_use]
+    pub const fn in_record_layer(mut self) -> Self {
+        self.follow_up = Some(rustyssl_abi::SSL_R_RECORD_LAYER_FAILURE);
+        self
+    }
+
     /// The same error with OpenSSL's data string.
     #[must_use]
     pub const fn with_data(mut self, data: &'static str) -> Self {
