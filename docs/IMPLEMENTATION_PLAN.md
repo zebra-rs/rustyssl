@@ -5185,6 +5185,10 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
   - the info, msg, and keylog callbacks, with exact argument values
   - `SSL_SESSION`: the full API, a **wire-compatible `i2d`/`d2i_SSL_SESSION`** so external
     session caches interoperate, the cache modes and callbacks, and `flush_sessions(_ex)`
+    (done: `ssl/session.rs`, `sess_asn1.rs`, `sess_cache.rs`; `tests/c/ssl_session.c` and
+    `ssl_sess_cache.c` match the reference byte for byte, resumption by ID and ticket in
+    TLS 1.2 and by ticket in TLS 1.3; `SSL_set_session_secret_cb`, `SSL_set_session_ticket_ext`
+    and `SSL_new_session_ticket` remain)
   - `SSL_export_keying_material(_early)`, `get_finished`, `client_random`/`server_random`,
     `master_key`
   - `SSL_get_shared_ciphers` buffer semantics, the get0 vs. get1 peer-certificate ownership

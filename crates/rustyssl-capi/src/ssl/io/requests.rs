@@ -227,12 +227,12 @@ pub(crate) unsafe fn handle(
             Some(Answer::Status { ret, response })
         }
         // The session cache (`sess_cache`).
-        // SAFETY: the caller's guarantee; no lock is held.
         Request::GetSession { id } => {
+            // SAFETY: the caller's guarantee; no lock is held.
             Some(unsafe { super::super::sess_cache::on_get_session(s, x, &id) })
         }
-        // SAFETY: as above.
         Request::RemoveSession { id } => {
+            // SAFETY: as above.
             Some(unsafe { super::super::sess_cache::on_remove_request(x, &id) })
         }
         // CT validation isn't enabled yet (`SSL_enable_ct` comes with step 7.4).

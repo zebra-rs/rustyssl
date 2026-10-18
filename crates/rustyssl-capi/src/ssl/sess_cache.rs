@@ -704,7 +704,7 @@ ffi_export! {
         };
         let (c, version) = {
             let st = x.state();
-            (st.session_ctx, st.version)
+            (st.session_ctx, live_version(&st))
         };
         // SAFETY: the connection's context.
         let Some(cx) = (unsafe { ctx::ctx(c) }) else { return 0 };
@@ -878,7 +878,7 @@ fn to_core(d: &SessData) -> Session {
 /// A session's fields from the core's session, the connection's peer certificates, and the
 /// negotiated group. The peer's references are taken here (under the connection's lock: no
 /// callbacks run).
-fn from_core(st: &SslState, c: &Session, group: Option<u16>) -> SessData {
+fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) -> SessData {
     let mut d = SessData::new();
     d.ssl_version = c_int::from(c.version);
     d.cipher_id = c.cipher_id;
@@ -899,9 +899,7 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>) -> SessData {
     if c.time != 0 {
         d.time = from_time_t(c.time);
     }
-    if c.timeout != 0 {
-        d.timeout = from_time_t(c.timeout);
-    }
+    d.timeout = from_time_t(if c.timeout != 0 { c.timeout } else { timeout });
     d.calculate_timeout();
     d.max_early_data = c.max_early_data;
     d.hostname = c
@@ -936,6 +934,15 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>) -> SessData {
     d
 }
 
+/// The connection's protocol version: the handshake's once it's negotiated (the mirror
+/// follows only with the cipher).
+fn live_version(st: &SslState) -> c_int {
+    match st.drv.tls.as_ref().map(|c| c.negotiated().version) {
+        Some(v) if v != 0 => c_int::from(v),
+        _ => st.version,
+    }
+}
+
 /// Whether two IDs are the same session's.
 fn same_id(s: *mut SSL_SESSION, id: &[u8]) -> bool {
     // SAFETY: a connection's session, or NULL.
@@ -948,6 +955,15 @@ fn same_id(s: *mut SSL_SESSION, id: &[u8]) -> bool {
 /// # Safety
 /// `x` is a live connection; no lock is held.
 unsafe fn settle(x: &Ssl, ticket: bool) {
+    // `ssl_get_new_session`'s timeout: the session context's, or the method's.
+    let sctx = x.state().session_ctx;
+    // SAFETY: the connection's context.
+    let ctx_timeout = unsafe { ctx::ctx(sctx) }.map_or(0, |c| c.state().session_timeout);
+    let timeout = if ctx_timeout == 0 {
+        super::method::DEFAULT_TIMEOUT
+    } else {
+        ctx_timeout
+    };
     let made = {
         let mut st = x.state();
         let Some((neg_session, reused, version, group)) = st.drv.tls.as_ref().map(|c| {
@@ -980,7 +996,7 @@ unsafe fn settle(x: &Ssl, ticket: bool) {
             }
         }
         st.sess.current = true;
-        from_core(&st, &neg_session, group)
+        from_core(&st, &neg_session, group, timeout)
     };
     // Made with no lock held (the ex_data callbacks run).
     let s = session::new_session(made);
@@ -1202,7 +1218,7 @@ pub(crate) unsafe fn on_fatal(x: &Ssl) {
 pub(crate) unsafe fn on_get_session(s: *mut SSL, x: &Ssl, id: &[u8]) -> Answer {
     let (c, version) = {
         let st = x.state();
-        (st.session_ctx, st.version)
+        (st.session_ctx, live_version(&st))
     };
     // SAFETY: the connection's context.
     let Some(cx) = (unsafe { ctx::ctx(c) }) else {
@@ -1267,7 +1283,7 @@ pub(crate) unsafe fn on_get_session(s: *mut SSL, x: &Ssl, id: &[u8]) -> Answer {
 pub(crate) unsafe fn on_remove_request(x: &Ssl, id: &[u8]) -> Answer {
     let (c, version) = {
         let st = x.state();
-        (st.session_ctx, st.version)
+        (st.session_ctx, live_version(&st))
     };
     // SAFETY: the connection's context.
     let Some(cx) = (unsafe { ctx::ctx(c) }) else {

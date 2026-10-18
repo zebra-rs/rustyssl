@@ -217,14 +217,14 @@ pub(crate) fn get_prev_session(c: &mut Connection, p: &dyn Provider) -> Result<O
     }
     if c.cfg.now > expires(&sess) {
         if try_cache {
-            // The session is from the cache: it leaves it (the answer doesn't matter).
-            let _ = ask_once(
-                c,
-                Request::RemoveSession {
-                    id: sess.session_id.clone(),
-                },
-                0,
-            );
+            // The session is from the cache: it leaves it (the answer doesn't matter, but it
+            // must be waited for, or the request stays pending).
+            let r = Request::RemoveSession {
+                id: sess.session_id.clone(),
+            };
+            if ask_once(c, r, 0).is_none() {
+                return Ok(None);
+            }
         }
         return miss(c);
     }
