@@ -4,8 +4,10 @@
 # "password"), {dir} (the PKI's directory).
 # Client directives: +full (no -brief; the session lines), +resume (a second connection
 # resuming the first's session), +early (with +resume: early data on the second), +cmd=X (send the command line X, R or k or K, first).
+# +faults (DTLS): the client talks through a relay that drops, duplicates and reorders
+# handshake datagrams by a schedule from --seed and the case.
 # A DTLS case (a server argument -dtls*) runs over UDP without -rev: no echo, the summaries and
-# the server's output are compared.
+# the server's output (including the line the client sent) are compared.
 # Each case runs in four pairings (reference/reference is the expectation; the server echoes
 # lines reversed and closes on CLOSE).
 
@@ -65,3 +67,10 @@ dtls1-cbc | -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 | {ca} -dtls1 -ciphe
 dtls12-listen | -dtls -listen | {ca} -dtls
 dtls12-mtu | -dtls -mtu 512 | {ca} -dtls -mtu 512
 dtls12-resume | -dtls | {ca} -dtls +resume
+dtls12-faults | -dtls | {ca} -dtls +faults
+dtls12-ecdsa-faults | {ec} -dtls1_2 | {ca} -dtls1_2 -cipher ECDHE-ECDSA-AES128-GCM-SHA256 +faults
+dtls1-cbc-faults | -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 | {ca} -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 +faults
+dtls12-listen-faults | -dtls -listen | {ca} -dtls +faults
+dtls12-mtu-faults | -dtls -mtu 512 | {ca} -dtls -mtu 512 +faults
+dtls12-resume-faults | -dtls | {ca} -dtls +resume +faults
+dtls12-client-auth-faults | -dtls -Verify 1 {ca} | {ca} -dtls {client} +faults
