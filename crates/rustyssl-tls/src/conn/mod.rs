@@ -274,6 +274,9 @@ pub struct Connection {
     pub(crate) rtt_write: u32,
     /// See `rtt_write`.
     pub(crate) rtt_read: u32,
+    /// The certificate whose TLS 1.3 Certificate entry extensions are being made or read (for
+    /// the custom extension callbacks' `x`).
+    pub(crate) ext_cert: Option<Vec<u8>>,
     /// The early data counted against the limit outside the record layer (`s->early_data_count`:
     /// a client's early writes, a server's skipped plaintext records after a HelloRetryRequest).
     pub(crate) early_data_count: u64,
@@ -361,6 +364,7 @@ impl Connection {
             sent_alert: None,
             rtt_write: 0,
             rtt_read: 0,
+            ext_cert: None,
             early_data_count: 0,
             early_read: None,
             needs_input: false,

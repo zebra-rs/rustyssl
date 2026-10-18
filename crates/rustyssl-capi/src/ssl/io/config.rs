@@ -624,6 +624,12 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         session_cache_mode: i64::from(snap.session_cache_mode),
         session_timeout: snap.session_timeout,
         ticket_keys: Some(snap.ticket_keys.clone()),
+        custom_exts: st
+            .cert
+            .custext
+            .iter()
+            .map(super::super::custom::Method::for_core)
+            .collect(),
         callbacks: Callbacks {
             info: st.info_callback.is_some() || snap.info_callback.is_some(),
             msg: st.msg_callback.is_some(),

@@ -19550,6 +19550,34 @@ const _: unsafe extern "C" fn(*mut SSL_CTX, *const X509) -> core::ffi::c_int =
     crate::ssl::ca::rustyssl_private_SSL_CTX_add1_to_CA_list;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *mut X509) -> core::ffi::c_int =
     crate::ssl::ca::rustyssl_private_SSL_CTX_add_client_CA;
+const _: unsafe extern "C" fn(
+    *mut SSL_CTX,
+    core::ffi::c_uint,
+    custom_ext_add_cb,
+    custom_ext_free_cb,
+    *mut core::ffi::c_void,
+    custom_ext_parse_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::custom::rustyssl_private_SSL_CTX_add_client_custom_ext;
+const _: unsafe extern "C" fn(
+    *mut SSL_CTX,
+    core::ffi::c_uint,
+    core::ffi::c_uint,
+    SSL_custom_ext_add_cb_ex,
+    SSL_custom_ext_free_cb_ex,
+    *mut core::ffi::c_void,
+    SSL_custom_ext_parse_cb_ex,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::custom::rustyssl_private_SSL_CTX_add_custom_ext;
+const _: unsafe extern "C" fn(
+    *mut SSL_CTX,
+    core::ffi::c_uint,
+    custom_ext_add_cb,
+    custom_ext_free_cb,
+    *mut core::ffi::c_void,
+    custom_ext_parse_cb,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::ssl::custom::rustyssl_private_SSL_CTX_add_server_custom_ext;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *mut SSL_SESSION) -> core::ffi::c_int =
     crate::ssl::sess_cache::rustyssl_private_SSL_CTX_add_session;
 const _: unsafe extern "C" fn(
@@ -19683,6 +19711,8 @@ const _: unsafe extern "C" fn(*const SSL_CTX) -> core::ffi::c_int =
     crate::ssl::ctx::rustyssl_private_SSL_CTX_get_verify_depth;
 const _: unsafe extern "C" fn(*const SSL_CTX) -> core::ffi::c_int =
     crate::ssl::accessors::rustyssl_private_SSL_CTX_get_verify_mode;
+const _: unsafe extern "C" fn(*const SSL_CTX, core::ffi::c_uint) -> core::ffi::c_int =
+    crate::ssl::custom::rustyssl_private_SSL_CTX_has_client_custom_ext;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::ssl::ctx::rustyssl_private_SSL_CTX_load_verify_dir;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
@@ -20122,6 +20152,16 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::keys::rustyssl_private_SSL_CTX_use_certificate_file;
 const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::ssl::ctx::rustyssl_private_SSL_CTX_use_psk_identity_hint;
+const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_uchar, usize) -> core::ffi::c_int =
+    crate::ssl::custom::rustyssl_private_SSL_CTX_use_serverinfo;
+const _: unsafe extern "C" fn(
+    *mut SSL_CTX,
+    core::ffi::c_uint,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::ssl::custom::rustyssl_private_SSL_CTX_use_serverinfo_ex;
+const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ssl::custom::rustyssl_private_SSL_CTX_use_serverinfo_file;
 const _: unsafe extern "C" fn(*const SSL_SESSION) -> *mut SSL_SESSION =
     crate::ssl::session::rustyssl_private_SSL_SESSION_dup;
 const _: unsafe extern "C" fn(*mut SSL_SESSION) =
@@ -20370,6 +20410,8 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     usize,
 ) -> core::ffi::c_int = crate::ssl::requests::rustyssl_private_SSL_export_keying_material_early;
+const _: unsafe extern "C" fn(core::ffi::c_uint) -> core::ffi::c_int =
+    crate::ssl::custom::rustyssl_private_SSL_extension_supported;
 const _: unsafe extern "C" fn(*mut SSL) = crate::ssl::conn::rustyssl_private_SSL_free;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::apis::rustyssl_private_SSL_free_buffers;

@@ -383,7 +383,10 @@ pub(crate) fn process_client_certificate(
                 .vec16()
                 .map_err(|_| Error::decode(abi::SSL_R_BAD_LENGTH))?;
             ext::collect(c, exts.rest(), cx::TLS1_3_CERTIFICATE, idx, idx == 0)?;
-            if ext::parse_all(c, p, cx::TLS1_3_CERTIFICATE, idx, list.is_empty())? == Step::Wait {
+            c.ext_cert = Some(der.to_vec());
+            let step = ext::parse_all(c, p, cx::TLS1_3_CERTIFICATE, idx, list.is_empty());
+            c.ext_cert = None;
+            if step? == Step::Wait {
                 return Ok(MsgProcess::Ask);
             }
         }

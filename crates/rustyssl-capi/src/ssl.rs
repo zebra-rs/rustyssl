@@ -15,6 +15,7 @@ pub(crate) mod conf;
 pub(crate) mod conn;
 pub(crate) mod ct;
 pub(crate) mod ctx;
+pub(crate) mod custom;
 pub(crate) mod dane;
 pub(crate) mod dup;
 pub(crate) mod early;

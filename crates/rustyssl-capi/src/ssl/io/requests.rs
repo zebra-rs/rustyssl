@@ -239,6 +239,28 @@ pub(crate) unsafe fn handle(
         }
         // SAFETY: as above.
         Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
+        Request::CustomExt {
+            index,
+            typ,
+            context,
+            body,
+            chainidx,
+            cert,
+        } => {
+            // SAFETY: as above.
+            Some(unsafe {
+                super::super::custom::answer(
+                    s,
+                    x,
+                    index,
+                    typ,
+                    context,
+                    body.as_deref(),
+                    chainidx,
+                    cert.as_deref(),
+                )
+            })
+        }
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {

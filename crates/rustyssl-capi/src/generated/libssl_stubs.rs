@@ -60,81 +60,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_SRP_CTX_init(_: *mut SSL_CTX) -> core
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_add_client_custom_ext(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_uint,
-    _: custom_ext_add_cb,
-    _: custom_ext_free_cb,
-    _: *mut core::ffi::c_void,
-    _: custom_ext_parse_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_add_client_custom_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_add_custom_ext(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_uint,
-    _: core::ffi::c_uint,
-    _: SSL_custom_ext_add_cb_ex,
-    _: SSL_custom_ext_free_cb_ex,
-    _: *mut core::ffi::c_void,
-    _: SSL_custom_ext_parse_cb_ex,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_add_custom_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_add_server_custom_ext(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_uint,
-    _: custom_ext_add_cb,
-    _: custom_ext_free_cb,
-    _: *mut core::ffi::c_void,
-    _: custom_ext_parse_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_add_server_custom_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_has_client_custom_ext(
-    _: *const SSL_CTX,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_has_client_custom_ext")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_use_serverinfo(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_use_serverinfo")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_use_serverinfo_ex(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_uint,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_use_serverinfo_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_use_serverinfo_file(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_use_serverinfo_file")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_SRP_CTX_free(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_SRP_CTX_free")
 }
@@ -152,13 +77,6 @@ pub extern "C" fn rustyssl_private_SSL_check_chain(
     _: *mut stack_st_X509,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_check_chain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_extension_supported(
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_extension_supported")
 }
 
 #[unsafe(no_mangle)]

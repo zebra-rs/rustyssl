@@ -138,12 +138,18 @@ pub enum Request {
     AllowEarlyData,
     /// A custom extension to add (`add_cb`) or parse (`parse_cb`).
     CustomExt {
+        /// The extension's index in [`crate::conn::Config::custom_exts`].
+        index: usize,
         /// The extension type.
         typ: u16,
         /// The message context (`SSL_EXT_*`).
         context: u32,
         /// The received body, for parsing; `None` to add.
         body: Option<Vec<u8>>,
+        /// The certificate's index in its chain (a TLS 1.3 Certificate's entries), else 0.
+        chainidx: usize,
+        /// That certificate (DER) for a Certificate entry's extensions (sent or received).
+        cert: Option<Vec<u8>>,
     },
     /// The DH parameters for a TLS 1.2 DHE server (`tmp_dh_callback`), at this size.
     TmpDh {
