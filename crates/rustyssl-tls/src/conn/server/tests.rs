@@ -141,6 +141,7 @@ fn rsa_cert(p: &TestProvider) -> CertKey {
         raw_public_key: None,
         ocsp_response: None,
         chain_security: None,
+        unsupported_digests: Vec::new(),
     }
 }
 

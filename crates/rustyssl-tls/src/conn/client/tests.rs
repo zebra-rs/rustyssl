@@ -618,6 +618,7 @@ fn client_cert(p: &TestProvider) -> crate::conn::CertKey {
         raw_public_key: None,
         ocsp_response: None,
         chain_security: None,
+        unsupported_digests: Vec::new(),
     }
 }
 
@@ -2023,6 +2024,8 @@ fn server_config(p: &TestProvider) -> Config {
             raw_public_key: None,
             ocsp_response: None,
             chain_security: None,
+            unsupported_digests: Vec::new(),
+        unsupported_digests: Vec::new(),
         }],
         max_cert_list: 102_400,
         max_send_fragment: 16384,

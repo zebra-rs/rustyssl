@@ -440,7 +440,48 @@ unsafe fn cert_key(
         raw_public_key: None,
         ocsp_response: ocsp,
         chain_security: (chain_security != 1).then_some(chain_security),
+        // SAFETY: our reference to the key; the context's library context and properties.
+        unsupported_digests: unsafe { unsupported_digests(r.pkey, src) },
     })
+}
+
+/// The digests of TLS's signature algorithms (`NID_undef` for those without one) that the key
+/// won't sign with (`EVP_PKEY_digestsign_supports_digest`, as `check_cert_usable` asks).
+///
+/// # Safety
+/// `pkey` is a live key; the pointers in `src` are live (or NULL where allowed).
+unsafe fn unsupported_digests(pkey: *mut EVP_PKEY, src: &ChainSource) -> Vec<c_int> {
+    use rustyssl_abi::{NID_md5_sha1, NID_sha1, NID_sha224, NID_sha256, NID_sha384, NID_sha512};
+    let mut out = Vec::new();
+    // What it answers isn't an error of the handshake's.
+    // SAFETY: no preconditions.
+    unsafe { crate::err::ERR_set_mark() };
+    for nid in [
+        NID_undef,
+        NID_md5_sha1,
+        NID_sha1,
+        NID_sha224,
+        NID_sha256,
+        NID_sha384,
+        NID_sha512,
+    ] {
+        let name = if nid == NID_undef {
+            ptr::null()
+        } else {
+            // SAFETY: no preconditions.
+            unsafe { crate::objects::OBJ_nid2sn(nid) }
+        };
+        // SAFETY: the caller's key; the digest's name (or NULL); the library context.
+        let ok = unsafe {
+            crate::evp::sigver::EVP_PKEY_digestsign_supports_digest(pkey, src.libctx, name, src.propq)
+        };
+        if ok <= 0 {
+            out.push(nid);
+        }
+    }
+    // SAFETY: the mark set above.
+    unsafe { crate::err::ERR_pop_to_mark() };
+    out
 }
 
 /// The DER names of a stack of `X509_NAME`s.

@@ -38,6 +38,10 @@ pub struct CertKey {
     /// The chain's failure of the security level (`ssl_security_cert_chain`'s `SSL_R_*`
     /// reason), which sending it fails with; `None` when it passes.
     pub chain_security: Option<i32>,
+    /// The digests (NIDs; `NID_undef` for none) the key won't sign with
+    /// (`EVP_PKEY_digestsign_supports_digest`: an RSA-PSS key's restriction, say), which
+    /// rule out the signature algorithms using them.
+    pub unsupported_digests: Vec<i32>,
 }
 
 /// A session to resume, or one just established (what `SSL_SESSION` holds that the handshake
