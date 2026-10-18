@@ -2419,6 +2419,13 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*mut CMAC_CTX, *const core::ffi::c_void, usize) -> core::ffi::c_int =
     crate::cmac::CMAC_Update;
 const _: unsafe extern "C" fn(*mut CMAC_CTX) -> core::ffi::c_int = crate::cmac::CMAC_resume;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *mut CMS_ContentInfo =
+    crate::cms::env::CMS_AuthEnvelopedData_create;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CMS_ContentInfo = crate::cms::env::CMS_AuthEnvelopedData_create_ex;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo) = crate::cms::base::CMS_ContentInfo_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cms::CMS_ContentInfo_it;
 const _: unsafe extern "C" fn() -> *mut CMS_ContentInfo = crate::cms::base::CMS_ContentInfo_new;
@@ -2460,6 +2467,23 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     usize,
 ) -> core::ffi::c_int = crate::cms::enc::CMS_EncryptedData_set1_key;
+const _: unsafe extern "C" fn(*const EVP_CIPHER) -> *mut CMS_ContentInfo =
+    crate::cms::env::CMS_EnvelopedData_create;
+const _: unsafe extern "C" fn(
+    *const EVP_CIPHER,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CMS_ContentInfo = crate::cms::env::CMS_EnvelopedData_create_ex;
+const _: unsafe extern "C" fn(
+    *mut CMS_EnvelopedData,
+    *mut BIO,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut ASN1_OCTET_STRING,
+    core::ffi::c_uint,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIO = crate::cms::env::CMS_EnvelopedData_decrypt;
 const _: unsafe extern "C" fn(*const CMS_EnvelopedData) -> *mut CMS_EnvelopedData =
     crate::cms::base::CMS_EnvelopedData_dup;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cms::CMS_EnvelopedData_it;
@@ -2489,6 +2513,94 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cms::CMS_ReceiptRequest_it;
 const _: unsafe extern "C" fn() -> *mut CMS_ReceiptRequest =
     crate::cms::ess::CMS_ReceiptRequest_new;
+const _: unsafe extern "C" fn(*mut CMS_RecipientEncryptedKey, *mut X509) -> core::ffi::c_int =
+    crate::cms::kari::CMS_RecipientEncryptedKey_cert_cmp;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientEncryptedKey,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut CMS_OtherKeyAttribute,
+    *mut *mut X509_NAME,
+    *mut *mut ASN1_INTEGER,
+) -> core::ffi::c_int = crate::cms::kari::CMS_RecipientEncryptedKey_get0_id;
+const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut CMS_RecipientInfo) -> core::ffi::c_int =
+    crate::cms::env::CMS_RecipientInfo_decrypt;
+const _: unsafe extern "C" fn(*const CMS_ContentInfo, *mut CMS_RecipientInfo) -> core::ffi::c_int =
+    crate::cms::env::CMS_RecipientInfo_encrypt;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> *mut EVP_PKEY_CTX =
+    crate::cms::env::CMS_RecipientInfo_get0_pkey_ctx;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut CMS_RecipientInfo,
+    *mut CMS_RecipientEncryptedKey,
+) -> core::ffi::c_int = crate::cms::kari::CMS_RecipientInfo_kari_decrypt;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut *mut X509_ALGOR,
+    *mut *mut ASN1_OCTET_STRING,
+) -> core::ffi::c_int = crate::cms::kari::CMS_RecipientInfo_kari_get0_alg;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> *mut EVP_CIPHER_CTX =
+    crate::cms::kari::CMS_RecipientInfo_kari_get0_ctx;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut *mut X509_ALGOR,
+    *mut *mut ASN1_BIT_STRING,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut X509_NAME,
+    *mut *mut ASN1_INTEGER,
+) -> core::ffi::c_int = crate::cms::kari::CMS_RecipientInfo_kari_get0_orig_id;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> *mut stack_st_CMS_RecipientEncryptedKey =
+    crate::cms::kari::CMS_RecipientInfo_kari_get0_reks;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut X509) -> core::ffi::c_int =
+    crate::cms::kari::CMS_RecipientInfo_kari_orig_id_cmp;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::cms::kari::CMS_RecipientInfo_kari_set0_pkey;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut EVP_PKEY,
+    *mut X509,
+) -> core::ffi::c_int = crate::cms::kari::CMS_RecipientInfo_kari_set0_pkey_and_peer;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut *mut X509_ALGOR,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut ASN1_OBJECT,
+    *mut *mut ASN1_TYPE,
+) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_kekri_get0_id;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_kekri_id_cmp;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut X509) -> core::ffi::c_int =
+    crate::cms::env::CMS_RecipientInfo_ktri_cert_cmp;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut *mut EVP_PKEY,
+    *mut *mut X509,
+    *mut *mut X509_ALGOR,
+) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_ktri_get0_algs;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut X509_NAME,
+    *mut *mut ASN1_INTEGER,
+) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_ktri_get0_signer_id;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_set0_key;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *mut core::ffi::c_uchar,
+    isize,
+) -> core::ffi::c_int = crate::cms::pwri::CMS_RecipientInfo_set0_password;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::cms::env::CMS_RecipientInfo_set0_pkey;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> core::ffi::c_int =
+    crate::cms::env::CMS_RecipientInfo_type;
 const _: unsafe extern "C" fn(
     *mut *mut core::ffi::c_uchar,
     *mut X509_ALGOR,
@@ -2547,12 +2659,44 @@ const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509) -> core::ffi::c_i
     crate::cms::base::CMS_add0_cert;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509_CRL) -> core::ffi::c_int =
     crate::cms::base::CMS_add0_crl;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut core::ffi::c_uchar,
+    usize,
+    *mut ASN1_GENERALIZEDTIME,
+    *mut ASN1_OBJECT,
+    *mut ASN1_TYPE,
+) -> *mut CMS_RecipientInfo = crate::cms::env::CMS_add0_recipient_key;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    isize,
+    *const EVP_CIPHER,
+) -> *mut CMS_RecipientInfo = crate::cms::pwri::CMS_add0_recipient_password;
 const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut CMS_ReceiptRequest) -> core::ffi::c_int =
     crate::cms::ess::CMS_add1_ReceiptRequest;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509) -> core::ffi::c_int =
     crate::cms::base::CMS_add1_cert;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509_CRL) -> core::ffi::c_int =
     crate::cms::base::CMS_add1_crl;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut X509,
+    core::ffi::c_uint,
+) -> *mut CMS_RecipientInfo = crate::cms::env::CMS_add1_recipient;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut X509,
+    core::ffi::c_uint,
+) -> *mut CMS_RecipientInfo = crate::cms::env::CMS_add1_recipient_cert;
 const _: unsafe extern "C" fn(
     *mut CMS_ContentInfo,
     *mut X509,
@@ -2591,6 +2735,34 @@ const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,
 ) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_data_create_ex;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut BIO,
+    *mut BIO,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::cms::smime::CMS_decrypt;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut core::ffi::c_uchar,
+    usize,
+    *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::cms::smime::CMS_decrypt_set1_key;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut core::ffi::c_uchar,
+    isize,
+) -> core::ffi::c_int = crate::cms::smime::CMS_decrypt_set1_password;
+const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut EVP_PKEY, *mut X509) -> core::ffi::c_int =
+    crate::cms::smime::CMS_decrypt_set1_pkey;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut EVP_PKEY,
+    *mut X509,
+    *mut X509,
+) -> core::ffi::c_int = crate::cms::smime::CMS_decrypt_set1_pkey_and_peer;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_MD, core::ffi::c_uint) -> *mut CMS_ContentInfo =
     crate::cms::smime::CMS_digest_create;
 const _: unsafe extern "C" fn(
@@ -2606,6 +2778,20 @@ const _: unsafe extern "C" fn(
     *mut BIO,
     core::ffi::c_uint,
 ) -> core::ffi::c_int = crate::cms::smime::CMS_digest_verify;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut BIO,
+    *const EVP_CIPHER,
+    core::ffi::c_uint,
+) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_encrypt;
+const _: unsafe extern "C" fn(
+    *mut stack_st_X509,
+    *mut BIO,
+    *const EVP_CIPHER,
+    core::ffi::c_uint,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_encrypt_ex;
 const _: unsafe extern "C" fn(
     *mut CMS_ContentInfo,
     *mut BIO,

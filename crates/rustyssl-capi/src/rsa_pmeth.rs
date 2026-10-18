@@ -1069,7 +1069,11 @@ unsafe extern "C" fn trans_cb(a: c_int, b: c_int, cb: *mut BN_GENCB) -> c_int {
 ///
 /// # Safety
 /// `pval` is what `ASN1_TYPE_set` takes for `ptype`, or NULL.
-unsafe fn algor_from_nid(nid: c_int, ptype: c_int, pval: *mut c_void) -> *mut X509_ALGOR {
+pub(crate) unsafe fn algor_from_nid(
+    nid: c_int,
+    ptype: c_int,
+    pval: *mut c_void,
+) -> *mut X509_ALGOR {
     // SAFETY: no preconditions.
     let alg = unsafe { X509_ALGOR_new() };
     // SAFETY: a new AlgorithmIdentifier, or NULL.
@@ -1098,7 +1102,7 @@ unsafe fn algor_from_nid(nid: c_int, ptype: c_int, pval: *mut c_void) -> *mut X5
 ///
 /// # Safety
 /// `md` is a live digest.
-unsafe fn algor_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
+pub(crate) unsafe fn algor_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
     // SAFETY: the caller's guarantee.
     if md.is_null() || unsafe { EVP_MD_is_a(md, c"SHA1".as_ptr()) } != 0 {
         return true;
@@ -1120,7 +1124,7 @@ unsafe fn algor_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
 ///
 /// # Safety
 /// `md` is a live digest.
-unsafe fn mgf1_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
+pub(crate) unsafe fn mgf1_from_md(slot: &mut *mut X509_ALGOR, md: *const EVP_MD) -> bool {
     *slot = ptr::null_mut();
     // SAFETY: the caller's guarantee.
     if md.is_null() || unsafe { EVP_MD_is_a(md, c"SHA1".as_ptr()) } != 0 {

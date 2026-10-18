@@ -4987,7 +4987,7 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     silently replaced by a random one, as in OpenSSL), and CompressedData (unsupported, as
     without zlib); the data path's dispatch; streaming, DER, PEM, and S/MIME;
     `CMS_SharedInfo_encode`. GCM's AlgorithmIdentifier parameters (`evp_cipher_*_asn1_aead_params`)
-    come with them. SignedData's and the enveloped types' data paths abort until 6.4b and 6.4c.
+    come with them; SignedData's and the enveloped types' data paths followed in 6.4b and 6.4c.
     Tests: `tests/c/cms_data.c`, the `cms_d2i` fuzz target.
   - [x] **6.4b SignedData** (`cms/sd.rs` and the signing and verifying in `cms/smime.rs` and
     `cms/ess.rs`, from `cms_sd.c`, `cms_smime.c`, `cms_ess.c`, and `cms_rsa.c`'s signature
@@ -4998,9 +4998,17 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     digest or by key parameter; `CMS_verify` with every flag (the message digest compared in
     constant time), receipts (`CMS_sign_receipt`, `CMS_verify_receipt`), and
     `CMS_SignedData_verify`. Tests: `tests/c/cms_sign.c`, the `ess_d2i` fuzz target.
-  - [ ] **6.4c The enveloped types** (`cms_env.c`, `cms_kari.c`, `cms_pwri.c` with the CVE-2025-9230
-    bounds check, `cms_dh.c`, `cms_ec.c`, `cms_rsa.c`'s key transport, AuthEnvelopedData, and
-    encrypting and decrypting in `cms_smime.c`).
+  - [x] **6.4c The enveloped types** (`cms/env.rs` from `cms_env.c`, `cms/kari.rs` from
+    `cms_kari.c`, `cms/pwri.rs` from `cms_pwri.c`, `cms/pkey.rs` from `cms_dh.c`, `cms_ec.c`, and
+    `cms_rsa.c`'s key transport, and encrypting and decrypting in `cms/smime.rs`; 38 exports):
+    EnvelopedData and AuthEnvelopedData (AES-GCM, its tag and authenticated attributes);
+    recipients by key transport (RSA with PKCS#1 v1.5 or OAEP from the key's context), key
+    agreement (ECDH with X9.63's KDF, X9.42 DH; ephemeral keys only, as in OpenSSL), KEK (AES
+    key wrap), and password (PBKDF2 and RFC 3211's wrap, its unwrap bounded as CVE-2025-9230
+    requires, its wrap refusing keys too short for the check octets); decryption that says
+    nothing to an oracle without a certificate or `CMS_DEBUG_DECRYPT`; `CMS_encrypt(_ex)`,
+    `CMS_decrypt` and its key, password, and peer setters, and `CMS_EnvelopedData_decrypt`.
+    Tests: `tests/c/cms_env.c`, the `cms_decrypt` fuzz target.
 - [ ] **6.5 PKCS#12:**
   - `PKCS12_parse`/`PKCS12_create(_ex)`
   - MACs: HMAC and PBMAC1 (3.4)
