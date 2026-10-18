@@ -1,0 +1,83 @@
+# Upstream OpenSSL's libssl test programs, run by `cargo xtask test-openssl-suite --ssl` (or by
+# program name) on the reference and then on rustyssl, one test (or one iteration of a test) per
+# process. Each line is a program and its arguments as its recipe in test/recipes/ passes them,
+# with {src} for the reference's source tree and {tmp} for a scratch file of the run's own. A
+# `skip` line names a program that isn't run, and why.
+
+# 90-test_sslapi.t (the default provider's run)
+sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
+# 80-test_ssl_new.t: ssl_test on each test/ssl-tests/*.cnf with the default provider (the
+# recipe's generated file is the checked-in one for the default build)
+ssl_test {src}/test/ssl-tests/01-simple.cnf default
+ssl_test {src}/test/ssl-tests/02-protocol-version.cnf default
+ssl_test {src}/test/ssl-tests/03-custom_verify.cnf default
+ssl_test {src}/test/ssl-tests/04-client_auth.cnf default
+ssl_test {src}/test/ssl-tests/05-sni.cnf default
+ssl_test {src}/test/ssl-tests/06-sni-ticket.cnf default
+ssl_test {src}/test/ssl-tests/07-dtls-protocol-version.cnf default
+ssl_test {src}/test/ssl-tests/08-npn.cnf default
+ssl_test {src}/test/ssl-tests/09-alpn.cnf default
+ssl_test {src}/test/ssl-tests/10-resumption.cnf default
+ssl_test {src}/test/ssl-tests/11-dtls_resumption.cnf default
+ssl_test {src}/test/ssl-tests/12-ct.cnf default
+ssl_test {src}/test/ssl-tests/13-fragmentation.cnf default
+ssl_test {src}/test/ssl-tests/14-curves.cnf default
+ssl_test {src}/test/ssl-tests/15-certstatus.cnf default
+ssl_test {src}/test/ssl-tests/16-dtls-certstatus.cnf default
+ssl_test {src}/test/ssl-tests/17-renegotiate.cnf default
+ssl_test {src}/test/ssl-tests/18-dtls-renegotiate.cnf default
+ssl_test {src}/test/ssl-tests/19-mac-then-encrypt.cnf default
+ssl_test {src}/test/ssl-tests/20-cert-select.cnf default
+ssl_test {src}/test/ssl-tests/21-key-update.cnf default
+ssl_test {src}/test/ssl-tests/23-srp.cnf default
+ssl_test {src}/test/ssl-tests/24-padding.cnf default
+ssl_test {src}/test/ssl-tests/25-cipher.cnf default
+ssl_test {src}/test/ssl-tests/26-tls13_client_auth.cnf default
+ssl_test {src}/test/ssl-tests/27-ticket-appdata.cnf default
+ssl_test {src}/test/ssl-tests/28-seclevel.cnf default
+ssl_test {src}/test/ssl-tests/30-extended-master-secret.cnf default
+ssl_test {src}/test/ssl-tests/33-compressed-spki.cnf default
+# (the recipe skips 22-compression without zlib, 29-dtls-sctp-label-bug without SCTP, and
+# 32-compressed-certificate without certificate compression, all off by default)
+# 80-test_ssl_test_ctx.t, 71-test_ssl_ctx.t
+ssl_test_ctx_test {src}/test/ssl_test_ctx_test.cnf
+ssl_ctx_test
+# 80-test_cipherlist.t, 80-test_ciphername.t, 80-test_cipherbytes.t
+cipherlist_test
+ciphername_test
+cipherbytes_test
+# 70-test_clienthello.t, 70-test_recordlen.t, 70-test_servername.t, 70-test_asyncio.t
+clienthellotest
+recordlentest {src}/apps/server.pem {src}/apps/server.pem
+servername_test {src}/apps/server.pem {src}/apps/server.pem
+asynciotest {src}/apps/server.pem {src}/apps/server.pem
+# 80-test_sslcorrupt.t, 90-test_sslbuffers.t, 90-test_tls13ccs.t
+sslcorrupttest {src}/apps/server.pem {src}/apps/server.pem
+sslbuffertest {src}/apps/server.pem {src}/apps/server.pem
+tls13ccstest {src}/apps/server.pem {src}/apps/server.pem
+# 70-test_tls13ticket.t, 70-test_tls13groupselection.t, 90-test_rpk.t
+tls13ticket_test {src}/apps/server.pem {src}/apps/server.pem
+tls13groupselection_test {src}/apps/server.pem {src}/apps/server.pem
+rpktest {src}/test/certs
+# DTLS (Phase 8): 80-test_dtls.t, 80-test_dtlsv1listen.t, 80-test_dtls_mtu.t, 70-test_bad_dtls.t
+dtlstest {src}/apps/server.pem {src}/apps/server.pem
+dtlsv1listentest
+dtls_mtu_test
+bad_dtls_test
+
+# Tests that read libssl's private structures (ssl/ssl_local.h, SSL_CONNECTION_FROM_SSL): they
+# can't pass on rustyssl, whose objects have another layout, and are reported apart. (ssl_test
+# does too, for the ForcePHA cases of 26-tls13_client_auth.cnf.)
+internal sslapitest test_cleanse_plaintext test_unknown_sigalgs_groups test_configuration_of_groups test_sigalg_ctx_switch test_sigalg_ctx_switch_cert_cb test_sigalg_ctx_switch_reneg
+internal sslbuffertest test_func
+internal dtls_mtu_test run_mtu_tests
+
+skip ssl_handshake_rtt_test calls libssl's internal state machine (ossl_statem_*_write_transition) and reads SSL_CONNECTION
+skip cipher_overhead_test calls libssl's internal cipher table (ssl3_get_cipher, ssl_cipher_get_overhead)
+skip tls13encryptiontest drives libssl's internal record layer (ossl_tls_record_method)
+skip tls13secretstest compiles its own copy of ssl/tls13_enc.c over libssl's private SSL_CONNECTION
+skip ssl_old_test 80-test_ssl_old.t drives it with certificates the openssl tool makes, in Perl
+skip cert_comp_test certificate compression (zlib, brotli, zstd) is off in the default build
+skip ssl_cert_table_internal_test an internal test (03-test_internal_ssl_cert_table.t)
+skip quicapitest QUIC (75-test_quicapi.t and the other quic recipes) is a later phase
+skip TLSProxy the 70-test_*.t recipes that drive s_server and s_client through Perl's TLSProxy aren't test programs
