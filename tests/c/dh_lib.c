@@ -464,6 +464,7 @@ static void test_methods(void)
     DH_METHOD *m = DH_meth_new("counting", 0x40), *dup;
     DH *a, *b;
     unsigned char s[300];
+    int n;
 
     check(ossl != NULL && m != NULL, "methods");
     printf("  OpenSSL's: %s flags %d default %d\n", DH_meth_get0_name(ossl),
@@ -501,7 +502,9 @@ static void test_methods(void)
            DH_test_flags(a, ~0));
     b = DH_new_by_nid(NID_ffdhe2048);
     printf("  generate %d %d", DH_generate_key(a), DH_generate_key(b));
-    printf(" compute %d\n", DH_compute_key(s, DH_get0_pub_key(b), a));
+    /* Random keys: the unpadded secret is shorter when it has leading zero octets. */
+    n = DH_compute_key(s, DH_get0_pub_key(b), a);
+    printf(" compute %d\n", n > 0 && n <= DH_size(a));
     printf("  calls %d %d %d\n", calls[0], calls[1], calls[2]);
     DH_set_default_method(m);
     DH_free(b);
