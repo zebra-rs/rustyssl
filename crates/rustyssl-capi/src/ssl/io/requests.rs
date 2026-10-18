@@ -567,10 +567,21 @@ unsafe fn verify(
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
-    // The chain as the core received it (a server records it only after verification), or
-    // the raw public key (`ssl_verify_rpk`).
-    // SAFETY: the snapshot's library context and properties, alive with it.
-    let owned = unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) };
+    // A client verifies the session's peer chain (`SSL_get_peer_cert_chain`, which a callback
+    // asking for a retry may have added to); otherwise the chain as the core received it (a
+    // server records it only after verification), or the raw public key (`ssl_verify_rpk`).
+    let session_chain = {
+        let st = x.state();
+        (!rpk && !st.server && st.drv.peer.from == peer.len())
+            .then_some(st.drv.peer.chain_no_leaf)
+            .filter(|p| !p.is_null())
+    };
+    let owned = match session_chain {
+        // SAFETY: the connection's stack, alive while it holds it (no callback runs meanwhile).
+        Some(sk) => unsafe { Chain::dup(sk) },
+        // SAFETY: the snapshot's library context and properties, alive with it.
+        None => unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) },
+    };
     let chain = owned.0;
     let key = Key(if rpk {
         // SAFETY: the context's library context and property query.
@@ -780,6 +791,31 @@ impl Chain {
             // SAFETY: the caller's guarantee.
             let c = unsafe { crate::x509::cert::decode_in(der, libctx, propq) };
             if c.is_null() {
+                continue;
+            }
+            // SAFETY: the new stack, which takes the reference.
+            if unsafe { crate::stack::OPENSSL_sk_push(sk.cast(), c.cast()) } == 0 {
+                // SAFETY: not taken.
+                unsafe { X509_free(c) };
+            }
+        }
+        Self(sk)
+    }
+
+    /// A copy of `from`, with a reference to each certificate.
+    ///
+    /// # Safety
+    /// `from` is a live stack of certificates.
+    unsafe fn dup(from: *mut stack_st_X509) -> Self {
+        // SAFETY: no preconditions.
+        let sk: *mut stack_st_X509 = unsafe { crate::stack::OPENSSL_sk_new_null() }.cast();
+        // SAFETY: the caller's stack.
+        let n = unsafe { crate::stack::OPENSSL_sk_num(from.cast()) };
+        for i in 0..n {
+            // SAFETY: an index in range.
+            let c: *mut X509 = unsafe { crate::stack::OPENSSL_sk_value(from.cast(), i) }.cast();
+            // SAFETY: a live certificate of the stack.
+            if c.is_null() || unsafe { crate::x509::cert::X509_up_ref(c) } == 0 {
                 continue;
             }
             // SAFETY: the new stack, which takes the reference.

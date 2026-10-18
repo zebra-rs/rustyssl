@@ -7,7 +7,7 @@
  * callback (SSL_get_tlsext_status_ocsp_resp(3)), the responder IDs and extensions a client
  * asks for, in the server's (SSL_set_tlsext_status_ids(3), SSL_get_tlsext_status_exts(3)),
  * the names SSL_get_servername(3) reports around a resumption, SSL_set_retry_verify(3) after
- * a successful
+ * a successful verification and after adding to SSL_get_peer_cert_chain(3), and
  * verification, and the chain's check against the security level, over a BIO pair.
  *
  * Only deterministic output is printed.
@@ -461,6 +461,37 @@ static void test_retry_verify(void)
     done(c, s, cctx, sctx);
 }
 
+static int chain_cb(X509_STORE_CTX *ctx, void *arg)
+{
+    SSL *s = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+
+    (void)arg;
+    printf("  verification with %d untrusted certificate(s)\n",
+           sk_X509_num(X509_STORE_CTX_get0_untrusted(ctx)));
+    if (retries-- > 0) {
+        /* The retry verifies the peer chain with what the application adds to it. */
+        sk_X509_push(SSL_get_peer_cert_chain(s), cert(CA_PEM));
+        return SSL_set_retry_verify(s);
+    }
+    return X509_verify_cert(ctx);
+}
+
+/* A retried verification sees the certificates added to SSL_get_peer_cert_chain. */
+static void test_retry_with_chain(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+
+    printf("# retry verify with an added certificate\n");
+    retries = 1;
+    SSL_CTX_set_cert_verify_callback(cctx, chain_cb, NULL);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the handshake");
+    printf("  verify result %ld, peer chain %d\n", SSL_get_verify_result(c),
+           sk_X509_num(SSL_get_peer_cert_chain(c)));
+    done(c, s, cctx, sctx);
+}
+
 /* A chain below the security level isn't sent: an internal error, and the reason. */
 static void test_security(void)
 {
@@ -491,6 +522,7 @@ int main(void)
     test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
     test_retry_verify();
+    test_retry_with_chain();
     test_security();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
