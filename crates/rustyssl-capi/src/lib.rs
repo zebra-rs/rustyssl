@@ -64,6 +64,7 @@ mod libctx;
 mod lowlevel;
 mod mem;
 mod objects;
+mod ocsp;
 mod params;
 mod passphrase;
 mod pem;
