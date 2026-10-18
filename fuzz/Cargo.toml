@@ -627,3 +627,9 @@ name = "crmf_d2i"
 path = "fuzz_targets/crmf_d2i.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "cmp_msg"
+path = "fuzz_targets/cmp_msg.rs"
+test = false
+doc = false

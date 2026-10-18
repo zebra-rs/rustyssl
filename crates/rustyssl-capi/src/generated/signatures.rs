@@ -9548,6 +9548,388 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
     crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_it;
 const _: unsafe extern "C" fn() -> *mut OSSL_BASIC_ATTR_CONSTRAINTS =
     crate::x509v3::acext::OSSL_BASIC_ATTR_CONSTRAINTS_new;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_ATAVS) = crate::cmp::asn::OSSL_CMP_ATAVS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cmp::asn::OSSL_CMP_ATAVS_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CMP_ATAVS = crate::cmp::asn::OSSL_CMP_ATAVS_new;
+const _: unsafe extern "C" fn(*mut ASN1_OBJECT, *mut ASN1_TYPE) -> *mut OSSL_CMP_ATAV =
+    crate::cmp::asn::OSSL_CMP_ATAV_create;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ATAV) -> *mut X509_ALGOR =
+    crate::cmp::asn::OSSL_CMP_ATAV_get0_algId;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ATAV) -> *mut ASN1_OBJECT =
+    crate::cmp::asn::OSSL_CMP_ATAV_get0_type;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ATAV) -> *mut ASN1_TYPE =
+    crate::cmp::asn::OSSL_CMP_ATAV_get0_value;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ATAV) -> core::ffi::c_int =
+    crate::cmp::asn::OSSL_CMP_ATAV_get_rsaKeyLen;
+const _: unsafe extern "C" fn(*const X509_ALGOR) -> *mut OSSL_CMP_ATAV =
+    crate::cmp::asn::OSSL_CMP_ATAV_new_algId;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut OSSL_CMP_ATAV =
+    crate::cmp::asn::OSSL_CMP_ATAV_new_rsaKeyLen;
+const _: unsafe extern "C" fn(*mut *mut OSSL_CMP_ATAVS, *const OSSL_CMP_ATAV) -> core::ffi::c_int =
+    crate::cmp::asn::OSSL_CMP_ATAV_push1;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_ATAV, *mut ASN1_OBJECT, *mut ASN1_TYPE) =
+    crate::cmp::asn::OSSL_CMP_ATAV_set0;
+const _: unsafe extern "C" fn(
+    *const X509_CRL,
+    *const X509,
+    core::ffi::c_int,
+) -> *mut OSSL_CMP_CRLSTATUS = crate::cmp::asn::OSSL_CMP_CRLSTATUS_create;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CRLSTATUS) = crate::cmp::asn::OSSL_CMP_CRLSTATUS_free;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_CRLSTATUS,
+    *mut *mut DIST_POINT_NAME,
+    *mut *mut GENERAL_NAMES,
+    *mut *mut ASN1_TIME,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_CRLSTATUS_get0;
+const _: unsafe extern "C" fn(
+    *const DIST_POINT_NAME,
+    *const GENERAL_NAMES,
+    *const ASN1_TIME,
+) -> *mut OSSL_CMP_CRLSTATUS = crate::cmp::asn::OSSL_CMP_CRLSTATUS_new1;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *mut X509_STORE,
+    *mut stack_st_X509,
+) -> core::ffi::c_int = crate::cmp::ctx::OSSL_CMP_CTX_build_cert_chain;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) = crate::cmp::ctx::OSSL_CMP_CTX_free;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut stack_st_OSSL_CMP_ITAV =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_geninfo_ITAVs;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut OSSL_LIB_CTX =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_libctx;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_newCert;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX, core::ffi::c_int) -> *mut EVP_PKEY =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_newPkey;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *const core::ffi::c_char =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_propq;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut OSSL_CMP_PKIFREETEXT =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_statusString;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut X509_STORE =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_trustedStore;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut stack_st_X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_untrusted;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get0_validatedSrvCert;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut stack_st_X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get1_caPubs;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut stack_st_X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get1_extraCertsIn;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut stack_st_X509 =
+    crate::cmp::ctx::OSSL_CMP_CTX_get1_newChain;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut core::ffi::c_void =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_certConf_cb_arg;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_failInfoCode;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut core::ffi::c_void =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_http_cb_arg;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_option;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_status;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) -> *mut core::ffi::c_void =
+    crate::cmp::ctx::OSSL_CMP_CTX_get_transfer_cb_arg;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> *mut OSSL_CMP_CTX =
+    crate::cmp::ctx::OSSL_CMP_CTX_new;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX) = crate::cmp::ctx::OSSL_CMP_CTX_print_errors;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut OSSL_CMP_ITAV) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_push0_geninfo_ITAV;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut OSSL_CMP_ITAV) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_push0_genm_ITAV;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut POLICYINFO) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_push0_policy;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const GENERAL_NAME) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_push1_subjectAltName;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_reinit;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_reqExtensions_have_SAN;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_reset_geninfo_ITAVs;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const OSSL_CMP_MSG) -> *mut OSSL_CMP_MSG =
+    crate::cmp::server::OSSL_CMP_CTX_server_perform;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    core::ffi::c_int,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::cmp::ctx::OSSL_CMP_CTX_set0_newPkey;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut X509_EXTENSIONS) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set0_reqExtensions;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut X509_STORE) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set0_trustedStore;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut X509) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_cert;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const X509_NAME) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_expected_sender;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut stack_st_X509) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_extraCertsOut;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const X509_NAME) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_issuer;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_no_proxy;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut X509) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_oldCert;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const X509_REQ) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_p10CSR;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_pkey;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_proxy;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const X509_NAME) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_recipient;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::cmp::ctx::OSSL_CMP_CTX_set1_referenceValue;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::cmp::ctx::OSSL_CMP_CTX_set1_secretValue;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const ASN1_OCTET_STRING) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_senderNonce;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const ASN1_INTEGER) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_serialNumber;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_server;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_serverPath;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut X509) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_srvCert;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const X509_NAME) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_subjectName;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const ASN1_OCTET_STRING) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_transactionID;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut stack_st_X509) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set1_untrusted;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, OSSL_CMP_certConf_cb_t) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_certConf_cb;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_certConf_cb_arg;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, OSSL_HTTP_bio_cb_t) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_http_cb;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_http_cb_arg;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, OSSL_CMP_log_cb_t) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_log_cb;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::cmp::ctx::OSSL_CMP_CTX_set_option;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_serverPort;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, OSSL_CMP_transfer_cb_t) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_transfer_cb;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut core::ffi::c_void) -> core::ffi::c_int =
+    crate::cmp::ctx::OSSL_CMP_CTX_set_transfer_cb_arg;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> *mut OSSL_CRMF_MSG = crate::cmp::msg::OSSL_CMP_CTX_setup_CRM;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_CTX,
+    *mut core::ffi::c_char,
+    usize,
+) -> *mut core::ffi::c_char = crate::cmp::status::OSSL_CMP_CTX_snprint_PKIStatus;
+const _: unsafe extern "C" fn(*const OSSL_CMP_PKIHEADER) -> *mut stack_st_OSSL_CMP_ITAV =
+    crate::cmp::hdr::OSSL_CMP_HDR_get0_geninfo_ITAVs;
+const _: unsafe extern "C" fn(*const OSSL_CMP_PKIHEADER) -> *mut ASN1_OCTET_STRING =
+    crate::cmp::hdr::OSSL_CMP_HDR_get0_recipNonce;
+const _: unsafe extern "C" fn(*const OSSL_CMP_PKIHEADER) -> *mut ASN1_OCTET_STRING =
+    crate::cmp::hdr::OSSL_CMP_HDR_get0_transactionID;
+const _: unsafe extern "C" fn(*mut ASN1_OBJECT, *mut ASN1_TYPE) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_create;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ITAV) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_ITAV) = crate::cmp::asn::OSSL_CMP_ITAV_free;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ITAV, *mut *mut stack_st_X509) -> core::ffi::c_int =
+    crate::cmp::asn::OSSL_CMP_ITAV_get0_caCerts;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ITAV,
+    *mut *mut stack_st_ASN1_UTF8STRING,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_get0_certProfile;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ITAV,
+    *mut *mut stack_st_OSSL_CMP_CRLSTATUS,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_get0_crlStatusList;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ITAV,
+    *mut *mut stack_st_X509_CRL,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_get0_crls;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ITAV, *mut *mut X509) -> core::ffi::c_int =
+    crate::cmp::asn::OSSL_CMP_ITAV_get0_rootCaCert;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ITAV,
+    *mut *mut X509,
+    *mut *mut X509,
+    *mut *mut X509,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_get0_rootCaKeyUpdate;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ITAV) -> *mut ASN1_OBJECT =
+    crate::cmp::asn::OSSL_CMP_ITAV_get0_type;
+const _: unsafe extern "C" fn(*const OSSL_CMP_ITAV) -> *mut ASN1_TYPE =
+    crate::cmp::asn::OSSL_CMP_ITAV_get0_value;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ITAV,
+    *mut *mut OSSL_CRMF_CERTTEMPLATE,
+    *mut *mut OSSL_CMP_ATAVS,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_get1_certReqTemplate;
+const _: unsafe extern "C" fn(*mut stack_st_ASN1_UTF8STRING) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new0_certProfile;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CRMF_CERTTEMPLATE,
+    *mut OSSL_CMP_ATAVS,
+) -> *mut OSSL_CMP_ITAV = crate::cmp::asn::OSSL_CMP_ITAV_new0_certReqTemplate;
+const _: unsafe extern "C" fn(*mut stack_st_OSSL_CMP_CRLSTATUS) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new0_crlStatusList;
+const _: unsafe extern "C" fn(*const stack_st_X509) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new_caCerts;
+const _: unsafe extern "C" fn(*const X509_CRL) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new_crls;
+const _: unsafe extern "C" fn(*const X509) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new_rootCaCert;
+const _: unsafe extern "C" fn(*const X509, *const X509, *const X509) -> *mut OSSL_CMP_ITAV =
+    crate::cmp::asn::OSSL_CMP_ITAV_new_rootCaKeyUpdate;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_OSSL_CMP_ITAV,
+    *mut OSSL_CMP_ITAV,
+) -> core::ffi::c_int = crate::cmp::asn::OSSL_CMP_ITAV_push0_stack_item;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_ITAV, *mut ASN1_OBJECT, *mut ASN1_TYPE) =
+    crate::cmp::asn::OSSL_CMP_ITAV_set0;
+const _: unsafe extern "C" fn(*const OSSL_CMP_MSG) -> *mut OSSL_CMP_MSG =
+    crate::cmp::asn::OSSL_CMP_MSG_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_MSG) = crate::cmp::msg::OSSL_CMP_MSG_free;
+const _: unsafe extern "C" fn(*const OSSL_CMP_MSG) -> *mut X509_PUBKEY =
+    crate::cmp::msg::OSSL_CMP_MSG_get0_certreq_publickey;
+const _: unsafe extern "C" fn(*const OSSL_CMP_MSG) -> *mut OSSL_CMP_PKIHEADER =
+    crate::cmp::msg::OSSL_CMP_MSG_get0_header;
+const _: unsafe extern "C" fn(*const OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::msg::OSSL_CMP_MSG_get_bodytype;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const OSSL_CMP_MSG) -> *mut OSSL_CMP_MSG =
+    crate::cmp::http::OSSL_CMP_MSG_http_perform;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cmp::asn::OSSL_CMP_MSG_it;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut OSSL_CMP_MSG = crate::cmp::msg::OSSL_CMP_MSG_read;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::msg::OSSL_CMP_MSG_update_recipNonce;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::msg::OSSL_CMP_MSG_update_transactionID;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *const OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::msg::OSSL_CMP_MSG_write;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_PKIHEADER) = crate::cmp::asn::OSSL_CMP_PKIHEADER_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cmp::asn::OSSL_CMP_PKIHEADER_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CMP_PKIHEADER =
+    crate::cmp::asn::OSSL_CMP_PKIHEADER_new;
+const _: unsafe extern "C" fn(*const OSSL_CMP_PKISI) -> *mut OSSL_CMP_PKISI =
+    crate::cmp::asn::OSSL_CMP_PKISI_dup;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_PKISI) = crate::cmp::asn::OSSL_CMP_PKISI_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cmp::asn::OSSL_CMP_PKISI_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_CMP_PKISI = crate::cmp::asn::OSSL_CMP_PKISI_new;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::cmp::asn::OSSL_CMP_PKISTATUS_it;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX) = crate::cmp::server::OSSL_CMP_SRV_CTX_free;
+const _: unsafe extern "C" fn(*const OSSL_CMP_SRV_CTX) -> *mut OSSL_CMP_CTX =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_get0_cmp_ctx;
+const _: unsafe extern "C" fn(*const OSSL_CMP_SRV_CTX) -> *mut core::ffi::c_void =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_get0_custom_ctx;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_SRV_CTX,
+    *mut core::ffi::c_void,
+    OSSL_CMP_SRV_cert_request_cb_t,
+    OSSL_CMP_SRV_rr_cb_t,
+    OSSL_CMP_SRV_genm_cb_t,
+    OSSL_CMP_SRV_error_cb_t,
+    OSSL_CMP_SRV_certConf_cb_t,
+    OSSL_CMP_SRV_pollReq_cb_t,
+) -> core::ffi::c_int = crate::cmp::server::OSSL_CMP_SRV_CTX_init;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_SRV_CTX,
+    OSSL_CMP_SRV_delayed_delivery_cb_t,
+    OSSL_CMP_SRV_clean_transaction_cb_t,
+) -> core::ffi::c_int = crate::cmp::server::OSSL_CMP_SRV_CTX_init_trans;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut OSSL_CMP_SRV_CTX = crate::cmp::server::OSSL_CMP_SRV_CTX_new;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_set_accept_raverified;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_set_accept_unprotected;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_set_grant_implicit_confirm;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX, core::ffi::c_int) -> core::ffi::c_int =
+    crate::cmp::server::OSSL_CMP_SRV_CTX_set_send_unprotected_errors;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_SRV_CTX, *const OSSL_CMP_MSG) -> *mut OSSL_CMP_MSG =
+    crate::cmp::server::OSSL_CMP_SRV_process_request;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_char,
+) -> *mut OSSL_CMP_PKISI = crate::cmp::status::OSSL_CMP_STATUSINFO_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *mut X509,
+    core::ffi::c_int,
+    *mut *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::cmp::client::OSSL_CMP_certConf_cb;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) -> *mut stack_st_OSSL_CMP_ITAV =
+    crate::cmp::client::OSSL_CMP_exec_GENM_ses;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX) -> core::ffi::c_int =
+    crate::cmp::client::OSSL_CMP_exec_RR_ses;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    core::ffi::c_int,
+    *const OSSL_CRMF_MSG,
+) -> *mut X509 = crate::cmp::client::OSSL_CMP_exec_certreq;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *mut *mut stack_st_X509) -> core::ffi::c_int =
+    crate::cmp::genm::OSSL_CMP_get1_caCerts;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *mut *mut OSSL_CRMF_CERTTEMPLATE,
+    *mut *mut OSSL_CMP_ATAVS,
+) -> core::ffi::c_int = crate::cmp::genm::OSSL_CMP_get1_certReqTemplate;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *const X509,
+    *const X509_CRL,
+    *mut *mut X509_CRL,
+) -> core::ffi::c_int = crate::cmp::genm::OSSL_CMP_get1_crlUpdate;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    *const X509,
+    *mut *mut X509,
+    *mut *mut X509,
+    *mut *mut X509,
+) -> core::ffi::c_int = crate::cmp::genm::OSSL_CMP_get1_rootCaKeyUpdate;
+const _: unsafe extern "C" fn() = crate::cmp::util::OSSL_CMP_log_close;
+const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::cmp::util::OSSL_CMP_log_open;
+const _: unsafe extern "C" fn(OSSL_CMP_log_cb_t) = crate::cmp::util::OSSL_CMP_print_errors_cb;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+    OSSL_CMP_severity,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::cmp::util::OSSL_CMP_print_to_bio;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_PKISI,
+    *mut core::ffi::c_char,
+    usize,
+) -> *mut core::ffi::c_char = crate::cmp::status::OSSL_CMP_snprint_PKIStatusInfo;
+const _: unsafe extern "C" fn(
+    *mut OSSL_CMP_CTX,
+    core::ffi::c_int,
+    *const OSSL_CRMF_MSG,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::cmp::client::OSSL_CMP_try_certreq;
+const _: unsafe extern "C" fn(*const OSSL_CMP_CTX, *mut X509_STORE, *mut X509) -> core::ffi::c_int =
+    crate::cmp::vfy::OSSL_CMP_validate_cert_path;
+const _: unsafe extern "C" fn(*mut OSSL_CMP_CTX, *const OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::vfy::OSSL_CMP_validate_msg;
 const _: unsafe extern "C" fn(
     *const OSSL_CRMF_ATTRIBUTETYPEANDVALUE,
 ) -> *mut OSSL_CRMF_ATTRIBUTETYPEANDVALUE = crate::crmf::asn::OSSL_CRMF_ATTRIBUTETYPEANDVALUE_dup;
@@ -17151,6 +17533,28 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut OSSL_BASIC_ATTR_CONSTRAINTS = crate::x509v3::acext::d2i_OSSL_BASIC_ATTR_CONSTRAINTS;
 const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CMP_ATAVS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CMP_ATAVS = crate::cmp::asn::d2i_OSSL_CMP_ATAVS;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CMP_MSG,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CMP_MSG = crate::cmp::msg::d2i_OSSL_CMP_MSG;
+const _: unsafe extern "C" fn(*mut BIO, *mut *mut OSSL_CMP_MSG) -> *mut OSSL_CMP_MSG =
+    crate::cmp::msg::d2i_OSSL_CMP_MSG_bio;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CMP_PKIHEADER,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CMP_PKIHEADER = crate::cmp::asn::d2i_OSSL_CMP_PKIHEADER;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_CMP_PKISI,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_CMP_PKISI = crate::cmp::asn::d2i_OSSL_CMP_PKISI;
+const _: unsafe extern "C" fn(
     *mut *mut OSSL_CRMF_CERTID,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -18172,6 +18576,24 @@ const _: unsafe extern "C" fn(
     *const OSSL_BASIC_ATTR_CONSTRAINTS,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509v3::acext::i2d_OSSL_BASIC_ATTR_CONSTRAINTS;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_ATAVS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::cmp::asn::i2d_OSSL_CMP_ATAVS;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_MSG,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::cmp::msg::i2d_OSSL_CMP_MSG;
+const _: unsafe extern "C" fn(*mut BIO, *const OSSL_CMP_MSG) -> core::ffi::c_int =
+    crate::cmp::msg::i2d_OSSL_CMP_MSG_bio;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_PKIHEADER,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::cmp::asn::i2d_OSSL_CMP_PKIHEADER;
+const _: unsafe extern "C" fn(
+    *const OSSL_CMP_PKISI,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::cmp::asn::i2d_OSSL_CMP_PKISI;
 const _: unsafe extern "C" fn(
     *const OSSL_CRMF_CERTID,
     *mut *mut core::ffi::c_uchar,

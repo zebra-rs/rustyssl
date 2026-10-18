@@ -5068,8 +5068,8 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   `localhost`), directories (with the hashed names of a subject search); and the store lookup's
   URIs (`X509_LOOKUP_store`, `X509_STORE_load_store`), no longer aborting. Tests:
   `tests/c/store.c` (53 checks), the `store_attach` fuzz target.
-- [ ] **6.10 CMP/CRMF** (RFC 4210/4211/9480): the structures, the `OSSL_CMP_CTX` client, and
-  the server/mock APIs. Large and seldom used, so it's scheduled last in this phase.
+- [x] **6.10 CMP/CRMF** (RFC 4210/4211/9480/9810): the structures, the `OSSL_CMP_CTX` client, and
+  the server/mock APIs.
   - [x] **6.10a CRMF** (`crmf.rs`, `crmf/{asn,msg,pbm}.rs` from `crmf_asn.c`, `crmf_lib.c`,
     `crmf_pbm.c`; all 92 exports of `crmf.h`): the structures with OpenSSL's layouts (which CMP
     reaches into), the controls and registration info (whose `get0_regInfo` getters, as in
@@ -5078,10 +5078,21 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     encipherment), central key generation, encrypted values and keys decrypted (the unwrapped
     key's size checked in constant time; EnvelopedData through CMS), and the password-based MAC.
     Tests: `tests/c/crmf.c` (86 checks), the `crmf_d2i` fuzz target.
-  - [ ] **6.10b CMP messages:** the ASN.1 types, `OSSL_CMP_CTX`, headers, PKIStatusInfo,
-    message creation, protection, and validation.
-  - [ ] **6.10c CMP client and server:** `OSSL_CMP_exec_*`, the general messages, HTTP
-    transfer, and `OSSL_CMP_SRV_CTX` with the mock server.
+  - [x] **6.10b/c CMP** (`cmp.rs`, `cmp/{asn,ctx,util,hdr,status,msg,protect,vfy,client,genm,http,
+    server}.rs` from the `cmp_*.c` of the same names; all 161 exports): the message and every
+    body's ASN.1 (with OpenSSL's layouts and field names, and the message's library context kept
+    through copies); the client context with every option, getter, and setter; logging through
+    the context's callback (`OSSL_CMP_print_to_bio` without the location, as in the NDEBUG
+    reference); headers, PKIStatusInfo and its text; creating every message type, protecting it
+    by MAC (PBM) or signature, and validating received ones (protection, sender, nonces,
+    transaction ID, the certificate path, 3GPP's trust of extraCerts); the client's transactions
+    (`OSSL_CMP_exec_certreq`/`try_certreq` with polling, `exec_RR_ses`, `exec_GENM_ses`, the
+    certConf callback); the general messages (`OSSL_CMP_get1_caCerts`, `_rootCaKeyUpdate`,
+    `_crlUpdate`, `_certReqTemplate`); the HTTP transfer; and the server context dispatching to an
+    application's handlers, with delayed delivery. OpenSSL's leaks on error paths are freed
+    instead, and `ossl_cmp_hdr_set_implicitConfirm`'s double free on a failed push is avoided.
+    Tests: `tests/c/cmp.c` (236 checks: an in-process client and server, every export), the
+    `cmp_msg` fuzz target (decoding, validation with a MAC, and a server without handlers).
 - [ ] **6.11 Remainder:**
   - `TXT_DB`, SRP (deprecated)
   - `COMP_*`, matching the default build (no zlib, brotli, or zstd)
