@@ -4978,6 +4978,22 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   - BIO streaming, `SMIME_read/write_CMS`
   - CMS compression behaves as in the default build (zlib disabled)
   - the RFC 3211 KEK unwrap is bounds-checked (CVE-2025-9230)
+  - [x] **6.4a Structures, library, and the simple types** (`cms.rs`, `cms/{base,att,ess,enc,io,smime}.rs`,
+    from `cms_asn1.c`, `cms_lib.c`, `cms_att.c`, `cms_dd.c`, `cms_cd.c`, part of `cms_ess.c`,
+    `cms_enc.c`, `cms_io.c`, and part of `cms_smime.c`; 85 exports): every content type's and
+    recipient info's ASN.1 with OpenSSL's internal layouts; objects, content and its type,
+    detaching, certificates and CRLs; signed and unsigned attributes; receipt requests; Data,
+    DigestedData (the digest compared in constant time), EncryptedData (a key of the wrong length
+    silently replaced by a random one, as in OpenSSL), and CompressedData (unsupported, as
+    without zlib); the data path's dispatch; streaming, DER, PEM, and S/MIME;
+    `CMS_SharedInfo_encode`. GCM's AlgorithmIdentifier parameters (`evp_cipher_*_asn1_aead_params`)
+    come with them. SignedData's and the enveloped types' data paths abort until 6.4b and 6.4c.
+    Tests: `tests/c/cms_data.c`, the `cms_d2i` fuzz target.
+  - [ ] **6.4b SignedData** (`cms_sd.c`, signing and verifying in `cms_smime.c`, receipts in
+    `cms_ess.c`, `cms_rsa.c`'s signature parts).
+  - [ ] **6.4c The enveloped types** (`cms_env.c`, `cms_kari.c`, `cms_pwri.c` with the CVE-2025-9230
+    bounds check, `cms_dh.c`, `cms_ec.c`, `cms_rsa.c`'s key transport, AuthEnvelopedData, and
+    encrypting and decrypting in `cms_smime.c`).
 - [ ] **6.5 PKCS#12:**
   - `PKCS12_parse`/`PKCS12_create(_ex)`
   - MACs: HMAC and PBMAC1 (3.4)

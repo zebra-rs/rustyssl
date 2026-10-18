@@ -19,6 +19,7 @@ mod bio;
 mod bn;
 mod buffer;
 mod cmac;
+mod cms;
 mod conf;
 mod ct;
 mod decoder;

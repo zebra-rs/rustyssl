@@ -652,6 +652,60 @@ unsafe fn add_made(x: *mut *mut AttrStack, made: *mut X509_ATTRIBUTE) -> *mut At
     ret
 }
 
+/// `ossl_x509at_add1_attr_by_OBJ`: [`X509at_add1_attr_by_OBJ`] without the duplicate check.
+///
+/// # Safety
+/// As for [`X509at_add1_attr_by_OBJ`].
+pub(crate) unsafe fn add1_by_obj(
+    x: *mut *mut AttrStack,
+    obj: *const ASN1_OBJECT,
+    type_: c_int,
+    bytes: *const c_uchar,
+    len: c_int,
+) -> *mut AttrStack {
+    // SAFETY: the caller's guarantee.
+    let made =
+        unsafe { X509_ATTRIBUTE_create_by_OBJ(ptr::null_mut(), obj, type_, bytes.cast(), len) };
+    // SAFETY: as above.
+    unsafe { add_made(x, made) }
+}
+
+/// `ossl_x509at_add1_attr_by_NID`: [`X509at_add1_attr_by_NID`] without the duplicate check.
+///
+/// # Safety
+/// As for [`X509at_add1_attr_by_NID`].
+pub(crate) unsafe fn add1_by_nid(
+    x: *mut *mut AttrStack,
+    nid: c_int,
+    type_: c_int,
+    bytes: *const c_uchar,
+    len: c_int,
+) -> *mut AttrStack {
+    // SAFETY: the caller's guarantee.
+    let made =
+        unsafe { X509_ATTRIBUTE_create_by_NID(ptr::null_mut(), nid, type_, bytes.cast(), len) };
+    // SAFETY: as above.
+    unsafe { add_made(x, made) }
+}
+
+/// `ossl_x509at_add1_attr_by_txt`: [`X509at_add1_attr_by_txt`] without the duplicate check.
+///
+/// # Safety
+/// As for [`X509at_add1_attr_by_txt`].
+pub(crate) unsafe fn add1_by_txt(
+    x: *mut *mut AttrStack,
+    attrname: *const c_char,
+    type_: c_int,
+    bytes: *const c_uchar,
+    len: c_int,
+) -> *mut AttrStack {
+    // SAFETY: the caller's guarantee.
+    let made =
+        unsafe { X509_ATTRIBUTE_create_by_txt(ptr::null_mut(), attrname, type_, bytes, len) };
+    // SAFETY: as above.
+    unsafe { add_made(x, made) }
+}
+
 ffi_export! {
     /// Adds an attribute of `obj` with one value (as `X509_ATTRIBUTE_set1_data` makes it),
     /// unless `*x` has one of `obj`. The stack, or NULL.

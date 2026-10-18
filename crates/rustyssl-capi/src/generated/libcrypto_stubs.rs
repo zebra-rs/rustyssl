@@ -238,11 +238,6 @@ pub extern "C" fn BIO_f_zstd() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_CMS(_: *mut BIO, _: *mut CMS_ContentInfo) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_CMS")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_from_core_bio")
 }
@@ -272,85 +267,6 @@ pub extern "C" fn CMS_AuthEnvelopedData_create_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_ContentInfo_free(_: *mut CMS_ContentInfo) {
-    crate::stub::unimplemented("CMS_ContentInfo_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ContentInfo_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CMS_ContentInfo_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ContentInfo_new() -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_ContentInfo_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ContentInfo_new_ex(
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_ContentInfo_new_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ContentInfo_print_ctx(
-    _: *mut BIO,
-    _: *const CMS_ContentInfo,
-    _: core::ffi::c_int,
-    _: *const ASN1_PCTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_ContentInfo_print_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EncryptedData_decrypt(
-    _: *mut CMS_ContentInfo,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_EncryptedData_decrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EncryptedData_encrypt(
-    _: *mut BIO,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_uint,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_EncryptedData_encrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EncryptedData_encrypt_ex(
-    _: *mut BIO,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: core::ffi::c_uint,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_EncryptedData_encrypt_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EncryptedData_set1_key(
-    _: *mut CMS_ContentInfo,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_EncryptedData_set1_key")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_EnvelopedData_create(_: *const EVP_CIPHER) -> *mut CMS_ContentInfo {
     crate::stub::unimplemented("CMS_EnvelopedData_create")
 }
@@ -376,65 +292,6 @@ pub extern "C" fn CMS_EnvelopedData_decrypt(
     _: *const core::ffi::c_char,
 ) -> *mut BIO {
     crate::stub::unimplemented("CMS_EnvelopedData_decrypt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EnvelopedData_dup(_: *const CMS_EnvelopedData) -> *mut CMS_EnvelopedData {
-    crate::stub::unimplemented("CMS_EnvelopedData_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_EnvelopedData_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CMS_EnvelopedData_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_create0(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut stack_st_GENERAL_NAMES,
-    _: *mut stack_st_GENERAL_NAMES,
-) -> *mut CMS_ReceiptRequest {
-    crate::stub::unimplemented("CMS_ReceiptRequest_create0")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_create0_ex(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *mut stack_st_GENERAL_NAMES,
-    _: *mut stack_st_GENERAL_NAMES,
-    _: *mut OSSL_LIB_CTX,
-) -> *mut CMS_ReceiptRequest {
-    crate::stub::unimplemented("CMS_ReceiptRequest_create0_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_free(_: *mut CMS_ReceiptRequest) {
-    crate::stub::unimplemented("CMS_ReceiptRequest_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_get0_values(
-    _: *mut CMS_ReceiptRequest,
-    _: *mut *mut ASN1_STRING,
-    _: *mut core::ffi::c_int,
-    _: *mut *mut stack_st_GENERAL_NAMES,
-    _: *mut *mut stack_st_GENERAL_NAMES,
-) {
-    crate::stub::unimplemented("CMS_ReceiptRequest_get0_values")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("CMS_ReceiptRequest_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_ReceiptRequest_new() -> *mut CMS_ReceiptRequest {
-    crate::stub::unimplemented("CMS_ReceiptRequest_new")
 }
 
 #[unsafe(no_mangle)]
@@ -628,16 +485,6 @@ pub extern "C" fn CMS_RecipientInfo_type(_: *mut CMS_RecipientInfo) -> core::ffi
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_SharedInfo_encode(
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut X509_ALGOR,
-    _: *mut ASN1_OCTET_STRING,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SharedInfo_encode")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_SignedData_free(_: *mut CMS_SignedData) {
     crate::stub::unimplemented("CMS_SignedData_free")
 }
@@ -735,30 +582,6 @@ pub extern "C" fn CMS_SignerInfo_verify_content(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_add0_CertificateChoices(
-    _: *mut CMS_ContentInfo,
-) -> *mut CMS_CertificateChoices {
-    crate::stub::unimplemented("CMS_add0_CertificateChoices")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add0_RevocationInfoChoice(
-    _: *mut CMS_ContentInfo,
-) -> *mut CMS_RevocationInfoChoice {
-    crate::stub::unimplemented("CMS_add0_RevocationInfoChoice")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add0_cert(_: *mut CMS_ContentInfo, _: *mut X509) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add0_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add0_crl(_: *mut CMS_ContentInfo, _: *mut X509_CRL) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add0_crl")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_add0_recipient_key(
     _: *mut CMS_ContentInfo,
     _: core::ffi::c_int,
@@ -784,24 +607,6 @@ pub extern "C" fn CMS_add0_recipient_password(
     _: *const EVP_CIPHER,
 ) -> *mut CMS_RecipientInfo {
     crate::stub::unimplemented("CMS_add0_recipient_password")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add1_ReceiptRequest(
-    _: *mut CMS_SignerInfo,
-    _: *mut CMS_ReceiptRequest,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add1_ReceiptRequest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add1_cert(_: *mut CMS_ContentInfo, _: *mut X509) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add1_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add1_crl(_: *mut CMS_ContentInfo, _: *mut X509_CRL) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add1_crl")
 }
 
 #[unsafe(no_mangle)]
@@ -858,49 +663,6 @@ pub extern "C" fn CMS_add_standard_smimecap(_: *mut *mut stack_st_X509_ALGOR) ->
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_compress(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: core::ffi::c_uint,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_compress")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_data(
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_dataFinal(_: *mut CMS_ContentInfo, _: *mut BIO) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_dataFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_dataInit(_: *mut CMS_ContentInfo, _: *mut BIO) -> *mut BIO {
-    crate::stub::unimplemented("CMS_dataInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_data_create(_: *mut BIO, _: core::ffi::c_uint) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_data_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_data_create_ex(
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_data_create_ex")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_decrypt(
     _: *mut CMS_ContentInfo,
     _: *mut EVP_PKEY,
@@ -952,36 +714,6 @@ pub extern "C" fn CMS_decrypt_set1_pkey_and_peer(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_digest_create(
-    _: *mut BIO,
-    _: *const EVP_MD,
-    _: core::ffi::c_uint,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_digest_create")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_digest_create_ex(
-    _: *mut BIO,
-    _: *const EVP_MD,
-    _: core::ffi::c_uint,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_digest_create_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_digest_verify(
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_digest_verify")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_encrypt(
     _: *mut stack_st_X509,
     _: *mut BIO,
@@ -1004,87 +736,8 @@ pub extern "C" fn CMS_encrypt_ex(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_final(
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_final")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_final_digest(
-    _: *mut CMS_ContentInfo,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_final_digest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_RecipientInfos(
-    _: *mut CMS_ContentInfo,
-) -> *mut stack_st_CMS_RecipientInfo {
-    crate::stub::unimplemented("CMS_get0_RecipientInfos")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_SignerInfos(_: *mut CMS_ContentInfo) -> *mut stack_st_CMS_SignerInfo {
-    crate::stub::unimplemented("CMS_get0_SignerInfos")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_content(_: *mut CMS_ContentInfo) -> *mut *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("CMS_get0_content")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_eContentType(_: *mut CMS_ContentInfo) -> *const ASN1_OBJECT {
-    crate::stub::unimplemented("CMS_get0_eContentType")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_get0_signers(_: *mut CMS_ContentInfo) -> *mut stack_st_X509 {
     crate::stub::unimplemented("CMS_get0_signers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_type(_: *const CMS_ContentInfo) -> *const ASN1_OBJECT {
-    crate::stub::unimplemented("CMS_get0_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get1_ReceiptRequest(
-    _: *mut CMS_SignerInfo,
-    _: *mut *mut CMS_ReceiptRequest,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_get1_ReceiptRequest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get1_certs(_: *mut CMS_ContentInfo) -> *mut stack_st_X509 {
-    crate::stub::unimplemented("CMS_get1_certs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get1_crls(_: *mut CMS_ContentInfo) -> *mut stack_st_X509_CRL {
-    crate::stub::unimplemented("CMS_get1_crls")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_is_detached(_: *mut CMS_ContentInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_is_detached")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_set1_eContentType(
-    _: *mut CMS_ContentInfo,
-    _: *const ASN1_OBJECT,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_set1_eContentType")
 }
 
 #[unsafe(no_mangle)]
@@ -1094,14 +747,6 @@ pub extern "C" fn CMS_set1_signers_certs(
     _: core::ffi::c_uint,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("CMS_set1_signers_certs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_set_detached(
-    _: *mut CMS_ContentInfo,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_set_detached")
 }
 
 #[unsafe(no_mangle)]
@@ -1137,204 +782,6 @@ pub extern "C" fn CMS_sign_receipt(
     _: core::ffi::c_uint,
 ) -> *mut CMS_ContentInfo {
     crate::stub::unimplemented("CMS_sign_receipt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_add1_attr(
-    _: *mut CMS_SignerInfo,
-    _: *mut X509_ATTRIBUTE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_add1_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_add1_attr_by_NID(
-    _: *mut CMS_SignerInfo,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_add1_attr_by_NID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_add1_attr_by_OBJ(
-    _: *mut CMS_SignerInfo,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_add1_attr_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_add1_attr_by_txt(
-    _: *mut CMS_SignerInfo,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_add1_attr_by_txt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_delete_attr(
-    _: *mut CMS_SignerInfo,
-    _: core::ffi::c_int,
-) -> *mut X509_ATTRIBUTE {
-    crate::stub::unimplemented("CMS_signed_delete_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_get0_data_by_OBJ(
-    _: *const CMS_SignerInfo,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CMS_signed_get0_data_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_get_attr(
-    _: *const CMS_SignerInfo,
-    _: core::ffi::c_int,
-) -> *mut X509_ATTRIBUTE {
-    crate::stub::unimplemented("CMS_signed_get_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_get_attr_by_NID(
-    _: *const CMS_SignerInfo,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_get_attr_by_NID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_get_attr_by_OBJ(
-    _: *const CMS_SignerInfo,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_get_attr_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_signed_get_attr_count(_: *const CMS_SignerInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_signed_get_attr_count")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_stream(
-    _: *mut *mut *mut core::ffi::c_uchar,
-    _: *mut CMS_ContentInfo,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_stream")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_uncompress(
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_uncompress")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_add1_attr(
-    _: *mut CMS_SignerInfo,
-    _: *mut X509_ATTRIBUTE,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_add1_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_add1_attr_by_NID(
-    _: *mut CMS_SignerInfo,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_add1_attr_by_NID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_add1_attr_by_OBJ(
-    _: *mut CMS_SignerInfo,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_add1_attr_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_add1_attr_by_txt(
-    _: *mut CMS_SignerInfo,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_add1_attr_by_txt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_delete_attr(
-    _: *mut CMS_SignerInfo,
-    _: core::ffi::c_int,
-) -> *mut X509_ATTRIBUTE {
-    crate::stub::unimplemented("CMS_unsigned_delete_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_get0_data_by_OBJ(
-    _: *mut CMS_SignerInfo,
-    _: *mut ASN1_OBJECT,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CMS_unsigned_get0_data_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_get_attr(
-    _: *const CMS_SignerInfo,
-    _: core::ffi::c_int,
-) -> *mut X509_ATTRIBUTE {
-    crate::stub::unimplemented("CMS_unsigned_get_attr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_get_attr_by_NID(
-    _: *const CMS_SignerInfo,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_get_attr_by_NID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_get_attr_by_OBJ(
-    _: *const CMS_SignerInfo,
-    _: *const ASN1_OBJECT,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_get_attr_by_OBJ")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_unsigned_get_attr_count(_: *const CMS_SignerInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_unsigned_get_attr_count")
 }
 
 #[unsafe(no_mangle)]
@@ -5904,46 +5351,6 @@ pub extern "C" fn PEM_SignUpdate(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_CMS(
-    _: *mut FILE,
-    _: *mut *mut CMS_ContentInfo,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("PEM_read_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_read_bio_CMS(
-    _: *mut BIO,
-    _: *mut *mut CMS_ContentInfo,
-    _: pem_password_cb,
-    _: *mut core::ffi::c_void,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("PEM_read_bio_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_CMS(_: *mut FILE, _: *const CMS_ContentInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_CMS(_: *mut BIO, _: *const CMS_ContentInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_write_bio_CMS_stream(
-    _: *mut BIO,
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_write_bio_CMS_stream")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn PKCS12_AUTHSAFES_it() -> *const ASN1_ITEM {
     crate::stub::unimplemented("PKCS12_AUTHSAFES_it")
 }
@@ -6600,31 +6007,6 @@ pub extern "C" fn PKCS1_MGF1(
 #[unsafe(no_mangle)]
 pub extern "C" fn PKCS7_to_TS_TST_INFO(_: *mut PKCS7) -> *mut TS_TST_INFO {
     crate::stub::unimplemented("PKCS7_to_TS_TST_INFO")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_CMS(_: *mut BIO, _: *mut *mut BIO) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("SMIME_read_CMS")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_read_CMS_ex(
-    _: *mut BIO,
-    _: core::ffi::c_int,
-    _: *mut *mut BIO,
-    _: *mut *mut CMS_ContentInfo,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("SMIME_read_CMS_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn SMIME_write_CMS(
-    _: *mut BIO,
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SMIME_write_CMS")
 }
 
 #[unsafe(no_mangle)]
@@ -8015,29 +7397,6 @@ pub extern "C" fn conf_ssl_name_find(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_CMS_ContentInfo(
-    _: *mut *mut CMS_ContentInfo,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("d2i_CMS_ContentInfo")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_CMS_ReceiptRequest(
-    _: *mut *mut CMS_ReceiptRequest,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut CMS_ReceiptRequest {
-    crate::stub::unimplemented("d2i_CMS_ReceiptRequest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_CMS_bio(_: *mut BIO, _: *mut *mut CMS_ContentInfo) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("d2i_CMS_bio")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_ESS_CERT_ID(
     _: *mut *mut ESS_CERT_ID,
     _: *mut *const core::ffi::c_uchar,
@@ -8495,37 +7854,6 @@ pub extern "C" fn d2i_TS_TST_INFO_bio(_: *mut BIO, _: *mut *mut TS_TST_INFO) -> 
 #[unsafe(no_mangle)]
 pub extern "C" fn d2i_TS_TST_INFO_fp(_: *mut FILE, _: *mut *mut TS_TST_INFO) -> *mut TS_TST_INFO {
     crate::stub::unimplemented("d2i_TS_TST_INFO_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CMS_ContentInfo(
-    _: *const CMS_ContentInfo,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CMS_ContentInfo")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CMS_ReceiptRequest(
-    _: *const CMS_ReceiptRequest,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CMS_ReceiptRequest")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CMS_bio(_: *mut BIO, _: *mut CMS_ContentInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CMS_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_CMS_bio_stream(
-    _: *mut BIO,
-    _: *mut CMS_ContentInfo,
-    _: *mut BIO,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_CMS_bio_stream")
 }
 
 #[unsafe(no_mangle)]

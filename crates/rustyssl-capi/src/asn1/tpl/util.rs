@@ -486,6 +486,109 @@ ffi_export! {
     }
 }
 
+/// `asn1_oct_int`: SEQUENCE { OCTET STRING, INTEGER (an `int32_t`) }, as GCM's parameters.
+#[repr(C)]
+struct OctInt {
+    oct: *mut ASN1_STRING,
+    num: i32,
+}
+
+static OCT_INT_TT: IntOctTemplates = IntOctTemplates([
+    super::template_at(0, 0, offset_of!(OctInt, oct), c"oct", ASN1_OCTET_STRING_it),
+    super::template_at(
+        ASN1_TFLG_EMBED,
+        0,
+        offset_of!(OctInt, num),
+        c"num",
+        INT32_it,
+    ),
+]);
+
+static OCT_INT: Item = item(
+    ASN1_ITYPE_SEQUENCE,
+    V_ASN1_SEQUENCE,
+    &raw const OCT_INT_TT.0 as *const ASN1_TEMPLATE,
+    2,
+    ptr::null(),
+    size_of_long::<OctInt>(),
+    c"asn1_oct_int",
+);
+
+/// `ossl_asn1_type_set_octetstring_int`: `a` made a SEQUENCE of `len` octets of `data` and
+/// `num` (cut to 32 bits, as in C). Whether it worked.
+///
+/// # Safety
+/// `a` is a live `ASN1_TYPE`; `data` holds `len` octets.
+pub(crate) unsafe fn set_octetstring_int(
+    a: *mut ASN1_TYPE,
+    num: c_long,
+    data: *mut c_uchar,
+    len: c_int,
+) -> bool {
+    let mut oct = ASN1_STRING {
+        length: len,
+        type_: V_ASN1_OCTET_STRING,
+        data,
+        flags: 0,
+    };
+    let mut atmp = OctInt {
+        oct: &raw mut oct,
+        num: super::long_to_int(num),
+    };
+    let mut a = a;
+    // SAFETY: a local value of the item; the caller's guarantee for `a`.
+    !unsafe { ASN1_TYPE_pack_sequence(&raw const OCT_INT.0, (&raw mut atmp).cast(), &raw mut a) }
+        .is_null()
+}
+
+/// `ossl_asn1_type_get_octetstring_int`: from a SEQUENCE of an OCTET STRING and an INTEGER in
+/// `a`, the number into `*num` and up to `data.len()` octets into `data`. The OCTET STRING's
+/// length, or -1 (`ASN1_R_DATA_IS_WRONG`).
+///
+/// # Safety
+/// `a` is NULL or a live `ASN1_TYPE`.
+pub(crate) unsafe fn get_octetstring_int(
+    a: *const ASN1_TYPE,
+    num: &mut c_long,
+    data: &mut [u8],
+) -> c_int {
+    let wrong = || {
+        err::raise(
+            ERR_LIB_ASN1,
+            ASN1_R_DATA_IS_WRONG,
+            "ossl_asn1_type_get_octetstring_int",
+        );
+        -1
+    };
+    // SAFETY: the caller's guarantee.
+    let Some(typ) = (unsafe { a.as_ref() }) else {
+        return wrong();
+    };
+    // SAFETY: the union's pointer member.
+    let sequence = unsafe { typ.value.sequence };
+    if typ.type_ != V_ASN1_SEQUENCE || sequence.is_null() {
+        return wrong();
+    }
+    // SAFETY: a live ASN1_TYPE holding a SEQUENCE.
+    let atmp: *mut OctInt = unsafe { ASN1_TYPE_unpack_sequence(&raw const OCT_INT.0, a) }.cast();
+    // SAFETY: a decoded value of the item, or NULL.
+    let Some(value) = (unsafe { atmp.as_ref() }) else {
+        return wrong();
+    };
+    // SAFETY: its OCTET STRING.
+    let octets = unsafe { &*value.oct };
+    let ret = octets.length;
+    *num = c_long::from(value.num);
+    let n = usize::try_from(ret).unwrap_or(0).min(data.len());
+    if n > 0 && !octets.data.is_null() {
+        // SAFETY: the string holds `ret` octets; room for `n`.
+        unsafe { ptr::copy_nonoverlapping(octets.data, data.as_mut_ptr(), n) };
+    }
+    // SAFETY: the decoded value.
+    unsafe { ASN1_item_free(atmp.cast(), &raw const OCT_INT.0) };
+    ret
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
