@@ -17,7 +17,7 @@
 use rustyssl_abi as abi;
 
 use super::*;
-use crate::codec::Reader;
+
 use crate::conn::common::{finished, keys};
 use crate::conn::{CertKey, Config, Event, Request, TicketKeys};
 use crate::consts::{ext as t, group, sigscheme, version as v};
@@ -171,19 +171,6 @@ pub(crate) fn server_config(p: &TestProvider) -> Config {
     }
 }
 
-/// Splits handshake octets into messages (with their headers).
-fn messages(b: &[u8]) -> Vec<Vec<u8>> {
-    let mut out = Vec::new();
-    let mut rd = Reader::new(b);
-    while !rd.is_empty() {
-        let at = b.len() - rd.len();
-        rd.u8().unwrap();
-        let body = rd.vec24().unwrap();
-        out.push(b[at..at + 4 + body.len()].to_vec());
-    }
-    out
-}
-
 /// A scripted TLS 1.3 client: the key schedule over the transcript, with the record layer of
 /// a client-role connection, to read the server's flight and answer it.
 struct Client {
@@ -285,28 +272,74 @@ impl Client {
     /// Reads EncryptedExtensions, Certificate, CertificateVerify, and Finished, checking the
     /// signature (with `cert`) and the Finished; returns the four messages.
     fn server_flight(&mut self, p: &dyn Provider, cert: &[u8]) -> Vec<Vec<u8>> {
+        use crate::consts::handshake as ht;
         let ee = self.message(p);
-        assert_eq!(ee[0], crate::consts::handshake::ENCRYPTED_EXTENSIONS);
+        assert_eq!(ee[0], ht::ENCRYPTED_EXTENSIONS);
         self.c.hs.transcript.add(&ee);
-        let ct = self.message(p);
-        assert_eq!(ct[0], crate::consts::handshake::CERTIFICATE);
-        self.c.hs.transcript.add(&ct);
-        let th = self.c.hs.transcript.current().unwrap();
-        let cv = self.message(p);
-        assert_eq!(cv[0], crate::consts::handshake::CERTIFICATE_VERIFY);
-        let scheme = u16::from_be_bytes([cv[4], cv[5]]);
-        let sig = &cv[8..];
-        let mut tbs = vec![0x20; 64];
-        tbs.extend_from_slice(b"TLS 1.3, server CertificateVerify\0");
-        tbs.extend_from_slice(&th);
-        assert!(p.verify(cert, scheme, &tbs, sig).unwrap(), "the signature");
-        self.c.hs.transcript.add(&cv);
-        let fin = self.message(p);
-        assert_eq!(fin[0], crate::consts::handshake::FINISHED);
-        let want = finished::final_finish_mac(&self.c, p, true).unwrap();
-        assert_eq!(&fin[4..], &want[..], "the server's Finished");
-        self.c.hs.transcript.add(&fin);
-        vec![ee, ct, cv, fin]
+        let mut flight = vec![ee];
+        let mut th = Vec::new();
+        loop {
+            let m = self.message(p);
+            match m[0] {
+                ht::CERTIFICATE_REQUEST | ht::CERTIFICATE => {
+                    self.c.hs.transcript.add(&m);
+                    th = self.c.hs.transcript.current().unwrap();
+                }
+                ht::CERTIFICATE_VERIFY => {
+                    let scheme = u16::from_be_bytes([m[4], m[5]]);
+                    let sig = &m[8..];
+                    let mut tbs = vec![0x20; 64];
+                    tbs.extend_from_slice(b"TLS 1.3, server CertificateVerify\0");
+                    tbs.extend_from_slice(&th);
+                    assert!(p.verify(cert, scheme, &tbs, sig).unwrap(), "the signature");
+                    self.c.hs.transcript.add(&m);
+                }
+                ht::FINISHED => {
+                    let want = finished::final_finish_mac(&self.c, p, true).unwrap();
+                    assert_eq!(&m[4..], &want[..], "the server's Finished");
+                    self.c.hs.transcript.add(&m);
+                    flight.push(m);
+                    return flight;
+                }
+                other => panic!("unexpected message {other}"),
+            }
+            flight.push(m);
+        }
+    }
+
+    /// A handshake message of the client's, protected, added to the transcript.
+    fn send(&mut self, p: &dyn Provider, typ: u8, body: &[u8]) -> Vec<u8> {
+        let msg = crate::msgs::frame(typ, body).unwrap();
+        self.c.hs.transcript.add(&msg);
+        self.c
+            .write_record(p, record::content_type::handshake(), &msg)
+            .unwrap();
+        self.c.take_output()
+    }
+
+    /// The application keys after the server's Finished: reading the server's, and (after
+    /// the client's Finished) writing.
+    fn application_read(&mut self, p: &dyn Provider) {
+        keys::generate_master_secret(&mut self.c, p).unwrap();
+        keys::store_server_finished_hash(&mut self.c).unwrap();
+        keys::change_cipher_state13(
+            &mut self.c,
+            p,
+            abi::SSL3_CC_APPLICATION | abi::SSL3_CHANGE_CIPHER_CLIENT_READ,
+            None,
+        )
+        .unwrap();
+    }
+
+    /// See [`Client::application_read`].
+    fn application_write(&mut self, p: &dyn Provider) {
+        keys::change_cipher_state13(
+            &mut self.c,
+            p,
+            abi::SSL3_CC_APPLICATION | abi::SSL3_CHANGE_CIPHER_CLIENT_WRITE,
+            None,
+        )
+        .unwrap();
     }
 
     /// The client's Finished, protected.
@@ -426,4 +459,705 @@ fn rfc8448_simple_1rtt() {
         assert_eq!(&t.ticket[..16], &[7; 16]);
     }
     assert!(client.record(&p).is_none());
+}
+
+/// A ClientHello built from its parts (TLS 1.3 unless changed).
+#[derive(Clone)]
+struct Hello {
+    legacy_version: u16,
+    random: [u8; 32],
+    session_id: Vec<u8>,
+    ciphers: Vec<u16>,
+    exts: Vec<(u16, Vec<u8>)>,
+}
+
+impl Hello {
+    /// A TLS 1.3 ClientHello with these groups and shares.
+    fn tls13(groups: &[u16], shares: &[(u16, Vec<u8>)]) -> Self {
+        use crate::msgs::ext as mx;
+        let entries: Vec<mx::key_share::Entry> = shares
+            .iter()
+            .map(|(g, k)| mx::key_share::Entry {
+                group: *g,
+                key: k.clone(),
+            })
+            .collect();
+        Self {
+            legacy_version: v::TLS1_2,
+            random: [0x11; 32],
+            session_id: Vec::new(),
+            ciphers: vec![0x1301],
+            exts: vec![
+                (
+                    t::SUPPORTED_VERSIONS,
+                    mx::supported_versions::encode_client(&[v::TLS1_3]).unwrap(),
+                ),
+                (
+                    t::SUPPORTED_GROUPS,
+                    mx::supported_groups::encode(groups).unwrap(),
+                ),
+                (
+                    t::KEY_SHARE,
+                    mx::key_share::encode_client(&entries).unwrap(),
+                ),
+                (
+                    t::SIGNATURE_ALGORITHMS,
+                    mx::signature_algorithms::encode(&[
+                        sigscheme::RSA_PSS_RSAE_SHA256,
+                        sigscheme::ECDSA_SECP256R1_SHA256,
+                        sigscheme::ED25519,
+                    ])
+                    .unwrap(),
+                ),
+            ],
+        }
+    }
+
+    /// With extension `typ` set to `body` (replaced, or added at the end).
+    fn with(mut self, typ: u16, body: Vec<u8>) -> Self {
+        match self.exts.iter_mut().find(|e| e.0 == typ) {
+            Some(e) => e.1 = body,
+            None => self.exts.push((typ, body)),
+        }
+        self
+    }
+
+    /// Without extension `typ`.
+    fn without(mut self, typ: u16) -> Self {
+        self.exts.retain(|e| e.0 != typ);
+        self
+    }
+
+    /// The message, with its header.
+    fn msg(&self) -> Vec<u8> {
+        let exts: Vec<_> = self
+            .exts
+            .iter()
+            .map(|(t, b)| crate::msgs::ext::Extension::new(*t, b.clone()))
+            .collect();
+        let body = crate::msgs::hello::ClientHello {
+            legacy_version: self.legacy_version,
+            random: self.random,
+            session_id: self.session_id.clone(),
+            cookie: None,
+            cipher_suites: self.ciphers.iter().flat_map(|c| c.to_be_bytes()).collect(),
+            compression_methods: vec![0],
+            extensions: Some(crate::msgs::ext::encode_contents(&exts).unwrap()),
+            extensions_offset: 0,
+            sslv2: false,
+        }
+        .encode()
+        .unwrap();
+        crate::msgs::frame(crate::consts::handshake::CLIENT_HELLO, &body).unwrap()
+    }
+}
+
+/// The server's key share in a ServerHello.
+fn server_share(sh: &[u8]) -> (u16, Vec<u8>) {
+    let parsed = crate::msgs::hello::ServerHello::parse(&sh[4..], true).unwrap();
+    let e = parsed
+        .extensions()
+        .unwrap()
+        .into_iter()
+        .find(|e| e.typ == t::KEY_SHARE)
+        .unwrap();
+    let entry = crate::msgs::ext::key_share::parse_server(&e.body).unwrap();
+    (entry.group, entry.key)
+}
+
+/// The first record's payload in `out` (a plaintext ServerHello).
+fn first_record(out: &[u8]) -> Vec<u8> {
+    let n = usize::from(out[3]) << 8 | usize::from(out[4]);
+    out[5..5 + n].to_vec()
+}
+
+/// Steps `c`, answering its requests with `answer`, until it needs input or finishes.
+fn drive_answering(
+    c: &mut Connection,
+    p: &dyn Provider,
+    answer: &mut dyn FnMut(&Request) -> crate::conn::Answer,
+) -> (Vec<u8>, crate::error::Result<Event>) {
+    let mut out = Vec::new();
+    loop {
+        let (o, e) = drive(c, p);
+        out.extend(o);
+        match e {
+            Ok(Event::Request(r)) => {
+                let a = answer(&r);
+                c.answer(a);
+            }
+            other => return (out, other),
+        }
+    }
+}
+
+/// The TLS alert record at the end of `out`: its level and description.
+fn last_alert(out: &[u8]) -> (u8, u8) {
+    assert!(out.len() >= 7, "an alert");
+    let a = &out[out.len() - 7..];
+    assert_eq!(a[0], 21, "an alert record: {out:02x?}");
+    (a[5], a[6])
+}
+
+/// Feeds `msgs` to a fresh server in plaintext records, and expects it to fail with `alert`
+/// and `reason`.
+fn expect_failure(cfg: Config, p: &TestProvider, msgs: &[Vec<u8>], alert: c_int, reason: c_int) {
+    let mut c = Connection::new(cfg);
+    for m in msgs {
+        c.feed(&plain_record(22, m));
+    }
+    let (out, last) = drive(&mut c, p);
+    assert_eq!(last.unwrap_err(), Error::alert(alert, reason));
+    assert_eq!(last_alert(&out).1, octet(alert));
+}
+
+/// A full TLS 1.3 handshake with the scripted client, up to the server's flight checked: the
+/// server, the client, and the flight.
+fn handshake13(
+    p: &TestProvider,
+    cfg: Config,
+    ch: impl Fn(Vec<u8>) -> Hello,
+) -> (Connection, Client, Vec<Vec<u8>>) {
+    let mut c = Connection::new(cfg);
+    let x = p.key_share(group::X25519).unwrap();
+    let hello = ch(x.public().to_vec());
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client::new();
+    let (_, sk) = server_share(&first_record(&out));
+    let shared = x.derive(&sk).unwrap();
+    client.hello(p, &out, &[hello.msg()], shared.bytes());
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let flight = client.server_flight(p, &cert);
+    (c, client, flight)
+}
+
+/// A plain X25519 ClientHello.
+fn x25519_hello(share: Vec<u8>) -> Hello {
+    Hello::tls13(&[group::X25519], &[(group::X25519, share)])
+}
+
+#[test]
+fn rfc8448_hello_retry_request() {
+    let p = TestProvider::new(b"rfc8448-hrr");
+    let mut cfg = server_config(&p);
+    cfg.groups = vec![group::SECP256R1];
+    cfg.key_share_groups = vec![group::SECP256R1];
+    cfg.group_tuples = vec![0];
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, rfc("5", "ClientHello", 0)));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert_eq!(c.state(), abi::TLS_ST_EARLY_DATA);
+    assert_eq!(c.hs.sh.hrr, Hrr::Pending);
+    // The RFC's HelloRetryRequest, without the cookie (which a stateful OpenSSL server
+    // doesn't send), in OpenSSL's order.
+    let hrr = first_record(&out);
+    assert_eq!(hrr, openssl_order(rfc("5", "ServerHello", 0), &[t::COOKIE]));
+    // The transcript starts again with ClientHello1's hash.
+    let ch1_hash = crate::testprov::digest(HashAlg::Sha256, rfc("5", "ClientHello", 0));
+    let mut want = crate::msgs::message_hash(&ch1_hash).unwrap();
+    want.extend_from_slice(&hrr);
+    assert_eq!(c.hs.transcript.buffered(), Some(&want[..]));
+}
+
+#[test]
+fn hello_retry_request_then_handshake() {
+    let p = TestProvider::new(b"hrr-full");
+    let mut cfg = server_config(&p);
+    cfg.groups = vec![group::SECP256R1];
+    cfg.group_tuples = vec![0];
+    let mut c = Connection::new(cfg);
+    let x = p.key_share(group::X25519).unwrap();
+    let groups = [group::X25519, group::SECP256R1];
+    let ch1 = Hello::tls13(&groups, &[(group::X25519, x.public().to_vec())]);
+    c.feed(&plain_record(22, &ch1.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let hrr = first_record(&out);
+    assert_eq!(&hrr[6..38], &crate::consts::HRR_RANDOM[..]);
+    let ec = p.key_share(group::SECP256R1).unwrap();
+    let ch2 = ch1.clone().with(
+        t::KEY_SHARE,
+        crate::msgs::ext::key_share::encode_client(&[crate::msgs::ext::key_share::Entry {
+            group: group::SECP256R1,
+            key: ec.public().to_vec(),
+        }])
+        .unwrap(),
+    );
+    c.feed(&plain_record(22, &ch2.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client::new();
+    let (g, server_key) = server_share(&first_record(&out));
+    assert_eq!(g, group::SECP256R1);
+    let shared = ec.derive(&server_key).unwrap();
+    let mh =
+        crate::msgs::message_hash(&crate::testprov::digest(HashAlg::Sha256, &ch1.msg())).unwrap();
+    client.hello(&p, &out, &[mh, hrr, ch2.msg()], shared.bytes());
+    let cert = c.cfg.certs[0].chain[0].clone();
+    client.server_flight(&p, &cert);
+    c.feed(&client.finished(&p));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.hs.sh.hrr, Hrr::Complete);
+    assert_eq!(c.neg.group, Some(group::SECP256R1));
+}
+
+#[test]
+fn second_client_hello_must_keep_the_suite_and_send_the_share() {
+    let p = TestProvider::new(b"hrr-bad");
+    let mut cfg = server_config(&p);
+    cfg.groups = vec![group::SECP256R1];
+    cfg.group_tuples = vec![0];
+    let x = p.key_share(group::X25519).unwrap();
+    let groups = [group::X25519, group::SECP256R1];
+    let ch1 = Hello::tls13(&groups, &[(group::X25519, x.public().to_vec())]);
+    let mut ch2 = ch1.clone();
+    ch2.ciphers = vec![0x1302];
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[ch1.msg(), ch2.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_CIPHER,
+    );
+    // Still the X25519 share, not the group asked for.
+    expect_failure(
+        cfg,
+        &p,
+        &[ch1.msg(), ch1.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_KEY_SHARE,
+    );
+}
+
+/// A client certificate: an Ed25519 key's, registered with the provider.
+fn client_cert(p: &TestProvider) -> (Vec<u8>, crate::crypto::KeyId) {
+    let key = crate::testprov::keys::PrivateKey::ed25519(p);
+    let der = key.public(p).unwrap().cert("client");
+    (der, p.add_key(key))
+}
+
+/// The client's TLS 1.3 Certificate with these entries.
+fn certificate13(chain: &[Vec<u8>]) -> Vec<u8> {
+    let mut w = crate::codec::Writer::new();
+    w.u8(0);
+    let o = w.open(3);
+    for c in chain {
+        w.vec(3, c).unwrap();
+        w.u16(0);
+    }
+    w.close(o).unwrap();
+    w.into_bytes()
+}
+
+/// The client's TLS 1.3 CertificateVerify with Ed25519 key `key`.
+fn client_cert_verify(p: &TestProvider, client: &Client, key: crate::crypto::KeyId) -> Vec<u8> {
+    let mut tbs = vec![0x20; 64];
+    tbs.extend_from_slice(b"TLS 1.3, client CertificateVerify\0");
+    tbs.extend_from_slice(&client.c.hs.transcript.current().unwrap());
+    let sig = p.sign(key, sigscheme::ED25519, &tbs).unwrap();
+    crate::msgs::cert::CertificateVerify {
+        scheme: Some(sigscheme::ED25519),
+        signature: sig,
+    }
+    .encode()
+    .unwrap()
+}
+
+#[test]
+fn tls13_client_authentication() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"client-auth");
+    let mut cfg = server_config(&p);
+    cfg.verify_mode = abi::SSL_VERIFY_PEER | abi::SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    cfg.sid_ctx = b"ctx".to_vec();
+    let (mut c, mut client, flight) = handshake13(&p, cfg, x25519_hello);
+    // EncryptedExtensions, CertificateRequest (empty context, signature_algorithms),
+    // Certificate, CertificateVerify, Finished.
+    let cr = &flight[1];
+    assert_eq!(cr[0], ht::CERTIFICATE_REQUEST);
+    assert_eq!(cr[4], 0, "an empty context");
+    let exts = crate::msgs::ext::split(&cr[7..]).unwrap();
+    assert!(exts.iter().any(|e| e.typ == t::SIGNATURE_ALGORITHMS));
+    client.application_read(&p);
+    let (der, key) = client_cert(&p);
+    let mut out = client.send(
+        &p,
+        ht::CERTIFICATE,
+        &certificate13(std::slice::from_ref(&der)),
+    );
+    let cv = client_cert_verify(&p, &client, key);
+    out.extend(client.send(&p, ht::CERTIFICATE_VERIFY, &cv));
+    out.extend(client.finished(&p));
+    c.feed(&out);
+    let mut asked = Vec::new();
+    let (_, last) = drive_answering(&mut c, &p, &mut |r| {
+        asked.push(r.clone());
+        crate::conn::Answer::Verified {
+            result: 0,
+            proceed: true,
+            verified_chain: vec![der.clone()],
+        }
+    });
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(
+        asked,
+        [Request::Verify {
+            chain: vec![der.clone()]
+        }]
+    );
+    assert_eq!(c.neg.peer_chain, std::slice::from_ref(&der));
+    assert_eq!(c.neg.session.peer_chain, [der]);
+    assert_eq!(c.hs.sh.peer_sigalg, Some(sigscheme::ED25519));
+}
+
+/// A client-authenticating TLS 1.3 handshake up to the client's Certificate, which is
+/// `chain`: the server, and the client's flight so far.
+fn up_to_client_certificate(
+    p: &TestProvider,
+    vm: c_int,
+    chain: &[Vec<u8>],
+) -> (Connection, Vec<u8>) {
+    let mut cfg = server_config(p);
+    cfg.verify_mode = vm;
+    let (c, mut client, _) = handshake13(p, cfg, x25519_hello);
+    let out = client.send(
+        p,
+        crate::consts::handshake::CERTIFICATE,
+        &certificate13(chain),
+    );
+    (c, out)
+}
+
+#[test]
+fn client_certificate_required_and_verified() {
+    let p = TestProvider::new(b"client-auth-fail");
+    let vm = abi::SSL_VERIFY_PEER | abi::SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    // None sent, one required.
+    let (mut c, out) = up_to_client_certificate(&p, vm, &[]);
+    c.feed(&out);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_CERTIFICATE_REQUIRED,
+            abi::SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE
+        )
+    );
+    assert!(!out.is_empty());
+    // One sent, and verification fails: the error's alert.
+    let (der, _) = client_cert(&p);
+    let (mut c, out) = up_to_client_certificate(&p, vm, &[der]);
+    c.feed(&out);
+    let (_, last) = drive_answering(&mut c, &p, &mut |_| crate::conn::Answer::Verified {
+        result: i64::from(abi::X509_V_ERR_CERT_HAS_EXPIRED),
+        proceed: false,
+        verified_chain: Vec::new(),
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_CERTIFICATE_EXPIRED,
+            abi::SSL_R_CERTIFICATE_VERIFY_FAILED
+        )
+    );
+    assert_eq!(
+        c.neg.verify_result,
+        i64::from(abi::X509_V_ERR_CERT_HAS_EXPIRED)
+    );
+    // An optional certificate not sent: the Finished comes next.
+    let (mut c, out) = up_to_client_certificate(&p, abi::SSL_VERIFY_PEER, &[]);
+    c.feed(&out);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert_eq!(c.state(), abi::TLS_ST_SR_CERT);
+}
+
+#[test]
+fn malformed_and_unexpected_client_hellos() {
+    let p = TestProvider::new(b"bad-hellos");
+    let cfg = server_config(&p);
+    let x = p.key_share(group::X25519).unwrap();
+    let good = x25519_hello(x.public().to_vec());
+    // A Finished first.
+    let fin = crate::msgs::frame(crate::consts::handshake::FINISHED, &[0; 32]).unwrap();
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[fin],
+        abi::SSL_AD_UNEXPECTED_MESSAGE,
+        abi::SSL_R_UNEXPECTED_MESSAGE,
+    );
+    // A truncated random.
+    let short =
+        crate::msgs::frame(crate::consts::handshake::CLIENT_HELLO, &[3, 3, 1, 2, 3]).unwrap();
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[short],
+        abi::SSL_AD_DECODE_ERROR,
+        abi::SSL_R_LENGTH_MISMATCH,
+    );
+    // TLS 1.3 needs signature_algorithms.
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[good.clone().without(t::SIGNATURE_ALGORITHMS).msg()],
+        abi::TLS13_AD_MISSING_EXTENSION,
+        abi::SSL_R_MISSING_SIGALGS_EXTENSION,
+    );
+    // No suite in common.
+    let mut none = good.clone();
+    none.ciphers = vec![0x1304];
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[none.msg()],
+        abi::SSL_AD_HANDSHAKE_FAILURE,
+        abi::SSL_R_NO_SHARED_CIPHER,
+    );
+    // A share for a group the client didn't list.
+    let bad_share = Hello::tls13(&[group::SECP256R1], &[(group::X25519, x.public().to_vec())]);
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[bad_share.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_KEY_SHARE,
+    );
+    // A share that isn't a point.
+    let not_a_point = Hello::tls13(&[group::SECP256R1], &[(group::SECP256R1, vec![4, 1, 2])]);
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[not_a_point.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_ECPOINT,
+    );
+    // Only TLS 1.3 enabled, and the client offers TLS 1.2.
+    let mut only13 = cfg.clone();
+    only13.min_version = v::TLS1_3;
+    expect_failure(
+        only13,
+        &p,
+        &[good.clone().without(t::SUPPORTED_VERSIONS).msg()],
+        abi::SSL_AD_PROTOCOL_VERSION,
+        abi::SSL_R_UNSUPPORTED_PROTOCOL,
+    );
+    // The null compression is required.
+    let mut c = Connection::new(cfg.clone());
+    let mut body = good.msg()[4..].to_vec();
+    let at = 2 + 32 + 1 + 2 + 2;
+    assert_eq!(&body[at..at + 2], &[1, 0]);
+    body[at + 1] = 1;
+    c.feed(&plain_record(22, &crate::msgs::frame(1, &body).unwrap()));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_REQUIRED_COMPRESSION_ALGORITHM_MISSING
+        )
+    );
+    // A non-empty early_data.
+    expect_failure(
+        cfg,
+        &p,
+        &[good.with(t::EARLY_DATA, vec![0]).msg()],
+        abi::SSL_AD_DECODE_ERROR,
+        abi::SSL_R_BAD_EXTENSION,
+    );
+}
+
+#[test]
+fn callbacks_in_openssl_order() {
+    use crate::conn::Answer;
+    let p = TestProvider::new(b"callbacks");
+    let mut cfg = server_config(&p);
+    cfg.callbacks.client_hello = true;
+    cfg.callbacks.servername = true;
+    cfg.callbacks.alpn_select = true;
+    cfg.callbacks.cert = true;
+    let ch = |share: Vec<u8>| {
+        x25519_hello(share)
+            .with(
+                t::SERVER_NAME,
+                crate::msgs::ext::server_name::encode_client(b"example.com").unwrap(),
+            )
+            .with(
+                t::ALPN,
+                crate::msgs::ext::alpn::encode_client(&[b"h2".to_vec(), b"http/1.1".to_vec()])
+                    .unwrap(),
+            )
+    };
+    let mut c = Connection::new(cfg.clone());
+    let x = p.key_share(group::X25519).unwrap();
+    let hello = ch(x.public().to_vec());
+    c.feed(&plain_record(22, &hello.msg()));
+    let mut asked = Vec::new();
+    let (out, last) = drive_answering(&mut c, &p, &mut |r| {
+        asked.push(r.clone());
+        match r {
+            Request::Servername => Answer::Tlsext {
+                ret: abi::SSL_TLSEXT_ERR_OK,
+                alert: abi::SSL_AD_UNRECOGNIZED_NAME,
+            },
+            Request::AlpnSelect { .. } => Answer::Alpn(Some(b"h2".to_vec())),
+            _ => Answer::Continue,
+        }
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let protos = crate::msgs::ext::alpn::parse_client(
+        &crate::msgs::ext::alpn::encode_client(&[b"h2".to_vec(), b"http/1.1".to_vec()]).unwrap(),
+    )
+    .unwrap();
+    // The client hello callback, the servername callback, ALPN (in TLS 1.3, while the
+    // extensions are parsed), then the certificate callback.
+    assert_eq!(
+        asked,
+        [
+            Request::ClientHello,
+            Request::Servername,
+            Request::AlpnSelect { protos },
+            Request::Cert
+        ]
+    );
+    assert_eq!(c.neg.alpn.as_deref(), Some(&b"h2"[..]));
+    assert_eq!(c.neg.servername.as_deref(), Some(&b"example.com"[..]));
+    assert_eq!(c.neg.session.hostname.as_deref(), Some(&b"example.com"[..]));
+    // EncryptedExtensions acknowledges the name and carries the protocol.
+    let mut client = Client::new();
+    let (_, sk) = server_share(&first_record(&out));
+    let shared = x.derive(&sk).unwrap();
+    client.hello(&p, &out, &[hello.msg()], shared.bytes());
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let flight = client.server_flight(&p, &cert);
+    let exts = crate::msgs::ext::split(&flight[0][6..]).unwrap();
+    let types: Vec<u16> = exts.iter().map(|e| e.typ).collect();
+    assert_eq!(types, [t::SERVER_NAME, t::SUPPORTED_GROUPS, t::ALPN]);
+    // A refused protocol is no_application_protocol.
+    let mut cfg = server_config(&p);
+    cfg.callbacks.alpn_select = true;
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive_answering(&mut c, &p, &mut |_| Answer::Fail {
+        alert: None,
+        reason: 0,
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_NO_APPLICATION_PROTOCOL,
+            abi::SSL_R_NO_APPLICATION_PROTOCOL
+        )
+    );
+    assert_eq!(last_alert(&out).1, 120);
+    // A client hello callback that fails, with its alert.
+    let mut cfg = server_config(&p);
+    cfg.callbacks.client_hello = true;
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive_answering(&mut c, &p, &mut |_| Answer::Fail {
+        alert: Some(octet(abi::SSL_AD_ACCESS_DENIED)),
+        reason: 0,
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(abi::SSL_AD_ACCESS_DENIED, abi::SSL_R_CALLBACK_FAILED)
+    );
+}
+
+#[test]
+fn key_update_after_the_handshake() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"key-update");
+    let (mut c, mut client, _) = handshake13(&p, server_config(&p), x25519_hello);
+    client.application_read(&p);
+    let fin = client.finished(&p);
+    client.application_write(&p);
+    c.feed(&fin);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    client.input.extend_from_slice(&out);
+    for _ in 0..2 {
+        assert_eq!(client.message(&p)[0], ht::NEW_SESSION_TICKET);
+    }
+    // The client updates its keys and asks the server to do the same.
+    let ku = crate::msgs::frame(ht::KEY_UPDATE, &[1]).unwrap();
+    client
+        .c
+        .write_record(&p, record::content_type::handshake(), &ku)
+        .unwrap();
+    keys::update_key(&mut client.c, &p, true).unwrap();
+    c.feed(&client.c.take_output());
+    // Reading finds the handshake message and goes back into the state machine.
+    assert_eq!(c.step(&p, true).unwrap(), Event::NeedInput);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert!(out.is_empty());
+    // The reply goes out before the next write (`ssl3_write_bytes` runs the handshake for a
+    // pending KeyUpdate).
+    assert_eq!(c.hs.sh.key_update, abi::SSL_KEY_UPDATE_NOT_REQUESTED);
+    c.start();
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.hs.sh.key_update, abi::SSL_KEY_UPDATE_NONE);
+    client.input.extend_from_slice(&out);
+    let reply = client.message(&p);
+    assert_eq!(reply, [ht::KEY_UPDATE, 0, 0, 1, 0]);
+    keys::update_key(&mut client.c, &p, false).unwrap();
+    // Application data under the new keys.
+    c.write_app(&p, b"ping").unwrap();
+    client.input.extend_from_slice(&c.take_output());
+    let (ty, data) = client.record(&p).unwrap();
+    assert_eq!(ty, record::content_type::application_data());
+    assert_eq!(data, b"ping");
+    assert_eq!(super::state_ref(&c).unwrap().sent_tickets, 2);
+}
+
+#[test]
+fn ticket_session_encoding_round_trips() {
+    let s = crate::conn::Session {
+        version: v::TLS1_3,
+        cipher_id: 0x0300_1301,
+        session_id: vec![1; 32],
+        sid_ctx: b"ctx".to_vec(),
+        master_key: vec![2; 32],
+        ems: true,
+        ticket: None,
+        ticket_age_add: 7,
+        ticket_lifetime_hint: 9,
+        time: 1_700_000_000,
+        timeout: -1,
+        max_early_data: 16384,
+        hostname: Some(b"a".to_vec()),
+        alpn: None,
+        peer_chain: vec![vec![3; 10], vec![4; 3]],
+        verify_result: 10,
+        max_fragment_len_mode: 2,
+        ext_flags: 1,
+    };
+    let enc = ticket::encode_session(&s).unwrap();
+    assert_eq!(ticket::decode_session(&enc), Some(s));
+    assert_eq!(ticket::decode_session(&enc[..enc.len() - 1]), None);
+    let mut over = enc.clone();
+    over.push(0);
+    assert_eq!(ticket::decode_session(&over), None);
+    assert_eq!(ticket::decode_session(&[2]), None);
+}
+
+#[test]
+fn x509_errors_become_openssls_alerts() {
+    use super::cert::x509err2alert;
+    assert_eq!(
+        x509err2alert(i64::from(abi::X509_V_ERR_CERT_REVOKED)),
+        abi::SSL_AD_CERTIFICATE_REVOKED
+    );
+    assert_eq!(
+        x509err2alert(i64::from(abi::X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY)),
+        abi::SSL_AD_UNKNOWN_CA
+    );
+    assert_eq!(x509err2alert(12345), abi::SSL_AD_CERTIFICATE_UNKNOWN);
 }
