@@ -930,6 +930,23 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
             // SAFETY: the connection's stack.
             d.peer_chain = unsafe { X509_chain_up_ref(p.chain_no_leaf) };
         }
+    } else if st.hit != 0 {
+        // A resumed handshake sends no certificate: a session made from it (a TLS 1.3 ticket's)
+        // keeps the resumed session's peer (`ssl_session_dup`).
+        // SAFETY: the connection's session, or NULL.
+        let (peer, chain) = unsafe {
+            with(st.sess.session, (ptr::null_mut(), ptr::null_mut()), |o| {
+                (o.peer, o.peer_chain)
+            })
+        };
+        // SAFETY: the session's certificate, or NULL.
+        if !peer.is_null() && unsafe { X509_up_ref(peer) } != 0 {
+            d.peer = peer;
+        }
+        if !chain.is_null() {
+            // SAFETY: the session's stack.
+            d.peer_chain = unsafe { X509_chain_up_ref(chain) };
+        }
     }
     d
 }

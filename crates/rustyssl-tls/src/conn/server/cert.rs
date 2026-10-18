@@ -179,10 +179,13 @@ pub(crate) fn construct_server_certificate(
     Ok(Construct::Send(body))
 }
 
-/// `ssl3_get_req_cert_type`: the certificate types a TLS 1.2 CertificateRequest accepts, by
-/// the signature algorithms this end allows (`ssl_set_sig_mask`): RSA, DSS, and ECDSA signing.
-/// (`SSL_set1_client_certificate_types`' own list isn't configurable here yet.)
+/// `ssl3_get_req_cert_type`: the certificate types a TLS 1.2 CertificateRequest accepts: the
+/// configured list (`SSL_set1_client_certificate_types`), or else by the signature algorithms
+/// this end allows (`ssl_set_sig_mask`): RSA, DSS, and ECDSA signing.
 fn req_cert_types(c: &Connection) -> Vec<u8> {
+    if let Some(t) = &c.cfg.req_cert_types {
+        return t.clone();
+    }
     let alg_a = sigalgs::sig_mask(c, abi::SSL_SECOP_SIGALG_MASK);
     let mut out = Vec::new();
     if alg_a & SSL_aRSA == 0 {

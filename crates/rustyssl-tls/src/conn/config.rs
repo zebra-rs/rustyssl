@@ -174,6 +174,10 @@ pub struct Config {
     pub client_cert_types: Vec<u8>,
     /// See `client_cert_types`.
     pub server_cert_types: Vec<u8>,
+    /// The certificate types a TLS 1.2 server's CertificateRequest lists
+    /// (`SSL_set1_client_certificate_types`, `s->cert->ctype`); `None` for OpenSSL's choice by
+    /// the signature algorithms allowed.
+    pub req_cert_types: Option<Vec<u8>>,
     /// The CA names to send in CertificateRequest / certificate_authorities (DER names).
     pub ca_names: Vec<Vec<u8>>,
     /// Whether a client sends the certificate_authorities extension.

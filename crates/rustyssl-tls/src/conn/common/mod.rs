@@ -213,6 +213,13 @@ pub struct Shared {
     pub server_cert_type_ctos: u8,
     /// The client's key share the server will use (`s->s3.peer_tmp`): its group and octets.
     pub peer_tmp: Option<(u16, Vec<u8>)>,
+    /// This end's TLS 1.3 key share, kept after the handshake as OpenSSL keeps
+    /// `s->s3.tmp.pkey` (`SSL_get_tmp_key`): its group and public octets. A server answering
+    /// a KEM has none; TLS 1.2 frees its ephemeral key once used, so there is none either.
+    pub own_tmp: Option<(u16, Vec<u8>)>,
+    /// A TLS 1.2 DHE server's key (`s->s3.peer_tmp`, for `SSL_get_peer_tmp_key`): the prime,
+    /// the generator, and its public value, big-endian.
+    pub peer_dh: Option<(Vec<u8>, Vec<u8>, Vec<u8>)>,
     /// The group negotiated, or asked for in a HelloRetryRequest (`s->s3.group_id`).
     pub group_id: u16,
     /// A group the server could ask for in a HelloRetryRequest (`s->s3.group_id_candidate`).
