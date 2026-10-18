@@ -18,8 +18,8 @@ use rustyssl_abi::{
     CRYPTO_EX_DATA, CRYPTO_EX_INDEX_SSL_SESSION, ERR_LIB_SSL, ERR_R_CRYPTO_LIB, EVP_PKEY,
     OPENSSL_INIT_LOAD_SSL_STRINGS, SSL_CIPHER, SSL_CTX, SSL_MAX_SID_CTX_LENGTH,
     SSL_MAX_SSL_SESSION_ID_LENGTH, SSL_R_SSL_SESSION_ID_CONTEXT_TOO_LONG,
-    SSL_R_SSL_SESSION_ID_TOO_LONG, SSL_SESSION, TLSEXT_max_fragment_length_UNSPECIFIED, X509,
-    stack_st_X509,
+    SSL_R_SSL_SESSION_ID_TOO_LONG, SSL_SESSION, TLSEXT_max_fragment_length_DISABLED,
+    TLSEXT_max_fragment_length_UNSPECIFIED, X509, stack_st_X509,
 };
 use rustyssl_tls::suites::Cipher;
 
@@ -974,8 +974,15 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_SESSION_get_max_fragment_length(session: *const SSL_SESSION) -> u8
     where failure = 0, library = ERR_LIB_SSL
     {
+        // An unspecified mode reads as disabled.
+        let f = |d: &mut SessData| match d.max_fragment_len_mode {
+            m if c_int::from(m) == TLSEXT_max_fragment_length_UNSPECIFIED => {
+                u8::try_from(TLSEXT_max_fragment_length_DISABLED).unwrap_or(0)
+            }
+            m => m,
+        };
         // SAFETY: the caller's guarantee.
-        unsafe { with(session, 0, |d| d.max_fragment_len_mode) }
+        unsafe { with(session, 0, f) }
     }
 }
 
