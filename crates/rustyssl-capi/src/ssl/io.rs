@@ -168,6 +168,8 @@ pub(crate) struct Driver {
     pub(crate) rtt_marks: (u32, u32),
     /// See `rtt_marks`.
     pub(crate) rtt_times: (Option<std::time::Instant>, Option<std::time::Instant>),
+    /// The certificate slot the core last chose (see `mirror`).
+    pub(crate) own_slot: Option<usize>,
     /// TLS 1.3's early data state (`early_data_state`), kept here before the core exists and
     /// mirrored from it after.
     pub(crate) early_data_state: EarlyDataState,
@@ -359,6 +361,20 @@ fn mirror(st: &mut SslState, c: &Connection) {
         let resumed12 = c.negotiated().reused && !c.is_tls13();
         if !resumed12 && let Some(list) = super::ciphers::peer_list(&st.drv.peer_ciphers_raw.0) {
             st.ciphers.peer = list;
+        }
+    }
+    // `tls_choose_sigalg` makes the chosen certificate current (`s->cert->key`), which
+    // `SSL_get_certificate` and `SSL_get_privatekey` then report; only when the choice changes,
+    // so an application's `SSL_set_current_cert` afterwards stands.
+    let own = c
+        .negotiated()
+        .own_cert
+        .and_then(|i| c.config().certs.get(i))
+        .map(|k| k.slot);
+    if own != st.drv.own_slot {
+        st.drv.own_slot = own;
+        if let Some(slot) = own {
+            st.cert.key = slot;
         }
     }
     st.drv.early_data_state = c.early_data_state();
