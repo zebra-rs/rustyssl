@@ -925,17 +925,8 @@ impl Connection {
                 // DTLS does).
                 return Ok(HsBytes::Ccs);
             }
-            if ty == alert() {
-                match self.process_alert(&rec.data)? {
-                    AlertOutcome::Continue => continue,
-                    AlertOutcome::Closed => {
-                        // close_notify mid-handshake: the read fails (`SSL_ERROR_ZERO_RETURN`
-                        // or SYSCALL, as capi decides from the shutdown flags).
-                        return Ok(HsBytes::Yield);
-                    }
-                }
-            }
-            // Only while the version is undecided: a renegotiation has one (fork M).
+            // Only while the version is undecided: a renegotiation has one (fork M). Before the
+            // alerts: a server's first record must be a ClientHello, even an alert fails here.
             if self.cfg.method_version == 0
                 && self.first_handshake
                 && (self.cfg.server || ty != alert())
@@ -945,6 +936,16 @@ impl Connection {
                     abi::SSL_AD_UNEXPECTED_MESSAGE,
                     abi::SSL_R_UNEXPECTED_MESSAGE,
                 ));
+            }
+            if ty == alert() {
+                match self.process_alert(&rec.data)? {
+                    AlertOutcome::Continue => continue,
+                    AlertOutcome::Closed => {
+                        // close_notify mid-handshake: the read fails (`SSL_ERROR_ZERO_RETURN`
+                        // or SYSCALL, as capi decides from the shutdown flags).
+                        return Ok(HsBytes::Yield);
+                    }
+                }
             }
             if ty == app_data() && self.skip_early_data() {
                 // Early data sent before a HelloRetryRequest arrives where the second
