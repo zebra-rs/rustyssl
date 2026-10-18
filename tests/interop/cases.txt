@@ -43,3 +43,5 @@ tls13-p521-cert | {p521} | {ca}
 tls12-ecdhe-ecdsa-chacha | {ec} | {ca} -tls1_2 -cipher ECDHE-ECDSA-CHACHA20-POLY1305
 tls12-aes128-sha256 | | {ca} -tls1_2 -cipher AES128-SHA256
 tls11 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher DEFAULT@SECLEVEL=0
+tls13-trace | -num_tickets 0 | {ca} +trace
+tls12-trace | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256 +trace
