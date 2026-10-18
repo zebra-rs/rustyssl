@@ -631,6 +631,11 @@ fn external_psk(c: &mut Connection) -> Result<Option<Option<ExternalSession>>> {
             ));
         }
     }
+    // `OPENSSL_memdup` of an empty identity is NULL (`CRYPTO_malloc(0)`), which OpenSSL takes
+    // for an allocation failure: an external PSK with no identity fails the handshake.
+    if found.as_ref().is_some_and(|(_, id)| id.is_empty()) {
+        return Err(Error::internal());
+    }
     Ok(Some(found))
 }
 

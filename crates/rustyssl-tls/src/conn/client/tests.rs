@@ -2113,6 +2113,32 @@ fn tls12_cbc_with_encrypt_then_mac() {
     assert!(c.negotiated().etm);
 }
 
+/// An external PSK with an empty identity, from either callback, fails as OpenSSL's does
+/// (`OPENSSL_memdup` of nothing is NULL): BoGo's `EmptyPSKHint-*`.
+#[test]
+fn tls13_external_psk_empty_identity() {
+    let p = TestProvider::new(b"psk13-empty");
+    for session in [true, false] {
+        let mut cfg = rfc_client();
+        cfg.callbacks.psk_session = session;
+        cfg.callbacks.psk = !session;
+        let mut c = Connection::new(cfg);
+        let mut seen = Seen::default();
+        let ext = crate::conn::ExternalPsk {
+            identity: Vec::new(),
+            key: vec![0x11; 32],
+            cipher_id: suites::by_protocol_id(0x1301).unwrap().id,
+        };
+        let mut give = |r: &Request| match r {
+            Request::PskSession { .. } | Request::Psk { .. } => Answer::Psk(Some(ext.clone())),
+            _ => accept(r),
+        };
+        let e = drive(&mut c, &p, false, &mut give, &mut seen).unwrap_err();
+        assert_eq!(e, Error::internal(), "session callback: {session}");
+        assert!(seen.written.is_empty());
+    }
+}
+
 #[test]
 fn tls12_psk() {
     let p = TestProvider::new(b"tls12-psk");
