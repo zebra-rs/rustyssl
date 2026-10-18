@@ -186,26 +186,36 @@ fn x25519(private: &str, peer: &[u8]) -> Vec<u8> {
     rustyssl_crypto::ecx::x25519(&k, &pk).unwrap().to_vec()
 }
 
-/// The server's side of RFC 8448's section 3, from the RFC's messages.
+/// The server's side of an RFC 8448 handshake, from the RFC's messages: the key schedule and
+/// the transcript, to encrypt the server's flights and check the client's.
 struct Server3 {
     sched: Schedule13,
     transcript: Vec<u8>,
+    /// The transcript hash after the ServerHello.
+    hs_hash: Vec<u8>,
+    /// The transcript hash after the server's Finished, once the master secret is made.
+    sf_hash: Vec<u8>,
 }
 
 impl Server3 {
     fn new(p: &TestProvider, psk: Option<&[u8]>, shared: &[u8], hellos: &[&[u8]]) -> Self {
         let mut sched = Schedule13::new(p, HashAlg::Sha256, psk).unwrap();
         sched.into_handshake(p, Some(shared)).unwrap();
+        let transcript = hellos.concat();
         Self {
             sched,
-            transcript: hellos.concat(),
+            hs_hash: sha256(p, &transcript),
+            transcript,
+            sf_hash: Vec::new(),
         }
     }
 
     /// The handshake flight after the ServerHello, encrypted.
     fn flight(&mut self, p: &TestProvider, msgs: &[&[u8]]) -> Vec<u8> {
-        let th = sha256(p, &self.transcript);
-        let secret = self.sched.server_handshake_traffic(p, &th).unwrap();
+        let secret = self
+            .sched
+            .server_handshake_traffic(p, &self.hs_hash)
+            .unwrap();
         let mut w = writer13(p, secret.bytes());
         for m in msgs {
             self.transcript.extend_from_slice(m);
@@ -213,15 +223,47 @@ impl Server3 {
         seal(p, &mut w, msgs)
     }
 
+    /// The Finished the client must send after `msgs` (its certificate messages).
+    fn client_finished(&mut self, p: &TestProvider, msgs: &[Vec<u8>]) -> Vec<u8> {
+        for m in msgs {
+            self.transcript.extend_from_slice(m);
+        }
+        let base = self
+            .sched
+            .client_handshake_traffic(p, &self.hs_hash)
+            .unwrap();
+        let th = sha256(p, &self.transcript);
+        let vd = keysched::verify_data_13(p, HashAlg::Sha256, base.bytes(), &th).unwrap();
+        crate::msgs::frame(hm::FINISHED, &vd).unwrap()
+    }
+
+    /// Moves to the master secret, after the server's Finished.
+    fn master(&mut self, p: &TestProvider) {
+        if self.sf_hash.is_empty() {
+            self.sf_hash = sha256(p, &self.transcript);
+            self.sched.into_master(p).unwrap();
+        }
+    }
+
     /// Application data records (a NewSessionTicket) after the server's Finished.
     fn app(&mut self, p: &TestProvider, msgs: &[&[u8]]) -> Vec<u8> {
-        let th = sha256(p, &self.transcript);
-        let mut s = Schedule13::new(p, HashAlg::Sha256, None).unwrap();
-        core::mem::swap(&mut s, &mut self.sched);
-        s.into_master(p).unwrap();
-        let secret = s.server_application_traffic(p, &th).unwrap();
+        self.master(p);
+        let secret = self
+            .sched
+            .server_application_traffic(p, &self.sf_hash)
+            .unwrap();
         let mut w = writer13(p, secret.bytes());
         seal(p, &mut w, msgs)
+    }
+
+    /// The client's first application traffic secret.
+    fn client_app(&mut self, p: &TestProvider) -> Vec<u8> {
+        self.master(p);
+        self.sched
+            .client_application_traffic(p, &self.sf_hash)
+            .unwrap()
+            .bytes()
+            .to_vec()
     }
 }
 
@@ -562,4 +604,227 @@ fn rfc8448_section7_compatibility_mode() {
     assert_eq!(seen.written, [rfc("7", "Finished", 1).to_vec()]);
     // The client's ChangeCipherSpec went first, in plaintext.
     assert_eq!(seen.output[..6], [20, 3, 3, 0, 1, 1]);
+}
+
+/// An ECDSA P-256 certificate and key for the client.
+fn client_cert(p: &TestProvider) -> crate::conn::CertKey {
+    use crate::testprov::keys::PrivateKey;
+    let k = PrivateKey::ec(abi::NID_X9_62_prime256v1, p).unwrap();
+    let cert = k.public(p).unwrap().cert("client");
+    crate::conn::CertKey {
+        chain: vec![cert],
+        key: p.add_key(k),
+        slot: crate::conn::common::sigalgs::PKEY_ECC,
+        schemes: vec![0x0403],
+        auth: crate::suites::masks::SSL_aECDSA,
+        ec_group: Some(0x0017),
+        curve_nid: abi::NID_X9_62_prime256v1,
+        can_sign: true,
+        cert_sig: None,
+        raw_public_key: None,
+        ocsp_response: None,
+    }
+}
+
+const S6_CLIENT_PRIVATE: &str = "c040b2bb8f3addd20fd4058c547003a3c6f9c1cd915d5e535c87d8d191aaf071";
+
+#[test]
+fn rfc8448_section6_client_authentication() {
+    let p = TestProvider::new(b"rfc8448-6");
+    let ch = rfc("6", "ClientHello", 0);
+    let sh = rfc("6", "ServerHello", 0);
+    let mut cfg = rfc_client();
+    cfg.certs = vec![client_cert(&p)];
+    p.queue_random(random_of(ch));
+    p.queue_random(&h(S6_CLIENT_PRIVATE));
+    let mut c = with_hellos(cfg, &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let shared = x25519(S6_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    let flight = server.flight(
+        &p,
+        &[
+            rfc("6", "EncryptedExtensions", 0),
+            rfc("6", "CertificateRequest", 0),
+            rfc("6", "Certificate", 0),
+            rfc("6", "CertificateVerify", 0),
+            rfc("6", "Finished", 0),
+        ],
+    );
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    seen.written.clear();
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    // The server's ECDSA certificate verified; the client sent its own chain, signed with
+    // ECDSA, and a Finished over them.
+    let [cert, cv, fin] = &seen.written[..] else {
+        panic!("{:?}", seen.written.len())
+    };
+    assert_eq!(cert[0], hm::CERTIFICATE);
+    assert_eq!(cert[4], 0, "an empty certificate_request_context");
+    let chain = &c.config().certs[0].chain[0];
+    assert_eq!(
+        cert[4..],
+        [
+            &[0][..],
+            &u32::try_from(chain.len() + 5).unwrap().to_be_bytes()[1..],
+            &u32::try_from(chain.len()).unwrap().to_be_bytes()[1..],
+            chain,
+            &[0, 0]
+        ]
+        .concat()
+    );
+    assert_eq!(cv[..6], [hm::CERTIFICATE_VERIFY, 0, 0, cv[3], 0x04, 0x03]);
+    let expected = server.client_finished(&p, &[cert.clone(), cv.clone()]);
+    assert_eq!(*fin, expected);
+    assert_eq!(c.negotiated().own_scheme, Some(0x0403));
+}
+
+#[test]
+fn rfc8448_section6_without_a_certificate() {
+    let p = TestProvider::new(b"rfc8448-6b");
+    let ch = rfc("6", "ClientHello", 0);
+    let sh = rfc("6", "ServerHello", 0);
+    p.queue_random(random_of(ch));
+    p.queue_random(&h(S6_CLIENT_PRIVATE));
+    let mut cfg = rfc_client();
+    cfg.callbacks.client_cert = true;
+    let mut c = with_hellos(cfg, &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    let shared = x25519(S6_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    let flight = server.flight(
+        &p,
+        &[
+            rfc("6", "EncryptedExtensions", 0),
+            rfc("6", "CertificateRequest", 0),
+            rfc("6", "Certificate", 0),
+            rfc("6", "CertificateVerify", 0),
+            rfc("6", "Finished", 0),
+        ],
+    );
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    seen.written.clear();
+    // The client certificate callback has nothing to give.
+    let mut none = |r: &Request| match r {
+        Request::ClientCert => Answer::Allowed(false),
+        _ => accept(r),
+    };
+    assert_eq!(
+        drive(&mut c, &p, false, &mut none, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(seen.requests.contains(&Request::ClientCert));
+    // An empty Certificate, no CertificateVerify.
+    let empty = vec![hm::CERTIFICATE, 0, 0, 4, 0, 0, 0, 0];
+    assert_eq!(seen.written[0], empty);
+    let expected = server.client_finished(&p, &[empty]);
+    assert_eq!(seen.written[1..], [expected]);
+}
+
+/// Section 3's handshake done, with the server's state.
+fn section3_done(p: &TestProvider, cfg: Config) -> (Connection, Seen, Server3) {
+    let (mut c, mut seen, mut server) = section3(p, cfg);
+    assert_eq!(
+        drive(&mut c, p, false, &mut accept, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    server.master(p);
+    server.transcript.extend_from_slice(&seen.written[0]);
+    seen.written.clear();
+    (c, seen, server)
+}
+
+#[test]
+fn post_handshake_authentication() {
+    let p = TestProvider::new(b"pha");
+    let mut cfg = rfc_client();
+    cfg.post_handshake_auth = true;
+    cfg.certs = vec![client_cert(&p)];
+    let (mut c, mut seen, mut server) = section3_done(&p, cfg);
+    assert_eq!(c.handshake().sh.pha, crate::conn::common::Pha::ExtSent);
+    // The transcript the request continues from: the handshake's, through the client's
+    // Finished.
+    let at_finished = server.transcript.clone();
+    let cr = crate::msgs::frame(
+        hm::CERTIFICATE_REQUEST,
+        &[
+            &[3, b'a', b'b', b'c'][..],
+            &[0, 8, 0, 13, 0, 4, 0, 2, 4, 3][..],
+        ]
+        .concat(),
+    )
+    .unwrap();
+    let rec = server.app(&p, &[&cr]);
+    c.feed(&rec);
+    while drive(&mut c, &p, true, &mut accept, &mut seen).unwrap() != Event::NeedInput {}
+    let [cert, cv, fin] = &seen.written[..] else {
+        panic!("{:?}", seen.written.len())
+    };
+    assert_eq!(cert[4..8], [3, b'a', b'b', b'c']);
+    assert_eq!(cv[4..6], [0x04, 0x03]);
+    // The Finished uses the client's application secret, over the handshake, the request, and
+    // the client's answer.
+    let base = server.client_app(&p);
+    let th = sha256(&p, &[&at_finished[..], &cr, cert, cv].concat());
+    let vd = keysched::verify_data_13(&p, HashAlg::Sha256, &base, &th).unwrap();
+    assert_eq!(fin[4..], vd);
+    assert_eq!(c.handshake().sh.pha, crate::conn::common::Pha::ExtSent);
+}
+
+#[test]
+fn key_update_requested_by_the_server() {
+    let p = TestProvider::new(b"key-update");
+    let (mut c, mut seen, mut server) = section3_done(&p, rfc_client());
+    let ku = crate::msgs::frame(hm::KEY_UPDATE, &[1]).unwrap();
+    let rec = server.app(&p, &[&ku]);
+    c.feed(&rec);
+    while drive(&mut c, &p, true, &mut accept, &mut seen).unwrap() != Event::NeedInput {}
+    // The read keys moved on; the client owes a KeyUpdate of its own.
+    assert_eq!(
+        c.handshake().sh.key_update,
+        abi::SSL_KEY_UPDATE_NOT_REQUESTED
+    );
+    let old = server.client_app(&p);
+    let next = keysched::next_traffic_secret(&p, HashAlg::Sha256, &old).unwrap();
+    // Data under the server's next keys reads.
+    let s_next = keysched::next_traffic_secret(
+        &p,
+        HashAlg::Sha256,
+        server
+            .sched
+            .server_application_traffic(&p, &server.sf_hash)
+            .unwrap()
+            .bytes(),
+    )
+    .unwrap();
+    let mut w = writer13(&p, s_next.bytes());
+    let mut data = Vec::new();
+    w.write(&p, 23, b"hi", &mut data).unwrap();
+    c.feed(&data);
+    assert_eq!(
+        drive(&mut c, &p, true, &mut accept, &mut seen).unwrap(),
+        Event::AppData
+    );
+    let mut buf = [0u8; 2];
+    assert_eq!(c.read_app(&mut buf, false), 2);
+    assert_eq!(&buf, b"hi");
+    // When the write side runs again (as `SSL_write` arranges), the KeyUpdate goes out and the
+    // write keys move on.
+    c.st.in_init = true;
+    c.st.state = crate::conn::statem::MsgFlow::Writing;
+    c.st.write_state = crate::conn::statem::WriteState::Transition;
+    seen.written.clear();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    assert_eq!(seen.written, [vec![hm::KEY_UPDATE, 0, 0, 1, 0]]);
+    assert_eq!(
+        c.handshake().sh.keys.client_app_secret.bytes(),
+        next.bytes()
+    );
 }
