@@ -1,0 +1,195 @@
+# tlsfuzzer scripts for `cargo xtask test-tlsfuzzer` (TEST_PLAN.md, layer L7).
+#
+# Each script runs against the reference's `openssl s_server`, once on the reference's
+# libraries and once on rustyssl's; the harness adds `-h 127.0.0.1 -p <port>`. A conversation
+# that fails on rustyssl but not on the reference is a failure; one both fail is reported
+# but not counted.
+#
+# Lines:
+#   pin <name> <owner/repository> <commit> <sha256 of the GitHub tarball>
+#   server <s_server arguments>     the server for the script lines that follow
+#   script <file> [arguments]       a script run by default
+#   timing <file> [arguments]       a timing script, run only with --timing
+# Arguments are split at spaces; "double quotes" keep one with spaces. `{tf}` is the
+# tlsfuzzer tree (its tests/ directory holds the keys and certificates).
+
+pin tlsfuzzer tlsfuzzer/tlsfuzzer 5eebc4464e5197a7f7392fb9acda99cfc32441f7 d1848c68d58d49b3f74b8ef07d5bf3c67d8c25e93641b8d422bd786079858b6d
+pin tlslite-ng tlsfuzzer/tlslite-ng 7e95ea1a86c0d42d8d931ff14134d31f01ce1d76 8afdc68f4ed0e200865aa57f058c11cc6c074da0c54abfa1a28ba1e4ebcf8d5c
+pin python-ecdsa tlsfuzzer/python-ecdsa bff40c6cf2340148d410d5b3def0e949c547caf1 1b13a4a79109e8f315a760b5bca15add5f5bcc950e2ca3564a26ff32016e45c9
+pin six benjaminp/six ebd9b3af90247b8858d415a05e96e9ee61e48d07 994d9b8712c48b7d552d9a3b472e54f59eb05729657c16e063eecb1510c2a29e
+
+# OpenSSL's own set (test/recipes/95-test_external_tlsfuzzer_data/cert.json.in).
+server -www -key {tf}/tests/serverX509Key.pem -cert {tf}/tests/serverX509Cert.pem -verify 1 -CAfile {tf}/tests/clientX509Cert.pem
+script test-tls13-certificate-verify.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem -s "9+5 9+6 9+4 ecdsa_secp256r1_sha256 ecdsa_secp384r1_sha384 ecdsa_secp521r1_sha512 ed25519 ed448 8+26 8+27 8+28 rsa_pss_pss_sha256 rsa_pss_pss_sha384 rsa_pss_pss_sha512 rsa_pss_rsae_sha256 rsa_pss_rsae_sha384 rsa_pss_rsae_sha512 rsa_pkcs1_sha256 rsa_pkcs1_sha384 rsa_pkcs1_sha512"
+script test-tls13-ecdsa-in-certificate-verify.py -k {tf}/tests/serverECKey.pem -c {tf}/tests/serverECCert.pem -s "9+5 9+6 9+4 ecdsa_secp256r1_sha256 ecdsa_secp384r1_sha384 ecdsa_secp521r1_sha512 ed25519 ed448 8+26 8+27 8+28 rsa_pss_pss_sha256 rsa_pss_pss_sha384 rsa_pss_pss_sha512 rsa_pss_rsae_sha256 rsa_pss_rsae_sha384 rsa_pss_rsae_sha512 rsa_pkcs1_sha256 rsa_pkcs1_sha384 rsa_pkcs1_sha512"
+script test-tls13-certificate-request.py
+script test-certificate-request.py
+script test-tls13-post-handshake-auth.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+script test-rsa-sigs-on-certificate-verify.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+script test-rsa-pss-sigs-on-certificate-verify.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+script test-certificate-malformed.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+script test-extended-master-secret-extension-with-client-cert.py -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+
+server -www -key {tf}/tests/serverX509Key.pem -cert {tf}/tests/serverX509Cert.pem -verify 1 -CAfile {tf}/tests/clientX509Cert.pem -client_sigalgs RSA+SHA384:rsa_pss_rsae_sha384:rsa_pss_pss_sha384
+script test-certificate-verify-malformed.py -d -k {tf}/tests/clientX509Key.pem -c {tf}/tests/clientX509Cert.pem
+
+# An RSA server as configured by default: the TLS 1.3 scripts.
+server -www -key {tf}/tests/serverX509Key.pem -cert {tf}/tests/serverX509Cert.pem
+script test-tls13-conversation.py
+script test-invalid-client-hello-w-record-overflow.py -n 0 -C TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 -d --ems "session ID len fuzz to 5 w/ext"
+script test-tls13-0rtt-garbage.py
+script test-tls13-ccs.py
+script test-tls13-connection-abort.py
+script test-tls13-count-tickets.py -t 2
+script test-tls13-dhe-shared-secret-padding.py
+script test-tls13-ecdhe-curves.py
+script test-tls13-empty-alert.py
+script test-tls13-ffdhe-groups.py
+script test-tls13-ffdhe-sanity.py
+script test-tls13-finished.py
+script test-tls13-finished-plaintext.py
+script test-tls13-hrr.py
+script test-tls13-invalid-ciphers.py
+script test-tls13-keyshare-omitted.py
+script test-tls13-keyupdate.py
+script test-tls13-large-number-of-extensions.py --exc 9 --exc 11 --exc 12 --exc 23 --exc 27 --exc 34 --exc 13172
+script test-tls13-legacy-version.py
+script test-tls13-lengths.py -n 200
+script test-tls13-mlkem.py
+script test-tls13-multiple-ccs-messages.py
+script test-tls13-no-unknown-groups.py
+script test-tls13-nociphers.py
+script test-tls13-non-support.py
+script test-tls13-obsolete-curves.py
+script test-tls13-pkcs-signature.py
+script test-tls13-record-layer-limits.py
+script test-tls13-record-padding.py
+script test-tls13-rsa-signatures.py
+script test-tls13-rsapss-signatures.py
+script test-tls13-serverhello-random.py
+script test-tls13-session-resumption.py
+script test-tls13-shuffled-extentions.py
+script test-tls13-signature-algorithms.py
+script test-tls13-symetric-ciphers.py
+script test-tls13-unencrypted-alert.py
+script test-tls13-unrecognised-groups.py
+script test-tls13-version-negotiation.py
+script test-tls13-zero-content-type.py
+script test-tls13-zero-length-data.py
+script test-downgrade-protection.py --server-max-protocol=TLSv1.3
+script test-fallback-scsv.py --tls-1.3
+script test-no-mlkem-in-old-tls.py
+
+# The TLS 1.2 (and older) scripts: most send no signature_algorithms by default, so the
+# server signs with SHA-1, which OpenSSL 3 refuses at the default security level; this server
+# runs at level 0 with every cipher (`ALL`), so the scripts reach what they test. Options as in
+# tlsfuzzer's own tests/tlslite-ng.json where they apply.
+server -www -key {tf}/tests/serverX509Key.pem -cert {tf}/tests/serverX509Cert.pem -cipher ALL:@SECLEVEL=0
+script test-conversation.py
+script test-conversation.py -d
+script test-aes-gcm-nonces.py
+script test-aesccm.py
+script test-aesccm.py -d
+script test-alpn-negotiation.py
+script test-atypical-padding.py
+script test-bleichenbacher-workaround.py -t 0.01
+script test-ccs.py
+script test-chacha20.py
+script test-chacha20.py --extra-exts
+script test-client-compatibility.py
+script test-client-hello-max-size.py
+script test-client-hello-max-size.py -d
+script test-clienthello-md5.py
+script test-connection-abort.py
+script test-cve-2016-2107.py
+script test-cve-2016-6309.py
+script test-cve-2016-7054.py
+script test-dhe-key-share-random.py
+script test-dhe-no-shared-secret-padding.py
+script test-dhe-rsa-key-exchange.py
+script test-dhe-rsa-key-exchange-signatures.py
+script test-dhe-rsa-key-exchange-with-bad-messages.py
+script test-early-application-data.py
+script test-ecdhe-padded-shared-secret.py
+script test-ecdhe-rsa-key-exchange.py
+script test-ecdhe-rsa-key-exchange-with-bad-messages.py
+script test-ecdhe-rsa-key-share-random.py
+script test-empty-extensions.py
+script test-encrypt-then-mac.py
+script test-encrypt-then-mac.py -d
+script test-encrypt-then-mac-renegotiation.py
+script test-export-ciphers-rejected.py --min-ver TLSv1.0
+script test-extended-master-secret-extension.py
+script test-extensions.py
+script test-ffdhe-expected-params.py
+script test-ffdhe-negotiation.py
+script test-fuzzed-ciphertext.py
+script test-fuzzed-ciphertext.py -d
+script test-fuzzed-finished.py
+script test-fuzzed-MAC.py
+script test-fuzzed-padding.py
+script test-fuzzed-padding.py -d
+script test-fuzzed-plaintext.py --random 4096
+script test-fuzzed-plaintext.py -C TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384 --random 4096
+script test-hello-request-by-client.py
+script test-interleaved-application-data-and-fragmented-handshakes-in-renegotiation.py
+script test-interleaved-application-data-in-renegotiation.py
+script test-interleaved-CKE-with-CCS.py
+script test-invalid-cipher-suites.py
+script test-invalid-client-hello.py
+script test-invalid-compression-methods.py
+script test-invalid-content-type.py
+script test-invalid-rsa-key-exchange-messages.py
+script test-invalid-server-name-extension.py
+script test-invalid-server-name-extension-resumption.py
+script test-invalid-session-id.py
+script test-invalid-version.py
+script test-large-hello.py
+script test-large-number-of-extensions.py
+script test-legacy-renegotiation.py
+script test-lengths.py -n 200
+script test-lucky13.py --quick
+script test-message-duplication.py
+script test-message-skipping.py
+script test-no-heartbeat.py
+script test-openssl-3712.py
+script test-point-extension.py
+script test-record-layer-fragmentation.py
+script test-record-size-limit.py
+script test-renegotiation-changed-clienthello.py
+script test-renegotiation-disabled.py
+script test-resumption-with-wrong-ciphers.py
+script test-resumption-with-wrong-ciphers.py -d
+script test-serverhello-random.py
+script test-session-ticket-resumption.py
+script test-sessionID-resumption.py
+script test-sessionID-resumption.py -d
+script test-sig-algs.py
+script test-sig-algs-renegotiation-resumption.py --no-renego --sig-algs-drop-ok
+script test-signature-algorithms.py
+script test-ssl-death-alert.py --alerts 0 --alert-level warning --alert-description close_notify
+script test-sslv2-connection.py
+script test-sslv2hello-protocol.py
+script test-TLSv1_2-rejected-without-TLSv1_2.py
+script test-truncating-of-client-hello.py
+script test-truncating-of-finished.py
+script test-truncating-of-kRSA-client-key-exchange.py
+script test-unsupported-curve-fallback.py
+script test-version-numbers.py
+script test-x25519.py
+script test-zero-length-data.py
+timing test-lucky13.py
+timing test-bleichenbacher-timing-marvin.py --srv-key {tf}/tests/serverX509Key.pem --srv-cert {tf}/tests/serverX509Cert.pem
+
+# An ECDSA server.
+server -www -key {tf}/tests/serverECKey.pem -cert {tf}/tests/serverECCert.pem
+script test-tls13-ecdsa-support.py
+script test-ecdsa-sig-flexibility.py
+
+# An Ed25519 server.
+server -www -key {tf}/tests/serverEd25519Key.pem -cert {tf}/tests/serverEd25519Cert.pem
+script test-tls13-eddsa.py
+
+# OCSP stapling: a server that asks for a response it doesn't have.
+server -www -key {tf}/tests/serverX509Key.pem -cert {tf}/tests/serverX509Cert.pem -status -cipher ALL:@SECLEVEL=0
+script test-ocsp-stapling.py --no-status
