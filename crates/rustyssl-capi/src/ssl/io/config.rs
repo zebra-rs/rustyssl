@@ -740,6 +740,13 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
         v => u16::try_from(v).unwrap_or(0),
     };
+    // The responder IDs and extensions a client's status request carries.
+    let (ocsp_ids, ocsp_exts) = if st.server {
+        (Vec::new(), Vec::new())
+    } else {
+        // SAFETY: the connection's stacks, NULL or live.
+        unsafe { super::super::ocsp_req::encode(&st) }
+    };
     // `get_ca_names`: a server's client CA names (`SSL_get_client_CA_list`) unless they're
     // missing or empty, else the CA names (`SSL_get0_CA_list`); each the connection's, else
     // its context's.
@@ -803,6 +810,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         verify_depth,
         post_handshake_auth: st.pha_enabled != 0,
         status_request: st.status_type == rustyssl_abi::TLSEXT_STATUSTYPE_ocsp,
+        ocsp_ids,
+        ocsp_exts,
         request_scts: st.ct.callback.is_some(),
         // SAFETY: the connection's context, which it keeps alive.
         srtp_profiles: super::super::srtp::ids(&st, unsafe { super::super::conn::ctx_of(&st) }),

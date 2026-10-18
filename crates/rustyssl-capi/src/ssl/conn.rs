@@ -183,6 +183,8 @@ impl Drop for SslState {
         unsafe { OPENSSL_sk_pop_free(self.peer_ca_names.cast(), Some(ctx::name_free)) };
         // SAFETY: as above.
         unsafe { crate::mem::release(self.ocsp_resp.cast()) };
+        // SAFETY: as above.
+        unsafe { super::ocsp_req::free(self) };
         // The write BIO first, then the read BIO (BIO_free_all frees a chain only when its
         // first BIO's last reference goes).
         // SAFETY: our references, each NULL or live.

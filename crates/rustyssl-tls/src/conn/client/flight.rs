@@ -549,7 +549,11 @@ fn status_result(a: &Answer) -> Result<()> {
 pub(super) fn initial_server_flight(c: &mut Connection, p: &dyn Provider) -> Result<bool> {
     check_cert_and_algorithm(c, p)?;
     if status_wanted(c) {
-        let Some(a) = ask_once(c, Request::Status, 0) else {
+        let req = Request::Status {
+            ocsp_ids: Vec::new(),
+            ocsp_exts: Vec::new(),
+        };
+        let Some(a) = ask_once(c, req, 0) else {
             return Ok(false);
         };
         status_result(&a)?;
@@ -615,7 +619,11 @@ pub(super) fn initial_flight_answers(
         return Ok(true);
     }
     if status_wanted(c) {
-        match ask_once(c, Request::Status, 0) {
+        let req = Request::Status {
+            ocsp_ids: Vec::new(),
+            ocsp_exts: Vec::new(),
+        };
+        match ask_once(c, req, 0) {
             None => return Ok(false),
             Some(a) if status_result(&a).is_err() => return Ok(true),
             Some(_) => {}

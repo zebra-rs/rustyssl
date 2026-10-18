@@ -4,7 +4,9 @@
  * client CA list is empty), the context the servername callback switches to
  * (SSL_set_SSL_CTX(3): its ALPN callback), what the ClientHello callback sets on the
  * connection (SSL_set_max_proto_version(3)), the stapled OCSP response in the client's status
- * callback (SSL_get_tlsext_status_ocsp_resp(3)), SSL_set_retry_verify(3) after a successful
+ * callback (SSL_get_tlsext_status_ocsp_resp(3)), the responder IDs and extensions a client
+ * asks for, in the server's (SSL_set_tlsext_status_ids(3), SSL_get_tlsext_status_exts(3)),
+ * SSL_set_retry_verify(3) after a successful
  * verification, and the chain's check against the security level, over a BIO pair.
  *
  * Only deterministic output is printed.
@@ -18,6 +20,7 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/ocsp.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
@@ -318,6 +321,60 @@ static void test_status(int version)
     done(c, s, cctx, sctx);
 }
 
+static X509 *status_cert = NULL;
+
+static int ids_status_cb(SSL *s, void *arg)
+{
+    STACK_OF(OCSP_RESPID) *ids = NULL;
+    STACK_OF(X509_EXTENSION) *exts = NULL;
+    int n;
+
+    (void)arg;
+    SSL_get_tlsext_status_ids(s, &ids);
+    SSL_get_tlsext_status_exts(s, &exts);
+    n = sk_OCSP_RESPID_num(ids);
+    printf("  the server's status callback: %d responder ID(s), %s; %d extension(s)", n,
+           n == 1 && OCSP_RESPID_match(sk_OCSP_RESPID_value(ids, 0), status_cert) ? "matching"
+                                                                                : "no match",
+           sk_X509_EXTENSION_num(exts));
+    if (sk_X509_EXTENSION_num(exts) == 1)
+        printf(", %s", OBJ_nid2sn(OBJ_obj2nid(
+                           X509_EXTENSION_get_object(sk_X509_EXTENSION_value(exts, 0)))));
+    printf("\n");
+    return SSL_TLSEXT_ERR_NOACK;
+}
+
+/* The responder IDs and extensions a client sets reach the server's status callback. */
+static void test_status_ids(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    BIO *b = BIO_new_mem_buf(SERVER_PEM, -1);
+    STACK_OF(OCSP_RESPID) *ids = sk_OCSP_RESPID_new_null();
+    STACK_OF(X509_EXTENSION) *exts = sk_X509_EXTENSION_new_null();
+    OCSP_RESPID *id = OCSP_RESPID_new();
+    ASN1_OCTET_STRING *nonce = ASN1_OCTET_STRING_new();
+
+    printf("# responder IDs and extensions\n");
+    status_cert = PEM_read_bio_X509(b, NULL, NULL, NULL);
+    BIO_free(b);
+    OCSP_RESPID_set_by_key(id, status_cert);
+    sk_OCSP_RESPID_push(ids, id);
+    ASN1_OCTET_STRING_set(nonce, (const unsigned char *)"\x04\x02nn", 4);
+    sk_X509_EXTENSION_push(exts, X509_EXTENSION_create_by_NID(NULL, NID_id_pkix_OCSP_Nonce, 0,
+                                                              nonce));
+    ASN1_OCTET_STRING_free(nonce);
+    SSL_CTX_set_tlsext_status_cb(sctx, ids_status_cb);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_tlsext_status_type(c, TLSEXT_STATUSTYPE_ocsp);
+    /* The connection takes both. */
+    SSL_set_tlsext_status_ids(c, ids);
+    SSL_set_tlsext_status_exts(c, exts);
+    check(handshake(c, s), "the handshake");
+    done(c, s, cctx, sctx);
+    X509_free(status_cert);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -370,6 +427,7 @@ int main(void)
     test_hello_cb();
     test_status(TLS1_3_VERSION);
     test_status(TLS1_2_VERSION);
+    test_status_ids();
     test_retry_verify();
     test_security();
     printf("1..%d\n", number);

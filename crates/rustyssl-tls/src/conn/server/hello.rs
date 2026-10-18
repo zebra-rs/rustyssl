@@ -566,7 +566,14 @@ fn handle_status_request_inner(c: &mut Connection) -> Result<bool> {
         return Ok(true);
     };
     c.cfg.current_cert = Some(cert);
-    let (ret, response) = match ask_once(c, Request::Status, 0) {
+    let req = {
+        let s = state_ref(c).ok_or_else(Error::internal)?;
+        Request::Status {
+            ocsp_ids: s.ocsp_ids.clone(),
+            ocsp_exts: s.ocsp_exts.clone(),
+        }
+    };
+    let (ret, response) = match ask_once(c, req, 0) {
         None => return Ok(false),
         Some(Answer::Status { ret, response }) => (ret, response),
         Some(_) => (abi::SSL_TLSEXT_ERR_ALERT_FATAL, None),

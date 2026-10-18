@@ -1669,7 +1669,7 @@ fn tls12_ocsp_stapling() {
     input.extend(s.done());
     c.feed(&input);
     let mut reject = |r: &Request| match r {
-        Request::Status => Answer::Status {
+        Request::Status { .. } => Answer::Status {
             ret: 0,
             response: None,
         },
@@ -1683,7 +1683,11 @@ fn tls12_ocsp_stapling() {
         }
     };
     assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 1, 0]));
-    assert!(seen.requests.contains(&Request::Status));
+    assert!(
+        seen.requests
+            .iter()
+            .any(|r| matches!(r, Request::Status { .. }))
+    );
     assert_eq!(
         e,
         Error::alert(
@@ -1919,7 +1923,7 @@ fn ocsp_and_scts_in_tls13() {
     c.feed(&flight);
     // The status callback is asked before the Finished is processed, and accepts.
     let mut ok = |r: &Request| match r {
-        Request::Status => Answer::Status {
+        Request::Status { .. } => Answer::Status {
             ret: 1,
             response: None,
         },
@@ -1929,7 +1933,11 @@ fn ocsp_and_scts_in_tls13() {
         drive(&mut c, &p, false, &mut ok, &mut seen).unwrap(),
         Event::HandshakeDone
     );
-    assert!(seen.requests.contains(&Request::Status));
+    assert!(
+        seen.requests
+            .iter()
+            .any(|r| matches!(r, Request::Status { .. }))
+    );
     assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 0]));
 }
 

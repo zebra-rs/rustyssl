@@ -189,7 +189,7 @@ pub(crate) fn ext_parse_status_request(
         } => {
             c.hs.sh.status_type = abi::TLSEXT_STATUSTYPE_ocsp;
             for id in &responder_ids {
-                if !der_is(id, 2, &[1, 2], true) {
+                if !der_is(id, 0x80, &[1, 2], true) {
                     return Err(bad);
                 }
             }

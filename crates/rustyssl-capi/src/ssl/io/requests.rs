@@ -206,7 +206,15 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             Some(Answer::Allowed(unsafe { cb(s, arg) } != 0))
         }
-        Request::Status => {
+        Request::Status {
+            ocsp_ids,
+            ocsp_exts,
+        } => {
+            if x.state().server {
+                // `tls_parse_ctos_status_request` keeps what the client sent on the connection.
+                // SAFETY: the connection's stacks.
+                unsafe { super::super::ocsp_req::install(&mut x.state(), &ocsp_ids, &ocsp_exts) };
+            }
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| (c.status_cb, c.status_arg));
             let Some(cb) = cb else {
                 return Some(Answer::Status {
