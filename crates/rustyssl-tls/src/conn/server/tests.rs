@@ -278,6 +278,60 @@ impl Client {
         sh
     }
 
+    /// A resumption's ServerHello: like [`Client::hello`], from the early secret of `psk` (or
+    /// the one already made, for early data, when the ClientHello is already in the
+    /// transcript), with `shared` if a key was exchanged. The client's handshake write keys
+    /// wait when `early` (they follow the EndOfEarlyData).
+    fn hello_psk(
+        &mut self,
+        p: &dyn Provider,
+        out: &[u8],
+        transcript: &[Vec<u8>],
+        shared: Option<&[u8]>,
+        psk: Option<&[u8]>,
+        early: bool,
+    ) -> Vec<u8> {
+        self.input.extend_from_slice(out);
+        let sh = self.message(p);
+        let c = &mut self.c;
+        let at = 4 + 2 + 32 + 1 + usize::from(sh[4 + 2 + 32]);
+        c.hs.new_cipher = crate::suites::by_protocol_id(u16::from_be_bytes([sh[at], sh[at + 1]]));
+        let hash = keys::handshake_md(c).unwrap();
+        for m in transcript {
+            c.hs.transcript.add(m);
+        }
+        c.hs.transcript.start_hash(p, hash, false).unwrap();
+        c.hs.transcript.add(&sh);
+        let cp = c.hs.new_cipher.unwrap();
+        if let Some(psk) = psk {
+            keys::generate_early(c, p, cp, Some(psk)).unwrap();
+        }
+        keys::generate_handshake_secret(c, p, shared).unwrap();
+        keys::store_handshake_traffic_hash(c).unwrap();
+        keys::change_cipher_state13(
+            c,
+            p,
+            abi::SSL3_CC_HANDSHAKE | abi::SSL3_CHANGE_CIPHER_CLIENT_READ,
+            None,
+        )
+        .unwrap();
+        if !early {
+            self.handshake_write(p);
+        }
+        sh
+    }
+
+    /// The client's handshake write keys.
+    fn handshake_write(&mut self, p: &dyn Provider) {
+        keys::change_cipher_state13(
+            &mut self.c,
+            p,
+            abi::SSL3_CC_HANDSHAKE | abi::SSL3_CHANGE_CIPHER_CLIENT_WRITE,
+            None,
+        )
+        .unwrap();
+    }
+
     /// Reads EncryptedExtensions, Certificate, CertificateVerify, and Finished, checking the
     /// signature (with `cert`) and the Finished; returns the four messages.
     fn server_flight(&mut self, p: &dyn Provider, cert: &[u8]) -> Vec<Vec<u8>> {
@@ -1989,4 +2043,376 @@ fn tls12_encrypt_then_mac() {
     let sh = crate::msgs::hello::ServerHello::parse(&first_record(&out)[4..], false).unwrap();
     assert!(sh.extensions().unwrap().iter().all(|e| e.typ != t::ENCRYPT_THEN_MAC));
     assert!(!c.hs.sh.use_etm);
+}
+
+/// A first TLS 1.3 handshake: its first ticket, and the PSK that ticket carries (from the
+/// client's resumption master secret).
+fn first_ticket(
+    p: &TestProvider,
+    cfg: Config,
+) -> (crate::msgs::misc::NewSessionTicket13, Vec<u8>) {
+    let (mut c, mut client, _) = handshake13(p, cfg, x25519_hello);
+    client.application_read(p);
+    let fin = client.finished(p);
+    client.application_write(p);
+    c.feed(&fin);
+    let (out, last) = drive(&mut c, p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    client.input.extend_from_slice(&out);
+    let nst = client.message(p);
+    let crate::msgs::misc::NewSessionTicket::Tls13(t) =
+        crate::msgs::misc::NewSessionTicket::parse(&nst[4..], true).unwrap()
+    else {
+        panic!("a TLS 1.3 ticket");
+    };
+    let psk = crate::keysched::resumption_psk(
+        p,
+        HashAlg::Sha256,
+        client.c.hs.sh.keys.resumption_master.bytes(),
+        &t.nonce,
+    )
+    .unwrap();
+    (t, psk.bytes().to_vec())
+}
+
+/// A ClientHello offering `identity` (with its PSK and age), psk_dhe_ke, an X25519 share,
+/// and (with `early`) early data; its binder computed over the hello.
+fn psk_hello(
+    p: &TestProvider,
+    share: Vec<u8>,
+    identity: &[u8],
+    age: u32,
+    psk: &[u8],
+    external: bool,
+    early: bool,
+) -> Hello {
+    use crate::msgs::ext::psk;
+    let mut h = x25519_hello(share).with(
+        t::PSK_KEY_EXCHANGE_MODES,
+        crate::msgs::ext::psk_key_exchange_modes::encode(&[1]).unwrap(),
+    );
+    if early {
+        h = h.with(t::EARLY_DATA, Vec::new());
+    }
+    let mut offer = psk::Strict {
+        identities: vec![psk::Identity {
+            identity: identity.to_vec(),
+            obfuscated_ticket_age: age,
+        }],
+        binders: vec![vec![0; 32]],
+    };
+    let draft = h.clone().with(t::PRE_SHARED_KEY, offer.encode().unwrap()).msg();
+    let prefix = &draft[..draft.len() - offer.binders_len()];
+    let th = crate::testprov::digest(HashAlg::Sha256, prefix);
+    let sched = crate::keysched::Schedule13::new(p, HashAlg::Sha256, Some(psk)).unwrap();
+    offer.binders = vec![sched.binder(p, !external, &th).unwrap()];
+    h.with(t::PRE_SHARED_KEY, offer.encode().unwrap())
+}
+
+/// The extension types of a message's extension block at `at`.
+fn ext_types(block: &[u8]) -> Vec<u16> {
+    crate::msgs::ext::split(block)
+        .unwrap()
+        .iter()
+        .map(|e| e.typ)
+        .collect()
+}
+
+#[test]
+fn tls13_resumption_with_a_ticket() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"resume13");
+    let (ticket, psk) = first_ticket(&p, server_config(&p));
+    let x = p.key_share(group::X25519).unwrap();
+    let xpub = x.public().to_vec();
+    let age = ticket.age_add.wrapping_add(500);
+    let hello = psk_hello(&p, xpub.clone(), &ticket.ticket, age, &psk, false, false);
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(c.neg.reused);
+    let sh = first_record(&out);
+    let parsed = crate::msgs::hello::ServerHello::parse(&sh[4..], true).unwrap();
+    let types: Vec<u16> = parsed.extensions().unwrap().iter().map(|e| e.typ).collect();
+    assert_eq!(
+        types,
+        [t::SUPPORTED_VERSIONS, t::KEY_SHARE, t::PRE_SHARED_KEY]
+    );
+    let (_, sk) = server_share(&sh);
+    let shared = x.derive(&sk).unwrap();
+    let mut client = Client::new();
+    client.hello_psk(&p, &out, &[hello.msg()], Some(shared.bytes()), Some(&psk), false);
+    // EncryptedExtensions and Finished: no certificate when resuming.
+    let ee = client.message(&p);
+    assert_eq!(ee[0], ht::ENCRYPTED_EXTENSIONS);
+    client.c.hs.transcript.add(&ee);
+    let fin = client.message(&p);
+    assert_eq!(fin[0], ht::FINISHED);
+    assert_eq!(
+        &fin[4..],
+        &finished::final_finish_mac(&client.c, &p, true).unwrap()[..]
+    );
+    client.c.hs.transcript.add(&fin);
+    client.application_read(&p);
+    c.feed(&client.finished(&p));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    // One new ticket after a resumption.
+    client.input.extend_from_slice(&out);
+    assert_eq!(client.message(&p)[0], ht::NEW_SESSION_TICKET);
+    assert!(client.record(&p).is_none());
+
+    // A binder that doesn't verify.
+    let mut bad = psk.clone();
+    bad[0] ^= 1;
+    let hello = psk_hello(&p, xpub.clone(), &ticket.ticket, age, &bad, false, false);
+    expect_failure(
+        server_config(&p),
+        &p,
+        &[hello.msg()],
+        abi::SSL_AD_DECRYPT_ERROR,
+        abi::SSL_R_BINDER_DOES_NOT_VERIFY,
+    );
+    // A ticket under another key isn't used: a full handshake.
+    let mut other = server_config(&p);
+    other.ticket_keys.as_mut().unwrap().name = [1; 16];
+    let hello = psk_hello(&p, xpub.clone(), &ticket.ticket, age, &psk, false, false);
+    let mut c = Connection::new(other);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(!c.neg.reused);
+    // pre_shared_key without psk_key_exchange_modes.
+    let hello = psk_hello(&p, xpub.clone(), &ticket.ticket, age, &psk, false, false)
+        .without(t::PSK_KEY_EXCHANGE_MODES);
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive(&mut c, &p);
+    // The extension is ignored without a mode, then its absence is the error.
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::TLS13_AD_MISSING_EXTENSION,
+            abi::SSL_R_MISSING_PSK_KEX_MODES_EXTENSION
+        )
+    );
+}
+
+#[test]
+fn tls13_external_psk() {
+    use crate::conn::Answer;
+    let p = TestProvider::new(b"external-psk");
+    let key = vec![0x42; 32];
+    let mut cfg = server_config(&p);
+    cfg.callbacks.psk_session = true;
+    let x = p.key_share(group::X25519).unwrap();
+    let hello = psk_hello(&p, x.public().to_vec(), b"client1", 0, &key, true, false);
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let mut asked = Vec::new();
+    let (out, last) = drive_answering(&mut c, &p, &mut |r| {
+        asked.push(r.clone());
+        Answer::Session(Some(crate::conn::Session {
+            version: v::TLS1_3,
+            cipher_id: crate::suites::cid(abi::TLS1_3_CK_AES_128_GCM_SHA256),
+            master_key: key.clone(),
+            ..crate::conn::Session::default()
+        }))
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert_eq!(
+        asked,
+        [Request::PskSession {
+            identity: b"client1".to_vec()
+        }]
+    );
+    assert!(c.neg.reused);
+    let sh = first_record(&out);
+    let (_, sk) = server_share(&sh);
+    let shared = x.derive(&sk).unwrap();
+    let mut client = Client::new();
+    client.hello_psk(&p, &out, &[hello.msg()], Some(shared.bytes()), Some(&key), false);
+    let ee = client.message(&p);
+    client.c.hs.transcript.add(&ee);
+    let fin = client.message(&p);
+    assert_eq!(
+        &fin[4..],
+        &finished::final_finish_mac(&client.c, &p, true).unwrap()[..]
+    );
+}
+
+#[test]
+fn tls13_early_data_accepted() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"early-data");
+    let mut cfg = server_config(&p);
+    cfg.max_early_data = 16384;
+    cfg.options |= abi::SSL_OP_NO_ANTI_REPLAY;
+    let (ticket, psk) = first_ticket(&p, cfg.clone());
+    // The ticket allows early data.
+    assert_eq!(ext_types(&ticket.extensions), [t::EARLY_DATA]);
+    let x = p.key_share(group::X25519).unwrap();
+    let age = ticket.age_add.wrapping_add(100);
+    let hello = psk_hello(&p, x.public().to_vec(), &ticket.ticket, age, &psk, false, true);
+    // The client: its early data under the early keys, then EndOfEarlyData.
+    let mut client = Client::new();
+    let ch = hello.msg();
+    client.c.hs.transcript.add(&ch);
+    let cp = crate::suites::by_protocol_id(0x1301).unwrap();
+    client.c.hs.new_cipher = Some(cp);
+    keys::generate_early(&mut client.c, &p, cp, Some(&psk)).unwrap();
+    keys::change_cipher_state13(
+        &mut client.c,
+        &p,
+        abi::SSL3_CC_EARLY | abi::SSL3_CHANGE_CIPHER_CLIENT_WRITE,
+        Some(cp),
+    )
+    .unwrap();
+    client
+        .c
+        .write_record(&p, record::content_type::application_data(), b"early")
+        .unwrap();
+    let early = client.c.take_output();
+    // `SSL_read_early_data`.
+    let mut c = Connection::new(cfg);
+    c.hs.sh.early_data_state = common::EarlyDataState::Accepting;
+    c.feed(&plain_record(22, &ch));
+    c.feed(&early);
+    let (out, last) = drive(&mut c, &p);
+    // The handshake stops after the server's flight, to read the early data.
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.neg.early_data_status, abi::SSL_EARLY_DATA_ACCEPTED);
+    assert_eq!(c.state(), abi::TLS_ST_EARLY_DATA);
+    c.hs.sh.early_data_state = common::EarlyDataState::Reading;
+    assert_eq!(c.step(&p, true).unwrap(), Event::AppData);
+    let mut buf = [0u8; 16];
+    let n = c.read_app(&mut buf, false);
+    assert_eq!(&buf[..n], b"early");
+    // The server's flight accepts it in EncryptedExtensions.
+    let sh = first_record(&out);
+    let (_, sk) = server_share(&sh);
+    let shared = x.derive(&sk).unwrap();
+    client.hello_psk(&p, &out, &[], Some(shared.bytes()), None, true);
+    let ee = client.message(&p);
+    assert!(ext_types(&ee[6..]).contains(&t::EARLY_DATA));
+    client.c.hs.transcript.add(&ee);
+    let fin = client.message(&p);
+    assert_eq!(fin[0], ht::FINISHED);
+    client.c.hs.transcript.add(&fin);
+    client.application_read(&p);
+    // EndOfEarlyData under the early keys, then the Finished under the handshake keys.
+    let mut out = client.send(&p, ht::END_OF_EARLY_DATA, &[]);
+    client.handshake_write(&p);
+    out.extend(client.finished(&p));
+    c.feed(&out);
+    assert_eq!(c.step(&p, true).unwrap(), Event::NeedInput);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(
+        c.hs.sh.early_data_state,
+        common::EarlyDataState::FinishedReading
+    );
+    assert_eq!(c.state(), abi::TLS_ST_OK);
+}
+
+#[test]
+fn tls13_early_data_rejected_without_the_server_allowing_it() {
+    let p = TestProvider::new(b"early-rejected");
+    let mut cfg = server_config(&p);
+    cfg.max_early_data = 16384;
+    cfg.options |= abi::SSL_OP_NO_ANTI_REPLAY;
+    let (ticket, psk) = first_ticket(&p, cfg.clone());
+    let x = p.key_share(group::X25519).unwrap();
+    let age = ticket.age_add.wrapping_add(100);
+    let hello = psk_hello(&p, x.public().to_vec(), &ticket.ticket, age, &psk, false, true);
+    // The application isn't reading early data: it is rejected, the resumption goes on.
+    let mut c = Connection::new(cfg.clone());
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(c.neg.reused);
+    assert_eq!(c.neg.early_data_status, abi::SSL_EARLY_DATA_REJECTED);
+    // The allow_early_data callback refuses it.
+    let mut cfg2 = cfg;
+    cfg2.callbacks.allow_early_data = true;
+    let mut c = Connection::new(cfg2);
+    c.hs.sh.early_data_state = common::EarlyDataState::Accepting;
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive_answering(&mut c, &p, &mut |r| {
+        assert_eq!(r, &Request::AllowEarlyData);
+        crate::conn::Answer::Allowed(false)
+    });
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.neg.early_data_status, abi::SSL_EARLY_DATA_REJECTED);
+}
+
+#[test]
+fn tls13_single_use_tickets_with_anti_replay() {
+    use crate::conn::Answer;
+    let p = TestProvider::new(b"anti-replay");
+    let mut cfg = server_config(&p);
+    cfg.max_early_data = 16384;
+    // Anti-replay (the default): stateful tickets, each a session ID in the cache.
+    let (mut c, mut client, _) = handshake13(&p, cfg.clone(), x25519_hello);
+    client.application_read(&p);
+    let fin = client.finished(&p);
+    client.application_write(&p);
+    c.feed(&fin);
+    let mut cached = Vec::new();
+    let mut out = Vec::new();
+    loop {
+        let e = c.step(&p, false).unwrap();
+        out.extend(c.take_output());
+        match e {
+            Event::UpdateCache { server: true } => cached.push(c.neg.session.clone()),
+            Event::HandshakeDone => break,
+            _ => {}
+        }
+    }
+    assert_eq!(cached.len(), 2);
+    client.input.extend_from_slice(&out);
+    let nst = client.message(&p);
+    let crate::msgs::misc::NewSessionTicket::Tls13(ticket) =
+        crate::msgs::misc::NewSessionTicket::parse(&nst[4..], true).unwrap()
+    else {
+        panic!("a TLS 1.3 ticket");
+    };
+    assert_eq!(ticket.ticket, cached[0].session_id, "a stateful ticket");
+    let psk = crate::keysched::resumption_psk(
+        &p,
+        HashAlg::Sha256,
+        client.c.hs.sh.keys.resumption_master.bytes(),
+        &ticket.nonce,
+    )
+    .unwrap();
+    assert_eq!(psk.bytes(), &cached[0].master_key[..]);
+    let x = p.key_share(group::X25519).unwrap();
+    let hello = psk_hello(
+        &p,
+        x.public().to_vec(),
+        &ticket.ticket,
+        ticket.age_add,
+        psk.bytes(),
+        false,
+        false,
+    );
+    // The cache has it once: the first use removes it, a replay finds nothing.
+    for (removed, reused) in [(true, true), (false, false)] {
+        let mut c = Connection::new(cfg.clone());
+        c.feed(&plain_record(22, &hello.msg()));
+        let (_, last) = drive_answering(&mut c, &p, &mut |r| match r {
+            Request::GetSession { id } => {
+                assert_eq!(id, &ticket.ticket);
+                Answer::Session(Some(cached[0].clone()))
+            }
+            Request::RemoveSession { id } => {
+                assert_eq!(id, &ticket.ticket);
+                Answer::Allowed(removed)
+            }
+            other => panic!("{other:?}"),
+        });
+        assert_eq!(last.unwrap(), Event::NeedInput);
+        assert_eq!(c.neg.reused, reused);
+    }
 }
