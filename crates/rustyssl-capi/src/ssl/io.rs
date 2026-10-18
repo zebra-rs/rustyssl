@@ -307,7 +307,7 @@ fn mirror(st: &mut SslState, c: &Connection) {
         }
         st.drv.rtt_marks = marks;
     }
-    st.in_init = c.in_init();
+    st.in_init = c.event_in_init();
     st.flow_uninited = c.before();
     let n = c.negotiated();
     if n.cipher.is_some() {

@@ -172,9 +172,10 @@ static void info_cb(const SSL *x, int where, int ret)
                SSL_alert_type_string_long(ret), SSL_alert_desc_string_long(ret));
         return;
     }
-    printf("    %s %s: %s [%s] %s/%s\n", SSL_is_server(x) ? "server" : "client",
+    printf("    %s %s: %s [%s] %s/%s%s\n", SSL_is_server(x) ? "server" : "client",
            where_name(where), SSL_state_string_long(x), SSL_state_string(x),
-           SSL_rstate_string(x), SSL_rstate_string_long(x));
+           SSL_rstate_string(x), SSL_rstate_string_long(x),
+           SSL_in_init((SSL *)x) ? "" : " (not in init)");
 }
 
 static int accept_any(int ok, X509_STORE_CTX *ctx)

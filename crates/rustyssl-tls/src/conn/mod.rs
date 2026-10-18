@@ -232,7 +232,10 @@ pub struct Connection {
     /// answer.
     pub(crate) cur_msg: Option<(u8, Vec<u8>)>,
     /// Events to report before anything else happens.
-    events: VecDeque<Event>,
+    events: VecDeque<(Event, bool)>,
+    /// Whether the connection was in init when the event [`Connection::step`] last returned from
+    /// the queue was raised (`None`: the last event is current).
+    event_in_init: Option<bool>,
     /// The request waiting for an answer.
     pending: Option<Request>,
     /// The answer, waiting for the code that asked.
@@ -350,6 +353,7 @@ impl Connection {
             hs_in: Vec::new(),
             cur_msg: None,
             events: VecDeque::new(),
+            event_in_init: None,
             pending: None,
             answer: None,
             pending_construct: false,
@@ -478,6 +482,14 @@ impl Connection {
         self.st.in_init || self.st.state == MsgFlow::Uninited
     }
 
+    /// [`Connection::in_init`] as of the event [`Connection::step`] last returned: an event
+    /// raised before the state machine moved on (`SSL_CB_HANDSHAKE_DONE` out of init, the
+    /// tickets after it back in) reports the state it was raised in, as OpenSSL's callbacks see.
+    #[must_use]
+    pub fn event_in_init(&self) -> bool {
+        self.event_in_init.unwrap_or_else(|| self.in_init())
+    }
+
     /// Whether no handshake has started (`SSL_in_before`).
     #[must_use]
     pub fn before(&self) -> bool {
@@ -589,7 +601,8 @@ impl Connection {
     /// # Errors
     /// The connection failed: the alert (if any) is in the output, and the error says why.
     pub fn step(&mut self, p: &dyn Provider, reading: bool) -> Result<Event> {
-        if let Some(e) = self.events.pop_front() {
+        self.event_in_init = None;
+        if let Some(e) = self.pop_event() {
             return Ok(e);
         }
         if let Some(e) = self.failed {
@@ -604,14 +617,15 @@ impl Connection {
         let r = self.advance(p);
         match r {
             Ok(Some(e)) => {
-                if let Some(q) = self.events.pop_front() {
-                    self.events.push_back(e);
+                if let Some(q) = self.pop_event() {
+                    let in_init = self.in_init();
+                    self.events.push_back((e, in_init));
                     return Ok(q);
                 }
                 Ok(e)
             }
             Ok(None) => {
-                if let Some(q) = self.events.pop_front() {
+                if let Some(q) = self.pop_event() {
                     return Ok(q);
                 }
                 if let Some(r) = &self.pending {
@@ -628,7 +642,7 @@ impl Connection {
             }
             Err(e) => {
                 self.fatal(p, e);
-                match self.events.pop_front() {
+                match self.pop_event() {
                     Some(q) => Ok(q),
                     None => Err(e),
                 }
@@ -680,7 +694,15 @@ impl Connection {
 
     /// Queues an event.
     pub(crate) fn notify(&mut self, e: Event) {
-        self.events.push_back(e);
+        let in_init = self.in_init();
+        self.events.push_back((e, in_init));
+    }
+
+    /// The next queued event, noting whether the connection was in init when it was raised.
+    fn pop_event(&mut self) -> Option<Event> {
+        let (e, in_init) = self.events.pop_front()?;
+        self.event_in_init = Some(in_init);
+        Some(e)
     }
 
     /// Whether events are queued.
