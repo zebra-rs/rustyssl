@@ -295,7 +295,8 @@ unsafe fn verify(
     use crate::x509::vpm::{
         X509_VERIFY_PARAM_move_peername, X509_VERIFY_PARAM_set_auth_level, X509_VERIFY_PARAM_set1,
     };
-    const F: &str = "ssl_verify_cert_chain";
+    // OpenSSL raises these from `ssl_verify_cert_chain`'s worker.
+    const F: &str = "ssl_verify_internal";
     let Some(snap) = snap else {
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
@@ -360,6 +361,24 @@ unsafe fn verify(
     let idx = unsafe { super::super::ctx::rustyssl_private_SSL_get_ex_data_X509_STORE_CTX_idx() };
     // SAFETY: the context; the connection as its application data.
     unsafe { X509_STORE_CTX_set_ex_data(ctx, idx, s.cast()) };
+    // Verify via DANE if enabled, with the context's matching types as they are now.
+    let dane: *mut rustyssl_abi::SSL_DANE = {
+        let mut st = x.state();
+        if st.lists.dane.enabled() {
+            // SAFETY: the connection holds a reference to its context.
+            if let Some(cx) = unsafe { super::super::conn::ctx_of(&st) } {
+                st.lists.dane.refresh(&cx.state().lists.dane_ctx);
+            }
+            // Boxed: the address is stable while the connection lives.
+            ptr::from_mut::<super::super::dane::Dane>(&mut st.lists.dane).cast()
+        } else {
+            ptr::null_mut()
+        }
+    };
+    if !dane.is_null() {
+        // SAFETY: the context; the connection's DANE state, which outlives it.
+        unsafe { crate::x509::ctx::X509_STORE_CTX_set0_dane(ctx, dane) };
+    }
     let purpose = if server { c"ssl_client" } else { c"ssl_server" };
     // SAFETY: as above; a NUL-terminated name.
     unsafe { X509_STORE_CTX_set_default(ctx, purpose.as_ptr()) };

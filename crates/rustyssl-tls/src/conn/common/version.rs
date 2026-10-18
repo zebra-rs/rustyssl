@@ -12,7 +12,7 @@ use rustyssl_abi as abi;
 use super::security::{self, SecOther};
 use crate::conn::Connection;
 use crate::consts::{TLS11_DOWNGRADE, TLS12_DOWNGRADE, version};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 
 /// The TLS versions the default build has, highest first, with the option that disables
 /// each (`tls_version_table`). SSLv3's methods are compiled out.
@@ -280,6 +280,11 @@ pub fn choose_server(
 /// # Errors
 /// OpenSSL's alert and reason.
 pub fn choose_client(c: &mut Connection, version_chosen: u16, hrr: bool) -> Result<()> {
+    choose_client_inner(c, version_chosen, hrr).in_func("ssl_choose_client_version")
+}
+
+/// See [`choose_client`].
+fn choose_client_inner(c: &mut Connection, version_chosen: u16, hrr: bool) -> Result<()> {
     let origv = c.neg.version;
     let fail = |c: &mut Connection, alert: c_int, reason: c_int| {
         c.neg.version = origv;

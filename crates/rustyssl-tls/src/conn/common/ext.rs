@@ -22,11 +22,12 @@ use super::{
     KEX_MODE_FLAG_NONE, Pha, STATUSTYPE_NOTHING, ask_once,
 };
 use crate::codec::Writer;
+use crate::conn::funcs::{self, Ext};
 use crate::conn::{Answer, Connection, Request, client, server};
 use crate::consts::context as cx;
 use crate::consts::ext as t;
 use crate::crypto::{HashAlg, Provider};
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::{Schedule13, hash_of};
 use crate::msgs::ext::{self as mx, EXT_DEFS, Policy};
 use crate::suites::masks::{SSL_aECDSA, SSL_kECDHE};
@@ -246,7 +247,7 @@ pub fn construct(
         }
     }
     let mut w = Writer::new();
-    if !custom_add(c, context, chainidx, max_version, &mut w)? {
+    if !custom_add(c, context, chainidx, max_version, &mut w).in_func("custom_ext_add")? {
         return Ok(None);
     }
     for (i, d) in EXT_DEFS.iter().enumerate() {
@@ -259,7 +260,8 @@ pub fn construct(
             written: w.len(),
             max_version,
         };
-        match construct_one(c, p, d.typ, &x)? {
+        let func = funcs::ext(c.cfg.server, Ext::Construct, d.typ);
+        match construct_one(c, p, d.typ, &x).in_func(func.unwrap_or("tls_construct_extensions"))? {
             ExtReturn::NotSent => {}
             ExtReturn::Wait => return Ok(None),
             ExtReturn::Sent(body) => {
@@ -376,7 +378,7 @@ pub fn collect(
             custom: &custom,
             sent: Some(&sent),
         };
-        mx::collect(contents, context, &policy)?
+        mx::collect(contents, context, &policy).in_func("tls_collect_extensions")?
     };
     let n = BUILTIN.saturating_add(c.cfg.custom_exts.len());
     let mut raw: Vec<Option<RawExt>> = vec![None; n];
@@ -468,8 +470,11 @@ pub fn parse_extension(
     };
     let step = match EXT_DEFS.get(idx) {
         Some(d) if !relevant(c, d.context, context) => Step::Done,
-        Some(d) => parse_one(c, p, d.typ, &body, &x)?,
-        None => custom_parse(c, context, typ, &body, chainidx)?,
+        Some(d) => {
+            let func = funcs::ext(c.cfg.server, Ext::Parse, d.typ);
+            parse_one(c, p, d.typ, &body, &x).in_func(func.unwrap_or("tls_parse_extension"))?
+        }
+        None => custom_parse(c, context, typ, &body, chainidx).in_func("custom_ext_parse")?,
     };
     if step == Step::Done
         && let Some(e) =
@@ -515,7 +520,12 @@ pub fn parse_all(
             let i = r.next_final;
             let Some(d) = EXT_DEFS.get(i) else { break };
             let sent = r.present(i);
-            if d.context & context != 0 && final_one(c, p, d.typ, context, sent)? == Step::Wait {
+            let func = funcs::ext(c.cfg.server, Ext::Final, d.typ);
+            if d.context & context != 0
+                && final_one(c, p, d.typ, context, sent)
+                    .in_func(func.unwrap_or("tls_parse_all_extensions"))?
+                    == Step::Wait
+            {
                 return Ok(Step::Wait);
             }
             if let Some(r) = c.hs.sh.received.get_mut(pos) {

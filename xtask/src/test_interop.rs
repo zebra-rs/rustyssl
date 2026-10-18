@@ -17,6 +17,8 @@
 //!   (`New,`/`Reused,`, ALPN, secure renegotiation) from its standard output.
 //! - `+resume`: two connections, the first saving its session (`-sess_out`) and the second, a
 //!   `+full` one, resuming it (`-sess_in`); the summary says whether it was reused.
+//! - `+trace`: the client also runs with `-trace`, and the summary takes the trace (its random
+//!   octets masked) from its standard output.
 //! - `+cmd=X`: the client first sends the command line `X` (`R` renegotiates, `k`/`K` update
 //!   the keys), then the data a second later; commands need it to run without `-ign_eof`, so
 //!   its input stays open until it exits.
@@ -334,6 +336,7 @@ struct Mode {
     full: bool,
     resume: bool,
     cmd: Option<String>,
+    trace: bool,
 }
 
 /// The client arguments without the directives, and the directives.
@@ -344,6 +347,7 @@ fn mode(args: &[String]) -> (Vec<String>, Mode) {
         match a.as_str() {
             "+full" => m.full = true,
             "+resume" => m.resume = true,
+            "+trace" => m.trace = true,
             _ => match a.strip_prefix("+cmd=") {
                 Some(c) => m.cmd = Some(c.to_owned()),
                 None => rest.push(a.clone()),
@@ -361,6 +365,7 @@ fn client(
     args: &[String],
     full: bool,
     cmd: Option<&str>,
+    trace: bool,
 ) -> Result<String> {
     let mut all = vec![
         "s_client".to_owned(),
@@ -369,6 +374,9 @@ fn client(
     ];
     if !full {
         all.push("-brief".to_owned());
+    }
+    if trace {
+        all.push("-trace".to_owned());
     }
     // `-ign_eof` turns the commands off (`USER_DATA_MODE_NONE`).
     if cmd.is_none() {
@@ -432,7 +440,19 @@ fn client(
         summary.push_str(line);
         summary.push('\n');
     }
-    let echoed = stdout.lines().any(|l| l == "lssytsur olleh");
+    // `-trace`'s lines (on standard output), with the random octets masked. The echo is written
+    // to the descriptor directly while the trace is buffered, so it lands anywhere in it.
+    let echo = "lssytsur olleh\n";
+    let echoed = if trace {
+        for line in stdout.replacen(echo, "", 1).lines() {
+            summary.push_str("trace: ");
+            summary.push_str(&mask_trace(line));
+            summary.push('\n');
+        }
+        stdout.contains(echo)
+    } else {
+        stdout.lines().any(|l| l == "lssytsur olleh")
+    };
     summary.push_str(if echoed {
         "echo: ok\n"
     } else {
@@ -470,7 +490,15 @@ fn connect(
     }
     let mut summary = String::new();
     for (args, full) in &runs {
-        match client(t, p.client_ours, port, args, *full, m.cmd.as_deref()) {
+        match client(
+            t,
+            p.client_ours,
+            port,
+            args,
+            *full,
+            m.cmd.as_deref(),
+            m.trace,
+        ) {
             Ok(s) => summary.push_str(&s),
             Err(e) => {
                 let _ = server.kill();
@@ -567,6 +595,10 @@ pub fn run(args: &[String]) -> Result {
                 Ok(got) if got == expected => {}
                 Ok(got) => {
                     ok = false;
+                    // Both whole, for a diff (the summaries with traces are long).
+                    let base = work.join(format!("{name}-{}", p.name.replace(['/', ' '], "-")));
+                    let _ = fs::write(base.with_extension("expected"), &expected);
+                    let _ = fs::write(base.with_extension("got"), &got);
                     println!(
                         "FAIL {name} ({}):\n  expected:\n{}\n  got:\n{}",
                         p.name,
@@ -596,6 +628,20 @@ pub fn run(args: &[String]) -> Result {
     } else {
         Err(format!("failed: {}", failures.join(", ")).into())
     }
+}
+
+/// A trace line with what varies between runs masked: hex octets (`name (len=N): …`), the time
+/// in a random, and `ticket_age_add`.
+fn mask_trace(line: &str) -> String {
+    if let Some(i) = line.find("): ") {
+        return format!("{}): *", &line[..i]);
+    }
+    for label in ["gmt_unix_time=", "ticket_age_add="] {
+        if let Some(i) = line.find(label) {
+            return format!("{}{label}*", &line[..i]);
+        }
+    }
+    line.to_owned()
 }
 
 fn indent(s: &str) -> String {

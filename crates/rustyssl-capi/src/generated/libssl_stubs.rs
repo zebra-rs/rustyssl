@@ -8,7 +8,7 @@
 // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.
 #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
 
-use libc::{off_t, timeval};
+use libc::timeval;
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
@@ -363,29 +363,6 @@ pub extern "C" fn rustyssl_private_SSL_read_early_data(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_rstate_string(_: *const SSL) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_rstate_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_rstate_string_long(
-    _: *const SSL,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_rstate_string_long")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_sendfile(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-    _: off_t,
-    _: usize,
-    _: core::ffi::c_int,
-) -> isize {
-    crate::stub::unimplemented("SSL_sendfile")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_set1_cert_comp_preference(
     _: *mut SSL,
     _: *mut core::ffi::c_int,
@@ -491,19 +468,6 @@ pub extern "C" fn rustyssl_private_SSL_srp_server_param_with_username(
 #[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_stateless(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_stateless")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_trace(
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_void,
-    _: usize,
-    _: *mut SSL,
-    _: *mut core::ffi::c_void,
-) {
-    crate::stub::unimplemented("SSL_trace")
 }
 
 #[unsafe(no_mangle)]

@@ -4842,7 +4842,8 @@ Exit checks:
     signatures and validity times (`internal_verify`); name constraints
     (`NAME_CONSTRAINTS_check`, `_check_CN`, punycode for SmtpUTF8Mailbox, `OSSL_parse_url` for
     URIs). Revocation (with `X509_V_FLAG_CRL_CHECK`) came with 5.4c and policies (with
-    `X509_V_FLAG_POLICY_CHECK`) with 5.4d, RFC 3779 resources with 5.4e; DANE waits for libssl.
+    `X509_V_FLAG_POLICY_CHECK`) with 5.4d, RFC 3779 resources with 5.4e; DANE with libssl's
+    (7.7, `x509/dane.rs`).
     Tests: `tests/c/x509_verify.c` (33 chains with the callback's trace), unit tests (punycode
     with the CVE-2022-3602 overflow, name constraints, URLs). The CVE-2015-1793 alternate-chain
     regression waits for the `tests/cve/` suite.
@@ -4873,8 +4874,7 @@ Exit checks:
     5.2f), run by `X509_verify_cert` after revocation, as OpenSSL's: each certificate's
     address blocks and AS identifiers within its issuer's (inheritance, missing families, the
     trust anchor not inheriting), each failure to the callback. Raw public keys came with
-    5.4b. DANE needs libssl's `SSL_DANE` state, so verifying with one aborts until libssl's
-    DANE (Phase 6). Tests: `tests/c/x509_rfc3779.c` (15 verifications with the callback's
+    5.4b. DANE, which needs libssl's `SSL_DANE` state, came with 7.7. Tests: `tests/c/x509_rfc3779.c` (15 verifications with the callback's
     trace and the validations rerun, 9 resource-set checks).
 - [x] **5.5 Identity checks** (`x509v3/check.rs`, the matching in `rustyssl-pki`'s `identity`,
   from `v3_utl.c`): `X509_check_host` (every `X509_CHECK_FLAG_*`, wildcards with OpenSSL's
@@ -5206,13 +5206,51 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     `master_key`
   - `SSL_get_shared_ciphers` buffer semantics, the get0 vs. get1 peer-certificate ownership
     rules
-- [ ] **7.6 Errors and strings:**
+- [x] **7.6 Errors and strings:**
   - the exact `SSL_R_*` reasons where applications branch on them (for example,
     `UNEXPECTED_EOF_WHILE_READING` together with `SSL_OP_IGNORE_UNEXPECTED_EOF`)
   - `SSL_alert_desc_string(_long)`, `SSL_state_string(_long)`, `SSL_get_version`
   - `SSL_CIPHER_get_name`/`standard_name`/`description`, byte-exact
-- [ ] **7.7 Default-build mirroring:** kTLS and `ssl-trace` are absent from the default build,
-  so their symbols behave the way they do there.
+  - Done: every TLS error carries the function OpenSSL raises it from (`ERR_get_error_all`,
+    `ERR_print_errors`): the state machine names each step's function from a table
+    (`conn::funcs`), the record layer, `ssl3_read_bytes`, the extension handlers (from
+    `ext_defs`), and the helpers OpenSSL implements separately name themselves first; the
+    record layer's follow-up `SSL_R_RECORD_LAYER_FAILURE` and the provider's entry under a
+    TLS 1.2 GCM/CCM bad tag come in OpenSSL's order. capi's raise sites were audited against
+    the reference source. `SSL_rstate_string(_long)` and `SSL_client_version` (the
+    ClientHello's version) are exact. Tests: `tests/c/ssl_errors.c` (22 failing handshakes,
+    renegotiation, EOF, configuration and ctrl errors, every queued entry with its function)
+    and `tests/c/ssl_strings.c` (38 handshake states at every info-callback point, the read
+    state, versions, 158 suites' names, all 357 `SSL_R_*` strings).
+- [x] **7.7 Default-build mirroring:** kTLS is absent from the default build
+  (`OPENSSL_NO_KTLS`), so its symbols behave the way they do there. `ssl-trace` turned out to
+  be *enabled* by default (no `OPENSSL_NO_SSL_TRACE`), so `SSL_trace` is ported in full.
+  - **`SSL_trace`** (`ssl/trace.rs`, from `t1_trce.c`): every record header, inner content
+    type, alert, ChangeCipherSpec and handshake message printed byte for byte, with the
+    tables (`ssl/trace/tables.rs`) extracted mechanically from the reference source (names
+    as text, numbers from `rustyssl_abi` where a public header defines them). The connection's
+    state is read as OpenSSL reads it: TLS 1.3 and `SSL_USE_SIGALGS` from the *method*
+    (flexible until a version is negotiated, while `s->version` is already the highest), the
+    key exchange from the negotiating cipher, the raw public key types. The state is copied
+    under the lock, which is released before any BIO write. Every read is bounded; a short
+    message ends with "Message length parse error!". Tests: `tests/c/ssl_trace.c` (crafted
+    messages of every kind on fresh TLS client, server and DTLS connections and after TLS 1.2
+    and 1.3 handshakes, malformed ones, and two traced handshakes with the random fields
+    masked), interop cases `tls13-trace` and `tls12-trace` (`s_client -trace` in all four
+    pairings, `+trace`), and the fuzz target `ssl_trace`.
+  - **kTLS** (`ssl/ktls.rs`): `BIO_get_ktls_send`/`_recv` are 0 both as the header's macros and
+    as the raw controls; `SSL_OP_ENABLE_KTLS` is kept but changes nothing; `SSL_sendfile`
+    fails as the reference's does (0 for NULL, -1 with `SSL_R_UNINITIALIZED`, or
+    `SSL_R_PROTOCOL_IS_SHUTDOWN`). Tests: `tests/c/ssl_ktls.c`.
+  - **DANE verification** (`x509/dane.rs` with `x509/verify.rs`, from `x509_vfy.c`): DANE-EE,
+    DANE-TA (certificates from the wire, the records' own Cert Full certificates, bare SPKI
+    Full keys), PKIX-TA and PKIX-EE; selectors 0/1; matching types 0/1/2 with digest agility;
+    `DANE_FLAG_NO_DANE_EE_NAMECHECKS`; `X509_V_ERR_DANE_NO_MATCH`; raw public keys. The
+    handshake's verification sets the state (`ssl/io/requests.rs`), and
+    `SSL_get0_dane_authority`/`_tlsa` report the match. The verifier reaches the state through
+    the context's pointer with no lock, so each access is brief and copies the records out
+    before matching. Tests: `tests/c/ssl_dane.c` (handshakes of every kind in TLS 1.3 and
+    1.2, and direct `X509_verify_cert` runs with a certificate and a raw public key).
 
 **Exit:** M2 and M4. The BoGo shim meets its pass target. The tlsfuzzer server scripts
 (including the Bleichenbacher/Marvin and Lucky13 timing scripts) pass. The interop matrix is

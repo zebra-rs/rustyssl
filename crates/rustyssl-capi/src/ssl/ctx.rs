@@ -761,7 +761,8 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_CTX_ctrl(c: *mut SSL_CTX, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_SSL
     {
-        const F: &str = "SSL_CTX_ctrl";
+        // The commands' errors come from OpenSSL's `ssl3_ctx_ctrl`.
+        const F: &str = "ssl3_ctx_ctrl";
         // SAFETY: the caller's guarantee (the group and signature algorithm lists, with the
         // syntax checks made with no context).
         if let Some(r) = unsafe { super::lists::ctx_ctrl(c, cmd, larg, parg) } {

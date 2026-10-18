@@ -13,7 +13,7 @@ use crate::consts::context as cx;
 use crate::consts::ext as t;
 use crate::consts::{HRR_RANDOM, handshake as hm, version as v};
 use crate::crypto::Provider;
-use crate::error::{Error, Result};
+use crate::error::{Error, InFunc, Result};
 use crate::keysched::{self, Transcript};
 use crate::msgs::{self, ext::EXT_DEFS, hello::ClientHello, hello::ServerHello};
 use crate::suites::{self, Cipher};
@@ -178,6 +178,11 @@ fn fill_binders(c: &mut Connection, p: &dyn Provider, body: &mut [u8]) -> Result
 
 /// `set_client_ciphersuite`: checks the suite the server chose.
 fn set_client_ciphersuite(c: &mut Connection, id: u16) -> Result<()> {
+    set_client_ciphersuite_inner(c, id).in_func("set_client_ciphersuite")
+}
+
+/// See [`set_client_ciphersuite`].
+fn set_client_ciphersuite_inner(c: &mut Connection, id: u16) -> Result<()> {
     let ill = |r| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, r);
     let Some(cp) = suites::by_protocol_id(id) else {
         return Err(ill(abi::SSL_R_UNKNOWN_CIPHER_RETURNED));
@@ -471,6 +476,16 @@ fn compression(c: &Connection, method: u8) -> Result<()> {
 /// a share for, a cookie), then the transcript restarts with the synthetic message_hash of the
 /// first ClientHello, followed by the HelloRetryRequest.
 fn process_as_hrr(
+    c: &mut Connection,
+    p: &dyn Provider,
+    exts: &[u8],
+    body: &[u8],
+) -> Result<MsgProcess> {
+    process_as_hrr_inner(c, p, exts, body).in_func("tls_process_as_hello_retry_request")
+}
+
+/// See [`process_as_hrr`].
+fn process_as_hrr_inner(
     c: &mut Connection,
     p: &dyn Provider,
     exts: &[u8],
