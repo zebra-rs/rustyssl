@@ -4972,7 +4972,7 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     with prefix and suffix functions; short and long streams as DER, PEM, and S/MIME, read back
     and verified or decrypted; the reference tool's S/MIME messages; malformed messages), the
     `smime_read` fuzz target.
-- [ ] **6.4 CMS:**
+- [x] **6.4 CMS:**
   - every content type and recipient-info type present in the target headers
   - signed attributes and receipts
   - BIO streaming, `SMIME_read/write_CMS`
