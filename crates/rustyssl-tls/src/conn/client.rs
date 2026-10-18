@@ -130,10 +130,10 @@ pub struct State {
     /// A renegotiation the server asked for must set up a new handshake before the ClientHello
     /// (`tls_setup_handshake` in the write transition, which runs without a provider here).
     needs_setup: bool,
-    /// A ClientHello to send in place of the one made (tests replaying RFC 8448, whose
-    /// extensions come in another order than OpenSSL's), once its state is made.
+    /// ClientHellos to send in place of the ones made, in turn (tests replaying RFC 8448,
+    /// whose extensions come in another order than OpenSSL's), once their state is made.
     #[cfg(test)]
-    pub(super) hello_override: Option<Vec<u8>>,
+    pub(super) hello_override: Vec<Vec<u8>>,
 }
 
 impl core::fmt::Debug for State {
@@ -366,7 +366,16 @@ pub(crate) fn x509err2alert(result: i64) -> c_int {
 /// # Errors
 /// Never; `Result` for the caller.
 pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
+    #[cfg(test)]
+    let overrides = match &mut c.hs.role {
+        RoleState::Client(s) => core::mem::take(&mut s.hello_override),
+        _ => Vec::new(),
+    };
     c.hs.role = RoleState::Client(Box::default());
+    #[cfg(test)]
+    {
+        state(c)?.hello_override = overrides;
+    }
     c.hs.sh.status_type = if c.cfg.status_request {
         abi::TLSEXT_STATUSTYPE_ocsp
     } else {

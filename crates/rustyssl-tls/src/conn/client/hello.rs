@@ -141,8 +141,8 @@ pub(super) fn construct_client_hello(c: &mut Connection, p: &dyn Provider) -> Re
     body.extend_from_slice(&block);
     fill_binders(c, p, &mut body)?;
     #[cfg(test)]
-    if let Some(o) = state(c)?.hello_override.clone() {
-        return Ok(Construct::Send(o));
+    if !state(c)?.hello_override.is_empty() {
+        return Ok(Construct::Send(state(c)?.hello_override.remove(0)));
     }
     Ok(Construct::Send(body))
 }
