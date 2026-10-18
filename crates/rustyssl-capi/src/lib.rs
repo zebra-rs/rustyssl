@@ -44,6 +44,7 @@ mod encoder;
 mod engine;
 mod err;
 mod errno;
+mod ess;
 mod evp;
 mod ex_data;
 #[expect(

@@ -485,103 +485,6 @@ pub extern "C" fn CMS_RecipientInfo_type(_: *mut CMS_RecipientInfo) -> core::ffi
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignedData_free(_: *mut CMS_SignedData) {
-    crate::stub::unimplemented("CMS_SignedData_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignedData_init(_: *mut CMS_ContentInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignedData_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignedData_new() -> *mut CMS_SignedData {
-    crate::stub::unimplemented("CMS_SignedData_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignedData_verify(
-    _: *mut CMS_SignedData,
-    _: *mut BIO,
-    _: *mut stack_st_X509,
-    _: *mut X509_STORE,
-    _: *mut stack_st_X509,
-    _: *mut stack_st_X509_CRL,
-    _: core::ffi::c_uint,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut BIO {
-    crate::stub::unimplemented("CMS_SignedData_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_cert_cmp(
-    _: *mut CMS_SignerInfo,
-    _: *mut X509,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignerInfo_cert_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_get0_algs(
-    _: *mut CMS_SignerInfo,
-    _: *mut *mut EVP_PKEY,
-    _: *mut *mut X509,
-    _: *mut *mut X509_ALGOR,
-    _: *mut *mut X509_ALGOR,
-) {
-    crate::stub::unimplemented("CMS_SignerInfo_get0_algs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_get0_md_ctx(_: *mut CMS_SignerInfo) -> *mut EVP_MD_CTX {
-    crate::stub::unimplemented("CMS_SignerInfo_get0_md_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_get0_pkey_ctx(_: *mut CMS_SignerInfo) -> *mut EVP_PKEY_CTX {
-    crate::stub::unimplemented("CMS_SignerInfo_get0_pkey_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_get0_signature(_: *mut CMS_SignerInfo) -> *mut ASN1_OCTET_STRING {
-    crate::stub::unimplemented("CMS_SignerInfo_get0_signature")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_get0_signer_id(
-    _: *mut CMS_SignerInfo,
-    _: *mut *mut ASN1_OCTET_STRING,
-    _: *mut *mut X509_NAME,
-    _: *mut *mut ASN1_INTEGER,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignerInfo_get0_signer_id")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_set1_signer_cert(_: *mut CMS_SignerInfo, _: *mut X509) {
-    crate::stub::unimplemented("CMS_SignerInfo_set1_signer_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_sign(_: *mut CMS_SignerInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignerInfo_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_verify(_: *mut CMS_SignerInfo) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignerInfo_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_SignerInfo_verify_content(
-    _: *mut CMS_SignerInfo,
-    _: *mut BIO,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_SignerInfo_verify_content")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn CMS_add0_recipient_key(
     _: *mut CMS_ContentInfo,
     _: core::ffi::c_int,
@@ -627,39 +530,6 @@ pub extern "C" fn CMS_add1_recipient_cert(
     _: core::ffi::c_uint,
 ) -> *mut CMS_RecipientInfo {
     crate::stub::unimplemented("CMS_add1_recipient_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add1_signer(
-    _: *mut CMS_ContentInfo,
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *const EVP_MD,
-    _: core::ffi::c_uint,
-) -> *mut CMS_SignerInfo {
-    crate::stub::unimplemented("CMS_add1_signer")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add_simple_smimecap(
-    _: *mut *mut stack_st_X509_ALGOR,
-    _: core::ffi::c_int,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add_simple_smimecap")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add_smimecap(
-    _: *mut CMS_SignerInfo,
-    _: *mut stack_st_X509_ALGOR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add_smimecap")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_add_standard_smimecap(_: *mut *mut stack_st_X509_ALGOR) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_add_standard_smimecap")
 }
 
 #[unsafe(no_mangle)]
@@ -733,78 +603,6 @@ pub extern "C" fn CMS_encrypt_ex(
     _: *const core::ffi::c_char,
 ) -> *mut CMS_ContentInfo {
     crate::stub::unimplemented("CMS_encrypt_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_get0_signers(_: *mut CMS_ContentInfo) -> *mut stack_st_X509 {
-    crate::stub::unimplemented("CMS_get0_signers")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_set1_signers_certs(
-    _: *mut CMS_ContentInfo,
-    _: *mut stack_st_X509,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_set1_signers_certs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_sign(
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_sign")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_sign_ex(
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-    _: *mut OSSL_LIB_CTX,
-    _: *const core::ffi::c_char,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_sign_ex")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_sign_receipt(
-    _: *mut CMS_SignerInfo,
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-    _: core::ffi::c_uint,
-) -> *mut CMS_ContentInfo {
-    crate::stub::unimplemented("CMS_sign_receipt")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_verify(
-    _: *mut CMS_ContentInfo,
-    _: *mut stack_st_X509,
-    _: *mut X509_STORE,
-    _: *mut BIO,
-    _: *mut BIO,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_verify")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_verify_receipt(
-    _: *mut CMS_ContentInfo,
-    _: *mut CMS_ContentInfo,
-    _: *mut stack_st_X509,
-    _: *mut X509_STORE,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_verify_receipt")
 }
 
 #[unsafe(no_mangle)]
@@ -1659,93 +1457,6 @@ pub extern "C" fn ENGINE_unregister_pkey_meths(_: *mut ENGINE) {
 #[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_up_ref(_: *mut ENGINE) -> core::ffi::c_int {
     crate::stub::unimplemented("ENGINE_up_ref")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_V2_dup(_: *const ESS_CERT_ID_V2) -> *mut ESS_CERT_ID_V2 {
-    crate::stub::unimplemented("ESS_CERT_ID_V2_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_V2_free(_: *mut ESS_CERT_ID_V2) {
-    crate::stub::unimplemented("ESS_CERT_ID_V2_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_V2_new() -> *mut ESS_CERT_ID_V2 {
-    crate::stub::unimplemented("ESS_CERT_ID_V2_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_dup(_: *const ESS_CERT_ID) -> *mut ESS_CERT_ID {
-    crate::stub::unimplemented("ESS_CERT_ID_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_free(_: *mut ESS_CERT_ID) {
-    crate::stub::unimplemented("ESS_CERT_ID_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_CERT_ID_new() -> *mut ESS_CERT_ID {
-    crate::stub::unimplemented("ESS_CERT_ID_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_ISSUER_SERIAL_dup(_: *const ESS_ISSUER_SERIAL) -> *mut ESS_ISSUER_SERIAL {
-    crate::stub::unimplemented("ESS_ISSUER_SERIAL_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_ISSUER_SERIAL_free(_: *mut ESS_ISSUER_SERIAL) {
-    crate::stub::unimplemented("ESS_ISSUER_SERIAL_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_ISSUER_SERIAL_new() -> *mut ESS_ISSUER_SERIAL {
-    crate::stub::unimplemented("ESS_ISSUER_SERIAL_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_V2_dup(
-    _: *const ESS_SIGNING_CERT_V2,
-) -> *mut ESS_SIGNING_CERT_V2 {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_V2_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_V2_free(_: *mut ESS_SIGNING_CERT_V2) {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_V2_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_V2_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_V2_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_V2_new() -> *mut ESS_SIGNING_CERT_V2 {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_V2_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_dup(_: *const ESS_SIGNING_CERT) -> *mut ESS_SIGNING_CERT {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_free(_: *mut ESS_SIGNING_CERT) {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ESS_SIGNING_CERT_new() -> *mut ESS_SIGNING_CERT {
-    crate::stub::unimplemented("ESS_SIGNING_CERT_new")
 }
 
 #[unsafe(no_mangle)]
@@ -4483,35 +4194,6 @@ pub extern "C" fn OSSL_CRMF_pbmp_new(
     _: core::ffi::c_int,
 ) -> *mut OSSL_CRMF_PBMPARAMETER {
     crate::stub::unimplemented("OSSL_CRMF_pbmp_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ESS_check_signing_certs(
-    _: *const ESS_SIGNING_CERT,
-    _: *const ESS_SIGNING_CERT_V2,
-    _: *const stack_st_X509,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_ESS_check_signing_certs")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ESS_signing_cert_new_init(
-    _: *const X509,
-    _: *const stack_st_X509,
-    _: core::ffi::c_int,
-) -> *mut ESS_SIGNING_CERT {
-    crate::stub::unimplemented("OSSL_ESS_signing_cert_new_init")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_ESS_signing_cert_v2_new_init(
-    _: *const EVP_MD,
-    _: *const X509,
-    _: *const stack_st_X509,
-    _: core::ffi::c_int,
-) -> *mut ESS_SIGNING_CERT_V2 {
-    crate::stub::unimplemented("OSSL_ESS_signing_cert_v2_new_init")
 }
 
 #[unsafe(no_mangle)]
@@ -7397,51 +7079,6 @@ pub extern "C" fn conf_ssl_name_find(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn d2i_ESS_CERT_ID(
-    _: *mut *mut ESS_CERT_ID,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ESS_CERT_ID {
-    crate::stub::unimplemented("d2i_ESS_CERT_ID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ESS_CERT_ID_V2(
-    _: *mut *mut ESS_CERT_ID_V2,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ESS_CERT_ID_V2 {
-    crate::stub::unimplemented("d2i_ESS_CERT_ID_V2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ESS_ISSUER_SERIAL(
-    _: *mut *mut ESS_ISSUER_SERIAL,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ESS_ISSUER_SERIAL {
-    crate::stub::unimplemented("d2i_ESS_ISSUER_SERIAL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ESS_SIGNING_CERT(
-    _: *mut *mut ESS_SIGNING_CERT,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ESS_SIGNING_CERT {
-    crate::stub::unimplemented("d2i_ESS_SIGNING_CERT")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_ESS_SIGNING_CERT_V2(
-    _: *mut *mut ESS_SIGNING_CERT_V2,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut ESS_SIGNING_CERT_V2 {
-    crate::stub::unimplemented("d2i_ESS_SIGNING_CERT_V2")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_OCSP_BASICRESP(
     _: *mut *mut OCSP_BASICRESP,
     _: *mut *const core::ffi::c_uchar,
@@ -7854,46 +7491,6 @@ pub extern "C" fn d2i_TS_TST_INFO_bio(_: *mut BIO, _: *mut *mut TS_TST_INFO) -> 
 #[unsafe(no_mangle)]
 pub extern "C" fn d2i_TS_TST_INFO_fp(_: *mut FILE, _: *mut *mut TS_TST_INFO) -> *mut TS_TST_INFO {
     crate::stub::unimplemented("d2i_TS_TST_INFO_fp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ESS_CERT_ID(
-    _: *const ESS_CERT_ID,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ESS_CERT_ID")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ESS_CERT_ID_V2(
-    _: *const ESS_CERT_ID_V2,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ESS_CERT_ID_V2")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ESS_ISSUER_SERIAL(
-    _: *const ESS_ISSUER_SERIAL,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ESS_ISSUER_SERIAL")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ESS_SIGNING_CERT(
-    _: *const ESS_SIGNING_CERT,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ESS_SIGNING_CERT")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_ESS_SIGNING_CERT_V2(
-    _: *const ESS_SIGNING_CERT_V2,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_ESS_SIGNING_CERT_V2")
 }
 
 #[unsafe(no_mangle)]

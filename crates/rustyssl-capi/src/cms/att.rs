@@ -305,18 +305,12 @@ ffi_export! {
     }
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 const F_SIGNED: c_int = 0x01;
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 const F_UNSIGNED: c_int = 0x02;
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 const F_REQUIRED_COND: c_int = 0x10;
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 const F_ONLY_ONE: c_int = 0x20;
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 const F_ONE_ATTR_VALUE: c_int = 0x40;
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `cms_attribute_properties`.
 const PROPERTIES: [(c_int, c_int); 7] = [
     (
@@ -346,7 +340,6 @@ const PROPERTIES: [(c_int, c_int); 7] = [
     ),
 ];
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `cms_check_attribute`.
 fn check_attribute(
     nid: c_int,
@@ -372,7 +365,6 @@ fn check_attribute(
         || count == 0)
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `ossl_cms_si_check_attributes`: whether the signer's attributes follow RFC 5652.
 pub(crate) fn si_check_attributes(si: *const CMS_SignerInfo) -> bool {
     let signed = attrs(si, true);

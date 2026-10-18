@@ -1,22 +1,36 @@
 //! Receipt requests (`cms_ess.c`, RFC 2634): making, encoding, adding, and reading them.
 
-use core::ffi::{c_int, c_uchar};
+use core::ffi::{c_int, c_uchar, c_uint};
 use core::ptr;
 
 use rustyssl_abi::{
-    ASN1_STRING, CMS_ReceiptRequest, CMS_SignerInfo, ERR_LIB_CMS, ERR_R_ASN1_LIB, ERR_R_CMS_LIB,
-    NID_id_smime_aa_receiptRequest, OSSL_LIB_CTX, V_ASN1_SEQUENCE, stack_st_GENERAL_NAMES,
+    ASN1_OBJECT, ASN1_OCTET_STRING, ASN1_STRING, CMS_ContentInfo, CMS_R_CONTENT_TYPE_MISMATCH,
+    CMS_R_CONTENTIDENTIFIER_MISMATCH, CMS_R_MSGSIGDIGEST_ERROR,
+    CMS_R_MSGSIGDIGEST_VERIFICATION_FAILURE, CMS_R_MSGSIGDIGEST_WRONG_LENGTH,
+    CMS_R_NEED_ONE_SIGNER, CMS_R_NO_CONTENT, CMS_R_NO_CONTENT_TYPE, CMS_R_NO_MATCHING_SIGNATURE,
+    CMS_R_NO_MSGSIGDIGEST, CMS_R_NO_RECEIPT_REQUEST, CMS_R_NOT_A_SIGNED_RECEIPT,
+    CMS_R_RECEIPT_DECODE_ERROR, CMS_ReceiptRequest, CMS_SignerInfo, ERR_LIB_CMS, ERR_R_ASN1_LIB,
+    ERR_R_CMS_LIB, EVP_MAX_MD_SIZE, NID_id_smime_aa_msgSigDigest, NID_id_smime_aa_receiptRequest,
+    NID_id_smime_aa_signingCertificate, NID_id_smime_aa_signingCertificateV2,
+    NID_id_smime_ct_receipt, NID_pkcs9_contentType, OSSL_LIB_CTX, V_ASN1_OBJECT,
+    V_ASN1_OCTET_STRING, V_ASN1_SEQUENCE, stack_st_GENERAL_NAMES, stack_st_X509,
 };
 
 use super::att::{CMS_signed_add1_attr_by_NID, CMS_signed_get0_data_by_OBJ};
 use super::base::{nid_obj, raise};
-use super::{CMS_ReceiptRequest_it, ReceiptRequest};
+use super::{CMS_ReceiptRequest_it, Receipt, ReceiptRequest, SignerInfo, Stack, sk_get};
+use crate::asn1::string::ASN1_STRING_cmp;
 use crate::asn1::string::{ASN1_STRING_set, ASN1_STRING_set0};
+use crate::asn1::tpl::free::ASN1_item_free;
 use crate::asn1::tpl::items::{d2i, i2d, new_free};
 use crate::asn1::tpl::util::ASN1_item_unpack;
+use crate::asn1::tpl::util::{ASN1_item_digest, ASN1_item_pack};
+use crate::evp::legacy_md::EVP_get_digestbyname;
 use crate::ffi::ffi_export;
 use crate::mem;
+use crate::objects::{OBJ_cmp, OBJ_nid2sn, OBJ_obj2nid};
 use crate::rand_lib::RAND_bytes_ex;
+use crate::stack::OPENSSL_sk_num;
 use crate::stack::OPENSSL_sk_pop_free;
 use crate::x509v3::genn::GENERAL_NAMES_free;
 
@@ -218,4 +232,313 @@ ffi_export! {
             *p = r.receipts_to.cast();
         }
     }
+}
+
+/// `ossl_cms_signerinfo_get_signing_cert(_v2)`: the signer's ESS signing-certificate
+/// attribute, decoded: 1, 0 for none, or -1.
+///
+/// # Safety
+/// `si` is a live signer info.
+unsafe fn signing_cert(
+    si: *const CMS_SignerInfo,
+    v2: bool,
+    out: &mut *mut core::ffi::c_void,
+) -> c_int {
+    *out = ptr::null_mut();
+    let nid = if v2 {
+        NID_id_smime_aa_signingCertificateV2
+    } else {
+        NID_id_smime_aa_signingCertificate
+    };
+    // SAFETY: the caller's guarantee; a static object.
+    let s = unsafe { CMS_signed_get0_data_by_OBJ(si, nid_obj(nid), -3, V_ASN1_SEQUENCE) }
+        .cast::<ASN1_STRING>();
+    if s.is_null() {
+        return 0;
+    }
+    let it = if v2 {
+        // SAFETY: no preconditions.
+        unsafe { crate::ess::ESS_SIGNING_CERT_V2_it() }
+    } else {
+        // SAFETY: no preconditions.
+        unsafe { crate::ess::ESS_SIGNING_CERT_it() }
+    };
+    // SAFETY: the attribute's encoding; the item.
+    let v = unsafe { ASN1_item_unpack(s, it) };
+    if v.is_null() {
+        return -1;
+    }
+    *out = v.cast();
+    1
+}
+
+/// `ossl_cms_check_signing_certs`: the signer's ESS signing-certificate attributes checked
+/// against its verified chain (one is required).
+///
+/// # Safety
+/// `si` is a live signer info; `chain` NULL or a live list.
+pub(crate) unsafe fn check_signing_certs(
+    si: *const CMS_SignerInfo,
+    chain: *const stack_st_X509,
+) -> bool {
+    use crate::ess::{
+        ESS_SIGNING_CERT_V2_free, ESS_SIGNING_CERT_free, OSSL_ESS_check_signing_certs,
+    };
+    let mut ss = ptr::null_mut();
+    let mut ssv2 = ptr::null_mut();
+    // SAFETY: the caller's guarantee.
+    let ret = unsafe { signing_cert(si, false, &mut ss) } >= 0
+        // SAFETY: as above.
+        && unsafe { signing_cert(si, true, &mut ssv2) } >= 0
+        // SAFETY: the attributes decoded, or NULL; the caller's chain.
+        && unsafe { OSSL_ESS_check_signing_certs(ss.cast(), ssv2.cast(), chain, 1) } > 0;
+    // SAFETY: the values decoded here, or NULL.
+    unsafe { ESS_SIGNING_CERT_free(ss.cast()) };
+    // SAFETY: as above.
+    unsafe { ESS_SIGNING_CERT_V2_free(ssv2.cast()) };
+    ret
+}
+
+/// `cms_msgSigDigest`: the digest of the signer's signed attributes (as received) with its
+/// digest algorithm.
+///
+/// # Safety
+/// `si` is a live signer info.
+unsafe fn msg_sig_digest(
+    si: &SignerInfo,
+    dig: &mut [u8; EVP_MAX_MD_SIZE as usize],
+    diglen: &mut c_uint,
+) -> bool {
+    // SAFETY: the signer's algorithm, live with it.
+    let obj =
+        unsafe { si.digest_algorithm.as_ref() }.map_or(ptr::null(), |a| a.algorithm.cast_const());
+    // SAFETY: the object, or NULL.
+    let nid = unsafe { OBJ_obj2nid(obj) };
+    // SAFETY: any NID.
+    let sn = unsafe { OBJ_nid2sn(nid) };
+    // SAFETY: NULL or a static name.
+    let md = unsafe { EVP_get_digestbyname(sn) };
+    if md.is_null() {
+        return false;
+    }
+    // SAFETY: no preconditions.
+    let it = unsafe { super::attributes_verify_it() };
+    // SAFETY: the item; a live digest; the signer's attributes; room for any digest.
+    unsafe { ASN1_item_digest(it, md, si.signed_attrs.cast(), dig.as_mut_ptr(), diglen) != 0 }
+}
+
+/// `ossl_cms_msgSigDigest_add1`: the digest of `src`'s signed attributes as `dest`'s
+/// msgSigDigest attribute.
+///
+/// # Safety
+/// `dest` and `src` are live signer infos.
+pub(crate) unsafe fn msg_sig_digest_add1(dest: *mut CMS_SignerInfo, src: &SignerInfo) -> bool {
+    let mut dig = [0u8; EVP_MAX_MD_SIZE as usize];
+    let mut diglen: c_uint = 0;
+    // SAFETY: the caller's guarantee.
+    if !unsafe { msg_sig_digest(src, &mut dig, &mut diglen) } {
+        raise(CMS_R_MSGSIGDIGEST_ERROR, "ossl_cms_msgSigDigest_add1");
+        return false;
+    }
+    let n = c_int::try_from(diglen).unwrap_or(0);
+    // SAFETY: as above; the digest's octets.
+    if unsafe {
+        CMS_signed_add1_attr_by_NID(
+            dest,
+            NID_id_smime_aa_msgSigDigest,
+            V_ASN1_OCTET_STRING,
+            dig.as_ptr().cast(),
+            n,
+        )
+    } == 0
+    {
+        raise(ERR_R_CMS_LIB, "ossl_cms_msgSigDigest_add1");
+        return false;
+    }
+    true
+}
+
+/// `ossl_cms_Receipt_verify`: a signed receipt checked against the request it answers.
+///
+/// # Safety
+/// `cms` and `req_cms` are live objects.
+pub(crate) unsafe fn receipt_verify(
+    cms: *mut CMS_ContentInfo,
+    req_cms: *mut CMS_ContentInfo,
+) -> c_int {
+    const F: &str = "ossl_cms_Receipt_verify";
+    // SAFETY: no preconditions.
+    let rct_it = unsafe { super::receipt_it() };
+    let mut rr: *mut CMS_ReceiptRequest = ptr::null_mut();
+    let mut rct: *mut Receipt = ptr::null_mut();
+    let r = 'err: {
+        // SAFETY: the caller's objects.
+        let osis = unsafe { super::base::CMS_get0_SignerInfos(req_cms) }.cast::<Stack>();
+        // SAFETY: as above.
+        let sis = unsafe { super::base::CMS_get0_SignerInfos(cms) }.cast::<Stack>();
+        if osis.is_null() || sis.is_null() {
+            break 'err 0;
+        }
+        // SAFETY: a live list.
+        if unsafe { OPENSSL_sk_num(sis.cast()) } != 1 {
+            raise(CMS_R_NEED_ONE_SIGNER, F);
+            break 'err 0;
+        }
+        // SAFETY: a live object.
+        let etype = unsafe { super::base::CMS_get0_eContentType(cms) };
+        // SAFETY: its type, or NULL.
+        if unsafe { OBJ_obj2nid(etype) } != NID_id_smime_ct_receipt {
+            raise(CMS_R_NOT_A_SIGNED_RECEIPT, F);
+            break 'err 0;
+        }
+        // SAFETY: as above.
+        let pcont = unsafe { super::base::CMS_get0_content(cms) };
+        // SAFETY: NULL or the content's slot.
+        let Some(&cont) = (unsafe { pcont.as_ref() }).filter(|c| !c.is_null()) else {
+            raise(CMS_R_NO_CONTENT, F);
+            break 'err 0;
+        };
+        // SAFETY: the content; the receipt's item.
+        rct = unsafe { ASN1_item_unpack(cont.cast(), rct_it) }.cast();
+        // SAFETY: the receipt decoded, or NULL.
+        let Some(receipt) = (unsafe { rct.as_ref() }) else {
+            raise(CMS_R_RECEIPT_DECODE_ERROR, F);
+            break 'err 0;
+        };
+        // SAFETY: the request's signer infos.
+        let n = unsafe { OPENSSL_sk_num(osis.cast()) };
+        let osi = (0..n).find_map(|i| {
+            // SAFETY: an index within them.
+            let o = unsafe { sk_get::<SignerInfo>(osis, i) }?;
+            // SAFETY: live strings.
+            (unsafe {
+                ASN1_STRING_cmp(
+                    o.signature.cast(),
+                    receipt.originator_signature_value.cast(),
+                )
+            } == 0)
+                .then_some(o)
+        });
+        let Some(osi) = osi else {
+            raise(CMS_R_NO_MATCHING_SIGNATURE, F);
+            break 'err 0;
+        };
+        // SAFETY: the receipt's only signer.
+        let si = unsafe { crate::stack::OPENSSL_sk_value(sis.cast(), 0) }.cast::<CMS_SignerInfo>();
+        let msd_obj = nid_obj(NID_id_smime_aa_msgSigDigest);
+        // SAFETY: the signer info; a static object.
+        let msig = unsafe { CMS_signed_get0_data_by_OBJ(si, msd_obj, -3, V_ASN1_OCTET_STRING) }
+            .cast::<ASN1_OCTET_STRING>();
+        if msig.is_null() {
+            raise(CMS_R_NO_MSGSIGDIGEST, F);
+            break 'err 0;
+        }
+        let mut dig = [0u8; EVP_MAX_MD_SIZE as usize];
+        let mut diglen: c_uint = 0;
+        // SAFETY: the request's signer.
+        if !unsafe { msg_sig_digest(osi, &mut dig, &mut diglen) } {
+            raise(CMS_R_MSGSIGDIGEST_ERROR, F);
+            break 'err 0;
+        }
+        // SAFETY: the attribute's string.
+        let got = unsafe { super::base::octets(msig) };
+        let computed = dig
+            .get(..usize::try_from(diglen).unwrap_or(0))
+            .unwrap_or_default();
+        if got.len() != computed.len() {
+            raise(CMS_R_MSGSIGDIGEST_WRONG_LENGTH, F);
+            break 'err 0;
+        }
+        // SAFETY: two buffers of `computed.len()` octets.
+        if unsafe {
+            crate::mem::CRYPTO_memcmp(
+                got.as_ptr().cast(),
+                computed.as_ptr().cast(),
+                computed.len(),
+            )
+        } != 0
+        {
+            raise(CMS_R_MSGSIGDIGEST_VERIFICATION_FAILURE, F);
+            break 'err 0;
+        }
+        let osi_c: *mut CMS_SignerInfo = core::ptr::from_ref(osi).cast_mut().cast();
+        let ct_obj = nid_obj(NID_pkcs9_contentType);
+        // SAFETY: the request's signer; a static object.
+        let octype = unsafe { CMS_signed_get0_data_by_OBJ(osi_c, ct_obj, -3, V_ASN1_OBJECT) }
+            .cast::<ASN1_OBJECT>();
+        if octype.is_null() {
+            raise(CMS_R_NO_CONTENT_TYPE, F);
+            break 'err 0;
+        }
+        // SAFETY: live objects.
+        if unsafe { OBJ_cmp(octype, receipt.content_type) } != 0 {
+            raise(CMS_R_CONTENT_TYPE_MISMATCH, F);
+            break 'err 0;
+        }
+        // SAFETY: the request's signer; room for the request.
+        if unsafe { CMS_get1_ReceiptRequest(osi_c, &mut rr) } <= 0 {
+            raise(CMS_R_NO_RECEIPT_REQUEST, F);
+            break 'err 0;
+        }
+        // SAFETY: the request decoded.
+        let req = unsafe { &*rr.cast::<ReceiptRequest>() };
+        // SAFETY: live strings.
+        if unsafe {
+            ASN1_STRING_cmp(
+                req.signed_content_identifier.cast(),
+                receipt.signed_content_identifier.cast(),
+            )
+        } != 0
+        {
+            raise(CMS_R_CONTENTIDENTIFIER_MISMATCH, F);
+            break 'err 0;
+        }
+        1
+    };
+    // SAFETY: the values decoded here, or NULL.
+    unsafe { CMS_ReceiptRequest_free(rr) };
+    // SAFETY: as above.
+    unsafe { ASN1_item_free(rct.cast(), rct_it) };
+    r
+}
+
+/// `ossl_cms_encode_Receipt`: the receipt answering the signer's request, encoded, or NULL.
+///
+/// # Safety
+/// `si` is a live signer info.
+pub(crate) unsafe fn encode_receipt(si: *mut CMS_SignerInfo) -> *mut ASN1_OCTET_STRING {
+    const F: &str = "ossl_cms_encode_Receipt";
+    let mut rr: *mut CMS_ReceiptRequest = ptr::null_mut();
+    let os = 'err: {
+        // SAFETY: the caller's guarantee; room for the request.
+        if unsafe { CMS_get1_ReceiptRequest(si, &mut rr) } <= 0 {
+            raise(CMS_R_NO_RECEIPT_REQUEST, F);
+            break 'err ptr::null_mut();
+        }
+        let ct_obj = nid_obj(NID_pkcs9_contentType);
+        // SAFETY: as above; a static object.
+        let ctype = unsafe { CMS_signed_get0_data_by_OBJ(si, ct_obj, -3, V_ASN1_OBJECT) }
+            .cast::<ASN1_OBJECT>();
+        if ctype.is_null() {
+            raise(CMS_R_NO_CONTENT_TYPE, F);
+            break 'err ptr::null_mut();
+        }
+        // SAFETY: the request decoded.
+        let req = unsafe { &*rr.cast::<ReceiptRequest>() };
+        // SAFETY: the caller's signer info.
+        let s = unsafe { &*si.cast::<SignerInfo>() };
+        let rct = Receipt {
+            version: 1,
+            content_type: ctype,
+            signed_content_identifier: req.signed_content_identifier,
+            originator_signature_value: s.signature,
+        };
+        // SAFETY: no preconditions.
+        let it = unsafe { super::receipt_it() };
+        // SAFETY: a local value of the item.
+        unsafe { ASN1_item_pack((&raw const rct).cast_mut().cast(), it, ptr::null_mut()) }.cast()
+    };
+    // SAFETY: the request decoded here, or NULL.
+    unsafe { CMS_ReceiptRequest_free(rr) };
+    os
 }

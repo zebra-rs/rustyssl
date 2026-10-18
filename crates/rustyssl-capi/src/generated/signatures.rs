@@ -2495,6 +2495,50 @@ const _: unsafe extern "C" fn(
     *mut ASN1_OCTET_STRING,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::cms::base::CMS_SharedInfo_encode;
+const _: unsafe extern "C" fn(*mut CMS_SignedData) = crate::cms::sd::CMS_SignedData_free;
+const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> core::ffi::c_int =
+    crate::cms::sd::CMS_SignedData_init;
+const _: unsafe extern "C" fn() -> *mut CMS_SignedData = crate::cms::sd::CMS_SignedData_new;
+const _: unsafe extern "C" fn(
+    *mut CMS_SignedData,
+    *mut BIO,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    *mut stack_st_X509,
+    *mut stack_st_X509_CRL,
+    core::ffi::c_uint,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut BIO = crate::cms::sd::CMS_SignedData_verify;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut X509) -> core::ffi::c_int =
+    crate::cms::sd::CMS_SignerInfo_cert_cmp;
+const _: unsafe extern "C" fn(
+    *mut CMS_SignerInfo,
+    *mut *mut EVP_PKEY,
+    *mut *mut X509,
+    *mut *mut X509_ALGOR,
+    *mut *mut X509_ALGOR,
+) = crate::cms::sd::CMS_SignerInfo_get0_algs;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo) -> *mut EVP_MD_CTX =
+    crate::cms::sd::CMS_SignerInfo_get0_md_ctx;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo) -> *mut EVP_PKEY_CTX =
+    crate::cms::sd::CMS_SignerInfo_get0_pkey_ctx;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo) -> *mut ASN1_OCTET_STRING =
+    crate::cms::sd::CMS_SignerInfo_get0_signature;
+const _: unsafe extern "C" fn(
+    *mut CMS_SignerInfo,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut X509_NAME,
+    *mut *mut ASN1_INTEGER,
+) -> core::ffi::c_int = crate::cms::sd::CMS_SignerInfo_get0_signer_id;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut X509) =
+    crate::cms::sd::CMS_SignerInfo_set1_signer_cert;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo) -> core::ffi::c_int =
+    crate::cms::sd::CMS_SignerInfo_sign;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo) -> core::ffi::c_int =
+    crate::cms::sd::CMS_SignerInfo_verify;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut BIO) -> core::ffi::c_int =
+    crate::cms::sd::CMS_SignerInfo_verify_content;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> *mut CMS_CertificateChoices =
     crate::cms::base::CMS_add0_CertificateChoices;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> *mut CMS_RevocationInfoChoice =
@@ -2509,6 +2553,22 @@ const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509) -> core::ffi::c_i
     crate::cms::base::CMS_add1_cert;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *mut X509_CRL) -> core::ffi::c_int =
     crate::cms::base::CMS_add1_crl;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut X509,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    core::ffi::c_uint,
+) -> *mut CMS_SignerInfo = crate::cms::sd::CMS_add1_signer;
+const _: unsafe extern "C" fn(
+    *mut *mut stack_st_X509_ALGOR,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::cms::sd::CMS_add_simple_smimecap;
+const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut stack_st_X509_ALGOR) -> core::ffi::c_int =
+    crate::cms::sd::CMS_add_smimecap;
+const _: unsafe extern "C" fn(*mut *mut stack_st_X509_ALGOR) -> core::ffi::c_int =
+    crate::cms::sd::CMS_add_standard_smimecap;
 const _: unsafe extern "C" fn(
     *mut BIO,
     core::ffi::c_int,
@@ -2567,6 +2627,8 @@ const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> *mut *mut ASN1_OCTET_STRI
     crate::cms::base::CMS_get0_content;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> *const ASN1_OBJECT =
     crate::cms::base::CMS_get0_eContentType;
+const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> *mut stack_st_X509 =
+    crate::cms::sd::CMS_get0_signers;
 const _: unsafe extern "C" fn(*const CMS_ContentInfo) -> *const ASN1_OBJECT =
     crate::cms::base::CMS_get0_type;
 const _: unsafe extern "C" fn(
@@ -2581,8 +2643,36 @@ const _: unsafe extern "C" fn(*mut CMS_ContentInfo) -> core::ffi::c_int =
     crate::cms::base::CMS_is_detached;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, *const ASN1_OBJECT) -> core::ffi::c_int =
     crate::cms::base::CMS_set1_eContentType;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut stack_st_X509,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::cms::sd::CMS_set1_signers_certs;
 const _: unsafe extern "C" fn(*mut CMS_ContentInfo, core::ffi::c_int) -> core::ffi::c_int =
     crate::cms::base::CMS_set_detached;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+    *mut BIO,
+    core::ffi::c_uint,
+) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_sign;
+const _: unsafe extern "C" fn(
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+    *mut BIO,
+    core::ffi::c_uint,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_sign_ex;
+const _: unsafe extern "C" fn(
+    *mut CMS_SignerInfo,
+    *mut X509,
+    *mut EVP_PKEY,
+    *mut stack_st_X509,
+    core::ffi::c_uint,
+) -> *mut CMS_ContentInfo = crate::cms::smime::CMS_sign_receipt;
 const _: unsafe extern "C" fn(*mut CMS_SignerInfo, *mut X509_ATTRIBUTE) -> core::ffi::c_int =
     crate::cms::att::CMS_signed_add1_attr;
 const _: unsafe extern "C" fn(
@@ -2683,6 +2773,21 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::cms::att::CMS_unsigned_get_attr_by_OBJ;
 const _: unsafe extern "C" fn(*const CMS_SignerInfo) -> core::ffi::c_int =
     crate::cms::att::CMS_unsigned_get_attr_count;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    *mut BIO,
+    *mut BIO,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::cms::smime::CMS_verify;
+const _: unsafe extern "C" fn(
+    *mut CMS_ContentInfo,
+    *mut CMS_ContentInfo,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::cms::smime::CMS_verify_receipt;
 const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut BIO) -> core::ffi::c_int =
     crate::conf::CONF_dump_bio;
 const _: unsafe extern "C" fn(*mut lhash_st_CONF_VALUE, *mut FILE) -> core::ffi::c_int =
@@ -5004,6 +5109,27 @@ const _: for<'a> unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::VaList<'a>,
 ) = crate::err::ERR_vset_error;
+const _: unsafe extern "C" fn(*const ESS_CERT_ID_V2) -> *mut ESS_CERT_ID_V2 =
+    crate::ess::ESS_CERT_ID_V2_dup;
+const _: unsafe extern "C" fn(*mut ESS_CERT_ID_V2) = crate::ess::ESS_CERT_ID_V2_free;
+const _: unsafe extern "C" fn() -> *mut ESS_CERT_ID_V2 = crate::ess::ESS_CERT_ID_V2_new;
+const _: unsafe extern "C" fn(*const ESS_CERT_ID) -> *mut ESS_CERT_ID = crate::ess::ESS_CERT_ID_dup;
+const _: unsafe extern "C" fn(*mut ESS_CERT_ID) = crate::ess::ESS_CERT_ID_free;
+const _: unsafe extern "C" fn() -> *mut ESS_CERT_ID = crate::ess::ESS_CERT_ID_new;
+const _: unsafe extern "C" fn(*const ESS_ISSUER_SERIAL) -> *mut ESS_ISSUER_SERIAL =
+    crate::ess::ESS_ISSUER_SERIAL_dup;
+const _: unsafe extern "C" fn(*mut ESS_ISSUER_SERIAL) = crate::ess::ESS_ISSUER_SERIAL_free;
+const _: unsafe extern "C" fn() -> *mut ESS_ISSUER_SERIAL = crate::ess::ESS_ISSUER_SERIAL_new;
+const _: unsafe extern "C" fn(*const ESS_SIGNING_CERT_V2) -> *mut ESS_SIGNING_CERT_V2 =
+    crate::ess::ESS_SIGNING_CERT_V2_dup;
+const _: unsafe extern "C" fn(*mut ESS_SIGNING_CERT_V2) = crate::ess::ESS_SIGNING_CERT_V2_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ess::ESS_SIGNING_CERT_V2_it;
+const _: unsafe extern "C" fn() -> *mut ESS_SIGNING_CERT_V2 = crate::ess::ESS_SIGNING_CERT_V2_new;
+const _: unsafe extern "C" fn(*const ESS_SIGNING_CERT) -> *mut ESS_SIGNING_CERT =
+    crate::ess::ESS_SIGNING_CERT_dup;
+const _: unsafe extern "C" fn(*mut ESS_SIGNING_CERT) = crate::ess::ESS_SIGNING_CERT_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ess::ESS_SIGNING_CERT_it;
+const _: unsafe extern "C" fn() -> *mut ESS_SIGNING_CERT = crate::ess::ESS_SIGNING_CERT_new;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     ::core::option::Option<
@@ -9036,6 +9162,23 @@ const _: unsafe extern "C" fn() -> *mut ERR_STATE = crate::err::OSSL_ERR_STATE_n
 const _: unsafe extern "C" fn(*const ERR_STATE) = crate::err::OSSL_ERR_STATE_restore;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save;
 const _: unsafe extern "C" fn(*mut ERR_STATE) = crate::err::OSSL_ERR_STATE_save_to_mark;
+const _: unsafe extern "C" fn(
+    *const ESS_SIGNING_CERT,
+    *const ESS_SIGNING_CERT_V2,
+    *const stack_st_X509,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ess::OSSL_ESS_check_signing_certs;
+const _: unsafe extern "C" fn(
+    *const X509,
+    *const stack_st_X509,
+    core::ffi::c_int,
+) -> *mut ESS_SIGNING_CERT = crate::ess::OSSL_ESS_signing_cert_new_init;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+    *const X509,
+    *const stack_st_X509,
+    core::ffi::c_int,
+) -> *mut ESS_SIGNING_CERT_V2 = crate::ess::OSSL_ESS_signing_cert_v2_new_init;
 const _: unsafe extern "C" fn(*mut BIO, *mut GENERAL_NAMES, core::ffi::c_int) -> core::ffi::c_int =
     crate::x509v3::crld::OSSL_GENERAL_NAMES_print;
 const _: unsafe extern "C" fn(*mut OSSL_HASH) = crate::x509v3::attrdesc::OSSL_HASH_free;
@@ -14873,6 +15016,31 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut EDIPARTYNAME = crate::x509v3::genn::d2i_EDIPARTYNAME;
 const _: unsafe extern "C" fn(
+    *mut *mut ESS_CERT_ID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ESS_CERT_ID = crate::ess::d2i_ESS_CERT_ID;
+const _: unsafe extern "C" fn(
+    *mut *mut ESS_CERT_ID_V2,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ESS_CERT_ID_V2 = crate::ess::d2i_ESS_CERT_ID_V2;
+const _: unsafe extern "C" fn(
+    *mut *mut ESS_ISSUER_SERIAL,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ESS_ISSUER_SERIAL = crate::ess::d2i_ESS_ISSUER_SERIAL;
+const _: unsafe extern "C" fn(
+    *mut *mut ESS_SIGNING_CERT,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ESS_SIGNING_CERT = crate::ess::d2i_ESS_SIGNING_CERT;
+const _: unsafe extern "C" fn(
+    *mut *mut ESS_SIGNING_CERT_V2,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut ESS_SIGNING_CERT_V2 = crate::ess::d2i_ESS_SIGNING_CERT_V2;
+const _: unsafe extern "C" fn(
     *mut *mut EXTENDED_KEY_USAGE,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -15739,6 +15907,26 @@ const _: unsafe extern "C" fn(
     *const EDIPARTYNAME,
     *mut *mut core::ffi::c_uchar,
 ) -> core::ffi::c_int = crate::x509v3::genn::i2d_EDIPARTYNAME;
+const _: unsafe extern "C" fn(
+    *const ESS_CERT_ID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ess::i2d_ESS_CERT_ID;
+const _: unsafe extern "C" fn(
+    *const ESS_CERT_ID_V2,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ess::i2d_ESS_CERT_ID_V2;
+const _: unsafe extern "C" fn(
+    *const ESS_ISSUER_SERIAL,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ess::i2d_ESS_ISSUER_SERIAL;
+const _: unsafe extern "C" fn(
+    *const ESS_SIGNING_CERT,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ess::i2d_ESS_SIGNING_CERT;
+const _: unsafe extern "C" fn(
+    *const ESS_SIGNING_CERT_V2,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ess::i2d_ESS_SIGNING_CERT_V2;
 const _: unsafe extern "C" fn(
     *const EXTENDED_KEY_USAGE,
     *mut *mut core::ffi::c_uchar,

@@ -4989,8 +4989,15 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     `CMS_SharedInfo_encode`. GCM's AlgorithmIdentifier parameters (`evp_cipher_*_asn1_aead_params`)
     come with them. SignedData's and the enveloped types' data paths abort until 6.4b and 6.4c.
     Tests: `tests/c/cms_data.c`, the `cms_d2i` fuzz target.
-  - [ ] **6.4b SignedData** (`cms_sd.c`, signing and verifying in `cms_smime.c`, receipts in
-    `cms_ess.c`, `cms_rsa.c`'s signature parts).
+  - [x] **6.4b SignedData** (`cms/sd.rs` and the signing and verifying in `cms/smime.rs` and
+    `cms/ess.rs`, from `cms_sd.c`, `cms_smime.c`, `cms_ess.c`, and `cms_rsa.c`'s signature
+    half; with ESS, `ess.rs` from `ess_asn1.c` and `ess_lib.c`, brought forward from 6.7):
+    signers by issuer and serial or key identifier, with RSA (PKCS#1 and PSS), RSA-PSS, EC,
+    DSA, Ed25519, and other keys' signature algorithms; signed attributes with S/MIME
+    capabilities, signing time, and CAdES's signing certificate; signing over a precomputed
+    digest or by key parameter; `CMS_verify` with every flag (the message digest compared in
+    constant time), receipts (`CMS_sign_receipt`, `CMS_verify_receipt`), and
+    `CMS_SignedData_verify`. Tests: `tests/c/cms_sign.c`, the `ess_d2i` fuzz target.
   - [ ] **6.4c The enveloped types** (`cms_env.c`, `cms_kari.c`, `cms_pwri.c` with the CVE-2025-9230
     bounds check, `cms_dh.c`, `cms_ec.c`, `cms_rsa.c`'s key transport, AuthEnvelopedData, and
     encrypting and decrypting in `cms_smime.c`).
@@ -5003,7 +5010,7 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   `OCSP_check_validity`, `OCSP_resp_find_status`, the responder APIs, nonces, printing, and
   `OCSP_sendreq_*`.
 - [ ] **6.7 TS (RFC 3161) and ESS:** request, response, verify, `TS_RESP_CTX`, and
-  signing-certificate v1/v2.
+  signing-certificate v1/v2 (ESS itself came with 6.4b).
 - [ ] **6.8 HTTP client** (`OSSL_HTTP_*`): get and transfer, proxies and `no_proxy` (the
   CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits.
 - [ ] **6.9 OSSL_STORE:** the `file:` loader (PEM bundles, DER, PKCS#12, directories),
