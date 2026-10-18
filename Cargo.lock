@@ -462,9 +462,11 @@ dependencies = [
 name = "rustyssl-tls"
 version = "0.1.0"
 dependencies = [
+ "rustyssl-abi",
  "rustyssl-asn1",
  "rustyssl-crypto",
  "rustyssl-pki",
+ "zeroize",
 ]
 
 [[package]]
