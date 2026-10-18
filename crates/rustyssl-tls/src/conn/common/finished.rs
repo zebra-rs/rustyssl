@@ -43,6 +43,25 @@ fn final_finish_mac_inner(c: &Connection, p: &dyn Provider, server_label: bool) 
     keysched::verify_data_12(p, prf, &c.neg.master_secret, !server_label, &transcript)
 }
 
+/// `tls1_final_finish_mac`'s `ssl3_digest_cached_records(s, 0)`: below TLS 1.3 the messages
+/// still buffered (a resumed handshake under `SSL_VERIFY_PEER` never learns there is no
+/// CertificateVerify) are hashed now, and the buffer is let go.
+///
+/// # Errors
+/// The provider failed.
+fn digest_for_finished(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    if c.is_tls13() {
+        return Ok(());
+    }
+    let r = if c.hs.transcript.alg().is_some() {
+        c.hs.transcript.drop_buffer();
+        Ok(())
+    } else {
+        keys::handshake_md(c).and_then(|alg| c.hs.transcript.start_hash(p, alg, false))
+    };
+    r.in_func("tls1_final_finish_mac")
+}
+
 /// `SSL_IS_FIRST_HANDSHAKE`: a Finished hasn't gone both ways yet.
 #[must_use]
 pub fn is_first_handshake(c: &Connection) -> bool {
@@ -55,6 +74,7 @@ pub fn is_first_handshake(c: &Connection) -> bool {
 /// # Errors
 /// As [`final_finish_mac`].
 pub fn take_mac(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    digest_for_finished(c, p)?;
     let md = final_finish_mac(c, p, !c.cfg.server)?;
     c.hs.peer_finish_md = md;
     Ok(())
@@ -84,6 +104,7 @@ pub fn construct_finished(c: &mut Connection, p: &dyn Provider) -> Result<Vec<u8
             None,
         )?;
     }
+    digest_for_finished(c, p)?;
     let md = final_finish_mac(c, p, c.cfg.server)?;
     c.hs.finish_md = md.clone();
     if !c.is_tls13() {

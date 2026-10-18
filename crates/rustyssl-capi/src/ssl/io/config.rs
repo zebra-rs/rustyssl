@@ -189,6 +189,33 @@ pub(crate) unsafe fn der_of(x: *mut X509) -> Option<Vec<u8>> {
     Some(v)
 }
 
+/// The SubjectPublicKeyInfo a raw public key Certificate carries (`tls_output_rpk`): the
+/// certificate's, else the private key's.
+///
+/// # Safety
+/// `x` is NULL or a live certificate; `pkey` a live key.
+unsafe fn spki_of(x: *mut X509, pkey: *mut EVP_PKEY) -> Option<Vec<u8>> {
+    let mut p: *mut u8 = ptr::null_mut();
+    let n = if x.is_null() {
+        // SAFETY: the caller's key; a slot for the encoding.
+        unsafe { crate::x509::pubkey::i2d_PUBKEY(pkey, &raw mut p) }
+    } else {
+        // SAFETY: the caller's certificate.
+        let xpk = unsafe { crate::x509::cert::X509_get_X509_PUBKEY(x) };
+        if xpk.is_null() {
+            return None;
+        }
+        // SAFETY: the certificate's key; a slot for the encoding.
+        unsafe { crate::x509::pubkey::i2d_X509_PUBKEY(xpk, &raw mut p) }
+    };
+    let len = usize::try_from(n).ok().filter(|_| !p.is_null())?;
+    // SAFETY: the `len` octets i2d wrote.
+    let v = unsafe { core::slice::from_raw_parts(p, len) }.to_vec();
+    // SAFETY: the encoding, ours.
+    unsafe { crate::mem::release(p.cast()) };
+    Some(v)
+}
+
 /// Where a leaf's chain comes from (`ssl_add_cert_chain`'s inputs).
 struct ChainSource {
     extra: *mut stack_st_X509,
@@ -211,6 +238,9 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
         X509_STORE_CTX_free, X509_STORE_CTX_get0_chain, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
     };
     let mut out = Vec::new();
+    if r.x509.is_null() {
+        return out;
+    }
     // SAFETY: our reference.
     let Some(leaf) = (unsafe { der_of(r.x509) }) else {
         return out;
@@ -361,31 +391,41 @@ unsafe fn cert_key(
     let key = unsafe { prov.add_key(r.pkey) }?;
     // SAFETY: the caller's guarantee.
     let chain = unsafe { send_chain(r, src) };
-    if chain.is_empty() {
+    if chain.is_empty() && !r.x509.is_null() {
         return None;
     }
+    // A key-only slot serves only as a raw public key (`ssl_has_cert`).
+    // SAFETY: as above.
+    let raw_public_key = unsafe { spki_of(r.x509, r.pkey) };
     // SAFETY: our certificate; the key stays its own.
     let pub_key = unsafe { X509_get0_pubkey(r.x509) };
     // SAFETY: the certificate's key, or the slot's.
     let nid = unsafe { curve_nid(if pub_key.is_null() { r.pkey } else { pub_key }) };
-    // SAFETY: our certificate.
-    let ext = unsafe { crate::x509::purpose::X509_get_extension_flags(r.x509) };
+    // A key alone has no key usage.
+    let ext = if r.x509.is_null() {
+        0
+    } else {
+        // SAFETY: as above.
+        unsafe { crate::x509::purpose::X509_get_extension_flags(r.x509) }
+    };
     let can_sign = ext & u32::try_from(EXFLAG_KUSAGE).unwrap_or(0) == 0 || {
         // SAFETY: as above.
         let ku = unsafe { crate::x509::purpose::X509_get_key_usage(r.x509) };
         ku & u32::try_from(KU_DIGITAL_SIGNATURE).unwrap_or(0) != 0
     };
     let (mut mdnid, mut pknid) = (NID_undef, NID_undef);
-    // SAFETY: as above; the slots.
-    unsafe {
-        crate::x509::purpose::X509_get_signature_info(
-            r.x509,
-            &raw mut mdnid,
-            &raw mut pknid,
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    if !r.x509.is_null() {
+        // SAFETY: as above; the slots.
+        unsafe {
+            crate::x509::purpose::X509_get_signature_info(
+                r.x509,
+                &raw mut mdnid,
+                &raw mut pknid,
+                ptr::null_mut(),
+                ptr::null_mut(),
+            )
+        };
+    }
     Some(CertKey {
         chain,
         key,
@@ -395,8 +435,8 @@ unsafe fn cert_key(
         ec_group: group_of_nid(prov, nid),
         curve_nid: nid,
         can_sign,
-        cert_sig: Some((mdnid, pknid)),
-        raw_public_key: None,
+        cert_sig: (!r.x509.is_null()).then_some((mdnid, pknid)),
+        raw_public_key,
         ocsp_response: ocsp,
     })
 }
@@ -432,11 +472,12 @@ fn slot_refs(x: &Ssl) -> (Vec<SlotRefs>, u32, *mut X509_STORE, Option<Vec<u8>>, 
     let st = x.state();
     let mut slots = Vec::new();
     for (slot, cpk) in st.cert.pkeys.iter().enumerate() {
-        if cpk.x509.is_null() || cpk.privatekey.is_null() {
+        // A slot with a key alone may still serve a raw public key.
+        if cpk.privatekey.is_null() {
             continue;
         }
-        // SAFETY: the slot's certificate.
-        if unsafe { X509_up_ref(cpk.x509) } == 0 {
+        // SAFETY: the slot's certificate, or NULL.
+        if !cpk.x509.is_null() && unsafe { X509_up_ref(cpk.x509) } == 0 {
             continue;
         }
         // SAFETY: the slot's key.

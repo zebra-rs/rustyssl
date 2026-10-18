@@ -38,6 +38,7 @@ use super::ctx::{self, Ctx};
 use super::session::{
     self, SESS_FLAG_EXTMS, SessData, from_time_t, max_id, sess, time_now, to_time_t, with,
 };
+use crate::evp::pkey::EVP_PKEY_up_ref;
 use crate::ffi::ffi_export;
 use crate::lhash::{
     OPENSSL_LH_delete, OPENSSL_LH_free, OPENSSL_LH_get_down_load, OPENSSL_LH_insert,
@@ -830,6 +831,44 @@ fn der_of(x: *mut rustyssl_abi::X509) -> Option<Vec<u8>> {
     Some(v)
 }
 
+/// A key's SubjectPublicKeyInfo DER, or `None` for NULL.
+///
+/// # Safety
+/// `k` is NULL or a live key.
+unsafe fn spki_der(k: *mut rustyssl_abi::EVP_PKEY) -> Option<Vec<u8>> {
+    if k.is_null() {
+        return None;
+    }
+    let mut out: *mut c_uchar = ptr::null_mut();
+    // SAFETY: the caller's key; our slot for its encoding.
+    let n = unsafe { crate::x509::pubkey::i2d_PUBKEY(k, &raw mut out) };
+    let len = usize::try_from(n)
+        .ok()
+        .filter(|&n| n > 0 && !out.is_null())?;
+    // SAFETY: the encoding's `n` octets.
+    let v = unsafe { core::slice::from_raw_parts(out, len) }.to_vec();
+    // SAFETY: the encoding, allocated by `i2d_PUBKEY`.
+    unsafe { crate::mem::release(out.cast()) };
+    Some(v)
+}
+
+/// A key decoded from its SubjectPublicKeyInfo DER in the connection's context's library
+/// context (`tls_process_rpk`), or NULL.
+fn spki_key(st: &SslState, der: &[u8]) -> *mut rustyssl_abi::EVP_PKEY {
+    let Ok(len) = c_long::try_from(der.len()) else {
+        return ptr::null_mut();
+    };
+    let mut p = der.as_ptr();
+    // SAFETY: the connection's live context, or NULL.
+    let (libctx, propq) = unsafe { ctx::ctx(st.ctx.cast_const()) }
+        .map_or((ptr::null_mut(), ptr::null()), |c| {
+            (c.libctx, c.propq_ptr())
+        });
+    // SAFETY: the key's octets (decoding runs no callbacks); the library context and
+    // properties.
+    unsafe { crate::x509::pubkey::d2i_PUBKEY_ex(ptr::null_mut(), &raw mut p, len, libctx, propq) }
+}
+
 /// A session's fields as the core's session.
 fn to_core(d: &SessData) -> Session {
     let mut chain = Vec::new();
@@ -869,6 +908,8 @@ fn to_core(d: &SessData) -> Session {
         hostname: d.hostname.as_ref().map(|h| h.as_bytes().to_vec()),
         alpn: d.alpn_selected.as_ref().map(|a| a.to_vec()),
         peer_chain: chain,
+        // SAFETY: the session's key, or NULL.
+        peer_rpk: unsafe { spki_der(d.peer_rpk) },
         verify_result: d.verify_result,
         max_fragment_len_mode: d.max_fragment_len_mode,
         ext_flags: d.ext_flags,
@@ -928,6 +969,9 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
         .as_ref()
         .map(|a| a.clone().into_boxed_slice());
     d.kex_group = group.map_or(0, u32::from);
+    if let Some(k) = &c.peer_rpk {
+        d.peer_rpk = spki_key(st, k);
+    }
     let p = &st.drv.peer;
     if p.from > 0 {
         if p.accepted {
@@ -951,11 +995,17 @@ fn from_core(st: &SslState, c: &Session, group: Option<u16>, timeout: c_long) ->
         // A resumed handshake sends no certificate: a session made from it (a TLS 1.3 ticket's)
         // keeps the resumed session's peer (`ssl_session_dup`).
         // SAFETY: the connection's session, or NULL.
-        let (peer, chain) = unsafe {
-            with(st.sess.session, (ptr::null_mut(), ptr::null_mut()), |o| {
-                (o.peer, o.peer_chain)
-            })
+        let (peer, chain, rpk) = unsafe {
+            with(
+                st.sess.session,
+                (ptr::null_mut(), ptr::null_mut(), ptr::null_mut()),
+                |o| (o.peer, o.peer_chain, o.peer_rpk),
+            )
         };
+        // SAFETY: the session's key, or NULL.
+        if d.peer_rpk.is_null() && !rpk.is_null() && unsafe { EVP_PKEY_up_ref(rpk) } != 0 {
+            d.peer_rpk = rpk;
+        }
         // SAFETY: the session's certificate, or NULL.
         if !peer.is_null() && unsafe { X509_up_ref(peer) } != 0 {
             d.peer = peer;

@@ -868,6 +868,13 @@ fn binder_prefix(c: &Connection, offer: &mx::psk::Offer) -> Result<Vec<u8>> {
         .ok_or_else(Error::internal)
 }
 
+/// [`encode_session`]'s format octet: always set.
+const FORMAT_BASE: u8 = 1;
+/// The format octet's flag for the application data.
+const FORMAT_APPDATA: u8 = 2;
+/// The format octet's flag for the peer's raw public key.
+const FORMAT_RPK: u8 = 4;
+
 /// The session's encoding inside a ticket (this crate's, versioned): every field of
 /// [`Session`] but the ticket itself.
 ///
@@ -876,9 +883,17 @@ fn binder_prefix(c: &Connection, offer: &mx::psk::Offer) -> Result<Vec<u8>> {
 pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     let mut w = Writer::new();
     let e = |_| Error::internal();
-    // Format 2 adds the application data; a ticket without it keeps format 1, so its length
-    // (which the trace shows) stays the reference's.
-    w.u8(if s.ticket_appdata.is_some() { 2 } else { 1 });
+    // The format octet's bits beyond the first say which optional fields follow (the
+    // application data, the peer's raw public key): a ticket with neither keeps format 1, so
+    // its length (which the trace shows) stays the reference's.
+    let mut format = FORMAT_BASE;
+    if s.ticket_appdata.is_some() {
+        format |= FORMAT_APPDATA;
+    }
+    if s.peer_rpk.is_some() {
+        format |= FORMAT_RPK;
+    }
+    w.u8(format);
     w.u16(s.version);
     w.u32(s.cipher_id);
     w.vec(1, &s.session_id).map_err(e)?;
@@ -910,6 +925,9 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     if let Some(b) = &s.ticket_appdata {
         w.vec(2, b).map_err(e)?;
     }
+    if let Some(k) = &s.peer_rpk {
+        w.vec(3, k).map_err(e)?;
+    }
     Ok(w.into_bytes())
 }
 
@@ -918,7 +936,7 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
 pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let mut rd = Reader::new(b);
     let format = rd.u8().ok()?;
-    if format != 1 && format != 2 {
+    if format & FORMAT_BASE == 0 || format & !(FORMAT_BASE | FORMAT_APPDATA | FORMAT_RPK) != 0 {
         return None;
     }
     let version = rd.u16().ok()?;
@@ -956,9 +974,15 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let verify_result = i64::from_ne_bytes(rd.u64().ok()?.to_ne_bytes());
     let max_fragment_len_mode = rd.u8().ok()?;
     let ext_flags = rd.u32().ok()?;
-    let ticket_appdata = match format {
-        2 => Some(rd.vec16().ok()?.rest().to_vec()),
-        _ => None,
+    let ticket_appdata = if format & FORMAT_APPDATA != 0 {
+        Some(rd.vec16().ok()?.rest().to_vec())
+    } else {
+        None
+    };
+    let peer_rpk = if format & FORMAT_RPK != 0 {
+        Some(rd.vec24().ok()?.rest().to_vec())
+    } else {
+        None
     };
     rd.end().ok()?;
     if session_id.len() > 32 || sid_ctx.len() > 32 {
@@ -980,6 +1004,7 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         hostname,
         alpn,
         peer_chain,
+        peer_rpk,
         verify_result,
         max_fragment_len_mode,
         ext_flags,

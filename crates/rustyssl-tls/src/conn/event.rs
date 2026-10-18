@@ -80,8 +80,10 @@ pub enum Request {
     ClientCert,
     /// Verify the peer's chain (DER, leaf first) with the application's store and callbacks.
     Verify {
-        /// The chain as received.
+        /// The chain as received, or the raw public key's SubjectPublicKeyInfo alone.
         chain: Vec<Vec<u8>>,
+        /// Whether `chain` is a raw public key (`ssl_verify_rpk`).
+        rpk: bool,
     },
     /// The ALPN selection callback, with the client's protocols (wire format).
     AlpnSelect {

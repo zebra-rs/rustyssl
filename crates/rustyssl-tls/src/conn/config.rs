@@ -71,6 +71,8 @@ pub struct Session {
     pub alpn: Option<Vec<u8>>,
     /// The peer's certificate chain (DER), leaf first.
     pub peer_chain: Vec<Vec<u8>>,
+    /// The peer's raw public key (its SubjectPublicKeyInfo), when it sent one.
+    pub peer_rpk: Option<Vec<u8>>,
     /// The verification result recorded with it (`X509_V_OK` ...).
     pub verify_result: i64,
     /// The max_fragment_length mode it used (0: none).
