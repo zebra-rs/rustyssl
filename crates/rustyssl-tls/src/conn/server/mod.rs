@@ -720,7 +720,10 @@ fn change_after_server_hello(c: &mut Connection, p: &dyn Provider) -> Result<Wor
         abi::SSL3_CC_HANDSHAKE | abi::SSL3_CHANGE_CIPHER_SERVER_WRITE,
         None,
     )?;
-    if c.neg.early_data_status != abi::SSL_EARLY_DATA_ACCEPTED {
+    if c.neg.early_data_status == abi::SSL_EARLY_DATA_ACCEPTED {
+        // Installed at the EndOfEarlyData, after the master secret.
+        common::keys::keep_client_handshake_secret(c, p)?;
+    } else {
         common::keys::change_cipher_state13(
             c,
             p,

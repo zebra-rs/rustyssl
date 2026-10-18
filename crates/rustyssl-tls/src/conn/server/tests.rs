@@ -1959,7 +1959,10 @@ fn ocsp_stapling_tls12_and_tls13() {
     assert_eq!(status.response, response);
     let sh = crate::msgs::hello::ServerHello::parse(&flight[0][4..], false).unwrap();
     let e = sh.extensions().unwrap();
-    assert!(e.iter().any(|x| x.typ == t::STATUS_REQUEST && x.body.is_empty()));
+    assert!(
+        e.iter()
+            .any(|x| x.typ == t::STATUS_REQUEST && x.body.is_empty())
+    );
     // The callback declines: nothing stapled.
     let mut c = Connection::new(cfg.clone());
     c.feed(&plain_record(22, &hello.msg()));
@@ -2011,14 +2014,20 @@ fn tls12_encrypt_then_mac() {
     let p = TestProvider::new(b"etm");
     let hello = hello12(&[0xc027]).with(t::ENCRYPT_THEN_MAC, Vec::new());
     let mut cfg = server_config(&p);
-    cfg.ciphers.push(crate::suites::by_protocol_id(0xc027).unwrap());
+    cfg.ciphers
+        .push(crate::suites::by_protocol_id(0xc027).unwrap());
     let mut c = Connection::new(cfg);
     c.feed(&plain_record(22, &hello.msg()));
     let (out, _) = drive(&mut c, &p);
     let mut client = Client12::new(&hello);
     let flight = client.server_flight(&p, &out);
     let sh = crate::msgs::hello::ServerHello::parse(&flight[0][4..], false).unwrap();
-    assert!(sh.extensions().unwrap().iter().any(|e| e.typ == t::ENCRYPT_THEN_MAC));
+    assert!(
+        sh.extensions()
+            .unwrap()
+            .iter()
+            .any(|e| e.typ == t::ENCRYPT_THEN_MAC)
+    );
     let cert = c.cfg.certs[0].chain[0].clone();
     let (curve, point) = ske_point(&client, &p, &flight[2], &cert);
     let share = p.key_share(curve).unwrap();
@@ -2041,16 +2050,18 @@ fn tls12_encrypt_then_mac() {
     c.feed(&plain_record(22, &hello.msg()));
     let (out, _) = drive(&mut c, &p);
     let sh = crate::msgs::hello::ServerHello::parse(&first_record(&out)[4..], false).unwrap();
-    assert!(sh.extensions().unwrap().iter().all(|e| e.typ != t::ENCRYPT_THEN_MAC));
+    assert!(
+        sh.extensions()
+            .unwrap()
+            .iter()
+            .all(|e| e.typ != t::ENCRYPT_THEN_MAC)
+    );
     assert!(!c.hs.sh.use_etm);
 }
 
 /// A first TLS 1.3 handshake: its first ticket, and the PSK that ticket carries (from the
 /// client's resumption master secret).
-fn first_ticket(
-    p: &TestProvider,
-    cfg: Config,
-) -> (crate::msgs::misc::NewSessionTicket13, Vec<u8>) {
+fn first_ticket(p: &TestProvider, cfg: Config) -> (crate::msgs::misc::NewSessionTicket13, Vec<u8>) {
     let (mut c, mut client, _) = handshake13(p, cfg, x25519_hello);
     client.application_read(p);
     let fin = client.finished(p);
@@ -2101,7 +2112,10 @@ fn psk_hello(
         }],
         binders: vec![vec![0; 32]],
     };
-    let draft = h.clone().with(t::PRE_SHARED_KEY, offer.encode().unwrap()).msg();
+    let draft = h
+        .clone()
+        .with(t::PRE_SHARED_KEY, offer.encode().unwrap())
+        .msg();
     let prefix = &draft[..draft.len() - offer.binders_len()];
     let th = crate::testprov::digest(HashAlg::Sha256, prefix);
     let sched = crate::keysched::Schedule13::new(p, HashAlg::Sha256, Some(psk)).unwrap();
@@ -2142,7 +2156,14 @@ fn tls13_resumption_with_a_ticket() {
     let (_, sk) = server_share(&sh);
     let shared = x.derive(&sk).unwrap();
     let mut client = Client::new();
-    client.hello_psk(&p, &out, &[hello.msg()], Some(shared.bytes()), Some(&psk), false);
+    client.hello_psk(
+        &p,
+        &out,
+        &[hello.msg()],
+        Some(shared.bytes()),
+        Some(&psk),
+        false,
+    );
     // EncryptedExtensions and Finished: no certificate when resuming.
     let ee = client.message(&p);
     assert_eq!(ee[0], ht::ENCRYPTED_EXTENSIONS);
@@ -2213,10 +2234,13 @@ fn tls13_external_psk() {
     let mut asked = Vec::new();
     let (out, last) = drive_answering(&mut c, &p, &mut |r| {
         asked.push(r.clone());
+        // As capi gives it: an SSL_SESSION_new's time and timeout.
         Answer::Session(Some(crate::conn::Session {
             version: v::TLS1_3,
             cipher_id: crate::suites::cid(abi::TLS1_3_CK_AES_128_GCM_SHA256),
             master_key: key.clone(),
+            time: 1_700_000_000,
+            timeout: 304,
             ..crate::conn::Session::default()
         }))
     });
@@ -2232,7 +2256,14 @@ fn tls13_external_psk() {
     let (_, sk) = server_share(&sh);
     let shared = x.derive(&sk).unwrap();
     let mut client = Client::new();
-    client.hello_psk(&p, &out, &[hello.msg()], Some(shared.bytes()), Some(&key), false);
+    client.hello_psk(
+        &p,
+        &out,
+        &[hello.msg()],
+        Some(shared.bytes()),
+        Some(&key),
+        false,
+    );
     let ee = client.message(&p);
     client.c.hs.transcript.add(&ee);
     let fin = client.message(&p);
@@ -2254,7 +2285,15 @@ fn tls13_early_data_accepted() {
     assert_eq!(ext_types(&ticket.extensions), [t::EARLY_DATA]);
     let x = p.key_share(group::X25519).unwrap();
     let age = ticket.age_add.wrapping_add(100);
-    let hello = psk_hello(&p, x.public().to_vec(), &ticket.ticket, age, &psk, false, true);
+    let hello = psk_hello(
+        &p,
+        x.public().to_vec(),
+        &ticket.ticket,
+        age,
+        &psk,
+        false,
+        true,
+    );
     // The client: its early data under the early keys, then EndOfEarlyData.
     let mut client = Client::new();
     let ch = hello.msg();
@@ -2300,7 +2339,7 @@ fn tls13_early_data_accepted() {
     let fin = client.message(&p);
     assert_eq!(fin[0], ht::FINISHED);
     client.c.hs.transcript.add(&fin);
-    client.application_read(&p);
+    keys::store_server_finished_hash(&mut client.c).unwrap();
     // EndOfEarlyData under the early keys, then the Finished under the handshake keys.
     let mut out = client.send(&p, ht::END_OF_EARLY_DATA, &[]);
     client.handshake_write(&p);
@@ -2325,7 +2364,15 @@ fn tls13_early_data_rejected_without_the_server_allowing_it() {
     let (ticket, psk) = first_ticket(&p, cfg.clone());
     let x = p.key_share(group::X25519).unwrap();
     let age = ticket.age_add.wrapping_add(100);
-    let hello = psk_hello(&p, x.public().to_vec(), &ticket.ticket, age, &psk, false, true);
+    let hello = psk_hello(
+        &p,
+        x.public().to_vec(),
+        &ticket.ticket,
+        age,
+        &psk,
+        false,
+        true,
+    );
     // The application isn't reading early data: it is rejected, the resumption goes on.
     let mut c = Connection::new(cfg.clone());
     c.feed(&plain_record(22, &hello.msg()));

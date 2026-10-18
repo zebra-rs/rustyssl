@@ -45,6 +45,8 @@ const ONE_WEEK_SEC: i64 = 7 * 24 * 60 * 60;
 const TICKET_AGE_ALLOWANCE_MS: i64 = 10_000;
 /// The method's default session timeout (`tls1_default_timeout`), in seconds.
 const DEFAULT_TIMEOUT: i64 = 7200;
+/// `SSL_SESSION_new`'s timeout, in seconds.
+const SESSION_NEW_TIMEOUT: i64 = 60 * 5 + 4;
 /// The most certificates a ticket's session may carry.
 const MAX_CHAIN: usize = 100;
 
@@ -658,10 +660,13 @@ pub(crate) fn parse_psk(
                     }
                     if !e.key.is_empty() {
                         let cid = crate::suites::cid(abi::TLS1_3_CK_AES_128_GCM_SHA256);
+                        // `SSL_SESSION_new`'s time and timeout (`60 * 5 + 4`).
                         sess = Some(Session {
                             master_key: e.key,
                             cipher_id: cid,
                             version: v::TLS1_3,
+                            time: c.cfg.now,
+                            timeout: SESSION_NEW_TIMEOUT,
                             ..Session::default()
                         });
                     }

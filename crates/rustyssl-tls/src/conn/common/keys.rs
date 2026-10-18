@@ -260,11 +260,17 @@ pub fn change_cipher_state13(
     let sched = c.hs.sh.keys.schedule.as_ref().ok_or_else(Error::internal)?;
     let (secret, label) = if handshake {
         if client_side {
-            let h = c.hs.sh.keys.handshake_traffic_hash.clone();
-            (
-                sched.client_handshake_traffic(p, &h)?,
-                keylog::CLIENT_HANDSHAKE_TRAFFIC_SECRET,
-            )
+            // Shared fix (tls-server): a server that accepted early data reads with these keys
+            // only after the EndOfEarlyData, when the schedule has moved on to the master
+            // secret; it kept the secret ([`keep_client_handshake_secret`]).
+            let kept = &c.hs.sh.keys.client_hs_secret;
+            let secret = if c.cfg.server && !kept.is_empty() {
+                kept.clone()
+            } else {
+                let h = c.hs.sh.keys.handshake_traffic_hash.clone();
+                sched.client_handshake_traffic(p, &h)?
+            };
+            (secret, keylog::CLIENT_HANDSHAKE_TRAFFIC_SECRET)
         } else {
             (
                 sched.server_handshake_traffic(p, &current)?,
@@ -301,6 +307,19 @@ pub fn change_cipher_state13(
     }
     let prot = protection13(p, cp, hash, secret.bytes())?;
     install13(c, read, prot)
+}
+
+/// Shared addition (tls-server): derives the client's handshake traffic secret now (from the
+/// hash stored after the ServerHello) and keeps it, for a server that accepted early data:
+/// it installs the keys at the EndOfEarlyData ([`change_cipher_state13`] then uses this one).
+///
+/// # Errors
+/// The schedule isn't at the handshake stage, or the provider failed.
+pub fn keep_client_handshake_secret(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    let sched = c.hs.sh.keys.schedule.as_ref().ok_or_else(Error::internal)?;
+    let h = c.hs.sh.keys.handshake_traffic_hash.clone();
+    c.hs.sh.keys.client_hs_secret = sched.client_handshake_traffic(p, &h)?;
+    Ok(())
 }
 
 /// `tls13_update_key`: the next application traffic secret in one direction (KeyUpdate).
