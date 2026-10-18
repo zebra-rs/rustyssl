@@ -10,6 +10,7 @@
 
 pub mod cipherstring;
 pub mod codec;
+pub mod conn;
 pub mod consts;
 pub mod crypto;
 pub mod error;

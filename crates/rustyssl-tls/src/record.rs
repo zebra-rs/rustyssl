@@ -1007,6 +1007,12 @@ impl RecordWriter {
         self.seq = 0;
     }
 
+    /// The current protection's mode.
+    #[must_use]
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
     /// The next sequence number.
     #[must_use]
     pub fn sequence(&self) -> u64 {
