@@ -546,12 +546,26 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
-        let mut st = x.state();
-        st.server = false;
-        st.shutdown = 0;
-        st.statem_clear();
-        st.handshake_func = Some(Role::Connect);
+        let old = {
+            let mut st = x.state();
+            st.server = false;
+            st.shutdown = 0;
+            st.statem_clear();
+            st.handshake_func = Some(Role::Connect);
+            restart(&mut st)
+        };
+        // Freed with no lock held (ex_data callbacks).
+        drop(old);
     }
+}
+
+/// `RECORD_LAYER_reset` after a handshake: the engine goes, with the records it buffered, so the
+/// next handshake starts afresh (the session stays, to be resumed). What it held, to be freed
+/// with no lock held.
+fn restart(st: &mut SslState) -> Option<super::io::Driver> {
+    st.drv.tls.as_ref()?;
+    let kept = st.drv.clear();
+    Some(core::mem::replace(&mut st.drv, kept))
 }
 
 ffi_export! {
@@ -564,11 +578,16 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return };
-        let mut st = x.state();
-        st.server = true;
-        st.shutdown = 0;
-        st.statem_clear();
-        st.handshake_func = Some(Role::Accept);
+        let old = {
+            let mut st = x.state();
+            st.server = true;
+            st.shutdown = 0;
+            st.statem_clear();
+            st.handshake_func = Some(Role::Accept);
+            restart(&mut st)
+        };
+        // Freed with no lock held (ex_data callbacks).
+        drop(old);
     }
 }
 
