@@ -1,5 +1,6 @@
 //! URL parsing (`OSSL_parse_url` of `http_lib.c`): a URL's scheme, user, host, port, path,
-//! query, and fragment. The rest of the HTTP client comes with step 6.8.
+//! query, and fragment; `OSSL_HTTP_parse_url`, which takes only HTTP(S) and defaults the port;
+//! and `OSSL_HTTP_adapt_proxy`, the proxy for a server unless `no_proxy` lists it.
 //!
 //! As OpenSSL's:
 //! - A scheme is letters, digits, `+`, `-`, and `.` after a letter, before `://`.
@@ -13,7 +14,9 @@ use core::ptr;
 
 use rustyssl_abi::{
     ERR_LIB_HTTP, ERR_R_PASSED_NULL_PARAMETER, HTTP_R_ERROR_PARSING_URL,
-    HTTP_R_INVALID_PORT_NUMBER, HTTP_R_INVALID_URL_PATH,
+    HTTP_R_INVALID_PORT_NUMBER, HTTP_R_INVALID_URL_PATH, HTTP_R_INVALID_URL_SCHEME,
+    OPENSSL_HTTP_PROXY, OPENSSL_HTTPS_PROXY, OPENSSL_NO_PROXY, OSSL_HTTP_NAME, OSSL_HTTP_PORT,
+    OSSL_HTTPS_NAME, OSSL_HTTPS_PORT,
 };
 
 use crate::err;
@@ -303,6 +306,182 @@ ffi_export! {
             return 0;
         }
         1
+    }
+}
+
+ffi_export! {
+    /// Splits an HTTP(S) URL as [`OSSL_parse_url`] does, refusing other schemes and giving the
+    /// default port (80, or 443 for HTTPS) for none; `*pssl` says whether it is HTTPS: 1, or 0
+    /// (`HTTP_R_INVALID_URL_SCHEME`).
+    ///
+    /// # Safety
+    /// `url` is NULL or a C string; each output is NULL or writable.
+    pub unsafe extern "C" fn OSSL_HTTP_parse_url(url: *const c_char, pssl: *mut c_int, puser: *mut *mut c_char, phost: *mut *mut c_char, pport: *mut *mut c_char, pport_num: *mut c_int, ppath: *mut *mut c_char, pquery: *mut *mut c_char, pfrag: *mut *mut c_char) -> c_int
+    where failure = 0, library = ERR_LIB_HTTP
+    {
+        // SAFETY: the caller's slot, or NULL.
+        if let Some(p) = unsafe { pport.as_mut() } {
+            *p = ptr::null_mut();
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { pssl.as_mut() } {
+            *p = 0;
+        }
+        let (mut scheme, mut port): (*mut c_char, *mut c_char) = (ptr::null_mut(), ptr::null_mut());
+        // SAFETY: the caller's URL and slots; rooms for the scheme and the port.
+        if unsafe { OSSL_parse_url(url, &raw mut scheme, puser, phost, &raw mut port, pport_num, ppath, pquery, pfrag) } == 0 {
+            return 0;
+        }
+        // SAFETY: made by `OSSL_parse_url`.
+        let s = unsafe { CStr::from_ptr(scheme) }.to_bytes();
+        let ssl = s == OSSL_HTTPS_NAME.to_bytes();
+        let ok = if ssl || s.is_empty() || s == OSSL_HTTP_NAME.to_bytes() {
+            if ssl {
+                // SAFETY: as above.
+                if let Some(p) = unsafe { pssl.as_mut() } {
+                    *p = 1;
+                }
+            }
+            true
+        } else {
+            err::raise(ERR_LIB_HTTP, HTTP_R_INVALID_URL_SCHEME, "OSSL_HTTP_parse_url");
+            false
+        };
+        // SAFETY: from `CRYPTO_malloc`.
+        unsafe { mem::release(scheme.cast()) };
+        // SAFETY: as above.
+        let ok = ok && unsafe { set_port(port, ssl, pport, pport_num) };
+        if !ok {
+            for s in [puser, phost, ppath, pquery, pfrag] {
+                // SAFETY: the caller's slots, holding NULL or parts made here.
+                unsafe { clear(s) };
+            }
+            return 0;
+        }
+        1
+    }
+}
+
+/// The port for [`OSSL_HTTP_parse_url`]: the URL's, or for `"0"` the scheme's default; into
+/// `*pport` (or freed) and `*pport_num`.
+///
+/// # Safety
+/// `port` is a C string from `CRYPTO_malloc`; the slots are NULL or writable.
+unsafe fn set_port(
+    port: *mut c_char,
+    ssl: bool,
+    pport: *mut *mut c_char,
+    pport_num: *mut c_int,
+) -> bool {
+    // SAFETY: the caller's string.
+    if unsafe { CStr::from_ptr(port) }.to_bytes() != b"0" {
+        // SAFETY: the caller's slot, or NULL.
+        match unsafe { pport.as_mut() } {
+            Some(p) => *p = port,
+            // SAFETY: from `CRYPTO_malloc`.
+            None => unsafe { mem::release(port.cast()) },
+        }
+        return true;
+    }
+    // SAFETY: as above.
+    unsafe { mem::release(port.cast()) };
+    let (def, num) = if ssl {
+        (OSSL_HTTPS_PORT, 443)
+    } else {
+        (OSSL_HTTP_PORT, 80)
+    };
+    // SAFETY: the caller's slot, or NULL.
+    if let Some(p) = unsafe { pport_num.as_mut() } {
+        *p = num;
+    }
+    // SAFETY: as above.
+    if let Some(p) = unsafe { pport.as_mut() } {
+        // SAFETY: a static C string.
+        *p = unsafe { crate::string::CRYPTO_strdup(def.as_ptr(), c"http_lib.c".as_ptr(), 0) };
+        return !p.is_null();
+    }
+    true
+}
+
+/// `ossl_isspace`.
+fn is_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
+}
+
+/// `use_proxy`: whether `server` (brackets stripped) is not in `no_proxy` (by default the
+/// `no_proxy`, then `NO_PROXY`, environment variable), a list separated by space or commas.
+///
+/// # Safety
+/// `no_proxy` is NULL or a C string; `server` a C string.
+unsafe fn use_proxy(no_proxy: *const c_char, server: *const c_char) -> bool {
+    /// `NI_MAXHOST`.
+    const MAXHOST: usize = 1025;
+    // SAFETY: the caller's string.
+    let mut host = unsafe { CStr::from_ptr(server) }.to_bytes();
+    let sl = host.len();
+    if (2..MAXHOST + 2).contains(&sl) && host.first() == Some(&b'[') && host.last() == Some(&b']') {
+        host = host.get(1..sl - 1).unwrap_or_default();
+    }
+    if host.is_empty() {
+        return true;
+    }
+    let list = if no_proxy.is_null() {
+        let p = crate::init::safe_getenv_ptr(c"no_proxy");
+        if p.is_null() {
+            crate::init::safe_getenv_ptr(OPENSSL_NO_PROXY)
+        } else {
+            p
+        }
+    } else {
+        no_proxy
+    };
+    if list.is_null() {
+        return true;
+    }
+    // SAFETY: a C string.
+    let list = unsafe { CStr::from_ptr(list) }.to_bytes();
+    let found = (0..list.len()).any(|i| {
+        let at = list.get(i..).unwrap_or_default();
+        let before = i
+            .checked_sub(1)
+            .and_then(|b| list.get(b))
+            .is_none_or(|&c| is_space(c) || c == b',');
+        let after = at.get(host.len()).is_none_or(|&c| is_space(c) || c == b',');
+        at.starts_with(host) && before && after
+    });
+    !found
+}
+
+ffi_export! {
+    /// The proxy to reach `server` through: `proxy`, or the `https_proxy`/`http_proxy` (then
+    /// upper-case) environment variable; NULL for none, an empty one, or a server `no_proxy`
+    /// lists.
+    ///
+    /// # Safety
+    /// `proxy` and `no_proxy` are NULL or C strings; `server` NULL or one.
+    pub unsafe extern "C" fn OSSL_HTTP_adapt_proxy(proxy: *const c_char, no_proxy: *const c_char, server: *const c_char, use_ssl: c_int) -> *const c_char
+    where failure = ptr::null(), library = ERR_LIB_HTTP
+    {
+        let mut proxy = proxy;
+        if proxy.is_null() {
+            proxy = crate::init::safe_getenv_ptr(if use_ssl != 0 { c"https_proxy" } else { c"http_proxy" });
+        }
+        if proxy.is_null() {
+            proxy = crate::init::safe_getenv_ptr(if use_ssl != 0 { OPENSSL_HTTPS_PROXY } else { OPENSSL_HTTP_PROXY });
+        }
+        // SAFETY: a C string, or NULL.
+        if proxy.is_null() || unsafe { *proxy } == 0 {
+            return ptr::null();
+        }
+        if server.is_null() {
+            // `ossl_assert(server != NULL)`, a plain check in release builds: no proxy.
+            return ptr::null();
+        }
+        // SAFETY: the caller's strings.
+        if !unsafe { use_proxy(no_proxy, server) } {
+            return ptr::null();
+        }
+        proxy
     }
 }
 

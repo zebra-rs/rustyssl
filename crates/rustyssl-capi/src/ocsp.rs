@@ -7,6 +7,7 @@
 pub(crate) mod asn;
 pub(crate) mod cl;
 pub(crate) mod ext;
+pub(crate) mod http;
 pub(crate) mod id;
 pub(crate) mod prn;
 pub(crate) mod srv;
