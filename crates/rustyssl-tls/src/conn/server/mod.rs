@@ -188,7 +188,7 @@ pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
 }
 
 /// `received_client_cert`: the client sent a certificate (or a raw public key).
-fn received_client_cert(c: &Connection) -> bool {
+pub(crate) fn received_client_cert(c: &Connection) -> bool {
     !c.neg.session.peer_chain.is_empty() || c.neg.peer_rpk.is_some()
 }
 
@@ -334,7 +334,15 @@ pub(crate) fn process_message(
         abi::TLS_ST_SR_KEY_EXCH => kx::process_client_key_exchange(c, p, body),
         abi::TLS_ST_SR_CERT_VRFY => common::cert::process_cert_verify(c, p, body),
         abi::TLS_ST_SR_NEXT_PROTO => process_next_proto(c, body),
-        abi::TLS_ST_SR_CHANGE => finished::process_change_cipher_spec(c, p, body),
+        abi::TLS_ST_SR_CHANGE => {
+            // `ssl3_do_change_cipher_spec`: a new session takes the suite now.
+            if c.neg.session.cipher_id == 0
+                && let Some(nc) = c.hs.new_cipher
+            {
+                c.neg.session.cipher_id = nc.id;
+            }
+            finished::process_change_cipher_spec(c, p, body)
+        }
         abi::TLS_ST_SR_FINISHED => finished::process_finished(c, p, body),
         abi::TLS_ST_SR_KEY_UPDATE => finished::process_key_update(c, p, body),
         _ => Err(Error::internal()),

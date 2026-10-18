@@ -1260,3 +1260,601 @@ fn post_handshake_authentication() {
     }
     assert_eq!(c.neg.session.peer_chain, [der]);
 }
+
+/// A TLS 1.2 ClientHello offering `ciphers`, X25519 and P-256, the RSA schemes, Extended
+/// Master Secret, the renegotiation SCSV, and an empty session ticket.
+fn hello12(ciphers: &[u16]) -> Hello {
+    use crate::msgs::ext as mx;
+    let mut cs = ciphers.to_vec();
+    cs.push(0x00ff);
+    Hello {
+        legacy_version: v::TLS1_2,
+        random: [0x22; 32],
+        session_id: Vec::new(),
+        ciphers: cs,
+        exts: vec![
+            (
+                t::SUPPORTED_GROUPS,
+                mx::supported_groups::encode(&[group::X25519, group::SECP256R1]).unwrap(),
+            ),
+            (
+                t::EC_POINT_FORMATS,
+                mx::ec_point_formats::encode(&[0]).unwrap(),
+            ),
+            (
+                t::SIGNATURE_ALGORITHMS,
+                mx::signature_algorithms::encode(&[
+                    sigscheme::RSA_PSS_RSAE_SHA256,
+                    sigscheme::RSA_PKCS1_SHA256,
+                ])
+                .unwrap(),
+            ),
+            (t::EXTENDED_MASTER_SECRET, Vec::new()),
+            (t::SESSION_TICKET, Vec::new()),
+        ],
+    }
+}
+
+/// A scripted TLS 1.2 client over a client-role connection's key schedule and record layer.
+struct Client12 {
+    c: Connection,
+    input: Vec<u8>,
+    hs: Vec<u8>,
+    ccs: bool,
+}
+
+impl Client12 {
+    fn new(hello: &Hello) -> Self {
+        let mut c = Connection::new(Config::default());
+        c.neg.version = v::TLS1_2;
+        c.rw.version = v::TLS1_2;
+        c.hs.transcript = crate::keysched::Transcript::new();
+        c.hs.client_random = hello.random;
+        c.hs.transcript.add(&hello.msg());
+        Self {
+            c,
+            input: Vec::new(),
+            hs: Vec::new(),
+            ccs: false,
+        }
+    }
+
+    /// The next handshake message (a ChangeCipherSpec turns the read keys on).
+    fn message(&mut self, p: &dyn Provider) -> Option<Vec<u8>> {
+        loop {
+            if self.hs.len() >= 4 {
+                let n = usize::from(self.hs[1]) << 16
+                    | usize::from(self.hs[2]) << 8
+                    | usize::from(self.hs[3]);
+                if self.hs.len() >= 4 + n {
+                    return Some(self.hs.drain(..4 + n).collect());
+                }
+            }
+            match self.c.rr.read(p, &self.input).unwrap() {
+                Read::NeedMore(_) => return None,
+                Read::IgnoredCcs { .. } => panic!("TLS 1.2"),
+                Read::Record { consumed, record } => {
+                    self.input.drain(..consumed);
+                    if record.content_type == record::content_type::change_cipher_spec() {
+                        assert_eq!(record.data, [1]);
+                        self.ccs = true;
+                        keys::setup_key_block(&mut self.c, p).unwrap();
+                        keys::change_cipher_state12(
+                            &mut self.c,
+                            p,
+                            abi::SSL3_CHANGE_CIPHER_CLIENT_READ,
+                        )
+                        .unwrap();
+                        continue;
+                    }
+                    assert_eq!(
+                        record.content_type,
+                        record::content_type::handshake(),
+                        "{:02x?}",
+                        record.data
+                    );
+                    self.hs.extend_from_slice(&record.data);
+                }
+            }
+        }
+    }
+
+    /// Reads the ServerHello and the rest of the flight to ServerHelloDone (or, resuming, to
+    /// the server's Finished, with any NewSessionTicket): the messages.
+    fn server_flight(&mut self, p: &dyn Provider, out: &[u8]) -> Vec<Vec<u8>> {
+        use crate::consts::handshake as ht;
+        self.input.extend_from_slice(out);
+        let mut msgs = Vec::new();
+        while let Some(m) = self.message(p) {
+            if m[0] == ht::SERVER_HELLO {
+                self.c.hs.server_random.copy_from_slice(&m[6..38]);
+                let sid = usize::from(m[38]);
+                let cs = u16::from_be_bytes([m[39 + sid], m[40 + sid]]);
+                self.c.hs.new_cipher = crate::suites::by_protocol_id(cs);
+                self.c.hs.transcript.add(&m);
+                let hash = keys::handshake_md(&self.c).unwrap();
+                self.c.hs.transcript.start_hash(p, hash, false).unwrap();
+            } else if m[0] == ht::FINISHED {
+                let want = finished::final_finish_mac(&self.c, p, true).unwrap();
+                assert_eq!(&m[4..], &want[..], "the server's Finished");
+                self.c.hs.transcript.add(&m);
+            } else {
+                self.c.hs.transcript.add(&m);
+            }
+            msgs.push(m);
+        }
+        msgs
+    }
+
+    /// A plaintext or protected handshake message, added to the transcript.
+    fn send(&mut self, p: &dyn Provider, typ: u8, body: &[u8]) -> Vec<u8> {
+        let msg = crate::msgs::frame(typ, body).unwrap();
+        self.c.hs.transcript.add(&msg);
+        self.c
+            .write_record(p, record::content_type::handshake(), &msg)
+            .unwrap();
+        self.c.take_output()
+    }
+
+    /// ChangeCipherSpec and Finished, after the master secret is known (or resumed).
+    fn ccs_finished(&mut self, p: &dyn Provider) -> Vec<u8> {
+        self.c
+            .write_record(p, record::content_type::change_cipher_spec(), &[1])
+            .unwrap();
+        keys::setup_key_block(&mut self.c, p).unwrap();
+        keys::change_cipher_state12(&mut self.c, p, abi::SSL3_CHANGE_CIPHER_CLIENT_WRITE).unwrap();
+        let md = finished::final_finish_mac(&self.c, p, false).unwrap();
+        self.c.neg.client_finished.clone_from(&md);
+        let mut out = self.c.take_output();
+        out.extend(self.send(p, crate::consts::handshake::FINISHED, &md));
+        out
+    }
+
+    /// The master secret from `pms` (with Extended Master Secret when `ems`).
+    fn master(&mut self, p: &dyn Provider, pms: &[u8], ems: bool) {
+        self.c.neg.ems = ems;
+        keys::generate_master_secret12(&mut self.c, p, pms).unwrap();
+    }
+}
+
+/// The ServerKeyExchange's ECDHE point, after checking its signature with `cert`.
+fn ske_point(client: &Client12, p: &dyn Provider, ske: &[u8], cert: &[u8]) -> (u16, Vec<u8>) {
+    let body = &ske[4..];
+    assert_eq!(body[0], 3, "a named curve");
+    let curve = u16::from_be_bytes([body[1], body[2]]);
+    let n = usize::from(body[3]);
+    let params = &body[..4 + n];
+    let point = body[4..4 + n].to_vec();
+    let scheme = u16::from_be_bytes([body[4 + n], body[5 + n]]);
+    let sig = &body[8 + n..];
+    let mut tbs = client.c.hs.client_random.to_vec();
+    tbs.extend_from_slice(&client.c.hs.server_random);
+    tbs.extend_from_slice(params);
+    assert!(
+        p.verify(cert, scheme, &tbs, sig).unwrap(),
+        "the ServerKeyExchange signature"
+    );
+    (curve, point)
+}
+
+/// A TLS 1.2 ECDHE-RSA handshake to the end: the server, the client, and the server's last
+/// flight (NewSessionTicket, ChangeCipherSpec, Finished).
+fn handshake12(
+    p: &TestProvider,
+    cfg: Config,
+    hello: &Hello,
+) -> (Connection, Client12, Vec<Vec<u8>>) {
+    use crate::consts::handshake as ht;
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client12::new(hello);
+    let flight = client.server_flight(p, &out);
+    let types: Vec<u8> = flight.iter().map(|m| m[0]).collect();
+    assert_eq!(
+        types,
+        [
+            ht::SERVER_HELLO,
+            ht::CERTIFICATE,
+            ht::SERVER_KEY_EXCHANGE,
+            ht::SERVER_HELLO_DONE
+        ]
+    );
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let (curve, point) = ske_point(&client, p, &flight[2], &cert);
+    assert_eq!(curve, group::X25519);
+    let share = p.key_share(curve).unwrap();
+    let public = share.public().to_vec();
+    let pms = share.derive(&point).unwrap();
+    let mut out = client.send(p, ht::CLIENT_KEY_EXCHANGE, &{
+        let mut b = vec![u8::try_from(public.len()).unwrap()];
+        b.extend_from_slice(&public);
+        b
+    });
+    client.master(p, pms.bytes(), true);
+    out.extend(client.ccs_finished(p));
+    c.feed(&out);
+    let (out, last) = drive(&mut c, p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    let last_flight = client.server_flight(p, &out);
+    assert!(client.ccs);
+    (c, client, last_flight)
+}
+
+#[test]
+fn tls12_ecdhe_rsa_handshake_with_ticket() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"tls12");
+    let hello = hello12(&[0xc02f]);
+    let (c, client, last) = handshake12(&p, server_config(&p), &hello);
+    // The server answered renegotiation_info (for the SCSV), ec_point_formats, the empty
+    // session_ticket, and Extended Master Secret, in OpenSSL's order.
+    let types: Vec<u8> = last.iter().map(|m| m[0]).collect();
+    assert_eq!(types, [ht::NEW_SESSION_TICKET, ht::FINISHED]);
+    assert_eq!(c.neg.version, v::TLS1_2);
+    assert_eq!(c.neg.cipher.map(|x| x.protocol_id()), Some(0xc02f));
+    assert!(c.neg.ems);
+    assert!(c.neg.secure_renegotiation);
+    assert_eq!(c.neg.master_secret, client.c.neg.master_secret);
+    // The ticket: a lifetime hint, and OpenSSL's format under the configured key name.
+    let nst = &last[0];
+    let crate::msgs::misc::NewSessionTicket::Tls12(t) =
+        crate::msgs::misc::NewSessionTicket::parse(&nst[4..], false).unwrap()
+    else {
+        panic!("a TLS 1.2 ticket");
+    };
+    assert_eq!(t.lifetime_hint, 7200);
+    assert_eq!(&t.ticket[..16], &[7; 16]);
+}
+
+#[test]
+fn tls12_server_hello_extensions_in_openssl_order() {
+    let p = TestProvider::new(b"tls12-sh");
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello12(&[0xc02f]).msg()));
+    let (out, _) = drive(&mut c, &p);
+    let sh = first_record(&out);
+    let parsed = crate::msgs::hello::ServerHello::parse(&sh[4..], false).unwrap();
+    let types: Vec<u16> = parsed.extensions().unwrap().iter().map(|e| e.typ).collect();
+    assert_eq!(
+        types,
+        [
+            t::RENEGOTIATE,
+            t::EC_POINT_FORMATS,
+            t::SESSION_TICKET,
+            t::EXTENDED_MASTER_SECRET
+        ]
+    );
+    // A ticket is coming, so no session ID (`ssl_generate_session_id`); without the
+    // session_ticket extension a new session gets one, as the server caches sessions.
+    assert!(parsed.session_id.is_empty());
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(
+        22,
+        &hello12(&[0xc02f]).without(t::SESSION_TICKET).msg(),
+    ));
+    let (out, _) = drive(&mut c, &p);
+    let parsed = crate::msgs::hello::ServerHello::parse(&first_record(&out)[4..], false).unwrap();
+    assert_eq!(parsed.session_id.len(), 32);
+    assert_eq!(parsed.session_id, c.neg.session.session_id);
+}
+
+#[test]
+fn tls12_resumes_a_ticket_and_a_cached_session() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"tls12-resume");
+    let hello = hello12(&[0xc02f]);
+    let (c1, client1, last) = handshake12(&p, server_config(&p), &hello);
+    let crate::msgs::misc::NewSessionTicket::Tls12(t) =
+        crate::msgs::misc::NewSessionTicket::parse(&last[0][4..], false).unwrap()
+    else {
+        panic!("a TLS 1.2 ticket");
+    };
+    // Resumption with the ticket: an abbreviated handshake.
+    let mut again = hello.clone().with(t::SESSION_TICKET, t.ticket.clone());
+    again.random = [0x33; 32];
+    again.session_id = vec![0x44; 32];
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &again.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(c.neg.reused);
+    let mut client = Client12::new(&again);
+    client
+        .c
+        .neg
+        .master_secret
+        .clone_from(&client1.c.neg.master_secret);
+    client.c.neg.ems = true;
+    let flight = client.server_flight(&p, &out);
+    let types: Vec<u8> = flight.iter().map(|m| m[0]).collect();
+    assert_eq!(types, [ht::SERVER_HELLO, ht::FINISHED]);
+    // The client's session ID is echoed.
+    assert_eq!(&flight[0][39..71], &[0x44; 32]);
+    c.feed(&client.ccs_finished(&p));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.neg.master_secret, c1.neg.master_secret);
+
+    // Resumption by session ID: the cache gives the session (made without a ticket).
+    let plain = hello.clone().without(t::SESSION_TICKET);
+    let (c2, client2, _) = handshake12(&p, server_config(&p), &plain);
+    let session = c2.neg.session.clone();
+    assert_eq!(session.session_id.len(), 32);
+    let mut by_id = plain.clone();
+    by_id.random = [0x55; 32];
+    by_id.session_id = session.session_id.clone();
+    let mut cfg = server_config(&p);
+    cfg.options |= abi::SSL_OP_NO_TICKET;
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &by_id.msg()));
+    let mut asked = Vec::new();
+    let (out, last) = drive_answering(&mut c, &p, &mut |r| {
+        asked.push(r.clone());
+        crate::conn::Answer::Session(Some(session.clone()))
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert_eq!(
+        asked,
+        [Request::GetSession {
+            id: session.session_id.clone()
+        }]
+    );
+    assert!(c.neg.reused);
+    let mut client = Client12::new(&by_id);
+    client
+        .c
+        .neg
+        .master_secret
+        .clone_from(&client2.c.neg.master_secret);
+    client.c.neg.ems = true;
+    let flight = client.server_flight(&p, &out);
+    assert_eq!(flight.len(), 2);
+    assert_eq!(&flight[0][39..71], &session.session_id[..]);
+    c.feed(&client.ccs_finished(&p));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+
+    // A session without Extended Master Secret isn't resumed by a client that sends it.
+    let mut old = session;
+    old.ems = false;
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &by_id.msg()));
+    let (_, last) = drive_answering(&mut c, &p, &mut |_| {
+        crate::conn::Answer::Session(Some(old.clone()))
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(!c.neg.reused);
+}
+
+#[test]
+fn tls12_rsa_and_dhe_key_exchanges() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"tls12-kx");
+    // RSA: the client's secret, encrypted to the certificate.
+    let hello = hello12(&[0x009c]);
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    let types: Vec<u8> = flight.iter().map(|m| m[0]).collect();
+    assert_eq!(
+        types,
+        [ht::SERVER_HELLO, ht::CERTIFICATE, ht::SERVER_HELLO_DONE]
+    );
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let mut pms = vec![3, 3];
+    pms.extend_from_slice(&[0x5c; 46]);
+    let enc = p.rsa_encrypt(&cert, &pms).unwrap();
+    let mut body = Vec::new();
+    body.extend_from_slice(&u16::try_from(enc.len()).unwrap().to_be_bytes());
+    body.extend_from_slice(&enc);
+    let mut out = client.send(&p, ht::CLIENT_KEY_EXCHANGE, &body);
+    client.master(&p, &pms, true);
+    out.extend(client.ccs_finished(&p));
+    c.feed(&out);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    client.server_flight(&p, &out);
+    assert_eq!(c.neg.master_secret, client.c.neg.master_secret);
+
+    // DHE with SSL_set_dh_auto: the RSA key's 112 bits give RFC 3526's 2048-bit prime.
+    let hello = hello12(&[0x009e]);
+    let mut cfg = server_config(&p);
+    cfg.dh_auto = true;
+    cfg.dh_tmp = true;
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    assert_eq!(flight[2][0], ht::SERVER_KEY_EXCHANGE);
+    let mut rd = crate::codec::Reader::new(&flight[2][4..]);
+    let dp = rd.vec16().unwrap().rest().to_vec();
+    let dg = rd.vec16().unwrap().rest().to_vec();
+    let ys = rd.vec16().unwrap().rest().to_vec();
+    assert_eq!(
+        dp.len(),
+        128,
+        "RFC 3526's 2048-bit prime: the RSA key's 80 bits round up"
+    );
+    assert_eq!(dg, [2]);
+    assert_eq!(
+        ys.len(),
+        dp.len(),
+        "the public value padded to the prime's length"
+    );
+    let share = p.dh_share(&dp, &dg).unwrap();
+    let public = share.public().to_vec();
+    let secret = share.derive(&ys).unwrap();
+    let pms = strip_zeros(secret.bytes());
+    let mut body = Vec::new();
+    body.extend_from_slice(&u16::try_from(public.len()).unwrap().to_be_bytes());
+    body.extend_from_slice(&public);
+    let mut out = client.send(&p, ht::CLIENT_KEY_EXCHANGE, &body);
+    client.master(&p, pms, true);
+    out.extend(client.ccs_finished(&p));
+    c.feed(&out);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+}
+
+fn strip_zeros(b: &[u8]) -> &[u8] {
+    let n = b.iter().take_while(|&&x| x == 0).count();
+    &b[n..]
+}
+
+#[test]
+fn tls12_handshake_message_is_not_a_change_cipher_spec() {
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"hr-ccs");
+    let hello = hello12(&[0xc02f]);
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let (curve, point) = ske_point(&client, &p, &flight[2], &cert);
+    let share = p.key_share(curve).unwrap();
+    let public = share.public().to_vec();
+    let mut b = vec![u8::try_from(public.len()).unwrap()];
+    b.extend_from_slice(&public);
+    let mut out = client.send(&p, ht::CLIENT_KEY_EXCHANGE, &b);
+    // A HelloRequest (type 0, as the CCS pseudo-type becomes) where the ChangeCipherSpec
+    // must come.
+    client
+        .c
+        .write_record(&p, record::content_type::handshake(), &[0, 0, 0, 0])
+        .unwrap();
+    out.extend(client.c.take_output());
+    let _ = point;
+    c.feed(&out);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_UNEXPECTED_MESSAGE,
+            abi::SSL_R_UNEXPECTED_MESSAGE
+        )
+    );
+}
+
+/// After a TLS 1.2 handshake, a renegotiating ClientHello under the handshake's keys.
+fn renegotiate(
+    p: &TestProvider,
+    options: u64,
+    hello: impl Fn(&Client12) -> Hello,
+) -> (Connection, Vec<u8>, crate::error::Result<Event>) {
+    let first = hello12(&[0xc02f]);
+    let mut cfg = server_config(p);
+    cfg.options |= options;
+    let (mut c, mut client, _) = handshake12(p, cfg, &first);
+    let h = hello(&client);
+    let msg = h.msg();
+    client
+        .c
+        .write_record(p, record::content_type::handshake(), &msg)
+        .unwrap();
+    c.feed(&client.c.take_output());
+    assert_eq!(c.step(p, true).unwrap(), Event::NeedInput);
+    let (out, last) = drive(&mut c, p);
+    (c, out, last)
+}
+
+#[test]
+fn tls12_client_renegotiation_refused_by_default() {
+    let p = TestProvider::new(b"reneg-refused");
+    let (c, out, last) = renegotiate(&p, 0, |client| {
+        no_scsv(hello12(&[0xc02f])).with(
+            t::RENEGOTIATE,
+            crate::msgs::ext::renegotiate::encode(&client.c.neg.client_finished).unwrap(),
+        )
+    });
+    // A warning no_renegotiation, and the connection carries on.
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    assert!(!out.is_empty());
+    assert!(c.error().is_none());
+    assert_eq!(c.state(), abi::TLS_ST_OK);
+    assert_eq!(c.alerts().0, Some((1, 100)));
+}
+
+#[test]
+fn cve_2021_3449_renegotiation_without_signature_algorithms() {
+    // OpenSSL 1.1.1h-j crashed on a renegotiating ClientHello that left out
+    // signature_algorithms but kept signature_algorithms_cert: the old list was freed, its
+    // length kept. Here each handshake starts with no peer list, and the server finds none
+    // shared.
+    let p = TestProvider::new(b"cve-2021-3449");
+    let (c, out, last) = renegotiate(&p, abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION, |client| {
+        no_scsv(hello12(&[0xc02f]))
+            .without(t::SIGNATURE_ALGORITHMS)
+            .with(
+                t::SIGNATURE_ALGORITHMS_CERT,
+                crate::msgs::ext::signature_algorithms::encode(&[sigscheme::RSA_PKCS1_SHA256])
+                    .unwrap(),
+            )
+            .with(
+                t::RENEGOTIATE,
+                crate::msgs::ext::renegotiate::encode(&client.c.neg.client_finished).unwrap(),
+            )
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_NO_SHARED_SIGNATURE_ALGORITHMS
+        )
+    );
+    assert!(!out.is_empty());
+    assert!(c.hs.sh.peer_sigalgs.is_none());
+}
+
+#[test]
+fn tls12_renegotiation_binding_must_match() {
+    let p = TestProvider::new(b"reneg-binding");
+    let (_, _, last) = renegotiate(&p, abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION, |_| {
+        no_scsv(hello12(&[0xc02f])).with(
+            t::RENEGOTIATE,
+            crate::msgs::ext::renegotiate::encode(&[0; 12]).unwrap(),
+        )
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_RENEGOTIATION_MISMATCH
+        )
+    );
+    // The SCSV is refused while renegotiating.
+    let (_, _, last) = renegotiate(&p, abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION, |_| {
+        hello12(&[0xc02f])
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_SCSV_RECEIVED_WHEN_RENEGOTIATING
+        )
+    );
+    // Without the binding at all: unsafe legacy renegotiation.
+    let (_, _, last) = renegotiate(&p, abi::SSL_OP_ALLOW_CLIENT_RENEGOTIATION, |_| {
+        no_scsv(hello12(&[0xc02f]))
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_R_UNSAFE_LEGACY_RENEGOTIATION_DISABLED
+        )
+    );
+}
+
+/// A ClientHello without the renegotiation SCSV.
+fn no_scsv(mut h: Hello) -> Hello {
+    h.ciphers.retain(|&c| c != 0x00ff);
+    h
+}

@@ -454,11 +454,20 @@ pub(crate) fn post_process_client_hello(
                 sigalgs::choose(c, true)?;
             }
         } else {
+            // Resuming TLS 1.2: the session's suite and master secret.
             c.hs.new_cipher = crate::suites::by_id(c.neg.session.cipher_id);
             if c.hs.new_cipher.is_none() {
                 return Err(Error::internal());
             }
+            c.neg.master_secret.clone_from(&c.neg.session.master_key);
+            c.neg.ems = c.neg.session.ems;
+            c.neg.etm = c.hs.sh.use_etm;
         }
+        if tls13 && !hit {
+            c.neg.session.cipher_id = c.hs.new_cipher.map_or(0, |x| x.id);
+        }
+        c.neg.cipher = c.hs.new_cipher;
+        c.neg.secure_renegotiation = state_ref(c).is_some_and(|s| s.send_connection_binding);
         set_stage(c, stage::STATUS)?;
     }
     if stage_of(c) == stage::STATUS {
