@@ -452,15 +452,14 @@ pub(crate) unsafe fn ssl_ctrl(
         }
         SSL_CTRL_GET_TMP_KEY => {
             let st = x.state();
-            let share = st
-                .drv
-                .tls
-                .as_deref()
-                .and_then(|c| c.handshake().sh.own_tmp.clone());
+            let core = st.drv.tls.as_deref();
+            let share = core.and_then(|c| c.handshake().sh.own_tmp.clone());
+            let dh = core.and_then(|c| c.handshake().sh.own_dh.clone());
             let prov = st.drv.provider.clone();
             drop(st);
-            let key = match (share, prov) {
-                (Some((id, octets)), Some(p)) => p.peer_share_key(id, &octets),
+            let key = match (share, dh, prov) {
+                (Some((id, octets)), _, Some(p)) => p.peer_share_key(id, &octets),
+                (None, Some((dp, dg, public)), Some(p)) => p.peer_dh_key(&dp, &dg, &public),
                 _ => None,
             };
             match key {

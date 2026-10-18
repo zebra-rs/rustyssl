@@ -285,6 +285,10 @@ pub(crate) unsafe fn handle(
                 )
             })
         }
+        Request::TmpDh { bits } => {
+            // SAFETY: as above.
+            Some(unsafe { tmp_dh(s, x, bits) })
+        }
         Request::PskSession { identity, md } => {
             // SAFETY: as above.
             Some(unsafe { super::super::psk::session(s, x, &identity, md) })
@@ -320,6 +324,45 @@ fn ticket_cbs(
             cs.ticket_cb_data,
         )
     })
+}
+
+/// A number's big-endian octets.
+///
+/// # Safety
+/// `bn` is NULL or a live number.
+unsafe fn bn_octets(bn: *const rustyssl_abi::BIGNUM) -> Option<Vec<u8>> {
+    if bn.is_null() {
+        return None;
+    }
+    // SAFETY: the caller's number.
+    let bits = unsafe { crate::bn::BN_num_bits(bn) };
+    let len = usize::try_from(bits).ok()?.div_ceil(8);
+    let mut out = vec![0u8; len];
+    // SAFETY: as above; room for its octets.
+    let n = unsafe { crate::bn::conv::BN_bn2bin(bn, out.as_mut_ptr()) };
+    (usize::try_from(n).ok() == Some(len)).then_some(out)
+}
+
+/// The deprecated `tmp_dh_callback` (`SSL_set_tmp_dh_callback`): the DH parameters it gives
+/// for `bits` (not an export key), which stay the application's; none when it gives NULL.
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+unsafe fn tmp_dh(s: *mut SSL, x: &Ssl, bits: c_int) -> Answer {
+    let Some(cb) = x.state().cert.dh_tmp_cb else {
+        return Answer::TmpDh(None);
+    };
+    // SAFETY: the application's callback with its connection; no lock is held.
+    let dh = unsafe { cb(s, 0, bits) };
+    if dh.is_null() {
+        return Answer::TmpDh(None);
+    }
+    let (mut p, mut q, mut g) = (ptr::null(), ptr::null(), ptr::null());
+    // SAFETY: the callback's DH; our slots.
+    unsafe { crate::dh::DH_get0_pqg(dh, &raw mut p, &raw mut q, &raw mut g) };
+    // SAFETY: the DH's numbers, or NULL.
+    let params = unsafe { bn_octets(p) }.zip(unsafe { bn_octets(g) });
+    Answer::TmpDh(params)
 }
 
 /// `generate_ticket_cb`: the application may change the session the ticket will hold (its
