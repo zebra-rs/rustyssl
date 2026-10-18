@@ -522,7 +522,17 @@ fn connect(
     let (args, m) = mode(client_args);
     let port = free_port()?;
     let naccept = if m.resume { 2 } else { 1 };
-    let (mut server, lines) = start_server(t, p.server_ours, port, naccept, server_args, !m.early)?;
+    // `-rev` can't be used with DTLS: no echo then (the summaries and the server's output are
+    // compared).
+    let dtls = server_args.iter().any(|a| a.starts_with("-dtls"));
+    let (mut server, lines) = start_server(
+        t,
+        p.server_ours,
+        port,
+        naccept,
+        server_args,
+        !m.early && !dtls,
+    )?;
     let sess = t.work.join("session.pem").display().to_string();
     let mut runs = Vec::new();
     if m.resume {
@@ -549,7 +559,7 @@ fn connect(
             port,
             args,
             *full,
-            *early || m.early,
+            *early || m.early || dtls,
             m.cmd.as_deref(),
             m.trace,
         ) {
