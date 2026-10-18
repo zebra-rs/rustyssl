@@ -1171,12 +1171,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     Input::Eof => {
                         let ignore = x.state().options & SSL_OP_IGNORE_UNEXPECTED_EOF != 0;
                         if ignore {
+                            // `SSL_set_shutdown(s, SSL_RECEIVED_SHUTDOWN)`: the flags become
+                            // that alone, so a close_notify sent before is forgotten (and an
+                            // `SSL_shutdown` sends another).
                             let mut st = x.state();
-                            st.shutdown |= SSL_RECEIVED_SHUTDOWN;
+                            st.shutdown = SSL_RECEIVED_SHUTDOWN;
                             st.drv.warn_alert = u8::try_from(SSL_AD_CLOSE_NOTIFY).unwrap_or(0);
                             if let Some(c) = st.drv.tls.as_mut() {
-                                let f = c.shutdown_state() | rustyssl_tls::conn::RECEIVED_SHUTDOWN;
-                                c.set_shutdown_state(f);
+                                c.set_shutdown_state(rustyssl_tls::conn::RECEIVED_SHUTDOWN);
                             }
                             break Stop::Closed;
                         }
@@ -1197,6 +1199,8 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                                         SSL_R_UNEXPECTED_EOF_WHILE_READING,
                                     ),
                                 );
+                                // `ossl_statem_fatal` puts it back in init.
+                                st.in_init = c.in_init();
                                 let mut c2 = st.drv.tls.take();
                                 if let Some(cc) = c2.as_mut() {
                                     push_output(&mut st.drv, cc);

@@ -625,6 +625,11 @@ ffi_export! {
                     Stop::Retry | Stop::Failed | Stop::Syscall => return -1,
                 }
             }
+            // `ssl3_shutdown`: the read ended (an unexpected EOF is fatal) without the peer's
+            // close_notify.
+            if x.state().shutdown & SSL_RECEIVED_SHUTDOWN == 0 {
+                return -1;
+            }
         }
         let st = x.state();
         c_int::from(st.shutdown == SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN && st.drv.out.is_empty())
