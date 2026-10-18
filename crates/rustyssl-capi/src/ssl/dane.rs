@@ -2,11 +2,10 @@
 //! matching types, and a connection's TLSA records, validated and ordered as OpenSSL orders
 //! them.
 //!
-//! Verifying a peer against the records (`x509_vfy.c`'s `dane_verify`) isn't implemented: a
-//! handshake on a connection with records aborts (security rule 10, `io::config`), and the
-//! verifier aborts on an `SSL_DANE` (`X509_STORE_CTX_set0_dane`). Until a handshake can run,
-//! `SSL_get0_dane_authority` and `SSL_get0_dane_tlsa` report no match (-1), as OpenSSL's do
-//! before one.
+//! The verifier matches the peer against the records (`crate::x509::dane`, given the state by
+//! `X509_STORE_CTX_set0_dane`) and leaves its result here: the matching record, the certificate
+//! that matched, and its depth, which `SSL_get0_dane_authority` and `SSL_get0_dane_tlsa`
+//! report.
 
 use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 use core::ptr;
@@ -35,20 +34,37 @@ use crate::x509::cert::{OSSL_STACK_OF_X509_free, X509_free, X509_get0_pubkey, d2
 use crate::x509::pubkey::d2i_PUBKEY;
 use crate::x509::vpm::X509_VERIFY_PARAM_set1_host;
 
-/// The TLSA certificate usages, selectors, and matching types (`internal/dane.h`).
-const USAGE_DANE_TA: u8 = 2;
-/// See [`USAGE_DANE_TA`]: PKIX-TA(0), PKIX-EE(1), DANE-TA(2), DANE-EE(3).
-const USAGE_LAST: u8 = 3;
+/// The TLSA certificate usages, selectors, and matching types (`internal/dane.h`):
+/// PKIX-TA(0), PKIX-EE(1), DANE-TA(2), DANE-EE(3).
+pub(crate) const USAGE_PKIX_TA: u8 = 0;
+/// See [`USAGE_PKIX_TA`].
+pub(crate) const USAGE_PKIX_EE: u8 = 1;
+/// See [`USAGE_PKIX_TA`].
+pub(crate) const USAGE_DANE_TA: u8 = 2;
+/// See [`USAGE_PKIX_TA`].
+pub(crate) const USAGE_DANE_EE: u8 = 3;
+/// See [`USAGE_PKIX_TA`].
+const USAGE_LAST: u8 = USAGE_DANE_EE;
+/// `DANETLS_USAGE_BIT`.
+pub(crate) const fn usage_bit(u: u8) -> u32 {
+    1 << u
+}
 /// The usages whose records name trust anchors (`DANETLS_TA_MASK`: PKIX-TA and DANE-TA).
-const TA_MASK: u32 = (1 << 0) | (1 << 2);
+pub(crate) const TA_MASK: u32 = usage_bit(USAGE_PKIX_TA) | usage_bit(USAGE_DANE_TA);
+/// The usages whose records name the end entity (`DANETLS_EE_MASK`).
+pub(crate) const EE_MASK: u32 = usage_bit(USAGE_PKIX_EE) | usage_bit(USAGE_DANE_EE);
+/// The PKIX usages (`DANETLS_PKIX_MASK`).
+pub(crate) const PKIX_MASK: u32 = usage_bit(USAGE_PKIX_TA) | usage_bit(USAGE_PKIX_EE);
+/// The DANE usages (`DANETLS_DANE_MASK`).
+pub(crate) const DANE_MASK: u32 = usage_bit(USAGE_DANE_TA) | usage_bit(USAGE_DANE_EE);
 /// Cert(0), SPKI(1).
-const SELECTOR_CERT: u8 = 0;
+pub(crate) const SELECTOR_CERT: u8 = 0;
 /// See [`SELECTOR_CERT`].
-const SELECTOR_SPKI: u8 = 1;
+pub(crate) const SELECTOR_SPKI: u8 = 1;
 /// See [`SELECTOR_CERT`].
 const SELECTOR_LAST: u8 = 1;
 /// Full(0), SHA2-256(1), SHA2-512(2).
-const MATCHING_FULL: u8 = 0;
+pub(crate) const MATCHING_FULL: u8 = 0;
 /// See [`MATCHING_FULL`].
 const MATCHING_LAST: u8 = 2;
 
@@ -62,14 +78,13 @@ pub(crate) struct DaneCtx {
 
 /// A TLSA record (`danetls_record`).
 #[derive(Debug)]
-struct Tlsa {
-    usage: u8,
-    selector: u8,
-    mtype: u8,
-    #[expect(dead_code, reason = "matched by DANE verification, which comes later")]
-    data: Vec<u8>,
+pub(crate) struct Tlsa {
+    pub(crate) usage: u8,
+    pub(crate) selector: u8,
+    pub(crate) mtype: u8,
+    pub(crate) data: Vec<u8>,
     /// A DANE-TA(2) SPKI(1) Full(0) record's key (owned), or NULL.
-    spki: *mut EVP_PKEY,
+    pub(crate) spki: *mut EVP_PKEY,
 }
 
 impl Drop for Tlsa {
@@ -82,13 +97,28 @@ impl Drop for Tlsa {
 /// A connection's DANE state (`ssl_dane_st`), at a stable address for `SSL_get0_dane`.
 #[derive(Debug)]
 pub(crate) struct Dane {
-    /// The records, or `None` until `SSL_dane_enable`.
-    trecs: Option<Vec<Tlsa>>,
+    /// The records (boxed, so a match can point at one), or `None` until `SSL_dane_enable`.
+    #[expect(
+        clippy::vec_box,
+        reason = "a match points at its record, which an insert would otherwise move"
+    )]
+    trecs: Option<Vec<Box<Tlsa>>>,
     /// The Full(0) trust anchor certificates of the records (owned), or NULL.
-    certs: *mut stack_st_X509,
+    pub(crate) certs: *mut stack_st_X509,
     /// The usages present (`umask`).
-    umask: u32,
-    flags: c_ulong,
+    pub(crate) umask: u32,
+    pub(crate) flags: c_ulong,
+    /// The context's matching types (`dctx`), copied each time the connection's records are
+    /// set up or verified, as the verifier can't take the context's lock.
+    mds: Vec<(*const EVP_MD, u8)>,
+    /// The certificate that matched a record (a reference), or NULL for a bare DANE-TA key.
+    pub(crate) mcert: *mut X509,
+    /// The record that matched, or NULL.
+    pub(crate) mtlsa: *const Tlsa,
+    /// The depth of the match, or -1 (`mdpth`).
+    pub(crate) mdpth: c_int,
+    /// The depth of a PKIX trust anchor found, or -1 (`pdpth`).
+    pub(crate) pdpth: c_int,
 }
 
 impl Default for Dane {
@@ -98,6 +128,11 @@ impl Default for Dane {
             certs: ptr::null_mut(),
             umask: 0,
             flags: 0,
+            mds: Vec::new(),
+            mcert: ptr::null_mut(),
+            mtlsa: ptr::null(),
+            mdpth: -1,
+            pdpth: -1,
         }
     }
 }
@@ -106,6 +141,8 @@ impl Drop for Dane {
     fn drop(&mut self) {
         // SAFETY: our own certificates, or NULL.
         unsafe { OSSL_STACK_OF_X509_free(self.certs) };
+        // SAFETY: our reference, or NULL.
+        unsafe { X509_free(self.mcert) };
     }
 }
 
@@ -120,6 +157,43 @@ impl Dane {
     /// `DANETLS_ENABLED`: whether the connection has records to verify against.
     pub(crate) fn enabled(&self) -> bool {
         self.trecs.as_ref().is_some_and(|t| !t.is_empty())
+    }
+
+    /// The records, in matching order.
+    pub(crate) fn records(&self) -> impl Iterator<Item = &Tlsa> {
+        self.trecs.iter().flatten().map(|t| &**t)
+    }
+
+    /// The digest of matching type `mtype` (`dctx->mdevp`), or NULL (Full, or disabled).
+    pub(crate) fn md(&self, mtype: u8) -> *const EVP_MD {
+        self.mds
+            .get(usize::from(mtype))
+            .map_or(ptr::null(), |&(md, _)| md)
+    }
+
+    /// The preference ordinal of matching type `mtype` (`dctx->mdord`).
+    pub(crate) fn ord(&self, mtype: u8) -> u8 {
+        self.mds.get(usize::from(mtype)).map_or(0, |&(_, o)| o)
+    }
+
+    /// Takes the context's matching types (`dctx`), for the verifier.
+    pub(crate) fn refresh(&mut self, ctx: &DaneCtx) {
+        self.mds.clone_from(&ctx.mds);
+    }
+
+    /// The record that matched, if it's still one of the connection's.
+    fn matched(&self) -> Option<&Tlsa> {
+        self.records().find(|t| ptr::eq(*t, self.mtlsa))
+    }
+
+    /// Clears the result of a verification (`dane_reset`), handing back the certificate's
+    /// reference for the caller to free with no lock held.
+    #[must_use]
+    pub(crate) fn reset(&mut self) -> *mut X509 {
+        self.mtlsa = ptr::null();
+        self.mdpth = -1;
+        self.pdpth = -1;
+        core::mem::replace(&mut self.mcert, ptr::null_mut())
     }
 }
 
@@ -224,13 +298,13 @@ unsafe fn tlsa_add(
     }
     // SAFETY: the caller's octets.
     let bytes = unsafe { core::slice::from_raw_parts(data, dlen) };
-    let mut t = Tlsa {
+    let mut t = Box::new(Tlsa {
         usage,
         selector,
         mtype,
         data: bytes.to_vec(),
         spki: ptr::null_mut(),
-    };
+    });
     if mtype == MATCHING_FULL {
         let len = c_long::from(ilen);
         let mut p = data;
@@ -245,7 +319,7 @@ unsafe fn tlsa_add(
                 err::raise(ERR_LIB_SSL, SSL_R_DANE_TLSA_BAD_CERTIFICATE, F);
                 return 0;
             }
-            if (1u32 << usage) & TA_MASK == 0 {
+            if usage_bit(usage) & TA_MASK == 0 {
                 // SAFETY: decoded above, not kept.
                 unsafe { X509_free(cert) };
             } else if !push_cert(dane, cert) {
@@ -287,7 +361,8 @@ unsafe fn tlsa_add(
         })
         .unwrap_or(trecs.len());
     trecs.insert(at, t);
-    dane.umask |= 1u32 << usage;
+    dane.umask |= usage_bit(usage);
+    dane.refresh(dctx);
     1
 }
 
@@ -385,10 +460,14 @@ ffi_export! {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let (ctx_enabled, already, has_host, param) = {
-            let st = x.state();
+            let mut st = x.state();
             // SAFETY: the connection holds a reference to its context.
             let cx = unsafe { ctx_of(&st) };
-            let enabled = cx.is_some_and(|c| c.state().lists.dane_ctx.mds.len() > 1);
+            let enabled = cx.is_some_and(|c| {
+                let cs = c.state();
+                st.lists.dane.refresh(&cs.lists.dane_ctx);
+                cs.lists.dane_ctx.mds.len() > 1
+            });
             (enabled, st.lists.dane.trecs.is_some(), st.hostname.is_some(), x.param)
         };
         if !ctx_enabled {
@@ -410,7 +489,13 @@ ffi_export! {
             err::raise(ERR_LIB_SSL, SSL_R_ERROR_SETTING_TLSA_BASE_DOMAIN, F);
             return -1;
         }
-        x.state().lists.dane.trecs = Some(Vec::new());
+        let old = {
+            let mut st = x.state();
+            st.lists.dane.trecs = Some(Vec::new());
+            st.lists.dane.reset()
+        };
+        // SAFETY: the previous match's reference, or NULL, freed with no lock held.
+        unsafe { X509_free(old) };
         1
     }
 }
@@ -481,46 +566,94 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
+        let mut st = x.state();
+        // The context's matching types, for a verification the application runs with it.
+        // SAFETY: the connection holds a reference to its context.
+        if let Some(cx) = unsafe { ctx_of(&st) } {
+            st.lists.dane.refresh(&cx.state().lists.dane_ctx);
+        }
         // The state is boxed: its address is stable for the connection's lifetime.
-        ptr::from_mut::<Dane>(&mut x.state().lists.dane).cast()
+        ptr::from_mut::<Dane>(&mut st.lists.dane).cast()
     }
 }
 
-/// `SSL_get0_dane_authority` and `SSL_get0_dane_tlsa`'s result: the matched depth, which no
-/// handshake has set yet (-1).
-fn match_depth(x: &super::conn::Ssl) -> c_int {
+/// The verification's match, if DANE is on and the peer verified (`SSL_get0_dane_authority`
+/// and `SSL_get0_dane_tlsa`): its depth, and what `f` reads of the matching record and
+/// certificate (with the connection's lock held: `f` runs no C).
+fn with_match<T: Default>(
+    x: &super::conn::Ssl,
+    f: impl FnOnce(&Dane, Option<&Tlsa>) -> T,
+) -> (c_int, T) {
     let st = x.state();
-    if !st.lists.dane.enabled() || st.verify_result != c_long::from(X509_V_OK) {
-        return -1;
+    let d = &st.lists.dane;
+    if !d.enabled() || st.verify_result != c_long::from(X509_V_OK) {
+        return (-1, T::default());
     }
-    -1
+    (d.mdpth, f(d, d.matched()))
+}
+
+/// Writes `v` through `p` unless it's NULL.
+///
+/// # Safety
+/// `p` is NULL or writable.
+unsafe fn put<T>(p: *mut T, v: T) {
+    // SAFETY: the caller's guarantee.
+    if let Some(r) = unsafe { p.as_mut() } {
+        *r = v;
+    }
 }
 
 ffi_export! {
-    /// The depth of the certificate that matched a TLSA record (with it or its key), or -1
-    /// for no match (DANE off, verification failed, or no handshake yet).
+    /// The depth of the certificate that matched a TLSA record, or -1 for no match (DANE off,
+    /// or verification failed or hasn't run); with a match, the certificate (`mcert`), or the
+    /// DANE-TA record's bare key when no certificate matched (`mspki`; NULL otherwise).
     ///
     /// # Safety
     /// `s` is NULL or a live connection; `mcert` and `mspki` NULL or writable.
     pub unsafe extern "C" fn rustyssl_private_SSL_get0_dane_authority(s: *mut SSL, mcert: *mut *mut X509, mspki: *mut *mut EVP_PKEY) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
-        let _ = (mcert, mspki);
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(-1, match_depth)
+        let Some(x) = (unsafe { ssl(s) }) else { return -1 };
+        let (depth, found) = with_match(x, |d, t| {
+            t.map(|t| (d.mcert, if d.mcert.is_null() { t.spki } else { ptr::null_mut() }))
+        });
+        if let Some((cert, spki)) = found {
+            // SAFETY: the caller's pointers.
+            unsafe { put(mcert, cert) };
+            // SAFETY: as above.
+            unsafe { put(mspki, spki) };
+        }
+        depth
     }
 }
 
 ffi_export! {
-    /// The TLSA record that matched and its depth, or -1 for no match (as for the authority).
+    /// The TLSA record that matched (its fields, and its data, valid while the connection's
+    /// records are) and its depth, or -1 for no match (as for the authority).
     ///
     /// # Safety
     /// `s` is NULL or a live connection; the out-arguments NULL or writable.
     pub unsafe extern "C" fn rustyssl_private_SSL_get0_dane_tlsa(s: *mut SSL, usage: *mut u8, selector: *mut u8, mtype: *mut u8, data: *mut *const u8, dlen: *mut usize) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
-        let _ = (usage, selector, mtype, data, dlen);
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(-1, match_depth)
+        let Some(x) = (unsafe { ssl(s) }) else { return -1 };
+        let (depth, found) = with_match(x, |_, t| {
+            t.map(|t| (t.usage, t.selector, t.mtype, t.data.as_ptr(), t.data.len()))
+        });
+        if let Some((u, sel, m, p, n)) = found {
+            // SAFETY: the caller's pointers.
+            unsafe { put(usage, u) };
+            // SAFETY: as above.
+            unsafe { put(selector, sel) };
+            // SAFETY: as above.
+            unsafe { put(mtype, m) };
+            // SAFETY: as above.
+            unsafe { put(data, p) };
+            // SAFETY: as above.
+            unsafe { put(dlen, n) };
+        }
+        depth
     }
 }

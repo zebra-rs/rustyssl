@@ -5,7 +5,7 @@
 
 #![allow(clippy::type_complexity)]
 
-use libc::{FILE, time_t, timeval, tm};
+use libc::{FILE, off_t, time_t, timeval, tm};
 use rustyssl_abi::*;
 
 const _: unsafe extern "C" fn(*mut ACCESS_DESCRIPTION) =
@@ -20688,6 +20688,8 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     core::ffi::c_uint,
 ) -> core::ffi::c_int = crate::ssl::io::alpn::rustyssl_private_SSL_select_next_proto;
+const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int, off_t, usize, core::ffi::c_int) -> isize =
+    crate::ssl::ktls::rustyssl_private_SSL_sendfile;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::accessors::rustyssl_private_SSL_session_reused;
 const _: unsafe extern "C" fn(*mut SSL, *mut stack_st_X509_NAME) =
@@ -20911,6 +20913,15 @@ const _: unsafe extern "C" fn(*mut SSL, u64) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_stream_conclude;
 const _: unsafe extern "C" fn(*mut SSL, *const SSL_STREAM_RESET_ARGS, usize) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_stream_reset;
+const _: unsafe extern "C" fn(
+    core::ffi::c_int,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *const core::ffi::c_void,
+    usize,
+    *mut SSL,
+    *mut core::ffi::c_void,
+) = crate::ssl::trace::rustyssl_private_SSL_trace;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_up_ref;
 const _: unsafe extern "C" fn(*mut SSL, *mut EVP_PKEY) -> core::ffi::c_int =

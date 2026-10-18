@@ -652,3 +652,9 @@ name = "tls_record"
 path = "fuzz_targets/tls_record.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "ssl_trace"
+path = "fuzz_targets/ssl_trace.rs"
+test = false
+doc = false
