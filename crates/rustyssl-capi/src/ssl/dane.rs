@@ -66,7 +66,6 @@ struct Tlsa {
     usage: u8,
     selector: u8,
     mtype: u8,
-    #[expect(dead_code, reason = "matched by DANE verification, which comes later")]
     data: Vec<u8>,
     /// A DANE-TA(2) SPKI(1) Full(0) record's key (owned), or NULL.
     spki: *mut EVP_PKEY,
@@ -78,6 +77,9 @@ impl Drop for Tlsa {
         unsafe { EVP_PKEY_free(self.spki) };
     }
 }
+
+/// A TLSA record's usage, selector, matching type, and data.
+pub(crate) type TlsaRecord = (u8, u8, u8, Vec<u8>);
 
 /// A connection's DANE state (`ssl_dane_st`), at a stable address for `SSL_get0_dane`.
 #[derive(Debug)]
@@ -120,6 +122,33 @@ impl Dane {
     /// `DANETLS_ENABLED`: whether the connection has records to verify against.
     pub(crate) fn enabled(&self) -> bool {
         self.trecs.as_ref().is_some_and(|t| !t.is_empty())
+    }
+
+    /// Whether `SSL_dane_enable` was called (`dane->dctx != NULL`).
+    pub(crate) fn has_ctx(&self) -> bool {
+        self.trecs.is_some()
+    }
+
+    /// `ssl_dane_dup`'s source: the flags and each record, or `None` when DANE isn't enabled.
+    pub(crate) fn records(&self) -> Option<(c_ulong, Vec<TlsaRecord>)> {
+        if !self.enabled() {
+            return None;
+        }
+        let t = self.trecs.as_ref()?;
+        let recs = t
+            .iter()
+            .map(|r| (r.usage, r.selector, r.mtype, r.data.clone()))
+            .collect();
+        Some((self.flags, recs))
+    }
+
+    /// `ssl_dane_dup`'s target: a fresh enabled state with `flags`, its records to be added.
+    pub(crate) fn reset_enabled(&mut self, flags: c_ulong) {
+        *self = Self {
+            trecs: Some(Vec::new()),
+            flags,
+            ..Self::default()
+        };
     }
 }
 

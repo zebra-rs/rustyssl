@@ -223,6 +223,12 @@ pub struct Connection {
     pub(crate) fatal_alert: u8,
     /// The last alert sent (level, description), for `SSL_alert_desc_string`.
     pub(crate) sent_alert: Option<(u8, u8)>,
+    /// How often the handshake passed the points where OpenSSL takes its round-trip timestamps
+    /// (`ts_msg_write`, `ts_msg_read`): the caller, which has the clock, notes the time when
+    /// each changes ([`Connection::rtt_marks`]).
+    pub(crate) rtt_write: u32,
+    /// See `rtt_write`.
+    pub(crate) rtt_read: u32,
     /// Whether the record layer needs more input to make progress.
     needs_input: bool,
     /// Whether the caller wants application data (an `SSL_read` is in progress).
@@ -302,6 +308,8 @@ impl Connection {
             warn_alert: 0,
             fatal_alert: 0,
             sent_alert: None,
+            rtt_write: 0,
+            rtt_read: 0,
             needs_input: false,
             reading: false,
             security_hook: None,
@@ -384,6 +392,13 @@ impl Connection {
             RoleState::Client(s) if self.hs.sh.cert_req != 0 => Some(s.certificate_types()),
             _ => None,
         }
+    }
+
+    /// The round-trip marks: how often the handshake passed OpenSSL's `ts_msg_write` and
+    /// `ts_msg_read` points (shared addition, fork O: `SSL_get_handshake_rtt`).
+    #[must_use]
+    pub fn rtt_marks(&self) -> (u32, u32) {
+        (self.rtt_write, self.rtt_read)
     }
 
     /// The handshake state (`SSL_get_state`).

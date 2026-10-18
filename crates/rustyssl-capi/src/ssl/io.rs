@@ -157,6 +157,11 @@ pub(crate) struct Driver {
     pub(crate) group_names: Vec<CString>,
     /// The peer's raw public key (RFC 7250) as an object, decoded on first use.
     pub(crate) peer_rpk: PeerRpk,
+    /// The core's round-trip marks last seen, and when each last moved (`ts_msg_write`,
+    /// `ts_msg_read`), for `SSL_get_handshake_rtt`.
+    pub(crate) rtt_marks: (u32, u32),
+    /// See `rtt_marks`.
+    pub(crate) rtt_times: (Option<std::time::Instant>, Option<std::time::Instant>),
 }
 
 /// An owned `EVP_PKEY` (the peer's raw public key), freed with the connection.
@@ -213,6 +218,17 @@ pub(crate) fn raise_core(e: &TlsError, function: &str) {
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    let marks = c.rtt_marks();
+    if marks != st.drv.rtt_marks {
+        let now = std::time::Instant::now();
+        if marks.0 != st.drv.rtt_marks.0 {
+            st.drv.rtt_times.0 = Some(now);
+        }
+        if marks.1 != st.drv.rtt_marks.1 {
+            st.drv.rtt_times.1 = Some(now);
+        }
+        st.drv.rtt_marks = marks;
+    }
     st.in_init = c.in_init();
     st.flow_uninited = c.before();
     let n = c.negotiated();

@@ -4,6 +4,7 @@
 //! modules. The handshake (ADR 0002) plugs into [`conn::SslState`].
 
 pub(crate) mod accessors;
+pub(crate) mod apis;
 pub(crate) mod bio_ssl;
 pub(crate) mod ca;
 pub(crate) mod cert;
@@ -15,6 +16,7 @@ pub(crate) mod conn;
 pub(crate) mod ct;
 pub(crate) mod ctx;
 pub(crate) mod dane;
+pub(crate) mod dup;
 pub(crate) mod io;
 pub(crate) mod keys;
 pub(crate) mod lists;

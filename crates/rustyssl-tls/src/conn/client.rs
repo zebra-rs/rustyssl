@@ -714,6 +714,7 @@ fn write_transition13(c: &mut Connection) -> Result<WriteTran> {
             return Err(Error::internal());
         }
     } else if is(abi::TLS_ST_CR_FINISHED) {
+        c.rtt_read = c.rtt_read.wrapping_add(1);
         let eds = c.hs.sh.early_data_state;
         if eds == EarlyDataState::WriteRetry || eds == EarlyDataState::FinishedWriting {
             abi::TLS_ST_PENDING_EARLY_DATA_END
@@ -788,6 +789,7 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
                 abi::TLS_ST_EARLY_DATA
             }
         } else {
+            c.rtt_write = c.rtt_write.wrapping_add(1);
             return Ok(WriteTran::Finished);
         }
     } else if is(abi::TLS_ST_CR_SRVR_HELLO) {
@@ -798,8 +800,10 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
             abi::TLS_ST_CW_CLNT_HELLO
         }
     } else if is(abi::TLS_ST_EARLY_DATA) {
+        c.rtt_write = c.rtt_write.wrapping_add(1);
         return Ok(WriteTran::Finished);
     } else if is(abi::TLS_ST_CR_SRVR_DONE) {
+        c.rtt_read = c.rtt_read.wrapping_add(1);
         if c.hs.sh.cert_req != 0 {
             abi::TLS_ST_CW_CERT
         } else {
