@@ -130,6 +130,8 @@ pub(crate) struct Driver {
     pub(crate) provider: Option<Arc<EvpProvider>>,
     /// Output the core produced that the write BIO hasn't taken yet.
     pub(crate) out: Vec<u8>,
+    /// What's left to write of the record at the front of `out` (0: a record starts there).
+    pub(crate) out_record_left: usize,
     /// A write waiting to be retried (`wpend_tot`, `wpend_buf`): what it accepted, and its
     /// buffer's address.
     pub(crate) wpend: Option<(usize, usize)>,
@@ -556,12 +558,19 @@ pub(crate) enum Flush {
 /// `x` is a live connection.
 pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
     loop {
+        // One record per write, as the record layer writes them (a BIO that takes only some
+        // writes sees each record retried on its own).
         let (wbio, chunk) = {
-            let st = x.state();
+            let mut st = x.state();
             if st.drv.out.is_empty() {
+                st.drv.out_record_left = 0;
                 return Flush::Done;
             }
-            (st.wbio, st.drv.out.clone())
+            if st.drv.out_record_left == 0 {
+                st.drv.out_record_left = record_len(&st.drv.out);
+            }
+            let n = st.drv.out_record_left.min(st.drv.out.len());
+            (st.wbio, st.drv.out.get(..n).unwrap_or_default().to_vec())
         };
         if wbio.is_null() {
             return Flush::Error;
@@ -596,8 +605,20 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
         }
         let done = usize::try_from(r).unwrap_or(0).min(chunk.len());
         let mut st = x.state();
+        st.drv.out_record_left = st.drv.out_record_left.saturating_sub(done);
         let out = &mut st.drv.out;
         out.drain(..done.min(out.len()));
+    }
+}
+
+/// The length of the TLS record at the front of `out` (header included), or all of `out` when
+/// it doesn't start with a whole header.
+fn record_len(out: &[u8]) -> usize {
+    match out.get(..5) {
+        Some(&[_, _, _, hi, lo]) => {
+            5usize.saturating_add(usize::from(u16::from_be_bytes([hi, lo])))
+        }
+        _ => out.len(),
     }
 }
 

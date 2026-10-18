@@ -563,7 +563,11 @@ ffi_export! {
 /// next handshake starts afresh (the session stays, to be resumed). What it held, to be freed
 /// with no lock held.
 fn restart(st: &mut SslState) -> Option<super::io::Driver> {
-    st.drv.tls.as_ref()?;
+    // An engine still before its first handshake stays (`SSL_accept` sets the role on the one
+    // `SSL_stateless` set up).
+    if st.drv.tls.as_ref()?.before() {
+        return None;
+    }
     let kept = st.drv.clear();
     Some(core::mem::replace(&mut st.drv, kept))
 }
@@ -1349,8 +1353,14 @@ ffi_export! {
             if st.hit != 0 && !tls13 {
                 return session_name();
             }
-            // Else the name the client's hello carried.
-            return st.drv.servername.as_deref().map_or(ptr::null(), core::ffi::CStr::as_ptr);
+            // Else the name the client's hello carried (it replaces the one set on the
+            // connection), or the one set.
+            return st
+                .drv
+                .servername
+                .as_deref()
+                .or(st.hostname.as_deref())
+                .map_or(ptr::null(), core::ffi::CStr::as_ptr);
         }
         // `SSL_in_before`.
         let before = st.hand_state == TLS_ST_BEFORE && st.flow_uninited;
@@ -1800,6 +1810,10 @@ ffi_export! {
                 st.max_send_fragment = usize::try_from(larg).unwrap_or(512);
                 if st.max_send_fragment < st.split_send_fragment {
                     st.split_send_fragment = st.max_send_fragment;
+                }
+                let n = st.max_send_fragment;
+                if let Some(c) = st.drv.tls.as_mut() {
+                    c.set_max_send_fragment(n);
                 }
                 1
             }

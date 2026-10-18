@@ -331,11 +331,14 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        let mut rw = RecordWriter::new(record_version);
+        // `ssl_get_max_send_fragment`.
+        rw.max_frag_len = cfg.max_send_fragment.clamp(1, rw.max_frag_len);
         Self {
             cfg,
             st: Statem::default(),
             rr: RecordReader::new(server),
-            rw: RecordWriter::new(record_version),
+            rw,
             hs: Handshake {
                 // `SSL_new`'s `key_update`: none pending, on either side (fork M).
                 sh: common::Shared {
@@ -419,6 +422,17 @@ impl Connection {
     /// The settings, to update mid-handshake (after a callback changed the `SSL`).
     pub fn config_mut(&mut self) -> &mut Config {
         &mut self.cfg
+    }
+
+    /// `SSL_set_max_send_fragment` on a running connection: the records written from now on
+    /// carry at most `n` octets, or the negotiated maximum fragment length if that's less.
+    pub fn set_max_send_fragment(&mut self, n: usize) {
+        self.cfg.max_send_fragment = n;
+        let negotiated =
+            crate::conn::common::ext::max_fragment_length(self.neg.session.max_fragment_len_mode);
+        self.rw.max_frag_len = negotiated
+            .map_or(n, |len| n.min(len))
+            .clamp(1, crate::record::MAX_PLAIN);
     }
 
     /// Installs the application's security callback (`SSL_CTX_set_security_callback`), which
