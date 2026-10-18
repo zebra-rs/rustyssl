@@ -380,18 +380,24 @@ pub(crate) unsafe fn write_internal(
     } else {
         num
     };
-    let r = {
+    // The core is written to out of the lock: the record padding callback may run.
+    let taken = {
         let mut st = x.state();
-        let prov = st.drv.provider.clone();
-        match (st.drv.tls.as_mut(), prov) {
-            (Some(c), Some(p)) => {
-                // SAFETY: the caller's `num` octets, of which `chunk` are taken.
-                let data = unsafe { core::slice::from_raw_parts(buf.cast::<u8>(), chunk) };
-                Some(c.write_app(&*p, data))
-            }
-            _ => None,
+        match st.drv.provider.clone() {
+            Some(p) => st.drv.tls.take().map(|c| (c, p)),
+            None => None,
         }
     };
+    let r = taken.map(|(mut c, p)| {
+        // SAFETY: the caller's `num` octets, of which `chunk` are taken.
+        let data = unsafe { core::slice::from_raw_parts(buf.cast::<u8>(), chunk) };
+        let r = c.write_app(&*p, data);
+        let mut st = x.state();
+        if st.drv.tls.is_none() {
+            st.drv.tls = Some(c);
+        }
+        r
+    });
     match r {
         Some(Ok(_)) => {}
         Some(Err(e)) => {

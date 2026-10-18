@@ -331,11 +331,17 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        let mut rw = RecordWriter::new(record_version);
+        // `SSL_CTX_set_block_padding_ex`, for TLS 1.3's protected records.
+        let (app, hs) = cfg.block_padding;
+        if app > 0 || hs > 0 {
+            rw.padding = record::Padding::Block(app, hs);
+        }
         Self {
             cfg,
             st: Statem::default(),
             rr: RecordReader::new(server),
-            rw: RecordWriter::new(record_version),
+            rw,
             hs: Handshake {
                 // `SSL_new`'s `key_update`: none pending, on either side (fork M).
                 sh: common::Shared {
@@ -426,6 +432,13 @@ impl Connection {
     /// call back into this connection.
     pub fn set_security_hook(&mut self, hook: Option<common::SecurityHook>) {
         self.security_hook = hook;
+    }
+
+    /// Installs the application's record padding callback
+    /// (`SSL_CTX_set_record_padding_callback`), which the record layer calls in place for
+    /// each protected TLS 1.3 record. The hook must not call back into this connection.
+    pub fn set_padding_hook(&mut self, hook: Option<record::PaddingHook>) {
+        self.rw.pad_hook = hook;
     }
 
     /// What was negotiated so far.

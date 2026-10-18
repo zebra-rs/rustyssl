@@ -1114,6 +1114,7 @@ ffi_export! {
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
         st.record_padding_arg = a;
+        st.padding_cell.lock().unwrap_or_else(std::sync::PoisonError::into_inner).1 = a;
     }
 }
 
