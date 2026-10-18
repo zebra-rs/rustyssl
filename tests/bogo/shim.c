@@ -1479,6 +1479,9 @@ static int do_exchange(SSL **out_session_owner, SSL *ssl, int is_resume)
                 }
                 n = do_read(ssl, buf, size);
                 err = SSL_get_error(ssl, n);
+                if (getenv("BOGO_SHIM_DEBUG") != NULL)
+                    fprintf(stderr, "read %d (error %d): %02x %02x\n", n, err,
+                            n > 0 ? buf[0] : 0, n > 1 ? buf[1] : 0);
                 if (err == SSL_ERROR_ZERO_RETURN || (n == 0 && err == SSL_ERROR_SYSCALL))
                     break;
                 if (err != SSL_ERROR_NONE || n <= 0) {
