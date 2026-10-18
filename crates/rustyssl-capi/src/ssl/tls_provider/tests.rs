@@ -152,6 +152,25 @@ fn aeads_agree_both_ways_and_reject_tampering() {
             .seal(&nonce, b"", &mut empty_t)
             .unwrap();
         assert_eq!(empty, empty_t, "{alg:?} empty");
+        // An empty record with additional data (a TLS 1.2 record's 13-octet header): only the
+        // tag, and it opens to nothing.
+        let header = [0u8; 13];
+        let mut sealed = Vec::new();
+        e.aead(alg, &key)
+            .unwrap()
+            .seal(&nonce, &header, &mut sealed)
+            .unwrap();
+        let mut sealed_t = Vec::new();
+        t.aead(alg, &key)
+            .unwrap()
+            .seal(&nonce, &header, &mut sealed_t)
+            .unwrap();
+        assert_eq!(sealed, sealed_t, "{alg:?} empty with a header");
+        e.aead(alg, &key)
+            .unwrap()
+            .open(&nonce, &header, &mut sealed_t)
+            .unwrap();
+        assert!(sealed_t.is_empty(), "{alg:?} opened empty");
         let mut short = vec![0u8; alg.tag_len() - 1];
         assert!(
             e.aead(alg, &key)

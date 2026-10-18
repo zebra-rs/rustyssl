@@ -896,9 +896,13 @@ pub(crate) fn write_transition(c: &mut Connection) -> Result<WriteTran> {
             abi::TLS_ST_OK
         }
     } else if is(abi::TLS_ST_CR_HELLO_REQ) {
-        // `ssl3_renegotiate_check`: a renegotiation the HelloRequest asked for starts now
-        // (its set-up runs before the ClientHello, in pre-work).
-        if c.renegotiate {
+        // `ssl3_renegotiate_check`: the renegotiation the HelloRequest asked for starts now,
+        // and is counted, unless records are still waiting to be read (then it starts at the
+        // next check); its set-up runs before the ClientHello, in pre-work.
+        if c.s3_renegotiate && c.input.is_empty() {
+            c.s3_renegotiate = false;
+            c.num_renegotiations = c.num_renegotiations.saturating_add(1);
+            c.total_renegotiations = c.total_renegotiations.saturating_add(1);
             state(c)?.needs_setup = true;
             abi::TLS_ST_CW_CLNT_HELLO
         } else {

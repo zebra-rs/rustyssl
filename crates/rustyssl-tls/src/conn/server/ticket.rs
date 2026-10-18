@@ -506,6 +506,15 @@ fn sealed(
     }
 }
 
+/// A ticket for `session` under the configuration's keys, for tests that offer one.
+#[cfg(test)]
+pub(crate) fn seal_for_test(c: &mut Connection, p: &dyn Provider, session: &Session) -> Vec<u8> {
+    match sealed(c, p, session, 0) {
+        Ok(Some(Some(t))) => t,
+        other => panic!("cannot seal a ticket: {other:?}"),
+    }
+}
+
 /// `construct_stateless_ticket`'s ticket: the key name, the IV, the session encrypted, and the
 /// HMAC.
 fn seal(p: &dyn Provider, k: &Keys, session: &Session) -> Result<Vec<u8>> {
@@ -821,8 +830,9 @@ pub(crate) fn parse_psk(
             return Err(Error::internal());
         };
         let ours = c.hs.new_cipher.ok_or_else(Error::internal)?;
-        let hash = keys::hashes(v::TLS1_3, scp).0;
-        if hash != keys::hashes(v::TLS1_3, ours).0 {
+        // `ssl_md` of each suite's own `algorithm2`: a session from a TLS 1.1 or older suite
+        // (MD5-SHA1) never fits a TLS 1.3 suite.
+        if scp.handshake_hash() != ours.handshake_hash() {
             c.hs.sh.early_data_ok = false;
             c.hs.sh.ticket_expected = true;
             continue;

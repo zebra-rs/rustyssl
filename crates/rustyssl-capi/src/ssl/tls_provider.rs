@@ -1258,6 +1258,9 @@ impl EvpAead {
                 EVP_CipherUpdate(ctx.0, ptr::null_mut(), &raw mut outl, aad.as_ptr(), alen)
             } != 0;
         let mut out = vec![0u8; data.len().saturating_add(16)];
+        // The additional data's update reported its own length; only the data's output counts
+        // (an empty record has none).
+        outl = 0;
         if ok && !data.is_empty() {
             // SAFETY: as above; room for the data and a block.
             ok = unsafe {

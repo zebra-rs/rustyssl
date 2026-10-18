@@ -1006,6 +1006,21 @@ fn malformed_and_unexpected_client_hellos() {
         abi::SSL_AD_ILLEGAL_PARAMETER,
         abi::SSL_R_BAD_ECPOINT,
     );
+    // A point that is on the curve but compressed (P-256's generator), which TLS 1.3 forbids.
+    let mut compressed = vec![0x03];
+    compressed.extend_from_slice(&[
+        0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47, 0xf8, 0xbc, 0xe6, 0xe5, 0x63, 0xa4, 0x40,
+        0xf2, 0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0, 0xf4, 0xa1, 0x39, 0x45, 0xd8, 0x98,
+        0xc2, 0x96,
+    ]);
+    let compressed = Hello::tls13(&[group::SECP256R1], &[(group::SECP256R1, compressed)]);
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[compressed.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_ECPOINT,
+    );
     // Only TLS 1.3 enabled, and the client offers TLS 1.2.
     let mut only13 = cfg.clone();
     only13.min_version = v::TLS1_3;
@@ -2284,6 +2299,46 @@ fn tls13_resumption_with_a_ticket() {
             abi::SSL_R_MISSING_PSK_KEX_MODES_EXTENSION
         )
     );
+}
+
+/// A ticket for a TLS 1.0 session (an MD5-SHA1 suite) offered as a TLS 1.3 PSK: its suite's
+/// hash isn't the TLS 1.3 suite's, so the server ignores it and runs a full handshake (it
+/// doesn't check the binder).
+#[test]
+fn tls13_ignores_an_older_versions_ticket() {
+    let p = TestProvider::new(b"old ticket");
+    let old = crate::conn::Session {
+        version: v::TLS1,
+        // TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA.
+        cipher_id: 0x0300_c013,
+        session_id: vec![1; 32],
+        master_key: vec![2; 48],
+        time: server_config(&p).now,
+        timeout: 7200,
+        ..crate::conn::Session::default()
+    };
+    let mut sealer = Connection::new(server_config(&p));
+    let ticket = super::ticket::seal_for_test(&mut sealer, &p, &old);
+    let x = p.key_share(group::X25519).unwrap();
+    // The binder as a client keeping the session's own hash makes it: MD5-SHA1's 36 octets.
+    let offer = crate::msgs::ext::psk::Strict {
+        identities: vec![crate::msgs::ext::psk::Identity {
+            identity: ticket,
+            obfuscated_ticket_age: 0,
+        }],
+        binders: vec![vec![0; 36]],
+    };
+    let hello = x25519_hello(x.public().to_vec())
+        .with(
+            t::PSK_KEY_EXCHANGE_MODES,
+            crate::msgs::ext::psk_key_exchange_modes::encode(&[1]).unwrap(),
+        )
+        .with(t::PRE_SHARED_KEY, offer.encode().unwrap());
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(!c.neg.reused);
 }
 
 #[test]

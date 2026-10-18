@@ -1168,7 +1168,7 @@ pub fn construct_sig_algs(c: &Connection) -> Result<ExtReturn> {
     let tls12 = super::version::of(abi::TLS1_2_VERSION);
     let level = super::version::tls_level;
     if level(c.hs.sh.client_version) < tls12
-        || (c.cfg.method_version != super::version::ANY && level(c.neg.version) < tls12)
+        || (super::version::method_fixed(c) && level(c.neg.version) < tls12)
     {
         return Ok(ExtReturn::NotSent);
     }

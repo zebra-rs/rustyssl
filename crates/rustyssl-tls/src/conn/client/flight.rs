@@ -736,7 +736,9 @@ pub(super) fn process_hello_req(
         c.send_alert(p, level, desc)?;
         return Ok(MsgProcess::FinishedReading);
     }
+    // `SSL_renegotiate_abbreviated`.
     c.renegotiate = true;
+    c.s3_renegotiate = true;
     // A TLS client answers with an abbreviated handshake, a DTLS client with a full one
     // (`SSL_renegotiate` rather than `SSL_renegotiate_abbreviated`, a historical discrepancy).
     c.hs.sh.new_session = c.cfg.dtls;

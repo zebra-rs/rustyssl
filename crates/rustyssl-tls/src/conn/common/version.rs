@@ -116,6 +116,15 @@ pub fn suiteb(c: &Connection) -> u32 {
     c.cfg.cert_flags & mask
 }
 
+/// Whether the connection runs a version's own method (`s->ssl.method->version` isn't
+/// `TLS_ANY_VERSION`): a fixed-version method's always, a flexible one's once the hellos
+/// chose the version (`ssl_choose_server_version`, `ssl_choose_client_version` switch it), so
+/// in a renegotiation too.
+#[must_use]
+pub fn method_fixed(c: &Connection) -> bool {
+    c.cfg.method_version != ANY || (!c.before() && c.version_decided())
+}
+
 /// The versions a handshake may use (`ssl_get_min_max_version`): `(min, max, real_max)`,
 /// where `real_max` is the highest version below the highest hole in the enabled range (for
 /// the client's fallback check). A fixed-version method gives its version for both, and

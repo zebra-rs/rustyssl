@@ -4936,7 +4936,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_STORE_CTX_set_current_reasons` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_set_default` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_set_depth` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
-| `X509_STORE_CTX_set_error` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx`, `x509_rfc3779` |
+| `X509_STORE_CTX_set_error` | libcrypto | `openssl/x509_vfy.h` | `ssl_handshake_reads`, `x509_ctx`, `x509_rfc3779` |
 | `X509_STORE_CTX_set_error_depth` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_set_ex_data` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
 | `X509_STORE_CTX_set_flags` | libcrypto | `openssl/x509_vfy.h` | `x509_ctx` |
@@ -6212,7 +6212,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get_shared_ciphers` | libssl | `openssl/ssl.h` | `ssl_cipher`, `ssl_strings` |
 | `SSL_get_shared_sigalgs` | libssl | `openssl/tls1.h` | `ssl_io_idle`, `ssl_mldsa` |
 | `SSL_get_shutdown` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_io`, `ssl_io_idle`, `ssl_misc`, `ssl_shutdown` |
-| `SSL_get_sigalgs` | libssl | `openssl/tls1.h` | `ssl_io_idle`, `ssl_mldsa` |
+| `SSL_get_sigalgs` | libssl | `openssl/tls1.h` | `ssl_handshake_reads`, `ssl_io_idle`, `ssl_mldsa` |
 | `SSL_get_signature_type_nid` | libssl | `openssl/tls1.h` | `ssl_handshake`, `ssl_io_idle` |
 | `SSL_get_srp_N` | libssl | `openssl/ssl.h` | `ssl_srp` |
 | `SSL_get_srp_g` | libssl | `openssl/ssl.h` | `ssl_srp` |

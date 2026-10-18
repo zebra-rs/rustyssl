@@ -204,6 +204,19 @@ rustyssl itself**. You can only regenerate golden files with
 - **BoGo** (the BoringSSL TLS test runner) with a rustyssl shim written in C against the
   OpenSSL API, which also exercises capi. A config file lists the BoringSSL-only features
   we skip.
+  - `cargo xtask test-bogo [pattern...]`: the runner from the BoringSSL commit pinned in
+    `tests/bogo/pin.txt` (archive SHA-256 checked, Go modules checked against go.sum),
+    `tests/bogo/shim.c`, `tests/bogo/config.json`. Each test runs on the reference and on
+    rustyssl; the reference's verdict is the expectation. The shim exits 89 (unimplemented)
+    for flags it can't express with the OpenSSL API (BoringSSL-only features: ECH, ALPS,
+    Channel ID, credentials, PAKEs, compliance policies, QUIC; and DTLS until Phase 8.1), so
+    those tests are skipped on both. Errors match loosely (`-loose-errors`), and the shim's
+    failure log compares the two libraries' first error entries instead. The report is
+    `target/bogo-report.md`.
+  - Measured 2026-10-18 at BoringSSL 5e1bfb45: 8091 tests, 5221 unimplemented by the shim;
+    the reference passes 2208, rustyssl 2218. **Pass target (M5): every test the reference
+    passes, passes on rustyssl** (none passing on the reference alone), and the shim's
+    unimplemented count shrinks as DTLS lands.
 - **tlsfuzzer**, against `s_server` (upstream app relinked, later our CLI): the script set
   OpenSSL and GnuTLS run in their CI, covering fragmentation, extensions, renegotiation,
   invalid ECDHE points, version negotiation, and the timing scripts for Bleichenbacher/Marvin
@@ -416,7 +429,7 @@ A function counts as **implemented** in the coverage report only when all of the
 | M2 | curl and nginx L8 smoke pass; interop with reference `s_client`/`s_server` on TLS 1.3; TLS client and server fuzzers clean for 24 h |
 | M3 | the OpenSSH regression suite matches the reference |
 | M4 | nginx, curl, CPython, httpd, HAProxy, and PostgreSQL match the reference; the tlsfuzzer core set passes; at least 90% of eligible upstream ssl and x509 recipes pass |
-| M5 | 100% libssl coverage; BoGo pass target (set once measured); the DTLS interop matrix is green |
+| M5 | 100% libssl coverage; BoGo: every test the reference passes, passes on rustyssl (`cargo xtask test-bogo`); the DTLS interop matrix is green |
 | M6 | 100% libcrypto coverage; **at least 98% of eligible upstream tests** pass; the Ruby, pyca, rust-openssl, and Node suites match the reference |
 | M7 | everything above, plus L11 green, the CVE suite complete, constant-time reports clean, perf targets met, and the external audit closed |
 | M8 | M7 repeated against the 4.0 reference |

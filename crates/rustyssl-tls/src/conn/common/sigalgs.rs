@@ -910,7 +910,8 @@ pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
     if !lu.available {
         return false;
     }
-    let (minproto, maxproto) = if c.cfg.method_version == version::ANY {
+    // Once the hellos chose the version, only that version counts.
+    let (minproto, maxproto) = if !version::method_fixed(c) {
         (
             c_int::from(c.cfg.min_version),
             c_int::from(c.cfg.max_version),

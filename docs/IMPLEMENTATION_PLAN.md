@@ -5288,8 +5288,17 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - the tests that read or write OpenSSL's private structures, listed as `internal` in
     `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
 - **Interop matrix:** green, 45 cases in all four pairings (`cargo xtask test-interop`).
-- **Not met yet:** the BoGo shim and the tlsfuzzer scripts aren't built, so M2 and M4's
-  external checks remain open; `test-consumers` (curl, nginx) arrives later.
+- **BoGo** (`cargo xtask test-bogo`, added in Phase 8): of 8091 tests, the shim implements
+  2870 on both libraries; the reference passes 2208, rustyssl 2218. Seven bugs it found are
+  fixed (an empty AEAD record's plaintext, a resumed client's verify result, renegotiation
+  counts, compressed TLS 1.3 key shares, signature algorithms after the version is chosen,
+  an older version's ticket offered in TLS 1.3, signature_algorithms in a TLS 1.0
+  renegotiation). Two still pass on the reference alone: `ECDSAKeyUsage-Client-TLS12` (the
+  key-usage bit isn't enforced for a TLS 1.2 ECDSA server certificate) and
+  `Unclean-Shutdown` (a second `SSL_shutdown` after an EOF with no close_notify returns 1,
+  not -1).
+- **Not met yet:** the tlsfuzzer scripts aren't built, so M2 and M4's external checks remain
+  partly open; `test-consumers` (curl, nginx) arrives later.
 
 ## Phase 8: libssl breadth → M5
 
