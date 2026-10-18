@@ -789,11 +789,10 @@ ffi_export! {
 /// left out; `None` if it couldn't be made.
 pub(crate) fn peer_list(raw: &[u8]) -> Option<CipherStack> {
     let found: Vec<&'static Cipher> = raw
-        .chunks_exact(2)
-        .filter_map(|e| match e {
-            &[hi, lo] => suites::by_protocol_id(u16::from_be_bytes([hi, lo])),
-            _ => None,
-        })
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .filter_map(|&e| suites::by_protocol_id(u16::from_be_bytes(e)))
         .filter(|c| c.valid)
         .collect();
     CipherStack::of(&found)

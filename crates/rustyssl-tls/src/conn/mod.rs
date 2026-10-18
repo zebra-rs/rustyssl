@@ -911,19 +911,6 @@ impl Connection {
                 }
                 return Ok(HsBytes::Got);
             }
-            // Only while the version is undecided: a renegotiation has one (fork M). Before the
-            // alert is processed: a server takes no alert before the ClientHello
-            // (`ssl3_read_bytes`).
-            if self.cfg.method_version == 0
-                && self.first_handshake
-                && (self.cfg.server || ty != alert())
-                && self.before_version()
-            {
-                return Err(Error::alert(
-                    abi::SSL_AD_UNEXPECTED_MESSAGE,
-                    abi::SSL_R_UNEXPECTED_MESSAGE,
-                ));
-            }
             if ty == ccs()
                 && self.cfg.server
                 && self.hs.sh.flags & abi::TLS1_FLAGS_STATELESS != 0
@@ -936,6 +923,19 @@ impl Connection {
                 // second ClientHello comes (`tls_get_message_header`).
                 self.interrupted = true;
                 return Err(Error::quiet(0));
+            }
+            // Only while the version is undecided: a renegotiation has one (fork M). Before the
+            // alert is processed: a server takes no alert before the ClientHello
+            // (`ssl3_read_bytes`).
+            if self.cfg.method_version == 0
+                && self.first_handshake
+                && (self.cfg.server || ty != alert())
+                && self.before_version()
+            {
+                return Err(Error::alert(
+                    abi::SSL_AD_UNEXPECTED_MESSAGE,
+                    abi::SSL_R_UNEXPECTED_MESSAGE,
+                ));
             }
             if ty == ccs() && !self.is_tls13() {
                 if !self.hs_in.is_empty() {
