@@ -553,8 +553,12 @@ pub(super) fn initial_server_flight(c: &mut Connection, p: &dyn Provider) -> Res
     Ok(true)
 }
 
-/// The CT validation's verdict on its answer: a failure counts with `SSL_VERIFY_PEER`.
-fn ct_result(c: &Connection, a: &Answer) -> Result<()> {
+/// The CT validation's verdict on its answer: a failure counts with `SSL_VERIFY_PEER`, and
+/// is recorded as the verification result either way (`ssl_validate_ct`, fork M).
+fn ct_result(c: &mut Connection, a: &Answer) -> Result<()> {
+    if matches!(a, Answer::Fail { .. } | Answer::Allowed(false)) {
+        c.neg.verify_result = i64::from(abi::X509_V_ERR_NO_VALID_SCTS);
+    }
     match a {
         Answer::Continue | Answer::Allowed(true) => Ok(()),
         Answer::Fail { alert, reason } => {

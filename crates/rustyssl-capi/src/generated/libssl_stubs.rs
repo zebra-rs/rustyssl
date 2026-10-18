@@ -284,11 +284,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_config(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_ct_is_enabled(_: *const SSL_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_dane_clear_flags(
     _: *mut SSL_CTX,
     _: core::ffi::c_ulong,
@@ -320,14 +315,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_dane_set_flags(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_enable_ct(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_enable_ct")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_flush_sessions(_: *mut SSL_CTX, _: core::ffi::c_long) {
     crate::stub::unimplemented("SSL_CTX_flush_sessions")
 }
@@ -344,13 +331,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_get0_client_cert_type(
     _: *mut usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_get0_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_get0_ctlog_store(
-    _: *const SSL_CTX,
-) -> *const CTLOG_STORE {
-    crate::stub::unimplemented("SSL_CTX_get0_ctlog_store")
 }
 
 #[unsafe(no_mangle)]
@@ -402,11 +382,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_sessions(_: *mut SSL_CTX) -> *mut lha
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set0_ctlog_store(_: *mut SSL_CTX, _: *mut CTLOG_STORE) {
-    crate::stub::unimplemented("SSL_CTX_set0_ctlog_store")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_set1_cert_comp_preference(
     _: *mut SSL_CTX,
     _: *mut core::ffi::c_int,
@@ -450,30 +425,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set_client_cert_engine(
     _: *mut ENGINE,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_set_client_cert_engine")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_ct_validation_callback(
-    _: *mut SSL_CTX,
-    _: ssl_ct_validation_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_ct_validation_callback")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_ctlog_list_file(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_ctlog_list_file")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_default_ctlog_list_file(
-    _: *mut SSL_CTX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_default_ctlog_list_file")
 }
 
 #[unsafe(no_mangle)]
@@ -905,11 +856,6 @@ pub extern "C" fn rustyssl_private_SSL_copy_session_id(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_ct_is_enabled(_: *const SSL) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_dane_clear_flags(
     _: *mut SSL,
     _: core::ffi::c_ulong,
@@ -948,14 +894,6 @@ pub extern "C" fn rustyssl_private_SSL_dane_tlsa_add(
 #[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_dup(_: *mut SSL) -> *mut SSL {
     crate::stub::unimplemented("SSL_dup")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_enable_ct(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_enable_ct")
 }
 
 #[unsafe(no_mangle)]
@@ -1037,11 +975,6 @@ pub extern "C" fn rustyssl_private_SSL_get0_next_proto_negotiated(
 #[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY {
     crate::stub::unimplemented("SSL_get0_peer_rpk")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_peer_scts(_: *mut SSL) -> *const stack_st_SCT {
-    crate::stub::unimplemented("SSL_get0_peer_scts")
 }
 
 #[unsafe(no_mangle)]
@@ -1469,15 +1402,6 @@ pub extern "C" fn rustyssl_private_SSL_set_blocking_mode(
     _: core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_set_blocking_mode")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_ct_validation_callback(
-    _: *mut SSL,
-    _: ssl_ct_validation_cb,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_ct_validation_callback")
 }
 
 #[unsafe(no_mangle)]

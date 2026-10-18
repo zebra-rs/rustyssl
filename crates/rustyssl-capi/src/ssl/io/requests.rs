@@ -231,8 +231,8 @@ pub(crate) unsafe fn handle(
         // Nor a session to find by ID (a TLS 1.3 client's random legacy ID reaches a TLS 1.2
         // server): a miss.
         Request::GetSession { .. } => Some(Answer::Session(None)),
-        // CT validation isn't enabled yet (`SSL_enable_ct` comes with step 7.4).
-        Request::CtValidate => Some(Answer::Continue),
+        // SAFETY: as above.
+        Request::CtValidate => Some(unsafe { super::super::ct::validate(s, x) }),
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {

@@ -142,6 +142,8 @@ pub(crate) struct SslState {
     pub(crate) rwstate: c_int,
     pub(crate) shutdown: c_int,
     pub(crate) verify_result: c_long,
+    /// CT validation (`ct_validation_callback`, the SCTs received).
+    pub(crate) ct: super::ct::ConnCt,
     pub(crate) hit: c_int,
     pub(crate) num_renegotiations: c_int,
     pub(crate) total_renegotiations: c_int,
@@ -344,7 +346,12 @@ ffi_export! {
                 block_padding: cs.block_padding,
                 hs_padding: cs.hs_padding,
                 max_fragment_len_mode: cs.max_fragment_len_mode,
-                status_type: cs.status_type,
+                // `SSL_set_ct_validation_callback` from `SSL_new`: CT asks for OCSP too.
+                status_type: if cs.ct.callback.is_some() {
+                    rustyssl_abi::TLSEXT_STATUSTYPE_ocsp
+                } else {
+                    cs.status_type
+                },
                 ocsp_resp: ptr::null_mut(),
                 ocsp_resp_len: 0,
                 ocsp_exts: ptr::null_mut(),
@@ -378,6 +385,7 @@ ffi_export! {
                 rwstate: SSL_NOTHING,
                 shutdown: 0,
                 verify_result: c_long::from(X509_V_OK),
+                ct: super::ct::ConnCt::new(cs.ct.callback, cs.ct.arg),
                 hit: 0,
                 num_renegotiations: 0,
                 total_renegotiations: 0,

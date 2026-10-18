@@ -171,6 +171,8 @@ pub(crate) struct CtxState {
     pub(crate) status_cb: AnyCb,
     pub(crate) status_arg: *mut c_void,
     pub(crate) status_type: c_int,
+    /// CT validation and the log store (`ct_validation_callback`, `ctlog_store`).
+    pub(crate) ct: super::ct::CtxCt,
     pub(crate) tick_key_name: [u8; TICK_KEY_NAME_LEN],
     pub(crate) tick_hmac_key: [u8; TICK_KEY_LEN],
     pub(crate) tick_aes_key: [u8; TICK_KEY_LEN],
@@ -449,6 +451,7 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         status_cb: None,
         status_arg: ptr::null_mut(),
         status_type: TLSEXT_STATUSTYPE_NOTHING,
+        ct: super::ct::CtxCt::default(),
         tick_key_name: [0; TICK_KEY_NAME_LEN],
         tick_hmac_key: [0; TICK_KEY_LEN],
         tick_aes_key: [0; TICK_KEY_LEN],
