@@ -1357,11 +1357,8 @@ ffi_export! {
         if before {
             // A TLS 1.2 session about to be resumed names the server it was made with.
             // SAFETY: as above.
-            if st.hostname.is_none()
-                && !session.is_null()
-                && unsafe { super::session::rustyssl_private_SSL_SESSION_get_protocol_version(session) }
-                    != rustyssl_abi::TLS1_3_VERSION
-            {
+            let version = unsafe { super::session::rustyssl_private_SSL_SESSION_get_protocol_version(session) };
+            if st.hostname.is_none() && !session.is_null() && version != rustyssl_abi::TLS1_3_VERSION {
                 return session_name();
             }
         } else if !tls13 && st.hit != 0 && !session_name().is_null() {
