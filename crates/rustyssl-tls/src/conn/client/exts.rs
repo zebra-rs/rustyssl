@@ -97,14 +97,15 @@ pub(crate) fn ext_construct_renegotiate(
 ) -> Result<ExtReturn> {
     if !c.renegotiate {
         let min = c_int::from(c.cfg.min_version);
-        if min >= abi::TLS1_3_VERSION
-            || (security::check(
-                c,
-                abi::SSL_SECOP_VERSION,
-                0,
-                abi::TLS1_VERSION,
-                security::SecOther::None,
-            ) && min <= abi::TLS1_VERSION)
+        if !c.cfg.dtls
+            && (min >= abi::TLS1_3_VERSION
+                || (security::check(
+                    c,
+                    abi::SSL_SECOP_VERSION,
+                    0,
+                    abi::TLS1_VERSION,
+                    security::SecOther::None,
+                ) && min <= abi::TLS1_VERSION))
         {
             return Ok(ExtReturn::NotSent);
         }

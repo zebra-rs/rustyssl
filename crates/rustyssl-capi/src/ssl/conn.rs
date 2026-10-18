@@ -175,6 +175,8 @@ pub(crate) struct SslState {
     pub(crate) lists: super::lists::Lists,
     /// The protocol engine and what it hands the application (`super::io`).
     pub(crate) drv: super::io::Driver,
+    /// DTLS's MTU and timer (`super::dtls`).
+    pub(crate) d1: super::dtls::D1,
     /// The session (`session`) and the one a server's lookup found (`super::sess_cache`).
     pub(crate) sess: super::sess_cache::Slot,
 }
@@ -428,6 +430,7 @@ ffi_export! {
                 ciphers,
                 lists: cs.lists.for_ssl(),
                 drv: super::io::Driver::default(),
+                d1: super::dtls::D1::default(),
                 sess: super::sess_cache::Slot::default(),
             };
             st.reset();
@@ -647,6 +650,8 @@ ffi_export! {
         let (old, mcert) = {
             let mut st = x.state();
             st.reset();
+            let keep_mtu = st.options & rustyssl_abi::SSL_OP_NO_QUERY_MTU != 0;
+            st.d1.clear(keep_mtu);
             let kept = st.drv.clear();
             // The DANE verification's result goes (the records stay).
             let mcert = st.lists.dane.reset();
@@ -1774,6 +1779,10 @@ ffi_export! {
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         // SAFETY: the live connection; `parg` as `cmd` documents.
         if let Some(r) = unsafe { super::io::api::handshake_ctrl(x, cmd, parg) } {
+            return r;
+        }
+        // SAFETY: as above (DTLS's timer and MTU).
+        if let Some(r) = unsafe { super::dtls::ssl_ctrl(s, x, cmd, larg, parg) } {
             return r;
         }
         // SAFETY: as above (the group and signature algorithm lists).

@@ -256,6 +256,25 @@ impl Connection {
         Ok(fallback)
     }
 
+    /// Whether a flight is being written (a timeout then retransmits nothing).
+    #[must_use]
+    pub fn dtls_writing_flight(&self) -> bool {
+        self.st.state == super::statem::MsgFlow::Writing
+            && self.st.write_state != super::statem::WriteState::Transition
+    }
+
+    /// `DTLSv1_listen` answered the ClientHello that's coming with a HelloVerifyRequest: the
+    /// handshake goes on from its second ClientHello (sequence numbers 1, and the record after
+    /// the one the HelloVerifyRequest borrowed).
+    pub fn dtls_listen_done(&mut self) {
+        self.dtls.read_seq = 1;
+        self.dtls.next_write_seq = 1;
+        if let Some(w) = self.rw.dtls.as_mut() {
+            let next = w.seq.saturating_add(1);
+            w.set_seq(next);
+        }
+    }
+
     /// The timer fired (`dtls1_handle_timeout` after the caller restarted the timer):
     /// retransmits the flight, unless a flight is being written.
     ///
@@ -353,11 +372,8 @@ impl Connection {
     ) -> Result<()> {
         let mtu = self.cfg.dtls_mtu.max(1);
         let overhead = self.rw.max_overhead();
-        let max_frag = if self.cfg.max_send_fragment > 0 {
-            self.cfg.max_send_fragment
-        } else {
-            record::MAX_PLAIN
-        };
+        // `ssl_get_max_send_fragment`: the setting, or the peer's max_fragment_length.
+        let max_frag = self.rw.max_frag_len.clamp(1, record::MAX_PLAIN);
         if ty == ccs() {
             let curr = mtu.saturating_sub(self.dtls.open.len().saturating_add(overhead));
             if curr <= DTLS_HEADER_LEN {

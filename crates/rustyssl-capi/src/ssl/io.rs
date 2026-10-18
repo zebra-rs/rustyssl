@@ -133,6 +133,8 @@ pub(crate) struct Driver {
     pub(crate) out: Vec<u8>,
     /// What's left to write of the record at the front of `out` (0: a record starts there).
     pub(crate) out_record_left: usize,
+    /// DTLS: the lengths of the datagrams in `out`, in order.
+    pub(crate) out_dgrams: std::collections::VecDeque<usize>,
     /// A write waiting to be retried (`wpend_tot`, `wpend_buf`): what it accepted, and its
     /// buffer's address.
     pub(crate) wpend: Option<(usize, usize)>,
@@ -467,6 +469,10 @@ enum Input {
 /// # Safety
 /// `x` is a live connection.
 unsafe fn read_input(x: &Ssl) -> Input {
+    if x.state().method.dtls {
+        // SAFETY: the caller's guarantee.
+        return unsafe { read_datagram(x) };
+    }
     let (rbio, want) = {
         let mut st = x.state();
         let read_ahead = st.read_ahead != 0;
@@ -520,6 +526,83 @@ unsafe fn read_input(x: &Ssl) -> Input {
         c.feed(&buf);
     }
     Input::Got
+}
+
+/// DTLS: one datagram from the read BIO (`dtls_get_more_records`' read with room for the
+/// largest record).
+///
+/// # Safety
+/// `x` is a live connection.
+unsafe fn read_datagram(x: &Ssl) -> Input {
+    let rbio = x.state().rbio;
+    if rbio.is_null() {
+        return Input::Error;
+    }
+    let size = |v: c_int| usize::try_from(v).unwrap_or(0);
+    let want = size(rustyssl_abi::SSL3_RT_MAX_PLAIN_LENGTH)
+        .saturating_add(size(rustyssl_abi::SSL3_RT_MAX_ENCRYPTED_OVERHEAD))
+        .saturating_add(rustyssl_tls::record::dtls::HEADER_LEN)
+        .saturating_add(size(rustyssl_abi::SSL3_ALIGN_PAYLOAD));
+    let mut buf = vec![0u8; want];
+    let Ok(n) = c_int::try_from(buf.len()) else {
+        return Input::Error;
+    };
+    // SAFETY: the connection's BIO; the room. No lock is held.
+    let r = unsafe { BIO_read(rbio, buf.as_mut_ptr().cast(), n) };
+    if r <= 0 {
+        // SAFETY: as above.
+        if unsafe { BIO_test_flags(rbio, BIO_FLAGS_SHOULD_RETRY) } != 0 {
+            return Input::Retry;
+        }
+        // SAFETY: as above.
+        if unsafe { BIO_ctrl(rbio, BIO_CTRL_EOF, 0, ptr::null_mut()) } != 0 {
+            return Input::Eof;
+        }
+        return Input::Error;
+    }
+    buf.truncate(usize::try_from(r).unwrap_or(0));
+    if let Some(c) = x.state().drv.tls.as_mut() {
+        c.feed_datagram(&buf);
+    }
+    Input::Got
+}
+
+/// Moves the core's output (DTLS: its datagrams) to the driver's buffer.
+pub(crate) fn push_output(d: &mut Driver, c: &mut Connection) {
+    if c.config().dtls {
+        for dg in c.take_datagrams() {
+            d.out_dgrams.push_back(dg.len());
+            d.out.extend_from_slice(&dg);
+        }
+    } else {
+        let out = c.take_output();
+        d.out.extend_from_slice(&out);
+    }
+}
+
+/// [`push_output`] for the connection's core, if it's in place.
+pub(crate) fn move_output(st: &mut SslState) {
+    let d = &mut st.drv;
+    if let Some(mut c) = d.tls.take() {
+        push_output(d, &mut c);
+        d.tls = Some(c);
+    }
+}
+
+/// Calls the message callback with no lock held (for what the core doesn't report itself).
+///
+/// # Safety
+/// `s` is the live connection behind `x`.
+pub(crate) unsafe fn report(
+    s: *mut SSL,
+    x: &Ssl,
+    write: bool,
+    version: c_int,
+    content_type: c_int,
+    bytes: &[u8],
+) {
+    // SAFETY: the caller's guarantee.
+    unsafe { message(s, x, write, version, content_type, bytes) };
 }
 
 /// Follows record boundaries in the input without read-ahead, so each read asks for exactly
@@ -588,7 +671,12 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
                 return Flush::Done;
             }
             if st.drv.out_record_left == 0 {
-                st.drv.out_record_left = record_len(&st.drv.out);
+                st.drv.out_record_left = if st.method.dtls {
+                    // One datagram per write.
+                    st.drv.out_dgrams.pop_front().unwrap_or(st.drv.out.len())
+                } else {
+                    record_len(&st.drv.out)
+                };
             }
             let n = st.drv.out_record_left.min(st.drv.out.len());
             (st.wbio, st.drv.out.get(..n).unwrap_or_default().to_vec())
@@ -868,6 +956,13 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
     // Whether the connection had failed when this call began (the core reports the alert
     // and the exit before the failure, so a later step sees its own error).
     let mut failed_at_entry = None;
+    let dtls = x.state().method.dtls;
+    if dtls {
+        // `dtls1_query_mtu`, before the handshake writes (a write in a DTLS handshake fails
+        // without an MTU).
+        // SAFETY: the caller's guarantee.
+        let _ = unsafe { super::dtls::query_mtu(x) };
+    }
     let stop = loop {
         // SAFETY: the caller's guarantee.
         match unsafe { flush(x) } {
@@ -937,7 +1032,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             in_handshake = true;
             post_handshake = true;
         }
-        let out = conn.take_output();
+        let timer = conn.take_dtls_timer();
         let have = x.state().drv.peer.from;
         let (libctx, propq) = snap
             .as_ref()
@@ -946,7 +1041,7 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         let peers = unsafe { peer_objects(&conn, have, server, libctx, propq) };
         let old_peers = {
             let mut st = x.state();
-            st.drv.out.extend_from_slice(&out);
+            push_output(&mut st.drv, &mut conn);
             mirror(&mut st, &conn);
             st.drv.tls = Some(conn);
             if let Some(first) = started {
@@ -962,6 +1057,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         };
         // Freed with no lock held (ex_data callbacks).
         drop(old_peers);
+        if let Some(t) = timer {
+            // SAFETY: the caller's guarantee; no lock is held.
+            unsafe { super::dtls::apply_timer(s, x, t) };
+        }
         if tls13_server_done {
             // SAFETY: the caller's guarantee; no lock is held.
             unsafe { super::sess_cache::on_finish_tls13_server(x) };
@@ -1040,6 +1139,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     Flush::Retry => break Stop::Retry,
                     Flush::Error => break Stop::Syscall,
                 }
+                // `dtls1_read_bytes`: a timer that fired retransmits before reading.
+                // SAFETY: as above.
+                if dtls
+                    && super::dtls::expired(x)
+                    && unsafe { super::dtls::handle_timeout(s, x) } > 0
+                {
+                    continue;
+                }
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
                     Input::Got => {}
@@ -1087,8 +1194,11 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                                         SSL_R_UNEXPECTED_EOF_WHILE_READING,
                                     ),
                                 );
-                                let out = c.take_output();
-                                st.drv.out.extend_from_slice(&out);
+                                let mut c2 = st.drv.tls.take();
+                                if let Some(cc) = c2.as_mut() {
+                                    push_output(&mut st.drv, cc);
+                                }
+                                st.drv.tls = c2;
                             }
                         }
                         // SAFETY: the caller's guarantee.

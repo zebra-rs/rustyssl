@@ -1281,11 +1281,7 @@ impl Connection {
         }
         if self.cfg.dtls {
             // One record per write (`do_dtls1_write`).
-            let max = if self.cfg.max_send_fragment > 0 {
-                self.cfg.max_send_fragment
-            } else {
-                record::MAX_PLAIN
-            };
+            let max = self.rw.max_frag_len.clamp(1, record::MAX_PLAIN);
             if data.len() > max {
                 let e = Error::alert(
                     abi::SSL_AD_INTERNAL_ERROR,

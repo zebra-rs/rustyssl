@@ -24,6 +24,8 @@ use crate::x509::cert::{X509_free, X509_get0_pubkey, X509_up_ref, i2d_X509};
 
 /// The context's pieces the driver reads, copied out under its lock.
 pub(crate) struct CtxSnapshot {
+    pub(crate) app_gen_cookie_cb: super::super::types::CookieGenCb,
+    pub(crate) app_verify_cookie_cb: super::super::types::CookieVerifyCb,
     pub(crate) gen_stateless_cookie_cb: super::super::types::StatelessCookieGenCb,
     pub(crate) verify_stateless_cookie_cb: super::super::types::StatelessCookieVerifyCb,
     pub(crate) info_callback: InfoCb,
@@ -68,6 +70,8 @@ impl CtxSnapshot {
 pub(crate) fn ctx_snapshot(c: &Ctx) -> CtxSnapshot {
     let cs = c.state();
     CtxSnapshot {
+        app_gen_cookie_cb: cs.app_gen_cookie_cb,
+        app_verify_cookie_cb: cs.app_verify_cookie_cb,
         gen_stateless_cookie_cb: cs.gen_stateless_cookie_cb,
         verify_stateless_cookie_cb: cs.verify_stateless_cookie_cb,
         info_callback: cs.info_callback,
@@ -837,6 +841,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     Config {
         server: st.server,
         method_version,
+        dtls: st.method.dtls,
+        dtls_mtu: st.d1.mtu,
         groups,
         no_groups,
         key_share_groups,
@@ -929,6 +935,8 @@ pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
         status: snap.status_cb.is_some(),
         record_padding: st.record_padding_cb.is_some(),
         allow_early_data: st.allow_early_data_cb.is_some(),
+        dtls_cookie_gen: snap.app_gen_cookie_cb.is_some(),
+        dtls_cookie_verify: snap.app_verify_cookie_cb.is_some(),
         cookie: snap.verify_stateless_cookie_cb.is_some(),
         session_ticket_ext: st.eap.ticket_ext_cb.is_some(),
         session_secret: st.eap.secret_cb.is_some(),

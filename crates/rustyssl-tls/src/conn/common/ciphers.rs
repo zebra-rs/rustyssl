@@ -135,6 +135,7 @@ pub fn cipher_list_to_bytes(c: &mut Connection) -> Result<Vec<u8>> {
 /// See [`cipher_list_to_bytes`].
 fn cipher_list_to_bytes_inner(c: &mut Connection) -> Result<Vec<u8>> {
     let reneg_scsv = !c.renegotiate
+        && !c.cfg.dtls
         && security::check(
             c,
             abi::SSL_SECOP_VERSION,
