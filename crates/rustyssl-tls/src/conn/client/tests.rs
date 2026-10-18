@@ -1668,3 +1668,315 @@ fn tls12_ocsp_stapling() {
         )
     );
 }
+
+impl Server3 {
+    /// A flight of the server's own after the RFC's ServerHello: EncryptedExtensions with
+    /// `exts`, then (with `cert`) its certificate and signature, then its Finished.
+    fn own_flight(
+        &mut self,
+        p: &TestProvider,
+        exts: &[(u16, &[u8])],
+        cert: Option<(KeyId, &[u8])>,
+    ) -> Vec<u8> {
+        let block = ext_block(exts);
+        let ee = crate::msgs::frame(
+            hm::ENCRYPTED_EXTENSIONS,
+            &[
+                &u16::try_from(block.len()).unwrap().to_be_bytes()[..],
+                &block,
+            ]
+            .concat(),
+        )
+        .unwrap();
+        let mut msgs = vec![ee];
+        self.transcript.extend_from_slice(&msgs[0]);
+        if let Some((key, der)) = cert {
+            let n = der.len();
+            let body = [
+                &[0u8][..],
+                &u32::try_from(n + 5).unwrap().to_be_bytes()[1..],
+                &u32::try_from(n).unwrap().to_be_bytes()[1..],
+                der,
+                &[0, 0],
+            ]
+            .concat();
+            let m = crate::msgs::frame(hm::CERTIFICATE, &body).unwrap();
+            self.transcript.extend_from_slice(&m);
+            msgs.push(m);
+            let tbs = [
+                &[0x20u8; 64][..],
+                b"TLS 1.3, server CertificateVerify\0",
+                &sha256(p, &self.transcript),
+            ]
+            .concat();
+            let sig = p.sign(key, 0x0804, &tbs).unwrap();
+            let body = [
+                &[0x08u8, 0x04][..],
+                &u16::try_from(sig.len()).unwrap().to_be_bytes(),
+                &sig,
+            ]
+            .concat();
+            let m = crate::msgs::frame(hm::CERTIFICATE_VERIFY, &body).unwrap();
+            self.transcript.extend_from_slice(&m);
+            msgs.push(m);
+        }
+        let base = self
+            .sched
+            .server_handshake_traffic(p, &self.hs_hash)
+            .unwrap();
+        let th = sha256(p, &self.transcript);
+        let vd = keysched::verify_data_13(p, HashAlg::Sha256, base.bytes(), &th).unwrap();
+        let fin = crate::msgs::frame(hm::FINISHED, &vd).unwrap();
+        self.transcript.extend_from_slice(&fin);
+        msgs.push(fin);
+        let mut w = writer13(p, base.bytes());
+        let refs: Vec<&[u8]> = msgs.iter().map(Vec::as_slice).collect();
+        seal(p, &mut w, &refs)
+    }
+}
+
+/// An RSA server certificate and its key, registered with `p`.
+fn server_cert(p: &TestProvider) -> (KeyId, Vec<u8>) {
+    let k = crate::testprov::keys_rsa::rfc8448_server();
+    let cert = k.public(p).unwrap().cert("server");
+    (p.add_key(k), cert)
+}
+
+/// A section 3 client (with `cfg`, after its ClientHello) given the server's own flight with
+/// `exts` in its EncryptedExtensions: the outcome, with the connection.
+fn custom13(
+    cfg: Config,
+    exts: &[(u16, &[u8])],
+    answer: &mut dyn FnMut(&Request) -> Answer,
+) -> (Result<Event, Error>, Connection, Seen) {
+    let p = TestProvider::new(b"custom13");
+    let (key, cert) = server_cert(&p);
+    let ch = rfc("3", "ClientHello", 0);
+    let sh = rfc("3", "ServerHello", 0);
+    p.queue_random(&h(S3_CLIENT_RANDOM));
+    p.queue_random(&h(S3_CLIENT_PRIVATE));
+    let mut c = with_hellos(cfg, &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, answer, &mut seen).unwrap();
+    let shared = x25519(S3_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    let flight = server.own_flight(&p, exts, Some((key, &cert)));
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    seen.written.clear();
+    let r = loop {
+        match drive(&mut c, &p, false, answer, &mut seen) {
+            Ok(Event::NeedInput) => break Ok(Event::NeedInput),
+            Ok(Event::HandshakeDone) => break Ok(Event::HandshakeDone),
+            Ok(_) => {}
+            Err(e) => break Err(e),
+        }
+    };
+    (r, c, seen)
+}
+
+#[test]
+fn encrypted_extensions() {
+    // ALPN: one offered is selected; the session records it.
+    let mut cfg = rfc_client();
+    cfg.alpn = b"\x02h2\x08http/1.1".to_vec();
+    let alpn: &[u8] = &[0, 9, 8, b'h', b't', b't', b'p', b'/', b'1', b'.', b'1'];
+    let (r, c, _) = custom13(cfg.clone(), &[(0x0010, alpn)], &mut accept);
+    assert_eq!(r.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.negotiated().alpn.as_deref(), Some(&b"http/1.1"[..]));
+    assert_eq!(c.negotiated().session.alpn, c.negotiated().alpn);
+    // One that wasn't offered.
+    let (r, _, _) = custom13(cfg, &[(0x0010, &[0, 3, 2, b'h', b'3'])], &mut accept);
+    assert_eq!(r.unwrap_err(), Error::decode(abi::SSL_R_BAD_EXTENSION));
+    // The server_name acknowledgement records the name in the session.
+    let (r, c, _) = custom13(rfc_client(), &[(0x0000, &[])], &mut accept);
+    assert_eq!(r.unwrap(), Event::HandshakeDone);
+    assert_eq!(
+        c.negotiated().session.hostname.as_deref(),
+        Some(&b"server"[..])
+    );
+    // A non-empty one is malformed.
+    let (r, _, _) = custom13(rfc_client(), &[(0x0000, &[0])], &mut accept);
+    assert_eq!(r.unwrap_err(), Error::decode(abi::SSL_R_BAD_EXTENSION));
+    // max_fragment_length: the mode asked for becomes binding; another one is refused.
+    let mut cfg = rfc_client();
+    cfg.max_fragment_len_mode = 2;
+    let (r, c, _) = custom13(cfg.clone(), &[(0x0001, &[2])], &mut accept);
+    assert_eq!(r.unwrap(), Event::HandshakeDone);
+    assert_eq!(c.negotiated().session.max_fragment_len_mode, 2);
+    let (r, _, _) = custom13(cfg, &[(0x0001, &[3])], &mut accept);
+    assert_eq!(
+        r.unwrap_err(),
+        ill(abi::SSL_R_SSL3_EXT_INVALID_MAX_FRAGMENT_LENGTH)
+    );
+    // Early data accepted without any being offered.
+    let (r, _, _) = custom13(rfc_client(), &[(0x002a, &[])], &mut accept);
+    assert_eq!(
+        r.unwrap_err(),
+        Error::alert(
+            abi::SSL_AD_UNSUPPORTED_EXTENSION,
+            abi::SSL_R_UNSOLICITED_EXTENSION
+        )
+    );
+    // An extension that doesn't belong in EncryptedExtensions.
+    let (r, _, _) = custom13(rfc_client(), &[(0x002b, &[3, 4])], &mut accept);
+    assert_eq!(r.unwrap_err().reason, abi::SSL_R_BAD_EXTENSION);
+}
+
+#[test]
+fn ocsp_and_scts_in_tls13() {
+    let p = TestProvider::new(b"status13");
+    let (key, cert) = server_cert(&p);
+    let mut cfg = rfc_client();
+    cfg.status_request = true;
+    cfg.callbacks.status = true;
+    let ch = rfc("3", "ClientHello", 0);
+    let sh = rfc("3", "ServerHello", 0);
+    p.queue_random(&h(S3_CLIENT_RANDOM));
+    p.queue_random(&h(S3_CLIENT_PRIVATE));
+    let mut c = with_hellos(cfg, &[ch]);
+    let mut seen = Seen::default();
+    drive(&mut c, &p, false, &mut accept, &mut seen).unwrap();
+    // The ClientHello the client made asked for OCSP.
+    let made = super::state_ref(&c).unwrap().made[0].clone();
+    assert_eq!(hello_ext(&made, 0x0005), Some(vec![1, 0, 0, 0, 0]));
+    let shared = x25519(S3_CLIENT_PRIVATE, &server_share(sh));
+    let mut server = Server3::new(&p, None, &shared, &[ch, sh]);
+    // The leaf's status_request entry extension staples a response.
+    let n = cert.len();
+    let status = [1u8, 0, 0, 2, 0x30, 0];
+    let ext = ext_block(&[(0x0005, &status)]);
+    let body = [
+        &[0u8][..],
+        &u32::try_from(n + 5 + ext.len()).unwrap().to_be_bytes()[1..],
+        &u32::try_from(n).unwrap().to_be_bytes()[1..],
+        &cert,
+        &u16::try_from(ext.len()).unwrap().to_be_bytes(),
+        &ext,
+    ]
+    .concat();
+    let ee = crate::msgs::frame(hm::ENCRYPTED_EXTENSIONS, &[0, 0]).unwrap();
+    let cm = crate::msgs::frame(hm::CERTIFICATE, &body).unwrap();
+    server.transcript.extend_from_slice(&ee);
+    server.transcript.extend_from_slice(&cm);
+    let tbs = [
+        &[0x20u8; 64][..],
+        b"TLS 1.3, server CertificateVerify\0",
+        &sha256(&p, &server.transcript),
+    ]
+    .concat();
+    let sig = p.sign(key, 0x0804, &tbs).unwrap();
+    let cv = crate::msgs::frame(
+        hm::CERTIFICATE_VERIFY,
+        &[
+            &[8u8, 4][..],
+            &u16::try_from(sig.len()).unwrap().to_be_bytes(),
+            &sig,
+        ]
+        .concat(),
+    )
+    .unwrap();
+    server.transcript.extend_from_slice(&cv);
+    let base = server
+        .sched
+        .server_handshake_traffic(&p, &server.hs_hash)
+        .unwrap();
+    let vd = keysched::verify_data_13(
+        &p,
+        HashAlg::Sha256,
+        base.bytes(),
+        &sha256(&p, &server.transcript),
+    )
+    .unwrap();
+    let fin = crate::msgs::frame(hm::FINISHED, &vd).unwrap();
+    let mut w = writer13(&p, base.bytes());
+    let flight = seal(&p, &mut w, &[&ee, &cm, &cv, &fin]);
+    c.feed(&record(22, sh));
+    c.feed(&flight);
+    // The status callback is asked before the Finished is processed, and accepts.
+    let mut ok = |r: &Request| match r {
+        Request::Status => Answer::Status {
+            ret: 1,
+            response: None,
+        },
+        _ => accept(r),
+    };
+    assert_eq!(
+        drive(&mut c, &p, false, &mut ok, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(seen.requests.contains(&Request::Status));
+    assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 0]));
+}
+
+#[test]
+fn tls13_external_psk() {
+    let p = TestProvider::new(b"psk13");
+    let mut cfg = rfc_client();
+    cfg.callbacks.psk_session = true;
+    let psk = vec![0x11; 32];
+    let mut c = Connection::new(cfg);
+    let mut seen = Seen::default();
+    let ext = crate::conn::ExternalPsk {
+        identity: b"id".to_vec(),
+        key: psk.clone(),
+        cipher_id: suites::by_protocol_id(0x1301).unwrap().id,
+    };
+    let mut give = |r: &Request| match r {
+        Request::PskSession { .. } => Answer::Psk(Some(ext.clone())),
+        _ => accept(r),
+    };
+    drive(&mut c, &p, false, &mut give, &mut seen).unwrap();
+    let ch = seen.written.remove(0);
+    // The identity, its zero age, and a binder over the ClientHello up to the binders.
+    let offer =
+        crate::msgs::ext::psk::Strict::parse(&hello_ext(&ch[4..], 0x0029).unwrap()).unwrap();
+    assert_eq!(offer.identities[0].identity, b"id");
+    assert_eq!(offer.identities[0].obfuscated_ticket_age, 0);
+    let cut = ch.len() - offer.binders_len();
+    let sched = Schedule13::new(&p, HashAlg::Sha256, Some(&psk)).unwrap();
+    let th = sha256(&p, &ch[..cut]);
+    assert_eq!(offer.binders[0], sched.binder(&p, false, &th).unwrap());
+    // The server accepts it with a new key exchange.
+    let share = server_share_for(&ch, 0x001d).unwrap();
+    use crate::crypto::Provider as _;
+    let (spub, shared) = p.respond(0x001d, &share).unwrap();
+    let ks = [
+        &[0u8, 0x1d][..],
+        &u16::try_from(spub.len()).unwrap().to_be_bytes(),
+        &spub,
+    ]
+    .concat();
+    let shb = {
+        let mut b = vec![3, 3];
+        b.extend_from_slice(&[0x33; 32]);
+        b.push(0);
+        b.extend_from_slice(&[0x13, 0x01, 0]);
+        let block = ext_block(&[(0x0029, &[0, 0]), (0x0033, &ks), (0x002b, &[3, 4])]);
+        b.extend_from_slice(&u16::try_from(block.len()).unwrap().to_be_bytes());
+        b.extend_from_slice(&block);
+        crate::msgs::frame(hm::SERVER_HELLO, &b).unwrap()
+    };
+    let mut server = Server3::new(&p, Some(&psk), shared.bytes(), &[&ch, &shb]);
+    let flight = server.own_flight(&p, &[], None);
+    c.feed(&record(22, &shb));
+    c.feed(&flight);
+    assert_eq!(
+        drive(&mut c, &p, false, &mut give, &mut seen).unwrap(),
+        Event::HandshakeDone
+    );
+    assert!(c.negotiated().reused);
+    assert!(c.negotiated().peer_chain.is_empty());
+    let fin = seen.written.last().unwrap().clone();
+    assert_eq!(fin, server.client_finished(&p, &[]));
+}
+
+/// The client's key share for `group` in a ClientHello message.
+fn server_share_for(ch: &[u8], group: u16) -> Option<Vec<u8>> {
+    let ks = hello_ext(&ch[4..], 0x0033)?;
+    crate::msgs::ext::key_share::parse_client(&ks)
+        .ok()?
+        .into_iter()
+        .find(|e| e.group == group)
+        .map(|e| e.key)
+}
