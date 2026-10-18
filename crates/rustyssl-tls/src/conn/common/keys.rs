@@ -179,6 +179,15 @@ pub fn generate_handshake_secret(
 /// # Errors
 /// The schedule isn't at the handshake stage, or the provider failed.
 pub fn generate_master_secret(c: &mut Connection, p: &dyn Provider) -> Result<()> {
+    // A client that deferred its handshake write keys (early data, middlebox compatibility)
+    // installs them after this, so their secret is kept now (shared fix, fork F; OpenSSL keeps
+    // the handshake secret itself).
+    let k = &c.hs.sh.keys;
+    if !c.cfg.server && k.client_hs_secret.is_empty() && !k.handshake_traffic_hash.is_empty() {
+        let sched = k.schedule.as_ref().ok_or_else(Error::internal)?;
+        let s = sched.client_handshake_traffic(p, &k.handshake_traffic_hash)?;
+        c.hs.sh.keys.client_hs_secret = s;
+    }
     let sched = c.hs.sh.keys.schedule.as_mut().ok_or_else(Error::internal)?;
     sched.into_master(p)
 }
@@ -260,15 +269,20 @@ pub fn change_cipher_state13(
     let sched = c.hs.sh.keys.schedule.as_ref().ok_or_else(Error::internal)?;
     let (secret, label) = if handshake {
         if client_side {
-            // Shared fix (tls-server): a server that accepted early data reads with these keys
-            // only after the EndOfEarlyData, when the schedule has moved on to the master
-            // secret; it kept the secret ([`keep_client_handshake_secret`]).
-            let kept = &c.hs.sh.keys.client_hs_secret;
+            // Shared fixes (tls-server, tls-client): a server that accepted early data reads
+            // with these keys only after the EndOfEarlyData, and a client may install deferred
+            // write keys (early data, middlebox mode) after the master secret: both use the secret
+            // kept when the schedule moved on.
+            let kept = c.hs.sh.keys.client_hs_secret.clone();
+            let h = c.hs.sh.keys.handshake_traffic_hash.clone();
             let secret = if c.cfg.server && !kept.is_empty() {
-                kept.clone()
+                kept
             } else {
-                let h = c.hs.sh.keys.handshake_traffic_hash.clone();
-                sched.client_handshake_traffic(p, &h)?
+                match sched.client_handshake_traffic(p, &h) {
+                    Ok(s) => s,
+                    Err(_) if !kept.is_empty() => kept,
+                    Err(e) => return Err(e),
+                }
             };
             (secret, keylog::CLIENT_HANDSHAKE_TRAFFIC_SECRET)
         } else {

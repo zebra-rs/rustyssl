@@ -15,6 +15,8 @@ pub(crate) mod client;
     reason = "the shared code, used as the role state machines arrive"
 )]
 pub(crate) mod common;
+#[cfg(test)]
+pub(crate) mod pair;
 pub(crate) mod server;
 
 use std::collections::VecDeque;
@@ -216,6 +218,12 @@ pub struct Connection {
     /// The application's security callback, as capi runs it (`SSL_CTX_set_security_callback`;
     /// used when the configuration says a custom one is set).
     pub(crate) security_hook: Option<common::SecurityHook>,
+    /// Whether a client with a flexible method hasn't learnt the version yet (shared fix, fork
+    /// F): OpenSSL's method is still `TLS_ANY_VERSION` then, so `SSL_CONNECTION_IS_TLS13` is
+    /// false although `s->version` (here `neg.version`) is the highest version offered. The
+    /// client's state machine sets it with its first ClientHello and clears it once the
+    /// ServerHello chose the version.
+    pub(crate) version_pending: bool,
 }
 
 impl core::fmt::Debug for Connection {
@@ -271,6 +279,7 @@ impl Connection {
             needs_input: false,
             reading: false,
             security_hook: None,
+            version_pending: false,
         }
     }
 
@@ -350,7 +359,7 @@ impl Connection {
     /// Whether the negotiated (or, before negotiation, the attempted) version is TLS 1.3.
     #[must_use]
     pub fn is_tls13(&self) -> bool {
-        self.neg.version == tls1_3()
+        self.neg.version == tls1_3() && !self.version_pending
     }
 
     /// Adds network input.

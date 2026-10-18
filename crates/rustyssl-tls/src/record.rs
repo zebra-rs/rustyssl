@@ -474,8 +474,13 @@ impl RecordReader {
         self.first_record = false;
         let header = head.to_vec();
 
-        // TLS 1.3's compatibility ChangeCipherSpec: exactly 0x01, ignored, counted as empty.
-        if ty == change_cipher_spec() && self.mode == Mode::Tls13 && self.first_handshake {
+        // TLS 1.3's compatibility ChangeCipherSpec: exactly 0x01, ignored, counted as empty;
+        // also in plaintext once a HelloRetryRequest told the client TLS 1.3 is coming
+        // (`tlsany_meth` after HRR; shared fix, fork F).
+        if ty == change_cipher_spec()
+            && (self.mode == Mode::Tls13 || self.mode == Mode::Plain(Some(tls13())))
+            && self.first_handshake
+        {
             if body != [1] {
                 return Err(fatal(
                     abi::SSL_AD_UNEXPECTED_MESSAGE,
