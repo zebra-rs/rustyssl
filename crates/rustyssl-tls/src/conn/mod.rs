@@ -9,8 +9,20 @@ pub mod config;
 pub mod event;
 pub mod statem;
 
+#[expect(
+    dead_code,
+    reason = "the extension handlers the client's state machine fills in"
+)]
 pub(crate) mod client;
+#[expect(
+    dead_code,
+    reason = "the shared code, used as the role state machines arrive"
+)]
 pub(crate) mod common;
+#[expect(
+    dead_code,
+    reason = "the extension handlers the server's state machine fills in"
+)]
 pub(crate) mod server;
 
 use std::collections::VecDeque;
@@ -53,6 +65,8 @@ pub struct Handshake {
     pub finish_md: Vec<u8>,
     /// Role-specific state (the client's or server's).
     pub role: RoleState,
+    /// The state both roles share.
+    pub sh: common::Shared,
 }
 
 impl core::fmt::Debug for Handshake {
@@ -207,6 +221,9 @@ pub struct Connection {
     needs_input: bool,
     /// Whether the caller wants application data (an `SSL_read` is in progress).
     reading: bool,
+    /// The application's security callback, as capi runs it (`SSL_CTX_set_security_callback`;
+    /// used when the configuration says a custom one is set).
+    pub(crate) security_hook: Option<common::SecurityHook>,
 }
 
 impl core::fmt::Debug for Connection {
@@ -261,6 +278,7 @@ impl Connection {
             sent_alert: None,
             needs_input: false,
             reading: false,
+            security_hook: None,
         }
     }
 
@@ -273,6 +291,14 @@ impl Connection {
     /// The settings, to update mid-handshake (after a callback changed the `SSL`).
     pub fn config_mut(&mut self) -> &mut Config {
         &mut self.cfg
+    }
+
+    /// Installs the application's security callback (`SSL_CTX_set_security_callback`), which
+    /// the core calls in place, synchronously, wherever OpenSSL calls `ssl_security`; it is
+    /// used while the configuration's `custom_security_callback` is set. The hook must not
+    /// call back into this connection.
+    pub fn set_security_hook(&mut self, hook: Option<common::SecurityHook>) {
+        self.security_hook = hook;
     }
 
     /// What was negotiated so far.
@@ -493,6 +519,7 @@ impl Connection {
     }
 
     /// Whether output is waiting to be taken: a flush point (`statem_flush`) waits for it.
+    #[expect(dead_code, reason = "the role state machines' flush points use it")]
     pub(crate) fn flushed(&self) -> bool {
         self.output.is_empty()
     }
@@ -739,6 +766,7 @@ impl Connection {
                 alert: None,
                 reason: abi::SSL_AD_REASON_OFFSET.saturating_add(i32::from(desc)),
                 library_reason: false,
+                data: None,
             });
         }
         if desc == msgs_type(abi::SSL_AD_NO_RENEGOTIATION) {

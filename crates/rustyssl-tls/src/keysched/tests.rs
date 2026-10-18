@@ -203,12 +203,24 @@ fn transcript_buffers_then_hashes_and_replaces_after_hrr() {
         t.current_with(b"x").unwrap(),
         hash_of(&p, HashAlg::Sha256, &[&synthetic[..], b"x"].concat()).unwrap()
     );
-    // Kept for client authentication.
+    // Kept for client authentication: frozen where hashing started, as OpenSSL's handshake
+    // buffer is, while the hash goes on.
     let mut t = Transcript::new();
     t.add(b"abc");
     t.start_hash(&p, HashAlg::Sha384, true).unwrap();
     t.add(b"def");
-    assert_eq!(t.buffered(), Some(&b"abcdef"[..]));
+    assert_eq!(t.buffered(), Some(&b"abc"[..]));
+    assert_eq!(
+        t.current().unwrap(),
+        hash_of(&p, HashAlg::Sha384, b"abcdef").unwrap()
+    );
+    let f = t.fork();
+    t.add(b"g");
+    assert_eq!(
+        f.current().unwrap(),
+        hash_of(&p, HashAlg::Sha384, b"abcdef").unwrap()
+    );
+    assert_eq!(f.buffered(), Some(&b"abc"[..]));
     t.drop_buffer();
     assert!(t.buffered().is_none());
 }

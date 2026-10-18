@@ -667,9 +667,13 @@ impl Transcript {
         }
     }
 
-    /// Adds a handshake message (with its 4-octet header).
+    /// Adds a handshake message (with its 4-octet header). A buffer kept when hashing started
+    /// stays as it was (`ssl3_finish_mac` only buffers before the digest exists): it holds what
+    /// a TLS 1.2 CertificateVerify signs.
     pub fn add(&mut self, msg: &[u8]) {
-        if let Some(b) = &mut self.buffer {
+        if !(self.keep_buffer && self.hash.is_some())
+            && let Some(b) = &mut self.buffer
+        {
             b.extend_from_slice(msg);
         }
         if let Some((_, h)) = &mut self.hash {
@@ -734,6 +738,17 @@ impl Transcript {
         let mut f = h.fork();
         f.update(extra);
         Ok(f.current())
+    }
+
+    /// A copy to continue separately (TLS 1.3 post-handshake authentication keeps the
+    /// transcript at the client's Finished: `tls13_save_handshake_digest_for_pha`).
+    #[must_use]
+    pub fn fork(&self) -> Self {
+        Self {
+            buffer: self.buffer.clone(),
+            hash: self.hash.as_ref().map(|(a, h)| (*a, h.fork())),
+            keep_buffer: self.keep_buffer,
+        }
     }
 
     /// After a HelloRetryRequest: the transcript becomes `message_hash` with ClientHello1's

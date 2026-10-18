@@ -22,6 +22,15 @@ pub struct CertKey {
     pub auth: u32,
     /// The curve of an EC key (its group's code point), for TLS 1.2's ECDSA checks.
     pub ec_group: Option<u16>,
+    /// The curve of an EC key as a NID (`ssl_get_EC_curve_nid`), or `NID_undef`.
+    pub curve_nid: i32,
+    /// Whether the leaf may sign (no keyUsage extension, or one with digitalSignature:
+    /// `ssl_set_masks`' `ecdsa_ok` for an EC certificate).
+    pub can_sign: bool,
+    /// The leaf's own signature, as `X509_get_signature_info` gives it (the hash's NID and the
+    /// signing key's NID), for the peer's signature_algorithms_cert restrictions; `None` when
+    /// there is no certificate (a raw public key only).
+    pub cert_sig: Option<(i32, i32)>,
     /// A raw public key (RFC 7250) to send instead of the certificate, when negotiated.
     pub raw_public_key: Option<Vec<u8>>,
     /// The OCSP response to staple (`SSL_set_tlsext_status_ocsp_resp`), if any.
@@ -175,4 +184,33 @@ pub struct Config {
     pub quic: bool,
     /// The DTLS MTU, for later.
     pub mtu: usize,
+    /// The certificate flags (`SSL_CERT_FLAG_*`: the Suite B modes and strict checking).
+    pub cert_flags: u32,
+    /// The application's custom extensions (`SSL_CTX_add_custom_ext` and the older
+    /// `_add_client_custom_ext` / `_add_server_custom_ext`), in registration order.
+    pub custom_exts: Vec<CustomExt>,
+    /// Whether SRP is configured (a client's `SSL_set_srp_username`, so `srp_Mask` has
+    /// `SSL_kSRP`); without it SRP suites are disabled.
+    pub srp: bool,
+    /// Whether a server can do DHE: DH parameters set (`SSL_set0_tmp_dh_pkey`), a
+    /// `tmp_dh_callback`, or `SSL_set_dh_auto`.
+    pub dh_tmp: bool,
+}
+
+/// A registered custom extension (`custom_ext_method`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CustomExt {
+    /// The extension type.
+    pub typ: u16,
+    /// The contexts it applies to (`SSL_EXT_*`).
+    pub context: u32,
+    /// Which side registered it: `Some(true)` the server's (`_add_server_custom_ext`),
+    /// `Some(false)` the client's, `None` either (`SSL_CTX_add_custom_ext`, `ENDPOINT_BOTH`).
+    pub server: Option<bool>,
+    /// Whether it has an add callback (the old API's extensions without one are sent empty
+    /// only in a ClientHello).
+    pub has_add: bool,
+    /// Whether it has a parse callback (without one, a received extension is accepted
+    /// unread).
+    pub has_parse: bool,
 }

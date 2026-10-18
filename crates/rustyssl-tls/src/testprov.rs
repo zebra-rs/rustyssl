@@ -541,7 +541,8 @@ impl Provider for TestProvider {
     }
 
     fn verify(&self, cert: &[u8], scheme: u16, msg: &[u8], sig: &[u8]) -> Result<bool> {
-        let public = keys::PublicKey::from_cert(cert)?;
+        let public =
+            keys::PublicKey::from_cert(cert).or_else(|_| keys::PublicKey::from_spki_der(cert))?;
         keys::verify(&public, scheme, msg, sig)
     }
 
@@ -559,6 +560,15 @@ impl Provider for TestProvider {
         let keys = self.keys.borrow();
         let k = keys.get(key.0).ok_or_else(fail)?;
         keys::rsa_decrypt_pms(k, ciphertext, client_version, self)
+    }
+
+    fn peer_key(&self, der: &[u8], spki: bool) -> Result<crate::crypto::PeerKey> {
+        let k = if spki {
+            keys::PublicKey::from_spki_der(der)?
+        } else {
+            keys::PublicKey::from_cert(der)?
+        };
+        Ok(k.info())
     }
 }
 
