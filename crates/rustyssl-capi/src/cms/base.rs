@@ -536,7 +536,8 @@ ffi_export! {
         }
         let cmsbio = match type_nid(cms) {
             n if n == NID_pkcs7_data => return cont,
-            n if n == NID_pkcs7_signed => crate::stub::unimplemented("CMS SignedData's data path (step 6.4b)"),
+            // SAFETY: a live object.
+            n if n == NID_pkcs7_signed => unsafe { super::sd::signed_data_init_bio(cms) },
             // SAFETY: a live DigestedData object.
             n if n == NID_pkcs7_digest => unsafe { digested_init_bio(cms) },
             // SAFETY: a live EncryptedData object.
@@ -629,10 +630,10 @@ pub(crate) unsafe fn data_final(
         n if n == NID_pkcs7_enveloped || n == NID_id_smime_ct_authEnvelopedData => {
             crate::stub::unimplemented("CMS (Auth)EnvelopedData's final (step 6.4c)")
         }
-        n if n == NID_pkcs7_signed => {
-            let _ = precomp_md;
-            crate::stub::unimplemented("CMS SignedData's final (step 6.4b)")
-        }
+        // SAFETY: a live SignedData object and its chain.
+        n if n == NID_pkcs7_signed => unsafe {
+            super::sd::signed_data_final(cms, cmsbio, precomp_md)
+        },
         // SAFETY: a live DigestedData object.
         n if n == NID_pkcs7_digest => unsafe { digested_do_final(cms, cmsbio, false) },
         _ => {
@@ -1276,6 +1277,47 @@ unsafe extern "C" fn crl_free(p: *mut c_void) {
     unsafe { X509_CRL_free(p.cast()) };
 }
 
+/// `ossl_cms_get1_crls_ex`: the object's CRLs, with new references, in a new stack (empty if it
+/// has none). `None` on failure.
+///
+/// # Safety
+/// `cms` is NULL or a live object.
+pub(crate) unsafe fn get1_crls_ex(cms: *mut CMS_ContentInfo) -> Option<*mut stack_st_X509_CRL> {
+    // SAFETY: the caller's guarantee.
+    let pcrls = unsafe { revocation_choices(cms) };
+    if pcrls.is_null() {
+        return None;
+    }
+    // SAFETY: the slot.
+    let crls = unsafe { pcrls.read() };
+    // SAFETY: the CRLs, or NULL.
+    let n = unsafe { OPENSSL_sk_num(crls.cast()) };
+    // SAFETY: no preconditions.
+    let out = unsafe { OPENSSL_sk_new_reserve(None, n) };
+    if out.is_null() {
+        return None;
+    }
+    for i in 0..n {
+        // SAFETY: an index within them.
+        let Some(rch) = (unsafe { super::sk_get::<RevocationInfoChoice>(crls, i) }) else {
+            continue;
+        };
+        if rch.type_ != REVCHOICE_CRL {
+            continue;
+        }
+        // SAFETY: the choice's CRL; the new stack.
+        if unsafe { X509_CRL_up_ref(rch.d.cast()) } == 0
+            // SAFETY: the new stack; a CRL with its reference.
+            || unsafe { OPENSSL_sk_push(out, rch.d) } == 0
+        {
+            // SAFETY: the stack made here, with its references.
+            unsafe { OPENSSL_sk_pop_free(out, Some(crl_free)) };
+            return None;
+        }
+    }
+    Some(out.cast())
+}
+
 ffi_export! {
     /// The object's CRLs with new references, or NULL if it has none.
     ///
@@ -1285,43 +1327,17 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_CMS
     {
         // SAFETY: the caller's guarantee.
-        let pcrls = unsafe { revocation_choices(cms) };
-        if pcrls.is_null() {
-            return ptr::null_mut();
-        }
-        // SAFETY: the slot.
-        let crls = unsafe { pcrls.read() };
-        // SAFETY: the CRLs, or NULL.
-        let n = unsafe { OPENSSL_sk_num(crls.cast()) };
-        // SAFETY: no preconditions.
-        let out = unsafe { OPENSSL_sk_new_reserve(None, n) };
-        if out.is_null() {
-            return ptr::null_mut();
-        }
-        for i in 0..n {
-            // SAFETY: an index within them; a choice.
-            let Some(rch) = (unsafe { super::sk_get::<RevocationInfoChoice>(crls, i) }) else { continue };
-            if rch.type_ != REVCHOICE_CRL {
-                continue;
-            }
-            // SAFETY: the choice's CRL; the new stack.
-            if unsafe { X509_CRL_up_ref(rch.d.cast()) } == 0 || unsafe { OPENSSL_sk_push(out, rch.d) } == 0 {
-                // SAFETY: the stack made here, with its references.
-                unsafe { OPENSSL_sk_pop_free(out, Some(crl_free)) };
-                return ptr::null_mut();
-            }
-        }
+        let Some(out) = (unsafe { get1_crls_ex(cms) }) else { return ptr::null_mut() };
         // SAFETY: the stack made.
-        if unsafe { OPENSSL_sk_num(out) } == 0 {
+        if unsafe { OPENSSL_sk_num(out.cast()) } == 0 {
             // SAFETY: as above, empty.
-            unsafe { OPENSSL_sk_free(out) };
+            unsafe { OPENSSL_sk_free(out.cast()) };
             return ptr::null_mut();
         }
-        out.cast()
+        out
     }
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `ossl_cms_ias_cert_cmp`: 0 if the issuer and serial are the certificate's.
 ///
 /// # Safety
@@ -1340,7 +1356,6 @@ pub(crate) unsafe fn ias_cert_cmp(ias: &IssuerAndSerialNumber, cert: *mut X509) 
     unsafe { ASN1_INTEGER_cmp(ias.serial_number, serial) }
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `ossl_cms_keyid_cert_cmp`: 0 if the key identifier is the certificate's (-1 if it has
 /// none).
 ///
@@ -1356,7 +1371,6 @@ pub(crate) unsafe fn keyid_cert_cmp(keyid: *const ASN1_OCTET_STRING, cert: *mut 
     unsafe { ASN1_OCTET_STRING_cmp(keyid, ck) }
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `ossl_cms_set1_ias`: `*pias` replaced by the certificate's issuer and serial.
 ///
 /// # Safety
@@ -1399,7 +1413,6 @@ pub(crate) unsafe fn set1_ias(pias: *mut *mut IssuerAndSerialNumber, cert: *mut 
     true
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 /// `ossl_cms_set1_keyid`: `*pkeyid` replaced by a copy of the certificate's key identifier.
 ///
 /// # Safety

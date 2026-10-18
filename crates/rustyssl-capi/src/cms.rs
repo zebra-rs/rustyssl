@@ -51,6 +51,7 @@ pub(crate) mod base;
 pub(crate) mod enc;
 pub(crate) mod ess;
 pub(crate) mod io;
+pub(crate) mod sd;
 pub(crate) mod smime;
 
 /// A stack of anything, as the structures hold them.
@@ -371,7 +372,6 @@ pub(crate) struct ReceiptsFrom {
     pub(crate) d: ReceiptsFromD,
 }
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 #[repr(C)]
 pub(crate) struct Receipt {
     pub(crate) version: i32,
@@ -916,9 +916,7 @@ static CI_TT: Templates<2> = Templates([
     adb_object(c"CMS_ContentInfo", ci_adb),
 ]);
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 static ATTR_SIGN: Template = template(ASN1_TFLG_SET_ORDER, 0, c"CMS_ATTRIBUTES", X509_ATTRIBUTE_it);
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 static ATTR_VERIFY: Template = template(
     ASN1_TFLG_SEQUENCE_OF | ASN1_TFLG_IMPTAG | ASN1_TFLG_UNIVERSAL,
     V_ASN1_SET as c_long,
@@ -937,7 +935,6 @@ static RR_TT: Templates<3> = tt![ReceiptRequest;
     SEQ_OF, 0, receipts_to, c"receiptsTo", GENERAL_NAMES_it;
 ];
 
-#[expect(dead_code, reason = "used by SignedData, step 6.4b")]
 static RCT_TT: Templates<4> = tt![Receipt;
     EMBED, 0, version, c"version", INT32_it;
     SIMPLE, 0, content_type, c"contentType", ASN1_OBJECT_it;
@@ -976,7 +973,6 @@ private_item! {
     fn authenticated_data_it = ndef_sequence::<AuthenticatedData, 9>(&AD_TT, None, c"CMS_AuthenticatedData");
     fn compressed_data_it = ndef_sequence::<CompressedData, 3>(&CD_TT, None, c"CMS_CompressedData");
     fn receipts_from_it = choice::<ReceiptsFrom, 2>(&RF_TT, offset_of!(ReceiptsFrom, type_), None, c"CMS_ReceiptsFrom");
-    #[expect(dead_code, reason = "used by SignedData, step 6.4b")]
     fn receipt_it = sequence::<Receipt, 4>(&RCT_TT, None, c"CMS_Receipt");
     fn shared_info_it = sequence::<SharedInfo, 3>(&SHI_TT, None, c"CMS_SharedInfo");
     /// `CMS_IssuerAndSerialNumber_it`, which OpenSSL doesn't export.
@@ -991,10 +987,8 @@ private_item! {
     fn recipient_info_it = choice::<RecipientInfo, 5>(&RI_TT, offset_of!(RecipientInfo, type_), Some(&RI_AUX), c"CMS_RecipientInfo");
     /// `CMS_PasswordRecipientInfo_it`, which OpenSSL doesn't export.
     fn password_recipient_info_it = sequence::<PasswordRecipientInfo, 4>(&PWRI_TT, None, c"CMS_PasswordRecipientInfo");
-    #[expect(dead_code, reason = "used by SignedData, step 6.4b")]
     /// `CMS_Attributes_Sign_it`: signed attributes as a SET OF, sorted.
     fn attributes_sign_it = item(ASN1_ITYPE_PRIMITIVE, -1, (&raw const ATTR_SIGN.0).cast(), 0, ptr::null(), 0, c"CMS_Attributes_Sign");
-    #[expect(dead_code, reason = "used by SignedData, step 6.4b")]
     /// `CMS_Attributes_Verify_it`: signed attributes as received, tagged as a SET.
     fn attributes_verify_it = item(ASN1_ITYPE_PRIMITIVE, -1, (&raw const ATTR_VERIFY.0).cast(), 0, ptr::null(), 0, c"CMS_Attributes_Verify");
 }
