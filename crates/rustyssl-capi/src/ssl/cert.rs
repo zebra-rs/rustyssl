@@ -586,50 +586,11 @@ pub(crate) unsafe fn security_cert(owner: Owner, x: *mut X509, is_ee: bool) -> c
         (SSL_SECOP_CA_KEY, SSL_R_CA_KEY_TOO_SMALL)
     };
     // SAFETY: the caller's guarantee; the certificate as the operation's object.
-    if !unsafe { security(owner, op, secbits, 0, x.cast()) } {
-        return reason;
+    if unsafe { security(owner, op, secbits, 0, x.cast()) } {
+        1
+    } else {
+        reason
     }
-    // SAFETY: as above.
-    if !unsafe { security_cert_sig(owner, x) } {
-        return rustyssl_abi::SSL_R_CA_MD_TOO_WEAK;
-    }
-    1
-}
-
-/// `ssl_security_cert_sig`: whether the certificate's signature is strong enough
-/// (`SSL_SECOP_CA_MD`, with the digest's NID, else the signature's); a self-signed one isn't
-/// checked.
-///
-/// # Safety
-/// The owner is live; `x` a live certificate.
-unsafe fn security_cert_sig(owner: Owner, x: *mut X509) -> bool {
-    use crate::x509::purpose::{X509_get_extension_flags, X509_get_signature_info};
-    use rustyssl_abi::NID_undef;
-    // SAFETY: the caller's certificate.
-    if unsafe { X509_get_extension_flags(x) } & u32::try_from(rustyssl_abi::EXFLAG_SS).unwrap_or(0)
-        != 0
-    {
-        return true;
-    }
-    let (mut nid, mut pknid, mut secbits) = (NID_undef, NID_undef, -1);
-    // SAFETY: as above; the slots.
-    if unsafe {
-        X509_get_signature_info(
-            x,
-            &raw mut nid,
-            &raw mut pknid,
-            &raw mut secbits,
-            ptr::null_mut(),
-        )
-    } == 0
-    {
-        secbits = -1;
-    }
-    if nid == NID_undef {
-        nid = pknid;
-    }
-    // SAFETY: the caller's guarantee; the certificate as the operation's object.
-    unsafe { security(owner, rustyssl_abi::SSL_SECOP_CA_MD, secbits, nid, x.cast()) }
 }
 
 /// `ssl_get_security_level_bits`'s table: the minimum security in bits at each level.
