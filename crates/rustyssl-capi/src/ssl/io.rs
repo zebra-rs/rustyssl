@@ -15,9 +15,11 @@
 //! `ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED`: OpenSSL's state machine isn't re-entrant either, and
 //! the outer call owns the pending request.
 
+pub(crate) mod alpn;
 pub(crate) mod api;
 pub(crate) mod config;
 pub(crate) mod requests;
+pub(crate) mod strings;
 
 use core::ffi::{c_int, c_long, c_void};
 use core::ptr;
@@ -109,6 +111,8 @@ impl Driver {
         Self {
             peer: core::mem::take(&mut self.peer),
             kept_cipher: cipher,
+            group_names: core::mem::take(&mut self.group_names),
+            provider: self.provider.take(),
             ..Self::default()
         }
     }
@@ -147,6 +151,8 @@ pub(crate) struct Driver {
     /// The cipher of a connection `SSL_clear` reset: OpenSSL keeps the session, and
     /// `SSL_get_current_cipher` reports its cipher until a new handshake replaces it.
     pub(crate) kept_cipher: Option<&'static rustyssl_tls::suites::Cipher>,
+    /// The group names `SSL_group_to_name` handed out, kept for the connection's lifetime.
+    pub(crate) group_names: Vec<CString>,
 }
 
 // SAFETY: the raw pointers are owned references (stacks of certificates) used under the
@@ -450,6 +456,25 @@ pub(crate) unsafe fn flush(x: &Ssl) -> Flush {
     }
 }
 
+/// The connection's provider of TLS crypto, made from its context's library context on first
+/// use.
+///
+/// # Safety
+/// `snap` is `x`'s context's snapshot.
+pub(crate) unsafe fn provider(x: &Ssl, snap: &config::CtxSnapshot) -> Arc<EvpProvider> {
+    let mut st = x.state();
+    match &st.drv.provider {
+        Some(p) => Arc::clone(p),
+        None => {
+            // SAFETY: the context's library context (it outlives the connection) and property
+            // query.
+            let p = Arc::new(unsafe { EvpProvider::new(snap.libctx, snap.propq()) });
+            st.drv.provider = Some(Arc::clone(&p));
+            p
+        }
+    }
+}
+
 /// Starts the core connection if there isn't one (`SSL_do_handshake`'s first call, or the
 /// first `SSL_read`/`SSL_write`), with a configuration from the connection and its context.
 ///
@@ -462,19 +487,8 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
     let Some(snap) = config::snapshot(x) else {
         return false;
     };
-    let prov = {
-        let mut st = x.state();
-        match &st.drv.provider {
-            Some(p) => Arc::clone(p),
-            None => {
-                // SAFETY: the context's library context (it outlives the connection) and
-                // property query.
-                let p = Arc::new(unsafe { EvpProvider::new(snap.libctx, snap.propq()) });
-                st.drv.provider = Some(Arc::clone(&p));
-                p
-            }
-        }
-    };
+    // SAFETY: the context's library context (it outlives the connection).
+    let prov = unsafe { provider(x, &snap) };
     // SAFETY: the caller's connection; its context's snapshot.
     let cfg = unsafe { config::build(s, x, &snap, &prov) };
     let custom_security = {

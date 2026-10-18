@@ -305,7 +305,7 @@ pub(crate) fn group_nid(prov: &EvpProvider, id: u16) -> c_int {
 }
 
 /// A group's code point by the NID of its curve, from the providers' groups.
-fn group_of_nid(prov: &EvpProvider, nid: c_int) -> Option<u16> {
+pub(crate) fn group_of_nid(prov: &EvpProvider, nid: c_int) -> Option<u16> {
     if nid == NID_undef {
         return None;
     }

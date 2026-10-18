@@ -899,34 +899,6 @@ pub extern "C" fn rustyssl_private_SSL_add_ssl_module() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_alert_desc_string(
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_alert_desc_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_alert_desc_string_long(
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_alert_desc_string_long")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_alert_type_string(
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_alert_type_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_alert_type_string_long(
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_alert_type_string_long")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_alloc_buffers(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_alloc_buffers")
 }
@@ -1464,14 +1436,6 @@ pub extern "C" fn rustyssl_private_SSL_get_wpoll_descriptor(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_group_to_name(
-    _: *mut SSL,
-    _: core::ffi::c_int,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_group_to_name")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_handle_events(_: *mut SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_handle_events")
 }
@@ -1616,18 +1580,6 @@ pub extern "C" fn rustyssl_private_SSL_rstate_string_long(
     _: *const SSL,
 ) -> *const core::ffi::c_char {
     crate::stub::unimplemented("SSL_rstate_string_long")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_select_next_proto(
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uchar,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_select_next_proto")
 }
 
 #[unsafe(no_mangle)]
@@ -1838,18 +1790,6 @@ pub extern "C" fn rustyssl_private_SSL_srp_server_param_with_username(
     _: *mut core::ffi::c_int,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_srp_server_param_with_username")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_state_string(_: *const SSL) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_state_string")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_state_string_long(
-    _: *const SSL,
-) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_state_string_long")
 }
 
 #[unsafe(no_mangle)]

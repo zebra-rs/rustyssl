@@ -1051,3 +1051,39 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         _ => return None,
     })
 }
+
+ffi_export! {
+    /// The TLS name of a group (`x25519`, `X25519MLKEM768`, ...), by NID or by
+    /// `TLSEXT_nid_unknown | code point`; NULL if the providers have no such group.
+    ///
+    /// # Safety
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_group_to_name(s: *mut SSL, id: c_int) -> *const c_char
+    where failure = ptr::null(), library = ERR_LIB_SSL
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { ssl(s) }) else { return ptr::null() };
+        let Some(snap) = super::config::snapshot(x) else { return ptr::null() };
+        // SAFETY: the connection's context's snapshot.
+        let prov = unsafe { super::provider(x, &snap) };
+        let code = if id & rustyssl_abi::TLSEXT_nid_unknown != 0 {
+            u16::try_from(id & 0xffff).ok()
+        } else {
+            super::config::group_of_nid(&prov, id)
+        };
+        let Some(code) = code else { return ptr::null() };
+        let Some(g) = rustyssl_tls::crypto::Provider::groups(&*prov).into_iter().find(|g| g.id == code) else {
+            return ptr::null();
+        };
+        let Ok(name) = std::ffi::CString::new(g.name) else { return ptr::null() };
+        let mut st = x.state();
+        let names = &mut st.drv.group_names;
+        if let Some(n) = names.iter().find(|n| **n == name) {
+            return n.as_ptr();
+        }
+        // The CString's buffer doesn't move when the vector grows.
+        let p = name.as_ptr();
+        names.push(name);
+        p
+    }
+}

@@ -19993,6 +19993,14 @@ const _: unsafe extern "C" fn(
     *mut stack_st_X509_NAME,
     *const core::ffi::c_char,
 ) -> core::ffi::c_int = crate::ssl::ca::rustyssl_private_SSL_add_store_cert_subjects_to_stack;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_alert_desc_string;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_alert_desc_string_long;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_alert_type_string;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_alert_type_string_long;
 const _: unsafe extern "C" fn(
     *mut SSL,
     *const core::ffi::c_uchar,
@@ -20179,6 +20187,8 @@ const _: unsafe extern "C" fn(*const SSL) -> *mut BIO =
     crate::ssl::conn::rustyssl_private_SSL_get_wbio;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_get_wfd;
+const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) -> *const core::ffi::c_char =
+    crate::ssl::io::api::rustyssl_private_SSL_group_to_name;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_has_pending;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
@@ -20228,6 +20238,14 @@ const _: unsafe extern "C" fn(
     usize,
     *mut usize,
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_read_ex;
+const _: unsafe extern "C" fn(
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uchar,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::ssl::io::alpn::rustyssl_private_SSL_select_next_proto;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::accessors::rustyssl_private_SSL_session_reused;
 const _: unsafe extern "C" fn(*mut SSL, *mut stack_st_X509_NAME) =
@@ -20414,6 +20432,10 @@ const _: unsafe extern "C" fn(*mut SSL, core::ffi::c_int) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_set_wfd;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_shutdown;
+const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_state_string;
+const _: unsafe extern "C" fn(*const SSL) -> *const core::ffi::c_char =
+    crate::ssl::io::strings::rustyssl_private_SSL_state_string_long;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_up_ref;
 const _: unsafe extern "C" fn(*mut SSL, *mut EVP_PKEY) -> core::ffi::c_int =
