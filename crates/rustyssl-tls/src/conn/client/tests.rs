@@ -2025,7 +2025,6 @@ fn server_config(p: &TestProvider) -> Config {
             ocsp_response: None,
             chain_security: None,
             unsupported_digests: Vec::new(),
-        unsupported_digests: Vec::new(),
         }],
         max_cert_list: 102_400,
         max_send_fragment: 16384,

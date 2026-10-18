@@ -52,9 +52,7 @@ fn output_cert_chain_inner(
         .and_then(|i| c.cfg.certs.get(i))
         .and_then(|k| k.chain_security)
     {
-        return Err(
-            Error::alert(abi::SSL_AD_INTERNAL_ERROR, reason).in_func("ssl_add_cert_chain")
-        );
+        return Err(Error::alert(abi::SSL_AD_INTERNAL_ERROR, reason).in_func("ssl_add_cert_chain"));
     }
     let chain = cert
         .and_then(|i| c.cfg.certs.get(i))

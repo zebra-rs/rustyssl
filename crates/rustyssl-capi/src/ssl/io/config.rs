@@ -473,7 +473,9 @@ unsafe fn unsupported_digests(pkey: *mut EVP_PKEY, src: &ChainSource) -> Vec<c_i
         };
         // SAFETY: the caller's key; the digest's name (or NULL); the library context.
         let ok = unsafe {
-            crate::evp::sigver::EVP_PKEY_digestsign_supports_digest(pkey, src.libctx, name, src.propq)
+            crate::evp::sigver::EVP_PKEY_digestsign_supports_digest(
+                pkey, src.libctx, name, src.propq,
+            )
         };
         if ok <= 0 {
             out.push(nid);

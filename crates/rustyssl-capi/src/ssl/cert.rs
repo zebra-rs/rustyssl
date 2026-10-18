@@ -614,7 +614,13 @@ unsafe fn security_cert_sig(owner: Owner, x: *mut X509) -> bool {
     let (mut nid, mut pknid, mut secbits) = (NID_undef, NID_undef, -1);
     // SAFETY: as above; the slots.
     if unsafe {
-        X509_get_signature_info(x, &raw mut nid, &raw mut pknid, &raw mut secbits, ptr::null_mut())
+        X509_get_signature_info(
+            x,
+            &raw mut nid,
+            &raw mut pknid,
+            &raw mut secbits,
+            ptr::null_mut(),
+        )
     } == 0
     {
         secbits = -1;
