@@ -900,15 +900,6 @@ pub extern "C" fn rustyssl_private_SSL_get0_group_name(_: *mut SSL) -> *const co
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_next_proto_negotiated(
-    _: *const SSL,
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-) {
-    crate::stub::unimplemented("SSL_get0_next_proto_negotiated")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get0_peer_rpk(_: *const SSL) -> *mut EVP_PKEY {
     crate::stub::unimplemented("SSL_get0_peer_rpk")
 }

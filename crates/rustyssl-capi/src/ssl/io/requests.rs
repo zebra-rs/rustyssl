@@ -101,6 +101,8 @@ pub(crate) unsafe fn handle(
             }
             Some(Answer::Alpn(None))
         }
+        // SAFETY: as above.
+        Request::Npn { protos } => Some(unsafe { super::super::npn::answer(s, x, snap, &protos) }),
         Request::ClientHello => {
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
                 (c.client_hello_cb, c.client_hello_cb_arg)

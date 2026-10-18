@@ -309,6 +309,60 @@ static void test_client_hello(int max)
     SSL_CTX_free(sctx);
 }
 
+static int npn_select(SSL *s, unsigned char **out, unsigned char *outlen, const unsigned char *in,
+    unsigned int inlen, void *arg)
+{
+    static const unsigned char mine[] = "\x08http/1.1\x02h2";
+
+    (void)s;
+    printf("  client select: %u octets offered, arg %s\n", inlen, arg == NULL ? "NULL" : "set");
+    return SSL_select_next_proto(out, outlen, in, inlen, mine, sizeof(mine) - 1) == OPENSSL_NPN_NEGOTIATED
+        ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
+}
+
+static int npn_advertise(SSL *s, const unsigned char **out, unsigned int *outlen, void *arg)
+{
+    static const unsigned char list[] = "\x02h2\x08http/1.1";
+
+    (void)s;
+    (void)arg;
+    *out = list;
+    *outlen = sizeof(list) - 1;
+    printf("  server advertises\n");
+    return SSL_TLSEXT_ERR_OK;
+}
+
+static void npn_report(const char *who, SSL *x)
+{
+    const unsigned char *p = NULL;
+    unsigned int n = 7;
+
+    SSL_get0_next_proto_negotiated(x, &p, &n);
+    printf("  %s: %.*s (%u)\n", who, (int)n, p == NULL ? "" : (const char *)p, n);
+}
+
+static void test_npn(int advertise)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+
+    printf("# NPN (TLS 1.2)%s\n", advertise ? "" : ", no advertisement");
+    SSL_CTX_set_max_proto_version(cctx, TLS1_2_VERSION);
+    SSL_CTX_set_next_proto_select_cb(cctx, npn_select, NULL);
+    if (advertise)
+        SSL_CTX_set_next_protos_advertised_cb(sctx, npn_advertise, NULL);
+    connect_pair(cctx, sctx, &c, &s);
+    npn_report("client before", c);
+    check(run(c, s, 0) == 0, "the handshake");
+    npn_report("client", c);
+    npn_report("server", s);
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 static void test_surface(void)
 {
     SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
@@ -382,6 +436,8 @@ int main(void)
     test_client_hello(TLS1_3_VERSION);
     test_client_hello(TLS1_2_VERSION);
     test_surface();
+    test_npn(1);
+    test_npn(0);
     (void)CLIENT_PEM;
     (void)CLIENT_KEY_PEM;
     (void)trust_root;

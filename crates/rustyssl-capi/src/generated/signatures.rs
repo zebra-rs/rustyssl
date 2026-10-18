@@ -20139,6 +20139,8 @@ const _: unsafe extern "C" fn(*mut SSL) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_get0_domain;
 const _: unsafe extern "C" fn(*mut SSL) -> *mut SSL =
     crate::ssl::misc::rustyssl_private_SSL_get0_listener;
+const _: unsafe extern "C" fn(*const SSL, *mut *const core::ffi::c_uchar, *mut core::ffi::c_uint) =
+    crate::ssl::npn::rustyssl_private_SSL_get0_next_proto_negotiated;
 const _: unsafe extern "C" fn(*mut SSL) -> *mut X509_VERIFY_PARAM =
     crate::ssl::conn::rustyssl_private_SSL_get0_param;
 const _: unsafe extern "C" fn(*const SSL) -> *const stack_st_X509_NAME =
