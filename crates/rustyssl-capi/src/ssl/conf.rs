@@ -59,7 +59,6 @@ use super::keys::{
     rustyssl_private_SSL_CTX_use_certificate_chain_file, rustyssl_private_SSL_set0_tmp_dh_pkey,
     rustyssl_private_SSL_use_PrivateKey_file, rustyssl_private_SSL_use_certificate_chain_file,
 };
-use super::types::SSL_PKEY_NUM;
 use crate::bio::{BIO_ctrl, BIO_free, BIO_new, file::BIO_s_file};
 use crate::decoder::ctx::{OSSL_DECODER_CTX_free, OSSL_DECODER_from_bio};
 use crate::decoder::pkey::OSSL_DECODER_CTX_new_for_pkey;
@@ -1353,11 +1352,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { conf(cctx) }) else { return };
+        // A name per slot (`ssl_pkey_num`).
+        // SAFETY: the caller's connection, or NULL.
+        let slots = unsafe { super::conn::ssl(ssl) }.map_or(0, |x| x.state().cert.pkeys.len());
         let mut st = c.state();
         st.ssl = ssl;
         st.ctx = ptr::null_mut();
         st.target = !ssl.is_null();
-        st.cert_filename = if ssl.is_null() { Vec::new() } else { vec![None; SSL_PKEY_NUM] };
+        st.cert_filename = vec![None; slots];
     }
 }
 
@@ -1372,11 +1374,14 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { conf(cctx) }) else { return };
+        // A name per slot (`SSL_PKEY_NUM + sigalg_list_len`).
+        // SAFETY: the caller's context, or NULL.
+        let slots = unsafe { super::ctx::ctx(ctx) }.map_or(0, |x| x.state().cert.pkeys.len());
         let mut st = c.state();
         st.ctx = ctx;
         st.ssl = ptr::null_mut();
         st.target = !ctx.is_null();
-        st.cert_filename = if ctx.is_null() { Vec::new() } else { vec![None; SSL_PKEY_NUM] };
+        st.cert_filename = vec![None; slots];
     }
 }
 

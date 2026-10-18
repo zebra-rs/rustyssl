@@ -203,6 +203,40 @@ static void contexts(SSL_CTX **cctx, SSL_CTX **sctx, const char *ciphers, const 
         SSL_CTX_set_srp_password(*cctx, (char *)pass);
 }
 
+/* The SRP username line of the session's SSL_SESSION_print, and its DER's (i2d's). */
+static void session_srp(const char *who, SSL *x)
+{
+    SSL_SESSION *sess = SSL_get_session(x), *back;
+    BIO *b = BIO_new(BIO_s_mem());
+    char line[256], *p;
+    unsigned char *der = NULL;
+    const unsigned char *q;
+    int len;
+
+    printf("  %s's session:", who);
+    if (sess == NULL || b == NULL || SSL_SESSION_print(b, sess) != 1) {
+        printf(" none\n");
+        BIO_free(b);
+        return;
+    }
+    while (BIO_gets(b, line, sizeof(line)) > 0)
+        if ((p = strstr(line, "SRP username:")) != NULL)
+            printf(" %s", p);
+    len = i2d_SSL_SESSION(sess, &der);
+    q = der;
+    back = len > 0 ? d2i_SSL_SESSION(NULL, &q, len) : NULL;
+    BIO_free(b);
+    b = BIO_new(BIO_s_mem());
+    if (back != NULL && b != NULL && SSL_SESSION_print(b, back) == 1) {
+        while (BIO_gets(b, line, sizeof(line)) > 0)
+            if ((p = strstr(line, "SRP username:")) != NULL)
+                printf("  decoded: %s", p);
+    }
+    SSL_SESSION_free(back);
+    OPENSSL_free(der);
+    BIO_free(b);
+}
+
 /* A handshake between the contexts (which it frees); 0, or the error that stopped it. */
 static int run(const char *name, SSL_CTX *cctx, SSL_CTX *sctx)
 {
@@ -218,6 +252,8 @@ static int run(const char *name, SSL_CTX *cctx, SSL_CTX *sctx)
                str(SSL_get_srp_userinfo(s)));
         printf("  client N %d g %d bits, server N %d g %d bits\n", bits(SSL_get_srp_N(c)),
                bits(SSL_get_srp_g(c)), bits(SSL_get_srp_N(s)), bits(SSL_get_srp_g(s)));
+        session_srp("client", c);
+        session_srp("server", s);
     }
     printf("  username callbacks %d, verify callbacks %d, password callbacks %d\n",
            username_calls, verify_calls, pwd_calls);

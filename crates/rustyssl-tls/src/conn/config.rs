@@ -42,6 +42,10 @@ pub struct CertKey {
     /// (`EVP_PKEY_digestsign_supports_digest`: an RSA-PSS key's restriction, say), which
     /// rule out the signature algorithms using them.
     pub unsupported_digests: Vec<i32>,
+    /// The certificate, its key, and its configured chain as strict mode
+    /// (`SSL_CERT_FLAG_TLS_STRICT`) checks them (`tls1_check_chain` on a slot); `None` without
+    /// a certificate.
+    pub strict: Option<crate::conn::common::sigalgs::ChainCandidate>,
 }
 
 /// A session to resume, or one just established (what `SSL_SESSION` holds that the handshake
@@ -91,6 +95,8 @@ pub struct Session {
     /// The group of its key exchange (`kex_group`; 0: none, as for TLS 1.2's FFDHE), which a
     /// resumed TLS 1.2 handshake reports (`SSL_get_negotiated_group`).
     pub kex_group: u16,
+    /// The SRP login of an SRP key exchange (`srp_username`), or `None`.
+    pub srp_username: Option<Vec<u8>>,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the

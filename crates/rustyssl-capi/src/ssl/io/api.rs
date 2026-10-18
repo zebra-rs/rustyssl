@@ -915,9 +915,10 @@ fn sigalg_info(code: u16) -> Option<(&'static CStr, c_int, c_int, c_int)> {
             NID_rsaEncryption,
             NID_undef,
         ),
-        s::MLDSA44 => (c"mldsa44", NID_undef, NID_ML_DSA_44, NID_undef),
-        s::MLDSA65 => (c"mldsa65", NID_undef, NID_ML_DSA_65, NID_undef),
-        s::MLDSA87 => (c"mldsa87", NID_undef, NID_ML_DSA_87, NID_undef),
+        // The providers' schemes: `sig` and `sigandhash` are both the sigalg name's NID.
+        s::MLDSA44 => (c"mldsa44", NID_undef, NID_ML_DSA_44, NID_ML_DSA_44),
+        s::MLDSA65 => (c"mldsa65", NID_undef, NID_ML_DSA_65, NID_ML_DSA_65),
+        s::MLDSA87 => (c"mldsa87", NID_undef, NID_ML_DSA_87, NID_ML_DSA_87),
         _ => return None,
     })
 }
@@ -1035,6 +1036,10 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        // Unlike `SSL_get_sigalgs`, a negative index gives 0, not the count.
+        if idx < 0 {
+            return 0;
+        }
         let list = x.state().drv.tls.as_ref().map(|c| c.negotiated().shared_sigalgs.clone()).unwrap_or_default();
         // SAFETY: the caller's slots.
         unsafe { sigalg_out(&list, idx, psign, phash, psignhash, rsig, rhash) }

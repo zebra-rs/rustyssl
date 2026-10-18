@@ -551,6 +551,13 @@ impl Connection {
         (self.sent_alert, self.fatal_alert, self.warn_alert)
     }
 
+    /// Whether the version is decided: a flexible method's is pending from the start of the
+    /// first handshake until the hellos chose it (OpenSSL sets `s->version` then).
+    #[must_use]
+    pub fn version_decided(&self) -> bool {
+        !self.version_pending
+    }
+
     /// Whether the negotiated (or, before negotiation, the attempted) version is TLS 1.3.
     #[must_use]
     pub fn is_tls13(&self) -> bool {

@@ -883,6 +883,8 @@ const FORMAT_BASE: u8 = 1;
 const FORMAT_APPDATA: u8 = 2;
 /// The format octet's flag for the peer's raw public key.
 const FORMAT_RPK: u8 = 4;
+/// The format octet's flag for the SRP login.
+const FORMAT_SRP: u8 = 8;
 
 /// The session's encoding inside a ticket (this crate's, versioned): every field of
 /// [`Session`] but the ticket itself.
@@ -901,6 +903,9 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     }
     if s.peer_rpk.is_some() {
         format |= FORMAT_RPK;
+    }
+    if s.srp_username.is_some() {
+        format |= FORMAT_SRP;
     }
     w.u8(format);
     w.u16(s.version);
@@ -940,6 +945,9 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
     if let Some(k) = &s.peer_rpk {
         w.vec(3, k).map_err(e)?;
     }
+    if let Some(u) = &s.srp_username {
+        w.vec(1, u).map_err(e)?;
+    }
     Ok(w.into_bytes())
 }
 
@@ -948,7 +956,9 @@ pub(crate) fn encode_session(s: &Session) -> Result<Vec<u8>> {
 pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     let mut rd = Reader::new(b);
     let format = rd.u8().ok()?;
-    if format & FORMAT_BASE == 0 || format & !(FORMAT_BASE | FORMAT_APPDATA | FORMAT_RPK) != 0 {
+    if format & FORMAT_BASE == 0
+        || format & !(FORMAT_BASE | FORMAT_APPDATA | FORMAT_RPK | FORMAT_SRP) != 0
+    {
         return None;
     }
     let version = rd.u16().ok()?;
@@ -997,6 +1007,11 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
     } else {
         None
     };
+    let srp_username = if format & FORMAT_SRP != 0 {
+        Some(rd.vec8().ok()?.rest().to_vec())
+    } else {
+        None
+    };
     rd.end().ok()?;
     if session_id.len() > 32 || sid_ctx.len() > 32 {
         return None;
@@ -1023,5 +1038,6 @@ pub(crate) fn decode_session(b: &[u8]) -> Option<Session> {
         ext_flags,
         kex_group,
         ticket_appdata,
+        srp_username,
     })
 }
