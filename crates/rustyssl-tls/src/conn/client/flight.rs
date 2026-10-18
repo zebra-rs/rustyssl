@@ -343,6 +343,8 @@ pub(super) fn process_key_exchange(
             .derive(&point)
             .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_ECPOINT))?;
         state(c)?.kx12 = Some(Kx12 { public, pms });
+        // Fork M: the server's point is the peer's temporary key (`SSL_get_peer_tmp_key`).
+        c.hs.sh.peer_tmp = Some((group, point.to_vec()));
         if auth & (SSL_aECDSA | SSL_aRSA) != 0 {
             signer = peer_pkey(c, p);
         }

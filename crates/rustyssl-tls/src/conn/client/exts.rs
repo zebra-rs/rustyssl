@@ -1253,6 +1253,11 @@ pub(crate) fn ext_parse_key_share(
         }
     })?;
     state(c)?.peer_share = true;
+    // Shared fix (fork M): the server's share is the peer's temporary key
+    // (`SSL_get_peer_tmp_key`), except for a KEM (`tls_parse_stoc_key_share`).
+    if !info.is_kem {
+        c.hs.sh.peer_tmp = Some((group, entry.key.clone()));
+    }
     if !c.neg.reused {
         let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
         keys::generate_early(c, p, cp, None)?;

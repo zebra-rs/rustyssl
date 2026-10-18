@@ -604,8 +604,10 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             mirror(&mut st, &conn);
             st.drv.tls = Some(conn);
             peers.map(|mut p| {
-                // The verified chain stays until verification replaces it.
+                // The verified chain and the verdict stay until verification replaces them (a
+                // server records the chain only after verifying it).
                 core::mem::swap(&mut p.verified, &mut st.drv.peer.verified);
+                p.accepted = st.drv.peer.accepted;
                 core::mem::replace(&mut st.drv.peer, p)
             })
         };

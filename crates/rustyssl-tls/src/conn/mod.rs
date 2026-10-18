@@ -240,17 +240,21 @@ impl Connection {
     /// A connection with `cfg`, before any handshake (`TLS_ST_BEFORE`).
     #[must_use]
     pub fn new(cfg: Config) -> Self {
-        let version = if cfg.method_version == 0 {
-            tls1_0()
+        // Shared fix (fork M): a flexible method's connection reports TLS 1.3 until a version
+        // is negotiated (`tls1_clear`: TLS_MAX_VERSION_INTERNAL), with is_tls13 false until
+        // then (the method isn't switched yet); its first records carry TLS 1.0.
+        let flexible = cfg.method_version == 0;
+        let (version, record_version) = if flexible {
+            (tls1_3(), tls1_0())
         } else {
-            cfg.method_version
+            (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
         Self {
             cfg,
             st: Statem::default(),
             rr: RecordReader::new(server),
-            rw: RecordWriter::new(version),
+            rw: RecordWriter::new(record_version),
             hs: Handshake::default(),
             neg: Negotiated {
                 version,
@@ -279,7 +283,7 @@ impl Connection {
             needs_input: false,
             reading: false,
             security_hook: None,
-            version_pending: false,
+            version_pending: flexible,
         }
     }
 
@@ -287,6 +291,32 @@ impl Connection {
     #[must_use]
     pub fn config(&self) -> &Config {
         &self.cfg
+    }
+
+    /// The ClientHello the server is processing (`s->clienthello`, until its processing ends)
+    /// and the extensions OpenSSL collects from it (`pre_proc_exts`: the recognised ones and the
+    /// custom ones, not unknown ones), in received order; for the client hello callback's
+    /// getters (`SSL_client_hello_get0_*`). Shared addition (fork M).
+    #[must_use]
+    pub fn client_hello_exts(
+        &self,
+    ) -> Option<(&crate::msgs::hello::ClientHello, Vec<(u16, &[u8])>)> {
+        let RoleState::Server(s) = &self.hs.role else {
+            return None;
+        };
+        let hello = s.hello.as_ref()?;
+        let mut exts: Vec<(usize, u16, &[u8])> =
+            common::ext::received(self, crate::consts::context::CLIENT_HELLO, 0)
+                .map(|r| {
+                    r.exts
+                        .iter()
+                        .flatten()
+                        .map(|e| (e.received_order, e.typ, e.body.as_slice()))
+                        .collect()
+                })
+                .unwrap_or_default();
+        exts.sort_by_key(|e| e.0);
+        Some((hello, exts.into_iter().map(|(_, t, b)| (t, b)).collect()))
     }
 
     /// The settings, to update mid-handshake (after a callback changed the `SSL`).
@@ -568,11 +598,17 @@ impl Connection {
                 headers.push(h.to_vec());
                 at = at.saturating_add(record::HEADER_LEN).saturating_add(len);
             }
+            // The header with the record's own version, then (TLS 1.3 protection) the inner
+            // content type with the same version (`tls_write_records`).
             for h in headers {
+                let v = i32::from(u16::from_be_bytes([
+                    h.get(1).copied().unwrap_or(0),
+                    h.get(2).copied().unwrap_or(0),
+                ]));
+                self.report_message_v(true, v, abi::SSL3_RT_HEADER, &h);
                 if protected13 {
-                    self.report_message(true, abi::SSL3_RT_INNER_CONTENT_TYPE, &[ty]);
+                    self.report_message_v(true, v, abi::SSL3_RT_INNER_CONTENT_TYPE, &[ty]);
                 }
-                self.report_message(true, abi::SSL3_RT_HEADER, &h);
             }
         }
         Ok(())
@@ -589,13 +625,27 @@ impl Connection {
                 }
                 Read::IgnoredCcs { consumed, header } => {
                     self.input.drain(..consumed.min(self.input.len()));
-                    self.report_message(false, abi::SSL3_RT_HEADER, &header);
+                    // The header with its own version, then the CCS's octet as TLS 1.3's
+                    // (`tls_get_more_records`).
+                    let v = i32::from(u16::from_be_bytes([
+                        header.get(1).copied().unwrap_or(0),
+                        header.get(2).copied().unwrap_or(0),
+                    ]));
+                    self.report_message_v(false, v, abi::SSL3_RT_HEADER, &header);
+                    let ccs = [msgs_type(abi::SSL3_MT_CCS)];
+                    self.report_message_v(
+                        false,
+                        abi::TLS1_3_VERSION,
+                        abi::SSL3_RT_CHANGE_CIPHER_SPEC,
+                        &ccs,
+                    );
                 }
                 Read::Record { consumed, record } => {
                     self.input.drain(..consumed.min(self.input.len()));
                     self.sslv2_record = record.version == record::SSL2_VERSION;
                     if !self.sslv2_record {
-                        self.report_message(false, abi::SSL3_RT_HEADER, &record.header);
+                        let v = i32::from(record.version);
+                        self.report_message_v(false, v, abi::SSL3_RT_HEADER, &record.header);
                     }
                     if record.inner {
                         self.report_message(
@@ -657,7 +707,8 @@ impl Connection {
                         abi::SSL_R_BAD_CHANGE_CIPHER_SPEC,
                     ));
                 }
-                self.report_message(false, abi::SSL3_RT_CHANGE_CIPHER_SPEC, &rec.data);
+                // TLS doesn't report a received ChangeCipherSpec to the message callback (only
+                // DTLS does).
                 return Ok(HsBytes::Ccs);
             }
             if ty == alert() {
@@ -880,6 +931,16 @@ impl Connection {
 
     /// Sends an alert (`ssl3_send_alert` / `ssl3_dispatch_alert`).
     pub(crate) fn send_alert(&mut self, p: &dyn Provider, level: u8, desc: u8) -> Result<()> {
+        // Shared fix (fork M): `ssl3_send_alert`'s mapping to the version's alerts
+        // (`tls13_alert_code` / `tls1_alert_code`): an alert the version doesn't have isn't
+        // sent, TLS 1.3's certificate_required and missing_extension become handshake_failure
+        // before TLS 1.3; after close_notify, only close_notify goes out.
+        let Some(desc) = self.alert_value(desc) else {
+            return Ok(());
+        };
+        if self.shutdown & SENT_SHUTDOWN != 0 && desc != msgs_type(abi::SSL_AD_CLOSE_NOTIFY) {
+            return Ok(());
+        }
         // TLS 1.3 alerts are all fatal except close_notify and user_cancelled
         // (`ssl3_send_alert`'s level adjustment).
         let level = if self.is_tls13()
@@ -902,6 +963,60 @@ impl Connection {
             });
         }
         Ok(())
+    }
+
+    /// `tls13_alert_code` / `tls1_alert_code`: the alert to send for `desc`, or `None` when
+    /// the version has none.
+    fn alert_value(&self, desc: u8) -> Option<u8> {
+        use crate::conn::common::{EarlyDataState as E, Hrr};
+        let d = i32::from(desc);
+        let as13 = self.is_tls13()
+            || matches!(
+                self.hs.sh.early_data_state,
+                E::Connecting | E::ConnectRetry | E::Writing | E::WriteRetry
+            )
+            || self.hs.sh.hrr == Hrr::Pending;
+        if d == abi::SSL_AD_CERTIFICATE_REQUIRED || d == abi::SSL_AD_MISSING_EXTENSION {
+            return Some(if as13 {
+                desc
+            } else {
+                msgs_type(abi::SSL_AD_HANDSHAKE_FAILURE)
+            });
+        }
+        let known = [
+            abi::SSL_AD_CLOSE_NOTIFY,
+            abi::SSL_AD_UNEXPECTED_MESSAGE,
+            abi::SSL_AD_BAD_RECORD_MAC,
+            abi::SSL_AD_DECRYPTION_FAILED,
+            abi::SSL_AD_RECORD_OVERFLOW,
+            abi::SSL_AD_DECOMPRESSION_FAILURE,
+            abi::SSL_AD_HANDSHAKE_FAILURE,
+            abi::SSL_AD_BAD_CERTIFICATE,
+            abi::SSL_AD_UNSUPPORTED_CERTIFICATE,
+            abi::SSL_AD_CERTIFICATE_REVOKED,
+            abi::SSL_AD_CERTIFICATE_EXPIRED,
+            abi::SSL_AD_CERTIFICATE_UNKNOWN,
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_AD_UNKNOWN_CA,
+            abi::SSL_AD_ACCESS_DENIED,
+            abi::SSL_AD_DECODE_ERROR,
+            abi::SSL_AD_DECRYPT_ERROR,
+            abi::SSL_AD_EXPORT_RESTRICTION,
+            abi::SSL_AD_PROTOCOL_VERSION,
+            abi::SSL_AD_INSUFFICIENT_SECURITY,
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_AD_USER_CANCELLED,
+            abi::SSL_AD_NO_RENEGOTIATION,
+            abi::SSL_AD_UNSUPPORTED_EXTENSION,
+            abi::SSL_AD_CERTIFICATE_UNOBTAINABLE,
+            abi::SSL_AD_UNRECOGNIZED_NAME,
+            abi::SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE,
+            abi::SSL_AD_BAD_CERTIFICATE_HASH_VALUE,
+            abi::SSL_AD_UNKNOWN_PSK_IDENTITY,
+            abi::SSL_AD_INAPPROPRIATE_FALLBACK,
+            abi::SSL_AD_NO_APPLICATION_PROTOCOL,
+        ];
+        known.contains(&d).then_some(desc)
     }
 
     /// Fails the connection (`ossl_statem_fatal`): sends the alert, once.

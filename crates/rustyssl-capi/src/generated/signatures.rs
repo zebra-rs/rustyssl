@@ -20021,6 +20021,32 @@ const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_clear;
 const _: unsafe extern "C" fn(*mut SSL, u64) -> u64 =
     crate::ssl::accessors::rustyssl_private_SSL_clear_options;
+const _: unsafe extern "C" fn(*mut SSL, *mut *const core::ffi::c_uchar) -> usize =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_ciphers;
+const _: unsafe extern "C" fn(*mut SSL, *mut *const core::ffi::c_uchar) -> usize =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_compression_methods;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    core::ffi::c_uint,
+    *mut *const core::ffi::c_uchar,
+    *mut usize,
+) -> core::ffi::c_int = crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_ext;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_uint =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_legacy_version;
+const _: unsafe extern "C" fn(*mut SSL, *mut *const core::ffi::c_uchar) -> usize =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_random;
+const _: unsafe extern "C" fn(*mut SSL, *mut *const core::ffi::c_uchar) -> usize =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get0_session_id;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *mut *mut core::ffi::c_int,
+    *mut usize,
+) -> core::ffi::c_int =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get1_extensions_present;
+const _: unsafe extern "C" fn(*mut SSL, *mut u16, *mut usize) -> core::ffi::c_int =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_get_extension_order;
+const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
+    crate::ssl::clienthello::rustyssl_private_SSL_client_hello_isv2;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_client_version;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
