@@ -195,6 +195,9 @@ pub struct Config {
     /// Whether a server can do DHE: DH parameters set (`SSL_set0_tmp_dh_pkey`), a
     /// `tmp_dh_callback`, or `SSL_set_dh_auto`.
     pub dh_tmp: bool,
+    /// The time in seconds since the epoch to use for session times and ticket ages, or `None`
+    /// for the system clock (shared addition, fork F: tests and capi's `SSL_SESSION` times).
+    pub now: Option<i64>,
 }
 
 /// A registered custom extension (`custom_ext_method`).
