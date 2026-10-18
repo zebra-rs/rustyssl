@@ -554,10 +554,16 @@ fn external_psk(c: &mut Connection) -> Result<Option<Option<ExternalSession>>> {
     let bad = Error::alert(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_BAD_PSK);
     let mut found = None;
     if c.cfg.callbacks.psk_session {
+        let md = if c.hs.sh.hrr == Hrr::Pending {
+            Some(keys::handshake_md(c)?)
+        } else {
+            None
+        };
         let Some(a) = ask_once(
             c,
             Request::PskSession {
                 identity: Vec::new(),
+                md,
             },
             0,
         ) else {

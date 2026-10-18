@@ -70,16 +70,6 @@ pub extern "C" fn rustyssl_private_SSL_SRP_CTX_init(_: *mut SSL) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_check_chain(
-    _: *mut SSL,
-    _: *mut X509,
-    _: *mut EVP_PKEY,
-    _: *mut stack_st_X509,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_check_chain")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_srp_N(_: *mut SSL) -> *mut BIGNUM {
     crate::stub::unimplemented("SSL_get_srp_N")
 }

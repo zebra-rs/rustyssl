@@ -919,7 +919,7 @@ unsafe extern "C" fn discover_sigalgs_cb(prov: *mut OSSL_PROVIDER, arg: *mut c_v
 }
 
 /// A hash's EVP name.
-fn hash_name(alg: HashAlg) -> &'static CStr {
+pub(crate) fn hash_name(alg: HashAlg) -> &'static CStr {
     match alg {
         HashAlg::Md5Sha1 => c"MD5-SHA1",
         HashAlg::Md5 => c"MD5",

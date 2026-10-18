@@ -146,6 +146,15 @@ fn fill_binders(c: &mut Connection, p: &dyn Provider, body: &mut [u8]) -> Result
     if binders.is_empty() {
         return Ok(());
     }
+    // An external PSK that early data will be sent under keeps its early secret as the
+    // connection's (`usepskfored`); otherwise it's put away for later.
+    let psk_max = state(c)?
+        .psk_session
+        .as_ref()
+        .map_or(0, |(s, _)| s.max_early_data);
+    let use_psk_for_ed = c.hs.sh.early_data_state == EarlyDataState::Connecting
+        && c.neg.session.max_early_data == 0
+        && psk_max > 0;
     let total = binders.iter().fold(2usize, |n, (h, _, _)| {
         n.saturating_add(1).saturating_add(h.len())
     });
@@ -167,7 +176,7 @@ fn fill_binders(c: &mut Connection, p: &dyn Provider, body: &mut [u8]) -> Result
             .ok_or_else(Error::internal)?
             .copy_from_slice(&binder);
         at = end;
-        if external {
+        if external && !use_psk_for_ed {
             c.hs.sh.keys.psk_early = Some(sched);
         } else {
             c.hs.sh.keys.schedule = Some(sched);

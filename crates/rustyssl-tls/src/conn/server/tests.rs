@@ -2273,7 +2273,8 @@ fn tls13_external_psk() {
     assert_eq!(
         asked,
         [Request::PskSession {
-            identity: b"client1".to_vec()
+            identity: b"client1".to_vec(),
+            md: None,
         }]
     );
     assert!(c.neg.reused);

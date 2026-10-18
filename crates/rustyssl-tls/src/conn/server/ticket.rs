@@ -599,12 +599,17 @@ pub(crate) fn construct_new_session_ticket(
     if c.cfg.callbacks.ticket_gen {
         // One answer per ticket.
         let tag = usize::try_from(state(c)?.next_ticket_nonce).unwrap_or(usize::MAX);
-        match ask_once(c, Request::TicketGenerate, tag) {
+        let r = Request::TicketGenerate {
+            session: Box::new(session.clone()),
+        };
+        match ask_once(c, r, tag) {
             None => return Ok(Construct::Ask),
-            Some(Answer::TicketAppData(a)) => {
-                // The application set it on the connection's session (`SSL_get_session`).
-                c.neg.session.ticket_appdata.clone_from(&a);
-                session.ticket_appdata = a;
+            Some(Answer::TicketGenerated { appdata, time }) => {
+                // The application changed the connection's session (`SSL_get_session`).
+                c.neg.session.ticket_appdata.clone_from(&appdata);
+                c.neg.session.time = time;
+                session.ticket_appdata = appdata;
+                session.time = time;
             }
             Some(_) => {
                 return Err(Error::alert_lib(
@@ -715,6 +720,7 @@ pub(crate) fn parse_psk(
         if c.cfg.callbacks.psk_session {
             let r = Request::PskSession {
                 identity: identity.clone(),
+                md: None,
             };
             match ask_once(c, r, id) {
                 None => return Ok(Step::Wait),

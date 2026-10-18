@@ -159,6 +159,7 @@ pub(crate) fn construct_server_key_exchange(
         padded.extend_from_slice(strip(&public));
         params.vec(2, &padded).map_err(tl)?;
         state(c)?.kx_key = Some(share);
+        c.hs.sh.own_dh = Some((dp, dg, public));
     } else if k & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
         if state_ref(c).is_some_and(|s| s.kx_key.is_some()) {
             return Err(Error::internal());
@@ -176,6 +177,7 @@ pub(crate) fn construct_server_key_exchange(
         params.u8(0);
         params.u8(u8::try_from(curve & 0xff).map_err(|_| Error::internal())?);
         params.vec(1, share.public()).map_err(tl)?;
+        c.hs.sh.own_tmp = Some((curve, share.public().to_vec()));
         let s = state(c)?;
         s.kx_key = Some(share);
         s.kx_group = curve;
@@ -285,80 +287,83 @@ pub(crate) fn process_client_key_exchange(
         }
     }
     let mm = Error::decode(abi::SSL_R_LENGTH_MISMATCH);
-    let pms: Option<Secret> =
-        if k & SSL_kPSK != 0 {
-            if !rd.is_empty() {
-                return Err(mm);
-            }
-            None
-        } else if k & (SSL_kRSA | SSL_kRSAPSK) != 0 {
-            let idx = sigalgs::cert_in_slot(c, sigalgs::PKEY_RSA).ok_or(Error::alert(
-                abi::SSL_AD_INTERNAL_ERROR,
-                abi::SSL_R_MISSING_RSA_CERTIFICATE,
-            ))?;
-            let key = c
-                .cfg
-                .certs
-                .get(idx)
-                .map(|k| k.key)
-                .ok_or_else(Error::internal)?;
-            let enc = rd.vec16().map_err(|_| mm)?;
-            rd.end().map_err(|_| mm)?;
-            let failed = Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_DECRYPTION_FAILED);
-            let pms = p
-                .rsa_decrypt_pms(key, enc.rest(), c.hs.sh.client_version)
-                .map_err(|_| failed)?;
-            let n = usize::try_from(abi::SSL_MAX_MASTER_KEY_LENGTH).unwrap_or(48);
-            if pms.len() != n {
-                return Err(failed);
-            }
-            Some(pms)
-        } else if k & (SSL_kDHE | SSL_kDHEPSK) != 0 {
-            let wrong = Error::decode(abi::SSL_R_DH_PUBLIC_VALUE_LENGTH_IS_WRONG);
-            let n = rd.u16().map_err(|_| wrong)?;
-            if rd.len() != usize::from(n) {
-                return Err(wrong);
-            }
-            let share = state(c)?.kx_key.take().ok_or(Error::alert(
-                abi::SSL_AD_INTERNAL_ERROR,
-                abi::SSL_R_MISSING_TMP_DH_KEY,
-            ))?;
-            if rd.is_empty() {
-                return Err(Error::decode(abi::SSL_R_MISSING_TMP_DH_KEY));
-            }
-            let secret = share.derive(rd.rest()).map_err(|_| {
-                Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE)
-            })?;
-            // TLS 1.2 strips the secret's leading zeros (OpenSSL pads only for TLS 1.3).
-            Some(Secret::new(strip(secret.bytes()).to_vec()))
-        } else if k & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
-            if rd.is_empty() {
-                return Err(Error::alert(
-                    abi::SSL_AD_HANDSHAKE_FAILURE,
-                    abi::SSL_R_MISSING_TMP_ECDH_KEY,
-                ));
-            }
-            let point = rd.vec8().map_err(|_| mm)?;
-            rd.end().map_err(|_| mm)?;
-            let share = state(c)?.kx_key.take().ok_or(Error::alert(
-                abi::SSL_AD_INTERNAL_ERROR,
-                abi::SSL_R_MISSING_TMP_ECDH_KEY,
-            ))?;
-            if point.is_empty() {
-                return Err(Error::alert(
-                    abi::SSL_AD_ILLEGAL_PARAMETER,
-                    abi::SSL_R_BAD_KEY_SHARE,
-                ));
-            }
-            Some(share.derive(point.rest()).map_err(|_| {
-                Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE)
-            })?)
-        } else {
+    let pms: Option<Secret> = if k & SSL_kPSK != 0 {
+        if !rd.is_empty() {
+            return Err(mm);
+        }
+        None
+    } else if k & (SSL_kRSA | SSL_kRSAPSK) != 0 {
+        let idx = sigalgs::cert_in_slot(c, sigalgs::PKEY_RSA).ok_or(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_MISSING_RSA_CERTIFICATE,
+        ))?;
+        let key = c
+            .cfg
+            .certs
+            .get(idx)
+            .map(|k| k.key)
+            .ok_or_else(Error::internal)?;
+        let enc = rd.vec16().map_err(|_| mm)?;
+        rd.end().map_err(|_| mm)?;
+        let failed = Error::alert(abi::SSL_AD_DECRYPT_ERROR, abi::SSL_R_DECRYPTION_FAILED);
+        let pms = p
+            .rsa_decrypt_pms(key, enc.rest(), c.hs.sh.client_version)
+            .map_err(|_| failed)?;
+        let n = usize::try_from(abi::SSL_MAX_MASTER_KEY_LENGTH).unwrap_or(48);
+        if pms.len() != n {
+            return Err(failed);
+        }
+        Some(pms)
+    } else if k & (SSL_kDHE | SSL_kDHEPSK) != 0 {
+        let wrong = Error::decode(abi::SSL_R_DH_PUBLIC_VALUE_LENGTH_IS_WRONG);
+        let n = rd.u16().map_err(|_| wrong)?;
+        if rd.len() != usize::from(n) {
+            return Err(wrong);
+        }
+        let share = state(c)?.kx_key.take().ok_or(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_MISSING_TMP_DH_KEY,
+        ))?;
+        if rd.is_empty() {
+            return Err(Error::decode(abi::SSL_R_MISSING_TMP_DH_KEY));
+        }
+        let secret = share
+            .derive(rd.rest())
+            .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE))?;
+        // The ephemeral key is freed once used.
+        c.hs.sh.own_dh = None;
+        // TLS 1.2 strips the secret's leading zeros (OpenSSL pads only for TLS 1.3).
+        Some(Secret::new(strip(secret.bytes()).to_vec()))
+    } else if k & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
+        if rd.is_empty() {
             return Err(Error::alert(
-                abi::SSL_AD_INTERNAL_ERROR,
-                abi::SSL_R_UNKNOWN_CIPHER_TYPE,
+                abi::SSL_AD_HANDSHAKE_FAILURE,
+                abi::SSL_R_MISSING_TMP_ECDH_KEY,
             ));
-        };
+        }
+        let point = rd.vec8().map_err(|_| mm)?;
+        rd.end().map_err(|_| mm)?;
+        let share = state(c)?.kx_key.take().ok_or(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_MISSING_TMP_ECDH_KEY,
+        ))?;
+        if point.is_empty() {
+            return Err(Error::alert(
+                abi::SSL_AD_ILLEGAL_PARAMETER,
+                abi::SSL_R_BAD_KEY_SHARE,
+            ));
+        }
+        let secret = share
+            .derive(point.rest())
+            .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE))?;
+        c.hs.sh.own_tmp = None;
+        Some(secret)
+    } else {
+        return Err(Error::alert(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::SSL_R_UNKNOWN_CIPHER_TYPE,
+        ));
+    };
     generate_master_secret(c, p, pms, psk)?;
     Ok(MsgProcess::ContinueProcessing)
 }

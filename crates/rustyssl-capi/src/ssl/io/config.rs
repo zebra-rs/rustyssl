@@ -732,6 +732,11 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         session_cache_mode: i64::from(snap.session_cache_mode),
         session_timeout: snap.session_timeout,
         ticket_keys: Some(snap.ticket_keys.clone()),
+        psk_identity_hint: st
+            .cert
+            .psk_identity_hint
+            .as_ref()
+            .map(|h| h.as_bytes().to_vec()),
         session_ticket_ext: st.eap.ticket_ext.clone(),
         custom_exts: st
             .cert
@@ -771,6 +776,9 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
                 cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
             }),
             cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
+            tmp_dh: st.cert.dh_tmp_cb.is_some(),
+            psk: super::super::psk::flags(&st).0,
+            psk_session: super::super::psk::flags(&st).1,
             // The client's select callback, or the server's advertisement callback.
             npn: if st.server {
                 snap.npn_advertised_cb.is_some()

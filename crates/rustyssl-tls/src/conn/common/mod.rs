@@ -217,6 +217,10 @@ pub struct Shared {
     /// `s->s3.tmp.pkey` (`SSL_get_tmp_key`): its group and public octets. A server answering
     /// a KEM has none; TLS 1.2 frees its ephemeral key once used, so there is none either.
     pub own_tmp: Option<(u16, Vec<u8>)>,
+    /// A TLS 1.2 DHE server's own ephemeral key from its ServerKeyExchange until the client's
+    /// key exchange uses it (`s->s3.tmp.pkey`, for `SSL_get_tmp_key`): the prime, the
+    /// generator, and its public value, big-endian. An ECDHE server's is in `own_tmp` then.
+    pub own_dh: Option<(Vec<u8>, Vec<u8>, Vec<u8>)>,
     /// A TLS 1.2 DHE server's key (`s->s3.peer_tmp`, for `SSL_get_peer_tmp_key`): the prime,
     /// the generator, and its public value, big-endian.
     pub peer_dh: Option<(Vec<u8>, Vec<u8>, Vec<u8>)>,
