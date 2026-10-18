@@ -334,6 +334,14 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        // `SSL_set_session` takes the session's verification result; a resumption verifies
+        // nothing, so it is what the connection reports (a full handshake's verification
+        // replaces it).
+        let verify_result = cfg
+            .session
+            .as_ref()
+            .filter(|_| !server)
+            .map_or(i64::from(abi::X509_V_OK), |s| s.verify_result);
         let mut rw = RecordWriter::new(record_version);
         // `ssl_get_max_send_fragment` (0: unset, the default).
         if cfg.max_send_fragment > 0 {
@@ -359,6 +367,7 @@ impl Connection {
             },
             neg: Negotiated {
                 version,
+                verify_result,
                 ..Negotiated::default()
             },
             input: Vec::new(),

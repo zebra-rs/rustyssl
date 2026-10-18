@@ -437,6 +437,45 @@ static void test_servername_resume(int version, const char *first, const char *s
     done(c, s, cctx, sctx);
 }
 
+/* Verification fails, but the client goes on (SSL_VERIFY_NONE). */
+static int soft_fail_cb(X509_STORE_CTX *ctx, void *arg)
+{
+    (void)arg;
+    X509_STORE_CTX_set_error(ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+    return 0;
+}
+
+/* A soft verification failure is kept in the session, and reported again on resumption. */
+static void test_soft_fail_resume(int version)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    SSL_SESSION *sess;
+    unsigned char b;
+
+    printf("# a soft verification failure, resumed, %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_verify(cctx, SSL_VERIFY_NONE, NULL);
+    SSL_CTX_set_cert_verify_callback(cctx, soft_fail_cb, NULL);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the first handshake");
+    SSL_read(c, &b, 1);
+    sess = SSL_get1_session(c);
+    printf("  first: result %ld\n", SSL_get_verify_result(c));
+    SSL_shutdown(c);
+    SSL_shutdown(s);
+    SSL_free(c);
+    SSL_free(s);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_session(c, sess);
+    printf("  set the session: result %ld\n", SSL_get_verify_result(c));
+    check(handshake(c, s), "the second handshake");
+    printf("  resumed: reused %d, result %ld\n", SSL_session_reused(c), SSL_get_verify_result(c));
+    SSL_SESSION_free(sess);
+    done(c, s, cctx, sctx);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -526,6 +565,8 @@ int main(void)
     test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
+    test_soft_fail_resume(TLS1_3_VERSION);
+    test_soft_fail_resume(TLS1_2_VERSION);
     test_retry_verify();
     test_retry_with_chain();
     test_security();
