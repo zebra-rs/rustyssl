@@ -615,8 +615,10 @@ unsafe fn verify(
     unsafe { X509_VERIFY_PARAM_move_peername(x.param, param) };
     // SAFETY: made above.
     unsafe { X509_STORE_CTX_free(ctx) };
+    // A verification that succeeded with `SSL_set_retry_verify` called suspends the handshake
+    // (`SSL_ERROR_WANT_RETRY_VERIFY`); the next call verifies again. A failure stays one.
     let retry = x.state().rwstate == SSL_RETRY_VERIFY;
-    if i <= 0 && retry {
+    if i > 0 && retry {
         // SAFETY: our copy of the chain, or NULL.
         unsafe { OPENSSL_sk_pop_free(verified.cast(), Some(x509_free)) };
         return None;
