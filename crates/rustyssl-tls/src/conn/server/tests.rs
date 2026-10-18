@@ -1006,6 +1006,27 @@ fn malformed_and_unexpected_client_hellos() {
         abi::SSL_AD_ILLEGAL_PARAMETER,
         abi::SSL_R_BAD_ECPOINT,
     );
+    // A compressed point (TLS 1.3 shares are uncompressed; tlsfuzzer's ECDHE scripts).
+    let mut compressed = vec![2];
+    compressed.extend_from_slice(&[1; 32]);
+    let compressed = Hello::tls13(&[group::SECP256R1], &[(group::SECP256R1, compressed)]);
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[compressed.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_ECPOINT,
+    );
+    // An FFDHE share one octet short of the prime's length, which it must be padded to (RFC
+    // 8446, section 4.2.8.1; tlsfuzzer's "right-truncated key_share").
+    let short = Hello::tls13(&[group::FFDHE2048], &[(group::FFDHE2048, vec![1; 255])]);
+    expect_failure(
+        cfg.clone(),
+        &p,
+        &[short.msg()],
+        abi::SSL_AD_ILLEGAL_PARAMETER,
+        abi::SSL_R_BAD_ECPOINT,
+    );
     // Only TLS 1.3 enabled, and the client offers TLS 1.2.
     let mut only13 = cfg.clone();
     only13.min_version = v::TLS1_3;
