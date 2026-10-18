@@ -183,9 +183,6 @@ pub struct Shared {
     pub psk_kex_mode: u8,
     /// Whether the server acknowledged the name (`s->servername_done`).
     pub servername_done: bool,
-    /// Whether the servername callback turned tickets off, so a server that isn't resuming
-    /// must make a new session ID (`ssl_generate_session_id` in `final_server_name`).
-    pub regenerate_session_id: bool,
     /// Whether tickets were on before the servername callback ran (`final_server_name`'s
     /// `was_ticket`), kept while the callback is pending.
     pub was_ticket: Option<bool>,
