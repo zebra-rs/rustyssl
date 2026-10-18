@@ -209,14 +209,20 @@ rustyssl itself**. You can only regenerate golden files with
     `tests/bogo/shim.c`, `tests/bogo/config.json`. Each test runs on the reference and on
     rustyssl; the reference's verdict is the expectation. The shim exits 89 (unimplemented)
     for flags it can't express with the OpenSSL API (BoringSSL-only features: ECH, ALPS,
-    Channel ID, credentials, PAKEs, compliance policies, QUIC; and DTLS until Phase 8.1), so
+    Channel ID, PAKE/PSK/delegated credentials, per-credential settings, compliance
+    policies, QUIC), so
     those tests are skipped on both. Errors match loosely (`-loose-errors`), and the shim's
     failure log compares the two libraries' first error entries instead. The report is
     `target/bogo-report.md`.
-  - Measured 2026-10-18 at BoringSSL 5e1bfb45: 8091 tests, 5221 unimplemented by the shim;
-    the reference passes 2208, rustyssl 2218. **Pass target (M5): every test the reference
-    passes, passes on rustyssl** (none passing on the reference alone), and the shim's
-    unimplemented count shrinks as DTLS lands.
+  - Under full load the runner sometimes loses the shim's alert (a closed connection or a
+    broken pipe before it reads it), on either library and on different tests each run;
+    every such test passes alone on both. So tests whose verdicts differ run again one at a
+    time on both libraries (`--workers N` sets the parallelism), and those verdicts count.
+    Failure logs are compared as multisets (tests with the same arguments share one).
+  - **Pass target (M5): every test the reference passes, passes on rustyssl.** Met
+    2026-10-18 at BoringSSL 5e1bfb45 (with DTLS, MTU, X.509 credentials and SRTP in the
+    shim): 7771 tests, 3455 unimplemented; the reference and rustyssl both pass 2897 and
+    fail 1419, the same tests, with no failed connection's first error differing.
 - **tlsfuzzer**, against `s_server` (upstream app relinked, later our CLI): the script set
   OpenSSL and GnuTLS run in their CI, covering fragmentation, extensions, renegotiation,
   invalid ECDHE points, version negotiation, and the timing scripts for Bleichenbacher/Marvin

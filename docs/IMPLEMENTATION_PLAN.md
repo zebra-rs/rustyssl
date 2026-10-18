@@ -5288,15 +5288,7 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - the tests that read or write OpenSSL's private structures, listed as `internal` in
     `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
 - **Interop matrix:** green, 45 cases in all four pairings (`cargo xtask test-interop`).
-- **BoGo** (`cargo xtask test-bogo`, added in Phase 8): of 8091 tests, the shim implements
-  2870 on both libraries; the reference passes 2208, rustyssl 2218. Seven bugs it found are
-  fixed (an empty AEAD record's plaintext, a resumed client's verify result, renegotiation
-  counts, compressed TLS 1.3 key shares, signature algorithms after the version is chosen,
-  an older version's ticket offered in TLS 1.3, signature_algorithms in a TLS 1.0
-  renegotiation). Two still pass on the reference alone: `ECDSAKeyUsage-Client-TLS12` (the
-  key-usage bit isn't enforced for a TLS 1.2 ECDSA server certificate) and
-  `Unclean-Shutdown` (a second `SSL_shutdown` after an EOF with no close_notify returns 1,
-  not -1).
+- **BoGo** (`cargo xtask test-bogo`, added in Phase 8): see the Phase 8 exit status.
 - **Not met yet:** the tlsfuzzer scripts aren't built, so M2 and M4's external checks remain
   partly open; `test-consumers` (curl, nginx) arrives later.
 
@@ -5352,6 +5344,21 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.
+
+**Exit status: BoGo (2026-10-18):** met. At BoringSSL 5e1bfb45, 7771 tests (3455
+unimplemented by the shim): the reference and rustyssl each pass 2897 and fail 1419, the same
+tests; none passes on one library alone, and no failed connection's first error differs.
+Bugs BoGo found, all fixed with tests: an empty AEAD record's plaintext; a resumed client's
+verify result; renegotiation counts; compressed TLS 1.3 key shares; signature algorithms
+after the version is chosen; an older version's ticket in TLS 1.3; signature_algorithms in a
+TLS 1.0 renegotiation; an ECDSA certificate that can't sign (TLS 1.2); `SSL_shutdown` after an
+unclean EOF and after the peer's fatal alert; an external TLS 1.3 PSK with an empty identity
+(fails, as `OPENSSL_memdup` of nothing does); several requested KeyUpdates in a row (one reply
+each: TLS 1.3 post-handshake messages re-enter the state machine from the start); SSL 3.0's
+missing protocol_version alert; a server's point formats without uncompressed (accepted); the
+decoder's entries for a certificate or CA name that doesn't decode; and the handshake's
+chosen certificate becoming the current one (`SSL_get_certificate`). The failures that
+appeared only under load were the runner's, on both libraries, not races.
 
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 
