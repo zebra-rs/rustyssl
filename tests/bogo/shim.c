@@ -112,6 +112,7 @@ struct config {
     struct ints signing_prefs;
     int expect_hrr, expect_no_hrr, use_old_client_cert_callback;
     int use_ticket_callback, renew_ticket, skip_ticket;
+    int dtls, mtu;
 };
 
 enum kind { BOOL, INT, STR, B64, INTS, UNSUPPORTED };
@@ -196,6 +197,8 @@ static const struct flag FLAGS[] = {
     F("-enable-ocsp-stapling", BOOL, enable_ocsp_stapling),
     F("-expect-ocsp-response", B64, expect_ocsp_response),
     F("-max-send-fragment", INT, max_send_fragment),
+    F("-dtls", BOOL, dtls),
+    F("-mtu", INT, mtu),
     F("-max-cert-list", INT, max_cert_list),
     F("-partial-write", BOOL, partial_write),
     F("-fallback-scsv", BOOL, fallback_scsv),
@@ -449,6 +452,8 @@ static struct state *get_state(const SSL *ssl)
 
 struct async_quota {
     size_t read, write;
+    /* Over DTLS's packets, a quota counts whole datagrams. */
+    int datagram;
 };
 
 static int async_write(BIO *b, const char *in, int inl)
@@ -465,13 +470,13 @@ static int async_write(BIO *b, const char *in, int inl)
         errno = EAGAIN;
         return -1;
     }
-    if ((size_t)inl > q->write)
+    if (!q->datagram && (size_t)inl > q->write)
         inl = (int)q->write;
     ret = BIO_write(next, in, inl);
     if (ret <= 0)
         BIO_copy_next_retry(b);
     else
-        q->write -= (size_t)ret;
+        q->write -= q->datagram ? 1 : (size_t)ret;
     return ret;
 }
 
@@ -489,13 +494,13 @@ static int async_read(BIO *b, char *out, int outl)
         errno = EAGAIN;
         return -1;
     }
-    if ((size_t)outl > q->read)
+    if (!q->datagram && (size_t)outl > q->read)
         outl = (int)q->read;
     ret = BIO_read(next, out, outl);
     if (ret <= 0)
         BIO_copy_next_retry(b);
     else
-        q->read -= (size_t)ret;
+        q->read -= q->datagram ? 1 : (size_t)ret;
     return ret;
 }
 
@@ -533,6 +538,155 @@ static BIO *async_bio_new(void)
         if (method == NULL || !BIO_meth_set_write(method, async_write)
             || !BIO_meth_set_read(method, async_read) || !BIO_meth_set_ctrl(method, async_ctrl)
             || !BIO_meth_set_create(method, async_create)
+            || !BIO_meth_set_destroy(method, async_destroy))
+            return NULL;
+    }
+    return BIO_new(method);
+}
+
+/*
+ * The packeted BIO: DTLS's datagrams over the runner's TCP connection. Each datagram goes as
+ * 'P', a 32-bit big-endian length and the bytes; the runner also sends 'M' (a new MTU) and
+ * the clock opcodes 'T' (a timeout passed), 'E' (the next timeout expected) and 'U' (a new
+ * initial timeout). BoringSSL's shim drives a simulated clock with those; OpenSSL's DTLS
+ * timers run on the real clock, so a test that sends one is unimplemented here.
+ */
+struct packeted {
+    SSL *ssl;
+};
+
+static int read_full(BIO *b, unsigned char *out, size_t len)
+{
+    while (len > 0) {
+        int n = BIO_read(b, out, len > INT32_MAX ? INT32_MAX : (int)len);
+
+        if (n <= 0)
+            return n;
+        out += n;
+        len -= (size_t)n;
+    }
+    return 1;
+}
+
+static int packeted_write(BIO *b, const char *in, int inl)
+{
+    BIO *next = BIO_next(b);
+    unsigned char header[5];
+    int n;
+
+    BIO_clear_retry_flags(b);
+    if (next == NULL || inl < 0)
+        return -1;
+    header[0] = 'P';
+    header[1] = (unsigned char)((unsigned)inl >> 24);
+    header[2] = (unsigned char)((unsigned)inl >> 16);
+    header[3] = (unsigned char)((unsigned)inl >> 8);
+    header[4] = (unsigned char)inl;
+    if (BIO_write(next, header, 5) != 5)
+        return -1;
+    for (n = 0; n < inl;) {
+        int w = BIO_write(next, in + n, inl - n);
+
+        if (w <= 0)
+            return -1;
+        n += w;
+    }
+    return inl;
+}
+
+static int packeted_read(BIO *b, char *out, int outl)
+{
+    struct packeted *d = BIO_get_data(b);
+    BIO *next = BIO_next(b);
+    unsigned char op, len[4], *buf;
+    uint32_t n;
+    int r;
+
+    BIO_clear_retry_flags(b);
+    if (next == NULL || d == NULL)
+        return -1;
+    for (;;) {
+        if ((r = read_full(next, &op, 1)) <= 0)
+            return r;
+        switch (op) {
+        case 'P':
+            if ((r = read_full(next, len, 4)) <= 0)
+                return r;
+            n = (uint32_t)len[0] << 24 | (uint32_t)len[1] << 16 | (uint32_t)len[2] << 8 | len[3];
+            buf = xmalloc(n);
+            if (read_full(next, buf, n) <= 0) {
+                fprintf(stderr, "Packeted BIO was truncated\n");
+                free(buf);
+                return -1;
+            }
+            if ((uint32_t)outl > n)
+                outl = (int)n;
+            memcpy(out, buf, (size_t)outl);
+            free(buf);
+            return outl;
+        case 'M':
+            if ((r = read_full(next, len, 4)) <= 0)
+                return r;
+            n = (uint32_t)len[0] << 24 | (uint32_t)len[1] << 16 | (uint32_t)len[2] << 8 | len[3];
+            if (d->ssl == NULL || !SSL_set_mtu(d->ssl, (long)n)) {
+                fprintf(stderr, "SSL_set_mtu(%u) failed\n", (unsigned)n);
+                return -1;
+            }
+            continue;
+        case 'T':
+        case 'E':
+        case 'U':
+            unimplemented("DTLS's simulated clock");
+            return -1;
+        default:
+            fprintf(stderr, "Unknown opcode, %u\n", op);
+            return -1;
+        }
+    }
+}
+
+static long packeted_ctrl(BIO *b, int cmd, long larg, void *parg)
+{
+    BIO *next = BIO_next(b);
+
+    switch (cmd) {
+    /* What a UDP socket would say, with BoringSSL's default MTU when none is set. */
+    case BIO_CTRL_DGRAM_QUERY_MTU:
+        return 1472;
+    case BIO_CTRL_DGRAM_GET_MTU_OVERHEAD:
+        return 0;
+    case BIO_CTRL_DGRAM_SET_MTU:
+        return larg;
+    case BIO_CTRL_FLUSH:
+        return 1;
+    default:
+        if (cmd >= BIO_CTRL_DGRAM_CONNECT && cmd <= BIO_CTRL_DGRAM_SET_PEEK_MODE)
+            return 0;
+        return next == NULL ? 0 : BIO_ctrl(next, cmd, larg, parg);
+    }
+}
+
+static int packeted_create(BIO *b)
+{
+    struct packeted *d = calloc(1, sizeof(*d));
+
+    if (d == NULL)
+        return 0;
+    BIO_set_data(b, d);
+    BIO_set_init(b, 1);
+    return 1;
+}
+
+static BIO *packeted_bio_new(void)
+{
+    static BIO_METHOD *method;
+
+    if (method == NULL) {
+        method = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_FILTER, "packeted bio");
+        if (method == NULL || !BIO_meth_set_write(method, packeted_write)
+            || !BIO_meth_set_read(method, packeted_read)
+            || !BIO_meth_set_ctrl(method, packeted_ctrl)
+            || !BIO_meth_set_create(method, packeted_create)
             || !BIO_meth_set_destroy(method, async_destroy))
             return NULL;
     }
@@ -893,9 +1047,9 @@ static int group_id(SSL *ssl)
 
 /* ---- Connection setup ---- */
 
-static SSL_CTX *new_ctx(void)
+static SSL_CTX *new_ctx(int dtls)
 {
-    SSL_CTX *ctx = SSL_CTX_new(TLS_method());
+    SSL_CTX *ctx = SSL_CTX_new(dtls ? DTLS_method() : TLS_method());
 
     if (ctx == NULL)
         return NULL;
@@ -942,8 +1096,13 @@ static SSL *new_ssl(SSL_CTX *ctx, const struct config *c, struct state *st, SSL_
         SSL_set_options(ssl, SSL_OP_CIPHER_SERVER_PREFERENCE);
     if (c->tls13_ciphers.set && !SSL_set_ciphersuites(ssl, (char *)c->tls13_ciphers.data))
         return NULL;
-    if (!SSL_set_min_proto_version(ssl, TLS1_VERSION))
+    if (!SSL_set_min_proto_version(ssl, c->dtls ? DTLS1_VERSION : TLS1_VERSION))
         return NULL;
+    if (c->mtu != 0) {
+        SSL_set_options(ssl, SSL_OP_NO_QUERY_MTU);
+        if (!SSL_set_mtu(ssl, c->mtu))
+            return NULL;
+    }
     if (c->min_version != 0 && !SSL_set_min_proto_version(ssl, c->min_version))
         return NULL;
     if (c->max_version_set && !SSL_set_max_proto_version(ssl, c->max_version))
@@ -1466,7 +1625,8 @@ static int do_exchange(SSL **out_session_owner, SSL *ssl, int is_resume)
                     return 0;
         }
         if (!c->shim_shuts_down) {
-            size_t size = c->read_size > 0 ? (size_t)c->read_size : 512;
+            /* TLS reads 512 octets at a time, so records span reads; DTLS a whole one. */
+            size_t size = c->read_size > 0 ? (size_t)c->read_size : c->dtls ? 16384 : 512;
             unsigned char *buf = xmalloc(size);
 
             for (;;) {
@@ -1609,7 +1769,7 @@ int main(int argc, char **argv)
     }
     log_init(argc, argv);
     g_state_index = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
-    ctx = new_ctx();
+    ctx = new_ctx(initial.dtls);
     if (ctx == NULL) {
         ERR_print_errors_fp(stderr);
         return 1;
@@ -1641,11 +1801,25 @@ int main(int argc, char **argv)
         if (fd < 0)
             return 1;
         bio = BIO_new_socket(fd, BIO_NOCLOSE);
+        if (c->dtls) {
+            BIO *packeted = packeted_bio_new();
+            struct packeted *d;
+
+            if (packeted == NULL)
+                return 1;
+            d = BIO_get_data(packeted);
+            d->ssl = ssl;
+            BIO_push(packeted, bio);
+            bio = packeted;
+        }
         if (c->async) {
             BIO *async = async_bio_new();
+            struct async_quota *q;
 
             if (async == NULL)
                 return 1;
+            q = BIO_get_data(async);
+            q->datagram = c->dtls;
             BIO_push(async, bio);
             st.async_bio = async;
             bio = async;
