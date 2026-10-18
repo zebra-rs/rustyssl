@@ -55,7 +55,9 @@ fn prepare(c: &mut Connection, p: &dyn Provider) -> Result<()> {
             None => new_session(c),
         };
     }
-    if hrr == Hrr::None {
+    // DTLS keeps the random of the ClientHello a HelloVerifyRequest answered.
+    let keep_random = c.cfg.dtls && c.hs.client_random.iter().any(|&b| b != 0);
+    if hrr == Hrr::None && !keep_random {
         let mut r = [0u8; 32];
         p.random(&mut r, false)
             .map_err(|_| Error::alert_lib(abi::SSL_AD_INTERNAL_ERROR, abi::ERR_R_INTERNAL_ERROR))?;
@@ -114,7 +116,7 @@ pub(super) fn construct_client_hello(c: &mut Connection, p: &dyn Provider) -> Re
         legacy_version: c.hs.sh.client_version,
         random: c.hs.client_random,
         session_id,
-        cookie: None,
+        cookie: c.cfg.dtls.then(|| c.dtls.cookie.clone()),
         cipher_suites,
         compression_methods: vec![0],
         extensions: None,
@@ -246,7 +248,12 @@ fn validate_all_contexts(c: &Connection, thisctx: u32, collected: u32) -> bool {
                 }
             }
         };
-        if context & thisctx == 0 || context & cx::DTLS_ONLY != 0 {
+        let wrong_kind = if c.cfg.dtls {
+            cx::TLS_ONLY
+        } else {
+            cx::DTLS_ONLY
+        };
+        if context & thisctx == 0 || context & wrong_kind != 0 {
             return false;
         }
     }
@@ -572,4 +579,20 @@ pub(super) fn process_encrypted_extensions(
         return Ok(MsgProcess::Ask);
     }
     Ok(MsgProcess::ContinueReading)
+}
+
+/// `dtls_process_hello_verify`: the cookie for the next ClientHello.
+///
+/// # Errors
+/// A malformed message or a cookie over 255 octets.
+pub(super) fn process_hello_verify(c: &mut Connection, body: &[u8]) -> Result<MsgProcess> {
+    let hvr = crate::msgs::HelloVerifyRequest::parse(body)?;
+    if hvr.cookie.len() > crate::conn::dtls::COOKIE_LEN {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_LENGTH_TOO_LONG,
+        ));
+    }
+    c.dtls.cookie = hvr.cookie;
+    Ok(MsgProcess::FinishedReading)
 }

@@ -257,7 +257,7 @@ fn read_transition13(c: &Connection, mt: u8) -> Option<u32> {
 /// `ossl_statem_server_read_transition` below TLS 1.3.
 fn read_transition12(c: &Connection, mt: u8) -> Option<u32> {
     match c.st.hand_state {
-        abi::TLS_ST_BEFORE | abi::TLS_ST_OK => {
+        abi::TLS_ST_BEFORE | abi::TLS_ST_OK | abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST => {
             (mt == ht::CLIENT_HELLO).then_some(abi::TLS_ST_SR_CLNT_HELLO)
         }
         abi::TLS_ST_SW_SRVR_DONE => {
@@ -301,6 +301,10 @@ pub(crate) fn read_transition(c: &mut Connection, mt: u8) -> Result<()> {
         read_transition12(c, mt)
     };
     let Some(next) = next else {
+        if c.cfg.dtls && c.st.ccs {
+            // An unexpected ChangeCipherSpec is dropped: the read is retried.
+            return Err(super::dtls_retry_read());
+        }
         return Err(unexpected());
     };
     if c.st.hand_state == st(abi::TLS_ST_OK) && next == abi::TLS_ST_SR_CLNT_HELLO {
@@ -524,6 +528,14 @@ fn write_transition12(c: &mut Connection) -> Result<WriteTran> {
         }
         abi::TLS_ST_BEFORE => return Ok(WriteTran::Finished),
         abi::TLS_ST_SW_HELLO_REQ => abi::TLS_ST_OK,
+        abi::TLS_ST_SR_CLNT_HELLO
+            if c.cfg.dtls
+                && !c.dtls.cookie_verified
+                && c.cfg.options & abi::SSL_OP_COOKIE_EXCHANGE != 0 =>
+        {
+            abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST
+        }
+        abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST => return Ok(WriteTran::Finished),
         abi::TLS_ST_SR_CLNT_HELLO => {
             if !c.renegotiate && !finished::is_first_handshake(c) {
                 // The renegotiation was refused.
@@ -612,6 +624,19 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
     match c.st.hand_state {
         abi::TLS_ST_SW_HELLO_REQ => {
             c.shutdown = 0;
+            if c.cfg.dtls {
+                c.dtls_clear_sent();
+            }
+        }
+        abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST => {
+            c.shutdown = 0;
+            c.dtls_clear_sent();
+            c.dtls.use_timer = false;
+        }
+        abi::TLS_ST_SW_SRVR_HELLO => {
+            if c.cfg.dtls {
+                c.dtls.use_timer = true;
+            }
         }
         abi::TLS_ST_SW_SESSION_TICKET => {
             if c.is_tls13()
@@ -621,6 +646,9 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
             {
                 // The end of the handshake, going straight on to the tickets.
                 return finished::finish_handshake(c, wst, false, false);
+            }
+            if c.cfg.dtls {
+                c.dtls.use_timer = false;
             }
         }
         abi::TLS_ST_SW_CHANGE => {
@@ -635,6 +663,9 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
                 return Err(Error::internal());
             }
             common::keys::setup_key_block(c, p)?;
+            if c.cfg.dtls {
+                c.dtls.use_timer = false;
+            }
         }
         abi::TLS_ST_EARLY_DATA => {
             if c.hs.sh.early_data_state != EarlyDataState::Accepting
@@ -658,7 +689,14 @@ pub(crate) fn pre_work(c: &mut Connection, p: &dyn Provider, wst: Work) -> Resul
 pub(crate) fn post_work(c: &mut Connection, p: &dyn Provider, _wst: Work) -> Result<Work> {
     let tls13 = c.is_tls13();
     let compat = c.cfg.options & abi::SSL_OP_ENABLE_MIDDLEBOX_COMPAT != 0;
-    match c.st.hand_state {
+    let hs = c.st.hand_state;
+    match hs {
+        abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST if !c.flushed() => return Ok(Work::MoreA),
+        abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST => {
+            // The HelloVerifyRequest and the ClientHello it answered aren't in the transcript.
+            c.hs.transcript = crate::keysched::Transcript::new();
+            c.first_packet = true;
+        }
         abi::TLS_ST_SW_HELLO_REQ => {
             if !c.flushed() {
                 return Ok(Work::MoreA);
@@ -764,6 +802,10 @@ pub(crate) fn construct_message(c: &mut Connection, p: &dyn Provider) -> Result<
             Construct::Send(Vec::new()),
         ),
         abi::TLS_ST_SW_HELLO_REQ => (ht::HELLO_REQUEST, Construct::Send(Vec::new())),
+        abi::DTLS_ST_SW_HELLO_VERIFY_REQUEST => (
+            ht::HELLO_VERIFY_REQUEST,
+            hello::construct_hello_verify_request(c)?,
+        ),
         abi::TLS_ST_SW_SRVR_HELLO => (ht::SERVER_HELLO, hello::construct_server_hello(c, p)?),
         abi::TLS_ST_SW_CERT => (ht::CERTIFICATE, cert::construct_server_certificate(c, p)?),
         abi::TLS_ST_SW_CERT_VRFY => (

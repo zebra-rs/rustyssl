@@ -2435,3 +2435,102 @@ fn loopback_srp() {
     };
     assert_eq!(e.reason, abi::SSL_R_PSK_IDENTITY_NOT_FOUND);
 }
+
+/// A DTLS configuration from a TLS one.
+fn dtls(mut cfg: Config, version: u16) -> Config {
+    cfg.dtls = true;
+    cfg.method_version = 0;
+    cfg.max_version = version;
+    cfg.min_version = 0;
+    cfg.dtls_mtu = 1400;
+    cfg
+}
+
+#[test]
+fn dtls_loopback() {
+    use crate::conn::pair::{self, End};
+    for (version, suite) in [(v::DTLS1_2, 0xc02f), (v::DTLS1, 0xc013)] {
+        let p = TestProvider::new(b"dtls-loopback");
+        let both = vec![
+            suites::by_protocol_id(0xc02f).unwrap(),
+            suites::by_protocol_id(0xc013).unwrap(),
+        ];
+        let mut ccfg = dtls(client12(), version);
+        ccfg.security_level = 0;
+        ccfg.callbacks.msg = true;
+        ccfg.ciphers.clone_from(&both);
+        let mut scfg = dtls(server_config(&p), version);
+        scfg.security_level = 0;
+        scfg.callbacks.info = true;
+        scfg.ciphers = both;
+        let mut client = Connection::new(ccfg);
+        let mut server = Connection::new(scfg);
+        let mut log = pair::Log::default();
+        let mut answer = |_: End, r: &Request| accept(r);
+        let mut keep = |_: End, _: usize| true;
+        let r = pair::handshake_dtls(
+            &p,
+            &mut client,
+            &mut server,
+            &mut answer,
+            &mut keep,
+            0,
+            &mut log,
+        );
+        assert!(
+            r.is_ok(),
+            "{r:?}: server state {}, client state {}\nsigalg {:?} cipher {:?}",
+            server.state(),
+            client.state(),
+            server.hs.sh.sigalg,
+            server.hs.new_cipher.map(|c| c.name),
+        );
+        assert_eq!(client.negotiated().version, version);
+        assert_eq!(server.negotiated().version, version);
+        assert_eq!(client.negotiated().cipher.unwrap().protocol_id(), suite);
+        // Application data both ways.
+        client.write_app(&p, b"ping").unwrap();
+        for d in client.take_datagrams() {
+            server.feed_datagram(&d);
+        }
+        assert_eq!(server.step(&p, true).unwrap(), Event::AppData);
+        let mut buf = [0u8; 16];
+        assert_eq!(server.read_app(&mut buf, false), 4);
+        assert_eq!(&buf[..4], b"ping");
+    }
+}
+
+#[test]
+fn dtls_survives_lost_datagrams() {
+    use crate::conn::pair::{self, End};
+    let p = TestProvider::new(b"dtls-loss");
+    let mut ccfg = dtls(client12(), v::DTLS1_2);
+    ccfg.dtls_mtu = 256;
+    let mut scfg = dtls(server_config(&p), v::DTLS1_2);
+    scfg.dtls_mtu = 256;
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(scfg);
+    let mut log = pair::Log::default();
+    let mut answer = |_: End, r: &Request| accept(r);
+    // Lose the server's second datagram and the client's third once each.
+    let mut keep = |e: End, n: usize| !matches!((e, n), (End::Server, 1) | (End::Client, 2));
+    let r = pair::handshake_dtls(
+        &p,
+        &mut client,
+        &mut server,
+        &mut answer,
+        &mut keep,
+        4,
+        &mut log,
+    );
+    assert!(
+        r.is_ok(),
+        "{r:?}: server {:?}\nclient {:?}",
+        log.server,
+        log.client
+    );
+    assert_eq!(
+        client.negotiated().client_finished,
+        server.negotiated().client_finished
+    );
+}

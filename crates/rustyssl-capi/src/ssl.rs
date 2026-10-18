@@ -18,6 +18,7 @@ pub(crate) mod ct;
 pub(crate) mod ctx;
 pub(crate) mod custom;
 pub(crate) mod dane;
+pub(crate) mod dtls;
 pub(crate) mod dup;
 pub(crate) mod eap;
 pub(crate) mod early;

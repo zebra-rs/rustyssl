@@ -285,6 +285,12 @@ pub(crate) unsafe fn handle(
         }
         // SAFETY: as above.
         Request::StatelessCookieGen => Some(unsafe { stateless_cookie_gen(s, snap) }),
+        // SAFETY: as above.
+        Request::DtlsCookieGenerate => Some(unsafe { dtls_cookie_gen(s, snap) }),
+        Request::DtlsCookieVerify { cookie } => {
+            // SAFETY: as above.
+            Some(unsafe { dtls_cookie_verify(s, snap, &cookie) })
+        }
         Request::StatelessCookieVerify { cookie } => {
             // SAFETY: as above.
             Some(unsafe { stateless_cookie_verify(s, snap, &cookie) })
@@ -503,6 +509,47 @@ unsafe fn stateless_cookie_gen(s: *mut SSL, snap: Option<&CtxSnapshot>) -> Answe
     }
     buf.truncate(len);
     Answer::Cookie(Some(buf))
+}
+
+/// `app_gen_cookie_cb`: a DTLS server's cookie (at most `DTLS1_COOKIE_LENGTH` octets), or
+/// `None` when it failed.
+///
+/// # Safety
+/// `s` is a live connection; no lock is held.
+unsafe fn dtls_cookie_gen(s: *mut SSL, snap: Option<&CtxSnapshot>) -> Answer {
+    let Some(cb) = snap.and_then(|c| c.app_gen_cookie_cb) else {
+        return Answer::Cookie(None);
+    };
+    let mut buf = vec![0u8; rustyssl_tls::conn::dtls::COOKIE_LEN];
+    let mut len: core::ffi::c_uint = 0;
+    // SAFETY: the application's callback with its connection and a buffer of
+    // `DTLS1_COOKIE_LENGTH` octets.
+    if unsafe { cb(s, buf.as_mut_ptr(), &raw mut len) } == 0 {
+        return Answer::Cookie(None);
+    }
+    let Ok(len) = usize::try_from(len) else {
+        return Answer::Cookie(None);
+    };
+    if len > buf.len() {
+        return Answer::Cookie(None);
+    }
+    buf.truncate(len);
+    Answer::Cookie(Some(buf))
+}
+
+/// `app_verify_cookie_cb`: whether a DTLS ClientHello's cookie is good.
+///
+/// # Safety
+/// `s` is a live connection; no lock is held.
+unsafe fn dtls_cookie_verify(s: *mut SSL, snap: Option<&CtxSnapshot>, cookie: &[u8]) -> Answer {
+    let Some(cb) = snap.and_then(|c| c.app_verify_cookie_cb) else {
+        return Answer::Allowed(false);
+    };
+    let Ok(len) = core::ffi::c_uint::try_from(cookie.len()) else {
+        return Answer::Allowed(false);
+    };
+    // SAFETY: the application's callback with its connection and the cookie's octets.
+    Answer::Allowed(unsafe { cb(s, cookie.as_ptr(), len) } != 0)
 }
 
 /// `verify_stateless_cookie_cb`: whether the application's cookie is good.

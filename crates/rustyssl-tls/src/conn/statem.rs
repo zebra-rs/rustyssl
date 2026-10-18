@@ -198,6 +198,10 @@ impl Connection {
             self.st.state = MsgFlow::Writing;
             self.st.write_state = WriteState::Transition;
             self.st.in_init = true;
+            if self.cfg.dtls {
+                // `ssl_init_wbio_buffer`: records collect into datagrams until a flush.
+                self.dtls.buffering = true;
+            }
             if self.has_events() {
                 return Ok(false);
             }
@@ -264,18 +268,29 @@ impl Connection {
                         return Ok(Sub::Yield);
                     }
                     let mt = self.st.message_type;
-                    if self.cfg.server {
+                    let tr = if self.cfg.server {
                         server::read_transition(self, mt).in_func(funcs::of(
                             true,
                             Phase::ReadTransition,
                             self.st.hand_state,
-                        ))?;
+                        ))
                     } else {
                         client::read_transition(self, mt).in_func(funcs::of(
                             false,
                             Phase::ReadTransition,
                             self.st.hand_state,
-                        ))?;
+                        ))
+                    };
+                    match tr {
+                        Ok(()) => {}
+                        Err(e) if self.cfg.dtls && e.reason == -1 && e.alert.is_none() => {
+                            // Dropped: read the next message.
+                            self.cur_msg = None;
+                            self.st.header_done = false;
+                            self.st.loop_reported = false;
+                            continue;
+                        }
+                        Err(e) => return Err(e),
                     }
                     let max = if self.cfg.server {
                         server::max_message_size(self)
@@ -323,7 +338,12 @@ impl Connection {
                     self.st.header_done = false;
                     self.st.loop_reported = false;
                     match r {
-                        MsgProcess::FinishedReading => return Ok(Sub::Finished),
+                        MsgProcess::FinishedReading => {
+                            if self.cfg.dtls {
+                                self.dtls_stop_timer();
+                            }
+                            return Ok(Sub::Finished);
+                        }
                         MsgProcess::ContinueProcessing => {
                             self.st.read_state = ReadState::PostProcess;
                             self.st.read_state_work = Work::MoreA;
@@ -354,8 +374,18 @@ impl Connection {
                         Work::Error => return Err(self.failed.unwrap_or_else(Error::internal)),
                         Work::MoreA | Work::MoreB | Work::MoreC => return Ok(Sub::Yield),
                         Work::FinishedContinue => self.st.read_state = ReadState::Header,
-                        Work::FinishedSwap => return Ok(Sub::Finished),
-                        Work::FinishedStop => return Ok(Sub::EndHandshake),
+                        Work::FinishedSwap => {
+                            if self.cfg.dtls {
+                                self.dtls_stop_timer();
+                            }
+                            return Ok(Sub::Finished);
+                        }
+                        Work::FinishedStop => {
+                            if self.cfg.dtls {
+                                self.dtls_stop_timer();
+                            }
+                            return Ok(Sub::EndHandshake);
+                        }
                     }
                 }
             }
@@ -526,6 +556,9 @@ impl Connection {
         mt: u8,
         body: &[u8],
     ) -> Result<()> {
+        if self.cfg.dtls {
+            return self.dtls_send_message(p, mt, body);
+        }
         // Shared fix (tls-server): the CCS pseudo-type is 0 as an octet, HelloRequest's type,
         // so the state says which is meant.
         if mt == msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC)
@@ -559,6 +592,19 @@ impl Connection {
 
     /// See [`Connection::get_message_header`].
     fn get_message_header_inner(&mut self, p: &dyn Provider) -> Result<Got> {
+        if self.cfg.dtls && self.hs_in.len() < msgs::HEADER_LEN {
+            match self.dtls_get_message(p)? {
+                super::dtls::DGot::Yield => return Ok(Got::Yield),
+                super::dtls::DGot::Ccs(extra) => {
+                    self.st.message_type = msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC);
+                    self.st.ccs = true;
+                    self.st.message_size = extra;
+                    self.cur_msg = Some((self.st.message_type, vec![0; extra]));
+                    return Ok(Got::Yes);
+                }
+                super::dtls::DGot::Message => {}
+            }
+        }
         loop {
             while self.hs_in.len() < msgs::HEADER_LEN {
                 match self.read_handshake_bytes(p)? {
@@ -667,6 +713,14 @@ impl Connection {
         let hrr = mt == msgs_type(abi::SSL3_MT_SERVER_HELLO)
             && raw.get(msgs::HEADER_LEN.saturating_add(2)..msgs::HEADER_LEN.saturating_add(34))
                 == Some(&crate::consts::HRR_RANDOM[..]);
+        if self.cfg.dtls {
+            let full = self.dtls_full_form(&raw);
+            self.hs.transcript.add(&full);
+            self.report_message(false, abi::SSL3_RT_HANDSHAKE, &full);
+            let body = raw.get(msgs::HEADER_LEN..).unwrap_or_default().to_vec();
+            self.cur_msg = Some((mt, body));
+            return Ok(Got::Yes);
+        }
         if !post13 && !hrr {
             self.hs.transcript.add(&raw);
         }

@@ -67,3 +67,38 @@ with no knowledge of C.
 - Algorithms come from providers exactly as in OpenSSL, including third-party groups.
 - A step returns after each event, so a handshake takes more calls into the core than OpenSSL
   takes function calls. The cost is a branch per event, small next to the crypto.
+
+## DTLS (implementation plan step 8.1)
+
+DTLS 1.0 and 1.2 share the TLS 1.2 state machine, as in OpenSSL (`statem.c` with the
+`SSL_CONNECTION_IS_DTLS` branches; there is no DTLS 1.3 in 3.5: `DTLS_MAX_VERSION_INTERNAL`
+is `DTLS1_2_VERSION`). The core keeps OpenSSL's wire versions (`DTLS1_VERSION` 0xfeff,
+`DTLS1_2_VERSION` 0xfefd): every ordering goes through `version::cmp`, which counts DTLS
+versions down, and the protocol features a version has (signature algorithms, the SHA-256
+PRF, explicit IVs) come from its TLS equivalent (`version::tls_level`).
+
+- **Datagrams in, datagrams out.** The caller feeds whole datagrams
+  (`Connection::feed_datagram`); a record never crosses one, and a truncated record drops the
+  rest of its datagram. Output is a list of datagrams (`Connection::take_datagrams`): during a
+  handshake records collect into the open datagram up to the MTU, as OpenSSL's buffering BIO
+  holds them until a flush, and a flush point closes it.
+- **The record layer** (`record::dtls`) reads 13-octet headers with the epoch and the 48-bit
+  sequence number, checks the 64-record replay window of the current epoch, buffers up to 16
+  records of the next epoch while in a handshake and replays them after the epoch changes,
+  and drops what OpenSSL drops (a wrong version, a record too long, a bad MAC or tag)
+  silently. The MAC and AEAD nonce take `epoch || sequence`. The writer keeps the previous
+  epoch's protection so the last flight can be retransmitted across a ChangeCipherSpec.
+- **The handshake layer** (`conn::dtls`, from `statem_dtls.c`): 12-octet message headers,
+  each message fragmented to the MTU; received fragments are reassembled with a bitmap, and
+  messages ahead of the expected one are buffered (at most ten ahead, each no longer than
+  `max_cert_list`), so a datagram's loss or reordering never reaches the state machine. The
+  transcript takes each message with its header as if unfragmented. The flight sent is kept
+  for retransmission and dropped when the peer's flight completes (`dtls1_stop_timer`).
+- **Timers stay with the caller.** The core says when OpenSSL starts and stops the
+  retransmission timer and counts timeouts; capi owns the clock, `DTLS_set_timer_cb`, the
+  `BIO_CTRL_DGRAM_SET_NEXT_TIMEOUT` notification, and calls `Connection::dtls_timeout` when
+  it fires (`DTLSv1_handle_timeout`, and before each read as `dtls1_read_bytes` does).
+- **Cookies** are requests like the other callbacks (`Request::DtlsCookieGenerate`,
+  `DtlsCookieVerify`). `DTLSv1_listen` is a stateless exchange in capi that answers
+  ClientHellos without a valid cookie with a HelloVerifyRequest and hands the first good one
+  to the core.

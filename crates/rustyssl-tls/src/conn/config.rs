@@ -116,8 +116,13 @@ pub struct ExternalPsk {
 pub struct Config {
     /// Whether this end is the server.
     pub server: bool,
-    /// The method's version (`TLS_method`: 0, `TLSv1_2_method`: `TLS1_2_VERSION`, ...).
+    /// The method's version (`TLS_method` and `DTLS_method`: 0, `TLSv1_2_method`:
+    /// `TLS1_2_VERSION`, `DTLSv1_2_method`: `DTLS1_2_VERSION`, ...).
     pub method_version: u16,
+    /// Whether the method is DTLS.
+    pub dtls: bool,
+    /// DTLS: the path MTU in use (`s->d1->mtu`; 0 until the caller sets or queries one).
+    pub dtls_mtu: usize,
     /// `SSL_set_min_proto_version` (0: the lowest supported).
     pub min_version: u16,
     /// `SSL_set_max_proto_version` (0: the highest supported).

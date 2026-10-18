@@ -184,7 +184,8 @@ fn custom_find(c: &Connection, role: Option<bool>, typ: u16) -> Option<usize> {
 pub fn relevant(c: &Connection, extctx: u32, thisctx: u32) -> bool {
     let is_tls13 = thisctx & cx::TLS1_3_HELLO_RETRY_REQUEST != 0 || c.is_tls13();
     let ssl3 = c_int::from(c.neg.version) == abi::SSL3_VERSION;
-    !((ssl3 && extctx & cx::SSL3_ALLOWED == 0)
+    !((c.cfg.dtls && extctx & cx::TLS_IMPLEMENTATION_ONLY != 0)
+        || (ssl3 && extctx & cx::SSL3_ALLOWED == 0)
         || (is_tls13 && extctx & cx::TLS1_2_AND_BELOW_ONLY != 0)
         || (!is_tls13 && extctx & cx::TLS1_3_ONLY != 0 && thisctx & cx::CLIENT_HELLO == 0)
         || (c.cfg.server && !is_tls13 && extctx & cx::TLS1_3_ONLY != 0)
@@ -201,7 +202,7 @@ pub fn should_add(c: &Connection, extctx: u32, thisctx: u32, max_version: u16) -
     relevant(c, extctx, thisctx)
         && !(extctx & cx::TLS1_3_ONLY != 0
             && thisctx & cx::CLIENT_HELLO != 0
-            && c_int::from(max_version) < abi::TLS1_3_VERSION)
+            && (c.cfg.dtls || c_int::from(max_version) < abi::TLS1_3_VERSION))
 }
 
 /// The contexts in which a response carries only custom extensions the peer sent.
@@ -385,7 +386,7 @@ pub fn collect(
         let flags = &c.hs.sh.ext;
         let sent = |typ: u16| flags.sent(typ);
         let policy = Policy {
-            dtls: false,
+            dtls: c.cfg.dtls,
             custom: &custom,
             sent: Some(&sent),
         };
@@ -1165,8 +1166,9 @@ fn final_psk(c: &Connection, sent: bool) -> Result<()> {
 /// internal error).
 pub fn construct_sig_algs(c: &Connection) -> Result<ExtReturn> {
     let tls12 = super::version::of(abi::TLS1_2_VERSION);
-    if c.hs.sh.client_version < tls12
-        || (c.cfg.method_version != super::version::ANY && c.neg.version < tls12)
+    let level = super::version::tls_level;
+    if level(c.hs.sh.client_version) < tls12
+        || (c.cfg.method_version != super::version::ANY && level(c.neg.version) < tls12)
     {
         return Ok(ExtReturn::NotSent);
     }

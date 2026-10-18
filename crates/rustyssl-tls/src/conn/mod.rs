@@ -14,6 +14,7 @@ pub(crate) mod client;
 /// `rustyssl-capi`'s configuration functions (the group and signature algorithm tables, the
 /// security framework).
 pub mod common;
+pub mod dtls;
 pub(crate) mod funcs;
 #[cfg(test)]
 pub(crate) mod pair;
@@ -308,6 +309,8 @@ pub struct Connection {
     /// client's state machine sets it with its first ClientHello and clears it once the
     /// ServerHello chose the version.
     pub(crate) version_pending: bool,
+    /// DTLS's state (unused in TLS).
+    pub(crate) dtls: dtls::State,
 }
 
 impl core::fmt::Debug for Connection {
@@ -328,13 +331,25 @@ impl Connection {
         // is negotiated (`tls1_clear`: TLS_MAX_VERSION_INTERNAL), with is_tls13 false until
         // then (the method isn't switched yet); its first records carry TLS 1.0.
         let flexible = cfg.method_version == 0;
-        let (version, record_version) = if flexible {
+        let (version, record_version) = if flexible && cfg.dtls {
+            // `dtls1_clear`: DTLS_MAX_VERSION_INTERNAL; the first records say DTLS 1.0
+            // (`do_dtls1_write`).
+            (
+                crate::consts::version::DTLS1_2,
+                crate::consts::version::DTLS1,
+            )
+        } else if flexible {
             (if cfg.server { tls1_3() } else { tls1_0() }, tls1_0())
         } else {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
-        let mut rw = RecordWriter::new(record_version);
+        let is_dtls = cfg.dtls;
+        let mut rw = if cfg.dtls {
+            RecordWriter::new_dtls(record_version)
+        } else {
+            RecordWriter::new(record_version)
+        };
         // `ssl_get_max_send_fragment` (0: unset, the default).
         if cfg.max_send_fragment > 0 {
             rw.max_frag_len = cfg.max_send_fragment.min(rw.max_frag_len);
@@ -347,7 +362,11 @@ impl Connection {
         Self {
             cfg,
             st: Statem::default(),
-            rr: RecordReader::new(server),
+            rr: if is_dtls {
+                RecordReader::new_dtls(server)
+            } else {
+                RecordReader::new(server)
+            },
             rw,
             hs: Handshake {
                 // `SSL_new`'s `key_update`: none pending, on either side (fork M).
@@ -396,6 +415,7 @@ impl Connection {
             reading: false,
             security_hook: None,
             version_pending: false,
+            dtls: dtls::State::default(),
         }
     }
 
@@ -573,6 +593,9 @@ impl Connection {
     /// How much network input is buffered (`SSL_has_pending` counts it).
     #[must_use]
     pub fn buffered_input(&self) -> usize {
+        if self.cfg.dtls {
+            return usize::from(self.dtls_input_pending());
+        }
         self.input.len()
     }
 
@@ -604,12 +627,21 @@ impl Connection {
     /// Application data received and not yet read (`SSL_pending`).
     #[must_use]
     pub fn pending_app(&self) -> usize {
-        self.app_in.len()
+        self.app_in.len().saturating_add(self.dtls_held_len())
     }
 
     /// Copies up to `buf.len()` octets of received application data into `buf`, removing them
     /// unless `peek`; returns how many.
     pub fn read_app(&mut self, buf: &mut [u8], peek: bool) -> usize {
+        if self.cfg.dtls && self.app_in.is_empty() {
+            // Application data held during the handshake is read once it's over.
+            while let Some(r) = self.dtls_take_held_app() {
+                if r.content_type == app_data() {
+                    self.app_in.extend(r.data.iter());
+                    break;
+                }
+            }
+        }
         let n = buf.len().min(self.app_in.len());
         for (d, s) in buf.iter_mut().zip(self.app_in.iter()) {
             *d = *s;
@@ -769,7 +801,10 @@ impl Connection {
     }
 
     /// Whether output is waiting to be taken: a flush point (`statem_flush`) waits for it.
-    pub(crate) fn flushed(&self) -> bool {
+    pub(crate) fn flushed(&mut self) -> bool {
+        if self.cfg.dtls {
+            self.dtls_close_datagram();
+        }
         self.output.is_empty()
     }
 
@@ -805,6 +840,10 @@ impl Connection {
     /// Writes `data` as records of type `ty` (`ssl3_write_bytes`), reporting each record's
     /// header (and TLS 1.3's inner content type) to the message callback.
     pub(crate) fn write_record(&mut self, p: &dyn Provider, ty: u8, data: &[u8]) -> Result<()> {
+        if self.cfg.dtls {
+            let epoch = self.rw.epoch();
+            return self.dtls_write_record(p, ty, data, epoch);
+        }
         let start = self.output.len();
         self.rw.write(p, ty, data, &mut self.output)?;
         if self.cfg.callbacks.msg {
@@ -836,6 +875,9 @@ impl Connection {
     /// Reads the next record (`read_record`), reporting its header (and TLS 1.3's inner
     /// content type) to the message callback. `None`: more input is needed.
     fn fetch_record(&mut self, p: &dyn Provider) -> Result<Option<record::Record>> {
+        if self.cfg.dtls {
+            return self.fetch_record_dtls(p);
+        }
         loop {
             self.rr.skip_undecryptable = self.skip_early_data();
             // A fatal record-layer error that sends an alert is followed by
@@ -1152,8 +1194,19 @@ impl Connection {
             common::enter_post_handshake(self);
             return Ok(None);
         }
-        let Some(rec) = self.fetch_record(p)? else {
-            return Ok(None);
+        let held = if self.cfg.dtls {
+            self.dtls_take_held_app()
+        } else {
+            None
+        };
+        let rec = match held {
+            Some(r) => r,
+            None => {
+                let Some(rec) = self.fetch_record(p)? else {
+                    return Ok(None);
+                };
+                rec
+            }
         };
         let ty = rec.content_type;
         if ty != alert() && !rec.data.is_empty() {
@@ -1161,6 +1214,18 @@ impl Connection {
         }
         if self.shutdown & RECEIVED_SHUTDOWN != 0 {
             return Ok(None);
+        }
+        if self.cfg.dtls && ty != app_data() && ty != alert() {
+            if self.shutdown & SENT_SHUTDOWN != 0 || ty == ccs() {
+                // A ChangeCipherSpec again is ignored (`dtls1_read_bytes`).
+                return Ok(None);
+            }
+            if ty == handshake() {
+                if self.dtls_post_handshake_record(p, rec)? {
+                    common::enter_post_handshake(self);
+                }
+                return Ok(None);
+            }
         }
         if ty == app_data() {
             self.app_in.extend(rec.data.iter());
@@ -1225,6 +1290,22 @@ impl Connection {
                 return Err(e);
             }
             self.early_data_count = count;
+        }
+        if self.cfg.dtls {
+            // One record per write (`do_dtls1_write`).
+            let max = self.rw.max_frag_len.clamp(1, record::MAX_PLAIN);
+            if data.len() > max {
+                let e = Error::alert(
+                    abi::SSL_AD_INTERNAL_ERROR,
+                    abi::SSL_R_EXCEEDS_MAX_FRAGMENT_SIZE,
+                )
+                .in_func("do_dtls1_write");
+                self.fatal(p, e);
+                return Err(e);
+            }
+            if data.is_empty() {
+                return Ok(0);
+            }
         }
         self.write_record(p, app_data(), data)?;
         Ok(data.len())
@@ -1453,6 +1534,10 @@ impl Connection {
             // Sending can't fail in a way that matters any more.
             let _ = self.send_alert(p, msgs_type(abi::SSL3_AL_FATAL), desc);
         }
+        if self.cfg.dtls {
+            // A fatal alert is flushed (`ssl3_dispatch_alert`).
+            self.dtls_close_datagram();
+        }
     }
 
     /// Sets up a new handshake (`tls_setup_handshake`).
@@ -1466,8 +1551,14 @@ impl Connection {
     }
 }
 
+/// The error that makes the state machine drop the message read and read again (DTLS: an
+/// unexpected ChangeCipherSpec).
+pub(crate) fn dtls_retry_read() -> Error {
+    Error::quiet(-1)
+}
+
 /// What an alert did.
-enum AlertOutcome {
+pub(crate) enum AlertOutcome {
     /// Ignored (a warning, or TLS 1.3's user_cancelled).
     Continue,
     /// close_notify.

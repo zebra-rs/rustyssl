@@ -12,24 +12,6 @@ use libc::timeval;
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_DTLS_get_data_mtu(_: *const SSL) -> usize {
-    crate::stub::unimplemented("DTLS_get_data_mtu")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_DTLS_set_timer_cb(_: *mut SSL, _: DTLS_timer_cb) {
-    crate::stub::unimplemented("DTLS_set_timer_cb")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_DTLSv1_listen(
-    _: *mut SSL,
-    _: *mut BIO_ADDR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("DTLSv1_listen")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD {
     crate::stub::unimplemented("OSSL_QUIC_client_method")
 }
