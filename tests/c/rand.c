@@ -300,9 +300,12 @@ static void replaced(void)
           && BIO_ctrl(nbio, BIO_CTRL_PENDING, 0, NULL) == 0, "without a next BIO");
     BIO_free(nbio);
 
+    /* Held while it is dropped, so that a new DRBG can't take its address. */
+    check(EVP_RAND_CTX_up_ref(mine) == 1, "a reference kept");
     check(RAND_set0_public(NULL, NULL) == 1 && RAND_set0_private(NULL, NULL) == 1,
           "the thread's DRBGs dropped");
     check(RAND_get0_public(NULL) != NULL && RAND_get0_public(NULL) != mine, "a new public one");
+    EVP_RAND_CTX_free(mine);
 }
 
 /* ---------------------------------------------------------------------------------------- */
