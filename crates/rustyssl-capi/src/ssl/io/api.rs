@@ -1079,7 +1079,17 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
         }
         SSL_CTRL_GET_SIGNATURE_NID => scheme_hash(tls.and_then(|c| c.negotiated().own_scheme)),
         SSL_CTRL_GET_NEGOTIATED_GROUP => {
-            let id = tls.and_then(|c| c.negotiated().group);
+            // TLS 1.3's group when the handshake made a key exchange, else the session's
+            // (`kex_group`: a resumed TLS 1.2 handshake reports the original's).
+            let id = tls
+                .filter(|c| c.is_tls13())
+                .and_then(|c| c.negotiated().group)
+                .or_else(|| {
+                    // SAFETY: the connection's session, or NULL, alive under its lock.
+                    let k = unsafe { crate::ssl::session::sess(st.sess.session) }
+                        .map_or(0, |d| d.data().kex_group);
+                    u16::try_from(k).ok().filter(|&k| k != 0)
+                });
             let prov = st.drv.provider.clone();
             match (id, prov) {
                 (Some(id), Some(p)) => c_long::from(super::config::group_nid(&p, id)),

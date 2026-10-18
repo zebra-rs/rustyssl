@@ -88,6 +88,9 @@ pub struct Session {
     pub ext_flags: u32,
     /// The application's data carried in its ticket (`SSL_SESSION_set1_ticket_appdata`).
     pub ticket_appdata: Option<Vec<u8>>,
+    /// The group of its key exchange (`kex_group`; 0: none, as for TLS 1.2's FFDHE), which a
+    /// resumed TLS 1.2 handshake reports (`SSL_get_negotiated_group`).
+    pub kex_group: u16,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the
