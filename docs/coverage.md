@@ -6010,7 +6010,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_CTX_use_certificate_file` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_CTX_use_psk_identity_hint` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_SESSION_dup` | libssl | `openssl/ssl.h` | `ssl_session` |
-| `SSL_SESSION_free` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
+| `SSL_SESSION_free` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_get0_alpn_selected` | libssl | `openssl/ssl.h` | `ssl_session` |
 | `SSL_SESSION_get0_cipher` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_get0_hostname` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
@@ -6031,7 +6031,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_SESSION_get_time_ex` | libssl | `openssl/ssl.h` | `ssl_session` |
 | `SSL_SESSION_get_timeout` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_has_ticket` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
-| `SSL_SESSION_is_resumable` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
+| `SSL_SESSION_is_resumable` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_new` | libssl | `openssl/ssl.h` | `ssl_sess_cache`, `ssl_session` |
 | `SSL_SESSION_print` | libssl | `openssl/ssl.h` | `ssl_session` |
 | `SSL_SESSION_print_fp` | libssl | `openssl/ssl.h` | `ssl_session` |
@@ -6107,7 +6107,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get0_next_proto_negotiated` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_get0_param` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get0_peer_CA_list` | libssl | `openssl/ssl.h` | `ssl_ctx` |
-| `SSL_get0_peer_certificate` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle`, `ssl_shutdown` |
+| `SSL_get0_peer_certificate` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_handshake`, `ssl_io_idle`, `ssl_shutdown` |
 | `SSL_get0_peer_rpk` | libssl | `openssl/ssl.h` | `ssl_io_idle` |
 | `SSL_get0_peer_scts` | libssl | `openssl/ssl.h` | `ssl_ct` |
 | `SSL_get0_peername` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6116,7 +6116,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get0_verified_chain` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle` |
 | `SSL_get1_builtin_sigalgs` | libssl | `openssl/tls1.h` | `ssl_lists` |
 | `SSL_get1_peer_certificate` | libssl | `openssl/ssl.h` | `ssl_io_idle`, `ssl_requests` |
-| `SSL_get1_session` | libssl | `openssl/ssl.h` | `ssl_sess_cache` |
+| `SSL_get1_session` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_sess_cache` |
 | `SSL_get1_supported_ciphers` | libssl | `openssl/ssl.h` | `ssl_lists` |
 | `SSL_get_SSL_CTX` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get_accept_connection_queue_len` | libssl | `openssl/ssl.h` | `ssl_misc` |
@@ -6226,13 +6226,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_peek` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `SSL_peek_ex` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `SSL_pending` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
-| `SSL_read` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle`, `ssl_requests`, `ssl_sess_cache`, `ssl_shutdown` |
+| `SSL_read` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_io`, `ssl_io_idle`, `ssl_requests`, `ssl_sess_cache`, `ssl_shutdown` |
 | `SSL_read_ex` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `SSL_renegotiate` | libssl | `openssl/ssl.h` | `ssl_requests` |
 | `SSL_renegotiate_abbreviated` | libssl | `openssl/ssl.h` | `ssl_requests` |
 | `SSL_renegotiate_pending` | libssl | `openssl/ssl.h` | `ssl_requests` |
 | `SSL_select_next_proto` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle`, `ssl_misc` |
-| `SSL_session_reused` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake`, `ssl_sess_cache` |
+| `SSL_session_reused` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_ctx`, `ssl_handshake`, `ssl_sess_cache` |
 | `SSL_set0_CA_list` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set0_rbio` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set0_security_ex_data` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6289,7 +6289,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_set_rfd` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_security_callback` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_security_level` | libssl | `openssl/ssl.h` | `ssl_ctx` |
-| `SSL_set_session` | libssl | `openssl/ssl.h` | `ssl_sess_cache` |
+| `SSL_set_session` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_sess_cache` |
 | `SSL_set_session_id_context` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_shutdown` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_io_idle`, `ssl_shutdown` |
 | `SSL_set_ssl_method` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6302,7 +6302,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_set_verify_depth` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_verify_result` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_wfd` | libssl | `openssl/ssl.h` | `ssl_ctx` |
-| `SSL_shutdown` | libssl | `openssl/ssl.h` | `ssl_io_idle`, `ssl_sess_cache`, `ssl_shutdown` |
+| `SSL_shutdown` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_io_idle`, `ssl_sess_cache`, `ssl_shutdown` |
 | `SSL_shutdown_ex` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_state_string` | libssl | `openssl/ssl.h` | `ssl_io_idle` |
 | `SSL_state_string_long` | libssl | `openssl/ssl.h` | `ssl_handshake`, `ssl_io_idle` |
@@ -6325,7 +6325,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_version` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake` |
 | `SSL_waiting_for_async` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_want` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake` |
-| `SSL_write` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle`, `ssl_requests`, `ssl_shutdown` |
+| `SSL_write` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_io`, `ssl_io_idle`, `ssl_requests`, `ssl_shutdown` |
 | `SSL_write_ex` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `TLS_client_method` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_conf`, `ssl_ct`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_dane`, `ssl_handshake`, `ssl_io`, `ssl_lists`, `ssl_misc`, `ssl_requests`, `ssl_sess_cache`, `ssl_session`, `ssl_shutdown` |
 | `TLS_method` | libssl | `openssl/ssl.h` | `ssl_cipher`, `ssl_conf`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_io_idle`, `ssl_lists` |
