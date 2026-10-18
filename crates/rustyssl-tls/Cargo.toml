@@ -11,7 +11,9 @@ publish.workspace = true
 [dependencies]
 rustyssl-asn1.workspace = true
 rustyssl-crypto.workspace = true
+rustyssl-abi.workspace = true
 rustyssl-pki.workspace = true
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true
