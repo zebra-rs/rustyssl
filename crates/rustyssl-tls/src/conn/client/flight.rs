@@ -320,6 +320,7 @@ pub(super) fn process_key_exchange(
         let lead = secret.bytes().iter().take_while(|&&b| b == 0).count();
         let pms = Secret::new(secret.bytes().get(lead..).unwrap_or_default().to_vec());
         state(c)?.kx12 = Some(Kx12 { public, pms });
+        c.hs.sh.peer_dh = Some((prime.to_vec(), g.to_vec(), ys.to_vec()));
         if auth & (SSL_aRSA | SSL_aDSS) != 0 {
             signer = peer_pkey(c, p);
         }

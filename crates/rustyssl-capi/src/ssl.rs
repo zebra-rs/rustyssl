@@ -7,6 +7,7 @@ pub(crate) mod accessors;
 pub(crate) mod bio_ssl;
 pub(crate) mod ca;
 pub(crate) mod cert;
+pub(crate) mod cert_ctrl;
 pub(crate) mod ciphers;
 pub(crate) mod clienthello;
 pub(crate) mod conf;

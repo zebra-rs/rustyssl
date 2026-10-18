@@ -43,9 +43,7 @@ use rustyssl_abi::{
 };
 
 use super::cert::{Cert, Owner};
-use super::ctx::{
-    self, Ctx, as_long, cert_ctrl, check_allowed_versions, set_version_bound, unimplemented_ctrl,
-};
+use super::ctx::{self, Ctx, as_long, cert_ctrl, check_allowed_versions, set_version_bound};
 use super::method::{DEFAULT_TIMEOUT, Method, method_of};
 use super::types::{AnyCb, InfoCb, MsgCb, NotResumableCb, RecordPaddingCb, TLS_CIPHER_LEN};
 use crate::bio::{BIO_ctrl, BIO_find_type, BIO_free_all, BIO_method_type, BIO_new, BIO_up_ref};
@@ -1685,7 +1683,11 @@ ffi_export! {
         if let Some(r) = unsafe { super::lists::ssl_ctrl(x, cmd, larg, parg) } {
             return r;
         }
-        if unimplemented_ctrl(cmd) || handshake_ctrl(cmd) || (cmd == SSL_CTRL_GET_RAW_CIPHERLIST && !parg.is_null()) {
+        // SAFETY: as above (certificate types, temporary keys, DH parameters, chains).
+        if let Some(r) = unsafe { super::cert_ctrl::ssl_ctrl(s, x, cmd, larg, parg) } {
+            return r;
+        }
+        if handshake_ctrl(cmd) || (cmd == SSL_CTRL_GET_RAW_CIPHERLIST && !parg.is_null()) {
             crate::stub::unimplemented(&format!("SSL_ctrl command {cmd}"));
         }
         if cmd == SSL_CTRL_SET_CURRENT_CERT && larg == c_long::from(rustyssl_abi::SSL_CERT_SET_SERVER) {
@@ -1853,24 +1855,20 @@ ffi_export! {
 /// the handshake is built (security rule 10).
 fn handshake_ctrl(cmd: c_int) -> bool {
     use rustyssl_abi::{
-        SSL_CTRL_GET_CLIENT_CERT_TYPES, SSL_CTRL_GET_EC_POINT_FORMATS, SSL_CTRL_GET_EXTMS_SUPPORT,
-        SSL_CTRL_GET_IANA_GROUPS, SSL_CTRL_GET_NEGOTIATED_GROUP, SSL_CTRL_GET_PEER_SIGNATURE_NAME,
-        SSL_CTRL_GET_PEER_SIGNATURE_NID, SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SIGNATURE_NAME,
-        SSL_CTRL_GET_SIGNATURE_NID, SSL_CTRL_GET_TMP_KEY,
+        SSL_CTRL_GET_EC_POINT_FORMATS, SSL_CTRL_GET_EXTMS_SUPPORT, SSL_CTRL_GET_NEGOTIATED_GROUP,
+        SSL_CTRL_GET_PEER_SIGNATURE_NAME, SSL_CTRL_GET_PEER_SIGNATURE_NID,
+        SSL_CTRL_GET_PEER_TMP_KEY, SSL_CTRL_GET_SIGNATURE_NAME, SSL_CTRL_GET_SIGNATURE_NID,
     };
     matches!(
         cmd,
-        SSL_CTRL_GET_CLIENT_CERT_TYPES
-            | SSL_CTRL_GET_EC_POINT_FORMATS
+        SSL_CTRL_GET_EC_POINT_FORMATS
             | SSL_CTRL_GET_EXTMS_SUPPORT
-            | SSL_CTRL_GET_IANA_GROUPS
             | SSL_CTRL_GET_NEGOTIATED_GROUP
             | SSL_CTRL_GET_PEER_SIGNATURE_NAME
             | SSL_CTRL_GET_PEER_SIGNATURE_NID
             | SSL_CTRL_GET_PEER_TMP_KEY
             | SSL_CTRL_GET_SIGNATURE_NAME
             | SSL_CTRL_GET_SIGNATURE_NID
-            | SSL_CTRL_GET_TMP_KEY
     )
 }
 

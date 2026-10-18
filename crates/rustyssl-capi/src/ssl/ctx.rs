@@ -751,18 +751,6 @@ pub(crate) unsafe fn cert_ctrl(
     Some(c_long::from(r))
 }
 
-/// The ctrl commands OpenSSL handles that rustyssl doesn't yet: they abort (security rule
-/// 10) rather than report a failure OpenSSL wouldn't.
-pub(crate) fn unimplemented_ctrl(cmd: c_int) -> bool {
-    use rustyssl_abi::{
-        SSL_CTRL_BUILD_CERT_CHAIN, SSL_CTRL_SET_CLIENT_CERT_TYPES, SSL_CTRL_SET_TMP_DH,
-    };
-    matches!(
-        cmd,
-        SSL_CTRL_SET_TMP_DH | SSL_CTRL_SET_CLIENT_CERT_TYPES | SSL_CTRL_BUILD_CERT_CHAIN
-    )
-}
-
 ffi_export! {
     /// The context's control commands (`SSL_CTX_ctrl`, `ssl3_ctx_ctrl`): the numbers and
     /// settings behind the `SSL_CTX_*` macros, with OpenSSL's return values; 0 for an unknown
@@ -781,8 +769,10 @@ ffi_export! {
         }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ctx(c) }) else { return 0 };
-        if unimplemented_ctrl(cmd) {
-            crate::stub::unimplemented(&format!("SSL_CTX_ctrl command {cmd}"));
+        // SAFETY: the live context; the caller's argument (DH parameters, certificate types,
+        // chain building).
+        if let Some(r) = unsafe { super::cert_ctrl::ctx_ctrl(c, cmd, larg, parg) } {
+            return r;
         }
         // SAFETY: the live context; the caller's argument.
         if let Some(r) = unsafe { cert_ctrl(Owner::Ctx(c), cmd, larg, parg) } {
