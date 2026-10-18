@@ -7,7 +7,7 @@
 //! and policies (`pcy.rs`). Each failure goes to the verification callback, which may accept it,
 //! with the error, its depth, and its certificate set, as OpenSSL's.
 //!
-//! DANE comes with libssl's: verifying with a DANE state aborts until then.
+//! With a DANE state (libssl's), the TLSA records take part (`dane.rs`).
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 use core::ptr;
@@ -26,7 +26,7 @@ use rustyssl_abi::{
     X509_V_ERR_AUTHORITY_KEY_IDENTIFIER_CRITICAL, X509_V_ERR_CA_BCONS_NOT_CRITICAL,
     X509_V_ERR_CA_CERT_MISSING_KEY_USAGE, X509_V_ERR_CA_KEY_TOO_SMALL, X509_V_ERR_CA_MD_TOO_WEAK,
     X509_V_ERR_CERT_CHAIN_TOO_LONG, X509_V_ERR_CERT_HAS_EXPIRED, X509_V_ERR_CERT_NOT_YET_VALID,
-    X509_V_ERR_CERT_REJECTED, X509_V_ERR_CERT_SIGNATURE_FAILURE,
+    X509_V_ERR_CERT_REJECTED, X509_V_ERR_CERT_SIGNATURE_FAILURE, X509_V_ERR_DANE_NO_MATCH,
     X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT, X509_V_ERR_EC_KEY_EXPLICIT_PARAMS,
     X509_V_ERR_EE_KEY_TOO_SMALL, X509_V_ERR_EMAIL_MISMATCH, X509_V_ERR_EMPTY_SUBJECT_ALT_NAME,
     X509_V_ERR_EMPTY_SUBJECT_SAN_NOT_CRITICAL, X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD,
@@ -58,6 +58,7 @@ use super::ctx::{
     Ctx, X509_STORE_CTX_free, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
     X509_STORE_CTX_set0_trusted_stack, best_issuer_sk, check_cert_time, ctx_of, verify_cb_cert,
 };
+use super::dane;
 use super::name::{
     X509_NAME_ENTRY_free, X509_NAME_ENTRY_get_object, X509_NAME_ENTRY_set, X509_NAME_cmp,
     X509_NAME_delete_entry, X509_NAME_dup, X509_NAME_entry_count, X509_NAME_free,
@@ -103,7 +104,7 @@ fn level_of(c: &Ctx) -> c_int {
 }
 
 /// The context's flags.
-fn flags_of(c: &Ctx) -> c_ulong {
+pub(super) fn flags_of(c: &Ctx) -> c_ulong {
     // SAFETY: as for `params`.
     unsafe { c.param.cast::<Param>().as_ref() }.map_or(0, |p| p.flags)
 }
@@ -142,14 +143,6 @@ unsafe fn fails(
 ) -> bool {
     // SAFETY: the caller's guarantee.
     cond && unsafe { verify_cb_cert(ctx, x, depth, err) } == 0
-}
-
-/// Whether the context has a DANE state (libssl's, which comes later).
-fn dane_enabled(c: &Ctx) -> bool {
-    if c.dane.is_null() {
-        return false;
-    }
-    crate::stub::unimplemented("DANE verification (with libssl)")
 }
 
 // Security levels.
@@ -326,11 +319,15 @@ unsafe fn check_trust(ctx: *mut X509_STORE_CTX, num_untrusted: c_int) -> c_int {
     let Some(cx) = (unsafe { c(ctx) }) else {
         return X509_TRUST_UNTRUSTED;
     };
-    if dane_enabled(cx) {
-        return X509_TRUST_UNTRUSTED;
-    }
     let chain = cx.chain;
     let num = len(chain);
+    // A DANE-TA(2) issuer from the wire settles it; any other match is only recorded.
+    if num_untrusted > 0 && num_untrusted < num {
+        let trust = dane::check_issuer(cx, num_untrusted);
+        if trust != X509_TRUST_UNTRUSTED {
+            return trust;
+        }
+    }
     let trust_id = params(cx).map_or(0, |p| p.trust);
     let partial = flags_of(cx) & flag(X509_V_FLAG_PARTIAL_CHAIN) != 0;
     let rejected = |x: *mut X509, i: c_int| {
@@ -346,7 +343,7 @@ unsafe fn check_trust(ctx: *mut X509_STORE_CTX, num_untrusted: c_int) -> c_int {
         // SAFETY: a certificate of the chain.
         let trust = unsafe { X509_check_trust(x, trust_id, 0) };
         if trust == X509_TRUST_TRUSTED {
-            return X509_TRUST_TRUSTED;
+            return trusted(ctx, num_untrusted);
         }
         if trust == X509_TRUST_REJECTED {
             return rejected(x, i);
@@ -354,7 +351,7 @@ unsafe fn check_trust(ctx: *mut X509_STORE_CTX, num_untrusted: c_int) -> c_int {
     }
     if num_untrusted < num {
         return if partial {
-            X509_TRUST_TRUSTED
+            trusted(ctx, num_untrusted)
         } else {
             X509_TRUST_UNTRUSTED
         };
@@ -385,9 +382,17 @@ unsafe fn check_trust(ctx: *mut X509_STORE_CTX, num_untrusted: c_int) -> c_int {
         if let Some(cx) = unsafe { c(ctx) } {
             cx.num_untrusted = 0;
         }
-        return X509_TRUST_TRUSTED;
+        return trusted(ctx, num_untrusted);
     }
     X509_TRUST_UNTRUSTED
+}
+
+/// `check_trust`'s trusted end: with DANE, a PKIX trust anchor needs a TLSA match too.
+fn trusted(ctx: *mut X509_STORE_CTX, num_untrusted: c_int) -> c_int {
+    // SAFETY: the context `check_trust` was given.
+    unsafe { c(ctx) }.map_or(X509_TRUST_TRUSTED, |cx| {
+        dane::pkix_trusted(cx, num_untrusted)
+    })
 }
 
 // Building the chain.
@@ -456,7 +461,6 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
     if len(cx.chain) != 1 || cx.num_untrusted != 1 {
         return int_err(ctx, ptr::null_mut());
     }
-    dane_enabled(cx);
     let flags = flags_of(cx);
     let mut search: u32 = if cx.untrusted.is_null() {
         0
@@ -464,12 +468,16 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
         DO_UNTRUSTED
     };
     let mut may_alternate = false;
-    if search == 0 || flags & flag(X509_V_FLAG_TRUSTED_FIRST) != 0 {
-        search |= DO_TRUSTED;
-    } else if flags & flag(X509_V_FLAG_NO_ALT_CHAINS) == 0 {
-        may_alternate = true;
+    let mut may_trusted = false;
+    // With only DANE-?? records, the trust store is never consulted.
+    if dane::has_pkix(cx) || !dane::has_dane(cx) {
+        if search == 0 || flags & flag(X509_V_FLAG_TRUSTED_FIRST) != 0 {
+            search |= DO_TRUSTED;
+        } else if flags & flag(X509_V_FLAG_NO_ALT_CHAINS) == 0 {
+            may_alternate = true;
+        }
+        may_trusted = true;
     }
-    let may_trusted = true;
     // SAFETY: no preconditions.
     let sk_untrusted = unsafe { OPENSSL_sk_new_null() }.cast::<stack_st_X509>();
     if sk_untrusted.is_null() {
@@ -477,6 +485,15 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
         return memerr(ctx, ptr::null_mut());
     }
     let add_default = c_int::try_from(X509_ADD_FLAG_DEFAULT).unwrap_or(0);
+    // The records' Cert(0) Full(0) trust anchors come first among the untrusted.
+    let dane_certs = dane::certs(cx);
+    // SAFETY: the working list; the records' certificates.
+    let added = dane_certs.is_null()
+        || unsafe { X509_add_certs(sk_untrusted, dane_certs, add_default) } != 0;
+    if !added {
+        err::raise(ERR_LIB_X509, ERR_R_X509_LIB, "build_chain");
+        return memerr(ctx, sk_untrusted);
+    }
     // SAFETY: the working list; the context's untrusted certificates.
     if unsafe { X509_add_certs(sk_untrusted, cx.untrusted, add_default) } == 0 {
         err::raise(ERR_LIB_X509, ERR_R_X509_LIB, "build_chain");
@@ -547,6 +564,8 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
                         num -= 1;
                     }
                     cx.num_untrusted = num;
+                    // A TLSA match above the shorter chain goes with it.
+                    dane::prune(cx);
                 }
                 if self_signed == 0 {
                     // SAFETY: the chain; the issuer, whose reference it takes.
@@ -647,6 +666,12 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
                 return int_err(ctx, sk_untrusted);
             }
             cx.num_untrusted += 1;
+            // A DANE-TA(2) match of the new top certificate.
+            let depth = cx.num_untrusted - 1;
+            trust = dane::check_issuer(cx, depth);
+            if trust == X509_TRUST_TRUSTED || trust == X509_TRUST_REJECTED {
+                break;
+            }
         }
     }
     // SAFETY: the working list, without references.
@@ -659,9 +684,15 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
         return -1;
     };
     let num = len(cx.chain);
-    if num <= max_depth && trust == X509_TRUST_UNTRUSTED && num == cx.num_untrusted {
-        // SAFETY: the context.
-        trust = unsafe { check_trust(ctx, num) };
+    // The last chances: a bare DANE-TA key that signed the top, or the leaf trusted directly.
+    if num <= max_depth {
+        if trust == X509_TRUST_UNTRUSTED && dane::has_dane_ta(cx) {
+            trust = dane::check_pkeys(cx);
+        }
+        if trust == X509_TRUST_UNTRUSTED && num == cx.num_untrusted {
+            // SAFETY: the context.
+            trust = unsafe { check_trust(ctx, num) };
+        }
     }
     if trust == X509_TRUST_TRUSTED {
         return 1;
@@ -696,6 +727,23 @@ unsafe fn build_chain(ctx: *mut X509_STORE_CTX) -> c_int {
             ptr::null_mut(),
             num - 1,
             X509_V_ERR_CERT_CHAIN_TOO_LONG,
+        )
+    } {
+        return 0;
+    }
+    // SAFETY: the context.
+    let Some(cx) = (unsafe { c(ctx) }) else {
+        return -1;
+    };
+    let no_match = dane::enabled(cx) && (!dane::has_pkix(cx) || dane::pdpth(cx) >= 0);
+    // SAFETY: as above.
+    if unsafe {
+        fails(
+            no_match,
+            ctx,
+            ptr::null_mut(),
+            num - 1,
+            X509_V_ERR_DANE_NO_MATCH,
         )
     } {
         return 0;
@@ -1011,7 +1059,7 @@ unsafe fn check_hosts(x: *mut X509, p: &mut Param) -> bool {
 ///
 /// # Safety
 /// `ctx` is a live context.
-unsafe fn check_id(ctx: *mut X509_STORE_CTX) -> c_int {
+pub(super) unsafe fn check_id(ctx: *mut X509_STORE_CTX) -> c_int {
     // SAFETY: the caller's guarantee.
     let Some(cx) = (unsafe { c(ctx) }) else {
         return 0;
@@ -1322,7 +1370,7 @@ unsafe fn verify(ctx: *mut X509_STORE_CTX) -> c_int {
 ///
 /// # Safety
 /// `ctx` is a live context with its leaf in its chain.
-unsafe fn verify_chain(ctx: *mut X509_STORE_CTX) -> c_int {
+pub(super) unsafe fn verify_chain(ctx: *mut X509_STORE_CTX) -> c_int {
     // SAFETY: the caller's guarantee, for each step.
     let mut ok = unsafe { build_chain(ctx) };
     if ok <= 0 {
@@ -1468,9 +1516,13 @@ unsafe fn verify_x509(ctx: *mut X509_STORE_CTX) -> c_int {
     let Some(cx) = (unsafe { c(ctx) }) else {
         return -1;
     };
-    dane_enabled(cx);
-    // SAFETY: the context, its leaf in its chain.
-    let ret = unsafe { verify_chain(ctx) };
+    let ret = if dane::enabled(cx) {
+        // SAFETY: the context, its leaf in its chain, with records to match.
+        unsafe { dane::verify(ctx) }
+    } else {
+        // SAFETY: the context, its leaf in its chain.
+        unsafe { verify_chain(ctx) }
+    };
     // SAFETY: the context.
     if let Some(cx) = unsafe { c(ctx) }
         && ret <= 0
@@ -1501,7 +1553,10 @@ unsafe fn verify_rpk(ctx: *mut X509_STORE_CTX) -> c_int {
         return -1;
     };
     cx.error = X509_V_ERR_RPK_UNTRUSTED;
-    dane_enabled(cx);
+    // With DANE, the error becomes the match's (`dane_verify_rpk`).
+    if dane::enabled(cx) && !dane::match_rpk(cx) {
+        return -1;
+    }
     let (verify_fn, cb, error) = (cx.verify, cx.verify_cb, cx.error);
     let ret = match verify_fn {
         // SAFETY: the context's function, with no reference into it held.

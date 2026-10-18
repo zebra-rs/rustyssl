@@ -599,13 +599,17 @@ ffi_export! {
         unsafe { super::sess_cache::on_clear(x) };
         // The engine goes with the handshake (the session's peer certificates and cipher stay);
         // it's freed with no lock held, since freeing what it holds may run ex_data callbacks.
-        let old = {
+        let (old, mcert) = {
             let mut st = x.state();
             st.reset();
             let kept = st.drv.clear();
-            core::mem::replace(&mut st.drv, kept)
+            // The DANE verification's result goes (the records stay).
+            let mcert = st.lists.dane.reset();
+            (core::mem::replace(&mut st.drv, kept), mcert)
         };
         drop(old);
+        // SAFETY: the DANE match's reference, or NULL.
+        unsafe { crate::x509::cert::X509_free(mcert) };
         // SAFETY: the connection's parameters.
         unsafe { crate::x509::vpm::X509_VERIFY_PARAM_move_peername(x.param, ptr::null_mut()) };
         1
