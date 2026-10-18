@@ -1193,7 +1193,9 @@ ffi_export! {
             return st.drv.peer_rpk.0;
         }
         let Some(der) = st.drv.tls.as_ref().and_then(|c| c.negotiated().peer_rpk.clone()) else {
-            return ptr::null_mut();
+            // A resumed session's (`sc->session->peer_rpk`).
+            // SAFETY: the connection's session, or NULL.
+            return unsafe { crate::ssl::session::with(st.sess.session, ptr::null_mut(), |d| d.peer_rpk) };
         };
         let Ok(len) = c_long::try_from(der.len()) else { return ptr::null_mut() };
         let mut p = der.as_ptr();

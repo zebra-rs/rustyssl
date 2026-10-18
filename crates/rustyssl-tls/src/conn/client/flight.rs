@@ -167,7 +167,7 @@ pub(super) fn post_process_server_certificate(
     } else {
         c.neg.peer_chain.clone()
     };
-    let Some(a) = ask_once(c, Request::Verify { chain }, 0) else {
+    let Some(a) = ask_once(c, Request::Verify { chain, rpk }, 0) else {
         return Ok(Work::MoreA);
     };
     let (result, proceed, verified) = match a {
@@ -229,6 +229,7 @@ pub(super) fn post_process_server_certificate(
         c.neg.peer_rpk = None;
     }
     c.neg.session.peer_chain.clone_from(&c.neg.peer_chain);
+    c.neg.session.peer_rpk.clone_from(&c.neg.peer_rpk);
     c.neg.session.verify_result = result;
     if c.is_tls13() {
         cert::save_cert_verify_hash(c)?;

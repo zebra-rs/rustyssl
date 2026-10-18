@@ -44,7 +44,7 @@ pub(crate) unsafe fn handle(
 ) -> Option<Answer> {
     match req {
         // SAFETY: the caller's guarantee.
-        Request::Verify { chain } => unsafe { verify(s, x, snap, &chain) },
+        Request::Verify { chain, rpk } => unsafe { verify(s, x, snap, &chain, rpk) },
         Request::Servername => {
             let (cb, arg) = snap.map_or((None, ptr::null_mut()), |c| {
                 (c.servername_cb, c.servername_arg)
@@ -475,6 +475,7 @@ unsafe fn verify(
     x: &Ssl,
     snap: Option<&CtxSnapshot>,
     peer: &[Vec<u8>],
+    rpk: bool,
 ) -> Option<Answer> {
     use crate::x509::ctx::{
         X509_STORE_CTX_free, X509_STORE_CTX_get_error, X509_STORE_CTX_get0_param,
@@ -490,9 +491,16 @@ unsafe fn verify(
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
-    // The chain as the core received it (a server records it only after verification).
-    let owned = Chain::of(peer);
+    // The chain as the core received it (a server records it only after verification), or
+    // the raw public key (`ssl_verify_rpk`).
+    let owned = Chain::of(if rpk { &[] } else { peer });
     let chain = owned.0;
+    let key = Key(if rpk {
+        // SAFETY: the context's library context and property query.
+        unsafe { decode_spki(peer.first(), snap) }
+    } else {
+        ptr::null_mut()
+    });
     let (store, verify_cb, server, verify_mode, level) = {
         let mut st = x.state();
         st.rwstate = rustyssl_abi::SSL_NOTHING;
@@ -512,7 +520,7 @@ unsafe fn verify(
     // SAFETY: our stack of the peer's certificates, or NULL (-1).
     let n = unsafe { OPENSSL_sk_num(chain.cast()) };
     let proceed_anyway = verify_mode == SSL_VERIFY_NONE;
-    if n <= 0 {
+    if n <= 0 && key.0.is_null() {
         return Some(Answer::Verified {
             result: i64::from(rustyssl_abi::X509_V_ERR_UNSPECIFIED),
             proceed: proceed_anyway,
@@ -529,10 +537,16 @@ unsafe fn verify(
             verified_chain: Vec::new(),
         });
     }
-    // SAFETY: the chain's first certificate (index in range).
-    let leaf: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), 0) }.cast();
-    // SAFETY: the new context; the store; the leaf; the chain.
-    if unsafe { X509_STORE_CTX_init(ctx, store, leaf, chain) } == 0 {
+    let init = if key.0.is_null() {
+        // SAFETY: the chain's first certificate (index in range).
+        let leaf: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), 0) }.cast();
+        // SAFETY: the new context; the store; the leaf; the chain.
+        unsafe { X509_STORE_CTX_init(ctx, store, leaf, chain) }
+    } else {
+        // SAFETY: the new context; the store; the key, which outlives the context.
+        unsafe { crate::x509::ctx::X509_STORE_CTX_init_rpk(ctx, store, key.0) }
+    };
+    if init == 0 {
         err::raise(ERR_LIB_SSL, ERR_R_X509_LIB, F);
         // SAFETY: made above.
         unsafe { X509_STORE_CTX_free(ctx) };
@@ -589,8 +603,13 @@ unsafe fn verify(
     };
     // SAFETY: as above.
     let result = unsafe { X509_STORE_CTX_get_error(ctx) };
-    // SAFETY: as above.
-    let verified: *mut stack_st_X509 = unsafe { X509_STORE_CTX_get1_chain(ctx) };
+    let verified: *mut stack_st_X509 = if key.0.is_null() {
+        // SAFETY: as above.
+        unsafe { X509_STORE_CTX_get1_chain(ctx) }
+    } else {
+        // A raw public key has no verified chain.
+        ptr::null_mut()
+    };
     // SAFETY: the connection's parameters; the context's (its peer name moves over).
     unsafe { X509_VERIFY_PARAM_move_peername(x.param, param) };
     // SAFETY: made above.
@@ -626,6 +645,41 @@ unsafe fn verify(
         proceed: i > 0 || proceed_anyway,
         verified_chain: der,
     })
+}
+
+/// A raw public key's SubjectPublicKeyInfo decoded in the context's library context, or
+/// NULL.
+///
+/// # Safety
+/// `snap`'s library context and property query are live.
+unsafe fn decode_spki(der: Option<&Vec<u8>>, snap: &CtxSnapshot) -> *mut EVP_PKEY {
+    let Some(der) = der else {
+        return ptr::null_mut();
+    };
+    let Ok(len) = core::ffi::c_long::try_from(der.len()) else {
+        return ptr::null_mut();
+    };
+    let mut q = der.as_ptr();
+    // SAFETY: the key's octets; the caller's library context and property query.
+    unsafe {
+        crate::x509::pubkey::d2i_PUBKEY_ex(
+            ptr::null_mut(),
+            &raw mut q,
+            len,
+            snap.libctx,
+            snap.propq(),
+        )
+    }
+}
+
+/// A key freed when dropped.
+struct Key(*mut EVP_PKEY);
+
+impl Drop for Key {
+    fn drop(&mut self) {
+        // SAFETY: our reference, or NULL.
+        unsafe { crate::evp::pkey::EVP_PKEY_free(self.0) };
+    }
 }
 
 /// A certificate stack made from DER encodings, freed when dropped.

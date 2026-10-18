@@ -1125,6 +1125,15 @@ fn own_rpk(c: &Connection) -> bool {
     t == crate::conn::statem::msgs_type(abi::TLSEXT_cert_type_rpk)
 }
 
+/// `tls12_rpk_and_privkey`: a raw public key negotiated for this end, and a key with no
+/// certificate in `slot`.
+fn rpk_and_privkey(c: &Connection, slot: usize) -> bool {
+    own_rpk(c)
+        && cert_in_slot(c, slot)
+            .and_then(|i| c.cfg.certs.get(i))
+            .is_some_and(|k| k.chain.is_empty() && k.raw_public_key.is_some())
+}
+
 /// `ssl_has_cert`: a certificate (or, with a raw public key negotiated, a key) in `slot`.
 #[must_use]
 pub fn has_cert(c: &Connection, slot: usize) -> bool {
@@ -1380,7 +1389,7 @@ fn cert_sigalg_idx(c: &Connection, lu: &SigAlg) -> Option<usize> {
         return None;
     }
     let f = valid_flag(c, idx);
-    let want = if own_rpk(c) && has_cert(c, idx) {
+    let want = if rpk_and_privkey(c, idx) {
         flag(abi::CERT_PKEY_RPK)
     } else {
         flag(abi::CERT_PKEY_VALID)
@@ -1547,7 +1556,7 @@ pub fn set_cert_validity(c: &mut Connection) {
             );
             continue;
         };
-        if own_rpk(c) && k.raw_public_key.is_some() && k.chain.is_empty() {
+        if rpk_and_privkey(c, slot) {
             set_valid_flag(c, slot, flag(abi::CERT_PKEY_RPK));
             continue;
         }
