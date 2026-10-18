@@ -1013,7 +1013,13 @@ pub(crate) fn ext_parse_sct(
             abi::SSL_R_BAD_EXTENSION,
         ));
     }
-    Ok(Step::Done)
+    ext::custom_parse(
+        c,
+        x.context,
+        t::SIGNED_CERTIFICATE_TIMESTAMP,
+        body,
+        x.chainidx,
+    )
 }
 
 /// `tls_parse_stoc_npn`: the server's protocols, from which the NPN callback selects
