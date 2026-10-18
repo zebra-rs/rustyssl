@@ -310,7 +310,7 @@ fn write_truncated(out: &mut [MaybeUninit<u8>], pieces: &[&[u8]]) -> usize {
 ///   when it fails, as it does for numbers it doesn't know;
 /// - macOS doesn't, so OpenSSL falls back to `strerror`, which describes any number
 ///   (`Unknown error: 200`). `strerror_r` writes the same text, even when it returns `EINVAL`.
-fn system_reason(reason: c_ulong) -> Option<Vec<u8>> {
+pub(crate) fn system_reason(reason: c_ulong) -> Option<Vec<u8>> {
     let number = c_int::try_from(reason).ok()?;
     let mut buffer = [0 as c_char; 256];
     // SAFETY: the buffer holds 256 bytes, which strerror_r NUL-terminates.

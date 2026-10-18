@@ -579,7 +579,7 @@ ffi_export! {
 ///
 /// # Safety
 /// `bio` is a live BIO; `cert` is NULL or a live certificate.
-unsafe fn print_ex_brief(bio: *mut BIO, cert: *mut X509, neg_cflags: c_ulong) -> bool {
+pub(crate) unsafe fn print_ex_brief(bio: *mut BIO, cert: *mut X509, neg_cflags: c_ulong) -> bool {
     let flags = fli(ASN1_STRFLGS_RFC2253)
         | fli(ASN1_STRFLGS_ESC_QUOTE)
         | fli(XN_FLAG_SEP_CPLUS_SPC)
