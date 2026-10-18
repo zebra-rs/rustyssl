@@ -6,7 +6,8 @@
  * connection (SSL_set_max_proto_version(3)), the stapled OCSP response in the client's status
  * callback (SSL_get_tlsext_status_ocsp_resp(3)), the responder IDs and extensions a client
  * asks for, in the server's (SSL_set_tlsext_status_ids(3), SSL_get_tlsext_status_exts(3)),
- * SSL_set_retry_verify(3) after a successful
+ * the names SSL_get_servername(3) reports around a resumption, SSL_set_retry_verify(3) after
+ * a successful
  * verification, and the chain's check against the security level, over a BIO pair.
  *
  * Only deterministic output is printed.
@@ -375,6 +376,62 @@ static void test_status_ids(void)
     X509_free(status_cert);
 }
 
+static int accept_name_cb(SSL *s, int *alert, void *arg)
+{
+    (void)s;
+    (void)alert;
+    (void)arg;
+    return SSL_TLSEXT_ERR_OK;
+}
+
+static const char *name_or_none(const char *n)
+{
+    return n == NULL ? "(none)" : n;
+}
+
+/*
+ * The names each end reports around a resumption: the first handshake with `first` (NULL:
+ * none), the second with `second`.
+ */
+static void test_servername_resume(int version, const char *first, const char *second)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    SSL_SESSION *sess;
+    unsigned char b;
+
+    printf("# servername around a resumption, %s: %s, then %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2", name_or_none(first),
+           name_or_none(second));
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_tlsext_servername_callback(sctx, accept_name_cb);
+    pair(cctx, sctx, &c, &s);
+    if (first != NULL)
+        SSL_set_tlsext_host_name(c, first);
+    check(handshake(c, s), "the first handshake");
+    /* The client takes its tickets. */
+    SSL_read(c, &b, 1);
+    SSL_shutdown(c);
+    SSL_shutdown(s);
+    sess = SSL_get1_session(c);
+    SSL_free(c);
+    SSL_free(s);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_session(c, sess);
+    printf("  client before: %s\n", name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)));
+    if (second != NULL)
+        SSL_set_tlsext_host_name(c, second);
+    printf("  client before, after setting: %s\n",
+           name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)));
+    printf("  server before: %s\n", name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    check(handshake(c, s), "the second handshake");
+    printf("  reused %d/%d; client: %s, server: %s\n", SSL_session_reused(c), SSL_session_reused(s),
+           name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)),
+           name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    SSL_SESSION_free(sess);
+    done(c, s, cctx, sctx);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -428,6 +485,11 @@ int main(void)
     test_status(TLS1_3_VERSION);
     test_status(TLS1_2_VERSION);
     test_status_ids();
+    test_servername_resume(TLS1_2_VERSION, "goodhost", "altgoodhost");
+    test_servername_resume(TLS1_3_VERSION, "goodhost", "altgoodhost");
+    test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
+    test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
+    test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
     test_retry_verify();
     test_security();
     printf("1..%d\n", number);

@@ -1329,11 +1329,45 @@ ffi_export! {
         if type_ != TLSEXT_NAMETYPE_host_name {
             return ptr::null();
         }
-        // Without sessions, both sides report the connection's name, as OpenSSL does when no
-        // session was resumed: on a server, the one the client's hello carried.
         let st = x.state();
-        let received = if st.server { st.drv.servername.as_deref() } else { None };
-        received.or(st.hostname.as_deref()).map_or(ptr::null(), core::ffi::CStr::as_ptr)
+        // An end whose role isn't known yet counts as a client.
+        let server = st.handshake_func.is_some() && st.server;
+        // `SSL_CONNECTION_IS_TLS13`: the negotiated version's method, else the method's own.
+        let method_version = st
+            .drv
+            .tls
+            .as_ref()
+            .map(|c| c.negotiated())
+            .filter(|n| n.cipher.is_some())
+            .map_or(st.method.version, |n| c_int::from(n.version));
+        let tls13 = method_version >= rustyssl_abi::TLS1_3_VERSION && method_version != rustyssl_abi::TLS_ANY_VERSION;
+        let session = st.sess.session;
+        // SAFETY: the connection's session, alive while it holds it, or NULL.
+        let session_name = || unsafe { super::session::rustyssl_private_SSL_SESSION_get0_hostname(session) };
+        if server {
+            // A TLS 1.2 resumption reports the name the original handshake accepted.
+            if st.hit != 0 && !tls13 {
+                return session_name();
+            }
+            // Else the name the client's hello carried.
+            return st.drv.servername.as_deref().map_or(ptr::null(), core::ffi::CStr::as_ptr);
+        }
+        // `SSL_in_before`.
+        let before = st.hand_state == TLS_ST_BEFORE && st.flow_uninited;
+        if before {
+            // A TLS 1.2 session about to be resumed names the server it was made with.
+            // SAFETY: as above.
+            if st.hostname.is_none()
+                && !session.is_null()
+                && unsafe { super::session::rustyssl_private_SSL_SESSION_get_protocol_version(session) }
+                    != rustyssl_abi::TLS1_3_VERSION
+            {
+                return session_name();
+            }
+        } else if !tls13 && st.hit != 0 && !session_name().is_null() {
+            return session_name();
+        }
+        st.hostname.as_deref().map_or(ptr::null(), core::ffi::CStr::as_ptr)
     }
 }
 
