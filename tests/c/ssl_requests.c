@@ -338,6 +338,36 @@ static void test_key_update(void)
     check(transfer(c, s, "and back"), "data back");
     check(SSL_is_init_finished(c) && SSL_is_init_finished(s), "both ends finished");
     errors();
+
+    /*
+     * Requested updates in a row, then data: what the server writes while it reads them (a
+     * TLS 1.3 KeyUpdate record is 27 octets).
+     */
+    {
+        char buf[16];
+        int i, n, r;
+
+        for (n = 1; n <= 5; n++) {
+            for (i = 0; i < n; i++) {
+                SSL_key_update(c, SSL_KEY_UPDATE_REQUESTED);
+                SSL_do_handshake(c);
+            }
+            SSL_write(c, "x", 1);
+            r = SSL_read(s, buf, sizeof(buf));
+            printf("  %d requests: the server read %d, wrote %d octets, pending %d\n", n, r,
+                   (int)BIO_ctrl_pending(SSL_get_rbio(c)), SSL_get_key_update_type(s));
+            {
+                char tmp[16];
+
+                printf("  then the server writes %d, and %d octets go out\n", SSL_write(s, "y", 1),
+                       (int)BIO_ctrl_pending(SSL_get_rbio(c)));
+                check(SSL_read(c, tmp, sizeof(tmp)) == 1, "the client reads it");
+            }
+            check(transfer(s, c, "after the requests"), "data after the requests");
+            check(transfer(c, s, "and back again"), "data back after the requests");
+        }
+        errors();
+    }
     SSL_free(c);
     SSL_free(s);
     SSL_CTX_free(cctx);

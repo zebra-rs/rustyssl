@@ -17,7 +17,12 @@
 //! but not on rustyssl (grouped by rustyssl's first error), those rustyssl passes alone, the
 //! tests whose expected failures differ in their first error, and what the shim leaves
 //! unimplemented. With patterns, only the tests they match run (`*` globs, as the runner's
-//! `-test` takes them). The command fails while any test passes on the reference alone.
+//! `-test` takes them); `--workers N` runs N tests at a time (the runner's `-num-workers`;
+//! by default one per CPU). Under full load the runner itself loses some alerts (it sees a
+//! closed connection or a broken pipe before it reads the shim's alert), on either library and
+//! never on the same tests twice, so the tests whose verdicts differ are run again one at a
+//! time on both libraries, and those verdicts count. The command fails while any test passes
+//! on the reference alone.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -43,7 +48,34 @@ struct Run {
     unimplemented: BTreeMap<String, usize>,
 }
 
+/// What the command line chose: the tests' patterns, and the runner's parallelism.
+struct Options {
+    patterns: Vec<String>,
+    workers: Option<usize>,
+}
+
+fn options(args: &[String]) -> Result<Options> {
+    let mut patterns = Vec::new();
+    let mut workers = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        if a == "--workers" {
+            let n = it.next().ok_or("--workers needs a count")?;
+            workers = Some(
+                n.parse::<usize>()
+                    .ok()
+                    .filter(|&n| n > 0)
+                    .ok_or_else(|| format!("--workers: bad count `{n}`"))?,
+            );
+        } else {
+            patterns.push(a.clone());
+        }
+    }
+    Ok(Options { patterns, workers })
+}
+
 pub fn run(args: &[String]) -> Result {
+    let opts = options(args)?;
     let root = workspace_root();
     let (commit, sum) = pin(&root)?;
     let source = fetch(&root, &commit, &sum)?;
@@ -64,7 +96,7 @@ pub fn run(args: &[String]) -> Result {
         &reference.join("lib"),
         &work,
         "reference",
-        args,
+        &opts,
     )?;
     let ours = execute(
         &runner,
@@ -74,8 +106,52 @@ pub fn run(args: &[String]) -> Result {
         &dist.join("lib"),
         &work,
         "rustyssl",
-        args,
+        &opts,
     )?;
+
+    let (mut theirs, mut ours) = (theirs, ours);
+    let differing: Vec<String> = theirs
+        .verdicts
+        .iter()
+        .filter(|(test, (v, _))| {
+            ours.verdicts
+                .get(*test)
+                .is_some_and(|(o, _)| (v == "PASS") != (o == "PASS"))
+        })
+        .map(|(test, _)| test.clone())
+        .collect();
+    if !differing.is_empty() && opts.workers != Some(1) {
+        println!(
+            "{} tests differ under load; running them again one at a time...",
+            differing.len()
+        );
+        let serial = Options {
+            patterns: differing.clone(),
+            workers: Some(1),
+        };
+        let lib = |dir: &Path| dir.join("lib");
+        for (run, dir, name) in [
+            (&mut theirs, &reference, "reference-serial"),
+            (&mut ours, &dist, "rustyssl-serial"),
+        ] {
+            let again = execute(
+                &runner,
+                &runner_dir,
+                &shim,
+                &config,
+                &lib(dir),
+                &work,
+                name,
+                &serial,
+            )?;
+            for test in &differing {
+                if let Some(v) = again.verdicts.get(test) {
+                    run.verdicts.insert(test.clone(), v.clone());
+                }
+            }
+            run.log.extend(again.log);
+        }
+    }
 
     let report = target_dir(&root).join("bogo-report.md");
     let regressions = write_report(&report, &commit, &theirs, &ours)?;
@@ -192,7 +268,7 @@ fn execute(
     lib_dir: &Path,
     work: &Path,
     name: &str,
-    patterns: &[String],
+    opts: &Options,
 ) -> Result<Run> {
     println!("Running BoGo on {name}...");
     let json_path = work.join(format!("{name}.json"));
@@ -215,8 +291,11 @@ fn execute(
             "-json-output",
         ])
         .arg(&json_path);
-    if !patterns.is_empty() {
-        cmd.arg("-test").arg(patterns.join(";"));
+    if !opts.patterns.is_empty() {
+        cmd.arg("-test").arg(opts.patterns.join(";"));
+    }
+    if let Some(n) = opts.workers {
+        cmd.arg("-num-workers").arg(n.to_string());
     }
     // The runner exits non-zero when a test fails; the JSON output is what counts.
     let output = cmd
@@ -299,6 +378,17 @@ fn first_error(message: &str) -> String {
     first_line.unwrap_or_else(|| message.lines().next().unwrap_or("").trim().to_owned())
 }
 
+/// A failure log's entries (without its argument lines), sorted.
+fn log_entries(log: &str) -> Vec<&str> {
+    let mut v: Vec<&str> = log
+        .lines()
+        .skip(1)
+        .filter(|l| !l.starts_with("args:"))
+        .collect();
+    v.sort_unstable();
+    v
+}
+
 /// Writes the report; returns how many tests pass on the reference but not on rustyssl.
 fn write_report(path: &Path, commit: &str, theirs: &Run, ours: &Run) -> Result<usize> {
     let count = |r: &Run, v: &str| r.verdicts.values().filter(|(x, _)| x == v).count();
@@ -322,11 +412,17 @@ fn write_report(path: &Path, commit: &str, theirs: &Run, ours: &Run) -> Result<u
             only_ours.push(test.as_str());
         }
     }
-    // Expected failures (passing on both) whose first error entries differ.
+    // Expected failures (passing on both) whose first error entries differ. Tests with the
+    // same arguments share a log file and append to it in whatever order they finish, so the
+    // entries are compared as a sorted multiset.
     let differing: BTreeSet<&String> = theirs
         .log
         .iter()
-        .filter(|(hash, entry)| ours.log.get(*hash).is_some_and(|o| o != *entry))
+        .filter(|(hash, entry)| {
+            ours.log
+                .get(*hash)
+                .is_some_and(|o| log_entries(o) != log_entries(entry))
+        })
         .map(|(hash, _)| hash)
         .collect();
 

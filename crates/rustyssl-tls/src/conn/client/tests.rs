@@ -1383,6 +1383,27 @@ fn full12(p: &TestProvider, cfg: Config, suite: u16, ticket: bool) -> (Connectio
     (c, seen)
 }
 
+/// A server's ec_point_formats without uncompressed is accepted with an ECDHE suite: OpenSSL
+/// checks it only against a list of the client's own, which nothing sets (BoGo's
+/// `PointFormat-Client-MissingUncompressed` fails on the reference too).
+#[test]
+fn tls12_server_point_formats_without_uncompressed() {
+    let p = TestProvider::new(b"tls12-point-formats");
+    let (mut c, mut seen, mut s) = hello12(&p, client12());
+    // ansiX962_compressed_prime alone.
+    let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS, (0x000b, &[1, 1])]);
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    assert_eq!(seen.written.len(), 2, "the ClientKeyExchange and Finished");
+}
+
 #[test]
 fn tls12_ecdhe_rsa() {
     let p = TestProvider::new(b"tls12-ecdhe");
@@ -2111,6 +2132,32 @@ fn tls12_cbc_with_encrypt_then_mac() {
         Event::HandshakeDone
     );
     assert!(c.negotiated().etm);
+}
+
+/// An external PSK with an empty identity, from either callback, fails as OpenSSL's does
+/// (`OPENSSL_memdup` of nothing is NULL): BoGo's `EmptyPSKHint-*`.
+#[test]
+fn tls13_external_psk_empty_identity() {
+    let p = TestProvider::new(b"psk13-empty");
+    for session in [true, false] {
+        let mut cfg = rfc_client();
+        cfg.callbacks.psk_session = session;
+        cfg.callbacks.psk = !session;
+        let mut c = Connection::new(cfg);
+        let mut seen = Seen::default();
+        let ext = crate::conn::ExternalPsk {
+            identity: Vec::new(),
+            key: vec![0x11; 32],
+            cipher_id: suites::by_protocol_id(0x1301).unwrap().id,
+        };
+        let mut give = |r: &Request| match r {
+            Request::PskSession { .. } | Request::Psk { .. } => Answer::Psk(Some(ext.clone())),
+            _ => accept(r),
+        };
+        let e = drive(&mut c, &p, false, &mut give, &mut seen).unwrap_err();
+        assert_eq!(e, Error::internal(), "session callback: {session}");
+        assert!(seen.written.is_empty());
+    }
 }
 
 #[test]

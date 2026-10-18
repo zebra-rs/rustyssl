@@ -174,6 +174,7 @@ fn parse_ca_names_inner(c: &mut Connection, rd: &mut Reader<'_>) -> Result<()> {
             Ok(()) => {}
             Err(true) => return Err(Error::decode(abi::SSL_R_CA_DN_LENGTH_MISMATCH)),
             Err(false) => {
+                c.decode_failure = Some(crate::conn::DecodeFailure::Name(n.clone()));
                 return Err(Error::alert_lib(
                     abi::SSL_AD_DECODE_ERROR,
                     abi::ERR_R_ASN1_LIB,

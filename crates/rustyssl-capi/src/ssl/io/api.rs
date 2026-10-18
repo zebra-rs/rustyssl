@@ -638,9 +638,13 @@ ffi_export! {
                 }
                 // SAFETY: as above.
                 match unsafe { drive(s, x, true, F) } {
-                    Stop::Closed => break,
+                    // A fatal alert from the peer fails the read but marks the connection
+                    // received-shutdown (`ssl3_read_bytes`), so with both directions closed
+                    // the call returns 1, the alert's entry still queued (BoGo's
+                    // `Unclean-Shutdown-Alert`, which fails on the reference too).
+                    Stop::Closed | Stop::Failed => break,
                     Stop::AppData | Stop::Done | Stop::Idle => {}
-                    Stop::Retry | Stop::Failed | Stop::Syscall => return -1,
+                    Stop::Retry | Stop::Syscall => return -1,
                 }
             }
             // `ssl3_shutdown`: the read ended (an unexpected EOF is fatal) without the peer's

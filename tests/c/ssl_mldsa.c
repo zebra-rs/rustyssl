@@ -175,10 +175,18 @@ static void handshake(const struct setup *t)
     ok = run(c, s) == 0;
     check(ok == t->expect_ok, t->name);
     if (ok) {
+        X509 *cur = SSL_get_certificate(s);
+
         printf("  %s\n", SSL_get_version(c));
         peer_scheme("client", c);
         if (t->ckey != NULL)
             peer_scheme("server", s);
+        /* The certificate chosen is the server's current one (tls_choose_sigalg). */
+        printf("  the server's current certificate: %d\n",
+               cur == NULL ? -1
+               : t->scerts[0] != NULL && X509_cmp(cur, t->scerts[0]) == 0 ? 0
+               : t->scerts[1] != NULL && X509_cmp(cur, t->scerts[1]) == 0 ? 1
+                                                                            : -1);
     }
     SSL_free(c);
     SSL_free(s);
