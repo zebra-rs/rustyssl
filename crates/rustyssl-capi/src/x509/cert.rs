@@ -468,6 +468,34 @@ d2i! {
     pub unsafe extern "C" fn d2i_X509(X509) = X509_it;
 }
 
+/// A certificate decoded from `der` in `libctx` with `propq`, so that its key is decoded with
+/// that context's providers (`X509_new_ex`, then `d2i_X509` into it, as libssl does), or NULL.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context; `propq` is NULL or a string.
+pub(crate) unsafe fn decode_in(
+    der: &[u8],
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> *mut X509 {
+    let Ok(len) = c_long::try_from(der.len()) else {
+        return ptr::null_mut();
+    };
+    // SAFETY: the caller's guarantee.
+    let mut x = unsafe { X509_new_ex(libctx, propq) };
+    if x.is_null() {
+        return x;
+    }
+    let mut p = der.as_ptr();
+    // SAFETY: the certificate made above; the octets.
+    if unsafe { d2i_X509(&raw mut x, &raw mut p, len) }.is_null() {
+        // SAFETY: made above (a failed decoding leaves it as it was).
+        unsafe { X509_free(x) };
+        return ptr::null_mut();
+    }
+    x
+}
+
 /// The certificate behind a pointer, or `None` for NULL.
 ///
 /// # Safety
