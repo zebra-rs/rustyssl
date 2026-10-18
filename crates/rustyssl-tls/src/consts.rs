@@ -263,6 +263,10 @@ pub mod sigscheme {
     pub const DSA_SHA224: u16 = 0x0302;
     /// dsa_sha1 (TLS 1.2).
     pub const DSA_SHA1: u16 = 0x0202;
+    /// Not a code point: TLS 1.0 and 1.1's MD5+SHA-1 RSA signature (OpenSSL's
+    /// `legacy_rsa_sigalg`, which has none), as the core passes it to the provider. TLS 1.0–1.1's
+    /// ECDSA and DSA signatures use [`ECDSA_SHA1`] and [`DSA_SHA1`].
+    pub const RSA_PKCS1_MD5_SHA1: u16 = 0xff01;
     /// gostr34102012_256 (intrinsic).
     pub const GOSTR34102012_256_INTRINSIC: u16 = 0x0840;
     /// gostr34102012_512 (intrinsic).

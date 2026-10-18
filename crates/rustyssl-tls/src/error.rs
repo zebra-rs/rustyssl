@@ -20,6 +20,8 @@ pub struct Error {
     pub reason: c_int,
     /// Whether `reason` is a common `ERR_R_*` reason rather than an `SSL_R_*` one.
     pub library_reason: bool,
+    /// The error's data string (`ERR_raise_data`'s text), if OpenSSL adds one.
+    pub data: Option<&'static str>,
 }
 
 impl Error {
@@ -30,6 +32,7 @@ impl Error {
             alert: Some(alert_octet(alert)),
             reason,
             library_reason: false,
+            data: None,
         }
     }
 
@@ -41,6 +44,7 @@ impl Error {
             alert: Some(alert_octet(alert)),
             reason,
             library_reason: true,
+            data: None,
         }
     }
 
@@ -51,7 +55,15 @@ impl Error {
             alert: None,
             reason,
             library_reason: false,
+            data: None,
         }
+    }
+
+    /// The same error with OpenSSL's data string.
+    #[must_use]
+    pub const fn with_data(mut self, data: &'static str) -> Self {
+        self.data = Some(data);
+        self
     }
 
     /// An internal error (OpenSSL's `SSL_AD_INTERNAL_ERROR` with `ERR_R_INTERNAL_ERROR`).
@@ -61,6 +73,7 @@ impl Error {
             alert: Some(alert_octet(rustyssl_abi::SSL_AD_INTERNAL_ERROR)),
             reason: rustyssl_abi::ERR_R_INTERNAL_ERROR,
             library_reason: true,
+            data: None,
         }
     }
 

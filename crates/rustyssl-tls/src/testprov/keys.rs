@@ -70,6 +70,14 @@ pub fn groups() -> Vec<GroupInfo> {
         min_dtls: 0,
         max_dtls: 0,
         is_kem,
+        algorithm: match id {
+            X25519 => "X25519",
+            X448 => "X448",
+            SECP256R1 | SECP384R1 | SECP521R1 => "EC",
+            FFDHE2048 | FFDHE3072 | FFDHE4096 | FFDHE6144 | FFDHE8192 => "DH",
+            _ => name,
+        }
+        .to_owned(),
     };
     let t13 = 0x0304;
     vec![
@@ -573,6 +581,49 @@ impl PublicKey {
         }
         let (_, spki, _) = tlv(tbs)?;
         Self::from_spki(spki)
+    }
+
+    /// The key in a SubjectPublicKeyInfo's DER.
+    pub fn from_spki_der(spki: &[u8]) -> Result<Self> {
+        let (_, c, _) = tlv(spki)?;
+        Self::from_spki(c)
+    }
+
+    /// What the signature checks need to know about the key.
+    pub fn info(&self) -> crate::crypto::PeerKey {
+        use crate::crypto::KeyKind;
+        let (kind, curve_nid, size, bits) = match self {
+            Self::Rsa(k, pss) => {
+                let n = k.n.as_ref().map_or(0, |n| n.num_bytes());
+                let kind = if *pss { KeyKind::RsaPss } else { KeyKind::Rsa };
+                let bits = if n >= 384 {
+                    128
+                } else if n >= 256 {
+                    112
+                } else {
+                    80
+                };
+                (kind, rustyssl_abi::NID_undef, n, bits)
+            }
+            Self::Ec(nid, _) => {
+                let (size, bits) = if *nid == NID_secp384r1 {
+                    (104, 192)
+                } else if *nid == NID_secp521r1 {
+                    (139, 256)
+                } else {
+                    (72, 128)
+                };
+                (KeyKind::Ec, *nid, size, bits)
+            }
+            Self::Ed25519(_) => (KeyKind::Ed25519, rustyssl_abi::NID_undef, 64, 128),
+            Self::Ed448(_) => (KeyKind::Ed448, rustyssl_abi::NID_undef, 114, 224),
+        };
+        crate::crypto::PeerKey {
+            kind,
+            curve_nid,
+            size,
+            security_bits: bits,
+        }
     }
 
     /// The key in a SubjectPublicKeyInfo's contents.

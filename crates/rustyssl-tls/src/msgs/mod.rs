@@ -18,7 +18,7 @@ pub mod kx;
 pub mod misc;
 
 #[cfg(test)]
-mod rfc8448;
+pub(crate) mod rfc8448;
 #[cfg(test)]
 mod tests;
 

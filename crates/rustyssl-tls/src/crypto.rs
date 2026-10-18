@@ -227,12 +227,17 @@ pub struct GroupInfo {
     pub max_dtls: i32,
     /// Whether the group is a KEM: the server encapsulates rather than sending its own share.
     pub is_kem: bool,
+    /// The key type the providers implement it with (`EC`, `X25519`, `X448`, `DH`, `ML-KEM-768`,
+    /// ...; the capability's `TLS_GROUP_ALG`): TLS 1.2's ECDHE only uses `EC`, `X25519`, and
+    /// `X448` groups (`tls_valid_group`'s `isec`).
+    pub algorithm: String,
 }
 
-/// A signature algorithm the providers offer (built in, or their `TLS-SIGALG` capability).
+/// A signature algorithm the providers offer (their `TLS-SIGALG` capability; the built-in ones
+/// are in [`crate::conn::common::sigalgs`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SigalgInfo {
-    /// The IANA name (`ecdsa_secp256r1_sha256`, `rsa_pss_rsae_sha256`, ...).
+    /// The IANA name (`mldsa65`, ...).
     pub name: String,
     /// The code point.
     pub id: u16,
@@ -242,6 +247,42 @@ pub struct SigalgInfo {
     pub min_tls: i32,
     /// See `min_tls`.
     pub max_tls: i32,
+    /// The key type it signs with (the capability's key type, or its signature or sigalg name:
+    /// `inferred_keytype`), as [`KeyKind::Other`] names it.
+    pub key_type: String,
+}
+
+/// A public key's algorithm, as the signature-algorithm checks tell them apart
+/// (`EVP_PKEY_get_id`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KeyKind {
+    /// RSA (`rsaEncryption`).
+    Rsa,
+    /// RSA-PSS (`id-RSASSA-PSS` keys).
+    RsaPss,
+    /// DSA.
+    Dsa,
+    /// EC.
+    Ec,
+    /// Ed25519.
+    Ed25519,
+    /// Ed448.
+    Ed448,
+    /// A provider's key type, by name (`ML-DSA-65`, ...).
+    Other(String),
+}
+
+/// What the signature checks need to know about a peer's key.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeerKey {
+    /// The key's algorithm.
+    pub kind: KeyKind,
+    /// An EC key's curve as a NID (`ssl_get_EC_curve_nid`), or `NID_undef`.
+    pub curve_nid: i32,
+    /// The key's signature size in octets (`EVP_PKEY_get_size`).
+    pub size: usize,
+    /// Its security in bits (`EVP_PKEY_get_security_bits`).
+    pub security_bits: i32,
 }
 
 /// A key share made for one group: the public value sent, and the secret derived once the
@@ -377,14 +418,15 @@ pub trait Provider {
 
     /// Signs `msg` with key `key` under signature scheme `scheme` (an IANA code point; for TLS
     /// 1.1 and earlier, OpenSSL's MD5+SHA-1 RSA or SHA-1 ECDSA/DSA signatures are passed as the
-    /// legacy pseudo-schemes in [`crate::consts`]).
+    /// legacy schemes in [`crate::consts::sigscheme`]: `RSA_PKCS1_MD5_SHA1`, `ECDSA_SHA1`,
+    /// `DSA_SHA1`).
     ///
     /// # Errors
     /// The key can't sign with that scheme, or the provider failed.
     fn sign(&self, key: KeyId, scheme: u16, msg: &[u8]) -> Result<Vec<u8>>;
 
     /// Whether `sig` is a valid signature of `msg` under `scheme` by the key of the certificate
-    /// `cert` (its DER).
+    /// `cert` (its DER; for a raw public key (RFC 7250), the SubjectPublicKeyInfo's DER).
     ///
     /// # Errors
     /// The certificate's key doesn't fit the scheme, or the provider failed.
@@ -407,4 +449,11 @@ pub trait Provider {
     /// The key isn't RSA, or the provider failed (not a padding failure, which is never seen).
     fn rsa_decrypt_pms(&self, key: KeyId, ciphertext: &[u8], client_version: u16)
     -> Result<Secret>;
+
+    /// The public key of a certificate (DER), or of a raw public key's SubjectPublicKeyInfo
+    /// when `spki` is set.
+    ///
+    /// # Errors
+    /// The encoding doesn't parse, or its key type isn't known.
+    fn peer_key(&self, der: &[u8], spki: bool) -> Result<PeerKey>;
 }

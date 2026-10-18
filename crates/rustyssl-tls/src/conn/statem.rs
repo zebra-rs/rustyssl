@@ -380,6 +380,9 @@ impl Connection {
                     } else {
                         client::construct_message(self, p)?
                     };
+                    if c != Construct::Ask {
+                        self.hs.sh.answers.clear();
+                    }
                     match c {
                         Construct::Ask => {
                             // Construction runs again, from pre-work done, after the answer.
@@ -407,6 +410,9 @@ impl Connection {
                         } else {
                             client::construct_message(self, p)?
                         };
+                        if c != Construct::Ask {
+                            self.hs.sh.answers.clear();
+                        }
                         match c {
                             Construct::Ask => return Ok(Sub::Yield),
                             Construct::Dummy | Construct::DontSend => {}
@@ -552,6 +558,9 @@ impl Connection {
             }
         }
         let raw: Vec<u8> = self.hs_in.drain(..total).collect();
+        // A new message: what the last one collected and asked is done with.
+        self.hs.sh.received.clear();
+        self.hs.sh.answers.clear();
         if self.st.message_type == msgs_type(abi::SSL3_MT_FINISHED) {
             self.take_mac(p)?;
         }

@@ -171,7 +171,15 @@ pub enum Answer {
     /// The ALPN callback's choice (`SSL_TLSEXT_ERR_OK` with this protocol), or `None` for
     /// `SSL_TLSEXT_ERR_NOACK` (no protocol, continue).
     Alpn(Option<Vec<u8>>),
-    /// A security callback's verdict.
+    /// A callback's `SSL_TLSEXT_ERR_*` result with the alert it chose (the servername
+    /// callback's `*al`, which starts as `SSL_AD_UNRECOGNIZED_NAME`).
+    Tlsext {
+        /// `SSL_TLSEXT_ERR_OK`, `_ALERT_WARNING`, `_ALERT_FATAL`, or `_NOACK`.
+        ret: i32,
+        /// The alert (`SSL_AD_*`).
+        alert: i32,
+    },
+    /// A yes-or-no callback's verdict (the security callback, `allow_early_data_cb`).
     Allowed(bool),
     /// The record padding callback's padding length.
     Padding(usize),
@@ -235,6 +243,16 @@ pub enum Event {
     },
     /// A key log line (`SSL_CTX_set_keylog_callback`).
     Keylog(String),
+    /// A handshake ended: capi updates the session cache (`ssl_update_cache` with
+    /// `SSL_SESS_CACHE_SERVER` or `_CLIENT`), as `tls_finish_handshake` does.
+    UpdateCache {
+        /// Whether this end is the server.
+        server: bool,
+    },
+    /// A TLS 1.3 client's handshake ended: its session leaves the cache
+    /// (`ssl_update_cache` is skipped; the tickets that follow are cached instead, and the
+    /// session it resumed is removed: `SSL_CTX_remove_session` when not reused).
+    RemoveSession,
     /// A decision to make (see [`Request`]).
     Request(Request),
     /// Output is waiting ([`super::Connection::take_output`]); the core continues after it is
