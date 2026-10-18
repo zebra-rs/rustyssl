@@ -642,7 +642,12 @@ impl Connection {
                 if let Some(q) = self.pop_event() {
                     return Ok(q);
                 }
-                if let Some(r) = &self.pending {
+                if self.answer.is_some() {
+                    // The machine moved on without taking the answer (the callback's flag
+                    // changed while it waited): the request is stale. Asking again would loop.
+                    self.pending = None;
+                    self.answer = None;
+                } else if let Some(r) = &self.pending {
                     return Ok(Event::Request(r.clone()));
                 }
                 if !self.output.is_empty() {
@@ -1467,4 +1472,43 @@ fn ccs() -> u8 {
 
 fn app_data() -> u8 {
     msgs_type(abi::SSL3_RT_APPLICATION_DATA)
+}
+
+#[cfg(test)]
+mod stale_answer_tests {
+    use super::{Answer, Config, Connection, Event, Request};
+    use crate::testprov::TestProvider;
+
+    /// An answer the machine never takes (its callback's flag went off while it waited) is
+    /// dropped: the connection waits for input instead of asking again forever.
+    #[test]
+    fn an_unconsumed_answer_is_dropped() {
+        let p = TestProvider::new(b"stale-answer");
+        let cfg = Config {
+            min_version: crate::consts::version::TLS1_3,
+            max_version: crate::consts::version::TLS1_3,
+            ciphers: vec![crate::suites::by_protocol_id(0x1301).unwrap()],
+            groups: vec![0x001d],
+            key_share_groups: vec![0x001d],
+            max_send_fragment: 16384,
+            ..Config::default()
+        };
+        let mut c = Connection::new(cfg);
+        let mut steps = 0;
+        loop {
+            steps += 1;
+            assert!(steps < 100, "no progress");
+            match c.step(&p, false).unwrap() {
+                Event::Output => drop(c.take_output()),
+                Event::NeedInput => break,
+                _ => {}
+            }
+        }
+        // A request answered after the machine stopped needing it.
+        c.pending = Some(Request::AllowEarlyData);
+        c.answer(Answer::Allowed(true));
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+        assert!(c.pending.is_none() && c.answer.is_none());
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+    }
 }
