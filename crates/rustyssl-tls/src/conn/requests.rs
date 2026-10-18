@@ -67,6 +67,12 @@ impl Connection {
         true
     }
 
+    /// The SRTP profile negotiated (`SSL_get_selected_srtp_profile`), if any.
+    #[must_use]
+    pub fn srtp_profile(&self) -> Option<u16> {
+        self.hs.sh.srtp_profile
+    }
+
     /// `SSL_get_key_update_type`: the KeyUpdate waiting to be sent, or `SSL_KEY_UPDATE_NONE`.
     #[must_use]
     pub fn key_update_type(&self) -> i32 {

@@ -144,6 +144,8 @@ pub(crate) struct SslState {
     pub(crate) verify_result: c_long,
     /// CT validation (`ct_validation_callback`, the SCTs received).
     pub(crate) ct: super::ct::ConnCt,
+    /// `SSL_set_tlsext_use_srtp`'s profiles (`srtp_profiles`).
+    pub(crate) srtp: super::srtp::Profiles,
     pub(crate) hit: c_int,
     pub(crate) num_renegotiations: c_int,
     pub(crate) total_renegotiations: c_int,
@@ -386,6 +388,7 @@ ffi_export! {
                 shutdown: 0,
                 verify_result: c_long::from(X509_V_OK),
                 ct: super::ct::ConnCt::new(cs.ct.callback, cs.ct.arg),
+                srtp: super::srtp::Profiles::default(),
                 hit: 0,
                 num_renegotiations: 0,
                 total_renegotiations: 0,

@@ -556,6 +556,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         post_handshake_auth: st.pha_enabled != 0,
         status_request: st.status_type == rustyssl_abi::TLSEXT_STATUSTYPE_ocsp,
         request_scts: st.ct.callback.is_some(),
+        // SAFETY: the connection's context, which it keeps alive.
+        srtp_profiles: super::super::srtp::ids(&st, unsafe { super::super::conn::ctx_of(&st) }),
         send_ca_names: !ca_names.is_empty(),
         ca_names,
         cert_flags: st.cert.cert_flags,

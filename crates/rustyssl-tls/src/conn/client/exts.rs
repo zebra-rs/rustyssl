@@ -277,16 +277,24 @@ pub(crate) fn ext_construct_alpn(
     Ok(ExtReturn::Sent(body))
 }
 
-/// `tls_construct_ctos_use_srtp`: the configuration has no SRTP profiles, so nothing.
+/// `tls_construct_ctos_use_srtp`: the configured SRTP profiles, with an empty MKI (fork M).
 ///
 /// # Errors
-/// Never; `Result` for the dispatch.
+/// Too many profiles (internal).
 pub(crate) fn ext_construct_use_srtp(
-    _c: &mut Connection,
+    c: &mut Connection,
     _p: &dyn Provider,
     _x: &ext::Ctx,
 ) -> Result<ExtReturn> {
-    Ok(ExtReturn::NotSent)
+    if c.cfg.srtp_profiles.is_empty() {
+        return Ok(ExtReturn::NotSent);
+    }
+    let offer = mx::use_srtp::Offer {
+        profiles: c.cfg.srtp_profiles.clone(),
+        mki: Vec::new(),
+    };
+    let body = mx::use_srtp::encode_client(&offer).map_err(|_| Error::internal())?;
+    Ok(ExtReturn::Sent(body))
 }
 
 /// `tls_construct_ctos_etm`.
@@ -1056,18 +1064,26 @@ pub(crate) fn ext_parse_alpn(
     Ok(Step::Done)
 }
 
-/// `tls_parse_stoc_use_srtp`: never offered (no profiles configured).
+/// `tls_parse_stoc_use_srtp`: the server's profile, which must be one configured (fork M).
 ///
 /// # Errors
-/// A malformed body, or `SSL_R_NO_SRTP_PROFILES`.
+/// A malformed body, `SSL_R_NO_SRTP_PROFILES` (none configured), or
+/// `SSL_R_BAD_SRTP_PROTECTION_PROFILE_LIST` (not one configured).
 pub(crate) fn ext_parse_use_srtp(
-    _c: &mut Connection,
+    c: &mut Connection,
     _p: &dyn Provider,
     body: &[u8],
     _x: &ext::Ctx,
 ) -> Result<Step> {
-    mx::use_srtp::parse_server(body)?;
-    Err(Error::decode(abi::SSL_R_NO_SRTP_PROFILES))
+    let id = mx::use_srtp::parse_server(body)?;
+    if c.cfg.srtp_profiles.is_empty() {
+        return Err(Error::decode(abi::SSL_R_NO_SRTP_PROFILES));
+    }
+    if !c.cfg.srtp_profiles.contains(&id) {
+        return Err(Error::decode(abi::SSL_R_BAD_SRTP_PROTECTION_PROFILE_LIST));
+    }
+    c.hs.sh.srtp_profile = Some(id);
+    Ok(Step::Done)
 }
 
 /// `tls_parse_stoc_etm`: encrypt-then-MAC, unless the suite is an AEAD or stream cipher.

@@ -19947,6 +19947,8 @@ const _: unsafe extern "C" fn(
     >,
 ) -> core::ffi::c_int =
     crate::ssl::accessors::rustyssl_private_SSL_CTX_set_tlsext_ticket_key_evp_cb;
+const _: unsafe extern "C" fn(*mut SSL_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ssl::srtp::rustyssl_private_SSL_CTX_set_tlsext_use_srtp;
 const _: unsafe extern "C" fn(
     *mut SSL_CTX,
     ::core::option::Option<
@@ -20268,6 +20270,8 @@ const _: unsafe extern "C" fn(
 > = crate::ssl::accessors::rustyssl_private_SSL_get_security_callback;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::accessors::rustyssl_private_SSL_get_security_level;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut SRTP_PROTECTION_PROFILE =
+    crate::ssl::srtp::rustyssl_private_SSL_get_selected_srtp_profile;
 const _: unsafe extern "C" fn(*const SSL, *mut core::ffi::c_uchar, usize) -> usize =
     crate::ssl::conn::rustyssl_private_SSL_get_server_random;
 const _: unsafe extern "C" fn(*const SSL, core::ffi::c_int) -> *const core::ffi::c_char =
@@ -20301,6 +20305,8 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_get_sigalgs;
 const _: unsafe extern "C" fn(*const SSL, *mut core::ffi::c_int) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_get_signature_type_nid;
+const _: unsafe extern "C" fn(*mut SSL) -> *mut stack_st_SRTP_PROTECTION_PROFILE =
+    crate::ssl::srtp::rustyssl_private_SSL_get_srtp_profiles;
 const _: unsafe extern "C" fn(*const SSL) -> *const SSL_METHOD =
     crate::ssl::conn::rustyssl_private_SSL_get_ssl_method;
 const _: unsafe extern "C" fn(*const SSL) -> OSSL_HANDSHAKE_STATE =
@@ -20605,6 +20611,8 @@ const _: unsafe extern "C" fn(*mut SSL, *const SSL_METHOD) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_set_ssl_method;
 const _: unsafe extern "C" fn(*mut SSL, u8) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_set_tlsext_max_fragment_length;
+const _: unsafe extern "C" fn(*mut SSL, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::ssl::srtp::rustyssl_private_SSL_set_tlsext_use_srtp;
 const _: unsafe extern "C" fn(
     *mut SSL,
     ::core::option::Option<

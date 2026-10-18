@@ -406,14 +406,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set_new_pending_conn_cb(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set_tlsext_use_srtp(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set_tlsext_use_srtp")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_use_serverinfo(
     _: *mut SSL_CTX,
     _: *const core::ffi::c_uchar,
@@ -985,13 +977,6 @@ pub extern "C" fn rustyssl_private_SSL_get_psk_identity_hint(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_selected_srtp_profile(
-    _: *mut SSL,
-) -> *mut SRTP_PROTECTION_PROFILE {
-    crate::stub::unimplemented("SSL_get_selected_srtp_profile")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_session(_: *const SSL) -> *mut SSL_SESSION {
     crate::stub::unimplemented("SSL_get_session")
 }
@@ -1014,13 +999,6 @@ pub extern "C" fn rustyssl_private_SSL_get_srp_userinfo(_: *mut SSL) -> *mut cor
 #[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get_srp_username(_: *mut SSL) -> *mut core::ffi::c_char {
     crate::stub::unimplemented("SSL_get_srp_username")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get_srtp_profiles(
-    _: *mut SSL,
-) -> *mut stack_st_SRTP_PROTECTION_PROFILE {
-    crate::stub::unimplemented("SSL_get_srtp_profiles")
 }
 
 #[unsafe(no_mangle)]
@@ -1212,14 +1190,6 @@ pub extern "C" fn rustyssl_private_SSL_set_srp_server_param_pw(
     _: *const core::ffi::c_char,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_set_srp_server_param_pw")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set_tlsext_use_srtp(
-    _: *mut SSL,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set_tlsext_use_srtp")
 }
 
 #[unsafe(no_mangle)]

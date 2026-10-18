@@ -363,6 +363,53 @@ static void test_npn(int advertise)
     SSL_CTX_free(sctx);
 }
 
+static void srtp_list(const char *what, STACK_OF(SRTP_PROTECTION_PROFILE) *l)
+{
+    int i;
+
+    printf("  %s:", what);
+    if (l == NULL)
+        printf(" none");
+    for (i = 0; i < sk_SRTP_PROTECTION_PROFILE_num(l); i++) {
+        SRTP_PROTECTION_PROFILE *p = sk_SRTP_PROTECTION_PROFILE_value(l, i);
+
+        printf(" %s/%lu", p->name, p->id);
+    }
+    printf("\n");
+}
+
+static void test_srtp(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    SRTP_PROTECTION_PROFILE *p;
+
+    printf("# SRTP profiles\n");
+    printf("  unknown: %d\n", SSL_CTX_set_tlsext_use_srtp(cctx, "SRTP_AES128_CM_SHA1_80:NOPE"));
+    errors();
+    printf("  duplicate: %d\n", SSL_CTX_set_tlsext_use_srtp(cctx, "SRTP_AES128_CM_SHA1_80:SRTP_AES128_CM_SHA1_80"));
+    errors();
+    printf("  empty: %d\n", SSL_CTX_set_tlsext_use_srtp(cctx, ""));
+    errors();
+    printf("  good: %d\n", SSL_CTX_set_tlsext_use_srtp(cctx, "SRTP_AEAD_AES_128_GCM:SRTP_AES128_CM_SHA1_80"));
+    printf("  server: %d\n", SSL_CTX_set_tlsext_use_srtp(sctx, "SRTP_AES128_CM_SHA1_80:SRTP_AEAD_AES_128_GCM"));
+    connect_pair(cctx, sctx, &c, &s);
+    srtp_list("client inherits", SSL_get_srtp_profiles(c));
+    printf("  connection's own: %d\n", SSL_set_tlsext_use_srtp(c, "SRTP_AEAD_AES_256_GCM:SRTP_AEAD_AES_128_GCM"));
+    srtp_list("client", SSL_get_srtp_profiles(c));
+    srtp_list("server", SSL_get_srtp_profiles(s));
+    check(SSL_get_selected_srtp_profile(c) == NULL, "none selected yet");
+    printf("  a TLS handshake (use_srtp is DTLS's): %d\n", run(c, s, 0));
+    p = SSL_get_selected_srtp_profile(c);
+    printf("  selected over TLS: client %s, server %s\n", p == NULL ? "none" : p->name,
+        SSL_get_selected_srtp_profile(s) == NULL ? "none" : SSL_get_selected_srtp_profile(s)->name);
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 static void test_surface(void)
 {
     SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
@@ -438,6 +485,7 @@ int main(void)
     test_surface();
     test_npn(1);
     test_npn(0);
+    test_srtp();
     (void)CLIENT_PEM;
     (void)CLIENT_KEY_PEM;
     (void)trust_root;
