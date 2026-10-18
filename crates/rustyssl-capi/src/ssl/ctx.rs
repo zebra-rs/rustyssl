@@ -761,7 +761,8 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_CTX_ctrl(c: *mut SSL_CTX, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_SSL
     {
-        const F: &str = "SSL_CTX_ctrl";
+        // The commands' errors come from OpenSSL's `ssl3_ctx_ctrl`.
+        const F: &str = "ssl3_ctx_ctrl";
         // SAFETY: the caller's guarantee (the group and signature algorithm lists, with the
         // syntax checks made with no context).
         if let Some(r) = unsafe { super::lists::ctx_ctrl(c, cmd, larg, parg) } {
@@ -857,7 +858,7 @@ ffi_export! {
             SSL_CTRL_GET_MIN_PROTO_VERSION => c_long::from(st.min_proto_version),
             SSL_CTRL_GET_MAX_PROTO_VERSION => c_long::from(st.max_proto_version),
             SSL_CTRL_SET_TMP_DH_CB => {
-                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, "ssl3_ctx_ctrl");
+                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, F);
                 0
             }
             SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG => {
@@ -871,7 +872,7 @@ ffi_export! {
                 }
                 if non_negative(larg) != Some(LEN) {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_INVALID_TICKET_KEYS_LENGTH, "ssl3_ctx_ctrl");
+                    err::raise(ERR_LIB_SSL, SSL_R_INVALID_TICKET_KEYS_LENGTH, F);
                     return 0;
                 }
                 // SAFETY: the caller's buffer of `LEN` octets.
@@ -918,7 +919,7 @@ ffi_export! {
                 let name = unsafe { core::ffi::CStr::from_ptr(parg.cast::<c_char>()) };
                 if name.is_empty() || name.count_bytes() > 255 {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_INVALID_SRP_USERNAME, "ssl3_ctx_ctrl");
+                    err::raise(ERR_LIB_SSL, SSL_R_INVALID_SRP_USERNAME, F);
                     return 0;
                 }
                 st.srp.login = Some(name.to_owned());
@@ -930,7 +931,7 @@ ffi_export! {
                     // OpenSSL strdups the NULL and fails (with ERR_R_INTERNAL_ERROR).
                     st.srp.info = None;
                     drop(st);
-                    err::raise(ERR_LIB_SSL, rustyssl_abi::ERR_R_INTERNAL_ERROR, "ssl3_ctx_ctrl");
+                    err::raise(ERR_LIB_SSL, rustyssl_abi::ERR_R_INTERNAL_ERROR, F);
                     return 0;
                 }
                 // SAFETY: the caller's string.
@@ -949,7 +950,7 @@ ffi_export! {
                 // SAFETY: the list, or NULL (which fails); the caller's certificate, taken.
                 if st.extra_certs.is_null() || unsafe { OPENSSL_sk_push(st.extra_certs.cast(), parg) } == 0 {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, ERR_R_CRYPTO_LIB, "ssl3_ctx_ctrl");
+                    err::raise(ERR_LIB_SSL, ERR_R_CRYPTO_LIB, F);
                     return 0;
                 }
                 1

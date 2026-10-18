@@ -5206,11 +5206,22 @@ Order: 7.1 → 7.2 → 7.3 client (curl, **M2**) → 7.3 server (nginx) → 7.4 
     `master_key`
   - `SSL_get_shared_ciphers` buffer semantics, the get0 vs. get1 peer-certificate ownership
     rules
-- [ ] **7.6 Errors and strings:**
+- [x] **7.6 Errors and strings:**
   - the exact `SSL_R_*` reasons where applications branch on them (for example,
     `UNEXPECTED_EOF_WHILE_READING` together with `SSL_OP_IGNORE_UNEXPECTED_EOF`)
   - `SSL_alert_desc_string(_long)`, `SSL_state_string(_long)`, `SSL_get_version`
   - `SSL_CIPHER_get_name`/`standard_name`/`description`, byte-exact
+  - Done: every TLS error carries the function OpenSSL raises it from (`ERR_get_error_all`,
+    `ERR_print_errors`): the state machine names each step's function from a table
+    (`conn::funcs`), the record layer, `ssl3_read_bytes`, the extension handlers (from
+    `ext_defs`), and the helpers OpenSSL implements separately name themselves first; the
+    record layer's follow-up `SSL_R_RECORD_LAYER_FAILURE` and the provider's entry under a
+    TLS 1.2 GCM/CCM bad tag come in OpenSSL's order. capi's raise sites were audited against
+    the reference source. `SSL_rstate_string(_long)` and `SSL_client_version` (the
+    ClientHello's version) are exact. Tests: `tests/c/ssl_errors.c` (22 failing handshakes,
+    renegotiation, EOF, configuration and ctrl errors, every queued entry with its function)
+    and `tests/c/ssl_strings.c` (38 handshake states at every info-callback point, the read
+    state, versions, 158 suites' names, all 357 `SSL_R_*` strings).
 - [ ] **7.7 Default-build mirroring:** kTLS and `ssl-trace` are absent from the default build,
   so their symbols behave the way they do there.
 

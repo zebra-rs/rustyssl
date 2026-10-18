@@ -365,6 +365,8 @@ pub struct RecordReader {
     pub first_handshake: bool,
     /// TLS 1.3: whether a plaintext alert may arrive (before the peer's keys are known).
     pub allow_plain_alerts: bool,
+    /// Whether a record's header is in and its body isn't yet (`SSL_ST_READ_BODY`).
+    reading_body: bool,
 }
 
 impl RecordReader {
@@ -380,6 +382,7 @@ impl RecordReader {
             empty_records: 0,
             first_record: true,
             server,
+            reading_body: false,
             first_handshake: true,
             allow_plain_alerts: false,
         }
@@ -421,6 +424,14 @@ impl RecordReader {
         len.max(self.default_read_len)
     }
 
+    /// Whether a record's header was read and its body is still awaited (OpenSSL's read state
+    /// `SSL_ST_READ_BODY`, from the header until the whole record is in, and after a header
+    /// that failed its checks).
+    #[must_use]
+    pub fn reading_body(&self) -> bool {
+        self.reading_body
+    }
+
     /// Reads the next record from `buf`, the input not yet consumed.
     ///
     /// # Errors
@@ -434,6 +445,7 @@ impl RecordReader {
         let Some(head) = buf.get(..HEADER_LEN) else {
             return Ok(Read::NeedMore(HEADER_LEN));
         };
+        self.reading_body = true;
         let b = |i: usize| head.get(i).copied().unwrap_or(0);
         let sslv2len = (usize::from(b(0)) << 8) | usize::from(b(1));
         // The first record a server receives may be an SSLv2-format ClientHello.
@@ -458,6 +470,7 @@ impl RecordReader {
             let Some(body) = buf.get(SSL2_HEADER_LEN..total) else {
                 return Ok(Read::NeedMore(total));
             };
+            self.reading_body = false;
             self.first_record = false;
             return Ok(Read::Record {
                 consumed: total,
@@ -491,6 +504,7 @@ impl RecordReader {
         let Some(body) = buf.get(HEADER_LEN..total) else {
             return Ok(Read::NeedMore(total));
         };
+        self.reading_body = false;
         self.first_record = false;
         let header = head.to_vec();
 

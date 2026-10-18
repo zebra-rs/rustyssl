@@ -684,7 +684,13 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
-        unsafe { ssl(s) }.map_or(0, |x| x.state().client_version)
+        let Some(x) = (unsafe { ssl(s) }) else { return 0 };
+        let st = x.state();
+        // The ClientHello's version once there is one, the method's before.
+        match st.drv.tls.as_ref().map(|c| c.client_version()) {
+            Some(v) if v != 0 => c_int::from(v),
+            _ => st.client_version,
+        }
     }
 }
 
@@ -1672,7 +1678,8 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_ctrl(s: *mut SSL, cmd: c_int, larg: c_long, parg: *mut c_void) -> c_long
     where failure = 0, library = ERR_LIB_SSL
     {
-        const F: &str = "SSL_ctrl";
+        // The commands' errors come from OpenSSL's `ssl3_ctrl`.
+        const F: &str = "ssl3_ctrl";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         // SAFETY: the live connection; `parg` as `cmd` documents.
@@ -1776,13 +1783,13 @@ ffi_export! {
             SSL_CTRL_GET_FLAGS => c_long::from(st.s3_flags),
             SSL_CTRL_SET_TMP_DH_CB => {
                 drop(st);
-                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, "ssl3_ctrl");
+                err::raise(ERR_LIB_SSL, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, F);
                 0
             }
             SSL_CTRL_SET_TLSEXT_HOSTNAME => {
                 if larg != c_long::from(TLSEXT_NAMETYPE_host_name) {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, "ssl3_ctrl");
+                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, F);
                     return 0;
                 }
                 st.hostname = None;
@@ -1793,7 +1800,7 @@ ffi_export! {
                 let name = unsafe { core::ffi::CStr::from_ptr(parg.cast::<c_char>()) };
                 if name.is_empty() || name.count_bytes() > usize::try_from(TLSEXT_MAXLEN_host_name).unwrap_or(255) {
                     drop(st);
-                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME, "ssl3_ctrl");
+                    err::raise(ERR_LIB_SSL, SSL_R_SSL3_EXT_INVALID_SERVERNAME, F);
                     return 0;
                 }
                 st.hostname = Some(name.to_owned());

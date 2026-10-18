@@ -458,6 +458,20 @@ impl Connection {
         core::mem::take(&mut self.output)
     }
 
+    /// The ClientHello's legacy_version (`s->client_version`): what a server received, or what a
+    /// client sent (TLS 1.2's number for TLS 1.3); 0 before either.
+    #[must_use]
+    pub fn client_version(&self) -> u16 {
+        self.hs.sh.client_version
+    }
+
+    /// Whether the record layer has a record's header and awaits its body
+    /// (`SSL_rstate_string`'s "RB").
+    #[must_use]
+    pub fn reading_record_body(&self) -> bool {
+        self.rr.reading_body()
+    }
+
     /// Application data received and not yet read (`SSL_pending`).
     #[must_use]
     pub fn pending_app(&self) -> usize {
