@@ -724,6 +724,11 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             // SAFETY: as above.
             ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
                 .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
+            // SAFETY: as above.
+            ticket_key: unsafe { super::super::ctx::ctx(st.session_ctx) }.is_some_and(|c| {
+                let cs = c.state();
+                cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
+            }),
             cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
             // The client's select callback, or the server's advertisement callback.
             npn: if st.server {

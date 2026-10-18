@@ -257,6 +257,14 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             Some(unsafe { ticket_decrypt(s, x, &keyname, status, session.as_deref()) })
         }
+        Request::TicketKey {
+            ticket,
+            session,
+            encrypt,
+        } => {
+            // SAFETY: as above.
+            Some(unsafe { super::ticket_key::answer(s, x, &ticket, &session, encrypt) })
+        }
         // SAFETY: as above.
         Request::StatelessCookieGen => Some(unsafe { stateless_cookie_gen(s, snap) }),
         Request::StatelessCookieVerify { cookie } => {
