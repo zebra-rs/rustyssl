@@ -250,7 +250,6 @@ fn get_prev_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<Option
     }
     c.neg.verify_result = sess.verify_result;
     c.neg.peer_chain.clone_from(&sess.peer_chain);
-    c.neg.peer_rpk.clone_from(&sess.peer_rpk);
     c.neg.session = sess;
     Ok(Some(true))
 }
