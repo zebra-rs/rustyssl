@@ -6,6 +6,7 @@
 pub(crate) mod accessors;
 pub(crate) mod ca;
 pub(crate) mod cert;
+pub(crate) mod ciphers;
 pub(crate) mod conn;
 pub(crate) mod ctx;
 pub(crate) mod keys;

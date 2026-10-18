@@ -153,6 +153,8 @@ pub(crate) struct SslState {
     pub(crate) peer_finish_md: Vec<u8>,
     /// The CA names the peer sent (owned), or NULL.
     pub(crate) peer_ca_names: *mut stack_st_X509_NAME,
+    /// The cipher lists, and the client's suites on a server (`cipher_list`, `peer_ciphers`, ...).
+    pub(crate) ciphers: super::ciphers::CipherLists,
 }
 
 // SAFETY: the raw pointers are owned references to OpenSSL objects (or the application's
@@ -300,6 +302,13 @@ ffi_export! {
                 return ptr::null_mut();
             };
             let method = cs.method;
+            let Some(ciphers) = super::ciphers::CipherLists::for_ssl(&cs.ciphers) else {
+                drop(cs);
+                err::raise(ERR_LIB_SSL, ERR_R_SSL_LIB, F);
+                // SAFETY: made above.
+                unsafe { X509_VERIFY_PARAM_free(param) };
+                return ptr::null_mut();
+            };
             let mut st = SslState {
                 ctx,
                 session_ctx: ctx,
@@ -377,6 +386,7 @@ ffi_export! {
                 finish_md: Vec::new(),
                 peer_finish_md: Vec::new(),
                 peer_ca_names: ptr::null_mut(),
+                ciphers,
             };
             st.reset();
             st
