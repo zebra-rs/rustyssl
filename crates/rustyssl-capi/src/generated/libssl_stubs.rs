@@ -132,81 +132,6 @@ pub extern "C" fn rustyssl_private_SSL_COMP_set0_compression_methods(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_clear_flags(
-    _: *mut SSL_CONF_CTX,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_uint {
-    crate::stub::unimplemented("SSL_CONF_CTX_clear_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_finish(_: *mut SSL_CONF_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CONF_CTX_finish")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_free(_: *mut SSL_CONF_CTX) {
-    crate::stub::unimplemented("SSL_CONF_CTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_new() -> *mut SSL_CONF_CTX {
-    crate::stub::unimplemented("SSL_CONF_CTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_set1_prefix(
-    _: *mut SSL_CONF_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CONF_CTX_set1_prefix")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_set_flags(
-    _: *mut SSL_CONF_CTX,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_uint {
-    crate::stub::unimplemented("SSL_CONF_CTX_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_set_ssl(_: *mut SSL_CONF_CTX, _: *mut SSL) {
-    crate::stub::unimplemented("SSL_CONF_CTX_set_ssl")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_CTX_set_ssl_ctx(_: *mut SSL_CONF_CTX, _: *mut SSL_CTX) {
-    crate::stub::unimplemented("SSL_CONF_CTX_set_ssl_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_cmd(
-    _: *mut SSL_CONF_CTX,
-    _: *const core::ffi::c_char,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CONF_cmd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_cmd_argv(
-    _: *mut SSL_CONF_CTX,
-    _: *mut core::ffi::c_int,
-    _: *mut *mut *mut core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CONF_cmd_argv")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CONF_cmd_value_type(
-    _: *mut SSL_CONF_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CONF_cmd_value_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_SRP_CTX_free(_: *mut SSL_CTX) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_SRP_CTX_free")
 }
@@ -265,47 +190,8 @@ pub extern "C" fn rustyssl_private_SSL_CTX_compress_certs(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_config(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_config")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_ct_is_enabled(_: *const SSL_CTX) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_dane_clear_flags(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("SSL_CTX_dane_clear_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_dane_enable(_: *mut SSL_CTX) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_dane_enable")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_dane_mtype_set(
-    _: *mut SSL_CTX,
-    _: *const EVP_MD,
-    _: u8,
-    _: u8,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_dane_mtype_set")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_dane_set_flags(
-    _: *mut SSL_CTX,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("SSL_CTX_dane_set_flags")
 }
 
 #[unsafe(no_mangle)]
@@ -317,28 +203,10 @@ pub extern "C" fn rustyssl_private_SSL_CTX_enable_ct(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_get0_client_cert_type(
-    _: *const SSL_CTX,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_get0_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_get0_ctlog_store(
     _: *const SSL_CTX,
 ) -> *const CTLOG_STORE {
     crate::stub::unimplemented("SSL_CTX_get0_ctlog_store")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_get0_server_cert_type(
-    _: *const SSL_CTX,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_get0_server_cert_type")
 }
 
 #[unsafe(no_mangle)]
@@ -382,15 +250,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set1_cert_comp_preference(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set1_client_cert_type(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set1_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_CTX_set1_compressed_cert(
     _: *mut SSL_CTX,
     _: core::ffi::c_int,
@@ -399,15 +258,6 @@ pub extern "C" fn rustyssl_private_SSL_CTX_set1_compressed_cert(
     _: usize,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_CTX_set1_compressed_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_CTX_set1_server_cert_type(
-    _: *mut SSL_CTX,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_CTX_set1_server_cert_type")
 }
 
 #[unsafe(no_mangle)]
@@ -623,52 +473,8 @@ pub extern "C" fn rustyssl_private_SSL_compress_certs(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_config(
-    _: *mut SSL,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_config")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_ct_is_enabled(_: *const SSL) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_ct_is_enabled")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_dane_clear_flags(
-    _: *mut SSL,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("SSL_dane_clear_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_dane_enable(
-    _: *mut SSL,
-    _: *const core::ffi::c_char,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_dane_enable")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_dane_set_flags(
-    _: *mut SSL,
-    _: core::ffi::c_ulong,
-) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("SSL_dane_set_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_dane_tlsa_add(
-    _: *mut SSL,
-    _: u8,
-    _: u8,
-    _: u8,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_dane_tlsa_add")
 }
 
 #[unsafe(no_mangle)]
@@ -724,53 +530,13 @@ pub extern "C" fn rustyssl_private_SSL_free_buffers(_: *mut SSL) -> core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_client_cert_type(
-    _: *const SSL,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get0_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get0_connection(_: *mut SSL) -> *mut SSL {
     crate::stub::unimplemented("SSL_get0_connection")
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_dane(_: *mut SSL) -> *mut SSL_DANE {
-    crate::stub::unimplemented("SSL_get0_dane")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_dane_authority(
-    _: *mut SSL,
-    _: *mut *mut X509,
-    _: *mut *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get0_dane_authority")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_dane_tlsa(
-    _: *mut SSL,
-    _: *mut u8,
-    _: *mut u8,
-    _: *mut u8,
-    _: *mut *const core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get0_dane_tlsa")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get0_domain(_: *mut SSL) -> *mut SSL {
     crate::stub::unimplemented("SSL_get0_domain")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_group_name(_: *mut SSL) -> *const core::ffi::c_char {
-    crate::stub::unimplemented("SSL_get0_group_name")
 }
 
 #[unsafe(no_mangle)]
@@ -798,22 +564,6 @@ pub extern "C" fn rustyssl_private_SSL_get0_peer_scts(_: *mut SSL) -> *const sta
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get0_server_cert_type(
-    _: *const SSL,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_get0_server_cert_type")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get1_builtin_sigalgs(
-    _: *mut OSSL_LIB_CTX,
-) -> *mut core::ffi::c_char {
-    crate::stub::unimplemented("SSL_get1_builtin_sigalgs")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_get1_compressed_cert(
     _: *mut SSL,
     _: core::ffi::c_int,
@@ -821,13 +571,6 @@ pub extern "C" fn rustyssl_private_SSL_get1_compressed_cert(
     _: *mut usize,
 ) -> usize {
     crate::stub::unimplemented("SSL_get1_compressed_cert")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_get1_supported_ciphers(
-    _: *mut SSL,
-) -> *mut stack_st_SSL_CIPHER {
-    crate::stub::unimplemented("SSL_get1_supported_ciphers")
 }
 
 #[unsafe(no_mangle)]
@@ -1193,15 +936,6 @@ pub extern "C" fn rustyssl_private_SSL_set1_cert_comp_preference(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set1_client_cert_type(
-    _: *mut SSL,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set1_client_cert_type")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn rustyssl_private_SSL_set1_compressed_cert(
     _: *mut SSL,
     _: core::ffi::c_int,
@@ -1218,15 +952,6 @@ pub extern "C" fn rustyssl_private_SSL_set1_initial_peer_addr(
     _: *const BIO_ADDR,
 ) -> core::ffi::c_int {
     crate::stub::unimplemented("SSL_set1_initial_peer_addr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_set1_server_cert_type(
-    _: *mut SSL,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_set1_server_cert_type")
 }
 
 #[unsafe(no_mangle)]

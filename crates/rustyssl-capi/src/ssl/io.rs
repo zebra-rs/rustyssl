@@ -33,6 +33,8 @@ use rustyssl_abi::{
     SSL_R_UNEXPECTED_EOF_WHILE_READING, SSL_READING, SSL_RECEIVED_SHUTDOWN, SSL_WRITING,
     stack_st_X509,
 };
+use rustyssl_tls::conn::common::SecurityHook;
+use rustyssl_tls::conn::common::security::SecOther;
 use rustyssl_tls::conn::{Connection, Event};
 use rustyssl_tls::error::Error as TlsError;
 
@@ -475,6 +477,47 @@ pub(crate) unsafe fn provider(x: &Ssl, snap: &config::CtxSnapshot) -> Arc<EvpPro
     }
 }
 
+/// The core's hook for the connection's security callback (`ssl_security` calling
+/// `sec_cb(s, NULL, op, bits, nid, other, sec_ex)`), or `None` while it is the default one,
+/// which the core applies itself. The core calls it during a step, with no lock held; `other`
+/// is the `SSL_CIPHER *`, the two code point octets, or NULL. A NULL callback (which OpenSSL
+/// would call) aborts (security rule 10).
+///
+/// # Safety
+/// `s` is the live connection behind `x`; the hook is used while it lives.
+pub(crate) unsafe fn security_hook(s: *mut SSL, x: &Ssl) -> Option<SecurityHook> {
+    let (cb, ex) = {
+        let st = x.state();
+        (st.cert.sec_cb, st.cert.sec_ex)
+    };
+    let Some(f) = cb else {
+        crate::stub::unimplemented("a handshake with a NULL security callback");
+    };
+    let default: super::types::SecCb = Some(super::cert::default_security_callback);
+    if default.is_some_and(|d| core::ptr::fn_addr_eq(f, d)) {
+        return None;
+    }
+    // The pointers travel as addresses: the hook must be `Send + Sync`, and the connection
+    // outlives its core connection.
+    let (s_addr, ex_addr) = (s.expose_provenance(), ex.expose_provenance());
+    Some(Arc::new(move |op, bits, nid, other| {
+        let s = ptr::with_exposed_provenance_mut::<SSL>(s_addr);
+        let ex = ptr::with_exposed_provenance_mut::<c_void>(ex_addr);
+        let code: [u8; 2];
+        let other: *mut c_void = match other {
+            SecOther::None => ptr::null_mut(),
+            // The suite table's entry, as `cipher_ptr` gives it.
+            SecOther::Cipher(c) => ptr::from_ref(c).cast_mut().cast(),
+            SecOther::CodePoint(b) => {
+                code = b;
+                code.as_ptr().cast_mut().cast()
+            }
+        };
+        // SAFETY: the application's callback with its arguments; no lock is held.
+        unsafe { f(s, ptr::null(), op, bits, nid, other, ex) != 0 }
+    }))
+}
+
 /// Starts the core connection if there isn't one (`SSL_do_handshake`'s first call, or the
 /// first `SSL_read`/`SSL_write`), with a configuration from the connection and its context.
 ///
@@ -491,21 +534,12 @@ pub(crate) unsafe fn ensure_core(s: *mut SSL, x: &Ssl) -> bool {
     let prov = unsafe { provider(x, &snap) };
     // SAFETY: the caller's connection; its context's snapshot.
     let cfg = unsafe { config::build(s, x, &snap, &prov) };
-    let custom_security = {
-        let st = x.state();
-        // A false "custom" here fails closed (it aborts), never open.
-        let default: super::types::SecCb = Some(super::cert::default_security_callback);
-        match (st.cert.sec_cb, default) {
-            (Some(f), Some(d)) => !core::ptr::fn_addr_eq(f, d),
-            _ => true,
-        }
-    };
-    if custom_security {
-        // The core's security hook can't be reached from here yet: refuse rather than run a
-        // handshake that ignores the application's policy (security rule 10).
-        crate::stub::unimplemented("a handshake with a custom security callback");
-    }
+    // SAFETY: the caller's connection.
+    let hook = unsafe { security_hook(s, x) };
+    let mut cfg = cfg;
+    cfg.custom_security_callback = hook.is_some();
     let mut c = Box::new(Connection::new(cfg));
+    c.set_security_hook(hook);
     c.start();
     let mut st = x.state();
     if st.drv.tls.is_none() {

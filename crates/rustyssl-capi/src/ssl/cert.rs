@@ -155,6 +155,10 @@ pub(crate) struct Cert {
     pub(crate) chain_store: *mut X509_STORE,
     /// The PSK identity hint, or `None`.
     pub(crate) psk_identity_hint: Option<CString>,
+    /// The signature algorithms configured (`conf_sigalgs`), or `None` for the defaults.
+    pub(crate) conf_sigalgs: Option<Vec<u16>>,
+    /// The signature algorithms for client authentication (`client_sigalgs`), or `None`.
+    pub(crate) client_sigalgs: Option<Vec<u16>>,
 }
 
 impl Cert {
@@ -176,6 +180,8 @@ impl Cert {
             verify_store: ptr::null_mut(),
             chain_store: ptr::null_mut(),
             psk_identity_hint: None,
+            conf_sigalgs: None,
+            client_sigalgs: None,
         }
     }
 
@@ -228,6 +234,8 @@ impl Cert {
         ret.sec_level = self.sec_level;
         ret.sec_ex = self.sec_ex;
         ret.psk_identity_hint.clone_from(&self.psk_identity_hint);
+        ret.conf_sigalgs.clone_from(&self.conf_sigalgs);
+        ret.client_sigalgs.clone_from(&self.client_sigalgs);
         Some(ret)
     }
 

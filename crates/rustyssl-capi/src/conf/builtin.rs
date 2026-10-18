@@ -501,11 +501,8 @@ unsafe extern "C" fn alg_module_init(md: *mut CONF_IMODULE, cnf: *const CONF) ->
 
 // --- ssl_conf (`conf_ssl.c`) ---
 
-/// A named set of SSL commands from the configuration (`ssl_conf_name_st`), for libssl.
-#[expect(
-    dead_code,
-    reason = "read by libssl's SSL_CTX_config, which comes with libssl"
-)]
+/// A named set of SSL commands from the configuration (`ssl_conf_name_st`), for libssl's
+/// `SSL_CTX_config` (`ssl::conf`).
 pub(crate) struct SslName {
     /// The set's name (the section line's name).
     pub(crate) name: CString,

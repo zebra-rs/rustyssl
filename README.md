@@ -191,7 +191,7 @@ generator. Don't paste the number.
 
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
-`test-apps`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`),
+`test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`),
 `test-wycheproof`, `test-timing`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
@@ -204,7 +204,7 @@ Tools each command needs:
 - **`coverage`:** `clang`, a C compiler (`$CC`), and `nm`.
 - **`usage-scan`:** `curl`, `xz`, and `zstd`, plus about 5 GB of downloads for a full scan
   (only the per-package results are kept, under `target/`).
-- **`dist`, `test-c`, `test-apps`, `test-differential`, and `test-timing`:** a C compiler (`$CC`), `ar`, and `nm`; on
+- **`dist`, `test-c`, `test-apps`, `test-interop`, `test-differential`, and `test-timing`:** a C compiler (`$CC`), `ar`, and `nm`; on
   Alpine also `llvm-libunwind-dev`.
 - **`test-openssl-suite`:** what `dist` and `ref-openssl` need (it builds upstream's test
   programs from the reference's source).
@@ -250,6 +250,7 @@ cargo xtask coverage [--list PREFIX...]      # implemented exports per library a
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-apps                        # the reference's openssl tool (tests/apps/commands.txt) on both libraries; output must match
+cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-differential --only evp --duration 24h  # a campaign: rounds of random EVP sessions on every core
 cargo xtask test-openssl-suite [file|program...]  # upstream evp_test (tests/openssl-suite/evp_test.txt), bntest, ectest, rsa_test, both libraries

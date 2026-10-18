@@ -83,6 +83,28 @@ pub fn disabled(c: &Connection, cp: &Cipher, op: c_int, ecdhe: bool) -> bool {
     !security::check(c, op, cp.strength_bits, 0, SecOther::Cipher(cp))
 }
 
+/// Shared addition (fork K, `SSL_get1_supported_ciphers`): the configured suites this end can
+/// use now: `ssl_set_client_disabled`, then each suite not [`disabled`] for
+/// `SSL_SECOP_CIPHER_SUPPORTED`. `None` when no version is enabled.
+pub fn supported(
+    c: &mut Connection,
+    p: &dyn crate::crypto::Provider,
+) -> Option<Vec<&'static Cipher>> {
+    if c.hs.sh.groups.is_empty() {
+        c.hs.sh.groups = p.groups();
+    }
+    if c.hs.sh.sigalgs.table.is_empty() {
+        c.hs.sh.sigalgs = sigalgs::Cache::new(p);
+    }
+    set_client_disabled(c).ok()?;
+    let list = c.cfg.ciphers.clone();
+    Some(
+        list.into_iter()
+            .filter(|cp| !disabled(c, cp, abi::SSL_SECOP_CIPHER_SUPPORTED, false))
+            .collect(),
+    )
+}
+
 /// `ssl_cipher_list_to_bytes`: the ClientHello's cipher_suites: the enabled suites of the
 /// cipher list, then `TLS_EMPTY_RENEGOTIATION_INFO_SCSV` (first handshake, TLS 1.0 allowed)
 /// and `TLS_FALLBACK_SCSV` (`SSL_MODE_SEND_FALLBACK_SCSV`). Sets the client's masks first.

@@ -20,10 +20,6 @@ pub(crate) struct Method {
     /// Whether it is a DTLS method.
     pub(crate) dtls: bool,
     /// Whether it can act as a client (its `ssl_connect` is defined).
-    #[expect(
-        dead_code,
-        reason = "the handshake (7.x) refuses SSL_connect without it"
-    )]
     pub(crate) client: bool,
     /// Whether it can act as a server (its `ssl_accept` is defined).
     pub(crate) server: bool,
