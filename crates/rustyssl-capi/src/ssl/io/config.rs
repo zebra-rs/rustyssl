@@ -801,6 +801,13 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     let st = x.state();
     let method_version = match st.method.version {
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
+        // `dtls1_clear`: a DTLS 1.0 client with SSL_OP_CISCO_ANYCONNECT speaks the
+        // pre-standard version.
+        rustyssl_abi::DTLS1_VERSION
+            if !st.server && st.options & rustyssl_abi::SSL_OP_CISCO_ANYCONNECT != 0 =>
+        {
+            u16::try_from(rustyssl_abi::DTLS1_BAD_VER).unwrap_or(0)
+        }
         v => u16::try_from(v).unwrap_or(0),
     };
     // The responder IDs and extensions a client's status request carries.

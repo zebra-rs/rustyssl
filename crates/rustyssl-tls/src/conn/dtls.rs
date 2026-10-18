@@ -199,6 +199,11 @@ impl Connection {
         v
     }
 
+    /// Whether the version is OpenSSL's pre-standard DTLS (`DTLS1_BAD_VER`, Cisco AnyConnect).
+    fn bad_ver(&self) -> bool {
+        self.neg.version == crate::consts::version::DTLS1_BAD
+    }
+
     /// DTLS: closes the open datagram (a flush of the buffering BIO).
     pub(crate) fn dtls_close_datagram(&mut self) {
         if self.dtls.open.is_empty() {
@@ -347,13 +352,18 @@ impl Connection {
         let epoch = self.rw.epoch();
         if is_ccs {
             let seq = self.dtls.next_write_seq;
-            let one = [msgs_type(abi::SSL3_MT_CCS)];
+            let mut one = vec![msgs_type(abi::SSL3_MT_CCS)];
+            if self.bad_ver() {
+                // `DTLS1_BAD_VER`'s ChangeCipherSpec is numbered like a message.
+                self.dtls.next_write_seq = seq.wrapping_add(1);
+                one.extend_from_slice(&seq.to_be_bytes());
+            }
             self.dtls.sent.push(Sent {
                 seq,
                 ccs: true,
                 epoch,
                 typ: 0,
-                body: one.to_vec(),
+                body: one.clone(),
             });
             return self.dtls_do_write(p, ccs(), 0, seq, &one, epoch);
         }
@@ -401,7 +411,10 @@ impl Connection {
         ]
         .concat();
         if !self.dtls.retransmitting {
-            self.hs.transcript.add(&full);
+            // `DTLS1_BAD_VER` hashes the bodies alone.
+            self.hs
+                .transcript
+                .add(if self.bad_ver() { body } else { &full });
         }
         let mut off = 0usize;
         let mut first_len = body.len();
@@ -851,6 +864,9 @@ impl Connection {
     pub(crate) fn dtls_full_form(&self, raw: &[u8]) -> Vec<u8> {
         let typ = raw.first().copied().unwrap_or(0);
         let body = raw.get(msgs::HEADER_LEN..).unwrap_or_default();
+        if self.bad_ver() {
+            return body.to_vec();
+        }
         let len = msgs::Header::peek(raw).map_or(0, |h| usize::try_from(h.len).unwrap_or(0));
         let hdr = hm_header(typ, len, self.dtls.cur_seq, 0, len).unwrap_or_default();
         [hdr, body.to_vec()].concat()

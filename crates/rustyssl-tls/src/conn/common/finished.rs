@@ -207,7 +207,9 @@ pub fn process_change_cipher_spec(
     p: &dyn Provider,
     body: &[u8],
 ) -> Result<MsgProcess> {
-    if !body.is_empty() {
+    // `DTLS1_BAD_VER`'s carries the message sequence number.
+    let bad = c.cfg.dtls && c.neg.version == crate::consts::version::DTLS1_BAD;
+    if body.len() != if bad { 2 } else { 0 } {
         return Err(Error::decode(abi::SSL_R_BAD_CHANGE_CIPHER_SPEC));
     }
     if c.hs.new_cipher.is_none() {
@@ -218,6 +220,9 @@ pub fn process_change_cipher_spec(
     }
     c.change_cipher_spec = true;
     do_change_cipher_spec(c, p)?;
+    if bad {
+        c.dtls.read_seq = c.dtls.read_seq.wrapping_add(1);
+    }
     Ok(MsgProcess::ContinueReading)
 }
 

@@ -284,7 +284,9 @@ impl Protection {
             mac_hash,
             mac_key: Secret::new(mac_key.to_vec()),
             iv: iv.to_vec(),
-            explicit_iv: version >= tls1_1(),
+            // DTLS (counted down, `DTLS1_BAD_VER` 0x0100 included) always sends the IV.
+            explicit_iv: version >= tls1_1()
+                || version == u16::try_from(abi::DTLS1_BAD_VER).unwrap_or(0x0100),
             etm,
         })
     }

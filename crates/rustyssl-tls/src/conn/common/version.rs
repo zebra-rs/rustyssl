@@ -25,9 +25,11 @@ const TABLE: [(u16, u64); 4] = [
 
 /// The DTLS versions, highest first, with the option that disables each
 /// (`dtls_version_table`).
-const DTLS_TABLE: [(u16, u64); 2] = [
+const DTLS_TABLE: [(u16, u64); 3] = [
     (version::DTLS1_2, abi::SSL_OP_NO_DTLSv1_2),
     (version::DTLS1, abi::SSL_OP_NO_DTLSv1),
+    // A client only (it has no server method).
+    (version::DTLS1_BAD, abi::SSL_OP_NO_DTLSv1),
 ];
 
 /// The version table of the connection's kind.
@@ -183,6 +185,7 @@ pub fn supported(c: &Connection, v: u16) -> bool {
     }
     table(c).iter().any(|&(tv, mask)| {
         tv == v
+            && !(c.cfg.server && tv == version::DTLS1_BAD)
             && method_error(c, tv, mask).is_none()
             && (!c.cfg.server || v != version::TLS1_3 || tls13_capable(c))
     })
@@ -299,7 +302,7 @@ pub fn choose_server(
     };
     let mut disabled = false;
     for &(v, mask) in table(c) {
-        if cmp(client_version, v) == Ordering::Less {
+        if cmp(client_version, v) == Ordering::Less || v == version::DTLS1_BAD {
             continue;
         }
         if method_error(c, v, mask).is_none() {
@@ -412,6 +415,11 @@ pub fn set_client_hello_version(c: &mut Connection) -> core::result::Result<(), 
     }
     let (_, max, _) = min_max(c)?;
     c.neg.version = max;
+    if max == version::DTLS1_BAD {
+        // Nothing else can be negotiated, and the ServerHello's record carries it: the
+        // record layer learns it now (`ssl_set_client_hello_version`).
+        set_record_version(c, max);
+    }
     c.hs.sh.client_version = if !c.cfg.dtls && max > version::TLS1_2 {
         version::TLS1_2
     } else {

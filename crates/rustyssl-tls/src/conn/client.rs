@@ -649,7 +649,11 @@ pub(crate) fn max_message_size(c: &Connection) -> usize {
     } else if is(abi::TLS_ST_CR_SRVR_DONE) {
         limits::SERVER_HELLO_DONE
     } else if is(abi::TLS_ST_CR_CHANGE) {
-        limits::CCS
+        if c.cfg.dtls && c.neg.version == crate::consts::version::DTLS1_BAD {
+            3
+        } else {
+            limits::CCS
+        }
     } else if is(abi::TLS_ST_CR_SESSION_TICKET) {
         if c.is_tls13() {
             limits::SESSION_TICKET_13
