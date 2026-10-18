@@ -815,6 +815,9 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         // SAFETY: the configuration's DH key (a reference held), or NULL.
         dh_params: unsafe { dh_params(st.cert.dh_tmp) },
         dh_auto: st.cert.dh_tmp_auto != 0,
+        srp: st.srp.enabled,
+        srp_login: st.srp.login.as_ref().map(|l| l.as_bytes().to_vec()),
+        srp_strength: st.srp.strength,
         now: now(),
         session_cache_mode: i64::from(snap.session_cache_mode),
         session_timeout: snap.session_timeout,
@@ -872,6 +875,7 @@ pub(crate) fn callbacks(st: &SslState, snap: &CtxSnapshot) -> Callbacks {
         }),
         cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
         tmp_dh: st.cert.dh_tmp_cb.is_some(),
+        srp_username: st.srp.username_cb_set(),
         psk: super::super::psk::flags(st).0,
         psk_session: super::super::psk::flags(st).1,
         // The client's select callback, or the server's advertisement callback.

@@ -305,6 +305,23 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             Some(unsafe { super::super::psk::key(s, x, &hint_or_identity) })
         }
+        // SRP (`ssl::srp`).
+        Request::SrpUsername { login } => {
+            // SAFETY: as above.
+            unsafe { super::super::srp::username(s, x, snap, &login) }
+        }
+        Request::SrpServerParams => Some(super::super::srp::server_params(x)),
+        Request::SrpServerSecret { a } => Some(super::super::srp::server_secret(x, snap, &a)),
+        Request::SrpVerifyParams(p) => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::srp::verify_params(s, x, &p) })
+        }
+        // SAFETY: as above.
+        Request::SrpClientA => Some(unsafe { super::super::srp::client_a(x, snap) }),
+        Request::SrpClientSecret => {
+            // SAFETY: as above.
+            Some(unsafe { super::super::srp::client_secret(s, x, snap) })
+        }
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {

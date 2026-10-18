@@ -117,6 +117,8 @@ pub(crate) struct SslState {
     pub(crate) psk_find_session_cb: rustyssl_abi::SSL_psk_find_session_cb_func,
     pub(crate) psk_use_session_cb: rustyssl_abi::SSL_psk_use_session_cb_func,
     pub(crate) allow_early_data_cb: rustyssl_abi::SSL_allow_early_data_cb_fn,
+    /// The SRP state (`s->srp_ctx`), from the context's settings.
+    pub(crate) srp: super::srp::ConnSrp,
     pub(crate) allow_early_data_cb_data: *mut c_void,
     pub(crate) async_cb: rustyssl_abi::SSL_async_callback_fn,
     pub(crate) async_cb_arg: *mut c_void,
@@ -373,6 +375,7 @@ ffi_export! {
                 psk_find_session_cb: cs.psk_find_session_cb,
                 psk_use_session_cb: cs.psk_use_session_cb,
                 allow_early_data_cb: cs.allow_early_data_cb,
+                srp: super::srp::ConnSrp::from_ctx(&cs.srp),
                 allow_early_data_cb_data: cs.allow_early_data_cb_data,
                 async_cb: cs.async_cb,
                 async_cb_arg: cs.async_cb_arg,

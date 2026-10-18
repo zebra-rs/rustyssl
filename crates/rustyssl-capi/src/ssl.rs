@@ -33,6 +33,7 @@ pub(crate) mod requests;
 pub(crate) mod sess_asn1;
 pub(crate) mod sess_cache;
 pub(crate) mod session;
+pub(crate) mod srp;
 pub(crate) mod srtp;
 pub(crate) mod tls_provider;
 pub(crate) mod trace;
