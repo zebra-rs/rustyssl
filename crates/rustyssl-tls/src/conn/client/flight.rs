@@ -540,15 +540,15 @@ fn check_cert_and_algorithm_inner(c: &Connection, p: &dyn Provider) -> Result<()
         && cp.auth & SSL_aECDSA != 0
         && key.is_some_and(|(_, k)| k.key_usage & signing == 0)
     {
-        return Err(Error::alert(
-            abi::SSL_AD_HANDSHAKE_FAILURE,
-            abi::SSL_R_BAD_ECC_CERT,
-        )
-        .caused_by(crate::error::Cause {
-            lib: abi::ERR_LIB_SSL,
-            reason: abi::SSL_R_ECC_CERT_NOT_FOR_SIGNING,
-            func: "ssl_check_srvr_ecc_cert_and_alg",
-        }));
+        return Err(
+            Error::alert(abi::SSL_AD_HANDSHAKE_FAILURE, abi::SSL_R_BAD_ECC_CERT).caused_by(
+                crate::error::Cause {
+                    lib: abi::ERR_LIB_SSL,
+                    reason: abi::SSL_R_ECC_CERT_NOT_FOR_SIGNING,
+                    func: "ssl_check_srvr_ecc_cert_and_alg",
+                },
+            ),
+        );
     }
     Ok(())
 }

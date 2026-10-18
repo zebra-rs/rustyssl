@@ -444,18 +444,19 @@ fn accept_ksgroup(c: &mut Connection, p: &dyn Provider, group: u16, key: &[u8]) 
     c.hs.sh.group_id_candidate = group;
     c.neg.group = Some(group);
     c.hs.sh.peer_tmp = Some((group, key.to_vec()));
-    if !groups::tls13_share_ok(c, group, key) {
-        return Err(Error::alert(
-            abi::SSL_AD_ILLEGAL_PARAMETER,
-            abi::SSL_R_BAD_ECPOINT,
-        ));
+    let bad_point = || Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_ECPOINT);
+    let share = p.respond(group, key).map_err(|_| bad_point())?;
+    // Our own share is padded to a DH group's prime, the length the client's must have.
+    let info = groups::lookup(c, group);
+    let kem = info.is_some_and(|g| g.is_kem);
+    if let Some(g) = info
+        && !kem
+        && !groups::encoded_share_ok(g, key, share.0.len())
+    {
+        return Err(bad_point());
     }
-    let share = p
-        .respond(group, key)
-        .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_ECPOINT))?;
     // Shared addition (fork N): the server's own share is its temporary key
     // (`SSL_get_tmp_key`); a KEM's ciphertext isn't a key.
-    let kem = groups::lookup(c, group).is_some_and(|g| g.is_kem);
     c.hs.sh.own_tmp = if kem {
         None
     } else {

@@ -136,15 +136,16 @@ pub fn lookup(c: &Connection, id: u16) -> Option<&GroupInfo> {
     c.hs.sh.groups.iter().find(|g| g.id == id)
 }
 
-/// `tls13_set_encoded_pub_key`'s check of a TLS 1.3 key share before it is decoded: an EC
-/// group's share must be an uncompressed point (RFC 8446, section 4.2.8.2), whatever the
-/// provider would accept.
+/// `tls13_set_encoded_pub_key`'s checks of a TLS 1.3 key share before it is used: a DH share
+/// must be padded to the prime's length (RFC 8446, section 4.2.8.1), which `own_len`, this
+/// end's share in the group, has (as OpenSSL's encoding pads it); an EC share must be an
+/// uncompressed point. Whether `peer` passes; a KEM's or an XDH group's octets go on to the
+/// provider as they are.
 #[must_use]
-pub fn tls13_share_ok(c: &Connection, id: u16, share: &[u8]) -> bool {
-    match lookup(c, id) {
-        Some(g) if g.algorithm.eq_ignore_ascii_case("EC") => {
-            share.len() >= 3 && share.first() == Some(&0x04)
-        }
+pub fn encoded_share_ok(info: &GroupInfo, peer: &[u8], own_len: usize) -> bool {
+    match info.algorithm.as_str() {
+        "DH" => own_len > 0 && peer.len() == own_len,
+        "EC" => peer.len() >= 3 && peer.first() == Some(&4),
         _ => true,
     }
 }

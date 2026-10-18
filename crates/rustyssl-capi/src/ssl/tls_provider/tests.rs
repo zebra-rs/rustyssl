@@ -171,6 +171,31 @@ fn aeads_agree_both_ways_and_reject_tampering() {
             .open(&nonce, &header, &mut sealed_t)
             .unwrap();
         assert!(sealed_t.is_empty(), "{alg:?} opened empty");
+        // An empty record (with the record header as AAD) opens to nothing, and only with its
+        // tag: CCM authenticates in the data update, which an empty record still needs
+        // (tlsfuzzer's test-aesccm, "empty app data with _8 ciphers").
+        let mut sealed = Vec::new();
+        e.aead(alg, &key)
+            .unwrap()
+            .seal(&nonce, b"aad", &mut sealed)
+            .unwrap();
+        let mut opened = sealed.clone();
+        e.aead(alg, &key)
+            .unwrap()
+            .open(&nonce, b"aad", &mut opened)
+            .unwrap();
+        assert!(opened.is_empty(), "{alg:?} empty open: {opened:?}");
+        let mut forged = sealed.clone();
+        if let Some(b) = forged.last_mut() {
+            *b ^= 1;
+        }
+        assert!(
+            e.aead(alg, &key)
+                .unwrap()
+                .open(&nonce, b"aad", &mut forged)
+                .is_err(),
+            "{alg:?} empty with a bad tag"
+        );
         let mut short = vec![0u8; alg.tag_len() - 1];
         assert!(
             e.aead(alg, &key)

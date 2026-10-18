@@ -123,11 +123,21 @@ fn check_boundary(c: &Connection) -> Result<()> {
     }
 }
 
+/// What the read side's new keys bring with them: OpenSSL makes a record layer for each key
+/// change, first-handshake only if the handshake still is (`ssl_set_new_record_layer`'s
+/// `SSL_IS_FIRST_HANDSHAKE`). So a server reading the client's application keys after its
+/// Finished takes no more compatibility ChangeCipherSpecs (`tls13_validate_record_header`:
+/// `SSL_R_BAD_RECORD_TYPE`), as RFC 8446, section 5 requires.
+fn new_read_layer(c: &mut Connection) {
+    c.rr.first_handshake = super::finished::is_first_handshake(c);
+}
+
 /// Installs TLS 1.3 protection in one direction.
 fn install13(c: &mut Connection, read: bool, prot: Protection) -> Result<()> {
     if read {
         check_boundary(c)?;
         c.rr.set_protection(Mode::Tls13, prot);
+        new_read_layer(c);
         c.early_read = None;
     } else {
         c.rw.set_protection(Mode::Tls13, prot);
@@ -420,6 +430,7 @@ fn update_key_inner(c: &mut Connection, p: &dyn Provider, sending: bool) -> Resu
     } else {
         check_boundary(c)?;
         c.rr.set_protection(Mode::Tls13, prot);
+        new_read_layer(c);
     }
     let label = if server_secret {
         "SERVER_TRAFFIC_SECRET_N"
@@ -562,6 +573,7 @@ fn change_cipher_state12_inner(c: &mut Connection, p: &dyn Provider, which: c_in
     if read {
         check_boundary(c)?;
         c.rr.set_protection(Mode::Tls12(version), protection);
+        new_read_layer(c);
     } else {
         c.rw.set_protection(Mode::Tls12(version), protection);
     }

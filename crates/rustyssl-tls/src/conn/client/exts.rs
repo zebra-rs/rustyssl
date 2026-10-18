@@ -1304,7 +1304,7 @@ pub(crate) fn ext_parse_key_share(
     // Shared addition (fork N): the client's own share stays its temporary key
     // (`SSL_get_tmp_key`), a KEM's encapsulation key included.
     c.hs.sh.own_tmp = Some((group, share.public().to_vec()));
-    if !info.is_kem && !groups::tls13_share_ok(c, group, &entry.key) {
+    if !info.is_kem && !groups::encoded_share_ok(&info, &entry.key, share.public().len()) {
         return Err(Error::alert(
             abi::SSL_AD_ILLEGAL_PARAMETER,
             abi::SSL_R_BAD_ECPOINT,

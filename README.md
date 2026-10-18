@@ -192,7 +192,7 @@ generator. Don't paste the number.
 Working now: `cargo build`, `test`, `clippy`, `fmt`, `deny`, `vet`, and `fuzz`, and the
 xtask commands `vendor`, `codegen`, `dist`, `ref-openssl`, `abi-check`, `test-c`,
 `test-apps`, `test-interop`, `test-differential`, `test-openssl-suite` (`evp_test`, `bntest`, `ectest`, `rsa_test`; libssl's programs with `--ssl`),
-`test-wycheproof`, `test-bogo`, `test-timing`, `coverage`, and `usage-scan`.
+`test-wycheproof`, `test-bogo`, `test-tlsfuzzer`, `test-timing`, `coverage`, and `usage-scan`.
 The other `cargo xtask` commands arrive later and fail with a message until then. Update this
 section when they change. CI (`.github/workflows/ci.yml`) runs the gates on every push.
 
@@ -208,6 +208,9 @@ Tools each command needs:
   Alpine also `llvm-libunwind-dev`.
 - **`test-openssl-suite`:** what `dist` and `ref-openssl` need (it builds upstream's test
   programs from the reference's source).
+- **`test-tlsfuzzer`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and
+  `python3` (tlsfuzzer and its Python dependencies are fetched at pinned commits). `--timing`
+  also needs tlsfuzzer's analysis packages (NumPy, SciPy, pandas, ...) in that Python.
 - **`test-wycheproof`:** what `dist` and `ref-openssl` need, plus `curl` (the vectors are
   fetched at a pinned commit).
 - **`test-bogo`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and Go (at least
@@ -259,6 +262,7 @@ cargo xtask test-openssl-suite [file|program...]  # upstream evp_test (tests/ope
 cargo xtask test-openssl-suite --ssl [program...]  # libssl's upstream programs (tests/openssl-suite/ssl.txt), per subtest, both libraries -> target/ssl-suite-report.md
 cargo xtask test-wycheproof [file...]        # Wycheproof's vectors (tests/wycheproof/files.txt) on both libraries
 cargo xtask test-bogo [pattern...]           # BoringSSL's runner with tests/bogo/shim.c on both libraries -> target/bogo-report.md
+cargo xtask test-tlsfuzzer [--timing] [script...]  # tlsfuzzer (tests/tlsfuzzer/scripts.txt) against s_server, both libraries -> target/tlsfuzzer-report.md
 cargo xtask test-timing [target...]          # dudect constant-time checks and Marvin's RSA split (tests/timing/dudect.c), both libraries
 cargo xtask test-consumers <name>            # curl/nginx/openssh/python/... test suites with our libraries
 cargo +nightly miri test -p rustyssl-capi    # the unsafe FFI layer under Miri (and its doctests)

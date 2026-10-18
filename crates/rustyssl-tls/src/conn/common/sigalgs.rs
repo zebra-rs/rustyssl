@@ -910,7 +910,10 @@ pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
     if !lu.available {
         return false;
     }
-    // Once the hellos chose the version, only that version counts.
+    // A flexible method gives way to the negotiated version's once the hellos choose it
+    // (`ssl_choose_server_version`/`_client_version` set `s->method`): from then on only that
+    // version counts, so a TLS 1.2 CertificateRequest has no TLS 1.3-only scheme and a TLS 1.3
+    // one no SHA-224.
     let (minproto, maxproto) = if !version::method_fixed(c) {
         (
             c_int::from(c.cfg.min_version),
