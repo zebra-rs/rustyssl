@@ -17,8 +17,8 @@ use rustyssl_abi::{
     OSSL_FUNC_PROVIDER_QUERY_OPERATION, OSSL_FUNC_PROVIDER_TEARDOWN, OSSL_LIB_CTX,
     OSSL_OP_ASYM_CIPHER, OSSL_OP_CIPHER, OSSL_OP_DECODER, OSSL_OP_DIGEST, OSSL_OP_ENCODER,
     OSSL_OP_KDF, OSSL_OP_KEM, OSSL_OP_KEYEXCH, OSSL_OP_KEYMGMT, OSSL_OP_MAC, OSSL_OP_RAND,
-    OSSL_OP_SIGNATURE, OSSL_OP_SKEYMGMT, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_PTR,
-    OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
+    OSSL_OP_SIGNATURE, OSSL_OP_SKEYMGMT, OSSL_OP_STORE, OSSL_PARAM, OSSL_PARAM_INTEGER,
+    OSSL_PARAM_UTF8_PTR, OSSL_PROV_PARAM_BUILDINFO, OSSL_PROV_PARAM_NAME, OSSL_PROV_PARAM_STATUS,
     OSSL_PROV_PARAM_VERSION, OSSL_PROVIDER, OSSL_provider_init_fn,
 };
 
@@ -50,6 +50,18 @@ struct ProvCtx {
 pub(crate) unsafe fn libctx_of(provctx: *mut c_void) -> *mut OSSL_LIB_CTX {
     // SAFETY: the caller's guarantee.
     unsafe { provctx.cast::<ProvCtx>().as_ref() }.map_or(ptr::null_mut(), |c| c.libctx.cast())
+}
+
+/// `PROV_CTX`'s handle: the provider of the default or base provider's context `provctx`
+/// (NULL for NULL).
+///
+/// # Safety
+/// As for [`libctx_of`].
+pub(crate) unsafe fn provider_of(provctx: *mut c_void) -> *mut OSSL_PROVIDER {
+    // SAFETY: the caller's guarantee.
+    unsafe { provctx.cast::<ProvCtx>().as_ref() }.map_or(ptr::null_mut(), |c| {
+        c.handle.cast::<OSSL_PROVIDER>().cast_mut()
+    })
 }
 
 /// `ossl_prov_ctx_get_param`: the provider's configuration parameter `name`, or `None`.
@@ -211,6 +223,7 @@ ffi_callback! {
             OSSL_OP_RAND => super::rands::base_rands(),
             OSSL_OP_ENCODER => super::encoders::base_encoders(),
             OSSL_OP_DECODER => super::decoders::base_decoders(),
+            OSSL_OP_STORE => super::file_store::base_stores(),
             _ => ptr::null(),
         }
     }
@@ -259,6 +272,7 @@ ffi_callback! {
             OSSL_OP_SKEYMGMT => super::skeymgmt::default_skeymgmt(),
             OSSL_OP_ENCODER => super::encoders::default_encoders(),
             OSSL_OP_DECODER => super::decoders::default_decoders(),
+            OSSL_OP_STORE => super::file_store::default_stores(),
             _ => ptr::null(),
         }
     }

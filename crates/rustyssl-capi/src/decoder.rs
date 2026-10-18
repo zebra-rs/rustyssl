@@ -141,7 +141,7 @@ unsafe fn cast<F: Copy>(f: AnyFn) -> F {
 /// # Safety
 /// `algo`'s names, properties, description, and table are the provider's, valid while it
 /// lives; `prov` is a live provider.
-unsafe fn from_algorithm(
+pub(crate) unsafe fn from_algorithm(
     name_id: u32,
     algo: &OSSL_ALGORITHM,
     prov: *mut OSSL_PROVIDER,

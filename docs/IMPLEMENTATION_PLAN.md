@@ -5056,9 +5056,18 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
   response's error content is not read. Tests: `tests/c/http.c` (canned responses over memory
   BIOs, and a server forked on the loopback interface for GET, redirections, a proxy,
   `CONNECT`, OCSP, and loading by URL), the `http_response` fuzz target.
-- [ ] **6.9 OSSL_STORE:** the `file:` loader (PEM bundles, DER, PKCS#12, directories),
-  `OSSL_STORE_INFO`, search, and custom `OSSL_STORE_LOADER` registration; then the URIs of
-  `X509_LOOKUP_store` and `X509_STORE_load_store`, which abort until then (5.3b).
+- [x] **6.9 OSSL_STORE** (`store.rs`, `store/{ctx,info,meth,result}.rs` from `store_lib.c`,
+  `store_meth.c`, `store_result.c`, `store_strings.c`; `provider/file_store.rs` from
+  `file_store.c` and `file_store_any2obj.c`; 59 exports, the registration API having come with
+  5.x): `OSSL_STORE_open`/`_open_ex`/`_attach`/`_load`/`_expect`/`_find`/`_eof`/`_error`/
+  `_close`/`_delete`/`_supports_search`/`_ctrl`/`_vctrl` (a registered loader's `ctrl` given the
+  `va_list`), the loaders the providers offer (`OSSL_STORE_LOADER_fetch` and the rest of
+  `store_meth.c`; fetch errors name the "Scheme"), `OSSL_STORE_INFO`, `OSSL_STORE_SEARCH`, and
+  the default and base providers' `file` store: files of PEM, DER, PKCS #12, MSBLOB, and PVK
+  through the decoders and the private "to object" decoders, `file:` URIs (absolute paths,
+  `localhost`), directories (with the hashed names of a subject search); and the store lookup's
+  URIs (`X509_LOOKUP_store`, `X509_STORE_load_store`), no longer aborting. Tests:
+  `tests/c/store.c` (53 checks), the `store_attach` fuzz target.
 - [ ] **6.10 CMP/CRMF** (RFC 4210/4211/9480): the structures, the `OSSL_CMP_CTX` client, and
   the server/mock APIs. Large and seldom used, so it's scheduled last in this phase.
 - [ ] **6.11 Remainder:**

@@ -128,6 +128,15 @@ impl PwData {
         true
     }
 
+    /// The `UI_METHOD` and its data, if that is the source (NULLs otherwise), as a registered
+    /// store loader gets them.
+    pub(crate) fn ui_method(&self) -> (*const UI_METHOD, *mut c_void) {
+        match self.source {
+            Source::Ui(m, d) => (m, d),
+            _ => (ptr::null(), ptr::null_mut()),
+        }
+    }
+
     /// `ossl_pw_enable_passphrase_caching`.
     pub(crate) fn enable_caching(&mut self) {
         self.cache_on = true;

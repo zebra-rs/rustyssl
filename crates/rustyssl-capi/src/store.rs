@@ -1,12 +1,15 @@
-//! Store loaders an application registers (`OSSL_STORE_LOADER_new(3)`, deprecated in 3.0;
-//! `store_register.c`): the loader object, its functions, and the registry of loaders by URI
-//! scheme.
-//!
-//! These come ahead of the rest of `OSSL_STORE` (step 6.9) because OpenSSL's command-line tools
-//! register their `org.openssl.engine` loader at start-up. Opening a store is still a stub, so
-//! nothing calls a registered loader's functions yet.
+//! Stores (`OSSL_STORE(7)`): the loader object, which is either one an application registers
+//! (`OSSL_STORE_LOADER_new(3)`, deprecated in 3.0; `store_register.c`) or a provider's
+//! ([`meth`]), the registry of the former by URI scheme, and the rest of the API in the
+//! submodules: opening and reading ([`ctx`]), the objects and searches ([`info`]), and making
+//! objects of what a provider's loader gives ([`result`]).
 
-use core::ffi::{CStr, c_char, c_int};
+pub(crate) mod ctx;
+pub(crate) mod info;
+pub(crate) mod meth;
+pub(crate) mod result;
+
+use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
@@ -21,36 +24,52 @@ use rustyssl_abi::{
 use crate::err;
 use crate::ffi::ffi_export;
 
-/// A loader's functions.
+/// A registered loader's functions.
 #[derive(Clone, Copy, Default)]
-struct Funcs {
-    open: OSSL_STORE_open_fn,
-    open_ex: OSSL_STORE_open_ex_fn,
-    attach: OSSL_STORE_attach_fn,
-    ctrl: OSSL_STORE_ctrl_fn,
-    expect: OSSL_STORE_expect_fn,
-    find: OSSL_STORE_find_fn,
-    load: OSSL_STORE_load_fn,
-    eof: OSSL_STORE_eof_fn,
-    error: OSSL_STORE_error_fn,
-    close: OSSL_STORE_close_fn,
+pub(crate) struct Funcs {
+    pub(crate) open: OSSL_STORE_open_fn,
+    pub(crate) open_ex: OSSL_STORE_open_ex_fn,
+    pub(crate) attach: OSSL_STORE_attach_fn,
+    pub(crate) ctrl: OSSL_STORE_ctrl_fn,
+    pub(crate) expect: OSSL_STORE_expect_fn,
+    pub(crate) find: OSSL_STORE_find_fn,
+    pub(crate) load: OSSL_STORE_load_fn,
+    pub(crate) eof: OSSL_STORE_eof_fn,
+    pub(crate) error: OSSL_STORE_error_fn,
+    pub(crate) close: OSSL_STORE_close_fn,
 }
 
-/// An application's loader (`struct ossl_store_loader_st` without a provider).
-struct Loader {
+/// A loader (`struct ossl_store_loader_st`): an application's, or with [`meth::Provided`], a
+/// provider's.
+pub(crate) struct Loader {
     engine: *mut ENGINE,
-    /// The caller's scheme string, not copied (as in OpenSSL).
+    /// The caller's scheme string, not copied (as in OpenSSL); NULL for a provider's loader.
     scheme: *const c_char,
     funcs: Mutex<Funcs>,
+    /// A provider's loader's part.
+    pub(crate) provided: Option<meth::Provided>,
 }
 
 impl Loader {
-    fn funcs(&self) -> MutexGuard<'_, Funcs> {
+    /// A provider's loader.
+    pub(crate) fn provided(p: meth::Provided) -> Self {
+        Self {
+            engine: ptr::null_mut(),
+            scheme: ptr::null(),
+            funcs: Mutex::new(Funcs::default()),
+            provided: Some(p),
+        }
+    }
+
+    pub(crate) fn funcs(&self) -> MutexGuard<'_, Funcs> {
         self.funcs.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// The scheme, as the caller's C string.
+    /// The scheme, as the caller's C string (empty for a provider's loader).
     fn scheme(&self) -> &CStr {
+        if self.scheme.is_null() {
+            return c"";
+        }
         // SAFETY: OSSL_STORE_LOADER_new refuses NULL, and the caller keeps the string.
         unsafe { CStr::from_ptr(self.scheme) }
     }
@@ -73,7 +92,7 @@ fn registry() -> MutexGuard<'static, Vec<Registered>> {
 ///
 /// # Safety
 /// `l` is NULL or a live loader from `OSSL_STORE_LOADER_new`.
-unsafe fn loader<'a>(l: *const OSSL_STORE_LOADER) -> Option<&'a Loader> {
+pub(crate) unsafe fn loader<'a>(l: *const OSSL_STORE_LOADER) -> Option<&'a Loader> {
     // SAFETY: the caller's guarantee.
     unsafe { l.cast::<Loader>().as_ref() }
 }
@@ -91,22 +110,28 @@ ffi_export! {
             err::raise(ERR_LIB_OSSL_STORE, OSSL_STORE_R_INVALID_SCHEME, "OSSL_STORE_LOADER_new");
             return ptr::null_mut();
         }
-        Box::into_raw(Box::new(Loader { engine: e, scheme, funcs: Mutex::new(Funcs::default()) })).cast()
+        Box::into_raw(Box::new(Loader { engine: e, scheme, funcs: Mutex::new(Funcs::default()), provided: None })).cast()
     }
 }
 
 ffi_export! {
-    /// Frees a loader from `OSSL_STORE_LOADER_new` (unregister it first); NULL does nothing.
+    /// Frees a loader from `OSSL_STORE_LOADER_new` (unregister it first), or drops a reference
+    /// to a provider's; NULL does nothing.
     ///
     /// # Safety
-    /// `loader` is NULL or a live loader, not used afterwards.
+    /// `loader` is NULL or a live loader, not used afterwards (unless other references remain).
     pub unsafe extern "C" fn OSSL_STORE_LOADER_free(loader: *mut OSSL_STORE_LOADER)
     where failure = (), library = ERR_LIB_OSSL_STORE
     {
-        if !loader.is_null() {
-            // SAFETY: a loader from OSSL_STORE_LOADER_new, freed once.
-            drop(unsafe { Box::from_raw(loader.cast::<Loader>()) });
+        // SAFETY: the caller's guarantee.
+        let Some(l) = (unsafe { self::loader(loader) }) else { return };
+        if let Some(p) = &l.provided
+            && !meth::release(p)
+        {
+            return;
         }
+        // SAFETY: a loader made here, freed once.
+        drop(unsafe { Box::from_raw(loader.cast::<Loader>()) });
     }
 }
 
@@ -355,5 +380,50 @@ ffi_export! {
                 ptr::null_mut()
             }
         }
+    }
+}
+
+/// `ossl_store_get0_loader_int`: the loader registered under `scheme`, or NULL with
+/// `OSSL_STORE_R_UNREGISTERED_SCHEME` (data `scheme=...`).
+pub(crate) fn registered(scheme: &[u8]) -> *mut OSSL_STORE_LOADER {
+    let reg = registry();
+    // SAFETY: registered loaders are live while registered.
+    let found = reg
+        .iter()
+        .find(|r| unsafe { self::loader(r.0) }.is_some_and(|l| l.scheme().to_bytes() == scheme));
+    if let Some(r) = found {
+        return r.0;
+    }
+    drop(reg);
+    let mut data = b"scheme=".to_vec();
+    data.extend_from_slice(scheme);
+    err::raise_with_bytes(
+        ERR_LIB_OSSL_STORE,
+        OSSL_STORE_R_UNREGISTERED_SCHEME,
+        "ossl_store_get0_loader_int",
+        &data,
+    );
+    ptr::null_mut()
+}
+
+type DoAllLoadersFn = unsafe extern "C" fn(*const OSSL_STORE_LOADER, *mut c_void);
+
+ffi_export! {
+    /// Calls `do_function` with each registered loader: 1.
+    ///
+    /// # Safety
+    /// `do_function` is NULL or a callback for `do_arg`; it doesn't register or unregister.
+    pub unsafe extern "C" fn OSSL_STORE_do_all_loaders(do_function: Option<DoAllLoadersFn>, do_arg: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_OSSL_STORE
+    {
+        // A copy, so the callback runs with no lock held.
+        let loaders: Vec<*mut OSSL_STORE_LOADER> = registry().iter().map(|r| r.0).collect();
+        if let Some(f) = do_function {
+            for l in loaders {
+                // SAFETY: the application's callback with a registered loader.
+                unsafe { f(l, do_arg) };
+            }
+        }
+        1
     }
 }
