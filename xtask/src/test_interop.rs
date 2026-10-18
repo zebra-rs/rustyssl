@@ -10,7 +10,8 @@
 //!
 //! A case line is `name | server arguments | client arguments`, with `{rsa}`, `{ec}`,
 //! `{p521}`, `{ed25519}` (a server's `-cert`/`-key` pair), `{client}` (a client's), `{ca}` (the
-//! root to verify with), and `{dir}` substituted. Lines starting with `#` are comments. Client
+//! root to verify with), `{srpvfile}` (an SRP verifier file with the user `user`, password
+//! `password`), and `{dir}` substituted. Lines starting with `#` are comments. Client
 //! arguments starting with `+` direct the harness:
 //!
 //! - `+full`: the client runs without `-brief`, and the summary takes its session lines
@@ -242,6 +243,19 @@ fn make_pki(t: &Tool<'_>, dir: &Path) -> Result {
             &d(&format!("{name}.pem")),
         ])?;
     }
+    // An SRP verifier file with the user "user", password "password", in the 1024-bit group.
+    fs::write(dir.join("srp.txt"), "")?;
+    t.setup(&[
+        "srp",
+        "-srpvfile",
+        &d("srp.txt"),
+        "-add",
+        "-gn",
+        "1024",
+        "-passout",
+        "pass:password",
+        "user",
+    ])?;
     Ok(())
 }
 
@@ -261,6 +275,7 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
                 ]);
             }
             "{ca}" => out.extend(["-CAfile".to_owned(), d("ca.pem")]),
+            "{srpvfile}" => out.extend(["-srpvfile".to_owned(), d("srp.txt")]),
             _ => out.push(a.replace("{dir}", &dir.display().to_string())),
         }
     }
