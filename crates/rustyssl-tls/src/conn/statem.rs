@@ -150,6 +150,11 @@ pub struct Statem {
     pub(crate) loop_reported: bool,
     /// Whether the header of the message being read has been taken (`init_num`'s header).
     pub(crate) header_done: bool,
+    /// Shared fix (tls-server): whether the message being read is a ChangeCipherSpec record
+    /// rather than a handshake message. `message_type` can't tell them apart: the CCS
+    /// pseudo-type (`SSL3_MT_CHANGE_CIPHER_SPEC`, 0x101) doesn't fit an octet and becomes 0,
+    /// HelloRequest's type, so a HelloRequest must never pass for a ChangeCipherSpec.
+    pub(crate) ccs: bool,
 }
 
 /// The handshake state as a `TLS_ST_*` number.
@@ -455,7 +460,12 @@ impl Connection {
         mt: u8,
         body: &[u8],
     ) -> Result<()> {
-        if mt == msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC) {
+        // Shared fix (tls-server): the CCS pseudo-type is 0 as an octet, HelloRequest's type,
+        // so the state says which is meant.
+        if mt == msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC)
+            && (self.st.hand_state == st(abi::TLS_ST_SW_CHANGE)
+                || self.st.hand_state == st(abi::TLS_ST_CW_CHANGE))
+        {
             let ccs = [msgs_type(abi::SSL3_MT_CCS)];
             self.write_record(p, msgs_type(abi::SSL3_RT_CHANGE_CIPHER_SPEC), &ccs)?;
             self.report_message(true, abi::SSL3_RT_CHANGE_CIPHER_SPEC, &ccs);
@@ -489,6 +499,7 @@ impl Connection {
                             ));
                         }
                         self.st.message_type = msgs_type(abi::SSL3_MT_CHANGE_CIPHER_SPEC);
+                        self.st.ccs = true;
                         self.st.message_size = 1;
                         self.cur_msg = Some((self.st.message_type, Vec::new()));
                         return Ok(Got::Yes);
@@ -511,6 +522,7 @@ impl Connection {
             return Err(Error::internal());
         };
         self.st.message_type = h.typ;
+        self.st.ccs = false;
         if self.sslv2_record {
             // The rest of the SSLv2 record is the ClientHello (`tls_get_message_header`).
             self.st.message_size = self.hs_in.len();

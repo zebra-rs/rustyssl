@@ -9,27 +9,19 @@ pub mod config;
 pub mod event;
 pub mod statem;
 
-#[expect(
-    dead_code,
-    reason = "the extension handlers the client's state machine fills in"
-)]
 pub(crate) mod client;
 #[expect(
     dead_code,
     reason = "the shared code, used as the role state machines arrive"
 )]
 pub(crate) mod common;
-#[expect(
-    dead_code,
-    reason = "the extension handlers the server's state machine fills in"
-)]
 pub(crate) mod server;
 
 use std::collections::VecDeque;
 
 use rustyssl_abi as abi;
 
-pub use config::{CertKey, Config, ExternalPsk, Session};
+pub use config::{CertKey, Config, ExternalPsk, Session, TicketKeys};
 pub use event::{Answer, Callbacks, Event, Request};
 
 use self::statem::{HsBytes, MsgFlow, Statem, msgs_type, st};
@@ -519,7 +511,6 @@ impl Connection {
     }
 
     /// Whether output is waiting to be taken: a flush point (`statem_flush`) waits for it.
-    #[expect(dead_code, reason = "the role state machines' flush points use it")]
     pub(crate) fn flushed(&self) -> bool {
         self.output.is_empty()
     }

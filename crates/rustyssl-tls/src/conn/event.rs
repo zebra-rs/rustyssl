@@ -102,6 +102,13 @@ pub enum Request {
     },
     /// A session to store (`new_session_cb`; and the internal cache).
     NewSession,
+    /// Shared addition (tls-server): removes the session with this ID from the server's cache
+    /// (`SSL_CTX_remove_session`, the TLS 1.3 anti-replay check of a single-use ticket),
+    /// answered with [`Answer::Allowed`]: whether it was there to remove.
+    RemoveSession {
+        /// The session ID.
+        id: Vec<u8>,
+    },
     /// The ticket key callback: encrypt (new ticket) or decrypt (received ticket).
     TicketKey {
         /// The key name (16 octets) of a received ticket; empty to make a new one.
