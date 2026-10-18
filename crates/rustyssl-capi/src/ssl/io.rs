@@ -20,6 +20,7 @@ pub(crate) mod api;
 pub(crate) mod config;
 pub(crate) mod requests;
 pub(crate) mod strings;
+pub(crate) mod ticket_key;
 
 use core::ffi::{c_int, c_long, c_void};
 use core::ptr;

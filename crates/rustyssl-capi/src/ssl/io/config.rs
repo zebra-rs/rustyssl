@@ -10,6 +10,7 @@ use rustyssl_abi::{
     EVP_PKEY, EXFLAG_KUSAGE, KU_DIGITAL_SIGNATURE, NID_undef, OSSL_LIB_CTX, SSL,
     SSL_MODE_NO_AUTO_CHAIN, X509, X509_NAME, X509_STORE, stack_st_X509, stack_st_X509_NAME,
 };
+use rustyssl_tls::conn::common::sigalgs;
 use rustyssl_tls::conn::{Callbacks, CertKey, Config};
 use rustyssl_tls::crypto::Provider;
 
@@ -386,6 +387,7 @@ unsafe fn cert_key(
     r: &SlotRefs,
     src: &ChainSource,
     ocsp: Option<Vec<u8>>,
+    table: &sigalgs::Cache,
 ) -> Option<CertKey> {
     // SAFETY: our reference to the key.
     let key = unsafe { prov.add_key(r.pkey) }?;
@@ -430,7 +432,8 @@ unsafe fn cert_key(
         chain,
         key,
         slot: r.slot,
-        schemes: Vec::new(),
+        // SAFETY: the slot's key; the library context and property query.
+        schemes: unsafe { usable_schemes(table, r.pkey, src.libctx, src.propq) },
         auth: slot_auth(r.slot),
         ec_group: group_of_nid(prov, nid),
         curve_nid: nid,
@@ -439,6 +442,66 @@ unsafe fn cert_key(
         raw_public_key,
         ocsp_response: ocsp,
     })
+}
+
+/// The schemes `pkey` can sign with, in the table's order: `check_cert_usable`'s
+/// `EVP_PKEY_digestsign_supports_digest` (a restricted RSA-PSS key refuses other digests), and
+/// for RSA-PSS schemes `rsa_pss_check_min_key_size`.
+///
+/// # Safety
+/// `pkey` is a live key; `libctx` is NULL or live; `propq` is NULL or a string.
+unsafe fn usable_schemes(
+    table: &sigalgs::Cache,
+    pkey: *mut EVP_PKEY,
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+) -> Vec<u16> {
+    use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free, EVP_MD_get_size};
+    use crate::evp::pkey::EVP_PKEY_get_size;
+    use crate::evp::sigver::EVP_PKEY_digestsign_supports_digest;
+    // Per digest NID: whether the key signs with it, and the digest's size.
+    let mut seen: Vec<(c_int, bool, c_int)> = Vec::new();
+    // SAFETY: the caller's key.
+    let key_size = unsafe { EVP_PKEY_get_size(pkey) };
+    let mut out = Vec::new();
+    for lu in table.table.iter().filter(|l| l.available) {
+        let (ok, md_size) = if let Some(&(_, ok, size)) = seen.iter().find(|m| m.0 == lu.hash) {
+            (ok, size)
+        } else {
+            let name = if lu.hash == NID_undef {
+                ptr::null()
+            } else {
+                // SAFETY: no preconditions; a static name or NULL.
+                unsafe { crate::objects::OBJ_nid2sn(lu.hash) }
+            };
+            // SAFETY: the caller's key, context and query; the name or NULL.
+            let ok = unsafe { EVP_PKEY_digestsign_supports_digest(pkey, libctx, name, propq) } > 0;
+            let size = if name.is_null() {
+                0
+            } else {
+                // SAFETY: as above.
+                let md = unsafe { EVP_MD_fetch(libctx, name, propq) };
+                // SAFETY: the digest fetched, or NULL (-1).
+                let size = unsafe { EVP_MD_get_size(md) };
+                // SAFETY: ours, or NULL.
+                unsafe { EVP_MD_free(md) };
+                size
+            };
+            seen.push((lu.hash, ok, size));
+            (ok, size)
+        };
+        if !ok {
+            continue;
+        }
+        // `RSA_PSS_MINIMUM_KEY_SIZE`: twice the digest plus two octets.
+        if lu.sig == sigalgs::Sig::RsaPss
+            && (md_size <= 0 || key_size < md_size.saturating_mul(2).saturating_add(2))
+        {
+            continue;
+        }
+        out.push(lu.sigalg);
+    }
+    out
 }
 
 /// The DER names of a stack of `X509_NAME`s.
@@ -527,9 +590,12 @@ pub(crate) unsafe fn certs(
         propq: snap.propq(),
     };
     let mut out = Vec::new();
+    // The algorithms a key's schemes come from (only made when there is a key).
+    let table = (!slots.is_empty()).then(|| sigalgs::Cache::new(prov));
     for r in &slots {
+        let Some(table) = table.as_ref() else { break };
         // SAFETY: our references; the context's stores.
-        if let Some(k) = unsafe { cert_key(prov, r, &src, ocsp.clone()) } {
+        if let Some(k) = unsafe { cert_key(prov, r, &src, ocsp.clone(), table) } {
             out.push(k);
         }
     }
@@ -699,6 +765,11 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
             // SAFETY: as above.
             ticket_dec: unsafe { super::super::ctx::ctx(st.session_ctx) }
                 .is_some_and(|c| c.state().decrypt_ticket_cb.is_some()),
+            // SAFETY: as above.
+            ticket_key: unsafe { super::super::ctx::ctx(st.session_ctx) }.is_some_and(|c| {
+                let cs = c.state();
+                cs.ticket_key_evp_cb.is_some() || cs.ticket_key_cb.is_some()
+            }),
             cookie_gen: snap.gen_stateless_cookie_cb.is_some(),
             // The client's select callback, or the server's advertisement callback.
             npn: if st.server {

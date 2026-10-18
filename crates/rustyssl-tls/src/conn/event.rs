@@ -122,10 +122,15 @@ pub enum Request {
         /// The session ID.
         id: Vec<u8>,
     },
-    /// The ticket key callback: encrypt (new ticket) or decrypt (received ticket).
+    /// The ticket key callback, whose cipher and HMAC contexts then do the ticket's
+    /// cryptography (`tls_decrypt_ticket`, `construct_stateless_ticket`), answered with
+    /// [`Answer::TicketKey`].
     TicketKey {
-        /// The key name (16 octets) of a received ticket; empty to make a new one.
-        name: Vec<u8>,
+        /// Decrypting: the received ticket (the callback gets its key name and IV). Empty when
+        /// encrypting.
+        ticket: Vec<u8>,
+        /// Encrypting: the session's encoding to seal. Empty when decrypting.
+        session: crate::crypto::Secret,
         /// Whether to encrypt.
         encrypt: bool,
     },
@@ -261,19 +266,16 @@ pub enum Answer {
     Padding(usize),
     /// A session (lookup result, PSK session), or `None`.
     Session(Option<super::Session>),
-    /// A ticket key callback's result: `1` use, `2` use and renew, `0` none, `-1` failure;
-    /// with the key name, the HMAC and cipher keys, and the IV it chose (encrypting).
+    /// A ticket key callback's result: `1` use, `2` use and renew, `0` none, negative for a
+    /// failure (also of the contexts' work: `SSL_TICKET_FATAL_ERR_OTHER`); and, after `1` or
+    /// `2`, what the contexts made.
     TicketKey {
         /// The callback's return value.
         ret: i32,
-        /// The key name.
-        name: Vec<u8>,
-        /// The cipher key.
-        aes_key: Vec<u8>,
-        /// The HMAC key.
-        hmac_key: Vec<u8>,
-        /// The IV.
-        iv: Vec<u8>,
+        /// Decrypting: the session's encoding, or `None` when the HMAC, the length or the
+        /// padding didn't check (`SSL_TICKET_NO_DECRYPT`). Encrypting: the ticket (key name,
+        /// IV, encrypted session, HMAC), or `None` if the contexts failed.
+        data: Option<crate::crypto::Secret>,
     },
     /// A PSK callback's result: the identity (client) and key, or nothing.
     Psk(Option<super::ExternalPsk>),

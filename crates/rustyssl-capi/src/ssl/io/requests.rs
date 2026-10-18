@@ -257,6 +257,14 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             Some(unsafe { ticket_decrypt(s, x, &keyname, status, session.as_deref()) })
         }
+        Request::TicketKey {
+            ticket,
+            session,
+            encrypt,
+        } => {
+            // SAFETY: as above.
+            Some(unsafe { super::ticket_key::answer(s, x, &ticket, &session, encrypt) })
+        }
         // SAFETY: as above.
         Request::StatelessCookieGen => Some(unsafe { stateless_cookie_gen(s, snap) }),
         Request::StatelessCookieVerify { cookie } => {
@@ -491,10 +499,16 @@ unsafe fn verify(
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
+<<<<<<< HEAD
     // The chain as the core received it (a server records it only after verification), or
     // the raw public key (`ssl_verify_rpk`).
     // SAFETY: the snapshot's library context and properties, alive with it.
     let owned = unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) };
+=======
+    // The chain as the core received it (a server records it only after verification).
+    // SAFETY: the snapshot's library context and properties, alive with it.
+    let owned = unsafe { Chain::of(peer, snap.libctx, snap.propq()) };
+>>>>>>> suite-internal-error
     let chain = owned.0;
     let key = Key(if rpk {
         // SAFETY: the context's library context and property query.
