@@ -1858,3 +1858,135 @@ fn no_scsv(mut h: Hello) -> Hello {
     h.ciphers.retain(|&c| c != 0x00ff);
     h
 }
+
+/// The client's OCSP status request (no responder IDs or extensions).
+fn ocsp_request() -> Vec<u8> {
+    crate::msgs::ext::status_request::encode(&crate::msgs::ext::status_request::Request::Ocsp {
+        responder_ids: Vec::new(),
+        extensions: Vec::new(),
+    })
+    .unwrap()
+}
+
+#[test]
+fn ocsp_stapling_tls12_and_tls13() {
+    use crate::conn::Answer;
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"ocsp");
+    let mut cfg = server_config(&p);
+    cfg.callbacks.status = true;
+    let response = b"an OCSP response".to_vec();
+    // TLS 1.2: a CertificateStatus after the Certificate, and an empty status_request.
+    let hello = hello12(&[0xc02f]).with(t::STATUS_REQUEST, ocsp_request());
+    let mut c = Connection::new(cfg.clone());
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, last) = drive_answering(&mut c, &p, &mut |r| {
+        assert_eq!(r, &Request::Status);
+        Answer::Status {
+            ret: abi::SSL_TLSEXT_ERR_OK,
+            response: Some(response.clone()),
+        }
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    let types: Vec<u8> = flight.iter().map(|m| m[0]).collect();
+    assert_eq!(
+        types,
+        [
+            ht::SERVER_HELLO,
+            ht::CERTIFICATE,
+            ht::CERTIFICATE_STATUS,
+            ht::SERVER_KEY_EXCHANGE,
+            ht::SERVER_HELLO_DONE
+        ]
+    );
+    let status = crate::msgs::cert::CertificateStatus::parse(&flight[2][4..]).unwrap();
+    assert_eq!(status.response, response);
+    let sh = crate::msgs::hello::ServerHello::parse(&flight[0][4..], false).unwrap();
+    let e = sh.extensions().unwrap();
+    assert!(e.iter().any(|x| x.typ == t::STATUS_REQUEST && x.body.is_empty()));
+    // The callback declines: nothing stapled.
+    let mut c = Connection::new(cfg.clone());
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
+        ret: abi::SSL_TLSEXT_ERR_NOACK,
+        response: None,
+    });
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    assert!(flight.iter().all(|m| m[0] != ht::CERTIFICATE_STATUS));
+    // A fatal answer is SSL_R_CLIENTHELLO_TLSEXT.
+    let mut c = Connection::new(cfg.clone());
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
+        ret: abi::SSL_TLSEXT_ERR_ALERT_FATAL,
+        response: None,
+    });
+    assert_eq!(
+        last.unwrap_err(),
+        Error::alert(abi::SSL_AD_INTERNAL_ERROR, abi::SSL_R_CLIENTHELLO_TLSEXT)
+    );
+    // TLS 1.3: the status in the leaf's Certificate entry.
+    let mut c = Connection::new(cfg);
+    let x = p.key_share(group::X25519).unwrap();
+    let h13 = x25519_hello(x.public().to_vec()).with(t::STATUS_REQUEST, ocsp_request());
+    c.feed(&plain_record(22, &h13.msg()));
+    let (out, last) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
+        ret: abi::SSL_TLSEXT_ERR_OK,
+        response: Some(response.clone()),
+    });
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    let mut client = Client::new();
+    let (_, sk) = server_share(&first_record(&out));
+    let shared = x.derive(&sk).unwrap();
+    client.hello(&p, &out, &[h13.msg()], shared.bytes());
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let flight = client.server_flight(&p, &cert);
+    let cm = crate::msgs::cert::Certificate::parse(&flight[1][4..], true, true).unwrap();
+    let exts = crate::msgs::ext::split(cm.entries[0].extensions.as_ref().unwrap()).unwrap();
+    assert_eq!(exts.len(), 1);
+    assert_eq!(exts[0].typ, t::STATUS_REQUEST);
+    let mut want = vec![1, 0, 0, u8::try_from(response.len()).unwrap()];
+    want.extend_from_slice(&response);
+    assert_eq!(exts[0].body, want);
+}
+
+#[test]
+fn tls12_encrypt_then_mac() {
+    let p = TestProvider::new(b"etm");
+    let hello = hello12(&[0xc027]).with(t::ENCRYPT_THEN_MAC, Vec::new());
+    let mut cfg = server_config(&p);
+    cfg.ciphers.push(crate::suites::by_protocol_id(0xc027).unwrap());
+    let mut c = Connection::new(cfg);
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    let sh = crate::msgs::hello::ServerHello::parse(&flight[0][4..], false).unwrap();
+    assert!(sh.extensions().unwrap().iter().any(|e| e.typ == t::ENCRYPT_THEN_MAC));
+    let cert = c.cfg.certs[0].chain[0].clone();
+    let (curve, point) = ske_point(&client, &p, &flight[2], &cert);
+    let share = p.key_share(curve).unwrap();
+    let public = share.public().to_vec();
+    let pms = share.derive(&point).unwrap();
+    let mut b = vec![u8::try_from(public.len()).unwrap()];
+    b.extend_from_slice(&public);
+    let mut out = client.send(&p, crate::consts::handshake::CLIENT_KEY_EXCHANGE, &b);
+    client.master(&p, pms.bytes(), true);
+    client.c.neg.etm = true;
+    out.extend(client.ccs_finished(&p));
+    c.feed(&out);
+    let (out, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::HandshakeDone);
+    client.server_flight(&p, &out);
+    assert!(c.neg.etm);
+    // With an AEAD suite it isn't used.
+    let hello = hello12(&[0xc02f]).with(t::ENCRYPT_THEN_MAC, Vec::new());
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let sh = crate::msgs::hello::ServerHello::parse(&first_record(&out)[4..], false).unwrap();
+    assert!(sh.extensions().unwrap().iter().all(|e| e.typ != t::ENCRYPT_THEN_MAC));
+    assert!(!c.hs.sh.use_etm);
+}
