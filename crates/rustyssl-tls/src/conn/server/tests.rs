@@ -2301,6 +2301,46 @@ fn tls13_resumption_with_a_ticket() {
     );
 }
 
+/// A ticket for a TLS 1.0 session (an MD5-SHA1 suite) offered as a TLS 1.3 PSK: its suite's
+/// hash isn't the TLS 1.3 suite's, so the server ignores it and runs a full handshake (it
+/// doesn't check the binder).
+#[test]
+fn tls13_ignores_an_older_versions_ticket() {
+    let p = TestProvider::new(b"old ticket");
+    let old = crate::conn::Session {
+        version: v::TLS1,
+        // TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA.
+        cipher_id: 0x0300_c013,
+        session_id: vec![1; 32],
+        master_key: vec![2; 48],
+        time: server_config(&p).now,
+        timeout: 7200,
+        ..crate::conn::Session::default()
+    };
+    let mut sealer = Connection::new(server_config(&p));
+    let ticket = super::ticket::seal_for_test(&mut sealer, &p, &old);
+    let x = p.key_share(group::X25519).unwrap();
+    // The binder as a client keeping the session's own hash makes it: MD5-SHA1's 36 octets.
+    let offer = crate::msgs::ext::psk::Strict {
+        identities: vec![crate::msgs::ext::psk::Identity {
+            identity: ticket,
+            obfuscated_ticket_age: 0,
+        }],
+        binders: vec![vec![0; 36]],
+    };
+    let hello = x25519_hello(x.public().to_vec())
+        .with(
+            t::PSK_KEY_EXCHANGE_MODES,
+            crate::msgs::ext::psk_key_exchange_modes::encode(&[1]).unwrap(),
+        )
+        .with(t::PRE_SHARED_KEY, offer.encode().unwrap());
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap(), Event::NeedInput);
+    assert!(!c.neg.reused);
+}
+
 #[test]
 fn tls13_external_psk() {
     use crate::conn::Answer;
