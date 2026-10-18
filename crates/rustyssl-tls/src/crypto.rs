@@ -171,7 +171,11 @@ impl CipherAlg {
     #[must_use]
     pub const fn key_len(self) -> usize {
         match self {
-            Self::Aes128Cbc | Self::Camellia128Cbc | Self::Aria128Cbc | Self::SeedCbc | Self::Sm4Cbc => 16,
+            Self::Aes128Cbc
+            | Self::Camellia128Cbc
+            | Self::Aria128Cbc
+            | Self::SeedCbc
+            | Self::Sm4Cbc => 16,
             Self::Aes256Cbc | Self::Camellia256Cbc | Self::Aria256Cbc => 32,
             Self::DesEde3Cbc => 24,
             Self::Null => 0,
@@ -373,5 +377,6 @@ pub trait Provider {
     ///
     /// # Errors
     /// The key isn't RSA, or the provider failed (not a padding failure, which is never seen).
-    fn rsa_decrypt_pms(&self, key: KeyId, ciphertext: &[u8], client_version: u16) -> Result<Secret>;
+    fn rsa_decrypt_pms(&self, key: KeyId, ciphertext: &[u8], client_version: u16)
+    -> Result<Secret>;
 }

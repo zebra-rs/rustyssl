@@ -19,6 +19,7 @@ rustyssl-abi = { path = "../crates/rustyssl-abi" }
 rustyssl-asn1 = { path = "../crates/rustyssl-asn1" }
 rustyssl-capi = { path = "../crates/rustyssl-capi" }
 rustyssl-crypto = { path = "../crates/rustyssl-crypto" }
+rustyssl-tls = { path = "../crates/rustyssl-tls" }
 
 [workspace]
 
@@ -637,5 +638,11 @@ doc = false
 [[bin]]
 name = "txt_db_read"
 path = "fuzz_targets/txt_db_read.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "tls_msgs"
+path = "fuzz_targets/tls_msgs.rs"
 test = false
 doc = false
