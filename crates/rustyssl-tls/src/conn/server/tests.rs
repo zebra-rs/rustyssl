@@ -1211,17 +1211,23 @@ fn ticket_session_encoding_round_trips() {
         ext_flags: 1,
         ticket_appdata: Some(b"app".to_vec()),
         kex_group: 0x001d,
+        srp_username: Some(b"user".to_vec()),
     };
     let enc = ticket::encode_session(&s).unwrap();
-    assert_eq!(enc.first(), Some(&7));
+    assert_eq!(enc.first(), Some(&15));
     assert_eq!(ticket::decode_session(&enc), Some(s.clone()));
     assert_eq!(ticket::decode_session(&enc[..enc.len() - 1]), None);
     let mut over = enc.clone();
     over.push(0);
     assert_eq!(ticket::decode_session(&over), None);
     assert_eq!(ticket::decode_session(&[2]), None);
-    // Each optional field alone, and neither (format 1, the length the trace shows).
-    for (appdata, rpk, format) in [(false, false, 1), (true, false, 3), (false, true, 5)] {
+    // Each optional field alone, and none (format 1, the length the trace shows).
+    for (appdata, rpk, srp, format) in [
+        (false, false, false, 1),
+        (true, false, false, 3),
+        (false, true, false, 5),
+        (false, false, true, 9),
+    ] {
         let mut t = s.clone();
         if !appdata {
             t.ticket_appdata = None;
@@ -1229,13 +1235,16 @@ fn ticket_session_encoding_round_trips() {
         if !rpk {
             t.peer_rpk = None;
         }
+        if !srp {
+            t.srp_username = None;
+        }
         let enc = ticket::encode_session(&t).unwrap();
         assert_eq!(enc.first(), Some(&format));
         assert_eq!(ticket::decode_session(&enc), Some(t));
     }
     let mut unknown = enc;
     if let Some(f) = unknown.first_mut() {
-        *f |= 8;
+        *f |= 16;
     }
     assert_eq!(ticket::decode_session(&unknown), None);
 }

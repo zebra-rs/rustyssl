@@ -95,6 +95,8 @@ pub struct Session {
     /// The group of its key exchange (`kex_group`; 0: none, as for TLS 1.2's FFDHE), which a
     /// resumed TLS 1.2 handshake reports (`SSL_get_negotiated_group`).
     pub kex_group: u16,
+    /// The SRP login of an SRP key exchange (`srp_username`), or `None`.
+    pub srp_username: Option<Vec<u8>>,
 }
 
 /// An external PSK (`SSL_CTX_set_psk_use_session_callback` / `psk_find_session_cb`, or the

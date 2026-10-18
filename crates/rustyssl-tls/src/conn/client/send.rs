@@ -123,6 +123,8 @@ pub(super) fn construct_client_key_exchange(
     } else if mkey & SSL_kSRP != 0 {
         let a = state(c)?.srp_a.clone().ok_or_else(Error::internal)?;
         w.vec(2, &a).map_err(|_| Error::internal())?;
+        // The session's `srp_username` (`tls_construct_cke_srp`).
+        c.neg.session.srp_username.clone_from(&c.cfg.srp_login);
         let Some(pms) = srp_client_secret(c)? else {
             return Ok(Construct::Ask);
         };
