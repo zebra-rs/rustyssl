@@ -499,16 +499,10 @@ unsafe fn verify(
         err::raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR, F);
         return None;
     };
-<<<<<<< HEAD
     // The chain as the core received it (a server records it only after verification), or
     // the raw public key (`ssl_verify_rpk`).
     // SAFETY: the snapshot's library context and properties, alive with it.
     let owned = unsafe { Chain::of(if rpk { &[] } else { peer }, snap.libctx, snap.propq()) };
-=======
-    // The chain as the core received it (a server records it only after verification).
-    // SAFETY: the snapshot's library context and properties, alive with it.
-    let owned = unsafe { Chain::of(peer, snap.libctx, snap.propq()) };
->>>>>>> suite-internal-error
     let chain = owned.0;
     let key = Key(if rpk {
         // SAFETY: the context's library context and property query.
