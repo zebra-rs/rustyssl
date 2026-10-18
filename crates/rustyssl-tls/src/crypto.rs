@@ -250,6 +250,7 @@ pub trait KeyShare: Send {
     /// The encoded public value.
     fn public(&self) -> &[u8];
     /// The shared secret with the peer's encoded share (for a KEM, the server's ciphertext).
+    /// Diffie-Hellman secrets come padded to the prime's length (TLS 1.3's form).
     ///
     /// # Errors
     /// The peer's share is invalid, or the provider failed.
@@ -322,6 +323,24 @@ pub trait Provider {
     /// The algorithm isn't available, or the key is wrong.
     fn cipher(&self, alg: CipherAlg, key: &[u8], encrypt: bool) -> Result<Box<dyn Cipher>>;
 
+    /// TLS 1.0–1.2's MAC of a decrypted MAC-then-encrypt CBC record, in constant time: the HMAC
+    /// keyed with `key` of the 13-octet `header` (sequence number, type, version, length) and
+    /// the first `data_size` octets of `data`, where `data` is the record's plaintext with its
+    /// MAC and padding (the public length) and `data_size` the length the padding gave (secret).
+    /// The time taken depends on `data.len()` only (OpenSSL's `ssl3_cbc_digest_record`, which
+    /// its HMAC computes when given `OSSL_MAC_PARAM_TLS_DATA_SIZE`).
+    ///
+    /// # Errors
+    /// The hash isn't one the constant-time MAC supports, or the provider failed.
+    fn tls_cbc_mac(
+        &self,
+        alg: HashAlg,
+        key: &[u8],
+        header: &[u8; 13],
+        data: &[u8],
+        data_size: usize,
+    ) -> Result<Vec<u8>>;
+
     /// The groups available, in the providers' order.
     fn groups(&self) -> Vec<GroupInfo>;
 
@@ -333,6 +352,15 @@ pub trait Provider {
     /// # Errors
     /// The group isn't available.
     fn key_share(&self, id: u16) -> Result<Box<dyn KeyShare>>;
+
+    /// A Diffie-Hellman key share over explicit parameters (TLS 1.2's DHE, whose
+    /// ServerKeyExchange carries the prime `p` and generator `g`, big-endian). The public value
+    /// and the secret are padded to the prime's length; TLS 1.2 strips the secret's leading
+    /// zeros itself (OpenSSL pads only for TLS 1.3).
+    ///
+    /// # Errors
+    /// The parameters are unusable, or the provider failed.
+    fn dh_share(&self, p: &[u8], g: &[u8]) -> Result<Box<dyn KeyShare>>;
 
     /// The server's answer to the client's share for group `id`: its own share (for a KEM, the
     /// ciphertext) and the shared secret.

@@ -508,6 +508,7 @@ dependencies = [
  "rustyssl-asn1",
  "rustyssl-crypto",
  "rustyssl-pki",
+ "subtle",
  "zeroize",
 ]
 

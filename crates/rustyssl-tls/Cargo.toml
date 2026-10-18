@@ -13,7 +13,13 @@ rustyssl-asn1.workspace = true
 rustyssl-crypto.workspace = true
 rustyssl-abi.workspace = true
 rustyssl-pki.workspace = true
+subtle.workspace = true
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
+
+[features]
+# The crate's own test provider (crypto through rustyssl-crypto directly, with deterministic
+# randomness) for the fuzz targets. Never enabled by anything that ships.
+test-provider = []
 
 [lints]
 workspace = true
