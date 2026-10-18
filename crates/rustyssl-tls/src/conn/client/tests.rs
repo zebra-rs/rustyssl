@@ -2026,23 +2026,40 @@ fn server_config(p: &TestProvider) -> Config {
         max_send_fragment: 16384,
         num_tickets: 2,
         now: 1_700_000_000,
+        ticket_keys: Some(crate::conn::TicketKeys {
+            name: [7; 16],
+            hmac_key: crate::crypto::Secret::new(vec![8; 32]),
+            aes_key: crate::crypto::Secret::new(vec![9; 32]),
+        }),
         ..Config::default()
     }
 }
 
 #[test]
-#[ignore = "needs the server's state machine (step 7.3)"]
 fn loopback_with_the_server() {
     use crate::conn::pair::{self, End};
     for (max, suite) in [(v::TLS1_3, 0x1301), (v::TLS1_2, 0xc02f)] {
         let p = TestProvider::new(b"loopback");
         let mut ccfg = client12();
         ccfg.max_version = max;
+        ccfg.callbacks.info = true;
+        ccfg.callbacks.msg = true;
+        let mut scfg = server_config(&p);
+        scfg.callbacks.info = true;
+        scfg.callbacks.msg = true;
         let mut client = Connection::new(ccfg);
-        let mut server = Connection::new(server_config(&p));
+        let mut server = Connection::new(scfg);
         let mut log = pair::Log::default();
         let mut answer = |_: End, r: &Request| accept(r);
-        pair::handshake(&p, &mut client, &mut server, true, &mut answer, &mut log).unwrap();
+        let r = pair::handshake(&p, &mut client, &mut server, true, &mut answer, &mut log);
+        assert!(
+            r.is_ok(),
+            "{r:?}: server state {}, client state {}\nserver: {:?}\nclient: {:?}",
+            server.state(),
+            client.state(),
+            log.server,
+            log.client
+        );
         assert_eq!(client.negotiated().version, max);
         assert_eq!(client.negotiated().cipher.unwrap().protocol_id(), suite);
         assert_eq!(

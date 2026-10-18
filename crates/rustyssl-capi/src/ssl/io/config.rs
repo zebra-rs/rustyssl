@@ -42,6 +42,12 @@ pub(crate) struct CtxSnapshot {
     pub(crate) client_ca_names: *mut stack_st_X509_NAME,
     pub(crate) libctx: *mut OSSL_LIB_CTX,
     pub(crate) propq: Option<CString>,
+    /// `SSL_CTX_set_session_cache_mode`.
+    pub(crate) session_cache_mode: u32,
+    /// `SSL_CTX_set_timeout`.
+    pub(crate) session_timeout: core::ffi::c_long,
+    /// The ticket keys every `SSL_CTX` makes (`SSL_CTX_set_tlsext_ticket_keys`).
+    pub(crate) ticket_keys: rustyssl_tls::conn::TicketKeys,
 }
 
 impl CtxSnapshot {
@@ -74,7 +80,21 @@ pub(crate) fn ctx_snapshot(c: &Ctx) -> CtxSnapshot {
         client_ca_names: cs.client_ca_names,
         libctx: c.libctx,
         propq: c.propq.clone(),
+        session_cache_mode: cs.session_cache_mode,
+        session_timeout: cs.session_timeout,
+        ticket_keys: rustyssl_tls::conn::TicketKeys {
+            name: cs.tick_key_name,
+            hmac_key: rustyssl_tls::crypto::Secret::new(cs.tick_hmac_key.to_vec()),
+            aes_key: rustyssl_tls::crypto::Secret::new(cs.tick_aes_key.to_vec()),
+        },
     }
+}
+
+/// The time now in seconds since the epoch (`ossl_time_now`).
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
 /// The connection's context, copied out (`None` without one).
@@ -533,6 +553,11 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         dh_tmp: !st.cert.dh_tmp.is_null()
             || st.cert.dh_tmp_cb.is_some()
             || st.cert.dh_tmp_auto != 0,
+        dh_auto: st.cert.dh_tmp_auto != 0,
+        now: now(),
+        session_cache_mode: i64::from(snap.session_cache_mode),
+        session_timeout: i64::from(snap.session_timeout),
+        ticket_keys: Some(snap.ticket_keys.clone()),
         callbacks: Callbacks {
             info: st.info_callback.is_some() || snap.info_callback.is_some(),
             msg: st.msg_callback.is_some(),

@@ -226,6 +226,10 @@ pub(crate) unsafe fn handle(
             };
             Some(Answer::Status { ret, response })
         }
+        // No internal session cache yet: removing a session from it always succeeds.
+        Request::RemoveSession { .. } => Some(Answer::Allowed(true)),
+        // CT validation isn't enabled yet (`SSL_enable_ct` comes with step 7.4).
+        Request::CtValidate => Some(Answer::Continue),
         // The configuration never asks for these yet (their callbacks aren't wired): answering
         // wrongly could accept what the application would refuse.
         _ => {
