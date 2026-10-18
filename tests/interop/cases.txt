@@ -1,6 +1,7 @@
 # TLS interop cases (cargo xtask test-interop): name | s_server arguments | s_client arguments.
 # Placeholders: {rsa} {ec} {p521} {ed25519} (the server's certificate and key), {client} (the
-# client's), {ca} (the root), {dir} (the PKI's directory).
+# client's), {ca} (the root), {srpvfile} (an SRP verifier file: user "user", password
+# "password"), {dir} (the PKI's directory).
 # Client directives: +full (no -brief; the session lines), +resume (a second connection
 # resuming the first's session), +early (with +resume: early data on the second), +cmd=X (send the command line X, R or k or K, first).
 # Each case runs in four pairings (reference/reference is the expectation; the server echoes
@@ -47,3 +48,5 @@ tls12-aes128-sha256 | | {ca} -tls1_2 -cipher AES128-SHA256
 tls11 | -cipher DEFAULT@SECLEVEL=0 | {ca} -tls1_1 -cipher DEFAULT@SECLEVEL=0
 tls13-trace | -num_tickets 0 | {ca} +trace
 tls12-trace | | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256 +trace
+tls12-srp | {srpvfile} | -tls1_2 -cipher SRP-AES-128-CBC-SHA -srpuser user -srppass password
+tls12-srp-rsa | {srpvfile} | {ca} -tls1_2 -cipher SRP-RSA-AES-256-CBC-SHA -srpuser user -srppass password

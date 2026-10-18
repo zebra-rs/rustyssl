@@ -99,6 +99,9 @@ pub struct State {
     pub(crate) kx_key: Option<Box<dyn KeyShare>>,
     /// The group (ECDHE) or the prime (DHE) of that key, as sent.
     pub(crate) kx_group: u16,
+    /// An SRP server's N as its ServerKeyExchange sent it (the client's A is checked
+    /// against it).
+    pub(crate) srp_n: Option<Vec<u8>>,
     /// The TLS 1.2-style PSK identity received (`s->session->psk_identity`).
     pub(crate) psk_identity: Option<Vec<u8>>,
     /// The PSK the server's PSK callback gave for it.

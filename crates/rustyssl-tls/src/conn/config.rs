@@ -213,6 +213,12 @@ pub struct Config {
     /// Whether SRP is configured (a client's `SSL_set_srp_username`, so `srp_Mask` has
     /// `SSL_kSRP`); without it SRP suites are disabled.
     pub srp: bool,
+    /// A client's SRP login (`s->srp_ctx.login`, at most 255 octets), sent in the srp
+    /// extension.
+    pub srp_login: Option<Vec<u8>>,
+    /// A client's minimum SRP prime size in bits (`s->srp_ctx.strength`, `SRP_MINIMAL_N` by
+    /// default).
+    pub srp_strength: i32,
     /// Whether a server can do DHE: DH parameters set (`SSL_set0_tmp_dh_pkey`), a
     /// `tmp_dh_callback`, or `SSL_set_dh_auto`.
     pub dh_tmp: bool,

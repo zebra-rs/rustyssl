@@ -69,7 +69,7 @@ use crate::x509::store::{X509_STORE_free, X509_STORE_new};
 use crate::x509::vpm::{X509_VERIFY_PARAM_free, X509_VERIFY_PARAM_new};
 
 /// The SRP settings (`SRP_CTX`'s client side, as far as the context stores them).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Srp {
     /// The username (`login`).
     pub(crate) login: Option<CString>,
@@ -89,6 +89,23 @@ pub(crate) struct Srp {
     pub(crate) give_client_pwd_cb: SrpClientPwdCb,
     /// Whether the password callback is the built-in one returning `info`.
     pub(crate) pwd_from_info: bool,
+}
+
+impl Default for Srp {
+    /// `ssl_ctx_srp_ctx_init_intern`: nothing set, the minimal strength.
+    fn default() -> Self {
+        Self {
+            login: None,
+            info: None,
+            strength: rustyssl_abi::SRP_MINIMAL_N,
+            cb_arg: ptr::null_mut(),
+            enabled: false,
+            username_cb: None,
+            verify_param_cb: None,
+            give_client_pwd_cb: None,
+            pwd_from_info: false,
+        }
+    }
 }
 
 /// A context's settings, with OpenSSL's field names (`struct ssl_ctx_st`).

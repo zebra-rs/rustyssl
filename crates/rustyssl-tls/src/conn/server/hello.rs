@@ -538,8 +538,9 @@ pub(crate) fn post_process_client_hello(
         }
         set_stage(c, stage::DONE)?;
     }
-    // SRP (`ssl_check_srp_ext_ClientHello`): SRP suites are only chosen with SRP configured,
-    // which a server can't be here.
+    if !tls13 && !check_srp_ext(c)? {
+        return Ok(Work::MoreC);
+    }
     if let Some(s) = super::state_ref(c)
         && s.hello.is_some()
     {
@@ -547,6 +548,44 @@ pub(crate) fn post_process_client_hello(
     }
     // OpenSSL's WORK_FINISHED_STOP from post-processing turns to writing.
     Ok(Work::FinishedSwap)
+}
+
+/// `ssl_check_srp_ext_ClientHello`: for an SRP suite with a username callback, the
+/// client's login (none: `SSL_R_PSK_IDENTITY_NOT_FOUND`, unknown-psk-identity) goes to the
+/// callback ([`Request::SrpUsername`]), which makes B; its fatal result fails with the alert
+/// it chose (`SSL_R_PSK_IDENTITY_NOT_FOUND` for unknown-psk-identity, else
+/// `SSL_R_CLIENTHELLO_TLSEXT`). `false` while waiting.
+fn check_srp_ext(c: &mut Connection) -> Result<bool> {
+    check_srp_ext_inner(c).in_func("ssl_check_srp_ext_ClientHello")
+}
+
+/// See [`check_srp_ext`].
+fn check_srp_ext_inner(c: &mut Connection) -> Result<bool> {
+    let srp =
+        c.hs.new_cipher
+            .is_some_and(|cp| cp.mkey & crate::suites::masks::SSL_kSRP != 0);
+    if !srp || !c.cfg.callbacks.srp_username {
+        return Ok(true);
+    }
+    let Some(login) = c.hs.sh.srp_login.clone() else {
+        return Err(Error::alert(
+            abi::SSL_AD_UNKNOWN_PSK_IDENTITY,
+            abi::SSL_R_PSK_IDENTITY_NOT_FOUND,
+        ));
+    };
+    match ask_once(c, Request::SrpUsername { login }, 0) {
+        None => Ok(false),
+        Some(Answer::SrpUsername { ret, alert }) if ret == abi::SSL3_AL_FATAL => {
+            let reason = if alert == abi::SSL_AD_UNKNOWN_PSK_IDENTITY {
+                abi::SSL_R_PSK_IDENTITY_NOT_FOUND
+            } else {
+                abi::SSL_R_CLIENTHELLO_TLSEXT
+            };
+            Err(Error::alert(alert, reason))
+        }
+        Some(Answer::SrpUsername { .. }) => Ok(true),
+        Some(_) => Err(Error::internal()),
+    }
 }
 
 /// `tls_handle_status_request`: with a status request and a status callback, the callback

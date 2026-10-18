@@ -15,6 +15,7 @@ pub mod groups;
 pub mod keys;
 pub mod security;
 pub mod sigalgs;
+pub mod srp;
 pub mod version;
 
 use core::ffi::c_int;

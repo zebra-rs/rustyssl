@@ -14,6 +14,7 @@ use crate::error::{Error, InFunc, Result};
 use crate::keysched::keylog;
 use crate::suites::masks::{
     SSL_PSK, SSL_kDHE, SSL_kDHEPSK, SSL_kECDHE, SSL_kECDHEPSK, SSL_kPSK, SSL_kRSA, SSL_kRSAPSK,
+    SSL_kSRP,
 };
 
 /// `PSK_MAX_PSK_LEN` and `PSK_MAX_IDENTITY_LEN`.
@@ -119,10 +120,40 @@ pub(super) fn construct_client_key_exchange(
         let kx = state(c)?.kx12.take().ok_or_else(Error::internal)?;
         w.vec(1, &kx.public).map_err(|_| Error::internal())?;
         state(c)?.pms = Some(kx.pms);
+    } else if mkey & SSL_kSRP != 0 {
+        let a = state(c)?.srp_a.clone().ok_or_else(Error::internal)?;
+        w.vec(2, &a).map_err(|_| Error::internal())?;
+        let Some(pms) = srp_client_secret(c)? else {
+            return Ok(Construct::Ask);
+        };
+        state(c)?.pms = Some(pms);
     } else if mkey & SSL_kPSK == 0 {
         return Err(Error::internal());
     }
     Ok(Construct::Send(w.into_bytes()))
+}
+
+/// `srp_generate_client_master_secret`'s premaster secret ([`Request::SrpClientSecret`]):
+/// `SSL_R_CALLBACK_FAILED` when the password callback gives none, else internal-error when
+/// it can't be made. `None` while waiting.
+fn srp_client_secret(c: &mut Connection) -> Result<Option<Secret>> {
+    srp_client_secret_inner(c).in_func("srp_generate_client_master_secret")
+}
+
+/// See [`srp_client_secret`].
+fn srp_client_secret_inner(c: &mut Connection) -> Result<Option<Secret>> {
+    match ask_once(c, Request::SrpClientSecret, 0) {
+        None => Ok(None),
+        Some(Answer::SrpValue(Some(k))) => Ok(Some(Secret::new(k))),
+        Some(Answer::Fail { alert, reason }) => Err(Error::alert(
+            alert.map_or(abi::SSL_AD_INTERNAL_ERROR, core::ffi::c_int::from),
+            reason,
+        )),
+        Some(_) => Err(Error::alert_lib(
+            abi::SSL_AD_INTERNAL_ERROR,
+            abi::ERR_R_INTERNAL_ERROR,
+        )),
+    }
 }
 
 /// `tls_client_key_exchange_post_work`: the master secret (`ssl_generate_master_secret`,
