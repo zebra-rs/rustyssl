@@ -2,7 +2,8 @@
 # program name) on the reference and then on rustyssl, one test (or one iteration of a test) per
 # process. Each line is a program and its arguments as its recipe in test/recipes/ passes them,
 # with {src} for the reference's source tree and {tmp} for a scratch file of the run's own. A
-# `skip` line names a program that isn't run, and why.
+# `whole` line runs its program once, as one subtest. A `skip` line names a program that isn't
+# run, and why; an `internal` line, a program's tests that read libssl's private structures.
 
 # 90-test_sslapi.t (the default provider's run)
 sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
@@ -57,7 +58,9 @@ sslbuffertest {src}/apps/server.pem {src}/apps/server.pem
 tls13ccstest {src}/apps/server.pem {src}/apps/server.pem
 # 70-test_tls13ticket.t, 70-test_tls13groupselection.t, 90-test_rpk.t
 tls13ticket_test {src}/apps/server.pem {src}/apps/server.pem
-tls13groupselection_test {src}/apps/server.pem {src}/apps/server.pem
+# (tls13groupselection_test takes its certificate from the first of argv whatever options come
+# before it, so it runs once, as one subtest)
+whole tls13groupselection_test {src}/apps/server.pem {src}/apps/server.pem
 rpktest {src}/test/certs
 # DTLS (Phase 8): 80-test_dtls.t, 80-test_dtlsv1listen.t, 80-test_dtls_mtu.t, 70-test_bad_dtls.t
 dtlstest {src}/apps/server.pem {src}/apps/server.pem

@@ -43,6 +43,9 @@ const DASYNC: &str = if cfg!(target_os = "macos") {
 struct Line {
     program: String,
     args: Vec<String>,
+    /// Whether it runs as one subtest (a `whole` line): its program reads its arguments in a
+    /// way that options before them break.
+    whole: bool,
 }
 
 impl Line {
@@ -110,9 +113,18 @@ impl List {
                         list.internal.push((program.to_owned(), test.to_owned()));
                     }
                 }
+                "whole" => list.lines.push(Line {
+                    program: words
+                        .next()
+                        .ok_or(format!("{}: `{line}`", path.display()))?
+                        .to_owned(),
+                    args: words.map(str::to_owned).collect(),
+                    whole: true,
+                }),
                 program => list.lines.push(Line {
                     program: program.to_owned(),
                     args: words.map(str::to_owned).collect(),
+                    whole: false,
                 }),
             }
         }
@@ -269,6 +281,60 @@ fn first_error(text: &str) -> Option<String> {
         .map(|l| (*l).to_owned())
 }
 
+/// The first error the library queued in `text` (testutil prints the queue after a failed
+/// check), as `function: reason`: the first that isn't an alert received from the peer (the
+/// peer's own error, when there is one, says why it sent it), else the first.
+fn first_queued_error(text: &str) -> Option<String> {
+    let mut errors = text.lines().filter_map(|line| {
+        // `THREAD:error:CODE:LIBRARY:FUNCTION:REASON:FILE:LINE:DATA`
+        let fields: Vec<&str> = line
+            .trim()
+            .trim_start_matches('#')
+            .trim()
+            .split(':')
+            .collect();
+        match fields.as_slice() {
+            [_, "error", code, _, function, reason, ..]
+                if code.len() == 8 && code.chars().all(|c| c.is_ascii_hexdigit()) =>
+            {
+                Some((reason.contains("alert"), format!("{function}: {reason}")))
+            }
+            _ => None,
+        }
+    });
+    let first = errors.next()?;
+    if !first.0 {
+        return Some(first.1);
+    }
+    Some(errors.find(|(alert, _)| !alert).unwrap_or(first).1)
+}
+
+/// What a failed run is grouped by: the library's first queued error, or else the test's
+/// first `ERROR` line; `ssl_test`'s, which is always the same comparison, gives way to the
+/// message after it (`ExpectedResult mismatch: expected Success, got ServerFail.`).
+fn failure_cause(text: &str, status: ExitStatus) -> String {
+    if let Some(error) = first_queued_error(text) {
+        return error;
+    }
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let checked = lines
+        .iter()
+        .position(|l| l.starts_with("# ERROR:") && l.contains("@ test/ssl_test.c"));
+    if let Some(at) = checked {
+        let message = lines
+            .iter()
+            .skip(at)
+            .skip_while(|l| !l.starts_with("# INFO:"))
+            .nth(1)
+            .and_then(|l| l.strip_prefix('#'))
+            .map(str::trim);
+        if let Some(message) = message.filter(|m| !m.is_empty()) {
+            return message.to_owned();
+        }
+    }
+    first_error(text).unwrap_or_else(|| format!("{status} without an ERROR line"))
+}
+
 fn classify(status: Option<ExitStatus>, text: &str) -> Outcome {
     if let Some(at) = text.find(" is not implemented yet; aborting") {
         let before = text.get(..at).unwrap_or_default();
@@ -293,9 +359,7 @@ fn classify(status: Option<ExitStatus>, text: &str) -> Outcome {
         }
     }
     if !status.success() {
-        return Outcome::Failed(
-            first_error(text).unwrap_or_else(|| format!("{status} without an ERROR line")),
-        );
+        return Outcome::Failed(failure_cause(text, status));
     }
     if text
         .lines()
@@ -400,7 +464,7 @@ fn category(outcome: &Outcome, internal: bool) -> &'static str {
 /// What a failure is grouped by.
 fn cause(outcome: &Outcome, label: &str, test: &str) -> String {
     match outcome {
-        Outcome::Stub(name) => format!("`{name}` is a stub"),
+        Outcome::Stub(name) => format!("`{name}` is not implemented yet"),
         Outcome::MissingSymbol(symbol) => format!("`{symbol}` isn't exported"),
         Outcome::Signal(signal, error) if error.is_empty() => {
             format!("{} in {label} {test}", signal_name(*signal))
@@ -452,6 +516,15 @@ pub fn run(
         let Some(line) = list.lines.get(n) else {
             continue;
         };
+        if line.whole {
+            units.push(Unit {
+                line: n,
+                id: 0,
+                test: line.program.clone(),
+                iteration: None,
+            });
+            continue;
+        }
         match list_tests(&setting, line, &theirs, n) {
             Ok(found) => units.extend(found),
             Err(e) => {
@@ -609,7 +682,11 @@ fn run_unit(
     let mut excerpt = String::new();
     for (lib, side) in [(theirs, "ref"), (ours, "ours")] {
         let tmp = setting.work.join(format!("{i}.{side}.tmp"));
-        let mut args = vec!["-test".to_owned(), unit.id.to_string()];
+        let mut args = Vec::new();
+        if !line.whole {
+            args.push("-test".to_owned());
+            args.push(unit.id.to_string());
+        }
         if let Some(iteration) = unit.iteration {
             args.push("-iter".to_owned());
             args.push(iteration.to_string());
@@ -718,15 +795,26 @@ fn write_report(
     let mut ranked: Vec<_> = groups.iter().collect();
     ranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then(a.0.cmp(b.0)));
     writeln!(md, "## Root causes, by subtests blocked\n")?;
-    writeln!(md, "| # | subtests | category | root cause | examples |")?;
-    writeln!(md, "|---:|---:|---|---|---|")?;
+    writeln!(
+        md,
+        "| # | subtests | tests | category | root cause | examples |"
+    )?;
+    writeln!(md, "|---:|---:|---:|---|---|---|")?;
     for (rank, ((category, cause), units)) in ranked.iter().enumerate() {
         let examples: Vec<&str> = units.iter().take(3).map(|(u, _)| u.as_str()).collect();
+        // The tests, iterations aside.
+        let mut tests: Vec<&str> = units
+            .iter()
+            .map(|(u, _)| u.rsplit_once(" #").map_or(u.as_str(), |(t, _)| t))
+            .collect();
+        tests.sort_unstable();
+        tests.dedup();
         writeln!(
             md,
-            "| {} | {} | {category} | {} | {} |",
+            "| {} | {} | {} | {category} | {} | {} |",
             rank + 1,
             units.len(),
+            tests.len(),
             cause.replace('|', "\\|"),
             examples.join("; ").replace('|', "\\|")
         )?;
@@ -736,8 +824,19 @@ fn write_report(
     writeln!(md, "## Details\n")?;
     for ((category, cause), units) in &ranked {
         writeln!(md, "### [{category}] {cause}\n")?;
-        let names: Vec<&str> = units.iter().map(|(u, _)| u.as_str()).collect();
-        writeln!(md, "{} subtest(s): {}\n", units.len(), names.join(", "))?;
+        let names: Vec<&str> = units.iter().take(40).map(|(u, _)| u.as_str()).collect();
+        let more = units.len().saturating_sub(names.len());
+        let more = if more > 0 {
+            format!(", and {more} more")
+        } else {
+            String::new()
+        };
+        writeln!(
+            md,
+            "{} subtest(s): {}{more}\n",
+            units.len(),
+            names.join(", ")
+        )?;
         if let Some((unit, excerpt)) = units.first() {
             writeln!(md, "rustyssl's output for {unit}:\n\n```\n{excerpt}\n```\n")?;
         }
