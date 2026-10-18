@@ -208,6 +208,17 @@ fn early_data_count_ok(
     Ok(())
 }
 
+/// Octets OpenSSL decodes with libcrypto where this core only checks their framing: when they
+/// don't decode, OpenSSL's queue has the decoder's entries before the handshake's
+/// `ERR_R_ASN1_LIB`, so the caller decodes them again to raise those.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DecodeFailure {
+    /// A certificate (`d2i_X509`).
+    Certificate(Vec<u8>),
+    /// A CA name (`d2i_X509_NAME`).
+    Name(Vec<u8>),
+}
+
 /// A TLS connection.
 pub struct Connection {
     /// The settings.
@@ -252,6 +263,8 @@ pub struct Connection {
     pub(crate) shutdown: u32,
     /// The fatal error, once one happened.
     pub(crate) failed: Option<Error>,
+    /// The octets whose decoding failed with `ERR_R_ASN1_LIB` (see [`DecodeFailure`]).
+    pub(crate) decode_failure: Option<DecodeFailure>,
     /// Whether the first handshake hasn't finished yet (`SSL_IS_FIRST_HANDSHAKE`).
     pub(crate) first_handshake: bool,
     /// Whether a renegotiation was requested.
@@ -401,6 +414,7 @@ impl Connection {
             app_in: VecDeque::new(),
             shutdown: 0,
             failed: None,
+            decode_failure: None,
             first_handshake: true,
             renegotiate: false,
             s3_renegotiate: false,
@@ -560,6 +574,11 @@ impl Connection {
     #[must_use]
     pub fn error(&self) -> Option<Error> {
         self.failed
+    }
+
+    /// What failed to decode when the connection failed with `ERR_R_ASN1_LIB`, once.
+    pub fn take_decode_failure(&mut self) -> Option<DecodeFailure> {
+        self.decode_failure.take()
     }
 
     /// `SSL_get_shutdown`'s flags.

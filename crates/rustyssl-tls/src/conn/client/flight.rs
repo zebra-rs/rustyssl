@@ -83,6 +83,7 @@ pub(super) fn process_server_certificate(
             Ok(()) => {}
             Err(true) => return Err(Error::decode(abi::SSL_R_CERT_LENGTH_MISMATCH)),
             Err(false) => {
+                c.decode_failure = Some(crate::conn::DecodeFailure::Certificate(der.to_vec()));
                 return Err(Error::alert_lib(
                     abi::SSL_AD_BAD_CERTIFICATE,
                     abi::ERR_R_ASN1_LIB,

@@ -337,6 +337,35 @@ static void cut_server_flight(int dir, int n, unsigned char *buf, int *len)
     }
 }
 
+static void garbage_leaf(int dir, int n, unsigned char *buf, int *len)
+{
+    /*
+     * The server's TLS 1.2 flight (plaintext): in its Certificate message, the leaf's DER
+     * length octet 0x82 becomes 0x84, a four-octet length far past the data ("too long"),
+     * with every outer length left as it was.
+     */
+    int r = 0;
+
+    if (dir != 1 || n != 0)
+        return;
+    while (r + 5 <= *len) {
+        int rlen = (buf[r + 3] << 8) | buf[r + 4], m = r + 5;
+
+        if (buf[r] == 0x16) {
+            while (m + 4 <= r + 5 + rlen && m + 4 <= *len) {
+                int mlen = (buf[m + 1] << 16) | (buf[m + 2] << 8) | buf[m + 3];
+
+                if (buf[m] == 0x0b && m + 4 + 7 < *len) {
+                    buf[m + 4 + 7] = 0x84;
+                    return;
+                }
+                m += 4 + mlen;
+            }
+        }
+        r += 5 + rlen;
+    }
+}
+
 /* Callbacks. */
 
 static int sni_fatal(SSL *s, int *al, void *arg)
@@ -490,6 +519,11 @@ static void test_handshakes(void)
     c = client_ctx(1);
     s = server_ctx();
     scenario("a ServerHello cut short", c, s, cut_server_flight);
+
+    c = client_ctx(1);
+    s = server_ctx();
+    SSL_CTX_set_max_proto_version(c, TLS1_2_VERSION);
+    scenario("a server certificate that doesn't decode (TLS 1.2)", c, s, garbage_leaf);
 
     c = client_ctx(1);
     s = server_ctx();

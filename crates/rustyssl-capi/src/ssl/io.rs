@@ -212,6 +212,33 @@ impl core::fmt::Debug for Driver {
 /// Raises the core's error as OpenSSL's ERR entry, in `function`. A received alert's reason
 /// gets OpenSSL's data, `SSL alert number <n>`.
 #[track_caller]
+/// Decodes what the core couldn't, as OpenSSL does (`d2i_X509`, `d2i_X509_NAME`), so the
+/// decoder's entries come before the handshake's `ERR_R_ASN1_LIB`.
+///
+/// # Safety
+/// No lock may be held (the decoders allocate and raise).
+unsafe fn raise_decoder_entries(bad: &rustyssl_tls::conn::DecodeFailure) {
+    use rustyssl_tls::conn::DecodeFailure;
+    match bad {
+        DecodeFailure::Certificate(der) => {
+            // SAFETY: the default library context; the octets.
+            let x = unsafe { crate::x509::cert::decode_in(der, ptr::null_mut(), ptr::null()) };
+            // SAFETY: ours, or NULL.
+            unsafe { crate::x509::cert::X509_free(x) };
+        }
+        DecodeFailure::Name(der) => {
+            let Ok(len) = c_long::try_from(der.len()) else {
+                return;
+            };
+            let mut p = der.as_ptr();
+            // SAFETY: the octets, `len` long.
+            let n = unsafe { crate::x509::name::d2i_X509_NAME(ptr::null_mut(), &raw mut p, len) };
+            // SAFETY: ours, or NULL.
+            unsafe { crate::x509::name::X509_NAME_free(n) };
+        }
+    }
+}
+
 pub(crate) fn raise_core(e: &TlsError, function: &str) {
     // OpenSSL's raising function when the core named it, else the API function's.
     let function = e.func.unwrap_or(function);
@@ -1090,6 +1117,16 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             Ok(ev) => ev,
             Err(e) => {
                 if !failed_before {
+                    let bad = x
+                        .state()
+                        .drv
+                        .tls
+                        .as_mut()
+                        .and_then(|c| c.take_decode_failure());
+                    if let Some(bad) = bad {
+                        // SAFETY: no lock is held; only the octets are read.
+                        unsafe { raise_decoder_entries(&bad) };
+                    }
                     raise_core(&e, function);
                 }
                 if removes_session {
