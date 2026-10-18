@@ -4,7 +4,8 @@
  * in both directions over a BIO pair, TLS 1.3 and 1.2, with the alerts each end reports;
  * writes after close_notify; application data while waiting for the peer's close_notify;
  * quiet shutdown; SSL_shutdown before and during a handshake; the shutdown flags set by hand;
- * and SSL_clear afterwards.
+ * SSL_clear afterwards; and a client reused with SSL_set_connect_state(3), which drops what it
+ * buffered and resumes its session.
  *
  * Only deterministic output is printed.
  *
@@ -374,6 +375,34 @@ static void test_clear(void)
     done(cctx, sctx, c, s);
 }
 
+/* A client reused after a shutdown: SSL_set_connect_state starts over, resuming. */
+static void test_reuse(int max)
+{
+    SSL_CTX *cctx, *sctx;
+    SSL *c, *s;
+    char buf[16];
+    int n;
+
+    printf("# a client reused with SSL_set_connect_state, %s\n",
+           max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    connected(max, &cctx, &sctx, &c, &s);
+    check(SSL_write(s, "Hello World", 11) == 11, "the server writes");
+    check(SSL_read(c, buf, 5) == 5, "the client reads part of it");
+    SSL_shutdown(c);
+    SSL_shutdown(s);
+    SSL_free(s);
+    s = SSL_new(sctx);
+    /* SSL_set_connect_state on the used client, SSL_set_accept_state on the new server. */
+    pair(c, s);
+    check(SSL_in_init(c) && SSL_get_shutdown(c) == 0, "the client is back in its handshake");
+    check(run(c, s, 0) == 0, "the second handshake");
+    check(SSL_session_reused(c) == 1, "the session is resumed");
+    check(SSL_write(s, "abc", 3) == 3, "the server writes again");
+    n = SSL_read(c, buf, sizeof(buf));
+    printf("  the client reads %d octet(s): %.*s\n", n, n > 0 ? n : 0, buf);
+    done(cctx, sctx, c, s);
+}
+
 int main(void)
 {
     test_both_ways(TLS1_3_VERSION);
@@ -383,6 +412,8 @@ int main(void)
     test_in_init();
     test_set_shutdown();
     test_clear();
+    test_reuse(TLS1_3_VERSION);
+    test_reuse(TLS1_2_VERSION);
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

@@ -234,8 +234,8 @@ pub(crate) fn ext_construct_session_ticket(
     }
 }
 
-/// `tls_construct_ctos_status_request`: an OCSP request with no responder IDs or extensions
-/// (the configuration has none), not for a client Certificate entry.
+/// `tls_construct_ctos_status_request`: an OCSP request with the configured responder IDs and
+/// extensions, not for a client Certificate entry.
 ///
 /// # Errors
 /// Never; `Result` for the dispatch.
@@ -250,8 +250,8 @@ pub(crate) fn ext_construct_status_request(
     }
     Ok(ExtReturn::Sent(mx::status_request::encode(
         &mx::status_request::Request::Ocsp {
-            responder_ids: Vec::new(),
-            extensions: Vec::new(),
+            responder_ids: c.cfg.ocsp_ids.clone(),
+            extensions: c.cfg.ocsp_exts.clone(),
         },
     )?))
 }

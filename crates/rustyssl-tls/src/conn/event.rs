@@ -165,7 +165,12 @@ pub enum Request {
         md: Option<crate::crypto::HashAlg>,
     },
     /// The OCSP status callback (client: check the stapled response; server: provide one).
-    Status,
+    Status {
+        /// The responder IDs the client sent, DER each (server; `SSL_get_tlsext_status_ids`).
+        ocsp_ids: Vec<Vec<u8>>,
+        /// The request extensions the client sent, DER (server; empty if none).
+        ocsp_exts: Vec<u8>,
+    },
     /// The NPN callback (client: select; server: advertise).
     Npn {
         /// The server's protocols (client side), wire format.

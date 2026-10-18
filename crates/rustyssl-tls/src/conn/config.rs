@@ -176,6 +176,10 @@ pub struct Config {
     pub post_handshake_auth: bool,
     /// `SSL_set_tlsext_status_type` (client asks for OCSP).
     pub status_request: bool,
+    /// `SSL_set_tlsext_status_ids`: the responder IDs a client sends, DER each.
+    pub ocsp_ids: Vec<Vec<u8>>,
+    /// `SSL_set_tlsext_status_exts`: the request extensions a client sends, DER (empty: none).
+    pub ocsp_exts: Vec<u8>,
     /// `SSL_enable_ct`'s request for SCTs.
     pub request_scts: bool,
     /// The certificate compression algorithms allowed, in preference order (RFC 8879 ids).

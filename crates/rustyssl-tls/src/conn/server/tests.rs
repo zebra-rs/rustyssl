@@ -1962,7 +1962,7 @@ fn ocsp_stapling_tls12_and_tls13() {
     let mut c = Connection::new(cfg.clone());
     c.feed(&plain_record(22, &hello.msg()));
     let (out, last) = drive_answering(&mut c, &p, &mut |r| {
-        assert_eq!(r, &Request::Status);
+        assert!(matches!(r, Request::Status { .. }));
         Answer::Status {
             ret: abi::SSL_TLSEXT_ERR_OK,
             response: Some(response.clone()),

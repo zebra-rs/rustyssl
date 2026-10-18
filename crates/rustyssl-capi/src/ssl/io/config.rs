@@ -727,6 +727,54 @@ unsafe fn dh_params(pkey: *const EVP_PKEY) -> Option<(Vec<u8>, Vec<u8>)> {
     Some((get(OSSL_PKEY_PARAM_FFC_P)?, get(OSSL_PKEY_PARAM_FFC_G)?))
 }
 
+/// What a new handshake on a connection reads afresh, as OpenSSL reads them from the
+/// connection when it starts one (`SSL_renegotiate` after `SSL_set_cipher_list`,
+/// `SSL_set_options`, ...): the cipher list, options, mode, version bounds, verify mode,
+/// groups, signature algorithms and session ID context, copied into the core's settings.
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+pub(crate) unsafe fn refresh_handshake_settings(s: *mut SSL, x: &Ssl) {
+    // SAFETY: the caller's connection.
+    let cipher_stack = unsafe { super::super::ciphers::ssl_ciphers(s) };
+    let ciphers = super::super::ciphers::ciphers_of(cipher_stack.cast());
+    let mut st = x.state();
+    let groups = st
+        .lists
+        .groups
+        .as_ref()
+        .filter(|g| !g.groups.is_empty())
+        .map(|g| g.for_core());
+    let (min, max, options, mode, verify_mode) = (
+        st.min_proto_version,
+        st.max_proto_version,
+        st.options,
+        st.mode,
+        st.verify_mode,
+    );
+    let sigalgs = st.cert.conf_sigalgs.clone().unwrap_or_default();
+    let client_sigalgs = st.cert.client_sigalgs.clone().unwrap_or_default();
+    let sid_ctx = st.sid_ctx.clone();
+    let Some(c) = st.drv.tls.as_mut() else {
+        return;
+    };
+    let cfg = c.config_mut();
+    cfg.ciphers = ciphers;
+    cfg.min_version = u16::try_from(min).unwrap_or(0);
+    cfg.max_version = u16::try_from(max).unwrap_or(0);
+    cfg.options = options;
+    cfg.mode = u64::from(mode);
+    cfg.verify_mode = verify_mode;
+    if let Some((g, k, t)) = groups {
+        cfg.groups = g;
+        cfg.key_share_groups = k;
+        cfg.group_tuples = t;
+    }
+    cfg.sigalgs = sigalgs;
+    cfg.client_sigalgs = client_sigalgs;
+    cfg.sid_ctx = sid_ctx;
+}
+
 pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpProvider) -> Config {
     // SAFETY: the caller's connection.
     let cipher_stack = unsafe { super::super::ciphers::ssl_ciphers(s) };
@@ -739,6 +787,13 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     let method_version = match st.method.version {
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
         v => u16::try_from(v).unwrap_or(0),
+    };
+    // The responder IDs and extensions a client's status request carries.
+    let (ocsp_ids, ocsp_exts) = if st.server {
+        (Vec::new(), Vec::new())
+    } else {
+        // SAFETY: the connection's stacks, NULL or live.
+        unsafe { super::super::ocsp_req::encode(&st) }
     };
     // `get_ca_names`: a server's client CA names (`SSL_get_client_CA_list`) unless they're
     // missing or empty, else the CA names (`SSL_get0_CA_list`); each the connection's, else
@@ -803,6 +858,8 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         verify_depth,
         post_handshake_auth: st.pha_enabled != 0,
         status_request: st.status_type == rustyssl_abi::TLSEXT_STATUSTYPE_ocsp,
+        ocsp_ids,
+        ocsp_exts,
         request_scts: st.ct.callback.is_some(),
         // SAFETY: the connection's context, which it keeps alive.
         srtp_profiles: super::super::srtp::ids(&st, unsafe { super::super::conn::ctx_of(&st) }),

@@ -232,7 +232,10 @@ pub struct Connection {
     /// answer.
     pub(crate) cur_msg: Option<(u8, Vec<u8>)>,
     /// Events to report before anything else happens.
-    events: VecDeque<Event>,
+    events: VecDeque<(Event, bool)>,
+    /// Whether the connection was in init when the event [`Connection::step`] last returned from
+    /// the queue was raised (`None`: the last event is current).
+    event_in_init: Option<bool>,
     /// The request waiting for an answer.
     pending: Option<Request>,
     /// The answer, waiting for the code that asked.
@@ -328,11 +331,16 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        let mut rw = RecordWriter::new(record_version);
+        // `ssl_get_max_send_fragment` (0: unset, the default).
+        if cfg.max_send_fragment > 0 {
+            rw.max_frag_len = cfg.max_send_fragment.min(rw.max_frag_len);
+        }
         Self {
             cfg,
             st: Statem::default(),
             rr: RecordReader::new(server),
-            rw: RecordWriter::new(record_version),
+            rw,
             hs: Handshake {
                 // `SSL_new`'s `key_update`: none pending, on either side (fork M).
                 sh: common::Shared {
@@ -350,6 +358,7 @@ impl Connection {
             hs_in: Vec::new(),
             cur_msg: None,
             events: VecDeque::new(),
+            event_in_init: None,
             pending: None,
             answer: None,
             pending_construct: false,
@@ -417,6 +426,17 @@ impl Connection {
         &mut self.cfg
     }
 
+    /// `SSL_set_max_send_fragment` on a running connection: the records written from now on
+    /// carry at most `n` octets, or the negotiated maximum fragment length if that's less.
+    pub fn set_max_send_fragment(&mut self, n: usize) {
+        self.cfg.max_send_fragment = n;
+        let negotiated =
+            crate::conn::common::ext::max_fragment_length(self.neg.session.max_fragment_len_mode);
+        self.rw.max_frag_len = negotiated
+            .map_or(n, |len| n.min(len))
+            .clamp(1, crate::record::MAX_PLAIN);
+    }
+
     /// Installs the application's security callback (`SSL_CTX_set_security_callback`), which
     /// the core calls in place, synchronously, wherever OpenSSL calls `ssl_security`; it is
     /// used while the configuration's `custom_security_callback` is set. The hook must not
@@ -476,6 +496,14 @@ impl Connection {
     #[must_use]
     pub fn in_init(&self) -> bool {
         self.st.in_init || self.st.state == MsgFlow::Uninited
+    }
+
+    /// [`Connection::in_init`] as of the event [`Connection::step`] last returned: an event
+    /// raised before the state machine moved on (`SSL_CB_HANDSHAKE_DONE` out of init, the
+    /// tickets after it back in) reports the state it was raised in, as OpenSSL's callbacks see.
+    #[must_use]
+    pub fn event_in_init(&self) -> bool {
+        self.event_in_init.unwrap_or_else(|| self.in_init())
     }
 
     /// Whether no handshake has started (`SSL_in_before`).
@@ -589,7 +617,8 @@ impl Connection {
     /// # Errors
     /// The connection failed: the alert (if any) is in the output, and the error says why.
     pub fn step(&mut self, p: &dyn Provider, reading: bool) -> Result<Event> {
-        if let Some(e) = self.events.pop_front() {
+        self.event_in_init = None;
+        if let Some(e) = self.pop_event() {
             return Ok(e);
         }
         if let Some(e) = self.failed {
@@ -604,17 +633,23 @@ impl Connection {
         let r = self.advance(p);
         match r {
             Ok(Some(e)) => {
-                if let Some(q) = self.events.pop_front() {
-                    self.events.push_back(e);
+                if let Some(q) = self.pop_event() {
+                    let in_init = self.in_init();
+                    self.events.push_back((e, in_init));
                     return Ok(q);
                 }
                 Ok(e)
             }
             Ok(None) => {
-                if let Some(q) = self.events.pop_front() {
+                if let Some(q) = self.pop_event() {
                     return Ok(q);
                 }
-                if let Some(r) = &self.pending {
+                if self.answer.is_some() {
+                    // The machine moved on without taking the answer (the callback's flag
+                    // changed while it waited): the request is stale. Asking again would loop.
+                    self.pending = None;
+                    self.answer = None;
+                } else if let Some(r) = &self.pending {
                     return Ok(Event::Request(r.clone()));
                 }
                 if !self.output.is_empty() {
@@ -628,7 +663,7 @@ impl Connection {
             }
             Err(e) => {
                 self.fatal(p, e);
-                match self.events.pop_front() {
+                match self.pop_event() {
                     Some(q) => Ok(q),
                     None => Err(e),
                 }
@@ -680,7 +715,15 @@ impl Connection {
 
     /// Queues an event.
     pub(crate) fn notify(&mut self, e: Event) {
-        self.events.push_back(e);
+        let in_init = self.in_init();
+        self.events.push_back((e, in_init));
+    }
+
+    /// The next queued event, noting whether the connection was in init when it was raised.
+    fn pop_event(&mut self) -> Option<Event> {
+        let (e, in_init) = self.events.pop_front()?;
+        self.event_in_init = Some(in_init);
+        Some(e)
     }
 
     /// Whether events are queued.
@@ -1432,4 +1475,43 @@ fn ccs() -> u8 {
 
 fn app_data() -> u8 {
     msgs_type(abi::SSL3_RT_APPLICATION_DATA)
+}
+
+#[cfg(test)]
+mod stale_answer_tests {
+    use super::{Answer, Config, Connection, Event, Request};
+    use crate::testprov::TestProvider;
+
+    /// An answer the machine never takes (its callback's flag went off while it waited) is
+    /// dropped: the connection waits for input instead of asking again forever.
+    #[test]
+    fn an_unconsumed_answer_is_dropped() {
+        let p = TestProvider::new(b"stale-answer");
+        let cfg = Config {
+            min_version: crate::consts::version::TLS1_3,
+            max_version: crate::consts::version::TLS1_3,
+            ciphers: vec![crate::suites::by_protocol_id(0x1301).unwrap()],
+            groups: vec![0x001d],
+            key_share_groups: vec![0x001d],
+            max_send_fragment: 16384,
+            ..Config::default()
+        };
+        let mut c = Connection::new(cfg);
+        let mut steps = 0;
+        loop {
+            steps += 1;
+            assert!(steps < 100, "no progress");
+            match c.step(&p, false).unwrap() {
+                Event::Output => drop(c.take_output()),
+                Event::NeedInput => break,
+                _ => {}
+            }
+        }
+        // A request answered after the machine stopped needing it.
+        c.pending = Some(Request::AllowEarlyData);
+        c.answer(Answer::Allowed(true));
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+        assert!(c.pending.is_none() && c.answer.is_none());
+        assert_eq!(c.step(&p, false).unwrap(), Event::NeedInput);
+    }
 }

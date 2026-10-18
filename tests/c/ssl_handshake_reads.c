@@ -4,7 +4,10 @@
  * client CA list is empty), the context the servername callback switches to
  * (SSL_set_SSL_CTX(3): its ALPN callback), what the ClientHello callback sets on the
  * connection (SSL_set_max_proto_version(3)), the stapled OCSP response in the client's status
- * callback (SSL_get_tlsext_status_ocsp_resp(3)), SSL_set_retry_verify(3) after a successful
+ * callback (SSL_get_tlsext_status_ocsp_resp(3)), the responder IDs and extensions a client
+ * asks for, in the server's (SSL_set_tlsext_status_ids(3), SSL_get_tlsext_status_exts(3)),
+ * the names SSL_get_servername(3) reports around a resumption, SSL_set_retry_verify(3) after
+ * a successful verification and after adding to SSL_get_peer_cert_chain(3), and
  * verification, and the chain's check against the security level, over a BIO pair.
  *
  * Only deterministic output is printed.
@@ -18,6 +21,7 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/ocsp.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
@@ -318,6 +322,121 @@ static void test_status(int version)
     done(c, s, cctx, sctx);
 }
 
+static X509 *status_cert = NULL;
+
+static int ids_status_cb(SSL *s, void *arg)
+{
+    STACK_OF(OCSP_RESPID) *ids = NULL;
+    STACK_OF(X509_EXTENSION) *exts = NULL;
+    int n;
+
+    (void)arg;
+    SSL_get_tlsext_status_ids(s, &ids);
+    SSL_get_tlsext_status_exts(s, &exts);
+    n = sk_OCSP_RESPID_num(ids);
+    printf("  the server's status callback: %d responder ID(s), %s; %d extension(s)", n,
+           n == 1 && OCSP_RESPID_match(sk_OCSP_RESPID_value(ids, 0), status_cert) ? "matching"
+                                                                                : "no match",
+           sk_X509_EXTENSION_num(exts));
+    if (sk_X509_EXTENSION_num(exts) == 1)
+        printf(", %s", OBJ_nid2sn(OBJ_obj2nid(
+                           X509_EXTENSION_get_object(sk_X509_EXTENSION_value(exts, 0)))));
+    printf("\n");
+    return SSL_TLSEXT_ERR_NOACK;
+}
+
+/* The responder IDs and extensions a client sets reach the server's status callback. */
+static void test_status_ids(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    BIO *b = BIO_new_mem_buf(SERVER_PEM, -1);
+    STACK_OF(OCSP_RESPID) *ids = sk_OCSP_RESPID_new_null();
+    STACK_OF(X509_EXTENSION) *exts = sk_X509_EXTENSION_new_null();
+    OCSP_RESPID *id = OCSP_RESPID_new();
+    ASN1_OCTET_STRING *nonce = ASN1_OCTET_STRING_new();
+
+    printf("# responder IDs and extensions\n");
+    status_cert = PEM_read_bio_X509(b, NULL, NULL, NULL);
+    BIO_free(b);
+    OCSP_RESPID_set_by_key(id, status_cert);
+    sk_OCSP_RESPID_push(ids, id);
+    ASN1_OCTET_STRING_set(nonce, (const unsigned char *)"\x04\x02nn", 4);
+    sk_X509_EXTENSION_push(exts, X509_EXTENSION_create_by_NID(NULL, NID_id_pkix_OCSP_Nonce, 0,
+                                                              nonce));
+    ASN1_OCTET_STRING_free(nonce);
+    SSL_CTX_set_tlsext_status_cb(sctx, ids_status_cb);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_tlsext_status_type(c, TLSEXT_STATUSTYPE_ocsp);
+    /* The connection takes both. */
+    SSL_set_tlsext_status_ids(c, ids);
+    SSL_set_tlsext_status_exts(c, exts);
+    check(handshake(c, s), "the handshake");
+    done(c, s, cctx, sctx);
+    X509_free(status_cert);
+}
+
+static int accept_name_cb(SSL *s, int *alert, void *arg)
+{
+    (void)s;
+    (void)alert;
+    (void)arg;
+    return SSL_TLSEXT_ERR_OK;
+}
+
+static const char *name_or_none(const char *n)
+{
+    return n == NULL ? "(none)" : n;
+}
+
+/*
+ * The names each end reports around a resumption: the first handshake with `first` (NULL:
+ * none), the second with `second`.
+ */
+static void test_servername_resume(int version, const char *first, const char *second)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    SSL_SESSION *sess;
+    unsigned char b;
+
+    printf("# servername around a resumption, %s: %s, then %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2", name_or_none(first),
+           name_or_none(second));
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_tlsext_servername_callback(sctx, accept_name_cb);
+    pair(cctx, sctx, &c, &s);
+    if (first != NULL)
+        SSL_set_tlsext_host_name(c, first);
+    /* A name set on the server stands until its handshake. */
+    SSL_set_tlsext_host_name(s, "set.example");
+    printf("  server before its first handshake: %s\n",
+           name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    check(handshake(c, s), "the first handshake");
+    printf("  server after it: %s\n", name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    /* The client takes its tickets. */
+    SSL_read(c, &b, 1);
+    SSL_shutdown(c);
+    SSL_shutdown(s);
+    sess = SSL_get1_session(c);
+    SSL_free(c);
+    SSL_free(s);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_session(c, sess);
+    printf("  client before: %s\n", name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)));
+    if (second != NULL)
+        SSL_set_tlsext_host_name(c, second);
+    printf("  client before, after setting: %s\n",
+           name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)));
+    printf("  server before: %s\n", name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    check(handshake(c, s), "the second handshake");
+    printf("  reused %d/%d; client: %s, server: %s\n", SSL_session_reused(c), SSL_session_reused(s),
+           name_or_none(SSL_get_servername(c, TLSEXT_NAMETYPE_host_name)),
+           name_or_none(SSL_get_servername(s, TLSEXT_NAMETYPE_host_name)));
+    SSL_SESSION_free(sess);
+    done(c, s, cctx, sctx);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -347,6 +466,37 @@ static void test_retry_verify(void)
     done(c, s, cctx, sctx);
 }
 
+static int chain_cb(X509_STORE_CTX *ctx, void *arg)
+{
+    SSL *s = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+
+    (void)arg;
+    printf("  verification with %d untrusted certificate(s)\n",
+           sk_X509_num(X509_STORE_CTX_get0_untrusted(ctx)));
+    if (retries-- > 0) {
+        /* The retry verifies the peer chain with what the application adds to it. */
+        sk_X509_push(SSL_get_peer_cert_chain(s), cert(CA_PEM));
+        return SSL_set_retry_verify(s);
+    }
+    return X509_verify_cert(ctx);
+}
+
+/* A retried verification sees the certificates added to SSL_get_peer_cert_chain. */
+static void test_retry_with_chain(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+
+    printf("# retry verify with an added certificate\n");
+    retries = 1;
+    SSL_CTX_set_cert_verify_callback(cctx, chain_cb, NULL);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the handshake");
+    printf("  verify result %ld, peer chain %d\n", SSL_get_verify_result(c),
+           sk_X509_num(SSL_get_peer_cert_chain(c)));
+    done(c, s, cctx, sctx);
+}
+
 /* A chain below the security level isn't sent: an internal error, and the reason. */
 static void test_security(void)
 {
@@ -370,7 +520,14 @@ int main(void)
     test_hello_cb();
     test_status(TLS1_3_VERSION);
     test_status(TLS1_2_VERSION);
+    test_status_ids();
+    test_servername_resume(TLS1_2_VERSION, "goodhost", "altgoodhost");
+    test_servername_resume(TLS1_3_VERSION, "goodhost", "altgoodhost");
+    test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
+    test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
+    test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
     test_retry_verify();
+    test_retry_with_chain();
     test_security();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;

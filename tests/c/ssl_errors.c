@@ -359,6 +359,19 @@ static int alpn_fatal(SSL *s, const unsigned char **out, unsigned char *outlen, 
     return SSL_TLSEXT_ERR_ALERT_FATAL;
 }
 
+/* Accepts with an empty selection, which the server can't use. */
+static int alpn_empty(SSL *s, const unsigned char **out, unsigned char *outlen, const unsigned char *in,
+                      unsigned int inlen, void *arg)
+{
+    (void)s;
+    (void)out;
+    (void)in;
+    (void)inlen;
+    (void)arg;
+    *outlen = 0;
+    return SSL_TLSEXT_ERR_OK;
+}
+
 static int cert_cb_fail(SSL *s, void *arg)
 {
     (void)s;
@@ -476,6 +489,12 @@ static void test_handshakes(void)
     SSL_CTX_set_alpn_protos(c, (const unsigned char *)"\x02h2", 3);
     SSL_CTX_set_alpn_select_cb(s, alpn_fatal, NULL);
     scenario("the ALPN callback fails", c, s, NULL);
+
+    c = client_ctx(1);
+    s = server_ctx();
+    SSL_CTX_set_alpn_protos(c, (const unsigned char *)"\x02h2", 3);
+    SSL_CTX_set_alpn_select_cb(s, alpn_empty, NULL);
+    scenario("the ALPN callback selects nothing", c, s, NULL);
 
     c = client_ctx(1);
     s = server_ctx();
