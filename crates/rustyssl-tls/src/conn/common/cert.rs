@@ -47,6 +47,15 @@ fn output_cert_chain_inner(
     p: &dyn Provider,
     cert: Option<usize>,
 ) -> Result<Option<Vec<u8>>> {
+    // `ssl_add_cert_chain`'s security check of the chain to send.
+    if let Some(reason) = cert
+        .and_then(|i| c.cfg.certs.get(i))
+        .and_then(|k| k.chain_security)
+    {
+        return Err(
+            Error::alert(abi::SSL_AD_INTERNAL_ERROR, reason).in_func("ssl_add_cert_chain")
+        );
+    }
     let chain = cert
         .and_then(|i| c.cfg.certs.get(i))
         .map(|k| k.chain.clone())

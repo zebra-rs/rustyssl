@@ -62,7 +62,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, &raw mut al, arg) };
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Tlsext { ret, alert: al })
         }
         Request::AlpnSelect { protos } => {
@@ -114,7 +114,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, &raw mut al, arg) };
             // SAFETY: the caller's guarantee.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             match ret {
                 SSL_CLIENT_HELLO_RETRY => {
                     x.state().rwstate = SSL_CLIENT_HELLO_CB;
@@ -148,7 +148,7 @@ pub(crate) unsafe fn handle(
                 });
             }
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Continue)
         }
         Request::ClientCert => {
@@ -179,7 +179,7 @@ pub(crate) unsafe fn handle(
             // SAFETY: as above.
             unsafe { crate::evp::pkey::EVP_PKEY_free(key) };
             // SAFETY: as above.
-            unsafe { refresh_certs(x, snap) };
+            unsafe { refresh_certs(s, x, snap) };
             Some(Answer::Continue)
         }
         Request::RecordPadding { content_type, len } => {
@@ -442,7 +442,7 @@ unsafe fn stateless_cookie_verify(
 ///
 /// # Safety
 /// `x` is a live connection.
-unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
+unsafe fn refresh_certs(s: *mut SSL, x: &Ssl, snap: Option<&CtxSnapshot>) {
     // The context may have changed (`SSL_set_SSL_CTX` from the servername callback).
     let fresh = config::snapshot(x);
     let Some(snap) = fresh.as_ref().or(snap) else {
@@ -452,7 +452,7 @@ unsafe fn refresh_certs(x: &Ssl, snap: Option<&CtxSnapshot>) {
         return;
     };
     // SAFETY: the connection; the context's snapshot.
-    let (certs, current) = unsafe { config::certs(x, snap, &prov) };
+    let (certs, current) = unsafe { config::certs(s, x, snap, &prov) };
     let mut st = x.state();
     let (verify_mode, sid_ctx) = (st.verify_mode, st.sid_ctx.clone());
     // What the callback may have set on the connection, read where OpenSSL reads it later

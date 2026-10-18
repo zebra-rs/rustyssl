@@ -197,23 +197,48 @@ struct ChainSource {
     ctx_store: *mut X509_STORE,
     libctx: *mut OSSL_LIB_CTX,
     propq: *const c_char,
+    /// The connection, for its security checks.
+    owner: super::super::cert::Owner,
+}
+
+/// `ssl_security_cert_chain`: 1 when the end-entity certificate and the CAs pass the security
+/// level, else the first one's `SSL_R_*` reason.
+///
+/// # Safety
+/// The owner is live; the certificates are.
+unsafe fn chain_security(src: &ChainSource, ee: *mut X509, cas: &[*mut X509]) -> c_int {
+    use super::super::cert::security_cert;
+    // SAFETY: the caller's guarantee.
+    let rv = unsafe { security_cert(src.owner, ee, true) };
+    if rv != 1 {
+        return rv;
+    }
+    for &c in cas {
+        // SAFETY: as above.
+        let rv = unsafe { security_cert(src.owner, c, false) };
+        if rv != 1 {
+            return rv;
+        }
+    }
+    1
 }
 
 /// The chain `ssl_add_cert_chain` sends, leaf first: the slot's chain, else the context's
 /// extra certificates, else (unless `SSL_MODE_NO_AUTO_CHAIN`) what the chain store (or the
 /// context's store) builds, root included if it finds one. Built with no lock held: the
-/// store's verification callback may run.
+/// store's verification callback may run. With it, the chain's security check
+/// (`ssl_security_cert_chain`: 1, or the reason).
 ///
 /// # Safety
 /// The pointers in `src` are live (or NULL where allowed).
-unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
+unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> (Vec<Vec<u8>>, c_int) {
     use crate::x509::ctx::{
         X509_STORE_CTX_free, X509_STORE_CTX_get0_chain, X509_STORE_CTX_init, X509_STORE_CTX_new_ex,
     };
     let mut out = Vec::new();
     // SAFETY: our reference.
     let Some(leaf) = (unsafe { der_of(r.x509) }) else {
-        return out;
+        return (out, 1);
     };
     if let Some(chain) = &r.chain {
         out.push(leaf);
@@ -221,19 +246,24 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
             // SAFETY: our references.
             out.extend(unsafe { der_of(c) });
         }
-        return out;
+        // SAFETY: the caller's guarantee; our references.
+        return (out, unsafe { chain_security(src, r.x509, chain) });
     }
     if !src.extra.is_null() {
         out.push(leaf);
         // SAFETY: the context's stack.
         let v = unsafe { refs_of(src.extra) };
-        for c in v {
+        for &c in &v {
             // SAFETY: the references taken above.
             out.extend(unsafe { der_of(c) });
+        }
+        // SAFETY: as above.
+        let sec = unsafe { chain_security(src, r.x509, &v) };
+        for c in v {
             // SAFETY: as above, released once.
             unsafe { X509_free(c) };
         }
-        return out;
+        return (out, sec);
     }
     let store = if src.mode & SSL_MODE_NO_AUTO_CHAIN != 0 {
         ptr::null_mut()
@@ -244,7 +274,8 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
     };
     if store.is_null() {
         out.push(leaf);
-        return out;
+        // SAFETY: the caller's guarantee; our reference.
+        return (out, unsafe { chain_security(src, r.x509, &[]) });
     }
     // SAFETY: the library context and property query of the connection's context.
     let xs = unsafe { X509_STORE_CTX_new_ex(src.libctx, src.propq) };
@@ -253,7 +284,8 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
         // SAFETY: made above, or NULL.
         unsafe { X509_STORE_CTX_free(xs) };
         out.push(leaf);
-        return out;
+        // SAFETY: as above.
+        return (out, unsafe { chain_security(src, r.x509, &[]) });
     }
     // The chain needn't be complete (the root usually isn't known): the result is ignored and
     // the errors cleared, as OpenSSL does.
@@ -268,17 +300,26 @@ unsafe fn send_chain(r: &SlotRefs, src: &ChainSource) -> Vec<Vec<u8>> {
     if n <= 0 {
         out.push(leaf);
     }
+    let mut built = Vec::new();
     for i in 0..n.max(0) {
         // SAFETY: an index in range.
         let x: *mut X509 = unsafe { OPENSSL_sk_value(chain.cast(), i) }.cast();
         if !x.is_null() {
             // SAFETY: a certificate of the chain.
             out.extend(unsafe { der_of(x) });
+            built.push(x);
         }
     }
+    // The chain built, its first certificate the end entity's.
+    let sec = match built.split_first() {
+        // SAFETY: the context's chain, alive until it's freed below.
+        Some((&ee, cas)) => unsafe { chain_security(src, ee, cas) },
+        // SAFETY: the caller's guarantee; our reference.
+        None => unsafe { chain_security(src, r.x509, &[]) },
+    };
     // SAFETY: made above.
     unsafe { X509_STORE_CTX_free(xs) };
-    out
+    (out, sec)
 }
 
 /// An EC key's curve as a NID (`ssl_get_EC_curve_nid`), or `NID_undef`.
@@ -360,7 +401,7 @@ unsafe fn cert_key(
     // SAFETY: our reference to the key.
     let key = unsafe { prov.add_key(r.pkey) }?;
     // SAFETY: the caller's guarantee.
-    let chain = unsafe { send_chain(r, src) };
+    let (chain, chain_security) = unsafe { send_chain(r, src) };
     if chain.is_empty() {
         return None;
     }
@@ -398,6 +439,7 @@ unsafe fn cert_key(
         cert_sig: Some((mdnid, pknid)),
         raw_public_key: None,
         ocsp_response: ocsp,
+        chain_security: (chain_security != 1).then_some(chain_security),
     })
 }
 
@@ -472,6 +514,7 @@ fn slot_refs(x: &Ssl) -> (Vec<SlotRefs>, u32, *mut X509_STORE, Option<Vec<u8>>, 
 /// # Safety
 /// `snap` is the connection's context's snapshot.
 pub(crate) unsafe fn certs(
+    s: *const SSL,
     x: &Ssl,
     snap: &CtxSnapshot,
     prov: &EvpProvider,
@@ -484,6 +527,7 @@ pub(crate) unsafe fn certs(
         ctx_store: snap.cert_store,
         libctx: snap.libctx,
         propq: snap.propq(),
+        owner: super::super::cert::Owner::Ssl(s),
     };
     let mut out = Vec::new();
     for r in &slots {
@@ -539,7 +583,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
     // SAFETY: the connection's parameters.
     let verify_depth = unsafe { crate::x509::vpm::X509_VERIFY_PARAM_get_depth(x.param) };
     // SAFETY: the snapshot's context is alive.
-    let (certs, current_cert) = unsafe { certs(x, snap, prov) };
+    let (certs, current_cert) = unsafe { certs(s, x, snap, prov) };
     let st = x.state();
     let method_version = match st.method.version {
         rustyssl_abi::TLS_ANY_VERSION | rustyssl_abi::DTLS_ANY_VERSION => 0,
