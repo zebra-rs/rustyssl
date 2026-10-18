@@ -5022,13 +5022,20 @@ result and error/depth. Mutation-based differential tests are clean. Upstream
     `EVP_PKEY_*_attr` APIs
   - Tests: `tests/c/pkcs12.c` (87 checks; PFXs made without randomness compared by their
     DER), the `pkcs12_parse` fuzz target.
-- [ ] **6.6 OCSP:** the request and response structures, `OCSP_basic_verify`,
-  `OCSP_check_validity`, `OCSP_resp_find_status`, the responder APIs, nonces, printing, and
-  `OCSP_sendreq_*`.
+- [x] **6.6 OCSP** (`ocsp.rs`, `ocsp/{asn,id,cl,srv,ext,prn,vfy,v3}.rs` from `ocsp_asn.c`,
+  `ocsp_lib.c`, `ocsp_cl.c`, `ocsp_srv.c`, `ocsp_ext.c`, `ocsp_prn.c`, `ocsp_vfy.c`, and
+  `v3_ocsp.c`; 167 exports): the request and response structures, CertIDs, building and
+  signing requests and responses, `OCSP_basic_verify` (the responder's key hash compared in
+  constant time) and `OCSP_request_verify`, `OCSP_check_validity`, `OCSP_resp_find_status`,
+  the responder APIs, nonces, the extension accessors and makers, printing, and the five OCSP
+  extension methods (replacing 5.2's placeholders). A ResponderID's old value is freed as what
+  it is (docs/DEVIATIONS.md). `OCSP_sendreq_new` and `OCSP_sendreq_bio` come with the HTTP
+  client (6.8). Tests: `tests/c/ocsp.c`, the `ocsp_d2i` fuzz target.
 - [ ] **6.7 TS (RFC 3161) and ESS:** request, response, verify, `TS_RESP_CTX`, and
   signing-certificate v1/v2 (ESS itself came with 6.4b).
 - [ ] **6.8 HTTP client** (`OSSL_HTTP_*`): get and transfer, proxies and `no_proxy` (the
-  CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits.
+  CVE-2025-9232 lesson), the TLS hook, redirects, and a strict response parser with limits;
+  then `OCSP_sendreq_new` and `OCSP_sendreq_bio` over it.
 - [ ] **6.9 OSSL_STORE:** the `file:` loader (PEM bundles, DER, PKCS#12, directories),
   `OSSL_STORE_INFO`, search, and custom `OSSL_STORE_LOADER` registration; then the URIs of
   `X509_LOOKUP_store` and `X509_STORE_load_store`, which abort until then (5.3b).

@@ -8817,6 +8817,410 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char) -> core::ffi::c_int =
     crate::objects::OBJ_txt2nid;
 const _: unsafe extern "C" fn(*const core::ffi::c_char, core::ffi::c_int) -> *mut ASN1_OBJECT =
     crate::objects::OBJ_txt2obj;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_BASICRESP_add1_ext_i2d;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_BASICRESP_add_ext;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_BASICRESP_delete_ext;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP) = crate::ocsp::asn::OCSP_BASICRESP_free;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ocsp::ext::OCSP_BASICRESP_get1_ext_d2i;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_BASICRESP_get_ext;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_BASICRESP_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_BASICRESP_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_BASICRESP_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_BASICRESP_get_ext_count;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_BASICRESP_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_BASICRESP = crate::ocsp::asn::OCSP_BASICRESP_new;
+const _: unsafe extern "C" fn(*const OCSP_CERTID) -> *mut OCSP_CERTID =
+    crate::ocsp::asn::OCSP_CERTID_dup;
+const _: unsafe extern "C" fn(*mut OCSP_CERTID) = crate::ocsp::asn::OCSP_CERTID_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_CERTID_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_CERTID = crate::ocsp::asn::OCSP_CERTID_new;
+const _: unsafe extern "C" fn(*mut OCSP_CERTSTATUS) = crate::ocsp::asn::OCSP_CERTSTATUS_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_CERTSTATUS_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_CERTSTATUS = crate::ocsp::asn::OCSP_CERTSTATUS_new;
+const _: unsafe extern "C" fn(*mut OCSP_CRLID) = crate::ocsp::asn::OCSP_CRLID_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_CRLID_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_CRLID = crate::ocsp::asn::OCSP_CRLID_new;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_ONEREQ_add1_ext_i2d;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_ONEREQ_add_ext;
+const _: unsafe extern "C" fn(*mut OCSP_ONEREQ, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_ONEREQ_delete_ext;
+const _: unsafe extern "C" fn(*mut OCSP_ONEREQ) = crate::ocsp::asn::OCSP_ONEREQ_free;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ocsp::ext::OCSP_ONEREQ_get1_ext_d2i;
+const _: unsafe extern "C" fn(*mut OCSP_ONEREQ, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_ONEREQ_get_ext;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_ONEREQ_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_ONEREQ_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut OCSP_ONEREQ,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_ONEREQ_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut OCSP_ONEREQ) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_ONEREQ_get_ext_count;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_ONEREQ_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_ONEREQ = crate::ocsp::asn::OCSP_ONEREQ_new;
+const _: unsafe extern "C" fn(*mut OCSP_REQINFO) = crate::ocsp::asn::OCSP_REQINFO_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_REQINFO_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_REQINFO = crate::ocsp::asn::OCSP_REQINFO_new;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_REQUEST_add1_ext_i2d;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_REQUEST_add_ext;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_REQUEST_delete_ext;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST) = crate::ocsp::asn::OCSP_REQUEST_free;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ocsp::ext::OCSP_REQUEST_get1_ext_d2i;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_REQUEST_get_ext;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_REQUEST_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_REQUEST_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_REQUEST_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_REQUEST_get_ext_count;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_REQUEST_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_REQUEST = crate::ocsp::asn::OCSP_REQUEST_new;
+const _: unsafe extern "C" fn(*mut BIO, *mut OCSP_REQUEST, core::ffi::c_ulong) -> core::ffi::c_int =
+    crate::ocsp::prn::OCSP_REQUEST_print;
+const _: unsafe extern "C" fn(*mut OCSP_RESPBYTES) = crate::ocsp::asn::OCSP_RESPBYTES_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_RESPBYTES_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_RESPBYTES = crate::ocsp::asn::OCSP_RESPBYTES_new;
+const _: unsafe extern "C" fn(*mut OCSP_RESPDATA) = crate::ocsp::asn::OCSP_RESPDATA_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_RESPDATA_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_RESPDATA = crate::ocsp::asn::OCSP_RESPDATA_new;
+const _: unsafe extern "C" fn(*mut OCSP_RESPID) = crate::ocsp::asn::OCSP_RESPID_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_RESPID_it;
+const _: unsafe extern "C" fn(*mut OCSP_RESPID, *mut X509) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_RESPID_match;
+const _: unsafe extern "C" fn(
+    *mut OCSP_RESPID,
+    *mut X509,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ocsp::srv::OCSP_RESPID_match_ex;
+const _: unsafe extern "C" fn() -> *mut OCSP_RESPID = crate::ocsp::asn::OCSP_RESPID_new;
+const _: unsafe extern "C" fn(*mut OCSP_RESPID, *mut X509) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_RESPID_set_by_key;
+const _: unsafe extern "C" fn(
+    *mut OCSP_RESPID,
+    *mut X509,
+    *mut OSSL_LIB_CTX,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::ocsp::srv::OCSP_RESPID_set_by_key_ex;
+const _: unsafe extern "C" fn(*mut OCSP_RESPID, *mut X509) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_RESPID_set_by_name;
+const _: unsafe extern "C" fn(*mut OCSP_RESPONSE) = crate::ocsp::asn::OCSP_RESPONSE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_RESPONSE_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_RESPONSE = crate::ocsp::asn::OCSP_RESPONSE_new;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut OCSP_RESPONSE,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::prn::OCSP_RESPONSE_print;
+const _: unsafe extern "C" fn(*mut OCSP_REVOKEDINFO) = crate::ocsp::asn::OCSP_REVOKEDINFO_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_REVOKEDINFO_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_REVOKEDINFO = crate::ocsp::asn::OCSP_REVOKEDINFO_new;
+const _: unsafe extern "C" fn(*mut OCSP_SERVICELOC) = crate::ocsp::asn::OCSP_SERVICELOC_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_SERVICELOC_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_SERVICELOC = crate::ocsp::asn::OCSP_SERVICELOC_new;
+const _: unsafe extern "C" fn(*mut OCSP_SIGNATURE) = crate::ocsp::asn::OCSP_SIGNATURE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_SIGNATURE_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_SIGNATURE = crate::ocsp::asn::OCSP_SIGNATURE_new;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+    core::ffi::c_int,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_SINGLERESP_add1_ext_i2d;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    *mut X509_EXTENSION,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_SINGLERESP_add_ext;
+const _: unsafe extern "C" fn(*mut OCSP_SINGLERESP, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_SINGLERESP_delete_ext;
+const _: unsafe extern "C" fn(*mut OCSP_SINGLERESP) = crate::ocsp::asn::OCSP_SINGLERESP_free;
+const _: unsafe extern "C" fn(*const OCSP_SINGLERESP) -> *const OCSP_CERTID =
+    crate::ocsp::cl::OCSP_SINGLERESP_get0_id;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::ocsp::ext::OCSP_SINGLERESP_get1_ext_d2i;
+const _: unsafe extern "C" fn(*mut OCSP_SINGLERESP, core::ffi::c_int) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_SINGLERESP_get_ext;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_SINGLERESP_get_ext_by_NID;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    *const ASN1_OBJECT,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_SINGLERESP_get_ext_by_OBJ;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    core::ffi::c_int,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_SINGLERESP_get_ext_by_critical;
+const _: unsafe extern "C" fn(*mut OCSP_SINGLERESP) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_SINGLERESP_get_ext_count;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::ocsp::asn::OCSP_SINGLERESP_it;
+const _: unsafe extern "C" fn() -> *mut OCSP_SINGLERESP = crate::ocsp::asn::OCSP_SINGLERESP_new;
+const _: unsafe extern "C" fn(*mut *mut core::ffi::c_char) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_accept_responses_new;
+const _: unsafe extern "C" fn(*mut core::ffi::c_char) -> *mut X509_EXTENSION =
+    crate::ocsp::ext::OCSP_archive_cutoff_new;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP, *mut X509) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_basic_add1_cert;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_basic_add1_nonce;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut OCSP_CERTID,
+    core::ffi::c_int,
+    core::ffi::c_int,
+    *mut ASN1_TIME,
+    *mut ASN1_TIME,
+    *mut ASN1_TIME,
+) -> *mut OCSP_SINGLERESP = crate::ocsp::srv::OCSP_basic_add1_status;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut X509,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    *mut stack_st_X509,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::srv::OCSP_basic_sign;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut X509,
+    *mut EVP_MD_CTX,
+    *mut stack_st_X509,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::srv::OCSP_basic_sign_ctx;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::vfy::OCSP_basic_verify;
+const _: unsafe extern "C" fn(
+    *const EVP_MD,
+    *const X509_NAME,
+    *const ASN1_BIT_STRING,
+    *const ASN1_INTEGER,
+) -> *mut OCSP_CERTID = crate::ocsp::id::OCSP_cert_id_new;
+const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
+    crate::ocsp::prn::OCSP_cert_status_str;
+const _: unsafe extern "C" fn(*const EVP_MD, *const X509, *const X509) -> *mut OCSP_CERTID =
+    crate::ocsp::id::OCSP_cert_to_id;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, *mut OCSP_BASICRESP) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_check_nonce;
+const _: unsafe extern "C" fn(
+    *mut ASN1_GENERALIZEDTIME,
+    *mut ASN1_GENERALIZEDTIME,
+    core::ffi::c_long,
+    core::ffi::c_long,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_check_validity;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP, *mut OCSP_REQUEST) -> core::ffi::c_int =
+    crate::ocsp::ext::OCSP_copy_nonce;
+const _: unsafe extern "C" fn(
+    *const core::ffi::c_char,
+    *mut core::ffi::c_long,
+    *mut core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::ocsp::ext::OCSP_crlID_new;
+const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
+    crate::ocsp::prn::OCSP_crl_reason_str;
+const _: unsafe extern "C" fn(*const OCSP_CERTID, *const OCSP_CERTID) -> core::ffi::c_int =
+    crate::ocsp::id::OCSP_id_cmp;
+const _: unsafe extern "C" fn(
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut ASN1_OBJECT,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut ASN1_INTEGER,
+    *mut OCSP_CERTID,
+) -> core::ffi::c_int = crate::ocsp::srv::OCSP_id_get0_info;
+const _: unsafe extern "C" fn(*const OCSP_CERTID, *const OCSP_CERTID) -> core::ffi::c_int =
+    crate::ocsp::id::OCSP_id_issuer_cmp;
+const _: unsafe extern "C" fn(*mut OCSP_ONEREQ) -> *mut OCSP_CERTID =
+    crate::ocsp::srv::OCSP_onereq_get0_id;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, *mut OCSP_CERTID) -> *mut OCSP_ONEREQ =
+    crate::ocsp::cl::OCSP_request_add0_id;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, *mut X509) -> core::ffi::c_int =
+    crate::ocsp::cl::OCSP_request_add1_cert;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    *mut core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::ext::OCSP_request_add1_nonce;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_request_is_signed;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST) -> core::ffi::c_int =
+    crate::ocsp::srv::OCSP_request_onereq_count;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, core::ffi::c_int) -> *mut OCSP_ONEREQ =
+    crate::ocsp::srv::OCSP_request_onereq_get0;
+const _: unsafe extern "C" fn(*mut OCSP_REQUEST, *const X509_NAME) -> core::ffi::c_int =
+    crate::ocsp::cl::OCSP_request_set1_name;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    *mut X509,
+    *mut EVP_PKEY,
+    *const EVP_MD,
+    *mut stack_st_X509,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_request_sign;
+const _: unsafe extern "C" fn(
+    *mut OCSP_REQUEST,
+    *mut stack_st_X509,
+    *mut X509_STORE,
+    core::ffi::c_ulong,
+) -> core::ffi::c_int = crate::ocsp::vfy::OCSP_request_verify;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP) -> core::ffi::c_int =
+    crate::ocsp::cl::OCSP_resp_count;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut OCSP_CERTID,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_resp_find;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut OCSP_CERTID,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_int,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut ASN1_GENERALIZEDTIME,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_resp_find_status;
+const _: unsafe extern "C" fn(*mut OCSP_BASICRESP, core::ffi::c_int) -> *mut OCSP_SINGLERESP =
+    crate::ocsp::cl::OCSP_resp_get0;
+const _: unsafe extern "C" fn(*const OCSP_BASICRESP) -> *const stack_st_X509 =
+    crate::ocsp::cl::OCSP_resp_get0_certs;
+const _: unsafe extern "C" fn(
+    *const OCSP_BASICRESP,
+    *mut *const ASN1_OCTET_STRING,
+    *mut *const X509_NAME,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_resp_get0_id;
+const _: unsafe extern "C" fn(*const OCSP_BASICRESP) -> *const ASN1_GENERALIZEDTIME =
+    crate::ocsp::cl::OCSP_resp_get0_produced_at;
+const _: unsafe extern "C" fn(*const OCSP_BASICRESP) -> *const OCSP_RESPDATA =
+    crate::ocsp::cl::OCSP_resp_get0_respdata;
+const _: unsafe extern "C" fn(*const OCSP_BASICRESP) -> *const ASN1_OCTET_STRING =
+    crate::ocsp::cl::OCSP_resp_get0_signature;
+const _: unsafe extern "C" fn(
+    *mut OCSP_BASICRESP,
+    *mut *mut X509,
+    *mut stack_st_X509,
+) -> core::ffi::c_int = crate::ocsp::vfy::OCSP_resp_get0_signer;
+const _: unsafe extern "C" fn(*const OCSP_BASICRESP) -> *const X509_ALGOR =
+    crate::ocsp::cl::OCSP_resp_get0_tbs_sigalg;
+const _: unsafe extern "C" fn(
+    *const OCSP_BASICRESP,
+    *mut *mut ASN1_OCTET_STRING,
+    *mut *mut X509_NAME,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_resp_get1_id;
+const _: unsafe extern "C" fn(core::ffi::c_int, *mut OCSP_BASICRESP) -> *mut OCSP_RESPONSE =
+    crate::ocsp::srv::OCSP_response_create;
+const _: unsafe extern "C" fn(*mut OCSP_RESPONSE) -> *mut OCSP_BASICRESP =
+    crate::ocsp::cl::OCSP_response_get1_basic;
+const _: unsafe extern "C" fn(*mut OCSP_RESPONSE) -> core::ffi::c_int =
+    crate::ocsp::cl::OCSP_response_status;
+const _: unsafe extern "C" fn(core::ffi::c_long) -> *const core::ffi::c_char =
+    crate::ocsp::prn::OCSP_response_status_str;
+const _: unsafe extern "C" fn(
+    *mut OCSP_SINGLERESP,
+    *mut core::ffi::c_int,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut ASN1_GENERALIZEDTIME,
+    *mut *mut ASN1_GENERALIZEDTIME,
+) -> core::ffi::c_int = crate::ocsp::cl::OCSP_single_get0_status;
+const _: unsafe extern "C" fn(
+    *const X509_NAME,
+    *mut *const core::ffi::c_char,
+) -> *mut X509_EXTENSION = crate::ocsp::ext::OCSP_url_svcloc_new;
 const _: unsafe extern "C" fn(*mut *mut OPENSSL_DIR_CTX) -> core::ffi::c_int =
     crate::dir::OPENSSL_DIR_end;
 const _: unsafe extern "C" fn(
@@ -15681,6 +16085,81 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut NOTICEREF = crate::x509v3::policy::d2i_NOTICEREF;
 const _: unsafe extern "C" fn(
+    *mut *mut OCSP_BASICRESP,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_BASICRESP = crate::ocsp::asn::d2i_OCSP_BASICRESP;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_CERTID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_CERTID = crate::ocsp::asn::d2i_OCSP_CERTID;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_CERTSTATUS,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_CERTSTATUS = crate::ocsp::asn::d2i_OCSP_CERTSTATUS;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_CRLID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_CRLID = crate::ocsp::asn::d2i_OCSP_CRLID;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_ONEREQ,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_ONEREQ = crate::ocsp::asn::d2i_OCSP_ONEREQ;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_REQINFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_REQINFO = crate::ocsp::asn::d2i_OCSP_REQINFO;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_REQUEST,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_REQUEST = crate::ocsp::asn::d2i_OCSP_REQUEST;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_RESPBYTES,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_RESPBYTES = crate::ocsp::asn::d2i_OCSP_RESPBYTES;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_RESPDATA,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_RESPDATA = crate::ocsp::asn::d2i_OCSP_RESPDATA;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_RESPID,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_RESPID = crate::ocsp::asn::d2i_OCSP_RESPID;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_RESPONSE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_RESPONSE = crate::ocsp::asn::d2i_OCSP_RESPONSE;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_REVOKEDINFO,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_REVOKEDINFO = crate::ocsp::asn::d2i_OCSP_REVOKEDINFO;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_SERVICELOC,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_SERVICELOC = crate::ocsp::asn::d2i_OCSP_SERVICELOC;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_SIGNATURE,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_SIGNATURE = crate::ocsp::asn::d2i_OCSP_SIGNATURE;
+const _: unsafe extern "C" fn(
+    *mut *mut OCSP_SINGLERESP,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OCSP_SINGLERESP = crate::ocsp::asn::d2i_OCSP_SINGLERESP;
+const _: unsafe extern "C" fn(
     *mut *mut OSSL_AA_DIST_POINT,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -16571,6 +17050,64 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509::spki::i2d_NETSCAPE_SPKI;
 const _: unsafe extern "C" fn(*const NOTICEREF, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::policy::i2d_NOTICEREF;
+const _: unsafe extern "C" fn(
+    *const OCSP_BASICRESP,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_BASICRESP;
+const _: unsafe extern "C" fn(
+    *const OCSP_CERTID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_CERTID;
+const _: unsafe extern "C" fn(
+    *const OCSP_CERTSTATUS,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_CERTSTATUS;
+const _: unsafe extern "C" fn(*const OCSP_CRLID, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::ocsp::asn::i2d_OCSP_CRLID;
+const _: unsafe extern "C" fn(
+    *const OCSP_ONEREQ,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_ONEREQ;
+const _: unsafe extern "C" fn(
+    *const OCSP_REQINFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_REQINFO;
+const _: unsafe extern "C" fn(
+    *const OCSP_REQUEST,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_REQUEST;
+const _: unsafe extern "C" fn(
+    *const OCSP_RESPBYTES,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_RESPBYTES;
+const _: unsafe extern "C" fn(
+    *const OCSP_RESPDATA,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_RESPDATA;
+const _: unsafe extern "C" fn(
+    *const OCSP_RESPID,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_RESPID;
+const _: unsafe extern "C" fn(
+    *const OCSP_RESPONSE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_RESPONSE;
+const _: unsafe extern "C" fn(
+    *const OCSP_REVOKEDINFO,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_REVOKEDINFO;
+const _: unsafe extern "C" fn(
+    *const OCSP_SERVICELOC,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_SERVICELOC;
+const _: unsafe extern "C" fn(
+    *const OCSP_SIGNATURE,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_SIGNATURE;
+const _: unsafe extern "C" fn(
+    *const OCSP_SINGLERESP,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::ocsp::asn::i2d_OCSP_SINGLERESP;
 const _: unsafe extern "C" fn(
     *const OSSL_AA_DIST_POINT,
     *mut *mut core::ffi::c_uchar,
