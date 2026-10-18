@@ -1,4 +1,4 @@
-//! `cargo xtask test-tlsfuzzer [--timing] [--reference-only] [--jobs N] [script...]`:
+//! `cargo xtask test-tlsfuzzer [--timing [--interface IF]] [--reference-only] [--jobs N] [script...]`:
 //! tlsfuzzer's scripts (TEST_PLAN.md, layer L7) against the reference's `openssl s_server`,
 //! once on the reference's libraries and once on rustyssl's.
 //!
@@ -16,8 +16,11 @@
 //! `target/xtask/test-tlsfuzzer/<script>.<library>.log`.
 //!
 //! The timing scripts (`timing` lines: Lucky13, Bleichenbacher/Marvin) run only with
-//! `--timing`. They measure many thousands of connections and need tlsfuzzer's analysis
-//! dependencies (NumPy, SciPy, pandas, ...) in the Python that runs them.
+//! `--timing`. They measure many thousands of connections, capturing them with `tcpdump` on
+//! the loopback interface (`--interface`, `lo0` on macOS and `lo` elsewhere by default; the
+//! capture needs the privileges tcpdump does), write their samples under the work directory,
+//! and need tlsfuzzer's analysis dependencies (NumPy, SciPy, pandas, ...) in the Python that
+//! runs them. Run them with `--jobs 1`: concurrent connections disturb the timings.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -224,6 +227,8 @@ struct Env {
     paths: Vec<PathBuf>,
     tf: PathBuf,
     work: PathBuf,
+    /// The interface timing scripts capture on.
+    interface: String,
 }
 
 /// Starts `s_server` on a free port and waits for it to accept.
@@ -300,6 +305,14 @@ fn run_script(env: &Env, s: &Script, ours: bool) -> Result<Outcome> {
     ));
     let out = fs::File::create(&log)?;
     let err = out.try_clone()?;
+    // A timing script captures its connections and writes its samples here.
+    let mut timing = Vec::new();
+    if s.timing {
+        let dir = log.with_extension("timing");
+        fs::create_dir_all(&dir)?;
+        timing.extend(["-i".to_owned(), env.interface.clone(), "-o".to_owned()]);
+        timing.push(dir.display().to_string());
+    }
     let mut child = Command::new(&env.python)
         .arg("-I")
         .arg("-c")
@@ -309,6 +322,7 @@ fn run_script(env: &Env, s: &Script, ours: bool) -> Result<Outcome> {
         .arg(&script)
         .args(["-h", "127.0.0.1", "-p", &port.to_string()])
         .args(&s.args)
+        .args(&timing)
         .current_dir(&env.work)
         .stdin(Stdio::null())
         .stdout(out)
@@ -519,11 +533,23 @@ pub fn run(args: &[String]) -> Result {
     let timing = args.iter().any(|a| a == "--timing");
     let reference_only = args.iter().any(|a| a == "--reference-only");
     let mut jobs = std::thread::available_parallelism().map_or(4, |n| n.get().div_ceil(2));
+    let mut interface = if cfg!(target_os = "macos") {
+        "lo0"
+    } else {
+        "lo"
+    }
+    .to_owned();
     let mut only = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--timing" | "--reference-only" => {}
+            "--interface" => {
+                interface = it
+                    .next()
+                    .cloned()
+                    .ok_or("--interface takes an interface name")?;
+            }
             "--jobs" => {
                 jobs = it
                     .next()
@@ -577,6 +603,7 @@ pub fn run(args: &[String]) -> Result {
         paths,
         tf,
         work,
+        interface,
     });
 
     // A pool of workers, each taking the next script and running it on both libraries.
