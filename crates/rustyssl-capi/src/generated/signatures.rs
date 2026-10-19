@@ -5855,6 +5855,38 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit_ex2;
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+    *mut *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineDecryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+    *mut *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineEncryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+    *const usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+    *const usize,
+    *mut *const core::ffi::c_uchar,
+    *const usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineUpdate;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
     *mut core::ffi::c_uchar,
     *mut core::ffi::c_int,
     *const core::ffi::c_uchar,

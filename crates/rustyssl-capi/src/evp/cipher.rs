@@ -40,7 +40,9 @@ use rustyssl_abi::{
     OSSL_FUNC_CIPHER_PIPELINE_DECRYPT_INIT, OSSL_FUNC_CIPHER_PIPELINE_ENCRYPT_INIT,
     OSSL_FUNC_CIPHER_PIPELINE_FINAL, OSSL_FUNC_CIPHER_PIPELINE_UPDATE,
     OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_UPDATE,
-    OSSL_LIB_CTX, OSSL_OP_CIPHER, OSSL_PARAM, OSSL_PROVIDER,
+    OSSL_FUNC_cipher_pipeline_decrypt_init_fn, OSSL_FUNC_cipher_pipeline_encrypt_init_fn,
+    OSSL_FUNC_cipher_pipeline_final_fn, OSSL_FUNC_cipher_pipeline_update_fn, OSSL_LIB_CTX,
+    OSSL_OP_CIPHER, OSSL_PARAM, OSSL_PROVIDER,
 };
 
 use super::fetch::{self, Kind};
@@ -91,11 +93,12 @@ pub(crate) struct Funcs {
     pub(crate) set_ctx_params: Option<SetCtxParamsFn>,
     pub(crate) gettable_ctx_params: Option<CtxParamsListFn>,
     pub(crate) settable_ctx_params: Option<CtxParamsListFn>,
-    /// The pipeline functions (a later step), which only `EVP_CIPHER_can_pipeline` looks at.
-    pub(crate) p_einit: Option<AnyFn>,
-    pub(crate) p_dinit: Option<AnyFn>,
-    pub(crate) p_cupdate: Option<AnyFn>,
-    pub(crate) p_cfinal: Option<AnyFn>,
+    /// The pipeline functions (`EVP_CipherPipelineEncryptInit` and the rest), which no
+    /// built-in cipher has.
+    pub(crate) p_einit: OSSL_FUNC_cipher_pipeline_encrypt_init_fn,
+    pub(crate) p_dinit: OSSL_FUNC_cipher_pipeline_decrypt_init_fn,
+    pub(crate) p_cupdate: OSSL_FUNC_cipher_pipeline_update_fn,
+    pub(crate) p_cfinal: OSSL_FUNC_cipher_pipeline_final_fn,
 }
 
 /// Where a cipher method came from (`EVP_ORIG_*`).

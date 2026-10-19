@@ -694,54 +694,6 @@ pub extern "C" fn ENGINE_up_ref(_: *mut ENGINE) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_CipherPipelineDecryptInit(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: usize,
-    _: *mut *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CipherPipelineDecryptInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CipherPipelineEncryptInit(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: usize,
-    _: *mut *const core::ffi::c_uchar,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CipherPipelineEncryptInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CipherPipelineFinal(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-    _: *const usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CipherPipelineFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_CipherPipelineUpdate(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut usize,
-    _: *const usize,
-    _: *mut *const core::ffi::c_uchar,
-    _: *const usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_CipherPipelineUpdate")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_VALUE_free(_: *mut OSSL_IETF_ATTR_SYNTAX_VALUE) {
     crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_VALUE_free")
 }
