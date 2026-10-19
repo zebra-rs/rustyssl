@@ -8,8 +8,8 @@ use core::ffi::{c_char, c_int, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ENGINE, ERR_LIB_ENGINE, ERR_LIB_SSL, ERR_R_ENGINE_LIB, ERR_R_PASSED_NULL_PARAMETER,
-    ERR_R_UNSUPPORTED, EVP_PKEY, SSL, SSL_CTX, SSL_new_pending_conn_cb_fn,
+    ENGINE, ERR_LIB_SSL, ERR_R_ENGINE_LIB, ERR_R_UNSUPPORTED, EVP_PKEY, SSL, SSL_CTX,
+    SSL_new_pending_conn_cb_fn,
 };
 
 use super::conn::ssl;
@@ -173,19 +173,36 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The client certificate engine: rustyssl has no engines, so `ENGINE_init` fails (for NULL
-    /// as OpenSSL's does) and so does this: 0.
+    /// Sets the engine that loads the client certificate (`ENGINE_load_ssl_client_cert`, asked
+    /// before the client certificate callback), initializing it; 0 with `ERR_R_ENGINE_LIB` if it
+    /// doesn't initialize, or `SSL_R_NO_CLIENT_CERT_METHOD` if it has no such function. As in
+    /// OpenSSL, an engine set before is kept (initialized) until the process ends.
     ///
     /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_client_cert_engine(_ctx: *mut SSL_CTX, e: *mut ENGINE) -> c_int
+    /// `ctx` is a live context; `e` is NULL or a live engine.
+    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_client_cert_engine(ctx: *mut SSL_CTX, e: *mut ENGINE) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
-        if e.is_null() {
-            err::raise(ERR_LIB_ENGINE, ERR_R_PASSED_NULL_PARAMETER, "engine_init");
+        // SAFETY: the caller's engine; its `init` may run, with no lock held.
+        if unsafe { crate::engine::ENGINE_init(e) } == 0 {
+            err::raise(ERR_LIB_SSL, ERR_R_ENGINE_LIB, "SSL_CTX_set_client_cert_engine");
+            return 0;
         }
-        err::raise(ERR_LIB_SSL, ERR_R_ENGINE_LIB, "SSL_CTX_set_client_cert_engine");
-        0
+        // SAFETY: as above, initialized.
+        if unsafe { crate::engine::ENGINE_get_ssl_client_cert_function(e) }.is_none() {
+            err::raise(ERR_LIB_SSL, rustyssl_abi::SSL_R_NO_CLIENT_CERT_METHOD, "SSL_CTX_set_client_cert_engine");
+            // SAFETY: the reference taken above.
+            unsafe { crate::engine::ENGINE_finish(e) };
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { super::ctx::ctx(ctx) }) else {
+            // SAFETY: as above.
+            unsafe { crate::engine::ENGINE_finish(e) };
+            return 0;
+        };
+        c.state().client_cert_engine = e;
+        1
     }
 }
 
