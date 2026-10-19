@@ -9,7 +9,7 @@
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_void};
 use core::ptr;
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
 use rustyssl_abi::{
@@ -146,11 +146,14 @@ unsafe fn funcs(ui: *mut UI) -> super::Funcs {
     unsafe { funcs_of(m) }
 }
 
-/// The default method (`UI_set_default_method`), NULL until one is set or asked for.
+/// The default method `UI_set_default_method` set, which may be NULL; `UI_OpenSSL` until one is
+/// (`DEFAULT_SET`).
 static DEFAULT_METHOD: AtomicPtr<UI_METHOD> = AtomicPtr::new(ptr::null_mut());
+static DEFAULT_SET: AtomicBool = AtomicBool::new(false);
 
 ffi_export! {
-    /// Sets the method new UIs take. Does nothing for NULL... it sets it, as OpenSSL does.
+    /// Sets the method new UIs take. NULL is a method too: `UI_get_default_method` then gives
+    /// NULL, and new UIs take `UI_null` (OpenSSL's `default_UI_meth`, starting at the console's).
     ///
     /// # Safety
     /// `meth` is NULL or a method that outlives its use as the default.
@@ -158,25 +161,23 @@ ffi_export! {
     where failure = (), library = ERR_LIB_UI
     {
         DEFAULT_METHOD.store(meth.cast_mut(), Ordering::Release);
+        DEFAULT_SET.store(true, Ordering::Release);
     }
 }
 
 ffi_export! {
-    /// The method new UIs take: the one set, else `UI_OpenSSL`.
+    /// The method new UIs take: the one set (NULL if that was NULL), else `UI_OpenSSL`.
     ///
     /// # Safety
     /// No preconditions.
     pub unsafe extern "C" fn UI_get_default_method() -> *const UI_METHOD
     where failure = ptr::null(), library = ERR_LIB_UI
     {
-        let m = DEFAULT_METHOD.load(Ordering::Acquire);
-        if !m.is_null() {
-            return m;
+        if DEFAULT_SET.load(Ordering::Acquire) {
+            return DEFAULT_METHOD.load(Ordering::Acquire);
         }
         // SAFETY: no preconditions.
-        let console = unsafe { UI_OpenSSL() };
-        DEFAULT_METHOD.store(console, Ordering::Release);
-        console
+        unsafe { UI_OpenSSL() }
     }
 }
 

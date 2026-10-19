@@ -2283,4 +2283,26 @@ mod tests {
         // SAFETY: the context from `newctx`.
         unsafe { freectx(ctx) };
     }
+
+    /// docs/DEVIATIONS.md: RC2's AlgorithmIdentifier parameters into a buffer too short for
+    /// them fail, with the length needed, and write nothing.
+    #[test]
+    fn a_short_buffer_for_parameters_is_refused() {
+        let mut room = [0xAAu8; 4];
+        let mut p = OSSL_PARAM {
+            key: c"alg_id_param".as_ptr(),
+            data_type: OSSL_PARAM_OCTET_STRING.cast_unsigned(),
+            data: room.as_mut_ptr().cast(),
+            data_size: room.len(),
+            return_size: 0,
+        };
+        let der = [0x02, 0x02, 0x00, 0xA0, 0x04];
+        // SAFETY: a parameter over `room`, of its size.
+        assert!(!unsafe { put_der(&mut p, &der) });
+        assert_eq!(p.return_size, der.len());
+        assert_eq!(room, [0xAA; 4]);
+        p.data = ptr::null_mut();
+        // SAFETY: a parameter with no buffer: only the length is asked for.
+        assert!(unsafe { put_der(&mut p, &der) });
+    }
 }

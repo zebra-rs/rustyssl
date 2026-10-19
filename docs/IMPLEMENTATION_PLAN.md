@@ -5403,7 +5403,7 @@ both libraries (step 8.1).
 
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 
-- [ ] **9.1 Loading external C providers:**
+- [x] **9.1 Loading external C providers:**
   - `OSSL_PROVIDER_load` of `.so` modules (`OSSL_provider_init`, MODULESDIR; 3.1d finds
     them), `OSSL_LIB_CTX_new_from_dispatch` and
     `OSSL_LIB_CTX_new_child` (from 3.1b), and the `legacy` provider as a module in
@@ -5436,7 +5436,8 @@ both libraries (step 8.1).
       provider_pkey_test (keys of a foreign key manager), prov_config_test,
       provider_status_test, evp_fetch_prov_test, evp_skey_test, evp_extra_test2, and
       sslapitest's test_pluggable_group, test_pluggable_signature and test_sigalgs_available.
-      All pass except one evp_extra_test2 subtest, a PEM passphrase error order.
+      All pass; evp_extra_test2's PEM passphrase subtest needed `UI_set_default_method(NULL)`
+      to leave NULL as the default (new UIs then take `UI_null`), as OpenSSL does.
     - evp_extra_test, evp_libctx_test, evp_pkey_provided_test and provider_internal_test use
       libcrypto's internals, so they're skipped with the reason.
   - Found on the way:
@@ -5468,8 +5469,27 @@ both libraries (step 8.1).
         RC2's parameters, RC4-HMAC-MD5 over TLS records (a bad MAC and a wrong length fail),
         DES's random keys, and a search path without the module.
     - Every harness points each library at its own modules directory (`OPENSSL_MODULES`).
-  - Left:
-    - Validation with oqs-provider, pkcs11-provider and tpm2-openssl.
+  - Validation (`cargo xtask test-providers`, TEST_PLAN.md L8; pins in
+    `tests/providers/pins.txt`), each built against the reference and run on both libraries:
+    - oqs-provider 0.10.0 with liboqs 0.14.0 (macOS and x86_64 Linux): its 7 `ctest`
+      programs; its certificate, CMS, CA and PKCS#12 scripts for all 52 signature
+      algorithms; and the TLS matrix of `test_tls_full.py`, 48 TLS signature algorithms by
+      29 groups (1392 handshakes). rustyssl passes everything the reference does. (The CA
+      script fails on both: its certificate's fixed end date, 2025-08-23, has passed.)
+    - pkcs11-provider 1.3.0 (x86_64 Linux, Docker): the NSS softokn suite passes as on the
+      reference (30 of 31; one skipped on both). The SoftHSM suite, with SoftHSM itself
+      running on rustyssl (its setup calls `ENGINE_by_id`), passes as on the reference once
+      9.3's engines are in: 24 of 26 on both.
+    - tpm2-openssl 1.3.0 (x86_64 Linux, Docker, `swtpm` behind `tpm2-abrmd`): all 48 tests
+      pass on both.
+  - Found by the validation:
+    - `EVP_PKEY_keygen` from a key that has only a type (`EVP_PKEY_set_type`) gives the key
+      manager no template, as OpenSSL does (oqs-provider's X25519/X448 hybrids).
+    - TLS with a provider that holds a resource for a running operation (PKCS#11 sessions):
+      one-shot hashes finish in place instead of finishing a copy; the AEAD's expected tag is
+      set before the data, as `tls13_cipher` sets it; and CBC records keep one cipher stream
+      per direction, the explicit IV's block encrypted through the chain, as OpenSSL's record
+      layer does (the PKCS#11 provider ignores a re-initialization and keeps its chain).
 - [x] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.
   - Done (audit, 2026-10-18): every family was implemented in Phases 4–6, and an application's
