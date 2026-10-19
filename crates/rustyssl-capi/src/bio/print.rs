@@ -593,21 +593,27 @@ unsafe fn convert(
             let num = unsafe { args.pointer() };
             if !num.is_null() {
                 let pos = out.pos;
-                // SAFETY: as above: `%n` takes a pointer to the integer type its length
-                // modifier names, which gets the count converted to that type, as C converts.
-                unsafe {
-                    match size {
-                        Modifier::Char => {
-                            num.cast::<i8>().write(pos.to_le_bytes()[0].cast_signed())
-                        }
-                        Modifier::Short => num.cast::<i16>().write(wrap_short(wrap(pos.into()))),
-                        Modifier::Long
-                        | Modifier::LongLong
-                        | Modifier::Size
-                        | Modifier::Ptrdiff => num.cast::<i64>().write(pos),
-                        Modifier::Int | Modifier::LongDouble => {
-                            num.cast::<c_int>().write(wrap(pos.into()));
-                        }
+                // `%n` takes a pointer to the integer type its length modifier names, which
+                // gets the count converted to that type, as C converts.
+                match size {
+                    Modifier::Char => {
+                        let v = pos.to_le_bytes()[0].cast_signed();
+                        // SAFETY: as above.
+                        unsafe { num.cast::<i8>().write(v) };
+                    }
+                    Modifier::Short => {
+                        let v = wrap_short(wrap(pos.into()));
+                        // SAFETY: as above.
+                        unsafe { num.cast::<i16>().write(v) };
+                    }
+                    Modifier::Long | Modifier::LongLong | Modifier::Size | Modifier::Ptrdiff => {
+                        // SAFETY: as above.
+                        unsafe { num.cast::<i64>().write(pos) };
+                    }
+                    Modifier::Int | Modifier::LongDouble => {
+                        let v = wrap(pos.into());
+                        // SAFETY: as above.
+                        unsafe { num.cast::<c_int>().write(v) };
                     }
                 }
             }

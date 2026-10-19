@@ -364,17 +364,37 @@ unsafe fn dup(object: *const Object) -> *mut Object {
     copy
 }
 
-/// Whether two objects have the same content octets and names (OpenSSL's `obj_equivalent`).
+/// An object's keys: its NID, length, content octets, and names.
+type Keys<'a> = (c_int, c_int, &'a [u8], Option<&'a [u8]>, Option<&'a [u8]>);
+
+/// The keys of `object`.
+///
+/// # Safety
+/// `object` is a live object whose names are strings and whose data holds its length; the
+/// result doesn't outlive them.
+unsafe fn keys<'a>(object: *const Object) -> Keys<'a> {
+    // SAFETY: the caller's guarantee.
+    let view = unsafe { &*object };
+    // SAFETY: as above.
+    let data = unsafe { content(object) };
+    // SAFETY: as above.
+    let sn = unsafe { c_text(view.sn) };
+    // SAFETY: as above.
+    let ln = unsafe { c_text(view.ln) };
+    (view.nid, view.length, data, sn, ln)
+}
+
+/// Whether two objects have the same length, content octets, and names (OpenSSL's
+/// `obj_equivalent`).
 ///
 /// # Safety
 /// Both are live objects.
 unsafe fn equivalent(a: *const Object, b: *const Object) -> bool {
     // SAFETY: the caller's guarantee.
-    let (x, y) = unsafe { (&*a, &*b) };
+    let (_, la, da, sa, na) = unsafe { keys(a) };
     // SAFETY: as above.
-    let same_names = unsafe { c_text(x.sn) == c_text(y.sn) && c_text(x.ln) == c_text(y.ln) };
-    // SAFETY: as above.
-    x.length == y.length && unsafe { content(a) == content(b) } && same_names
+    let (_, lb, db, sb, nb) = unsafe { keys(b) };
+    la == lb && da == db && sa == sb && na == nb
 }
 
 /// OpenSSL 3.6's `add_object`: keeps a copy of `object` for the life of the process under its
@@ -394,6 +414,7 @@ unsafe fn add_object(object: *const Object, indirect: bool) -> c_int {
     }
     // SAFETY: the caller's guarantee.
     let view = unsafe { &*object };
+    let view_nid = view.nid;
     let builtin_nids = c_int::try_from(table::objects().len()).unwrap_or(c_int::MAX);
     let kept = if indirect {
         if view.nid != NID_undef {
@@ -412,8 +433,8 @@ unsafe fn add_object(object: *const Object, indirect: bool) -> c_int {
         unsafe { (*kept).nid = nid };
         kept
     } else {
-        // SAFETY: the caller's guarantee: its names are strings, its data its length.
-        let (data, sn, ln) = unsafe { (content(object), c_text(view.sn), c_text(view.ln)) };
+        // SAFETY: the caller's guarantee.
+        let (_, _, data, sn, ln) = unsafe { keys(object) };
         if view.nid < builtin_nids
             || table::by_der(data).is_some()
             || sn.is_some_and(|sn| table::by_short_name(sn).is_some())
@@ -454,14 +475,11 @@ unsafe fn add_object(object: *const Object, indirect: bool) -> c_int {
     .last()
     .copied();
     if let Some(Kept(existing)) = existing {
-        // SAFETY: added objects are always live; `object` is the caller's.
-        let same = unsafe { (*object).nid == (*existing).nid && equivalent(object, existing) };
-        // SAFETY: as above.
-        let result = if same {
-            unsafe { (*existing).nid }
-        } else {
-            NID_undef
-        };
+        // SAFETY: added objects are always live.
+        let existing_nid = unsafe { (*existing).nid };
+        // SAFETY: as above; `object` is the caller's.
+        let same = view_nid == existing_nid && unsafe { equivalent(object, existing) };
+        let result = if same { existing_nid } else { NID_undef };
         if kept != existing {
             // SAFETY: the copy made here, not shared.
             unsafe { free_object(kept) };

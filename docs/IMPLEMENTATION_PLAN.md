@@ -5622,6 +5622,15 @@ both libraries (step 8.1).
       `EVP_CIPHER_CTX_iv` and `get_updated_iv`'s pointer form fail with an error) and counts a
       partial block once it makes its key stream, which a new key without an IV shows
       (`provider/ciphers.rs` `chacha20_get_ctx_params`; rustyssl-crypto `ChaCha::apply`).
+    - The AES-CBC-HMAC-SHA1/SHA256/SHA512-ETM ciphers (128, 192, 256-bit keys) exist on aarch64
+      with the AES and SHA instructions, as in the reference (`provider/modes.rs` `etm_*`,
+      `etm_capable`; rustyssl-crypto `provided/cipher/etm.rs`; listed in
+      `ciphers.rs` `DEFAULT_CIPHERS`, filtered by `default_ciphers`). Each update is its own
+      message: CBC from the IV as set (the IV never advances) and HMAC over its ciphertext,
+      continued from the MAC key's pads counting one block (so without a MAC key, from the
+      hash's initial state). Ciphers report `encrypt-then-mac`. Their arrival shifts the
+      default provider's algorithm numbers that appear in error text on aarch64.
+      `tests/c/evp_cipher_etm.c`.
 
 **Exit:** M6.
 

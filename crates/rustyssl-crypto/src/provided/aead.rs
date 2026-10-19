@@ -111,7 +111,7 @@ fn put(a: &mut [u8], i: usize, v: u8) {
 }
 
 /// Constant-time equality of two octet strings of one length.
-fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }

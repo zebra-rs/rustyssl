@@ -556,6 +556,9 @@ pub(crate) enum Value {
     IvCopyFirst(*const u8, usize),
     /// Octets copied into an octet string.
     Octets(*const u8, usize),
+    /// The context's octets copied into an octet string, else as a pointer, leaving the first
+    /// try's error (3.5's way, which 3.6's ETM ciphers keep).
+    StringThenPtr(*const u8, usize),
 }
 
 /// Sets the parameter `key` of `params`, if there is one, to `value`, raising
@@ -594,6 +597,16 @@ pub(crate) unsafe fn set_param(
         Value::Octets(v, n) => unsafe {
             crate::params::OSSL_PARAM_set_octet_string(p, v.cast(), n)
         },
+        Value::StringThenPtr(v, n) => {
+            // SAFETY: as above; the octets live as long as the context.
+            let ok = unsafe { crate::params::OSSL_PARAM_set_octet_string(p, v.cast(), n) };
+            if ok == 0 {
+                // SAFETY: as above.
+                unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) }
+            } else {
+                ok
+            }
+        }
     };
     if ok == 0 {
         err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, function);
@@ -627,7 +640,7 @@ impl Info {
             cts: kind.cts(),
             multiblock: kind.composite(),
             rand_key: kind.has_rand_key(),
-            etm: false,
+            etm: kind.etm(),
             key_len: kind.key_len(),
             block_size: kind.block_size(),
             iv_len: kind.iv_len(),
@@ -1873,7 +1886,7 @@ cipher!(chacha20, Kind::ChaCha20, chacha20);
 
 /// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order. The composites
 /// (`ALGC`) are taken out where the CPU lacks AES-NI, as the reference's are.
-pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
+pub(crate) static DEFAULT_CIPHERS: Algorithms<140> = Algorithms([
     alg(c"NULL", &null::TABLE),
     alg(c"AES-256-ECB:2.16.840.1.101.3.4.1.41", &aes256ecb::TABLE),
     alg(c"AES-192-ECB:2.16.840.1.101.3.4.1.21", &aes192ecb::TABLE),
@@ -2006,6 +2019,42 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
     alg(
         c"AES-256-CBC-HMAC-SHA256",
         &modes::aes256cbc_hmac_sha256::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA1-ETM",
+        &modes::aes128cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA1-ETM",
+        &modes::aes192cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA1-ETM",
+        &modes::aes256cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA256-ETM",
+        &modes::aes128cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA256-ETM",
+        &modes::aes192cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA256-ETM",
+        &modes::aes256cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA512-ETM",
+        &modes::aes128cbc_hmac_sha512_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA512-ETM",
+        &modes::aes192cbc_hmac_sha512_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA512-ETM",
+        &modes::aes256cbc_hmac_sha512_etm::TABLE,
     ),
     alg(
         c"ARIA-256-GCM:1.2.410.200046.1.1.36",
@@ -2239,32 +2288,74 @@ pub(crate) static LEGACY_CIPHERS: Algorithms<33> = Algorithms([
     ALG_END,
 ]);
 
-/// The default provider's cipher table: `DEFAULT_CIPHERS`, less the composites without AES-NI
-/// (`ossl_prov_cache_exported_algorithms`).
+/// The default provider's cipher table: `DEFAULT_CIPHERS`, less the ciphers the CPU can't run
+/// (`ossl_prov_cache_exported_algorithms`): the AES-CBC-HMAC composites without AES-NI, and
+/// 3.6's ETM ciphers without aarch64's AES and SHA instructions.
 pub(crate) fn default_ciphers() -> *const OSSL_ALGORITHM {
-    /// The table without the composites.
+    /// The table without what's missing.
     struct Table(Vec<OSSL_ALGORITHM>);
     // SAFETY: the static table's entries, never written.
     unsafe impl Send for Table {}
     // SAFETY: as above.
     unsafe impl Sync for Table {}
-    static WITHOUT: std::sync::OnceLock<Table> = std::sync::OnceLock::new();
-    if crate::evp::legacy_cipher::aesni() {
-        return DEFAULT_CIPHERS.0.as_ptr();
-    }
+    static TABLE: std::sync::OnceLock<Table> = std::sync::OnceLock::new();
+    let aesni = crate::evp::legacy_cipher::aesni();
     let composites = [
         modes::aes128cbc_hmac_sha1::TABLE.0.as_ptr(),
         modes::aes256cbc_hmac_sha1::TABLE.0.as_ptr(),
         modes::aes128cbc_hmac_sha256::TABLE.0.as_ptr(),
         modes::aes256cbc_hmac_sha256::TABLE.0.as_ptr(),
     ];
-    WITHOUT
+    let etm = [
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes128cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes192cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes256cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes128cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes192cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes256cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes128cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes192cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes256cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+    ];
+    TABLE
         .get_or_init(|| {
             Table(
                 DEFAULT_CIPHERS
                     .0
                     .iter()
-                    .filter(|a| !composites.contains(&a.implementation))
+                    .filter(|a| aesni || !composites.contains(&a.implementation))
+                    .filter(|a| {
+                        etm.iter()
+                            .find(|(_, t)| *t == a.implementation)
+                            .is_none_or(|(mode, _)| modes::etm_capable(*mode))
+                    })
                     .copied()
                     .collect(),
             )

@@ -13,7 +13,7 @@ use core::ptr;
 
 use rustyssl_abi::{
     ERR_LIB_PROV, OSSL_CIPHER_CTS_MODE_CS1, OSSL_CIPHER_CTS_MODE_CS2, OSSL_CIPHER_CTS_MODE_CS3,
-    OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD,
+    OSSL_CIPHER_HMAC_PARAM_MAC, OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD,
     OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, OSSL_CIPHER_PARAM_CTS_MODE, OSSL_CIPHER_PARAM_IV,
     OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_NUM,
     OSSL_CIPHER_PARAM_PADDING, OSSL_CIPHER_PARAM_TLS_VERSION,
@@ -31,7 +31,7 @@ use rustyssl_abi::{
     OSSL_PARAM_UTF8_STRING, PROV_R_FAILED_TO_GET_PARAMETER, PROV_R_FAILED_TO_SET_PARAMETER,
     PROV_R_INVALID_KEY_LENGTH,
 };
-use rustyssl_crypto::provided::cipher::{Kind, Mode, TLS1_AAD_LEN};
+use rustyssl_crypto::provided::cipher::{ETM_MAX_TAG, Kind, Mode, TLS1_AAD_LEN};
 use rustyssl_crypto::sym::BlockAlgorithm::{self, Aes, Camellia, Sm4, TripleDes};
 
 use super::ciphers::{
@@ -43,7 +43,10 @@ use super::ciphers::{
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::err;
 use crate::ffi::ffi_callback;
-use crate::params::{OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const};
+use crate::params::{
+    OSSL_PARAM_get_octet_string, OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate,
+    OSSL_PARAM_locate_const,
+};
 use crate::string::OPENSSL_strcasecmp;
 
 /// A block mode of `algorithm` with `key_len` octets of key.
@@ -953,6 +956,259 @@ cipher_mod!(
     block(Aes, 32, Mode::CbcHmacSha256),
     composite
 );
+
+// -------------------------------------------------------------------------------------------
+// The AES-CBC-HMAC-SHA*-ETM ciphers (OpenSSL 3.6)
+
+ffi_callback! {
+    /// `aes_get_ctx_params` (`cipher_aes_cbc_hmac_sha_etm.c`): the lengths, the IVs (as an
+    /// octet string, else a pointer, leaving the first try's error), and an encryption's tag.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn etm_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "aes_get_ctx_params";
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let Some(g) = ctx.core.generic_mut() else { return 0 };
+        for (key, value) in [
+            (OSSL_CIPHER_PARAM_KEYLEN, Value::Size(g.key_len())),
+            (OSSL_CIPHER_PARAM_IVLEN, Value::Size(g.iv_len())),
+        ] {
+            // SAFETY: the caller's array.
+            if !unsafe { set_param(params, key, F, value) } {
+                return 0;
+            }
+        }
+        let ivlen = g.iv_len();
+        for (key, original) in [(OSSL_CIPHER_PARAM_IV, true), (OSSL_CIPHER_PARAM_UPDATED_IV, false)] {
+            let iv = if original { g.original_iv() } else { g.updated_iv() }.as_mut_ptr().cast_const();
+            // SAFETY: as above; the IV holds `ivlen` octets and lives as long as the context.
+            if !unsafe { set_param(params, key, F, Value::StringThenPtr(iv, ivlen)) } {
+                return 0;
+            }
+        }
+        // SAFETY: the caller's array.
+        let p = unsafe { OSSL_PARAM_locate(params, OSSL_CIPHER_HMAC_PARAM_MAC.as_ptr()) };
+        if !p.is_null() {
+            // SAFETY: a located parameter.
+            let size = unsafe { (*p).data_size };
+            let tag = match g.etm_tag(size) {
+                Ok(tag) => tag,
+                Err(e) => {
+                    raise(e, F);
+                    return 0;
+                }
+            };
+            // SAFETY: as above; the tag's octets.
+            if !unsafe { set_param(params, OSSL_CIPHER_HMAC_PARAM_MAC, F, Value::Octets(tag.as_ptr(), tag.len())) } {
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+ffi_callback! {
+    /// `aes_set_ctx_params` (`cipher_aes_cbc_hmac_sha_etm.c`): the MAC key, `keylen` (only the
+    /// cipher's), and the expected tag.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array whose
+    /// octet strings hold their sizes.
+    pub(crate) unsafe extern "C" fn etm_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "aes_set_ctx_params";
+        if params.is_null() {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let Some(g) = ctx.core.generic_mut() else { return 0 };
+        // SAFETY: the caller's array.
+        let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_MAC_KEY.as_ptr()) };
+        if !p.is_null() {
+            // SAFETY: a located parameter.
+            let p = unsafe { &*p };
+            if p.data_type != OSSL_PARAM_OCTET_STRING.cast_unsigned() {
+                err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
+                return 0;
+            }
+            // SAFETY: an octet string holds its size.
+            let Some(key) = (unsafe { super::ciphers::input(p.data.cast_const().cast(), p.data_size) }) else {
+                return 0;
+            };
+            g.etm_set_mac_key(key);
+        }
+        // SAFETY: the caller's array.
+        match unsafe { get_param(params, OSSL_CIPHER_PARAM_KEYLEN, F, get_size) } {
+            Err(()) => return 0,
+            Ok(Some(n)) if n != g.key_len() => {
+                err::raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH, F);
+                return 0;
+            }
+            Ok(_) => {}
+        }
+        // SAFETY: the caller's array.
+        let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_CIPHER_HMAC_PARAM_MAC.as_ptr()) };
+        if !p.is_null() {
+            let mut tag = [0u8; ETM_MAX_TAG];
+            let mut dst = tag.as_mut_ptr().cast::<c_void>();
+            let mut size = 0;
+            // SAFETY: a located parameter; room for `ETM_MAX_TAG` octets.
+            if unsafe { OSSL_PARAM_get_octet_string(p, &raw mut dst, ETM_MAX_TAG, &raw mut size) } == 0 {
+                err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, F);
+                return 0;
+            }
+            if let Err(e) = g.etm_set_expected_tag(tag.get(..size).unwrap_or_default()) {
+                raise(e, F);
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+inits!(etm_einit, etm_dinit, etm_set_ctx_params);
+
+static ETM_GETTABLE: Params<5> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_IVLEN, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
+    defn(OSSL_CIPHER_PARAM_IV, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
+// The reference lists the TLS AAD, which it doesn't take.
+static ETM_SETTABLE: Params<4> = Params([
+    defn(OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD, OSSL_PARAM_OCTET_STRING, 0),
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    PARAM_END,
+]);
+list!(etm_gettable_ctx_params, ETM_GETTABLE);
+list!(etm_settable_ctx_params, ETM_SETTABLE);
+
+/// `IMPLEMENT_CIPHER` in `cipher_aes_cbc_hmac_sha_etm.c`.
+macro_rules! etm {
+    () => {
+        pub(crate) static TABLE: Dispatch<15> = Dispatch([
+            entry!(OSSL_FUNC_CIPHER_NEWCTX, newctx, NewCtxFn),
+            entry!(OSSL_FUNC_CIPHER_FREECTX, freectx, FreeFn),
+            entry!(OSSL_FUNC_CIPHER_DUPCTX, dupctx, DupFn),
+            entry!(OSSL_FUNC_CIPHER_ENCRYPT_INIT, etm_einit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_DECRYPT_INIT, etm_dinit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_UPDATE, update, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_FINAL, final_, FinalFn),
+            entry!(OSSL_FUNC_CIPHER_CIPHER, cipher, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_GET_PARAMS, get_params, GetParamsFn),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
+                generic_gettable_params,
+                GettableFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GET_CTX_PARAMS,
+                etm_get_ctx_params,
+                GetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
+                etm_gettable_ctx_params,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SET_CTX_PARAMS,
+                etm_set_ctx_params,
+                SetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
+                etm_settable_ctx_params,
+                CtxParamsFn
+            ),
+            END,
+        ]);
+    };
+}
+
+cipher_mod!(
+    aes128cbc_hmac_sha1_etm,
+    block(Aes, 16, Mode::CbcHmacSha1Etm),
+    etm
+);
+cipher_mod!(
+    aes192cbc_hmac_sha1_etm,
+    block(Aes, 24, Mode::CbcHmacSha1Etm),
+    etm
+);
+cipher_mod!(
+    aes256cbc_hmac_sha1_etm,
+    block(Aes, 32, Mode::CbcHmacSha1Etm),
+    etm
+);
+cipher_mod!(
+    aes128cbc_hmac_sha256_etm,
+    block(Aes, 16, Mode::CbcHmacSha256Etm),
+    etm
+);
+cipher_mod!(
+    aes192cbc_hmac_sha256_etm,
+    block(Aes, 24, Mode::CbcHmacSha256Etm),
+    etm
+);
+cipher_mod!(
+    aes256cbc_hmac_sha256_etm,
+    block(Aes, 32, Mode::CbcHmacSha256Etm),
+    etm
+);
+cipher_mod!(
+    aes128cbc_hmac_sha512_etm,
+    block(Aes, 16, Mode::CbcHmacSha512Etm),
+    etm
+);
+cipher_mod!(
+    aes192cbc_hmac_sha512_etm,
+    block(Aes, 24, Mode::CbcHmacSha512Etm),
+    etm
+);
+cipher_mod!(
+    aes256cbc_hmac_sha512_etm,
+    block(Aes, 32, Mode::CbcHmacSha512Etm),
+    etm
+);
+
+/// Whether the CPU has what the reference's ETM ciphers need (`HWAES_CBC_HMAC_SHA*_ETM_CAPABLE`):
+/// aarch64's AES instructions and those of the hash, SHA-1 and SHA-256 (`sha2`) or SHA-512
+/// (`sha3`, which includes them). Elsewhere the reference has none of them.
+pub(crate) fn etm_capable(mode: Mode) -> bool {
+    #[cfg(target_arch = "aarch64")]
+    {
+        let aes = std::arch::is_aarch64_feature_detected!("aes");
+        aes && match mode {
+            Mode::CbcHmacSha1Etm | Mode::CbcHmacSha256Etm => {
+                std::arch::is_aarch64_feature_detected!("sha2")
+            }
+            Mode::CbcHmacSha512Etm => std::arch::is_aarch64_feature_detected!("sha3"),
+            _ => false,
+        }
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        let _ = mode;
+        false
+    }
+}
 
 #[cfg(test)]
 mod tests {

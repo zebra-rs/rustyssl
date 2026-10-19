@@ -27,9 +27,11 @@
 use zeroize::{Zeroize, Zeroizing};
 
 mod composite;
+mod etm;
 mod modes;
 
 pub use composite::{Multiblock, TLS1_AAD_LEN};
+pub use etm::MAX_TAG as ETM_MAX_TAG;
 
 use crate::sym::{self, BlockAlgorithm, BlockCipher};
 
@@ -74,6 +76,13 @@ pub enum Mode {
     CbcHmacSha1,
     /// AES-CBC-HMAC-SHA256.
     CbcHmacSha256,
+    /// AES-CBC-HMAC-SHA1-ETM (OpenSSL 3.6, `cipher_aes_cbc_hmac_sha_etm.c`): CBC, then HMAC
+    /// over the ciphertext.
+    CbcHmacSha1Etm,
+    /// AES-CBC-HMAC-SHA256-ETM.
+    CbcHmacSha256Etm,
+    /// AES-CBC-HMAC-SHA512-ETM.
+    CbcHmacSha512Etm,
 }
 
 /// The default provider's ciphers handled here.
@@ -106,9 +115,13 @@ impl Kind {
         match self {
             Self::Block { mode, .. } => match mode {
                 Mode::Ecb => rustyssl_abi::EVP_CIPH_ECB_MODE.cast_unsigned(),
-                Mode::Cbc | Mode::CbcCts | Mode::CbcHmacSha1 | Mode::CbcHmacSha256 => {
-                    rustyssl_abi::EVP_CIPH_CBC_MODE.cast_unsigned()
-                }
+                Mode::Cbc
+                | Mode::CbcCts
+                | Mode::CbcHmacSha1
+                | Mode::CbcHmacSha256
+                | Mode::CbcHmacSha1Etm
+                | Mode::CbcHmacSha256Etm
+                | Mode::CbcHmacSha512Etm => rustyssl_abi::EVP_CIPH_CBC_MODE.cast_unsigned(),
                 Mode::Ofb => rustyssl_abi::EVP_CIPH_OFB_MODE.cast_unsigned(),
                 Mode::Cfb | Mode::Cfb1 | Mode::Cfb8 => {
                     rustyssl_abi::EVP_CIPH_CFB_MODE.cast_unsigned()
@@ -138,7 +151,15 @@ impl Kind {
         match self {
             Self::Block {
                 algorithm,
-                mode: Mode::Ecb | Mode::Cbc | Mode::CbcCts | Mode::CbcHmacSha1 | Mode::CbcHmacSha256,
+                mode:
+                    Mode::Ecb
+                    | Mode::Cbc
+                    | Mode::CbcCts
+                    | Mode::CbcHmacSha1
+                    | Mode::CbcHmacSha256
+                    | Mode::CbcHmacSha1Etm
+                    | Mode::CbcHmacSha256Etm
+                    | Mode::CbcHmacSha512Etm,
                 ..
             } => algorithm.block_size(),
             Self::Block {
@@ -254,6 +275,18 @@ impl Kind {
             self,
             Self::Block {
                 mode: Mode::CbcHmacSha1 | Mode::CbcHmacSha256,
+                ..
+            }
+        )
+    }
+
+    /// Whether the cipher is one of 3.6's AES-CBC-HMAC-SHA*-ETM ciphers
+    /// (`EVP_CIPH_FLAG_ENC_THEN_MAC`).
+    pub const fn etm(self) -> bool {
+        matches!(
+            self,
+            Self::Block {
+                mode: Mode::CbcHmacSha1Etm | Mode::CbcHmacSha256Etm | Mode::CbcHmacSha512Etm,
                 ..
             }
         )
@@ -475,6 +508,8 @@ pub struct Generic {
     xts_ieee: bool,
     /// The AES-CBC-HMAC composites' MAC and TLS state.
     hmac: Option<Box<composite::Hmac>>,
+    /// The AES-CBC-HMAC-SHA*-ETM ciphers' MAC state and tags.
+    etm: Option<Box<etm::Etm>>,
     cipher: Option<Box<dyn BlockCipher>>,
     chacha: Option<ChaCha>,
     /// RC4's key stream.
@@ -509,6 +544,7 @@ impl Clone for Generic {
             key_enc: self.key_enc,
             xts_ieee: self.xts_ieee,
             hmac: self.hmac.clone(),
+            etm: self.etm.clone(),
             cipher: self.cipher.as_ref().map(|c| c.clone_box()),
             chacha: self.chacha.clone(),
             rc4: self.rc4.as_ref().and_then(|r| r.clone_box().ok()),
@@ -579,6 +615,7 @@ impl Ctx {
             hmac: kind
                 .composite()
                 .then(|| Box::new(composite::Hmac::new(kind.composite_sha256()))),
+            etm: etm::Etm::new(kind).map(Box::new),
             cipher: None,
             chacha: (kind == Kind::ChaCha20).then(ChaCha::new),
             rc4: None,
@@ -802,6 +839,9 @@ impl Generic {
                         | Mode::CbcCts
                         | Mode::CbcHmacSha1
                         | Mode::CbcHmacSha256
+                        | Mode::CbcHmacSha1Etm
+                        | Mode::CbcHmacSha256Etm
+                        | Mode::CbcHmacSha512Etm
                         | Mode::Cfb
                         | Mode::Cfb1
                         | Mode::Cfb8
@@ -861,6 +901,9 @@ impl Generic {
                 self.cipher = Some(c);
                 if self.is_composite() {
                     self.composite_key();
+                }
+                if let Some(e) = self.etm.as_mut() {
+                    e.reset_mac_key();
                 }
             }
             Kind::ChaCha20 => {
@@ -1094,8 +1137,15 @@ impl Generic {
                         let ks = self.buf.get_mut(..bs).ok_or(Error::Internal)?;
                         self.num = ctr(cipher.as_ref(), iv, ks, data, self.num)?;
                     }
-                    // XTS and the key wraps run in `modes`, not here.
-                    Mode::Xts | Mode::Wrap | Mode::WrapPad | Mode::WrapInv | Mode::WrapPadInv => {
+                    // XTS, the key wraps, and the ETM ciphers run in their modules, not here.
+                    Mode::Xts
+                    | Mode::Wrap
+                    | Mode::WrapPad
+                    | Mode::WrapInv
+                    | Mode::WrapPadInv
+                    | Mode::CbcHmacSha1Etm
+                    | Mode::CbcHmacSha256Etm
+                    | Mode::CbcHmacSha512Etm => {
                         return Err(Error::Silent);
                     }
                 }
