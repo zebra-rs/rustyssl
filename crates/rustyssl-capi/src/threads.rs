@@ -457,9 +457,105 @@ ffi_export! {
     }
 }
 
-/// Frees the calling thread's library state, as `OPENSSL_thread_stop` does: its random
-/// generators (of every context) and its error queue.
+/// A thread-stop handler a provider registered (`core_thread_start`, `ossl_init_thread_start`).
+struct StopHandler {
+    /// The thread's number ([`ThreadExit`]).
+    thread: u64,
+    /// The provider's address, for [`deregister_stop_handlers`].
+    provider: usize,
+    handler: unsafe extern "C" fn(*mut c_void),
+    arg: crate::provider::Ptr<c_void>,
+}
+
+/// Every thread's handlers, oldest first (OpenSSL's global register of per-thread lists).
+static STOP_HANDLERS: std::sync::Mutex<Vec<StopHandler>> = std::sync::Mutex::new(Vec::new());
+
+/// The next thread's number.
+static NEXT_THREAD: AtomicU64 = AtomicU64::new(1);
+
+/// A thread's number, and its handlers' run when it exits (`init_thread_destructor`). The
+/// number lives in the thread-local itself, so it's still known while thread-locals are torn
+/// down.
+struct ThreadExit(u64);
+
+impl Drop for ThreadExit {
+    fn drop(&mut self) {
+        run_thread_handlers(self.0, None);
+    }
+}
+
+thread_local! {
+    static THREAD_EXIT: ThreadExit = ThreadExit(NEXT_THREAD.fetch_add(1, Ordering::Relaxed));
+}
+
+/// The calling thread's number, `None` once its thread-locals are gone.
+fn thread_number() -> Option<u64> {
+    THREAD_EXIT.try_with(|t| t.0).ok()
+}
+
+/// `ossl_init_thread_start`: `handler(arg)` is to run when the calling thread stops, on behalf of
+/// the provider at `provider`. True once registered.
+pub(crate) fn add_stop_handler(
+    provider: usize,
+    handler: unsafe extern "C" fn(*mut c_void),
+    arg: *mut c_void,
+) -> bool {
+    let Some(thread) = thread_number() else {
+        return false;
+    };
+    STOP_HANDLERS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(StopHandler {
+            thread,
+            provider,
+            handler,
+            arg: crate::provider::Ptr(arg),
+        });
+    true
+}
+
+/// `init_thread_stop`: runs the calling thread's handlers, newest first, each once: all of them,
+/// or only those registered with the argument `only`. They run with no lock held (OpenSSL holds
+/// its register's).
+pub(crate) fn run_stop_handlers(only: Option<*mut c_void>) {
+    if let Some(me) = thread_number() {
+        run_thread_handlers(me, only);
+    }
+}
+
+/// [`run_stop_handlers`] for the thread numbered `me`.
+fn run_thread_handlers(me: u64, only: Option<*mut c_void>) {
+    let mine: Vec<StopHandler> = {
+        let mut all = STOP_HANDLERS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (mine, rest) = core::mem::take(&mut *all)
+            .into_iter()
+            .partition(|h| h.thread == me && only.is_none_or(|a| h.arg.0 == a));
+        *all = rest;
+        mine
+    };
+    for h in mine.into_iter().rev() {
+        // SAFETY: the provider's handler with its own argument, once; no lock is held.
+        unsafe { (h.handler)(h.arg.0) };
+    }
+}
+
+/// `ossl_init_thread_deregister`: drops the provider's handlers on every thread, unrun, as it
+/// goes.
+pub(crate) fn deregister_stop_handlers(provider: usize) {
+    STOP_HANDLERS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .retain(|h| h.provider != provider);
+}
+
+/// Frees the calling thread's library state, as `OPENSSL_thread_stop` does: the providers'
+/// thread-stop handlers run, then its random generators (of every context) and its error queue
+/// go.
 pub(crate) fn stop_thread() {
+    run_stop_handlers(None);
     crate::rand_lib::stop_thread(None);
     err::stop_thread();
 }
@@ -487,6 +583,10 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         if let Some(c) = unsafe { crate::libctx::resolve(ctx) } {
+            // `ossl_ctx_thread_stop`: the handlers registered with the context as their
+            // argument.
+            let concrete = if ctx.is_null() { crate::libctx::current() } else { ctx };
+            run_stop_handlers(Some(concrete.cast()));
             crate::rand_lib::stop_thread(Some(crate::rand_lib::id_of(&c)));
         }
     }

@@ -7,18 +7,18 @@
 //! directory. The file is opened with `dlopen`, and a failure raises OpenSSL's errors with the
 //! system's message.
 //!
-//! rustyssl doesn't run external providers yet (that needs the rest of the core's services): a
-//! module that opens is closed again and the load fails with `ERR_R_UNSUPPORTED`.
+//! The module stays open with its provider and is closed after the provider's teardown, when its
+//! last reference goes (docs/adr/0003-external-providers.md).
 
-use core::ffi::{CStr, c_char};
+use core::ffi::{CStr, c_char, c_int, c_void};
 use std::ffi::CString;
 
 use rustyssl_abi::{
     DSO_R_LOAD_FAILED, DSO_R_SYM_FAILURE, ERR_LIB_CRYPTO, ERR_LIB_DSO, ERR_R_DSO_LIB,
-    ERR_R_UNSUPPORTED,
+    OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_provider_init_fn,
 };
 
-use super::Provider;
+use super::{Provider, Ptr};
 use crate::{err, init, version};
 
 /// `DSO_EXTENSION`.
@@ -59,9 +59,34 @@ fn dlerror() -> Vec<u8> {
     unsafe { CStr::from_ptr(e) }.to_bytes().to_vec()
 }
 
-/// Looks for the module of the provider `prov`, raising OpenSSL's errors, and fails: an
-/// external provider can't run yet.
-pub(super) fn load(prov: &Provider, search_path: Option<&CStr>) {
+/// An open module: the loader's handle, closed when it drops (`DSO_free`).
+pub(crate) struct Module {
+    handle: Ptr<c_void>,
+    /// The file it was opened from (`DSO_get_filename`).
+    pub(crate) filename: CString,
+    /// Its `OSSL_provider_init`, if it has one.
+    pub(crate) init: OSSL_provider_init_fn,
+}
+
+impl Drop for Module {
+    fn drop(&mut self) {
+        // SAFETY: the handle `dlopen` gave, closed once; its provider was torn down first.
+        unsafe { libc::dlclose(self.handle.0) };
+    }
+}
+
+/// A provider's init function, as a module defines `OSSL_provider_init`.
+type InitFn = unsafe extern "C" fn(
+    *const OSSL_CORE_HANDLE,
+    *const OSSL_DISPATCH,
+    *mut *const OSSL_DISPATCH,
+    *mut *mut c_void,
+) -> c_int;
+
+/// Opens the module of the provider `prov` and binds its init function (`provider_init`'s DSO
+/// part), raising OpenSSL's errors: `None` if it can't be opened. A module without
+/// `OSSL_provider_init` opens (with the binding's errors raised) and has no init function.
+pub(super) fn open(prov: &Provider, search_path: Option<&CStr>) -> Option<Module> {
     let name = prov.name().to_bytes();
     let dir = search_path
         .map(CStr::to_owned)
@@ -75,11 +100,11 @@ pub(super) fn load(prov: &Provider, search_path: Option<&CStr>) {
     name_data.extend_from_slice(name);
     let Ok(cpath) = CString::new(path.clone()) else {
         err::raise_with_bytes(ERR_LIB_CRYPTO, ERR_R_DSO_LIB, "provider_init", &name_data);
-        return;
+        return None;
     };
     // SAFETY: a NUL-terminated path.
-    let module = unsafe { libc::dlopen(cpath.as_ptr(), libc::RTLD_NOW) };
-    if module.is_null() {
+    let handle = unsafe { libc::dlopen(cpath.as_ptr(), libc::RTLD_NOW) };
+    if handle.is_null() {
         let mut data = b"filename(".to_vec();
         data.extend_from_slice(&path);
         data.extend_from_slice(b"): ");
@@ -87,28 +112,26 @@ pub(super) fn load(prov: &Provider, search_path: Option<&CStr>) {
         err::raise_with_bytes(ERR_LIB_DSO, DSO_R_LOAD_FAILED, "dlfcn_load", &data);
         err::raise(ERR_LIB_DSO, DSO_R_LOAD_FAILED, "DSO_load");
         err::raise_with_bytes(ERR_LIB_CRYPTO, ERR_R_DSO_LIB, "provider_init", &name_data);
-        return;
+        return None;
     }
     // SAFETY: an open module and a NUL-terminated name.
-    let init = unsafe { libc::dlsym(module, c"OSSL_provider_init".as_ptr()) };
-    let reason: &[u8] = if init.is_null() {
+    let sym = unsafe { libc::dlsym(handle, c"OSSL_provider_init".as_ptr()) };
+    let init = if sym.is_null() {
         let mut data = b"symname(OSSL_provider_init): ".to_vec();
         data.extend_from_slice(&dlerror());
         err::raise_with_bytes(ERR_LIB_DSO, DSO_R_SYM_FAILURE, "dlfcn_bind_func", &data);
         err::raise(ERR_LIB_DSO, DSO_R_SYM_FAILURE, "DSO_bind_func");
-        b", provider has no provider init function"
+        None
     } else {
-        b", rustyssl doesn't run external providers yet"
+        // SAFETY: the module's `OSSL_provider_init`, which a provider defines with this type
+        // (`OSSL_provider_init_fn`); a data and a function pointer have one size here.
+        Some(unsafe { core::mem::transmute::<*mut c_void, InitFn>(sym) })
     };
-    // SAFETY: the module opened above, no longer used.
-    unsafe { libc::dlclose(module) };
-    name_data.extend_from_slice(reason);
-    err::raise_with_bytes(
-        ERR_LIB_CRYPTO,
-        ERR_R_UNSUPPORTED,
-        "provider_init",
-        &name_data,
-    );
+    Some(Module {
+        handle: Ptr(handle),
+        filename: cpath,
+        init,
+    })
 }
 
 #[cfg(test)]

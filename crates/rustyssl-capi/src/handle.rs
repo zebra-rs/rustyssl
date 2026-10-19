@@ -87,6 +87,22 @@ pub(crate) unsafe trait Handle: Sized {
         true
     }
 
+    /// [`Handle::up_ref`], returning the count afterwards: every reference, the library's own
+    /// and the holds included. `None` for null or a handle of another type.
+    ///
+    /// # Safety
+    /// As for [`Handle::get`].
+    unsafe fn up_ref_count(handle: *const Self) -> Option<usize> {
+        // SAFETY: the caller's guarantee is the one `get` needs.
+        unsafe { Self::get(handle) }?;
+        let tagged = handle.cast::<Tagged<Self::Object>>();
+        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`.
+        unsafe { Arc::increment_strong_count(tagged) };
+        // SAFETY: as above; the `Arc` is only looked at, never dropped.
+        let arc = core::mem::ManuallyDrop::new(unsafe { Arc::from_raw(tagged) });
+        Some(Arc::strong_count(&arc))
+    }
+
     /// Keeps the object alive for as long as the returned guard lives, without changing the
     /// count `*_free` and `*_up_ref` work with: a call that runs C callbacks holds its object
     /// this way, so a callback that frees it can't free it under the call. `None` for null or

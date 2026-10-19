@@ -23,6 +23,7 @@ pub(crate) mod addr;
 pub(crate) mod base64;
 pub(crate) mod buffer;
 pub(crate) mod connect;
+pub(crate) mod core_bio;
 pub(crate) mod debug;
 pub(crate) mod dgram;
 pub(crate) mod dgram_pair;
@@ -142,6 +143,11 @@ impl Bio {
     /// `BIO_set_retry_write`.
     pub(crate) fn set_retry_write(&self) {
         self.set_flags(BIO_FLAGS_WRITE | BIO_FLAGS_SHOULD_RETRY);
+    }
+
+    /// The library context it was made in (`BIO_new_ex`), NULL for the default.
+    pub(crate) fn libctx(&self) -> *mut OSSL_LIB_CTX {
+        self.libctx.0
     }
 
     pub(crate) fn next(&self) -> *mut BIO {

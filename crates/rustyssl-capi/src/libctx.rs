@@ -44,9 +44,31 @@ pub(crate) struct LibCtx {
     /// `OSSL_SELF_TEST_set_callback`'s callback and its argument (an address: the context
     /// is shared between threads).
     self_test: std::sync::Mutex<(rustyssl_abi::OSSL_CALLBACK, usize)>,
+    /// For a context a provider made from its core's table (`OSSL_LIB_CTX_new_from_dispatch`):
+    /// the core's BIO functions, for `BIO_new_from_core_bio`.
+    core_bio: OnceLock<crate::provider::upcalls::CoreBio>,
+    /// For a child context (`OSSL_LIB_CTX_new_child`): its link to the parent.
+    child: OnceLock<crate::provider::child::Globals>,
 }
 
 handle_type!(OSSL_LIB_CTX => LibCtx);
+
+impl LibCtx {
+    /// The core's BIO functions, for a context made from a core's table.
+    pub(crate) fn core_bio(&self) -> Option<crate::provider::upcalls::CoreBio> {
+        self.core_bio.get().copied()
+    }
+
+    /// A child context's link to its parent.
+    pub(crate) fn child(&self) -> Option<&crate::provider::child::Globals> {
+        self.child.get()
+    }
+
+    /// Makes it a child context. False if it already was.
+    pub(crate) fn set_child(&self, globals: crate::provider::child::Globals) -> bool {
+        self.child.set(globals).is_ok()
+    }
+}
 
 /// The global default context's address.
 struct Global(*mut OSSL_LIB_CTX);
@@ -128,13 +150,77 @@ ffi_export! {
         if ctx.is_null() || ctx == current() || ctx == global() {
             return;
         }
-        // `ossl_ctx_thread_stop`: the calling thread's generators of the context go first.
         // SAFETY: the caller's guarantee.
         if let Some(c) = unsafe { OSSL_LIB_CTX::get(ctx) } {
+            // `ossl_provider_deinit_child`: the parent stops calling a child context back.
+            crate::provider::child::deinit(c);
+            // `ossl_ctx_thread_stop`: the calling thread's handlers registered with the
+            // context and its generators of the context go first.
+            crate::threads::run_stop_handlers(Some(ctx.cast()));
             crate::rand_lib::stop_thread(Some(crate::rand_lib::id_of(c)));
         }
         // SAFETY: the caller's guarantee.
         unsafe { OSSL_LIB_CTX::free(ctx) };
+    }
+}
+
+ffi_export! {
+    /// A new library context for a provider, whose BIOs made with `BIO_new_from_core_bio` reach
+    /// the core's through the BIO functions of the core's table `in_` (`ossl_bio_init_core`).
+    /// NULL on failure.
+    ///
+    /// # Safety
+    /// `in_` is a core's dispatch table, ended by a zero function id, whose functions have the
+    /// types their ids stand for and outlive the context.
+    pub unsafe extern "C" fn OSSL_LIB_CTX_new_from_dispatch(handle: *const rustyssl_abi::OSSL_CORE_HANDLE, in_: *const rustyssl_abi::OSSL_DISPATCH) -> *mut OSSL_LIB_CTX
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        let _ = handle;
+        let ctx = LibCtx::default();
+        // SAFETY: the caller's guarantee.
+        let _ = ctx.core_bio.set(unsafe { crate::provider::upcalls::CoreBio::from_dispatch(in_) });
+        OSSL_LIB_CTX::new_handle(ctx)
+    }
+}
+
+ffi_export! {
+    /// A new child library context for the provider `handle` (`OSSL_LIB_CTX_new_child(3)`):
+    /// `OSSL_LIB_CTX_new_from_dispatch`'s, whose providers are the parent's active ones, as they
+    /// come and go, and whose default properties mirror the parent's. NULL if the table lacks
+    /// the provider functions this needs or a child couldn't be made.
+    ///
+    /// # Safety
+    /// As for `OSSL_LIB_CTX_new_from_dispatch`; `handle` is the provider's handle.
+    pub unsafe extern "C" fn OSSL_LIB_CTX_new_child(handle: *const rustyssl_abi::OSSL_CORE_HANDLE, in_: *const rustyssl_abi::OSSL_DISPATCH) -> *mut OSSL_LIB_CTX
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        let ctx = unsafe { OSSL_LIB_CTX_new_from_dispatch(handle, in_) };
+        if ctx.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: the new context; the caller's guarantee.
+        if !unsafe { crate::provider::child::init_as_child(ctx, handle, in_) } {
+            // SAFETY: made above.
+            unsafe { OSSL_LIB_CTX_free(ctx) };
+            return ptr::null_mut();
+        }
+        ctx
+    }
+}
+
+ffi_export! {
+    /// OpenSSL's internal store at `index` of the context. rustyssl's stores have another
+    /// layout, so there's none to give: NULL for every index, as for an index a build doesn't
+    /// have (docs/DEVIATIONS.md).
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub unsafe extern "C" fn OSSL_LIB_CTX_get_data(ctx: *mut OSSL_LIB_CTX, index: c_int) -> *mut core::ffi::c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        let _ = (ctx, index);
+        ptr::null_mut()
     }
 }
 

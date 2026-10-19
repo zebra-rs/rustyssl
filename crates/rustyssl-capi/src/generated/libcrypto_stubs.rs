@@ -55,16 +55,6 @@ pub extern "C" fn ASN1_SCTX_set_app_data(_: *mut ASN1_SCTX, _: *mut core::ffi::c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_from_core_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_core")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
     crate::stub::unimplemented("BIO_s_log")
 }
@@ -1009,30 +999,6 @@ pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority(
     _: *mut GENERAL_NAMES,
 ) {
     crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_get_data(
-    _: *mut OSSL_LIB_CTX,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OSSL_LIB_CTX_get_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_new_child(
-    _: *const OSSL_CORE_HANDLE,
-    _: *const OSSL_DISPATCH,
-) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_new_child")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
-    _: *const OSSL_CORE_HANDLE,
-    _: *const OSSL_DISPATCH,
-) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_new_from_dispatch")
 }
 
 #[unsafe(no_mangle)]

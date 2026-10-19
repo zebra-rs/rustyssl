@@ -194,8 +194,16 @@ fn test_calls(ctx: &Context) -> Result<HashMap<String, BTreeSet<String>>> {
     let (_, host) = host()?;
     let config = ctx.abi.join("config").join(host.configure);
     let mut calls: HashMap<String, BTreeSet<String>> = HashMap::new();
-    for (name, source) in select(&ctx.root.join("tests/c"), &[])? {
-        let object = ctx.work.join(format!("{name}.o"));
+    let mut sources = select(&ctx.root.join("tests/c"), &[])?;
+    // The test providers and other modules the tests load (`tests/c/modules/`).
+    let modules = ctx.root.join("tests/c/modules");
+    if modules.is_dir() {
+        for (name, source) in select(&modules, &[])? {
+            sources.push((format!("modules/{name}"), source));
+        }
+    }
+    for (name, source) in sources {
+        let object = ctx.work.join(format!("{}.o", name.replace('/', "-")));
         run_output(
             cc().args(CFLAGS)
                 .arg("-I")
