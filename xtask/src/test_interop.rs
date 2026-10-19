@@ -815,11 +815,18 @@ fn mask_trace(line: &str) -> String {
 }
 
 /// An `ERR_print_errors` line with its source location masked (`…:reason:FILE:LINE:data`): the
-/// file and line are the implementation's, not behavior.
+/// file and line are the implementation's, not behavior. The thread id before `:error:` is
+/// masked too: on Linux it's the thread's address, which differs from run to run.
 fn mask_err_location(line: &str) -> String {
     let Some(at) = line.find(":error:") else {
         return line.to_owned();
     };
+    let id_start = line[..at]
+        .rfind(|c: char| !c.is_ascii_hexdigit())
+        .map_or(0, |i| i + 1);
+    let masked = format!("{}*{}", &line[..id_start], &line[at..]);
+    let line = masked.as_str();
+    let at = id_start + 1;
     // thread id, "error", code, library, function, reason, file, line, data
     let fields: Vec<&str> = line[at + 1..].splitn(8, ':').collect();
     match fields.as_slice() {
@@ -842,4 +849,20 @@ fn indent(s: &str) -> String {
         .map(|l| format!("    {l}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mask_err_location;
+
+    #[test]
+    fn error_lines_lose_their_thread_and_location() {
+        assert_eq!(
+            mask_err_location(
+                "807BE6FEFF7F0000:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:ssl/statem/statem_lib.c:155:"
+            ),
+            "*:error:0A0000BF:SSL routines:tls_setup_handshake:no protocols available:*:*:"
+        );
+        assert_eq!(mask_err_location("no error here"), "no error here");
+    }
 }

@@ -52,6 +52,7 @@ const INFO: Info = Info {
     cts: false,
     multiblock: false,
     rand_key: false,
+    etm: false,
     key_len: 16,
     block_size: 1,
     iv_len: 0,

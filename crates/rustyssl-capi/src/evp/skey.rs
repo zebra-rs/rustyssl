@@ -92,7 +92,7 @@ unsafe fn alloc_fetch(
 }
 
 /// A new key of `skeymgmt`'s with `keydata`, or NULL for no key data.
-fn new_key(skeymgmt: Ref, keydata: *mut c_void) -> *mut EVP_SKEY {
+pub(crate) fn new_key(skeymgmt: Ref, keydata: *mut c_void) -> *mut EVP_SKEY {
     if keydata.is_null() {
         return ptr::null_mut();
     }
@@ -139,6 +139,92 @@ ffi_export! {
         let keydata = unsafe { m.get().import(selection, params) };
         new_key(m, keydata)
     }
+}
+
+ffi_export! {
+    /// A new key of `skeymgmt`'s (3.6) from the values in `params` that `selection` picks;
+    /// NULL if it refuses them (or for no key manager).
+    ///
+    /// # Safety
+    /// `skeymgmt` is NULL or a live symmetric key manager; `params` is NULL or a parameter
+    /// array.
+    pub unsafe extern "C" fn EVP_SKEY_import_SKEYMGMT(libctx: *mut OSSL_LIB_CTX, skeymgmt: *mut rustyssl_abi::EVP_SKEYMGMT, selection: c_int, params: *const OSSL_PARAM) -> *mut EVP_SKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        let _ = libctx;
+        // SAFETY: the caller's guarantee.
+        let Some(m) = (unsafe { Ref::borrow(skeymgmt) }) else {
+            return ptr::null_mut();
+        };
+        // SAFETY: the caller's parameters.
+        let keydata = unsafe { m.get().import(selection, params) };
+        new_key(m, keydata)
+    }
+}
+
+/// `evp_skeymgmt_fetch_from_prov`, then `EVP_SKEYMGMT_fetch` anywhere: the key manager for
+/// `key_type` that `EVP_PKEY_derive_SKEY` and `EVP_KDF_derive_SKEY` use (the caller's
+/// `mgmt` if given), or `None` with `ERR_R_FETCH_FAILED`.
+///
+/// # Safety
+/// `mgmt` is NULL or a live key manager; `prov` a live provider; the strings are strings or
+/// NULL.
+pub(crate) unsafe fn derive_skeymgmt(
+    mgmt: *mut rustyssl_abi::EVP_SKEYMGMT,
+    prov: *mut rustyssl_abi::OSSL_PROVIDER,
+    libctx: *mut OSSL_LIB_CTX,
+    key_type: &CStr,
+    propquery: *const c_char,
+) -> Option<Ref> {
+    if !mgmt.is_null() {
+        // SAFETY: the caller's guarantee.
+        return unsafe { Ref::borrow(mgmt) };
+    }
+    // SAFETY: as above.
+    let props = unsafe { text(propquery) };
+    // SAFETY: as above.
+    let m = unsafe { skeymgmt::fetch_from_prov(prov, key_type, props) }
+        // SAFETY: as above.
+        .or_else(|| unsafe { skeymgmt::fetch_by_name(libctx, Some(key_type), props) });
+    if m.is_none() {
+        err::raise(
+            ERR_LIB_EVP,
+            rustyssl_abi::ERR_R_FETCH_FAILED,
+            "EVP_derive_SKEY",
+        );
+    }
+    m
+}
+
+/// The fallback of the `derive_SKEY` functions: `keylen` octets that `derive` makes, imported
+/// as `skeymgmt`'s raw secret (`OSSL_SKEY_PARAM_RAW_BYTES`), or NULL.
+pub(crate) fn import_derived(
+    skeymgmt: Ref,
+    keylen: usize,
+    derive: impl FnOnce(&mut [u8]) -> bool,
+) -> *mut EVP_SKEY {
+    let mut key = vec![0u8; keylen];
+    if !derive(&mut key) {
+        crate::provider::macs::wipe(&mut key);
+        return ptr::null_mut();
+    }
+    // SAFETY: a static key; our octets, which outlive the call.
+    let params = [
+        unsafe {
+            OSSL_PARAM_construct_octet_string(RAW_BYTES.as_ptr(), key.as_mut_ptr().cast(), keylen)
+        },
+        // SAFETY: no preconditions.
+        unsafe { OSSL_PARAM_construct_end() },
+    ];
+    // SAFETY: the parameters above.
+    let keydata = unsafe {
+        skeymgmt.get().import(
+            rustyssl_abi::OSSL_SKEYMGMT_SELECT_SECRET_KEY,
+            params.as_ptr(),
+        )
+    };
+    crate::provider::macs::wipe(&mut key);
+    new_key(skeymgmt, keydata)
 }
 
 ffi_export! {

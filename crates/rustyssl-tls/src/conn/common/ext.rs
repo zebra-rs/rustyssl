@@ -761,7 +761,7 @@ fn init_one(c: &mut Connection, idx: usize, _context: u32) {
             if server {
                 sh.status_type = STATUSTYPE_NOTHING;
             } else {
-                c.neg.ocsp_response = None;
+                c.neg.ocsp_responses.clear();
             }
         }
         t::NEXT_PROTO_NEG => sh.npn_seen = false,

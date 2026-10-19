@@ -28,7 +28,7 @@ use rustyssl_abi::{
     OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_BITS,
     OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    OSSL_PKEY_PARAM_SLH_DSA_SEED,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, OSSL_PKEY_PARAM_SLH_DSA_SEED,
 };
 use rustyssl_crypto::slhdsa::{MAX_N, PrivateKey, PublicKey, Variant};
 
@@ -321,6 +321,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_IMPORT) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         if selection & KEYPAIR == 0 {
             return 0;
@@ -398,12 +402,20 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let v = k.variant;
         let ints = [
             (OSSL_PKEY_PARAM_BITS, v.public_key_bytes().saturating_mul(8)),
             (OSSL_PKEY_PARAM_SECURITY_BITS, v.n().saturating_mul(8)),
             (OSSL_PKEY_PARAM_MAX_SIZE, v.signature_bytes()),
+            (
+                OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+                usize::try_from(v.security_category()).unwrap_or(0),
+            ),
         ];
         for (name, value) in ints {
             // SAFETY: the caller's array; a static name.
@@ -442,10 +454,15 @@ ffi_callback! {
 }
 
 /// `slh_dsa_params`.
-static GETTABLE: Params<7> = Params([
+static GETTABLE: Params<8> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
@@ -485,6 +502,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn slh_dsa_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_GEN_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.

@@ -563,8 +563,18 @@ impl CertificateStatus {
             return Err(Error::decode(r::UNSUPPORTED_STATUS_TYPE));
         }
         let mm = Error::decode(r::LENGTH_MISMATCH);
+        // 3.6 takes a body of only the type (no response: `response` empty), and refuses an
+        // empty response (`SSL_R_BAD_PACKET`).
+        if rd.end().is_ok() {
+            return Ok(Self {
+                response: Vec::new(),
+            });
+        }
         let response = rd.vec24().or_alert(mm)?.rest().to_vec();
         rd.end().or_alert(mm)?;
+        if response.is_empty() {
+            return Err(Error::decode(r::BAD_PACKET));
+        }
         Ok(Self { response })
     }
 

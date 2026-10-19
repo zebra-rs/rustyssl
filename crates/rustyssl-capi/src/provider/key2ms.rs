@@ -106,6 +106,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KEY2PVK_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { vctx.cast::<Key2Ms>().as_mut() }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_ENCODER_PARAM_ENCRYPT_LEVEL.as_ptr()) };

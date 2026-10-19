@@ -29,7 +29,7 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_FFC_PBITS, OSSL_PKEY_PARAM_FFC_PCOUNTER,
     OSSL_PKEY_PARAM_FFC_Q, OSSL_PKEY_PARAM_FFC_QBITS, OSSL_PKEY_PARAM_FFC_SEED,
     OSSL_PKEY_PARAM_FFC_TYPE, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_PRIV_KEY,
-    OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
+    OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PKEY_PARAM_SECURITY_CATEGORY,
 };
 
 use super::builtin::libctx_of;
@@ -348,6 +348,8 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, unsafe { DSA_bits(h) }),
             (OSSL_PKEY_PARAM_SECURITY_BITS, unsafe { DSA_security_bits(h) }),
             (OSSL_PKEY_PARAM_MAX_SIZE, unsafe { DSA_size(h) }),
+            // 3.6: classical keys are in no NIST post-quantum category.
+            (OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0),
         ];
         for (name, v) in ints {
             // SAFETY: the caller's array.
@@ -372,10 +374,11 @@ ffi_callback! {
 }
 
 /// `dsa_params`: what `dsa_get_params` reports.
-static GETTABLE: Params<15> = Params([
+static GETTABLE: Params<16> = Params([
     defn(OSSL_PKEY_PARAM_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_SECURITY_CATEGORY, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_DEFAULT_DIGEST, UTF8, 0),
     defn(OSSL_PKEY_PARAM_FFC_P, BN, 0),
     defn(OSSL_PKEY_PARAM_FFC_Q, BN, 0),

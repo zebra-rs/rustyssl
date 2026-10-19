@@ -79,7 +79,7 @@ pub struct State {
     /// Whether an OCSP response will be sent (`s->ext.status_expected`).
     pub(crate) status_expected: bool,
     /// The OCSP response the status callback gave (`s->ext.ocsp.resp`).
-    pub(crate) ocsp_response: Option<Vec<u8>>,
+    pub(crate) ocsp_responses: Vec<Option<Vec<u8>>>,
     /// CertificateRequests sent on this connection (`s->certreqs_sent`).
     pub(crate) certreqs_sent: u32,
     /// TLS 1.3 tickets sent since the handshake or the last post-handshake authentication
@@ -179,7 +179,7 @@ pub(crate) fn setup(c: &mut Connection, _p: &dyn Provider) -> Result<()> {
     s.ciphers_raw.clear();
     s.tmp_session_id.clear();
     s.status_expected = false;
-    s.ocsp_response = None;
+    s.ocsp_responses.clear();
     s.tick_identity = 0;
     s.share = None;
     s.kx_key = None;
@@ -876,19 +876,29 @@ fn construct_server_done(c: &mut Connection, p: &dyn Provider) -> Result<Constru
 ///
 /// # Errors
 /// The response is too long.
-pub(crate) fn cert_status_body(c: &Connection) -> Result<Vec<u8>> {
-    let resp = state_ref(c)
-        .and_then(|s| s.ocsp_response.clone())
-        .unwrap_or_default();
+pub(crate) fn cert_status_body(c: &Connection, resp: &[u8]) -> Result<Vec<u8>> {
     let mut w = crate::codec::Writer::new();
     w.u8(u8::try_from(c.hs.sh.status_type).map_err(|_| Error::internal())?);
-    w.vec(3, &resp).map_err(|_| Error::internal())?;
+    w.vec(3, resp).map_err(|_| Error::internal())?;
     Ok(w.into_bytes())
 }
 
-/// `tls_construct_cert_status`: TLS 1.2's CertificateStatus.
+/// The OCSP response for the certificate at `chainidx` (`ossl_get_ocsp_response`), if any.
+pub(crate) fn ocsp_response_for(c: &Connection, chainidx: usize) -> Option<Vec<u8>> {
+    state_ref(c)?
+        .ocsp_responses
+        .get(chainidx)
+        .cloned()
+        .flatten()
+}
+
+/// `tls_construct_cert_status`: TLS 1.2's CertificateStatus, not sent without a response for
+/// the leaf (3.6).
 fn construct_cert_status(c: &Connection) -> Result<Construct> {
-    Ok(Construct::Send(cert_status_body(c)?))
+    let Some(resp) = ocsp_response_for(c, 0) else {
+        return Ok(Construct::DontSend);
+    };
+    Ok(Construct::Send(cert_status_body(c, &resp)?))
 }
 
 /// `tls_process_next_proto`: the client's NextProtocol, its protocol and padding filling

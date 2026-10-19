@@ -34,10 +34,10 @@ const LIBSSL_SRC: &str = "libs/libssl/src";
 
 /// A C prototype as Rust types.
 #[derive(Clone, PartialEq, Debug)]
-struct Prototype {
-    params: Vec<String>,
-    variadic: bool,
-    output: Option<String>,
+pub(crate) struct Prototype {
+    pub(crate) params: Vec<String>,
+    pub(crate) variadic: bool,
+    pub(crate) output: Option<String>,
 }
 
 pub fn generate(ctx: &Context, exports: &[Exports]) -> Result {
@@ -200,7 +200,7 @@ fn defined_functions(source: &str) -> Vec<String> {
 }
 
 /// Every prototype in bindgen's output, keyed by function name.
-fn prototypes(bindgen: &str) -> Result<HashMap<String, Prototype>> {
+pub(crate) fn prototypes(bindgen: &str) -> Result<HashMap<String, Prototype>> {
     let file = syn::parse_file(bindgen)?;
     let mut prototypes = HashMap::new();
     for item in file.items {
@@ -235,7 +235,7 @@ fn prototypes(bindgen: &str) -> Result<HashMap<String, Prototype>> {
 
 /// A type as Rust source. `va_list` is spelled differently on every target (x86_64 passes a
 /// pointer to `__va_list_tag`), so it becomes `VaList`, which matches the C ABI everywhere.
-fn rust_type(ty: &syn::Type) -> String {
+pub(crate) fn rust_type(ty: &syn::Type) -> String {
     let text = ty.to_token_stream().to_string();
     match text.as_str() {
         "va_list" | "__builtin_va_list" | "* mut __va_list_tag" => {
@@ -319,7 +319,7 @@ fn render_stubs_file(library: &str, prefix: &str, stubs: &[String]) -> Result<St
 
 /// A function pointer type for `prototype`. A `VaList` parameter's elided lifetime becomes a
 /// higher-ranked one, which the function's own late-bound lifetime coerces to.
-fn function_type(prototype: &Prototype) -> String {
+pub(crate) fn function_type(prototype: &Prototype) -> String {
     let mut params = prototype.params.clone();
     if prototype.variadic {
         params.push("...".to_owned());

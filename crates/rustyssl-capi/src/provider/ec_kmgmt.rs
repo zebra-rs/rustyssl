@@ -43,8 +43,9 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_EC_PUB_X, OSSL_PKEY_PARAM_EC_PUB_Y, OSSL_PKEY_PARAM_EC_SEED,
     OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME, OSSL_PKEY_PARAM_MAX_SIZE,
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, POINT_CONVERSION_UNCOMPRESSED, PROV_R_INVALID_CURVE,
-    PROV_R_NO_PARAMETERS_SET, PROV_R_NOT_A_PUBLIC_KEY, SN_X9_62_ppBasis, SN_X9_62_tpBasis,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH,
+    POINT_CONVERSION_UNCOMPRESSED, PROV_R_INVALID_CURVE, PROV_R_NO_PARAMETERS_SET,
+    PROV_R_NOT_A_PUBLIC_KEY, SN_X9_62_ppBasis, SN_X9_62_tpBasis,
 };
 
 use super::builtin::libctx_of;
@@ -544,6 +545,9 @@ unsafe fn get_params(
         || !unsafe { set_int(params, OSSL_PKEY_PARAM_BITS, bits) }
         // SAFETY: as above.
         || !unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_BITS, security_bits(bits)) }
+        // 3.6: classical keys are in no NIST post-quantum category.
+        // SAFETY: as above.
+        || !unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0) }
     {
         return false;
     }
@@ -655,10 +659,11 @@ ffi_callback! {
 }
 
 /// `ec_known_gettable_params`.
-static GETTABLE: Params<31> = Params([
+static GETTABLE: Params<32> = Params([
     defn(OSSL_PKEY_PARAM_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_SECURITY_CATEGORY, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_DEFAULT_DIGEST, UTF8, 0),
     defn(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OCTETS, 0),
     defn(

@@ -367,24 +367,33 @@ unsafe fn move_scts(
     }
 }
 
-/// The SCTs of the stapled OCSP response's single responses.
+/// `ct_extract_ocsp_response_scts` (3.6): the SCTs of every stapled OCSP response's single
+/// responses, in order; one without a basic response ends the collection, and a single
+/// response without SCTs is an error (-1), as in 3.6.
 ///
 /// # Safety
 /// `dst` holds NULL or a live list.
-unsafe fn ocsp_scts(dst: &mut *mut stack_st_SCT, resp: &[u8]) -> c_int {
-    let Ok(len) = c_long::try_from(resp.len()) else {
-        return 0;
-    };
-    let mut p: *const c_uchar = resp.as_ptr();
-    // SAFETY: our octets.
-    let rsp: *mut OCSP_RESPONSE = unsafe { d2i_OCSP_RESPONSE(ptr::null_mut(), &raw mut p, len) };
-    if rsp.is_null() {
-        return 0;
-    }
-    // SAFETY: the response just decoded.
-    let br = unsafe { OCSP_response_get1_basic(rsp) };
-    let mut extracted = 0;
-    if !br.is_null() {
+unsafe fn ocsp_scts(dst: &mut *mut stack_st_SCT, responses: &[Vec<u8>]) -> c_int {
+    let mut extracted: c_int = 0;
+    for resp in responses {
+        let Ok(len) = c_long::try_from(resp.len()) else {
+            return extracted;
+        };
+        let mut p: *const c_uchar = resp.as_ptr();
+        // SAFETY: our octets.
+        let rsp: *mut OCSP_RESPONSE =
+            unsafe { d2i_OCSP_RESPONSE(ptr::null_mut(), &raw mut p, len) };
+        let br = if rsp.is_null() {
+            ptr::null_mut()
+        } else {
+            // SAFETY: the response just decoded.
+            unsafe { OCSP_response_get1_basic(rsp) }
+        };
+        // SAFETY: ours, or NULL.
+        unsafe { OCSP_RESPONSE_free(rsp) };
+        if br.is_null() {
+            return extracted;
+        }
         // SAFETY: the basic response.
         let n = unsafe { OCSP_resp_count(br) };
         for i in 0..n.max(0) {
@@ -403,19 +412,25 @@ unsafe fn ocsp_scts(dst: &mut *mut stack_st_SCT, resp: &[u8]) -> c_int {
                 )
             }
             .cast();
+            if scts.is_null() {
+                // SAFETY: ours.
+                unsafe { OCSP_BASICRESP_free(br) };
+                return -1;
+            }
             // SAFETY: as above; the list just decoded.
-            extracted = unsafe { move_scts(dst, scts, SCT_SOURCE_OCSP_STAPLED_RESPONSE) };
+            let moved = unsafe { move_scts(dst, scts, SCT_SOURCE_OCSP_STAPLED_RESPONSE) };
             // SAFETY: the decoded list, ours.
             unsafe { SCT_LIST_free(scts) };
-            if extracted < 0 {
-                break;
+            if moved < 0 {
+                // SAFETY: ours.
+                unsafe { OCSP_BASICRESP_free(br) };
+                return -1;
             }
+            extracted = extracted.saturating_add(moved);
         }
+        // SAFETY: ours.
+        unsafe { OCSP_BASICRESP_free(br) };
     }
-    // SAFETY: ours, or NULL.
-    unsafe { OCSP_BASICRESP_free(br) };
-    // SAFETY: ours.
-    unsafe { OCSP_RESPONSE_free(rsp) };
     extracted
 }
 
@@ -432,9 +447,9 @@ fn peer_scts(x: &Ssl) -> *mut stack_st_SCT {
     if st.ct.parsed {
         return st.ct.scts;
     }
-    let (ext, ocsp) = st.drv.tls.as_ref().map_or((None, None), |c| {
+    let (ext, ocsp) = st.drv.tls.as_ref().map_or((None, Vec::new()), |c| {
         let n = c.negotiated();
-        (n.scts.clone(), n.ocsp_response.clone())
+        (n.scts.clone(), n.ocsp_responses.clone())
     });
     let leaf = peer_leaf(&st);
     let mut list = core::mem::replace(&mut st.ct.scts, ptr::null_mut());
@@ -450,9 +465,9 @@ fn peer_scts(x: &Ssl) -> *mut stack_st_SCT {
         // SAFETY: as above.
         unsafe { SCT_LIST_free(scts) };
     }
-    if ok && let Some(resp) = ocsp.filter(|r| !r.is_empty()) {
+    if ok {
         // SAFETY: our list.
-        ok &= unsafe { ocsp_scts(&mut list, &resp) } >= 0;
+        ok &= unsafe { ocsp_scts(&mut list, &ocsp) } >= 0;
     }
     if ok && !leaf.is_null() {
         // SAFETY: the connection's live leaf certificate.

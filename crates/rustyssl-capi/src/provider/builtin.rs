@@ -212,7 +212,8 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `legacy_query`: the legacy provider's digests, ciphers, and KDFs, cacheable.
+    /// `legacy_query`: the legacy provider's digests, ciphers, KDFs, and (from 3.6) symmetric key
+    /// managers, cacheable.
     ///
     /// # Safety
     /// `no_cache` is NULL or valid for a write.
@@ -227,6 +228,7 @@ ffi_callback! {
             OSSL_OP_DIGEST => super::digests::LEGACY_DIGESTS.0.as_ptr(),
             OSSL_OP_CIPHER => super::ciphers::LEGACY_CIPHERS.0.as_ptr(),
             OSSL_OP_KDF => super::kdfs::LEGACY_KDFS.0.as_ptr(),
+            OSSL_OP_SKEYMGMT => super::skeymgmt::LEGACY_SKEYMGMT.0.as_ptr(),
             _ => ptr::null(),
         }
     }

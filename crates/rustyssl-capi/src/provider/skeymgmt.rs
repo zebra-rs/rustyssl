@@ -12,10 +12,13 @@ use core::ptr;
 
 use rustyssl_abi::{
     OSSL_ALGORITHM, OSSL_CALLBACK, OSSL_FUNC_SKEYMGMT_EXPORT, OSSL_FUNC_SKEYMGMT_FREE,
-    OSSL_FUNC_SKEYMGMT_IMPORT, OSSL_PARAM, OSSL_SKEYMGMT_SELECT_SECRET_KEY,
+    OSSL_FUNC_SKEYMGMT_IMP_SETTABLE_PARAMS, OSSL_FUNC_SKEYMGMT_IMPORT, OSSL_PARAM,
+    OSSL_PARAM_OCTET_STRING, OSSL_SKEY_PARAM_RAW_BYTES, OSSL_SKEYMGMT_SELECT_SECRET_KEY,
 };
 
-use super::tables::{ALG_END, Algorithms, Dispatch, END, alg_desc, entry};
+use super::tables::{
+    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg_desc, defn, entry, legacy_alg,
+};
 use crate::ffi::ffi_callback;
 use crate::params::{
     OSSL_PARAM_construct_end, OSSL_PARAM_construct_octet_string, OSSL_PARAM_locate_const,
@@ -24,6 +27,25 @@ use crate::params::{
 type FreeFn = unsafe extern "C" fn(*mut c_void);
 type ImportFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_PARAM) -> *mut c_void;
 type ExportFn = unsafe extern "C" fn(*mut c_void, c_int, OSSL_CALLBACK, *mut c_void) -> c_int;
+type SettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
+
+/// `generic_skey_import_list`: the raw octets.
+static IMP_SETTABLE: Params<2> = Params([
+    defn(OSSL_SKEY_PARAM_RAW_BYTES, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `generic_imp_settable_params` (from 3.6): what an import takes.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn generic_imp_settable_params(_provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = rustyssl_abi::ERR_LIB_PROV
+    {
+        IMP_SETTABLE.0.as_ptr()
+    }
+}
 
 /// The key's type (`SKEY_TYPE_*`).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -48,6 +70,50 @@ impl Drop for ProvSkey {
     }
 }
 
+/// The raw secret of the built-in key managers' key data (`PROV_SKEY`), for the KDFs' and
+/// exchanges' `set_skey` (3.6); `None` for NULL.
+///
+/// # Safety
+/// `keydata` is NULL or key data of these key managers.
+pub(crate) unsafe fn raw_secret<'a>(keydata: *mut c_void) -> Option<&'a [u8]> {
+    // SAFETY: the caller's guarantee.
+    unsafe { keydata.cast::<ProvSkey>().as_ref() }.map(|k| k.data.as_slice())
+}
+
+/// Imports `secret` with `import` (`OSSL_SKEY_PARAM_RAW_BYTES`): the provider-side end of
+/// the `derive_skey` functions (3.6). NULL without `import`.
+///
+/// # Safety
+/// `import` is NULL or a key manager's import with its provider context `provctx`.
+pub(crate) unsafe fn import_secret(
+    provctx: *mut c_void,
+    import: Option<crate::evp::skeymgmt::ImportFn>,
+    secret: &mut [u8],
+) -> *mut c_void {
+    let Some(import) = import else {
+        return core::ptr::null_mut();
+    };
+    let params = [
+        // SAFETY: a static key; the caller's octets, which outlive the call.
+        unsafe {
+            crate::params::OSSL_PARAM_construct_octet_string(
+                RAW_BYTES.as_ptr(),
+                secret.as_mut_ptr().cast(),
+                secret.len(),
+            )
+        },
+        crate::params::end(),
+    ];
+    // SAFETY: the caller's import with its provider context; the array above.
+    unsafe {
+        import(
+            provctx,
+            rustyssl_abi::OSSL_SKEYMGMT_SELECT_SECRET_KEY,
+            params.as_ptr(),
+        )
+    }
+}
+
 /// The raw key's parameter (`OSSL_SKEY_PARAM_RAW_BYTES`).
 const RAW_BYTES: &core::ffi::CStr = c"raw-bytes";
 
@@ -58,6 +124,15 @@ const RAW_BYTES: &core::ffi::CStr = c"raw-bytes";
 /// `params` is NULL or a parameter array.
 unsafe fn import(selection: c_int, params: *const OSSL_PARAM) -> Option<Box<ProvSkey>> {
     if selection & OSSL_SKEYMGMT_SELECT_SECRET_KEY == 0 {
+        return None;
+    }
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::GENERIC_SKEY_IMPORT,
+        )
+    } {
         return None;
     }
     // SAFETY: the caller's guarantee.
@@ -182,19 +257,33 @@ ffi_callback! {
     }
 }
 
-static GENERIC_FUNCTIONS: Dispatch<4> = Dispatch([
+static GENERIC_FUNCTIONS: Dispatch<5> = Dispatch([
     entry!(OSSL_FUNC_SKEYMGMT_FREE, generic_free, FreeFn),
     entry!(OSSL_FUNC_SKEYMGMT_IMPORT, generic_import, ImportFn),
     entry!(OSSL_FUNC_SKEYMGMT_EXPORT, generic_export, ExportFn),
+    entry!(
+        OSSL_FUNC_SKEYMGMT_IMP_SETTABLE_PARAMS,
+        generic_imp_settable_params,
+        SettableFn
+    ),
     END,
 ]);
 
-static AES_FUNCTIONS: Dispatch<4> = Dispatch([
+static AES_FUNCTIONS: Dispatch<5> = Dispatch([
     entry!(OSSL_FUNC_SKEYMGMT_FREE, generic_free, FreeFn),
     entry!(OSSL_FUNC_SKEYMGMT_IMPORT, aes_import, ImportFn),
     entry!(OSSL_FUNC_SKEYMGMT_EXPORT, aes_export, ExportFn),
+    entry!(
+        OSSL_FUNC_SKEYMGMT_IMP_SETTABLE_PARAMS,
+        generic_imp_settable_params,
+        SettableFn
+    ),
     END,
 ]);
+
+/// `legacy_skeymgmt` (from 3.6): the generic key manager, under `provider=legacy`.
+pub(crate) static LEGACY_SKEYMGMT: Algorithms<2> =
+    Algorithms([legacy_alg(c"GENERIC-SECRET", &GENERIC_FUNCTIONS), ALG_END]);
 
 /// `deflt_skeymgmt`.
 static DEFAULT_SKEYMGMT: Algorithms<3> = Algorithms([

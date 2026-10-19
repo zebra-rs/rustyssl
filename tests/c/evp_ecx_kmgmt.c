@@ -268,8 +268,10 @@ static void test_fromdata(const char *type, const char *priv, const char *pub)
 
     k = fromdata(type, EVP_PKEY_KEYPAIR, NULL, NULL);
     EVP_PKEY_free(k);
-    k = fromdata(type, EVP_PKEY_PUBLIC_KEY, priv, NULL);
-    EVP_PKEY_free(k);
+    /*
+     * A public key from only a private key isn't tested: OpenSSL 3.6 derives it from a NULL
+     * private key and crashes (docs/DEVIATIONS.md).
+     */
     k = fromdata(type, EVP_PKEY_KEY_PARAMETERS, priv, pub);
     EVP_PKEY_free(k);
     k = fromdata(type, EVP_PKEY_KEYPAIR, "0102", NULL);

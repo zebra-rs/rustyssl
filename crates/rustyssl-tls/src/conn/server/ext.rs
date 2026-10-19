@@ -829,12 +829,15 @@ pub(crate) fn ext_construct_status_request(
 ) -> Result<ExtReturn> {
     if x.context == cx::TLS1_3_CERTIFICATE_REQUEST
         || !state_ref(c).is_some_and(|s| s.status_expected)
-        || (c.is_tls13() && x.chainidx != 0)
     {
         return Ok(ExtReturn::NotSent);
     }
+    // 3.6: each certificate's own response (TLS 1.2 asks for the leaf's), when there is one.
+    let Some(resp) = super::ocsp_response_for(c, x.chainidx) else {
+        return Ok(ExtReturn::NotSent);
+    };
     if c.is_tls13() {
-        return Ok(ExtReturn::Sent(super::cert_status_body(c)?));
+        return Ok(ExtReturn::Sent(super::cert_status_body(c, &resp)?));
     }
     Ok(ExtReturn::Sent(Vec::new()))
 }

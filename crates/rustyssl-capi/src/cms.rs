@@ -12,17 +12,17 @@ use core::ptr;
 
 use rustyssl_abi::{
     ASN1_BIT_STRING, ASN1_GENERALIZEDTIME, ASN1_INTEGER, ASN1_ITEM, ASN1_ITYPE_NDEF_SEQUENCE,
-    ASN1_ITYPE_PRIMITIVE, ASN1_OBJECT, ASN1_OCTET_STRING, ASN1_OP_DETACHED_POST,
+    ASN1_ITYPE_PRIMITIVE, ASN1_OBJECT, ASN1_OCTET_STRING, ASN1_OP_D2I_POST, ASN1_OP_DETACHED_POST,
     ASN1_OP_DETACHED_PRE, ASN1_OP_FREE_POST, ASN1_OP_FREE_PRE, ASN1_OP_NEW_POST,
     ASN1_OP_STREAM_POST, ASN1_OP_STREAM_PRE, ASN1_STREAM_ARG, ASN1_TFLG_EMBED, ASN1_TFLG_EXPLICIT,
     ASN1_TFLG_IMPLICIT, ASN1_TFLG_IMPTAG, ASN1_TFLG_NDEF, ASN1_TFLG_OPTIONAL,
     ASN1_TFLG_SEQUENCE_OF, ASN1_TFLG_SET_OF, ASN1_TFLG_SET_ORDER, ASN1_TFLG_UNIVERSAL, ASN1_TYPE,
-    ASN1_VALUE, CMS_RECIPINFO_KEK, CMS_RECIPINFO_PASS, CMS_RECIPINFO_TRANS, ERR_LIB_ASN1,
-    ERR_LIB_CMS, EVP_CIPHER, EVP_CIPHER_CTX, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW, EVP_MD_CTX, EVP_PKEY,
-    EVP_PKEY_CTX, NID_id_smime_ct_authData, NID_id_smime_ct_authEnvelopedData,
-    NID_id_smime_ct_compressedData, NID_pkcs7_data, NID_pkcs7_digest, NID_pkcs7_encrypted,
-    NID_pkcs7_enveloped, NID_pkcs7_signed, OSSL_LIB_CTX, V_ASN1_SEQUENCE, V_ASN1_SET, X509,
-    X509_ALGOR, X509_NAME,
+    ASN1_VALUE, CMS_RECIPINFO_KEK, CMS_RECIPINFO_OTHER, CMS_RECIPINFO_PASS, CMS_RECIPINFO_TRANS,
+    ERR_LIB_ASN1, ERR_LIB_CMS, EVP_CIPHER, EVP_CIPHER_CTX, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW,
+    EVP_MD_CTX, EVP_PKEY, EVP_PKEY_CTX, NID_id_smime_ct_authData,
+    NID_id_smime_ct_authEnvelopedData, NID_id_smime_ct_compressedData, NID_id_smime_ori_kem,
+    NID_pkcs7_data, NID_pkcs7_digest, NID_pkcs7_encrypted, NID_pkcs7_enveloped, NID_pkcs7_signed,
+    OSSL_LIB_CTX, V_ASN1_SEQUENCE, V_ASN1_SET, X509, X509_ALGOR, X509_NAME,
 };
 
 use crate::asn1::tpl::ints::INT32_it;
@@ -53,6 +53,7 @@ pub(crate) mod env;
 pub(crate) mod ess;
 pub(crate) mod io;
 pub(crate) mod kari;
+pub(crate) mod kemri;
 pub(crate) mod pkey;
 pub(crate) mod pwri;
 pub(crate) mod sd;
@@ -176,8 +177,12 @@ pub(crate) struct EncryptedContentInfo {
     pub(crate) havenocert: c_int,
 }
 
+/// A recipient info (3.6): the CHOICE as encoded (`encoded_type`), its type as the API
+/// reports it (`CMS_RECIPINFO_KEM` for an other recipient info that is a KEM one), and the
+/// choice.
 #[repr(C)]
 pub(crate) struct RecipientInfo {
+    pub(crate) encoded_type: c_int,
     pub(crate) type_: c_int,
     pub(crate) d: *mut c_void,
 }
@@ -267,10 +272,37 @@ pub(crate) struct PasswordRecipientInfo {
     pub(crate) cms_ctx: *const CmsCtx,
 }
 
+/// An other recipient info: its type and, by it, a KEM recipient info (3.6) or any value.
 #[repr(C)]
 pub(crate) struct OtherRecipientInfo {
     pub(crate) ori_type: *mut ASN1_OBJECT,
-    pub(crate) ori_value: *mut ASN1_TYPE,
+    pub(crate) d: *mut c_void,
+}
+
+/// A KEM recipient info (RFC 9629, 3.6's `CMS_KEMRecipientInfo`), with the key contexts and
+/// user keying material it works with.
+#[repr(C)]
+pub(crate) struct KemRecipientInfo {
+    pub(crate) version: i32,
+    pub(crate) rid: *mut SignerIdentifier,
+    pub(crate) kem: *mut X509_ALGOR,
+    pub(crate) kemct: *mut ASN1_OCTET_STRING,
+    pub(crate) kdf: *mut X509_ALGOR,
+    pub(crate) kek_length: u32,
+    pub(crate) ukm: *mut ASN1_OCTET_STRING,
+    pub(crate) wrap: *mut X509_ALGOR,
+    pub(crate) encrypted_key: *mut ASN1_OCTET_STRING,
+    pub(crate) pctx: *mut EVP_PKEY_CTX,
+    pub(crate) ctx: *mut EVP_CIPHER_CTX,
+    pub(crate) cms_ctx: *const CmsCtx,
+}
+
+/// `CMS_CMSORIforKEMOtherInfo` (RFC 9629), the KDF's info.
+#[repr(C)]
+pub(crate) struct OriForKemOtherInfo {
+    pub(crate) wrap: *mut X509_ALGOR,
+    pub(crate) kek_length: u32,
+    pub(crate) ukm: *mut ASN1_OCTET_STRING,
 }
 
 #[repr(C)]
@@ -685,10 +717,88 @@ static PWRI_TT: Templates<4> = tt![PasswordRecipientInfo;
     SIMPLE, 0, encrypted_key, c"encryptedKey", ASN1_OCTET_STRING_it;
 ];
 
-static ORI_TT: Templates<2> = tt![OtherRecipientInfo;
-    SIMPLE, 0, ori_type, c"oriType", ASN1_OBJECT_it;
-    OPT, 0, ori_value, c"oriValue", ASN1_ANY_it;
+ffi_callback! {
+    /// `cms_kemri_cb`: the key-wrap cipher context, made and freed with the recipient info,
+    /// and its key context freed.
+    ///
+    /// # Safety
+    /// As the template engine calls it.
+    pub(crate) unsafe extern "C" fn cms_kemri_cb(operation: c_int, pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM, _exarg: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_CMS
+    {
+        // SAFETY: the value made or being freed.
+        let Some(k) = (unsafe { slot_value::<KemRecipientInfo>(pval) }) else {
+            return 1;
+        };
+        if operation == ASN1_OP_NEW_POST {
+            // SAFETY: no preconditions.
+            k.ctx = unsafe { EVP_CIPHER_CTX_new() };
+            if k.ctx.is_null() {
+                return 0;
+            }
+            // SAFETY: the new context.
+            unsafe { EVP_CIPHER_CTX_set_flags(k.ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW) };
+            k.pctx = ptr::null_mut();
+        } else if operation == ASN1_OP_FREE_POST {
+            // SAFETY: its own contexts, or NULL.
+            unsafe { EVP_PKEY_CTX_free(k.pctx) };
+            // SAFETY: as above.
+            unsafe { EVP_CIPHER_CTX_free(k.ctx) };
+        }
+        1
+    }
+}
+
+static KEMRI_AUX: Aux = aux(cms_kemri_cb);
+
+static KEMRI_TT: Templates<9> = tt![KemRecipientInfo;
+    EMBED, 0, version, c"version", INT32_it;
+    SIMPLE, 0, rid, c"rid", signer_identifier_it;
+    SIMPLE, 0, kem, c"kem", X509_ALGOR_it;
+    SIMPLE, 0, kemct, c"kemct", ASN1_OCTET_STRING_it;
+    SIMPLE, 0, kdf, c"kdf", X509_ALGOR_it;
+    EMBED, 0, kek_length, c"kekLength", INT32_it;
+    EXP_OPT, 0, ukm, c"ukm", ASN1_OCTET_STRING_it;
+    SIMPLE, 0, wrap, c"wrap", X509_ALGOR_it;
+    SIMPLE, 0, encrypted_key, c"encryptedKey", ASN1_OCTET_STRING_it;
 ];
+
+static KEMOTHER_TT: Templates<3> = tt![OriForKemOtherInfo;
+    SIMPLE, 0, wrap, c"wrap", X509_ALGOR_it;
+    EMBED, 0, kek_length, c"kekLength", INT32_it;
+    EXP_OPT, 0, ukm, c"ukm", ASN1_OCTET_STRING_it;
+];
+
+const ORI_D: usize = offset_of!(OtherRecipientInfo, d);
+
+static ORI_DEFAULT: Template = Template(template_at(SIMPLE, 0, ORI_D, c"d.other", ASN1_ANY_it));
+
+static ORI_ADB_TBL: AdbEntries<1> = AdbEntries([adb_entry(
+    NID_id_smime_ori_kem,
+    template_at(SIMPLE, 0, ORI_D, c"d.kemri", kem_recipient_info_it),
+)]);
+
+static ORI_ADB: Adb = adb_oid(
+    offset_of!(OtherRecipientInfo, ori_type),
+    &ORI_ADB_TBL,
+    &ORI_DEFAULT,
+);
+
+/// The other recipient info's ANY DEFINED BY table.
+unsafe extern "C" fn ori_adb() -> *const ASN1_ITEM {
+    (&raw const ORI_ADB.0).cast()
+}
+
+static ORI_TT: Templates<2> = Templates([
+    template_at(
+        SIMPLE,
+        0,
+        offset_of!(OtherRecipientInfo, ori_type),
+        c"oriType",
+        ASN1_OBJECT_it,
+    ),
+    adb_object(c"CMS_OtherRecipientInfo", ori_adb),
+]);
 
 ffi_callback! {
     /// `cms_ri_cb`: frees what a recipient info holds beyond its encoding.
@@ -698,13 +808,28 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn cms_ri_cb(operation: c_int, pval: *mut *mut ASN1_VALUE, _it: *const ASN1_ITEM, _exarg: *mut c_void) -> c_int
     where failure = 0, library = ERR_LIB_CMS
     {
-        if operation != ASN1_OP_FREE_PRE {
-            return 1;
-        }
-        // SAFETY: the value being freed.
+        // SAFETY: the value made, decoded, or being freed.
         let Some(ri) = (unsafe { slot_value::<RecipientInfo>(pval) }) else {
             return 1;
         };
+        if operation == ASN1_OP_NEW_POST || operation == ASN1_OP_D2I_POST {
+            // 3.6: the reported type is the encoded one, but an other recipient info of the
+            // KEM type is a KEM recipient.
+            ri.type_ = ri.encoded_type;
+            if operation == ASN1_OP_D2I_POST
+                && ri.type_ == CMS_RECIPINFO_OTHER
+                // SAFETY: the choice's member, NULL or live.
+                && unsafe { ri.d.cast::<OtherRecipientInfo>().as_ref() }
+                    // SAFETY: its type, NULL or live.
+                    .is_some_and(|o| unsafe { crate::objects::OBJ_obj2nid(o.ori_type) } == NID_id_smime_ori_kem)
+            {
+                ri.type_ = rustyssl_abi::CMS_RECIPINFO_KEM;
+            }
+            return 1;
+        }
+        if operation != ASN1_OP_FREE_PRE {
+            return 1;
+        }
         match ri.type_ {
             CMS_RECIPINFO_TRANS => {
                 // SAFETY: the choice's member, NULL or live.
@@ -988,7 +1113,11 @@ private_item! {
     /// `CMS_EncryptedContentInfo_it`, which OpenSSL doesn't export.
     fn encrypted_content_info_it = ndef_sequence::<EncryptedContentInfo, 3>(&ECINFO_TT, Some(&EC_AUX), c"CMS_EncryptedContentInfo");
     /// `CMS_RecipientInfo_it`, which OpenSSL doesn't export.
-    fn recipient_info_it = choice::<RecipientInfo, 5>(&RI_TT, offset_of!(RecipientInfo, type_), Some(&RI_AUX), c"CMS_RecipientInfo");
+    fn recipient_info_it = choice::<RecipientInfo, 5>(&RI_TT, offset_of!(RecipientInfo, encoded_type), Some(&RI_AUX), c"CMS_RecipientInfo");
+    /// `CMS_KEMRecipientInfo_it` (3.6).
+    fn kem_recipient_info_it = sequence::<KemRecipientInfo, 9>(&KEMRI_TT, Some(&KEMRI_AUX), c"CMS_KEMRecipientInfo");
+    /// `CMS_CMSORIforKEMOtherInfo_it` (3.6).
+    fn ori_for_kem_other_info_it = sequence::<OriForKemOtherInfo, 3>(&KEMOTHER_TT, None, c"CMS_CMSORIforKEMOtherInfo");
     /// `CMS_PasswordRecipientInfo_it`, which OpenSSL doesn't export.
     fn password_recipient_info_it = sequence::<PasswordRecipientInfo, 4>(&PWRI_TT, None, c"CMS_PasswordRecipientInfo");
     /// `CMS_Attributes_Sign_it`: signed attributes as a SET OF, sorted.

@@ -124,6 +124,15 @@ impl Variant {
         }
     }
 
+    /// Its NIST security category (FIPS 203, section 8: 1, 3, or 5).
+    pub const fn security_category(self) -> u32 {
+        match self {
+            Self::MlKem512 => 1,
+            Self::MlKem768 => 3,
+            Self::MlKem1024 => 5,
+        }
+    }
+
     /// Its security bits.
     pub const fn security_bits(self) -> u32 {
         match self {

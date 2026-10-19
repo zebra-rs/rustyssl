@@ -13,10 +13,12 @@
 //! | `binary` | a program linked against the reference loads against ours, every symbol bound |
 //! | `static` | that program links statically against `libssl.a` and `libcrypto.a` and runs |
 //! | `headers` | the installed headers and pkg-config files match the reference's and work |
+//! | `compat35` | every 3.5 export is still exported, at its node, with its prototype and layouts |
 //!
 //! Name checks to run only those. The checks use the host's target: CI runs them on each
 //! platform it builds.
 
+mod compat35;
 mod library;
 mod programs;
 mod values;
@@ -49,6 +51,7 @@ const CHECKS: &[(&str, Check)] = &[
     ("binary", programs::binary),
     ("static", programs::static_linking),
     ("headers", programs::headers),
+    ("compat35", compat35::compat35),
 ];
 
 /// How many problems a failing check prints; the rest are counted.

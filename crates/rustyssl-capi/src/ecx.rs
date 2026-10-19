@@ -440,3 +440,36 @@ pub(crate) fn exchange(private: &[u8], public: &[u8]) -> Option<(Vec<u8>, bool)>
         None => (vec![0; n], false),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::params::{OSSL_PARAM_construct_end, OSSL_PARAM_construct_octet_string};
+
+    /// docs/DEVIATIONS.md: OpenSSL 3.6 derives the public key from a NULL private key.
+    #[test]
+    fn a_public_key_from_only_a_private_key_fails() {
+        let handle = new(ptr::null_mut(), EcxType::X25519, None);
+        // SAFETY: the key just made.
+        let k = unsafe { key(handle) }.unwrap();
+        let mut private = [7u8; 32];
+        let params = [
+            // SAFETY: a static name; the array above, which outlives the parameters.
+            unsafe {
+                OSSL_PARAM_construct_octet_string(
+                    OSSL_PKEY_PARAM_PRIV_KEY.as_ptr(),
+                    private.as_mut_ptr().cast(),
+                    private.len(),
+                )
+            },
+            // SAFETY: no preconditions.
+            unsafe { OSSL_PARAM_construct_end() },
+        ];
+        // SAFETY: a parameter array.
+        assert!(!unsafe { key_fromdata(k, params.as_ptr(), false) });
+        // SAFETY: as above; with the private key included, the public key is derived.
+        assert!(unsafe { key_fromdata(k, params.as_ptr(), true) });
+        // SAFETY: the key made above, freed once.
+        unsafe { free(handle) };
+    }
+}

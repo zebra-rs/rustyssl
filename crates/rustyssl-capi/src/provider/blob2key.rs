@@ -133,6 +133,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PVK2KEY_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { bctx(vctx) }) else { return 0 };
         // SAFETY: as above.
         c_int::from(unsafe { read_into(params, OSSL_DECODER_PARAM_PROPERTIES, &mut c.propq) })

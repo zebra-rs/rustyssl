@@ -43,8 +43,8 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_RSA_FACTOR7, OSSL_PKEY_PARAM_RSA_FACTOR8, OSSL_PKEY_PARAM_RSA_FACTOR9,
     OSSL_PKEY_PARAM_RSA_FACTOR10, OSSL_PKEY_PARAM_RSA_MASKGENFUNC, OSSL_PKEY_PARAM_RSA_MGF1_DIGEST,
     OSSL_PKEY_PARAM_RSA_N, OSSL_PKEY_PARAM_RSA_PRIMES, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN,
-    OSSL_PKEY_PARAM_SECURITY_BITS, PROV_R_KEY_SIZE_TOO_SMALL, RSA, RSA_DEFAULT_PRIME_NUM, RSA_F4,
-    RSA_R_INVALID_KEYPAIR, SN_mgf1,
+    OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_KEY_SIZE_TOO_SMALL,
+    RSA, RSA_DEFAULT_PRIME_NUM, RSA_F4, RSA_R_INVALID_KEYPAIR, SN_mgf1,
 };
 use rustyssl_crypto::bn::{self, BigNum};
 use rustyssl_crypto::rsa::{ExtraPrime, Key, ifc_ffc_security_bits};
@@ -969,6 +969,8 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, c_int::try_from(k.bits()).unwrap_or(0)),
             (OSSL_PKEY_PARAM_SECURITY_BITS, security_bits(k)),
             (OSSL_PKEY_PARAM_MAX_SIZE, c_int::try_from(k.size()).unwrap_or(0)),
+            // 3.6: classical keys are in no NIST post-quantum category.
+            (OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0),
         ];
         for (name, v) in ints {
             // SAFETY: the caller's array; a static name.
@@ -1008,10 +1010,11 @@ ffi_callback! {
 }
 
 /// `rsa_gettable_params`'s list.
-static GETTABLE: Params<37> = Params([
+static GETTABLE: Params<38> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, 0),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, 0),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, 0),
+    defn(OSSL_PKEY_PARAM_SECURITY_CATEGORY, OSSL_PARAM_INTEGER, 0),
     defn(OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_RSA_N, OSSL_PARAM_UNSIGNED_INTEGER, 0),
     defn(OSSL_PKEY_PARAM_RSA_E, OSSL_PARAM_UNSIGNED_INTEGER, 0),

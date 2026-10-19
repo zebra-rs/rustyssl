@@ -271,6 +271,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::MAC_LEGACY_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(vctx) }) else { return 0 };
         // SAFETY: the MAC context; the caller's array.
         unsafe { EVP_MAC_CTX_set_params(c.macctx.0, params) }

@@ -6,7 +6,7 @@ use std::process::Command;
 use crate::util::{Result, run_output};
 
 /// The vendored OpenSSL release series that codegen reads (`abi/openssl-<series>/`).
-pub const OPENSSL_SERIES: &str = "3.5";
+pub const OPENSSL_SERIES: &str = "3.6";
 
 pub struct Target {
     /// OpenSSL `Configure` target; also the directory name under `abi/openssl-*/config/`.

@@ -380,6 +380,14 @@ unsafe fn groups_equal(g1: *const EC_GROUP, g2: *const EC_GROUP) -> bool {
 /// # Safety
 /// `params` is NULL or an array.
 unsafe fn set_params(c: &mut KemCtx, params: *const OSSL_PARAM) -> c_int {
+    let decoder = match c.family {
+        Family::Ec => &crate::provider::param_decoders::ECKEM_SET_CTX_PARAMS,
+        Family::Ecx => &crate::provider::param_decoders::ECXKEM_SET_CTX_PARAMS,
+    };
+    // SAFETY: the caller's guarantee.
+    if !unsafe { crate::provider::param_decoders::decode(params, decoder) } {
+        return 0;
+    }
     // SAFETY: the caller's guarantee.
     if unsafe { is_empty(params) } {
         return 1;

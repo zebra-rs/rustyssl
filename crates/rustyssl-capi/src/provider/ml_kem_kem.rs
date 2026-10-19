@@ -114,6 +114,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_KEM_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         if c.op == EVP_PKEY_OP_DECAPSULATE {
             c.clear_entropy();

@@ -277,6 +277,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECDH_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -397,6 +401,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn ecdh_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECDH_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         let find = |key: &CStr| {
@@ -658,6 +666,47 @@ ffi_callback! {
     }
 }
 
+ffi_callback! {
+    /// `ecdh_derive_skey` (3.6): the derivation of exactly `outlen` octets, imported as a key
+    /// with `import`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `import` is NULL or a key manager's import with its
+    /// provider context `provctx`.
+    pub(crate) unsafe extern "C" fn ecdh_derive_skey(vctx: *mut c_void, _key_type: *const core::ffi::c_char, provctx: *mut c_void, import: Option<crate::evp::skeymgmt::ImportFn>, outlen: usize, _params: *const OSSL_PARAM) -> *mut c_void
+    where failure = core::ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        if import.is_none() || outlen == 0 {
+            return core::ptr::null_mut();
+        }
+        let mut len = 0usize;
+        // SAFETY: the caller's context; a size query.
+        if unsafe { ecdh_derive(vctx, core::ptr::null_mut(), &raw mut len, outlen) } == 0 {
+            return core::ptr::null_mut();
+        }
+        let mut secret = vec![0u8; len];
+        // SAFETY: as above; our room for `len` octets (at least what `outlen` asks).
+        let ok = unsafe { ecdh_derive(vctx, secret.as_mut_ptr(), &raw mut len, outlen) } != 0;
+        let key = if ok && len == outlen {
+            secret.truncate(outlen);
+            // SAFETY: the caller's import and context.
+            unsafe { super::skeymgmt::import_secret(provctx, import, &mut secret) }
+        } else {
+            core::ptr::null_mut()
+        };
+        super::macs::wipe(&mut secret);
+        key
+    }
+}
+
+type DeriveSkeyFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const core::ffi::c_char,
+    *mut c_void,
+    Option<crate::evp::skeymgmt::ImportFn>,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut c_void;
 type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 type InitFn = unsafe extern "C" fn(*mut c_void, *mut c_void, *const OSSL_PARAM) -> c_int;
 type SetPeerFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int;
@@ -669,10 +718,15 @@ type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type ListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
 
 /// `ossl_ecdh_keyexch_functions`.
-pub(crate) static ECDH_KEYEXCH: Dispatch<11> = Dispatch([
+pub(crate) static ECDH_KEYEXCH: Dispatch<12> = Dispatch([
     entry!(OSSL_FUNC_KEYEXCH_NEWCTX, ecdh_newctx, NewCtxFn),
     entry!(OSSL_FUNC_KEYEXCH_INIT, ecdh_init, InitFn),
     entry!(OSSL_FUNC_KEYEXCH_DERIVE, ecdh_derive, DeriveFn),
+    entry!(
+        rustyssl_abi::OSSL_FUNC_KEYEXCH_DERIVE_SKEY,
+        ecdh_derive_skey,
+        DeriveSkeyFn
+    ),
     entry!(OSSL_FUNC_KEYEXCH_SET_PEER, ecdh_set_peer, SetPeerFn),
     entry!(OSSL_FUNC_KEYEXCH_FREECTX, ecdh_freectx, FreeCtxFn),
     entry!(OSSL_FUNC_KEYEXCH_DUPCTX, ecdh_dupctx, DupCtxFn),

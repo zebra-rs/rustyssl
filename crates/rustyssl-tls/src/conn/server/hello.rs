@@ -657,19 +657,23 @@ fn handle_status_request_inner(c: &mut Connection) -> Result<bool> {
             ocsp_exts: s.ocsp_exts.clone(),
         }
     };
-    let (ret, response) = match ask_once(c, req, 0) {
+    let (ret, expected, responses) = match ask_once(c, req, 0) {
         None => return Ok(false),
-        Some(Answer::Status { ret, response }) => (ret, response),
-        Some(_) => (abi::SSL_TLSEXT_ERR_ALERT_FATAL, None),
+        Some(Answer::Status {
+            ret,
+            expected,
+            responses,
+        }) => (ret, expected, responses),
+        Some(_) => (abi::SSL_TLSEXT_ERR_ALERT_FATAL, false, Vec::new()),
     };
     match ret {
         abi::SSL_TLSEXT_ERR_NOACK => {}
         abi::SSL_TLSEXT_ERR_OK => {
-            let resp =
-                response.or_else(|| c.cfg.certs.get(cert).and_then(|k| k.ocsp_response.clone()));
+            // 3.6: a status is promised when the application set any response; each
+            // certificate's is sent if it applies to it.
             let s = state(c)?;
-            s.status_expected = resp.is_some();
-            s.ocsp_response = resp;
+            s.status_expected = expected;
+            s.ocsp_responses = responses;
         }
         _ => {
             return Err(Error::alert(

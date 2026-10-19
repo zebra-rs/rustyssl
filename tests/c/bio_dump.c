@@ -149,8 +149,8 @@ static void hex_strings(void)
               && same(contents(mem), ""),
           "no bytes writes nothing and returns 1");
     check(BIO_hex_string(mem, -3, 0, bytes, 3) == 1
-              && same(contents(mem), "00:\n1F:\nA0"),
-          "a width of 0 breaks the line after each byte; a negative indentation is none");
+              && same(contents(mem), "00:\n   1F:\n   A0"),
+          "a width of 0 breaks the line after each byte; a negative indentation counts as positive");
     BIO_free(mem);
 }
 

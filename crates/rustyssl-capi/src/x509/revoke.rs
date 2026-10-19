@@ -1,5 +1,5 @@
 //! Revocation (`x509_vfy.c`): the context's default `check_revocation`, `check_crl`, and
-//! `cert_crl`. With `X509_V_FLAG_CRL_CHECK` the leaf (with `X509_V_FLAG_CRL_CHECK_ALL`, every
+//! `cert_crl`, with 3.6's checks against stapled OCSP responses first. With `X509_V_FLAG_CRL_CHECK` the leaf (with `X509_V_FLAG_CRL_CHECK_ALL`, every
 //! certificate of the chain) is checked against CRLs until every reason is covered: the
 //! context's CRLs and then the store's are scored (issuer name, authority key identifier and
 //! the CRL issuer's place, distribution point scope, times, critical extensions), the best one
@@ -13,18 +13,22 @@ use core::ptr;
 use libc::time_t;
 use rustyssl_abi::{
     CRL_REASON_REMOVE_FROM_CRL, CRLDP_ALL_REASONS, DIST_POINT, DIST_POINT_NAME, ERR_LIB_X509,
-    EXFLAG_CA, EXFLAG_CRITICAL, EXFLAG_FRESHEST, EXFLAG_KUSAGE, EXFLAG_PROXY, GEN_DIRNAME,
-    GENERAL_NAME, GENERAL_NAMES, IDP_INDIRECT, IDP_INVALID, IDP_ONLYATTR, IDP_ONLYCA, IDP_ONLYUSER,
-    IDP_REASONS, KU_CRL_SIGN, NID_authority_key_identifier, NID_issuing_distribution_point, X509,
-    X509_CRL, X509_NAME, X509_REVOKED, X509_STORE_CTX, X509_V_ERR_CERT_REVOKED,
-    X509_V_ERR_CRL_HAS_EXPIRED, X509_V_ERR_CRL_NOT_YET_VALID, X509_V_ERR_CRL_PATH_VALIDATION_ERROR,
-    X509_V_ERR_CRL_SIGNATURE_FAILURE, X509_V_ERR_DIFFERENT_CRL_SCOPE,
-    X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD, X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD,
-    X509_V_ERR_INVALID_EXTENSION, X509_V_ERR_KEYUSAGE_NO_CRL_SIGN,
+    EXFLAG_CA, EXFLAG_CRITICAL, EXFLAG_FRESHEST, EXFLAG_KUSAGE, EXFLAG_PROXY, EXFLAG_SS,
+    GEN_DIRNAME, GENERAL_NAME, GENERAL_NAMES, IDP_INDIRECT, IDP_INVALID, IDP_ONLYATTR, IDP_ONLYCA,
+    IDP_ONLYUSER, IDP_REASONS, KU_CRL_SIGN, NID_authority_key_identifier,
+    NID_issuing_distribution_point, OCSP_RESPONSE_STATUS_SUCCESSFUL, V_OCSP_CERTSTATUS_GOOD,
+    V_OCSP_CERTSTATUS_REVOKED, X509, X509_CRL, X509_NAME, X509_REVOKED, X509_STORE_CTX,
+    X509_V_ERR_CERT_REVOKED, X509_V_ERR_CRL_HAS_EXPIRED, X509_V_ERR_CRL_NOT_YET_VALID,
+    X509_V_ERR_CRL_PATH_VALIDATION_ERROR, X509_V_ERR_CRL_SIGNATURE_FAILURE,
+    X509_V_ERR_DIFFERENT_CRL_SCOPE, X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD,
+    X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD, X509_V_ERR_INVALID_EXTENSION,
+    X509_V_ERR_KEYUSAGE_NO_CRL_SIGN, X509_V_ERR_OCSP_HAS_EXPIRED, X509_V_ERR_OCSP_NO_RESPONSE,
+    X509_V_ERR_OCSP_RESP_INVALID, X509_V_ERR_OCSP_SIGNATURE_FAILURE, X509_V_ERR_OCSP_VERIFY_FAILED,
     X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY, X509_V_ERR_UNABLE_TO_GET_CRL,
     X509_V_ERR_UNABLE_TO_GET_CRL_ISSUER, X509_V_ERR_UNHANDLED_CRITICAL_CRL_EXTENSION,
     X509_V_FLAG_CRL_CHECK, X509_V_FLAG_CRL_CHECK_ALL, X509_V_FLAG_EXTENDED_CRL_SUPPORT,
-    X509_V_FLAG_IGNORE_CRITICAL, X509_V_FLAG_NO_CHECK_TIME, X509_V_FLAG_USE_CHECK_TIME,
+    X509_V_FLAG_IGNORE_CRITICAL, X509_V_FLAG_NO_CHECK_TIME, X509_V_FLAG_OCSP_RESP_CHECK,
+    X509_V_FLAG_OCSP_RESP_CHECK_ALL, X509_V_FLAG_PARTIAL_CHAIN, X509_V_FLAG_USE_CHECK_TIME,
     X509_V_FLAG_USE_DELTAS, X509_V_OK, stack_st_X509, stack_st_X509_CRL,
 };
 
@@ -154,9 +158,10 @@ unsafe fn verify_cb_crl(ctx: *mut X509_STORE_CTX, err: c_int) -> c_int {
     cb.map_or(0, |f| unsafe { f(0, ctx) })
 }
 
-/// `check_revocation`: nothing to check without `X509_V_FLAG_CRL_CHECK`; otherwise the leaf
-/// (or with `X509_V_FLAG_CRL_CHECK_ALL` every certificate; a CRL path's context checks none
-/// but with it) goes through `check_cert`.
+/// `check_revocation` (3.6): with `X509_V_FLAG_OCSP_RESP_CHECK` the leaf (with
+/// `X509_V_FLAG_OCSP_RESP_CHECK_ALL`, every certificate) is checked against the stapled OCSP
+/// responses, falling back to CRLs where `X509_V_FLAG_CRL_CHECK` (`_ALL`) allows when there's
+/// no good response; then, unless OCSP covered the whole chain, CRLs as before for what's left.
 pub(crate) unsafe extern "C" fn check_revocation(ctx: *mut X509_STORE_CTX) -> c_int {
     crate::ffi::guard(
         ERR_LIB_X509,
@@ -168,31 +173,248 @@ pub(crate) unsafe extern "C" fn check_revocation(ctx: *mut X509_STORE_CTX) -> c_
                 return 0;
             };
             let flags = flags_of(c);
-            if flags & flag(X509_V_FLAG_CRL_CHECK) == 0 {
+            let crl_check = flags & flag(X509_V_FLAG_CRL_CHECK) != 0;
+            let crl_all = crl_check && flags & flag(X509_V_FLAG_CRL_CHECK_ALL) != 0;
+            let ocsp_check = flags & flag(X509_V_FLAG_OCSP_RESP_CHECK) != 0;
+            let ocsp_all = ocsp_check && flags & flag(X509_V_FLAG_OCSP_RESP_CHECK_ALL) != 0;
+            if !crl_check && !ocsp_check {
                 return 1;
             }
-            let last = if flags & flag(X509_V_FLAG_CRL_CHECK_ALL) != 0 {
-                len(c.chain) - 1
-            } else if !c.parent.is_null() {
-                return 1;
-            } else {
-                0
-            };
-            for i in 0..=last {
+            if ocsp_check {
+                let mut last = 0;
+                if ocsp_all {
+                    last = len(c.chain) - 1;
+                } else if !crl_all && !c.parent.is_null() {
+                    return 1;
+                }
+                for i in 0..=last {
+                    // SAFETY: as above.
+                    let ok = unsafe { check_ocsp_at(ctx, i, crl_check, crl_all) };
+                    if ok == 0 {
+                        return 0;
+                    }
+                }
+            }
+            if crl_check && !ocsp_all {
                 // SAFETY: as above.
                 let Some(c) = (unsafe { cx(ctx) }) else {
                     return 0;
                 };
-                c.error_depth = i;
-                // SAFETY: as above.
-                let ok = unsafe { check_cert(ctx) };
-                if ok == 0 {
-                    return ok;
+                let last = if crl_all {
+                    len(c.chain) - 1
+                } else if !c.parent.is_null() {
+                    return 1;
+                } else {
+                    0
+                };
+                let first = c_int::from(ocsp_check && crl_all);
+                for i in first..=last {
+                    // SAFETY: as above.
+                    let Some(c) = (unsafe { cx(ctx) }) else {
+                        return 0;
+                    };
+                    c.error_depth = i;
+                    // SAFETY: as above.
+                    let ok = unsafe { check_cert(ctx) };
+                    if ok == 0 {
+                        return ok;
+                    }
                 }
             }
             1
         },
     )
+}
+
+/// One certificate of `check_revocation`'s OCSP pass: skipped if self-signed (or the partial
+/// chain's anchor), else good, or else checked with CRLs when allowed, else reported as
+/// `X509_V_ERR_OCSP_VERIFY_FAILED` (as is a revoked one). 0 stops the verification.
+///
+/// # Safety
+/// `ctx` is a live context.
+unsafe fn check_ocsp_at(
+    ctx: *mut X509_STORE_CTX,
+    i: c_int,
+    crl_check: bool,
+    crl_all: bool,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { cx(ctx) }) else {
+        return 0;
+    };
+    c.error_depth = i;
+    c.current_cert = at(c.chain, i);
+    // SAFETY: the chain's certificate.
+    if unsafe { cache_view(c.current_cert) }.flags & ex(EXFLAG_SS) != 0 {
+        return 1;
+    }
+    c.current_issuer = at(c.chain, i + 1);
+    if c.current_issuer.is_null() {
+        if flags_of(c) & flag(X509_V_FLAG_PARTIAL_CHAIN) != 0 {
+            return 1;
+        }
+        // SAFETY: as above.
+        return unsafe { verify_cb_crl(ctx, X509_V_ERR_OCSP_VERIFY_FAILED) };
+    }
+    // SAFETY: as above.
+    let ok = unsafe { check_cert_ocsp_resp(ctx) };
+    if ok == V_OCSP_CERTSTATUS_REVOKED {
+        // SAFETY: as above.
+        let err = unsafe { cx(ctx) }.map_or(0, |c| c.error);
+        let err = if err != 0 {
+            err
+        } else {
+            X509_V_ERR_OCSP_VERIFY_FAILED
+        };
+        // SAFETY: as above.
+        return unsafe { verify_cb_crl(ctx, err) };
+    }
+    if ok == V_OCSP_CERTSTATUS_GOOD {
+        return 1;
+    }
+    if crl_all || (crl_check && i == 0) {
+        // SAFETY: as above.
+        return unsafe { check_cert(ctx) };
+    }
+    // SAFETY: as above.
+    unsafe { verify_cb_crl(ctx, X509_V_ERR_OCSP_VERIFY_FAILED) }
+}
+
+/// `check_cert_ocsp_resp`: the stapled response for the certificate at the error depth: its
+/// status (`V_OCSP_CERTSTATUS_*`), or an `X509_V_ERR_OCSP_*` for none, an invalid one, a bad
+/// signature, or one past its validity (five minutes' grace).
+///
+/// # Safety
+/// `ctx` is a live context with a current certificate and issuer.
+unsafe fn check_cert_ocsp_resp(ctx: *mut X509_STORE_CTX) -> c_int {
+    use crate::ocsp::asn::{OCSP_BASICRESP_free, OCSP_CERTID_free};
+    use crate::ocsp::cl::{
+        OCSP_SINGLERESP_get0_id, OCSP_check_validity, OCSP_resp_count, OCSP_resp_find_status,
+        OCSP_resp_get0, OCSP_response_get1_basic, OCSP_response_status,
+    };
+    use crate::ocsp::id::{OCSP_cert_to_id, OCSP_id_cmp};
+    use crate::ocsp::srv::OCSP_id_get0_info;
+    use crate::ocsp::vfy::OCSP_basic_verify;
+
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { cx(ctx) }) else {
+        return X509_V_ERR_OCSP_NO_RESPONSE;
+    };
+    let (list, depth, chain, store) = (c.ocsp_resp, c.error_depth, c.chain, c.store);
+    let (cert, issuer) = (c.current_cert, c.current_issuer);
+    // SAFETY: the stapled responses are NULL or a live list.
+    let num = unsafe { OPENSSL_sk_num(list.cast()) };
+    if num < 0 || num <= depth {
+        return X509_V_ERR_OCSP_NO_RESPONSE;
+    }
+    // SAFETY: an index within them.
+    let resp =
+        unsafe { OPENSSL_sk_value(list.cast(), depth) }.cast::<rustyssl_abi::OCSP_RESPONSE>();
+    if resp.is_null() {
+        return X509_V_ERR_OCSP_NO_RESPONSE;
+    }
+    // SAFETY: a live response.
+    let bs = unsafe { OCSP_response_get1_basic(resp) };
+    if bs.is_null() {
+        return X509_V_ERR_OCSP_NO_RESPONSE;
+    }
+    let mut cert_id: *mut rustyssl_abi::OCSP_CERTID = ptr::null_mut();
+    let ret = 'end: {
+        // SAFETY: the basic response.
+        let count = unsafe { OCSP_resp_count(bs) };
+        if count < 1 {
+            break 'end X509_V_ERR_OCSP_NO_RESPONSE;
+        }
+        // SAFETY: a live response.
+        if unsafe { OCSP_response_status(resp) } != OCSP_RESPONSE_STATUS_SUCCESSFUL {
+            break 'end X509_V_ERR_OCSP_RESP_INVALID;
+        }
+        // SAFETY: the basic response; the context's chain and store.
+        if unsafe { OCSP_basic_verify(bs, chain, store, 0) } <= 0 {
+            break 'end X509_V_ERR_OCSP_SIGNATURE_FAILURE;
+        }
+        for i in 0..count {
+            // SAFETY: an index within the responses.
+            let sr = unsafe { OCSP_resp_get0(bs, i) };
+            // SAFETY: a single response of the basic response.
+            let sr_id = unsafe { OCSP_SINGLERESP_get0_id(sr) };
+            let mut md_oid: *mut rustyssl_abi::ASN1_OBJECT = ptr::null_mut();
+            // SAFETY: its certificate identifier; a place for the algorithm.
+            unsafe {
+                OCSP_id_get0_info(
+                    ptr::null_mut(),
+                    &raw mut md_oid,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                    sr_id.cast_mut(),
+                )
+            };
+            let md = if md_oid.is_null() {
+                ptr::null()
+            } else {
+                // `EVP_get_digestbyobj`.
+                // SAFETY: the identifier's algorithm.
+                let nid = unsafe { crate::objects::OBJ_obj2nid(md_oid) };
+                // SAFETY: a number.
+                let sn = unsafe { crate::objects::OBJ_nid2sn(nid) };
+                if sn.is_null() {
+                    ptr::null()
+                } else {
+                    // SAFETY: a static name.
+                    unsafe { crate::evp::legacy_md::EVP_get_digestbyname(sn) }
+                }
+            };
+            // SAFETY: the digest, or NULL; the context's certificates.
+            cert_id = unsafe { OCSP_cert_to_id(md, cert, issuer) };
+            if cert_id.is_null() {
+                break 'end X509_V_ERR_OCSP_RESP_INVALID;
+            }
+            // SAFETY: two identifiers.
+            if unsafe { OCSP_id_cmp(cert_id, sr_id) } == 0 {
+                break;
+            }
+            // SAFETY: made above.
+            unsafe { OCSP_CERTID_free(cert_id) };
+            cert_id = ptr::null_mut();
+        }
+        if cert_id.is_null() {
+            break 'end X509_V_ERR_OCSP_NO_RESPONSE;
+        }
+        let (mut status, mut reason) = (0, 0);
+        let mut rev = ptr::null_mut();
+        let mut thisupd = ptr::null_mut();
+        let mut nextupd = ptr::null_mut();
+        // SAFETY: the basic response; the identifier; places for the results.
+        let found = unsafe {
+            OCSP_resp_find_status(
+                bs,
+                cert_id,
+                &raw mut status,
+                &raw mut reason,
+                &raw mut rev,
+                &raw mut thisupd,
+                &raw mut nextupd,
+            )
+        };
+        if found <= 0 {
+            break 'end X509_V_ERR_OCSP_RESP_INVALID;
+        }
+        if status != V_OCSP_CERTSTATUS_GOOD {
+            break 'end status;
+        }
+        // A stapled response is accepted up to five minutes after it expires.
+        // SAFETY: the response's times.
+        if unsafe { OCSP_check_validity(thisupd, nextupd, 300, -1) } == 0 {
+            X509_V_ERR_OCSP_HAS_EXPIRED
+        } else {
+            V_OCSP_CERTSTATUS_GOOD
+        }
+    };
+    // SAFETY: made here, or NULL.
+    unsafe { OCSP_CERTID_free(cert_id) };
+    // SAFETY: as above.
+    unsafe { OCSP_BASICRESP_free(bs) };
+    ret
 }
 
 /// `check_cert`: checks the chain's certificate at the error depth against CRLs until every
@@ -211,7 +433,9 @@ unsafe fn check_cert(ctx: *mut X509_STORE_CTX) -> c_int {
     c.current_crl_score = 0;
     c.current_reasons = 0;
     // SAFETY: the chain's certificate.
-    if unsafe { cache_view(x) }.flags & ex(EXFLAG_PROXY) != 0 {
+    let ex_flags = unsafe { cache_view(x) }.flags;
+    // 3.6 skips a self-signed certificate (3.5 looked for its CRL).
+    if ex_flags & ex(EXFLAG_SS) != 0 || ex_flags & ex(EXFLAG_PROXY) != 0 {
         return 1;
     }
     let mut crl: *mut X509_CRL = ptr::null_mut();

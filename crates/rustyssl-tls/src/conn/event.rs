@@ -362,13 +362,17 @@ pub enum Answer {
     },
     /// A PSK callback's result: the identity (client) and key, or nothing.
     Psk(Option<super::ExternalPsk>),
-    /// The status callback's result: `1` ok, `0` reject, negative error; and the response
+    /// The status callback's result: `1` ok, `0` reject, negative error; and the responses
     /// (server).
     Status {
         /// The callback's return value.
         ret: i32,
-        /// The OCSP response to staple (server), if any.
-        response: Option<Vec<u8>>,
+        /// Whether the application set any response (`resp_ex` isn't empty), which promises a
+        /// status (server).
+        expected: bool,
+        /// The OCSP response to staple for each certificate, from the leaf, where it applies
+        /// (`ossl_get_ocsp_response`; server).
+        responses: Vec<Option<Vec<u8>>>,
     },
     /// The NPN choice (client) or the protocols to advertise (server), wire format; `None`
     /// for no NPN.

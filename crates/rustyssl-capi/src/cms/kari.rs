@@ -598,6 +598,7 @@ pub(crate) unsafe fn kari_init(
         return false;
     }
     ri.d = kp.cast();
+    ri.encoded_type = CMS_RECIPINFO_AGREE;
     ri.type_ = CMS_RECIPINFO_AGREE;
     // SAFETY: the new choice.
     let k = unsafe { &mut *kp };
@@ -688,13 +689,17 @@ pub(crate) unsafe fn kari_init(
     true
 }
 
-/// `cms_wrap_init`: the key wrap for the content cipher (triple DES's for triple DES, else
-/// AES's of the key's size, or the cipher's own) in the recipient's cipher context.
+/// `ossl_cms_RecipientInfo_wrap_init` (3.6's `cms_wrap_init`, shared by key agreement and
+/// KEM recipients): the key wrap for the content cipher (triple DES's for triple DES, else
+/// AES's of the key's size, or the cipher's own) in the recipient's cipher context `ctx`.
 ///
 /// # Safety
-/// `cipher` is NULL or live.
-unsafe fn wrap_init(k: &mut KeyAgreeRecipientInfo, cipher: *const EVP_CIPHER) -> bool {
-    let ctx = k.ctx;
+/// `ctx` is the recipient's live cipher context; `cipher` is NULL or live.
+pub(crate) unsafe fn wrap_init(
+    ctx: *mut EVP_CIPHER_CTX,
+    cms_ctx: *const CmsCtx,
+    cipher: *const EVP_CIPHER,
+) -> bool {
     // SAFETY: the recipient's cipher context.
     let set = unsafe { EVP_CIPHER_CTX_get0_cipher(ctx) };
     if !set.is_null() {
@@ -750,7 +755,7 @@ unsafe fn wrap_init(k: &mut KeyAgreeRecipientInfo, cipher: *const EVP_CIPHER) ->
             SN_id_aes256_wrap.as_ptr()
         };
     }
-    let (libctx, propq) = ctx_parts(k.cms_ctx);
+    let (libctx, propq) = ctx_parts(cms_ctx);
     // SAFETY: the name; the context's parts.
     let fetched = unsafe { EVP_CIPHER_fetch(libctx, name, propq) };
     if fetched.is_null() {
@@ -784,7 +789,7 @@ pub(crate) unsafe fn kari_encrypt(cms: *const CMS_ContentInfo, ri: *mut Recipien
         return false;
     };
     // SAFETY: the content's cipher, or NULL.
-    if !unsafe { wrap_init(k, ec.cipher) } {
+    if !unsafe { wrap_init(k.ctx, k.cms_ctx, ec.cipher) } {
         return false;
     }
     // SAFETY: the recipient's originator, made with it.

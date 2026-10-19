@@ -223,7 +223,8 @@ Tools each command needs:
 - **`test-bogo`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and Go (at least
   the version BoringSSL's go.mod names; it builds the runner, fetching its modules).
 - **`abi-check`:** what `dist` and `ref-openssl` need, plus `pkg-config`, and on macOS `otool`
-  (from the Xcode command-line tools).
+  (from the Xcode command-line tools); its `compat35` check also needs what `codegen` needs
+  (`clang` and bindgen 0.73.2).
 
 Building for a distribution: the directories rustyssl reports and reads from default to
 OpenSSL's default build for the target (`OPENSSLDIR` `/usr/local/ssl` and so on, from
@@ -257,7 +258,7 @@ cargo xtask vendor 3.5.9                     # fetch, verify (PGP + SHA-256), an
 cargo xtask codegen                          # regenerate bindings, export lists, stubs, error and object tables
 cargo xtask dist                             # build lib{crypto,ssl}.so.3 with soname + symbol versions into target/dist/
 cargo xtask ref-openssl [3.5.9]              # build the reference OpenSSL (default: the vendored version) into target/ref/
-cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers
+cargo xtask abi-check [check...]             # L3: exports+versions, metadata, signatures, layouts, constants, linking, headers, compat35
 cargo xtask coverage [--list PREFIX...]      # implemented exports per library and header -> docs/coverage.md
 cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro packages import them -> docs/symbol-usage.md
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match

@@ -22,7 +22,7 @@ use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rustyssl_abi::{
     CRYPTO_R_TOO_MANY_RECORDS, ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT,
     ERR_R_PASSED_NULL_PARAMETER, OPENSSL_STACK, OPENSSL_sk_compfunc, OPENSSL_sk_copyfunc,
-    OPENSSL_sk_freefunc,
+    OPENSSL_sk_freefunc, OPENSSL_sk_freefunc_thunk,
 };
 
 use crate::err;
@@ -50,10 +50,16 @@ impl Comparator {
     }
 }
 
+/// The free thunk 3.6's typed stacks set (`OPENSSL_sk_set_thunks`): it calls the element type's
+/// free function through `OPENSSL_sk_pop_free`'s untyped one.
+#[derive(Clone, Copy)]
+struct Thunk(OPENSSL_sk_freefunc_thunk);
+
 struct Inner {
     data: Vec<Element>,
     sorted: bool,
     comp: Comparator,
+    thunk: Thunk,
 }
 
 /// What a stack handle points to.
@@ -73,6 +79,7 @@ impl Stack {
             data: Vec::new(),
             sorted: false,
             comp: Comparator(comp),
+            thunk: Thunk(None),
         }))
     }
 
@@ -396,9 +403,28 @@ unsafe fn snapshot(handle: *const OPENSSL_STACK) -> (Vec<Element>, bool, Compara
     }
 }
 
+/// The stack's free thunk (none for null).
+///
+/// # Safety
+/// `handle` is null or a live stack.
+unsafe fn thunk_of(handle: *const OPENSSL_STACK) -> Thunk {
+    // SAFETY: the caller's guarantee.
+    unsafe { stack(handle) }.map_or(Thunk(None), |s| s.read().thunk)
+}
+
 /// A new stack holding `data`.
-fn with_elements(data: Vec<Element>, sorted: bool, comp: Comparator) -> *mut OPENSSL_STACK {
-    OPENSSL_STACK::new_handle(Stack(RwLock::new(Inner { data, sorted, comp })))
+fn with_elements(
+    data: Vec<Element>,
+    sorted: bool,
+    comp: Comparator,
+    thunk: Thunk,
+) -> *mut OPENSSL_STACK {
+    OPENSSL_STACK::new_handle(Stack(RwLock::new(Inner {
+        data,
+        sorted,
+        comp,
+        thunk,
+    })))
 }
 
 ffi_export! {
@@ -482,14 +508,38 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let (elements, _, _) = unsafe { snapshot(st) };
+        // SAFETY: as above.
+        let thunk = unsafe { thunk_of(st) };
         if let Some(func) = func {
             for element in elements.iter().filter(|e| !e.0.is_null()) {
-                // SAFETY: the caller's guarantee about `func`.
-                unsafe { func(element.0.cast_mut()) };
+                match thunk.0 {
+                    // SAFETY: the thunk the stack's typed constructor set, for its elements.
+                    Some(t) => unsafe { t(Some(func), element.0.cast_mut()) },
+                    // SAFETY: the caller's guarantee about `func`.
+                    None => unsafe { func(element.0.cast_mut()) },
+                }
             }
         }
         // SAFETY: as above.
         unsafe { free(st) };
+    }
+}
+
+ffi_export! {
+    /// Sets the free thunk `OPENSSL_sk_pop_free` calls each element's free function through
+    /// (3.6; the typed constructors in `safestack.h` call it). Returns the stack; null does
+    /// nothing.
+    ///
+    /// # Safety
+    /// `st` is null or a live stack; `f_thunk` is null or takes its elements.
+    pub unsafe extern "C" fn OPENSSL_sk_set_thunks(st: *mut OPENSSL_STACK, f_thunk: OPENSSL_sk_freefunc_thunk) -> *mut OPENSSL_STACK
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(s) = unsafe { stack(st) } {
+            s.write().thunk = Thunk(f_thunk);
+        }
+        st
     }
 }
 
@@ -783,7 +833,8 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let (elements, sorted, comp) = unsafe { snapshot(sk) };
-        with_elements(elements, sorted, comp)
+        // SAFETY: as above.
+        with_elements(elements, sorted, comp, unsafe { thunk_of(sk) })
     }
 }
 
@@ -824,7 +875,8 @@ ffi_export! {
             }
             copies.push(Element(copy));
         }
-        with_elements(copies, sorted, comp)
+        // SAFETY: the caller's guarantee.
+        with_elements(copies, sorted, comp, unsafe { thunk_of(sk) })
     }
 }
 

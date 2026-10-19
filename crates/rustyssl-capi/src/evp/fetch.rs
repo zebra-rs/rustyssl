@@ -654,6 +654,14 @@ pub(crate) fn prefill(ctx: &libctx::LibCtx) {
     for nid in nids {
         add_legacy_names(&mut state.names, 0, 0, nid, None);
     }
+    // 3.6 adds RSA-PSS's names next, for providers (up to 3.5) without its `rsassaPss` alias,
+    // which numbers it before the key types.
+    let num = state.names.add_name(0, b"RSA-PSS");
+    if num != 0 {
+        for alias in [&b"rsassaPss"[..], b"RSASSA-PSS", b"1.2.840.113549.1.1.10"] {
+            state.names.add_name(num, alias);
+        }
+    }
     for (base, nid, pem) in super::pkey::ameth::prefill_entries() {
         add_legacy_names(&mut state.names, 0, base, nid, pem);
     }

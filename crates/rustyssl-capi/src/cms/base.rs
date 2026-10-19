@@ -398,6 +398,11 @@ pub(crate) unsafe fn resolve_libctx(ci: *mut CMS_ContentInfo) {
                     k.cms_ctx = ctx
                 }
             }
+            rustyssl_abi::CMS_RECIPINFO_KEM => {
+                if let Some(k) = super::kemri::kemri_of(ri, "", false) {
+                    k.cms_ctx = ctx;
+                }
+            }
             _ => {}
         }
     }

@@ -22,15 +22,15 @@ use rustyssl_abi::{
     ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, OSSL_ALGORITHM,
     OSSL_CIPHER_PARAM_AEAD, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS,
     OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS_OLD, OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS,
-    OSSL_CIPHER_PARAM_CUSTOM_IV, OSSL_CIPHER_PARAM_DECRYPT_ONLY, OSSL_CIPHER_PARAM_HAS_RAND_KEY,
-    OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN,
-    OSSL_CIPHER_PARAM_MODE, OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING,
-    OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_RC2_KEYBITS, OSSL_CIPHER_PARAM_TLS_MAC,
-    OSSL_CIPHER_PARAM_TLS_MAC_SIZE, OSSL_CIPHER_PARAM_TLS_VERSION,
-    OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_CIPHER_PARAM_USE_BITS,
-    OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT, OSSL_FUNC_CIPHER_DUPCTX,
-    OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL, OSSL_FUNC_CIPHER_FREECTX,
-    OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
+    OSSL_CIPHER_PARAM_CUSTOM_IV, OSSL_CIPHER_PARAM_DECRYPT_ONLY,
+    OSSL_CIPHER_PARAM_ENCRYPT_THEN_MAC, OSSL_CIPHER_PARAM_HAS_RAND_KEY, OSSL_CIPHER_PARAM_IV,
+    OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_MODE,
+    OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING, OSSL_CIPHER_PARAM_RANDOM_KEY,
+    OSSL_CIPHER_PARAM_RC2_KEYBITS, OSSL_CIPHER_PARAM_TLS_MAC, OSSL_CIPHER_PARAM_TLS_MAC_SIZE,
+    OSSL_CIPHER_PARAM_TLS_VERSION, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV,
+    OSSL_CIPHER_PARAM_USE_BITS, OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT,
+    OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL,
+    OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
     OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
     OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_CIPHER_UPDATE, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_PTR,
@@ -55,8 +55,7 @@ use crate::err;
 use crate::ffi::ffi_callback;
 use crate::params::{
     OSSL_PARAM_get_size_t, OSSL_PARAM_get_uint, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
-    OSSL_PARAM_set_int, OSSL_PARAM_set_octet_ptr, OSSL_PARAM_set_octet_string,
-    OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_octet_ptr, OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
 };
 
 /// An algorithm context: the cipher's, and where the NULL cipher found the TLS MAC (in the
@@ -555,6 +554,11 @@ pub(crate) enum Value {
     Iv(*const u8, usize),
     /// Likewise, copied as an octet string first (the AEADs' order).
     IvCopyFirst(*const u8, usize),
+    /// Octets copied into an octet string.
+    Octets(*const u8, usize),
+    /// The context's octets copied into an octet string, else as a pointer, leaving the first
+    /// try's error (3.5's way, which 3.6's ETM ciphers keep).
+    StringThenPtr(*const u8, usize),
 }
 
 /// Sets the parameter `key` of `params`, if there is one, to `value`, raising
@@ -582,24 +586,25 @@ pub(crate) unsafe fn set_param(
         Value::Size(v) => unsafe { OSSL_PARAM_set_size_t(p, v) },
         // SAFETY: as above; the caller's pointer.
         Value::Ptr(v, n) => unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) },
-        Value::IvCopyFirst(v, n) => {
-            // SAFETY: as above; the IV holds `n` octets.
-            let r = unsafe { OSSL_PARAM_set_octet_string(p, v.cast(), n) };
-            if r == 0 {
+        // 3.6 sets an IV by the parameter's type (`OSSL_PARAM_set_octet_string_or_ptr`): a
+        // copy into a string, the context's own IV into a pointer. (3.5 tried one type, then
+        // the other, leaving the first's error.)
+        // SAFETY: as above; the IV holds `n` octets and lives as long as the context.
+        Value::IvCopyFirst(v, n) | Value::Iv(v, n) => unsafe {
+            crate::params::OSSL_PARAM_set_octet_string_or_ptr(p, v.cast(), n)
+        },
+        // SAFETY: as above; the caller's `n` octets.
+        Value::Octets(v, n) => unsafe {
+            crate::params::OSSL_PARAM_set_octet_string(p, v.cast(), n)
+        },
+        Value::StringThenPtr(v, n) => {
+            // SAFETY: as above; the octets live as long as the context.
+            let ok = unsafe { crate::params::OSSL_PARAM_set_octet_string(p, v.cast(), n) };
+            if ok == 0 {
                 // SAFETY: as above.
                 unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) }
             } else {
-                r
-            }
-        }
-        Value::Iv(v, n) => {
-            // SAFETY: as above.
-            let r = unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) };
-            if r == 0 {
-                // SAFETY: as above; the IV holds `n` octets.
-                unsafe { OSSL_PARAM_set_octet_string(p, v.cast(), n) }
-            } else {
-                r
+                ok
             }
         }
     };
@@ -619,6 +624,8 @@ pub(crate) struct Info {
     pub(crate) cts: bool,
     pub(crate) multiblock: bool,
     pub(crate) rand_key: bool,
+    /// `EVP_CIPH_FLAG_ENC_THEN_MAC` (3.6's AES-CBC-HMAC-SHA*-ETM ciphers).
+    pub(crate) etm: bool,
     pub(crate) key_len: usize,
     pub(crate) block_size: usize,
     pub(crate) iv_len: usize,
@@ -633,6 +640,7 @@ impl Info {
             cts: kind.cts(),
             multiblock: kind.composite(),
             rand_key: kind.has_rand_key(),
+            etm: kind.etm(),
             key_len: kind.key_len(),
             block_size: kind.block_size(),
             iv_len: kind.iv_len(),
@@ -659,6 +667,7 @@ pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int
         (OSSL_CIPHER_PARAM_CTS, info.cts),
         (OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, info.multiblock),
         (OSSL_CIPHER_PARAM_HAS_RAND_KEY, info.rand_key),
+        (OSSL_CIPHER_PARAM_ENCRYPT_THEN_MAC, info.etm),
     ];
     // SAFETY: the caller's array; a located parameter.
     if !unsafe { set_param(params, OSSL_CIPHER_PARAM_MODE, F, Value::Uint(info.mode)) } {
@@ -689,6 +698,15 @@ pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int
 /// `params` is NULL or a parameter array.
 pub(crate) unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
     // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_GENERIC_GET_PARAMS,
+        )
+    } {
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
     unsafe { get_params_of(Info::of(kind), params) }
 }
 
@@ -701,6 +719,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn generic_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_GENERIC_GET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_generic_get_ctx_params";
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
@@ -812,6 +834,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn generic_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_GENERIC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_generic_set_ctx_params";
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -873,6 +899,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn var_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_VAR_KEYLEN_SET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_var_keylen_set_ctx_params";
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -1110,11 +1140,12 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `chacha20_get_ctx_params`: the IV and key lengths.
+    /// `chacha20_get_ctx_params`: the IV and key lengths, and (3.6) the counter and nonce as
+    /// the updated IV, an octet string.
     ///
     /// # Safety
-    /// `params` is NULL or a parameter array.
-    pub(crate) unsafe extern "C" fn chacha20_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    /// `vctx` is a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn chacha20_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         const F: &str = "chacha20_get_ctx_params";
@@ -1126,6 +1157,13 @@ ffi_callback! {
             if !unsafe { set_param(params, key, F, Value::Size(value)) } {
                 return 0;
             }
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let state = ctx.core.generic().and_then(|g| g.chacha_state()).unwrap_or_default();
+        // SAFETY: the caller's array; the state's 16 octets.
+        if !unsafe { set_param(params, OSSL_CIPHER_PARAM_UPDATED_IV, F, Value::Octets(state.as_ptr(), state.len())) } {
+            return 0;
         }
         1
     }
@@ -1214,7 +1252,7 @@ pub(crate) const SIZE_T: usize = size_of::<usize>();
 pub(crate) const INT: usize = size_of::<c_int>();
 pub(crate) const UINT: usize = size_of::<c_uint>();
 
-pub(crate) static GENERIC_GETTABLE: Params<10> = Params([
+pub(crate) static GENERIC_GETTABLE: Params<11> = Params([
     defn(OSSL_CIPHER_PARAM_MODE, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
@@ -1232,6 +1270,7 @@ pub(crate) static GENERIC_GETTABLE: Params<10> = Params([
     defn(OSSL_CIPHER_PARAM_CTS, OSSL_PARAM_INTEGER, INT),
     defn(OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_PARAM_INTEGER, INT),
     defn(OSSL_CIPHER_PARAM_HAS_RAND_KEY, OSSL_PARAM_INTEGER, INT),
+    defn(OSSL_CIPHER_PARAM_ENCRYPT_THEN_MAC, OSSL_PARAM_INTEGER, INT),
     PARAM_END,
 ]);
 
@@ -1251,9 +1290,10 @@ macro_rules! default_gettable_ctx {
     };
 }
 
+// 3.6's generated list calls `tls-mac` an octet string (it is still returned as a pointer).
 static GENERIC_GETTABLE_CTX: Params<8> = Params(default_gettable_ctx!(defn(
     OSSL_CIPHER_PARAM_TLS_MAC,
-    OSSL_PARAM_OCTET_PTR,
+    OSSL_PARAM_OCTET_STRING,
     0
 )));
 static GENERIC_SETTABLE_CTX: Params<6> = Params([
@@ -1281,12 +1321,21 @@ static TDES_GETTABLE_CTX: Params<8> = Params(default_gettable_ctx!(defn(
     OSSL_PARAM_OCTET_STRING,
     0
 )));
-// `ossl_tdes_settable_ctx_params` lists `padding` and `num` twice, as the reference's does.
-static TDES_SETTABLE_CTX: Params<5> = Params([
+// `ossl_tdes_settable_ctx_params` (3.5 listed `padding` and `num` twice; 3.6 once).
+static TDES_SETTABLE_CTX: Params<3> = Params([
     defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
-    defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
-    defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    PARAM_END,
+]);
+// `chacha20_known_gettable_ctx_params` (3.6 adds `updated-iv`).
+static CHACHA20_GETTABLE_CTX: Params<4> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_IVLEN, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
+    defn(OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_PARAM_OCTET_STRING, 0),
     PARAM_END,
 ]);
 static CHACHA20_CTX: Params<3> = Params([
@@ -1387,6 +1436,7 @@ list!(generic_settable_ctx_params, GENERIC_SETTABLE_CTX);
 list!(tdes_gettable_ctx_params, TDES_GETTABLE_CTX);
 list!(tdes_settable_ctx_params, TDES_SETTABLE_CTX);
 list!(chacha20_ctx_params, CHACHA20_CTX);
+list!(chacha20_gettable_ctx_params, CHACHA20_GETTABLE_CTX);
 list!(null_gettable_ctx_params, NULL_GETTABLE_CTX);
 list!(null_settable_ctx_params, NULL_SETTABLE_CTX);
 
@@ -1699,7 +1749,7 @@ macro_rules! chacha20 {
             ),
             entry!(
                 OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
-                chacha20_ctx_params,
+                chacha20_gettable_ctx_params,
                 CtxParamsFn
             ),
             entry!(
@@ -1857,7 +1907,7 @@ cipher!(chacha20, Kind::ChaCha20, chacha20);
 
 /// `deflt_ciphers`, with the reference's names (`PROV_NAMES_*`) in its order. The composites
 /// (`ALGC`) are taken out where the CPU lacks AES-NI, as the reference's are.
-pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
+pub(crate) static DEFAULT_CIPHERS: Algorithms<140> = Algorithms([
     alg(c"NULL", &null::TABLE),
     alg(c"AES-256-ECB:2.16.840.1.101.3.4.1.41", &aes256ecb::TABLE),
     alg(c"AES-192-ECB:2.16.840.1.101.3.4.1.21", &aes192ecb::TABLE),
@@ -1990,6 +2040,42 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
     alg(
         c"AES-256-CBC-HMAC-SHA256",
         &modes::aes256cbc_hmac_sha256::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA1-ETM",
+        &modes::aes128cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA1-ETM",
+        &modes::aes192cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA1-ETM",
+        &modes::aes256cbc_hmac_sha1_etm::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA256-ETM",
+        &modes::aes128cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA256-ETM",
+        &modes::aes192cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA256-ETM",
+        &modes::aes256cbc_hmac_sha256_etm::TABLE,
+    ),
+    alg(
+        c"AES-128-CBC-HMAC-SHA512-ETM",
+        &modes::aes128cbc_hmac_sha512_etm::TABLE,
+    ),
+    alg(
+        c"AES-192-CBC-HMAC-SHA512-ETM",
+        &modes::aes192cbc_hmac_sha512_etm::TABLE,
+    ),
+    alg(
+        c"AES-256-CBC-HMAC-SHA512-ETM",
+        &modes::aes256cbc_hmac_sha512_etm::TABLE,
     ),
     alg(
         c"ARIA-256-GCM:1.2.410.200046.1.1.36",
@@ -2223,32 +2309,74 @@ pub(crate) static LEGACY_CIPHERS: Algorithms<33> = Algorithms([
     ALG_END,
 ]);
 
-/// The default provider's cipher table: `DEFAULT_CIPHERS`, less the composites without AES-NI
-/// (`ossl_prov_cache_exported_algorithms`).
+/// The default provider's cipher table: `DEFAULT_CIPHERS`, less the ciphers the CPU can't run
+/// (`ossl_prov_cache_exported_algorithms`): the AES-CBC-HMAC composites without AES-NI, and
+/// 3.6's ETM ciphers without aarch64's AES and SHA instructions.
 pub(crate) fn default_ciphers() -> *const OSSL_ALGORITHM {
-    /// The table without the composites.
+    /// The table without what's missing.
     struct Table(Vec<OSSL_ALGORITHM>);
     // SAFETY: the static table's entries, never written.
     unsafe impl Send for Table {}
     // SAFETY: as above.
     unsafe impl Sync for Table {}
-    static WITHOUT: std::sync::OnceLock<Table> = std::sync::OnceLock::new();
-    if crate::evp::legacy_cipher::aesni() {
-        return DEFAULT_CIPHERS.0.as_ptr();
-    }
+    static TABLE: std::sync::OnceLock<Table> = std::sync::OnceLock::new();
+    let aesni = crate::evp::legacy_cipher::aesni();
     let composites = [
         modes::aes128cbc_hmac_sha1::TABLE.0.as_ptr(),
         modes::aes256cbc_hmac_sha1::TABLE.0.as_ptr(),
         modes::aes128cbc_hmac_sha256::TABLE.0.as_ptr(),
         modes::aes256cbc_hmac_sha256::TABLE.0.as_ptr(),
     ];
-    WITHOUT
+    let etm = [
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes128cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes192cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha1Etm,
+            modes::aes256cbc_hmac_sha1_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes128cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes192cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha256Etm,
+            modes::aes256cbc_hmac_sha256_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes128cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes192cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+        (
+            Mode::CbcHmacSha512Etm,
+            modes::aes256cbc_hmac_sha512_etm::TABLE.0.as_ptr(),
+        ),
+    ];
+    TABLE
         .get_or_init(|| {
             Table(
                 DEFAULT_CIPHERS
                     .0
                     .iter()
-                    .filter(|a| !composites.contains(&a.implementation))
+                    .filter(|a| aesni || !composites.contains(&a.implementation))
+                    .filter(|a| {
+                        etm.iter()
+                            .find(|(_, t)| *t == a.implementation)
+                            .is_none_or(|(mode, _)| modes::etm_capable(*mode))
+                    })
                     .copied()
                     .collect(),
             )

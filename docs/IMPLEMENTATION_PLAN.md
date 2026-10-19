@@ -5549,9 +5549,214 @@ both libraries (step 8.1).
     (`OPENSSL_armcap_P`, `OPENSSL_cpuid_setup`, the `ossl_*` dispatch tables) because the macOS
     link doesn't restrict exports; no public header declares them, so they aren't part of the
     ABI, and rustyssl exports exactly `libcrypto.num` on every target (`abi-check`).
-- [ ] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
+- [x] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
   additions under the `OPENSSL_3.6.0` node, and re-run the full test plan against the 3.6
   reference.
+  - Approach (ADR 0004): 3.6.5 is vendored beside 3.5.9 and `OPENSSL_SERIES` is `"3.6"`, so
+    codegen, the export lists (with `OPENSSL_3.6.0`), `dist`, the reference build and every
+    harness work from 3.6; the library reports `OpenSSL 3.6.5+rustyssl.<version>`. No 3.5
+    build stays selectable: 3.6's exports are a superset of 3.5's (none removed), so 3.5
+    binaries run unchanged; `abi/openssl-3.5/` stays vendored for a 3.5-compatibility check.
+  - Decision (the user, 2026-10-19): **3.6 only.** One build follows 3.6.5; no 3.5 build stays
+    selectable. `abi/openssl-3.5/` stays for `abi-check`'s `compat35` check (every 3.5 export
+    still exported, at the same version node, with an unchanged prototype), and the 3.5 → 3.6
+    behavior changes below are kept as the list for users of the 3.5 LTS.
+  - Progress: all 23 new functions are done (the array allocators,
+    `OPENSSL_sk_set_thunks`, `OSSL_PARAM_set_octet_string_or_ptr`,
+    `EVP_PKEY_get_security_category`, `i2d_PKCS8PrivateKey`,
+    `OSSL_STORE_LOADER_settable_ctx_params`, `X509_CRL_get0_tbs_sigalg` in
+    `tests/c/openssl36.c`; `X509_STORE_CTX_set_ocsp_resp` in `tests/c/ssl_ocsp_stapling.c`; the
+    four `EVP_SKEY` derivations in `tests/c/evp_skey_derive.c`; the five
+    `CMS_RecipientInfo_kemri_*` functions in `tests/c/cms_kemri.c`). Providers follow 3.6's
+    parameter lists; HKDF-SHA256/384/512 and the AES-CBC-HMAC-SHA*-ETM ciphers exist; every
+    tests/c program gives the reference's output on macOS.
+    `abi-check`'s `compat35` (`xtask/src/abi_check/compat35.rs`; TEST_PLAN.md L3 item 9)
+    passes on all three targets: every 3.5 export is still at its node with its prototype,
+    and 3.5's struct layouts are unchanged (3.6 only names `OPENSSL_sk_pop_free`'s function
+    type `OPENSSL_sk_freefunc`, which the check resolves).
+  - Done (2026-10-19): the test plan against 3.6.5, on macOS (aarch64) and x86_64 Linux:
+    fmt, clippy, `cargo test`, codegen and coverage up to date, deny, vet; Miri on the host and
+    for x86_64 Linux (20 of 20 shards' runs each); `test-c` (261 programs, the reference's
+    output on both); the GCC `-Werror` checks; `test-apps` (46 commands); `test-interop` (64
+    cases in all four pairings); `test-openssl-suite` (109 `evp_test` files and 9 program
+    runs, rebuilt from 3.6.5); `test-wycheproof` (61339 tests agree); `test-differential`
+    (corpus and random sessions); `abi-check` with `compat35`; `test-providers` (oqs-provider as
+    on the reference). `test-openssl-suite --ssl`: 4659 of 4729 subtests pass on macOS (4661 of
+    the 4720 that pass on the reference on Linux); the rest are the known classes: tests that
+    read OpenSSL's private structures or call its internal functions (the `internal` lines of
+    `tests/openssl-suite/ssl.txt`) and QUIC (`SSL_set_quic_tls_cbs`, `OSSL_QUIC_client_method`;
+    Phase 10). `test-bogo` and `test-tlsfuzzer` weren't rerun against 3.6.5.
+  - 3.5 → 3.6 behavior changes (for users of the 3.5 LTS; 3.6's are followed):
+    - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
+      (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
+    - Typed stacks made by 3.6's headers free through a thunk (`OPENSSL_sk_set_thunks`).
+    - Every key manager reports `security-category`; ML-KEM reports CMS's `ri-type` and
+      `kemri-kdf-alg`; ciphers report `encrypt-then-mac`.
+    - HMAC no longer lists `digest-noinit`/`digest-oneshot`; ECDSA no longer takes `kat` (an
+      ACVP-only parameter); EdDSA lists only `algorithm-id` as gettable; SM2 encryption no longer
+      lists `engine`; RSA lists its integer `pad-mode`/`saltlen` forms too; the DRBGs take
+      `provider-name`; the encoders list `save-parameters`; the hybrid ML-KEM key managers take
+      `properties` as a string (3.5 listed an octet string).
+    - HKDF and TLS13-KDF return the digest, mode and salt from `get_params`; a fixed-digest
+      HKDF refuses `digest` in `set_params` but takes it at derive time (a reference quirk,
+      reproduced).
+    - KRB5KDF, PKCS12KDF and scrypt answer `get_params` with 1 when no size is asked (3.5:
+      -2); argon2 always answers -2, even after setting the size.
+    - X9.42 KDF fetches the CEK algorithm with the given properties (3.5 used the algorithm's
+      name as the query, a bug).
+    - IVs are returned by the parameter's type, with no stray error (3.5 left a
+      `CRYPTO_R_PARAM_OF_INCOMPATIBLE_TYPE` entry for an octet-string request).
+    - `i2d_PrivateKey`'s unsupported-type error now names `i2d_PrivateKey_impl`.
+    - The default provider gains HKDF-SHA256/384/512 and, on aarch64 with AES and SHA
+      hardware, nine AES-CBC-HMAC-SHA*-ETM ciphers, which shifts algorithm numbers in error
+      text; the legacy provider gains a `GENERIC-SECRET` symmetric key manager; RSA-PSS gains
+      the name `rsassaPss`.
+    - `PKCS12_SALT_LEN` is 16 (3.5: 8).
+    - `BIO_printf` and `BIO_snprintf` follow C more closely (`bio/print.rs`): a negative `*`
+      width is the `-` flag (3.5 ignored it, so a negative `%*s` indentation, as in
+      `BIO_hex_string`, now indents); a negative `*` precision is none; `.` alone is precision
+      0; a precision drops the `0` flag of integers; 0 with precision 0 prints nothing; `%#x`
+      of 0 is `0` and `%#X` gives `0X`; `%p` of null is `0`; `hh` and `t` are length modifiers
+      (3.5 printed `%hhd` as `d`); `%n` honors length modifiers and counts output a full buffer
+      dropped; `%-f` no longer pads on the right (a 3.6 quirk); widths and precisions of
+      `INT_MAX / 10` or more fail; a full buffer no longer stops reading the arguments.
+    - The DRBGs (`provider/rands.rs`): HMAC-DRBG no longer defaults its MAC to HMAC
+      (`hmac_fetch_algs`), so one given only a digest doesn't instantiate, and a refused digest
+      keeps the MAC; CTR-DRBG ignores `properties` that aren't a string (3.5 refused them;
+      `propquery`).
+    - `OBJ_add_object` registrations are immutable (`objects.rs`, `add_object`): a NID within
+      the built-in table, a built-in OID or name, or any key (OID, name, NID) already added by
+      a different object gives `NID_undef` (3.5 replaced the older object under each key, and
+      crashed on a built-in object, a deviation now gone); adding the same object again
+      returns its NID.
+    - `X509_VERIFY_PARAM_get0` with a negative id no longer raises an error (`x509/vpm.rs`); 3.6
+      returns a pointer before its table there, so rustyssl returns NULL (docs/DEVIATIONS.md).
+    - Importing an X25519/X448/ED25519/ED448 public key from only a private key crashes 3.6
+      (it derives from a NULL private key); rustyssl keeps 3.5's failure (`ecx.rs`,
+      `key_fromdata`; docs/DEVIATIONS.md).
+    - ChaCha20 reports its counter and nonce as `updated-iv` (an octet string, so
+      `EVP_CIPHER_CTX_iv` and `get_updated_iv`'s pointer form fail with an error) and counts a
+      partial block once it makes its key stream, which a new key without an IV shows
+      (`provider/ciphers.rs` `chacha20_get_ctx_params`; rustyssl-crypto `ChaCha::apply`).
+    - The AES-CBC-HMAC-SHA1/SHA256/SHA512-ETM ciphers (128, 192, 256-bit keys) exist on aarch64
+      with the AES and SHA instructions, as in the reference (`provider/modes.rs` `etm_*`,
+      `etm_capable`; rustyssl-crypto `provided/cipher/etm.rs`; listed in
+      `ciphers.rs` `DEFAULT_CIPHERS`, filtered by `default_ciphers`). Each update is its own
+      message: CBC from the IV as set (the IV never advances) and HMAC over its ciphertext,
+      continued from the MAC key's pads counting one block (so without a MAC key, from the
+      hash's initial state). Ciphers report `encrypt-then-mac`. Their arrival shifts the
+      default provider's algorithm numbers that appear in error text on aarch64.
+      `tests/c/evp_cipher_etm.c`.
+    - The name map adds RSA-PSS's names (`RSA-PSS`, `rsassaPss`, `RSASSA-PSS`, its OID) after
+      the legacy digests' and before the key types' (`evp/fetch.rs` `prefill`), so RSA-PSS's
+      number comes before RSA's, which moves numbers in error text and the order of
+      `*_do_all_provided` lists.
+    - DH's `get_params` sets `security-category` after the encoded public key, so a request
+      whose encoded key fails leaves it unset (`provider/dh_kmgmt.rs`).
+    - TLS13-KDF checks its mode even without parameters (so deriving in the default mode
+      raises `PROV_R_INVALID_MODE`), and replaces its data only when `data` is given (3.5
+      cleared it on every call; `provider/kdfs.rs` `tls13_set_ctx_params`).
+    - `EVP_DigestSignUpdate` on a context whose init failed
+      raises `EVP_R_INITIALIZATION_ERROR` (`evp/sigver.rs` `sigver_update`).
+    - `X509_CRL_print_ex` indents its header by 4 (3.5: 8) and its extensions by 4, and puts a
+      multi-line issuer on lines of its own indented by 8 (`x509/tprint.rs`).
+    - `X509_PURPOSE_add`'s invalid-argument error is `ERR_LIB_X509`'s (3.5: X509V3's;
+      `x509/purpose.rs`).
+    - The file store takes a relative path in a `file:` URI (3.5 raised
+      `PROV_R_PATH_MUST_BE_ABSOLUTE`), decodes a search's subject before refusing a search
+      outside a directory, and names the URI and subject in that error
+      (`provider/file_store.rs`); `X509_LOOKUP_store` drops what its search raises
+      (`x509/lookup.rs`).
+    - `RSA_blinding_on` and `RSA_blinding_off` only change the flags (3.5's `on` made a fresh
+      blinding from the private generator and `off` freed it), so the key keeps its blinding
+      and draws less from the generator (`rsa_lib.rs`).
+    - ML-DSA signs and verifies a message in pieces (`sign_message_update`/`_final`,
+      `verify_message_update`/`_final` with the `signature` parameter, which only a
+      message-at-a-time verification lists; rustyssl-crypto `MuHasher`), reports the
+      signature's length before refusing too little room, fails a length query with nowhere to
+      put it, and raises `PROV_R_BAD_LENGTH` for an external `mu` that isn't 64 octets
+      (`provider/ml_dsa_sig.rs`).
+    - libssl's ec_point_formats offers only uncompressed unless the new
+      `SSL_OP_LEGACY_EC_POINT_FORMATS` (`LegacyECPointFormats`, `-legacy_ec_point_formats`)
+      asks for 3.5's three formats (rustyssl-tls `groups::formats`; `ssl/conf.rs`).
+    - OCSP stapling (`ssl/ocsp_resp.rs`; rustyssl-tls `server::ocsp_response_for`,
+      `client::flight::store_cert_status`): a connection keeps its responses parsed
+      (`SSL_CTRL_*_OCSP_RESP_EX`, 142/143); `SSL_set_tlsext_status_ocsp_resp` keeps the one it
+      takes only if it decodes, and `SSL_get_tlsext_status_ocsp_resp` re-encodes the first. A
+      server staples, per certificate (TLS 1.3: each entry), the response at its index if it's
+      for that certificate (serial and issuer name hash; none for a self-signed one; one that
+      isn't successful as it is), and promises a status only when any is set; a client fails a
+      response that doesn't decode (`SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE`), keeps a
+      TLS 1.3 response for every certificate, and accepts a status with no response.
+      `SSL_get0_peer_scts` takes SCTs from every response, and fails on a single response
+      without them (`ssl/ct.rs`).
+    - Verification (`x509/revoke.rs`): `X509_STORE_CTX_set_ocsp_resp` and
+      `X509_V_FLAG_OCSP_RESP_CHECK` (`_ALL`) check the chain against the stapled responses
+      (TLS 1.3 clients pass theirs), falling back to CRLs where `X509_V_FLAG_CRL_CHECK` allows,
+      else `X509_V_ERR_OCSP_VERIFY_FAILED`; CRL checking now skips self-signed certificates.
+      `tests/c/ssl_ocsp_stapling.c`.
+    - The session cache tells the remove callback about evicted and flushed sessions after
+      releasing its lock, the last removed first (`ssl/sess_cache.rs`).
+    - Opaque symmetric keys from derivations (`evp/exchange.rs` `EVP_PKEY_derive_SKEY`,
+      `evp/kdf.rs` `EVP_KDF_derive_SKEY`/`EVP_KDF_CTX_set_SKEY`, `evp/skey.rs`
+      `EVP_SKEY_import_SKEYMGMT`): a method's own `derive_skey`/`set_skey` when the key manager
+      is its provider's (ECDH's `derive_skey`; PBKDF1's both, in the legacy provider), else the
+      raw output imported, or the key's raw secret set as the parameter.
+      `tests/c/evp_skey_derive.c`.
+    - CMS has KEM recipients (RFC 9629; `cms/kemri.rs`, `cms.rs` `KemRecipientInfo`): a
+      recipient certificate whose key encapsulates (ML-KEM) gets a `KEMRecipientInfo` inside
+      an `OtherRecipientInfo` (`id-ori-kem`), reported by `CMS_RecipientInfo_type` as
+      `CMS_RECIPINFO_KEM` though encoded as `CMS_RECIPINFO_OTHER`; the KEK comes from the
+      key's `kemri-kdf-alg` (HKDF-SHA256 by default) over the shared secret with
+      `CMSORIforKEMOtherInfo`, and wraps the content key with AES key wrap sized to the
+      content cipher; enveloped data with one is version 3. `CMS_decrypt` tries a KEM
+      recipient like a key-agreement one. `tests/c/cms_kemri.c`; messages made by either
+      library decrypt with the other.
+    - The recipient type of a key (`cms/env.rs` `pkey_get_ri_type`) is the provider's `ri-type`
+      parameter first, then the known types', then the method's, and otherwise what the key can
+      do (encrypt: key transport; derive: key agreement; encapsulate: KEM), under an error
+      mark. 3.5 defaulted every unknown key to key transport.
+    - `OPENSSL_thread_stop` forgets every random generator of the thread, those installed with
+      `RAND_set0_public`/`RAND_set0_private` too (3.6 clears the thread's values after the stop
+      handlers, `CRYPTO_THREAD_clean_local`; 3.5 kept an installed one whose freeing wasn't
+      registered), so the next `RAND_bytes` makes a new one from the primary. 3.6 leaks the
+      thread's reference; rustyssl releases it (`rand_lib.rs` `stop_thread`).
+      `OPENSSL_thread_stop_ex` is unchanged.
+    - `EVP_CIPHER_CTX_ctrl`'s `EVP_CTRL_AEAD_TLS1_AAD` and the two TLS 1.1 multiblock ctrls return
+      0 for a length beyond `INT_MAX` (3.5 truncated it, so a provider that answered nothing
+      gave -1; `evp/cipher_ctx.rs` `length_or_zero`).
+    - Parameter decoders (`provider/param_decoders.rs`, generated from 3.6.5's
+      `produce_param_decoder` declarations by `target/v36/gendec.py`-style extraction): every
+      provider function 3.6 reads through a generated decoder (130 in the default and legacy
+      providers: the ciphers' common, CCM, GCM, and ChaCha20-Poly1305 functions, the digests',
+      MACs', KDFs', DRBGs', signatures', key exchanges', KEMs', asymmetric ciphers', ECX, ML-DSA,
+      ML-KEM, hybrid and SLH-DSA key managers', the en/decoders', the file store's, and the
+      generic symmetric key import) fails a request that gives one of its parameters twice
+      (`PROV_R_REPEATED_PARAMETER`, "param <key> is repeated"; aliases such as `secret` and `key`
+      are one parameter) or a list parameter (HKDF's, KBKDF's, SSKDF's `info`, TLS1-PRF's
+      `seed`) more than 5 (6) times (`PROV_R_TOO_MANY_RECORDS`), before using any of it; 3.5 took
+      the first. Functions 3.6 didn't convert (RSA, EC, DH, DSA key managers, ...) still take
+      the first. To name each decoder in its errors, the size-only KDF getters, SSKDF/X963KDF's
+      setters, and the SPKI/EPKI decoders' setters are separate functions now.
+      `tests/c/params_repeated.c`.
+    - Ed25519ph, Ed25519ctx, and Ed448ph signatures set only the context string
+      (`eddsa_set_variant_ctx_params`): an `instance` given is ignored (3.5 refused it, the
+      instance being preset); the preset error now names `eddsa_set_ctx_params_internal`
+      (`provider/eddsa_sig.rs`).
+    - GCM answers `iv`, `updated-iv`, and `tag` without a buffer with their lengths (3.5 raised
+      `PROV_R_INVALID_IV_LENGTH` and `PROV_R_INVALID_TAG`; `provider/aeads.rs` `gcm_get`).
+      `tests/c/evp_aead.c`.
+    - GMAC no longer has `get_ctx_params` in the default provider (FIPS only in 3.6), as before
+      in rustyssl.
+  - Test harnesses adapted to 3.6.5 (the same change for both libraries): `evp_test`'s fake
+    random generator found by its own list instead of OpenSSL's private `EVP_RAND_CTX`
+    (`fake_random_patches`); `SSL_CONNECTION_FROM_SSL`'s new internal call weakly referenced
+    (`ssl.rs`); `test_tlsext_status_type_multi` listed as reading library internals; a patch
+    already upstream skipped (3.6 links `provider_test` with the shared libcrypto); interop
+    masks `ERR_print_errors`' thread id (an address on Linux); the differential probe sets its
+    DRBGs again after each thread stop and its generator follows 3.6's `BIO_printf` modifiers
+    (`hh`, `t`) and never asks 3.6 for an ECX public key from a private key alone (it crashes,
+    docs/DEVIATIONS.md).
 
 **Exit:** M6.
 

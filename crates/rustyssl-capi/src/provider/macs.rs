@@ -22,13 +22,13 @@ use rustyssl_abi::{
     OSSL_FUNC_MAC_NEWCTX, OSSL_FUNC_MAC_SET_CTX_PARAMS, OSSL_FUNC_MAC_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_MAC_UPDATE, OSSL_LIB_CTX, OSSL_MAC_PARAM_BLOCK_SIZE, OSSL_MAC_PARAM_C_ROUNDS,
     OSSL_MAC_PARAM_CIPHER, OSSL_MAC_PARAM_CUSTOM, OSSL_MAC_PARAM_D_ROUNDS, OSSL_MAC_PARAM_DIGEST,
-    OSSL_MAC_PARAM_DIGEST_NOINIT, OSSL_MAC_PARAM_DIGEST_ONESHOT, OSSL_MAC_PARAM_IV,
-    OSSL_MAC_PARAM_KEY, OSSL_MAC_PARAM_PROPERTIES, OSSL_MAC_PARAM_SALT, OSSL_MAC_PARAM_SIZE,
-    OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_MAC_PARAM_XOF, OSSL_PARAM, OSSL_PARAM_INTEGER,
-    OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING,
-    PROV_R_INVALID_CUSTOM_LENGTH, PROV_R_INVALID_DIGEST_LENGTH, PROV_R_INVALID_KEY_LENGTH,
-    PROV_R_INVALID_MODE, PROV_R_INVALID_OUTPUT_LENGTH, PROV_R_INVALID_SALT_LENGTH,
-    PROV_R_LENGTH_TOO_LARGE, PROV_R_NO_KEY_SET, PROV_R_NOT_XOF_OR_INVALID_LENGTH,
+    OSSL_MAC_PARAM_IV, OSSL_MAC_PARAM_KEY, OSSL_MAC_PARAM_PROPERTIES, OSSL_MAC_PARAM_SALT,
+    OSSL_MAC_PARAM_SIZE, OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_MAC_PARAM_XOF, OSSL_PARAM,
+    OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER,
+    OSSL_PARAM_UTF8_STRING, PROV_R_INVALID_CUSTOM_LENGTH, PROV_R_INVALID_DIGEST_LENGTH,
+    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_MODE, PROV_R_INVALID_OUTPUT_LENGTH,
+    PROV_R_INVALID_SALT_LENGTH, PROV_R_LENGTH_TOO_LARGE, PROV_R_NO_KEY_SET,
+    PROV_R_NOT_XOF_OR_INVALID_LENGTH,
 };
 
 use super::builtin::libctx_of;
@@ -646,7 +646,8 @@ static HMAC_GETTABLE_CTX: Params<3> = Params([
     PARAM_END,
 ]);
 
-static HMAC_SETTABLE_CTX: Params<7> = Params([
+/// 3.6 dropped `digest-noinit` and `digest-oneshot` from the list (they were never acted on).
+static HMAC_SETTABLE_CTX: Params<5> = Params([
     defn(OSSL_MAC_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
     defn(
         OSSL_MAC_PARAM_PROPERTIES,
@@ -654,16 +655,6 @@ static HMAC_SETTABLE_CTX: Params<7> = Params([
         0,
     ),
     defn(OSSL_MAC_PARAM_KEY, OSSL_PARAM_OCTET_STRING as c_int, 0),
-    defn(
-        OSSL_MAC_PARAM_DIGEST_NOINIT,
-        OSSL_PARAM_INTEGER as c_int,
-        INT,
-    ),
-    defn(
-        OSSL_MAC_PARAM_DIGEST_ONESHOT,
-        OSSL_PARAM_INTEGER as c_int,
-        INT,
-    ),
     defn(
         OSSL_MAC_PARAM_TLS_DATA_SIZE,
         OSSL_PARAM_UNSIGNED_INTEGER as c_int,
@@ -705,6 +696,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HMAC_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { context::<HmacData>(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE.as_ptr()) };
@@ -742,6 +737,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn hmac_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HMAC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -1028,6 +1027,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CMAC_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { context::<CmacData>(vctx) }) else { return 0 };
         let size = cmac_size(m);
         // SAFETY: the caller's guarantee.
@@ -1046,6 +1049,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn cmac_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CMAC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -1332,6 +1339,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::GMAC_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         c_int::from(unsafe { set_size(params, OSSL_MAC_PARAM_SIZE, EVP_GCM_TLS_TAG_LEN as usize) })
     }
 }
@@ -1356,6 +1367,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn gmac_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::GMAC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -1669,6 +1684,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::POLY1305_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         c_int::from(unsafe { set_size(params, OSSL_MAC_PARAM_SIZE, Poly1305::SIZE) })
     }
 }
@@ -1693,6 +1712,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn poly1305_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::POLY1305_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { context::<Poly1305>(vctx) }) else { return 0 };
         // SAFETY: as above.
@@ -1921,6 +1944,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SIPHASH_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { context::<SipHash>(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee, here and below.
         let ok = unsafe { set_size(params, OSSL_MAC_PARAM_SIZE, m.size()) }
@@ -1940,6 +1967,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn siphash_set_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SIPHASH_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -2236,6 +2267,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::BLAKE2_GET_CTX) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(m) = (unsafe { context::<Blake2Mac>(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         let ok = unsafe { set_size(params, OSSL_MAC_PARAM_SIZE, m.size()) }
@@ -2253,6 +2288,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn blake2_mac_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::BLAKE2_MAC_SET_CTX) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -2676,6 +2715,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KMAC_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { context::<KmacData>(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         if !unsafe { set_size(params, OSSL_MAC_PARAM_SIZE, k.out_len) } {
@@ -2703,6 +2746,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn kmac_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KMAC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;

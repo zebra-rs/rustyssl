@@ -33,10 +33,11 @@ use rustyssl_abi::{
     OSSL_FUNC_ENCODER_NEWCTX, OSSL_FUNC_ENCODER_SET_CTX_PARAMS,
     OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, OSSL_FUNC_KEYMGMT_FREE, OSSL_FUNC_KEYMGMT_IMPORT,
     OSSL_FUNC_KEYMGMT_NEW, OSSL_KEYMGMT_SELECT_ALL_PARAMETERS, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_PARAM, OSSL_PARAM_UTF8_STRING, OSSL_PASSPHRASE_CALLBACK,
-    PEM_BUFSIZE, PKCS8_PRIV_KEY_INFO, PROV_R_BN_ERROR, PROV_R_MISSING_OID,
-    PROV_R_NOT_A_PRIVATE_KEY, PROV_R_NOT_A_PUBLIC_KEY, PROV_R_UNABLE_TO_GET_PASSPHRASE,
-    V_ASN1_NULL, V_ASN1_OBJECT, V_ASN1_SEQUENCE, V_ASN1_UNDEF, X509_PUBKEY, X509_SIG,
+    OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_UTF8_STRING,
+    OSSL_PASSPHRASE_CALLBACK, PEM_BUFSIZE, PKCS8_PRIV_KEY_INFO, PROV_R_BN_ERROR,
+    PROV_R_MISSING_OID, PROV_R_NOT_A_PRIVATE_KEY, PROV_R_NOT_A_PUBLIC_KEY,
+    PROV_R_UNABLE_TO_GET_PASSPHRASE, V_ASN1_NULL, V_ASN1_OBJECT, V_ASN1_SEQUENCE, V_ASN1_UNDEF,
+    X509_PUBKEY, X509_SIG,
 };
 
 use super::builtin::libctx_of;
@@ -211,14 +212,20 @@ ffi_callback! {
 }
 
 /// `key2any_settable_ctx_params`'s table.
-static SETTABLE: Params<3> = Params([
+static SETTABLE: Params<4> = Params([
     defn(OSSL_ENCODER_PARAM_CIPHER, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_ENCODER_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_ENCODER_PARAM_SAVE_PARAMETERS,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     PARAM_END,
 ]);
 
 ffi_callback! {
-    /// `key2any_settable_ctx_params`: the cipher and its properties.
+    /// `key2any_settable_ctx_params`: the cipher, its properties, and whether to save a key's
+    /// parameters (listed from 3.6).
     ///
     /// # Safety
     /// No preconditions.
@@ -238,6 +245,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn key2any_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KEY2ANY_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { kctx(vctx) }) else { return 0 };
         // SAFETY: the provider's context.

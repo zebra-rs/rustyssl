@@ -691,7 +691,7 @@ pub(crate) fn process_message(
     } else if is(abi::TLS_ST_CR_CERT_VRFY) {
         common::cert::process_cert_verify(c, p, body)
     } else if is(abi::TLS_ST_CR_CERT_STATUS) {
-        flight::process_cert_status(c, body)
+        flight::process_cert_status(c, p, body)
     } else if is(abi::TLS_ST_CR_KEY_EXCH) {
         flight::process_key_exchange(c, p, body)
     } else if is(abi::TLS_ST_CR_CERT_REQ) {

@@ -602,6 +602,39 @@ static void test_ctx(const char *alg)
     r = EVP_PKEY_sign_message_init(c, s, NULL);
     r = r * 10 + EVP_PKEY_sign_message_update(c, MSG, MSGLEN);
     printf("  message init, update: %d\n", r);
+    {
+        /* 3.6: a message in pieces, signed deterministically, then verified in pieces. */
+        unsigned char sig1[4627], sig2[4627];
+        size_t l1 = sizeof(sig1), l2 = sizeof(sig2), q = 0;
+        int det = 1;
+        OSSL_PARAM dp[2], sp[2];
+
+        dp[0] = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, &det);
+        dp[1] = OSSL_PARAM_construct_end();
+        r = EVP_PKEY_sign_message_init(c, s, dp);
+        r = r * 10 + EVP_PKEY_sign_message_update(c, MSG, 3);
+        r = r * 10 + EVP_PKEY_sign_message_update(c, MSG + 3, MSGLEN - 3);
+        r = r * 10 + EVP_PKEY_sign_message_final(c, NULL, &q);
+        r = r * 10 + EVP_PKEY_sign_message_final(c, sig1, &l1);
+        printf("  in pieces: %d, length query %zu, %zu\n", r, q, l1);
+        errors();
+        r = EVP_PKEY_sign_message_init(c, s, dp) * 10 + EVP_PKEY_sign(c, sig2, &l2, MSG, MSGLEN);
+        printf("  one-shot: %d, the same %d\n", r, l1 == l2 && memcmp(sig1, sig2, l1) == 0);
+        sp[0] = OSSL_PARAM_construct_octet_string(OSSL_SIGNATURE_PARAM_SIGNATURE, sig2, l2);
+        sp[1] = OSSL_PARAM_construct_end();
+        r = EVP_PKEY_verify_message_init(c, s, NULL);
+        r = r * 10 + EVP_PKEY_CTX_set_params(c, sp);
+        r = r * 10 + EVP_PKEY_verify_message_update(c, MSG, MSGLEN);
+        r = r * 10 + EVP_PKEY_verify_message_final(c);
+        printf("  verified in pieces: %d\n", r);
+        r = EVP_PKEY_verify_message_init(c, s, NULL);
+        sig2[0] ^= 1;
+        r = r * 10 + EVP_PKEY_CTX_set_params(c, sp);
+        r = r * 10 + EVP_PKEY_verify_message_update(c, MSG, MSGLEN);
+        r = r * 10 + EVP_PKEY_verify_message_final(c);
+        printf("  a changed signature: %d\n", r);
+        errors();
+    }
     check(c != NULL, "the operation's context: parameters, copies, inits");
     EVP_SIGNATURE_free(s);
     EVP_PKEY_CTX_free(c);

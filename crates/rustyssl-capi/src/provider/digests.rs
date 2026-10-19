@@ -65,6 +65,15 @@ fn new_context(kind: Kind) -> *mut c_void {
 /// # Safety
 /// `params` is NULL or a parameter array.
 unsafe fn default_get_params(kind: Kind, params: *mut OSSL_PARAM, function: &str) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::DIGEST_DEFAULT_GET_PARAMS,
+        )
+    } {
+        return 0;
+    }
     let flags = [
         (OSSL_DIGEST_PARAM_XOF, kind.is_xof()),
         (OSSL_DIGEST_PARAM_ALGID_ABSENT, kind.algid_absent()),
@@ -346,6 +355,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SHAKE_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -379,6 +392,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn xof_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SHAKE_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
@@ -425,6 +442,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::BLAKE_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -457,6 +478,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn blake2_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::BLAKE_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.

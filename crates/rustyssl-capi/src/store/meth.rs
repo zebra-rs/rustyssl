@@ -18,7 +18,7 @@ use rustyssl_abi::{
     OSSL_FUNC_store_attach_fn, OSSL_FUNC_store_close_fn, OSSL_FUNC_store_delete_fn,
     OSSL_FUNC_store_eof_fn, OSSL_FUNC_store_export_object_fn, OSSL_FUNC_store_load_fn,
     OSSL_FUNC_store_open_ex_fn, OSSL_FUNC_store_open_fn, OSSL_FUNC_store_set_ctx_params_fn,
-    OSSL_FUNC_store_settable_ctx_params_fn, OSSL_LIB_CTX, OSSL_OP_STORE, OSSL_PROVIDER,
+    OSSL_FUNC_store_settable_ctx_params_fn, OSSL_LIB_CTX, OSSL_OP_STORE, OSSL_PARAM, OSSL_PROVIDER,
     OSSL_STORE_LOADER, OSSL_STORE_R_LOADER_INCOMPLETE,
 };
 
@@ -216,6 +216,27 @@ ffi_export! {
             p.refs.fetch_add(1, Ordering::Relaxed);
         }
         1
+    }
+}
+
+ffi_export! {
+    /// The parameters the loader's contexts take (3.6), as its provider lists them with no
+    /// provider context; NULL for NULL, a registered loader, or a provider without the list.
+    ///
+    /// # Safety
+    /// `loader` is NULL or a live loader.
+    pub unsafe extern "C" fn OSSL_STORE_LOADER_settable_ctx_params(loader: *const OSSL_STORE_LOADER) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_OSSL_STORE
+    {
+        if loader.is_null() {
+            return ptr::null();
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(settable) = unsafe { provided(loader) }.and_then(|p| p.settable_ctx_params) else {
+            return ptr::null();
+        };
+        // SAFETY: the provider's function, which OpenSSL calls with a NULL context too.
+        unsafe { settable(ptr::null_mut()) }
     }
 }
 

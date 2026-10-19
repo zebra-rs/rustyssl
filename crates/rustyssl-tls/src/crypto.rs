@@ -493,4 +493,11 @@ pub trait Provider {
     /// # Errors
     /// The encoding doesn't parse, or its key type isn't known.
     fn peer_key(&self, der: &[u8], spki: bool) -> Result<PeerKey>;
+
+    /// Whether `der` decodes as an `OCSPResponse` (`d2i_OCSP_RESPONSE`), which 3.6's client
+    /// requires of a stapled response.
+    fn ocsp_response_ok(&self, der: &[u8]) -> bool {
+        let _ = der;
+        true
+    }
 }

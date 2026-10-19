@@ -9,14 +9,14 @@ use core::ffi::{CStr, c_int, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    EC_KEY, ERR_LIB_PROV, EVP_MD, OSSL_ASYM_CIPHER_PARAM_DIGEST, OSSL_ASYM_CIPHER_PARAM_ENGINE,
-    OSSL_ASYM_CIPHER_PARAM_PROPERTIES, OSSL_FUNC_ASYM_CIPHER_DECRYPT,
-    OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT, OSSL_FUNC_ASYM_CIPHER_DUPCTX,
-    OSSL_FUNC_ASYM_CIPHER_ENCRYPT, OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT,
-    OSSL_FUNC_ASYM_CIPHER_FREECTX, OSSL_FUNC_ASYM_CIPHER_GET_CTX_PARAMS,
-    OSSL_FUNC_ASYM_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_ASYM_CIPHER_NEWCTX,
-    OSSL_FUNC_ASYM_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_ASYM_CIPHER_SETTABLE_CTX_PARAMS, OSSL_LIB_CTX,
-    OSSL_PARAM, OSSL_PARAM_UTF8_STRING, PROV_R_INVALID_KEY,
+    EC_KEY, ERR_LIB_PROV, EVP_MD, OSSL_ASYM_CIPHER_PARAM_DIGEST, OSSL_ASYM_CIPHER_PARAM_PROPERTIES,
+    OSSL_FUNC_ASYM_CIPHER_DECRYPT, OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT,
+    OSSL_FUNC_ASYM_CIPHER_DUPCTX, OSSL_FUNC_ASYM_CIPHER_ENCRYPT,
+    OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT, OSSL_FUNC_ASYM_CIPHER_FREECTX,
+    OSSL_FUNC_ASYM_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_ASYM_CIPHER_GETTABLE_CTX_PARAMS,
+    OSSL_FUNC_ASYM_CIPHER_NEWCTX, OSSL_FUNC_ASYM_CIPHER_SET_CTX_PARAMS,
+    OSSL_FUNC_ASYM_CIPHER_SETTABLE_CTX_PARAMS, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_UTF8_STRING,
+    PROV_R_INVALID_KEY,
 };
 
 use super::builtin::libctx_of;
@@ -205,6 +205,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SM2_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_DIGEST.as_ptr()) };
@@ -251,6 +255,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SM2_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -263,10 +271,9 @@ ffi_callback! {
 }
 
 /// `known_settable_ctx_params`.
-static SETTABLE: Params<4> = Params([
+static SETTABLE: Params<3> = Params([
     defn(OSSL_ASYM_CIPHER_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_ASYM_CIPHER_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
-    defn(OSSL_ASYM_CIPHER_PARAM_ENGINE, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 

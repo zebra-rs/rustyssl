@@ -26,8 +26,7 @@ use rustyssl_abi::{
     OSSL_PARAM_UTF8_STRING, OSSL_PASSPHRASE_CALLBACK, OSSL_STORE_INFO_CERT, OSSL_STORE_INFO_CRL,
     OSSL_STORE_INFO_PKEY, OSSL_STORE_INFO_PUBKEY, OSSL_STORE_PARAM_EXPECT,
     OSSL_STORE_PARAM_INPUT_TYPE, OSSL_STORE_PARAM_PROPERTIES, OSSL_STORE_PARAM_SUBJECT,
-    PROV_R_PATH_MUST_BE_ABSOLUTE, PROV_R_SEARCH_ONLY_SUPPORTED_FOR_DIRECTORIES,
-    PROV_R_URI_AUTHORITY_UNSUPPORTED, X509_NAME,
+    PROV_R_SEARCH_ONLY_SUPPORTED_FOR_DIRECTORIES, PROV_R_URI_AUTHORITY_UNSUPPORTED, X509_NAME,
 };
 
 use super::builtin::{libctx_of, provider_of};
@@ -54,7 +53,7 @@ use crate::params::{
     OSSL_PARAM_get_utf8_string, OSSL_PARAM_locate_const,
 };
 use crate::pvkfmt::{BLOB_MAX_LENGTH, Cursor, blob_header, blob_length, pvk_header};
-use crate::x509::name::{X509_NAME_free, X509_NAME_hash_ex, d2i_X509_NAME};
+use crate::x509::name::{X509_NAME_free, X509_NAME_hash_ex, X509_NAME_oneline, d2i_X509_NAME};
 
 /// `OSSL_MAX_CODEC_STRUCT_SIZE`.
 const MAX_CODEC_STRUCT: usize = 32;
@@ -172,9 +171,10 @@ fn open_stream(bio: *mut BIO, uri: Option<&[u8]>, provctx: *mut c_void) -> *mut 
 }
 
 /// The paths `file_open` tries for the URI: the URI as given, then for a `file:` one the path
-/// it names (which must be absolute). `Err` with the error for an authority it doesn't take.
-fn paths_of(uri: &[u8]) -> Result<Vec<(Vec<u8>, bool)>, ()> {
-    let mut paths = vec![(uri.to_vec(), false)];
+/// it names (3.6 takes a relative one too; 3.5 refused it with `PROV_R_PATH_MUST_BE_ABSOLUTE`).
+/// `Err` with the error for an authority it doesn't take.
+fn paths_of(uri: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
+    let mut paths = vec![uri.to_vec()];
     let Some(mut p) = uri
         .get(..5)
         .filter(|p| p.eq_ignore_ascii_case(b"file:"))
@@ -195,7 +195,7 @@ fn paths_of(uri: &[u8]) -> Result<Vec<(Vec<u8>, bool)>, ()> {
             return Err(());
         }
     }
-    paths.push((p.to_vec(), true));
+    paths.push(p.to_vec());
     Ok(paths)
 }
 
@@ -217,14 +217,7 @@ ffi_callback! {
             return ptr::null_mut();
         };
         let mut found = None;
-        for (path, check_absolute) in paths {
-            if check_absolute && path.first() != Some(&b'/') {
-                // SAFETY: as above.
-                unsafe { ERR_clear_last_mark() };
-                let p = String::from_utf8_lossy(&path);
-                err::raise_with_text(ERR_LIB_PROV, PROV_R_PATH_MUST_BE_ABSOLUTE, "file_open", &format!("Given path={p}"));
-                return ptr::null_mut();
-            }
+        for path in paths {
             let Ok(cpath) = std::ffi::CString::new(path.clone()) else { continue };
             // SAFETY: an all-zero `stat` is valid.
             let mut st: libc::stat = unsafe { core::mem::zeroed() };
@@ -315,7 +308,11 @@ unsafe fn set_string(p: *const OSSL_PARAM, slot: &mut *mut c_char) -> bool {
 ///
 /// # Safety
 /// `p` is a parameter; `provctx` the provider's context.
-unsafe fn subject_hash(p: *const OSSL_PARAM, provctx: *mut c_void) -> Option<Vec<u8>> {
+unsafe fn subject_hash(
+    p: *const OSSL_PARAM,
+    provctx: *mut c_void,
+    not_dir: Option<Option<&[u8]>>,
+) -> Option<Vec<u8>> {
     let (mut der, mut der_len): (*const c_void, usize) = (ptr::null(), 0);
     // SAFETY: the caller's parameter; rooms for its value.
     if unsafe { OSSL_PARAM_get_octet_string_ptr(p, &raw mut der, &raw mut der_len) } == 0 {
@@ -326,6 +323,34 @@ unsafe fn subject_hash(p: *const OSSL_PARAM, provctx: *mut c_void) -> Option<Vec
     // SAFETY: the octets.
     let name: *mut X509_NAME = unsafe { d2i_X509_NAME(ptr::null_mut(), &raw mut q, len) };
     if name.is_null() {
+        return None;
+    }
+    // 3.6 decodes the name first, then refuses a search outside a directory, naming both.
+    if let Some(uri) = not_dir {
+        // SAFETY: the name decoded above; a new string.
+        let text = unsafe { X509_NAME_oneline(name, ptr::null_mut(), 0) };
+        let subject = if text.is_null() {
+            String::from("<NULL>")
+        } else {
+            // SAFETY: a C string made above.
+            unsafe { CStr::from_ptr(text) }
+                .to_string_lossy()
+                .into_owned()
+        };
+        // SAFETY: made above, or NULL.
+        unsafe { crate::mem::CRYPTO_free(text.cast(), c"".as_ptr(), 0) };
+        let uri = uri.map_or_else(
+            || String::from("<NULL>"),
+            |u| String::from_utf8_lossy(u).into_owned(),
+        );
+        err::raise_with_text(
+            ERR_LIB_PROV,
+            PROV_R_SEARCH_ONLY_SUPPORTED_FOR_DIRECTORIES,
+            "file_set_ctx_params",
+            &format!("uri={uri}:subject={subject}"),
+        );
+        // SAFETY: decoded here.
+        unsafe { X509_NAME_free(name) };
         return None;
     }
     let mut ok: c_int = 0;
@@ -353,6 +378,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn file_set_ctx_params(loaderctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::FILE_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx_of(loaderctx) }) else { return 0 };
         // SAFETY: as above.
@@ -383,12 +412,9 @@ ffi_callback! {
         }
         let p = locate(OSSL_STORE_PARAM_SUBJECT);
         if !p.is_null() {
-            if !is_dir {
-                err::raise(ERR_LIB_PROV, PROV_R_SEARCH_ONLY_SUPPORTED_FOR_DIRECTORIES, "file_set_ctx_params");
-                return 0;
-            }
+            let not_dir = (!is_dir).then_some(c.uri.as_deref());
             // SAFETY: as above; the provider's context.
-            let Some(h) = (unsafe { subject_hash(p, c.provctx) }) else { return 0 };
+            let Some(h) = (unsafe { subject_hash(p, c.provctx, not_dir) }) else { return 0 };
             if let Source::Dir { search_name, .. } = &mut c.source {
                 *search_name = h;
             }
@@ -938,6 +964,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ANY2OBJ_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { vctx.cast::<Any2Obj>().as_mut() }) else { return 0 };
         // SAFETY: the caller's array.
         let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_OBJECT_PARAM_DATA_STRUCTURE.as_ptr()) };
@@ -1236,20 +1266,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn file_uris_name_absolute_paths() {
-        assert_eq!(paths_of(b"/a/b"), Ok(vec![(b"/a/b".to_vec(), false)]));
+    fn file_uris_name_paths() {
+        assert_eq!(paths_of(b"/a/b"), Ok(vec![b"/a/b".to_vec()]));
         assert_eq!(
             paths_of(b"file:/a"),
-            Ok(vec![(b"file:/a".to_vec(), false), (b"/a".to_vec(), true)])
+            Ok(vec![b"file:/a".to_vec(), b"/a".to_vec()])
         );
-        assert_eq!(paths_of(b"FILE:///a"), Ok(vec![(b"/a".to_vec(), true)]));
-        assert_eq!(
-            paths_of(b"file://localhost/a"),
-            Ok(vec![(b"/a".to_vec(), true)])
-        );
+        assert_eq!(paths_of(b"FILE:///a"), Ok(vec![b"/a".to_vec()]));
+        assert_eq!(paths_of(b"file://localhost/a"), Ok(vec![b"/a".to_vec()]));
         assert_eq!(
             paths_of(b"file:rel"),
-            Ok(vec![(b"file:rel".to_vec(), false), (b"rel".to_vec(), true)])
+            Ok(vec![b"file:rel".to_vec(), b"rel".to_vec()])
         );
     }
 

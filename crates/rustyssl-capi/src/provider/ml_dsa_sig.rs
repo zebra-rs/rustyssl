@@ -19,21 +19,26 @@ use core::ffi::{c_char, c_int, c_uchar, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, NID_ML_DSA_44, NID_ML_DSA_65, NID_ML_DSA_87, OSSL_FUNC_SIGNATURE_DIGEST_SIGN,
+    ERR_LIB_PROV, EVP_PKEY_OP_SIGN, EVP_PKEY_OP_SIGNMSG, EVP_PKEY_OP_VERIFYMSG, NID_ML_DSA_44,
+    NID_ML_DSA_65, NID_ML_DSA_87, OSSL_FUNC_SIGNATURE_DIGEST_SIGN,
     OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_FUNC_SIGNATURE_DIGEST_VERIFY,
     OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_FUNC_SIGNATURE_DUPCTX,
     OSSL_FUNC_SIGNATURE_FREECTX, OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS,
     OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_FUNC_SIGNATURE_NEWCTX,
     OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS,
-    OSSL_FUNC_SIGNATURE_SIGN, OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, OSSL_FUNC_SIGNATURE_VERIFY,
-    OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER,
-    OSSL_PARAM_OCTET_STRING, OSSL_SIGNATURE_PARAM_ALGORITHM_ID,
-    OSSL_SIGNATURE_PARAM_CONTEXT_STRING, OSSL_SIGNATURE_PARAM_DETERMINISTIC,
-    OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING, OSSL_SIGNATURE_PARAM_MU,
-    OSSL_SIGNATURE_PARAM_TEST_ENTROPY, PROV_R_INVALID_DIGEST, PROV_R_INVALID_SEED_LENGTH,
-    PROV_R_NO_KEY_SET,
+    OSSL_FUNC_SIGNATURE_SIGN, OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_FINAL,
+    OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_UPDATE,
+    OSSL_FUNC_SIGNATURE_VERIFY, OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_FINAL,
+    OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_UPDATE,
+    OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING,
+    OSSL_SIGNATURE_PARAM_ALGORITHM_ID, OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
+    OSSL_SIGNATURE_PARAM_DETERMINISTIC, OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING,
+    OSSL_SIGNATURE_PARAM_MU, OSSL_SIGNATURE_PARAM_SIGNATURE, OSSL_SIGNATURE_PARAM_TEST_ENTROPY,
+    PROV_R_BAD_LENGTH, PROV_R_INVALID_DIGEST, PROV_R_INVALID_SEED_LENGTH, PROV_R_NO_KEY_SET,
 };
-use rustyssl_crypto::mldsa::{self, MAX_CONTEXT, MU_BYTES, PublicKey, RANDOM_BYTES, Variant};
+use rustyssl_crypto::mldsa::{
+    self, MAX_CONTEXT, MU_BYTES, MuHasher, PublicKey, RANDOM_BYTES, Variant,
+};
 
 use super::builtin::libctx_of;
 use super::eddsa_sig::eddsa_aid;
@@ -67,6 +72,13 @@ struct SigCtx {
     aid: Vec<u8>,
     /// `mu`: the message is the representative `mu`.
     mu: c_int,
+    /// The operation the context was last initialized for (`EVP_PKEY_OP_*`).
+    operation: c_int,
+    /// 3.6's message in pieces (`md_ctx`), from the first update; it survives a new init, as
+    /// the reference's does.
+    hasher: Option<MuHasher>,
+    /// The signature a message-at-a-time verification checks (`signature`).
+    sig: Option<Vec<u8>>,
 }
 
 impl SigCtx {
@@ -80,7 +92,12 @@ impl SigCtx {
     /// `ml_dsa_verify_internal`'s start), or `None` for a given `mu` of the wrong length.
     fn mu(&self, public: &PublicKey, msg: &[u8]) -> Option<[u8; MU_BYTES]> {
         if self.mu != 0 {
-            return <[u8; MU_BYTES]>::try_from(msg).ok();
+            let mu = <[u8; MU_BYTES]>::try_from(msg).ok();
+            if mu.is_none() {
+                // 3.6 says why (3.5 failed silently).
+                err::raise(ERR_LIB_PROV, PROV_R_BAD_LENGTH, "ml_dsa_sign_internal");
+            }
+            return mu;
         }
         if self.msg_encode == 0 {
             return public.mu(msg);
@@ -135,6 +152,9 @@ unsafe fn newctx(provctx: *mut c_void, variant: Variant) -> *mut c_void {
         deterministic: 0,
         aid: Vec::new(),
         mu: 0,
+        operation: 0,
+        hasher: None,
+        sig: None,
     })
 }
 
@@ -171,7 +191,12 @@ ffi_callback! {
 /// # Safety
 /// `vctx` is NULL or a live context; `vkey` is NULL or live ML-DSA key data; `params` is NULL
 /// or an array.
-unsafe fn msg_init(vctx: *mut c_void, vkey: *mut c_void, params: *const OSSL_PARAM) -> c_int {
+unsafe fn msg_init(
+    vctx: *mut c_void,
+    vkey: *mut c_void,
+    params: *const OSSL_PARAM,
+    operation: c_int,
+) -> c_int {
     // SAFETY: the caller's guarantee.
     let Some(c) = (unsafe { ctx(vctx) }) else {
         return 0;
@@ -192,21 +217,161 @@ unsafe fn msg_init(vctx: *mut c_void, vkey: *mut c_void, params: *const OSSL_PAR
     }
     c.aid = eddsa_aid(nid(c.variant));
     c.mu = 0;
+    c.operation = operation;
     // SAFETY: the caller's guarantee.
     unsafe { ml_dsa_set_ctx_params(vctx, params) }
 }
 
 ffi_callback! {
-    /// `ml_dsa_sign_msg_init` and `ml_dsa_verify_msg_init`.
+    /// `ml_dsa_sign_msg_init`.
     ///
     /// # Safety
     /// `vctx` is NULL or a live context; `vkey` is NULL or live ML-DSA key data; `params` is
     /// NULL or an array.
-    pub(crate) unsafe extern "C" fn ml_dsa_signverify_msg_init(vctx: *mut c_void, vkey: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    pub(crate) unsafe extern "C" fn ml_dsa_sign_msg_init(vctx: *mut c_void, vkey: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
-        unsafe { msg_init(vctx, vkey, params) }
+        unsafe { msg_init(vctx, vkey, params, EVP_PKEY_OP_SIGNMSG) }
+    }
+}
+
+ffi_callback! {
+    /// `ml_dsa_verify_msg_init`.
+    ///
+    /// # Safety
+    /// As for [`ml_dsa_sign_msg_init`].
+    pub(crate) unsafe extern "C" fn ml_dsa_verify_msg_init(vctx: *mut c_void, vkey: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { msg_init(vctx, vkey, params, EVP_PKEY_OP_VERIFYMSG) }
+    }
+}
+
+ffi_callback! {
+    /// `ml_dsa_signverify_msg_update` (3.6): the next piece of the message, hashed into `mu`
+    /// (refused when the message is `mu` itself).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `data` holds `datalen` octets.
+    pub(crate) unsafe extern "C" fn ml_dsa_signverify_msg_update(vctx: *mut c_void, data: *const c_uchar, datalen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        if c.mu != 0 {
+            return 0;
+        }
+        if c.hasher.is_none() {
+            let Some(k) = c.key() else { return 0 };
+            let material = k.lock();
+            let Some(public) = material.public() else { return 0 };
+            let context = (c.msg_encode != 0).then_some(&c.context[..]);
+            c.hasher = public.mu_hasher(context);
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(data) = (unsafe { bytes(data, datalen) }) else { return 0 };
+        c_int::from(c.hasher.as_mut().is_some_and(|h| h.update(data)))
+    }
+}
+
+ffi_callback! {
+    /// `ml_dsa_sign_msg_final` (3.6): the signature of the message so far (squeezing its `mu`
+    /// on), or its length when `sig` is NULL.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `sig` is NULL or has room for `sigsize` octets;
+    /// `siglen` is NULL or writable.
+    pub(crate) unsafe extern "C" fn ml_dsa_sign_msg_final(vctx: *mut c_void, sig: *mut c_uchar, siglen: *mut usize, sigsize: usize) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        if c.hasher.is_none() {
+            return 0;
+        }
+        let mut rnd = None;
+        let mut mu = None;
+        if !sig.is_null() {
+            let Some(r) = randomness(c) else { return 0 };
+            rnd = Some(r);
+            mu = c.hasher.as_mut().and_then(MuHasher::squeeze);
+            if mu.is_none() {
+                return 0;
+            }
+        }
+        // SAFETY: the caller's guarantee.
+        let r = unsafe { sign_mu(c, mu.as_ref(), rnd.as_ref(), sig, siglen, sigsize) };
+        if let Some(r) = rnd.as_mut() {
+            wipe(r);
+        }
+        if let Some(m) = mu.as_mut() {
+            wipe(m);
+        }
+        r
+    }
+}
+
+ffi_callback! {
+    /// `ml_dsa_verify_msg_final` (3.6): whether the `signature` set signs the message so far.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context.
+    pub(crate) unsafe extern "C" fn ml_dsa_verify_msg_final(vctx: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        let Some(mu) = c.hasher.as_mut().and_then(MuHasher::squeeze) else { return 0 };
+        let Some(k) = c.key() else { return 0 };
+        let material = k.lock();
+        let Some(public) = material.public() else { return 0 };
+        c_int::from(public.verify(&mu, c.sig.as_deref().unwrap_or_default()))
+    }
+}
+
+/// `ossl_ml_dsa_sign` of a given `mu` (3.6's order): the length reported first, then, with
+/// `mu` and randomness, the signature into room of at least that length.
+///
+/// # Safety
+/// `sig` is NULL or has room for `sigsize` octets; `siglen` is NULL or writable.
+unsafe fn sign_mu(
+    c: &SigCtx,
+    mu: Option<&[u8; MU_BYTES]>,
+    rnd: Option<&[u8; RANDOM_BYTES]>,
+    sig: *mut c_uchar,
+    siglen: *mut usize,
+    sigsize: usize,
+) -> c_int {
+    let Some(k) = c.key() else { return 0 };
+    let material = k.lock();
+    let Some(private) = material.private() else {
+        return 0;
+    };
+    let sig_len = k.variant.signature_bytes();
+    // SAFETY: the caller's guarantee: NULL or writable.
+    match unsafe { siglen.as_mut() } {
+        Some(l) => *l = sig_len,
+        None if sig.is_null() => return 0,
+        None => {}
+    }
+    if sig.is_null() {
+        return 1;
+    }
+    if sigsize < sig_len {
+        return 0;
+    }
+    let (Some(mu), Some(rnd)) = (mu, rnd) else {
+        return 0;
+    };
+    match private.sign(mu, rnd) {
+        Some(s) => {
+            // SAFETY: the caller's room for `sigsize` (at least `sig_len`) octets.
+            unsafe { ptr::copy_nonoverlapping(s.as_ptr(), sig, s.len()) };
+            1
+        }
+        None => 0,
     }
 }
 
@@ -237,8 +402,9 @@ ffi_callback! {
             // SAFETY: the caller's guarantee.
             return unsafe { ml_dsa_set_ctx_params(vctx, params) };
         }
+        // 3.6 initializes both digest directions as a signature.
         // SAFETY: the caller's guarantee.
-        unsafe { msg_init(vctx, vkey, params) }
+        unsafe { msg_init(vctx, vkey, params, EVP_PKEY_OP_SIGN) }
     }
 }
 
@@ -281,6 +447,14 @@ ffi_callback! {
             let material = k.lock();
             let private = material.private()?;
             let sig_len = k.variant.signature_bytes();
+            // 3.6 reports the length first, even when the room is too small (and fails a
+            // length query without anywhere to report it).
+            // SAFETY: the caller's guarantee: NULL or writable.
+            match unsafe { siglen.as_mut() } {
+                Some(l) => *l = sig_len,
+                None if rnd.is_none() => return None,
+                None => {}
+            }
             let mut ret = 1;
             if let Some(rnd) = rnd.as_ref() {
                 if sigsize < sig_len {
@@ -295,10 +469,6 @@ ffi_callback! {
                     Some(s) => unsafe { ptr::copy_nonoverlapping(s.as_ptr(), sig, s.len()) },
                     None => ret = 0,
                 }
-            }
-            // SAFETY: the caller's guarantee: NULL or writable.
-            if let Some(l) = unsafe { siglen.as_mut() } {
-                *l = sig_len;
             }
             Some(ret)
         })();
@@ -343,6 +513,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn ml_dsa_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_VERIFYMSG_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.
@@ -397,9 +571,53 @@ ffi_callback! {
                 return 0;
             }
         }
+        // 3.6: the signature a message-at-a-time verification checks.
+        if c.operation == EVP_PKEY_OP_VERIFYMSG
+            // SAFETY: the caller's array; a static name.
+            && let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_SIGNATURE) }
+        {
+            c.sig = None;
+            let mut data: *mut c_void = ptr::null_mut();
+            let mut n = 0;
+            // SAFETY: a parameter of the array; a place for a new allocation.
+            if unsafe { OSSL_PARAM_get_octet_string(p, &raw mut data, 0, &raw mut n) } != 1 {
+                return 0;
+            }
+            // SAFETY: the allocation just made holds `n` octets.
+            c.sig = Some(unsafe { bytes(data.cast::<u8>(), n) }.unwrap_or_default().to_vec());
+            // SAFETY: allocated by the call above.
+            unsafe { crate::mem::release(data) };
+        }
         1
     }
 }
+
+/// `ml_dsa_verifymsg_set_ctx_params_list` (3.6): with the signature.
+static VERIFYMSG_SETTABLE: Params<7> = Params([
+    defn(
+        OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
+        OSSL_PARAM_OCTET_STRING,
+        0,
+    ),
+    defn(
+        OSSL_SIGNATURE_PARAM_TEST_ENTROPY,
+        OSSL_PARAM_OCTET_STRING,
+        0,
+    ),
+    defn(
+        OSSL_SIGNATURE_PARAM_DETERMINISTIC,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
+    defn(
+        OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
+    defn(OSSL_SIGNATURE_PARAM_MU, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(OSSL_SIGNATURE_PARAM_SIGNATURE, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
 
 /// `settable_ctx_params`.
 static SETTABLE: Params<6> = Params([
@@ -418,12 +636,12 @@ static SETTABLE: Params<6> = Params([
         OSSL_PARAM_INTEGER,
         INT_SIZE,
     ),
-    defn(OSSL_SIGNATURE_PARAM_MU, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(
         OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING,
         OSSL_PARAM_INTEGER,
         INT_SIZE,
     ),
+    defn(OSSL_SIGNATURE_PARAM_MU, OSSL_PARAM_INTEGER, INT_SIZE),
     PARAM_END,
 ]);
 
@@ -432,9 +650,13 @@ ffi_callback! {
     ///
     /// # Safety
     /// No preconditions.
-    pub(crate) unsafe extern "C" fn ml_dsa_settable_ctx_params(_vctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    pub(crate) unsafe extern "C" fn ml_dsa_settable_ctx_params(vctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
     where failure = ptr::null(), library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's context, or NULL.
+        if unsafe { ctx(vctx) }.is_some_and(|c| c.operation == EVP_PKEY_OP_VERIFYMSG) {
+            return VERIFYMSG_SETTABLE.0.as_ptr();
+        }
         SETTABLE.0.as_ptr()
     }
 }
@@ -470,6 +692,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID.as_ptr()) };
@@ -499,6 +725,9 @@ type VerifyFn =
 type DigestInitFn =
     unsafe extern "C" fn(*mut c_void, *const c_char, *mut c_void, *const OSSL_PARAM) -> c_int;
 type FreeCtxFn = unsafe extern "C" fn(*mut c_void);
+type UpdateFn = unsafe extern "C" fn(*mut c_void, *const c_uchar, usize) -> c_int;
+type SignFinalFn = unsafe extern "C" fn(*mut c_void, *mut c_uchar, *mut usize, usize) -> c_int;
+type VerifyFinalFn = unsafe extern "C" fn(*mut c_void) -> c_int;
 type DupCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
 type GetParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type SetParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
@@ -521,11 +750,15 @@ macro_rules! ml_dsa_signature {
         }
 
         #[doc = $doc]
-        pub(crate) static $table: Dispatch<16> = Dispatch([
+        pub(crate) static $table: Dispatch<20> = Dispatch([
             entry!(OSSL_FUNC_SIGNATURE_NEWCTX, $new, NewCtxFn),
-            entry!(OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, ml_dsa_signverify_msg_init, InitFn),
+            entry!(OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, ml_dsa_sign_msg_init, InitFn),
+            entry!(OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_UPDATE, ml_dsa_signverify_msg_update, UpdateFn),
+            entry!(OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_FINAL, ml_dsa_sign_msg_final, SignFinalFn),
             entry!(OSSL_FUNC_SIGNATURE_SIGN, ml_dsa_sign, SignFn),
-            entry!(OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, ml_dsa_signverify_msg_init, InitFn),
+            entry!(OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, ml_dsa_verify_msg_init, InitFn),
+            entry!(OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_UPDATE, ml_dsa_signverify_msg_update, UpdateFn),
+            entry!(OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_FINAL, ml_dsa_verify_msg_final, VerifyFinalFn),
             entry!(OSSL_FUNC_SIGNATURE_VERIFY, ml_dsa_verify, VerifyFn),
             entry!(OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, ml_dsa_digest_signverify_init, DigestInitFn),
             entry!(OSSL_FUNC_SIGNATURE_DIGEST_SIGN, ml_dsa_sign, SignFn),

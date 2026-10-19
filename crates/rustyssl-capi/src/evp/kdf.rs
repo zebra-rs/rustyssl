@@ -44,6 +44,15 @@ type GettableFn = unsafe extern "C" fn(*mut c_void) -> *const OSSL_PARAM;
 type GetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *mut OSSL_PARAM) -> c_int;
 type SetCtxParamsFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> c_int;
 type CtxParamsListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARAM;
+type SetSkeyFn = unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_char) -> c_int;
+type DeriveSkeyFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const c_char,
+    *mut c_void,
+    Option<super::skeymgmt::ImportFn>,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut c_void;
 
 /// A KDF algorithm's functions, as its dispatch table gave them.
 #[derive(Default, Clone, Copy)]
@@ -59,6 +68,10 @@ struct Funcs {
     set_ctx_params: Option<SetCtxParamsFn>,
     gettable_ctx_params: Option<CtxParamsListFn>,
     settable_ctx_params: Option<CtxParamsListFn>,
+    /// 3.6: setting a parameter from an opaque key of the provider's.
+    set_skey: Option<SetSkeyFn>,
+    /// 3.6: deriving into an opaque key of the provider's.
+    derive_skey: Option<DeriveSkeyFn>,
 }
 
 /// A KDF method (`EVP_KDF`).
@@ -158,6 +171,8 @@ unsafe fn from_algorithm(
             OSSL_FUNC_KDF_GET_PARAMS => set!(get_params),
             OSSL_FUNC_KDF_GET_CTX_PARAMS => set!(get_ctx_params),
             OSSL_FUNC_KDF_SET_CTX_PARAMS => set!(set_ctx_params),
+            rustyssl_abi::OSSL_FUNC_KDF_SET_SKEY => set!(set_skey),
+            rustyssl_abi::OSSL_FUNC_KDF_DERIVE_SKEY => set!(derive_skey),
             _ => {}
         }
     }
@@ -634,6 +649,115 @@ ffi_export! {
         let Some(derive) = c.kdf().and_then(|m| m.funcs.derive) else { return 0 };
         // SAFETY: the provider's function with its context and the caller's arguments.
         unsafe { derive(c.algctx.0, key, keylen, params) }
+    }
+}
+
+/// `convert_key_cb`: the exported raw secret as the octet string parameter `name`, into `arg`
+/// (a `(name, param)` pair).
+unsafe extern "C" fn convert_key(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+    // SAFETY: the export's array.
+    let p = unsafe { crate::params::OSSL_PARAM_locate_const(params, c"raw-bytes".as_ptr()) };
+    if p.is_null() {
+        return 0;
+    }
+    let (mut data, mut len): (*const c_void, usize) = (ptr::null(), 0);
+    // SAFETY: a located parameter; places for its value.
+    if unsafe { crate::params::OSSL_PARAM_get_octet_string_ptr(p, &raw mut data, &raw mut len) }
+        == 0
+    {
+        return 0;
+    }
+    // SAFETY: `arg` is the caller's pair.
+    let pair = unsafe { &mut *arg.cast::<(*const c_char, OSSL_PARAM)>() };
+    // SAFETY: the name; the key manager's octets, which outlive the set below.
+    pair.1 = unsafe { OSSL_PARAM_construct_octet_string(pair.0, data.cast_mut(), len) };
+    1
+}
+
+ffi_export! {
+    /// Sets the parameter `paramname` (the key, `key`, for NULL) from the opaque key (3.6): by
+    /// the KDF's own `set_skey` when the key is its provider's, else its exported raw secret.
+    /// 1, or 0.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live KDF context; `key` is NULL or a live key; `paramname` is NULL or
+    /// a string.
+    pub unsafe extern "C" fn EVP_KDF_CTX_set_SKEY(ctx: *mut EVP_KDF_CTX, key: *mut rustyssl_abi::EVP_SKEY, paramname: *const c_char) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { context(ctx) }) else { return 0 };
+        // SAFETY: as above.
+        let Some(k) = (unsafe { super::skey::key(key) }) else { return 0 };
+        let Some(m) = c.kdf() else { return 0 };
+        let name = if paramname.is_null() { c"key".as_ptr() } else { paramname };
+        if let Some(set) = m.funcs.set_skey
+            && m.prov.0 == k.skeymgmt.get().prov.0
+        {
+            // SAFETY: the provider's function with its context and its own key data.
+            return unsafe { set(c.algctx.0, k.keydata.0, name) };
+        }
+        let Some(set) = m.funcs.set_ctx_params else { return 0 };
+        // SAFETY: an all-zero parameter is the end marker.
+        let mut pair: (*const c_char, OSSL_PARAM) = (name, unsafe { core::mem::zeroed() });
+        // SAFETY: the key's own data; our callback and its pair.
+        let exported = unsafe {
+            k.skeymgmt.get().export(k.keydata.0, rustyssl_abi::OSSL_SKEYMGMT_SELECT_SECRET_KEY, Some(convert_key), (&raw mut pair).cast())
+        };
+        if exported == 0 {
+            return 0;
+        }
+        let params = [pair.1, end()];
+        // SAFETY: the provider's function with its context and the array above.
+        unsafe { set(c.algctx.0, params.as_ptr()) }
+    }
+}
+
+ffi_export! {
+    /// Derives `keylen` octets into a new opaque key of the type `key_type` (3.6): `mgmt`, or
+    /// the KDF's provider's key manager for it, or any; by the KDF's `derive_skey` when the key
+    /// manager is its provider's, else derived and imported as the raw secret. NULL on failure.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live KDF context; `mgmt` is NULL or a live key manager; the strings
+    /// are NULL or strings; `params` is NULL or a parameter array.
+    pub unsafe extern "C" fn EVP_KDF_derive_SKEY(ctx: *mut EVP_KDF_CTX, mgmt: *mut rustyssl_abi::EVP_SKEYMGMT, key_type: *const c_char, propquery: *const c_char, keylen: usize, params: *const OSSL_PARAM) -> *mut rustyssl_abi::EVP_SKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_KDF_derive_SKEY";
+        // SAFETY: the caller's guarantee.
+        let c = unsafe { context(ctx) };
+        let (Some(c), false) = (c, key_type.is_null()) else {
+            err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_PASSED_NULL_PARAMETER, F);
+            return ptr::null_mut();
+        };
+        let Some(m) = c.kdf() else { return ptr::null_mut() };
+        // SAFETY: a string.
+        let kt = unsafe { CStr::from_ptr(key_type) };
+        // SAFETY: the method's provider.
+        let libctx = unsafe { crate::provider::libctx_of(m.prov.0) };
+        // SAFETY: the caller's guarantee; the method's live provider.
+        let Some(sk) = (unsafe { super::skey::derive_skeymgmt(mgmt, m.prov.0, libctx, kt, propquery) }) else {
+            return ptr::null_mut();
+        };
+        let (algctx, funcs) = (c.algctx.0, m.funcs);
+        if sk.get().prov.0 != m.prov.0 || funcs.derive_skey.is_none() {
+            let Some(derive) = funcs.derive else {
+                err::raise(rustyssl_abi::ERR_R_EVP_LIB, rustyssl_abi::ERR_R_UNSUPPORTED, F);
+                return ptr::null_mut();
+            };
+            return super::skey::import_derived(sk, keylen, |key| {
+                // SAFETY: the provider's function with its context, our room, and the caller's
+                // parameters.
+                let r = unsafe { derive(algctx, key.as_mut_ptr(), key.len(), params) };
+                r != 0
+            });
+        }
+        let Some(derive_skey) = funcs.derive_skey else { return ptr::null_mut() };
+        let (pctx, import) = (sk.get().provider_ctx(), sk.get().import_fn());
+        // SAFETY: the provider's function with its context and the key manager's.
+        let keydata = unsafe { derive_skey(algctx, key_type, pctx, import, keylen, params) };
+        super::skey::new_key(sk, keydata)
     }
 }
 

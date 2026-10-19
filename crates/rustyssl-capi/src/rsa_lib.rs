@@ -26,7 +26,7 @@ use crate::ex_data::{CRYPTO_get_ex_data, CRYPTO_set_ex_data};
 use crate::ffi::ffi_export;
 use crate::provider::Ptr;
 use crate::provider::rsa_kmgmt::security_bits;
-use crate::rsa::{Field, Kind, Rsa, free, key_field, private_random, read_numbers, rsa, up_ref};
+use crate::rsa::{Field, Kind, Rsa, free, key_field, read_numbers, rsa, up_ref};
 use crate::rsa_meth::fns_of;
 
 /// The key behind `r`.
@@ -755,16 +755,16 @@ ffi_export! {
     where failure = (), library = ERR_LIB_RSA
     {
         // SAFETY: the caller's guarantee.
+        // 3.6 only changes the flags; the key keeps its blinding (3.5 freed it).
         if let Some(k) = unsafe { key(rsa) } {
-            k.lock().key.drop_blinding();
             k.set_flags_to((k.flags() & !RSA_FLAG_BLINDING) | RSA_FLAG_NO_BLINDING);
         }
     }
 }
 
 ffi_export! {
-    /// Makes the key a fresh blinding now (from the private generator) and turns blinding on.
-    /// 1, or 0 (blinding stays as it was set: off if it had a blinding).
+    /// Turns blinding on: 1. As in 3.6, only the flags change; a blinding is made when a
+    /// private-key operation first needs one (3.5 made a fresh one here).
     ///
     /// # Safety
     /// `rsa` is NULL or a live key; `ctx` is NULL or a live `BN_CTX`.
@@ -773,16 +773,6 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(rsa) }) else { return 0 };
-        let st = k.snapshot();
-        if st.key.has_blinding() {
-            // SAFETY: as above.
-            unsafe { RSA_blinding_off(rsa) };
-        }
-        let mut rng = private_random(k.libctx.get());
-        if !st.key.new_blinding(&mut rng) {
-            err::raise(ERR_LIB_RSA, ERR_R_BN_LIB, "RSA_setup_blinding");
-            return 0;
-        }
         k.set_flags_to((k.flags() | RSA_FLAG_BLINDING) & !RSA_FLAG_NO_BLINDING);
         1
     }

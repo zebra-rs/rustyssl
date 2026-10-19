@@ -23,9 +23,9 @@ use rustyssl_abi::{
     SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION, SSL_OP_CIPHER_SERVER_PREFERENCE,
     SSL_OP_DISABLE_TLSEXT_CA_NAMES, SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS, SSL_OP_ENABLE_KTLS,
     SSL_OP_ENABLE_KTLS_TX_ZEROCOPY_SENDFILE, SSL_OP_ENABLE_MIDDLEBOX_COMPAT,
-    SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_OP_LEGACY_SERVER_CONNECT, SSL_OP_NO_ANTI_REPLAY,
-    SSL_OP_NO_COMPRESSION, SSL_OP_NO_DTLSv1, SSL_OP_NO_DTLSv1_2, SSL_OP_NO_ENCRYPT_THEN_MAC,
-    SSL_OP_NO_EXTENDED_MASTER_SECRET, SSL_OP_NO_RENEGOTIATION,
+    SSL_OP_IGNORE_UNEXPECTED_EOF, SSL_OP_LEGACY_EC_POINT_FORMATS, SSL_OP_LEGACY_SERVER_CONNECT,
+    SSL_OP_NO_ANTI_REPLAY, SSL_OP_NO_COMPRESSION, SSL_OP_NO_DTLSv1, SSL_OP_NO_DTLSv1_2,
+    SSL_OP_NO_ENCRYPT_THEN_MAC, SSL_OP_NO_EXTENDED_MASTER_SECRET, SSL_OP_NO_RENEGOTIATION,
     SSL_OP_NO_RX_CERTIFICATE_COMPRESSION, SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION,
     SSL_OP_NO_SSL_MASK, SSL_OP_NO_SSLv2, SSL_OP_NO_SSLv3, SSL_OP_NO_TICKET, SSL_OP_NO_TLSv1,
     SSL_OP_NO_TLSv1_1, SSL_OP_NO_TLSv1_2, SSL_OP_NO_TLSv1_3, SSL_OP_NO_TX_CERTIFICATE_COMPRESSION,
@@ -340,7 +340,7 @@ fn protocol_list() -> [Flag; 9] {
 }
 
 /// `Options`'s names (`ssl_option_list`).
-fn option_list() -> [Flag; 26] {
+fn option_list() -> [Flag; 27] {
     [
         inv("SessionTicket", SSL_OP_NO_TICKET),
         inv("EmptyFragments", SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS),
@@ -387,6 +387,8 @@ fn option_list() -> [Flag; 26] {
             SSL_OP_ENABLE_KTLS_TX_ZEROCOPY_SENDFILE,
         ),
         both_flag("IgnoreUnexpectedEOF", SSL_OP_IGNORE_UNEXPECTED_EOF),
+        // 3.6.
+        both_flag("LegacyECPointFormats", SSL_OP_LEGACY_EC_POINT_FORMATS),
     ]
 }
 
@@ -569,6 +571,13 @@ fn commands() -> Vec<CmdEntry> {
         switch("no_anti_replay", s, SSL_OP_NO_ANTI_REPLAY, 0),
         switch("no_etm", 0, SSL_OP_NO_ENCRYPT_THEN_MAC, 0),
         switch("no_ems", 0, SSL_OP_NO_EXTENDED_MASTER_SECRET, 0),
+        // 3.6.
+        switch(
+            "legacy_ec_point_formats",
+            0,
+            SSL_OP_LEGACY_EC_POINT_FORMATS,
+            0,
+        ),
         valued(
             Cmd::SignatureAlgorithms,
             "SignatureAlgorithms",

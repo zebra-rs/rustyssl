@@ -196,6 +196,11 @@ fn to_int(n: usize) -> c_int {
     n as c_int
 }
 
+/// A length a ctrl returns: 0 when it doesn't fit an `int` (3.6; 3.5 truncated it).
+fn length_or_zero(n: usize) -> c_int {
+    c_int::try_from(n).unwrap_or(0)
+}
+
 /// A parameter of `data_type` at `data`, `size` octets.
 fn param(key: &'static CStr, data_type: u32, data: *mut c_void, size: usize) -> OSSL_PARAM {
     construct(key.as_ptr(), data_type, data, size)
@@ -1641,7 +1646,7 @@ ffi_export! {
                     if r <= 0 {
                         break 'end r;
                     }
-                    return to_int(sz);
+                    return length_or_zero(sz);
                 }
                 EVP_CTRL_GET_RC2_KEY_BITS | EVP_CTRL_SET_RC2_KEY_BITS => {
                     set = type_ == EVP_CTRL_SET_RC2_KEY_BITS;
@@ -1656,7 +1661,7 @@ ffi_export! {
                     if get_params_of(c, &mut params) <= 0 {
                         return 0;
                     }
-                    return to_int(sz);
+                    return length_or_zero(sz);
                 }
                 EVP_CTRL_TLS1_1_MULTIBLOCK_AAD | EVP_CTRL_TLS1_1_MULTIBLOCK_ENCRYPT => {
                     let aad = type_ == EVP_CTRL_TLS1_1_MULTIBLOCK_AAD;
@@ -1690,7 +1695,7 @@ ffi_export! {
                     if get_params_of(c, &mut params) <= 0 {
                         return 0;
                     }
-                    return to_int(sz);
+                    return length_or_zero(sz);
                 }
                 EVP_CTRL_AEAD_SET_MAC_KEY => {
                     if arg < 0 {

@@ -44,6 +44,9 @@ impl Ctx {
         if kind.composite() {
             return Some(g.composite_process(io, one_shot).map_err(Raised::from));
         }
+        if kind.etm() {
+            return Some(g.etm_process(io, one_shot));
+        }
         if !kind.wrap() {
             return None;
         }

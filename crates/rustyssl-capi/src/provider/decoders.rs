@@ -182,6 +182,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PEM2DER_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { dctx(vctx) }) else { return 0 };
         // SAFETY: as above.
         if !unsafe { read_into(params, OSSL_DECODER_PARAM_PROPERTIES, &mut c.propq) } {
@@ -192,18 +196,51 @@ ffi_callback! {
     }
 }
 
+/// `spki2typespki_set_ctx_params` and `epki2pki_set_ctx_params`: the properties, through
+/// the function's 3.6 decoder.
+///
+/// # Safety
+/// `vctx` is a live context; `params` is NULL or an array.
+unsafe fn props_set_ctx_params(
+    vctx: *mut c_void,
+    params: *const OSSL_PARAM,
+    decoder: &crate::provider::param_decoders::Decoder,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe { crate::provider::param_decoders::decode(params, decoder) } {
+        return 0;
+    }
+    // SAFETY: as above.
+    let Some(c) = (unsafe { dctx(vctx) }) else {
+        return 0;
+    };
+    // SAFETY: as above.
+    c_int::from(unsafe { read_into(params, OSSL_DECODER_PARAM_PROPERTIES, &mut c.propq) })
+}
+
 ffi_callback! {
-    /// `spki2typespki_set_ctx_params` and `epki2pki_set_ctx_params`: the properties.
+    /// `spki2typespki_set_ctx_params`: the properties.
     ///
     /// # Safety
     /// `vctx` is a live context; `params` is NULL or an array.
-    pub(crate) unsafe extern "C" fn props_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    pub(crate) unsafe extern "C" fn spki2typespki_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
-        let Some(c) = (unsafe { dctx(vctx) }) else { return 0 };
-        // SAFETY: as above.
-        c_int::from(unsafe { read_into(params, OSSL_DECODER_PARAM_PROPERTIES, &mut c.propq) })
+        unsafe { props_set_ctx_params(vctx, params, &crate::provider::param_decoders::SPKI2TYPESPKI_SET_CTX_PARAMS) }
+    }
+}
+
+ffi_callback! {
+    /// `epki2pki_set_ctx_params`: the properties.
+    ///
+    /// # Safety
+    /// `vctx` is a live context; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn epki2pki_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { props_set_ctx_params(vctx, params, &crate::provider::param_decoders::EPKI2PKI_SET_CTX_PARAMS) }
     }
 }
 
@@ -822,7 +859,7 @@ static SPKI_TO_DER: Dispatch<6> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_DECODER_SET_CTX_PARAMS,
-        props_set_ctx_params,
+        spki2typespki_set_ctx_params,
         SetParamsFn
     ),
     END,
@@ -840,7 +877,7 @@ static EPKI_TO_DER: Dispatch<6> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_DECODER_SET_CTX_PARAMS,
-        props_set_ctx_params,
+        epki2pki_set_ctx_params,
         SetParamsFn
     ),
     END,

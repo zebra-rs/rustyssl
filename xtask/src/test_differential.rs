@@ -3230,14 +3230,21 @@ fn ecxkm_session(random: &mut Random, out: &mut String) -> Result {
         let selection = random.pick(&["87", "87", "86", "85", "84", "83", "81", "80", "7", "4"]);
         let part = |random: &mut Random| match random.below(5) {
             0 => "-".to_owned(),
+            // At least an octet: an empty field would shift the probe's fields.
             1 => {
-                let len = usize::try_from(random.below(64)).unwrap_or(0);
+                let len = usize::try_from(random.below(63)).unwrap_or(0) + 1;
                 random_hex(random, len)
             }
             _ => random_hex(random, keylen),
         };
         let privkey = part(random);
-        let pubkey = part(random);
+        let mut pubkey = part(random);
+        // A public key selected without the private key, given only a private key: 3.6 derives
+        // the public key from NULL and crashes (docs/DEVIATIONS.md), so give one.
+        let selected = selection.parse::<u32>().unwrap_or(0);
+        if selected & 3 == 2 && privkey != "-" && pubkey == "-" {
+            pubkey = random_hex(random, keylen);
+        }
         writeln!(out, "ecxkm {kind} {selection} {privkey} {pubkey} -")?;
     }
     Ok(())
@@ -6420,34 +6427,29 @@ fn printf_format(random: &mut Random) -> (String, Vec<String>) {
                 needed.push(format!("i:{}", random.offset(-5, 20)));
             }
         }
-        let modifier = random.pick(&["", "", "", "", "h", "l", "ll", "z", "j", "q", "L", "hh"]);
+        // 3.6's modifiers: `hh` and `t` are modifiers too (3.5 took `%hh` as `%h` and the
+        // unknown conversion `h`, so the conversion character was text).
+        let modifier = random.pick(&[
+            "", "", "", "", "h", "l", "ll", "z", "j", "q", "L", "hh", "t",
+        ]);
         spec.push_str(modifier);
-        let mut conversion = random.pick(&[
+        let conversion = random.pick(&[
             "d", "i", "u", "x", "X", "o", "c", "s", "s", "p", "f", "f", "e", "E", "g", "G", "%",
             "k", "w",
         ]);
-        if modifier == "hh" && conversion == "%" {
-            // After `%hh` the conversion character is text; a `%` would start a conversion.
-            conversion = "d";
-        }
         spec.push_str(conversion);
-        let wide = ["l", "ll", "z", "j", "q"].contains(&modifier);
-        // `%hh` is `%h` and the unknown conversion `h`: the conversion character is just text.
-        let argument = if modifier == "hh" {
-            None
-        } else {
-            match conversion {
-                "d" | "i" | "u" | "x" | "X" | "o" if wide => Some(printf_long(random)),
-                "d" | "i" | "u" | "x" | "X" | "o" => Some(printf_int(random)),
-                "c" => Some(format!("i:{}", random.below(128))),
-                "s" => Some(format!(
-                    "s:{}",
-                    random.pick(&["-", "x", "hello", "abcdefghijklmnopqrstuvwxyz0123456789"])
-                )),
-                "p" => Some(printf_long(random)),
-                "f" | "e" | "E" | "g" | "G" => Some(printf_double(random)),
-                _ => None,
-            }
+        let wide = ["l", "ll", "z", "j", "q", "t"].contains(&modifier);
+        let argument = match conversion {
+            "d" | "i" | "u" | "x" | "X" | "o" if wide => Some(printf_long(random)),
+            "d" | "i" | "u" | "x" | "X" | "o" => Some(printf_int(random)),
+            "c" => Some(format!("i:{}", random.below(128))),
+            "s" => Some(format!(
+                "s:{}",
+                random.pick(&["-", "x", "hello", "abcdefghijklmnopqrstuvwxyz0123456789"])
+            )),
+            "p" => Some(printf_long(random)),
+            "f" | "e" | "E" | "g" | "G" => Some(printf_double(random)),
+            _ => None,
         };
         needed.extend(argument);
         if args.len() + needed.len() > 3 {

@@ -30,8 +30,8 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_ML_DSA_PREFER_SEED,
     OSSL_PKEY_PARAM_ML_DSA_RETAIN_SEED, OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_INVALID_KEY, PROV_R_INVALID_KEY_LENGTH,
-    PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_INVALID_KEY,
+    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
 };
 use rustyssl_crypto::mldsa::{self, PrivateKey, PublicKey, SEED_BYTES, Variant};
 
@@ -326,6 +326,15 @@ fn octets_ptr(p: &OSSL_PARAM) -> Result<(bool, &[u8]), ()> {
 /// # Safety
 /// `params` is NULL or an array.
 unsafe fn key_fromdata(k: &MlDsaKey, params: *const OSSL_PARAM, include_private: bool) -> bool {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::ML_DSA_KEY_TYPE_PARAMS,
+        )
+    } {
+        return false;
+    }
     const F: &str = "ml_dsa_key_fromdata";
     let v = k.variant;
     let name = v.name();
@@ -528,12 +537,20 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let v = k.variant;
         let ints = [
             (OSSL_PKEY_PARAM_BITS, v.public_key_bytes().saturating_mul(8)),
             (OSSL_PKEY_PARAM_SECURITY_BITS, usize::try_from(v.lambda()).unwrap_or(0)),
             (OSSL_PKEY_PARAM_MAX_SIZE, v.signature_bytes()),
+            (
+                OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+                usize::try_from(v.security_category()).unwrap_or(0),
+            ),
         ];
         for (name, value) in ints {
             // SAFETY: the caller's array; a static name.
@@ -580,10 +597,15 @@ ffi_callback! {
 }
 
 /// `ml_dsa_gettable_params`' list.
-static GETTABLE: Params<8> = Params([
+static GETTABLE: Params<9> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
@@ -624,6 +646,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_GEN_SET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         if let Some(p) = unsafe { locate(params, OSSL_PKEY_PARAM_ML_DSA_SEED) } {
@@ -653,8 +679,8 @@ ffi_callback! {
 
 /// `ml_dsa_gen_settable_params`' list.
 static GEN_SETTABLE: Params<3> = Params([
-    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 

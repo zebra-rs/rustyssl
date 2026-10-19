@@ -275,7 +275,9 @@ unsafe fn add(c: *mut SSL_CTX, x: &Ctx, s: *mut SSL_SESSION) -> c_int {
         }
     };
     let cb = remove_cb(x);
-    for e in evicted {
+    // 3.6 keeps the evicted sessions in a list it prepends to, so the callback sees the last
+    // evicted first.
+    for e in evicted.into_iter().rev() {
         if let Some(cb) = cb {
             // SAFETY: the application's callback with its context and the session; no lock is
             // held.
@@ -379,14 +381,15 @@ pub(crate) unsafe fn flush(c: *mut SSL_CTX, x: &Ctx, t: i64) {
         unsafe { OPENSSL_LH_set_down_load(x.cache.lh, down) };
         gone
     };
-    if let Some(cb) = remove_cb(x) {
-        for &s in &gone {
+    // 3.6 pops them off a stack outside the lock: the last removed first, each told to the
+    // callback and then freed (3.5 called the callback under the lock, in order).
+    let cb = remove_cb(x);
+    for s in gone.into_iter().rev() {
+        if let Some(cb) = cb {
             // SAFETY: the application's callback with its context and the session; no lock
             // is held.
             unsafe { cb(c, s) };
         }
-    }
-    for s in gone {
         // SAFETY: the cache's reference.
         unsafe { session::free(s) };
     }

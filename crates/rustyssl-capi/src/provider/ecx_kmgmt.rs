@@ -29,7 +29,7 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_DHKEM_IKM, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME,
     OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    PROV_R_ALGORITHM_MISMATCH, PROV_R_INVALID_INPUT_LENGTH,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_ALGORITHM_MISMATCH, PROV_R_INVALID_INPUT_LENGTH,
 };
 use rustyssl_crypto::ec::dhkem::{self, ECX_KEMS};
 
@@ -173,6 +173,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_EC
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_IMEXPORT_TYPES) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { ecx_key(keydata) }) else { return 0 };
         if selection & KEYPAIR == 0 {
             return 0;
@@ -294,7 +298,10 @@ unsafe fn get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int {
         // SAFETY: as above.
         && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_BITS, secbits) }
         // SAFETY: as above.
-        && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, size) };
+        && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, size) }
+        // 3.6: classical keys are in no NIST post-quantum category.
+        // SAFETY: as above.
+        && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0) };
     if ok && !k.kind.is_ed() {
         // SAFETY: as above.
         ok = unsafe { set_octets(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, pubkey) };
@@ -319,28 +326,38 @@ unsafe fn get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int {
 }
 
 /// `ecx_gettable_params`.
-static ECX_GETTABLE: Params<7> = Params([
+static ECX_GETTABLE: Params<8> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
+    defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(
         OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),
-    defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
-    defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
     PARAM_END,
 ]);
 
 /// `ed_gettable_params`.
-static ED_GETTABLE: Params<7> = Params([
+static ED_GETTABLE: Params<8> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
-    defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 
@@ -481,6 +498,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn ecx_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_EC
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_GEN_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
@@ -754,6 +775,11 @@ macro_rules! ecx_keymgmt {
             pub(crate) unsafe extern "C" fn $get(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int
             where failure = 0, library = ERR_LIB_EC
             {
+                let decoder = if $ed { &crate::provider::param_decoders::ED_GET_PARAMS } else { &crate::provider::param_decoders::ECX_GET_PARAMS };
+                // SAFETY: the caller's guarantee.
+                if keydata.is_null() || !unsafe { crate::provider::param_decoders::decode(params, decoder) } {
+                    return 0;
+                }
                 // SAFETY: the caller's guarantee.
                 unsafe { get_params(keydata, params) }
             }
@@ -779,6 +805,10 @@ macro_rules! ecx_keymgmt {
             {
                 if $ed {
                     return 1;
+                }
+                // SAFETY: the caller's guarantee.
+                if keydata.is_null() || !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_SET_PARAMS) } {
+                    return 0;
                 }
                 // SAFETY: the caller's guarantee.
                 unsafe { set_params(keydata, params) }

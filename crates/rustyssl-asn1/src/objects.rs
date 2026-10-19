@@ -148,10 +148,10 @@ mod tests {
 
     #[test]
     fn duplicates_resolve_as_openssl_does() {
-        // OpenSSL 3.5's obj_dat.h: three objects are named "NULL", and ORG and
-        // identified-organization share 1.3; its binary searches stop at these.
-        assert_eq!(by_short_name(b"NULL"), Some(1323));
-        assert_eq!(by_long_name(b"NULL"), Some(1323));
+        // OpenSSL 3.6's obj_dat.h: three objects are named "NULL" (the search finds 404 there;
+        // 3.5 found 1323), and ORG and identified-organization share 1.3.
+        assert_eq!(by_short_name(b"NULL"), Some(404));
+        assert_eq!(by_long_name(b"NULL"), Some(404));
         assert_eq!(by_der(&[0x2b]), Some(379));
         assert_eq!(by_short_name(b"SHA256"), Some(672));
         assert_eq!(by_long_name(b"sha256"), Some(672));

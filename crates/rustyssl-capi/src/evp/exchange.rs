@@ -44,6 +44,14 @@ use crate::provider::Ptr;
 type InitFn = unsafe extern "C" fn(*mut c_void, *mut c_void, *const OSSL_PARAM) -> c_int;
 type SetPeerFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int;
 type DeriveFn = unsafe extern "C" fn(*mut c_void, *mut u8, *mut usize, usize) -> c_int;
+type DeriveSkeyFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const core::ffi::c_char,
+    *mut c_void,
+    Option<super::skeymgmt::ImportFn>,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut c_void;
 
 /// A key exchange's functions.
 #[derive(Default, Clone, Copy)]
@@ -52,6 +60,8 @@ pub(crate) struct Funcs {
     init: Option<InitFn>,
     set_peer: Option<SetPeerFn>,
     derive: Option<DeriveFn>,
+    /// 3.6: deriving into an opaque key of the provider's.
+    derive_skey: Option<DeriveSkeyFn>,
 }
 
 impl Table for Funcs {
@@ -64,6 +74,7 @@ impl Table for Funcs {
             OSSL_FUNC_KEYEXCH_INIT => keep!(self.init, f),
             OSSL_FUNC_KEYEXCH_SET_PEER => keep!(self.set_peer, f),
             OSSL_FUNC_KEYEXCH_DERIVE => keep!(self.derive, f),
+            rustyssl_abi::OSSL_FUNC_KEYEXCH_DERIVE_SKEY => keep!(self.derive_skey, f),
             OSSL_FUNC_KEYEXCH_FREECTX => keep!(c.freectx, f),
             OSSL_FUNC_KEYEXCH_DUPCTX => keep!(c.dupctx, f),
             OSSL_FUNC_KEYEXCH_GET_CTX_PARAMS => keep!(c.get_ctx_params, f),
@@ -462,6 +473,66 @@ ffi_export! {
         };
         // SAFETY: the provider's function with its context and the caller's buffers.
         unsafe { derive(algctx, key, pkeylen, size) }
+    }
+}
+
+ffi_export! {
+    /// Derives the shared secret into a new opaque key of the type `key_type` (3.6), `keylen`
+    /// octets: `mgmt`, or the exchange's provider's key manager for it, or any; by the
+    /// exchange's `derive_skey` when the key manager is its provider's, else derived and
+    /// imported as the raw secret. NULL on failure.
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live context; `mgmt` is NULL or a live key manager; the strings are
+    /// NULL or strings; `params` is NULL or a parameter array.
+    pub unsafe extern "C" fn EVP_PKEY_derive_SKEY(ctx: *mut EVP_PKEY_CTX, mgmt: *mut rustyssl_abi::EVP_SKEYMGMT, key_type: *const core::ffi::c_char, propquery: *const core::ffi::c_char, keylen: usize, params: *const OSSL_PARAM) -> *mut rustyssl_abi::EVP_SKEY
+    where failure = ptr::null_mut(), library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_PKEY_derive_SKEY";
+        // SAFETY: the caller's guarantee.
+        let c = unsafe { pkey_ctx::context(ctx) };
+        let (Some(c), false) = (c, key_type.is_null()) else {
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+            return ptr::null_mut();
+        };
+        if !c.lock().is_derive_op() {
+            err::raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED, F);
+            return ptr::null_mut();
+        }
+        let Some((m, algctx)) = provider_op(c) else {
+            err::raise(rustyssl_abi::ERR_R_EVP_LIB, rustyssl_abi::ERR_R_UNSUPPORTED, F);
+            return ptr::null_mut();
+        };
+        let libctx = c.lock().libctx.0;
+        // SAFETY: a string.
+        let kt = unsafe { core::ffi::CStr::from_ptr(key_type) };
+        let prov = m.get().prov.0;
+        // SAFETY: the caller's guarantee; the exchange's live provider.
+        let Some(sk) = (unsafe { super::skey::derive_skeymgmt(mgmt, prov, libctx, kt, propquery) }) else {
+            return ptr::null_mut();
+        };
+        let funcs = m.get().funcs;
+        if sk.get().prov.0 != prov || funcs.derive_skey.is_none() {
+            let Some(derive) = funcs.derive else {
+                err::raise(rustyssl_abi::ERR_R_EVP_LIB, rustyssl_abi::ERR_R_UNSUPPORTED, F);
+                return ptr::null_mut();
+            };
+            return super::skey::import_derived(sk, keylen, |key| {
+                let mut len = key.len();
+                // SAFETY: the provider's function with its context and our room.
+                let ok = unsafe { derive(algctx, key.as_mut_ptr(), &raw mut len, key.len()) } != 0;
+                if ok && len != key.len() {
+                    err::raise(rustyssl_abi::ERR_R_EVP_LIB, rustyssl_abi::ERR_R_INTERNAL_ERROR, F);
+                    return false;
+                }
+                ok
+            });
+        }
+        let Some(derive_skey) = funcs.derive_skey else { return ptr::null_mut() };
+        let (pctx, import) = (sk.get().provider_ctx(), sk.get().import_fn());
+        // SAFETY: the provider's function with its context and the key manager's.
+        let keydata = unsafe { derive_skey(algctx, key_type, pctx, import, keylen, params) };
+        super::skey::new_key(sk, keydata)
     }
 }
 

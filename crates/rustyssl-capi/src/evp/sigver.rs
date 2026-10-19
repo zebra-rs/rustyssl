@@ -691,6 +691,16 @@ unsafe fn sigver_update(
     let Some((sig, algctx)) = (unsafe { provided(c, op) }) else {
         // `legacy`: an ordinary digest update, after a legacy method's `digest_custom`.
         let pctx = c.pctx;
+        // 3.6's signing (not verifying) refuses a key context without a legacy method, as
+        // after a failed init.
+        if !ver
+            // SAFETY: the context's key context, NULL or live.
+            && let Some(lc) = unsafe { pkey_ctx::context(pctx) }
+            && lc.lock().pmeth_funcs().is_none()
+        {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, function);
+            return 0;
+        }
         // SAFETY: the context's key context, NULL or live.
         if !unsafe { call_digest_custom(ctx, pctx) } {
             return 0;

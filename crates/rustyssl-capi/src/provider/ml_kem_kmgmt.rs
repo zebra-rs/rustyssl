@@ -17,22 +17,24 @@ use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rustyssl_abi::{
-    ERR_LIB_CRYPTO, ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, OSSL_CALLBACK, OSSL_FUNC_KEYMGMT_DUP,
-    OSSL_FUNC_KEYMGMT_EXPORT, OSSL_FUNC_KEYMGMT_EXPORT_TYPES, OSSL_FUNC_KEYMGMT_FREE,
-    OSSL_FUNC_KEYMGMT_GEN, OSSL_FUNC_KEYMGMT_GEN_CLEANUP, OSSL_FUNC_KEYMGMT_GEN_INIT,
-    OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS,
-    OSSL_FUNC_KEYMGMT_GET_PARAMS, OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS,
-    OSSL_FUNC_KEYMGMT_IMPORT, OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_LOAD,
-    OSSL_FUNC_KEYMGMT_MATCH, OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_SET_PARAMS,
-    OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_VALIDATE,
-    OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
+    CMS_RECIPINFO_KEM, ERR_LIB_CRYPTO, ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, NID_HKDF_SHA256,
+    OSSL_CALLBACK, OSSL_FUNC_KEYMGMT_DUP, OSSL_FUNC_KEYMGMT_EXPORT, OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
+    OSSL_FUNC_KEYMGMT_FREE, OSSL_FUNC_KEYMGMT_GEN, OSSL_FUNC_KEYMGMT_GEN_CLEANUP,
+    OSSL_FUNC_KEYMGMT_GEN_INIT, OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS,
+    OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_GET_PARAMS,
+    OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, OSSL_FUNC_KEYMGMT_HAS, OSSL_FUNC_KEYMGMT_IMPORT,
+    OSSL_FUNC_KEYMGMT_IMPORT_TYPES, OSSL_FUNC_KEYMGMT_LOAD, OSSL_FUNC_KEYMGMT_MATCH,
+    OSSL_FUNC_KEYMGMT_NEW, OSSL_FUNC_KEYMGMT_SET_PARAMS, OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS,
+    OSSL_FUNC_KEYMGMT_VALIDATE, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, OSSL_KEYMGMT_SELECT_KEYPAIR,
     OSSL_KEYMGMT_SELECT_PRIVATE_KEY, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM,
     OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_BITS,
+    OSSL_PKEY_PARAM_CMS_KEMRI_KDF_ALGORITHM, OSSL_PKEY_PARAM_CMS_RI_TYPE,
     OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_MAX_SIZE,
     OSSL_PKEY_PARAM_ML_KEM_IMPORT_PCT_TYPE, OSSL_PKEY_PARAM_ML_KEM_PREFER_SEED,
     OSSL_PKEY_PARAM_ML_KEM_RETAIN_SEED, OSSL_PKEY_PARAM_ML_KEM_SEED, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    PROV_R_INVALID_KEY, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_INVALID_KEY, PROV_R_INVALID_KEY_LENGTH,
+    PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
     PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
 };
 use rustyssl_crypto::mlkem::{self, PrivateKey, PublicKey, RANDOM_BYTES, SEED_BYTES, Variant};
@@ -395,6 +397,15 @@ unsafe fn key_fromdata(k: &MlKemKey, params: *const OSSL_PARAM, include_private:
     if k.has_public() {
         return false;
     }
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::ML_KEM_KEY_TYPE_PARAMS,
+        )
+    } {
+        return false;
+    }
     let v = k.variant;
     let name = v.name();
     let (mut seed, mut prv): (&[u8], &[u8]) = (&[], &[]);
@@ -654,6 +665,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_KEM_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let v = k.variant;
         // SAFETY: the caller's array, for each.
@@ -661,8 +676,24 @@ ffi_callback! {
             // SAFETY: as above.
             && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_BITS, v.security_bits()) }
             // SAFETY: as above.
-            && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, v.ciphertext_bytes()) })
+            && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, v.ciphertext_bytes()) }
+            // SAFETY: as above.
+            && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_CATEGORY, v.security_category()) }
+            // CMS's KEMRecipientInfo (from 3.6): the recipient info type, and the KDF's
+            // AlgorithmIdentifier, HKDF-SHA256 with absent parameters.
+            // SAFETY: as above.
+            && unsafe { set_int(params, OSSL_PKEY_PARAM_CMS_RI_TYPE, CMS_RECIPINFO_KEM) })
         {
+            return 0;
+        }
+        let kdf_alg = super::kdfs::oid_der(NID_HKDF_SHA256).and_then(|oid| {
+            let mut aid = vec![0x30, u8::try_from(oid.len()).ok()?];
+            aid.extend_from_slice(&oid);
+            Some(aid)
+        });
+        let Some(kdf_alg) = kdf_alg else { return 0 };
+        // SAFETY: the caller's array.
+        if !unsafe { put(params, OSSL_PKEY_PARAM_CMS_KEMRI_KDF_ALGORITHM, &kdf_alg) } {
             return 0;
         }
         let (public, private, seed) = {
@@ -697,15 +728,26 @@ ffi_callback! {
 }
 
 /// `ml_kem_gettable_params`' list.
-static GETTABLE: Params<8> = Params([
+static GETTABLE: Params<11> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_ML_KEM_SEED, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(
         OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
+        OSSL_PARAM_OCTET_STRING,
+        0,
+    ),
+    defn(OSSL_PKEY_PARAM_CMS_RI_TYPE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_CMS_KEMRI_KDF_ALGORITHM,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),
@@ -730,6 +772,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn ml_kem_set_params(keydata: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_KEM_SET_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ml_kem_set_params";
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -813,6 +859,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_KEM_GEN_SET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: as above.
         if unsafe { is_empty(params) } {
@@ -851,8 +901,9 @@ ffi_callback! {
 }
 
 /// `ml_kem_gen_settable_params`' list.
-static GEN_SETTABLE: Params<2> = Params([
+static GEN_SETTABLE: Params<3> = Params([
     defn(OSSL_PKEY_PARAM_ML_KEM_SEED, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 
