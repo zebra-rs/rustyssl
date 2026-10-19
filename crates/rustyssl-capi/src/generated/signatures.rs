@@ -322,6 +322,20 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::A
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::ASN1_PRINTABLE_new;
 const _: unsafe extern "C" fn(*const core::ffi::c_uchar, core::ffi::c_int) -> core::ffi::c_int =
     crate::asn1::text::ASN1_PRINTABLE_type;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) = crate::asn1::sctx::ASN1_SCTX_free;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *mut core::ffi::c_void =
+    crate::asn1::sctx::ASN1_SCTX_get_app_data;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> core::ffi::c_ulong =
+    crate::asn1::sctx::ASN1_SCTX_get_flags;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *const ASN1_ITEM =
+    crate::asn1::sctx::ASN1_SCTX_get_item;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *const ASN1_TEMPLATE =
+    crate::asn1::sctx::ASN1_SCTX_get_template;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut ASN1_SCTX) -> core::ffi::c_int>,
+) -> *mut ASN1_SCTX = crate::asn1::sctx::ASN1_SCTX_new;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX, *mut core::ffi::c_void) =
+    crate::asn1::sctx::ASN1_SCTX_set_app_data;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SEQUENCE_ANY_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SEQUENCE_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SET_ANY_it;

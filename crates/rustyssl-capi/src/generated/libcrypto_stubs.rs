@@ -8,43 +8,6 @@
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_free(_: *mut ASN1_SCTX) {
-    crate::stub::unimplemented("ASN1_SCTX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_get_app_data(_: *mut ASN1_SCTX) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("ASN1_SCTX_get_app_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_get_flags(_: *mut ASN1_SCTX) -> core::ffi::c_ulong {
-    crate::stub::unimplemented("ASN1_SCTX_get_flags")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_get_item(_: *mut ASN1_SCTX) -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASN1_SCTX_get_item")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_get_template(_: *mut ASN1_SCTX) -> *const ASN1_TEMPLATE {
-    crate::stub::unimplemented("ASN1_SCTX_get_template")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_new(
-    _: ::core::option::Option<unsafe extern "C" fn(ctx: *mut ASN1_SCTX) -> core::ffi::c_int>,
-) -> *mut ASN1_SCTX {
-    crate::stub::unimplemented("ASN1_SCTX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_SCTX_set_app_data(_: *mut ASN1_SCTX, _: *mut core::ffi::c_void) {
-    crate::stub::unimplemented("ASN1_SCTX_set_app_data")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
     crate::stub::unimplemented("BIO_new_from_core_bio")
 }

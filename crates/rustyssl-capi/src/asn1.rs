@@ -16,6 +16,7 @@ pub(crate) mod item_list;
 pub(crate) mod mime;
 pub(crate) mod ndef;
 pub(crate) mod parse;
+pub(crate) mod sctx;
 pub(crate) mod sign;
 pub(crate) mod string;
 pub(crate) mod text;

@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 5711 | 165 | 97.2% |
+| libcrypto | 5876 | 5718 | 158 | 97.3% |
 | libssl | 603 | 595 | 8 | 98.7% |
-| **Total** | **6479** | **6306** | **173** | **97.3%** |
+| **Total** | **6479** | **6313** | **166** | **97.4%** |
 
 ## By header
 
@@ -25,7 +25,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
 | `openssl/aes.h` | libcrypto | 15 | 15 | 100.0% |
-| `openssl/asn1.h` | libcrypto | 291 | 284 | 97.6% |
+| `openssl/asn1.h` | libcrypto | 291 | 291 | 100.0% |
 | `openssl/asn1t.h` | libcrypto | 20 | 20 | 100.0% |
 | `openssl/async.h` | libcrypto | 22 | 22 | 100.0% |
 | `openssl/bio.h` | libcrypto | 184 | 181 | 98.4% |
@@ -233,6 +233,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_PRINTABLE_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_PRINTABLE_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `ASN1_PRINTABLE_type` | libcrypto | `openssl/asn1.h` | `asn1_text` |
+| `ASN1_SCTX_free` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_get_app_data` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_get_flags` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_get_item` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_get_template` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_new` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
+| `ASN1_SCTX_set_app_data` | libcrypto | `openssl/asn1.h` | `asn1_sctx` |
 | `ASN1_SEQUENCE_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_template`, `http` |
 | `ASN1_SEQUENCE_it` | libcrypto | `openssl/asn1t.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_SET_ANY_it` | libcrypto | `openssl/asn1.h` | `asn1_template` |
