@@ -92,10 +92,11 @@ internal dtls_mtu_test run_mtu_tests
 # evp_extra_test: test_EVP_PKEY_check sets a context's key by writing into the private
 # EVP_PKEY_CTX; the others call internal functions (only weakly linked here, see
 # xtask/src/test_openssl_suite/ssl.rs): test_custom_pmeth's legacy-key iterations downgrade
-# with evp_pkey_copy_downgraded, test_EC_keygen_with_enc exports with
+# with evp_pkey_copy_downgraded (its provided-key iterations, 1-6, check the key with
+# evp_pkey_is_provided, a macro reading the private EVP_PKEY), test_EC_keygen_with_enc exports with
 # evp_keymgmt_util_export, and the fake pipelining provider's parameters are
 # ossl_cipher_generic_get_params and _gettable_params.
-internal evp_extra_test test_EVP_PKEY_check test_custom_pmeth#7 test_custom_pmeth#8 test_custom_pmeth#9 test_custom_pmeth#10 test_custom_pmeth#11 test_custom_pmeth#12 test_EC_keygen_with_enc test_evp_cipher_pipeline
+internal evp_extra_test test_EVP_PKEY_check test_custom_pmeth#1 test_custom_pmeth#2 test_custom_pmeth#3 test_custom_pmeth#4 test_custom_pmeth#5 test_custom_pmeth#6 test_custom_pmeth#7 test_custom_pmeth#8 test_custom_pmeth#9 test_custom_pmeth#10 test_custom_pmeth#11 test_custom_pmeth#12 test_EC_keygen_with_enc test_evp_cipher_pipeline
 
 skip ssl_handshake_rtt_test calls libssl's internal state machine (ossl_statem_*_write_transition) and reads SSL_CONNECTION
 skip cipher_overhead_test calls libssl's internal cipher table (ssl3_get_cipher, ssl_cipher_get_overhead)
