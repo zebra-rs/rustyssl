@@ -5477,9 +5477,9 @@ both libraries (step 8.1).
       29 groups (1392 handshakes). rustyssl passes everything the reference does. (The CA
       script fails on both: its certificate's fixed end date, 2025-08-23, has passed.)
     - pkcs11-provider 1.3.0 (x86_64 Linux, Docker): the NSS softokn suite passes as on the
-      reference (30 of 31; one skipped on both). The SoftHSM suite needs SoftHSM itself to
-      run on rustyssl, and its setup calls `ENGINE_by_id`, so it waits for 9.3 (1 of 26
-      until then).
+      reference (30 of 31; one skipped on both). The SoftHSM suite, with SoftHSM itself
+      running on rustyssl (its setup calls `ENGINE_by_id`), passes as on the reference once
+      9.3's engines are in: 24 of 26 on both.
     - tpm2-openssl 1.3.0 (x86_64 Linux, Docker, `swtpm` behind `tpm2-abrmd`): all 48 tests
       pass on both.
   - Found by the validation:
