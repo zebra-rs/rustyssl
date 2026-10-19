@@ -337,8 +337,28 @@ AES-128-CBC/HMAC-SHA1 record without encrypt-then-MAC whose padding length is 0 
 That target found rustyssl's padding removal taking about 70 ns longer on a good padding (|t|
 18–20, reference 3): LLVM had turned the masks into data-dependent code, and they now pass
 through an optimization barrier. Measured 2026-10-18 (Apple silicon), every target under
-|t| 10 on rustyssl; `tls-cbc-record` 4.9 (reference 4.4), X25519 the highest at 9.4
-(reference 2.6), which is worth watching.
+|t| 10 on rustyssl; `tls-cbc-record` 4.9 (reference 4.4).
+
+X25519 was the next highest, at |t| 9.4 (reference 2.6), and it crossed 10 in some runs (3.9 to
+13.9 over four runs of 100,000). `x25519-derive`, which times `EVP_PKEY_derive` alone, and
+`x25519-ctx`, which times the context's setup alone, put it in the derivation: about 0.2 ticks
+of `mach_absolute_time` (roughly 10 ns) in 25 µs, the fixed key 0x11×32 the faster, |t| 10–14 at
+400,000 measurements against the reference's 3–6. Two controls, both of them harness switches
+(`DUDECT_DIT=1`, `DUDECT_FIXED_RANDOM=1`; `DUDECT_MEANS=1` prints the class means):
+- **DIT set:** with Arm's `PSTATE.DIT` set for the run, the signal went away (|t| 2.7, 2.1).
+- **Random fixed key:** a random fixed key, drawn once in place of the structured one, showed
+  none either (|t| 1.9, 1.7).
+
+So no branch or lookup depends on the key; on this core (an M5) instructions that
+`curve25519-dalek`'s constant-time arithmetic relies on take operand-dependent time unless DIT
+is set. rustyssl now runs X25519, X448 and the EdDSA public-key derivations with DIT set
+(`rustyssl-capi/src/dit.rs`; the caller's setting is restored, and cores without `FEAT_DIT` are
+left alone). After: `x25519-derive` |t| 1.4–3.6 at 400,000 measurements and `x25519` 2.5, at the
+same speed.
+
+The other secret-handling paths (ECDSA and RSA private operations, ML-KEM, the software AEADs,
+BN `CONSTTIME`) don't set DIT yet. Their targets are under |t| 10, but they're candidates for
+the same treatment.
 
 **CVE regression suite (`tests/cve/`).** Every OpenSSL security advisory since 2014
 (openssl-library.org vulnerabilities list) is classified as **applicable** (a test
