@@ -151,6 +151,11 @@ impl Siv {
     /// `siv_init` before the parameters: the direction, and the key if given
     /// (`ossl_siv128_init`).
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>) -> Result<(), Error> {
         self.enc = enc;
         let Some(key) = key else {
             return Ok(());
@@ -274,6 +279,17 @@ impl Siv {
         out: bool,
         outsize: usize,
     ) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(input, inl, out, outsize))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(
+        &mut self,
+        input: Option<&[u8]>,
+        inl: usize,
+        out: bool,
+        outsize: usize,
+    ) -> Result<Output, Error> {
         if out && outsize < inl {
             return Err(Error::OutputBufferTooSmall);
         }
@@ -307,6 +323,11 @@ impl Siv {
 
     /// `siv_stream_final`: whether the last encryption or decryption succeeded.
     pub fn finalize(&self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&self) -> Result<Output, Error> {
         if self.final_ret == 0 {
             Ok(Output::new(Vec::new(), 0))
         } else {
@@ -398,6 +419,11 @@ impl GcmSiv {
     /// `ossl_aes_gcm_siv_init` before the parameters: the direction, key, and nonce, then the
     /// message keys derived from them (every init, with or without a new key).
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.enc = enc;
         if let Some(key) = key {
             if key.len() != self.key_len {
@@ -583,6 +609,17 @@ impl GcmSiv {
         out: bool,
         outsize: usize,
     ) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(input, inl, out, outsize))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(
+        &mut self,
+        input: Option<&[u8]>,
+        inl: usize,
+        out: bool,
+        outsize: usize,
+    ) -> Result<Output, Error> {
         if outsize < inl {
             return Err(Error::OutputBufferTooSmall);
         }
@@ -623,6 +660,11 @@ impl GcmSiv {
 
     /// `final`.
     pub fn finalize(&mut self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<Output, Error> {
         if self.finish() {
             Ok(Output::new(Vec::new(), 0))
         } else {

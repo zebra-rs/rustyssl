@@ -99,7 +99,7 @@ enum Start {
 impl Gcm {
     /// `CRYPTO_gcm128_init`: the hash key is the block function's encryption of zeros.
     pub fn new(b: &impl Block128) -> Self {
-        Self {
+        crate::dit::with(|| Self {
             h: b.block(&[0; BLOCK]),
             yi: [0; BLOCK],
             eki: [0; BLOCK],
@@ -110,7 +110,7 @@ impl Gcm {
             ares: 0,
             alen: 0,
             mlen: 0,
-        }
+        })
     }
 
     /// Hashes `data` (whole blocks) into the running hash.
@@ -155,38 +155,40 @@ impl Gcm {
     /// `CRYPTO_gcm128_setiv`: a 12-octet IV with a counter of 1, any other length hashed;
     /// the lengths and the hash start again.
     pub fn setiv(&mut self, iv: &[u8], b: &impl Block128) {
-        self.alen = 0;
-        self.mlen = 0;
-        self.ares = 0;
-        self.mres = 0;
-        let ctr;
-        if iv.len() == 12 {
-            self.yi = [0; BLOCK];
-            put(&mut self.yi, 0, iv);
-            self.yi[15] = 1;
-            ctr = 1u32;
-        } else {
+        crate::dit::with(|| {
+            self.alen = 0;
+            self.mlen = 0;
+            self.ares = 0;
+            self.mres = 0;
+            let ctr;
+            if iv.len() == 12 {
+                self.yi = [0; BLOCK];
+                put(&mut self.yi, 0, iv);
+                self.yi[15] = 1;
+                ctr = 1u32;
+            } else {
+                self.xi = [0; BLOCK];
+                let (blocks, rest) = iv.as_chunks::<BLOCK>();
+                for block in blocks {
+                    xor_into(&mut self.xi, block);
+                    self.mul();
+                }
+                if !rest.is_empty() {
+                    xor_into(&mut self.xi, &block_at(rest, 0));
+                    self.mul();
+                }
+                let bits = u64::try_from(iv.len()).unwrap_or(u64::MAX).wrapping_shl(3);
+                let mut len = [0u8; BLOCK];
+                put(&mut len, 8, &bits.to_be_bytes());
+                xor_into(&mut self.xi, &len);
+                self.mul();
+                ctr = self.ctr_of_xi();
+                self.yi = self.xi;
+            }
             self.xi = [0; BLOCK];
-            let (blocks, rest) = iv.as_chunks::<BLOCK>();
-            for block in blocks {
-                xor_into(&mut self.xi, block);
-                self.mul();
-            }
-            if !rest.is_empty() {
-                xor_into(&mut self.xi, &block_at(rest, 0));
-                self.mul();
-            }
-            let bits = u64::try_from(iv.len()).unwrap_or(u64::MAX).wrapping_shl(3);
-            let mut len = [0u8; BLOCK];
-            put(&mut len, 8, &bits.to_be_bytes());
-            xor_into(&mut self.xi, &len);
-            self.mul();
-            ctr = self.ctr_of_xi();
-            self.yi = self.xi;
-        }
-        self.xi = [0; BLOCK];
-        self.ek0 = b.block(&self.yi);
-        self.set_ctr(ctr.wrapping_add(1));
+            self.ek0 = b.block(&self.yi);
+            self.set_ctr(ctr.wrapping_add(1));
+        })
     }
 
     /// The running hash's last 32 bits, as a counter.
@@ -201,43 +203,45 @@ impl Gcm {
 
     /// `CRYPTO_gcm128_aad`: 0, -1 past 2^61 octets of AAD, or -2 after the message has started.
     pub fn aad(&mut self, aad: &[u8]) -> i32 {
-        if self.mlen != 0 {
-            return -2;
-        }
-        let len = u64::try_from(aad.len()).unwrap_or(u64::MAX);
-        let alen = self.alen.wrapping_add(len);
-        if alen > GCM_MAX_AAD || alen < len {
-            return -1;
-        }
-        self.alen = alen;
-        let mut aad = aad;
-        let mut n = self.ares;
-        if n != 0 {
-            while n != 0 && !aad.is_empty() {
-                if let (Some(x), Some(a)) = (self.xi.get_mut(n), aad.first()) {
-                    *x ^= a;
+        crate::dit::with(|| {
+            if self.mlen != 0 {
+                return -2;
+            }
+            let len = u64::try_from(aad.len()).unwrap_or(u64::MAX);
+            let alen = self.alen.wrapping_add(len);
+            if alen > GCM_MAX_AAD || alen < len {
+                return -1;
+            }
+            self.alen = alen;
+            let mut aad = aad;
+            let mut n = self.ares;
+            if n != 0 {
+                while n != 0 && !aad.is_empty() {
+                    if let (Some(x), Some(a)) = (self.xi.get_mut(n), aad.first()) {
+                        *x ^= a;
+                    }
+                    aad = aad.get(1..).unwrap_or_default();
+                    n = n.wrapping_add(1) % BLOCK;
                 }
-                aad = aad.get(1..).unwrap_or_default();
-                n = n.wrapping_add(1) % BLOCK;
+                if n == 0 {
+                    self.mul();
+                } else {
+                    self.ares = n;
+                    return 0;
+                }
             }
-            if n == 0 {
-                self.mul();
-            } else {
-                self.ares = n;
-                return 0;
+            let whole = aad.len() & !(BLOCK - 1);
+            if whole != 0 {
+                self.ghash(aad.get(..whole).unwrap_or_default());
+                aad = aad.get(whole..).unwrap_or_default();
             }
-        }
-        let whole = aad.len() & !(BLOCK - 1);
-        if whole != 0 {
-            self.ghash(aad.get(..whole).unwrap_or_default());
-            aad = aad.get(whole..).unwrap_or_default();
-        }
-        if !aad.is_empty() {
-            n = aad.len();
-            xor_into(&mut self.xi, &block_at(aad, 0));
-        }
-        self.ares = n;
-        0
+            if !aad.is_empty() {
+                n = aad.len();
+                xor_into(&mut self.xi, &block_at(aad, 0));
+            }
+            self.ares = n;
+            0
+        })
     }
 
     /// The start of an encryption or decryption of `len` octets: the length check, and the
@@ -373,12 +377,12 @@ impl Gcm {
 
     /// `CRYPTO_gcm128_encrypt`.
     pub fn encrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        self.crypt(input, out, b, None, true)
+        crate::dit::with(|| self.crypt(input, out, b, None, true))
     }
 
     /// `CRYPTO_gcm128_decrypt`.
     pub fn decrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        self.crypt(input, out, b, None, false)
+        crate::dit::with(|| self.crypt(input, out, b, None, false))
     }
 
     /// `CRYPTO_gcm128_encrypt_ctr32`: whole blocks through `stream`.
@@ -389,7 +393,7 @@ impl Gcm {
         b: &impl Block128,
         stream: &impl Ctr128,
     ) -> i32 {
-        self.crypt(input, out, b, Some(stream), true)
+        crate::dit::with(|| self.crypt(input, out, b, Some(stream), true))
     }
 
     /// `CRYPTO_gcm128_decrypt_ctr32`: whole blocks through `stream`.
@@ -400,47 +404,51 @@ impl Gcm {
         b: &impl Block128,
         stream: &impl Ctr128,
     ) -> i32 {
-        self.crypt(input, out, b, Some(stream), false)
+        crate::dit::with(|| self.crypt(input, out, b, Some(stream), false))
     }
 
     /// `CRYPTO_gcm128_finish`: hashes what's buffered and the lengths into the tag, then
     /// compares the first `tag.len()` (at most 16) octets with `tag`: 0 if equal, 1 if not, -1
     /// with no tag or a longer one. Nothing is reset, so another `finish` hashes again.
     pub fn finish(&mut self, tag: Option<&[u8]>) -> i32 {
-        let mut mres = self.mres;
-        if mres != 0 {
-            let blocks = mres.next_multiple_of(BLOCK);
-            for x in self.xn.iter_mut().take(blocks).skip(mres) {
-                *x = 0;
+        crate::dit::with(|| {
+            let mut mres = self.mres;
+            if mres != 0 {
+                let blocks = mres.next_multiple_of(BLOCK);
+                for x in self.xn.iter_mut().take(blocks).skip(mres) {
+                    *x = 0;
+                }
+                mres = blocks;
+                if mres == self.xn.len() {
+                    self.ghash_xn(mres);
+                    mres = 0;
+                }
+            } else if self.ares != 0 {
+                self.mul();
             }
-            mres = blocks;
-            if mres == self.xn.len() {
-                self.ghash_xn(mres);
-                mres = 0;
+            put(&mut self.xn, mres, &self.alen.wrapping_shl(3).to_be_bytes());
+            put(
+                &mut self.xn,
+                mres.saturating_add(8),
+                &self.mlen.wrapping_shl(3).to_be_bytes(),
+            );
+            self.ghash_xn(mres.saturating_add(BLOCK));
+            let ek0 = self.ek0;
+            xor_into(&mut self.xi, &ek0);
+            match tag {
+                Some(t) if t.len() <= BLOCK => memcmp(&self.xi, t, t.len()),
+                _ => -1,
             }
-        } else if self.ares != 0 {
-            self.mul();
-        }
-        put(&mut self.xn, mres, &self.alen.wrapping_shl(3).to_be_bytes());
-        put(
-            &mut self.xn,
-            mres.saturating_add(8),
-            &self.mlen.wrapping_shl(3).to_be_bytes(),
-        );
-        self.ghash_xn(mres.saturating_add(BLOCK));
-        let ek0 = self.ek0;
-        xor_into(&mut self.xi, &ek0);
-        match tag {
-            Some(t) if t.len() <= BLOCK => memcmp(&self.xi, t, t.len()),
-            _ => -1,
-        }
+        })
     }
 
     /// `CRYPTO_gcm128_tag`: a `finish` without a tag, then the first `out.len()` (at most 16)
     /// octets of the tag.
     pub fn tag(&mut self, out: &mut [u8]) {
-        self.finish(None);
-        put(out, 0, &self.xi);
+        crate::dit::with(|| {
+            self.finish(None);
+            put(out, 0, &self.xi);
+        })
     }
 }
 
@@ -493,69 +501,73 @@ impl Ccm {
     /// `CRYPTO_ccm128_setiv`: the nonce (its first `14 - L` octets) and the message length.
     /// Returns 0, or -1 for a nonce too short.
     pub fn setiv(&mut self, nonce: &[u8], mlen: usize) -> i32 {
-        let l = self.l();
-        let need = 14usize.saturating_sub(l);
-        if nonce.len() < need {
-            return -1;
-        }
-        let m = u64::try_from(mlen).unwrap_or(u64::MAX).to_be_bytes();
-        if l >= 3 {
-            put(&mut self.nonce, 8, m.get(..4).unwrap_or_default());
-        } else {
-            put(&mut self.nonce, 8, &[0; 4]);
-        }
-        put(&mut self.nonce, 12, m.get(4..).unwrap_or_default());
-        self.nonce[0] &= !0x40;
-        put(&mut self.nonce, 1, nonce.get(..need).unwrap_or_default());
-        0
+        crate::dit::with(|| {
+            let l = self.l();
+            let need = 14usize.saturating_sub(l);
+            if nonce.len() < need {
+                return -1;
+            }
+            let m = u64::try_from(mlen).unwrap_or(u64::MAX).to_be_bytes();
+            if l >= 3 {
+                put(&mut self.nonce, 8, m.get(..4).unwrap_or_default());
+            } else {
+                put(&mut self.nonce, 8, &[0; 4]);
+            }
+            put(&mut self.nonce, 12, m.get(4..).unwrap_or_default());
+            self.nonce[0] &= !0x40;
+            put(&mut self.nonce, 1, nonce.get(..need).unwrap_or_default());
+            0
+        })
     }
 
     /// `CRYPTO_ccm128_aad`: starts the CBC-MAC with the nonce block (the Adata flag set) and
     /// absorbs the AAD with its length encoding. Nothing for no AAD.
     pub fn aad(&mut self, aad: &[u8], b: &impl Block128) {
-        let alen = aad.len();
-        if alen == 0 {
-            return;
-        }
-        self.nonce[0] |= 0x40;
-        self.cmac = b.block(&self.nonce);
-        self.blocks = self.blocks.wrapping_add(1);
-        let a = u64::try_from(alen).unwrap_or(u64::MAX).to_be_bytes();
-        let mut head = [0u8; 10];
-        let i = if alen < 0x10000 - 0x100 {
-            put(&mut head, 0, a.get(6..).unwrap_or_default());
-            2
-        } else if alen >= 1 << 32 {
-            head[0] = 0xff;
-            head[1] = 0xff;
-            put(&mut head, 2, &a);
-            10
-        } else {
-            head[0] = 0xff;
-            head[1] = 0xfe;
-            put(&mut head, 2, a.get(4..).unwrap_or_default());
-            6
-        };
-        for (c, h) in self.cmac.iter_mut().zip(head.iter().take(i)) {
-            *c ^= h;
-        }
-        let mut i = i;
-        let mut aad = aad;
-        loop {
-            while i < BLOCK && !aad.is_empty() {
-                if let (Some(c), Some(x)) = (self.cmac.get_mut(i), aad.first()) {
-                    *c ^= x;
-                }
-                aad = aad.get(1..).unwrap_or_default();
-                i = i.wrapping_add(1);
+        crate::dit::with(|| {
+            let alen = aad.len();
+            if alen == 0 {
+                return;
             }
-            self.cmac = b.block(&self.cmac);
+            self.nonce[0] |= 0x40;
+            self.cmac = b.block(&self.nonce);
             self.blocks = self.blocks.wrapping_add(1);
-            i = 0;
-            if aad.is_empty() {
-                break;
+            let a = u64::try_from(alen).unwrap_or(u64::MAX).to_be_bytes();
+            let mut head = [0u8; 10];
+            let i = if alen < 0x10000 - 0x100 {
+                put(&mut head, 0, a.get(6..).unwrap_or_default());
+                2
+            } else if alen >= 1 << 32 {
+                head[0] = 0xff;
+                head[1] = 0xff;
+                put(&mut head, 2, &a);
+                10
+            } else {
+                head[0] = 0xff;
+                head[1] = 0xfe;
+                put(&mut head, 2, a.get(4..).unwrap_or_default());
+                6
+            };
+            for (c, h) in self.cmac.iter_mut().zip(head.iter().take(i)) {
+                *c ^= h;
             }
-        }
+            let mut i = i;
+            let mut aad = aad;
+            loop {
+                while i < BLOCK && !aad.is_empty() {
+                    if let (Some(c), Some(x)) = (self.cmac.get_mut(i), aad.first()) {
+                        *c ^= x;
+                    }
+                    aad = aad.get(1..).unwrap_or_default();
+                    i = i.wrapping_add(1);
+                }
+                self.cmac = b.block(&self.cmac);
+                self.blocks = self.blocks.wrapping_add(1);
+                i = 0;
+                if aad.is_empty() {
+                    break;
+                }
+            }
+        })
     }
 
     /// The common start: the CBC-MAC's first block (without AAD), the counter set to 1, and
@@ -720,12 +732,12 @@ impl Ccm {
 
     /// `CRYPTO_ccm128_encrypt`.
     pub fn encrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        self.crypt(input, out, b, None, true)
+        crate::dit::with(|| self.crypt(input, out, b, None, true))
     }
 
     /// `CRYPTO_ccm128_decrypt`.
     pub fn decrypt(&mut self, input: &[u8], out: &mut [u8], b: &impl Block128) -> i32 {
-        self.crypt(input, out, b, None, false)
+        crate::dit::with(|| self.crypt(input, out, b, None, false))
     }
 
     /// `CRYPTO_ccm128_encrypt_ccm64`.
@@ -736,7 +748,7 @@ impl Ccm {
         b: &impl Block128,
         stream: &impl Ccm128,
     ) -> i32 {
-        self.crypt(input, out, b, Some(stream), true)
+        crate::dit::with(|| self.crypt(input, out, b, Some(stream), true))
     }
 
     /// `CRYPTO_ccm128_decrypt_ccm64`.
@@ -747,20 +759,22 @@ impl Ccm {
         b: &impl Block128,
         stream: &impl Ccm128,
     ) -> i32 {
-        self.crypt(input, out, b, Some(stream), false)
+        crate::dit::with(|| self.crypt(input, out, b, Some(stream), false))
     }
 
     /// `CRYPTO_ccm128_tag`: the tag into `tag` if `len` is the configured size; returns that
     /// size, or 0.
     pub fn tag(&self, tag: &mut [u8], len: usize) -> usize {
-        let m = usize::from((self.nonce[0] >> 3) & 7)
-            .saturating_mul(2)
-            .saturating_add(2);
-        if len != m {
-            return 0;
-        }
-        put(tag, 0, self.cmac.get(..m).unwrap_or_default());
-        m
+        crate::dit::with(|| {
+            let m = usize::from((self.nonce[0] >> 3) & 7)
+                .saturating_mul(2)
+                .saturating_add(2);
+            if len != m {
+                return 0;
+            }
+            put(tag, 0, self.cmac.get(..m).unwrap_or_default());
+            m
+        })
     }
 }
 
@@ -775,66 +789,68 @@ pub fn xts(
     b1: &impl Block128,
     b2: &impl Block128,
 ) -> i32 {
-    let total = input.len();
-    if total < BLOCK {
-        return -1;
-    }
-    let mut tweak = b2.block(iv);
-    let mut len = total;
-    if !enc && !total.is_multiple_of(BLOCK) {
-        len = len.saturating_sub(BLOCK);
-    }
-    let mut scratch = [0u8; BLOCK];
-    let mut i = 0;
-    while len >= BLOCK {
-        scratch = block_at(input, i);
-        xor_into(&mut scratch, &tweak);
-        scratch = b1.block(&scratch);
-        xor_into(&mut scratch, &tweak);
-        put(out, i, &scratch);
-        i = i.saturating_add(BLOCK);
-        len = len.saturating_sub(BLOCK);
-        if len == 0 {
-            return 0;
+    crate::dit::with(|| {
+        let total = input.len();
+        if total < BLOCK {
+            return -1;
         }
-        tweak = xts_double(&tweak);
-    }
-    if enc {
-        for k in 0..len {
-            let c = at(input, i.saturating_add(k));
-            if let Some(o) = out.get_mut(i.saturating_add(k)) {
-                *o = at(&scratch, k);
-            }
-            if let Some(s) = scratch.get_mut(k) {
-                *s = c;
-            }
+        let mut tweak = b2.block(iv);
+        let mut len = total;
+        if !enc && !total.is_multiple_of(BLOCK) {
+            len = len.saturating_sub(BLOCK);
         }
-        xor_into(&mut scratch, &tweak);
-        scratch = b1.block(&scratch);
-        xor_into(&mut scratch, &tweak);
-        put(out, i.saturating_sub(BLOCK), &scratch);
-    } else {
-        let tweak1 = xts_double(&tweak);
-        scratch = block_at(input, i);
-        xor_into(&mut scratch, &tweak1);
-        scratch = b1.block(&scratch);
-        xor_into(&mut scratch, &tweak1);
-        for k in 0..len {
-            let c = at(input, i.saturating_add(BLOCK).saturating_add(k));
-            if let Some(o) = out.get_mut(i.saturating_add(BLOCK).saturating_add(k)) {
-                *o = at(&scratch, k);
+        let mut scratch = [0u8; BLOCK];
+        let mut i = 0;
+        while len >= BLOCK {
+            scratch = block_at(input, i);
+            xor_into(&mut scratch, &tweak);
+            scratch = b1.block(&scratch);
+            xor_into(&mut scratch, &tweak);
+            put(out, i, &scratch);
+            i = i.saturating_add(BLOCK);
+            len = len.saturating_sub(BLOCK);
+            if len == 0 {
+                return 0;
             }
-            if let Some(s) = scratch.get_mut(k) {
-                *s = c;
-            }
+            tweak = xts_double(&tweak);
         }
-        xor_into(&mut scratch, &tweak);
-        scratch = b1.block(&scratch);
-        xor_into(&mut scratch, &tweak);
-        put(out, i, &scratch);
-    }
-    scratch.zeroize();
-    0
+        if enc {
+            for k in 0..len {
+                let c = at(input, i.saturating_add(k));
+                if let Some(o) = out.get_mut(i.saturating_add(k)) {
+                    *o = at(&scratch, k);
+                }
+                if let Some(s) = scratch.get_mut(k) {
+                    *s = c;
+                }
+            }
+            xor_into(&mut scratch, &tweak);
+            scratch = b1.block(&scratch);
+            xor_into(&mut scratch, &tweak);
+            put(out, i.saturating_sub(BLOCK), &scratch);
+        } else {
+            let tweak1 = xts_double(&tweak);
+            scratch = block_at(input, i);
+            xor_into(&mut scratch, &tweak1);
+            scratch = b1.block(&scratch);
+            xor_into(&mut scratch, &tweak1);
+            for k in 0..len {
+                let c = at(input, i.saturating_add(BLOCK).saturating_add(k));
+                if let Some(o) = out.get_mut(i.saturating_add(BLOCK).saturating_add(k)) {
+                    *o = at(&scratch, k);
+                }
+                if let Some(s) = scratch.get_mut(k) {
+                    *s = c;
+                }
+            }
+            xor_into(&mut scratch, &tweak);
+            scratch = b1.block(&scratch);
+            xor_into(&mut scratch, &tweak);
+            put(out, i, &scratch);
+        }
+        scratch.zeroize();
+        0
+    })
 }
 
 /// XTS's tweak times x in GF(2^128), little-endian.
@@ -925,26 +941,28 @@ impl Ocb {
     /// `CRYPTO_ocb128_init`: `L_*` is the encryption of zeros, `L_$` and `L_0`..`L_4` its
     /// doublings.
     pub fn new(e: &impl Block128) -> Self {
-        let l_star = e.block(&[0; BLOCK]);
-        let l_dollar = ocb_double(&l_star);
-        let mut l = [[0u8; BLOCK]; OCB_MAX_L];
-        let mut prev = l_dollar;
-        for slot in l.iter_mut().take(5) {
-            prev = ocb_double(&prev);
-            *slot = prev;
-        }
-        Self {
-            l_star,
-            l_dollar,
-            l,
-            l_index: 4,
-            blocks_hashed: 0,
-            blocks_processed: 0,
-            offset_aad: [0; BLOCK],
-            sum: [0; BLOCK],
-            offset: [0; BLOCK],
-            checksum: [0; BLOCK],
-        }
+        crate::dit::with(|| {
+            let l_star = e.block(&[0; BLOCK]);
+            let l_dollar = ocb_double(&l_star);
+            let mut l = [[0u8; BLOCK]; OCB_MAX_L];
+            let mut prev = l_dollar;
+            for slot in l.iter_mut().take(5) {
+                prev = ocb_double(&prev);
+                *slot = prev;
+            }
+            Self {
+                l_star,
+                l_dollar,
+                l,
+                l_index: 4,
+                blocks_hashed: 0,
+                blocks_processed: 0,
+                offset_aad: [0; BLOCK],
+                sum: [0; BLOCK],
+                offset: [0; BLOCK],
+                checksum: [0; BLOCK],
+            }
+        })
     }
 
     /// `L_idx`, computing the ones up to it.
@@ -963,84 +981,88 @@ impl Ocb {
     /// `CRYPTO_ocb128_setiv`: a nonce of 1 to 15 octets and a tag of 1 to 16. Returns 1, or
     /// -1.
     pub fn setiv(&mut self, iv: &[u8], taglen: usize, e: &impl Block128) -> i32 {
-        let len = iv.len();
-        if !(1..=15).contains(&len) || !(1..=16).contains(&taglen) {
-            return -1;
-        }
-        self.blocks_hashed = 0;
-        self.blocks_processed = 0;
-        self.offset_aad = [0; BLOCK];
-        self.sum = [0; BLOCK];
-        self.offset = [0; BLOCK];
-        self.checksum = [0; BLOCK];
-        let mut nonce = [0u8; BLOCK];
-        nonce[0] = u8::try_from((taglen.saturating_mul(8) % 128) << 1).unwrap_or(0);
-        put(&mut nonce, BLOCK.saturating_sub(len), iv);
-        if let Some(x) = nonce.get_mut(15usize.saturating_sub(len)) {
-            *x |= 1;
-        }
-        let mut tmp = nonce;
-        tmp[15] &= 0xc0;
-        let mut ktop = e.block(&tmp);
-        let mut stretch = [0u8; 24];
-        put(&mut stretch, 0, &ktop);
-        for (k, s) in stretch.iter_mut().skip(BLOCK).enumerate() {
-            *s = at(&ktop, k) ^ at(&ktop, k.saturating_add(1));
-        }
-        let bottom = usize::from(nonce[15] & 0x3f);
-        let shift = bottom % 8;
-        let base = bottom / 8;
-        for k in 0..BLOCK {
-            let hi = at(&stretch, base.saturating_add(k));
-            let lo = if k == 15 {
-                0
-            } else {
-                at(&stretch, base.saturating_add(k).saturating_add(1))
-            };
-            let v = if shift == 0 {
-                hi
-            } else {
-                (hi << shift) | (lo >> 8usize.wrapping_sub(shift))
-            };
-            if let Some(o) = self.offset.get_mut(k) {
-                *o = v;
+        crate::dit::with(|| {
+            let len = iv.len();
+            if !(1..=15).contains(&len) || !(1..=16).contains(&taglen) {
+                return -1;
             }
-        }
-        if shift != 0 {
-            let back = 8usize.wrapping_sub(shift);
-            let mask = 0xffu8 << back;
-            self.offset[15] |= (at(&stretch, base.saturating_add(16)) & mask) >> back;
-        }
-        ktop.zeroize();
-        stretch.zeroize();
-        1
+            self.blocks_hashed = 0;
+            self.blocks_processed = 0;
+            self.offset_aad = [0; BLOCK];
+            self.sum = [0; BLOCK];
+            self.offset = [0; BLOCK];
+            self.checksum = [0; BLOCK];
+            let mut nonce = [0u8; BLOCK];
+            nonce[0] = u8::try_from((taglen.saturating_mul(8) % 128) << 1).unwrap_or(0);
+            put(&mut nonce, BLOCK.saturating_sub(len), iv);
+            if let Some(x) = nonce.get_mut(15usize.saturating_sub(len)) {
+                *x |= 1;
+            }
+            let mut tmp = nonce;
+            tmp[15] &= 0xc0;
+            let mut ktop = e.block(&tmp);
+            let mut stretch = [0u8; 24];
+            put(&mut stretch, 0, &ktop);
+            for (k, s) in stretch.iter_mut().skip(BLOCK).enumerate() {
+                *s = at(&ktop, k) ^ at(&ktop, k.saturating_add(1));
+            }
+            let bottom = usize::from(nonce[15] & 0x3f);
+            let shift = bottom % 8;
+            let base = bottom / 8;
+            for k in 0..BLOCK {
+                let hi = at(&stretch, base.saturating_add(k));
+                let lo = if k == 15 {
+                    0
+                } else {
+                    at(&stretch, base.saturating_add(k).saturating_add(1))
+                };
+                let v = if shift == 0 {
+                    hi
+                } else {
+                    (hi << shift) | (lo >> 8usize.wrapping_sub(shift))
+                };
+                if let Some(o) = self.offset.get_mut(k) {
+                    *o = v;
+                }
+            }
+            if shift != 0 {
+                let back = 8usize.wrapping_sub(shift);
+                let mask = 0xffu8 << back;
+                self.offset[15] |= (at(&stretch, base.saturating_add(16)) & mask) >> back;
+            }
+            ktop.zeroize();
+            stretch.zeroize();
+            1
+        })
     }
 
     /// `CRYPTO_ocb128_aad`: whole blocks into the sum, and a partial last block (which only
     /// the last call may have). Returns 1.
     pub fn aad(&mut self, aad: &[u8], e: &impl Block128) -> i32 {
-        let (blocks, rest) = aad.as_chunks::<BLOCK>();
-        for block in blocks {
-            self.blocks_hashed = self.blocks_hashed.wrapping_add(1);
-            let li = self.lookup(ntz(self.blocks_hashed));
-            xor_into(&mut self.offset_aad, &li);
-            let mut tmp = *block;
-            xor_into(&mut tmp, &self.offset_aad);
-            let enc = e.block(&tmp);
-            xor_into(&mut self.sum, &enc);
-        }
-        if !rest.is_empty() {
-            let ls = self.l_star;
-            xor_into(&mut self.offset_aad, &ls);
-            let mut tmp = block_at(rest, 0);
-            if let Some(x) = tmp.get_mut(rest.len()) {
-                *x = 0x80;
+        crate::dit::with(|| {
+            let (blocks, rest) = aad.as_chunks::<BLOCK>();
+            for block in blocks {
+                self.blocks_hashed = self.blocks_hashed.wrapping_add(1);
+                let li = self.lookup(ntz(self.blocks_hashed));
+                xor_into(&mut self.offset_aad, &li);
+                let mut tmp = *block;
+                xor_into(&mut tmp, &self.offset_aad);
+                let enc = e.block(&tmp);
+                xor_into(&mut self.sum, &enc);
             }
-            xor_into(&mut tmp, &self.offset_aad);
-            let enc = e.block(&tmp);
-            xor_into(&mut self.sum, &enc);
-        }
-        1
+            if !rest.is_empty() {
+                let ls = self.l_star;
+                xor_into(&mut self.offset_aad, &ls);
+                let mut tmp = block_at(rest, 0);
+                if let Some(x) = tmp.get_mut(rest.len()) {
+                    *x = 0x80;
+                }
+                xor_into(&mut tmp, &self.offset_aad);
+                let enc = e.block(&tmp);
+                xor_into(&mut self.sum, &enc);
+            }
+            1
+        })
     }
 
     /// Encrypts (`enc`, with `e`) or decrypts (with `d`), the whole blocks through `stream`
@@ -1146,7 +1168,7 @@ impl Ocb {
         d: &impl Block128,
         stream: Option<&dyn Ocb128>,
     ) -> i32 {
-        self.crypt(input, out, e, d, stream, true)
+        crate::dit::with(|| self.crypt(input, out, e, d, stream, true))
     }
 
     /// `CRYPTO_ocb128_decrypt`.
@@ -1158,7 +1180,7 @@ impl Ocb {
         d: &impl Block128,
         stream: Option<&dyn Ocb128>,
     ) -> i32 {
-        self.crypt(input, out, e, d, stream, false)
+        crate::dit::with(|| self.crypt(input, out, e, d, stream, false))
     }
 
     /// The tag: `ENCIPHER(Checksum xor Offset xor L_$) xor Sum`.
@@ -1174,25 +1196,29 @@ impl Ocb {
     /// `CRYPTO_ocb128_finish`: compares the first `tag.len()` (1 to 16) octets of the tag with
     /// `tag`: 0 if equal, 1 if not, -1 for another length.
     pub fn finish(&self, tag: &[u8], e: &impl Block128) -> i32 {
-        if !(1..=BLOCK).contains(&tag.len()) {
-            return -1;
-        }
-        let mut t = self.compute_tag(e);
-        let r = memcmp(&t, tag, tag.len());
-        t.zeroize();
-        r
+        crate::dit::with(|| {
+            if !(1..=BLOCK).contains(&tag.len()) {
+                return -1;
+            }
+            let mut t = self.compute_tag(e);
+            let r = memcmp(&t, tag, tag.len());
+            t.zeroize();
+            r
+        })
     }
 
     /// `CRYPTO_ocb128_tag`: the first `out.len()` (1 to 16) octets of the tag. Returns 1, or
     /// -1 for another length.
     pub fn tag(&self, out: &mut [u8], e: &impl Block128) -> i32 {
-        if !(1..=BLOCK).contains(&out.len()) {
-            return -1;
-        }
-        let mut t = self.compute_tag(e);
-        put(out, 0, &t);
-        t.zeroize();
-        1
+        crate::dit::with(|| {
+            if !(1..=BLOCK).contains(&out.len()) {
+                return -1;
+            }
+            let mut t = self.compute_tag(e);
+            put(out, 0, &t);
+            t.zeroize();
+            1
+        })
     }
 }
 

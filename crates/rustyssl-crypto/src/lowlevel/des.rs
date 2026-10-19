@@ -118,49 +118,51 @@ fn fp(l: &mut u32, r: &mut u32) {
 /// `DES_set_key_unchecked`: the schedule in OpenSSL's form (PC-1 by bit swaps, the
 /// rotations, PC-2 through its tables).
 pub fn set_key_unchecked(key: &[u8; 8]) -> Schedule {
-    const SHIFTS2: [bool; 16] = [
-        false, false, true, true, true, true, true, true, false, true, true, true, true, true,
-        true, false,
-    ];
-    let mut c = c2l(key, 0);
-    let mut d = c2l(key, 4);
-    perm_op(&mut d, &mut c, 4, 0x0f0f_0f0f);
-    hperm_op(&mut c, 0xcccc_0000);
-    hperm_op(&mut d, 0xcccc_0000);
-    perm_op(&mut d, &mut c, 1, 0x5555_5555);
-    perm_op(&mut c, &mut d, 8, 0x00ff_00ff);
-    perm_op(&mut d, &mut c, 1, 0x5555_5555);
-    d = ((d & 0x0000_00ff) << 16)
-        | (d & 0x0000_ff00)
-        | ((d & 0x00ff_0000) >> 16)
-        | ((c & 0xf000_0000) >> 4);
-    c &= 0x0fff_ffff;
-    let mut ks = [0u32; 32];
-    for (i, pair) in ks.as_chunks_mut::<2>().0.iter_mut().enumerate() {
-        if SHIFTS2.get(i).copied().unwrap_or(false) {
-            c = (c >> 2) | (c << 26);
-            d = (d >> 2) | (d << 26);
-        } else {
-            c = (c >> 1) | (c << 27);
-            d = (d >> 1) | (d << 27);
-        }
+    crate::dit::with(|| {
+        const SHIFTS2: [bool; 16] = [
+            false, false, true, true, true, true, true, true, false, true, true, true, true, true,
+            true, false,
+        ];
+        let mut c = c2l(key, 0);
+        let mut d = c2l(key, 4);
+        perm_op(&mut d, &mut c, 4, 0x0f0f_0f0f);
+        hperm_op(&mut c, 0xcccc_0000);
+        hperm_op(&mut d, 0xcccc_0000);
+        perm_op(&mut d, &mut c, 1, 0x5555_5555);
+        perm_op(&mut c, &mut d, 8, 0x00ff_00ff);
+        perm_op(&mut d, &mut c, 1, 0x5555_5555);
+        d = ((d & 0x0000_00ff) << 16)
+            | (d & 0x0000_ff00)
+            | ((d & 0x00ff_0000) >> 16)
+            | ((c & 0xf000_0000) >> 4);
         c &= 0x0fff_ffff;
-        d &= 0x0fff_ffff;
-        let s = ct_lookup(row(&SKB, 0), c & 0x3f)
-            | ct_lookup(row(&SKB, 1), ((c >> 6) & 0x03) | ((c >> 7) & 0x3c))
-            | ct_lookup(row(&SKB, 2), ((c >> 13) & 0x0f) | ((c >> 14) & 0x30))
-            | ct_lookup(
-                row(&SKB, 3),
-                ((c >> 20) & 0x01) | ((c >> 21) & 0x06) | ((c >> 22) & 0x38),
-            );
-        let t = ct_lookup(row(&SKB, 4), d & 0x3f)
-            | ct_lookup(row(&SKB, 5), ((d >> 7) & 0x03) | ((d >> 8) & 0x3c))
-            | ct_lookup(row(&SKB, 6), (d >> 15) & 0x3f)
-            | ct_lookup(row(&SKB, 7), ((d >> 21) & 0x0f) | ((d >> 22) & 0x30));
-        pair[0] = ((t << 16) | (s & 0x0000_ffff)).rotate_right(30);
-        pair[1] = ((s >> 16) | (t & 0xffff_0000)).rotate_right(26);
-    }
-    ks
+        let mut ks = [0u32; 32];
+        for (i, pair) in ks.as_chunks_mut::<2>().0.iter_mut().enumerate() {
+            if SHIFTS2.get(i).copied().unwrap_or(false) {
+                c = (c >> 2) | (c << 26);
+                d = (d >> 2) | (d << 26);
+            } else {
+                c = (c >> 1) | (c << 27);
+                d = (d >> 1) | (d << 27);
+            }
+            c &= 0x0fff_ffff;
+            d &= 0x0fff_ffff;
+            let s = ct_lookup(row(&SKB, 0), c & 0x3f)
+                | ct_lookup(row(&SKB, 1), ((c >> 6) & 0x03) | ((c >> 7) & 0x3c))
+                | ct_lookup(row(&SKB, 2), ((c >> 13) & 0x0f) | ((c >> 14) & 0x30))
+                | ct_lookup(
+                    row(&SKB, 3),
+                    ((c >> 20) & 0x01) | ((c >> 21) & 0x06) | ((c >> 22) & 0x38),
+                );
+            let t = ct_lookup(row(&SKB, 4), d & 0x3f)
+                | ct_lookup(row(&SKB, 5), ((d >> 7) & 0x03) | ((d >> 8) & 0x3c))
+                | ct_lookup(row(&SKB, 6), (d >> 15) & 0x3f)
+                | ct_lookup(row(&SKB, 7), ((d >> 21) & 0x0f) | ((d >> 22) & 0x30));
+            pair[0] = ((t << 16) | (s & 0x0000_ffff)).rotate_right(30);
+            pair[1] = ((s >> 16) | (t & 0xffff_0000)).rotate_right(26);
+        }
+        ks
+    })
 }
 
 /// `D_ENCRYPT`: one round into `ll` from `r` with the round keys at `s` (and, for
@@ -302,46 +304,48 @@ pub fn cbc(
     enc: bool,
     update_iv: bool,
 ) {
-    let whole = len.saturating_sub(len % 8);
-    let rest = len % 8;
-    if enc {
-        let mut t = load(iv, 0);
-        let mut at = 0;
-        while at < whole || (at == whole && rest != 0) {
-            let n = if at < whole { 8 } else { rest };
-            let x = load_n(input, at, n);
-            t = [x[0] ^ t[0], x[1] ^ t[1]];
-            c.encrypt(&mut t);
-            store(t, out, at);
-            at = at.saturating_add(8);
-        }
-        if update_iv {
-            store(t, iv, 0);
-        }
-    } else {
-        let mut x = load(iv, 0);
-        let mut at = 0;
-        while at < whole || (at == whole && rest != 0) {
-            let tin = load(input, at);
-            let mut d = tin;
-            c.decrypt(&mut d);
-            let o = [d[0] ^ x[0], d[1] ^ x[1]];
-            if at < whole {
-                store(o, out, at);
-                x = tin;
-            } else {
-                store_n(o, out, at, rest);
-                // `DES_cbc_encrypt` doesn't take the last partial block into the chain.
-                if update_iv {
-                    x = tin;
-                }
+    crate::dit::with(|| {
+        let whole = len.saturating_sub(len % 8);
+        let rest = len % 8;
+        if enc {
+            let mut t = load(iv, 0);
+            let mut at = 0;
+            while at < whole || (at == whole && rest != 0) {
+                let n = if at < whole { 8 } else { rest };
+                let x = load_n(input, at, n);
+                t = [x[0] ^ t[0], x[1] ^ t[1]];
+                c.encrypt(&mut t);
+                store(t, out, at);
+                at = at.saturating_add(8);
             }
-            at = at.saturating_add(8);
+            if update_iv {
+                store(t, iv, 0);
+            }
+        } else {
+            let mut x = load(iv, 0);
+            let mut at = 0;
+            while at < whole || (at == whole && rest != 0) {
+                let tin = load(input, at);
+                let mut d = tin;
+                c.decrypt(&mut d);
+                let o = [d[0] ^ x[0], d[1] ^ x[1]];
+                if at < whole {
+                    store(o, out, at);
+                    x = tin;
+                } else {
+                    store_n(o, out, at, rest);
+                    // `DES_cbc_encrypt` doesn't take the last partial block into the chain.
+                    if update_iv {
+                        x = tin;
+                    }
+                }
+                at = at.saturating_add(8);
+            }
+            if update_iv {
+                store(x, iv, 0);
+            }
         }
-        if update_iv {
-            store(x, iv, 0);
-        }
-    }
+    })
 }
 
 /// `DES_xcbc_encrypt`: CBC with whitening blocks `inw` (in) and `outw` (out), the IV updated.
@@ -356,68 +360,72 @@ pub fn xcbc(
     outw: &[u8; 8],
     enc: bool,
 ) {
-    let inw = load(inw, 0);
-    let outw = load(outw, 0);
-    let whole = len.saturating_sub(len % 8);
-    let rest = len % 8;
-    if enc {
-        let mut t = load(iv, 0);
-        let mut at = 0;
-        while at < whole || (at == whole && rest != 0) {
-            let n = if at < whole { 8 } else { rest };
-            let x = load_n(input, at, n);
-            let mut d = [x[0] ^ t[0] ^ inw[0], x[1] ^ t[1] ^ inw[1]];
-            encrypt1(&mut d, ks, true);
-            t = [d[0] ^ outw[0], d[1] ^ outw[1]];
-            store(t, out, at);
-            at = at.saturating_add(8);
+    crate::dit::with(|| {
+        let inw = load(inw, 0);
+        let outw = load(outw, 0);
+        let whole = len.saturating_sub(len % 8);
+        let rest = len % 8;
+        if enc {
+            let mut t = load(iv, 0);
+            let mut at = 0;
+            while at < whole || (at == whole && rest != 0) {
+                let n = if at < whole { 8 } else { rest };
+                let x = load_n(input, at, n);
+                let mut d = [x[0] ^ t[0] ^ inw[0], x[1] ^ t[1] ^ inw[1]];
+                encrypt1(&mut d, ks, true);
+                t = [d[0] ^ outw[0], d[1] ^ outw[1]];
+                store(t, out, at);
+                at = at.saturating_add(8);
+            }
+            store(t, iv, 0);
+        } else {
+            let mut x = load(iv, 0);
+            // OpenSSL's loop stops a block early ("l > 0"); its tail takes the last block,
+            // whole or not.
+            let blocks = len.div_ceil(8);
+            for i in 0..blocks {
+                let at = i.saturating_mul(8);
+                let tin = load(input, at);
+                let mut d = [tin[0] ^ outw[0], tin[1] ^ outw[1]];
+                encrypt1(&mut d, ks, false);
+                let o = [d[0] ^ x[0] ^ inw[0], d[1] ^ x[1] ^ inw[1]];
+                store_n(o, out, at, len.saturating_sub(at).min(8));
+                x = tin;
+            }
+            store(x, iv, 0);
         }
-        store(t, iv, 0);
-    } else {
-        let mut x = load(iv, 0);
-        // OpenSSL's loop stops a block early ("l > 0"); its tail takes the last block,
-        // whole or not.
-        let blocks = len.div_ceil(8);
-        for i in 0..blocks {
-            let at = i.saturating_mul(8);
-            let tin = load(input, at);
-            let mut d = [tin[0] ^ outw[0], tin[1] ^ outw[1]];
-            encrypt1(&mut d, ks, false);
-            let o = [d[0] ^ x[0] ^ inw[0], d[1] ^ x[1] ^ inw[1]];
-            store_n(o, out, at, len.saturating_sub(at).min(8));
-            x = tin;
-        }
-        store(x, iv, 0);
-    }
+    })
 }
 
 /// `DES_pcbc_encrypt`: propagating CBC; the IV stays as it was. Encryption reads `len` and
 /// writes it rounded up; decryption reads it rounded up and writes `len`.
 pub fn pcbc(input: &[u8], out: &mut [u8], len: usize, ks: &Schedule, iv: &[u8; 8], enc: bool) {
-    let mut x = load(iv, 0);
-    let mut at = 0;
-    while at < len {
-        let left = len.saturating_sub(at);
-        if enc {
-            let s = if left >= 8 {
-                load(input, at)
+    crate::dit::with(|| {
+        let mut x = load(iv, 0);
+        let mut at = 0;
+        while at < len {
+            let left = len.saturating_sub(at);
+            if enc {
+                let s = if left >= 8 {
+                    load(input, at)
+                } else {
+                    load_n(input, at, left)
+                };
+                let mut d = [s[0] ^ x[0], s[1] ^ x[1]];
+                encrypt1(&mut d, ks, true);
+                x = [s[0] ^ d[0], s[1] ^ d[1]];
+                store(d, out, at);
             } else {
-                load_n(input, at, left)
-            };
-            let mut d = [s[0] ^ x[0], s[1] ^ x[1]];
-            encrypt1(&mut d, ks, true);
-            x = [s[0] ^ d[0], s[1] ^ d[1]];
-            store(d, out, at);
-        } else {
-            let s = load(input, at);
-            let mut d = s;
-            encrypt1(&mut d, ks, false);
-            let o = [d[0] ^ x[0], d[1] ^ x[1]];
-            store_n(o, out, at, left.min(8));
-            x = [o[0] ^ s[0], o[1] ^ s[1]];
+                let s = load(input, at);
+                let mut d = s;
+                encrypt1(&mut d, ks, false);
+                let o = [d[0] ^ x[0], d[1] ^ x[1]];
+                store_n(o, out, at, left.min(8));
+                x = [o[0] ^ s[0], o[1] ^ s[1]];
+            }
+            at = at.saturating_add(8);
         }
-        at = at.saturating_add(8);
-    }
+    })
 }
 
 /// CFB with `numbits` (1 to 64) bits a step (`DES_cfb_encrypt`, `DES_ede3_cfb_encrypt`):
@@ -433,48 +441,50 @@ pub fn cfb(
     iv: &mut [u8; 8],
     enc: bool,
 ) {
-    if numbits == 0 || numbits > 64 {
-        return;
-    }
-    let n = usize::try_from(numbits.div_ceil(8)).unwrap_or(8);
-    let num = usize::try_from(numbits / 8).unwrap_or(8);
-    let rem = numbits % 8;
-    let mut v = load(iv, 0);
-    let mut at = 0;
-    while len.saturating_sub(at) >= n {
-        let mut ti = v;
-        c.encrypt(&mut ti);
-        let d_in = load_n(input, at, n);
-        let d = [d_in[0] ^ ti[0], d_in[1] ^ ti[1]];
-        store_n(d, out, at, n);
-        let ct = if enc { d } else { d_in };
-        if numbits == 32 {
-            v = [v[1], ct[0]];
-        } else if numbits == 64 {
-            v = ct;
-        } else {
-            let mut ovec = [0u8; 17];
-            store(v, &mut ovec, 0);
-            store(ct, &mut ovec, 8);
-            let mut shifted = [0u8; 8];
-            for (i, s) in shifted.iter_mut().enumerate() {
-                let hi = ovec.get(i.saturating_add(num)).copied().unwrap_or(0);
-                *s = if rem == 0 {
-                    hi
-                } else {
-                    (hi << rem)
-                        | (ovec
-                            .get(i.saturating_add(num).saturating_add(1))
-                            .copied()
-                            .unwrap_or(0)
-                            >> 8u32.wrapping_sub(rem))
-                };
-            }
-            v = load(&shifted, 0);
+    crate::dit::with(|| {
+        if numbits == 0 || numbits > 64 {
+            return;
         }
-        at = at.saturating_add(n);
-    }
-    store(v, iv, 0);
+        let n = usize::try_from(numbits.div_ceil(8)).unwrap_or(8);
+        let num = usize::try_from(numbits / 8).unwrap_or(8);
+        let rem = numbits % 8;
+        let mut v = load(iv, 0);
+        let mut at = 0;
+        while len.saturating_sub(at) >= n {
+            let mut ti = v;
+            c.encrypt(&mut ti);
+            let d_in = load_n(input, at, n);
+            let d = [d_in[0] ^ ti[0], d_in[1] ^ ti[1]];
+            store_n(d, out, at, n);
+            let ct = if enc { d } else { d_in };
+            if numbits == 32 {
+                v = [v[1], ct[0]];
+            } else if numbits == 64 {
+                v = ct;
+            } else {
+                let mut ovec = [0u8; 17];
+                store(v, &mut ovec, 0);
+                store(ct, &mut ovec, 8);
+                let mut shifted = [0u8; 8];
+                for (i, s) in shifted.iter_mut().enumerate() {
+                    let hi = ovec.get(i.saturating_add(num)).copied().unwrap_or(0);
+                    *s = if rem == 0 {
+                        hi
+                    } else {
+                        (hi << rem)
+                            | (ovec
+                                .get(i.saturating_add(num).saturating_add(1))
+                                .copied()
+                                .unwrap_or(0)
+                                >> 8u32.wrapping_sub(rem))
+                    };
+                }
+                v = load(&shifted, 0);
+            }
+            at = at.saturating_add(n);
+        }
+        store(v, iv, 0);
+    })
 }
 
 /// CFB-64 by octets (`DES_cfb64_encrypt`, `DES_ede3_cfb64_encrypt`): `num` (its low three
@@ -487,24 +497,26 @@ pub fn cfb64(
     num: &mut i32,
     enc: bool,
 ) {
-    let mut n = usize::try_from(*num & 7).unwrap_or(0);
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            let mut ti = load(iv, 0);
-            c.encrypt(&mut ti);
-            store(ti, iv, 0);
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num & 7).unwrap_or(0);
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                let mut ti = load(iv, 0);
+                c.encrypt(&mut ti);
+                store(ti, iv, 0);
+            }
+            let k = iv.get(n).copied().unwrap_or(0);
+            let (o, keep) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
+            if let Some(d) = out.get_mut(i) {
+                *d = o;
+            }
+            if let Some(v) = iv.get_mut(n) {
+                *v = keep;
+            }
+            n = n.wrapping_add(1) & 7;
         }
-        let k = iv.get(n).copied().unwrap_or(0);
-        let (o, keep) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
-        if let Some(d) = out.get_mut(i) {
-            *d = o;
-        }
-        if let Some(v) = iv.get_mut(n) {
-            *v = keep;
-        }
-        n = n.wrapping_add(1) & 7;
-    }
-    *num = i32::try_from(n).unwrap_or(0);
+        *num = i32::try_from(n).unwrap_or(0);
+    })
 }
 
 /// OFB with `numbits` (1 to 64) bits a step (`DES_ofb_encrypt`): `steps` steps (not octets) of
@@ -517,97 +529,103 @@ pub fn ofb(
     ks: &Schedule,
     iv: &mut [u8; 8],
 ) {
-    if numbits == 0 || numbits > 64 {
-        return;
-    }
-    let n = usize::try_from(numbits.div_ceil(8)).unwrap_or(8);
-    let (mask0, mask1) = if numbits > 32 {
-        (
-            u32::MAX,
-            if numbits >= 64 {
-                u32::MAX
-            } else {
-                (1u32 << numbits.wrapping_sub(32)).wrapping_sub(1)
-            },
-        )
-    } else if numbits == 32 {
-        (u32::MAX, 0)
-    } else {
-        ((1u32 << numbits).wrapping_sub(1), 0)
-    };
-    let mut v = load(iv, 0);
-    for step in 0..steps {
-        let at = step.saturating_mul(n);
-        let mut ti = v;
-        encrypt1(&mut ti, ks, true);
-        let d_in = load_n(input, at, n);
-        let d = [(d_in[0] ^ ti[0]) & mask0, (d_in[1] ^ ti[1]) & mask1];
-        store_n(d, out, at, n);
-        v = if numbits == 32 {
-            [v[1], ti[0]]
-        } else if numbits == 64 {
-            ti
-        } else if numbits > 32 {
-            let s = numbits.wrapping_sub(32);
-            [
-                (v[1] >> s) | (ti[0] << 32u32.wrapping_sub(s)),
-                (ti[0] >> s) | (ti[1] << 32u32.wrapping_sub(s)),
-            ]
+    crate::dit::with(|| {
+        if numbits == 0 || numbits > 64 {
+            return;
+        }
+        let n = usize::try_from(numbits.div_ceil(8)).unwrap_or(8);
+        let (mask0, mask1) = if numbits > 32 {
+            (
+                u32::MAX,
+                if numbits >= 64 {
+                    u32::MAX
+                } else {
+                    (1u32 << numbits.wrapping_sub(32)).wrapping_sub(1)
+                },
+            )
+        } else if numbits == 32 {
+            (u32::MAX, 0)
         } else {
-            [
-                (v[0] >> numbits) | (v[1] << 32u32.wrapping_sub(numbits)),
-                (v[1] >> numbits) | (ti[0] << 32u32.wrapping_sub(numbits)),
-            ]
+            ((1u32 << numbits).wrapping_sub(1), 0)
         };
-    }
-    store(v, iv, 0);
+        let mut v = load(iv, 0);
+        for step in 0..steps {
+            let at = step.saturating_mul(n);
+            let mut ti = v;
+            encrypt1(&mut ti, ks, true);
+            let d_in = load_n(input, at, n);
+            let d = [(d_in[0] ^ ti[0]) & mask0, (d_in[1] ^ ti[1]) & mask1];
+            store_n(d, out, at, n);
+            v = if numbits == 32 {
+                [v[1], ti[0]]
+            } else if numbits == 64 {
+                ti
+            } else if numbits > 32 {
+                let s = numbits.wrapping_sub(32);
+                [
+                    (v[1] >> s) | (ti[0] << 32u32.wrapping_sub(s)),
+                    (ti[0] >> s) | (ti[1] << 32u32.wrapping_sub(s)),
+                ]
+            } else {
+                [
+                    (v[0] >> numbits) | (v[1] << 32u32.wrapping_sub(numbits)),
+                    (v[1] >> numbits) | (ti[0] << 32u32.wrapping_sub(numbits)),
+                ]
+            };
+        }
+        store(v, iv, 0);
+    })
 }
 
 /// OFB-64 by octets (`DES_ofb64_encrypt`, `DES_ede3_ofb64_encrypt`): `num` (its low three
 /// bits) is the position in the keystream block, which goes back into the IV only if a new
 /// one was made.
 pub fn ofb64(input: &[u8], out: &mut [u8], c: Cipher<'_>, iv: &mut [u8; 8], num: &mut i32) {
-    let mut n = usize::try_from(*num & 7).unwrap_or(0);
-    let mut ti = load(iv, 0);
-    let mut d = *iv;
-    let mut made = false;
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            c.encrypt(&mut ti);
-            store(ti, &mut d, 0);
-            made = true;
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num & 7).unwrap_or(0);
+        let mut ti = load(iv, 0);
+        let mut d = *iv;
+        let mut made = false;
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                c.encrypt(&mut ti);
+                store(ti, &mut d, 0);
+                made = true;
+            }
+            if let Some(o) = out.get_mut(i) {
+                *o = x ^ d.get(n).copied().unwrap_or(0);
+            }
+            n = n.wrapping_add(1) & 7;
         }
-        if let Some(o) = out.get_mut(i) {
-            *o = x ^ d.get(n).copied().unwrap_or(0);
+        if made {
+            store(ti, iv, 0);
         }
-        n = n.wrapping_add(1) & 7;
-    }
-    if made {
-        store(ti, iv, 0);
-    }
-    d.zeroize();
-    *num = i32::try_from(n).unwrap_or(0);
+        d.zeroize();
+        *num = i32::try_from(n).unwrap_or(0);
+    })
 }
 
 /// `DES_cbc_cksum`: the CBC-MAC of `len` octets (a partial last block padded with zeros), as
 /// a block, and its second word byte-swapped (MIT Kerberos's checksum).
 pub fn cbc_cksum(input: &[u8], len: usize, ks: &Schedule, iv: &[u8; 8]) -> ([u8; 8], u32) {
-    let mut t = load(iv, 0);
-    let mut at = 0;
-    while at < len {
-        let left = len.saturating_sub(at);
-        let x = if left >= 8 {
-            load(input, at)
-        } else {
-            load_n(input, at, left)
-        };
-        t = [x[0] ^ t[0], x[1] ^ t[1]];
-        encrypt1(&mut t, ks, true);
-        at = at.saturating_add(8);
-    }
-    let mut out = [0u8; 8];
-    store(t, &mut out, 0);
-    (out, t[1].swap_bytes())
+    crate::dit::with(|| {
+        let mut t = load(iv, 0);
+        let mut at = 0;
+        while at < len {
+            let left = len.saturating_sub(at);
+            let x = if left >= 8 {
+                load(input, at)
+            } else {
+                load_n(input, at, left)
+            };
+            t = [x[0] ^ t[0], x[1] ^ t[1]];
+            encrypt1(&mut t, ks, true);
+            at = at.saturating_add(8);
+        }
+        let mut out = [0u8; 8];
+        store(t, &mut out, 0);
+        (out, t[1].swap_bytes())
+    })
 }
 
 /// `DES_quad_cksum`: Kerberos's quadratic checksum of `len` octets from `seed`, repeated over
@@ -619,32 +637,34 @@ pub fn quad_cksum(
     out_count: i32,
     seed: &[u8; 8],
 ) -> (Vec<[u32; 2]>, u32) {
-    const NOISE: u32 = 83_653_421;
-    let rounds = usize::try_from(out_count.clamp(1, 4)).unwrap_or(1);
-    let mut z0 = c2l(seed, 0);
-    let mut z1 = c2l(seed, 4);
-    let mut outs = Vec::with_capacity(rounds);
-    for _ in 0..rounds {
-        let mut at = 0;
-        while at < len {
-            let left = len.saturating_sub(at);
-            let b0 = u32::from(input.get(at).copied().unwrap_or(0));
-            let t0 = if left > 1 {
-                let b1 = u32::from(input.get(at.saturating_add(1)).copied().unwrap_or(0));
-                at = at.saturating_add(2);
-                b0 | (b1 << 8)
-            } else {
-                at = at.saturating_add(1);
-                b0
-            };
-            let t0 = t0.wrapping_add(z0);
-            let t1 = z1;
-            z0 = (t0.wrapping_mul(t0).wrapping_add(t1.wrapping_mul(t1))) % 0x7fff_ffff;
-            z1 = t0.wrapping_mul(t1.wrapping_add(NOISE)) % 0x7fff_ffff;
+    crate::dit::with(|| {
+        const NOISE: u32 = 83_653_421;
+        let rounds = usize::try_from(out_count.clamp(1, 4)).unwrap_or(1);
+        let mut z0 = c2l(seed, 0);
+        let mut z1 = c2l(seed, 4);
+        let mut outs = Vec::with_capacity(rounds);
+        for _ in 0..rounds {
+            let mut at = 0;
+            while at < len {
+                let left = len.saturating_sub(at);
+                let b0 = u32::from(input.get(at).copied().unwrap_or(0));
+                let t0 = if left > 1 {
+                    let b1 = u32::from(input.get(at.saturating_add(1)).copied().unwrap_or(0));
+                    at = at.saturating_add(2);
+                    b0 | (b1 << 8)
+                } else {
+                    at = at.saturating_add(1);
+                    b0
+                };
+                let t0 = t0.wrapping_add(z0);
+                let t1 = z1;
+                z0 = (t0.wrapping_mul(t0).wrapping_add(t1.wrapping_mul(t1))) % 0x7fff_ffff;
+                z1 = t0.wrapping_mul(t1.wrapping_add(NOISE)) % 0x7fff_ffff;
+            }
+            outs.push([z0, z1]);
         }
-        outs.push([z0, z1]);
-    }
-    (outs, z0)
+        (outs, z0)
+    })
 }
 
 /// OpenSSL's odd-parity form of an octet: its low bit set so the octet has an odd number of
@@ -714,53 +734,57 @@ fn reverse_bits(j: u8) -> u8 {
 /// `DES_string_to_key`: the string folded into a key, odd parity, then its CBC checksum under
 /// itself.
 pub fn string_to_key(s: &[u8]) -> [u8; 8] {
-    let mut key = [0u8; 8];
-    for (i, &j) in s.iter().enumerate() {
-        if i % 16 < 8 {
-            if let Some(k) = key.get_mut(i % 8) {
-                *k ^= j << 1;
+    crate::dit::with(|| {
+        let mut key = [0u8; 8];
+        for (i, &j) in s.iter().enumerate() {
+            if i % 16 < 8 {
+                if let Some(k) = key.get_mut(i % 8) {
+                    *k ^= j << 1;
+                }
+            } else if let Some(k) = key.get_mut(7usize.saturating_sub(i % 8)) {
+                *k ^= reverse_bits(j);
             }
-        } else if let Some(k) = key.get_mut(7usize.saturating_sub(i % 8)) {
-            *k ^= reverse_bits(j);
         }
-    }
-    set_odd_parity(&mut key);
-    let mut ks = set_key_unchecked(&key);
-    let (mac, _) = cbc_cksum(s, s.len(), &ks, &key);
-    ks.zeroize();
-    key = mac;
-    set_odd_parity(&mut key);
-    key
+        set_odd_parity(&mut key);
+        let mut ks = set_key_unchecked(&key);
+        let (mac, _) = cbc_cksum(s, s.len(), &ks, &key);
+        ks.zeroize();
+        key = mac;
+        set_odd_parity(&mut key);
+        key
+    })
 }
 
 /// `DES_string_to_2keys`: two keys, folded alternately (the second the first's for up to 8
 /// octets), each then checksummed under itself.
 pub fn string_to_2keys(s: &[u8]) -> ([u8; 8], [u8; 8]) {
-    let mut k1 = [0u8; 8];
-    let mut k2 = [0u8; 8];
-    for (i, &j) in s.iter().enumerate() {
-        let target = if i % 16 < 8 { &mut k1 } else { &mut k2 };
-        if i % 32 < 16 {
-            if let Some(k) = target.get_mut(i % 8) {
-                *k ^= j << 1;
+    crate::dit::with(|| {
+        let mut k1 = [0u8; 8];
+        let mut k2 = [0u8; 8];
+        for (i, &j) in s.iter().enumerate() {
+            let target = if i % 16 < 8 { &mut k1 } else { &mut k2 };
+            if i % 32 < 16 {
+                if let Some(k) = target.get_mut(i % 8) {
+                    *k ^= j << 1;
+                }
+            } else if let Some(k) = target.get_mut(7usize.saturating_sub(i % 8)) {
+                *k ^= reverse_bits(j);
             }
-        } else if let Some(k) = target.get_mut(7usize.saturating_sub(i % 8)) {
-            *k ^= reverse_bits(j);
         }
-    }
-    if s.len() <= 8 {
-        k2 = k1;
-    }
-    set_odd_parity(&mut k1);
-    set_odd_parity(&mut k2);
-    let mut ks = set_key_unchecked(&k1);
-    k1 = cbc_cksum(s, s.len(), &ks, &k1).0;
-    ks = set_key_unchecked(&k2);
-    k2 = cbc_cksum(s, s.len(), &ks, &k2).0;
-    ks.zeroize();
-    set_odd_parity(&mut k1);
-    set_odd_parity(&mut k2);
-    (k1, k2)
+        if s.len() <= 8 {
+            k2 = k1;
+        }
+        set_odd_parity(&mut k1);
+        set_odd_parity(&mut k2);
+        let mut ks = set_key_unchecked(&k1);
+        k1 = cbc_cksum(s, s.len(), &ks, &k1).0;
+        ks = set_key_unchecked(&k2);
+        k2 = cbc_cksum(s, s.len(), &ks, &k2).0;
+        ks.zeroize();
+        set_odd_parity(&mut k1);
+        set_odd_parity(&mut k2);
+        (k1, k2)
+    })
 }
 
 /// `fcrypt_body`: 25 DES encryptions of zeros with the salt's E-box swaps.

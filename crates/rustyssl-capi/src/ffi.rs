@@ -42,6 +42,8 @@ pub(crate) fn guard<R>(
     body: impl FnOnce() -> R,
 ) -> R {
     let caller = std::panic::Location::caller();
+    // The crypto crate's timing-mode hooks, before any of its work runs.
+    crate::dit::install();
     catch_unwind(AssertUnwindSafe(body)).unwrap_or_else(|_| {
         let line = c_int::try_from(caller.line()).unwrap_or(c_int::MAX);
         let file = Some(caller.file().as_bytes());

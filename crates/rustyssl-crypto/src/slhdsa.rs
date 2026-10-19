@@ -964,6 +964,11 @@ impl PrivateKey {
 
     /// The root of the top XMSS tree of the key's seeds.
     fn root(variant: Variant, bytes: &[u8]) -> Node {
+        crate::dit::with(|| Self::root_dit(variant, bytes))
+    }
+
+    /// [`PrivateKey::root`]'s work.
+    fn root_dit(variant: Variant, bytes: &[u8]) -> Node {
         let n = variant.n();
         let ctx = Ctx::new(
             variant,
@@ -1015,6 +1020,11 @@ impl PrivateKey {
     /// with `n` octets of additional randomness, or `PK.seed` (deterministic) when `None`; `None`
     /// for randomness of another length.
     pub fn sign(&self, msg: &[u8], add_rand: Option<&[u8]>) -> Option<Vec<u8>> {
+        crate::dit::with(|| self.sign_dit(msg, add_rand))
+    }
+
+    /// [`PrivateKey::sign`]'s work.
+    fn sign_dit(&self, msg: &[u8], add_rand: Option<&[u8]>) -> Option<Vec<u8>> {
         let n = self.variant.n();
         let (sk, pk) = self
             .bytes

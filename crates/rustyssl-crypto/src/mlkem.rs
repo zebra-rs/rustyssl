@@ -575,12 +575,14 @@ impl PublicKey {
         &self,
         m: &[u8; RANDOM_BYTES],
     ) -> Option<(Vec<u8>, Zeroizing<[u8; SHARED_SECRET_BYTES]>)> {
-        let kr = g(&[m, &self.hash])?;
-        let (key, r) = kr.split_at(SHARED_SECRET_BYTES);
-        let r = Zeroizing::new(<[u8; 32]>::try_from(r).ok()?);
-        let c = self.encrypt(m, &r)?;
-        let key = Zeroizing::new(<[u8; 32]>::try_from(key).ok()?);
-        Some((c, key))
+        crate::dit::with(|| {
+            let kr = g(&[m, &self.hash])?;
+            let (key, r) = kr.split_at(SHARED_SECRET_BYTES);
+            let r = Zeroizing::new(<[u8; 32]>::try_from(r).ok()?);
+            let c = self.encrypt(m, &r)?;
+            let key = Zeroizing::new(<[u8; 32]>::try_from(key).ok()?);
+            Some((c, key))
+        })
     }
 }
 
@@ -600,6 +602,11 @@ impl PrivateKey {
     /// `ML-KEM.KeyGen_internal` (FIPS 203 Algorithm 16) from the seed `d || z`; the key keeps
     /// `d`.
     pub fn generate(variant: Variant, seed: &[u8; SEED_BYTES]) -> Option<Self> {
+        crate::dit::with(|| Self::generate_dit(variant, seed))
+    }
+
+    /// [`PrivateKey::generate`]'s work.
+    fn generate_dit(variant: Variant, seed: &[u8; SEED_BYTES]) -> Option<Self> {
         let (d, z) = seed.split_at(RANDOM_BYTES);
         let d = Zeroizing::new(<[u8; 32]>::try_from(d).ok()?);
         let z = Zeroizing::new(<[u8; 32]>::try_from(z).ok()?);
@@ -738,6 +745,11 @@ impl PrivateKey {
     /// rejection secret `J(z || c)` for a ciphertext that doesn't re-encrypt to itself; `None`
     /// for a ciphertext of the wrong length (or a failed hash).
     pub fn decapsulate(&self, c: &[u8]) -> Option<Zeroizing<[u8; SHARED_SECRET_BYTES]>> {
+        crate::dit::with(|| self.decapsulate_dit(c))
+    }
+
+    /// [`PrivateKey::decapsulate`]'s work.
+    fn decapsulate_dit(&self, c: &[u8]) -> Option<Zeroizing<[u8; SHARED_SECRET_BYTES]>> {
         if c.len() != self.public.variant.ciphertext_bytes() {
             return None;
         }

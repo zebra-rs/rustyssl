@@ -132,124 +132,126 @@ fn load(k: &[u32; WORDS], at: usize) -> [u32; 4] {
 /// `Camellia_Ekeygen`: the key table of a 16-, 24-, or 32-octet key (`None` for another
 /// length). Only its first [`filled_words`] words are the key's (the rest are zero).
 pub fn set_key(key: &[u8]) -> Option<CamelliaKey> {
-    if !matches!(key.len(), 16 | 24 | 32) {
-        return None;
-    }
-    let mut k = [0u32; WORDS];
-    let w = |i: usize| {
-        let mut b = [0u8; 4];
-        for (j, d) in b.iter_mut().enumerate() {
-            *d = key
-                .get(i.wrapping_mul(4).wrapping_add(j))
-                .copied()
-                .unwrap_or(0);
+    crate::dit::with(|| {
+        if !matches!(key.len(), 16 | 24 | 32) {
+            return None;
         }
-        u32::from_be_bytes(b)
-    };
-    const ID: [usize; 4] = [0, 1, 2, 3];
-    let mut s = [w(0), w(1), w(2), w(3)];
-    store(&mut k, 0, &s, ID, 4);
-    if key.len() != 16 {
-        s = if key.len() == 24 {
-            [w(4), w(5), !w(4), !w(5)]
-        } else {
-            [w(4), w(5), w(6), w(7)]
+        let mut k = [0u32; WORDS];
+        let w = |i: usize| {
+            let mut b = [0u8; 4];
+            for (j, d) in b.iter_mut().enumerate() {
+                *d = key
+                    .get(i.wrapping_mul(4).wrapping_add(j))
+                    .copied()
+                    .unwrap_or(0);
+            }
+            u32::from_be_bytes(b)
         };
-        store(&mut k, 8, &s, ID, 4);
+        const ID: [usize; 4] = [0, 1, 2, 3];
+        let mut s = [w(0), w(1), w(2), w(3)];
+        store(&mut k, 0, &s, ID, 4);
+        if key.len() != 16 {
+            s = if key.len() == 24 {
+                [w(4), w(5), !w(4), !w(5)]
+            } else {
+                [w(4), w(5), w(6), w(7)]
+            };
+            store(&mut k, 8, &s, ID, 4);
+            xor_from(&mut s, &k, 0);
+        }
+        scramble(&mut s, 0);
         xor_from(&mut s, &k, 0);
-    }
-    scramble(&mut s, 0);
-    xor_from(&mut s, &k, 0);
-    scramble(&mut s, 4);
+        scramble(&mut s, 4);
 
-    // The rotations, as OpenSSL writes them: `perm` is the order of the four words it stores
-    // (it rotates by 32 or more by starting from another word).
-    const R1: [usize; 4] = [1, 2, 3, 0];
-    const R2: [usize; 4] = [2, 3, 0, 1];
-    let grand_rounds = if key.len() == 16 {
-        store(&mut k, 4, &s, ID, 4); // KA
-        rot128(&mut s, 15);
-        store(&mut k, 12, &s, ID, 4); // KA <<< 15
-        rot128(&mut s, 15);
-        store(&mut k, 16, &s, ID, 4); // KA <<< 30
-        rot128(&mut s, 15);
-        store(&mut k, 24, &s, ID, 2); // KA <<< 45
-        rot128(&mut s, 15);
-        store(&mut k, 28, &s, ID, 4); // KA <<< 60
-        let mut r = [s[1], s[2], s[3], s[0]];
-        rot128(&mut r, 2);
-        store(&mut k, 40, &r, ID, 4); // KA <<< 94
-        rot128(&mut r, 17);
-        store(&mut k, 48, &r, ID, 4); // KA <<< 111
+        // The rotations, as OpenSSL writes them: `perm` is the order of the four words it stores
+        // (it rotates by 32 or more by starting from another word).
+        const R1: [usize; 4] = [1, 2, 3, 0];
+        const R2: [usize; 4] = [2, 3, 0, 1];
+        let grand_rounds = if key.len() == 16 {
+            store(&mut k, 4, &s, ID, 4); // KA
+            rot128(&mut s, 15);
+            store(&mut k, 12, &s, ID, 4); // KA <<< 15
+            rot128(&mut s, 15);
+            store(&mut k, 16, &s, ID, 4); // KA <<< 30
+            rot128(&mut s, 15);
+            store(&mut k, 24, &s, ID, 2); // KA <<< 45
+            rot128(&mut s, 15);
+            store(&mut k, 28, &s, ID, 4); // KA <<< 60
+            let mut r = [s[1], s[2], s[3], s[0]];
+            rot128(&mut r, 2);
+            store(&mut k, 40, &r, ID, 4); // KA <<< 94
+            rot128(&mut r, 17);
+            store(&mut k, 48, &r, ID, 4); // KA <<< 111
 
-        s = load(&k, 0);
-        rot128(&mut s, 15);
-        store(&mut k, 8, &s, ID, 4); // KL <<< 15
-        rot128(&mut s, 30);
-        store(&mut k, 20, &s, ID, 4); // KL <<< 45
-        rot128(&mut s, 15);
-        store(&mut k, 26, &s, R2, 2); // KL <<< 60
-        rot128(&mut s, 17);
-        store(&mut k, 32, &s, ID, 4); // KL <<< 77
-        rot128(&mut s, 17);
-        store(&mut k, 36, &s, ID, 4); // KL <<< 94
-        rot128(&mut s, 17);
-        store(&mut k, 44, &s, ID, 4); // KL <<< 111
-        r.zeroize();
-        3
-    } else {
-        store(&mut k, 12, &s, ID, 4); // KA
-        xor_from(&mut s, &k, 8);
-        scramble(&mut s, 8);
-        store(&mut k, 4, &s, ID, 4); // KB
-        rot128(&mut s, 30);
-        store(&mut k, 20, &s, ID, 4); // KB <<< 30
-        rot128(&mut s, 30);
-        store(&mut k, 40, &s, ID, 4); // KB <<< 60
-        let mut r = [s[1], s[2], s[3], s[0]];
-        rot128(&mut r, 19);
-        store(&mut k, 64, &r, ID, 4); // KB <<< 111
+            s = load(&k, 0);
+            rot128(&mut s, 15);
+            store(&mut k, 8, &s, ID, 4); // KL <<< 15
+            rot128(&mut s, 30);
+            store(&mut k, 20, &s, ID, 4); // KL <<< 45
+            rot128(&mut s, 15);
+            store(&mut k, 26, &s, R2, 2); // KL <<< 60
+            rot128(&mut s, 17);
+            store(&mut k, 32, &s, ID, 4); // KL <<< 77
+            rot128(&mut s, 17);
+            store(&mut k, 36, &s, ID, 4); // KL <<< 94
+            rot128(&mut s, 17);
+            store(&mut k, 44, &s, ID, 4); // KL <<< 111
+            r.zeroize();
+            3
+        } else {
+            store(&mut k, 12, &s, ID, 4); // KA
+            xor_from(&mut s, &k, 8);
+            scramble(&mut s, 8);
+            store(&mut k, 4, &s, ID, 4); // KB
+            rot128(&mut s, 30);
+            store(&mut k, 20, &s, ID, 4); // KB <<< 30
+            rot128(&mut s, 30);
+            store(&mut k, 40, &s, ID, 4); // KB <<< 60
+            let mut r = [s[1], s[2], s[3], s[0]];
+            rot128(&mut r, 19);
+            store(&mut k, 64, &r, ID, 4); // KB <<< 111
 
-        s = load(&k, 8);
-        rot128(&mut s, 15);
-        store(&mut k, 8, &s, ID, 4); // KR <<< 15
-        rot128(&mut s, 15);
-        store(&mut k, 16, &s, ID, 4); // KR <<< 30
-        rot128(&mut s, 30);
-        store(&mut k, 36, &s, ID, 4); // KR <<< 60
-        r = [s[1], s[2], s[3], s[0]];
-        rot128(&mut r, 2);
-        store(&mut k, 52, &r, ID, 4); // KR <<< 94
+            s = load(&k, 8);
+            rot128(&mut s, 15);
+            store(&mut k, 8, &s, ID, 4); // KR <<< 15
+            rot128(&mut s, 15);
+            store(&mut k, 16, &s, ID, 4); // KR <<< 30
+            rot128(&mut s, 30);
+            store(&mut k, 36, &s, ID, 4); // KR <<< 60
+            r = [s[1], s[2], s[3], s[0]];
+            rot128(&mut r, 2);
+            store(&mut k, 52, &r, ID, 4); // KR <<< 94
 
-        s = load(&k, 12);
-        rot128(&mut s, 15);
-        store(&mut k, 12, &s, ID, 4); // KA <<< 15
-        rot128(&mut s, 30);
-        store(&mut k, 28, &s, ID, 4); // KA <<< 45
-        store(&mut k, 48, &s, R1, 4); // KA <<< 77
-        r = [s[1], s[2], s[3], s[0]];
-        rot128(&mut r, 17);
-        store(&mut k, 56, &r, ID, 4); // KA <<< 94
+            s = load(&k, 12);
+            rot128(&mut s, 15);
+            store(&mut k, 12, &s, ID, 4); // KA <<< 15
+            rot128(&mut s, 30);
+            store(&mut k, 28, &s, ID, 4); // KA <<< 45
+            store(&mut k, 48, &s, R1, 4); // KA <<< 77
+            r = [s[1], s[2], s[3], s[0]];
+            rot128(&mut r, 17);
+            store(&mut k, 56, &r, ID, 4); // KA <<< 94
 
-        s = load(&k, 0);
-        r = [s[1], s[2], s[3], s[0]];
-        rot128(&mut r, 13);
-        store(&mut k, 24, &r, ID, 4); // KL <<< 45
-        rot128(&mut r, 15);
-        store(&mut k, 32, &r, ID, 4); // KL <<< 60
-        rot128(&mut r, 17);
-        store(&mut k, 44, &r, ID, 4); // KL <<< 77
-        let mut q = [r[1], r[2], r[3], r[0]];
-        rot128(&mut q, 2);
-        store(&mut k, 60, &q, ID, 4); // KL <<< 111
-        r.zeroize();
-        q.zeroize();
-        4
-    };
-    s.zeroize();
-    Some(CamelliaKey {
-        words: k,
-        grand_rounds,
+            s = load(&k, 0);
+            r = [s[1], s[2], s[3], s[0]];
+            rot128(&mut r, 13);
+            store(&mut k, 24, &r, ID, 4); // KL <<< 45
+            rot128(&mut r, 15);
+            store(&mut k, 32, &r, ID, 4); // KL <<< 60
+            rot128(&mut r, 17);
+            store(&mut k, 44, &r, ID, 4); // KL <<< 77
+            let mut q = [r[1], r[2], r[3], r[0]];
+            rot128(&mut q, 2);
+            store(&mut k, 60, &q, ID, 4); // KL <<< 111
+            r.zeroize();
+            q.zeroize();
+            4
+        };
+        s.zeroize();
+        Some(CamelliaKey {
+            words: k,
+            grand_rounds,
+        })
     })
 }
 

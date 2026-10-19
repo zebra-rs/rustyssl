@@ -134,53 +134,55 @@ pub fn block_cipher(
     key: &[u8],
     rc2_effective_bits: Option<usize>,
 ) -> Result<Box<dyn BlockCipher>, Error> {
-    match (algorithm, key.len()) {
-        (BlockAlgorithm::Aes, 16) => keyed::<aes::Aes128>(key),
-        (BlockAlgorithm::Aes, 24) => keyed::<aes::Aes192>(key),
-        (BlockAlgorithm::Aes, 32) => keyed::<aes::Aes256>(key),
-        (BlockAlgorithm::Aria, 16) => keyed::<aria::Aria128>(key),
-        (BlockAlgorithm::Aria, 24) => keyed::<aria::Aria192>(key),
-        (BlockAlgorithm::Aria, 32) => keyed::<aria::Aria256>(key),
-        (BlockAlgorithm::Camellia, 16) => keyed::<camellia::Camellia128>(key),
-        (BlockAlgorithm::Camellia, 24) => keyed::<camellia::Camellia192>(key),
-        (BlockAlgorithm::Camellia, 32) => keyed::<camellia::Camellia256>(key),
-        (BlockAlgorithm::Sm4, 16) => keyed::<sm4::Sm4>(key),
-        (BlockAlgorithm::Des, 8) => keyed::<des::Des>(key),
-        (BlockAlgorithm::TripleDes, 16) => keyed::<des::TdesEde2>(key),
-        (BlockAlgorithm::TripleDes, 24) => keyed::<des::TdesEde3>(key),
-        (BlockAlgorithm::Idea, 16) => keyed::<idea::Idea>(key),
-        (BlockAlgorithm::Blowfish, 1..=72) => {
-            // The crate takes 4 to 56 octets through `KeyInit`; its key schedule itself takes
-            // any length, as OpenSSL's does.
-            let mut bf = blowfish::Blowfish::bc_init_state();
-            bf.bc_expand_key(key);
-            Ok(Box::new(Block(bf)))
+    crate::dit::with(|| -> Result<Box<dyn BlockCipher>, Error> {
+        match (algorithm, key.len()) {
+            (BlockAlgorithm::Aes, 16) => keyed::<aes::Aes128>(key),
+            (BlockAlgorithm::Aes, 24) => keyed::<aes::Aes192>(key),
+            (BlockAlgorithm::Aes, 32) => keyed::<aes::Aes256>(key),
+            (BlockAlgorithm::Aria, 16) => keyed::<aria::Aria128>(key),
+            (BlockAlgorithm::Aria, 24) => keyed::<aria::Aria192>(key),
+            (BlockAlgorithm::Aria, 32) => keyed::<aria::Aria256>(key),
+            (BlockAlgorithm::Camellia, 16) => keyed::<camellia::Camellia128>(key),
+            (BlockAlgorithm::Camellia, 24) => keyed::<camellia::Camellia192>(key),
+            (BlockAlgorithm::Camellia, 32) => keyed::<camellia::Camellia256>(key),
+            (BlockAlgorithm::Sm4, 16) => keyed::<sm4::Sm4>(key),
+            (BlockAlgorithm::Des, 8) => keyed::<des::Des>(key),
+            (BlockAlgorithm::TripleDes, 16) => keyed::<des::TdesEde2>(key),
+            (BlockAlgorithm::TripleDes, 24) => keyed::<des::TdesEde3>(key),
+            (BlockAlgorithm::Idea, 16) => keyed::<idea::Idea>(key),
+            (BlockAlgorithm::Blowfish, 1..=72) => {
+                // The crate takes 4 to 56 octets through `KeyInit`; its key schedule itself takes
+                // any length, as OpenSSL's does.
+                let mut bf = blowfish::Blowfish::bc_init_state();
+                bf.bc_expand_key(key);
+                Ok(Box::new(Block(bf)))
+            }
+            (BlockAlgorithm::Cast5, 1..=16) => {
+                // The crate takes 5 to 16 octets. A shorter key padded with zeros to 5 is the same
+                // key (the schedule pads to 16) with the same 12 rounds (for up to 10 octets).
+                let mut padded = [0u8; 5];
+                let key = if key.len() < 5 {
+                    padded
+                        .get_mut(..key.len())
+                        .ok_or(Error::KeyLength)?
+                        .copy_from_slice(key);
+                    &padded[..]
+                } else {
+                    key
+                };
+                keyed::<cast5::Cast5>(key)
+            }
+            (BlockAlgorithm::Rc2, 1..=128) => {
+                let bits = match rc2_effective_bits {
+                    Some(b) if (1..=1024).contains(&b) => b,
+                    Some(_) => return Err(Error::EffectiveBits),
+                    None => key.len().saturating_mul(8),
+                };
+                Ok(Box::new(Block(rc2::Rc2::new_with_eff_key_len(key, bits))))
+            }
+            _ => Err(Error::KeyLength),
         }
-        (BlockAlgorithm::Cast5, 1..=16) => {
-            // The crate takes 5 to 16 octets. A shorter key padded with zeros to 5 is the same
-            // key (the schedule pads to 16) with the same 12 rounds (for up to 10 octets).
-            let mut padded = [0u8; 5];
-            let key = if key.len() < 5 {
-                padded
-                    .get_mut(..key.len())
-                    .ok_or(Error::KeyLength)?
-                    .copy_from_slice(key);
-                &padded[..]
-            } else {
-                key
-            };
-            keyed::<cast5::Cast5>(key)
-        }
-        (BlockAlgorithm::Rc2, 1..=128) => {
-            let bits = match rc2_effective_bits {
-                Some(b) if (1..=1024).contains(&b) => b,
-                Some(_) => return Err(Error::EffectiveBits),
-                None => key.len().saturating_mul(8),
-            };
-            Ok(Box::new(Block(rc2::Rc2::new_with_eff_key_len(key, bits))))
-        }
-        _ => Err(Error::KeyLength),
-    }
+    })
 }
 
 /// A key stream XORed into data.
@@ -214,9 +216,11 @@ impl ChaCha {
 
 impl KeyStream for ChaCha {
     fn apply(&mut self, data: &mut [u8]) {
-        // Past the end of the 64-bit counter's stream (2^70 octets) the crate refuses; the
-        // data is left as it is, which no caller can reach.
-        let _ = self.cipher.try_apply_keystream(data);
+        crate::dit::with(|| {
+            // Past the end of the 64-bit counter's stream (2^70 octets) the crate refuses; the
+            // data is left as it is, which no caller can reach.
+            let _ = self.cipher.try_apply_keystream(data);
+        })
     }
 
     fn clone_box(&self) -> Result<Box<dyn KeyStream>, Error> {
@@ -228,13 +232,15 @@ impl KeyStream for ChaCha {
 /// ChaCha20 keyed with a 32-octet `key` and OpenSSL's 16-octet `iv`: the starting block counter
 /// (64 bits, little-endian) then the 64-bit nonce.
 pub fn chacha20(key: &[u8], iv: &[u8]) -> Result<Box<dyn KeyStream>, Error> {
-    let key: &[u8; 32] = key.try_into().map_err(|_| Error::KeyLength)?;
-    let iv: &[u8; 16] = iv.try_into().map_err(|_| Error::IvLength)?;
-    let (counter, nonce) = iv.split_at(8);
-    let counter = u64::from_le_bytes(counter.try_into().map_err(|_| Error::IvLength)?);
-    let nonce: [u8; 8] = nonce.try_into().map_err(|_| Error::IvLength)?;
-    let position = u128::from(counter).checked_mul(64).ok_or(Error::IvLength)?;
-    Ok(Box::new(ChaCha::new(key, nonce, position)?))
+    crate::dit::with(|| -> Result<Box<dyn KeyStream>, Error> {
+        let key: &[u8; 32] = key.try_into().map_err(|_| Error::KeyLength)?;
+        let iv: &[u8; 16] = iv.try_into().map_err(|_| Error::IvLength)?;
+        let (counter, nonce) = iv.split_at(8);
+        let counter = u64::from_le_bytes(counter.try_into().map_err(|_| Error::IvLength)?);
+        let nonce: [u8; 8] = nonce.try_into().map_err(|_| Error::IvLength)?;
+        let position = u128::from(counter).checked_mul(64).ok_or(Error::IvLength)?;
+        Ok(Box::new(ChaCha::new(key, nonce, position)?))
+    })
 }
 
 /// XORs ChaCha20's key stream into whole 64-octet blocks of `data`, starting at block
@@ -247,25 +253,27 @@ pub fn chacha20_blocks(
     counter: u64,
     data: &mut [u8],
 ) -> Result<u64, Error> {
-    use cipher::StreamCipherCore;
+    crate::dit::with(|| {
+        use cipher::StreamCipherCore;
 
-    let (mut blocks, rest) = Array::slice_as_chunks_mut(data);
-    if !rest.is_empty() {
-        return Err(Error::BlockLength);
-    }
-    let mut core = chacha20::ChaCha20LegacyCore::new(key.into(), (&nonce).into());
-    let mut counter = counter;
-    while !blocks.is_empty() {
-        // Up to the wrap, so no backend has to carry past the counter's end.
-        let to_wrap = u64::MAX.wrapping_sub(counter).saturating_add(1);
-        let n = usize::try_from(to_wrap).map_or(blocks.len(), |w| w.min(blocks.len()));
-        let (now, later) = blocks.split_at_mut(n);
-        core.set_block_pos(counter);
-        core.apply_keystream_blocks(now);
-        counter = counter.wrapping_add(u64::try_from(n).map_err(|_| Error::BlockLength)?);
-        blocks = later;
-    }
-    Ok(counter)
+        let (mut blocks, rest) = Array::slice_as_chunks_mut(data);
+        if !rest.is_empty() {
+            return Err(Error::BlockLength);
+        }
+        let mut core = chacha20::ChaCha20LegacyCore::new(key.into(), (&nonce).into());
+        let mut counter = counter;
+        while !blocks.is_empty() {
+            // Up to the wrap, so no backend has to carry past the counter's end.
+            let to_wrap = u64::MAX.wrapping_sub(counter).saturating_add(1);
+            let n = usize::try_from(to_wrap).map_or(blocks.len(), |w| w.min(blocks.len()));
+            let (now, later) = blocks.split_at_mut(n);
+            core.set_block_pos(counter);
+            core.apply_keystream_blocks(now);
+            counter = counter.wrapping_add(u64::try_from(n).map_err(|_| Error::BlockLength)?);
+            blocks = later;
+        }
+        Ok(counter)
+    })
 }
 
 /// RC4: the crate's can't be copied, and RC4 is a few lines, so it's ours. **Not constant
@@ -305,19 +313,21 @@ impl Drop for Rc4 {
 
 impl KeyStream for Rc4 {
     fn apply(&mut self, data: &mut [u8]) {
-        for b in data {
-            self.i = self.i.wrapping_add(1);
-            let si = self.s.get(usize::from(self.i)).copied().unwrap_or(0);
-            self.j = self.j.wrapping_add(si);
-            self.s.swap(usize::from(self.i), usize::from(self.j));
-            let sj = self.s.get(usize::from(self.i)).copied().unwrap_or(0);
-            let sk = self.s.get(usize::from(self.j)).copied().unwrap_or(0);
-            *b ^= self
-                .s
-                .get(usize::from(sj.wrapping_add(sk)))
-                .copied()
-                .unwrap_or(0);
-        }
+        crate::dit::with(|| {
+            for b in data {
+                self.i = self.i.wrapping_add(1);
+                let si = self.s.get(usize::from(self.i)).copied().unwrap_or(0);
+                self.j = self.j.wrapping_add(si);
+                self.s.swap(usize::from(self.i), usize::from(self.j));
+                let sj = self.s.get(usize::from(self.i)).copied().unwrap_or(0);
+                let sk = self.s.get(usize::from(self.j)).copied().unwrap_or(0);
+                *b ^= self
+                    .s
+                    .get(usize::from(sj.wrapping_add(sk)))
+                    .copied()
+                    .unwrap_or(0);
+            }
+        })
     }
 
     fn clone_box(&self) -> Result<Box<dyn KeyStream>, Error> {
@@ -365,22 +375,26 @@ where
     U: universal_hash::UniversalHash + Clone + Send + Sync + 'static,
 {
     fn update_padded(&mut self, data: &[u8]) {
-        if let Some(u) = &mut self.0 {
-            u.update_padded(data);
-        }
+        crate::dit::with(|| {
+            if let Some(u) = &mut self.0 {
+                u.update_padded(data);
+            }
+        })
     }
 
     fn finalize(&mut self, last: &[u8]) -> [u8; 16] {
-        let Some(mut u) = self.0.take() else {
-            return [0; 16];
-        };
-        u.update_padded(last);
-        let tag = u.finalize();
-        let mut out = [0u8; 16];
-        if let Some(t) = tag.get(..16) {
-            out.copy_from_slice(t);
-        }
-        out
+        crate::dit::with(|| {
+            let Some(mut u) = self.0.take() else {
+                return [0; 16];
+            };
+            u.update_padded(last);
+            let tag = u.finalize();
+            let mut out = [0u8; 16];
+            if let Some(t) = tag.get(..16) {
+                out.copy_from_slice(t);
+            }
+            out
+        })
     }
 
     fn clone_box(&self) -> Box<dyn UniversalHash> {
@@ -394,21 +408,25 @@ struct Poly(Option<poly1305::Poly1305>);
 
 impl UniversalHash for Poly {
     fn update_padded(&mut self, data: &[u8]) {
-        if let Some(p) = &mut self.0 {
-            p.update_padded(data);
-        }
+        crate::dit::with(|| {
+            if let Some(p) = &mut self.0 {
+                p.update_padded(data);
+            }
+        })
     }
 
     fn finalize(&mut self, last: &[u8]) -> [u8; 16] {
-        let Some(p) = self.0.take() else {
-            return [0; 16];
-        };
-        let tag = p.compute_unpadded(last);
-        let mut out = [0u8; 16];
-        if let Some(t) = tag.get(..16) {
-            out.copy_from_slice(t);
-        }
-        out
+        crate::dit::with(|| {
+            let Some(p) = self.0.take() else {
+                return [0; 16];
+            };
+            let tag = p.compute_unpadded(last);
+            let mut out = [0u8; 16];
+            if let Some(t) = tag.get(..16) {
+                out.copy_from_slice(t);
+            }
+            out
+        })
     }
 
     fn clone_box(&self) -> Box<dyn UniversalHash> {
@@ -421,15 +439,17 @@ pub fn universal_hash(
     algorithm: HashAlgorithm,
     key: &[u8],
 ) -> Result<Box<dyn UniversalHash>, Error> {
-    Ok(match algorithm {
-        HashAlgorithm::Ghash => Box::new(Uhf(Some(
-            ghash::GHash::new_from_slice(key).map_err(|_| Error::KeyLength)?,
-        ))),
-        HashAlgorithm::Polyval => Box::new(Uhf(Some(
-            polyval::Polyval::new_from_slice(key).map_err(|_| Error::KeyLength)?,
-        ))),
-        HashAlgorithm::Poly1305 => Box::new(Poly(Some(
-            poly1305::Poly1305::new_from_slice(key).map_err(|_| Error::KeyLength)?,
-        ))),
+    crate::dit::with(|| -> Result<Box<dyn UniversalHash>, Error> {
+        Ok(match algorithm {
+            HashAlgorithm::Ghash => Box::new(Uhf(Some(
+                ghash::GHash::new_from_slice(key).map_err(|_| Error::KeyLength)?,
+            ))),
+            HashAlgorithm::Polyval => Box::new(Uhf(Some(
+                polyval::Polyval::new_from_slice(key).map_err(|_| Error::KeyLength)?,
+            ))),
+            HashAlgorithm::Poly1305 => Box::new(Poly(Some(
+                poly1305::Poly1305::new_from_slice(key).map_err(|_| Error::KeyLength)?,
+            ))),
+        })
     })
 }

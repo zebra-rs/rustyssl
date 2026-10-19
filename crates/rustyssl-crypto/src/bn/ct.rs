@@ -173,6 +173,11 @@ fn zero_mask(v: &[Limb]) -> Limb {
 /// digits, so the result ends with it exactly when the steps leave the result's own object in
 /// place. Constant time for the operands' lengths.
 pub fn gcd(a: &BigNum, b: &BigNum) -> (BigNum, bool) {
+    crate::dit::with(|| gcd_dit(a, b))
+}
+
+/// [`gcd`]'s work.
+fn gcd_dit(a: &BigNum, b: &BigNum) -> (BigNum, bool) {
     // r = 2a and g = 2b, then both shifted right past their common low zero bits.
     let (Ok(r2), Ok(g2)) = (super::lshift1(a), super::lshift1(b)) else {
         return (BigNum::zero(), true);
@@ -361,6 +366,11 @@ fn mul_low(a: &[Limb], b: &[Limb], len: usize) -> Vec<Limb> {
 /// none. Constant time for the lengths, except that an even modulus with an even `x` (which
 /// has no inverse) answers at once.
 pub fn inverse(x: &BigNum, m: &BigNum) -> Option<BigNum> {
+    crate::dit::with(|| inverse_dit(x, m))
+}
+
+/// [`inverse`]'s work.
+fn inverse_dit(x: &BigNum, m: &BigNum) -> Option<BigNum> {
     let len = m.top();
     let ml = m.limbs();
     if m.is_odd() {

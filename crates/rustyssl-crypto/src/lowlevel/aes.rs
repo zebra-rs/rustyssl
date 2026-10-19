@@ -66,80 +66,84 @@ fn sub_word(word: [u8; 4]) -> [u8; 4] {
 /// The encryption schedule of `key` (FIPS 197's KeyExpansion), or [`Error::Bits`] for a key of
 /// another size than 16, 24, or 32 octets.
 pub fn encrypt_schedule(key: &[u8]) -> Result<Schedule, Error> {
-    let (nk, rounds): (usize, usize) = match key.len() {
-        16 => (4, 10),
-        24 => (6, 12),
-        32 => (8, 14),
-        _ => return Err(Error::Bits),
-    };
-    let total = rounds.saturating_add(1).saturating_mul(4);
-    let mut words = [[0u8; 4]; 4 * (MAX_ROUNDS + 1)];
-    for (w, k) in words.iter_mut().zip(key.as_chunks::<4>().0) {
-        *w = *k;
-    }
-    let mut rcon: u8 = 1;
-    for i in nk..total {
-        let mut temp = words.get(i.wrapping_sub(1)).copied().unwrap_or_default();
-        let pos = i.checked_rem(nk).unwrap_or(1);
-        if pos == 0 {
-            temp.rotate_left(1);
-            temp = sub_word(temp);
-            temp[0] ^= rcon;
-            rcon = (rcon << 1) ^ (if rcon & 0x80 != 0 { 0x1b } else { 0 });
-        } else if nk > 6 && pos == 4 {
-            temp = sub_word(temp);
+    crate::dit::with(|| {
+        let (nk, rounds): (usize, usize) = match key.len() {
+            16 => (4, 10),
+            24 => (6, 12),
+            32 => (8, 14),
+            _ => return Err(Error::Bits),
+        };
+        let total = rounds.saturating_add(1).saturating_mul(4);
+        let mut words = [[0u8; 4]; 4 * (MAX_ROUNDS + 1)];
+        for (w, k) in words.iter_mut().zip(key.as_chunks::<4>().0) {
+            *w = *k;
         }
-        let back = words.get(i.wrapping_sub(nk)).copied().unwrap_or_default();
-        if let Some(w) = words.get_mut(i) {
-            for ((d, a), b) in w.iter_mut().zip(back).zip(temp) {
-                *d = a ^ b;
+        let mut rcon: u8 = 1;
+        for i in nk..total {
+            let mut temp = words.get(i.wrapping_sub(1)).copied().unwrap_or_default();
+            let pos = i.checked_rem(nk).unwrap_or(1);
+            if pos == 0 {
+                temp.rotate_left(1);
+                temp = sub_word(temp);
+                temp[0] ^= rcon;
+                rcon = (rcon << 1) ^ (if rcon & 0x80 != 0 { 0x1b } else { 0 });
+            } else if nk > 6 && pos == 4 {
+                temp = sub_word(temp);
+            }
+            let back = words.get(i.wrapping_sub(nk)).copied().unwrap_or_default();
+            if let Some(w) = words.get_mut(i) {
+                for ((d, a), b) in w.iter_mut().zip(back).zip(temp) {
+                    *d = a ^ b;
+                }
+            }
+            temp.zeroize();
+        }
+        let mut schedule = Schedule {
+            keys: [[0; 16]; MAX_ROUNDS + 1],
+            rounds,
+        };
+        for (round, four) in schedule.keys.iter_mut().zip(words.as_chunks::<4>().0) {
+            for (dst, w) in round.as_chunks_mut::<4>().0.iter_mut().zip(four) {
+                *dst = *w;
             }
         }
-        temp.zeroize();
-    }
-    let mut schedule = Schedule {
-        keys: [[0; 16]; MAX_ROUNDS + 1],
-        rounds,
-    };
-    for (round, four) in schedule.keys.iter_mut().zip(words.as_chunks::<4>().0) {
-        for (dst, w) in round.as_chunks_mut::<4>().0.iter_mut().zip(four) {
-            *dst = *w;
-        }
-    }
-    words.zeroize();
-    Ok(schedule)
+        words.zeroize();
+        Ok(schedule)
+    })
 }
 
 /// The decryption schedule of `key`: the encryption schedule's round keys in reverse order,
 /// the inner ones through InvMixColumns.
 pub fn decrypt_schedule(key: &[u8]) -> Result<Schedule, Error> {
-    let enc = encrypt_schedule(key)?;
-    let rounds = enc.rounds;
-    let mut dec = Schedule {
-        keys: [[0; 16]; MAX_ROUNDS + 1],
-        rounds,
-    };
-    for (r, dst) in dec
-        .keys
-        .iter_mut()
-        .take(rounds.saturating_add(1))
-        .enumerate()
-    {
-        let src = enc
+    crate::dit::with(|| {
+        let enc = encrypt_schedule(key)?;
+        let rounds = enc.rounds;
+        let mut dec = Schedule {
+            keys: [[0; 16]; MAX_ROUNDS + 1],
+            rounds,
+        };
+        for (r, dst) in dec
             .keys
-            .get(rounds.wrapping_sub(r))
-            .copied()
-            .unwrap_or_default();
-        let mut block = Block::from(src);
-        if r != 0 && r != rounds {
-            inv_mix_columns(&mut block);
+            .iter_mut()
+            .take(rounds.saturating_add(1))
+            .enumerate()
+        {
+            let src = enc
+                .keys
+                .get(rounds.wrapping_sub(r))
+                .copied()
+                .unwrap_or_default();
+            let mut block = Block::from(src);
+            if r != 0 && r != rounds {
+                inv_mix_columns(&mut block);
+            }
+            for (d, b) in dst.iter_mut().zip(block.iter()) {
+                *d = *b;
+            }
+            block.as_mut_slice().zeroize();
         }
-        for (d, b) in dst.iter_mut().zip(block.iter()) {
-            *d = *b;
-        }
-        block.as_mut_slice().zeroize();
-    }
-    Ok(dec)
+        Ok(dec)
+    })
 }
 
 /// XORs a round key into the state.

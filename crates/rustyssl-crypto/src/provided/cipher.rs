@@ -572,6 +572,11 @@ impl Ctx {
     /// `einit`/`dinit` before the parameters: the direction, then the IV and the key if given
     /// (each of the cipher's length). The parameters are set afterwards, by the caller.
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         match self {
             Self::Null(n) => {
                 // The NULL cipher's `dinit` leaves the direction as it was.
@@ -596,6 +601,11 @@ impl Ctx {
     /// `update`: up to `outsize` octets of output for `inl` octets (bits for CFB1 counting
     /// bits) of input; `input` holds [`Ctx::input_len`] of them.
     pub fn update(&mut self, input: &[u8], inl: usize, outsize: usize) -> Result<Output, Error> {
+        crate::dit::with(|| self.update_dit(input, inl, outsize))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, input: &[u8], inl: usize, outsize: usize) -> Result<Output, Error> {
         match self {
             Self::Null(n) => n.cipher(input, outsize),
             Self::Generic(g) => {
@@ -612,6 +622,11 @@ impl Ctx {
 
     /// `final`.
     pub fn finalize(&mut self, outsize: usize) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit(outsize))
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self, outsize: usize) -> Result<Output, Error> {
         match self {
             Self::Null(_) => Ok(Output::new(Vec::new(), 0)),
             Self::Generic(g) => {
@@ -632,6 +647,11 @@ impl Ctx {
     /// `cipher` (`EVP_Cipher`): the mode applied to `inl` octets (or bits) of input without
     /// buffering or padding.
     pub fn cipher(&mut self, input: &[u8], inl: usize, outsize: usize) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(input, inl, outsize))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(&mut self, input: &[u8], inl: usize, outsize: usize) -> Result<Output, Error> {
         match self {
             Self::Null(n) => n.cipher(input, outsize),
             Self::Generic(g) => g.cipher(input, inl, outsize),

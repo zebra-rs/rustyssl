@@ -894,13 +894,14 @@ impl RecordReader {
                     record.data = ct;
                     return Ok(());
                 }
-                // MAC-then-encrypt, in constant time.
-                let orig_len = ct.len();
-                let (data_len, mac, good) = cbc_remove_padding_and_mac(p, &ct, bs, mac_len)?;
-                let header = mac_header(seq, record.content_type, record.version, data_len)?;
-                let want = p.tls_cbc_mac(*mac_hash, mac_key.bytes(), &header, &ct, data_len)?;
-                let mac_ok = want.ct_eq(&mac) & good;
-                let _ = orig_len;
+                // MAC-then-encrypt, in constant time (and in the core's data-independent timing
+                // mode: `rustyssl_crypto::dit`).
+                let (data_len, mac_ok) = rustyssl_crypto::dit::with(|| {
+                    let (data_len, mac, good) = cbc_remove_padding_and_mac(p, &ct, bs, mac_len)?;
+                    let header = mac_header(seq, record.content_type, record.version, data_len)?;
+                    let want = p.tls_cbc_mac(*mac_hash, mac_key.bytes(), &header, &ct, data_len)?;
+                    Ok::<_, Error>((data_len, want.ct_eq(&mac) & good))
+                })?;
                 if !bool::from(mac_ok)
                     || data_len > size(abi::SSL3_RT_MAX_COMPRESSED_LENGTH).saturating_add(mac_len)
                 {

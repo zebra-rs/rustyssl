@@ -52,6 +52,11 @@ pub enum SignError {
 /// `s = (1 + d)^-1 (k - r d) mod n`, with OpenSSL's limits on its Montgomery operands (each of
 /// at most the order's limbs).
 pub fn sign_s(order: &BigNum, d: &BigNum, k: &BigNum, r: &BigNum) -> Result<BigNum, SignError> {
+    crate::dit::with(|| sign_s_dit(order, d, k, r))
+}
+
+/// [`sign_s`]'s work.
+fn sign_s_dit(order: &BigNum, d: &BigNum, k: &BigNum, r: &BigNum) -> Result<BigNum, SignError> {
     let f = Fp::new(order).ok_or(SignError::Bn)?;
     let de = f.from_bn_unreduced(d).ok_or(SignError::Bn)?;
     let ke = f.from_bn_unreduced(k).ok_or(SignError::Bn)?;
