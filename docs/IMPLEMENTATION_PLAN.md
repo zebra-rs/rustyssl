@@ -5683,6 +5683,8 @@ both libraries (step 8.1).
       (TLS 1.3 clients pass theirs), falling back to CRLs where `X509_V_FLAG_CRL_CHECK` allows,
       else `X509_V_ERR_OCSP_VERIFY_FAILED`; CRL checking now skips self-signed certificates.
       `tests/c/ssl_ocsp_stapling.c`.
+    - The session cache tells the remove callback about evicted and flushed sessions after
+      releasing its lock, the last removed first (`ssl/sess_cache.rs`).
 
 **Exit:** M6.
 
