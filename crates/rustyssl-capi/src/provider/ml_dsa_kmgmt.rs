@@ -30,8 +30,8 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_ML_DSA_PREFER_SEED,
     OSSL_PKEY_PARAM_ML_DSA_RETAIN_SEED, OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_INVALID_KEY, PROV_R_INVALID_KEY_LENGTH,
-    PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_FAILED_TO_GENERATE_KEY, PROV_R_INVALID_KEY,
+    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_SEED_LENGTH, PROV_R_MISSING_KEY,
 };
 use rustyssl_crypto::mldsa::{self, PrivateKey, PublicKey, SEED_BYTES, Variant};
 
@@ -534,6 +534,10 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, v.public_key_bytes().saturating_mul(8)),
             (OSSL_PKEY_PARAM_SECURITY_BITS, usize::try_from(v.lambda()).unwrap_or(0)),
             (OSSL_PKEY_PARAM_MAX_SIZE, v.signature_bytes()),
+            (
+                OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+                usize::try_from(v.security_category()).unwrap_or(0),
+            ),
         ];
         for (name, value) in ints {
             // SAFETY: the caller's array; a static name.
@@ -580,10 +584,15 @@ ffi_callback! {
 }
 
 /// `ml_dsa_gettable_params`' list.
-static GETTABLE: Params<8> = Params([
+static GETTABLE: Params<9> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
@@ -653,8 +662,8 @@ ffi_callback! {
 
 /// `ml_dsa_gen_settable_params`' list.
 static GEN_SETTABLE: Params<3> = Params([
-    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_PKEY_PARAM_ML_DSA_SEED, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 

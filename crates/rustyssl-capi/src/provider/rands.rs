@@ -42,9 +42,9 @@ use rustyssl_abi::{
     OSSL_FUNC_RAND_UNINSTANTIATE, OSSL_FUNC_RAND_UNLOCK, OSSL_FUNC_RAND_VERIFY_ZEROIZATION,
     OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES, OSSL_PARAM, OSSL_PARAM_INTEGER,
     OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING,
-    OSSL_RAND_PARAM_GENERATE, OSSL_RAND_PARAM_MAX_REQUEST, OSSL_RAND_PARAM_STATE,
-    OSSL_RAND_PARAM_STRENGTH, OSSL_RAND_PARAM_TEST_ENTROPY, OSSL_RAND_PARAM_TEST_NONCE,
-    PROV_R_ADDITIONAL_INPUT_TOO_LONG, PROV_R_ALREADY_INSTANTIATED,
+    OSSL_PROV_PARAM_CORE_PROV_NAME, OSSL_RAND_PARAM_GENERATE, OSSL_RAND_PARAM_MAX_REQUEST,
+    OSSL_RAND_PARAM_STATE, OSSL_RAND_PARAM_STRENGTH, OSSL_RAND_PARAM_TEST_ENTROPY,
+    OSSL_RAND_PARAM_TEST_NONCE, PROV_R_ADDITIONAL_INPUT_TOO_LONG, PROV_R_ALREADY_INSTANTIATED,
     PROV_R_DERIVATION_FUNCTION_INIT_FAILED, PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK,
     PROV_R_ERROR_INSTANTIATING_DRBG, PROV_R_ERROR_RETRIEVING_ENTROPY,
     PROV_R_ERROR_RETRIEVING_NONCE, PROV_R_GENERATE_ERROR, PROV_R_IN_ERROR_STATE,
@@ -2725,11 +2725,13 @@ macro_rules! drbg_gettable {
     };
 }
 
-/// The parameters each DRBG takes (`OSSL_PARAM_DRBG_SETTABLE_CTX_COMMON`) after its own.
+/// The parameters each DRBG takes (`OSSL_PARAM_DRBG_SETTABLE_CTX_COMMON`) after its own: from
+/// 3.6 the provider's name (listed and taken, not used), then the reseed limits.
 macro_rules! drbg_settable {
     ($($own:expr),* $(,)?) => {
         Params([
             $($own,)*
+            defn(OSSL_PROV_PARAM_CORE_PROV_NAME, OSSL_PARAM_UTF8_STRING as c_int, 0),
             defn(OSSL_DRBG_PARAM_RESEED_REQUESTS, OSSL_PARAM_UNSIGNED_INTEGER as c_int, size_of::<c_uint>()),
             defn(OSSL_DRBG_PARAM_RESEED_TIME_INTERVAL, OSSL_PARAM_UNSIGNED_INTEGER as c_int, size_of::<u64>()),
             PARAM_END,
@@ -2745,7 +2747,7 @@ static CTR_GETTABLE: Params<16> = drbg_gettable!(
         size_of::<c_int>()
     ),
 );
-static CTR_SETTABLE: Params<6> = drbg_settable!(
+static CTR_SETTABLE: Params<7> = drbg_settable!(
     defn(
         OSSL_DRBG_PARAM_PROPERTIES,
         OSSL_PARAM_UTF8_STRING as c_int,
@@ -2763,7 +2765,7 @@ static HASH_GETTABLE: Params<15> = drbg_gettable!(defn(
     OSSL_PARAM_UTF8_STRING as c_int,
     0
 ));
-static HASH_SETTABLE: Params<5> = drbg_settable!(
+static HASH_SETTABLE: Params<6> = drbg_settable!(
     defn(
         OSSL_DRBG_PARAM_PROPERTIES,
         OSSL_PARAM_UTF8_STRING as c_int,
@@ -2775,7 +2777,7 @@ static HMAC_GETTABLE: Params<16> = drbg_gettable!(
     defn(OSSL_DRBG_PARAM_MAC, OSSL_PARAM_UTF8_STRING as c_int, 0),
     defn(OSSL_DRBG_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
 );
-static HMAC_SETTABLE: Params<6> = drbg_settable!(
+static HMAC_SETTABLE: Params<7> = drbg_settable!(
     defn(
         OSSL_DRBG_PARAM_PROPERTIES,
         OSSL_PARAM_UTF8_STRING as c_int,

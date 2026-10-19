@@ -724,16 +724,11 @@ ffi_callback! {
     }
 }
 
-/// `known_gettable_ctx_params`.
-static GETTABLE: Params<4> = Params([
+/// `eddsa_get_ctx_params_list`: the AlgorithmIdentifier only (3.6 stopped listing the instance
+/// and the context string, which were never got).
+static GETTABLE: Params<2> = Params([
     defn(
         OSSL_SIGNATURE_PARAM_ALGORITHM_ID,
-        OSSL_PARAM_OCTET_STRING,
-        0,
-    ),
-    defn(OSSL_SIGNATURE_PARAM_INSTANCE, OSSL_PARAM_UTF8_STRING, 0),
-    defn(
-        OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),

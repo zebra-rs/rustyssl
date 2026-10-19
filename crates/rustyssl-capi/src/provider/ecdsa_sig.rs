@@ -43,10 +43,9 @@ use rustyssl_abi::{
     OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_FINAL, OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT,
     OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_UPDATE, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_OCTET_STRING,
     OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING, OSSL_SIGNATURE_PARAM_ALGORITHM_ID,
-    OSSL_SIGNATURE_PARAM_DIGEST, OSSL_SIGNATURE_PARAM_DIGEST_SIZE, OSSL_SIGNATURE_PARAM_KAT,
-    OSSL_SIGNATURE_PARAM_NONCE_TYPE, OSSL_SIGNATURE_PARAM_PROPERTIES,
-    OSSL_SIGNATURE_PARAM_SIGNATURE, PROV_R_DIGEST_NOT_ALLOWED, PROV_R_INVALID_DIGEST,
-    PROV_R_NO_KEY_SET, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
+    OSSL_SIGNATURE_PARAM_DIGEST, OSSL_SIGNATURE_PARAM_DIGEST_SIZE, OSSL_SIGNATURE_PARAM_NONCE_TYPE,
+    OSSL_SIGNATURE_PARAM_PROPERTIES, OSSL_SIGNATURE_PARAM_SIGNATURE, PROV_R_DIGEST_NOT_ALLOWED,
+    PROV_R_INVALID_DIGEST, PROV_R_NO_KEY_SET, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
 };
 use rustyssl_asn1::objects;
 
@@ -902,21 +901,16 @@ ffi_callback! {
     }
 }
 
-/// `ecdsa_common_set_ctx_params`: the known-answer test flag and the nonce type.
+/// `ecdsa_common_set_ctx_params`: the nonce type. (The known-answer test flag `kat` exists only
+/// in builds with ACVP tests, which the default build leaves out (`OPENSSL_NO_ACVP_TESTS`); 3.6
+/// stopped accepting it there.)
 ///
 /// # Safety
 /// `params` is an array.
 unsafe fn common_set_ctx_params(c: &mut SigCtx, params: *const OSSL_PARAM) -> c_int {
     // SAFETY: the caller's array; a static name.
-    if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_KAT) } {
-        // SAFETY: a parameter of the array; the context's field.
-        if unsafe { OSSL_PARAM_get_uint(p, &raw mut c.kattest) } != 1 {
-            return 0;
-        }
-    }
-    // SAFETY: as above.
     if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE) } {
-        // SAFETY: as above.
+        // SAFETY: a parameter of the array; the context's field.
         if unsafe { OSSL_PARAM_get_uint(p, &raw mut c.nonce_type) } != 1 {
             return 0;
         }
@@ -993,15 +987,14 @@ ffi_callback! {
 }
 
 /// `settable_ctx_params`.
-static SETTABLE: Params<6> = Params([
+static SETTABLE: Params<5> = Params([
     defn(OSSL_SIGNATURE_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
+    defn(OSSL_SIGNATURE_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     defn(
         OSSL_SIGNATURE_PARAM_DIGEST_SIZE,
         OSSL_PARAM_UNSIGNED_INTEGER,
         SIZE_T,
     ),
-    defn(OSSL_SIGNATURE_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
-    defn(OSSL_SIGNATURE_PARAM_KAT, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(
         OSSL_SIGNATURE_PARAM_NONCE_TYPE,
         OSSL_PARAM_UNSIGNED_INTEGER,
@@ -1137,9 +1130,8 @@ ffi_callback! {
 }
 
 /// `settable_sigalg_ctx_params`.
-static SIGALG_SETTABLE: Params<4> = Params([
+static SIGALG_SETTABLE: Params<3> = Params([
     defn(OSSL_SIGNATURE_PARAM_SIGNATURE, OSSL_PARAM_OCTET_STRING, 0),
-    defn(OSSL_SIGNATURE_PARAM_KAT, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(
         OSSL_SIGNATURE_PARAM_NONCE_TYPE,
         OSSL_PARAM_UNSIGNED_INTEGER,

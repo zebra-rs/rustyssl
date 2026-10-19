@@ -29,7 +29,7 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_DHKEM_IKM, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME,
     OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_PRIV_KEY,
     OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
-    PROV_R_ALGORITHM_MISMATCH, PROV_R_INVALID_INPUT_LENGTH,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_ALGORITHM_MISMATCH, PROV_R_INVALID_INPUT_LENGTH,
 };
 use rustyssl_crypto::ec::dhkem::{self, ECX_KEMS};
 
@@ -294,7 +294,10 @@ unsafe fn get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int {
         // SAFETY: as above.
         && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_BITS, secbits) }
         // SAFETY: as above.
-        && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, size) };
+        && unsafe { set_int(params, OSSL_PKEY_PARAM_MAX_SIZE, size) }
+        // 3.6: classical keys are in no NIST post-quantum category.
+        // SAFETY: as above.
+        && unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0) };
     if ok && !k.kind.is_ed() {
         // SAFETY: as above.
         ok = unsafe { set_octets(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, pubkey) };
@@ -319,28 +322,38 @@ unsafe fn get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int {
 }
 
 /// `ecx_gettable_params`.
-static ECX_GETTABLE: Params<7> = Params([
+static ECX_GETTABLE: Params<8> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
+    defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(
         OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),
-    defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
-    defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
     PARAM_END,
 ]);
 
 /// `ed_gettable_params`.
-static ED_GETTABLE: Params<7> = Params([
+static ED_GETTABLE: Params<8> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
-    defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(OSSL_PKEY_PARAM_PUB_KEY, OSSL_PARAM_OCTET_STRING, 0),
     defn(OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_MANDATORY_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 

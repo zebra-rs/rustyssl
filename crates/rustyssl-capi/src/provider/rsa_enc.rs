@@ -612,13 +612,18 @@ ffi_callback! {
 }
 
 /// `known_gettable_ctx_params`.
-static GETTABLE: Params<8> = Params([
+static GETTABLE: Params<9> = Params([
     defn(
         OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST,
         OSSL_PARAM_UTF8_STRING,
         0,
     ),
     defn(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_ASYM_CIPHER_PARAM_PAD_MODE,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     defn(
         OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST,
         OSSL_PARAM_UTF8_STRING,
@@ -644,7 +649,7 @@ static GETTABLE: Params<8> = Params([
 ]);
 
 /// `known_settable_ctx_params`.
-static SETTABLE: Params<10> = Params([
+static SETTABLE: Params<11> = Params([
     defn(
         OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST,
         OSSL_PARAM_UTF8_STRING,
@@ -656,6 +661,11 @@ static SETTABLE: Params<10> = Params([
         0,
     ),
     defn(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_ASYM_CIPHER_PARAM_PAD_MODE,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     defn(
         OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST,
         OSSL_PARAM_UTF8_STRING,

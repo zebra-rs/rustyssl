@@ -28,8 +28,8 @@ use rustyssl_abi::{
     OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_BITS,
     OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OSSL_PKEY_PARAM_GROUP_NAME, OSSL_PKEY_PARAM_MAX_SIZE,
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PROPERTIES, OSSL_PKEY_PARAM_PUB_KEY,
-    OSSL_PKEY_PARAM_SECURITY_BITS, PROV_R_INVALID_KEY, PROV_R_INVALID_KEY_LENGTH,
-    PROV_R_MISSING_KEY, PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
+    OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PKEY_PARAM_SECURITY_CATEGORY, PROV_R_INVALID_KEY,
+    PROV_R_INVALID_KEY_LENGTH, PROV_R_MISSING_KEY, PROV_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE,
     PROV_R_OUTPUT_BUFFER_TOO_SMALL, PROV_R_UNSUPPORTED_SELECTION,
 };
 
@@ -70,10 +70,13 @@ pub(crate) struct MlKemInfo {
     pub(crate) ctext_bytes: usize,
     bits: c_int,
     secbits: c_int,
+    /// The ML-KEM parameter set, for its NIST security category.
+    variant: rustyssl_crypto::mlkem::Variant,
 }
 
 const ML_KEM_768: MlKemInfo = MlKemInfo {
     name: c"ML-KEM-768",
+    variant: rustyssl_crypto::mlkem::Variant::MlKem768,
     pubkey_bytes: 1184,
     prvkey_bytes: 2400,
     ctext_bytes: 1088,
@@ -82,6 +85,7 @@ const ML_KEM_768: MlKemInfo = MlKemInfo {
 };
 const ML_KEM_1024: MlKemInfo = MlKemInfo {
     name: c"ML-KEM-1024",
+    variant: rustyssl_crypto::mlkem::Variant::MlKem1024,
     pubkey_bytes: 1568,
     prvkey_bytes: 3168,
     ctext_bytes: 1568,
@@ -736,10 +740,15 @@ ffi_callback! {
 }
 
 /// `mlx_kem_gettable_params`' list.
-static GETTABLE: Params<6> = Params([
+static GETTABLE: Params<7> = Params([
     defn(OSSL_PKEY_PARAM_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PARAM_INTEGER, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PARAM_INTEGER, INT_SIZE),
+    defn(
+        OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+        OSSL_PARAM_INTEGER,
+        INT_SIZE,
+    ),
     defn(
         OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
         OSSL_PARAM_OCTET_STRING,
@@ -816,6 +825,10 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, info.ml_kem.bits),
             (OSSL_PKEY_PARAM_SECURITY_BITS, info.ml_kem.secbits),
             (OSSL_PKEY_PARAM_MAX_SIZE, max),
+            (
+                OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+                c_int::try_from(info.ml_kem.variant.security_category()).unwrap_or(0),
+            ),
         ] {
             // SAFETY: the caller's array; a static name.
             let p = unsafe { OSSL_PARAM_locate(params, name.as_ptr()) };
@@ -876,12 +889,13 @@ ffi_callback! {
 }
 
 /// `mlx_kem_settable_params`' list.
-static SETTABLE: Params<2> = Params([
+static SETTABLE: Params<3> = Params([
     defn(
         OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),
+    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 
@@ -985,7 +999,7 @@ ffi_callback! {
 
 /// `mlx_kem_gen_settable_params`' list (the properties, listed as an octet string).
 static GEN_SETTABLE: Params<2> = Params([
-    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_PKEY_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     PARAM_END,
 ]);
 

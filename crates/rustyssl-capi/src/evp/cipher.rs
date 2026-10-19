@@ -22,15 +22,16 @@ use std::sync::{Mutex, PoisonError};
 use rustyssl_abi::{
     ERR_LIB_EVP, ERR_R_EVP_LIB, ERR_R_INTERNAL_ERROR, EVP_CIPH_CUSTOM_IV,
     EVP_CIPH_FLAG_AEAD_CIPHER, EVP_CIPH_FLAG_CTS, EVP_CIPH_FLAG_CUSTOM_ASN1,
-    EVP_CIPH_FLAG_CUSTOM_CIPHER, EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK, EVP_CIPH_MODE, EVP_CIPH_RAND_KEY,
-    EVP_CIPHER, EVP_R_CACHE_CONSTANTS_FAILED, EVP_R_CANNOT_GET_PARAMETERS,
-    EVP_R_INVALID_PROVIDER_FUNCTIONS, NID_aes_128_cfb1, NID_aes_128_cfb8, NID_aes_128_cfb128,
-    NID_aes_192_cfb1, NID_aes_192_cfb8, NID_aes_192_cfb128, NID_aes_256_cfb1, NID_aes_256_cfb8,
-    NID_aes_256_cfb128, NID_des_cfb1, NID_des_cfb8, NID_des_cfb64, NID_des_ede3_cfb1,
-    NID_des_ede3_cfb8, NID_des_ede3_cfb64, NID_rc2_40_cbc, NID_rc2_64_cbc, NID_rc2_cbc, NID_rc4,
-    NID_rc4_40, NID_undef, OBJ_NAME_TYPE_CIPHER_METH, OSSL_ALGORITHM, OSSL_CIPHER_PARAM_AEAD,
-    OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS, OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS,
-    OSSL_CIPHER_PARAM_CUSTOM_IV, OSSL_CIPHER_PARAM_HAS_RAND_KEY, OSSL_CIPHER_PARAM_IVLEN,
+    EVP_CIPH_FLAG_CUSTOM_CIPHER, EVP_CIPH_FLAG_ENC_THEN_MAC, EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK,
+    EVP_CIPH_MODE, EVP_CIPH_RAND_KEY, EVP_CIPHER, EVP_R_CACHE_CONSTANTS_FAILED,
+    EVP_R_CANNOT_GET_PARAMETERS, EVP_R_INVALID_PROVIDER_FUNCTIONS, NID_aes_128_cfb1,
+    NID_aes_128_cfb8, NID_aes_128_cfb128, NID_aes_192_cfb1, NID_aes_192_cfb8, NID_aes_192_cfb128,
+    NID_aes_256_cfb1, NID_aes_256_cfb8, NID_aes_256_cfb128, NID_des_cfb1, NID_des_cfb8,
+    NID_des_cfb64, NID_des_ede3_cfb1, NID_des_ede3_cfb8, NID_des_ede3_cfb64, NID_rc2_40_cbc,
+    NID_rc2_64_cbc, NID_rc2_cbc, NID_rc4, NID_rc4_40, NID_undef, OBJ_NAME_TYPE_CIPHER_METH,
+    OSSL_ALGORITHM, OSSL_CIPHER_PARAM_AEAD, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS,
+    OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS, OSSL_CIPHER_PARAM_CUSTOM_IV,
+    OSSL_CIPHER_PARAM_ENCRYPT_THEN_MAC, OSSL_CIPHER_PARAM_HAS_RAND_KEY, OSSL_CIPHER_PARAM_IVLEN,
     OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_MODE, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK,
     OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT, OSSL_FUNC_CIPHER_DECRYPT_SKEY_INIT,
     OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT,
@@ -304,13 +305,14 @@ const fn flag(f: c_int) -> c_ulong {
 fn cache_constants(c: &mut Cipher) -> bool {
     let (mut blksz, mut ivlen, mut keylen): (usize, usize, usize) = (0, 0, 0);
     let mut mode: core::ffi::c_uint = 0;
-    let (mut aead, mut custom_iv, mut cts, mut multiblock, mut randkey): (
+    let (mut aead, mut custom_iv, mut cts, mut multiblock, mut randkey, mut etm): (
         c_int,
         c_int,
         c_int,
         c_int,
         c_int,
-    ) = (0, 0, 0, 0, 0);
+        c_int,
+    ) = (0, 0, 0, 0, 0, 0);
     let size = |key: &'static CStr, v: *mut usize| {
         construct(
             key.as_ptr(),
@@ -342,6 +344,7 @@ fn cache_constants(c: &mut Cipher) -> bool {
         int(OSSL_CIPHER_PARAM_CTS, &raw mut cts),
         int(OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, &raw mut multiblock),
         int(OSSL_CIPHER_PARAM_HAS_RAND_KEY, &raw mut randkey),
+        int(OSSL_CIPHER_PARAM_ENCRYPT_THEN_MAC, &raw mut etm),
         end(),
     ];
     // `evp_do_ciph_getparams`.
@@ -378,6 +381,7 @@ fn cache_constants(c: &mut Cipher) -> bool {
         (multiblock != 0, EVP_CIPH_FLAG_TLS1_1_MULTIBLOCK),
         (c.funcs.ccipher.is_some(), EVP_CIPH_FLAG_CUSTOM_CIPHER),
         (randkey != 0, EVP_CIPH_RAND_KEY),
+        (etm != 0, EVP_CIPH_FLAG_ENC_THEN_MAC),
     ] {
         if on {
             flags |= flag(f);

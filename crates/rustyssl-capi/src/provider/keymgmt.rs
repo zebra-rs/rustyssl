@@ -1000,7 +1000,7 @@ static DEFAULT_KEYMGMT: Algorithms<41> = Algorithms([
         c"OpenSSL RSA implementation",
     ),
     alg_desc(
-        c"RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10",
+        c"RSA-PSS:RSASSA-PSS:rsassaPss:1.2.840.113549.1.1.10",
         &super::rsa_kmgmt::RSAPSS_KEYMGMT,
         c"OpenSSL RSA-PSS implementation",
     ),

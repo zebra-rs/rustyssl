@@ -1699,16 +1699,26 @@ ffi_callback! {
 }
 
 /// `known_gettable_ctx_params`.
-static GETTABLE: Params<6> = Params([
+static GETTABLE: Params<8> = Params([
     defn(
         OSSL_SIGNATURE_PARAM_ALGORITHM_ID,
         OSSL_PARAM_OCTET_STRING,
         0,
     ),
     defn(OSSL_SIGNATURE_PARAM_PAD_MODE, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_SIGNATURE_PARAM_PAD_MODE,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     defn(OSSL_SIGNATURE_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_SIGNATURE_PARAM_PSS_SALTLEN,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     PARAM_END,
 ]);
 
@@ -1926,10 +1936,15 @@ ffi_callback! {
 }
 
 /// `settable_ctx_params` and, inside a digest operation, `settable_ctx_params_no_digest`.
-static SETTABLE: Params<7> = Params([
+static SETTABLE: Params<9> = Params([
     defn(OSSL_SIGNATURE_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_SIGNATURE_PARAM_PROPERTIES, OSSL_PARAM_UTF8_STRING, 0),
     defn(OSSL_SIGNATURE_PARAM_PAD_MODE, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_SIGNATURE_PARAM_PAD_MODE,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     defn(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, OSSL_PARAM_UTF8_STRING, 0),
     defn(
         OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES,
@@ -1937,6 +1952,11 @@ static SETTABLE: Params<7> = Params([
         0,
     ),
     defn(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, OSSL_PARAM_UTF8_STRING, 0),
+    defn(
+        OSSL_SIGNATURE_PARAM_PSS_SALTLEN,
+        OSSL_PARAM_INTEGER,
+        size_of::<c_int>(),
+    ),
     PARAM_END,
 ]);
 static SETTABLE_NO_DIGEST: Params<5> = Params([

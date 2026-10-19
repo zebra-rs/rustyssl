@@ -39,15 +39,16 @@ use rustyssl_abi::{
     OSSL_MAC_PARAM_CIPHER, OSSL_MAC_PARAM_CUSTOM, OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES,
     OSSL_MAC_PARAM_SIZE, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING,
     OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING, PKCS5_DEFAULT_ITER, PROV_R_BAD_ENCODING,
-    PROV_R_BAD_LENGTH, PROV_R_INVALID_DATA, PROV_R_INVALID_ITERATION_COUNT,
-    PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_MAC, PROV_R_INVALID_MODE, PROV_R_INVALID_PUBINFO,
-    PROV_R_INVALID_SALT_LENGTH, PROV_R_INVALID_SEED_LENGTH, PROV_R_INVALID_UKM_LENGTH,
-    PROV_R_KEY_SIZE_TOO_SMALL, PROV_R_MISSING_CEK_ALG, PROV_R_MISSING_KEY, PROV_R_MISSING_MAC,
-    PROV_R_MISSING_MESSAGE_DIGEST, PROV_R_MISSING_PASS, PROV_R_MISSING_SALT, PROV_R_MISSING_SECRET,
-    PROV_R_MISSING_SEED, PROV_R_MISSING_SESSION_ID, PROV_R_MISSING_TYPE, PROV_R_MISSING_XCGHASH,
-    PROV_R_NO_KEY_SET, PROV_R_NOT_SUPPORTED, PROV_R_UNABLE_TO_LOAD_SHA256,
-    PROV_R_UNSUPPORTED_CEK_ALG, PROV_R_UNSUPPORTED_MAC_TYPE, PROV_R_VALUE_ERROR,
-    PROV_R_WRONG_OUTPUT_BUFFER_SIZE, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
+    PROV_R_BAD_LENGTH, PROV_R_DIGEST_NOT_ALLOWED, PROV_R_INVALID_DATA,
+    PROV_R_INVALID_ITERATION_COUNT, PROV_R_INVALID_KEY_LENGTH, PROV_R_INVALID_MAC,
+    PROV_R_INVALID_MODE, PROV_R_INVALID_PUBINFO, PROV_R_INVALID_SALT_LENGTH,
+    PROV_R_INVALID_SEED_LENGTH, PROV_R_INVALID_UKM_LENGTH, PROV_R_KEY_SIZE_TOO_SMALL,
+    PROV_R_MISSING_CEK_ALG, PROV_R_MISSING_KEY, PROV_R_MISSING_MAC, PROV_R_MISSING_MESSAGE_DIGEST,
+    PROV_R_MISSING_PASS, PROV_R_MISSING_SALT, PROV_R_MISSING_SECRET, PROV_R_MISSING_SEED,
+    PROV_R_MISSING_SESSION_ID, PROV_R_MISSING_TYPE, PROV_R_MISSING_XCGHASH, PROV_R_NO_KEY_SET,
+    PROV_R_NOT_SUPPORTED, PROV_R_UNABLE_TO_LOAD_SHA256, PROV_R_UNSUPPORTED_CEK_ALG,
+    PROV_R_UNSUPPORTED_MAC_TYPE, PROV_R_VALUE_ERROR, PROV_R_WRONG_OUTPUT_BUFFER_SIZE,
+    PROV_R_XOF_DIGESTS_NOT_ALLOWED,
 };
 
 use super::builtin::libctx_of;
@@ -79,8 +80,8 @@ use crate::params::{
     OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_size_t,
     OSSL_PARAM_construct_utf8_string, OSSL_PARAM_get_int, OSSL_PARAM_get_octet_string,
     OSSL_PARAM_get_octet_string_ptr, OSSL_PARAM_get_size_t, OSSL_PARAM_get_uint64,
-    OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
-    OSSL_PARAM_set_octet_string, OSSL_PARAM_set_size_t, end,
+    OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_locate_const, OSSL_PARAM_set_int,
+    OSSL_PARAM_set_octet_string, OSSL_PARAM_set_size_t, OSSL_PARAM_set_utf8_string, end,
 };
 
 pub(super) type NewCtxFn = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
@@ -535,6 +536,8 @@ struct Hkdf {
     provctx: Ptr,
     mode: c_int,
     digest: Prov<EVP_MD>,
+    /// HKDF-SHA256/384/512 (3.6): the digest is the algorithm's and can't be set.
+    fixed_digest: bool,
     salt: Option<Secret>,
     key: Option<Secret>,
     prefix: Option<Secret>,
@@ -594,7 +597,10 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         if let Some(h) = unsafe { context::<Hkdf>(vctx) } {
-            *h = Hkdf { provctx: h.provctx, ..Hkdf::default() };
+            // A fixed-digest HKDF keeps its digest (`kdf_hkdf_reset_ex`).
+            let fixed = h.fixed_digest;
+            let digest = if fixed { core::mem::take(&mut h.digest) } else { Prov::default() };
+            *h = Hkdf { provctx: h.provctx, digest, fixed_digest: fixed, ..Hkdf::default() };
         }
     }
 }
@@ -620,7 +626,18 @@ ffi_callback! {
             return ptr::null_mut();
         };
         let Some(digest) = src.digest.copy() else { return ptr::null_mut() };
-        boxed(Hkdf { provctx: src.provctx, mode: src.mode, digest, salt, key, prefix, label, data, info })
+        boxed(Hkdf {
+            provctx: src.provctx,
+            mode: src.mode,
+            digest,
+            fixed_digest: src.fixed_digest,
+            salt,
+            key,
+            prefix,
+            label,
+            data,
+            info,
+        })
     }
 }
 
@@ -699,7 +716,8 @@ unsafe fn hkdf_common_set(h: &mut Hkdf, params: *const OSSL_PARAM) -> bool {
     true
 }
 
-/// `hkdf_common_get_ctx_params`: the size and the info.
+/// `hkdf_common_get_ctx_params`: the size, the digest's name, the mode (as a name or a number,
+/// by the parameter's type), the salt, and the info (the digest, mode, and salt from 3.6).
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
@@ -719,20 +737,134 @@ unsafe fn hkdf_common_get(h: &Hkdf, params: *mut OSSL_PARAM) -> bool {
         }
     }
     // SAFETY: as above.
-    let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_INFO.as_ptr()) };
+    let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_DIGEST.as_ptr()) };
+    if !p.is_null() {
+        if h.digest.method.is_null() {
+            return false;
+        }
+        // SAFETY: the context's digest.
+        let name = unsafe { EVP_MD_get0_name(h.digest.method) };
+        // SAFETY: a parameter of the caller's array; the digest's name.
+        if name.is_null() || unsafe { OSSL_PARAM_set_utf8_string(p, name) } == 0 {
+            return false;
+        }
+    }
+    // SAFETY: as above.
+    let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_MODE.as_ptr()) };
     // SAFETY: as above.
     if let Some(q) = unsafe { p.as_mut() } {
-        match h.info.as_ref().filter(|i| i.len() > 0) {
-            None => q.return_size = 0,
-            Some(i) => {
-                // SAFETY: as above; the context's info.
-                if unsafe { OSSL_PARAM_set_octet_string(q, i.ptr().cast(), i.len()) } == 0 {
-                    return false;
+        let ok = if q.data_type == OSSL_PARAM_UTF8_STRING.cast_unsigned() {
+            let name = match h.mode {
+                EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND => c"EXTRACT_AND_EXPAND",
+                EVP_KDF_HKDF_MODE_EXTRACT_ONLY => c"EXTRACT_ONLY",
+                EVP_KDF_HKDF_MODE_EXPAND_ONLY => c"EXPAND_ONLY",
+                _ => return false,
+            };
+            // SAFETY: as above; a static name.
+            unsafe { OSSL_PARAM_set_utf8_string(q, name.as_ptr()) }
+        } else {
+            // SAFETY: as above.
+            unsafe { OSSL_PARAM_set_int(q, h.mode) }
+        };
+        if ok == 0 {
+            return false;
+        }
+    }
+    for (name, value) in [
+        (OSSL_KDF_PARAM_SALT, &h.salt),
+        (OSSL_KDF_PARAM_INFO, &h.info),
+    ] {
+        // SAFETY: as above.
+        let p = unsafe { OSSL_PARAM_locate(params, name.as_ptr()) };
+        // SAFETY: as above.
+        if let Some(q) = unsafe { p.as_mut() } {
+            match value.as_ref().filter(|i| i.len() > 0) {
+                None => q.return_size = 0,
+                Some(i) => {
+                    // SAFETY: as above; the context's octets.
+                    if unsafe { OSSL_PARAM_set_octet_string(q, i.ptr().cast(), i.len()) } == 0 {
+                        return false;
+                    }
                 }
             }
         }
     }
     true
+}
+
+/// `kdf_hkdf_fixed_digest_new`: an HKDF whose digest is `digest` and stays it.
+///
+/// # Safety
+/// `provctx` is the provider's context.
+unsafe fn hkdf_fixed_new(provctx: *mut c_void, digest: &'static CStr) -> *mut c_void {
+    let mut h = Hkdf {
+        provctx: Ptr(provctx),
+        fixed_digest: true,
+        ..Hkdf::default()
+    };
+    let params = [
+        // SAFETY: a static key and name.
+        unsafe {
+            OSSL_PARAM_construct_utf8_string(
+                OSSL_KDF_PARAM_DIGEST.as_ptr(),
+                digest.as_ptr().cast_mut(),
+                0,
+            )
+        },
+        end(),
+    ];
+    // SAFETY: the provider's context; the array above.
+    if !unsafe { load_digest(&mut h.digest, params.as_ptr(), provctx) } {
+        return ptr::null_mut();
+    }
+    boxed(h)
+}
+
+macro_rules! hkdf_fixed {
+    ($new:ident, $name:literal) => {
+        ffi_callback! {
+            /// `kdf_hkdf_<hash>_new`: HKDF with a fixed digest.
+            ///
+            /// # Safety
+            /// `provctx` is the provider's context.
+            pub(crate) unsafe extern "C" fn $new(provctx: *mut c_void) -> *mut c_void
+            where failure = ptr::null_mut(), library = ERR_LIB_PROV
+            {
+                // SAFETY: the caller's guarantee.
+                unsafe { hkdf_fixed_new(provctx, $name) }
+            }
+        }
+    };
+}
+hkdf_fixed!(hkdf_sha256_new, c"SHA256");
+hkdf_fixed!(hkdf_sha384_new, c"SHA384");
+hkdf_fixed!(hkdf_sha512_new, c"SHA512");
+
+ffi_callback! {
+    /// `kdf_hkdf_fixed_digest_set_ctx_params`: as HKDF's, except that the digest can't be set.
+    ///
+    /// # Safety
+    /// `vctx` is a live HKDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn hkdf_fixed_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: as above; a static name.
+        if unsafe { locate(params, OSSL_KDF_PARAM_DIGEST) }.is_some() {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                PROV_R_DIGEST_NOT_ALLOWED,
+                "kdf_hkdf_fixed_digest_set_ctx_params",
+                "Setting the digest is not supported for fixed-digest HKDFs",
+            );
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        unsafe { hkdf_set_ctx_params(vctx, params) }
+    }
 }
 
 ffi_callback! {
@@ -1065,15 +1197,86 @@ static TLS13_SETTABLE: Params<10> = Params([
     PARAM_END,
 ]);
 
-static HKDF_GETTABLE: Params<3> = Params([
+static HKDF_GETTABLE: Params<7> = Params([
     defn(
         OSSL_KDF_PARAM_SIZE,
         OSSL_PARAM_UNSIGNED_INTEGER as c_int,
         SIZE_T,
     ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_MODE, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_MODE,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
     defn(OSSL_KDF_PARAM_INFO, OSSL_PARAM_OCTET_STRING as c_int, 0),
     PARAM_END,
 ]);
+
+/// `hkdf_fixed_digest_set_ctx_params_list`: HKDF's without the digest (and its properties).
+static HKDF_FIXED_SETTABLE: Params<6> = Params([
+    defn(OSSL_KDF_PARAM_MODE, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_MODE,
+        OSSL_PARAM_INTEGER as c_int,
+        size_of::<c_int>(),
+    ),
+    defn(OSSL_KDF_PARAM_KEY, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_INFO, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `kdf_hkdf_fixed_digest_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn hkdf_fixed_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        HKDF_FIXED_SETTABLE.0.as_ptr()
+    }
+}
+
+/// `ossl_kdf_hkdf_<hash>_functions`.
+macro_rules! hkdf_fixed_functions {
+    ($table:ident, $new:ident) => {
+        static $table: Dispatch<10> = Dispatch([
+            entry!(OSSL_FUNC_KDF_NEWCTX, $new, NewCtxFn),
+            entry!(OSSL_FUNC_KDF_DUPCTX, hkdf_dup, DupCtxFn),
+            entry!(OSSL_FUNC_KDF_FREECTX, hkdf_free, FreeCtxFn),
+            entry!(OSSL_FUNC_KDF_RESET, hkdf_reset, ResetFn),
+            entry!(OSSL_FUNC_KDF_DERIVE, hkdf_derive, DeriveFn),
+            entry!(
+                OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+                hkdf_fixed_settable,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_KDF_SET_CTX_PARAMS,
+                hkdf_fixed_set_ctx_params,
+                SetCtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+                hkdf_gettable,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_KDF_GET_CTX_PARAMS,
+                hkdf_get_ctx_params,
+                GetCtxParamsFn
+            ),
+            END,
+        ]);
+    };
+}
+hkdf_fixed_functions!(HKDF_SHA256_FUNCTIONS, hkdf_sha256_new);
+hkdf_fixed_functions!(HKDF_SHA384_FUNCTIONS, hkdf_sha384_new);
+hkdf_fixed_functions!(HKDF_SHA512_FUNCTIONS, hkdf_sha512_new);
 
 ffi_callback! {
     /// `kdf_hkdf_settable_ctx_params`.
@@ -3806,7 +4009,7 @@ const KEK_ALGS: [(&CStr, c_int, usize); 4] = [
 ];
 
 /// A NID's OBJECT IDENTIFIER, DER-encoded (from the object table).
-fn oid_der(nid: c_int) -> Option<Vec<u8>> {
+pub(crate) fn oid_der(nid: c_int) -> Option<Vec<u8>> {
     // SAFETY: a built-in NID.
     let obj = unsafe { OBJ_nid2obj(nid) };
     if obj.is_null() {
@@ -4653,8 +4856,20 @@ static SCRYPT_FUNCTIONS: Dispatch<10> = Dispatch([
 ]);
 
 /// `deflt_kdfs`, in the reference's order.
-static DEFAULT_KDFS: Algorithms<17> = Algorithms([
+static DEFAULT_KDFS: Algorithms<20> = Algorithms([
     alg(c"HKDF", &HKDF_FUNCTIONS),
+    alg(
+        c"HKDF-SHA256:id-alg-hkdf-with-sha256:1.2.840.113549.1.9.16.3.28",
+        &HKDF_SHA256_FUNCTIONS,
+    ),
+    alg(
+        c"HKDF-SHA384:id-alg-hkdf-with-sha384:1.2.840.113549.1.9.16.3.29",
+        &HKDF_SHA384_FUNCTIONS,
+    ),
+    alg(
+        c"HKDF-SHA512:id-alg-hkdf-with-sha512:1.2.840.113549.1.9.16.3.30",
+        &HKDF_SHA512_FUNCTIONS,
+    ),
     alg(c"TLS13-KDF", &TLS13_FUNCTIONS),
     alg(c"SSKDF", &SSKDF_FUNCTIONS),
     alg(c"PBKDF2:1.2.840.113549.1.5.12", &PBKDF2_FUNCTIONS),

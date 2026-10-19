@@ -37,6 +37,7 @@ use rustyssl_abi::{
     OSSL_PKEY_PARAM_FFC_Q, OSSL_PKEY_PARAM_FFC_QBITS, OSSL_PKEY_PARAM_FFC_SEED,
     OSSL_PKEY_PARAM_FFC_TYPE, OSSL_PKEY_PARAM_GROUP_NAME, OSSL_PKEY_PARAM_MAX_SIZE,
     OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PKEY_PARAM_SECURITY_BITS,
+    OSSL_PKEY_PARAM_SECURITY_CATEGORY,
 };
 use rustyssl_crypto::ffc as groups;
 
@@ -368,6 +369,8 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, unsafe { DH_bits(h) }),
             (OSSL_PKEY_PARAM_SECURITY_BITS, unsafe { DH_security_bits(h) }),
             (OSSL_PKEY_PARAM_MAX_SIZE, unsafe { DH_size(h) }),
+            // 3.6: classical keys are in no NIST post-quantum category.
+            (OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0),
         ];
         for (name, v) in ints {
             // SAFETY: the caller's array.
@@ -404,10 +407,11 @@ ffi_callback! {
 }
 
 /// `dh_params`: what `dh_get_params` reports.
-static GETTABLE: Params<17> = Params([
+static GETTABLE: Params<18> = Params([
     defn(OSSL_PKEY_PARAM_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_SECURITY_BITS, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_MAX_SIZE, INT, INT_SIZE),
+    defn(OSSL_PKEY_PARAM_SECURITY_CATEGORY, INT, INT_SIZE),
     defn(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, OCTETS, 0),
     defn(OSSL_PKEY_PARAM_FFC_P, BN, 0),
     defn(OSSL_PKEY_PARAM_FFC_Q, BN, 0),

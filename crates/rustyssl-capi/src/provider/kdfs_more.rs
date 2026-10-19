@@ -1013,6 +1013,12 @@ ffi_callback! {
 
 static HMAC_DRBG_SETTABLE: Params<5> = Params([
     defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(
         OSSL_KDF_PARAM_HMACDRBG_ENTROPY,
         OSSL_PARAM_OCTET_STRING as c_int,
         0,
@@ -1020,12 +1026,6 @@ static HMAC_DRBG_SETTABLE: Params<5> = Params([
     defn(
         OSSL_KDF_PARAM_HMACDRBG_NONCE,
         OSSL_PARAM_OCTET_STRING as c_int,
-        0,
-    ),
-    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
-    defn(
-        OSSL_KDF_PARAM_PROPERTIES,
-        OSSL_PARAM_UTF8_STRING as c_int,
         0,
     ),
     PARAM_END,
