@@ -3748,8 +3748,10 @@ mod tests {
         for name in [c"HASH-DRBG", c"HMAC-DRBG"] {
             let ctx = rand_ctx(name, ptr::null_mut());
             let digest = c"NULL";
+            // 3.6's HMAC-DRBG takes no digest without a MAC, so it's given one.
+            let mac = c"HMAC";
             // SAFETY: a static key and string.
-            let params = [
+            let mut params = [
                 unsafe {
                     OSSL_PARAM_construct_utf8_string(
                         OSSL_DRBG_PARAM_DIGEST.as_ptr(),
@@ -3757,8 +3759,19 @@ mod tests {
                         0,
                     )
                 },
+                // SAFETY: as above.
+                unsafe {
+                    OSSL_PARAM_construct_utf8_string(
+                        OSSL_DRBG_PARAM_MAC.as_ptr(),
+                        mac.as_ptr().cast_mut(),
+                        0,
+                    )
+                },
                 end(),
             ];
+            if name == c"HASH-DRBG" {
+                params[1] = end();
+            }
             // SAFETY: the context; the parameters above.
             assert_eq!(unsafe { EVP_RAND_CTX_set_params(ctx, params.as_ptr()) }, 0);
             let mut out = [0u8; 64];
