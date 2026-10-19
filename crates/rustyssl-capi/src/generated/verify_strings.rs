@@ -5,16 +5,19 @@ use core::ffi::{CStr, c_int};
 
 /// Each verification error and its text, in `x509_txt.c`'s order.
 pub(crate) static VERIFY_STRINGS: &[(c_int, &CStr)] = &[
-    (0, c"ok"),                                              // X509_V_OK
-    (1, c"unspecified certificate verification error"),      // X509_V_ERR_UNSPECIFIED
-    (2, c"unable to get issuer certificate"),                // X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT
-    (3, c"unable to get certificate CRL"),                   // X509_V_ERR_UNABLE_TO_GET_CRL
+    (0, c"ok"),                                         // X509_V_OK
+    (1, c"unspecified certificate verification error"), // X509_V_ERR_UNSPECIFIED
+    (2, c"unable to get issuer certificate"),           // X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT
+    (3, c"unable to get certificate CRL"),              // X509_V_ERR_UNABLE_TO_GET_CRL
     (4, c"unable to decrypt certificate's signature"), // X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE
     (5, c"unable to decrypt CRL's signature"),         // X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE
     (6, c"unable to decode issuer public key"), // X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY
     (7, c"certificate signature failure"),      // X509_V_ERR_CERT_SIGNATURE_FAILURE
     (8, c"CRL signature failure"),              // X509_V_ERR_CRL_SIGNATURE_FAILURE
-    (9, c"certificate is not yet valid"),       // X509_V_ERR_CERT_NOT_YET_VALID
+    (
+        9,
+        c"certificate is not yet valid or the system clock is incorrect",
+    ), // X509_V_ERR_CERT_NOT_YET_VALID
     (10, c"certificate has expired"),           // X509_V_ERR_CERT_HAS_EXPIRED
     (11, c"CRL is not yet valid"),              // X509_V_ERR_CRL_NOT_YET_VALID
     (12, c"CRL has expired"),                   // X509_V_ERR_CRL_HAS_EXPIRED
@@ -87,6 +90,14 @@ pub(crate) static VERIFY_STRINGS: &[(c_int, &CStr)] = &[
     (73, c"OCSP verification needed"),              // X509_V_ERR_OCSP_VERIFY_NEEDED
     (74, c"OCSP verification failed"),              // X509_V_ERR_OCSP_VERIFY_FAILED
     (75, c"OCSP unknown cert"),                     // X509_V_ERR_OCSP_CERT_UNKNOWN
+    (96, c"OCSP response(s) invalid"),              // X509_V_ERR_OCSP_RESP_INVALID
+    (97, c"OCSP response signature verification failure"), // X509_V_ERR_OCSP_SIGNATURE_FAILURE
+    (
+        98,
+        c"OCSP response not yet valid (contains a date in the future)",
+    ), // X509_V_ERR_OCSP_NOT_YET_VALID
+    (99, c"OCSP response has expired"),             // X509_V_ERR_OCSP_HAS_EXPIRED
+    (100, c"no OCSP response available for certificate"), // X509_V_ERR_OCSP_NO_RESPONSE
     (76, c"Cannot find certificate signature algorithm"), // X509_V_ERR_UNSUPPORTED_SIGNATURE_ALGORITHM
     (
         77,

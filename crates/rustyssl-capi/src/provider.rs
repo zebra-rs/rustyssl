@@ -1888,7 +1888,10 @@ mod tests {
         assert_eq!(r, 1);
         // SAFETY: set to a static string.
         let info = unsafe { CStr::from_ptr(info) }.to_str().unwrap_or_default();
-        assert!(info.starts_with("3.5.9+rustyssl."), "{info}");
+        let version = rustyssl_abi::OPENSSL_VERSION_STR
+            .to_str()
+            .unwrap_or_default();
+        assert!(info.starts_with(&format!("{version}+rustyssl.")), "{info}");
         // SAFETY: null's context is its handle.
         let provctx = unsafe { OSSL_PROVIDER_get0_provider_ctx(null) };
         assert_eq!(provctx, null.cast());
