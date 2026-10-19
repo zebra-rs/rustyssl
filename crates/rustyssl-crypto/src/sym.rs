@@ -43,16 +43,24 @@ pub enum BlockAlgorithm {
     Idea,
     /// RC2 (1 to 128 octets, with an effective key length).
     Rc2,
+    /// SEED (16 octets).
+    Seed,
+    /// DESX (24 octets: the DES key, then the input and output whitening keys).
+    DesX,
 }
 
 impl BlockAlgorithm {
     /// The block size in octets.
     pub const fn block_size(self) -> usize {
         match self {
-            Self::Aes | Self::Aria | Self::Camellia | Self::Sm4 => 16,
-            Self::Des | Self::TripleDes | Self::Blowfish | Self::Cast5 | Self::Idea | Self::Rc2 => {
-                8
-            }
+            Self::Aes | Self::Aria | Self::Camellia | Self::Sm4 | Self::Seed => 16,
+            Self::Des
+            | Self::TripleDes
+            | Self::Blowfish
+            | Self::Cast5
+            | Self::Idea
+            | Self::Rc2
+            | Self::DesX => 8,
         }
     }
 }
@@ -172,6 +180,19 @@ pub fn block_cipher(
                 };
                 keyed::<cast5::Cast5>(key)
             }
+            (BlockAlgorithm::Seed, 16) => {
+                let k: &[u8; 16] = key.try_into().map_err(|_| Error::KeyLength)?;
+                Ok(Box::new(Seed(crate::lowlevel::seed::set_key(k))))
+            }
+            (BlockAlgorithm::DesX, 24) => {
+                let (des_key, whitening) = key.split_at(8);
+                let (inw, outw) = whitening.split_at(8);
+                Ok(Box::new(DesX {
+                    des: des::Des::new_from_slice(des_key).map_err(|_| Error::KeyLength)?,
+                    inw: Zeroizing::new(inw.try_into().map_err(|_| Error::KeyLength)?),
+                    outw: Zeroizing::new(outw.try_into().map_err(|_| Error::KeyLength)?),
+                }))
+            }
             (BlockAlgorithm::Rc2, 1..=128) => {
                 let bits = match rc2_effective_bits {
                     Some(b) if (1..=1024).contains(&b) => b,
@@ -183,6 +204,98 @@ pub fn block_cipher(
             _ => Err(Error::KeyLength),
         }
     })
+}
+
+/// SEED, over the low-level key schedule.
+#[derive(Clone)]
+struct Seed(crate::lowlevel::seed::SeedKey);
+
+impl Seed {
+    fn each(&self, data: &mut [u8], enc: bool) -> Result<(), Error> {
+        let (blocks, rest) = data.as_chunks_mut::<16>();
+        if !rest.is_empty() {
+            return Err(Error::BlockLength);
+        }
+        for b in blocks {
+            *b = if enc {
+                self.0.encrypt(b)
+            } else {
+                self.0.decrypt(b)
+            };
+        }
+        Ok(())
+    }
+}
+
+impl BlockCipher for Seed {
+    fn block_size(&self) -> usize {
+        16
+    }
+
+    fn encrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error> {
+        self.each(data, true)
+    }
+
+    fn decrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error> {
+        self.each(data, false)
+    }
+
+    fn clone_box(&self) -> Box<dyn BlockCipher> {
+        Box::new(self.clone())
+    }
+}
+
+/// DESX (`DES_xcbc_encrypt`'s block function): DES of the block XORed with the input
+/// whitening key, XORed with the output whitening key.
+#[derive(Clone)]
+struct DesX {
+    des: des::Des,
+    inw: Zeroizing<[u8; 8]>,
+    outw: Zeroizing<[u8; 8]>,
+}
+
+impl BlockCipher for DesX {
+    fn block_size(&self) -> usize {
+        8
+    }
+
+    fn encrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error> {
+        let (blocks, rest) = Array::slice_as_chunks_mut(data);
+        if !rest.is_empty() {
+            return Err(Error::BlockLength);
+        }
+        for b in blocks {
+            for (x, w) in b.iter_mut().zip(self.inw.iter()) {
+                *x ^= w;
+            }
+            self.des.encrypt_block(b);
+            for (x, w) in b.iter_mut().zip(self.outw.iter()) {
+                *x ^= w;
+            }
+        }
+        Ok(())
+    }
+
+    fn decrypt_blocks(&self, data: &mut [u8]) -> Result<(), Error> {
+        let (blocks, rest) = Array::slice_as_chunks_mut(data);
+        if !rest.is_empty() {
+            return Err(Error::BlockLength);
+        }
+        for b in blocks {
+            for (x, w) in b.iter_mut().zip(self.outw.iter()) {
+                *x ^= w;
+            }
+            self.des.decrypt_block(b);
+            for (x, w) in b.iter_mut().zip(self.inw.iter()) {
+                *x ^= w;
+            }
+        }
+        Ok(())
+    }
+
+    fn clone_box(&self) -> Box<dyn BlockCipher> {
+        Box::new(self.clone())
+    }
 }
 
 /// A key stream XORed into data.

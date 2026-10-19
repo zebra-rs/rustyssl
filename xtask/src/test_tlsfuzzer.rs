@@ -244,6 +244,10 @@ fn start_server(env: &Env, ours: bool, args: &[String]) -> Result<(Child, u16)> 
             .args(args)
             .current_dir(&env.work)
             .env(LOADER_PATH, if ours { &env.ours } else { &env.reference })
+            .env(
+                "OPENSSL_MODULES",
+                crate::test_c::modules_of(if ours { &env.ours } else { &env.reference }),
+            )
             .env("OPENSSL_CONF", MISSING_CONFIG)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())

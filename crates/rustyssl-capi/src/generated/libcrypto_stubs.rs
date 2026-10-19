@@ -8,16 +8,6 @@
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_new_from_core_bio(_: *mut OSSL_LIB_CTX, _: *mut OSSL_CORE_BIO) -> *mut BIO {
-    crate::stub::unimplemented("BIO_new_from_core_bio")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_core")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_add(_: *mut ENGINE) -> core::ffi::c_int {
     crate::stub::unimplemented("ENGINE_add")
 }
@@ -691,28 +681,4 @@ pub extern "C" fn ENGINE_unregister_pkey_meths(_: *mut ENGINE) {
 #[unsafe(no_mangle)]
 pub extern "C" fn ENGINE_up_ref(_: *mut ENGINE) -> core::ffi::c_int {
     crate::stub::unimplemented("ENGINE_up_ref")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_get_data(
-    _: *mut OSSL_LIB_CTX,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OSSL_LIB_CTX_get_data")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_new_child(
-    _: *const OSSL_CORE_HANDLE,
-    _: *const OSSL_DISPATCH,
-) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_new_child")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
-    _: *const OSSL_CORE_HANDLE,
-    _: *const OSSL_DISPATCH,
-) -> *mut OSSL_LIB_CTX {
-    crate::stub::unimplemented("OSSL_LIB_CTX_new_from_dispatch")
 }

@@ -186,6 +186,22 @@ enum SigKindConst {
     Gost,
 }
 
+impl SigKindConst {
+    /// The key type a key manager is fetched by (`EVP_PKEY_set_type` of `lu->sig`), or `None`
+    /// for GOST, which the default build has no provider for.
+    const fn keytype(self) -> Option<&'static str> {
+        match self {
+            Self::Rsa => Some("RSA"),
+            Self::RsaPss => Some("RSA-PSS"),
+            Self::Dsa => Some("DSA"),
+            Self::Ec => Some("EC"),
+            Self::Ed25519 => Some("ED25519"),
+            Self::Ed448 => Some("ED448"),
+            Self::Gost => None,
+        }
+    }
+}
+
 /// A built-in table row.
 struct BuiltIn {
     name: &'static str,
@@ -729,7 +745,10 @@ impl Cache {
                 maxtls: b.maxtls,
                 mindtls: dtls_of(b.mintls),
                 maxdtls: dtls_of(b.maxtls),
-                available: !matches!(b.sig, SigKindConst::Gost),
+                // GOST has no provider in the default build; the others need their hash and
+                // their key type (`ssl_setup_sigalgs`).
+                available: b.sig.keytype().is_some_and(|k| p.keytype_available(k))
+                    && (b.hash == abi::NID_undef || p.digest_available(b.hash)),
                 provider_bits: 0,
             })
             .collect();

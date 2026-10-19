@@ -1086,19 +1086,26 @@ pub(crate) unsafe fn handshake_ctrl(x: &Ssl, cmd: c_int, parg: *mut c_void) -> O
     };
     let st = x.state();
     let tls = st.drv.tls.as_deref();
+    // A scheme's name and hash: a built-in's, else a provider's (the context's cache).
+    let lookup = |code: u16| -> Option<(*const c_char, c_int)> {
+        sigalg_info(code)
+            .map(|(name, hash, ..)| (name.as_ptr(), hash))
+            .or_else(|| st.drv.provider.as_ref()?.provider_sigalg(code))
+    };
     let scheme_name = |code: Option<u16>| -> c_long {
-        let Some((name, ..)) = code.and_then(sigalg_info) else {
+        let Some((name, _)) = code.and_then(lookup) else {
             return 0;
         };
         if parg.is_null() {
             return 0;
         }
-        // SAFETY: the caller's slot for a string pointer.
-        unsafe { parg.cast::<*const c_char>().write(name.as_ptr()) };
+        // SAFETY: the caller's slot for a string pointer; the name is static, or lives with the
+        // connection's provider.
+        unsafe { parg.cast::<*const c_char>().write(name) };
         1
     };
     let scheme_hash = |code: Option<u16>| -> c_long {
-        let Some((_, hash, ..)) = code.and_then(sigalg_info) else {
+        let Some((_, hash)) = code.and_then(lookup) else {
             return 0;
         };
         if !parg.is_null() {

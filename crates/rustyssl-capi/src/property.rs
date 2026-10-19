@@ -38,6 +38,9 @@ pub(crate) struct Properties {
     pub(crate) global: Option<List>,
     /// Parsed property definitions by text (`ossl_prop_defn_get`).
     pub(crate) definitions: std::collections::HashMap<Vec<u8>, List>,
+    /// A child context's own default query was set, so its parent's is no longer mirrored
+    /// (`ossl_global_properties_stop_mirroring`).
+    pub(crate) no_mirrored: bool,
 }
 
 /// A context's properties, behind their lock.
@@ -101,24 +104,57 @@ fn parse_default(ctx: &libctx::LibCtx, propq: &[u8], function: &str) -> Option<L
 }
 
 /// `evp_set_parsed_default_properties`: makes `list` the context's default query, after
-/// loading the configuration if `load` and checking that it has canonical text.
+/// loading the configuration if `load` and checking that it has canonical text. A query set on
+/// the context itself (not `mirrored` from a parent's) ends the mirroring; a mirrored one after
+/// that fails. Child contexts hear of the new query first (`ossl_provider_default_props_update`).
 #[track_caller]
-fn set_parsed(ctx: &libctx::LibCtx, list: Option<List>, load: bool, function: &str) -> bool {
+fn set_parsed(
+    ctx: &libctx::LibCtx,
+    list: Option<List>,
+    load: bool,
+    mirrored: bool,
+    function: &str,
+) -> bool {
     if load && !load_config() {
         err::raise(ERR_LIB_EVP, ERR_R_INTERNAL_ERROR, function);
         return false;
     }
     let mut properties = ctx.properties.lock();
-    if property::to_text(&properties.strings, list.as_ref()).is_none() {
+    if mirrored {
+        if properties.no_mirrored {
+            return false;
+        }
+    } else {
+        properties.no_mirrored = true;
+    }
+    let Some(text) = property::to_text(&properties.strings, list.as_ref()) else {
         drop(properties);
         err::raise(ERR_LIB_EVP, ERR_R_INTERNAL_ERROR, function);
         return false;
-    }
-    properties.global = list;
+    };
     drop(properties);
+    crate::provider::default_props_update(ctx, &text);
+    ctx.properties.lock().global = list;
     // Choices made under the old defaults are stale (`ossl_method_store_cache_flush_all`).
     ctx.evp.flush();
     true
+}
+
+/// `evp_get_global_properties_str(libctx, 0)`: the default query's canonical text ("" for none),
+/// without loading the configuration; `None` if it has none.
+pub(crate) fn global_text(ctx: &libctx::LibCtx) -> Option<Vec<u8>> {
+    let properties = ctx.properties.lock();
+    property::to_text(&properties.strings, properties.global.as_ref())
+}
+
+/// `evp_set_default_properties_int(libctx, props, 0, 1)`, a child context's mirror of its
+/// parent's defaults: false once the child set its own, or if the query doesn't parse.
+pub(crate) fn set_mirrored(ctx: &libctx::LibCtx, props: &[u8]) -> bool {
+    let name = "evp_set_default_properties_int";
+    let Some(list) = parse_default(ctx, props, name) else {
+        return false;
+    };
+    set_parsed(ctx, Some(list), false, true, name)
 }
 
 /// `evp_set_default_properties_int(libctx, propq, 0, 0)`, for the configuration's
@@ -136,7 +172,7 @@ pub(crate) unsafe fn set_default_from_conf(libctx: *mut OSSL_LIB_CTX, propq: &CS
     let Some(list) = parse_default(&ctx, propq.to_bytes(), name) else {
         return false;
     };
-    set_parsed(&ctx, Some(list), false, name)
+    set_parsed(&ctx, Some(list), false, false, name)
 }
 
 /// `evp_default_properties_enable_fips_int(libctx, enable, 0)`, for the configuration's
@@ -167,7 +203,13 @@ pub(crate) unsafe fn enable_fips_from_conf(libctx: *mut OSSL_LIB_CTX, enable: bo
         Some(current) => property::merge(&list, current),
         None => list,
     };
-    set_parsed(&ctx, Some(merged), false, "evp_default_properties_merge")
+    set_parsed(
+        &ctx,
+        Some(merged),
+        false,
+        false,
+        "evp_default_properties_merge",
+    )
 }
 
 ffi_export! {
@@ -196,7 +238,7 @@ ffi_export! {
             };
             Some(list)
         };
-        c_int::from(set_parsed(&ctx, list, true, name))
+        c_int::from(set_parsed(&ctx, list, true, false, name))
     }
 }
 
@@ -252,14 +294,14 @@ ffi_export! {
         if !load_config() {
             // OpenSSL then sets the query as the whole default (without loading again).
             let Some(list) = parse_default(&ctx, query, name) else { return 0 };
-            return c_int::from(set_parsed(&ctx, Some(list), false, name));
+            return c_int::from(set_parsed(&ctx, Some(list), false, false, name));
         }
         let Some(list) = parse_default(&ctx, query, name) else { return 0 };
         let merged = match &ctx.properties.lock().global {
             Some(current) => property::merge(&list, current),
             None => list,
         };
-        c_int::from(set_parsed(&ctx, Some(merged), false, name))
+        c_int::from(set_parsed(&ctx, Some(merged), false, false,name))
     }
 }
 

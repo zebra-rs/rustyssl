@@ -1459,6 +1459,8 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char, *const core::ffi::c_char
     crate::bio::file::BIO_new_file;
 const _: unsafe extern "C" fn(*mut FILE, core::ffi::c_int) -> *mut BIO =
     crate::bio::file::BIO_new_fp;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_CORE_BIO) -> *mut BIO =
+    crate::bio::core_bio::BIO_new_from_core_bio;
 const _: unsafe extern "C" fn(*const core::ffi::c_void, core::ffi::c_int) -> *mut BIO =
     crate::bio::mem::BIO_new_mem_buf;
 const _: unsafe extern "C" fn(core::ffi::c_int, core::ffi::c_int) -> *mut BIO =
@@ -1519,6 +1521,7 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::accept::BIO_s_accept;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::pair::BIO_s_bio;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::connect::BIO_s_connect;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::core_bio::BIO_s_core;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram::BIO_s_datagram;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::BIO_s_dgram_mem;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::BIO_s_dgram_pair;
@@ -10936,9 +10939,15 @@ const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_get0_global_default;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> core::ffi::c_int =
     crate::libctx::OSSL_LIB_CTX_get_conf_diagnostics;
+const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::libctx::OSSL_LIB_CTX_get_data;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *const core::ffi::c_char) -> core::ffi::c_int =
     crate::conf::modules::OSSL_LIB_CTX_load_config;
 const _: unsafe extern "C" fn() -> *mut OSSL_LIB_CTX = crate::libctx::OSSL_LIB_CTX_new;
+const _: unsafe extern "C" fn(*const OSSL_CORE_HANDLE, *const OSSL_DISPATCH) -> *mut OSSL_LIB_CTX =
+    crate::libctx::OSSL_LIB_CTX_new_child;
+const _: unsafe extern "C" fn(*const OSSL_CORE_HANDLE, *const OSSL_DISPATCH) -> *mut OSSL_LIB_CTX =
+    crate::libctx::OSSL_LIB_CTX_new_from_dispatch;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX) -> *mut OSSL_LIB_CTX =
     crate::libctx::OSSL_LIB_CTX_set0_default;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, core::ffi::c_int) =

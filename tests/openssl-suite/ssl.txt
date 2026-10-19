@@ -1,9 +1,12 @@
-# Upstream OpenSSL's libssl test programs, run by `cargo xtask test-openssl-suite --ssl` (or by
-# program name) on the reference and then on rustyssl, one test (or one iteration of a test) per
-# process. Each line is a program and its arguments as its recipe in test/recipes/ passes them,
-# with {src} for the reference's source tree and {tmp} for a scratch file of the run's own. A
-# `whole` line runs its program once, as one subtest. A `skip` line names a program that isn't
-# run, and why; an `internal` line, a program's tests that read libssl's private structures.
+# Upstream OpenSSL's libssl test programs, and the provider programs, run by `cargo xtask
+# test-openssl-suite --ssl` (or by program name) on the reference and then on rustyssl, one test
+# (or one iteration of a test) per process. Each line is a program and its arguments as its recipe
+# in test/recipes/ passes them, after any `VAR=value` words for its environment, with {src} for
+# the reference's source tree, {tmp} for a scratch file of the run's own, and {suite} for the
+# directory the programs and modules are built into. A `whole` line runs its program once, as
+# one subtest. A `build` line names modules to build (`test/p_test`). A `skip` line names a
+# program that isn't run, and why; an `internal` line, a program's tests that read libssl's
+# private structures.
 
 # 90-test_sslapi.t (the default provider's run)
 sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
@@ -90,3 +93,33 @@ skip cert_comp_test certificate compression (zlib, brotli, zstd) is off in the d
 skip ssl_cert_table_internal_test an internal test (03-test_internal_ssl_cert_table.t)
 skip quicapitest QUIC (75-test_quicapi.t and the other quic recipes) is a later phase
 skip TLSProxy the 70-test_*.t recipes that drive s_server and s_client through Perl's TLSProxy aren't test programs
+
+# Provider programs (libcrypto's, run here for the same per-subtest isolation). {suite} is the
+# directory the programs and test modules are built into, OPENSSL_MODULES for the module runs.
+build test/p_test test/p_minimal
+# 04-test_provider.t
+provider_test
+OPENSSL_MODULES={suite} provider_test -loaded
+# 04-test_provfetch.t, 04-test_provider_fallback.t, 04-test_provider_default_search_path.t,
+# 04-test_provider_pkey.t
+provfetchtest
+OPENSSL_CONF=/dev/null provider_fallback_test
+OPENSSL_CONF=/dev/null provider_default_search_path_test
+OPENSSL_CONF=/dev/null provider_pkey_test
+# 30-test_prov_config.t
+prov_config_test {src}/test/default.cnf {src}/test/recursive.cnf {src}/test/pathed.cnf
+# 30-test_provider_status.t (legacy is a module: found in the library's MODULESDIR)
+provider_status_test -provider_name null
+provider_status_test -provider_name base
+provider_status_test -provider_name default
+# 30-test_evp_fetch_prov.t, 30-test_evp_skey.t, 30-test_evp_extra.t's second program
+evp_fetch_prov_test -config {src}/test/default.cnf -type digest
+evp_fetch_prov_test -config {src}/test/default.cnf -type cipher
+evp_fetch_prov_test -config {src}/test/default.cnf -type digest -property provider=default
+evp_fetch_prov_test -config {src}/test/default.cnf -type digest -property provider!=default -fetchfail
+evp_skey_test
+evp_extra_test2
+skip evp_extra_test compiles the legacy provider's internals into itself (STATIC_LEGACY), which no shared libcrypto exports
+skip evp_libctx_test uses libcrypto's internal BIGNUM constants (ossl_bignum_dh2048_256_g, ...), which carry OpenSSL's private BIGNUM layout
+skip evp_pkey_provided_test uses libcrypto's internal BIGNUM constants (ossl_bignum_const_2), which carry OpenSSL's private BIGNUM layout
+skip provider_internal_test calls libcrypto's internal provider API (ossl_provider_*)

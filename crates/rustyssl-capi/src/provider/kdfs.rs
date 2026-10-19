@@ -1574,6 +1574,502 @@ static PBKDF2_FUNCTIONS: Dispatch<10> = Dispatch([
 ]);
 
 // -------------------------------------------------------------------------------------------
+// PBKDF1 and PVKKDF (the legacy provider's)
+
+/// `KDF_PBKDF1` and `KDF_PVK`: the password, the salt, the digest, and PBKDF1's iterations.
+#[derive(Default)]
+struct LegacyKdf {
+    provctx: Ptr,
+    pass: Option<Secret>,
+    salt: Option<Secret>,
+    iter: u64,
+    digest: Prov<EVP_MD>,
+}
+
+impl LegacyKdf {
+    /// `kdf_pvk_init`: SHA-1 (PBKDF1 starts with no digest).
+    fn pvk_init(&mut self) {
+        let params = [
+            // SAFETY: static strings.
+            unsafe {
+                OSSL_PARAM_construct_utf8_string(
+                    OSSL_KDF_PARAM_DIGEST.as_ptr(),
+                    c"SHA1".as_ptr().cast_mut(),
+                    0,
+                )
+            },
+            end(),
+        ];
+        // SAFETY: the provider's context.
+        let libctx = unsafe { libctx_of(self.provctx.0) };
+        // SAFETY: the array above.
+        if !unsafe {
+            self.digest
+                .load(params.as_ptr(), OSSL_ALG_PARAM_DIGEST, libctx)
+        } {
+            self.digest.reset();
+        }
+    }
+
+    /// `kdf_pbkdf1_set_ctx_params` and `kdf_pvk_set_ctx_params`: the digest (no XOF check, as
+    /// `ossl_prov_digest_load_from_params` makes none), the password, the salt, and with
+    /// `iter` the iterations.
+    ///
+    /// # Safety
+    /// `params` is NULL or a parameter array.
+    unsafe fn set(&mut self, params: *const OSSL_PARAM, iter: bool) -> bool {
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return true;
+        }
+        // SAFETY: as above.
+        if unsafe { locate(params, OSSL_ALG_PARAM_DIGEST) }.is_some() {
+            // SAFETY: the provider's context.
+            let libctx = unsafe { libctx_of(self.provctx.0) };
+            // SAFETY: the caller's array.
+            if !unsafe { self.digest.load(params, OSSL_ALG_PARAM_DIGEST, libctx) } {
+                return false;
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_PASSWORD) } {
+            // SAFETY: a parameter of the caller's array.
+            if !unsafe { set_membuf(&mut self.pass, p) } {
+                return false;
+            }
+        }
+        // SAFETY: as above.
+        if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_SALT) } {
+            // SAFETY: a parameter of the caller's array.
+            if !unsafe { set_membuf(&mut self.salt, p) } {
+                return false;
+            }
+        }
+        if iter {
+            // SAFETY: as above.
+            if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_ITER) } {
+                let mut n = 0u64;
+                // SAFETY: a parameter of the caller's array.
+                if unsafe { OSSL_PARAM_get_uint64(p, &raw mut n) } == 0 {
+                    return false;
+                }
+                self.iter = n;
+            }
+        }
+        true
+    }
+
+    /// A copy (`kdf_pbkdf1_dup`, `kdf_pvk_dup`).
+    fn dup(&self) -> Option<Self> {
+        Some(Self {
+            provctx: self.provctx,
+            pass: memdup(&self.pass)?,
+            salt: memdup(&self.salt)?,
+            iter: self.iter,
+            digest: self.digest.copy()?,
+        })
+    }
+}
+
+/// One digest over `parts`, into `out` (room for any digest): `EVP_DigestInit_ex`,
+/// `EVP_DigestUpdate` of each part, `EVP_DigestFinal_ex`.
+///
+/// # Safety
+/// `md` is a live digest; `mctx` a live digest context.
+unsafe fn digest_parts(
+    mctx: *mut rustyssl_abi::EVP_MD_CTX,
+    md: *const EVP_MD,
+    parts: &[&[u8]],
+    out: &mut [u8; MAX_MD],
+) -> bool {
+    // SAFETY: the caller's guarantee.
+    if unsafe { EVP_DigestInit_ex(mctx, md, ptr::null_mut()) } == 0 {
+        return false;
+    }
+    for part in parts {
+        // SAFETY: as above; the part's octets.
+        if unsafe { EVP_DigestUpdate(mctx, part.as_ptr().cast(), part.len()) } == 0 {
+            return false;
+        }
+    }
+    // SAFETY: as above; room for any digest.
+    unsafe { EVP_DigestFinal_ex(mctx, out.as_mut_ptr(), ptr::null_mut()) != 0 }
+}
+
+/// `kdf_pbkdf1_do_derive`: `T_1 = H(P || S)`, `T_i = H(T_(i-1))` up to the iterations, and its
+/// first `keylen` octets, at most the digest's size.
+///
+/// # Safety
+/// `md` is NULL or a live digest; `key` has room for `keylen` octets.
+unsafe fn pbkdf1_compute(
+    c: &LegacyKdf,
+    pass: &Secret,
+    salt: &Secret,
+    key: *mut u8,
+    keylen: usize,
+) -> bool {
+    let md = c.digest.method;
+    // SAFETY: no preconditions.
+    let mctx = unsafe { EVP_MD_CTX_new() };
+    if mctx.is_null() {
+        raise(rustyssl_abi::ERR_R_EVP_LIB, "kdf_pbkdf1_do_derive");
+        return false;
+    }
+    let mut t = [0u8; MAX_MD];
+    // SAFETY: the context made here; the caller's digest.
+    let mut ok = unsafe { digest_parts(mctx, md, &[pass.0.as_slice(), salt.0.as_slice()], &mut t) };
+    let size = if ok {
+        // SAFETY: the digest, which digested above.
+        unsafe { md_size(md) }
+    } else {
+        None
+    };
+    ok = match size {
+        None => false,
+        Some(n) if keylen > n => {
+            raise(
+                rustyssl_abi::PROV_R_LENGTH_TOO_LARGE,
+                "kdf_pbkdf1_do_derive",
+            );
+            false
+        }
+        Some(n) => {
+            let mut i = 1u64;
+            let mut fine = true;
+            while fine && i < c.iter {
+                let prev = t;
+                // SAFETY: as above.
+                fine =
+                    unsafe { digest_parts(mctx, md, &[prev.get(..n).unwrap_or_default()], &mut t) };
+                i += 1;
+            }
+            if fine {
+                // SAFETY: the caller's room for `keylen` octets, at most `n`.
+                let out = unsafe { core::slice::from_raw_parts_mut(key, keylen) };
+                out.copy_from_slice(t.get(..keylen).unwrap_or_default());
+            }
+            fine
+        }
+    };
+    wipe(&mut t);
+    // SAFETY: made here.
+    unsafe { EVP_MD_CTX_free(mctx) };
+    ok
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_new`: no digest, no iterations.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn pbkdf1_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        boxed(LegacyKdf { provctx: Ptr(provctx), ..LegacyKdf::default() })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pvk_new`: SHA-1.
+    ///
+    /// # Safety
+    /// `provctx` is the provider's context.
+    pub(crate) unsafe extern "C" fn pvk_new(provctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        let mut k = LegacyKdf { provctx: Ptr(provctx), ..LegacyKdf::default() };
+        k.pvk_init();
+        boxed(k)
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_free` and `kdf_pvk_free`.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or such a context, not used afterwards.
+    pub(crate) unsafe extern "C" fn legacy_kdf_free(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { unbox::<LegacyKdf>(vctx) };
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_reset`: nothing set.
+    ///
+    /// # Safety
+    /// `vctx` is a live PBKDF1 context.
+    pub(crate) unsafe extern "C" fn pbkdf1_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(k) = unsafe { context::<LegacyKdf>(vctx) } {
+            *k = LegacyKdf { provctx: k.provctx, ..LegacyKdf::default() };
+        }
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pvk_reset`: SHA-1 again, nothing else set.
+    ///
+    /// # Safety
+    /// `vctx` is a live PVKKDF context.
+    pub(crate) unsafe extern "C" fn pvk_reset(vctx: *mut c_void)
+    where failure = (), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(k) = unsafe { context::<LegacyKdf>(vctx) } {
+            *k = LegacyKdf { provctx: k.provctx, ..LegacyKdf::default() };
+            k.pvk_init();
+        }
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_dup` and `kdf_pvk_dup`.
+    ///
+    /// # Safety
+    /// `vctx` is a live such context.
+    pub(crate) unsafe extern "C" fn legacy_kdf_dup(vctx: *mut c_void) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(src) = (unsafe { context::<LegacyKdf>(vctx) }) else { return ptr::null_mut() };
+        src.dup().map_or(ptr::null_mut(), boxed)
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_set_ctx_params`.
+    ///
+    /// # Safety
+    /// `vctx` is a live PBKDF1 context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn pbkdf1_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        c_int::from(unsafe { k.set(params, true) })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pvk_set_ctx_params`.
+    ///
+    /// # Safety
+    /// `vctx` is a live PVKKDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn pvk_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        c_int::from(unsafe { k.set(params, false) })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_derive`.
+    ///
+    /// # Safety
+    /// `vctx` is a live PBKDF1 context; `key` has room for `keylen` octets; `params` is NULL
+    /// or a parameter array.
+    pub(crate) unsafe extern "C" fn pbkdf1_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if unsafe { pbkdf1_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
+        let Some(pass) = k.pass.as_ref() else {
+            raise(PROV_R_MISSING_PASS, "kdf_pbkdf1_derive");
+            return 0;
+        };
+        let Some(salt) = k.salt.as_ref() else {
+            raise(PROV_R_MISSING_SALT, "kdf_pbkdf1_derive");
+            return 0;
+        };
+        // SAFETY: the context's digest; the caller's room.
+        c_int::from(unsafe { pbkdf1_compute(k, pass, salt, key, keylen) })
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pvk_derive`: the digest of the salt then the password, into a key at least the
+    /// digest's size.
+    ///
+    /// # Safety
+    /// `vctx` is a live PVKKDF context; `key` has room for `keylen` octets; `params` is NULL
+    /// or a parameter array.
+    pub(crate) unsafe extern "C" fn pvk_derive(vctx: *mut c_void, key: *mut c_uchar, keylen: usize, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "kdf_pvk_derive";
+        // SAFETY: the caller's guarantee.
+        if unsafe { pvk_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
+        let Some(pass) = k.pass.as_ref() else {
+            raise(PROV_R_MISSING_PASS, F);
+            return 0;
+        };
+        let Some(salt) = k.salt.as_ref() else {
+            raise(PROV_R_MISSING_SALT, F);
+            return 0;
+        };
+        let md = k.digest.method;
+        if md.is_null() {
+            raise(rustyssl_abi::PROV_R_INVALID_DIGEST, F);
+            return 0;
+        }
+        // SAFETY: a live digest.
+        let Some(size) = (unsafe { md_size(md) }) else {
+            raise(PROV_R_BAD_LENGTH, F);
+            return 0;
+        };
+        if size > keylen {
+            raise(rustyssl_abi::PROV_R_LENGTH_TOO_LARGE, F);
+            return 0;
+        }
+        // SAFETY: no preconditions.
+        let mctx = unsafe { EVP_MD_CTX_new() };
+        let mut out = [0u8; MAX_MD];
+        // SAFETY: the context made here, or NULL; the digest.
+        let ok = !mctx.is_null() && unsafe { digest_parts(mctx, md, &[salt.0.as_slice(), pass.0.as_slice()], &mut out) };
+        if ok {
+            // SAFETY: the caller's room: at least `size` octets.
+            let dst = unsafe { core::slice::from_raw_parts_mut(key, size) };
+            dst.copy_from_slice(out.get(..size).unwrap_or_default());
+        }
+        wipe(&mut out);
+        // SAFETY: made here, or NULL.
+        unsafe { EVP_MD_CTX_free(mctx) };
+        c_int::from(ok)
+    }
+}
+
+static PBKDF1_SETTABLE: Params<6> = Params([
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_PASSWORD, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(
+        OSSL_KDF_PARAM_ITER,
+        OSSL_PARAM_UNSIGNED_INTEGER as c_int,
+        size_of::<u64>(),
+    ),
+    PARAM_END,
+]);
+
+static PVK_SETTABLE: Params<5> = Params([
+    defn(
+        OSSL_KDF_PARAM_PROPERTIES,
+        OSSL_PARAM_UTF8_STRING as c_int,
+        0,
+    ),
+    defn(OSSL_KDF_PARAM_DIGEST, OSSL_PARAM_UTF8_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_PASSWORD, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    defn(OSSL_KDF_PARAM_SALT, OSSL_PARAM_OCTET_STRING as c_int, 0),
+    PARAM_END,
+]);
+
+ffi_callback! {
+    /// `kdf_pbkdf1_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn pbkdf1_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        PBKDF1_SETTABLE.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pvk_settable_ctx_params`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn pvk_settable(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        PVK_SETTABLE.0.as_ptr()
+    }
+}
+
+static PBKDF1_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, pbkdf1_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, legacy_kdf_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, legacy_kdf_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, pbkdf1_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, pbkdf1_derive, DeriveFn),
+    entry!(
+        OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS,
+        pbkdf1_settable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        pbkdf1_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        any_size_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+static PVK_FUNCTIONS: Dispatch<10> = Dispatch([
+    entry!(OSSL_FUNC_KDF_NEWCTX, pvk_new, NewCtxFn),
+    entry!(OSSL_FUNC_KDF_DUPCTX, legacy_kdf_dup, DupCtxFn),
+    entry!(OSSL_FUNC_KDF_FREECTX, legacy_kdf_free, FreeCtxFn),
+    entry!(OSSL_FUNC_KDF_RESET, pvk_reset, ResetFn),
+    entry!(OSSL_FUNC_KDF_DERIVE, pvk_derive, DeriveFn),
+    entry!(OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, pvk_settable, CtxParamsFn),
+    entry!(
+        OSSL_FUNC_KDF_SET_CTX_PARAMS,
+        pvk_set_ctx_params,
+        SetCtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
+        size_only_gettable,
+        CtxParamsFn
+    ),
+    entry!(
+        OSSL_FUNC_KDF_GET_CTX_PARAMS,
+        any_size_get_ctx_params,
+        GetCtxParamsFn
+    ),
+    END,
+]);
+
+/// `legacy_kdfs`: PBKDF1 and PVKKDF.
+pub(crate) static LEGACY_KDFS: Algorithms<3> = Algorithms([
+    super::tables::legacy_alg(c"PBKDF1", &PBKDF1_FUNCTIONS),
+    super::tables::legacy_alg(c"PVKKDF", &PVK_FUNCTIONS),
+    ALG_END,
+]);
+
+// -------------------------------------------------------------------------------------------
 // TLS1-PRF
 
 /// `TLS1_PRF`: the HMAC contexts (two for MD5-SHA1), the secret, and the seed.
