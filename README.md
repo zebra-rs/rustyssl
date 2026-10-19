@@ -216,8 +216,10 @@ Tools each command needs:
   (oqs: liboqs and oqs-provider). `pkcs11` also needs meson, ninja, SoftHSM, NSS's tools and
   softokn, OpenSC, GnuTLS's `p11tool`, `expect`, and `xxd` (Debian: `meson ninja-build softhsm2
   libnss3-tools libnss3-dev opensc gnutls-bin expect xxd`); without them it skips with a message.
-  `tpm2` needs autotools, `libtss2-dev`, `tpm2-abrmd`, `tpm2-tools`, `swtpm`, and a D-Bus daemon,
-  as tpm2-openssl's CI does; without them it skips too.
+  `tpm2` needs autotools, `libtss2-dev`, `tpm2-abrmd` with its TCTI library
+  (`libtss2-tcti-tabrmd0` on Debian), `tpm2-tools`, `swtpm`, and a D-Bus daemon, as
+  tpm2-openssl's CI does; without them it skips too. `swtpm` needs seccomp, so in Docker on an
+  arm64 host run it in an arm64 container, not an emulated amd64 one.
 - **`test-wycheproof`:** what `dist` and `ref-openssl` need, plus `curl` (the vectors are
   fetched at a pinned commit).
 - **`test-bogo`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and Go (at least
