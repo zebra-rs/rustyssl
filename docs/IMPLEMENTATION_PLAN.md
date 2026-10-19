@@ -5615,6 +5615,9 @@ both libraries (step 8.1).
       returns its NID.
     - `X509_VERIFY_PARAM_get0` with a negative id no longer raises an error (`x509/vpm.rs`); 3.6
       returns a pointer before its table there, so rustyssl returns NULL (docs/DEVIATIONS.md).
+    - Importing an X25519/X448/ED25519/ED448 public key from only a private key crashes 3.6
+      (it derives from a NULL private key); rustyssl keeps 3.5's failure (`ecx.rs`,
+      `key_fromdata`; docs/DEVIATIONS.md).
 
 **Exit:** M6.
 
