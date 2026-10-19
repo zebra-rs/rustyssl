@@ -227,6 +227,7 @@ static void poly_run(size_t i)
 /* ---- X25519: the private key, with a fixed peer. ---- */
 static EVP_PKEY *peer;
 static EVP_PKEY *keys[BATCH];
+static unsigned char x25519_fixed[32];
 
 static int x25519_setup(void)
 {
@@ -234,6 +235,11 @@ static int x25519_setup(void)
 
     random_bytes(pub, 32);
     pub[31] &= 0x7f;
+    /* The fixed class's key: 0x11s, or (DUDECT_FIXED_RANDOM=1) a random key drawn once. */
+    if (getenv("DUDECT_FIXED_RANDOM") != NULL)
+        random_bytes(x25519_fixed, 32);
+    else
+        memset(x25519_fixed, 0x11, 32);
     peer = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, pub, 32);
     return peer != NULL;
 }
@@ -243,7 +249,7 @@ static void x25519_prepare(size_t i, int c)
     unsigned char priv[32];
 
     if (c == 0)
-        memset(priv, 0x11, 32);
+        memcpy(priv, x25519_fixed, 32);
     else
         random_bytes(priv, 32);
     EVP_PKEY_free(keys[i]);
@@ -260,6 +266,39 @@ static void x25519_run(size_t i)
     EVP_PKEY_derive(d, out, &n);
     EVP_PKEY_CTX_free(d);
     sink ^= out[0];
+}
+
+/*
+ * The same split in two: X25519's derivation alone, on contexts set up before timing, and the
+ * context's setup alone (EVP_PKEY_CTX_new, derive_init, derive_set_peer), to tell which half
+ * a signal of the whole comes from.
+ */
+static EVP_PKEY_CTX *dctx[BATCH];
+
+static void x25519_derive_prepare(size_t i, int c)
+{
+    x25519_prepare(i, c);
+    EVP_PKEY_CTX_free(dctx[i]);
+    dctx[i] = EVP_PKEY_CTX_new(keys[i], NULL);
+    EVP_PKEY_derive_init(dctx[i]);
+    EVP_PKEY_derive_set_peer(dctx[i], peer);
+}
+
+static void x25519_derive_run(size_t i)
+{
+    size_t n = sizeof(out);
+
+    EVP_PKEY_derive(dctx[i], out, &n);
+    sink ^= out[0];
+}
+
+static void x25519_ctx_run(size_t i)
+{
+    EVP_PKEY_CTX *d = EVP_PKEY_CTX_new(keys[i], NULL);
+
+    EVP_PKEY_derive_init(d);
+    EVP_PKEY_derive_set_peer(d, peer);
+    EVP_PKEY_CTX_free(d);
 }
 
 /* ---- ECDSA P-256 signing: the private key (fixed, or one of a pool of random ones). ---- */
@@ -620,6 +659,8 @@ static const struct target targets[] = {
     { "ghash", ghash_setup, tag_prepare, ghash_run, 8, 0 },
     { "poly1305", poly_setup, key_prepare, poly_run, 8, 0 },
     { "x25519", x25519_setup, x25519_prepare, x25519_run, 1, 0 },
+    { "x25519-derive", x25519_setup, x25519_derive_prepare, x25519_derive_run, 1, 0 },
+    { "x25519-ctx", x25519_setup, x25519_prepare, x25519_ctx_run, 1, 0 },
     { "ecdsa-sign", ecdsa_setup, ecdsa_prepare, ecdsa_run, 1, 0 },
     { "rsa-pkcs1-decrypt", rsa_setup, rsa_prepare, rsa_run, 1, 0 },
     { "rsa-raw-decrypt", rsa_setup, rsaraw_prepare, rsaraw_run, 1, 0 },
@@ -652,6 +693,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "unknown target or count\n");
         return 2;
     }
+#if defined(__aarch64__)
+    /* DUDECT_DIT=1: run with PSTATE.DIT set (MSR DIT, #1), the Arm mode in which instruction
+     * timing doesn't depend on data (and Apple's data-dependent prefetcher is off). */
+    if (getenv("DUDECT_DIT") != NULL)
+        __asm__ volatile(".inst 0xd503415f" ::: "memory");
+#endif
     if (!t->setup()) {
         fprintf(stderr, "%s: setup failed\n", t->name);
         ERR_print_errors_fp(stderr);
@@ -721,6 +768,12 @@ int main(int argc, char **argv)
     }
     printf("%s t=%.2f n=%ld test=%s\n", t->name, best, total,
            best_at == 0 ? "all" : best_at == PERCENTILES + 1 ? "second-order" : "cropped");
+    /* DUDECT_MEANS=1: each class's mean time in the deciding test and in the whole, for
+     * telling how large a signal is (in the clock's ticks). */
+    if (getenv("DUDECT_MEANS") != NULL)
+        printf("  means: deciding %.3f / %.3f (n %.0f / %.0f), all %.3f / %.3f\n",
+               tests[best_at].mean[0], tests[best_at].mean[1], tests[best_at].n[0],
+               tests[best_at].n[1], tests[0].mean[0], tests[0].mean[1]);
     (void)sink;
     return 0;
 }
