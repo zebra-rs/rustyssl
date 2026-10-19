@@ -157,13 +157,39 @@ pub(crate) unsafe fn handle(
             Some(Answer::Continue)
         }
         Request::ClientCert => {
-            let Some(cb) = snap.and_then(|c| c.client_cert_cb) else {
+            let cb = snap.and_then(|c| c.client_cert_cb);
+            let engine = snap.map_or(ptr::null_mut(), |c| c.client_cert_engine);
+            if cb.is_none() && engine.is_null() {
                 return Some(Answer::Continue);
-            };
+            }
             let mut cert: *mut X509 = ptr::null_mut();
             let mut key: *mut EVP_PKEY = ptr::null_mut();
-            // SAFETY: the application's callback with the slots; no lock is held.
-            let rv = unsafe { cb(s, &raw mut cert, &raw mut key) };
+            // `ssl_do_client_cert_cb`: the engine first, then the callback if the engine gave 0.
+            let mut rv = 0;
+            if !engine.is_null() {
+                // SAFETY: the connection.
+                let ca = unsafe { super::super::ca::rustyssl_private_SSL_get_client_CA_list(s) };
+                // SAFETY: the context's initialized engine; the connection, its list and the
+                // slots; no lock is held.
+                rv = unsafe {
+                    crate::engine::pkey::ENGINE_load_ssl_client_cert(
+                        engine,
+                        s,
+                        ca,
+                        &raw mut cert,
+                        &raw mut key,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    )
+                };
+            }
+            if rv == 0
+                && let Some(cb) = cb
+            {
+                // SAFETY: the application's callback with the slots; no lock is held.
+                rv = unsafe { cb(s, &raw mut cert, &raw mut key) };
+            }
             if rv < 0 {
                 x.state().rwstate = SSL_X509_LOOKUP;
                 return None;

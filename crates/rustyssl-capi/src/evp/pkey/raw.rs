@@ -1,20 +1,17 @@
 //! Raw keys (`EVP_PKEY_new_raw_private_key(3)`, `EVP_PKEY_get_raw_private_key(3)`,
 //! `EVP_PKEY_new_CMAC_key(3)`; `p_lib.c`): keys made from their raw octets through the key
 //! manager's import (`EVP_PKEY_fromdata` with `priv` or `pub`), or else by the key type's ASN.1
-//! method (an application's), and their raw octets exported back.
-//!
-//! There are no engines, so an engine argument fails with `ERR_R_ENGINE_LIB` where OpenSSL would
-//! initialize it (docs/DEVIATIONS.md).
+//! method (an application's or an engine's), and their raw octets exported back.
 
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ENGINE, ERR_LIB_EVP, ERR_R_ENGINE_LIB, ERR_R_EVP_LIB, EVP_CIPHER, EVP_PKEY, EVP_PKEY_NONE,
+    ENGINE, ERR_LIB_EVP, ERR_R_EVP_LIB, EVP_CIPHER, EVP_PKEY, EVP_PKEY_NONE,
     EVP_R_GET_RAW_KEY_FAILED, EVP_R_KEY_SETUP_FAILED,
     EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
     OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PKEY_PARAM_CIPHER,
-    OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
+    OSSL_PKEY_PARAM_ENGINE, OSSL_PKEY_PARAM_PRIV_KEY, OSSL_PKEY_PARAM_PUB_KEY,
 };
 
 use super::super::pkey_ctx::{
@@ -52,12 +49,25 @@ unsafe fn new_raw_key(
     is_priv: bool,
 ) -> *mut EVP_PKEY {
     const F: &str = "new_raw_key_int";
-    if !e.is_null() {
-        // There are no engines (their API can't make one).
-        err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
-        return ptr::null_mut();
+    // SAFETY: the caller's guarantee.
+    let type_name = unsafe { super::text(strtype) }.map(CStr::to_bytes);
+    // Without an engine given, one registered for the type takes it to the legacy path.
+    let mut claimed = !e.is_null();
+    if e.is_null() {
+        let (m, tmpe) = match type_name {
+            Some(n) => super::ameth::find_str_engine(n),
+            None if nidtype != EVP_PKEY_NONE => super::ameth::find_engine(nidtype),
+            None => (None, ptr::null_mut()),
+        };
+        claimed = !tmpe.is_null() && m.is_some();
+        // SAFETY: the search's functional reference, or NULL.
+        unsafe { crate::engine::ENGINE_finish(tmpe) };
     }
-    // Without engines, a key manager makes the key if it can, else the type's ASN.1 method.
+    if claimed {
+        // SAFETY: the caller's guarantee.
+        return unsafe { legacy_raw_key(e, strtype, nidtype, key, len, is_priv) };
+    }
+    // A key manager makes the key if it can, else the type's ASN.1 method.
     let name = if strtype.is_null() {
         // SAFETY: a type number.
         unsafe { OBJ_nid2sn(nidtype) }
@@ -97,18 +107,20 @@ unsafe fn new_raw_key(
     unsafe { ERR_pop_to_mark() };
     // The type's ASN.1 method sets the key (the context is freed after).
     // SAFETY: the caller's guarantee.
-    let k = unsafe { legacy_raw_key(strtype, nidtype, key, len, is_priv) };
+    let k = unsafe { legacy_raw_key(e, strtype, nidtype, key, len, is_priv) };
     // SAFETY: made above.
     unsafe { EVP_PKEY_CTX_free(ctx) };
     k
 }
 
 /// `new_raw_key_int`'s legacy path: a key typed by the ASN.1 method of `strtype` (or `nidtype`)
-/// given its raw key by the method, or NULL with an error.
+/// given its raw key by the method, or NULL with an error. The key keeps the engine `e`, if
+/// given, or the one whose method it took.
 ///
 /// # Safety
-/// `strtype` is NULL or a string; `key` holds `len` octets.
+/// `e` is NULL or a live engine; `strtype` is NULL or a string; `key` holds `len` octets.
 unsafe fn legacy_raw_key(
+    e: *mut ENGINE,
     strtype: *const c_char,
     nidtype: c_int,
     key: *const u8,
@@ -123,7 +135,7 @@ unsafe fn legacy_raw_key(
     };
     // SAFETY: the caller's guarantee.
     let name = unsafe { super::text(strtype) }.map(CStr::to_bytes);
-    if !super::set_type(Some(k.get()), nidtype, name, None) {
+    if !super::set_type_engine(Some(k.get()), e, nidtype, name, None) {
         return ptr::null_mut();
     }
     let Some(f) = k.get().ameth_funcs() else {
@@ -168,7 +180,7 @@ ffi_export! {
     /// A key of type `type_` from its raw private key; NULL with an error.
     ///
     /// # Safety
-    /// `e` must be NULL (there are no engines); `priv_` holds `len` octets.
+    /// `e` is NULL or a live engine; `priv_` holds `len` octets.
     pub unsafe extern "C" fn EVP_PKEY_new_raw_private_key(type_: c_int, e: *mut ENGINE, priv_: *const u8, len: usize) -> *mut EVP_PKEY
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
@@ -195,7 +207,7 @@ ffi_export! {
     /// A key of type `type_` from its raw public key; NULL with an error.
     ///
     /// # Safety
-    /// `e` must be NULL (there are no engines); `pub_` holds `len` octets.
+    /// `e` is NULL or a live engine; `pub_` holds `len` octets.
     pub unsafe extern "C" fn EVP_PKEY_new_raw_public_key(type_: c_int, e: *mut ENGINE, pub_: *const u8, len: usize) -> *mut EVP_PKEY
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
@@ -337,21 +349,23 @@ ffi_export! {
     /// `EVP_R_KEY_SETUP_FAILED`.
     ///
     /// # Safety
-    /// `e` must be NULL (there are no engines); `priv_` holds `len` octets; `cipher` is NULL or a
+    /// `e` is NULL or a live engine; `priv_` holds `len` octets; `cipher` is NULL or a
     /// live cipher.
     pub unsafe extern "C" fn EVP_PKEY_new_CMAC_key(e: *mut ENGINE, priv_: *const u8, len: usize, cipher: *const EVP_CIPHER) -> *mut EVP_PKEY
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
         const F: &str = "new_cmac_key_int";
+        // The key manager looks the engine up by its id (`OSSL_PKEY_PARAM_ENGINE`).
+        let engine_id = if e.is_null() {
+            ptr::null()
+        } else {
+            // SAFETY: the caller's live engine.
+            unsafe { crate::engine::ENGINE_get_id(e) }
+        };
         // SAFETY: the caller's guarantee.
         let name = if cipher.is_null() { ptr::null() } else { unsafe { EVP_CIPHER_get0_name(cipher) } };
         if name.is_null() {
             err::raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED, F);
-            return ptr::null_mut();
-        }
-        if !e.is_null() {
-            // There are no engines (their API can't make one).
-            err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
             return ptr::null_mut();
         }
         // SAFETY: the default context; a static name.
@@ -372,7 +386,14 @@ ffi_export! {
             let p1 = unsafe {
                 OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_CIPHER.as_ptr(), name.cast_mut(), 0)
             };
-            let mut params = [p0, p1, end()];
+            let mut params = vec![p0, p1];
+            if !engine_id.is_null() {
+                // SAFETY: a static key; the engine's id.
+                params.push(unsafe {
+                    OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_ENGINE.as_ptr(), engine_id.cast_mut(), 0)
+                });
+            }
+            params.push(end());
             // SAFETY: the context; the array above.
             if unsafe { EVP_PKEY_fromdata(ctx, &raw mut pkey, KEYPAIR, params.as_mut_ptr()) } <= 0 {
                 err::raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED, F);

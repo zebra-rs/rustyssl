@@ -143,6 +143,9 @@ pub(crate) struct CtxState {
     pub(crate) msg_callback_arg: *mut c_void,
     pub(crate) keylog_callback: rustyssl_abi::SSL_CTX_keylog_cb_func,
     pub(crate) client_cert_cb: ClientCertCb,
+    /// `client_cert_engine`: the engine asked for the client certificate before the callback,
+    /// with a functional reference, or NULL.
+    pub(crate) client_cert_engine: *mut rustyssl_abi::ENGINE,
     pub(crate) app_verify_callback: AppVerifyCb,
     pub(crate) app_verify_arg: *mut c_void,
     pub(crate) client_hello_cb: rustyssl_abi::SSL_client_hello_cb_fn,
@@ -227,6 +230,9 @@ impl Drop for CtxState {
         unsafe { OPENSSL_sk_pop_free(self.client_ca_names.cast(), Some(name_free)) };
         // SAFETY: as above.
         unsafe { OSSL_STACK_OF_X509_free(self.extra_certs) };
+        // `tls_engine_finish`. SAFETY: our functional reference, or NULL; the context is being
+        // freed, so no lock of it is held.
+        unsafe { crate::engine::ENGINE_finish(self.client_cert_engine) };
         wipe(&mut self.tick_hmac_key);
         wipe(&mut self.tick_aes_key);
         wipe(&mut self.cookie_hmac_key);
@@ -421,6 +427,7 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         msg_callback_arg: ptr::null_mut(),
         keylog_callback: None,
         client_cert_cb: None,
+        client_cert_engine: ptr::null_mut(),
         app_verify_callback: None,
         app_verify_arg: ptr::null_mut(),
         client_hello_cb: None,

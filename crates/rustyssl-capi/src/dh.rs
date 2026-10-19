@@ -135,6 +135,8 @@ pub(crate) struct Legacy {
     pub(crate) meth: Ptr<DH_METHOD>,
     pub(crate) flags: c_int,
     pub(crate) numbers: Numbers,
+    /// The engine the method came from, with a functional reference, or NULL.
+    pub(crate) engine: Ptr<ENGINE>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -178,7 +180,36 @@ impl Dh {
     /// `dh_new_intern`: an empty key in `libctx` with the default method (whose `init` it
     /// runs), or NULL with the error raised.
     pub(crate) fn new_handle_in(libctx: *mut OSSL_LIB_CTX) -> *mut DH {
-        let meth = crate::dh_meth::default_or_builtin();
+        // SAFETY: no engine.
+        unsafe { Self::new_handle_engine(libctx, ptr::null_mut()) }
+    }
+
+    /// `dh_new_intern` with an engine: the key takes its method from `engine` (initialized),
+    /// else from the default DH engine if there is one, else the default method.
+    ///
+    /// # Safety
+    /// `engine` is NULL or a live engine.
+    pub(crate) unsafe fn new_handle_engine(
+        libctx: *mut OSSL_LIB_CTX,
+        engine: *mut ENGINE,
+    ) -> *mut DH {
+        // SAFETY: the caller's guarantee.
+        let chosen = unsafe {
+            crate::engine::key_method(
+                engine,
+                crate::engine::table::ENGINE_get_default_DH,
+                crate::engine::ENGINE_get_DH,
+            )
+        };
+        let Ok((engine, emeth)) = chosen else {
+            err::raise(ERR_LIB_DH, rustyssl_abi::ERR_R_ENGINE_LIB, "dh_new_intern");
+            return ptr::null_mut();
+        };
+        let meth = if emeth.is_null() {
+            crate::dh_meth::default_or_builtin()
+        } else {
+            emeth
+        };
         // SAFETY: a live method.
         let mflags = unsafe { crate::dh_meth::flags(meth) };
         let h = DH::new_handle(Dh {
@@ -190,6 +221,7 @@ impl Dh {
                 meth: Ptr(meth.cast_mut()),
                 flags: mflags,
                 numbers: Numbers::default(),
+                engine: Ptr(engine),
             }),
             ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
                 ctx: ptr::null_mut(),
@@ -388,6 +420,9 @@ pub(crate) unsafe fn free(d: *mut DH) {
         // SAFETY: the method's function takes the key.
         unsafe { finish(d) };
     }
+    let engine = core::mem::replace(&mut held.legacy().engine, Ptr(ptr::null_mut()));
+    // SAFETY: the key's functional reference to its engine, or NULL.
+    unsafe { crate::engine::ENGINE_finish(engine.0) };
     // SAFETY: the key's own ex_data; its last reference.
     unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_DH, d.cast(), held.ex_data()) };
     // SAFETY: the last reference; the hold keeps the key until this returns.
@@ -445,17 +480,17 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// `DH_new` with an engine: NULL only (rustyssl has no engines; another pointer aborts).
+    /// `DH_new` with the engine's DH method (the engine initialized, and kept until the key is
+    /// freed); with NULL, the default DH engine's, if any. NULL (`ERR_R_ENGINE_LIB`) if the
+    /// engine doesn't initialize or has no DH method.
     ///
     /// # Safety
-    /// `engine` is NULL.
+    /// `engine` is NULL or a live engine.
     pub unsafe extern "C" fn DH_new_method(engine: *mut ENGINE) -> *mut DH
     where failure = ptr::null_mut(), library = ERR_LIB_DH
     {
-        if !engine.is_null() {
-            crate::stub::unimplemented("DH_new_method with an engine (rustyssl has none)");
-        }
-        Dh::new_handle_in(ptr::null_mut())
+        // SAFETY: the caller's guarantee.
+        unsafe { Dh::new_handle_engine(ptr::null_mut(), engine) }
     }
 }
 
@@ -502,6 +537,10 @@ ffi_export! {
             // SAFETY: the method's function takes the key.
             unsafe { finish(dh) };
         }
+        // The engine the old method came from is let go.
+        let engine = core::mem::replace(&mut k.legacy().engine, Ptr(ptr::null_mut()));
+        // SAFETY: the key's functional reference, or NULL.
+        unsafe { crate::engine::ENGINE_finish(engine.0) };
         k.legacy().meth = Ptr(meth.cast_mut());
         // SAFETY: the caller's method.
         if let Some(init) = unsafe { crate::dh_meth::fns_of(meth) }.and_then(|f| f.init) {
@@ -513,14 +552,15 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's engine: always NULL (rustyssl has no engines).
+    /// The engine the key's method came from, or NULL.
     ///
     /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn DH_get0_engine(_d: *mut DH) -> *mut ENGINE
+    /// `d` is NULL or a live key.
+    pub unsafe extern "C" fn DH_get0_engine(d: *mut DH) -> *mut ENGINE
     where failure = ptr::null_mut(), library = ERR_LIB_DH
     {
-        ptr::null_mut()
+        // SAFETY: the caller's guarantee.
+        unsafe { dh(d) }.map_or(ptr::null_mut(), |k| k.legacy().engine.0)
     }
 }
 

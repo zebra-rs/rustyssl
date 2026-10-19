@@ -304,6 +304,10 @@ fn render_stubs_file(library: &str, prefix: &str, stubs: &[String]) -> Result<St
          // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.\n\
          #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]\n\n"
     );
+    if stubs.is_empty() {
+        out.push_str("// Every export is implemented: there are no stubs.\n");
+        return Ok(out);
+    }
     let body: String = stubs.concat();
     out.push_str(&imports(&body)?);
     for stub in stubs {

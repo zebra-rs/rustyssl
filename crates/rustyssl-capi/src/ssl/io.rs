@@ -534,10 +534,12 @@ unsafe fn read_input(x: &Ssl) -> Input {
     }
     let (rbio, want) = {
         let mut st = x.state();
-        let read_ahead = st.read_ahead != 0;
+        let read_ahead = st.read_ahead != 0 || st.max_pipelines > 1;
+        // The read buffer holds a record per pipeline (`tls_setup_read_buffer`).
+        let pipelines = st.max_pipelines.max(1);
         let d = &mut st.drv;
         let want = if read_ahead {
-            READ_AHEAD_CHUNK
+            READ_AHEAD_CHUNK.saturating_mul(pipelines)
         } else if d.rec_left > 0 {
             d.rec_left
         } else {
@@ -576,7 +578,7 @@ unsafe fn read_input(x: &Ssl) -> Input {
     let got = usize::try_from(r).unwrap_or(0).min(buf.len());
     buf.truncate(got);
     let mut st = x.state();
-    let read_ahead = st.read_ahead != 0;
+    let read_ahead = st.read_ahead != 0 || st.max_pipelines > 1;
     if !read_ahead {
         let server = st.server;
         track_records(&mut st.drv, server, &buf);

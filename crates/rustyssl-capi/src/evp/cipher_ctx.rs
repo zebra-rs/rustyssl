@@ -20,8 +20,9 @@
 //!   `EVP_R_CTRL_OPERATION_NOT_IMPLEMENTED`.
 //!
 //! What OpenSSL dereferences without checking (a NULL context in most of these, a NULL cipher
-//! for `EVP_CIPHER_CTX_set_key_length`) is refused here instead (docs/DEVIATIONS.md). There
-//! are no engines, so an `ENGINE` argument fails initialization. Random keys come from the
+//! for `EVP_CIPHER_CTX_set_key_length`) is refused here instead (docs/DEVIATIONS.md). An
+//! `ENGINE` argument, or one reserved for the cipher's NID, takes the legacy path with the
+//! engine's cipher, the context holding the engine until it's reset. Random keys come from the
 //! operating system until the private generator of 3.7. The `EVP_CIPHER_meth_*` ciphers come
 //! with 3.11, the pipeline functions and the AlgorithmIdentifier ones later.
 //! `EVP_CipherInit_SKEY` keys a cipher with an opaque key of its provider's: its data for a
@@ -87,7 +88,7 @@ const MAX_BLOCK: usize = EVP_MAX_BLOCK_LENGTH.cast_unsigned() as usize;
 struct CipherCtx {
     /// The cipher in use.
     cipher: *const EVP_CIPHER,
-    /// Always NULL: there are no engines.
+    /// The engine the cipher in use came from, with a functional reference, or NULL.
     engine: *mut ENGINE,
     /// 1 when encrypting.
     encrypt: c_int,
@@ -276,9 +277,13 @@ fn reset(c: &mut CipherCtx) {
         // SAFETY: the context's own reference.
         unsafe { EVP_CIPHER_free(c.fetched_cipher) };
     } else {
-        // The legacy path, for a context without a provided cipher: it owns its cipher data.
+        // The legacy path, for a context without a provided cipher: it owns its cipher data,
+        // and the engine the cipher came from is let go.
         // SAFETY: memory the application gave the context to free.
         unsafe { mem::release(c.cipher_data) };
+        // SAFETY: the context's functional reference, or NULL; the engine's `finish` gets the
+        // engine, not the context.
+        unsafe { crate::engine::ENGINE_finish(c.engine) };
     }
     *c = CipherCtx::cleared();
 }
@@ -514,10 +519,38 @@ unsafe fn init_internal(
         err::raise(ERR_LIB_EVP, EVP_R_NO_CIPHER_SET, F);
         return 0;
     }
-    // There are no engines (their API can't make one), so an engine argument can't be valid.
-    if !engine.is_null() {
-        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
-        return 0;
+    // An init after a final keeps the engine's cipher when it's for the same algorithm.
+    // SAFETY: the caller's live method, or NULL.
+    let nid = unsafe { method(cipher) }.map(|m| m.nid);
+    if !c.engine.is_null()
+        && let Some(current) = c.cipher()
+        && nid.is_none_or(|n| n == current.nid)
+    {
+        // SAFETY: the caller's guarantee; the context keeps its cipher.
+        return unsafe {
+            legacy::init(
+                ctx,
+                ptr::null(),
+                (key, iv),
+                enc,
+                (ptr::null_mut(), ptr::null_mut()),
+            )
+        };
+    }
+    let reserved = match nid {
+        // SAFETY: no preconditions; a functional reference, or NULL.
+        Some(n) if engine.is_null() => unsafe { crate::engine::table::ENGINE_get_cipher_engine(n) },
+        _ => ptr::null_mut(),
+    };
+    if !c.engine.is_null() || !reserved.is_null() || !engine.is_null() {
+        if c.cipher == c.fetched_cipher.cast_const() {
+            c.cipher = ptr::null();
+        }
+        // SAFETY: the context's own reference.
+        unsafe { EVP_CIPHER_free(c.fetched_cipher) };
+        c.fetched_cipher = ptr::null_mut();
+        // SAFETY: the caller's guarantee; `reserved` is NULL or a functional reference.
+        return unsafe { legacy::init(ctx, cipher, (key, iv), enc, (engine, reserved)) };
     }
     if !cipher.is_null() && !c.cipher.is_null() {
         // SAFETY: the caller's guarantee.
@@ -536,7 +569,15 @@ unsafe fn init_internal(
         unsafe { EVP_CIPHER_free(c.fetched_cipher) };
         c.fetched_cipher = ptr::null_mut();
         // SAFETY: the caller's guarantee.
-        return unsafe { legacy::init(ctx, cipher, key, iv, enc) };
+        return unsafe {
+            legacy::init(
+                ctx,
+                cipher,
+                (key, iv),
+                enc,
+                (ptr::null_mut(), ptr::null_mut()),
+            )
+        };
     }
     let mut cipher = if cipher.is_null() { c.cipher } else { cipher };
     // SAFETY: the caller's live method, or the context's.

@@ -3,9 +3,6 @@
 //! `asn_moid.c`, `asn_mstbl.c`, `eng_cnf.c`, `evp_cnf.c`, `conf_ssl.c`, `provider_conf.c`, and
 //! `rand_lib.c` do them.
 //!
-//! rustyssl has no engines (ENGINE comes later, and only as OpenSSL 3's stubs of it): an
-//! `engines` section that needs one fails as `ENGINE_by_id` of an engine that can't be loaded
-//! does in OpenSSL, built-in ones too (docs/DEVIATIONS.md).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong};
 use core::ptr;
@@ -18,10 +15,9 @@ use rustyssl_abi::{
     CONF_R_SSL_COMMAND_SECTION_EMPTY, CONF_R_SSL_COMMAND_SECTION_NOT_FOUND,
     CONF_R_SSL_SECTION_EMPTY, CONF_R_SSL_SECTION_NOT_FOUND, CONF_VALUE,
     CRYPTO_R_PROVIDER_SECTION_ERROR, CRYPTO_R_RANDOM_SECTION_ERROR,
-    CRYPTO_R_UNKNOWN_NAME_IN_RANDOM_SECTION, DSO_R_LOAD_FAILED, ENGINE_R_DSO_NOT_FOUND,
-    ENGINE_R_ENGINE_CONFIGURATION_ERROR, ENGINE_R_ENGINE_SECTION_ERROR,
-    ENGINE_R_ENGINES_SECTION_ERROR, ENGINE_R_NO_SUCH_ENGINE, ERR_LIB_ASN1, ERR_LIB_CONF,
-    ERR_LIB_CRYPTO, ERR_LIB_DSO, ERR_LIB_ENGINE, ERR_LIB_EVP, ERR_R_ASN1_LIB, ERR_R_INTERNAL_ERROR,
+    CRYPTO_R_UNKNOWN_NAME_IN_RANDOM_SECTION, ENGINE_R_ENGINE_CONFIGURATION_ERROR,
+    ENGINE_R_ENGINE_SECTION_ERROR, ENGINE_R_ENGINES_SECTION_ERROR, ERR_LIB_ASN1, ERR_LIB_CONF,
+    ERR_LIB_CRYPTO, ERR_LIB_ENGINE, ERR_LIB_EVP, ERR_R_ASN1_LIB, ERR_R_INTERNAL_ERROR,
     EVP_R_ERROR_LOADING_SECTION, EVP_R_SET_DEFAULT_PROPERTY_FAILURE, EVP_R_UNKNOWN_OPTION,
     NID_undef, OPENSSL_STACK, OSSL_LIB_CTX, SSL_CONF_CMD, STABLE_FLAGS_CLEAR, STABLE_NO_MASK,
 };
@@ -307,60 +303,113 @@ unsafe extern "C" fn stbl_module_finish(_md: *mut CONF_IMODULE) {
 
 // --- engines (`eng_cnf.c`) ---
 
-/// The ENGINE ex_data index OpenSSL's dynamic engine reserves at its first use, once per
-/// process, for its per-engine data; reserved here too, so applications' indexes match.
-static DYNAMIC_EX_INDEX: std::sync::Once = std::sync::Once::new();
+/// An engine pointer the `engines` module keeps initialized.
+struct EnginePtr(*mut rustyssl_abi::ENGINE);
 
-/// The errors OpenSSL raises when the dynamic engine can't load the library `file`.
-fn engine_load_failed(file: &[u8]) {
-    DYNAMIC_EX_INDEX.call_once(|| {
-        // SAFETY: no functions for the index.
-        unsafe {
-            crate::ex_data::CRYPTO_get_ex_new_index(
-                rustyssl_abi::CRYPTO_EX_INDEX_ENGINE,
-                0,
-                ptr::null_mut(),
-                None,
-                None,
-                None,
-            )
+// SAFETY: engines are shared between threads, as OpenSSL's are.
+unsafe impl Send for EnginePtr {}
+
+/// The engines the configuration initialized (`initialized_engines`), finished when the
+/// module is.
+static INITIALIZED_ENGINES: Mutex<Vec<EnginePtr>> = Mutex::new(Vec::new());
+
+/// `int_engine_init`: a functional reference the module keeps.
+///
+/// # Safety
+/// `e` is a live engine.
+unsafe fn engine_init(e: *mut rustyssl_abi::ENGINE) -> bool {
+    // SAFETY: the caller's guarantee.
+    if unsafe { crate::engine::ENGINE_init(e) } == 0 {
+        return false;
+    }
+    INITIALIZED_ENGINES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .push(EnginePtr(e));
+    true
+}
+
+/// One command of an engine's section, on the engine `e` (looked up by `name` first if
+/// there's none yet): `init` (0 or 1) and `default_algorithms` are the module's own; anything
+/// else is a control command to the engine (`EMPTY` for no argument). `None` when the engine
+/// is missing and `soft` lets it be.
+///
+/// # Safety
+/// `cnf` is a live configuration; `value` a C string; `ecmd` an entry of its section.
+unsafe fn engine_command(
+    e: &mut *mut rustyssl_abi::ENGINE,
+    name: &[u8],
+    soft: bool,
+    ecmd: &CONF_VALUE,
+    value: *const c_char,
+    cnf: *const CONF,
+    do_init: &mut c_long,
+) -> Option<bool> {
+    use crate::engine::{ENGINE_by_id, ENGINE_ctrl_cmd_string, ENGINE_set_default_string};
+    if e.is_null() {
+        let Ok(id) = CString::new(name) else {
+            return Some(false);
         };
-    });
-    let d = data(&[b"filename(", file, b"): rustyssl has no engines"]);
-    err::raise_with_bytes(ERR_LIB_DSO, DSO_R_LOAD_FAILED, "dlfcn_load", &d);
-    err::raise(ERR_LIB_DSO, DSO_R_LOAD_FAILED, "DSO_load");
-    err::raise(ERR_LIB_ENGINE, ENGINE_R_DSO_NOT_FOUND, "dynamic_load");
-}
-
-/// `ENGINE_by_id` of an engine there isn't: the dynamic engine's attempt to load it from the
-/// engines directory, then `ENGINE_R_NO_SUCH_ENGINE`.
-pub(crate) fn engine_by_id_failed(id: &[u8]) {
-    let dir = crate::init::safe_getenv(c"OPENSSL_ENGINES")
-        .unwrap_or_else(|| crate::version::enginesdir().to_owned());
-    #[cfg(target_os = "macos")]
-    let ext: &[u8] = b".dylib";
-    #[cfg(not(target_os = "macos"))]
-    let ext: &[u8] = b".so";
-    let file = if id.contains(&b'/') {
-        id.to_vec()
+        // SAFETY: a C string.
+        *e = unsafe { ENGINE_by_id(id.as_ptr()) };
+        if e.is_null() && soft {
+            // SAFETY: no preconditions.
+            unsafe { crate::err::ERR_clear_error() };
+            return None;
+        }
+        if e.is_null() {
+            return Some(false);
+        }
+    }
+    // SAFETY: the entry's strings.
+    let (full, cvalue) = (unsafe { text(ecmd.name) }, unsafe { text(ecmd.value) });
+    let ctrlname = skip_dot(full);
+    let arg = if cvalue == b"EMPTY" {
+        ptr::null()
     } else {
-        data(&[dir.as_bytes(), b"/", id, ext])
+        ecmd.value.cast_const()
     };
-    engine_load_failed(&file);
-    err::raise_with_bytes(
-        ERR_LIB_ENGINE,
-        ENGINE_R_NO_SUCH_ENGINE,
-        "ENGINE_by_id",
-        &data(&[b"id=", id]),
-    );
+    Some(match ctrlname {
+        b"init" => {
+            // SAFETY: the configuration, the section's name and a local.
+            let got = unsafe { super::NCONF_get_number_e(cnf, value, c"init".as_ptr(), do_init) };
+            if got == 0 {
+                return Some(false);
+            }
+            match *do_init {
+                // SAFETY: a live engine.
+                1 => unsafe { engine_init(*e) },
+                0 => true,
+                _ => {
+                    err::raise(
+                        ERR_LIB_ENGINE,
+                        rustyssl_abi::ENGINE_R_INVALID_INIT_VALUE,
+                        "int_engine_configure",
+                    );
+                    false
+                }
+            }
+        }
+        // SAFETY: a live engine, and NULL or a C string.
+        b"default_algorithms" => (unsafe { ENGINE_set_default_string(*e, arg) } != 0),
+        _ => {
+            let Ok(cmd) = CString::new(ctrlname) else {
+                return Some(false);
+            };
+            // SAFETY: a live engine, and C strings.
+            (unsafe { ENGINE_ctrl_cmd_string(*e, cmd.as_ptr(), arg, 0) } != 0)
+        }
+    })
 }
 
-/// `int_engine_configure`: an engine's section. With no engines, any command but the pseudo
-/// ones (`engine_id`, `soft_load`) needs an engine there isn't.
+/// `int_engine_configure`: an engine's section. `engine_id` renames it, `soft_load` lets it be
+/// missing, `dynamic_path` loads it as a module (listed: `LIST_ADD` 2); the other commands go
+/// to [`engine_command`]. Without `init`, the engine is initialized at the end.
 ///
 /// # Safety
 /// `cnf` is a live configuration; `value` a C string.
 unsafe fn engine_configure(name: &[u8], value: *const c_char, cnf: *const CONF) -> bool {
+    use crate::engine::{ENGINE_by_id, ENGINE_ctrl_cmd_string, ENGINE_free};
     let mut name = skip_dot(name).to_vec();
     // SAFETY: the caller's guarantee.
     let ecmds = unsafe { NCONF_get_section(cnf, value) };
@@ -372,33 +421,69 @@ unsafe fn engine_configure(name: &[u8], value: *const c_char, cnf: *const CONF) 
         );
         return false;
     }
+    let mut e: *mut rustyssl_abi::ENGINE = ptr::null_mut();
     let mut soft = false;
+    let mut do_init: c_long = -1;
+    // The entry that failed; `None` for the closing initialization.
+    let mut failed: Option<Option<&CONF_VALUE>> = None;
     // SAFETY: the configuration's section.
     for ecmd in unsafe { entries(ecmds) } {
         // SAFETY: the entry's strings.
         let (full, cvalue) = (unsafe { text(ecmd.name) }, unsafe { text(ecmd.value) });
-        match skip_dot(full) {
-            b"engine_id" => name = cvalue.to_vec(),
-            b"soft_load" => soft = true,
-            b"dynamic_path" => engine_load_failed(cvalue),
+        let ok = match skip_dot(full) {
+            b"engine_id" => {
+                name = cvalue.to_vec();
+                true
+            }
+            b"soft_load" => {
+                soft = true;
+                true
+            }
+            b"dynamic_path" => {
+                // SAFETY: a C string.
+                e = unsafe { ENGINE_by_id(c"dynamic".as_ptr()) };
+                let cmd = |n: &CStr, a: *const c_char| {
+                    // SAFETY: the dynamic engine, and C strings.
+                    (unsafe { ENGINE_ctrl_cmd_string(e, n.as_ptr(), a, 0) } != 0)
+                };
+                !e.is_null()
+                    && cmd(c"SO_PATH", ecmd.value)
+                    && cmd(c"LIST_ADD", c"2".as_ptr())
+                    && cmd(c"LOAD", ptr::null())
+            }
             _ => {
-                engine_by_id_failed(&name);
-                if soft {
-                    // SAFETY: no preconditions.
-                    unsafe { crate::err::ERR_clear_error() };
-                    return true;
+                // SAFETY: the caller's guarantee; the section's entry.
+                match unsafe { engine_command(&mut e, &name, soft, ecmd, value, cnf, &mut do_init) }
+                {
+                    None => return true,
+                    Some(ok) => ok,
                 }
             }
+        };
+        if !ok {
+            failed = Some(Some(ecmd));
+            break;
         }
-        if !matches!(skip_dot(full), b"engine_id" | b"soft_load") {
-            // SAFETY: the entry's section.
+    }
+    // SAFETY: a live engine.
+    if failed.is_none() && !e.is_null() && do_init == -1 && !unsafe { engine_init(e) } {
+        failed = Some(None);
+    }
+    match failed {
+        Some(None) => err::raise(
+            ERR_LIB_ENGINE,
+            ENGINE_R_ENGINE_CONFIGURATION_ERROR,
+            "int_engine_configure",
+        ),
+        Some(Some(ecmd)) => {
+            // SAFETY: the entry's strings.
             let d = data(&[
                 b"section=",
                 unsafe { text(ecmd.section) },
                 b", name=",
-                full,
+                unsafe { text(ecmd.name) },
                 b", value=",
-                cvalue,
+                unsafe { text(ecmd.value) },
             ]);
             err::raise_with_bytes(
                 ERR_LIB_ENGINE,
@@ -406,10 +491,12 @@ unsafe fn engine_configure(name: &[u8], value: *const c_char, cnf: *const CONF) 
                 "int_engine_configure",
                 &d,
             );
-            return false;
         }
+        None => {}
     }
-    true
+    // SAFETY: our reference, or NULL.
+    unsafe { ENGINE_free(e) };
+    failed.is_none()
 }
 
 /// `int_engine_module_init`.
@@ -436,8 +523,19 @@ unsafe extern "C" fn engine_module_init(md: *mut CONF_IMODULE, cnf: *const CONF)
     1
 }
 
-/// `int_engine_module_finish`: no engines were initialized.
-unsafe extern "C" fn engine_module_finish(_md: *mut CONF_IMODULE) {}
+/// `int_engine_module_finish`: the engines the configuration initialized are finished, newest
+/// first.
+unsafe extern "C" fn engine_module_finish(_md: *mut CONF_IMODULE) {
+    let engines = core::mem::take(
+        &mut *INITIALIZED_ENGINES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner),
+    );
+    for e in engines.into_iter().rev() {
+        // SAFETY: the functional reference the module took.
+        unsafe { crate::engine::ENGINE_finish(e.0) };
+    }
+}
 
 // --- alg_section (`evp_cnf.c`) ---
 
@@ -1065,21 +1163,20 @@ mod tests {
         (r, reasons)
     }
 
-    /// docs/DEVIATIONS.md: an `engines` section that needs an engine fails, even for one
-    /// OpenSSL builds in (`dynamic`), as `ENGINE_by_id` of an engine that can't be loaded
-    /// does; one that only names it, or loads it softly, succeeds as in OpenSSL.
+    /// An `engines` section, as the reference runs it: the built-in `dynamic` engine is found
+    /// (`init = 0` leaves it uninitialized), a section that only names an engine does
+    /// nothing, and a missing one loaded softly is no error.
     #[test]
     #[cfg_attr(
         miri,
         ignore = "the engines directory comes from the environment, which reads the process's IDs"
     )]
-    fn engines_are_never_found() {
+    fn engines_sections_run() {
         let (r, reasons) = run(
             b"openssl_conf = init\n[init]\nengines = e\n[e]\nx = f\n[f]\nengine_id = dynamic\ninit = 0\n",
             0,
         );
-        assert_eq!(r, -1);
-        assert!(reasons.contains(&ENGINE_R_NO_SUCH_ENGINE), "{reasons:?}");
+        assert_eq!((r, reasons), (1, Vec::new()));
         let (r, _) = run(
             b"openssl_conf = init\n[init]\nengines = e\n[e]\nx = f\n[f]\nengine_id = dynamic\n",
             0,
@@ -1102,8 +1199,8 @@ mod tests {
         assert_eq!(
             reasons,
             [
-                DSO_R_LOAD_FAILED,
-                DSO_R_LOAD_FAILED,
+                rustyssl_abi::DSO_R_LOAD_FAILED,
+                rustyssl_abi::DSO_R_LOAD_FAILED,
                 rustyssl_abi::CONF_R_ERROR_LOADING_DSO,
                 rustyssl_abi::CONF_R_UNKNOWN_MODULE_NAME
             ]

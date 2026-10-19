@@ -8,6 +8,12 @@
 # program that isn't run, and why; an `internal` line, a program's tests that read libssl's
 # private structures.
 
+# 30-test_engine.t: the ENGINE API (libcrypto's, run here as the dasync engine is built here)
+enginetest {src}/test/certs/root-cert.pem
+
+# 30-test_evp_extra.t: the EVP API (libcrypto's, run here for its tests with the dasync engine)
+evp_extra_test
+
 # 90-test_sslapi.t (the default provider's run)
 sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
 # 80-test_ssl_new.t: ssl_test on each test/ssl-tests/*.cnf with the default provider (the
@@ -83,6 +89,14 @@ internal ssl_test/26-tls13_client_auth test_handshake#7 test_handshake#8 test_ha
 internal sslapitest test_session_with_only_int_cache test_session_with_only_ext_cache test_session_with_both_cache test_session_wo_ca_names test_ciphersuite_change test_session_timeout test_session_cache_overflow test_cleanse_plaintext test_unknown_sigalgs_groups test_configuration_of_groups test_sigalg_ctx_switch test_sigalg_ctx_switch_cert_cb test_sigalg_ctx_switch_reneg
 internal sslbuffertest test_func
 internal dtls_mtu_test run_mtu_tests
+# evp_extra_test: test_EVP_PKEY_check sets a context's key by writing into the private
+# EVP_PKEY_CTX; the others call internal functions (only weakly linked here, see
+# xtask/src/test_openssl_suite/ssl.rs): test_custom_pmeth's legacy-key iterations downgrade
+# with evp_pkey_copy_downgraded (its provided-key iterations, 1-6, check the key with
+# evp_pkey_is_provided, a macro reading the private EVP_PKEY), test_EC_keygen_with_enc exports with
+# evp_keymgmt_util_export, and the fake pipelining provider's parameters are
+# ossl_cipher_generic_get_params and _gettable_params.
+internal evp_extra_test test_EVP_PKEY_check test_custom_pmeth#1 test_custom_pmeth#2 test_custom_pmeth#3 test_custom_pmeth#4 test_custom_pmeth#5 test_custom_pmeth#6 test_custom_pmeth#7 test_custom_pmeth#8 test_custom_pmeth#9 test_custom_pmeth#10 test_custom_pmeth#11 test_custom_pmeth#12 test_EC_keygen_with_enc test_evp_cipher_pipeline
 
 skip ssl_handshake_rtt_test calls libssl's internal state machine (ossl_statem_*_write_transition) and reads SSL_CONNECTION
 skip cipher_overhead_test calls libssl's internal cipher table (ssl3_get_cipher, ssl_cipher_get_overhead)
@@ -119,7 +133,6 @@ evp_fetch_prov_test -config {src}/test/default.cnf -type digest -property provid
 evp_fetch_prov_test -config {src}/test/default.cnf -type digest -property provider!=default -fetchfail
 evp_skey_test
 evp_extra_test2
-skip evp_extra_test compiles the legacy provider's internals into itself (STATIC_LEGACY), which no shared libcrypto exports
 skip evp_libctx_test uses libcrypto's internal BIGNUM constants (ossl_bignum_dh2048_256_g, ...), which carry OpenSSL's private BIGNUM layout
 skip evp_pkey_provided_test uses libcrypto's internal BIGNUM constants (ossl_bignum_const_2), which carry OpenSSL's private BIGNUM layout
 skip provider_internal_test calls libcrypto's internal provider API (ossl_provider_*)

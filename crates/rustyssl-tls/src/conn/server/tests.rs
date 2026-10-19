@@ -161,6 +161,7 @@ pub(crate) fn server_config(p: &TestProvider) -> Config {
         num_tickets: 2,
         max_send_fragment: 16384,
         split_send_fragment: 16384,
+        max_pipelines: 0,
         max_cert_list: 102_400,
         verify_depth: -1,
         session_cache_mode: i64::from(abi::SSL_SESS_CACHE_SERVER),

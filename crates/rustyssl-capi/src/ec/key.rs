@@ -204,6 +204,8 @@ pub(crate) struct Fields {
     pub(crate) conv_form: point_conversion_form_t,
     pub(crate) version: c_int,
     pub(crate) flags: c_int,
+    /// The engine the method came from, with a functional reference, or NULL.
+    pub(crate) engine: Ptr<ENGINE>,
 }
 
 /// The key's ex_data, which only the ex_data functions touch.
@@ -292,13 +294,43 @@ pub(crate) unsafe fn key<'a>(k: *const EC_KEY) -> Option<&'a EcKey> {
 /// # Safety
 /// `propq` is NULL or a string.
 pub(crate) unsafe fn new_key(libctx: *mut OSSL_LIB_CTX, propq: *const c_char) -> *mut EC_KEY {
+    // SAFETY: the caller's guarantee; no engine.
+    unsafe { new_key_engine(libctx, propq, ptr::null_mut()) }
+}
+
+/// `ossl_ec_key_new_method_int`: as [`new_key`], with the method from `engine` (initialized),
+/// else from the default EC engine if there is one, else the default method.
+///
+/// # Safety
+/// As for [`new_key`]; `engine` is NULL or a live engine.
+pub(crate) unsafe fn new_key_engine(
+    libctx: *mut OSSL_LIB_CTX,
+    propq: *const c_char,
+    engine: *mut ENGINE,
+) -> *mut EC_KEY {
+    // SAFETY: the caller's guarantee.
+    let chosen = unsafe {
+        crate::engine::key_method(
+            engine,
+            crate::engine::table::ENGINE_get_default_EC,
+            crate::engine::ENGINE_get_EC,
+        )
+    };
+    let Ok((engine, emeth)) = chosen else {
+        raise(rustyssl_abi::ERR_R_ENGINE_LIB, "ossl_ec_key_new_method_int");
+        return ptr::null_mut();
+    };
     let propq = if propq.is_null() {
         None
     } else {
         // SAFETY: the caller's guarantee.
         Some(unsafe { CStr::from_ptr(propq) }.to_owned())
     };
-    let meth = default_method();
+    let meth = if emeth.is_null() {
+        default_method()
+    } else {
+        emeth.cast::<Method>()
+    };
     let h = EC_KEY::new_handle(EcKey {
         references: AtomicI32::new(1),
         dirty: AtomicUsize::new(0),
@@ -313,6 +345,7 @@ pub(crate) unsafe fn new_key(libctx: *mut OSSL_LIB_CTX, propq: *const c_char) ->
             conv_form: POINT_CONVERSION_UNCOMPRESSED,
             version: 1,
             flags: 0,
+            engine: Ptr(engine),
         }),
         ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
             ctx: ptr::null_mut(),
@@ -365,6 +398,8 @@ pub(crate) unsafe fn free(r: *mut EC_KEY) {
         // SAFETY: the method's function takes the key.
         unsafe { finish(r) };
     }
+    // SAFETY: the key's functional reference to its engine, or NULL.
+    unsafe { crate::engine::ENGINE_finish(f.engine.0) };
     // SAFETY: the key's own ex_data; its last reference.
     unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_EC_KEY, r.cast(), held.ex_data()) };
     // SAFETY: the last reference; the hold keeps the key until this returns.
@@ -398,18 +433,17 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// A new key with the default method; rustyssl has no engines.
+    /// A new key with the engine's EC_KEY method (the engine initialized, and kept until the
+    /// key is freed); with NULL, the default EC engine's, if any. NULL (`ERR_R_ENGINE_LIB`) if
+    /// the engine doesn't initialize or has no EC_KEY method.
     ///
     /// # Safety
-    /// `engine` is NULL.
+    /// `engine` is NULL or a live engine.
     pub unsafe extern "C" fn EC_KEY_new_method(engine: *mut ENGINE) -> *mut EC_KEY
     where failure = ptr::null_mut(), library = ERR_LIB_EC
     {
-        if !engine.is_null() {
-            crate::stub::unimplemented("EC_KEY_new_method with an engine (rustyssl has none)");
-        }
-        // SAFETY: no query.
-        unsafe { new_key(ptr::null_mut(), ptr::null()) }
+        // SAFETY: no query; the caller's guarantee.
+        unsafe { new_key_engine(ptr::null_mut(), ptr::null(), engine) }
     }
 }
 
@@ -489,15 +523,15 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's engine: always NULL, as rustyssl has no engines.
+    /// The engine the key's method came from, or NULL.
     ///
     /// # Safety
-    /// No preconditions.
+    /// `eckey` is NULL or a live key.
     pub unsafe extern "C" fn EC_KEY_get0_engine(eckey: *const EC_KEY) -> *mut ENGINE
     where failure = ptr::null_mut(), library = ERR_LIB_EC
     {
-        let _ = eckey;
-        ptr::null_mut()
+        // SAFETY: the caller's guarantee.
+        unsafe { key(eckey) }.map_or(ptr::null_mut(), |k| k.get().engine.0)
     }
 }
 
@@ -537,6 +571,11 @@ ffi_export! {
                 // SAFETY: the method's function takes the key.
                 unsafe { finish(dest) };
             }
+            // SAFETY: the destination's functional reference to its engine, or NULL.
+            if unsafe { crate::engine::ENGINE_finish(df.engine.0) } == 0 {
+                return ptr::null_mut();
+            }
+            d.update(|f| f.engine = Ptr(ptr::null_mut()));
         }
         d.update(|f| f.libctx = sf.libctx);
         if !sf.group.0.is_null() {
@@ -586,7 +625,14 @@ ffi_export! {
             return ptr::null_mut();
         }
         if sf.meth.0 != df.meth.0 {
-            d.update(|f| f.meth = sf.meth);
+            // SAFETY: the source's engine, or NULL; a functional reference for the copy.
+            if !sf.engine.0.is_null() && unsafe { crate::engine::ENGINE_init(sf.engine.0) } == 0 {
+                return ptr::null_mut();
+            }
+            d.update(|f| {
+                f.engine = sf.engine;
+                f.meth = sf.meth;
+            });
         }
         // SAFETY: the source's method; no lock is held while its function runs.
         if let Some(copy) = unsafe { method(sf.meth.0) }.and_then(|m| m.copy)
@@ -1815,6 +1861,10 @@ ffi_export! {
             // SAFETY: the method's function takes the key.
             unsafe { finish(key) };
         }
+        // The engine the old method came from is let go.
+        let engine = k.update(|f| core::mem::replace(&mut f.engine, Ptr(ptr::null_mut())));
+        // SAFETY: the key's functional reference, or NULL.
+        unsafe { crate::engine::ENGINE_finish(engine.0) };
         k.update(|f| f.meth = Ptr(meth.cast::<Method>().cast_mut()));
         // SAFETY: the caller's method; no lock is held while its function runs.
         match unsafe { method(meth.cast()) }.and_then(|m| m.init) {

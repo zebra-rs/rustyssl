@@ -199,6 +199,12 @@ impl Cipher {
         }
     }
 
+    /// A static legacy cipher with its own C functions (`EVP_CIPHER_meth_get_*` reports them).
+    pub(crate) fn with_legacy(mut self, legacy: Legacy) -> Self {
+        self.legacy = Mutex::new(legacy);
+        self
+    }
+
     /// An application's cipher (`EVP_CIPHER_meth_new`), or a copy of `from`
     /// (`EVP_CIPHER_meth_dup`).
     pub(crate) fn meth(nid: c_int, block_size: c_int, key_len: c_int, from: Option<&Self>) -> Self {

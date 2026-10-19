@@ -201,6 +201,13 @@ pub trait Cipher: Send {
     /// # Errors
     /// The provider failed.
     fn crypt(&mut self, iv: &[u8], data: &mut [u8]) -> Result<()>;
+
+    /// Whether the cipher can process several records at once (OpenSSL's
+    /// `EVP_CIPH_FLAG_PIPELINE`, which only an engine's ciphers have): with it, writes are split
+    /// over pipelines and reads take several buffered records (`SSL_set_max_pipelines`).
+    fn pipeline(&self) -> bool {
+        false
+    }
 }
 
 /// A group the providers offer (their `TLS-GROUP` capability).
