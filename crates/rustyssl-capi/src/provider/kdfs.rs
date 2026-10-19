@@ -3932,6 +3932,14 @@ ffi_callback! {
         }
         // SAFETY: as above.
         if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_MODE) } {
+            if u32::try_from(OSSL_PARAM_UTF8_STRING) != Ok(p.data_type) {
+                // 3.6 reads the mode with `OSSL_PARAM_get_utf8_string_ptr`, whose type check
+                // raises `CRYPTO_R_PARAM_OF_INCOMPATIBLE_TYPE` (3.5 said `PROV_R_INVALID_MODE`).
+                let mut text: *const c_char = ptr::null();
+                // SAFETY: the located parameter; a local out-pointer.
+                unsafe { OSSL_PARAM_get_utf8_string_ptr(p, &raw mut text) };
+                return 0;
+            }
             let data = p.data.cast_const().cast::<u8>();
             if data.is_null() && p.data_size > 0 {
                 // The reference compares through NULL (docs/DEVIATIONS.md).

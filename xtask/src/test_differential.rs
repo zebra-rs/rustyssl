@@ -5442,8 +5442,15 @@ fn bn_session(random: &mut Random, out: &mut String) -> Result {
                         _ => format!("{:02x}", random.below(256)),
                     })
                     .collect();
+                let r = reg(random);
+                if !hex.is_empty() && hex.bytes().all(|b| b == b'0') {
+                    // Zero octets read into a negative number leave its sign on OpenSSL (a
+                    // negative zero) and make zero here (docs/DEVIATIONS.md): read them into a
+                    // non-negative one.
+                    writeln!(out, "bnset {r} 0")?;
+                }
                 let hex = if hex.is_empty() { "-".to_owned() } else { hex };
-                writeln!(out, "bnfrom {} {} {hex}", reg(random), random.pick(KINDS))?;
+                writeln!(out, "bnfrom {r} {} {hex}", random.pick(KINDS))?;
             }
             16 => {
                 let body = random.below(20);

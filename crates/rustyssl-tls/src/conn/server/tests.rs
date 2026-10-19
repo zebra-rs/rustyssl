@@ -1913,6 +1913,26 @@ fn tls12_handshake_message_is_not_a_change_cipher_spec() {
     );
 }
 
+#[test]
+fn tls12_ecdhe_empty_point_is_a_decode_error() {
+    // OpenSSL 3.6 (tlsfuzzer's "empty x25519 key share"): the ECPoint is <1..2^8-1>, so an
+    // empty one is malformed, decode_error with SSL_R_LENGTH_MISMATCH; 3.5 sent
+    // illegal_parameter.
+    use crate::consts::handshake as ht;
+    let p = TestProvider::new(b"empty-point");
+    let hello = hello12(&[0xc02f]);
+    let mut c = Connection::new(server_config(&p));
+    c.feed(&plain_record(22, &hello.msg()));
+    let (out, _) = drive(&mut c, &p);
+    let mut client = Client12::new(&hello);
+    let flight = client.server_flight(&p, &out);
+    assert_eq!(flight[2][0], ht::SERVER_KEY_EXCHANGE);
+    let out = client.send(&p, ht::CLIENT_KEY_EXCHANGE, &[0]);
+    c.feed(&out);
+    let (_, last) = drive(&mut c, &p);
+    assert_eq!(last.unwrap_err(), Error::decode(abi::SSL_R_LENGTH_MISMATCH));
+}
+
 /// After a TLS 1.2 handshake, a renegotiating ClientHello under the handshake's keys.
 fn renegotiate(
     p: &TestProvider,

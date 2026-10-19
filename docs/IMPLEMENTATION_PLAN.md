@@ -5585,7 +5585,15 @@ both libraries (step 8.1).
     the 4720 that pass on the reference on Linux); the rest are the known classes: tests that
     read OpenSSL's private structures or call its internal functions (the `internal` lines of
     `tests/openssl-suite/ssl.txt`) and QUIC (`SSL_set_quic_tls_cbs`, `OSSL_QUIC_client_method`;
-    Phase 10). `test-bogo` and `test-tlsfuzzer` weren't rerun against 3.6.5.
+    Phase 10). Rerun against 3.6.5 afterwards (2026-10-19): `test-bogo` (BoringSSL 5e1bfb45,
+    7771 tests: each library passes the same 2805, none on the reference alone);
+    `test-tlsfuzzer` (151 scripts, none failing on rustyssl where it passes on the reference,
+    after the empty-point fix below); `test-providers` pkcs11 (SoftHSM 24/26, NSS softokn
+    30/31, as the reference, x86_64 Linux) and tpm2 (48/48 on both, aarch64 Linux: `swtpm`'s
+    seccomp filter can't load under amd64 emulation on an arm64 host). CI's random
+    `test-differential` sessions then found the KBKDF mode change below, and a generator case
+    that reached a recorded deviation (zero octets read into a negative BIGNUM, a negative zero
+    on OpenSSL); the generator now reads those into a non-negative register.
   - 3.5 → 3.6 behavior changes (for users of the 3.5 LTS; 3.6's are followed):
     - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
       (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
@@ -5676,6 +5684,13 @@ both libraries (step 8.1).
       signature's length before refusing too little room, fails a length query with nowhere to
       put it, and raises `PROV_R_BAD_LENGTH` for an external `mu` that isn't 64 octets
       (`provider/ml_dsa_sig.rs`).
+    - KBKDF reads its `mode` with `OSSL_PARAM_get_utf8_string_ptr`, so a mode that isn't a
+      string fails its type check (`CRYPTO_R_PARAM_OF_INCOMPATIBLE_TYPE`) where 3.5 said
+      `PROV_R_INVALID_MODE` (`provider/kdfs.rs`, `kbkdf_set_ctx_params`; a random
+      `test-differential` session found it). `tests/c/evp_kdf_more.c`.
+    - A TLS 1.2 server refuses a ClientKeyExchange whose ECDHE point is empty as malformed
+      (decode_error, `SSL_R_LENGTH_MISMATCH`), where 3.5 sent illegal_parameter
+      (`SSL_R_BAD_KEY_SHARE`) (rustyssl-tls `server::kx`; tlsfuzzer's `test-x25519.py`).
     - libssl's ec_point_formats offers only uncompressed unless the new
       `SSL_OP_LEGACY_EC_POINT_FORMATS` (`LegacyECPointFormats`, `-legacy_ec_point_formats`)
       asks for 3.5's three formats (rustyssl-tls `groups::formats`; `ssl/conf.rs`).

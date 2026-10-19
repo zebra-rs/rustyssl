@@ -360,16 +360,15 @@ pub(crate) fn process_client_key_exchange(
         }
         let point = rd.vec8().map_err(|_| mm)?;
         rd.end().map_err(|_| mm)?;
+        // 3.6: an empty point is a malformed message (`i == 0` in the length check), not a bad
+        // share; 3.5 refused it later as `SSL_R_BAD_KEY_SHARE`.
+        if point.is_empty() {
+            return Err(mm);
+        }
         let share = state(c)?.kx_key.take().ok_or(Error::alert(
             abi::SSL_AD_INTERNAL_ERROR,
             abi::SSL_R_MISSING_TMP_ECDH_KEY,
         ))?;
-        if point.is_empty() {
-            return Err(Error::alert(
-                abi::SSL_AD_ILLEGAL_PARAMETER,
-                abi::SSL_R_BAD_KEY_SHARE,
-            ));
-        }
         let secret = share
             .derive(point.rest())
             .map_err(|_| Error::alert(abi::SSL_AD_ILLEGAL_PARAMETER, abi::SSL_R_BAD_KEY_SHARE))?;
