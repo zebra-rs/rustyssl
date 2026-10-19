@@ -545,6 +545,49 @@
 
 static BUF_MEM *buffer = NULL;
 
+/*
+ * The contexts installed as the thread's public and private DRBGs (see the RAND commands), and
+ * whether each is still set up: a failed set can break one after it's installed (see rset),
+ * and RAND_bytes then crashes the reference running it.
+ */
+static EVP_RAND_CTX *rand_pub_ctx, *rand_priv_ctx;
+static int rand_pub_broken, rand_priv_broken;
+/* The RAND commands' two contexts (see there). */
+static EVP_RAND_CTX *rand_slot[2];
+/* Whether the thread's public and private DRBGs were set to deterministic ones. */
+static int rand_pub_det, rand_priv_det;
+
+/*
+ * OPENSSL_thread_stop, then the probe's DRBGs set again: since 3.6 the thread's stop forgets
+ * the DRBGs RAND_set0_public and RAND_set0_private installed.
+ */
+static void thread_stop(void)
+{
+    OPENSSL_thread_stop();
+    if (rand_pub_ctx != NULL && EVP_RAND_CTX_up_ref(rand_pub_ctx))
+        RAND_set0_public(NULL, rand_pub_ctx);
+    if (rand_priv_ctx != NULL && EVP_RAND_CTX_up_ref(rand_priv_ctx))
+        RAND_set0_private(NULL, rand_priv_ctx);
+}
+
+/*
+ * A slot's context freed. One installed for RAND_bytes isn't set again after the thread's
+ * stop that ends the command: the thread's reference is then its last (3.6 leaks it at the
+ * stop; rustyssl releases it), and the thread goes back to its own DRBG.
+ */
+static void rand_slot_free(EVP_RAND_CTX *ctx)
+{
+    if (ctx != NULL && ctx == rand_pub_ctx) {
+        rand_pub_ctx = NULL;
+        rand_pub_det = rand_pub_broken = 0;
+    }
+    if (ctx != NULL && ctx == rand_priv_ctx) {
+        rand_priv_ctx = NULL;
+        rand_priv_det = rand_priv_broken = 0;
+    }
+    EVP_RAND_CTX_free(ctx);
+}
+
 static void print_state(const char *command, size_t result)
 {
     printf("%s %zu length=%zu max=%zu\n", command, result, buffer->length, buffer->max);
@@ -2481,7 +2524,7 @@ static int prov_command(const char *command, const char *line)
      * which differ between the libraries; drop the error state so no slot keeps a buffer sized
      * by it (the err commands print the sizes).
      */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 
@@ -2658,7 +2701,7 @@ static int fetch_command(const char *command, const char *line)
     }
     print_fetch_errors();
     /* The data's name numbers differ between the libraries: drop the buffers they sized. */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 
@@ -3823,7 +3866,7 @@ static int mac_command(const char *command, const char *line)
     print_digest_errors();
     /* A failed fetch's error text has the name's number, which differs between the libraries:
      * drop the buffers it sized. */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 
@@ -4030,7 +4073,7 @@ static int kdf_command(const char *command, const char *line)
     }
     print_digest_errors();
     /* A failed fetch's error text has the name's number: drop the buffers it sized. */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 
@@ -4043,7 +4086,6 @@ static int kdf_command(const char *command, const char *line)
  * TEST-RAND, or from a DRBG directly under one (anything seeded by the operating system, or by
  * a DRBG, which mixes in its address, isn't).
  */
-static EVP_RAND_CTX *rand_slot[2];
 static int rand_current;
 /*
  * What each context is, and what OpenSSL can't be given (docs/DEVIATIONS.md). A DRBG never
@@ -4057,16 +4099,6 @@ static int rand_current;
 enum { R_OTHER, R_CTR, R_HASH, R_HMAC, R_SEED, R_TEST };
 static int rand_kind[2], rand_parent[2], rand_det[2], rand_ctr_ok[2], rand_gen[2], rand_child[2];
 static int rand_digest_ok[2], rand_digest_tried[2];
-/* Whether the thread's public and private DRBGs were set to deterministic ones. */
-static int rand_pub_det, rand_priv_det;
-/*
- * The contexts installed as the thread's public and private DRBGs, and whether each is still
- * set up: a failed set can break one after it's installed (see rset), and RAND_bytes then
- * crashes the reference running it.
- */
-static EVP_RAND_CTX *rand_pub_ctx, *rand_priv_ctx;
-static int rand_pub_broken, rand_priv_broken;
-
 static int rand_kind_of(const EVP_RAND *r)
 {
     if (r == NULL)
@@ -4158,7 +4190,7 @@ static int rand_command(const char *command, const char *line)
             }
         }
         rand = EVP_RAND_fetch(NULL, a, NULL);
-        EVP_RAND_CTX_free(ctx);
+        rand_slot_free(ctx);
         rand_slot[c] = EVP_RAND_CTX_new(rand, parent);
         rand_kind[c] = rand_kind_of(rand);
         rand_parent[c] = parent != NULL;
@@ -4315,12 +4347,12 @@ static int rand_command(const char *command, const char *line)
     } else if (strcmp(command, "rzero") == 0) {
         printf(" %d", EVP_RAND_verify_zeroization(ctx));
     } else {
-        EVP_RAND_CTX_free(ctx);
+        rand_slot_free(ctx);
         rand_slot[c] = NULL;
     }
     print_digest_errors();
     /* A failed fetch's error text has the name's number: drop the buffers it sized. */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 
@@ -11011,7 +11043,7 @@ static int conf_modules_command(const char *command, const char *line)
     OSSL_LIB_CTX_free(ctx);
     ERR_clear_error();
     /* No error slot keeps a buffer sized by a DSO message, which differs between libraries. */
-    OPENSSL_thread_stop();
+    thread_stop();
     return 1;
 }
 

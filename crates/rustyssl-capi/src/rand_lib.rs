@@ -168,9 +168,10 @@ struct Local {
     id: u64,
     public: *mut EVP_RAND_CTX,
     private: *mut EVP_RAND_CTX,
-    /// Whether the thread's stop frees them (`ossl_init_thread_start` registered
-    /// `rand_delete_thread_state`): only once one was made by `RAND_get0_public`/`_private`
-    /// while the other was unset. DRBGs only ever set with `RAND_set0_*` stay, as in OpenSSL.
+    /// Whether a context's thread stop (`OPENSSL_thread_stop_ex`) frees them
+    /// (`ossl_init_thread_start` registered `rand_delete_thread_state`): only once one was
+    /// made by `RAND_get0_public`/`_private` while the other was unset. There, DRBGs only ever
+    /// set with `RAND_set0_*` stay, as in OpenSSL.
     registered: bool,
 }
 
@@ -256,15 +257,18 @@ fn register(id: u64) {
     });
 }
 
-/// The thread's stop (`OPENSSL_thread_stop`, `OPENSSL_thread_stop_ex`): frees its DRBGs of the
-/// context `id` (or of every context) whose freeing was registered.
+/// The thread's stop: `OPENSSL_thread_stop_ex` (`id`) frees its DRBGs of that context whose
+/// freeing was registered; `OPENSSL_thread_stop` (`None`) drops every one, of every context,
+/// as 3.6 does (`CRYPTO_THREAD_clean_local` forgets the thread's values after the handlers run,
+/// so a DRBG set with `RAND_set0_*` goes too; 3.6 leaks the thread's reference to it, which
+/// rustyssl releases).
 pub(crate) fn stop_thread(id: Option<u64>) {
     let taken: Vec<Local> = LOCALS
         .try_with(|l| {
             let mut l = l.borrow_mut();
             let (gone, kept): (Vec<Local>, Vec<Local>) =
                 l.0.drain(..)
-                    .partition(|x| x.registered && id.is_none_or(|i| i == x.id));
+                    .partition(|x| id.is_none_or(|i| x.registered && i == x.id));
             l.0 = kept;
             gone
         })
