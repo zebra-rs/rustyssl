@@ -55,14 +55,14 @@ mod arm {
         ret == 0 && value != 0
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(target_os = "linux")]
     fn probe() -> bool {
         // SAFETY: getauxval has no preconditions.
         let hwcap = unsafe { libc::getauxval(libc::AT_HWCAP) };
         hwcap & libc::HWCAP_DIT != 0
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     fn probe() -> bool {
         false
     }
