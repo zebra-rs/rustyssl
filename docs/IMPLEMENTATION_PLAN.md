@@ -5604,6 +5604,10 @@ both libraries (step 8.1).
       (3.5 printed `%hhd` as `d`); `%n` honors length modifiers and counts output a full buffer
       dropped; `%-f` no longer pads on the right (a 3.6 quirk); widths and precisions of
       `INT_MAX / 10` or more fail; a full buffer no longer stops reading the arguments.
+    - The DRBGs (`provider/rands.rs`): HMAC-DRBG no longer defaults its MAC to HMAC
+      (`hmac_fetch_algs`), so one given only a digest doesn't instantiate, and a refused digest
+      keeps the MAC; CTR-DRBG ignores `properties` that aren't a string (3.5 refused them;
+      `propquery`).
 
 **Exit:** M6.
 

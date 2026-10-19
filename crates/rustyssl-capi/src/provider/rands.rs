@@ -40,23 +40,22 @@ use rustyssl_abi::{
     OSSL_FUNC_RAND_NEWCTX, OSSL_FUNC_RAND_NONCE, OSSL_FUNC_RAND_RESEED,
     OSSL_FUNC_RAND_SET_CTX_PARAMS, OSSL_FUNC_RAND_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_RAND_UNINSTANTIATE, OSSL_FUNC_RAND_UNLOCK, OSSL_FUNC_RAND_VERIFY_ZEROIZATION,
-    OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES, OSSL_PARAM, OSSL_PARAM_INTEGER,
-    OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, OSSL_PARAM_UTF8_STRING,
-    OSSL_PROV_PARAM_CORE_PROV_NAME, OSSL_RAND_PARAM_GENERATE, OSSL_RAND_PARAM_MAX_REQUEST,
-    OSSL_RAND_PARAM_STATE, OSSL_RAND_PARAM_STRENGTH, OSSL_RAND_PARAM_TEST_ENTROPY,
-    OSSL_RAND_PARAM_TEST_NONCE, PROV_R_ADDITIONAL_INPUT_TOO_LONG, PROV_R_ALREADY_INSTANTIATED,
-    PROV_R_DERIVATION_FUNCTION_INIT_FAILED, PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK,
-    PROV_R_ERROR_INSTANTIATING_DRBG, PROV_R_ERROR_RETRIEVING_ENTROPY,
-    PROV_R_ERROR_RETRIEVING_NONCE, PROV_R_GENERATE_ERROR, PROV_R_IN_ERROR_STATE,
-    PROV_R_INSUFFICIENT_DRBG_STRENGTH, PROV_R_INVALID_DIGEST, PROV_R_INVALID_MAC,
-    PROV_R_MISSING_CIPHER, PROV_R_MISSING_MAC, PROV_R_NOT_INSTANTIATED,
-    PROV_R_PARENT_CANNOT_SUPPLY_ENTROPY_SEED, PROV_R_PARENT_LOCKING_NOT_ENABLED,
-    PROV_R_PARENT_STRENGTH_TOO_WEAK, PROV_R_PERSONALISATION_STRING_TOO_LONG,
-    PROV_R_REQUEST_TOO_LARGE_FOR_DRBG, PROV_R_REQUIRE_CTR_MODE_CIPHER, PROV_R_RESEED_ERROR,
+    OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER,
+    OSSL_PARAM_UTF8_STRING, OSSL_PROV_PARAM_CORE_PROV_NAME, OSSL_RAND_PARAM_GENERATE,
+    OSSL_RAND_PARAM_MAX_REQUEST, OSSL_RAND_PARAM_STATE, OSSL_RAND_PARAM_STRENGTH,
+    OSSL_RAND_PARAM_TEST_ENTROPY, OSSL_RAND_PARAM_TEST_NONCE, PROV_R_ADDITIONAL_INPUT_TOO_LONG,
+    PROV_R_ALREADY_INSTANTIATED, PROV_R_DERIVATION_FUNCTION_INIT_FAILED,
+    PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK, PROV_R_ERROR_INSTANTIATING_DRBG,
+    PROV_R_ERROR_RETRIEVING_ENTROPY, PROV_R_ERROR_RETRIEVING_NONCE, PROV_R_GENERATE_ERROR,
+    PROV_R_IN_ERROR_STATE, PROV_R_INSUFFICIENT_DRBG_STRENGTH, PROV_R_MISSING_CIPHER,
+    PROV_R_MISSING_MAC, PROV_R_NOT_INSTANTIATED, PROV_R_PARENT_CANNOT_SUPPLY_ENTROPY_SEED,
+    PROV_R_PARENT_LOCKING_NOT_ENABLED, PROV_R_PARENT_STRENGTH_TOO_WEAK,
+    PROV_R_PERSONALISATION_STRING_TOO_LONG, PROV_R_REQUEST_TOO_LARGE_FOR_DRBG,
+    PROV_R_REQUIRE_CTR_MODE_CIPHER, PROV_R_RESEED_ERROR,
     PROV_R_SEED_SOURCES_MUST_NOT_HAVE_A_PARENT, PROV_R_UNABLE_TO_FIND_CIPHERS,
     PROV_R_UNABLE_TO_GET_PARENT_STRENGTH, PROV_R_UNABLE_TO_INITIALISE_CIPHERS,
-    PROV_R_UNABLE_TO_LOCK_PARENT, PROV_R_UNABLE_TO_RESEED, PROV_R_VALUE_ERROR,
-    PROV_R_XOF_DIGESTS_NOT_ALLOWED, RAND_R_ENTROPY_INPUT_TOO_LONG, RAND_R_ENTROPY_OUT_OF_RANGE,
+    PROV_R_UNABLE_TO_LOCK_PARENT, PROV_R_UNABLE_TO_RESEED, PROV_R_XOF_DIGESTS_NOT_ALLOWED,
+    RAND_R_ENTROPY_INPUT_TOO_LONG, RAND_R_ENTROPY_OUT_OF_RANGE,
 };
 
 use super::builtin::libctx_of;
@@ -74,8 +73,8 @@ use crate::evp::cipher_ctx::{
 };
 use crate::evp::digest::{EVP_MD_fetch, EVP_MD_free, EVP_MD_get_size, EVP_MD_get0_name};
 use crate::evp::mac::{
-    EVP_MAC_CTX_free, EVP_MAC_CTX_get0_mac, EVP_MAC_CTX_new, EVP_MAC_CTX_set_params, EVP_MAC_fetch,
-    EVP_MAC_final, EVP_MAC_free, EVP_MAC_get0_name, EVP_MAC_init, EVP_MAC_update,
+    EVP_MAC_CTX_free, EVP_MAC_CTX_get0_mac, EVP_MAC_CTX_new, EVP_MAC_fetch, EVP_MAC_final,
+    EVP_MAC_free, EVP_MAC_get0_name, EVP_MAC_init, EVP_MAC_update,
 };
 use crate::evp::md_ctx::{
     EVP_DigestFinal, EVP_DigestInit_ex, EVP_DigestUpdate, EVP_MD_CTX_free, EVP_MD_CTX_new,
@@ -88,10 +87,10 @@ use crate::evp::rand::{
 };
 use crate::ffi::ffi_callback;
 use crate::params::{
-    OSSL_PARAM_construct_uint, OSSL_PARAM_construct_utf8_string, OSSL_PARAM_get_int,
-    OSSL_PARAM_get_octet_string, OSSL_PARAM_get_size_t, OSSL_PARAM_get_time_t, OSSL_PARAM_get_uint,
-    OSSL_PARAM_get_utf8_string_ptr, OSSL_PARAM_locate, OSSL_PARAM_set_int, OSSL_PARAM_set_size_t,
-    OSSL_PARAM_set_time_t, OSSL_PARAM_set_uint, OSSL_PARAM_set_utf8_string, end,
+    OSSL_PARAM_construct_uint, OSSL_PARAM_get_int, OSSL_PARAM_get_octet_string,
+    OSSL_PARAM_get_size_t, OSSL_PARAM_get_time_t, OSSL_PARAM_get_uint, OSSL_PARAM_locate,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_size_t, OSSL_PARAM_set_time_t, OSSL_PARAM_set_uint,
+    OSSL_PARAM_set_utf8_string, end,
 };
 use crate::rand::{Pool, Seed, UserEntropy, user_entropy, user_nonce};
 use crate::secure::{CRYPTO_secure_clear_free, CRYPTO_secure_malloc};
@@ -1823,13 +1822,13 @@ fn ctr_init(d: &mut Drbg) -> bool {
     true
 }
 
-/// The query a DRBG fetches its methods with: `properties`, or `provider=default`.
-fn propquery(params: *const OSSL_PARAM) -> Result<*const c_char, ()> {
+/// The query a DRBG fetches its methods with: `properties`, or `provider=default` (also when
+/// `properties` isn't a string, which 3.5's CTR-DRBG refused).
+fn propquery(params: *const OSSL_PARAM) -> *const c_char {
     // SAFETY: the callers' guarantee: `params` is NULL or a parameter array.
     match unsafe { locate(params, OSSL_DRBG_PARAM_PROPERTIES) } {
-        Some(p) if p.data_type == OSSL_PARAM_UTF8_STRING as u32 => Ok(p.data.cast_const().cast()),
-        Some(_) => Err(()),
-        None => Ok(c"provider=default".as_ptr()),
+        Some(p) if p.data_type == OSSL_PARAM_UTF8_STRING as u32 => p.data.cast_const().cast(),
+        _ => c"provider=default".as_ptr(),
     }
 }
 
@@ -1853,9 +1852,7 @@ unsafe fn ctr_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
             cipher_init = true;
         }
     }
-    let Ok(propq) = propquery(params) else {
-        return false;
-    };
+    let propq = propquery(params);
     // SAFETY: as above.
     if let Some(p) = unsafe { locate(params, OSSL_DRBG_PARAM_CIPHER) } {
         if p.data_type != OSSL_PARAM_UTF8_STRING as u32 || p.data_size < 3 || p.data.is_null() {
@@ -1986,9 +1983,10 @@ unsafe fn hash_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
     unsafe { common_set_params(d, params) }
 }
 
-/// `drbg_fetch_algs_from_prov`: the digest and the MAC (HMAC unless `mac` says otherwise),
-/// fetched with the query, the MAC context made with the digest; false (with errors) if any
-/// part fails, which leaves no MAC context if it got that far.
+/// `drbg_fetch_algs_from_prov` (3.6): the digest, if `digest` names one, and a new MAC context,
+/// if `mac` names a MAC, fetched with the query; false if either is given but isn't a string or
+/// doesn't fetch. Unlike 3.5's, it fetches no MAC (3.5: HMAC) when `mac` is absent, makes no
+/// MAC context without a digest, and raises nothing.
 ///
 /// # Safety
 /// `params` is NULL or a parameter array.
@@ -1999,41 +1997,32 @@ unsafe fn hmac_fetch_algs(
     digest: &mut *mut EVP_MD,
     propq: *const c_char,
 ) -> bool {
-    const F: &str = "drbg_fetch_algs_from_prov";
     // SAFETY: the caller's guarantee.
-    let Some(p) = (unsafe { locate(params, OSSL_ALG_PARAM_DIGEST) }) else {
-        raise(PROV_R_INVALID_DIGEST, F);
-        return false;
-    };
-    let mut digest_name: *const c_char = ptr::null();
-    // SAFETY: a parameter of the caller's array; a local.
-    if unsafe { OSSL_PARAM_get_utf8_string_ptr(p, &raw mut digest_name) } == 0 {
-        raise(PROV_R_VALUE_ERROR, F);
-        return false;
-    }
-    // SAFETY: the library context; the parameter's string; the query.
-    let md = unsafe { EVP_MD_fetch(libctx, p.data.cast_const().cast(), propq) };
-    if md.is_null() {
-        raise(PROV_R_INVALID_DIGEST, F);
-        return false;
-    }
-    // SAFETY: the digest the caller holds, or NULL.
-    unsafe { EVP_MD_free(*digest) };
-    *digest = md;
-    let mut hmac_name: *const c_char = c"HMAC".as_ptr();
-    // SAFETY: the caller's guarantee.
-    if let Some(p) = unsafe { locate(params, OSSL_ALG_PARAM_MAC) } {
-        // SAFETY: a parameter of the caller's array; a local.
-        if unsafe { OSSL_PARAM_get_utf8_string_ptr(p, &raw mut hmac_name) } == 0 {
-            raise(PROV_R_VALUE_ERROR, F);
+    if let Some(p) = unsafe { locate(params, OSSL_ALG_PARAM_DIGEST) } {
+        if p.data_type != OSSL_PARAM_UTF8_STRING as u32 {
             return false;
         }
+        // SAFETY: the library context; the parameter's string; the query.
+        let md = unsafe { EVP_MD_fetch(libctx, p.data.cast_const().cast(), propq) };
+        if md.is_null() {
+            return false;
+        }
+        // SAFETY: the digest the caller holds, or NULL.
+        unsafe { EVP_MD_free(*digest) };
+        *digest = md;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(p) = (unsafe { locate(params, OSSL_ALG_PARAM_MAC) }) else {
+        return true;
+    };
+    if p.data_type != OSSL_PARAM_UTF8_STRING as u32 {
+        return false;
     }
     // SAFETY: the caller's context, replaced.
     unsafe { EVP_MAC_CTX_free(*macctx) };
     *macctx = ptr::null_mut();
-    // SAFETY: the library context; the name; the query.
-    let mac = unsafe { EVP_MAC_fetch(libctx, hmac_name, propq) };
+    // SAFETY: the library context; the parameter's string; the query.
+    let mac = unsafe { EVP_MAC_fetch(libctx, p.data.cast_const().cast(), propq) };
     if mac.is_null() {
         return false;
     }
@@ -2041,33 +2030,6 @@ unsafe fn hmac_fetch_algs(
     *macctx = unsafe { EVP_MAC_CTX_new(mac) };
     // SAFETY: as above; the context holds its own reference.
     unsafe { EVP_MAC_free(mac) };
-    // SAFETY: static keys; the caller's strings, which outlive the call.
-    let mac_params = [
-        unsafe {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_MAC_PARAM_DIGEST.as_ptr(),
-                digest_name.cast_mut(),
-                0,
-            )
-        },
-        // SAFETY: as above.
-        unsafe {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_MAC_PARAM_PROPERTIES.as_ptr(),
-                propq.cast_mut(),
-                0,
-            )
-        },
-        end(),
-    ];
-    // SAFETY: the new context (or NULL, which fails); the array above.
-    if unsafe { EVP_MAC_CTX_set_params(*macctx, mac_params.as_ptr()) } == 0 {
-        raise(PROV_R_INVALID_MAC, F);
-        // SAFETY: the context made here.
-        unsafe { EVP_MAC_CTX_free(*macctx) };
-        *macctx = ptr::null_mut();
-        return false;
-    }
     true
 }
 
@@ -2081,11 +2043,7 @@ unsafe fn hmac_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
     let Mech::Hmac(m) = &mut d.mech else {
         return false;
     };
-    // SAFETY: the caller's guarantee.
-    let props = match unsafe { locate(params, OSSL_DRBG_PARAM_PROPERTIES) } {
-        Some(p) if p.data_type == OSSL_PARAM_UTF8_STRING as u32 => p.data.cast_const().cast(),
-        _ => c"provider=default".as_ptr(),
-    };
+    let props = propquery(params);
     let mut prov_md: *mut EVP_MD = ptr::null_mut();
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
@@ -2096,6 +2054,19 @@ unsafe fn hmac_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
         if !prov_md.is_null() {
             m.digest.reset();
             m.digest.method = prov_md;
+        }
+        // SAFETY: the context's MAC context; the caller's array.
+        if !unsafe {
+            macctx_load(
+                &mut m.ctx,
+                params,
+                ptr::null(),
+                ptr::null(),
+                ptr::null(),
+                libctx,
+            )
+        } {
+            return false;
         }
     } else {
         // SAFETY: as above.

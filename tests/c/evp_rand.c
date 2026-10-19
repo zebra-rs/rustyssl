@@ -1564,7 +1564,7 @@ static void drbg_setup(void)
         codes();
         params[0] = OSSL_PARAM_construct_int(OSSL_DRBG_PARAM_PROPERTIES, (int *)"x");
         params[1] = OSSL_PARAM_construct_end();
-        check(EVP_RAND_CTX_set_params(ctx, params) == 0, "properties not a string");
+        check(EVP_RAND_CTX_set_params(ctx, params) == 1, "properties not a string are ignored");
         errors();
     }
     drbg_params(ctx);
@@ -1697,7 +1697,14 @@ static void drbg_states(void)
     hex("hash", out, 200);
     EVP_RAND_CTX_free(ctx);
     ctx = rand_ctx("HMAC-DRBG", t);
-    check(set_str(ctx, OSSL_DRBG_PARAM_DIGEST, "SHA512") == 1, "HMAC-DRBG under TEST-RAND");
+    check(set_str(ctx, OSSL_DRBG_PARAM_DIGEST, "SHA512") == 1
+          && EVP_RAND_instantiate(ctx, 0, 0, NULL, 0, NULL) == 0,
+          "HMAC-DRBG with a digest but no MAC doesn't instantiate");
+    errors();
+    EVP_RAND_CTX_free(ctx);
+    ctx = rand_ctx("HMAC-DRBG", t);
+    check(set_str(ctx, OSSL_DRBG_PARAM_MAC, "HMAC") == 1
+          && set_str(ctx, OSSL_DRBG_PARAM_DIGEST, "SHA512") == 1, "HMAC-DRBG under TEST-RAND");
     check(EVP_RAND_instantiate(ctx, 0, 0, NULL, 0, NULL) == 1, "instantiated");
     check(EVP_RAND_generate(ctx, out, 150, 0, 0, NULL, 0) == 1, "150 octets");
     hex("hmac", out, 150);
@@ -1757,7 +1764,8 @@ static void chains(void)
     EVP_RAND_CTX_free(child);
 
     none = rand_ctx("HMAC-DRBG", NULL);
-    check(none != NULL && set_str(none, OSSL_DRBG_PARAM_DIGEST, "SHA384") == 1
+    check(none != NULL && set_str(none, OSSL_DRBG_PARAM_MAC, "HMAC") == 1
+          && set_str(none, OSSL_DRBG_PARAM_DIGEST, "SHA384") == 1
           && EVP_RAND_instantiate(none, 192, 0, (unsigned char *)"me", 2, NULL) == 1
           && EVP_RAND_generate(none, out, 64, 192, 1, NULL, 0) == 1,
           "a DRBG without a parent seeds itself");
