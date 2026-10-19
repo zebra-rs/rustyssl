@@ -498,7 +498,11 @@ unsafe fn resolve(
         if e.is_null()
             && let Some(k) = pkey
         {
-            e = k.get().pmeth_engine();
+            let k = k.get();
+            e = k.pmeth_engine();
+            if e.is_null() {
+                e = k.engine();
+            }
         }
         if e.is_null() {
             // OpenSSL searches for an engine implementing the type first.

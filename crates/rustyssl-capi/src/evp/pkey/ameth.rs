@@ -631,6 +631,64 @@ pub(crate) fn find(mut type_: c_int) -> Option<Ref> {
     None
 }
 
+/// `EVP_PKEY_asn1_find` with `pe`: the method of `type_` (following aliases), or the method of
+/// the engine registered for the type it stands for, with that engine (a functional reference
+/// the caller lets go), if there's one.
+pub(crate) fn find_engine(type_: c_int) -> (Option<Ref>, *mut ENGINE) {
+    let mut t = type_;
+    let mut m = None;
+    for _ in 0..=count() {
+        match find_exact(t) {
+            Some(x) if x.get().is_alias() => t = x.get().base_id,
+            x => {
+                m = x;
+                break;
+            }
+        }
+    }
+    // (Miri can't run the system calls the engine search loads the configuration with.)
+    if cfg!(miri) {
+        return (m, ptr::null_mut());
+    }
+    // SAFETY: no preconditions; a functional reference, or NULL.
+    let e = unsafe { crate::engine::table::ENGINE_get_pkey_asn1_meth_engine(t) };
+    if e.is_null() {
+        return (m, e);
+    }
+    // SAFETY: an initialized engine; its method callback may run.
+    let am = unsafe { crate::engine::table::ENGINE_get_pkey_asn1_meth(e, t) };
+    // SAFETY: the engine's method, or NULL; a reference is taken.
+    (unsafe { Ref::new(am) }, e)
+}
+
+/// `EVP_PKEY_asn1_find_str` with `pe`: the method an engine registered under the PEM name
+/// `name`, with that engine (initialized: a functional reference the caller lets go), or else
+/// the built-in or application method.
+pub(crate) fn find_str_engine(name: &[u8]) -> (Option<Ref>, *mut ENGINE) {
+    if !cfg!(miri)
+        && let Ok(len) = c_int::try_from(name.len())
+    {
+        let mut e = ptr::null_mut();
+        // SAFETY: room for the engine; the name's `len` octets.
+        let am = unsafe {
+            crate::engine::table::ENGINE_pkey_asn1_find_str(&raw mut e, name.as_ptr().cast(), len)
+        };
+        if !am.is_null() {
+            // A structural reference turned into a functional one.
+            // SAFETY: the engine found; its `init` may run, with no lock held.
+            let ok = unsafe { crate::engine::ENGINE_init(e) } != 0;
+            // SAFETY: the structural reference returned.
+            unsafe { crate::engine::ENGINE_free(e) };
+            if !ok {
+                return (None, ptr::null_mut());
+            }
+            // SAFETY: the engine's method; a reference is taken.
+            return (unsafe { Ref::new(am) }, e);
+        }
+    }
+    (find_str(name), ptr::null_mut())
+}
+
 /// `EVP_PKEY_asn1_find_str`: the (non-alias) method whose PEM name is `name`, ignoring case,
 /// searching from the last method.
 pub(crate) fn find_str(name: &[u8]) -> Option<Ref> {
@@ -655,11 +713,12 @@ pub(crate) fn engine_lookup() {
     let _ = unsafe { crate::init::OPENSSL_init_crypto(flag, ptr::null()) };
 }
 
-/// `EVP_PKEY_type`: the key type `type_` stands for, `NID_undef` if none (after the engine
-/// search OpenSSL makes).
+/// `EVP_PKEY_type`: the key type `type_` stands for (by an engine's method, if one's registered
+/// for it), `NID_undef` if none.
 pub(crate) fn pkey_type(type_: c_int) -> c_int {
-    let m = find(type_);
-    engine_lookup();
+    let (m, e) = find_engine(type_);
+    // SAFETY: the search's functional reference, or NULL.
+    unsafe { crate::engine::ENGINE_finish(e) };
     m.map_or(NID_undef, |m| m.get().pkey_id)
 }
 
@@ -811,26 +870,30 @@ ffi_export! {
 
 ffi_export! {
     /// The method of the key type `type_` (an application's first), following aliases; NULL if
-    /// there's none. `*pe`, if given, is set to NULL: there are no engines.
+    /// there's none. With `pe`, an engine registered for the type gives the method instead, and
+    /// `*pe` is set to it (a functional reference the caller finishes) or NULL.
     ///
     /// # Safety
     /// `pe` is NULL or room for a pointer.
     pub unsafe extern "C" fn EVP_PKEY_asn1_find(pe: *mut *mut ENGINE, type_: c_int) -> *const EVP_PKEY_ASN1_METHOD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        let m = find(type_);
-        if !pe.is_null() {
-            engine_lookup();
+        let m = if pe.is_null() {
+            find(type_)
+        } else {
+            let (m, e) = find_engine(type_);
             // SAFETY: the caller's guarantee.
-            unsafe { pe.write(ptr::null_mut()) };
-        }
+            unsafe { pe.write(e) };
+            m
+        };
         m.map_or(ptr::null(), |m| m.as_ptr().cast_const())
     }
 }
 
 ffi_export! {
     /// The method whose PEM name is the `len` characters of `str_` (all of it for -1), ignoring
-    /// case; NULL if there's none. `*pe`, if given, is set to NULL: there are no engines.
+    /// case; NULL if there's none. With `pe`, an engine's method of that name comes first, and
+    /// `*pe` is set to its engine (a functional reference the caller finishes) or NULL.
     ///
     /// # Safety
     /// `pe` is NULL or room for a pointer; `str_` is NULL or holds `len` characters (or is a
@@ -863,7 +926,15 @@ ffi_export! {
             }
             v
         };
-        find_str(&name).map_or(ptr::null(), |m| m.as_ptr().cast_const())
+        let m = if pe.is_null() {
+            find_str(&name)
+        } else {
+            let (m, e) = find_str_engine(&name);
+            // SAFETY: the caller's guarantee.
+            unsafe { pe.write(e) };
+            m
+        };
+        m.map_or(ptr::null(), |m| m.as_ptr().cast_const())
     }
 }
 

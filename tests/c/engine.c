@@ -842,6 +842,146 @@ static void test_mac(const char *name, const char *which, const char *alg, const
     EVP_MAC_free(m);
 }
 
+/*
+ * Keys whose ASN.1 method comes from an engine (EVP_PKEY_asn1_find with an engine registered
+ * for the type), raw keys made with an engine, and CMAC keys whose cipher is an engine's.
+ */
+static EVP_PKEY_ASN1_METHOD *evp_ameth;
+static int set_privs;
+
+static int count_set_priv(EVP_PKEY *pk, const unsigned char *priv, size_t len)
+{
+    (void)pk;
+    (void)priv;
+    (void)len;
+    set_privs++;
+    return 1;
+}
+
+static int evp_asn1_meths(ENGINE *e, EVP_PKEY_ASN1_METHOD **m, const int **nids, int nid)
+{
+    static const int n[] = { NID_hmac };
+
+    (void)e;
+    if (m == NULL) {
+        *nids = n;
+        return 1;
+    }
+    *m = nid == NID_hmac ? evp_ameth : NULL;
+    return *m != NULL;
+}
+
+static void test_key_engines(ENGINE *e)
+{
+    unsigned char key[16] = { 0x5a }, ed[32] = { 0x5a }, out[64];
+    ENGINE *pe = NULL;
+    EVP_PKEY *k;
+    EVP_PKEY_CTX *p;
+    EVP_MD_CTX *md;
+    size_t n = sizeof(out);
+    char id[64];
+    int calls;
+
+    evp_ameth = EVP_PKEY_asn1_new(NID_hmac, 0, "RUSTYSSL-EVP", "an engine's method");
+    EVP_PKEY_asn1_set_set_priv_key(evp_ameth, count_set_priv);
+    check(ENGINE_set_pkey_asn1_meths(e, evp_asn1_meths) == 1
+              && ENGINE_register_pkey_asn1_meths(e) == 1,
+          "an engine's ASN.1 method registered");
+    printf("  inits %d, finishes %d\n", inits, finishes);
+    check(EVP_PKEY_asn1_find(&pe, NID_hmac) == evp_ameth && pe == e,
+          "EVP_PKEY_asn1_find gives the engine's method");
+    ENGINE_finish(pe);
+    check(EVP_PKEY_asn1_find(NULL, NID_hmac) != evp_ameth, "and without pe, the built-in one");
+    pe = NULL;
+    check(EVP_PKEY_asn1_find_str(&pe, "rustyssl-evp", -1) == evp_ameth && pe == e,
+          "EVP_PKEY_asn1_find_str by the engine's PEM name");
+    ENGINE_finish(pe);
+    printf("  EVP_PKEY_asn1_find_str(HMAC): %s, engine %s\n",
+           EVP_PKEY_asn1_find_str(&pe, "HMAC", -1) != NULL ? "found" : "none",
+           pe == NULL ? "none" : pe == e ? "the engine" : "another");
+    ENGINE_finish(pe);
+    printf("  EVP_PKEY_type(hmac) %d, inits %d, finishes %d\n", EVP_PKEY_type(NID_hmac), inits,
+           finishes);
+
+    /* The engine claims the type: the raw key takes its method. */
+    k = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, key, sizeof(key));
+    check(k != NULL, "a raw key the engine's method sets");
+    if (k != NULL) {
+        printf("  set_privs %d, engine %s, method %s\n", set_privs,
+               EVP_PKEY_get0_engine(k) == e ? "the engine" : "another",
+               EVP_PKEY_get0_asn1(k) == evp_ameth ? "the engine's" : "another");
+        ERR_clear_error();
+        p = EVP_PKEY_CTX_new(k, NULL);
+        printf("  its context: %s", p != NULL ? "made" : "not made");
+        if (p != NULL)
+            printf(", keygen_init %d", EVP_PKEY_keygen_init(p));
+        printf(", keygens %d\n", keygens);
+        errors("EVP_PKEY_CTX_new(engine key)");
+        EVP_PKEY_CTX_free(p);
+        EVP_PKEY_free(k);
+    }
+    printf("  freed: inits %d, finishes %d\n", inits, finishes);
+    ENGINE_unregister_pkey_asn1_meths(e);
+
+    /* An engine given: the built-in method, the key keeps the engine. */
+    ERR_clear_error();
+    k = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, e, key, sizeof(key));
+    printf("  a raw key made with an engine: %s\n", k != NULL ? "made" : "not made");
+    errors("EVP_PKEY_new_raw_private_key(hmac, e)");
+    if (k != NULL) {
+        printf("  set_privs %d, engine %s, method %s, inits %d\n", set_privs,
+               EVP_PKEY_get0_engine(k) == e ? "the engine" : "another",
+               EVP_PKEY_get0_asn1(k) == evp_ameth ? "the engine's" : "another", inits);
+        p = EVP_PKEY_CTX_new(k, NULL);
+        printf("  its context: %s", p != NULL ? "made" : "not made");
+        if (p != NULL)
+            printf(", keygen_init %d", EVP_PKEY_keygen_init(p));
+        printf(", keygens %d\n", keygens);
+        EVP_PKEY_CTX_free(p);
+        n = sizeof(out);
+        check(EVP_PKEY_get_raw_private_key(k, out, &n) == 1 && n == sizeof(key)
+                  && memcmp(out, key, n) == 0,
+              "its raw key");
+        EVP_PKEY_free(k);
+    }
+    printf("  freed: inits %d, finishes %d\n", inits, finishes);
+    ERR_clear_error();
+    k = EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, e, ed, sizeof(ed));
+    printf("  an Ed25519 raw key with the engine: %s\n", k != NULL ? "made" : "not made");
+    if (k != NULL) {
+        printf("  engine %s, inits %d\n", EVP_PKEY_get0_engine(k) == e ? "the engine" : "another",
+               inits);
+        n = sizeof(out);
+        check(EVP_PKEY_get_raw_public_key(k, out, &n) == 1 && n == 32, "its public key");
+        hex("Ed25519 public key", out, n);
+    }
+    errors("EVP_PKEY_new_raw_private_key(ed25519, e)");
+    EVP_PKEY_free(k);
+
+    /* A CMAC key whose cipher is the engine's. */
+    k = EVP_PKEY_new_CMAC_key(e, key, sizeof(key), EVP_aes_128_cbc());
+    check(k != NULL, "EVP_PKEY_new_CMAC_key with the engine");
+    if (k != NULL) {
+        id[0] = '\0';
+        printf("  engine param %d (%s), get0_engine %s\n",
+               EVP_PKEY_get_utf8_string_param(k, "engine", id, sizeof(id), NULL), id,
+               EVP_PKEY_get0_engine(k) == NULL ? "NULL" : "set");
+        md = EVP_MD_CTX_new();
+        calls = cipher_calls;
+        n = sizeof(out);
+        check(EVP_DigestSignInit(md, NULL, NULL, NULL, k) == 1
+                  && EVP_DigestSignUpdate(md, "abc", 3) == 1
+                  && EVP_DigestSignFinal(md, out, &n) == 1,
+              "a CMAC through the key");
+        printf("  cipher calls %d\n", cipher_calls - calls);
+        hex("the CMAC", out, n);
+        EVP_MD_CTX_free(md);
+        EVP_PKEY_free(k);
+    }
+    printf("  freed: inits %d, finishes %d\n", inits, finishes);
+    EVP_PKEY_asn1_free(evp_ameth);
+}
+
 static void test_evp(void)
 {
     ENGINE *e = app_engine("rustyssl-evp"), *bare = app_engine("rustyssl-evp-bare");
@@ -951,8 +1091,9 @@ static void test_evp(void)
     test_mac("CMAC", OSSL_MAC_PARAM_CIPHER, "AES-128-CBC", "rustyssl-evp");
     test_mac("GMAC", OSSL_MAC_PARAM_CIPHER, "AES-128-GCM", "rustyssl-evp");
     test_mac("HMAC", OSSL_MAC_PARAM_DIGEST, "SHA256", "rustyssl-no-such-engine");
+    test_key_engines(e);
     ENGINE_remove(e);
-    printf("  after the MACs: inits %d, finishes %d\n", inits, finishes);
+    printf("  after the MACs and keys: inits %d, finishes %d\n", inits, finishes);
 
     EVP_MD_CTX_free(md);
     EVP_MD_CTX_free(md2);

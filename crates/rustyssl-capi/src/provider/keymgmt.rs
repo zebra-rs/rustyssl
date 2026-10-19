@@ -153,12 +153,23 @@ pub(crate) unsafe fn mac_key_up_ref(keydata: *mut c_void) {
 
 impl MacKey {
     /// Runs `f` with the key's octets (`None` without a key), its cipher's name (NULL without
-    /// one), and its properties, holding its lock: the octets stay in place for `f`.
+    /// one), its cipher's engine's id (NULL without one), and its properties, holding its lock: the octets stay in place for `f`.
     pub(crate) fn with<R>(
         &self,
-        f: impl FnOnce(Option<&[u8]>, *const core::ffi::c_char, Option<&CStr>) -> R,
+        f: impl FnOnce(
+            Option<&[u8]>,
+            *const core::ffi::c_char,
+            *const core::ffi::c_char,
+            Option<&CStr>,
+        ) -> R,
     ) -> R {
         let d = self.lock();
+        let engine = if d.cipher.0.engine.is_null() {
+            ptr::null()
+        } else {
+            // SAFETY: the cipher's engine, held by the key.
+            unsafe { crate::engine::ENGINE_get_id(d.cipher.0.engine) }
+        };
         let cipher = d.cipher.ptr();
         let name = if cipher.is_null() {
             ptr::null()
@@ -169,6 +180,7 @@ impl MacKey {
         f(
             d.priv_key.as_ref().map(SecureBytes::as_slice),
             name,
+            engine,
             d.properties.as_deref(),
         )
     }
@@ -340,6 +352,26 @@ enum Target {
     Params(*mut OSSL_PARAM),
 }
 
+/// `ossl_param_build_set_utf8_string`: `value` as `key`, pushed to a builder or set in an
+/// array (if it has the key).
+///
+/// # Safety
+/// The target is a live builder or array; `value` is a string that outlives a builder's array.
+unsafe fn set_utf8(target: &Target, key: &CStr, value: *const core::ffi::c_char) -> bool {
+    match *target {
+        Target::Builder(b) => {
+            // SAFETY: the caller's builder and string; a static key.
+            (unsafe { OSSL_PARAM_BLD_push_utf8_string(b, key.as_ptr(), value, 0) } != 0)
+        }
+        Target::Params(p) => {
+            // SAFETY: the caller's array.
+            let p = unsafe { OSSL_PARAM_locate(p, key.as_ptr()) };
+            // SAFETY: a parameter of it; the caller's string.
+            p.is_null() || unsafe { OSSL_PARAM_set_utf8_string(p, value) } != 0
+        }
+    }
+}
+
 /// `key_to_params`: the private key and the cipher's name, to a builder or into an array. A
 /// builder keeps pointers to the key's octets until it makes its array, so the caller holds the
 /// key's lock until then.
@@ -376,21 +408,17 @@ fn key_to_params(d: &MacKeyData, target: &Target) -> bool {
     if !cipher.is_null() {
         // SAFETY: the key's fetched cipher.
         let name = unsafe { EVP_CIPHER_get0_name(cipher) };
-        let ok = match *target {
-            Target::Builder(b) => {
-                // SAFETY: a live builder; a static key; the cipher's name.
-                (unsafe {
-                    OSSL_PARAM_BLD_push_utf8_string(b, OSSL_PKEY_PARAM_CIPHER.as_ptr(), name, 0)
-                } != 0)
-            }
-            Target::Params(p) => {
-                // SAFETY: the caller's array.
-                let p = unsafe { OSSL_PARAM_locate(p, OSSL_PKEY_PARAM_CIPHER.as_ptr()) };
-                // SAFETY: a parameter of it; the name.
-                p.is_null() || unsafe { OSSL_PARAM_set_utf8_string(p, name) } != 0
-            }
-        };
-        if !ok {
+        // SAFETY: the caller's target; a static key; the cipher's name.
+        if !unsafe { set_utf8(target, OSSL_PKEY_PARAM_CIPHER, name) } {
+            return false;
+        }
+    }
+    let engine = d.cipher.0.engine;
+    if !engine.is_null() {
+        // SAFETY: the cipher's engine, held by the key.
+        let id = unsafe { crate::engine::ENGINE_get_id(engine) };
+        // SAFETY: as above; the engine's id.
+        if !unsafe { set_utf8(target, OSSL_PKEY_PARAM_ENGINE, id) } {
             return false;
         }
     }

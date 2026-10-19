@@ -166,7 +166,6 @@ OpenSSL never depends on them.
 | `PEM_ASN1_read_bio` (and `PEM_ASN1_read`) with a NULL decoding function | calls through NULL | returns NULL with `ERR_R_ASN1_LIB` after reading the block | `pem_read::null_tests::a_null_decoder_fails` |
 | The `EVP_PKEY_CTX_*` functions with a NULL context (`EVP_PKEY_CTX_dup`, `is_a`, the getters, `set_params`, `set_mac_key`, ...) | dereference NULL and crash | fail (0, NULL, or the operation's "not supported" value) | `evp::pkey_ctx::tests::null_contexts_are_refused` |
 | `EVP_PKEY_CTX_get_keygen_info` with the index equal to the count, or after generation or `EVP_PKEY_CTX_set0_keygen_info` left no array | reads past the array, or through NULL | returns 0 | `evp::pkey::tests::keygen_info_past_the_end_is_zero` |
-| An `ENGINE` given to `EVP_PKEY_new_raw_private_key`/`_public_key`, `EVP_PKEY_new_mac_key`, or `EVP_PKEY_new_CMAC_key` (`EVP_PKEY_CTX_new`, `_new_id` and `EVP_PKEY_set1_engine` use engines, as OpenSSL's) | makes a legacy key through the type's ASN.1 method, the engine recorded as the key's | fails with `ERR_R_ENGINE_LIB` (not a security deviation: a gap left from before engines existed, to close with step 9.3) | `evp::pkey::tests::engines_without_key_methods_are_refused` |
 | `EVP_PKEY_keygen`, `EVP_PKEY_paramgen`, `EVP_PKEY_generate`, `EVP_PKEY_fromdata` into a key typed by name (`EVP_PKEY_set_type_str`) | the key keeps its type when retyped, so gets no key manager, and its new data is used through the NULL key manager, which crashes | fails with `ERR_R_INTERNAL_ERROR`, leaving the key without data | `evp::pkey::tests::keys_typed_by_name_take_no_data` |
 | `EVP_SIGNATURE_up_ref`, `EVP_SIGNATURE_get0_name` and the other accessors, and `EVP_SIGNATURE_names_do_all` with a NULL algorithm | dereference NULL and crash | fail (0, NULL) | `evp::signature::tests::null_methods_are_refused` |
 | `EVP_PKEY_sign_message_update`/`_final` and `EVP_PKEY_verify_message_update`/`_final` after an init that left the operation without an algorithm (one given of another key type) | read the missing algorithm and crash | fail with -2 and `EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE`, as `EVP_PKEY_sign` does there | `evp::signature::tests::message_functions_without_an_algorithm_fail` |
@@ -353,9 +352,9 @@ OpenSSL never depends on them.
   without an async backend (`ASYNC_NULL`), which can't start a job at all (`ASYNC_NO_JOBS`);
   rustyssl runs it. Everything else matches: the thread's pool and its limits,
   `ASYNC_get_current_job`, blocked pauses, the wait contexts, and the caller's default library
-  context being restored. Nothing in rustyssl pauses (it has no engines), so `SSL_MODE_ASYNC`
-  and other job users get correct results; only code that waits in a job for an outside event,
-  such as an asynchronous hardware provider, sees the difference: its pause returns without
+  context being restored. Nothing built into rustyssl pauses, so `SSL_MODE_ASYNC` and other
+  job users get correct results; only code that waits in a job for an outside event, such as an
+  asynchronous hardware provider or an engine like dasync, sees the difference: its pause returns without
   waiting, so it polls. Test: `tests/c/async.c`.
 
 - **Arm's data-independent timing (`PSTATE.DIT`) during operations on secrets** (checked
