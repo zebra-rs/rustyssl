@@ -782,6 +782,11 @@ pub struct PrivateKey {
 impl PrivateKey {
     /// `ML-DSA.KeyGen_internal` (FIPS 204 Algorithm 6) from the seed `xi`; the key keeps it.
     pub fn generate(variant: Variant, seed: &[u8; SEED_BYTES]) -> Option<Self> {
+        crate::dit::with(|| Self::generate_dit(variant, seed))
+    }
+
+    /// [`PrivateKey::generate`]'s work.
+    fn generate_dit(variant: Variant, seed: &[u8; SEED_BYTES]) -> Option<Self> {
         let (k, l) = (
             u8::try_from(variant.k()).ok()?,
             u8::try_from(variant.l()).ok()?,
@@ -941,6 +946,11 @@ impl PrivateKey {
     /// `ML-DSA.Sign_internal` (FIPS 204 Algorithm 7) of `mu` with the randomness `rnd` (zeros
     /// for deterministic signing).
     pub fn sign(&self, mu: &[u8; MU_BYTES], rnd: &[u8; RANDOM_BYTES]) -> Option<Vec<u8>> {
+        crate::dit::with(|| self.sign_dit(mu, rnd))
+    }
+
+    /// [`PrivateKey::sign`]'s work.
+    fn sign_dit(&self, mu: &[u8; MU_BYTES], rnd: &[u8; RANDOM_BYTES]) -> Option<Vec<u8>> {
         let v = self.public.variant;
         let (k, l) = (v.k(), v.l());
         let gamma1 = v.gamma1();

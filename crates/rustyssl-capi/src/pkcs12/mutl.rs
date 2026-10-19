@@ -620,7 +620,7 @@ ffi_export! {
         // SAFETY: the digest, made with it.
         let want = unsafe { super::asn::octets(macoct) };
         let got = mac.get(..usize::try_from(maclen).unwrap_or(0)).unwrap_or(&[]);
-        c_int::from(got.len() == want.len() && bool::from(got.ct_eq(want)))
+        c_int::from(got.len() == want.len() && bool::from(crate::dit::with(|| got.ct_eq(want))))
     }
 }
 

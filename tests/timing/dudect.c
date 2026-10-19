@@ -301,22 +301,32 @@ static void x25519_ctx_run(size_t i)
     EVP_PKEY_CTX_free(d);
 }
 
-/* ---- ECDSA P-256 signing: the private key (fixed, or one of a pool of random ones). ---- */
+/* ---- ECDSA P-256 signing: the private key (fixed, or one of a pool of random ones). Both
+ * classes draw from a pool of 64 key objects, the fixed class's all copies of one key, so
+ * the key objects' cache warmth is the same for both and only the secret differs (with a
+ * single fixed object, the fixed class ran warm and showed a signal on both libraries).
+ * ---- */
 #define POOL 64
-static EVP_PKEY *pool[POOL], *fixed_key;
+static EVP_PKEY *pool[POOL], *fixed_pool[POOL];
 static EVP_PKEY *picked[BATCH];
 static unsigned char digest32[32];
 
 static int ecdsa_setup(void)
 {
+    EVP_PKEY *fixed_key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256");
     int i;
 
-    for (i = 0; i < POOL; i++)
+    if (fixed_key == NULL)
+        return 0;
+    for (i = 0; i < POOL; i++) {
         if ((pool[i] = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256")) == NULL)
             return 0;
-    fixed_key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256");
+        if ((fixed_pool[i] = EVP_PKEY_dup(fixed_key)) == NULL)
+            return 0;
+    }
+    EVP_PKEY_free(fixed_key);
     memset(digest32, 0x33, sizeof(digest32));
-    return fixed_key != NULL;
+    return 1;
 }
 
 static void ecdsa_prepare(size_t i, int c)
@@ -324,7 +334,7 @@ static void ecdsa_prepare(size_t i, int c)
     unsigned char r;
 
     random_bytes(&r, 1);
-    picked[i] = c == 0 ? fixed_key : pool[r % POOL];
+    picked[i] = c == 0 ? fixed_pool[r % POOL] : pool[r % POOL];
 }
 
 static void ecdsa_run(size_t i)

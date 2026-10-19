@@ -77,6 +77,11 @@ impl Poly1305 {
 
     /// `poly1305_setkey`: a 32-octet key (`None` for NULL).
     pub fn set_key(&mut self, key: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.set_key_dit(key))
+    }
+
+    /// [`Self::set_key`]'s work.
+    fn set_key_dit(&mut self, key: Option<&[u8]>) -> Result<(), Error> {
         let key = key.ok_or(Error::InvalidKeyLength)?;
         self.mac = Some(backend::poly1305(key).map_err(|_| Error::InvalidKeyLength)?);
         self.updated = false;
@@ -91,6 +96,11 @@ impl Poly1305 {
 
     /// `poly1305_update`.
     pub fn update(&mut self, data: &[u8]) -> Result<(), Error> {
+        crate::dit::with(|| self.update_dit(data))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, data: &[u8]) -> Result<(), Error> {
         if !self.key_set {
             return Err(Error::NoKeySet);
         }
@@ -104,6 +114,11 @@ impl Poly1305 {
 
     /// `poly1305_final`: the tag.
     pub fn finalize(&mut self) -> Result<[u8; 16], Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<[u8; 16], Error> {
         if !self.key_set {
             return Err(Error::NoKeySet);
         }
@@ -367,6 +382,11 @@ impl SipHash {
 
     /// `siphash_setkey`: a 16-octet key. False for another length.
     pub fn set_key(&mut self, key: &[u8]) -> bool {
+        crate::dit::with(|| self.set_key_dit(key))
+    }
+
+    /// [`Self::set_key`]'s work.
+    fn set_key_dit(&mut self, key: &[u8]) -> bool {
         let Ok(k) = <&[u8; 16]>::try_from(key) else {
             return false;
         };
@@ -383,6 +403,11 @@ impl SipHash {
 
     /// `siphash_update`.
     pub fn update(&mut self, data: &[u8]) {
+        crate::dit::with(|| self.update_dit(data))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, data: &[u8]) {
         if !data.is_empty() {
             self.siphash.update(data);
         }
@@ -390,6 +415,11 @@ impl SipHash {
 
     /// `siphash_final` into `out` (exactly [`SipHash::size`] octets). False if it can't.
     pub fn finalize(&self, out: &mut [u8]) -> bool {
+        crate::dit::with(|| self.finalize_dit(out))
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&self, out: &mut [u8]) -> bool {
         self.siphash.finalize(out)
     }
 }
@@ -459,6 +489,11 @@ impl Blake2Mac {
 
     /// `blake2_setkey`: 1 to the largest output's length.
     pub fn set_key(&mut self, key: &[u8]) -> Result<(), Error> {
+        crate::dit::with(|| self.set_key_dit(key))
+    }
+
+    /// [`Self::set_key`]'s work.
+    fn set_key_dit(&mut self, key: &[u8]) -> Result<(), Error> {
         if key.is_empty() || key.len() > self.algorithm.max_size() {
             return Err(Error::InvalidKeyLength);
         }
@@ -508,6 +543,11 @@ impl Blake2Mac {
 
     /// `blake2_mac_update`: nothing to do on the zeroed context.
     pub fn update(&mut self, data: &[u8]) {
+        crate::dit::with(|| self.update_dit(data))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, data: &[u8]) {
         if let Some((mac, _)) = self.ctx.as_mut() {
             // The backend refuses only after a final, which `ctx` doesn't outlive.
             let _ = mac.update(data);
@@ -517,6 +557,11 @@ impl Blake2Mac {
     /// `blake2_mac_final`: the output of the size the computation started with (none from the
     /// zeroed context), which leaves the context zeroed.
     pub fn finalize(&mut self) -> Zeroizing<Vec<u8>> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Zeroizing<Vec<u8>> {
         let Some((mut mac, n)) = self.ctx.take() else {
             return Zeroizing::new(Vec::new());
         };

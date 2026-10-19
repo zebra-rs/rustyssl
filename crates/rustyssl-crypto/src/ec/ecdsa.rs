@@ -109,9 +109,11 @@ fn order_field(order: &BigNum) -> Option<Fp> {
 /// `k^-1 mod n` by Fermat's little theorem in constant time (`ec_field_inverse_mod_ord`), for
 /// `k` of at most the order's limbs.
 pub fn inverse_mod_order(order: &BigNum, k: &BigNum) -> Option<BigNum> {
-    let f = order_field(order)?;
-    let x = f.from_bn_unreduced(k)?;
-    Some(f.to_bn(&f.inv(&x)))
+    crate::dit::with(|| {
+        let f = order_field(order)?;
+        let x = f.from_bn_unreduced(k)?;
+        Some(f.to_bn(&f.inv(&x)))
+    })
 }
 
 /// `s = kinv (m + r d) mod n`, with OpenSSL's limits on its Montgomery operands: `r`, `d`, and
@@ -123,16 +125,18 @@ pub fn sign_s(
     kinv: &BigNum,
     r: &BigNum,
 ) -> Result<BigNum, SignError> {
-    let f = order_field(order).ok_or(SignError::Bn)?;
-    let get = |v: &BigNum| f.from_bn_unreduced(&v.abs()).ok_or(SignError::Bn);
-    let (fd, fr, fk) = (get(d)?, get(r)?, get(kinv)?);
-    // The digest has at most the order's bits, so it's below 2n.
-    let fm = get(m)?;
-    let s = f.mul(&fk, &f.add(&f.mul(&fr, &fd), &fm));
-    if f.is_zero(&s) {
-        return Err(SignError::ZeroS);
-    }
-    Ok(f.to_bn(&s))
+    crate::dit::with(|| {
+        let f = order_field(order).ok_or(SignError::Bn)?;
+        let get = |v: &BigNum| f.from_bn_unreduced(&v.abs()).ok_or(SignError::Bn);
+        let (fd, fr, fk) = (get(d)?, get(r)?, get(kinv)?);
+        // The digest has at most the order's bits, so it's below 2n.
+        let fm = get(m)?;
+        let s = f.mul(&fk, &f.add(&f.mul(&fr, &fd), &fm));
+        if f.is_zero(&s) {
+            return Err(SignError::ZeroS);
+        }
+        Ok(f.to_bn(&s))
+    })
 }
 
 /// `ossl_encode_der_length`.

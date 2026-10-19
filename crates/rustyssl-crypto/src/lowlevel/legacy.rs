@@ -100,26 +100,28 @@ pub fn cbc(
     iv: &mut [u8; 8],
     enc: bool,
 ) {
-    let blocks = len.div_ceil(8);
-    for i in 0..blocks {
-        let at = i.saturating_mul(8);
-        let n = len.saturating_sub(at).min(8);
-        if enc {
-            let mut x = [0u8; 8];
-            put(
-                &mut x,
-                0,
-                input.get(at..at.saturating_add(n)).unwrap_or_default(),
-            );
-            *iv = c.encrypt(&xor8(&x, iv));
-            put(out, at, iv);
-        } else {
-            let x = block_at(input, at);
-            let p = xor8(&c.decrypt(&x), iv);
-            put(out, at, p.get(..n).unwrap_or_default());
-            *iv = x;
+    crate::dit::with(|| {
+        let blocks = len.div_ceil(8);
+        for i in 0..blocks {
+            let at = i.saturating_mul(8);
+            let n = len.saturating_sub(at).min(8);
+            if enc {
+                let mut x = [0u8; 8];
+                put(
+                    &mut x,
+                    0,
+                    input.get(at..at.saturating_add(n)).unwrap_or_default(),
+                );
+                *iv = c.encrypt(&xor8(&x, iv));
+                put(out, at, iv);
+            } else {
+                let x = block_at(input, at);
+                let p = xor8(&c.decrypt(&x), iv);
+                put(out, at, p.get(..n).unwrap_or_default());
+                *iv = x;
+            }
         }
-    }
+    })
 }
 
 /// CFB-64 by octets: `num`'s low three bits are the position in the IV, which becomes the
@@ -132,45 +134,49 @@ pub fn cfb64(
     num: &mut i32,
     enc: bool,
 ) {
-    let mut n = usize::try_from(*num & 7).unwrap_or(0);
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            *iv = c.encrypt(iv);
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num & 7).unwrap_or(0);
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                *iv = c.encrypt(iv);
+            }
+            let k = iv.get(n).copied().unwrap_or(0);
+            let (o, keep) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
+            if let Some(d) = out.get_mut(i) {
+                *d = o;
+            }
+            if let Some(v) = iv.get_mut(n) {
+                *v = keep;
+            }
+            n = n.wrapping_add(1) & 7;
         }
-        let k = iv.get(n).copied().unwrap_or(0);
-        let (o, keep) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
-        if let Some(d) = out.get_mut(i) {
-            *d = o;
-        }
-        if let Some(v) = iv.get_mut(n) {
-            *v = keep;
-        }
-        n = n.wrapping_add(1) & 7;
-    }
-    *num = i32::try_from(n).unwrap_or(0);
+        *num = i32::try_from(n).unwrap_or(0);
+    })
 }
 
 /// OFB-64 by octets: `num`'s low three bits are the position in the keystream block, which
 /// goes back into the IV only if a new one was made.
 pub fn ofb64(input: &[u8], out: &mut [u8], c: &impl Block64, iv: &mut [u8; 8], num: &mut i32) {
-    let mut n = usize::try_from(*num & 7).unwrap_or(0);
-    let mut d = *iv;
-    let mut made = false;
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            d = c.encrypt(&d);
-            made = true;
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num & 7).unwrap_or(0);
+        let mut d = *iv;
+        let mut made = false;
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                d = c.encrypt(&d);
+                made = true;
+            }
+            if let Some(o) = out.get_mut(i) {
+                *o = x ^ d.get(n).copied().unwrap_or(0);
+            }
+            n = n.wrapping_add(1) & 7;
         }
-        if let Some(o) = out.get_mut(i) {
-            *o = x ^ d.get(n).copied().unwrap_or(0);
+        if made {
+            *iv = d;
         }
-        n = n.wrapping_add(1) & 7;
-    }
-    if made {
-        *iv = d;
-    }
-    d.zeroize();
-    *num = i32::try_from(n).unwrap_or(0);
+        d.zeroize();
+        *num = i32::try_from(n).unwrap_or(0);
+    })
 }
 
 /// A block as two big-endian words.
@@ -264,31 +270,33 @@ impl Block64 for BfKey {
 /// `BF_set_key`: the key's first 72 octets (repeated as needed) into the P-array, then the
 /// array and S-boxes by encrypting zeros. An empty key is a single zero octet.
 pub fn bf_set_key(key: &[u8]) -> BfKey {
-    let key = key.get(..key.len().min(72)).unwrap_or(key);
-    let key: &[u8] = if key.is_empty() { &[0] } else { key };
-    let mut k = BfKey { p: BF_P, s: BF_S };
-    let mut bytes = key.iter().cycle();
-    for p in k.p.iter_mut() {
-        let mut ri = 0u32;
-        for _ in 0..4 {
-            ri = (ri << 8) | u32::from(bytes.next().copied().unwrap_or(0));
+    crate::dit::with(|| {
+        let key = key.get(..key.len().min(72)).unwrap_or(key);
+        let key: &[u8] = if key.is_empty() { &[0] } else { key };
+        let mut k = BfKey { p: BF_P, s: BF_S };
+        let mut bytes = key.iter().cycle();
+        for p in k.p.iter_mut() {
+            let mut ri = 0u32;
+            for _ in 0..4 {
+                ri = (ri << 8) | u32::from(bytes.next().copied().unwrap_or(0));
+            }
+            *p ^= ri;
         }
-        *p ^= ri;
-    }
-    let mut d = [0u32; 2];
-    for i in 0..9 {
-        k.encrypt_words(&mut d);
-        if let Some(pair) = k.p.as_chunks_mut::<2>().0.get_mut(i) {
-            *pair = d;
+        let mut d = [0u32; 2];
+        for i in 0..9 {
+            k.encrypt_words(&mut d);
+            if let Some(pair) = k.p.as_chunks_mut::<2>().0.get_mut(i) {
+                *pair = d;
+            }
         }
-    }
-    for i in 0..512 {
-        k.encrypt_words(&mut d);
-        if let Some(pair) = k.s.as_chunks_mut::<2>().0.get_mut(i) {
-            *pair = d;
+        for i in 0..512 {
+            k.encrypt_words(&mut d);
+            if let Some(pair) = k.s.as_chunks_mut::<2>().0.get_mut(i) {
+                *pair = d;
+            }
         }
-    }
-    k
+        k
+    })
 }
 
 /// A CAST-128 key (`CAST_KEY`): each round's masking and rotation keys, and whether the key
@@ -325,11 +333,11 @@ enum Op {
 
 impl Op {
     fn apply(self, a: u32, b: u32) -> u32 {
-        match self {
+        crate::dit::with(|| match self {
             Op::Add => a.wrapping_add(b),
             Op::Xor => a ^ b,
             Op::Sub => a.wrapping_sub(b),
-        }
+        })
     }
 }
 
@@ -409,89 +417,91 @@ fn cast_exp(l: u32, big: &mut [u32; 4], small: &mut [u8; 16], n: usize) {
 /// `CAST_set_key`: the key's first 16 octets (zero-padded); 10 or fewer make a short key.
 #[allow(clippy::many_single_char_names)]
 pub fn cast_set_key(key: &[u8]) -> CastKey {
-    let len = key.len().min(16);
-    let mut x = [0u8; 16];
-    put(&mut x, 0, key.get(..len).unwrap_or_default());
-    let mut z = [0u8; 16];
-    let mut xx = [0u32; 4];
-    let mut zz = [0u32; 4];
-    for (w, b) in xx.iter_mut().zip(x.as_chunks::<4>().0) {
-        *w = u32::from_be_bytes(*b);
-    }
-    let s4 = |i: u8| cast_s(4, u32::from(i));
-    let s5 = |i: u8| cast_s(5, u32::from(i));
-    let s6 = |i: u8| cast_s(6, u32::from(i));
-    let s7 = |i: u8| cast_s(7, u32::from(i));
-    let mut k = [0u32; 32];
-    for half in 0..2 {
-        let mut kh = [0u32; 16];
-        let l = xx[0] ^ s4(x[13]) ^ s5(x[15]) ^ s6(x[12]) ^ s7(x[14]) ^ s6(x[8]);
-        cast_exp(l, &mut zz, &mut z, 0);
-        let l = xx[2] ^ s4(z[0]) ^ s5(z[2]) ^ s6(z[1]) ^ s7(z[3]) ^ s7(x[10]);
-        cast_exp(l, &mut zz, &mut z, 4);
-        let l = xx[3] ^ s4(z[7]) ^ s5(z[6]) ^ s6(z[5]) ^ s7(z[4]) ^ s4(x[9]);
-        cast_exp(l, &mut zz, &mut z, 8);
-        let l = xx[1] ^ s4(z[10]) ^ s5(z[9]) ^ s6(z[11]) ^ s7(z[8]) ^ s5(x[11]);
-        cast_exp(l, &mut zz, &mut z, 12);
-        kh[0] = s4(z[8]) ^ s5(z[9]) ^ s6(z[7]) ^ s7(z[6]) ^ s4(z[2]);
-        kh[1] = s4(z[10]) ^ s5(z[11]) ^ s6(z[5]) ^ s7(z[4]) ^ s5(z[6]);
-        kh[2] = s4(z[12]) ^ s5(z[13]) ^ s6(z[3]) ^ s7(z[2]) ^ s6(z[9]);
-        kh[3] = s4(z[14]) ^ s5(z[15]) ^ s6(z[1]) ^ s7(z[0]) ^ s7(z[12]);
-        let l = zz[2] ^ s4(z[5]) ^ s5(z[7]) ^ s6(z[4]) ^ s7(z[6]) ^ s6(z[0]);
-        cast_exp(l, &mut xx, &mut x, 0);
-        let l = zz[0] ^ s4(x[0]) ^ s5(x[2]) ^ s6(x[1]) ^ s7(x[3]) ^ s7(z[2]);
-        cast_exp(l, &mut xx, &mut x, 4);
-        let l = zz[1] ^ s4(x[7]) ^ s5(x[6]) ^ s6(x[5]) ^ s7(x[4]) ^ s4(z[1]);
-        cast_exp(l, &mut xx, &mut x, 8);
-        let l = zz[3] ^ s4(x[10]) ^ s5(x[9]) ^ s6(x[11]) ^ s7(x[8]) ^ s5(z[3]);
-        cast_exp(l, &mut xx, &mut x, 12);
-        kh[4] = s4(x[3]) ^ s5(x[2]) ^ s6(x[12]) ^ s7(x[13]) ^ s4(x[8]);
-        kh[5] = s4(x[1]) ^ s5(x[0]) ^ s6(x[14]) ^ s7(x[15]) ^ s5(x[13]);
-        kh[6] = s4(x[7]) ^ s5(x[6]) ^ s6(x[8]) ^ s7(x[9]) ^ s6(x[3]);
-        kh[7] = s4(x[5]) ^ s5(x[4]) ^ s6(x[10]) ^ s7(x[11]) ^ s7(x[7]);
-        let l = xx[0] ^ s4(x[13]) ^ s5(x[15]) ^ s6(x[12]) ^ s7(x[14]) ^ s6(x[8]);
-        cast_exp(l, &mut zz, &mut z, 0);
-        let l = xx[2] ^ s4(z[0]) ^ s5(z[2]) ^ s6(z[1]) ^ s7(z[3]) ^ s7(x[10]);
-        cast_exp(l, &mut zz, &mut z, 4);
-        let l = xx[3] ^ s4(z[7]) ^ s5(z[6]) ^ s6(z[5]) ^ s7(z[4]) ^ s4(x[9]);
-        cast_exp(l, &mut zz, &mut z, 8);
-        let l = xx[1] ^ s4(z[10]) ^ s5(z[9]) ^ s6(z[11]) ^ s7(z[8]) ^ s5(x[11]);
-        cast_exp(l, &mut zz, &mut z, 12);
-        kh[8] = s4(z[3]) ^ s5(z[2]) ^ s6(z[12]) ^ s7(z[13]) ^ s4(z[9]);
-        kh[9] = s4(z[1]) ^ s5(z[0]) ^ s6(z[14]) ^ s7(z[15]) ^ s5(z[12]);
-        kh[10] = s4(z[7]) ^ s5(z[6]) ^ s6(z[8]) ^ s7(z[9]) ^ s6(z[2]);
-        kh[11] = s4(z[5]) ^ s5(z[4]) ^ s6(z[10]) ^ s7(z[11]) ^ s7(z[6]);
-        let l = zz[2] ^ s4(z[5]) ^ s5(z[7]) ^ s6(z[4]) ^ s7(z[6]) ^ s6(z[0]);
-        cast_exp(l, &mut xx, &mut x, 0);
-        let l = zz[0] ^ s4(x[0]) ^ s5(x[2]) ^ s6(x[1]) ^ s7(x[3]) ^ s7(z[2]);
-        cast_exp(l, &mut xx, &mut x, 4);
-        let l = zz[1] ^ s4(x[7]) ^ s5(x[6]) ^ s6(x[5]) ^ s7(x[4]) ^ s4(z[1]);
-        cast_exp(l, &mut xx, &mut x, 8);
-        let l = zz[3] ^ s4(x[10]) ^ s5(x[9]) ^ s6(x[11]) ^ s7(x[8]) ^ s5(z[3]);
-        cast_exp(l, &mut xx, &mut x, 12);
-        kh[12] = s4(x[8]) ^ s5(x[9]) ^ s6(x[7]) ^ s7(x[6]) ^ s4(x[3]);
-        kh[13] = s4(x[10]) ^ s5(x[11]) ^ s6(x[5]) ^ s7(x[4]) ^ s5(x[7]);
-        kh[14] = s4(x[12]) ^ s5(x[13]) ^ s6(x[3]) ^ s7(x[2]) ^ s6(x[8]);
-        kh[15] = s4(x[14]) ^ s5(x[15]) ^ s6(x[1]) ^ s7(x[0]) ^ s7(x[13]);
-        if let Some(dst) = k.as_chunks_mut::<16>().0.get_mut(half) {
-            *dst = kh;
+    crate::dit::with(|| {
+        let len = key.len().min(16);
+        let mut x = [0u8; 16];
+        put(&mut x, 0, key.get(..len).unwrap_or_default());
+        let mut z = [0u8; 16];
+        let mut xx = [0u32; 4];
+        let mut zz = [0u32; 4];
+        for (w, b) in xx.iter_mut().zip(x.as_chunks::<4>().0) {
+            *w = u32::from_be_bytes(*b);
         }
-        kh.zeroize();
-    }
-    let mut out = CastKey {
-        data: [0; 32],
-        short_key: len <= 10,
-    };
-    let (km, kr) = k.split_at(16);
-    for ((pair, m), r) in out.data.as_chunks_mut::<2>().0.iter_mut().zip(km).zip(kr) {
-        *pair = [*m, r.wrapping_add(16) & 0x1f];
-    }
-    x.zeroize();
-    z.zeroize();
-    xx.zeroize();
-    zz.zeroize();
-    k.zeroize();
-    out
+        let s4 = |i: u8| cast_s(4, u32::from(i));
+        let s5 = |i: u8| cast_s(5, u32::from(i));
+        let s6 = |i: u8| cast_s(6, u32::from(i));
+        let s7 = |i: u8| cast_s(7, u32::from(i));
+        let mut k = [0u32; 32];
+        for half in 0..2 {
+            let mut kh = [0u32; 16];
+            let l = xx[0] ^ s4(x[13]) ^ s5(x[15]) ^ s6(x[12]) ^ s7(x[14]) ^ s6(x[8]);
+            cast_exp(l, &mut zz, &mut z, 0);
+            let l = xx[2] ^ s4(z[0]) ^ s5(z[2]) ^ s6(z[1]) ^ s7(z[3]) ^ s7(x[10]);
+            cast_exp(l, &mut zz, &mut z, 4);
+            let l = xx[3] ^ s4(z[7]) ^ s5(z[6]) ^ s6(z[5]) ^ s7(z[4]) ^ s4(x[9]);
+            cast_exp(l, &mut zz, &mut z, 8);
+            let l = xx[1] ^ s4(z[10]) ^ s5(z[9]) ^ s6(z[11]) ^ s7(z[8]) ^ s5(x[11]);
+            cast_exp(l, &mut zz, &mut z, 12);
+            kh[0] = s4(z[8]) ^ s5(z[9]) ^ s6(z[7]) ^ s7(z[6]) ^ s4(z[2]);
+            kh[1] = s4(z[10]) ^ s5(z[11]) ^ s6(z[5]) ^ s7(z[4]) ^ s5(z[6]);
+            kh[2] = s4(z[12]) ^ s5(z[13]) ^ s6(z[3]) ^ s7(z[2]) ^ s6(z[9]);
+            kh[3] = s4(z[14]) ^ s5(z[15]) ^ s6(z[1]) ^ s7(z[0]) ^ s7(z[12]);
+            let l = zz[2] ^ s4(z[5]) ^ s5(z[7]) ^ s6(z[4]) ^ s7(z[6]) ^ s6(z[0]);
+            cast_exp(l, &mut xx, &mut x, 0);
+            let l = zz[0] ^ s4(x[0]) ^ s5(x[2]) ^ s6(x[1]) ^ s7(x[3]) ^ s7(z[2]);
+            cast_exp(l, &mut xx, &mut x, 4);
+            let l = zz[1] ^ s4(x[7]) ^ s5(x[6]) ^ s6(x[5]) ^ s7(x[4]) ^ s4(z[1]);
+            cast_exp(l, &mut xx, &mut x, 8);
+            let l = zz[3] ^ s4(x[10]) ^ s5(x[9]) ^ s6(x[11]) ^ s7(x[8]) ^ s5(z[3]);
+            cast_exp(l, &mut xx, &mut x, 12);
+            kh[4] = s4(x[3]) ^ s5(x[2]) ^ s6(x[12]) ^ s7(x[13]) ^ s4(x[8]);
+            kh[5] = s4(x[1]) ^ s5(x[0]) ^ s6(x[14]) ^ s7(x[15]) ^ s5(x[13]);
+            kh[6] = s4(x[7]) ^ s5(x[6]) ^ s6(x[8]) ^ s7(x[9]) ^ s6(x[3]);
+            kh[7] = s4(x[5]) ^ s5(x[4]) ^ s6(x[10]) ^ s7(x[11]) ^ s7(x[7]);
+            let l = xx[0] ^ s4(x[13]) ^ s5(x[15]) ^ s6(x[12]) ^ s7(x[14]) ^ s6(x[8]);
+            cast_exp(l, &mut zz, &mut z, 0);
+            let l = xx[2] ^ s4(z[0]) ^ s5(z[2]) ^ s6(z[1]) ^ s7(z[3]) ^ s7(x[10]);
+            cast_exp(l, &mut zz, &mut z, 4);
+            let l = xx[3] ^ s4(z[7]) ^ s5(z[6]) ^ s6(z[5]) ^ s7(z[4]) ^ s4(x[9]);
+            cast_exp(l, &mut zz, &mut z, 8);
+            let l = xx[1] ^ s4(z[10]) ^ s5(z[9]) ^ s6(z[11]) ^ s7(z[8]) ^ s5(x[11]);
+            cast_exp(l, &mut zz, &mut z, 12);
+            kh[8] = s4(z[3]) ^ s5(z[2]) ^ s6(z[12]) ^ s7(z[13]) ^ s4(z[9]);
+            kh[9] = s4(z[1]) ^ s5(z[0]) ^ s6(z[14]) ^ s7(z[15]) ^ s5(z[12]);
+            kh[10] = s4(z[7]) ^ s5(z[6]) ^ s6(z[8]) ^ s7(z[9]) ^ s6(z[2]);
+            kh[11] = s4(z[5]) ^ s5(z[4]) ^ s6(z[10]) ^ s7(z[11]) ^ s7(z[6]);
+            let l = zz[2] ^ s4(z[5]) ^ s5(z[7]) ^ s6(z[4]) ^ s7(z[6]) ^ s6(z[0]);
+            cast_exp(l, &mut xx, &mut x, 0);
+            let l = zz[0] ^ s4(x[0]) ^ s5(x[2]) ^ s6(x[1]) ^ s7(x[3]) ^ s7(z[2]);
+            cast_exp(l, &mut xx, &mut x, 4);
+            let l = zz[1] ^ s4(x[7]) ^ s5(x[6]) ^ s6(x[5]) ^ s7(x[4]) ^ s4(z[1]);
+            cast_exp(l, &mut xx, &mut x, 8);
+            let l = zz[3] ^ s4(x[10]) ^ s5(x[9]) ^ s6(x[11]) ^ s7(x[8]) ^ s5(z[3]);
+            cast_exp(l, &mut xx, &mut x, 12);
+            kh[12] = s4(x[8]) ^ s5(x[9]) ^ s6(x[7]) ^ s7(x[6]) ^ s4(x[3]);
+            kh[13] = s4(x[10]) ^ s5(x[11]) ^ s6(x[5]) ^ s7(x[4]) ^ s5(x[7]);
+            kh[14] = s4(x[12]) ^ s5(x[13]) ^ s6(x[3]) ^ s7(x[2]) ^ s6(x[8]);
+            kh[15] = s4(x[14]) ^ s5(x[15]) ^ s6(x[1]) ^ s7(x[0]) ^ s7(x[13]);
+            if let Some(dst) = k.as_chunks_mut::<16>().0.get_mut(half) {
+                *dst = kh;
+            }
+            kh.zeroize();
+        }
+        let mut out = CastKey {
+            data: [0; 32],
+            short_key: len <= 10,
+        };
+        let (km, kr) = k.split_at(16);
+        for ((pair, m), r) in out.data.as_chunks_mut::<2>().0.iter_mut().zip(km).zip(kr) {
+            *pair = [*m, r.wrapping_add(16) & 0x1f];
+        }
+        x.zeroize();
+        z.zeroize();
+        xx.zeroize();
+        zz.zeroize();
+        k.zeroize();
+        out
+    })
 }
 
 /// An RC2 key (`RC2_KEY`): 64 16-bit words.
@@ -508,39 +518,41 @@ impl Drop for Rc2Key {
 /// effective bits (1 to 1024; 0 or less, or more, is 1024). An empty key expands from a last
 /// octet of 0.
 pub fn rc2_set_key(key: &[u8], bits: i32) -> Rc2Key {
-    let len = key.len().min(128);
-    let bits = if bits <= 0 || bits > 1024 { 1024 } else { bits };
-    let mut k = [0u8; 128];
-    put(&mut k, 0, key.get(..len).unwrap_or_default());
-    let mut d = key.get(len.wrapping_sub(1)).copied().unwrap_or(0);
-    let at = |k: &[u8; 128], i: usize| k.get(i).copied().unwrap_or(0);
-    for (j, i) in (len..128).enumerate() {
-        let idx = usize::from(at(&k, j).wrapping_add(d));
-        d = ct_get8(&RC2_PITABLE, idx);
+    crate::dit::with(|| {
+        let len = key.len().min(128);
+        let bits = if bits <= 0 || bits > 1024 { 1024 } else { bits };
+        let mut k = [0u8; 128];
+        put(&mut k, 0, key.get(..len).unwrap_or_default());
+        let mut d = key.get(len.wrapping_sub(1)).copied().unwrap_or(0);
+        let at = |k: &[u8; 128], i: usize| k.get(i).copied().unwrap_or(0);
+        for (j, i) in (len..128).enumerate() {
+            let idx = usize::from(at(&k, j).wrapping_add(d));
+            d = ct_get8(&RC2_PITABLE, idx);
+            if let Some(b) = k.get_mut(i) {
+                *b = d;
+            }
+        }
+        let j = usize::try_from(bits.saturating_add(7) >> 3).unwrap_or(128);
+        let mut i = 128usize.saturating_sub(j);
+        let c = 0xffu8 >> (bits.wrapping_neg() & 7);
+        d = ct_get8(&RC2_PITABLE, usize::from(at(&k, i) & c));
         if let Some(b) = k.get_mut(i) {
             *b = d;
         }
-    }
-    let j = usize::try_from(bits.saturating_add(7) >> 3).unwrap_or(128);
-    let mut i = 128usize.saturating_sub(j);
-    let c = 0xffu8 >> (bits.wrapping_neg() & 7);
-    d = ct_get8(&RC2_PITABLE, usize::from(at(&k, i) & c));
-    if let Some(b) = k.get_mut(i) {
-        *b = d;
-    }
-    while i > 0 {
-        i = i.saturating_sub(1);
-        d = ct_get8(&RC2_PITABLE, usize::from(at(&k, i.saturating_add(j)) ^ d));
-        if let Some(b) = k.get_mut(i) {
-            *b = d;
+        while i > 0 {
+            i = i.saturating_sub(1);
+            d = ct_get8(&RC2_PITABLE, usize::from(at(&k, i.saturating_add(j)) ^ d));
+            if let Some(b) = k.get_mut(i) {
+                *b = d;
+            }
         }
-    }
-    let mut out = Rc2Key([0; 64]);
-    for (w, b) in out.0.iter_mut().zip(k.as_chunks::<2>().0) {
-        *w = u32::from(b[0]) | (u32::from(b[1]) << 8);
-    }
-    k.zeroize();
-    out
+        let mut out = Rc2Key([0; 64]);
+        for (w, b) in out.0.iter_mut().zip(k.as_chunks::<2>().0) {
+            *w = u32::from(b[0]) | (u32::from(b[1]) << 8);
+        }
+        k.zeroize();
+        out
+    })
 }
 
 impl Rc2Key {
@@ -693,57 +705,61 @@ impl Drop for Rc4 {
 
 /// `RC4_set_key`: the key schedule over `key` (not empty).
 pub fn rc4_set_key(key: &[u8]) -> Rc4 {
-    let mut s = Rc4 {
-        x: 0,
-        y: 0,
-        data: core::array::from_fn(|i| u32::try_from(i).unwrap_or(0)),
-    };
-    let mut id2 = 0usize;
-    let mut kb = key.iter().cycle();
-    for n in 0..256usize {
-        let tmp = s.data.get(n).copied().unwrap_or(0);
-        let kv = u32::from(kb.next().copied().unwrap_or(0));
-        id2 = usize::try_from(
-            kv.wrapping_add(tmp)
-                .wrapping_add(u32::try_from(id2).unwrap_or(0))
-                & 0xff,
-        )
-        .unwrap_or(0);
-        let other = ct_get(&s.data, id2);
-        if let Some(d) = s.data.get_mut(n) {
-            *d = other;
+    crate::dit::with(|| {
+        let mut s = Rc4 {
+            x: 0,
+            y: 0,
+            data: core::array::from_fn(|i| u32::try_from(i).unwrap_or(0)),
+        };
+        let mut id2 = 0usize;
+        let mut kb = key.iter().cycle();
+        for n in 0..256usize {
+            let tmp = s.data.get(n).copied().unwrap_or(0);
+            let kv = u32::from(kb.next().copied().unwrap_or(0));
+            id2 = usize::try_from(
+                kv.wrapping_add(tmp)
+                    .wrapping_add(u32::try_from(id2).unwrap_or(0))
+                    & 0xff,
+            )
+            .unwrap_or(0);
+            let other = ct_get(&s.data, id2);
+            if let Some(d) = s.data.get_mut(n) {
+                *d = other;
+            }
+            ct_set(&mut s.data, id2, tmp);
         }
-        ct_set(&mut s.data, id2, tmp);
-    }
-    s
+        s
+    })
 }
 
 impl Rc4 {
     /// `RC4`: the keystream XORed into `input`.
     pub fn apply(&mut self, input: &[u8], out: &mut [u8]) {
-        let mut x = self.x;
-        let mut y = self.y;
-        for (i, b) in input.iter().enumerate() {
-            x = x.wrapping_add(1) & 0xff;
-            let xi = usize::try_from(x).unwrap_or(0);
-            let tx = self.data.get(xi).copied().unwrap_or(0);
-            y = tx.wrapping_add(y) & 0xff;
-            let yi = usize::try_from(y).unwrap_or(0);
-            let ty = ct_get(&self.data, yi);
-            if let Some(d) = self.data.get_mut(xi) {
-                *d = ty;
+        crate::dit::with(|| {
+            let mut x = self.x;
+            let mut y = self.y;
+            for (i, b) in input.iter().enumerate() {
+                x = x.wrapping_add(1) & 0xff;
+                let xi = usize::try_from(x).unwrap_or(0);
+                let tx = self.data.get(xi).copied().unwrap_or(0);
+                y = tx.wrapping_add(y) & 0xff;
+                let yi = usize::try_from(y).unwrap_or(0);
+                let ty = ct_get(&self.data, yi);
+                if let Some(d) = self.data.get_mut(xi) {
+                    *d = ty;
+                }
+                ct_set(&mut self.data, yi, tx);
+                let k = ct_get(
+                    &self.data,
+                    usize::try_from(tx.wrapping_add(ty) & 0xff).unwrap_or(0),
+                );
+                if let Some(o) = out.get_mut(i) {
+                    *o = b ^ k.to_le_bytes()[0];
+                }
             }
-            ct_set(&mut self.data, yi, tx);
-            let k = ct_get(
-                &self.data,
-                usize::try_from(tx.wrapping_add(ty) & 0xff).unwrap_or(0),
-            );
-            if let Some(o) = out.get_mut(i) {
-                *o = b ^ k.to_le_bytes()[0];
-            }
-        }
-        self.x = x;
-        self.y = y;
+            self.x = x;
+            self.y = y;
+        })
     }
 }
 

@@ -280,7 +280,7 @@ unsafe fn open(cbs: &Callbacks, s: *mut SSL, cx: &Contexts, hmac: Hmac, ticket: 
         return fatal;
     };
     // `CRYPTO_memcmp`: in constant time.
-    if want.len() != mlen || !bool::from(want.as_slice().ct_eq(tag)) {
+    if want.len() != mlen || !bool::from(crate::dit::with(|| want.as_slice().ct_eq(tag))) {
         return no_decrypt;
     }
     let Some(enc) = signed.get(header..) else {

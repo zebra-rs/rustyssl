@@ -113,11 +113,13 @@ pub fn hkdf_extract(
     ikm: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    if out.len() != digest_size(digest)? {
-        return Err(Error::OutputLength);
-    }
-    let m = mac::hmac(digest, salt)?;
-    mac_of(&*m, &[ikm], out)
+    crate::dit::with(|| {
+        if out.len() != digest_size(digest)? {
+            return Err(Error::OutputLength);
+        }
+        let m = mac::hmac(digest, salt)?;
+        mac_of(&*m, &[ikm], out)
+    })
 }
 
 /// HKDF-Expand: T(i) = HMAC(PRK, T(i - 1) || info || i), at most 255 blocks.
@@ -127,18 +129,20 @@ pub fn hkdf_expand(
     info: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    if out.len().div_ceil(size) > 255 {
-        return Err(Error::OutputLength);
-    }
-    let m = mac::hmac(digest, prk)?;
-    let mut prev = Zeroizing::new(Vec::with_capacity(size));
-    by_blocks(out, size, |i, buf| {
-        let counter = u8::try_from(i).map_err(|_| Error::OutputLength)?;
-        mac_of(&*m, &[&prev, info, &[counter]], buf)?;
-        prev.clear();
-        prev.extend_from_slice(buf);
-        Ok(())
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        if out.len().div_ceil(size) > 255 {
+            return Err(Error::OutputLength);
+        }
+        let m = mac::hmac(digest, prk)?;
+        let mut prev = Zeroizing::new(Vec::with_capacity(size));
+        by_blocks(out, size, |i, buf| {
+            let counter = u8::try_from(i).map_err(|_| Error::OutputLength)?;
+            mac_of(&*m, &[&prev, info, &[counter]], buf)?;
+            prev.clear();
+            prev.extend_from_slice(buf);
+            Ok(())
+        })
     })
 }
 
@@ -150,9 +154,11 @@ pub fn hkdf(
     info: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let mut prk = Zeroizing::new(vec![0u8; digest_size(digest)?]);
-    hkdf_extract(digest, salt, ikm, &mut prk)?;
-    hkdf_expand(digest, &prk, info, out)
+    crate::dit::with(|| {
+        let mut prk = Zeroizing::new(vec![0u8; digest_size(digest)?]);
+        hkdf_extract(digest, salt, ikm, &mut prk)?;
+        hkdf_expand(digest, &prk, info, out)
+    })
 }
 
 /// TLS 1.3's HKDF-Expand-Label: HKDF-Expand with the `HkdfLabel` structure (the output
@@ -166,21 +172,23 @@ pub fn tls13_expand(
     data: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let out_len = u16::try_from(out.len()).map_err(|_| Error::OutputLength)?;
-    let label_len = prefix
-        .len()
-        .checked_add(label.len())
-        .and_then(|n| u8::try_from(n).ok())
-        .ok_or(Error::InputLength)?;
-    let data_len = u8::try_from(data.len()).map_err(|_| Error::InputLength)?;
-    let mut info = Vec::with_capacity(514);
-    info.extend_from_slice(&out_len.to_be_bytes());
-    info.push(label_len);
-    info.extend_from_slice(prefix);
-    info.extend_from_slice(label);
-    info.push(data_len);
-    info.extend_from_slice(data);
-    hkdf_expand(digest, secret, &info, out)
+    crate::dit::with(|| {
+        let out_len = u16::try_from(out.len()).map_err(|_| Error::OutputLength)?;
+        let label_len = prefix
+            .len()
+            .checked_add(label.len())
+            .and_then(|n| u8::try_from(n).ok())
+            .ok_or(Error::InputLength)?;
+        let data_len = u8::try_from(data.len()).map_err(|_| Error::InputLength)?;
+        let mut info = Vec::with_capacity(514);
+        info.extend_from_slice(&out_len.to_be_bytes());
+        info.push(label_len);
+        info.extend_from_slice(prefix);
+        info.extend_from_slice(label);
+        info.push(data_len);
+        info.extend_from_slice(data);
+        hkdf_expand(digest, secret, &info, out)
+    })
 }
 
 /// TLS 1.3's secret derivation (OpenSSL's TLS13-KDF in extract mode): HKDF-Extract of
@@ -194,19 +202,21 @@ pub fn tls13_extract(
     label: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    let zeros = vec![0u8; size];
-    let salt = match previous {
-        None => Zeroizing::new(zeros.clone()),
-        Some(previous) => {
-            let mut empty_hash = vec![0u8; size];
-            hash(digest, &[], &mut empty_hash)?;
-            let mut salt = Zeroizing::new(vec![0u8; size]);
-            tls13_expand(digest, previous, prefix, label, &empty_hash, &mut salt)?;
-            salt
-        }
-    };
-    hkdf_extract(digest, &salt, secret.unwrap_or(&zeros), out)
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        let zeros = vec![0u8; size];
+        let salt = match previous {
+            None => Zeroizing::new(zeros.clone()),
+            Some(previous) => {
+                let mut empty_hash = vec![0u8; size];
+                hash(digest, &[], &mut empty_hash)?;
+                let mut salt = Zeroizing::new(vec![0u8; size]);
+                tls13_expand(digest, previous, prefix, label, &empty_hash, &mut salt)?;
+                salt
+            }
+        };
+        hkdf_extract(digest, &salt, secret.unwrap_or(&zeros), out)
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -221,18 +231,20 @@ pub fn pbkdf1(
     iterations: u64,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    if out.len() > size {
-        return Err(Error::OutputLength);
-    }
-    let mut t = Zeroizing::new(vec![0u8; size]);
-    hash(digest, &[password, salt], &mut t)?;
-    for _ in 1..iterations {
-        let prev = t.clone();
-        hash(digest, &[&prev], &mut t)?;
-    }
-    out.copy_from_slice(t.get(..out.len()).ok_or(Error::OutputLength)?);
-    Ok(())
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        if out.len() > size {
+            return Err(Error::OutputLength);
+        }
+        let mut t = Zeroizing::new(vec![0u8; size]);
+        hash(digest, &[password, salt], &mut t)?;
+        for _ in 1..iterations {
+            let prev = t.clone();
+            hash(digest, &[&prev], &mut t)?;
+        }
+        out.copy_from_slice(t.get(..out.len()).ok_or(Error::OutputLength)?);
+        Ok(())
+    })
 }
 
 /// PBKDF2 with HMAC over `digest`. Zero iterations count as one.
@@ -243,21 +255,23 @@ pub fn pbkdf2(
     iterations: u64,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    if out.len().checked_div(size).ok_or(Error::Digest)? >= 0xffff_ffff {
-        return Err(Error::OutputLength);
-    }
-    let m = mac::hmac(digest, password)?;
-    let mut u = Zeroizing::new(vec![0u8; size]);
-    by_blocks(out, size, |i, t| {
-        mac_of(&*m, &[salt, &i.to_be_bytes()], &mut u)?;
-        t.copy_from_slice(&u);
-        for _ in 1..iterations {
-            let prev = u.clone();
-            mac_of(&*m, &[&prev], &mut u)?;
-            t.iter_mut().zip(u.iter()).for_each(|(t, &u)| *t ^= u);
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        if out.len().checked_div(size).ok_or(Error::Digest)? >= 0xffff_ffff {
+            return Err(Error::OutputLength);
         }
-        Ok(())
+        let m = mac::hmac(digest, password)?;
+        let mut u = Zeroizing::new(vec![0u8; size]);
+        by_blocks(out, size, |i, t| {
+            mac_of(&*m, &[salt, &i.to_be_bytes()], &mut u)?;
+            t.copy_from_slice(&u);
+            for _ in 1..iterations {
+                let prev = u.clone();
+                mac_of(&*m, &[&prev], &mut u)?;
+                t.iter_mut().zip(u.iter()).for_each(|(t, &u)| *t ^= u);
+            }
+            Ok(())
+        })
     })
 }
 
@@ -280,43 +294,45 @@ pub fn pkcs12(
     iterations: u64,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let u = digest_size(digest)?;
-    let v = digest.block_size();
-    if v == 0 {
-        return Err(Error::Digest);
-    }
-    let fill = |n: usize| n.div_ceil(v).checked_mul(v).ok_or(Error::InputLength);
-    let d = vec![id; v];
-    let mut i: Zeroizing<Vec<u8>> = Zeroizing::new(
-        repeat(salt, fill(salt.len())?)
-            .chain(repeat(password, fill(password.len())?))
-            .collect(),
-    );
-    let mut a = Zeroizing::new(vec![0u8; u]);
-    let mut b = Zeroizing::new(vec![0u8; v]);
-    let mut chunks = out.chunks_mut(u).peekable();
-    while let Some(chunk) = chunks.next() {
-        hash(digest, &[&d, &i], &mut a)?;
-        for _ in 1..iterations {
-            let prev = a.clone();
-            hash(digest, &[&prev], &mut a)?;
+    crate::dit::with(|| {
+        let u = digest_size(digest)?;
+        let v = digest.block_size();
+        if v == 0 {
+            return Err(Error::Digest);
         }
-        chunk.copy_from_slice(a.get(..chunk.len()).ok_or(Error::OutputLength)?);
-        if chunks.peek().is_none() {
-            break;
-        }
-        // I_j = (I_j + B + 1) mod 2^(8v), for each v-octet block of I.
-        b.iter_mut().zip(repeat(&a, v)).for_each(|(b, a)| *b = a);
-        for block in i.chunks_mut(v) {
-            let mut carry = 1u16;
-            for (x, &y) in block.iter_mut().rev().zip(b.iter().rev()) {
-                let sum = carry.wrapping_add(u16::from(*x)).wrapping_add(u16::from(y));
-                *x = sum.to_le_bytes()[0];
-                carry = sum >> 8;
+        let fill = |n: usize| n.div_ceil(v).checked_mul(v).ok_or(Error::InputLength);
+        let d = vec![id; v];
+        let mut i: Zeroizing<Vec<u8>> = Zeroizing::new(
+            repeat(salt, fill(salt.len())?)
+                .chain(repeat(password, fill(password.len())?))
+                .collect(),
+        );
+        let mut a = Zeroizing::new(vec![0u8; u]);
+        let mut b = Zeroizing::new(vec![0u8; v]);
+        let mut chunks = out.chunks_mut(u).peekable();
+        while let Some(chunk) = chunks.next() {
+            hash(digest, &[&d, &i], &mut a)?;
+            for _ in 1..iterations {
+                let prev = a.clone();
+                hash(digest, &[&prev], &mut a)?;
+            }
+            chunk.copy_from_slice(a.get(..chunk.len()).ok_or(Error::OutputLength)?);
+            if chunks.peek().is_none() {
+                break;
+            }
+            // I_j = (I_j + B + 1) mod 2^(8v), for each v-octet block of I.
+            b.iter_mut().zip(repeat(&a, v)).for_each(|(b, a)| *b = a);
+            for block in i.chunks_mut(v) {
+                let mut carry = 1u16;
+                for (x, &y) in block.iter_mut().rev().zip(b.iter().rev()) {
+                    let sum = carry.wrapping_add(u16::from(*x)).wrapping_add(u16::from(y));
+                    *x = sum.to_le_bytes()[0];
+                    carry = sum >> 8;
+                }
             }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// PVK's KDF (Microsoft's private-key blobs): Hash(salt || password) into the first digest's
@@ -327,9 +343,11 @@ pub fn pvk(
     password: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    let head = out.get_mut(..size).ok_or(Error::OutputLength)?;
-    hash(digest, &[salt, password], head)
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        let head = out.get_mut(..size).ok_or(Error::OutputLength)?;
+        hash(digest, &[salt, password], head)
+    })
 }
 
 /// `EVP_BytesToKey`: D_i = Hash^count(D_(i-1) || data || salt), filling `key` then `iv`.
@@ -342,23 +360,25 @@ pub fn bytes_to_key(
     key: &mut [u8],
     iv: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    let mut d = Zeroizing::new(Vec::new());
-    let mut outputs = key.iter_mut().chain(iv.iter_mut()).peekable();
-    while outputs.peek().is_some() {
-        let mut next = Zeroizing::new(vec![0u8; size]);
-        hash(digest, &[&d, data, salt.unwrap_or(&[])], &mut next)?;
-        for _ in 1..count {
-            let prev = next.clone();
-            hash(digest, &[&prev], &mut next)?;
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        let mut d = Zeroizing::new(Vec::new());
+        let mut outputs = key.iter_mut().chain(iv.iter_mut()).peekable();
+        while outputs.peek().is_some() {
+            let mut next = Zeroizing::new(vec![0u8; size]);
+            hash(digest, &[&d, data, salt.unwrap_or(&[])], &mut next)?;
+            for _ in 1..count {
+                let prev = next.clone();
+                hash(digest, &[&prev], &mut next)?;
+            }
+            // The digest's octets drive the zip, so no output is taken past them.
+            for (&b, o) in next.iter().zip(outputs.by_ref()) {
+                *o = b;
+            }
+            d = next;
         }
-        // The digest's octets drive the zip, so no output is taken past them.
-        for (&b, o) in next.iter().zip(outputs.by_ref()) {
-            *o = b;
-        }
-        d = next;
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -382,29 +402,35 @@ pub fn sskdf_hash(
     info: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    check_one_step(&[z, info], out)?;
-    by_blocks(out, digest_size(digest)?, |i, buf| {
-        hash(digest, &[&i.to_be_bytes(), z, info], buf)
+    crate::dit::with(|| {
+        check_one_step(&[z, info], out)?;
+        by_blocks(out, digest_size(digest)?, |i, buf| {
+            hash(digest, &[&i.to_be_bytes(), z, info], buf)
+        })
     })
 }
 
 /// X9.63's KDF: Hash(z || counter || info) for counters from 1.
 pub fn x963(digest: md::Algorithm, z: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), Error> {
-    check_one_step(&[z, info], out)?;
-    by_blocks(out, digest_size(digest)?, |i, buf| {
-        hash(digest, &[z, &i.to_be_bytes(), info], buf)
+    crate::dit::with(|| {
+        check_one_step(&[z, info], out)?;
+        by_blocks(out, digest_size(digest)?, |i, buf| {
+            hash(digest, &[z, &i.to_be_bytes(), info], buf)
+        })
     })
 }
 
 /// SSKDF with a MAC (HMAC or KMAC), already keyed with the salt and sized:
 /// MAC(counter || z || info) for counters from 1.
 pub fn sskdf_mac(mac: &dyn mac::Mac, z: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), Error> {
-    check_one_step(&[z, info], out)?;
-    if mac.size() == 0 {
-        return Err(Error::Mac(mac::Error::OutputSize));
-    }
-    by_blocks(out, mac.size(), |i, buf| {
-        mac_of(mac, &[&i.to_be_bytes(), z, info], buf)
+    crate::dit::with(|| {
+        check_one_step(&[z, info], out)?;
+        if mac.size() == 0 {
+            return Err(Error::Mac(mac::Error::OutputSize));
+        }
+        by_blocks(out, mac.size(), |i, buf| {
+            mac_of(mac, &[&i.to_be_bytes(), z, info], buf)
+        })
     })
 }
 
@@ -496,16 +522,18 @@ pub fn x942(
     info: &X942Info<'_>,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    let (mut other, at) = x942_other_info(info)?;
-    check_one_step(&[z, &other], out)?;
-    by_blocks(out, size, |i, buf| {
-        other
-            .get_mut(at..)
-            .and_then(|c| c.get_mut(..4))
-            .ok_or(Error::Parameter)?
-            .copy_from_slice(&i.to_be_bytes());
-        hash(digest, &[z, &other], buf)
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        let (mut other, at) = x942_other_info(info)?;
+        check_one_step(&[z, &other], out)?;
+        by_blocks(out, size, |i, buf| {
+            other
+                .get_mut(at..)
+                .and_then(|c| c.get_mut(..4))
+                .ok_or(Error::Parameter)?
+                .copy_from_slice(&i.to_be_bytes());
+            hash(digest, &[z, &other], buf)
+        })
     })
 }
 
@@ -535,53 +563,55 @@ pub fn kbkdf(
     use_l: bool,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    if !matches!(counter_bits, 8 | 16 | 24 | 32) {
-        return Err(Error::Parameter);
-    }
-    if out.is_empty() {
-        return Err(Error::OutputLength);
-    }
-    let h = mac.size();
-    if h == 0 {
-        return Err(Error::Mac(mac::Error::OutputSize));
-    }
-    let counter_len = usize::try_from(counter_bits / 8).map_err(|_| Error::Parameter)?;
-    let mut previous = Zeroizing::new(Vec::new());
-    match mode {
-        KbkdfMode::Feedback(iv) => {
-            if !iv.is_empty() && iv.len() != h {
-                return Err(Error::Parameter);
-            }
-            previous.extend_from_slice(iv);
+    crate::dit::with(|| {
+        if !matches!(counter_bits, 8 | 16 | 24 | 32) {
+            return Err(Error::Parameter);
         }
-        KbkdfMode::Counter => {
-            let blocks = u64::try_from(out.len().checked_div(h).unwrap_or(0))
-                .map_err(|_| Error::OutputLength)?;
-            if blocks >= 1u64 << counter_bits {
-                return Err(Error::OutputLength);
+        if out.is_empty() {
+            return Err(Error::OutputLength);
+        }
+        let h = mac.size();
+        if h == 0 {
+            return Err(Error::Mac(mac::Error::OutputSize));
+        }
+        let counter_len = usize::try_from(counter_bits / 8).map_err(|_| Error::Parameter)?;
+        let mut previous = Zeroizing::new(Vec::new());
+        match mode {
+            KbkdfMode::Feedback(iv) => {
+                if !iv.is_empty() && iv.len() != h {
+                    return Err(Error::Parameter);
+                }
+                previous.extend_from_slice(iv);
+            }
+            KbkdfMode::Counter => {
+                let blocks = u64::try_from(out.len().checked_div(h).unwrap_or(0))
+                    .map_err(|_| Error::OutputLength)?;
+                if blocks >= 1u64 << counter_bits {
+                    return Err(Error::OutputLength);
+                }
             }
         }
-    }
-    let feedback = matches!(mode, KbkdfMode::Feedback(_));
-    // L is the output length in bits, taken modulo 2^32 as the reference's 32-bit field.
-    let l = u64::try_from(out.len())
-        .map(|n| n.wrapping_mul(8).to_be_bytes())
-        .map_err(|_| Error::OutputLength)?;
-    let l = l.get(4..).unwrap_or(&[]);
-    let mut counter = 0u32;
-    for chunk in out.chunks_mut(h) {
-        counter = counter.wrapping_add(1);
-        let be = counter.to_be_bytes();
-        let ctr = be.get(4usize.saturating_sub(counter_len)..).unwrap_or(&[]);
-        let mut block = Zeroizing::new(vec![0u8; h]);
-        let fb: &[u8] = if feedback { &previous } else { &[] };
-        let sep: &[u8] = if separator { &[0] } else { &[] };
-        let len: &[u8] = if use_l { l } else { &[] };
-        mac_of(mac, &[fb, ctr, label, sep, context, len], &mut block)?;
-        chunk.copy_from_slice(block.get(..chunk.len()).ok_or(Error::OutputLength)?);
-        previous = block;
-    }
-    Ok(())
+        let feedback = matches!(mode, KbkdfMode::Feedback(_));
+        // L is the output length in bits, taken modulo 2^32 as the reference's 32-bit field.
+        let l = u64::try_from(out.len())
+            .map(|n| n.wrapping_mul(8).to_be_bytes())
+            .map_err(|_| Error::OutputLength)?;
+        let l = l.get(4..).unwrap_or(&[]);
+        let mut counter = 0u32;
+        for chunk in out.chunks_mut(h) {
+            counter = counter.wrapping_add(1);
+            let be = counter.to_be_bytes();
+            let ctr = be.get(4usize.saturating_sub(counter_len)..).unwrap_or(&[]);
+            let mut block = Zeroizing::new(vec![0u8; h]);
+            let fb: &[u8] = if feedback { &previous } else { &[] };
+            let sep: &[u8] = if separator { &[0] } else { &[] };
+            let len: &[u8] = if use_l { l } else { &[] };
+            mac_of(mac, &[fb, ctr, label, sep, context, len], &mut block)?;
+            chunk.copy_from_slice(block.get(..chunk.len()).ok_or(Error::OutputLength)?);
+            previous = block;
+        }
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -612,19 +642,21 @@ pub fn tls1_prf(
     seed: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    if digest != md::Algorithm::Md5Sha1 {
-        return p_hash(digest, secret, seed, out);
-    }
-    let half = secret.len().div_ceil(2);
-    let first = secret.get(..half).ok_or(Error::InputLength)?;
-    let second = secret
-        .get(secret.len().saturating_sub(half)..)
-        .ok_or(Error::InputLength)?;
-    p_hash(md::Algorithm::Md5, first, seed, out)?;
-    let mut sha1 = Zeroizing::new(vec![0u8; out.len()]);
-    p_hash(md::Algorithm::Sha1, second, seed, &mut sha1)?;
-    out.iter_mut().zip(sha1.iter()).for_each(|(o, &s)| *o ^= s);
-    Ok(())
+    crate::dit::with(|| {
+        if digest != md::Algorithm::Md5Sha1 {
+            return p_hash(digest, secret, seed, out);
+        }
+        let half = secret.len().div_ceil(2);
+        let first = secret.get(..half).ok_or(Error::InputLength)?;
+        let second = secret
+            .get(secret.len().saturating_sub(half)..)
+            .ok_or(Error::InputLength)?;
+        p_hash(md::Algorithm::Md5, first, seed, out)?;
+        let mut sha1 = Zeroizing::new(vec![0u8; out.len()]);
+        p_hash(md::Algorithm::Sha1, second, seed, &mut sha1)?;
+        out.iter_mut().zip(sha1.iter()).for_each(|(o, &s)| *o ^= s);
+        Ok(())
+    })
 }
 
 /// SSH's KDF (RFC 4253 section 7.2): K1 = Hash(K || H || type || session_id), then
@@ -637,28 +669,30 @@ pub fn sshkdf(
     session_id: &[u8],
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = digest_size(digest)?;
-    let mut block = Zeroizing::new(vec![0u8; size]);
-    let mut done = 0usize;
-    while done < out.len() {
-        let so_far = out.get(..done).ok_or(Error::OutputLength)?;
-        if done == 0 {
-            hash(
-                digest,
-                &[key, exchange_hash, &[kind], session_id],
-                &mut block,
-            )?;
-        } else {
-            hash(digest, &[key, exchange_hash, so_far], &mut block)?;
+    crate::dit::with(|| {
+        let size = digest_size(digest)?;
+        let mut block = Zeroizing::new(vec![0u8; size]);
+        let mut done = 0usize;
+        while done < out.len() {
+            let so_far = out.get(..done).ok_or(Error::OutputLength)?;
+            if done == 0 {
+                hash(
+                    digest,
+                    &[key, exchange_hash, &[kind], session_id],
+                    &mut block,
+                )?;
+            } else {
+                hash(digest, &[key, exchange_hash, so_far], &mut block)?;
+            }
+            let n = size.min(out.len().saturating_sub(done));
+            let end = done.saturating_add(n);
+            out.get_mut(done..end)
+                .ok_or(Error::OutputLength)?
+                .copy_from_slice(block.get(..n).ok_or(Error::OutputLength)?);
+            done = end;
         }
-        let n = size.min(out.len().saturating_sub(done));
-        let end = done.saturating_add(n);
-        out.get_mut(done..end)
-            .ok_or(Error::OutputLength)?
-            .copy_from_slice(block.get(..n).ok_or(Error::OutputLength)?);
-        done = end;
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// RFC 3961's n-fold of `constant` to `size` octets, computed as the reference does.
@@ -764,24 +798,26 @@ pub fn krb5kdf(
     des3: bool,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    let size = cipher.block_size();
-    if constant.is_empty() || constant.len() > size {
-        return Err(Error::Parameter);
-    }
-    if des3 && out.len() != 24 {
-        return Err(Error::OutputLength);
-    }
-    let mut block = Zeroizing::new(n_fold(constant, size)?);
-    for chunk in out.chunks_mut(size) {
-        cipher
-            .encrypt_blocks(&mut block)
-            .map_err(|_| Error::Parameter)?;
-        chunk.copy_from_slice(block.get(..chunk.len()).ok_or(Error::OutputLength)?);
-    }
-    if des3 {
-        des3_random_to_key(out)?;
-    }
-    Ok(())
+    crate::dit::with(|| {
+        let size = cipher.block_size();
+        if constant.is_empty() || constant.len() > size {
+            return Err(Error::Parameter);
+        }
+        if des3 && out.len() != 24 {
+            return Err(Error::OutputLength);
+        }
+        let mut block = Zeroizing::new(n_fold(constant, size)?);
+        for chunk in out.chunks_mut(size) {
+            cipher
+                .encrypt_blocks(&mut block)
+                .map_err(|_| Error::Parameter)?;
+            chunk.copy_from_slice(block.get(..chunk.len()).ok_or(Error::OutputLength)?);
+        }
+        if des3 {
+            des3_random_to_key(out)?;
+        }
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -896,47 +932,49 @@ pub fn scrypt(
     max_memory: u64,
     out: &mut [u8],
 ) -> Result<(), Error> {
-    const PR_MAX: u64 = (1 << 30) - 1;
-    if r == 0 || p == 0 || n < 2 || !n.is_power_of_two() {
-        return Err(Error::Parameter);
-    }
-    if p > PR_MAX.checked_div(r).unwrap_or(0) {
-        return Err(Error::MemoryLimit);
-    }
-    if let Some(bits) = r.checked_mul(16).filter(|&b| b <= 63)
-        && n >= 1u64 << bits
-    {
-        return Err(Error::MemoryLimit);
-    }
-    let b_len = p.wrapping_mul(128).wrapping_mul(r);
-    if b_len > u64::from(i32::MAX.unsigned_abs()) {
-        return Err(Error::MemoryLimit);
-    }
-    if n.saturating_add(2) > (u64::MAX / 128).checked_div(r).unwrap_or(0) {
-        return Err(Error::MemoryLimit);
-    }
-    let v_len = r.wrapping_mul(128).wrapping_mul(n.wrapping_add(2));
-    let total = b_len.checked_add(v_len).ok_or(Error::MemoryLimit)?;
-    let max_memory = max_memory.min(u64::try_from(usize::MAX).unwrap_or(u64::MAX));
-    if total > max_memory {
-        return Err(Error::MemoryLimit);
-    }
-    let r = usize::try_from(r).map_err(|_| Error::MemoryLimit)?;
-    let block = r.checked_mul(128).ok_or(Error::MemoryLimit)?;
-    let v_words = usize::try_from(n)
-        .ok()
-        .and_then(|n| n.checked_mul(r.checked_mul(32)?))
-        .ok_or(Error::MemoryLimit)?;
-    let mut b = Zeroizing::new(try_filled(
-        usize::try_from(b_len).map_err(|_| Error::MemoryLimit)?,
-        0u8,
-    )?);
-    let mut v = Zeroizing::new(try_filled(v_words, 0u32)?);
-    pbkdf2(md::Algorithm::Sha256, password, salt, 1, &mut b)?;
-    for chunk in b.chunks_exact_mut(block) {
-        ro_mix(chunk, r, n, &mut v)?;
-    }
-    pbkdf2(md::Algorithm::Sha256, password, &b, 1, out)
+    crate::dit::with(|| {
+        const PR_MAX: u64 = (1 << 30) - 1;
+        if r == 0 || p == 0 || n < 2 || !n.is_power_of_two() {
+            return Err(Error::Parameter);
+        }
+        if p > PR_MAX.checked_div(r).unwrap_or(0) {
+            return Err(Error::MemoryLimit);
+        }
+        if let Some(bits) = r.checked_mul(16).filter(|&b| b <= 63)
+            && n >= 1u64 << bits
+        {
+            return Err(Error::MemoryLimit);
+        }
+        let b_len = p.wrapping_mul(128).wrapping_mul(r);
+        if b_len > u64::from(i32::MAX.unsigned_abs()) {
+            return Err(Error::MemoryLimit);
+        }
+        if n.saturating_add(2) > (u64::MAX / 128).checked_div(r).unwrap_or(0) {
+            return Err(Error::MemoryLimit);
+        }
+        let v_len = r.wrapping_mul(128).wrapping_mul(n.wrapping_add(2));
+        let total = b_len.checked_add(v_len).ok_or(Error::MemoryLimit)?;
+        let max_memory = max_memory.min(u64::try_from(usize::MAX).unwrap_or(u64::MAX));
+        if total > max_memory {
+            return Err(Error::MemoryLimit);
+        }
+        let r = usize::try_from(r).map_err(|_| Error::MemoryLimit)?;
+        let block = r.checked_mul(128).ok_or(Error::MemoryLimit)?;
+        let v_words = usize::try_from(n)
+            .ok()
+            .and_then(|n| n.checked_mul(r.checked_mul(32)?))
+            .ok_or(Error::MemoryLimit)?;
+        let mut b = Zeroizing::new(try_filled(
+            usize::try_from(b_len).map_err(|_| Error::MemoryLimit)?,
+            0u8,
+        )?);
+        let mut v = Zeroizing::new(try_filled(v_words, 0u32)?);
+        pbkdf2(md::Algorithm::Sha256, password, salt, 1, &mut b)?;
+        for chunk in b.chunks_exact_mut(block) {
+            ro_mix(chunk, r, n, &mut v)?;
+        }
+        pbkdf2(md::Algorithm::Sha256, password, &b, 1, out)
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1257,115 +1295,117 @@ impl Geometry {
 
 /// Argon2 into `out` (4 octets or more).
 pub fn argon2(params: &Argon2<'_>, out: &mut [u8]) -> Result<(), Error> {
-    if !matches!(params.version, 0x10 | 0x13)
-        || params.passes == 0
-        || !(1..=0xff_ffff).contains(&params.lanes)
-        || params.memory < params.lanes.wrapping_mul(8)
-    {
-        return Err(Error::Parameter);
-    }
-    let out_len = u32::try_from(out.len()).map_err(|_| Error::OutputLength)?;
-    if out_len < 4 {
-        return Err(Error::OutputLength);
-    }
-    if params.salt.len() < 8 {
-        return Err(Error::InputLength);
-    }
-    let lanes = params.lanes;
-    let segment = params
-        .memory
-        .checked_div(lanes.wrapping_mul(4))
-        .unwrap_or(0);
-    let geometry = Geometry {
-        lanes,
-        passes: params.passes,
-        segment,
-        lane_length: segment.wrapping_mul(4),
-        blocks: segment.wrapping_mul(lanes).wrapping_mul(4),
-        variant: params.variant,
-        version: params.version,
-    };
-    let mut memory: Zeroizing<Vec<Block>> = Zeroizing::new(try_filled(
-        usize::try_from(geometry.blocks).map_err(|_| Error::Allocation)?,
-        [0u64; 128],
-    )?);
-
-    // H0, then the first two blocks of each lane.
-    let mut seed = Zeroizing::new([0u8; 72]);
-    let fields = [
-        lanes,
-        out_len,
-        params.memory,
-        params.passes,
-        params.version,
-        params.variant.number(),
-    ]
-    .map(u32::to_le_bytes);
-    let mut parts: Vec<&[u8]> = fields.iter().map(|f| &f[..]).collect();
-    let lengths = [
-        le32(params.password.len())?,
-        le32(params.salt.len())?,
-        le32(params.secret.len())?,
-        le32(params.ad.len())?,
-    ];
-    let [pl, sl, kl, al] = &lengths;
-    parts.extend_from_slice(&[
-        pl,
-        params.password,
-        sl,
-        params.salt,
-        kl,
-        params.secret,
-        al,
-        params.ad,
-    ]);
-    {
-        let (h0, _) = seed.split_at_mut(64);
-        let mut m = md::context(md::Algorithm::Blake2b512);
-        for part in &parts {
-            m.update(part).map_err(|_| Error::Digest)?;
+    crate::dit::with(|| {
+        if !matches!(params.version, 0x10 | 0x13)
+            || params.passes == 0
+            || !(1..=0xff_ffff).contains(&params.lanes)
+            || params.memory < params.lanes.wrapping_mul(8)
+        {
+            return Err(Error::Parameter);
         }
-        m.finalize(h0).map_err(|_| Error::Digest)?;
-    }
-    let mut bytes = Zeroizing::new([0u8; 1024]);
-    for lane in 0..lanes {
-        for first in 0..2u32 {
-            let (_, tail) = seed.split_at_mut(64);
-            let (a, b) = tail.split_at_mut(4);
-            a.copy_from_slice(&first.to_le_bytes());
-            b.copy_from_slice(&lane.to_le_bytes());
-            blake2b_long(&[&*seed], &mut *bytes)?;
-            let index = lane.wrapping_mul(geometry.lane_length).wrapping_add(first);
-            let block = memory
-                .get_mut(usize::try_from(index).map_err(|_| Error::Allocation)?)
-                .ok_or(Error::Allocation)?;
-            for (w, chunk) in block.iter_mut().zip(bytes.as_chunks::<8>().0) {
-                *w = u64::from_le_bytes(*chunk);
+        let out_len = u32::try_from(out.len()).map_err(|_| Error::OutputLength)?;
+        if out_len < 4 {
+            return Err(Error::OutputLength);
+        }
+        if params.salt.len() < 8 {
+            return Err(Error::InputLength);
+        }
+        let lanes = params.lanes;
+        let segment = params
+            .memory
+            .checked_div(lanes.wrapping_mul(4))
+            .unwrap_or(0);
+        let geometry = Geometry {
+            lanes,
+            passes: params.passes,
+            segment,
+            lane_length: segment.wrapping_mul(4),
+            blocks: segment.wrapping_mul(lanes).wrapping_mul(4),
+            variant: params.variant,
+            version: params.version,
+        };
+        let mut memory: Zeroizing<Vec<Block>> = Zeroizing::new(try_filled(
+            usize::try_from(geometry.blocks).map_err(|_| Error::Allocation)?,
+            [0u64; 128],
+        )?);
+
+        // H0, then the first two blocks of each lane.
+        let mut seed = Zeroizing::new([0u8; 72]);
+        let fields = [
+            lanes,
+            out_len,
+            params.memory,
+            params.passes,
+            params.version,
+            params.variant.number(),
+        ]
+        .map(u32::to_le_bytes);
+        let mut parts: Vec<&[u8]> = fields.iter().map(|f| &f[..]).collect();
+        let lengths = [
+            le32(params.password.len())?,
+            le32(params.salt.len())?,
+            le32(params.secret.len())?,
+            le32(params.ad.len())?,
+        ];
+        let [pl, sl, kl, al] = &lengths;
+        parts.extend_from_slice(&[
+            pl,
+            params.password,
+            sl,
+            params.salt,
+            kl,
+            params.secret,
+            al,
+            params.ad,
+        ]);
+        {
+            let (h0, _) = seed.split_at_mut(64);
+            let mut m = md::context(md::Algorithm::Blake2b512);
+            for part in &parts {
+                m.update(part).map_err(|_| Error::Digest)?;
+            }
+            m.finalize(h0).map_err(|_| Error::Digest)?;
+        }
+        let mut bytes = Zeroizing::new([0u8; 1024]);
+        for lane in 0..lanes {
+            for first in 0..2u32 {
+                let (_, tail) = seed.split_at_mut(64);
+                let (a, b) = tail.split_at_mut(4);
+                a.copy_from_slice(&first.to_le_bytes());
+                b.copy_from_slice(&lane.to_le_bytes());
+                blake2b_long(&[&*seed], &mut *bytes)?;
+                let index = lane.wrapping_mul(geometry.lane_length).wrapping_add(first);
+                let block = memory
+                    .get_mut(usize::try_from(index).map_err(|_| Error::Allocation)?)
+                    .ok_or(Error::Allocation)?;
+                for (w, chunk) in block.iter_mut().zip(bytes.as_chunks::<8>().0) {
+                    *w = u64::from_le_bytes(*chunk);
+                }
             }
         }
-    }
 
-    for pass in 0..params.passes {
-        for slice in 0..4 {
-            for lane in 0..lanes {
-                geometry.fill_segment(&mut memory, pass, lane, slice);
+        for pass in 0..params.passes {
+            for slice in 0..4 {
+                for lane in 0..lanes {
+                    geometry.fill_segment(&mut memory, pass, lane, slice);
+                }
             }
         }
-    }
 
-    // The XOR of each lane's last block, hashed to the output.
-    let mut last = [0u64; 128];
-    for lane in 0..lanes {
-        let index = lane
-            .wrapping_mul(geometry.lane_length)
-            .wrapping_add(geometry.lane_length.wrapping_sub(1));
-        if let Some(block) = memory.get(usize::try_from(index).unwrap_or(usize::MAX)) {
-            last.iter_mut().zip(block).for_each(|(l, &b)| *l ^= b);
+        // The XOR of each lane's last block, hashed to the output.
+        let mut last = [0u64; 128];
+        for lane in 0..lanes {
+            let index = lane
+                .wrapping_mul(geometry.lane_length)
+                .wrapping_add(geometry.lane_length.wrapping_sub(1));
+            if let Some(block) = memory.get(usize::try_from(index).unwrap_or(usize::MAX)) {
+                last.iter_mut().zip(block).for_each(|(l, &b)| *l ^= b);
+            }
         }
-    }
-    for (chunk, w) in bytes.as_chunks_mut::<8>().0.iter_mut().zip(last) {
-        chunk.copy_from_slice(&w.to_le_bytes());
-    }
-    last.zeroize();
-    blake2b_long(&[&*bytes], out)
+        for (chunk, w) in bytes.as_chunks_mut::<8>().0.iter_mut().zip(last) {
+            chunk.copy_from_slice(&w.to_le_bytes());
+        }
+        last.zeroize();
+        blake2b_long(&[&*bytes], out)
+    })
 }

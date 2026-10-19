@@ -7,6 +7,7 @@
 #![deny(clippy::arithmetic_side_effects)]
 
 pub mod bn;
+pub mod dit;
 pub mod ec;
 pub mod ecx;
 pub mod ecx448;

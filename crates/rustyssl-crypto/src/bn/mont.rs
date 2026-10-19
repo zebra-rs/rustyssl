@@ -199,6 +199,11 @@ impl Montgomery {
     /// `base^exp mod N` in constant time (for a given modulus length and exponent length in
     /// limbs), for a non-negative `base` below `R`. The modulus must be set.
     pub fn exp_consttime(&self, base: &BigNum, exp: &[Limb]) -> BigNum {
+        crate::dit::with(|| self.exp_consttime_dit(base, exp))
+    }
+
+    /// [`Montgomery::exp_consttime`]'s work.
+    fn exp_consttime_dit(&self, base: &BigNum, exp: &[Limb]) -> BigNum {
         let nl = self.limbs();
         let np = self.n.limbs();
         // One limb more than the modulus for the product's top, as REDC's input is 2 nl.

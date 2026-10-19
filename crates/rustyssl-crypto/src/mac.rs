@@ -105,32 +105,34 @@ fn keyed_digest(algorithm: md::Algorithm, block: &[u8], pad: u8) -> Box<dyn md::
 
 /// HMAC with `digest` (any but an XOF) and `key`; a key longer than a block is hashed first.
 pub fn hmac(digest: md::Algorithm, key: &[u8]) -> Result<Box<dyn Mac>, Error> {
-    if digest.is_xof() {
-        return Err(Error::Digest);
-    }
-    let block_size = digest.block_size();
-    let mut block = Zeroizing::new(vec![0u8; block_size]);
-    if key.len() > block_size {
-        let mut hashed = Zeroizing::new(vec![0u8; digest.output_size()]);
-        let mut ctx = md::context(digest);
-        ctx.update(key).map_err(|_| Error::Digest)?;
-        ctx.finalize(&mut hashed).map_err(|_| Error::Digest)?;
-        block
-            .iter_mut()
-            .zip(hashed.iter())
-            .for_each(|(b, &h)| *b = h);
-    } else {
-        block.iter_mut().zip(key).for_each(|(b, &k)| *b = k);
-    }
-    let keyed_inner = keyed_digest(digest, &block, 0x36);
-    let keyed_outer = keyed_digest(digest, &block, 0x5c);
-    Ok(Box::new(Hmac {
-        algorithm: digest,
-        inner: keyed_inner.clone_box(),
-        keyed_inner,
-        keyed_outer,
-        done: false,
-    }))
+    crate::dit::with(|| -> Result<Box<dyn Mac>, Error> {
+        if digest.is_xof() {
+            return Err(Error::Digest);
+        }
+        let block_size = digest.block_size();
+        let mut block = Zeroizing::new(vec![0u8; block_size]);
+        if key.len() > block_size {
+            let mut hashed = Zeroizing::new(vec![0u8; digest.output_size()]);
+            let mut ctx = md::context(digest);
+            ctx.update(key).map_err(|_| Error::Digest)?;
+            ctx.finalize(&mut hashed).map_err(|_| Error::Digest)?;
+            block
+                .iter_mut()
+                .zip(hashed.iter())
+                .for_each(|(b, &h)| *b = h);
+        } else {
+            block.iter_mut().zip(key).for_each(|(b, &k)| *b = k);
+        }
+        let keyed_inner = keyed_digest(digest, &block, 0x36);
+        let keyed_outer = keyed_digest(digest, &block, 0x5c);
+        Ok(Box::new(Hmac {
+            algorithm: digest,
+            inner: keyed_inner.clone_box(),
+            keyed_inner,
+            keyed_outer,
+            done: false,
+        }))
+    })
 }
 
 impl Mac for Hmac {
@@ -139,21 +141,25 @@ impl Mac for Hmac {
     }
 
     fn update(&mut self, data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        self.inner.update(data).map_err(|_| Error::Finalized)
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            self.inner.update(data).map_err(|_| Error::Finalized)
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, self.size(), out)?;
-        let mut inner = Zeroizing::new(vec![0u8; self.size()]);
-        self.inner
-            .finalize(&mut inner)
-            .map_err(|_| Error::Finalized)?;
-        let mut outer = self.keyed_outer.clone_box();
-        outer.update(&inner).map_err(|_| Error::Finalized)?;
-        outer.finalize(out).map_err(|_| Error::Finalized)?;
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, self.size(), out)?;
+            let mut inner = Zeroizing::new(vec![0u8; self.size()]);
+            self.inner
+                .finalize(&mut inner)
+                .map_err(|_| Error::Finalized)?;
+            let mut outer = self.keyed_outer.clone_box();
+            outer.update(&inner).map_err(|_| Error::Finalized)?;
+            outer.finalize(out).map_err(|_| Error::Finalized)?;
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -203,24 +209,26 @@ struct Cmac {
 
 /// CMAC over a keyed block cipher of 8 or 16 octets.
 pub fn cmac(cipher: Box<dyn sym::BlockCipher>) -> Result<Box<dyn Mac>, Error> {
-    let n = cipher.block_size();
-    if n != 8 && n != 16 {
-        return Err(Error::BlockSize);
-    }
-    let mut l = Zeroizing::new(vec![0u8; n]);
-    cipher
-        .encrypt_blocks(&mut l)
-        .map_err(|_| Error::BlockSize)?;
-    let k1 = double(&l);
-    let k2 = double(&k1);
-    Ok(Box::new(Cmac {
-        cipher,
-        k1,
-        k2,
-        x: Zeroizing::new(vec![0u8; n]),
-        pending: Zeroizing::new(Vec::with_capacity(n)),
-        done: false,
-    }))
+    crate::dit::with(|| -> Result<Box<dyn Mac>, Error> {
+        let n = cipher.block_size();
+        if n != 8 && n != 16 {
+            return Err(Error::BlockSize);
+        }
+        let mut l = Zeroizing::new(vec![0u8; n]);
+        cipher
+            .encrypt_blocks(&mut l)
+            .map_err(|_| Error::BlockSize)?;
+        let k1 = double(&l);
+        let k2 = double(&k1);
+        Ok(Box::new(Cmac {
+            cipher,
+            k1,
+            k2,
+            x: Zeroizing::new(vec![0u8; n]),
+            pending: Zeroizing::new(Vec::with_capacity(n)),
+            done: false,
+        }))
+    })
 }
 
 impl Cmac {
@@ -238,43 +246,47 @@ impl Mac for Cmac {
     }
 
     fn update(&mut self, mut data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        let n = self.x.len();
-        while !data.is_empty() {
-            // A full pending block is chained only once more data follows it.
-            if self.pending.len() == n {
-                let block = self.pending.clone();
-                self.chain(&block);
-                self.pending.clear();
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            let n = self.x.len();
+            while !data.is_empty() {
+                // A full pending block is chained only once more data follows it.
+                if self.pending.len() == n {
+                    let block = self.pending.clone();
+                    self.chain(&block);
+                    self.pending.clear();
+                }
+                let take = n.saturating_sub(self.pending.len()).min(data.len());
+                let (head, rest) = data.split_at(take);
+                self.pending.extend_from_slice(head);
+                data = rest;
             }
-            let take = n.saturating_sub(self.pending.len()).min(data.len());
-            let (head, rest) = data.split_at(take);
-            self.pending.extend_from_slice(head);
-            data = rest;
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, self.size(), out)?;
-        let n = self.x.len();
-        let mut last = Zeroizing::new(vec![0u8; n]);
-        let subkey = if self.pending.len() == n {
-            last.copy_from_slice(&self.pending);
-            &self.k1
-        } else {
+        crate::dit::with(|| {
+            check_final(self.done, self.size(), out)?;
+            let n = self.x.len();
+            let mut last = Zeroizing::new(vec![0u8; n]);
+            let subkey = if self.pending.len() == n {
+                last.copy_from_slice(&self.pending);
+                &self.k1
+            } else {
+                last.iter_mut()
+                    .zip(self.pending.iter().copied().chain([0x80]))
+                    .for_each(|(l, p)| *l = p);
+                &self.k2
+            };
             last.iter_mut()
-                .zip(self.pending.iter().copied().chain([0x80]))
-                .for_each(|(l, p)| *l = p);
-            &self.k2
-        };
-        last.iter_mut()
-            .zip(subkey.iter())
-            .for_each(|(l, &k)| *l ^= k);
-        self.chain(&last);
-        out.copy_from_slice(&self.x);
-        self.done = true;
-        Ok(())
+                .zip(subkey.iter())
+                .for_each(|(l, &k)| *l ^= k);
+            self.chain(&last);
+            out.copy_from_slice(&self.x);
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -316,23 +328,27 @@ struct Ghash {
 
 impl Ghash {
     fn update(&mut self, mut data: &[u8]) {
-        while !data.is_empty() {
-            let take = 16usize.saturating_sub(self.pending.len()).min(data.len());
-            let (head, rest) = data.split_at(take);
-            self.pending.extend_from_slice(head);
-            data = rest;
-            if self.pending.len() == 16 {
-                self.hash.update_padded(&self.pending);
-                self.pending.clear();
+        crate::dit::with(|| {
+            while !data.is_empty() {
+                let take = 16usize.saturating_sub(self.pending.len()).min(data.len());
+                let (head, rest) = data.split_at(take);
+                self.pending.extend_from_slice(head);
+                data = rest;
+                if self.pending.len() == 16 {
+                    self.hash.update_padded(&self.pending);
+                    self.pending.clear();
+                }
             }
-        }
+        })
     }
 
     /// The hash of everything fed, zero-padded, then `lengths`.
     fn finalize(&mut self, lengths: &[u8; 16]) -> [u8; 16] {
-        self.hash.update_padded(&self.pending);
-        self.pending.clear();
-        self.hash.finalize(lengths)
+        crate::dit::with(|| {
+            self.hash.update_padded(&self.pending);
+            self.pending.clear();
+            self.hash.finalize(lengths)
+        })
     }
 
     fn clone(&self) -> Self {
@@ -364,38 +380,40 @@ fn ghash(h: &[u8; 16]) -> Result<Ghash, Error> {
 /// GMAC over a keyed 128-bit block cipher and a non-empty IV of any length (12 octets are
 /// used as they are; others through GHASH, as GCM does).
 pub fn gmac(cipher: Box<dyn sym::BlockCipher>, iv: &[u8]) -> Result<Box<dyn Mac>, Error> {
-    if cipher.block_size() != 16 {
-        return Err(Error::BlockSize);
-    }
-    if iv.is_empty() {
-        return Err(Error::IvLength);
-    }
-    let mut h = Zeroizing::new([0u8; 16]);
-    cipher
-        .encrypt_blocks(&mut *h)
-        .map_err(|_| Error::BlockSize)?;
-    let mut j0 = Zeroizing::new([0u8; 16]);
-    if iv.len() == 12 {
-        j0.iter_mut().zip(iv).for_each(|(j, &v)| *j = v);
-        if let Some(last) = j0.last_mut() {
-            *last = 1;
+    crate::dit::with(|| -> Result<Box<dyn Mac>, Error> {
+        if cipher.block_size() != 16 {
+            return Err(Error::BlockSize);
         }
-    } else {
-        let mut g = ghash(&h)?;
-        g.update(iv);
-        *j0 = g.finalize(&length_block(0, iv.len()).ok_or(Error::IvLength)?);
-    }
-    let mut mask = j0;
-    cipher
-        .encrypt_blocks(&mut *mask)
-        .map_err(|_| Error::BlockSize)?;
-    Ok(Box::new(Gmac {
-        ghash: ghash(&h)?,
-        h,
-        mask,
-        length: 0,
-        done: false,
-    }))
+        if iv.is_empty() {
+            return Err(Error::IvLength);
+        }
+        let mut h = Zeroizing::new([0u8; 16]);
+        cipher
+            .encrypt_blocks(&mut *h)
+            .map_err(|_| Error::BlockSize)?;
+        let mut j0 = Zeroizing::new([0u8; 16]);
+        if iv.len() == 12 {
+            j0.iter_mut().zip(iv).for_each(|(j, &v)| *j = v);
+            if let Some(last) = j0.last_mut() {
+                *last = 1;
+            }
+        } else {
+            let mut g = ghash(&h)?;
+            g.update(iv);
+            *j0 = g.finalize(&length_block(0, iv.len()).ok_or(Error::IvLength)?);
+        }
+        let mut mask = j0;
+        cipher
+            .encrypt_blocks(&mut *mask)
+            .map_err(|_| Error::BlockSize)?;
+        Ok(Box::new(Gmac {
+            ghash: ghash(&h)?,
+            h,
+            mask,
+            length: 0,
+            done: false,
+        }))
+    })
 }
 
 impl Mac for Gmac {
@@ -404,25 +422,29 @@ impl Mac for Gmac {
     }
 
     fn update(&mut self, data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        self.length = self
-            .length
-            .checked_add(data.len())
-            .ok_or(Error::OutputSize)?;
-        self.ghash.update(data);
-        Ok(())
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            self.length = self
+                .length
+                .checked_add(data.len())
+                .ok_or(Error::OutputSize)?;
+            self.ghash.update(data);
+            Ok(())
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, 16, out)?;
-        let lengths = length_block(self.length, 0).ok_or(Error::OutputSize)?;
-        let mut tag = Zeroizing::new(self.ghash.finalize(&lengths));
-        tag.iter_mut()
-            .zip(self.mask.iter())
-            .for_each(|(t, &m)| *t ^= m);
-        out.copy_from_slice(&*tag);
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, 16, out)?;
+            let lengths = length_block(self.length, 0).ok_or(Error::OutputSize)?;
+            let mut tag = Zeroizing::new(self.ghash.finalize(&lengths));
+            tag.iter_mut()
+                .zip(self.mask.iter())
+                .for_each(|(t, &m)| *t ^= m);
+            out.copy_from_slice(&*tag);
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -537,34 +559,36 @@ pub fn kmac(
     size: usize,
     xof: bool,
 ) -> Result<Box<dyn Mac>, Error> {
-    if !(KMAC_MIN_KEY..=KMAC_MAX_KEY).contains(&key.len()) {
-        return Err(Error::KeyLength);
-    }
-    if custom.len() > KMAC_MAX_CUSTOM {
-        return Err(Error::CustomLength);
-    }
-    if size > KMAC_MAX_OUTPUT {
-        return Err(Error::OutputSize);
-    }
-    let digest = algorithm.digest();
-    let rate = digest.block_size();
-    let name = encode_string(b"KMAC").ok_or(Error::CustomLength)?;
-    let custom = encode_string(custom).ok_or(Error::CustomLength)?;
-    let key = Zeroizing::new(encode_string(key).ok_or(Error::KeyLength)?);
-    let mut keyed = md::context(digest);
-    keyed
-        .update(&bytepad(&[&name, &custom], rate))
-        .map_err(|_| Error::Finalized)?;
-    keyed
-        .update(&bytepad(&[&key], rate))
-        .map_err(|_| Error::Finalized)?;
-    Ok(Box::new(Kmac {
-        sponge: keyed.clone_box(),
-        keyed,
-        size,
-        xof,
-        done: false,
-    }))
+    crate::dit::with(|| -> Result<Box<dyn Mac>, Error> {
+        if !(KMAC_MIN_KEY..=KMAC_MAX_KEY).contains(&key.len()) {
+            return Err(Error::KeyLength);
+        }
+        if custom.len() > KMAC_MAX_CUSTOM {
+            return Err(Error::CustomLength);
+        }
+        if size > KMAC_MAX_OUTPUT {
+            return Err(Error::OutputSize);
+        }
+        let digest = algorithm.digest();
+        let rate = digest.block_size();
+        let name = encode_string(b"KMAC").ok_or(Error::CustomLength)?;
+        let custom = encode_string(custom).ok_or(Error::CustomLength)?;
+        let key = Zeroizing::new(encode_string(key).ok_or(Error::KeyLength)?);
+        let mut keyed = md::context(digest);
+        keyed
+            .update(&bytepad(&[&name, &custom], rate))
+            .map_err(|_| Error::Finalized)?;
+        keyed
+            .update(&bytepad(&[&key], rate))
+            .map_err(|_| Error::Finalized)?;
+        Ok(Box::new(Kmac {
+            sponge: keyed.clone_box(),
+            keyed,
+            size,
+            xof,
+            done: false,
+        }))
+    })
 }
 
 impl Mac for Kmac {
@@ -573,23 +597,27 @@ impl Mac for Kmac {
     }
 
     fn update(&mut self, data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        self.sponge.update(data).map_err(|_| Error::Finalized)
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            self.sponge.update(data).map_err(|_| Error::Finalized)
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, self.size, out)?;
-        let bits = if self.xof {
-            0
-        } else {
-            self.size.checked_mul(8).ok_or(Error::OutputSize)?
-        };
-        self.sponge
-            .update(&encode(bits, true))
-            .map_err(|_| Error::Finalized)?;
-        self.sponge.finalize(out).map_err(|_| Error::Finalized)?;
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, self.size, out)?;
+            let bits = if self.xof {
+                0
+            } else {
+                self.size.checked_mul(8).ok_or(Error::OutputSize)?
+            };
+            self.sponge
+                .update(&encode(bits, true))
+                .map_err(|_| Error::Finalized)?;
+            self.sponge.finalize(out).map_err(|_| Error::Finalized)?;
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -621,15 +649,17 @@ struct Poly1305 {
 
 /// Poly1305 with a 32-octet one-time key (r, then s).
 pub fn poly1305(key: &[u8]) -> Result<Box<dyn Mac>, Error> {
-    let key: [u8; 32] = key.try_into().map_err(|_| Error::KeyLength)?;
-    let hash =
-        sym::universal_hash(sym::HashAlgorithm::Poly1305, &key).map_err(|_| Error::KeyLength)?;
-    Ok(Box::new(Poly1305 {
-        key: Zeroizing::new(key),
-        hash,
-        pending: Zeroizing::new(Vec::with_capacity(16)),
-        done: false,
-    }))
+    crate::dit::with(|| -> Result<Box<dyn Mac>, Error> {
+        let key: [u8; 32] = key.try_into().map_err(|_| Error::KeyLength)?;
+        let hash = sym::universal_hash(sym::HashAlgorithm::Poly1305, &key)
+            .map_err(|_| Error::KeyLength)?;
+        Ok(Box::new(Poly1305 {
+            key: Zeroizing::new(key),
+            hash,
+            pending: Zeroizing::new(Vec::with_capacity(16)),
+            done: false,
+        }))
+    })
 }
 
 impl Mac for Poly1305 {
@@ -638,28 +668,32 @@ impl Mac for Poly1305 {
     }
 
     fn update(&mut self, mut data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        while !data.is_empty() {
-            // A full pending block waits until more data shows it isn't the last.
-            if self.pending.len() == 16 {
-                self.hash.update_padded(&self.pending);
-                self.pending.clear();
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            while !data.is_empty() {
+                // A full pending block waits until more data shows it isn't the last.
+                if self.pending.len() == 16 {
+                    self.hash.update_padded(&self.pending);
+                    self.pending.clear();
+                }
+                let take = 16usize.saturating_sub(self.pending.len()).min(data.len());
+                let (head, rest) = data.split_at(take);
+                self.pending.extend_from_slice(head);
+                data = rest;
             }
-            let take = 16usize.saturating_sub(self.pending.len()).min(data.len());
-            let (head, rest) = data.split_at(take);
-            self.pending.extend_from_slice(head);
-            data = rest;
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, 16, out)?;
-        let tag = Zeroizing::new(self.hash.finalize(&self.pending));
-        out.copy_from_slice(&*tag);
-        self.pending.clear();
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, 16, out)?;
+            let tag = Zeroizing::new(self.hash.finalize(&self.pending));
+            out.copy_from_slice(&*tag);
+            self.pending.clear();
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -792,45 +826,49 @@ impl Mac for SipHash {
     }
 
     fn update(&mut self, data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        for &b in data {
-            if let Some(p) = self.pending.get_mut(self.pending_len) {
-                *p = b;
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            for &b in data {
+                if let Some(p) = self.pending.get_mut(self.pending_len) {
+                    *p = b;
+                }
+                self.pending_len = self.pending_len.saturating_add(1);
+                self.total = self.total.wrapping_add(1);
+                if self.pending_len == 8 {
+                    let m = u64::from_le_bytes(self.pending);
+                    self.compress(m);
+                    self.pending_len = 0;
+                }
             }
-            self.pending_len = self.pending_len.saturating_add(1);
-            self.total = self.total.wrapping_add(1);
-            if self.pending_len == 8 {
-                let m = u64::from_le_bytes(self.pending);
-                self.compress(m);
-                self.pending_len = 0;
-            }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, self.size, out)?;
-        let mut last = [0u8; 8];
-        last.iter_mut()
-            .zip(self.pending.iter().take(self.pending_len))
-            .for_each(|(l, &p)| *l = p);
-        if let Some(top) = last.last_mut() {
-            *top = self.total;
-        }
-        self.compress(u64::from_le_bytes(last));
-        self.v[2] ^= if self.size == 16 { 0xee } else { 0xff };
-        let first = self.half();
-        let mut tag = [0u8; 16];
-        let (lo, hi) = tag.split_at_mut(8);
-        lo.copy_from_slice(&first.to_le_bytes());
-        if self.size == 16 {
-            self.v[1] ^= 0xdd;
-            hi.copy_from_slice(&self.half().to_le_bytes());
-        }
-        out.iter_mut().zip(tag).for_each(|(o, t)| *o = t);
-        tag.zeroize();
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, self.size, out)?;
+            let mut last = [0u8; 8];
+            last.iter_mut()
+                .zip(self.pending.iter().take(self.pending_len))
+                .for_each(|(l, &p)| *l = p);
+            if let Some(top) = last.last_mut() {
+                *top = self.total;
+            }
+            self.compress(u64::from_le_bytes(last));
+            self.v[2] ^= if self.size == 16 { 0xee } else { 0xff };
+            let first = self.half();
+            let mut tag = [0u8; 16];
+            let (lo, hi) = tag.split_at_mut(8);
+            lo.copy_from_slice(&first.to_le_bytes());
+            if self.size == 16 {
+                self.v[1] ^= 0xdd;
+                hi.copy_from_slice(&self.half().to_le_bytes());
+            }
+            out.iter_mut().zip(tag).for_each(|(o, t)| *o = t);
+            tag.zeroize();
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
@@ -976,22 +1014,26 @@ where
     }
 
     fn update(&mut self, data: &[u8]) -> Result<(), Error> {
-        check_update(self.done)?;
-        let Self { core, buffer, .. } = self;
-        buffer.digest_blocks(data, |blocks| core.update_blocks(blocks));
-        Ok(())
+        crate::dit::with(|| {
+            check_update(self.done)?;
+            let Self { core, buffer, .. } = self;
+            buffer.digest_blocks(data, |blocks| core.update_blocks(blocks));
+            Ok(())
+        })
     }
 
     fn finalize(&mut self, out: &mut [u8]) -> Result<(), Error> {
-        check_final(self.done, self.size, out)?;
-        let mut full = Output::<C>::default();
-        self.core
-            .finalize_variable_core(&mut self.buffer, &mut full);
-        let n = C::OutputSize::USIZE.min(self.size);
-        out.copy_from_slice(full.get(..n).ok_or(Error::OutputSize)?);
-        full.zeroize();
-        self.done = true;
-        Ok(())
+        crate::dit::with(|| {
+            check_final(self.done, self.size, out)?;
+            let mut full = Output::<C>::default();
+            self.core
+                .finalize_variable_core(&mut self.buffer, &mut full);
+            let n = C::OutputSize::USIZE.min(self.size);
+            out.copy_from_slice(full.get(..n).ok_or(Error::OutputSize)?);
+            full.zeroize();
+            self.done = true;
+            Ok(())
+        })
     }
 
     fn reset(&mut self) {
