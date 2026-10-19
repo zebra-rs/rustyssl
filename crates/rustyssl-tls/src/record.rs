@@ -192,8 +192,11 @@ pub enum Protection {
         mac_hash: HashAlg,
         /// The MAC key.
         mac_key: Secret,
-        /// The IV: TLS 1.0 chains it from the last ciphertext block; later versions send an
-        /// explicit one per record (and this holds nothing).
+        /// The chaining value: the last ciphertext block so far (at first, the key block's IV,
+        /// or zeros where there's none). TLS 1.0 chains each record from it; later versions
+        /// also run their explicit IV through the chain, as OpenSSL does (the first block of
+        /// each record is the encrypted random block, discarded when decrypting), so a cipher
+        /// keeps one CBC stream per direction and is never re-initialized.
         iv: Vec<u8>,
         /// Whether each record carries its IV (TLS 1.1 and later).
         explicit_iv: bool,
@@ -283,7 +286,11 @@ impl Protection {
             block_len: alg.block_len(),
             mac_hash,
             mac_key: Secret::new(mac_key.to_vec()),
-            iv: iv.to_vec(),
+            iv: if iv.len() == alg.block_len() {
+                iv.to_vec()
+            } else {
+                vec![0; alg.block_len()]
+            },
             // DTLS (counted down, `DTLS1_BAD_VER` 0x0100 included) always sends the IV.
             explicit_iv: version >= tls1_1()
                 || version == u16::try_from(abi::DTLS1_BAD_VER).unwrap_or(0x0100),
@@ -862,24 +869,22 @@ impl RecordReader {
                     return Err(bad_mac());
                 }
                 take_seq(fixed, &mut self.seq)?;
-                let (chain_iv, mut ct) = if *explicit_iv {
-                    if record.data.len() < bs {
-                        return Err(bad_mac());
-                    }
-                    let ct = record.data.split_off(bs);
-                    (core::mem::take(&mut record.data), ct)
-                } else {
-                    let last = record
-                        .data
-                        .get(record.data.len().saturating_sub(bs)..)
-                        .unwrap_or_default()
-                        .to_vec();
-                    (
-                        core::mem::replace(iv, last),
-                        core::mem::take(&mut record.data),
-                    )
-                };
+                if *explicit_iv && record.data.len() < bs {
+                    return Err(bad_mac());
+                }
+                let last = record
+                    .data
+                    .get(record.data.len().saturating_sub(bs)..)
+                    .unwrap_or_default()
+                    .to_vec();
+                let chain_iv = core::mem::replace(iv, last);
+                let mut ct = core::mem::take(&mut record.data);
                 c.crypt(&chain_iv, &mut ct)?;
+                if *explicit_iv {
+                    // The explicit IV's block decrypts to nothing of use; what follows it
+                    // decrypts the same whatever came before.
+                    ct.drain(..bs);
+                }
                 if *etm {
                     // The padding is public now: the MAC already passed.
                     let pad = usize::from(ct.last().copied().unwrap_or(0));
@@ -1449,25 +1454,18 @@ fn cbc_seal(
             let pad = bs.saturating_sub(plain.len().checked_rem(bs).unwrap_or(0));
             let pad_octet = u8::try_from(pad.saturating_sub(1)).map_err(|_| Error::internal())?;
             plain.extend(core::iter::repeat_n(pad_octet, pad));
-            let use_iv = if explicit_iv {
+            if explicit_iv {
+                // A random block first, through the chain: its ciphertext is the record's IV.
                 let mut e = vec![0u8; bs];
                 p.random(&mut e, false)?;
-                e
-            } else {
-                iv.clone()
-            };
-            c.crypt(&use_iv, &mut plain)?;
-            if !explicit_iv {
-                *iv = plain
-                    .get(plain.len().saturating_sub(bs)..)
-                    .unwrap_or_default()
-                    .to_vec();
+                plain.splice(..0, e);
             }
-            let mut body = if explicit_iv {
-                [use_iv, plain].concat()
-            } else {
-                plain
-            };
+            c.crypt(iv, &mut plain)?;
+            *iv = plain
+                .get(plain.len().saturating_sub(bs)..)
+                .unwrap_or_default()
+                .to_vec();
+            let mut body = plain;
             if etm {
                 let tag = mac(&body)?;
                 body.extend_from_slice(&tag);

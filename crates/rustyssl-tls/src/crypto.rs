@@ -59,6 +59,12 @@ pub trait Hash: Send {
     fn current(&self) -> Vec<u8>;
     /// A copy of the state, to continue separately.
     fn fork(&self) -> Box<dyn Hash>;
+    /// The hash of everything added, ending the hash (`EVP_DigestFinal_ex` on the context
+    /// itself, where [`Hash::current`] finishes a copy). A provider that holds a resource for a
+    /// running hash, such as a PKCS#11 session's digest operation, sees it end.
+    fn finish(self: Box<Self>) -> Vec<u8> {
+        self.current()
+    }
 }
 
 /// An HMAC (or other MAC) over one key.
