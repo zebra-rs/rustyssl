@@ -1091,8 +1091,10 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The named parameter at `id`: the built-in ones, then those added; NULL past them
-    /// (`ERR_R_PASSED_INVALID_ARGUMENT` for a negative one).
+    /// The named parameter at `id`: the built-in ones, then those added; NULL past them.
+    ///
+    /// A negative `id` gives NULL, where OpenSSL 3.6 returns a pointer before its table
+    /// (docs/DEVIATIONS.md; 3.5 raised `ERR_R_PASSED_INVALID_ARGUMENT`).
     ///
     /// # Safety
     /// No preconditions.
@@ -1100,7 +1102,6 @@ ffi_export! {
     where failure = ptr::null(), library = ERR_LIB_X509
     {
         let Ok(i) = usize::try_from(id) else {
-            err::raise(ERR_LIB_X509, ERR_R_PASSED_INVALID_ARGUMENT, "X509_VERIFY_PARAM_get0");
             return ptr::null();
         };
         if let Some(p) = BUILTINS.0.get(i) {
@@ -1161,6 +1162,15 @@ ffi_export! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// docs/DEVIATIONS.md: OpenSSL 3.6 returns a pointer before its table.
+    #[test]
+    fn a_negative_id_is_null() {
+        // SAFETY: no preconditions.
+        assert!(unsafe { X509_VERIFY_PARAM_get0(-1) }.is_null());
+        // SAFETY: as above.
+        assert!(unsafe { X509_VERIFY_PARAM_get0(c_int::MIN) }.is_null());
+    }
 
     #[test]
     fn null_parameters_are_safe() {

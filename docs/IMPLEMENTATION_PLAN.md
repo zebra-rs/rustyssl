@@ -5613,6 +5613,8 @@ both libraries (step 8.1).
       a different object gives `NID_undef` (3.5 replaced the older object under each key, and
       crashed on a built-in object, a deviation now gone); adding the same object again
       returns its NID.
+    - `X509_VERIFY_PARAM_get0` with a negative id no longer raises an error (`x509/vpm.rs`); 3.6
+      returns a pointer before its table there, so rustyssl returns NULL (docs/DEVIATIONS.md).
 
 **Exit:** M6.
 

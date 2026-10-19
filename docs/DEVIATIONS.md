@@ -267,6 +267,7 @@ OpenSSL never depends on them.
 | `X509_signature_dump` with a NULL signature | dereferences NULL | returns 0 | `x509::print::tests::a_null_signature_is_refused` |
 | The `X509_VERIFY_PARAM_*` getters and setters, `X509_VERIFY_PARAM_inherit` into, and `X509_VERIFY_PARAM_add0_table` of a NULL parameter | dereference NULL | answer 0 or NULL, or do nothing | `x509::vpm::tests::null_parameters_are_safe` |
 | `X509_VERIFY_PARAM_add0_table` of a parameter the table holds | frees it, then adds the freed parameter | keeps it, once | `x509::vpm::tests::adding_a_parameter_twice_keeps_it` |
+| `X509_VERIFY_PARAM_get0` with a negative id | returns a pointer before its table (3.6; 3.5 returned NULL with `ERR_R_PASSED_INVALID_ARGUMENT`) | NULL, with no error | `x509::vpm::tests::a_negative_id_is_null` |
 | `X509_VERIFY_PARAM_inherit` (and `X509_VERIFY_PARAM_set1`) from the parameter itself | may free its host names and policies, then copy them | does nothing | `x509::vpm::tests::inheriting_from_itself_does_nothing` |
 | The `X509_STORE_*` functions (adding, searching, locking, the parameters', callbacks', and application data's) with a NULL store | dereference NULL | answer 0 or NULL, or do nothing | `x509::store::tests::null_stores_are_safe` |
 | The `X509_OBJECT_*` functions with a NULL object, and `X509_OBJECT_set1_X509` with a NULL certificate | dereference NULL | answer 0, NULL, or `X509_LU_NONE` | `x509::store::tests::null_objects_are_safe` |
