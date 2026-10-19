@@ -20,8 +20,9 @@
 //!   `EVP_R_CTRL_OPERATION_NOT_IMPLEMENTED`.
 //!
 //! What OpenSSL dereferences without checking (a NULL context in most of these, a NULL cipher
-//! for `EVP_CIPHER_CTX_set_key_length`) is refused here instead (docs/DEVIATIONS.md). There
-//! are no engines, so an `ENGINE` argument fails initialization. Random keys come from the
+//! for `EVP_CIPHER_CTX_set_key_length`) is refused here instead (docs/DEVIATIONS.md). An
+//! `ENGINE` argument, or one reserved for the cipher's NID, takes the legacy path with the
+//! engine's cipher, the context holding the engine until it's reset. Random keys come from the
 //! operating system until the private generator of 3.7. The `EVP_CIPHER_meth_*` ciphers come
 //! with 3.11, the pipeline functions and the AlgorithmIdentifier ones later.
 //! `EVP_CipherInit_SKEY` keys a cipher with an opaque key of its provider's: its data for a

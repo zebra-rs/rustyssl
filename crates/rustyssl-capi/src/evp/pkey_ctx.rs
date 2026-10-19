@@ -635,7 +635,8 @@ ffi_export! {
     /// error if there's none.
     ///
     /// # Safety
-    /// `pkey` is NULL or a live key; `e` must be NULL (there are no engines).
+    /// `pkey` is NULL or a live key; `e` is NULL or a live engine (whose `EVP_PKEY_METHOD` the
+    /// context then uses).
     pub unsafe extern "C" fn EVP_PKEY_CTX_new(pkey: *mut EVP_PKEY, e: *mut ENGINE) -> *mut EVP_PKEY_CTX
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
@@ -651,7 +652,7 @@ ffi_export! {
     /// there's no key manager for it.
     ///
     /// # Safety
-    /// `e` must be NULL (there are no engines).
+    /// `e` is NULL or a live engine (whose `EVP_PKEY_METHOD` the context then uses).
     pub unsafe extern "C" fn EVP_PKEY_CTX_new_id(id: c_int, e: *mut ENGINE) -> *mut EVP_PKEY_CTX
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {

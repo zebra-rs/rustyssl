@@ -1601,7 +1601,9 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's engine: always NULL, as there are no engines.
+    /// The engine whose ASN.1 method the key's type came from (`pkey->engine`, not the
+    /// `EVP_PKEY_set1_engine` one): NULL, as keys don't take ASN.1 methods from engines yet
+    /// (step 9.3).
     ///
     /// # Safety
     /// `pkey` is NULL or a live key.

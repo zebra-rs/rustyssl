@@ -5417,6 +5417,21 @@ both libraries (step 8.1).
 - [ ] **9.3 ENGINE API** (3.x only): export every `ENGINE_*` symbol with "no engines
   available" semantics, i.e. how a normal build with no engines installed behaves. Settle the
   details by testing against consumers.
+  - Progress (2026-10-19): every `ENGINE_*` export is implemented (`crates/rustyssl-capi/src/
+    engine/`): application engines, the engine list, control commands, method tables and
+    defaults, key loaders, ex_data, the configuration's engines module, the built-in `dynamic`
+    engine (which loads engine modules: OpenSSL's own `loader_attic`, `padlock` and `capi`, and
+    the test engine `dasync`) and `rdrand` on x86 cores with RDRAND. Engines' methods are used:
+    `RSA_new_method`/`DSA_`/`DH_`/`EC_KEY_` and the default key engines; `EVP_DigestInit_ex`,
+    `EVP_CipherInit_ex` and their forms with an engine or a default digest/cipher engine (the
+    legacy path, the context holding a functional reference); `EVP_PKEY_CTX_new`/`_new_id` with
+    an engine's `EVP_PKEY_METHOD`; `EVP_PKEY_set1_engine`. Tests: `tests/c/engine.c` (134
+    checks, identical on both libraries); upstream `enginetest` 3/3 in `test-openssl-suite`.
+  - Left: the static ciphers (`EVP_aes_128_cbc()` ...) have no legacy functions, which engines
+    such as `dasync` call (`EVP_CIPHER_meth_get_init`), so sslapitest's `test_pipelining`
+    crashes calling NULL; raw, MAC and CMAC keys with an engine, an engine's ASN.1 methods
+    (`pkey->engine`), and the MACs' `engine` parameter still fail (docs/DEVIATIONS.md, marked
+    as gaps); `SSL_CTX_set_client_cert_engine`; `evp_extra_test`'s engine parts.
 - [ ] **9.4 Long-tail sweep:** every remaining `DEPRECATEDIN_*` family, the exported data
   symbols, and the platform helpers (`OPENSSL_ia32cap_loc`, …), until libcrypto coverage
   reaches 100%; `OSSL_LIB_CTX_get_data` (from 3.1e).

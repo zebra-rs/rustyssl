@@ -5,6 +5,9 @@
 # `whole` line runs its program once, as one subtest. A `skip` line names a program that isn't
 # run, and why; an `internal` line, a program's tests that read libssl's private structures.
 
+# 30-test_engine.t: the ENGINE API (libcrypto's, run here as the dasync engine is built here)
+enginetest {src}/test/certs/root-cert.pem
+
 # 90-test_sslapi.t (the default provider's run)
 sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
 # 80-test_ssl_new.t: ssl_test on each test/ssl-tests/*.cnf with the default provider (the
