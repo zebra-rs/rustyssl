@@ -113,8 +113,12 @@ static void integers(void)
           "widths, flags, and precisions of ints");
     reset();
     check(is(BIO_snprintf(buf, 64, "%x %X %#x %o %#o %u %#X", 255, 255, 255, 8, 8, 4000000000U, 0),
-             32, "ff FF 0xff 10 010 4000000000 0x0"),
-          "hex, octal, and unsigned; # gives 0x (lowercase even for %X) and a leading 0");
+             30, "ff FF 0xff 10 010 4000000000 0"),
+          "hex, octal, and unsigned; # gives 0x only to nonzero values, and a leading 0");
+    reset();
+    check(is(sn(buf, 64, "[%#X|%#o|%#.3o|%.0d|%.0x|%#.0o|%.d]", 255, 0, 8, 0, 0, 0, 0), 17,
+             "[0XFF|0|010|||0|]"),
+          "%#X gives 0X; 0 with a precision of 0 is empty, except %#o; . alone is precision 0");
     reset();
     check(is(BIO_snprintf(buf, 64, "%ld %lu %lld %zu %zd %jd", -1L, 18446744073709551615UL,
                           (long long)INT64_MIN, (size_t)7, (ssize_t)-7, (intmax_t)9), 51,
@@ -127,15 +131,15 @@ static void integers(void)
     check(is(BIO_snprintf(buf, 64, "[%*d|%-*d|%.*d]", 4, 1, 3, 2, 3, 3), 14, "[   1|2  |003]"),
           "widths and precisions from *");
     reset();
-    check(is(sn(buf, 64, "[%*d|%.*d]", -4, 1, -2, 7), 5, "[1|7]"),
-          "negative widths and precisions from * are ignored");
+    check(is(sn(buf, 64, "[%*d|%.*d]", -4, 1, -2, 7), 8, "[1   |7]"),
+          "a negative width from * is the - flag; a negative precision is none");
     reset();
-    check(is(BIO_snprintf(buf, 64, "%p %p", (void *)0, (void *)0x1234), 10, "0x0 0x1234"),
-          "%p is hex with 0x");
+    check(is(BIO_snprintf(buf, 64, "%p %p", (void *)0, (void *)0x1234), 8, "0 0x1234"),
+          "%p is hex with 0x, and null is 0");
     reset();
-    check(is(sn(buf, 64, "[%08.3d|%-08d|%+05d]", 5, 5, -5), 23,
-             "[000005|00000005|-0005]"),
-          "0 pads to the width despite a precision, and despite -");
+    check(is(sn(buf, 64, "[%08.3d|%-08d|%+05d|%-+5d]", 5, 5, -5, 5), 31,
+             "[     005|5       |-0005|+5   ]"),
+          "a precision drops the 0 flag, and - beats 0");
 }
 
 static void quirks(void)
@@ -143,12 +147,32 @@ static void quirks(void)
     int n = -1;
 
     reset();
-    check(is(sn(buf, 64, "%hhd|", 5), 2, "d|"), "%hhd is %h then the unknown conversion h");
+    check(is(sn(buf, 64, "%hhd|%hhu|%hhx|", 261, -1, 511), 9, "5|255|ff|"),
+          "hh narrows to a char");
+    reset();
+    check(is(sn(buf, 64, "%td|%tx", (ptrdiff_t)-3, (ptrdiff_t)255), 5, "-3|ff"),
+          "t reads a ptrdiff_t");
     reset();
     check(is(sn(buf, 64, "a%wbc%k%5%d", 1), 4, "ac%d"),
           "%w skips the next character; unknown conversions print nothing; %5% is %");
     reset();
     check(is(BIO_snprintf(buf, 64, "abc%n|", &n), 4, "abc|") && n == 3, "%n stores the count");
+    {
+        signed char hh = -1;
+        short h = -1;
+        long l = -1;
+        long long ll = -1;
+        size_t z = 0;
+
+        reset();
+        check(is(sn(buf, 64, "a%hhnbc%hnd%lne%llnf%zn", &hh, &h, &l, &ll, &z), 6, "abcdef")
+              && hh == 1 && h == 3 && l == 4 && ll == 5 && z == 6,
+              "%n stores into the type its length modifier names");
+    }
+    reset();
+    n = -1;
+    check(sn(buf, 4, "abcdef%n%10s", &n, "") == -1 && n == 6 && strcmp(buf, "abc") == 0,
+          "%n counts what a full buffer drops");
     reset();
     check(is(sn(buf, 64, "trailing %"), 9, "trailing "), "a trailing % prints nothing");
 }
@@ -174,9 +198,9 @@ static void doubles(void)
              "1.500000 2.67 3 3."),
           "%f rounds the scaled fraction half up; # keeps the point");
     reset();
-    check(is(BIO_snprintf(buf, 64, "[%10.3f|%-10.3f|%010.3f|%+.1f]", -1.5, -1.5, -1.5, 2.25), 38,
-             "[    -1.500|-1.500    |-0001.500|+2.3]"),
-          "widths and flags of %f");
+    check(is(sn(buf, 64, "[%10.3f|%-10.3f|%010.3f|%+.1f]", -1.5, -1.5, -1.5, 2.25), 34,
+             "[    -1.500|-1.500|-0001.500|+2.3]"),
+          "widths and flags of %f; - drops the padding");
     reset();
     check(is(BIO_snprintf(buf, 64, "%.12f", 0.5), 11, "0.500000000"),
           "%f prints at most 9 decimals");

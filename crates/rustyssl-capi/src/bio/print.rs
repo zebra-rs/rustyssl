@@ -3,17 +3,23 @@
 //!
 //! OpenSSL doesn't use the C library's printf. Its formatter (`_dopr` in `bio_print.c`)
 //! differs from C's in many details, and applications diff its output, so this is a port of its
-//! behavior, quirks included:
-//! - Widths and precisions from `*` that are negative are ignored, not turned into the `-`
-//!   flag or "no precision".
+//! behavior, quirks included. This follows OpenSSL 3.6's formatter, which differs from 3.5's
+//! (docs/IMPLEMENTATION_PLAN.md, step 9.5):
+//! - A negative width from `*` sets the `-` flag; a negative precision from `*` counts as none.
+//!   A `.` without digits is a precision of 0. Widths and precisions of `INT_MAX / 10` or more
+//!   fail.
+//! - Integers follow C: a precision drops the `0` flag, 0 with a precision of 0 prints nothing,
+//!   `%#o` always gets its `0` (counted against the precision), `%#x` gets `0x` (`0X` for `%#X`)
+//!   only when the value isn't 0, and `%p` prints like `%#x`. `hh` and `t` are length modifiers,
+//!   and `%n` honors each length modifier.
 //! - `%f`, `%e`, and `%g` print at most 9 decimals, round half up on the scaled fraction, print
 //!   `?` as the sign of an infinity or NaN (whose digits are 0), fail for values of 2^64 or more,
-//!   leave 10.0 as the mantissa of `%e` (`10.000000e+00`), and drop the leading digit of a
-//!   20-digit integer part. `L` reads a `double`, as OpenSSL is built without `long double`.
-//! - `%p` prints like `%#x`; `%hhd` is `%h` then the unknown conversion `h`, so the `d` is
-//!   printed; `%w` skips the character after it; unknown conversions print nothing.
+//!   leave 10.0 as the mantissa of `%e` (`10.000000e+00`), drop the leading digit of a 20-digit
+//!   integer part, and never pad on the right (the `-` flag drops the padding). `L` reads a
+//!   `double`, as OpenSSL is built without `long double`.
+//! - `%w` skips the character after it; unknown conversions print nothing.
 //! - `BIO_snprintf` returns -1 when the output doesn't fit (the buffer holds what fit, and a NUL
-//!   if it has room), and stops reading the format, and the arguments, once the buffer is full.
+//!   if it has room); it reads the whole format, and all the arguments, regardless.
 //! - `BIO_printf` grows its buffer 1 KiB at a time and fails once that would pass `INT_MAX`.
 //!
 //! The arithmetic wraps where OpenSSL's C does, and `f64` is the C `double` OpenSSL computes in,
@@ -53,11 +59,13 @@ const UNSIGNED: u8 = 1 << 6;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Modifier {
     Int,
+    Char,
     Short,
     Long,
     LongDouble,
     LongLong,
     Size,
+    Ptrdiff,
 }
 
 /// Where the formatter is in a conversion (OpenSSL's `DP_S_*`).
@@ -186,22 +194,20 @@ enum Sink {
     Growing(Vec<u8>),
 }
 
-/// The output so far (`currlen` is `len`).
+/// The output so far (`currlen` is `len`; `pos`, what `%n` reports, also counts what a full
+/// fixed buffer dropped).
 struct Output {
     sink: Sink,
     len: usize,
+    pos: i64,
 }
 
 impl Output {
-    fn is_fixed(&self) -> bool {
-        matches!(self.sink, Sink::Fixed { .. })
-    }
-
-    /// The buffer is full, which stops a fixed buffer's formatting.
-    fn is_full(&self) -> bool {
-        match self.sink {
-            Sink::Fixed { size, .. } => self.len >= size,
-            Sink::Growing(_) => false,
+    fn new(sink: Sink) -> Self {
+        Self {
+            sink,
+            len: 0,
+            pos: 0,
         }
     }
 
@@ -210,11 +216,16 @@ impl Output {
         self.repeat(c, 1)
     }
 
-    /// Appends `count` copies of `c`, as that many calls of [`put`](Self::put) would.
+    /// Appends `count` copies of `c`, as that many calls of [`put`](Self::put) would (OpenSSL's
+    /// padding loops, which `eob_ok` cuts short at the end of a fixed buffer, counting the rest).
     fn repeat(&mut self, c: u8, count: usize) -> Result<(), Failed> {
         if count == 0 {
             return Ok(());
         }
+        self.pos = i64::try_from(count)
+            .ok()
+            .and_then(|n| self.pos.checked_add(n))
+            .unwrap_or(i64::MAX);
         match &mut self.sink {
             Sink::Fixed { buf, size } => {
                 if buf.is_null() {
@@ -246,15 +257,6 @@ impl Output {
     /// Appends `bytes`, as [`put`](Self::put) for each would.
     fn extend(&mut self, bytes: &[u8]) -> Result<(), Failed> {
         bytes.iter().try_for_each(|b| self.put(*b))
-    }
-
-    /// The buffer size the `%s` conversion bounds a string by when it has no precision:
-    /// `INT_MAX` while growing, else the fixed size as a C `int`.
-    fn string_bound(&self) -> c_int {
-        match self.sink {
-            Sink::Fixed { size, .. } => wrap(i128::try_from(size).unwrap_or(0)),
-            Sink::Growing(_) => c_int::MAX,
-        }
     }
 }
 
@@ -341,7 +343,8 @@ impl Format {
 }
 
 /// OpenSSL's `_dopr`: formats into `out`, then appends a NUL. Returns the length without the
-/// NUL (`currlen - 1`, wrapping as in C) and whether a fixed buffer was too small.
+/// NUL (`currlen - 1`, wrapping as in C) and whether a fixed buffer was too small. A failure
+/// still cuts the output short and ends it with a NUL, as OpenSSL does.
 ///
 /// # Safety
 /// `format` is a NUL-terminated string; `args` are what it says, as for C's `printf`.
@@ -350,6 +353,32 @@ unsafe fn dopr(
     args: &mut impl Args,
     out: &mut Output,
 ) -> Result<(usize, bool), Failed> {
+    // SAFETY: the caller's guarantee.
+    let formatted = unsafe { conversions(format, args, out) };
+    let mut truncated = false;
+    if let Sink::Fixed { size, .. } = out.sink {
+        truncated = out.len > size.wrapping_sub(1);
+        if truncated {
+            out.len = size - 1;
+        }
+    }
+    let ended = out.put(0);
+    formatted?;
+    ended?;
+    Ok((out.len.wrapping_sub(1), truncated))
+}
+
+/// `_dopr`'s loop over the format.
+///
+/// # Safety
+/// As for [`dopr`].
+unsafe fn conversions(
+    format: *const c_char,
+    args: &mut impl Args,
+    out: &mut Output,
+) -> Result<(), Failed> {
+    /// Widths and precisions stop growing here; another digit fails.
+    const CAP: c_int = c_int::MAX / 10;
     let mut format = Format(format.cast());
     let mut state = State::Default;
     let mut flags = 0u8;
@@ -357,10 +386,7 @@ unsafe fn dopr(
     let mut min: c_int = 0;
     let mut max: c_int = -1;
     let mut ch = format.next();
-    loop {
-        if ch == 0 || (out.is_fixed() && out.is_full()) {
-            break;
-        }
+    while ch != 0 {
         match state {
             State::Default => {
                 if ch == b'%' {
@@ -388,12 +414,19 @@ unsafe fn dopr(
             }
             State::Min => {
                 if ch.is_ascii_digit() {
-                    min = min.wrapping_mul(10).wrapping_add(c_int::from(ch - b'0'));
+                    if min >= CAP {
+                        return Err(Failed);
+                    }
+                    min = 10 * min + c_int::from(ch - b'0');
                     ch = format.next();
                 } else {
                     if ch == b'*' {
                         // SAFETY: the caller's guarantee.
                         min = unsafe { args.int() };
+                        if min < 0 {
+                            flags |= MINUS;
+                            min = min.wrapping_neg();
+                        }
                         ch = format.next();
                     }
                     state = State::Dot;
@@ -409,22 +442,29 @@ unsafe fn dopr(
             }
             State::Max => {
                 if ch.is_ascii_digit() {
-                    max = max
-                        .max(0)
-                        .wrapping_mul(10)
-                        .wrapping_add(c_int::from(ch - b'0'));
+                    max = max.max(0);
+                    if max >= CAP {
+                        return Err(Failed);
+                    }
+                    max = 10 * max + c_int::from(ch - b'0');
                     ch = format.next();
                 } else {
                     if ch == b'*' {
                         // SAFETY: the caller's guarantee.
                         max = unsafe { args.int() };
                         ch = format.next();
+                    } else {
+                        max = max.max(0);
                     }
                     state = State::Mod;
                 }
             }
             State::Mod => {
                 let modifier = match ch {
+                    b'h' if format.peek() == b'h' => {
+                        format.skip();
+                        Some(Modifier::Char)
+                    }
                     b'h' => Some(Modifier::Short),
                     b'l' if format.peek() == b'l' => {
                         format.skip();
@@ -434,6 +474,7 @@ unsafe fn dopr(
                     b'q' | b'j' => Some(Modifier::LongLong),
                     b'L' => Some(Modifier::LongDouble),
                     b'z' => Some(Modifier::Size),
+                    b't' => Some(Modifier::Ptrdiff),
                     _ => None,
                 };
                 if let Some(modifier) = modifier {
@@ -454,15 +495,7 @@ unsafe fn dopr(
             }
         }
     }
-    let mut truncated = false;
-    if let Sink::Fixed { size, .. } = out.sink {
-        truncated = out.len > size.wrapping_sub(1);
-        if truncated {
-            out.len = size - 1;
-        }
-    }
-    out.put(0)?;
-    Ok((out.len.wrapping_sub(1), truncated))
+    Ok(())
 }
 
 /// One conversion, `ch`, with its flags, length modifier, width, and precision.
@@ -488,10 +521,14 @@ unsafe fn convert(
             // SAFETY: the caller's guarantee.
             let value = match unsafe { integer(args, size) } {
                 Integer::Wide(value) => value,
-                Integer::Int(value) if size == Modifier::Short => {
-                    i64::from(wrap_short(value)).cast_unsigned()
+                Integer::Int(value) => {
+                    let value = match size {
+                        Modifier::Char => i64::from(value.to_le_bytes()[0].cast_signed()),
+                        Modifier::Short => i64::from(wrap_short(value)),
+                        _ => i64::from(value),
+                    };
+                    value.cast_unsigned()
                 }
-                Integer::Int(value) => i64::from(value).cast_unsigned(),
             };
             fmtint(out, value, 10, min, max, flags)
         }
@@ -503,10 +540,14 @@ unsafe fn convert(
             // SAFETY: the caller's guarantee.
             let value = match unsafe { integer(args, size) } {
                 Integer::Wide(value) => value,
-                Integer::Int(value) if size == Modifier::Short => {
-                    u64::from(value.cast_unsigned() & 0xFFFF)
+                Integer::Int(value) => {
+                    let value = value.cast_unsigned();
+                    u64::from(match size {
+                        Modifier::Char => value & 0xFF,
+                        Modifier::Short => value & 0xFFFF,
+                        _ => value,
+                    })
                 }
-                Integer::Int(value) => u64::from(value.cast_unsigned()),
             };
             let base = match ch {
                 b'o' => 8,
@@ -537,7 +578,7 @@ unsafe fn convert(
             // SAFETY: as above.
             let value = unsafe { args.pointer() }.cast::<c_char>();
             if max < 0 {
-                max = out.string_bound();
+                max = c_int::MAX;
             }
             // SAFETY: as above: a string, or null.
             unsafe { fmtstr(out, value, flags, min, max) }
@@ -549,10 +590,26 @@ unsafe fn convert(
         }
         b'n' => {
             // SAFETY: as above.
-            let num = unsafe { args.pointer() }.cast::<c_int>();
+            let num = unsafe { args.pointer() };
             if !num.is_null() {
-                // SAFETY: as above: `%n` takes a pointer to an `int`.
-                unsafe { num.write(wrap(i128::try_from(out.len).unwrap_or(0))) };
+                let pos = out.pos;
+                // SAFETY: as above: `%n` takes a pointer to the integer type its length
+                // modifier names, which gets the count converted to that type, as C converts.
+                unsafe {
+                    match size {
+                        Modifier::Char => {
+                            num.cast::<i8>().write(pos.to_le_bytes()[0].cast_signed())
+                        }
+                        Modifier::Short => num.cast::<i16>().write(wrap_short(wrap(pos.into()))),
+                        Modifier::Long
+                        | Modifier::LongLong
+                        | Modifier::Size
+                        | Modifier::Ptrdiff => num.cast::<i64>().write(pos),
+                        Modifier::Int | Modifier::LongDouble => {
+                            num.cast::<c_int>().write(wrap(pos.into()));
+                        }
+                    }
+                }
             }
             Ok(())
         }
@@ -576,7 +633,10 @@ enum Integer {
 /// # Safety
 /// An argument of that type is next.
 unsafe fn integer(args: &mut impl Args, size: Modifier) -> Integer {
-    if matches!(size, Modifier::Long | Modifier::LongLong | Modifier::Size) {
+    if matches!(
+        size,
+        Modifier::Long | Modifier::LongLong | Modifier::Size | Modifier::Ptrdiff
+    ) {
         // SAFETY: the caller's guarantee.
         Integer::Wide(unsafe { args.long() })
     } else {
@@ -609,9 +669,12 @@ unsafe fn fmtstr(
     let limit = usize::try_from(max).unwrap_or(usize::MAX);
     // SAFETY: the caller's guarantee.
     let len = unsafe { libc::strnlen(value, limit) };
-    let mut padlen = wrap(i128::from(min) - i128::try_from(len).unwrap_or(0));
-    if min < 0 || padlen < 0 {
-        padlen = 0;
+    let mut strln = c_int::try_from(len).ok();
+    let mut padlen: c_int = 0;
+    if min >= 0
+        && let Some(strln) = strln.filter(|n| *n < c_int::MAX)
+    {
+        padlen = (min - strln).max(0);
     }
     if max >= 0 {
         max = if max < c_int::MAX - padlen {
@@ -620,29 +683,33 @@ unsafe fn fmtstr(
             c_int::MAX
         };
     }
-    // How many of `wanted` characters fit after `written`.
-    let fits = |wanted: usize, written: usize| {
-        if max < 0 {
-            wanted
-        } else {
-            wanted.min(count(max).saturating_sub(written))
+    let mut cnt: c_int = 0;
+    if flags & MINUS == 0 && padlen > 0 {
+        if max >= 0 {
+            padlen = padlen.min(max);
+            cnt = padlen;
         }
-    };
-    let mut written = 0;
-    let (left, right) = if flags & MINUS == 0 {
-        (count(padlen), 0)
-    } else {
-        (0, count(padlen))
-    };
-    let n = fits(left, written);
-    out.repeat(b' ', n)?;
-    written += n;
-    let n = fits(len, written);
-    // SAFETY: `len` bytes before any NUL are readable (strnlen read them).
-    let bytes = unsafe { core::slice::from_raw_parts(value.cast::<u8>(), n) };
+        out.repeat(b' ', count(padlen))?;
+    }
+    let mut take = len;
+    if max >= 0 {
+        if strln.is_none_or(|n| n > max - cnt) {
+            strln = Some(max - cnt);
+            take = count(max - cnt);
+        }
+        cnt += strln.unwrap_or(0);
+    }
+    // SAFETY: `take` is at most `len`, and `len` bytes before any NUL are readable (strnlen
+    // read them).
+    let bytes = unsafe { core::slice::from_raw_parts(value.cast::<u8>(), take) };
     out.extend(bytes)?;
-    written += n;
-    out.repeat(b' ', fits(right, written))
+    if flags & MINUS != 0 && padlen > 0 {
+        if max >= 0 {
+            padlen = padlen.min(max - cnt);
+        }
+        out.repeat(b' ', count(padlen))?;
+    }
+    Ok(())
 }
 
 /// OpenSSL's `fmtint`: `value` in `base`, signed unless the flags say `UNSIGNED`, with at least
@@ -653,9 +720,15 @@ fn fmtint(
     base: u64,
     min: c_int,
     max: c_int,
-    flags: u8,
+    mut flags: u8,
 ) -> Result<(), Failed> {
-    let max = max.max(0);
+    let max = if max < 0 {
+        1
+    } else {
+        // A precision drops the `0` flag.
+        flags &= !ZERO;
+        max
+    };
     let mut magnitude = value;
     let mut sign = None;
     if flags & UNSIGNED == 0 {
@@ -670,41 +743,34 @@ fn fmtint(
     }
     let prefix: &[u8] = match (flags & NUM != 0, base) {
         (true, 8) => b"0",
-        (true, 16) => b"0x",
+        (true, 16) if value != 0 && flags & UP != 0 => b"0X",
+        (true, 16) if value != 0 => b"0x",
         _ => b"",
     };
-    // OpenSSL's buffer: `DECIMAL_SIZE(int64_t) + 3`, which every value fits.
+    let octal = c_int::from(base == 8 && !prefix.is_empty());
+    // OpenSSL's buffer: `DECIMAL_SIZE(int64_t) + 3`, which every value fits. 0 has no digits.
     let mut digits = Digits::<26>::new();
-    loop {
+    while magnitude != 0 && digits.len < 26 {
         digits.push(digit(magnitude % base, flags & UP != 0));
         magnitude /= base;
-        if magnitude == 0 || digits.len >= 26 {
-            break;
-        }
     }
     if digits.len == 26 {
         digits.len -= 1;
     }
     let place = digits.place();
-    let mut zpadlen = max - place;
-    let mut spadlen = wrap(
-        i128::from(min)
-            - i128::from(max.max(place))
-            - i128::from(sign.is_some())
-            - i128::try_from(prefix.len()).unwrap_or(0),
-    );
-    zpadlen = zpadlen.max(0);
-    spadlen = spadlen.max(0);
-    if flags & ZERO != 0 {
-        zpadlen = zpadlen.max(spadlen);
+    let mut zpadlen = max.wrapping_sub(place).wrapping_sub(octal).max(0);
+    let shown = place
+        .wrapping_add(zpadlen)
+        .wrapping_add(c_int::from(sign.is_some()))
+        .wrapping_add(c_int::try_from(prefix.len()).unwrap_or(0));
+    let mut spadlen = min.wrapping_sub(max.max(shown)).max(0);
+    if flags & MINUS != 0 {
+        spadlen = -spadlen;
+    } else if flags & ZERO != 0 {
+        zpadlen = zpadlen.wrapping_add(spadlen);
         spadlen = 0;
     }
-    let (left, right) = if flags & MINUS == 0 {
-        (spadlen, 0)
-    } else {
-        (0, spadlen)
-    };
-    out.repeat(b' ', count(left))?;
+    out.repeat(b' ', count(spadlen))?;
     if let Some(sign) = sign {
         out.put(sign)?;
     }
@@ -713,7 +779,7 @@ fn fmtint(
     digits
         .most_significant_first()
         .try_for_each(|d| out.put(d))?;
-    out.repeat(b' ', count(right))
+    out.repeat(b' ', count(spadlen.wrapping_neg()))
 }
 
 /// OpenSSL's `abs_val`: the magnitude, with infinities and NaNs as 0.
@@ -905,6 +971,8 @@ fn fmtfp(
         out.repeat(b'0', count(padlen))?;
         padlen = 0;
     }
+    // OpenSSL drops the padding of the `-` flag: it clears `padlen` here, before the padding on
+    // the right would print.
     out.repeat(b' ', count(padlen))?;
     if let Some(sign) = sign {
         out.put(sign)?;
@@ -926,7 +994,7 @@ fn fmtfp(
             .most_significant_first()
             .try_for_each(|d| out.put(d))?;
     }
-    out.repeat(b' ', count(padlen.saturating_neg()))
+    Ok(())
 }
 
 /// `BIO_vsnprintf`: formats into `buf`, which has `n` bytes. Returns the length without the
@@ -944,13 +1012,10 @@ pub(crate) unsafe fn vsnprintf(
     if format.is_null() {
         return -1;
     }
-    let mut out = Output {
-        sink: Sink::Fixed {
-            buf: buf.cast(),
-            size: n,
-        },
-        len: 0,
-    };
+    let mut out = Output::new(Sink::Fixed {
+        buf: buf.cast(),
+        size: n,
+    });
     // SAFETY: the caller's guarantee.
     match unsafe { dopr(format, args, &mut out) } {
         Ok((len, false)) => c_int::try_from(len).unwrap_or(-1),
@@ -982,10 +1047,7 @@ pub(crate) unsafe fn vprintf(bio: *mut BIO, format: *const c_char, args: &mut im
     if format.is_null() {
         return -1;
     }
-    let mut out = Output {
-        sink: Sink::Growing(Vec::new()),
-        len: 0,
-    };
+    let mut out = Output::new(Sink::Growing(Vec::new()));
     // SAFETY: the caller's guarantee.
     let Ok((len, _)) = (unsafe { dopr(format, args, &mut out) }) else {
         return -1;
@@ -1110,9 +1172,13 @@ mod tests {
             format(c"%.3d|%+d|% d", &[Arg::Int(5), Arg::Int(5), Arg::Int(5)]).1,
             b"005|+5| 5"
         );
-        // A negative width from `*` is ignored, unlike C's printf.
-        assert_eq!(format(c"[%*d]", &[Arg::Int(-4), Arg::Int(1)]).1, b"[1]");
-        assert_eq!(format(c"%hhd", &[Arg::Int(1)]).1, b"d");
+        // A negative width from `*` is the `-` flag, as in C's printf.
+        assert_eq!(format(c"[%*d]", &[Arg::Int(-4), Arg::Int(1)]).1, b"[1   ]");
+        assert_eq!(format(c"%hhd", &[Arg::Int(257)]).1, b"1");
+        assert_eq!(
+            format(c"%#x|%#o|%.0d", &[Arg::Int(0), Arg::Int(0), Arg::Int(0)]).1,
+            b"0|0|"
+        );
         assert_eq!(format(c"%ld", &[Arg::Long(u64::MAX)]).1, b"-1");
     }
 

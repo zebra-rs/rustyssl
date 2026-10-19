@@ -5596,6 +5596,14 @@ both libraries (step 8.1).
       text; the legacy provider gains a `GENERIC-SECRET` symmetric key manager; RSA-PSS gains
       the name `rsassaPss`.
     - `PKCS12_SALT_LEN` is 16 (3.5: 8).
+    - `BIO_printf` and `BIO_snprintf` follow C more closely (`bio/print.rs`): a negative `*`
+      width is the `-` flag (3.5 ignored it, so a negative `%*s` indentation, as in
+      `BIO_hex_string`, now indents); a negative `*` precision is none; `.` alone is precision
+      0; a precision drops the `0` flag of integers; 0 with precision 0 prints nothing; `%#x`
+      of 0 is `0` and `%#X` gives `0X`; `%p` of null is `0`; `hh` and `t` are length modifiers
+      (3.5 printed `%hhd` as `d`); `%n` honors length modifiers and counts output a full buffer
+      dropped; `%-f` no longer pads on the right (a 3.6 quirk); widths and precisions of
+      `INT_MAX / 10` or more fail; a full buffer no longer stops reading the arguments.
 
 **Exit:** M6.
 
