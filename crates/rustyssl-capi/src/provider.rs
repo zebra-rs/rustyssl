@@ -214,7 +214,7 @@ pub(crate) struct Provider {
     parent: std::sync::OnceLock<Ptr<OSSL_CORE_HANDLE>>,
 }
 
-handle_type!(OSSL_PROVIDER => Provider);
+handle_type!(OSSL_PROVIDER => Provider, teardown = Provider::teardown);
 
 /// A provider's reason strings as `ERR_load_strings` takes them: the library's name, then the
 /// reasons, then the end. The strings are the provider's (static in its module) and its name.
@@ -291,26 +291,32 @@ impl Provider {
     }
 }
 
-impl Drop for Provider {
-    /// `ossl_provider_free` at the last reference: an initialized provider is torn down, its
-    /// reason strings unloaded, its thread-stop handlers dropped; then its module is closed
-    /// (the field drops last).
-    fn drop(&mut self) {
+impl Provider {
+    /// `ossl_provider_free` at the last reference ([`Handle::teardown`]): an initialized
+    /// provider is torn down, its reason strings unloaded, its thread-stop handlers dropped;
+    /// its module is closed when it drops (the field drops last). The teardown makes upcalls
+    /// with the provider's handle, which still reaches it.
+    fn teardown(&self) {
         let is_child = self.parent.get().is_some();
-        let state = self.state.get_mut().unwrap_or_else(PoisonError::into_inner);
-        if state.initialized {
+        let (initialized, teardown, provctx) = {
+            let state = self.state();
+            let provctx = state.provctx.map_or(ptr::null_mut(), |p| p.0);
+            (state.initialized, state.functions.teardown, provctx)
+        };
+        if initialized {
             // `ossl_provider_teardown`: a child provider's context is its parent's, torn down
             // with the parent.
-            if let Some(teardown) = state.functions.teardown.filter(|_| !is_child) {
-                let provctx = state.provctx.map_or(ptr::null_mut(), |p| p.0);
-                // SAFETY: the provider's own teardown, given its own context, once.
+            if let Some(teardown) = teardown.filter(|_| !is_child) {
+                // SAFETY: the provider's own teardown, given its own context, once, with no
+                // lock held.
                 unsafe { teardown(provctx) };
             }
             let reasons = self
                 .reasons
-                .get_mut()
-                .unwrap_or_else(PoisonError::into_inner);
-            if let Some(Reasons(table)) = reasons.as_mut() {
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+            if let Some(Reasons(mut table)) = reasons {
                 // SAFETY: the table loaded at init, ended by a zero entry.
                 unsafe {
                     crate::err::strings::ERR_unload_strings(self.error_lib, table.as_mut_ptr())
@@ -402,15 +408,15 @@ impl StoreState {
     }
 }
 
-impl Drop for StoreState {
+impl StoreState {
     /// `provider_deactivate_free` for each provider, as the context goes.
-    fn drop(&mut self) {
+    fn release(conf_activated: Vec<Stored>, providers: Vec<Stored>) {
         // `ossl_prov_conf_ctx_free`: the configuration's references.
-        for p in self.conf_activated.drain(..) {
+        for p in conf_activated {
             // SAFETY: the configuration's reference, given up.
             unsafe { OSSL_PROVIDER::free(p.0.0) };
         }
-        for p in self.providers.drain(..) {
+        for p in providers {
             // The context is going, its method store with it: only the count changes.
             if let Some(prov) = p.get().filter(|p| p.state().activated) {
                 count_deactivation(prov);
@@ -421,11 +427,34 @@ impl Drop for StoreState {
     }
 }
 
+impl Drop for StoreState {
+    fn drop(&mut self) {
+        Self::release(
+            core::mem::take(&mut self.conf_activated),
+            core::mem::take(&mut self.providers),
+        );
+    }
+}
+
 /// A library context's provider store, behind its lock.
 #[derive(Default)]
 pub(crate) struct Store(Mutex<StoreState>);
 
 impl Store {
+    /// Gives up the store's providers as its context goes ([`Handle::teardown`]): their
+    /// teardowns run with the context still there and the store unlocked.
+    pub(crate) fn release(&self) {
+        let (conf_activated, providers) = {
+            let mut s = self.lock();
+            s.sorted = true;
+            (
+                core::mem::take(&mut s.conf_activated),
+                core::mem::take(&mut s.providers),
+            )
+        };
+        StoreState::release(conf_activated, providers);
+    }
+
     fn lock(&self) -> MutexGuard<'_, StoreState> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }

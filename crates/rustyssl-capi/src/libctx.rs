@@ -51,9 +51,17 @@ pub(crate) struct LibCtx {
     child: OnceLock<crate::provider::child::Globals>,
 }
 
-handle_type!(OSSL_LIB_CTX => LibCtx);
+handle_type!(OSSL_LIB_CTX => LibCtx, teardown = LibCtx::teardown);
 
 impl LibCtx {
+    /// `context_deinit_objs`, as far as it runs C code: the method store and the generators
+    /// go, then the providers, whose teardowns may reach the context through its handle.
+    fn teardown(&self) {
+        self.evp.release();
+        self.rand.release();
+        self.providers.release();
+    }
+
     /// The core's BIO functions, for a context made from a core's table.
     pub(crate) fn core_bio(&self) -> Option<crate::provider::upcalls::CoreBio> {
         self.core_bio.get().copied()
@@ -354,6 +362,111 @@ mod tests {
         unsafe { OSSL_LIB_CTX_free(global()) };
         // SAFETY: no longer a default, so freed now.
         unsafe { OSSL_LIB_CTX_free(ctx) };
+    }
+
+    /// A provider's child context, made at its init and freed by its teardown (as upstream's
+    /// legacy provider does), which runs as the parent context is freed.
+    mod teardown {
+        use super::*;
+        use core::ffi::c_void;
+        use rustyssl_abi::{
+            OSSL_ALGORITHM, OSSL_CORE_HANDLE, OSSL_DISPATCH, OSSL_FUNC_PROVIDER_QUERY_OPERATION,
+            OSSL_FUNC_PROVIDER_TEARDOWN,
+        };
+        use std::sync::atomic::{AtomicPtr, AtomicU32};
+
+        pub(super) static CHILD: AtomicPtr<OSSL_LIB_CTX> = AtomicPtr::new(ptr::null_mut());
+        pub(super) static TEARDOWNS: AtomicU32 = AtomicU32::new(0);
+
+        struct Table([OSSL_DISPATCH; 3]);
+        // SAFETY: function pointers only.
+        unsafe impl Sync for Table {}
+
+        unsafe extern "C" fn query(
+            _: *mut c_void,
+            _: c_int,
+            _: *mut c_int,
+        ) -> *const OSSL_ALGORITHM {
+            ptr::null()
+        }
+
+        unsafe extern "C" fn teardown(_: *mut c_void) {
+            TEARDOWNS.fetch_add(1, Ordering::SeqCst);
+            // SAFETY: the child made at init, freed once.
+            unsafe { OSSL_LIB_CTX_free(CHILD.swap(ptr::null_mut(), Ordering::SeqCst)) };
+        }
+
+        static PROVIDER: Table = Table([
+            OSSL_DISPATCH {
+                function_id: OSSL_FUNC_PROVIDER_QUERY_OPERATION as c_int,
+                // SAFETY: the core casts it back to the type its id stands for.
+                function: Some(unsafe {
+                    core::mem::transmute::<
+                        unsafe extern "C" fn(
+                            *mut c_void,
+                            c_int,
+                            *mut c_int,
+                        ) -> *const OSSL_ALGORITHM,
+                        unsafe extern "C" fn(),
+                    >(query)
+                }),
+            },
+            OSSL_DISPATCH {
+                function_id: OSSL_FUNC_PROVIDER_TEARDOWN as c_int,
+                // SAFETY: as above.
+                function: Some(unsafe {
+                    core::mem::transmute::<unsafe extern "C" fn(*mut c_void), unsafe extern "C" fn()>(
+                        teardown,
+                    )
+                }),
+            },
+            OSSL_DISPATCH {
+                function_id: 0,
+                function: None,
+            },
+        ]);
+
+        pub(super) unsafe extern "C" fn init(
+            handle: *const OSSL_CORE_HANDLE,
+            in_: *const OSSL_DISPATCH,
+            out: *mut *const OSSL_DISPATCH,
+            provctx: *mut *mut c_void,
+        ) -> c_int {
+            // SAFETY: the core's handle and functions.
+            let child = unsafe { OSSL_LIB_CTX_new_child(handle, in_) };
+            if child.is_null() {
+                return 0;
+            }
+            CHILD.store(child, Ordering::SeqCst);
+            // SAFETY: the core's out-parameters.
+            unsafe { out.write(PROVIDER.0.as_ptr()) };
+            // SAFETY: as above.
+            unsafe { provctx.write(child.cast()) };
+            1
+        }
+    }
+
+    #[test]
+    fn a_providers_child_context_is_freed_by_its_teardown() {
+        // SAFETY: no preconditions.
+        let ctx = unsafe { OSSL_LIB_CTX_new() };
+        // SAFETY: a live context, a string, and an init function.
+        let r = unsafe {
+            provider::OSSL_PROVIDER_add_builtin(ctx, c"childtest".as_ptr(), Some(teardown::init))
+        };
+        assert_eq!(r, 1);
+        // SAFETY: as above.
+        let prov = unsafe { provider::OSSL_PROVIDER_load(ctx, c"childtest".as_ptr()) };
+        assert!(!prov.is_null());
+        assert!(!teardown::CHILD.load(Ordering::SeqCst).is_null());
+        // SAFETY: the reference `load` gave. The child's copy of the provider keeps it.
+        assert_eq!(unsafe { provider::OSSL_PROVIDER_unload(prov) }, 1);
+        // SAFETY: the context goes, with its provider, whose teardown frees the child, which
+        // reaches the context and the provider being destroyed.
+        unsafe { OSSL_LIB_CTX_free(ctx) };
+        assert_eq!(teardown::TEARDOWNS.load(Ordering::SeqCst), 1);
+        assert!(teardown::CHILD.load(Ordering::SeqCst).is_null());
+        crate::err::take_all();
     }
 }
 

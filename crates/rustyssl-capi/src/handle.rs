@@ -1,7 +1,7 @@
 //! Opaque C handles (`SSL_CTX *`, `X509 *`, ...): pointers to reference-counted Rust objects.
 //!
-//! [`Handle::new_handle`] moves the object into an `Arc` behind a type tag and gives C the
-//! pointer. `*_up_ref` adds a reference ([`Handle::up_ref`]), `*_free` drops one
+//! [`Handle::new_handle`] moves the object onto the heap behind a type tag and a reference
+//! count and gives C the pointer. `*_up_ref` adds a reference ([`Handle::up_ref`]), `*_free` drops one
 //! ([`Handle::free`]), and the object lives until the last is gone.
 //!
 //! The object never moves, so pointers to its fields, which OpenSSL's `get0` functions return,
@@ -12,14 +12,70 @@
 //! The tag is defense in depth. A handle of one type passed where another belongs (an `SSL *`
 //! for an `SSL_CTX *`, say) is caught and rejected instead of being reinterpreted. A pointer
 //! that isn't one of our handles at all is still undefined behavior, as with OpenSSL.
+//!
+//! An object whose teardown runs C code that may reach the object again through its handle (a
+//! provider's teardown, which makes upcalls with its handle and frees child contexts that look
+//! for their parent) does that in [`Handle::teardown`], which runs through a shared reference
+//! after the last reference goes and before the object drops: dropping borrows the object
+//! exclusively, so nothing may reach it then. The count is ours rather than an `Arc`'s so that
+//! it and the tag sit outside the object, readable throughout: a dying object can't be held.
 
-use std::sync::Arc;
+use core::mem::ManuallyDrop;
+use core::sync::atomic::{AtomicUsize, Ordering, fence};
 
-/// The allocation behind a handle: the tag first, at a fixed offset for every `T`.
+/// The allocation behind a handle: the tag first, at a fixed offset for every `T`, then the
+/// reference count. The object is dropped by itself when the count reaches zero, then the
+/// allocation is freed.
 #[repr(C)]
 struct Tagged<T> {
     tag: u64,
-    object: T,
+    strong: AtomicUsize,
+    object: ManuallyDrop<T>,
+}
+
+/// Reads the tag of a handle of any type.
+///
+/// # Safety
+/// `handle` is a handle from [`Handle::new_handle`] whose allocation is live (its object may
+/// be dropping).
+unsafe fn tag_of<T>(handle: *const Tagged<T>) -> u64 {
+    // SAFETY: every handle starts with its tag (`Tagged` is `repr(C)`), so reading it is
+    // valid before we know the type; nothing borrows the tag mutably.
+    unsafe { handle.cast::<u64>().read() }
+}
+
+/// The count of a handle whose tag has been checked.
+///
+/// # Safety
+/// As for [`tag_of`], and the tag is `T`'s.
+unsafe fn strong<'a, T>(handle: *const Tagged<T>) -> &'a AtomicUsize {
+    // SAFETY: the caller's guarantee; the count is outside the object, so this borrows nothing
+    // a teardown has borrowed.
+    unsafe { &*(&raw const (*handle).strong) }
+}
+
+/// Drops one reference of a handle whose tag has been checked; with the last, tears the object
+/// down, drops it, and frees its allocation.
+///
+/// # Safety
+/// As for [`strong`], and the caller owns a reference.
+unsafe fn release<H: Handle>(handle: *const Tagged<H::Object>) {
+    // SAFETY: the caller's guarantee.
+    if unsafe { strong(handle) }.fetch_sub(1, Ordering::Release) != 1 {
+        return;
+    }
+    // Every other reference's use happens before the teardown (as `Arc` does).
+    fence(Ordering::Acquire);
+    // SAFETY: the object is live; its teardown may reach it again through the handle, sharing
+    // it.
+    H::teardown(unsafe { &*(&raw const (*handle).object) });
+    let handle = handle.cast_mut();
+    // SAFETY: that was the last reference, so nothing else uses the object; this borrows the
+    // object alone, leaving the tag and the count readable while it drops.
+    unsafe { ManuallyDrop::drop(&mut *(&raw mut (*handle).object)) };
+    // SAFETY: the allocation came from `Box::into_raw` in `new_handle`, and its object is gone
+    // (`ManuallyDrop` keeps the box from dropping it again).
+    drop(unsafe { Box::from_raw(handle) });
 }
 
 /// A tag derived from the C type's name (FNV-1a), unique per type in practice.
@@ -43,13 +99,19 @@ pub(crate) unsafe trait Handle: Sized {
     type Object: Send + Sync + 'static;
     const TAG: u64;
 
+    /// Runs after the last reference goes, before the object drops: the part of its teardown
+    /// that may reach it again through its handle (C callbacks, provider upcalls). The object
+    /// can still be got, though no longer held.
+    fn teardown(_object: &Self::Object) {}
+
     /// Moves `object` behind a new handle with one reference.
     fn new_handle(object: Self::Object) -> *mut Self {
-        let tagged = Arc::new(Tagged {
+        let tagged = Box::new(Tagged {
             tag: Self::TAG,
-            object,
+            strong: AtomicUsize::new(1),
+            object: ManuallyDrop::new(object),
         });
-        Arc::into_raw(tagged).cast_mut().cast()
+        Box::into_raw(tagged).cast()
     }
 
     /// The object behind `handle`, or `None` if it's null or a handle of another type.
@@ -62,14 +124,12 @@ pub(crate) unsafe trait Handle: Sized {
             return None;
         }
         let tagged = handle.cast::<Tagged<Self::Object>>();
-        // SAFETY: every handle starts with its tag (`Tagged` is `repr(C)`), so reading it is
-        // valid before we know the type.
-        let tag = unsafe { tagged.cast::<u64>().read() };
-        if tag != Self::TAG {
+        // SAFETY: the caller's guarantee.
+        if unsafe { tag_of(tagged) } != Self::TAG {
             return None;
         }
-        // SAFETY: the tag says this is a `Tagged<Self::Object>` inside a live `Arc`.
-        Some(unsafe { &(*tagged).object })
+        // SAFETY: the tag says this is a live `Tagged<Self::Object>`.
+        Some(unsafe { &*(&raw const (*tagged).object) })
     }
 
     /// Adds a reference, as `*_up_ref` does. Returns `false` for null or a handle of another
@@ -82,8 +142,9 @@ pub(crate) unsafe trait Handle: Sized {
         if unsafe { Self::get(handle) }.is_none() {
             return false;
         }
-        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`.
-        unsafe { Arc::increment_strong_count(handle.cast::<Tagged<Self::Object>>()) };
+        // SAFETY: `get` checked that this is a live `Tagged<Self::Object>`; the caller's
+        // reference keeps the count above zero.
+        unsafe { strong(handle.cast::<Tagged<Self::Object>>()) }.fetch_add(1, Ordering::Relaxed);
         true
     }
 
@@ -95,12 +156,9 @@ pub(crate) unsafe trait Handle: Sized {
     unsafe fn up_ref_count(handle: *const Self) -> Option<usize> {
         // SAFETY: the caller's guarantee is the one `get` needs.
         unsafe { Self::get(handle) }?;
-        let tagged = handle.cast::<Tagged<Self::Object>>();
-        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`.
-        unsafe { Arc::increment_strong_count(tagged) };
-        // SAFETY: as above; the `Arc` is only looked at, never dropped.
-        let arc = core::mem::ManuallyDrop::new(unsafe { Arc::from_raw(tagged) });
-        Some(Arc::strong_count(&arc))
+        // SAFETY: `get` checked that this is a live `Tagged<Self::Object>`.
+        let count = unsafe { strong(handle.cast::<Tagged<Self::Object>>()) };
+        Some(count.fetch_add(1, Ordering::Relaxed) + 1)
     }
 
     /// Keeps the object alive for as long as the returned guard lives, without changing the
@@ -115,17 +173,28 @@ pub(crate) unsafe trait Handle: Sized {
     /// As for [`Handle::get`]; an object being destroyed is still allocated (its teardown is
     /// running).
     unsafe fn hold(handle: *const Self) -> Option<Held<Self>> {
-        // SAFETY: the caller's guarantee is the one `get` needs.
-        unsafe { Self::get(handle) }?;
+        if handle.is_null() {
+            return None;
+        }
+        // Not through `get`: the object of one being destroyed is borrowed by its teardown.
         let tagged = handle.cast::<Tagged<Self::Object>>();
-        // SAFETY: `get` checked that this is an `Arc<Tagged<Self::Object>>`'s allocation, live
-        // or being destroyed; the `Arc` is only looked at, never dropped.
-        let arc = core::mem::ManuallyDrop::new(unsafe { Arc::from_raw(tagged) });
-        // A weak reference upgrades only while a strong one remains.
-        let strong = Arc::downgrade(&arc).upgrade()?;
-        Some(Held {
-            tagged: Arc::into_raw(strong),
-        })
+        // SAFETY: the caller's guarantee.
+        if unsafe { tag_of(tagged) } != Self::TAG {
+            return None;
+        }
+        // SAFETY: the tag says this is a `Tagged<Self::Object>`, live or being destroyed.
+        let count = unsafe { strong(tagged) };
+        // A reference is taken only while another remains.
+        let mut n = count.load(Ordering::Relaxed);
+        loop {
+            if n == 0 {
+                return None;
+            }
+            match count.compare_exchange_weak(n, n + 1, Ordering::Acquire, Ordering::Relaxed) {
+                Ok(_) => return Some(Held { tagged }),
+                Err(now) => n = now,
+            }
+        }
     }
 
     /// Drops a reference, as `*_free` does; the object is dropped with the last one. Null and
@@ -138,9 +207,9 @@ pub(crate) unsafe trait Handle: Sized {
         if unsafe { Self::get(handle) }.is_none() {
             return;
         }
-        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`, and the
-        // caller owns one of its references.
-        unsafe { Arc::decrement_strong_count(handle.cast::<Tagged<Self::Object>>()) };
+        // SAFETY: `get` checked that this is a live `Tagged<Self::Object>`, and the caller owns
+        // one of its references.
+        unsafe { release::<Self>(handle.cast_const().cast::<Tagged<Self::Object>>()) };
     }
 }
 
@@ -149,7 +218,7 @@ pub(crate) struct Held<H: Handle> {
     tagged: *const Tagged<H::Object>,
 }
 
-// SAFETY: a `Held` is a strong reference to an `Arc`, which may move to and be shared with
+// SAFETY: a `Held` is a reference to a handle, which may move to and be shared with
 // other threads when the object can.
 unsafe impl<H: Handle> Send for Held<H> where H::Object: Send + Sync {}
 // SAFETY: as above.
@@ -159,19 +228,21 @@ impl<H: Handle> core::ops::Deref for Held<H> {
     type Target = H::Object;
 
     fn deref(&self) -> &H::Object {
-        // SAFETY: the guard owns a strong reference, so the allocation is live.
-        unsafe { &(*self.tagged).object }
+        // SAFETY: the guard owns a reference, so the object is live.
+        unsafe { &*(&raw const (*self.tagged).object) }
     }
 }
 
 impl<H: Handle> Drop for Held<H> {
     fn drop(&mut self) {
-        // SAFETY: the guard owns one strong reference, taken in `hold`.
-        unsafe { Arc::decrement_strong_count(self.tagged) };
+        // SAFETY: the guard owns one reference, taken in `hold`.
+        unsafe { release::<H>(self.tagged) };
     }
 }
 
-/// Implements [`Handle`] for an opaque C type: `handle_type!(rustyssl_abi::X509 => X509Object);`
+/// Implements [`Handle`] for an opaque C type: `handle_type!(rustyssl_abi::X509 => X509Object);`,
+/// or `handle_type!(OSSL_LIB_CTX => LibCtx, teardown = LibCtx::teardown);` with a
+/// [`Handle::teardown`].
 macro_rules! handle_type {
     ($c:ty => $object:ty) => {
         // SAFETY: the tag comes from the C type's name, and each C type has one implementation.
@@ -180,13 +251,25 @@ macro_rules! handle_type {
             const TAG: u64 = $crate::handle::tag(stringify!($c));
         }
     };
+    ($c:ty => $object:ty, teardown = $teardown:path) => {
+        // SAFETY: as above.
+        unsafe impl $crate::handle::Handle for $c {
+            type Object = $object;
+            const TAG: u64 = $crate::handle::tag(stringify!($c));
+
+            fn teardown(object: &$object) {
+                $teardown(object)
+            }
+        }
+    };
 }
 pub(crate) use handle_type;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicU32};
 
     /// Stand-ins for two opaque C types.
     #[repr(C)]
@@ -288,7 +371,7 @@ mod tests {
     }
 
     /// An object whose teardown reaches its own handle, as a provider's teardown reaches the
-    /// context being freed.
+    /// provider being freed through its handle.
     #[repr(C)]
     struct Looper {
         _opaque: [u8; 0],
@@ -296,27 +379,41 @@ mod tests {
     struct LooperObject {
         me: core::sync::atomic::AtomicPtr<Looper>,
         drops: Arc<AtomicU32>,
-        held_in_drop: Arc<AtomicBool>,
+        got_in_teardown: Arc<AtomicBool>,
+        held_in_teardown: Arc<AtomicBool>,
+    }
+    impl LooperObject {
+        fn teardown(&self) {
+            let me = self.me.load(Ordering::SeqCst);
+            // SAFETY: the allocation is still there while its object is torn down.
+            let got = unsafe { Looper::get(me) };
+            self.got_in_teardown.store(
+                got.is_some_and(|o| core::ptr::eq(o, self)),
+                Ordering::SeqCst,
+            );
+            // SAFETY: as above.
+            let held = unsafe { Looper::hold(me) };
+            self.held_in_teardown
+                .store(held.is_some(), Ordering::SeqCst);
+        }
     }
     impl Drop for LooperObject {
         fn drop(&mut self) {
             self.drops.fetch_add(1, Ordering::SeqCst);
-            let me = self.me.load(Ordering::SeqCst);
-            // SAFETY: the allocation is still there while its object drops.
-            let held = unsafe { Looper::hold(me) };
-            self.held_in_drop.store(held.is_some(), Ordering::SeqCst);
         }
     }
-    crate::handle::handle_type!(Looper => LooperObject);
+    crate::handle::handle_type!(Looper => LooperObject, teardown = LooperObject::teardown);
 
     #[test]
     fn an_object_being_destroyed_cant_be_held() {
         let drops = Arc::new(AtomicU32::new(0));
-        let held_in_drop = Arc::new(AtomicBool::new(false));
+        let got_in_teardown = Arc::new(AtomicBool::new(false));
+        let held_in_teardown = Arc::new(AtomicBool::new(true));
         let handle = Looper::new_handle(LooperObject {
             me: core::sync::atomic::AtomicPtr::new(core::ptr::null_mut()),
             drops: drops.clone(),
-            held_in_drop: held_in_drop.clone(),
+            got_in_teardown: got_in_teardown.clone(),
+            held_in_teardown: held_in_teardown.clone(),
         });
         // SAFETY: `handle` is live.
         let object = unsafe { Looper::get(handle) }.unwrap();
@@ -324,7 +421,8 @@ mod tests {
         // SAFETY: drops the only reference.
         unsafe { Looper::free(handle) };
         assert_eq!(drops.load(Ordering::SeqCst), 1);
-        assert!(!held_in_drop.load(Ordering::SeqCst));
+        assert!(got_in_teardown.load(Ordering::SeqCst));
+        assert!(!held_in_teardown.load(Ordering::SeqCst));
     }
 
     #[test]

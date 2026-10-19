@@ -158,6 +158,20 @@ impl Store {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Gives up the stored methods as the context goes ([`crate::handle::Handle::teardown`]):
+    /// they drop with the store unlocked and before the providers, whose references they hold.
+    pub(crate) fn release(&self) {
+        let (store, providers) = {
+            let mut s = self.lock();
+            (
+                core::mem::take(&mut s.store),
+                core::mem::take(&mut s.providers),
+            )
+        };
+        drop(store);
+        drop(providers);
+    }
+
     /// Forgets the cached choices.
     pub(crate) fn flush(&self) {
         self.lock().store.flush_all();
