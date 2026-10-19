@@ -5775,6 +5775,20 @@ both libraries (step 8.1).
 
 **Exit:** M6.
 
+**Exit status (2026-10-19):** Steps 9.1–9.5 are done (PRs #192–#197); rustyssl targets the
+OpenSSL 3.6.5 ABI, with every 3.5 export unchanged (`abi-check compat35`).
+- **Met:** libcrypto coverage is 100% (every export of 3.6.5's `libcrypto.num`); libssl lacks
+  only the 8 QUIC exports (Phase 10). Third-party providers work as on the reference
+  (`cargo xtask test-providers`: oqs-provider, pkcs11-provider, tpm2-openssl).
+- **Measured, against 3.6.5:** the upstream programs `test-openssl-suite` runs (`evp_test`,
+  `bntest`, `ectest`, `rsa_test`, the libssl and provider programs) pass on rustyssl wherever
+  they pass on the reference, apart from QUIC and the tests that read OpenSSL's private
+  structures; BoGo, tlsfuzzer, Wycheproof, the interop matrix and the differential probe agree.
+- **Not met yet:** M6's "at least 98% of eligible upstream tests" needs the rest of the
+  upstream tree (`cargo xtask test-openssl-suite` runs a subset), and its consumer suites
+  (Ruby, pyca/cryptography, rust-openssl, Node.js) need `cargo xtask test-consumers`, which
+  doesn't exist yet.
+
 ## Phase 10: QUIC
 
 - [ ] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
