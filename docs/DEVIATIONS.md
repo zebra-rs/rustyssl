@@ -357,3 +357,15 @@ OpenSSL never depends on them.
   and other job users get correct results; only code that waits in a job for an outside event,
   such as an asynchronous hardware provider, sees the difference: its pause returns without
   waiting, so it polls. Test: `tests/c/async.c`.
+
+- **Arm's data-independent timing (`PSTATE.DIT`) during operations on secrets** (checked
+  against OpenSSL 3.5.9, which never sets it). Not a deviation: on cores with `FEAT_DIT`,
+  rustyssl sets DIT for the length of each operation on secrets and puts the thread's setting
+  back before returning, on every path including a panic's (`TEST_PLAN.md`, constant-time
+  verification). A caller sees DIT exactly as it left it, before and after every call. The only
+  code that could see it set is C that runs inside such an operation: an application's
+  `RAND_METHOD` asked for a nonce, or a third-party provider's function reached from it. For
+  them DIT changes timing only, never results; a callback that sets or clears DIT itself has
+  its change undone when the operation ends, which only restores the caller's own setting.
+  Tests: `dit::arm::tests` (set inside, restored after, from either state; the crypto crate's
+  hooks) and `dit::tests` in `rustyssl-crypto` (nesting and unwinding).

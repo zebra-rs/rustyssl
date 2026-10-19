@@ -12,8 +12,10 @@
 //! under Miri, they only run the computation.
 //!
 //! DIT is a per-thread mode, so whatever runs while it is set runs with it. The crypto crate
-//! calls no C, so no application callback ever does; capi's [`with`] goes around Rust
-//! computations only, never around a call into C.
+//! calls no C itself; C runs inside an operation only through what capi hands it, such as an
+//! application's `RAND_METHOD` asked for a nonce or a third-party provider's digest, and for
+//! that code DIT changes timing only. capi's own [`with`] goes around Rust computations only.
+//! Between operations the caller's setting is back (`docs/DEVIATIONS.md`, notes).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

@@ -356,9 +356,58 @@ is set. rustyssl now runs X25519, X448 and the EdDSA public-key derivations with
 left alone). After: `x25519-derive` |t| 1.4–3.6 at 400,000 measurements and `x25519` 2.5, at the
 same speed.
 
-The other secret-handling paths (ECDSA and RSA private operations, ML-KEM, the software AEADs,
-BN `CONSTTIME`) don't set DIT yet. Their targets are under |t| 10, but they're candidates for
-the same treatment.
+**DIT policy.** Every operation on secrets runs with DIT set, from `rustyssl-crypto`
+(`dit::with`; capi installs the hooks that set and clear `PSTATE.DIT` the first time any export
+runs, as the crate can't hold the instruction). It goes around whole operations, never single
+blocks: a set and restore costs about 18 ns on an M5, several AES blocks' worth. Covered: RSA
+private operations and their padding checks (implicit rejection, OAEP, the TLS premaster
+check); constant-time Montgomery exponentiation, inversion and gcd (so DH, DSA and RSA); EC
+scalar multiplication and the ECDSA and SM2 signing arithmetic; X25519, X448, Ed25519 and
+Ed448; ML-KEM key generation, encapsulation and decapsulation; ML-DSA key generation and
+signing; SLH-DSA; the provided ciphers, AEADs, SIV modes and MACs (HMAC, CMAC, GMAC, KMAC,
+Poly1305, SipHash, BLAKE2); the low-level modes and AEAD helpers (`AES_cbc_encrypt`,
+`CRYPTO_gcm128_*`, key wrap, ...); key schedules; the KDFs; `CRYPTO_memcmp` and capi's tag
+checks; and the TLS record layer's MAC-then-encrypt check. Not covered: single-block APIs
+(`AES_encrypt`, `DES_ecb_encrypt`, `Camellia_encrypt`, ...), where the 18 ns would dominate,
+and plain digests (keyed uses go through the MAC and KDF paths). Whatever runs inside an
+operation runs with DIT too, which is only a timing mode: an application's `RAND_METHOD` or a
+C provider called during it, never one of the application's callbacks between operations.
+Nested operations read the mode and leave it to the outermost.
+
+Cost (rustyssl before and after, `-O2` C loop, M5; the reference for scale):
+
+| Operation | Before | After | Reference |
+|---|---:|---:|---:|
+| AES-256-GCM, 16 KiB | 26.3 µs | 28.1 µs (+7%) | 2.1 µs |
+| AES-256-GCM, 64 B | 0.88 µs | 1.03 µs (+17%) | 0.25 µs |
+| X25519 derive (DIT already) | 25.9 µs | 25.6 µs | 15.1 µs |
+| ECDSA P-256 sign | 368 µs | 421 µs (+14%) | 11 µs |
+| RSA-2048 decrypt | 1613 µs | 1626 µs | 312 µs |
+| `CRYPTO_memcmp`, 16 B | 4 ns | 28 ns | 1.5 ns |
+
+`cargo xtask test-timing`, |t| on rustyssl (reference), before and after:
+
+| Target | Before | After |
+|---|---|---|
+| aes-gcm | 1.92 (1.42) | 1.91 (2.39) |
+| ghash | 1.49 (2.43) | 2.24 (2.72) |
+| poly1305 | 4.28 (2.31) | 1.22 (1.40) |
+| memcmp | 2.92 (2.52) | 2.27 (2.16) |
+| x25519 | 1.06 (1.78) | 3.15 (1.92) |
+| x25519-derive | 1.90 (1.31) | 1.84 (2.90) |
+| x25519-ctx | 3.13 (1.43) | 1.75 (1.21) |
+| bn-modexp-consttime | 4.32 (2.33) | 1.64 (1.83) |
+| ml-kem-decap | 1.41 (2.29) | 1.89 (1.61) |
+| ecdsa-sign (old target) | 6.37 (11.43) | 2.62 (36.48) |
+| ecdsa-sign (fair target) | — | 3.02 (2.16), 1.59 (3.88) |
+| rsa-raw-decrypt | 1.72 (1.95) | 2.06 (1.19) |
+| rsa-pkcs1-decrypt | 1.65 (1.31) | 1.85 (2.40) |
+| tls-cbc-record | 5.34 (3.72) | 1.38 (3.40) |
+
+`ecdsa-sign` wasn't measuring the secret. Its fixed class signed with one key object and its
+random class rotated through 64, so the fixed class ran warm in cache: the reference showed
+|t| 11–36 from that alone, and rustyssl 6–10. Both classes now draw from 64 key objects (the
+fixed class's are copies of one key), and the reference reads 2–4.
 
 **CVE regression suite (`tests/cve/`).** Every OpenSSL security advisory since 2014
 (openssl-library.org vulnerabilities list) is classified as **applicable** (a test
