@@ -55,8 +55,7 @@ use crate::err;
 use crate::ffi::ffi_callback;
 use crate::params::{
     OSSL_PARAM_get_size_t, OSSL_PARAM_get_uint, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
-    OSSL_PARAM_set_int, OSSL_PARAM_set_octet_ptr, OSSL_PARAM_set_octet_string,
-    OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_octet_ptr, OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
 };
 
 /// An algorithm context: the cipher's, and where the NULL cipher found the TLS MAC (in the
@@ -582,26 +581,13 @@ pub(crate) unsafe fn set_param(
         Value::Size(v) => unsafe { OSSL_PARAM_set_size_t(p, v) },
         // SAFETY: as above; the caller's pointer.
         Value::Ptr(v, n) => unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) },
-        Value::IvCopyFirst(v, n) => {
-            // SAFETY: as above; the IV holds `n` octets.
-            let r = unsafe { OSSL_PARAM_set_octet_string(p, v.cast(), n) };
-            if r == 0 {
-                // SAFETY: as above.
-                unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) }
-            } else {
-                r
-            }
-        }
-        Value::Iv(v, n) => {
-            // SAFETY: as above.
-            let r = unsafe { OSSL_PARAM_set_octet_ptr(p, v.cast(), n) };
-            if r == 0 {
-                // SAFETY: as above; the IV holds `n` octets.
-                unsafe { OSSL_PARAM_set_octet_string(p, v.cast(), n) }
-            } else {
-                r
-            }
-        }
+        // 3.6 sets an IV by the parameter's type (`OSSL_PARAM_set_octet_string_or_ptr`): a
+        // copy into a string, the context's own IV into a pointer. (3.5 tried one type, then
+        // the other, leaving the first's error.)
+        // SAFETY: as above; the IV holds `n` octets and lives as long as the context.
+        Value::IvCopyFirst(v, n) | Value::Iv(v, n) => unsafe {
+            crate::params::OSSL_PARAM_set_octet_string_or_ptr(p, v.cast(), n)
+        },
     };
     if ok == 0 {
         err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, function);
@@ -1256,9 +1242,10 @@ macro_rules! default_gettable_ctx {
     };
 }
 
+// 3.6's generated list calls `tls-mac` an octet string (it is still returned as a pointer).
 static GENERIC_GETTABLE_CTX: Params<8> = Params(default_gettable_ctx!(defn(
     OSSL_CIPHER_PARAM_TLS_MAC,
-    OSSL_PARAM_OCTET_PTR,
+    OSSL_PARAM_OCTET_STRING,
     0
 )));
 static GENERIC_SETTABLE_CTX: Params<6> = Params([
@@ -1286,10 +1273,8 @@ static TDES_GETTABLE_CTX: Params<8> = Params(default_gettable_ctx!(defn(
     OSSL_PARAM_OCTET_STRING,
     0
 )));
-// `ossl_tdes_settable_ctx_params` lists `padding` and `num` twice, as the reference's does.
-static TDES_SETTABLE_CTX: Params<5> = Params([
-    defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
-    defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+// `ossl_tdes_settable_ctx_params` (3.5 listed `padding` and `num` twice; 3.6 once).
+static TDES_SETTABLE_CTX: Params<3> = Params([
     defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     PARAM_END,
@@ -1310,8 +1295,7 @@ static NULL_GETTABLE_CTX: Params<4> = Params([
         SIZE_T,
     ),
     defn(OSSL_CIPHER_PARAM_IVLEN, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
-    // 3.6 lists it as a string (it is still returned as a pointer).
-    defn(OSSL_CIPHER_PARAM_TLS_MAC, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_TLS_MAC, OSSL_PARAM_OCTET_PTR, 0),
     PARAM_END,
 ]);
 static NULL_SETTABLE_CTX: Params<2> = Params([

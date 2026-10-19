@@ -4207,9 +4207,14 @@ ffi_callback! {
         }
         if let Some(p) = first(OSSL_KDF_PARAM_CEK_ALG, None) {
             let Some(name) = utf8(p) else { return 0 };
-            // The reference passes the algorithm's name as the property query when there are
-            // properties at all.
-            let propq = if first(OSSL_ALG_PARAM_PROPERTIES, None).is_some() { name } else { ptr::null() };
+            // The properties, as given (3.6; 3.5 passed the algorithm's name as the query).
+            let propq = match first(OSSL_ALG_PARAM_PROPERTIES, None) {
+                None => ptr::null(),
+                Some(q) => match utf8(q) {
+                    Some(q) => q,
+                    None => return 0,
+                },
+            };
             // SAFETY: the provider's context.
             let libctx = unsafe { libctx_of(x.provctx.0) };
             // SAFETY: the parameter's string; the query.
@@ -4765,21 +4770,19 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `kdf_scrypt_get_ctx_params` (PKCS12KDF's and Argon2's too): the size, any; -2 when it
-    /// isn't asked for, as the reference returns.
+    /// `kdf_argon2_get_ctx_params`: any size when asked; and -2 whatever was asked (3.6 returns
+    /// -2 even after setting the size).
     ///
     /// # Safety
     /// `params` is NULL or a parameter array.
-    pub(crate) unsafe extern "C" fn size_or_unasked_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    pub(crate) unsafe extern "C" fn argon2_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
-        let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE.as_ptr()) };
-        if p.is_null() {
-            return -2;
+        if !unsafe { set_size(params, OSSL_KDF_PARAM_SIZE, usize::MAX) } {
+            return 0;
         }
-        // SAFETY: a parameter of the caller's array.
-        unsafe { OSSL_PARAM_set_size_t(p, usize::MAX) }
+        -2
     }
 }
 
@@ -4849,7 +4852,7 @@ static SCRYPT_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        size_or_unasked_get_ctx_params,
+        any_size_get_ctx_params,
         GetCtxParamsFn
     ),
     END,

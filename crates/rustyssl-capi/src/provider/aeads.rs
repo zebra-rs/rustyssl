@@ -1222,6 +1222,46 @@ static AEAD_SETTABLE: Params<6> = Params([
     ),
     PARAM_END,
 ]);
+/// `ossl_cipher_ccm_get_ctx_params_list` (3.6): GCM's without the TLS IV generation, which CCM
+/// never handled.
+static CCM_GETTABLE: Params<8> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_IVLEN, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
+    defn(
+        OSSL_CIPHER_PARAM_AEAD_TAGLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_IV, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_PARAM_OCTET_STRING, 0),
+    defn(
+        OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    PARAM_END,
+]);
+/// `ossl_cipher_ccm_set_ctx_params_list` (3.6): without the invocation field.
+static CCM_SETTABLE: Params<5> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_AEAD_IVLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_PARAM_OCTET_STRING, 0),
+    defn(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD, OSSL_PARAM_OCTET_STRING, 0),
+    defn(
+        OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED,
+        OSSL_PARAM_OCTET_STRING,
+        0,
+    ),
+    PARAM_END,
+]);
 static OCB_GETTABLE: Params<7> = Params([
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
@@ -1308,6 +1348,8 @@ macro_rules! list {
 
 list!(aead_gettable_ctx_params, AEAD_GETTABLE);
 list!(aead_settable_ctx_params, AEAD_SETTABLE);
+list!(ccm_gettable_ctx_params, CCM_GETTABLE);
+list!(ccm_settable_ctx_params, CCM_SETTABLE);
 list!(ocb_gettable_ctx_params, OCB_GETTABLE);
 list!(ocb_settable_ctx_params, OCB_SETTABLE);
 list!(chacha_poly_gettable_ctx_params, CHACHA_POLY_GETTABLE);
@@ -1436,8 +1478,8 @@ macro_rules! ccm {
             $name,
             Aead::Ccm(Box::new(Ccm::new($alg, $len))),
             aead_info(EVP_CIPH_CCM_MODE, $len, 1),
-            aead_gettable_ctx_params,
-            aead_settable_ctx_params
+            ccm_gettable_ctx_params,
+            ccm_settable_ctx_params
         );
     };
 }

@@ -39,8 +39,8 @@ use rustyssl_crypto::kdf;
 use super::builtin::libctx_of;
 use super::kdfs::{
     CtxParamsFn, DeriveFn, DupCtxFn, FreeCtxFn, GetCtxParamsFn, MAX_MD, NewCtxFn, Ptr, ResetFn,
-    Secret, SetCtxParamsFn, get_octets, macctx_load, md_size, memdup, raise, set_membuf,
-    size_only_gettable, size_or_unasked_get_ctx_params, utf8,
+    Secret, SetCtxParamsFn, any_size_get_ctx_params, argon2_get_ctx_params, get_octets,
+    macctx_load, md_size, memdup, raise, set_membuf, size_only_gettable, utf8,
 };
 use super::macs::{Prov, boxed, context, is_empty, locate, unbox};
 use super::rands::HmacState;
@@ -416,7 +416,7 @@ pub(super) static PKCS12_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        size_or_unasked_get_ctx_params,
+        any_size_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -715,7 +715,7 @@ ffi_callback! {
 
 ffi_callback! {
     /// `krb5kdf_get_ctx_params`: the size, the cipher's key length (`EVP_MAX_KEY_LENGTH`
-    /// without one); -2 when it isn't asked for.
+    /// without one); 1 when it isn't asked for (3.6; 3.5 returned -2).
     ///
     /// # Safety
     /// `vctx` is a live KRB5KDF context; `params` is NULL or a parameter array.
@@ -733,8 +733,9 @@ ffi_callback! {
         };
         // SAFETY: the caller's guarantee.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE.as_ptr()) };
+        // 3.6: nothing asked is success.
         if p.is_null() {
-            return -2;
+            return 1;
         }
         // SAFETY: a parameter of the caller's array.
         unsafe { OSSL_PARAM_set_size_t(p, len) }
@@ -1611,7 +1612,7 @@ macro_rules! argon2_table {
             ),
             entry!(
                 OSSL_FUNC_KDF_GET_CTX_PARAMS,
-                size_or_unasked_get_ctx_params,
+                argon2_get_ctx_params,
                 GetCtxParamsFn
             ),
             END,
