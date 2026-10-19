@@ -5277,16 +5277,18 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
 `cipherlist_test` pass.
 
 **Exit status (2026-10-18):** Steps 7.1–7.7 are done.
-- **Upstream libssl suite:** `cargo xtask test-openssl-suite --ssl` passes 4122 of the 4349
-  subtests that pass on the reference. `cipherlist_test`, `tls13ccstest`, `tls13ticket_test`,
-  `tls13groupselection_test`, `rpktest` and every non-DTLS `ssl-tests/*.cnf` iteration pass.
-  What fails is:
-  - DTLS (Phase 8): about 190 subtests, including sslapitest's DTLS iterations;
+- **Upstream libssl suite:** `cargo xtask test-openssl-suite --ssl` passes 4538 of the 4615
+  subtests that don't fail on the reference (2026-10-19, with `enginetest` and
+  `evp_extra_test` in the list). `cipherlist_test`, `tls13ccstest`, `tls13ticket_test`,
+  `tls13groupselection_test`, `rpktest`, `dtlstest`, `enginetest` and every
+  `ssl-tests/*.cnf` iteration outside the `internal` ones pass. What fails is:
   - QUIC (`SSL_set_quic_tls_cbs`, `OSSL_QUIC_client_method`);
-  - ENGINE (`test_pipelining`, step 9.3);
-  - third-party C providers (`test_pluggable_*`, `test_sigalgs_available`);
-  - the tests that read or write OpenSSL's private structures, listed as `internal` in
-    `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
+  - third-party C providers (`OSSL_LIB_CTX_new_from_dispatch`: `test_pluggable_*`,
+    evp_extra_test's `test_sign_continuation`; `test_sigalgs_available`);
+  - evp_extra_test's `EVP_SealInit` (a stub) and `test_keygen_with_empty_template`'s second
+    iteration;
+  - the tests that read or write OpenSSL's private structures or call its internal functions,
+    listed as `internal` in `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
 - **Interop matrix:** green, 45 cases in all four pairings (`cargo xtask test-interop`).
 - **BoGo** (`cargo xtask test-bogo`, added in Phase 8): see the Phase 8 exit status.
 - **tlsfuzzer** (`cargo xtask test-tlsfuzzer`, added in Phase 8): 151 scripts and 6048
@@ -5414,24 +5416,34 @@ both libraries (step 8.1).
   Validate with pkcs11-provider, oqs-provider, and tpm2-openssl.
 - [ ] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.
-- [ ] **9.3 ENGINE API** (3.x only): export every `ENGINE_*` symbol with "no engines
-  available" semantics, i.e. how a normal build with no engines installed behaves. Settle the
-  details by testing against consumers.
-  - Progress (2026-10-19): every `ENGINE_*` export is implemented (`crates/rustyssl-capi/src/
-    engine/`): application engines, the engine list, control commands, method tables and
-    defaults, key loaders, ex_data, the configuration's engines module, the built-in `dynamic`
-    engine (which loads engine modules: OpenSSL's own `loader_attic`, `padlock` and `capi`, and
-    the test engine `dasync`) and `rdrand` on x86 cores with RDRAND. Engines' methods are used:
-    `RSA_new_method`/`DSA_`/`DH_`/`EC_KEY_` and the default key engines; `EVP_DigestInit_ex`,
-    `EVP_CipherInit_ex` and their forms with an engine or a default digest/cipher engine (the
-    legacy path, the context holding a functional reference); `EVP_PKEY_CTX_new`/`_new_id` with
-    an engine's `EVP_PKEY_METHOD`; `EVP_PKEY_set1_engine`. Tests: `tests/c/engine.c` (134
-    checks, identical on both libraries); upstream `enginetest` 3/3 in `test-openssl-suite`.
-  - Left: the static ciphers (`EVP_aes_128_cbc()` ...) have no legacy functions, which engines
-    such as `dasync` call (`EVP_CIPHER_meth_get_init`), so sslapitest's `test_pipelining`
-    crashes calling NULL; raw, MAC and CMAC keys with an engine, an engine's ASN.1 methods
-    (`pkey->engine`), and the MACs' `engine` parameter still fail (docs/DEVIATIONS.md, marked
-    as gaps); `SSL_CTX_set_client_cert_engine`; `evp_extra_test`'s engine parts.
+- [x] **9.3 ENGINE API** (3.x only): every `ENGINE_*` export, with OpenSSL's semantics
+  (engines are real: applications', the configuration's, and modules the `dynamic` engine
+  loads), settled by tests against the reference.
+  - Done (2026-10-19): `crates/rustyssl-capi/src/engine/`: application engines, the engine
+    list, control commands, method tables and defaults, key loaders, ex_data, the
+    configuration's engines module, the built-in `dynamic` engine (which loads engine modules:
+    OpenSSL's own `loader_attic`, `padlock` and `capi`, and the test engine `dasync`) and
+    `rdrand` on x86 cores with RDRAND. Engines' methods are used everywhere OpenSSL uses them:
+    - `RSA_new_method`/`DSA_`/`DH_`/`EC_KEY_` and the default key engines;
+    - `EVP_DigestInit_ex`, `EVP_CipherInit_ex` and their forms with an engine or a default
+      digest/cipher engine (the legacy path, the context holding a functional reference). The
+      static ciphers and digests (`EVP_aes_128_cbc()`, ...) have working legacy functions
+      (`EVP_CIPHER_meth_get_*`), which engines such as `dasync` call with their own state; the
+      private-state ones (AEAD, XTS, wrap, SHA-3) have failing ones (docs/DEVIATIONS.md);
+    - `EVP_PKEY_CTX_new`/`_new_id` with an engine's `EVP_PKEY_METHOD`, `EVP_PKEY_set1_engine`;
+      keys whose ASN.1 method is an engine's (`EVP_PKEY_asn1_find`/`_find_str` with `pe`,
+      `EVP_PKEY_get0_engine`), raw keys made with an engine, CMAC keys whose cipher is one;
+    - the MACs' `engine` parameter (HMAC, CMAC, GMAC);
+    - `SSL_CTX_set_client_cert_engine`; pipelining (`SSL_set_max_pipelines`, with `dasync`'s
+      pipelining ciphers) and `SSL_CTX_set_split_send_fragment`.
+  - Tests: `tests/c/engine.c`, `evp_cipher_legacy.c`, `ssl_client_cert_engine.c` (identical
+    on both libraries); upstream `enginetest` 3/3, sslapitest's `test_pipelining` 7/7 with the
+    reference's `dasync`, and `evp_extra_test` (in `tests/openssl-suite/ssl.txt`, relinked with
+    the shared libraries) passes its engine tests (`test_signatures_with_engine` 3/3,
+    `test_cipher_with_engine`): 217 of the 238 subtests that pass on the reference pass, and of
+    the 21 others, 17 are `internal` (private structures, internal functions); the rest fail
+    outside 9.3: `EVP_SealInit` and `OSSL_LIB_CTX_new_from_dispatch` (stubs) and
+    `test_keygen_with_empty_template`'s second iteration.
 - [ ] **9.4 Long-tail sweep:** every remaining `DEPRECATEDIN_*` family, the exported data
   symbols, and the platform helpers (`OPENSSL_ia32cap_loc`, …), until libcrypto coverage
   reaches 100%; `OSSL_LIB_CTX_get_data` (from 3.1e).

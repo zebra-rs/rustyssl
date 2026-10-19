@@ -13,7 +13,7 @@
 //! reference first: what fails there alone isn't counted. What then fails on rustyssl is
 //! classified (a stub's abort, a missing export, a crash, a timeout, a failed check, a skip the
 //! reference didn't make) and grouped by root cause into `target/ssl-suite-report.md`: the
-//! stub, the symbol, or the test's first `ERROR` line. Tests that read libssl's private
+//! stub, the symbol, or the test's first `ERROR` line. Tests that read the libraries' private
 //! structures (`internal` lines) are reported apart: they can't pass on another layout.
 
 use std::collections::BTreeMap;
@@ -78,7 +78,7 @@ pub struct List {
     lines: Vec<Line>,
     /// Programs not run, and why.
     skips: Vec<(String, String)>,
-    /// Each program's tests that read libssl's private structures: a program (or an `ssl_test`
+    /// Each program's tests that read the libraries' private structures: a program (or an `ssl_test`
     /// file, as `ssl_test/<file>`) and a test, or one iteration of it (`<test>#<iteration>`).
     internal: Vec<(String, String)>,
 }
@@ -175,6 +175,41 @@ pub fn build(list: &List) -> Build {
                 "SOURCE[sslapitest]=sslapitest.c helpers/ssltestlib.c filterprov.c tls-provider.c\n",
                 "SOURCE[sslapitest]=sslapitest.c helpers/ssltestlib.c filterprov.c tls-provider.c \
                  ../providers/common/provider_ctx.c ../providers/common/bio_prov.c ../crypto/time.c\n",
+            ),
+            // `evp_extra_test` (run for its engine tests, as the `dasync` engine is built here)
+            // links the static libraries too, and the legacy provider built in from them; it
+            // gets the shared libraries, and the legacy provider as a module.
+            (
+                "test/build.info",
+                "DEPEND[evp_extra_test]=../libcrypto.a libtestutil.a",
+                "DEPEND[evp_extra_test]=../libcrypto libtestutil.a",
+            ),
+            (
+                "test/build.info",
+                "    DEFINE[evp_extra_test]=STATIC_LEGACY\n    SOURCE[evp_extra_test]=../providers/legacyprov.c\n    DEPEND[evp_extra_test]=../providers/liblegacy.a \\\n                           ../providers/libcommon.a\n",
+                "",
+            ),
+            (
+                "test/build.info",
+                "SOURCE[evp_extra_test]=evp_extra_test.c fake_rsaprov.c fake_pipelineprov.c\n",
+                "SOURCE[evp_extra_test]=evp_extra_test.c fake_rsaprov.c fake_pipelineprov.c \
+                 ../providers/prov_running.c\n",
+            ),
+            // Four more internal functions no shared library exports (except the reference's on
+            // macOS) are referenced weakly, so that the program loads without them: the tests
+            // that call them (`test_EVP_PKEY_check` downgrading a key, `test_EVP_PKEY_check`'s
+            // export, and the fake pipelining provider's parameters) then fail on that library.
+            (
+                "test/evp_extra_test.c",
+                "#include \"fake_pipelineprov.h\"\n",
+                "#include \"fake_pipelineprov.h\"\n#pragma weak evp_pkey_copy_downgraded\n\
+                 #pragma weak evp_keymgmt_util_export\n",
+            ),
+            (
+                "test/fake_pipelineprov.c",
+                "#include \"fake_pipelineprov.h\"\n",
+                "#include \"fake_pipelineprov.h\"\n#pragma weak ossl_cipher_generic_get_params\n\
+                 #pragma weak ossl_cipher_generic_gettable_params\n",
             ),
         ],
     }
@@ -454,7 +489,7 @@ struct Done {
 /// A failure's category, in the order the report lists them.
 fn category(outcome: &Outcome, internal: bool) -> &'static str {
     if internal {
-        return "reads libssl internals";
+        return "reads library internals";
     }
     match outcome {
         Outcome::Stub(_) => "stub abort",

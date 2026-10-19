@@ -3,10 +3,13 @@
 # process. Each line is a program and its arguments as its recipe in test/recipes/ passes them,
 # with {src} for the reference's source tree and {tmp} for a scratch file of the run's own. A
 # `whole` line runs its program once, as one subtest. A `skip` line names a program that isn't
-# run, and why; an `internal` line, a program's tests that read libssl's private structures.
+# run, and why; an `internal` line, a program's tests that read the libraries' private structures.
 
 # 30-test_engine.t: the ENGINE API (libcrypto's, run here as the dasync engine is built here)
 enginetest {src}/test/certs/root-cert.pem
+
+# 30-test_evp_extra.t: the EVP API (libcrypto's, run here for its tests with the dasync engine)
+evp_extra_test
 
 # 90-test_sslapi.t (the default provider's run)
 sslapitest {src}/test/certs {src}/test/recipes/90-test_sslapi_data/passwd.txt {tmp} default {src}/test/default.cnf {src}/test/recipes/90-test_sslapi_data/dhparams.pem {src}/test/recipes/90-test_sslapi_data
@@ -83,6 +86,13 @@ internal ssl_test/26-tls13_client_auth test_handshake#7 test_handshake#8 test_ha
 internal sslapitest test_session_with_only_int_cache test_session_with_only_ext_cache test_session_with_both_cache test_session_wo_ca_names test_ciphersuite_change test_session_timeout test_session_cache_overflow test_cleanse_plaintext test_unknown_sigalgs_groups test_configuration_of_groups test_sigalg_ctx_switch test_sigalg_ctx_switch_cert_cb test_sigalg_ctx_switch_reneg
 internal sslbuffertest test_func
 internal dtls_mtu_test run_mtu_tests
+# evp_extra_test: test_EVP_PKEY_check sets a context's key by writing into the private
+# EVP_PKEY_CTX; the others call internal functions (only weakly linked here, see
+# xtask/src/test_openssl_suite/ssl.rs): test_custom_pmeth's legacy-key iterations downgrade
+# with evp_pkey_copy_downgraded, test_EC_keygen_with_enc exports with
+# evp_keymgmt_util_export, and the fake pipelining provider's parameters are
+# ossl_cipher_generic_get_params and _gettable_params.
+internal evp_extra_test test_EVP_PKEY_check test_custom_pmeth#7 test_custom_pmeth#8 test_custom_pmeth#9 test_custom_pmeth#10 test_custom_pmeth#11 test_custom_pmeth#12 test_EC_keygen_with_enc test_evp_cipher_pipeline
 
 skip ssl_handshake_rtt_test calls libssl's internal state machine (ossl_statem_*_write_transition) and reads SSL_CONNECTION
 skip cipher_overhead_test calls libssl's internal cipher table (ssl3_get_cipher, ssl_cipher_get_overhead)

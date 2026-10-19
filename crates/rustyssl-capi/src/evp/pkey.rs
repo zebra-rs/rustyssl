@@ -2525,6 +2525,7 @@ mod tests {
     /// An engine without a key method for the type gives neither an HMAC key (which has no
     /// ASN.1 method) nor a context.
     #[test]
+    #[cfg_attr(miri, ignore = "fetches, which loads the configuration")]
     fn engines_without_key_methods_are_refused() {
         // SAFETY: no preconditions.
         let e = unsafe { crate::engine::ENGINE_new() };
