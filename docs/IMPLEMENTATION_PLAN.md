@@ -5565,11 +5565,15 @@ both libraries (step 8.1).
     `OPENSSL_sk_set_thunks`, `OSSL_PARAM_set_octet_string_or_ptr`,
     `EVP_PKEY_get_security_category`, `i2d_PKCS8PrivateKey`,
     `OSSL_STORE_LOADER_settable_ctx_params`, `X509_CRL_get0_tbs_sigalg`; `tests/c/openssl36.c`).
-    Left: the CMS KEMRecipientInfo functions (5), the `EVP_SKEY` derivations (4),
-    `X509_STORE_CTX_set_ocsp_resp` with OCSP checking in verification. Providers follow 3.6's
-    parameter lists, and HKDF-SHA256/384/512 exist. Still to do: the AES-CBC-HMAC-SHA*-ETM
-    ciphers (aarch64 only), and the remaining tests/c differences against 3.6.5 (print
-    indentation, BIO_printf, libssl's OCSP and point-format changes, and others).
+    Providers follow 3.6's parameter lists; HKDF-SHA256/384/512 and the AES-CBC-HMAC-SHA*-ETM
+    ciphers exist. All but four tests/c programs give the reference's output.
+    Left: the CMS KEMRecipientInfo functions (5); the `EVP_SKEY` derivations (4);
+    `X509_STORE_CTX_set_ocsp_resp` with OCSP checking in verification, together with libssl's
+    stapled responses kept as parsed `OCSP_RESPONSE`s (`SSL_CTRL_*_OCSP_RESP_EX`, 142/143;
+    one per certificate in TLS 1.3; a response that doesn't parse isn't sent, and a client
+    receiving one fails the handshake), which `ssl_ctx`, `ssl_handshake_reads` and
+    `ssl_strings` show; the session cache's removal order (`ssl_sess_cache`); then
+    `abi-check`'s 3.5-exports check and the rest of the test plan.
   - 3.5 → 3.6 behavior changes found so far (for review; 3.6's are followed):
     - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
       (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
