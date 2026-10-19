@@ -322,7 +322,10 @@ impl Setting<'_> {
     }
 
     /// Runs `program` with `args` on the libraries in `lib`, for at most `TIMEOUT`: its exit
-    /// status (`None` if it timed out) and output. `name` keeps its files apart from others'.
+    /// status (`None` if it timed out) and output. `name` keeps its files apart from others':
+    /// its output, and the directory it runs in, where programs write their own files
+    /// (`sslapitest`'s pluggable tests write a key and a certificate per iteration, which
+    /// subtests running at the same time would otherwise share).
     fn run(
         &self,
         program: &str,
@@ -333,10 +336,12 @@ impl Setting<'_> {
     ) -> Result<(Option<ExitStatus>, String)> {
         let out_path = self.work.join(format!("{name}.out"));
         let out = File::create(&out_path)?;
+        let cwd = self.work.join(format!("{name}.d"));
+        fs::create_dir_all(&cwd)?;
         let exe = self.suite.join(program);
         let mut child = Command::new(&exe)
             .args(args)
-            .current_dir(&self.work)
+            .current_dir(&cwd)
             .env(LOADER_PATH, lib)
             .env("OPENSSL_CONF", MISSING_CONFIG)
             .env("OPENSSL_ENGINES", self.suite)
@@ -363,6 +368,7 @@ impl Setting<'_> {
         };
         let text = String::from_utf8_lossy(&fs::read(&out_path)?).into_owned();
         fs::remove_file(&out_path)?;
+        fs::remove_dir_all(&cwd)?;
         Ok((status, text))
     }
 }
