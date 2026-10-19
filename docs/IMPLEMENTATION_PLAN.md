@@ -5570,8 +5570,11 @@ both libraries (step 8.1).
     `CMS_RecipientInfo_kemri_*` functions in `tests/c/cms_kemri.c`). Providers follow 3.6's
     parameter lists; HKDF-SHA256/384/512 and the AES-CBC-HMAC-SHA*-ETM ciphers exist; every
     tests/c program gives the reference's output on macOS.
-    Left: `abi-check`'s 3.5-exports check (`compat35`); the rest of the test plan against
-    3.6.5.
+    `abi-check`'s `compat35` (`xtask/src/abi_check/compat35.rs`; TEST_PLAN.md L3 item 9)
+    passes on all three targets: every 3.5 export is still at its node with its prototype,
+    and 3.5's struct layouts are unchanged (3.6 only names `OPENSSL_sk_pop_free`'s function
+    type `OPENSSL_sk_freefunc`, which the check resolves).
+    Left: the rest of the test plan against 3.6.5.
   - 3.5 → 3.6 behavior changes found so far (for review; 3.6's are followed):
     - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
       (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.

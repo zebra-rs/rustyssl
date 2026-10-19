@@ -71,7 +71,18 @@ jobs:
           key: wycheproof-${{ hashFiles('tests/wycheproof/files.txt') }}
       - name: Wycheproof's vectors on the reference and rustyssl
         run: cargo xtask test-wycheproof
-      - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking)
+      # abi-check's compat35 compares 3.5's headers with the current ones through bindgen.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
+      - name: Cache bindgen
+        id: bindgen
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/bindgen
+          key: bindgen-cli-0.73.2-${{ runner.os }}-${{ runner.arch }}
+      - if: steps.bindgen.outputs.cache-hit != 'true'
+        run: cargo install --locked bindgen-cli --version 0.73.2
+      - name: ABI conformance (symbols, metadata, signatures, layouts, constants, linking, 3.5 compatibility)
         run: cargo xtask abi-check
 
   # Miri interprets one thread at a time, so the tests run in parallel jobs, each one Miri

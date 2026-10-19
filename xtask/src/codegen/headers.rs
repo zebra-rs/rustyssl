@@ -64,14 +64,17 @@ pub struct Context {
 impl Context {
     /// Points clang at the vendored headers, using `work` (emptied first) for scratch files.
     pub fn new(root: &Path, work: &Path) -> Result<Self> {
+        Self::for_series(root, work, OPENSSL_SERIES)
+    }
+
+    /// Points clang at the headers of the vendored release `series` (`abi/openssl-<series>/`).
+    pub fn for_series(root: &Path, work: &Path, series: &str) -> Result<Self> {
         let abi = root
             .join("abi")
-            .join(format!("openssl-{OPENSSL_SERIES}"))
+            .join(format!("openssl-{series}"))
             .canonicalize()
             .map_err(|e| {
-                format!(
-                    "abi/openssl-{OPENSSL_SERIES} is missing ({e}); run `cargo xtask vendor` first"
-                )
+                format!("abi/openssl-{series} is missing ({e}); run `cargo xtask vendor` first")
             })?;
         fresh_dir(work)?;
         let libc_stubs = write_libc_stubs(work)?;

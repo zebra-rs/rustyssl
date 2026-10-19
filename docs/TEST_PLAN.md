@@ -114,6 +114,11 @@ rustyssl itself**. You can only regenerate golden files with
 7. **Static linking.** `cc app.c libssl.a libcrypto.a` links and runs.
 8. **Installed headers and pkg-config:** every installed header compiles on its own and with
    the others; `pkg-config --cflags --libs openssl` works.
+9. **3.5 compatibility (`compat35`).** rustyssl follows 3.6 only (ADR 0004), so binaries built
+   against the 3.5 LTS must keep working: on every target, each export in
+   `abi/openssl-3.5/`'s version scripts is in the current ones at the same version node, with
+   the same prototype (bindgen of both releases' headers, type aliases resolved), and every
+   struct's size, alignment and field offsets from 3.5's headers are unchanged.
 
 ### L4: C API conformance (dual-run)
 
