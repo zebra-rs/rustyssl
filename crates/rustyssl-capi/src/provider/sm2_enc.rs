@@ -205,6 +205,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SM2_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_DIGEST.as_ptr()) };
@@ -250,6 +254,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn sm2_enc_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SM2_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.

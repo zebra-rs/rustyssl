@@ -687,6 +687,15 @@ unsafe fn key_fromdata(k: &MlxKey, params: *const OSSL_PARAM, include_private: b
     if inner.state >= HAVE_PUBKEY {
         return false;
     }
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::ML_KEM_IMPORT_EXPORT,
+        )
+    } {
+        return false;
+    }
     let info = k.info;
     let mut public: &[u8] = &[];
     // SAFETY: the caller's array; a static name.
@@ -818,6 +827,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::MLX_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let info = k.info;
         let max = c_int::try_from(info.ciphertext_len()).unwrap_or(c_int::MAX);
@@ -917,6 +930,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn mlx_kem_set_params(keydata: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::MLX_SET_PARAMS) } {
+            return 0;
+        }
         const F: &str = "mlx_kem_set_params";
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
@@ -979,6 +996,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn mlx_kem_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::MLX_GEN_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.

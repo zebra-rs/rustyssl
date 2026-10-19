@@ -1606,6 +1606,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn rsa_sig_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::RSA_SIG_RSA_GET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "rsa_get_ctx_params";
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
@@ -1774,6 +1778,15 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
+        }
+        let decoder = if c.flag_allow_md {
+            &crate::provider::param_decoders::RSA_SIG_RSA_SET_CTX_PARAMS
+        } else {
+            &crate::provider::param_decoders::RSA_SET_CTX_PARAMS_NO_DIGEST
+        };
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, decoder) } {
+            return 0;
         }
         let find = |key: &CStr| {
             // SAFETY: the caller's array; a static name.
@@ -2065,6 +2078,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn rsa_sigalg_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::RSA_SIGALG_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's guarantee.

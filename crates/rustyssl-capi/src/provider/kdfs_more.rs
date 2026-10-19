@@ -39,8 +39,8 @@ use rustyssl_crypto::kdf;
 use super::builtin::libctx_of;
 use super::kdfs::{
     CtxParamsFn, DeriveFn, DupCtxFn, FreeCtxFn, GetCtxParamsFn, MAX_MD, NewCtxFn, Ptr, ResetFn,
-    Secret, SetCtxParamsFn, any_size_get_ctx_params, argon2_get_ctx_params, get_octets,
-    macctx_load, md_size, memdup, raise, set_membuf, size_only_gettable, utf8,
+    Secret, SetCtxParamsFn, argon2_get_ctx_params, get_octets, macctx_load, md_size, memdup,
+    pkcs12_get_ctx_params, raise, set_membuf, size_only_gettable, utf8,
 };
 use super::macs::{Prov, boxed, context, is_empty, locate, unbox};
 use super::rands::HmacState;
@@ -182,6 +182,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn pkcs12_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PKCS12_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -416,7 +420,7 @@ pub(super) static PKCS12_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        pkcs12_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -511,6 +515,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn krb5_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KRB5KDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -723,6 +731,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KRB5KDF_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context::<Krb5>(vctx) }) else { return 0 };
         let len = if c.cipher.method.is_null() {
             EVP_MAX_KEY_LENGTH as usize
@@ -899,6 +911,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HMAC_DRBG_KDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
         }
@@ -977,6 +993,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn hmac_drbg_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HMAC_DRBG_KDF_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context::<HmacDrbg>(vctx) }) else { return 0 };
         // SAFETY: as above.
@@ -1295,6 +1315,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn argon2_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ARGON2_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;

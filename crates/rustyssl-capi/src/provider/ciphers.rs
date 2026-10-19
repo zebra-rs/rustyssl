@@ -698,6 +698,15 @@ pub(crate) unsafe fn get_params_of(info: Info, params: *mut OSSL_PARAM) -> c_int
 /// `params` is NULL or a parameter array.
 pub(crate) unsafe fn generic_get_params(kind: Kind, params: *mut OSSL_PARAM) -> c_int {
     // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_GENERIC_GET_PARAMS,
+        )
+    } {
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
     unsafe { get_params_of(Info::of(kind), params) }
 }
 
@@ -710,6 +719,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn generic_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_GENERIC_GET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_generic_get_ctx_params";
         // SAFETY: the caller's guarantee.
         let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
@@ -821,6 +834,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn generic_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_GENERIC_SET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_generic_set_ctx_params";
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
@@ -882,6 +899,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn var_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::CIPHER_VAR_KEYLEN_SET_CTX_PARAMS) } {
+            return 0;
+        }
         const F: &str = "ossl_cipher_var_keylen_set_ctx_params";
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {

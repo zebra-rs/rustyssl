@@ -490,6 +490,15 @@ unsafe fn each<'a>(params: *mut OSSL_PARAM) -> impl Iterator<Item = *mut OSSL_PA
 /// # Safety
 /// As for `get_ctx_params`.
 unsafe fn gcm_get(g: &mut Gcm, params: *mut OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_GCM_GET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "ossl_gcm_get_ctx_params";
     // SAFETY: the caller's guarantee.
     for p in unsafe { each(params) } {
@@ -508,7 +517,8 @@ unsafe fn gcm_get(g: &mut Gcm, params: *mut OSSL_PARAM) -> c_int {
         } else if key == OSSL_CIPHER_PARAM_IV || key == OSSL_CIPHER_PARAM_UPDATED_IV {
             let size = q.data_size;
             let Some(iv) = g.iv_buffer() else { return 0 };
-            if iv.len() > size {
+            // 3.6: without a buffer, a query of the length.
+            if !q.data.is_null() && iv.len() > size {
                 err::raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH, F);
                 return 0;
             }
@@ -518,7 +528,13 @@ unsafe fn gcm_get(g: &mut Gcm, params: *mut OSSL_PARAM) -> c_int {
             // SAFETY: as above.
             unsafe { set_param(p, key, F, Value::Size(g.tls_aad_pad())) }
         } else if key == OSSL_CIPHER_PARAM_AEAD_TAG {
-            let tag = match g.tag(q.data_size) {
+            // 3.6: without a buffer, a query of the tag's length.
+            let size = if q.data.is_null() {
+                g.tag_len()
+            } else {
+                q.data_size
+            };
+            let tag = match g.tag(size) {
                 Ok(t) => t.to_vec(),
                 Err(_) => {
                     err::raise(ERR_LIB_PROV, PROV_R_INVALID_TAG, F);
@@ -565,6 +581,15 @@ unsafe fn gcm_get(g: &mut Gcm, params: *mut OSSL_PARAM) -> c_int {
 /// # Safety
 /// As for `set_ctx_params`.
 unsafe fn gcm_set(g: &mut Gcm, params: *const OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_GCM_SET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "ossl_gcm_set_ctx_params";
     // SAFETY: the caller's guarantee.
     for p in unsafe { each(params.cast_mut()) } {
@@ -652,6 +677,15 @@ unsafe fn find<'a>(
 /// # Safety
 /// As for `get_ctx_params`.
 unsafe fn ccm_get(g: &mut Ccm, params: *mut OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_CCM_GET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "ossl_ccm_get_ctx_params";
     for (key, v) in [
         (OSSL_CIPHER_PARAM_IVLEN, g.iv_len()),
@@ -730,6 +764,15 @@ unsafe fn ccm_get(g: &mut Ccm, params: *mut OSSL_PARAM) -> c_int {
 /// # Safety
 /// As for `set_ctx_params`.
 unsafe fn ccm_set(g: &mut Ccm, params: *const OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::OSSL_CIPHER_CCM_SET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "ossl_ccm_set_ctx_params";
     let params = params.cast_mut();
     // SAFETY: the caller's array.
@@ -908,6 +951,15 @@ unsafe fn ocb_set(g: &mut Ocb, params: *const OSSL_PARAM) -> c_int {
 /// # Safety
 /// As for `get_ctx_params`.
 unsafe fn chacha_poly_get(g: &mut ChaChaPoly, params: *mut OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::CHACHA20_POLY1305_GET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "chacha20_poly1305_get_ctx_params";
     for (key, v) in [
         (OSSL_CIPHER_PARAM_IVLEN, 12),
@@ -947,6 +999,15 @@ unsafe fn chacha_poly_get(g: &mut ChaChaPoly, params: *mut OSSL_PARAM) -> c_int 
 /// # Safety
 /// As for `set_ctx_params`.
 unsafe fn chacha_poly_set(g: &mut ChaChaPoly, params: *const OSSL_PARAM) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::CHACHA20_POLY1305_SET_CTX_PARAMS,
+        )
+    } {
+        return 0;
+    }
     const F: &str = "chacha20_poly1305_set_ctx_params";
     for (key, want, reason) in [
         (OSSL_CIPHER_PARAM_KEYLEN, 32, PROV_R_INVALID_KEY_LENGTH),

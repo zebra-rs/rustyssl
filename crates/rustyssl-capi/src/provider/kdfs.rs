@@ -849,6 +849,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HKDF_FIXED_DIGEST_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
         }
@@ -877,6 +881,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HKDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
         }
@@ -899,6 +907,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn hkdf_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::HKDF_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(h) = (unsafe { context::<Hkdf>(vctx) }) else { return 0 };
         // SAFETY: as above.
@@ -1123,6 +1135,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn tls13_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KDF_TLS1_3_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // 3.6 checks the mode even without parameters (3.5 returned 1 first).
         // SAFETY: the caller's guarantee.
         let Some(h) = (unsafe { context::<Hkdf>(vctx) }) else { return 0 };
@@ -1508,6 +1524,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PBKDF2_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
         }
@@ -1698,18 +1718,69 @@ ffi_callback! {
     }
 }
 
-ffi_callback! {
-    /// `kdf_pbkdf2_get_ctx_params` (TLS1-PRF's too): the size, any.
-    ///
-    /// # Safety
-    /// `params` is NULL or a parameter array.
-    pub(crate) unsafe extern "C" fn any_size_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
-    where failure = 0, library = ERR_LIB_PROV
-    {
-        // SAFETY: the caller's guarantee.
-        c_int::from(unsafe { set_size(params, OSSL_KDF_PARAM_SIZE, usize::MAX) })
-    }
+/// A KDF's `get_ctx_params` that answers the size (any) through its 3.6 decoder.
+macro_rules! size_getter {
+    ($name:ident, $decoder:ident, $c:literal) => {
+        ffi_callback! {
+            #[doc = concat!("`", $c, "`: the size, any.")]
+            ///
+            /// # Safety
+            /// `params` is NULL or a parameter array.
+            pub(crate) unsafe extern "C" fn $name(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+            where failure = 0, library = ERR_LIB_PROV
+            {
+                use crate::provider::param_decoders::{$decoder, decode};
+                // SAFETY: the caller's guarantee.
+                if !unsafe { decode(params, &$decoder) } {
+                    return 0;
+                }
+                // SAFETY: as above.
+                c_int::from(unsafe { set_size(params, OSSL_KDF_PARAM_SIZE, usize::MAX) })
+            }
+        }
+    };
 }
+
+size_getter!(
+    pbkdf2_get_ctx_params,
+    PBKDF2_GET_CTX_PARAMS,
+    "kdf_pbkdf2_get_ctx_params"
+);
+size_getter!(
+    pbkdf1_get_ctx_params,
+    PBKDF1_GET_CTX_PARAMS,
+    "kdf_pbkdf1_get_ctx_params"
+);
+size_getter!(
+    pvk_get_ctx_params,
+    PVK_GET_CTX_PARAMS,
+    "kdf_pvk_get_ctx_params"
+);
+size_getter!(
+    tls1_prf_get_ctx_params,
+    TLS1PRF_GET_CTX_PARAMS,
+    "kdf_tls1_prf_get_ctx_params"
+);
+size_getter!(
+    sshkdf_get_ctx_params,
+    SSHKDF_GET_CTX_PARAMS,
+    "kdf_sshkdf_get_ctx_params"
+);
+size_getter!(
+    kbkdf_get_ctx_params,
+    KBKDF_GET_CTX_PARAMS,
+    "kbkdf_get_ctx_params"
+);
+size_getter!(
+    scrypt_get_ctx_params,
+    SCRYPT_GET_CTX_PARAMS,
+    "kdf_scrypt_get_ctx_params"
+);
+size_getter!(
+    pkcs12_get_ctx_params,
+    PKCS12_GET_CTX_PARAMS,
+    "kdf_pkcs12_get_ctx_params"
+);
 
 static PBKDF2_SETTABLE: Params<7> = Params([
     defn(
@@ -1768,7 +1839,7 @@ static PBKDF2_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        pbkdf2_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -2051,6 +2122,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PBKDF1_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
         // SAFETY: as above.
         c_int::from(unsafe { k.set(params, true) })
@@ -2065,6 +2140,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn pvk_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::PVK_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
         // SAFETY: as above.
@@ -2309,7 +2388,7 @@ static PBKDF1_FUNCTIONS: Dispatch<12> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        pbkdf1_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -2334,7 +2413,7 @@ static PVK_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        pvk_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -2456,6 +2535,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn tls1_prf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::TLS1PRF_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -2720,7 +2803,7 @@ static TLS1_PRF_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        tls1_prf_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -3117,7 +3200,7 @@ unsafe fn sskdf_common_set(s: &mut Sskdf, params: *const OSSL_PARAM) -> bool {
 }
 
 ffi_callback! {
-    /// `sskdf_set_ctx_params` (X963KDF's too).
+    /// `sskdf_set_ctx_params`.
     ///
     /// # Safety
     /// `vctx` is a live SSKDF context; `params` is NULL or a parameter array.
@@ -3125,6 +3208,29 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SSKDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: as above.
+        let Some(s) = (unsafe { context::<Sskdf>(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        c_int::from(unsafe { sskdf_common_set(s, params) })
+    }
+}
+
+ffi_callback! {
+    /// `x963kdf_set_ctx_params`.
+    ///
+    /// # Safety
+    /// `vctx` is a live X963KDF context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn x963kdf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::X963KDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: as above.
         let Some(s) = (unsafe { context::<Sskdf>(vctx) }) else { return 0 };
         // SAFETY: as above.
         c_int::from(unsafe { sskdf_common_set(s, params) })
@@ -3139,6 +3245,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn sskdf_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SSKDF_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -3285,9 +3395,9 @@ ffi_callback! {
     }
 }
 
-/// An SSKDF-family dispatch table with its `derive`.
+/// An SSKDF-family dispatch table with its `derive` and `set_ctx_params`.
 macro_rules! sskdf_table {
-    ($derive:ident) => {
+    ($derive:ident, $set:ident) => {
         Dispatch([
             entry!(OSSL_FUNC_KDF_NEWCTX, sskdf_new, NewCtxFn),
             entry!(OSSL_FUNC_KDF_DUPCTX, sskdf_dup, DupCtxFn),
@@ -3299,11 +3409,7 @@ macro_rules! sskdf_table {
                 sskdf_settable,
                 CtxParamsFn
             ),
-            entry!(
-                OSSL_FUNC_KDF_SET_CTX_PARAMS,
-                sskdf_set_ctx_params,
-                SetCtxParamsFn
-            ),
+            entry!(OSSL_FUNC_KDF_SET_CTX_PARAMS, $set, SetCtxParamsFn),
             entry!(
                 OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS,
                 size_only_gettable,
@@ -3319,8 +3425,8 @@ macro_rules! sskdf_table {
     };
 }
 
-static SSKDF_FUNCTIONS: Dispatch<10> = sskdf_table!(sskdf_derive);
-static X963KDF_FUNCTIONS: Dispatch<10> = sskdf_table!(x963kdf_derive);
+static SSKDF_FUNCTIONS: Dispatch<10> = sskdf_table!(sskdf_derive, sskdf_set_ctx_params);
+static X963KDF_FUNCTIONS: Dispatch<10> = sskdf_table!(x963kdf_derive, x963kdf_set_ctx_params);
 
 // -------------------------------------------------------------------------------------------
 // SSHKDF
@@ -3402,6 +3508,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn sshkdf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SSHKDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -3617,7 +3727,7 @@ static SSHKDF_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        sshkdf_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -3791,6 +3901,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn kbkdf_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::KBKDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -4066,7 +4180,7 @@ static KBKDF_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        kbkdf_get_ctx_params,
         GetCtxParamsFn
     ),
     END,
@@ -4235,6 +4349,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn x942_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::X942KDF_SSHKDF_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
@@ -4455,6 +4573,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn x942_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::X942KDF_SSHKDF_GET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { context::<X942>(vctx) }) else { return 0 };
         // SAFETY: as above.
@@ -4701,6 +4823,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SCRYPT_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { is_empty(params) } {
             return 1;
         }
@@ -4854,6 +4980,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ARGON2_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         if !unsafe { set_size(params, OSSL_KDF_PARAM_SIZE, usize::MAX) } {
             return 0;
         }
@@ -4927,7 +5057,7 @@ static SCRYPT_FUNCTIONS: Dispatch<10> = Dispatch([
     ),
     entry!(
         OSSL_FUNC_KDF_GET_CTX_PARAMS,
-        any_size_get_ctx_params,
+        scrypt_get_ctx_params,
         GetCtxParamsFn
     ),
     END,

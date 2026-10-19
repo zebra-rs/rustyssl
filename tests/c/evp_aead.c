@@ -604,6 +604,27 @@ static void gcm_final_again(void)
     EVP_CIPHER_free(c);
 }
 
+/* 3.6: GCM's IV, updated IV and tag without a buffer are queries of their lengths. */
+static void gcm_size_queries(void)
+{
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    unsigned char out[64];
+    int outl = 0;
+    OSSL_PARAM p[4];
+
+    EVP_EncryptInit_ex2(ctx, EVP_aes_256_gcm(), key, iv, NULL);
+    EVP_EncryptUpdate(ctx, out, &outl, data, 16);
+    EVP_EncryptFinal_ex(ctx, out, &outl);
+    p[0] = OSSL_PARAM_construct_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0);
+    p[1] = OSSL_PARAM_construct_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0);
+    p[2] = OSSL_PARAM_construct_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0);
+    p[3] = OSSL_PARAM_construct_end();
+    check(EVP_CIPHER_CTX_get_params(ctx, p) == 1, "GCM: length queries");
+    printf("  iv %zu, updated iv %zu, tag %zu\n", p[0].return_size, p[1].return_size, p[2].return_size);
+    ERR_clear_error();
+    EVP_CIPHER_CTX_free(ctx);
+}
+
 int main(void)
 {
     size_t i;
@@ -626,6 +647,7 @@ int main(void)
     copies();
     ccm_unkeyed();
     gcm_final_again();
+    gcm_size_queries();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

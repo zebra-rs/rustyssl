@@ -379,6 +379,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::FILE_SET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx_of(loaderctx) }) else { return 0 };
         // SAFETY: as above.
         if params.is_null() || unsafe { (*params).key }.is_null() {
@@ -959,6 +963,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn any2obj_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ANY2OBJ_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { vctx.cast::<Any2Obj>().as_mut() }) else { return 0 };
         // SAFETY: the caller's array.

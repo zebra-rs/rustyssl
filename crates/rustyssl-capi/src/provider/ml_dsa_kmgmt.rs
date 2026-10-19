@@ -326,6 +326,15 @@ fn octets_ptr(p: &OSSL_PARAM) -> Result<(bool, &[u8]), ()> {
 /// # Safety
 /// `params` is NULL or an array.
 unsafe fn key_fromdata(k: &MlDsaKey, params: *const OSSL_PARAM, include_private: bool) -> bool {
+    // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::ML_DSA_KEY_TYPE_PARAMS,
+        )
+    } {
+        return false;
+    }
     const F: &str = "ml_dsa_key_fromdata";
     let v = k.variant;
     let name = v.name();
@@ -528,6 +537,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_GET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let v = k.variant;
         let ints = [
@@ -632,6 +645,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn ml_dsa_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ML_DSA_GEN_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.

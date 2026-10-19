@@ -2146,6 +2146,15 @@ unsafe fn common_set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
 /// # Safety
 /// `params` is NULL or a parameter array.
 unsafe fn set_params(d: &mut Drbg, params: *const OSSL_PARAM) -> bool {
+    let decoder = match d.mech {
+        Mech::Ctr(_) => &super::param_decoders::DRBG_CTR_SET_CTX_PARAMS,
+        Mech::Hash(_) => &super::param_decoders::DRBG_HASH_SET_CTX_PARAMS,
+        Mech::Hmac(_) => &super::param_decoders::DRBG_HMAC_SET_CTX_PARAMS,
+    };
+    // SAFETY: the caller's guarantee.
+    if !unsafe { super::param_decoders::decode(params, decoder) } {
+        return false;
+    }
     match d.mech {
         // SAFETY: the caller's guarantee.
         Mech::Ctr(_) => unsafe { ctr_set_params(d, params) },
@@ -2556,6 +2565,15 @@ ffi_callback! {
         }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { shared::<DrbgCtx>(vctx) }) else { return 0 };
+        let decoder = match guard(&c.inner).mech {
+            Mech::Ctr(_) => &super::param_decoders::DRBG_CTR_GET_CTX_PARAMS,
+            Mech::Hash(_) => &super::param_decoders::DRBG_HASH_GET_CTX_PARAMS,
+            Mech::Hmac(_) => &super::param_decoders::DRBG_HMAC_GET_CTX_PARAMS,
+        };
+        // SAFETY: the caller's array.
+        if !unsafe { super::param_decoders::decode(params, decoder) } {
+            return 0;
+        }
         let mut cnt = 0usize;
         // SAFETY: the caller's array.
         let p = unsafe { find(params, OSSL_RAND_PARAM_MAX_REQUEST) };
@@ -3005,6 +3023,10 @@ ffi_callback! {
         // SAFETY: the caller's guarantee.
         let Some(s) = (unsafe { shared::<SeedSrc>(vctx) }) else { return 0 };
         // SAFETY: as above.
+        if !unsafe { super::param_decoders::decode(params, &super::param_decoders::SEED_SRC_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: as above.
         let p = unsafe { find(params, OSSL_RAND_PARAM_STATE) };
         // SAFETY: a parameter of the caller's array.
         if !p.is_null() && unsafe { OSSL_PARAM_set_int(p, s.state.load(Ordering::Relaxed)) } == 0 {
@@ -3230,6 +3252,12 @@ ffi_callback! {
 /// `params` is NULL or a parameter array.
 unsafe fn test_set_params(t: &mut TestRng, params: *const OSSL_PARAM) -> bool {
     // SAFETY: the caller's guarantee.
+    if !unsafe {
+        super::param_decoders::decode(params, &super::param_decoders::TEST_RNG_SET_CTX_PARAMS)
+    } {
+        return false;
+    }
+    // SAFETY: the caller's guarantee.
     if unsafe { is_empty(params) } {
         return true;
     }
@@ -3431,6 +3459,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn test_rng_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { super::param_decoders::decode(params, &super::param_decoders::TEST_RNG_GET_CTX_PARAMS) } {
+            return 0;
+        }
         let get = |t: &mut TestRng| {
             let strength = c_int::try_from(t.strength).unwrap_or(c_int::MAX);
             let int = |key: &CStr, v: c_int| {

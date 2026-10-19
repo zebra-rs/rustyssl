@@ -127,6 +127,15 @@ unsafe fn import(selection: c_int, params: *const OSSL_PARAM) -> Option<Box<Prov
         return None;
     }
     // SAFETY: the caller's guarantee.
+    if !unsafe {
+        crate::provider::param_decoders::decode(
+            params,
+            &crate::provider::param_decoders::GENERIC_SKEY_IMPORT,
+        )
+    } {
+        return None;
+    }
+    // SAFETY: the caller's guarantee.
     let p = unsafe { OSSL_PARAM_locate_const(params, RAW_BYTES.as_ptr()) };
     // SAFETY: a parameter of the array.
     let p = unsafe { p.as_ref() }?;

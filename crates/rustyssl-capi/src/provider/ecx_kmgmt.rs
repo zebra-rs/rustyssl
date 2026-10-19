@@ -173,6 +173,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_EC
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_IMEXPORT_TYPES) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { ecx_key(keydata) }) else { return 0 };
         if selection & KEYPAIR == 0 {
             return 0;
@@ -495,6 +499,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_EC
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_GEN_SET_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         if let Some(p) = unsafe { locate(params, OSSL_PKEY_PARAM_GROUP_NAME) } {
@@ -767,6 +775,11 @@ macro_rules! ecx_keymgmt {
             pub(crate) unsafe extern "C" fn $get(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int
             where failure = 0, library = ERR_LIB_EC
             {
+                let decoder = if $ed { &crate::provider::param_decoders::ED_GET_PARAMS } else { &crate::provider::param_decoders::ECX_GET_PARAMS };
+                // SAFETY: the caller's guarantee.
+                if keydata.is_null() || !unsafe { crate::provider::param_decoders::decode(params, decoder) } {
+                    return 0;
+                }
                 // SAFETY: the caller's guarantee.
                 unsafe { get_params(keydata, params) }
             }
@@ -792,6 +805,10 @@ macro_rules! ecx_keymgmt {
             {
                 if $ed {
                     return 1;
+                }
+                // SAFETY: the caller's guarantee.
+                if keydata.is_null() || !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::ECX_SET_PARAMS) } {
+                    return 0;
                 }
                 // SAFETY: the caller's guarantee.
                 unsafe { set_params(keydata, params) }

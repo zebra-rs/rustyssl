@@ -321,6 +321,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_IMPORT) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         if selection & KEYPAIR == 0 {
             return 0;
@@ -397,6 +401,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn slh_dsa_get_params(keydata: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_GET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(k) = (unsafe { key(keydata) }) else { return 0 };
         let v = k.variant;
@@ -494,6 +502,10 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn slh_dsa_gen_set_params(genctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::SLH_DSA_GEN_SET_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(g) = (unsafe { context::<GenCtx>(genctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.

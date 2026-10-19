@@ -84,6 +84,7 @@ mod mlx_kem;
 pub(crate) mod mlx_kmgmt;
 pub(crate) mod modes;
 mod module;
+pub(crate) mod param_decoders;
 pub(crate) mod rands;
 mod rc4_hmac_md5;
 pub(crate) mod rsa_enc;

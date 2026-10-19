@@ -36,6 +36,7 @@ use rustyssl_crypto::ecx448::ED448_SIGSIZE;
 
 use super::builtin::libctx_of;
 use super::macs::{boxed, context, is_empty, locate, unbox, wipe};
+use super::param_decoders::{EDDSA_SET_CTX_PARAMS, EDDSA_SET_VARIANT_CTX_PARAMS, decode};
 use super::tables::{Dispatch, END, PARAM_END, Params, defn, entry};
 use crate::ecx::{self, EcxKey, EcxType, digest_available, sha512_available};
 use crate::err;
@@ -710,6 +711,10 @@ ffi_callback! {
     where failure = 0, library = ERR_LIB_PROV
     {
         // SAFETY: the caller's guarantee.
+        if !unsafe { crate::provider::param_decoders::decode(params, &crate::provider::param_decoders::EDDSA_GET_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
         // SAFETY: the caller's array; a static name.
         let p = unsafe { OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID.as_ptr()) };
@@ -756,61 +761,94 @@ ffi_callback! {
     pub(crate) unsafe extern "C" fn eddsa_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
-        const F: &str = "eddsa_set_ctx_params";
+        // SAFETY: the caller's guarantee.
+        if !unsafe { decode(params, &EDDSA_SET_CTX_PARAMS) } {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
-        // SAFETY: the caller's guarantee.
-        if unsafe { is_empty(params) } {
-            return 1;
-        }
-        // SAFETY: the caller's array; a static name.
-        if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_INSTANCE) } {
-            if c.instance_preset {
-                err::raise_with_text(
-                    ERR_LIB_PROV,
-                    PROV_R_NO_INSTANCE_ALLOWED,
-                    F,
-                    "the EdDSA instance is preset, you may not try to specify it",
-                );
-                return 0;
-            }
-            let mut buf = [0 as c_char; MAX_NAME];
-            let mut s = buf.as_mut_ptr();
-            // SAFETY: a parameter of the array; the buffer.
-            if unsafe { OSSL_PARAM_get_utf8_string(p, &raw mut s, MAX_NAME) } != 1 {
-                return 0;
-            }
-            // SAFETY: NUL-terminated by the call.
-            let name = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_bytes();
-            let Some(&(_, instance)) = Instance::NAMES
-                .iter()
-                .find(|(n, _)| n.as_bytes().eq_ignore_ascii_case(name))
-            else {
-                err::raise_with_text(
-                    ERR_LIB_PROV,
-                    PROV_R_INVALID_EDDSA_INSTANCE_FOR_ATTEMPTED_OPERATION,
-                    F,
-                    &format!("unknown INSTANCE name: {}", String::from_utf8_lossy(name)),
-                );
-                return 0;
-            };
-            let by_caller = c.prehash_by_caller;
-            c.setup_instance(instance, false, by_caller);
-        }
-        // SAFETY: the caller's array; a static name.
-        if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_CONTEXT_STRING) } {
-            let mut buf = [0u8; MAX_CONTEXT];
-            let mut data = buf.as_mut_ptr().cast::<c_void>();
-            let mut n = 0;
-            // SAFETY: a parameter of the array; the buffer.
-            if unsafe { OSSL_PARAM_get_octet_string(p, &raw mut data, MAX_CONTEXT, &raw mut n) } != 1 {
-                c.context.clear();
-                return 0;
-            }
-            c.context = buf.get(..n).unwrap_or_default().to_vec();
-        }
-        1
+        // SAFETY: as above.
+        unsafe { set_ctx(c, params, true) }
     }
+}
+
+ffi_callback! {
+    /// `eddsa_set_variant_ctx_params` (3.6; Ed25519ph's, Ed25519ctx's, and Ed448ph's): only
+    /// the context string, so an instance given is ignored (3.5 refused it, being preset).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live context; `params` is NULL or an array.
+    pub(crate) unsafe extern "C" fn eddsa_set_variant_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { decode(params, &EDDSA_SET_VARIANT_CTX_PARAMS) } {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(c) = (unsafe { ctx(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        unsafe { set_ctx(c, params, false) }
+    }
+}
+
+/// `eddsa_set_ctx_params_internal`: the instance (if `instance`) and the context string.
+///
+/// # Safety
+/// `params` is NULL or an array.
+unsafe fn set_ctx(c: &mut EddsaCtx, params: *const OSSL_PARAM, instance: bool) -> c_int {
+    const F: &str = "eddsa_set_ctx_params_internal";
+    // SAFETY: the caller's guarantee.
+    if unsafe { is_empty(params) } {
+        return 1;
+    }
+    // SAFETY: the caller's array; a static name.
+    if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_INSTANCE) }.filter(|_| instance) {
+        if c.instance_preset {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                PROV_R_NO_INSTANCE_ALLOWED,
+                F,
+                "the EdDSA instance is preset, you may not try to specify it",
+            );
+            return 0;
+        }
+        let mut buf = [0 as c_char; MAX_NAME];
+        let mut s = buf.as_mut_ptr();
+        // SAFETY: a parameter of the array; the buffer.
+        if unsafe { OSSL_PARAM_get_utf8_string(p, &raw mut s, MAX_NAME) } != 1 {
+            return 0;
+        }
+        // SAFETY: NUL-terminated by the call.
+        let name = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_bytes();
+        let Some(&(_, instance)) = Instance::NAMES
+            .iter()
+            .find(|(n, _)| n.as_bytes().eq_ignore_ascii_case(name))
+        else {
+            err::raise_with_text(
+                ERR_LIB_PROV,
+                PROV_R_INVALID_EDDSA_INSTANCE_FOR_ATTEMPTED_OPERATION,
+                F,
+                &format!("unknown INSTANCE name: {}", String::from_utf8_lossy(name)),
+            );
+            return 0;
+        };
+        let by_caller = c.prehash_by_caller;
+        c.setup_instance(instance, false, by_caller);
+    }
+    // SAFETY: the caller's array; a static name.
+    if let Some(p) = unsafe { locate(params, OSSL_SIGNATURE_PARAM_CONTEXT_STRING) } {
+        let mut buf = [0u8; MAX_CONTEXT];
+        let mut data = buf.as_mut_ptr().cast::<c_void>();
+        let mut n = 0;
+        // SAFETY: a parameter of the array; the buffer.
+        if unsafe { OSSL_PARAM_get_octet_string(p, &raw mut data, MAX_CONTEXT, &raw mut n) } != 1 {
+            c.context.clear();
+            return 0;
+        }
+        c.context = buf.get(..n).unwrap_or_default().to_vec();
+    }
+    1
 }
 
 /// `settable_ctx_params`.
@@ -882,7 +920,7 @@ type ListFn = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const OSSL_PARA
 /// `IMPL_EDDSA_DISPATCH(vn, bn)`: a table's common start, with `vn`'s message init and the
 /// base `bn`'s sign, verify, and key types.
 macro_rules! eddsa_dispatch {
-    ($n:literal, $name:ident, $doc:literal, $message_init:ident, $sign:ident, $verify:ident, $key_types:ident, [$($rest:expr),* $(,)?]) => {
+    ($n:literal, $name:ident, $doc:literal, $message_init:ident, $sign:ident, $verify:ident, $key_types:ident, $set:ident, [$($rest:expr),* $(,)?]) => {
         #[doc = $doc]
         pub(crate) static $name: Dispatch<$n> = Dispatch([
             entry!(OSSL_FUNC_SIGNATURE_NEWCTX, eddsa_newctx, NewCtxFn),
@@ -896,7 +934,7 @@ macro_rules! eddsa_dispatch {
             $($rest,)*
             entry!(OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, eddsa_get_ctx_params, GetParamsFn),
             entry!(OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, eddsa_gettable_ctx_params, ListFn),
-            entry!(OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, eddsa_set_ctx_params, SetParamsFn),
+            entry!(OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, $set, SetParamsFn),
             END,
         ]);
     };
@@ -910,6 +948,7 @@ eddsa_dispatch!(
     ed25519_sign,
     ed25519_verify,
     ed25519_sigalg_query_key_types,
+    eddsa_set_ctx_params,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -949,6 +988,7 @@ eddsa_dispatch!(
     ed25519_sign,
     ed25519_verify,
     ed25519_sigalg_query_key_types,
+    eddsa_set_variant_ctx_params,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -986,6 +1026,7 @@ eddsa_dispatch!(
     ed25519_sign,
     ed25519_verify,
     ed25519_sigalg_query_key_types,
+    eddsa_set_variant_ctx_params,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
@@ -1013,6 +1054,7 @@ eddsa_dispatch!(
     ed448_sign,
     ed448_verify,
     ed448_sigalg_query_key_types,
+    eddsa_set_ctx_params,
     [
         entry!(OSSL_FUNC_SIGNATURE_SIGN_INIT, ed448_signverify_init, InitFn),
         entry!(
@@ -1048,6 +1090,7 @@ eddsa_dispatch!(
     ed448_sign,
     ed448_verify,
     ed448_sigalg_query_key_types,
+    eddsa_set_variant_ctx_params,
     [
         entry!(
             OSSL_FUNC_SIGNATURE_SIGN_INIT,
