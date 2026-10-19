@@ -678,6 +678,38 @@ static void argon2s(void)
     EVP_KDF_CTX_free(ctx);
 }
 
+/* KBKDF's mode: a string ("counter" or "feedback"); 3.6 refuses another type while reading it. */
+static void kbkdf_mode(void)
+{
+    EVP_KDF *kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
+    EVP_KDF_CTX *ctx = EVP_KDF_CTX_new(kdf);
+    int three = 3;
+    OSSL_PARAM as_int[] = {
+        OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, &three),
+        OSSL_PARAM_END
+    };
+    OSSL_PARAM as_text[] = {
+        OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, (char *)"sideways", 0),
+        OSSL_PARAM_END
+    };
+    OSSL_PARAM feedback[] = {
+        OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, (char *)"FeedBack", 0),
+        OSSL_PARAM_END
+    };
+
+    printf("# KBKDF's mode\n");
+    check(ctx != NULL, "a KBKDF context");
+    ERR_clear_error();
+    printf("  an integer: %d\n", EVP_KDF_CTX_set_params(ctx, as_int));
+    codes();
+    printf("  an unknown name: %d\n", EVP_KDF_CTX_set_params(ctx, as_text));
+    codes();
+    check(EVP_KDF_CTX_set_params(ctx, feedback) == 1, "feedback, in any case");
+    codes();
+    EVP_KDF_CTX_free(ctx);
+    EVP_KDF_free(kdf);
+}
+
 int main(void)
 {
     methods();
@@ -685,6 +717,7 @@ int main(void)
     krb5kdf();
     hmac_drbg();
     argon2s();
+    kbkdf_mode();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }
