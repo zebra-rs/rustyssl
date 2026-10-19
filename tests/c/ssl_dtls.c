@@ -2,8 +2,9 @@
  * Conformance test for DTLS (DTLS_client_method(3), DTLSv1_listen(3), DTLS_set_timer_cb(3),
  * DTLS_get_data_mtu(3), SSL_set_mtu(3)): DTLS 1.2 and 1.0 handshakes and application data over
  * a datagram BIO pair, the MTU controls and the data MTU, the retransmission timer (its
- * callback, DTLSv1_get_timeout, DTLSv1_handle_timeout after a lost datagram), and
- * DTLSv1_listen's cookie exchange.
+ * callback, DTLSv1_get_timeout, DTLSv1_handle_timeout after a lost datagram), the same timer
+ * through SSL_get_event_timeout(3) and SSL_handle_events(3), and DTLSv1_listen's cookie
+ * exchange.
  *
  * Built once against the vendored headers, then run against the reference OpenSSL and against
  * rustyssl: it must pass on both with the same output (TEST_PLAN.md, layer L4).
@@ -236,6 +237,67 @@ static void test_timer(void)
     SSL_CTX_free(s);
 }
 
+/*
+ * 20 ms at first (the first `last` is the default second), then 10 seconds: past the 15 ms
+ * under which DTLSv1_get_timeout reports a timer as due, so the first handshake call waits.
+ */
+static unsigned int due_cb(SSL *s, unsigned int last)
+{
+    (void)s;
+    return last == 20000 ? 10000000 : 20000;
+}
+
+/* An event timeout as `ret infinite`, and whether it is due now or later. */
+static void event_timeout(const char *what, SSL *x)
+{
+    struct timeval tv;
+    int inf = -1, r = SSL_get_event_timeout(x, &tv, &inf);
+
+    if (inf)
+        printf("  %s: %d infinite, %ld s\n", what, r, (long)tv.tv_sec);
+    else
+        printf("  %s: %d finite, %s\n", what, r,
+               tv.tv_sec == 0 && tv.tv_usec == 0 ? "due" : "later");
+}
+
+static void test_events(void)
+{
+    SSL_CTX *c = client_ctx(0), *s = server_ctx(0);
+    struct link l;
+    struct timeval tv;
+    char drop[2048];
+    long spins;
+    int r, inf = 1;
+
+    printf("# SSL_get_event_timeout and SSL_handle_events on DTLS\n");
+    link_up(&l, c, s);
+    event_timeout("before a handshake", l.c);
+    printf("  handle events before a handshake: %d\n", SSL_handle_events(l.c));
+    DTLS_set_timer_cb(l.c, due_cb);
+    r = SSL_do_handshake(l.c);
+    printf("  connect %d error %d\n", r, SSL_get_error(l.c, r));
+    /* The ClientHello is lost; the timer comes due. */
+    check(BIO_read(l.sb, drop, sizeof(drop)) > 0, "the ClientHello is dropped");
+    for (spins = 0; spins < 100000000L; spins++)
+        if (SSL_get_event_timeout(l.c, &tv, &inf) == 1 && !inf && tv.tv_sec == 0
+            && tv.tv_usec == 0)
+            break;
+    check(!inf && tv.tv_sec == 0 && tv.tv_usec == 0, "the event timeout comes due");
+    printf("  handle events when due: %d\n", SSL_handle_events(l.c));
+    check(BIO_ctrl_pending(l.sb) > 0, "the ClientHello went again");
+    event_timeout("after the retransmission (10 s)", l.c);
+    printf("  handle events before it is due: %d\n", SSL_handle_events(l.c));
+    check(pump(&l), "the handshake completes");
+    event_timeout("client after the handshake", l.c);
+    event_timeout("server after the handshake", l.s);
+    printf("  handle events after the handshake: %d %d\n", SSL_handle_events(l.c),
+           SSL_handle_events(l.s));
+    check(talk(&l), "application data");
+    link_down(&l);
+    SSL_CTX_free(c);
+    SSL_CTX_free(s);
+}
+
 static int gen_cookie(SSL *s, unsigned char *cookie, unsigned int *len)
 {
     (void)s;
@@ -296,6 +358,7 @@ int main(void)
     test_handshakes();
     test_mtu();
     test_timer();
+    test_events();
     test_listen();
     X509_free(cert);
     EVP_PKEY_free(key);

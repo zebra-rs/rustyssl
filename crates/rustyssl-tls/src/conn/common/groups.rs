@@ -136,6 +136,20 @@ pub fn lookup(c: &Connection, id: u16) -> Option<&GroupInfo> {
     c.hs.sh.groups.iter().find(|g| g.id == id)
 }
 
+/// `tls13_set_encoded_pub_key`'s checks of a TLS 1.3 key share before it is used: a DH share
+/// must be padded to the prime's length (RFC 8446, section 4.2.8.1), which `own_len`, this
+/// end's share in the group, has (as OpenSSL's encoding pads it); an EC share must be an
+/// uncompressed point. Whether `peer` passes; a KEM's or an XDH group's octets go on to the
+/// provider as they are.
+#[must_use]
+pub fn encoded_share_ok(info: &GroupInfo, peer: &[u8], own_len: usize) -> bool {
+    match info.algorithm.as_str() {
+        "DH" => own_len > 0 && peer.len() == own_len,
+        "EC" => peer.len() >= 3 && peer.first() == Some(&4),
+        _ => true,
+    }
+}
+
 /// `tls1_get_supported_groups`: Suite B's curves in a Suite B mode, otherwise the configured
 /// list (or the default).
 #[must_use]
@@ -203,7 +217,7 @@ pub fn valid(c: &Connection, id: u16, min: u16, max: u16, isec: bool) -> (bool, 
     if gmin < 0 || gmax < 0 {
         return (false, false);
     }
-    let vc = super::ciphers::vcmp;
+    let vc = |a, b| super::ciphers::vcmp(c, a, b);
     let mut ok = gmax == 0 || vc(i32::from(min), gmax).is_le();
     if gmin > 0 {
         ok &= vc(i32::from(max), gmin).is_ge();
@@ -288,7 +302,7 @@ pub fn shared_group(c: &Connection, nmatch: i32) -> u16 {
             continue;
         }
         let v = i32::from(c.neg.version);
-        let vc = super::ciphers::vcmp;
+        let vc = |a, b| super::ciphers::vcmp(c, a, b);
         if (gmin != 0 && vc(v, gmin).is_lt()) || (gmax != 0 && vc(v, gmax).is_gt()) {
             continue;
         }

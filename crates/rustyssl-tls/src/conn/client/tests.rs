@@ -1383,6 +1383,27 @@ fn full12(p: &TestProvider, cfg: Config, suite: u16, ticket: bool) -> (Connectio
     (c, seen)
 }
 
+/// A server's ec_point_formats without uncompressed is accepted with an ECDHE suite: OpenSSL
+/// checks it only against a list of the client's own, which nothing sets (BoGo's
+/// `PointFormat-Client-MissingUncompressed` fails on the reference too).
+#[test]
+fn tls12_server_point_formats_without_uncompressed() {
+    let p = TestProvider::new(b"tls12-point-formats");
+    let (mut c, mut seen, mut s) = hello12(&p, client12());
+    // ansiX962_compressed_prime alone.
+    let mut input = s.hello(0xc02f, &[7; 32], &[RI, EMS, (0x000b, &[1, 1])]);
+    input.extend(s.certificate());
+    let params = s.ecdhe_params(0x001d);
+    input.extend(s.ske(&params, 0x0804));
+    input.extend(s.done());
+    c.feed(&input);
+    assert_eq!(
+        drive(&mut c, &p, false, &mut accept, &mut seen).unwrap(),
+        Event::NeedInput
+    );
+    assert_eq!(seen.written.len(), 2, "the ClientKeyExchange and Finished");
+}
+
 #[test]
 fn tls12_ecdhe_rsa() {
     let p = TestProvider::new(b"tls12-ecdhe");
@@ -2084,6 +2105,37 @@ fn loopback_with_the_server() {
 }
 
 #[test]
+fn tls13_post_handshake_fragment_then_app_data_fails() {
+    // Part of a KeyUpdate (its type octet) and then application data: TLS 1.3 doesn't
+    // interleave them (`ssl3_read_bytes`; tlsfuzzer's "1/4 fragmented keyupdate msg, appdata
+    // between").
+    use crate::conn::pair::{self, End};
+    let p = TestProvider::new(b"mixed");
+    let mut ccfg = client12();
+    ccfg.max_version = v::TLS1_3;
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(server_config(&p));
+    let mut log = pair::Log::default();
+    let mut answer = |_: End, r: &Request| accept(r);
+    pair::handshake(&p, &mut client, &mut server, true, &mut answer, &mut log).unwrap();
+    client
+        .write_record(
+            &p,
+            crate::record::content_type::handshake(),
+            &[hm::KEY_UPDATE],
+        )
+        .unwrap();
+    client.write_app(&p, b"between").unwrap();
+    server.feed(&client.take_output());
+    // One record per step: the fragment, then the application data.
+    let e = (0..8)
+        .find_map(|_| server.step(&p, true).err())
+        .expect("the server took the records");
+    assert_eq!(e.alert.map(i32::from), Some(abi::SSL_AD_UNEXPECTED_MESSAGE));
+    assert_eq!(e.reason, abi::SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA);
+}
+
+#[test]
 fn tls12_cbc_with_encrypt_then_mac() {
     let p = TestProvider::new(b"tls12-etm");
     let mut cfg = client12();
@@ -2111,6 +2163,32 @@ fn tls12_cbc_with_encrypt_then_mac() {
         Event::HandshakeDone
     );
     assert!(c.negotiated().etm);
+}
+
+/// An external PSK with an empty identity, from either callback, fails as OpenSSL's does
+/// (`OPENSSL_memdup` of nothing is NULL): BoGo's `EmptyPSKHint-*`.
+#[test]
+fn tls13_external_psk_empty_identity() {
+    let p = TestProvider::new(b"psk13-empty");
+    for session in [true, false] {
+        let mut cfg = rfc_client();
+        cfg.callbacks.psk_session = session;
+        cfg.callbacks.psk = !session;
+        let mut c = Connection::new(cfg);
+        let mut seen = Seen::default();
+        let ext = crate::conn::ExternalPsk {
+            identity: Vec::new(),
+            key: vec![0x11; 32],
+            cipher_id: suites::by_protocol_id(0x1301).unwrap().id,
+        };
+        let mut give = |r: &Request| match r {
+            Request::PskSession { .. } | Request::Psk { .. } => Answer::Psk(Some(ext.clone())),
+            _ => accept(r),
+        };
+        let e = drive(&mut c, &p, false, &mut give, &mut seen).unwrap_err();
+        assert_eq!(e, Error::internal(), "session callback: {session}");
+        assert!(seen.written.is_empty());
+    }
 }
 
 #[test]
@@ -2498,6 +2576,154 @@ fn dtls_loopback() {
         assert_eq!(server.read_app(&mut buf, false), 4);
         assert_eq!(&buf[..4], b"ping");
     }
+}
+
+/// A seeded fault schedule for [`pair::handshake_dtls_faults`]: per end, about 20% of datagrams
+/// dropped (at most two in a row), 10% duplicated and 15% held back (reordered).
+fn fault_schedule(
+    seed: u64,
+) -> impl FnMut(crate::conn::pair::End, usize) -> crate::conn::pair::Fate {
+    use crate::conn::pair::{End, Fate};
+    let mut state = [seed ^ 0x5151, seed ^ 0xa3a3];
+    let mut drops = [0u32; 2];
+    move |e: End, _n: usize| {
+        let i = usize::from(matches!(e, End::Server));
+        let s = &mut state[i];
+        *s = s.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = *s;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^= z >> 31;
+        let f = match z % 100 {
+            0..20 if drops[i] < 2 => Fate::Drop,
+            20..30 => Fate::Duplicate,
+            30..45 => Fate::Delay,
+            _ => Fate::Deliver,
+        };
+        drops[i] = if f == Fate::Drop { drops[i] + 1 } else { 0 };
+        f
+    }
+}
+
+#[test]
+fn dtls_survives_drops_duplicates_and_reordering() {
+    use crate::conn::pair::{self, End};
+    for (version, mtu, suite) in [
+        (v::DTLS1_2, 1400, 0xc02f),
+        (v::DTLS1_2, 256, 0xc02f),
+        (v::DTLS1, 1400, 0xc013),
+    ] {
+        for seed in 0..200u64 {
+            let p = TestProvider::new(b"dtls-faults");
+            let s = suites::by_protocol_id(suite).unwrap();
+            let mut ccfg = dtls(client12(), version);
+            ccfg.security_level = 0;
+            ccfg.dtls_mtu = mtu;
+            ccfg.ciphers = vec![s];
+            let mut scfg = dtls(server_config(&p), version);
+            scfg.security_level = 0;
+            scfg.dtls_mtu = mtu;
+            scfg.ciphers = vec![s];
+            let mut client = Connection::new(ccfg);
+            let mut server = Connection::new(scfg);
+            let mut log = pair::Log::default();
+            let mut answer = |_: End, r: &Request| accept(r);
+            let mut fate = fault_schedule(seed);
+            let r = pair::handshake_dtls_faults(
+                &p,
+                &mut client,
+                &mut server,
+                &mut answer,
+                &mut fate,
+                64,
+                &mut log,
+            );
+            assert!(
+                r.is_ok(),
+                "version {version:04x} mtu {mtu} seed {seed}: {r:?}: server state {}, client \
+                 state {}",
+                server.state(),
+                client.state(),
+            );
+            assert_eq!(
+                client.negotiated().client_finished,
+                server.negotiated().client_finished,
+                "seed {seed}"
+            );
+            client.write_app(&p, b"ping").unwrap();
+            for d in client.take_datagrams() {
+                server.feed_datagram(&d);
+            }
+            let mut got = Vec::new();
+            for _ in 0..8 {
+                if server.step(&p, true).unwrap() == Event::AppData {
+                    let mut buf = [0u8; 16];
+                    let n = server.read_app(&mut buf, false);
+                    got.extend_from_slice(&buf[..n]);
+                    break;
+                }
+            }
+            assert_eq!(got, b"ping", "version {version:04x} mtu {mtu} seed {seed}");
+        }
+    }
+}
+
+/// The timer changes one end makes in a step, until it waits for input.
+fn dtls_timer_changes(
+    c: &mut Connection,
+    p: &TestProvider,
+    reading: bool,
+    out: &mut Vec<Vec<u8>>,
+) -> Vec<crate::conn::dtls::Timer> {
+    let mut timers = Vec::new();
+    for _ in 0..1000 {
+        let ev = c.step(p, reading).unwrap();
+        timers.extend(c.take_dtls_timer());
+        match ev {
+            Event::Request(r) => c.answer(accept(&r)),
+            Event::Output => out.extend(c.take_datagrams()),
+            Event::NeedInput | Event::Idle | Event::HandshakeDone => {
+                out.extend(c.take_datagrams());
+                if !matches!(ev, Event::HandshakeDone) {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    timers
+}
+
+/// A flight read and the next one written in one step stop the timer and start it again
+/// (`dtls1_stop_timer` resets the duration), rather than only re-arming it: otherwise the
+/// next flight's timer keeps the previous one's doubled duration.
+#[test]
+fn dtls_next_flight_restarts_the_timer() {
+    use crate::conn::dtls::Timer;
+    let p = TestProvider::new(b"dtls-timer");
+    let mut client = Connection::new(dtls(client12(), v::DTLS1_2));
+    let mut server = Connection::new(dtls(server_config(&p), v::DTLS1_2));
+    let mut to_server = Vec::new();
+    assert_eq!(
+        dtls_timer_changes(&mut client, &p, false, &mut to_server),
+        [Timer::Start]
+    );
+    let mut to_client = Vec::new();
+    for d in to_server.drain(..) {
+        server.feed_datagram(&d);
+    }
+    dtls_timer_changes(&mut server, &p, true, &mut to_client);
+    for d in to_client.drain(..) {
+        client.feed_datagram(&d);
+    }
+    // The server's flight read, the client's next one written: a restart, then only re-arms
+    // as the flight's further messages go (each `dtls1_start_timer` keeps the duration).
+    let changes = dtls_timer_changes(&mut client, &p, true, &mut to_server);
+    assert_eq!(changes.first(), Some(&Timer::Restart), "{changes:?}");
+    assert!(
+        changes.iter().skip(1).all(|t| *t == Timer::Start),
+        "{changes:?}"
+    );
 }
 
 #[test]

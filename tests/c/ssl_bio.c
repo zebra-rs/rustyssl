@@ -406,11 +406,112 @@ static void test_constructors(void)
     SSL_CTX_free(ctx);
 }
 
+/* The lengths of the application data records an end writes, as text. */
+static char app_records[256];
+
+static void count_app_records(int write_p, int version, int content_type, const void *buf,
+                              size_t len, SSL *ssl, void *arg)
+{
+    const unsigned char *h = buf;
+    size_t at = strlen(app_records);
+
+    (void)version;
+    (void)ssl;
+    (void)arg;
+    if (write_p && content_type == SSL3_RT_HEADER && len >= 5 && h[0] == SSL3_RT_APPLICATION_DATA
+        && at + 8 < sizeof(app_records))
+        snprintf(app_records + at, sizeof(app_records) - at, " %u", (unsigned)(h[3] << 8 | h[4]));
+}
+
+/*
+ * A line read as s_server -www reads its request (BIO_gets through a BIO_f_buffer over a
+ * BIO_f_ssl), with the line split over records: TLS 1.0 CBC with the first octet alone in its
+ * record (the 1/n-1 split tlslite and browsers make), and the same over TLS 1.2.
+ */
+static void test_split_line(void)
+{
+    static const struct {
+        const char *name;
+        int version;
+    } cases[] = { { "TLS 1.0", TLS1_VERSION }, { "TLS 1.2", TLS1_2_VERSION } };
+    size_t k;
+
+    for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+        SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+        SSL *c, *s;
+        BIO *io, *sb;
+        char buf[128], what[160];
+        int n, tries;
+
+        SSL_CTX_set_min_proto_version(cctx, cases[k].version);
+        SSL_CTX_set_max_proto_version(cctx, cases[k].version);
+        SSL_CTX_set_cipher_list(cctx, "ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:AES128-SHA:@SECLEVEL=0");
+        SSL_CTX_set_cipher_list(sctx, "ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:AES128-SHA:@SECLEVEL=0");
+        SSL_CTX_set_min_proto_version(sctx, cases[k].version);
+        /* No empty fragment before each record: the client's writes are its records. */
+        SSL_CTX_set_options(cctx, SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS);
+        connect_pair(cctx, sctx, &c, &s);
+        /* Set before the handshake: a record layer takes the callback when it's made. */
+        SSL_set_msg_callback(s, count_app_records);
+        snprintf(what, sizeof(what), "%s: the handshake", cases[k].name);
+        check(run(c, s, 0) == 0, what);
+        snprintf(what, sizeof(what), "%s: two records written", cases[k].name);
+        check(SSL_write(c, "G", 1) == 1 && SSL_write(c, "ET / HTTP/1.0\r\n", 15) == 15, what);
+        io = BIO_new(BIO_f_buffer());
+        sb = BIO_new(BIO_f_ssl());
+        BIO_set_ssl(sb, s, BIO_NOCLOSE);
+        BIO_push(io, sb);
+        n = -1;
+        for (tries = 0; tries < 8 && n < 0; tries++)
+            n = BIO_gets(io, buf, sizeof(buf));
+        printf("  %s: BIO_gets %d \"%.*s\"\n", cases[k].name, n, n > 2 ? n - 2 : 0, buf);
+        snprintf(what, sizeof(what), "%s: BIO_gets returns the whole line", cases[k].name);
+        check(n == 16 && memcmp(buf, "GET / HTTP/1.0\r\n", 16) == 0, what);
+        /*
+         * The answer, as s_server -www writes it: lines through the buffer, a flush, then
+         * close_notify. In TLS 1.0 CBC each write is an empty fragment and then the data.
+         */
+        BIO_puts(io, "HTTP/1.0 200 ok\r\n");
+        BIO_puts(io, "\r\n<pre>\n");
+        app_records[0] = '\0';
+        snprintf(what, sizeof(what), "%s: the answer flushed", cases[k].name);
+        check(BIO_flush(io) == 1, what);
+        /* TLS 1.0 CBC: an empty fragment (only its MAC and padding) before the data. */
+        printf("  %s: the server's application data records:%s\n", cases[k].name, app_records);
+        snprintf(what, sizeof(what), "%s: the server's close_notify", cases[k].name);
+        check(SSL_shutdown(s) == 0, what);
+        {
+            char got[256];
+            int total = 0, r;
+
+            while ((r = SSL_read(c, got + total, (int)sizeof(got) - 1 - total)) > 0)
+                total += r;
+            got[total] = '\0';
+            printf("  %s: the client read %d octets, then %d (SSL_get_error %d)\n",
+                   cases[k].name, total, r, SSL_get_error(c, r));
+            snprintf(what, sizeof(what), "%s: the client reads the whole answer, then EOF",
+                     cases[k].name);
+            check(total == 25 && strcmp(got, "HTTP/1.0 200 ok\r\n\r\n<pre>\n") == 0
+                      && SSL_get_error(c, r) == SSL_ERROR_ZERO_RETURN,
+                  what);
+        }
+        BIO_free_all(io);
+        SSL_set_shutdown(c, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+        SSL_set_shutdown(s, SSL_SENT_SHUTDOWN | SSL_RECEIVED_SHUTDOWN);
+        SSL_free(c);
+        SSL_free(s);
+        SSL_CTX_free(cctx);
+        SSL_CTX_free(sctx);
+        errors();
+    }
+}
+
 int main(void)
 {
     test_pair();
     test_set_ssl();
     test_constructors();
+    test_split_line();
     (void)CLIENT_PEM;
     (void)CLIENT_KEY_PEM;
     (void)trust_root;

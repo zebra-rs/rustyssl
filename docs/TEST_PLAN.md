@@ -204,10 +204,51 @@ rustyssl itself**. You can only regenerate golden files with
 - **BoGo** (the BoringSSL TLS test runner) with a rustyssl shim written in C against the
   OpenSSL API, which also exercises capi. A config file lists the BoringSSL-only features
   we skip.
+  - `cargo xtask test-bogo [pattern...]`: the runner from the BoringSSL commit pinned in
+    `tests/bogo/pin.txt` (archive SHA-256 checked, Go modules checked against go.sum),
+    `tests/bogo/shim.c`, `tests/bogo/config.json`. Each test runs on the reference and on
+    rustyssl; the reference's verdict is the expectation. The shim exits 89 (unimplemented)
+    for flags it can't express with the OpenSSL API (BoringSSL-only features: ECH, ALPS,
+    Channel ID, PAKE/PSK/delegated credentials, per-credential settings, compliance
+    policies, QUIC), so
+    those tests are skipped on both. Errors match loosely (`-loose-errors`), and the shim's
+    failure log compares the two libraries' first error entries instead. The report is
+    `target/bogo-report.md`.
+  - Under full load the runner sometimes loses the shim's alert (a closed connection or a
+    broken pipe before it reads it), on either library and on different tests each run;
+    every such test passes alone on both. So tests whose verdicts differ run again one at a
+    time on both libraries (`--workers N` sets the parallelism), and those verdicts count.
+    Failure logs are compared as multisets (tests with the same arguments share one).
+  - **Pass target (M5): every test the reference passes, passes on rustyssl.** Met
+    2026-10-18 at BoringSSL 5e1bfb45 (with DTLS, MTU, X.509 credentials and SRTP in the
+    shim): 7771 tests, 3455 unimplemented; the reference and rustyssl both pass 2897 and
+    fail 1419, the same tests, with no failed connection's first error differing.
 - **tlsfuzzer**, against `s_server` (upstream app relinked, later our CLI): the script set
   OpenSSL and GnuTLS run in their CI, covering fragmentation, extensions, renegotiation,
   invalid ECDHE points, version negotiation, and the timing scripts for Bleichenbacher/Marvin
   and Lucky13.
+  - `cargo xtask test-tlsfuzzer [--timing] [script...]` (`tests/tlsfuzzer/scripts.txt`, the
+    trees pinned and checked by SHA-256): each script against the reference's `s_server` on
+    each library; a conversation failing on rustyssl alone is a failure. The report is
+    `target/tlsfuzzer-report.md`. Many scripts run a random sample of their conversations,
+    so a name only one side ran is reported, not counted.
+  - Measured 2026-10-18 at tlsfuzzer 5eebc446: **151 scripts, 6048 conversations, none
+    failing on rustyssl alone** (the target, M4 and M5: every conversation the reference
+    passes). Fixes it led to: version comparison by the connection's kind (a TLS 0xfefe is
+    a high version, not DTLS), SSL 3.0's alert for protocol_version (handshake_failure), the
+    TLS 1.0 CBC empty fragment before each record of data, a TLS 1.3 post-handshake
+    message's fragment followed by another record type, CCM's empty records, TLS 1.3 key
+    shares (padded DH, uncompressed EC), signature algorithms once the version is chosen,
+    no TLS 1.3 ChangeCipherSpec after the handshake, `SSL_read`'s 0 on a fatal alert, and
+    the session kept after a failure that follows close_notify. The harness also read the
+    `*-random.py` scripts' `"<name>" repeat <n>...` lines as no conversation at all, which
+    had hidden the empty-fragment regression; it reads them now.
+  - `test-lengths.py -n 200` and `test-tls13-lengths.py -n 200` stop at the same
+    conversation (157 of 200) on both libraries and time out after 900 s, so their last 43
+    aren't checked.
+  - The timing scripts (`--timing`) capture with `tcpdump` (root on macOS: `/dev/bpf*`) and
+    analyse with SciPy and pandas; they weren't run on the development machine for lack of
+    both. Their two concerns are measured by `cargo xtask test-timing` instead (below).
 - **TLS-Anvil** combinatorial client and server testing, weekly.
 - **The interop matrix** (docker-compose, nightly). Our client and our server each run
   against every peer, combining:
@@ -220,6 +261,22 @@ rustyssl itself**. You can only regenerate golden files with
   | Features | full and resumed handshakes (IDs and tickets), HRR, PSK, 0-RTT, client auth and post-handshake auth, ALPN, SNI, OCSP stapling, renegotiation, KeyUpdate, certificate compression, record size limit, hybrid PQ groups |
 - **DTLS:** interop with the reference and GnuTLS, with loss, duplication, and reordering
   injected (a fault-injecting BIO plus netem).
+  - Built: `cargo xtask test-interop`'s `+faults` cases put a UDP relay
+    (`xtask/src/test_interop/relay.rs`) between the reference's `s_client` and `s_server`.
+    Its seeded schedule (`--seed`, per case and direction) drops about 20% of the handshake's
+    datagrams (at most two in a row and three per direction), duplicates 10%, and holds 15%
+    back past the next one. It runs in all four library pairings, the reference's being the
+    expectation. `--peer gnutls` (`tests/interop/gnutls.txt`) pairs `s_server`/`s_client` on
+    each library with `gnutls-cli`/`gnutls-serv`: TLS 1.3, TLS 1.2 (GCM and CBC), client
+    authentication, and DTLS 1.2, with and without the relay. The core has the same faults
+    as a unit test (`dtls_survives_drops_duplicates_and_reordering`: 600 seeded handshakes
+    over DTLS 1.2 at two MTUs and DTLS 1.0).
+  - The relay's `s_client` runs with `-nbio`. A blocking one, on either library, waits in
+    `recvfrom` after `dtls1_read_bytes` discards a stale datagram that arrives after the
+    handshake. The drop cap keeps the doubling timer within the cases' time limit on the
+    reference too.
+  - Status (2026-10-18): 64 cases pass in all four pairings, the eight fault cases under
+    seeds 1 to 6, and the 17 GnuTLS cases on both libraries.
 - **QUIC:** quic-interop-runner cases (handshake, transfer, retry, resumption, zerortt,
   chacha20, keyupdate, multiplexing), plus curl and nghttp3 over HTTP/3.
 - **PKI:** the full x509-limbo suite. Results equal the reference's or are stricter only
@@ -287,6 +344,37 @@ M2. **Any crash, panic, hang, or OOM is a P0 bug** and gets a minimized regressi
 3. **The Marvin toolkit** against RSA decryption, both through the API and through TLS RSA
    key exchange.
 4. **The tlsfuzzer timing scripts** (Lucky13, Bleichenbacher/Marvin).
+
+`cargo xtask test-timing` (`tests/timing/dudect.c`) covers the first and part of the third on
+both libraries: AES-GCM, GHASH, Poly1305, `CRYPTO_memcmp`, X25519, BN `CONSTTIME` modexp,
+ML-KEM decapsulation, ECDSA signing, RSA raw and PKCS#1 v1.5 decryption (Marvin's
+valid/invalid split), and `tls-cbc-record`: Lucky13 through `SSL_read`, a TLS 1.2
+AES-128-CBC/HMAC-SHA1 record without encrypt-then-MAC whose padding length is 0 or 255.
+That target found rustyssl's padding removal taking about 70 ns longer on a good padding (|t|
+18–20, reference 3): LLVM had turned the masks into data-dependent code, and they now pass
+through an optimization barrier. Measured 2026-10-18 (Apple silicon), every target under
+|t| 10 on rustyssl; `tls-cbc-record` 4.9 (reference 4.4).
+
+X25519 was the next highest, at |t| 9.4 (reference 2.6), and it crossed 10 in some runs (3.9 to
+13.9 over four runs of 100,000). `x25519-derive`, which times `EVP_PKEY_derive` alone, and
+`x25519-ctx`, which times the context's setup alone, put it in the derivation: about 0.2 ticks
+of `mach_absolute_time` (roughly 10 ns) in 25 µs, the fixed key 0x11×32 the faster, |t| 10–14 at
+400,000 measurements against the reference's 3–6. Two controls, both of them harness switches
+(`DUDECT_DIT=1`, `DUDECT_FIXED_RANDOM=1`; `DUDECT_MEANS=1` prints the class means):
+- **DIT set:** with Arm's `PSTATE.DIT` set for the run, the signal went away (|t| 2.7, 2.1).
+- **Random fixed key:** a random fixed key, drawn once in place of the structured one, showed
+  none either (|t| 1.9, 1.7).
+
+So no branch or lookup depends on the key; on this core (an M5) instructions that
+`curve25519-dalek`'s constant-time arithmetic relies on take operand-dependent time unless DIT
+is set. rustyssl now runs X25519, X448 and the EdDSA public-key derivations with DIT set
+(`rustyssl-capi/src/dit.rs`; the caller's setting is restored, and cores without `FEAT_DIT` are
+left alone). After: `x25519-derive` |t| 1.4–3.6 at 400,000 measurements and `x25519` 2.5, at the
+same speed.
+
+The other secret-handling paths (ECDSA and RSA private operations, ML-KEM, the software AEADs,
+BN `CONSTTIME`) don't set DIT yet. Their targets are under |t| 10, but they're candidates for
+the same treatment.
 
 **CVE regression suite (`tests/cve/`).** Every OpenSSL security advisory since 2014
 (openssl-library.org vulnerabilities list) is classified as **applicable** (a test
@@ -416,7 +504,7 @@ A function counts as **implemented** in the coverage report only when all of the
 | M2 | curl and nginx L8 smoke pass; interop with reference `s_client`/`s_server` on TLS 1.3; TLS client and server fuzzers clean for 24 h |
 | M3 | the OpenSSH regression suite matches the reference |
 | M4 | nginx, curl, CPython, httpd, HAProxy, and PostgreSQL match the reference; the tlsfuzzer core set passes; at least 90% of eligible upstream ssl and x509 recipes pass |
-| M5 | 100% libssl coverage; BoGo pass target (set once measured); the DTLS interop matrix is green |
+| M5 | 100% libssl coverage; BoGo: every test the reference passes, passes on rustyssl (`cargo xtask test-bogo`); the DTLS interop matrix is green |
 | M6 | 100% libcrypto coverage; **at least 98% of eligible upstream tests** pass; the Ruby, pyca, rust-openssl, and Node suites match the reference |
 | M7 | everything above, plus L11 green, the CVE suite complete, constant-time reports clean, perf targets met, and the external audit closed |
 | M8 | M7 repeated against the 4.0 reference |

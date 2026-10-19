@@ -632,6 +632,7 @@ impl PublicKey {
             curve_nid,
             size,
             security_bits: bits,
+            key_usage: u32::MAX,
         }
     }
 

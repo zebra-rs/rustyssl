@@ -403,6 +403,51 @@ static void test_reuse(int max)
     done(cctx, sctx, c, s);
 }
 
+/*
+ * The client sends its close_notify, then the peer closes with none (its end of the pair is
+ * shut for writing): the second SSL_shutdown, with and without SSL_OP_IGNORE_UNEXPECTED_EOF.
+ */
+static void test_unclean(int max, int ignore)
+{
+    SSL_CTX *cctx, *sctx;
+    SSL *c, *s;
+
+    printf("# an unclean close after our close_notify, %s, %s\n",
+           max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2",
+           ignore ? "unexpected EOF ignored" : "unexpected EOF an error");
+    connected(max, &cctx, &sctx, &c, &s);
+    if (ignore)
+        SSL_set_options(c, SSL_OP_IGNORE_UNEXPECTED_EOF);
+    said("first SSL_shutdown", c, SSL_shutdown(c));
+    (void)BIO_shutdown_wr(SSL_get_wbio(s));
+    said("second SSL_shutdown", c, SSL_shutdown(c));
+    said("third SSL_shutdown", c, SSL_shutdown(c));
+    done(cctx, sctx, c, s);
+}
+
+/*
+ * The client sends its close_notify, and the peer answers with a fatal alert instead (here
+ * bad_record_mac, for a record it can't decrypt): the second SSL_shutdown.
+ */
+static void test_peer_alert(int max)
+{
+    static const unsigned char junk[37] = { 0x17, 0x03, 0x03, 0x00, 0x20 };
+    SSL_CTX *cctx, *sctx;
+    SSL *c, *s;
+    char buf[16];
+
+    printf("# a fatal alert from the peer after our close_notify, %s\n",
+           max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    connected(max, &cctx, &sctx, &c, &s);
+    SSL_set_info_callback(c, alert_cb);
+    (void)BIO_write(SSL_get_wbio(c), junk, sizeof(junk));
+    said("the server reads a record it can't decrypt", s, SSL_read(s, buf, sizeof(buf)));
+    said("first SSL_shutdown", c, SSL_shutdown(c));
+    said("second SSL_shutdown", c, SSL_shutdown(c));
+    said("third SSL_shutdown", c, SSL_shutdown(c));
+    done(cctx, sctx, c, s);
+}
+
 int main(void)
 {
     test_both_ways(TLS1_3_VERSION);
@@ -414,6 +459,11 @@ int main(void)
     test_clear();
     test_reuse(TLS1_3_VERSION);
     test_reuse(TLS1_2_VERSION);
+    test_unclean(TLS1_3_VERSION, 1);
+    test_unclean(TLS1_2_VERSION, 1);
+    test_unclean(TLS1_2_VERSION, 0);
+    test_peer_alert(TLS1_3_VERSION);
+    test_peer_alert(TLS1_2_VERSION);
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

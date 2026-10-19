@@ -631,6 +631,11 @@ fn external_psk(c: &mut Connection) -> Result<Option<Option<ExternalSession>>> {
             ));
         }
     }
+    // `OPENSSL_memdup` of an empty identity is NULL (`CRYPTO_malloc(0)`), which OpenSSL takes
+    // for an allocation failure: an external PSK with no identity fails the handshake.
+    if found.as_ref().is_some_and(|(_, id)| id.is_empty()) {
+        return Err(Error::internal());
+    }
     Ok(Some(found))
 }
 
@@ -1304,6 +1309,12 @@ pub(crate) fn ext_parse_key_share(
     // Shared addition (fork N): the client's own share stays its temporary key
     // (`SSL_get_tmp_key`), a KEM's encapsulation key included.
     c.hs.sh.own_tmp = Some((group, share.public().to_vec()));
+    if !info.is_kem && !groups::encoded_share_ok(&info, &entry.key, share.public().len()) {
+        return Err(Error::alert(
+            abi::SSL_AD_ILLEGAL_PARAMETER,
+            abi::SSL_R_BAD_ECPOINT,
+        ));
+    }
     let shared = share.derive(&entry.key).map_err(|_| {
         if info.is_kem {
             Error::internal()

@@ -168,6 +168,8 @@ pub(crate) struct Driver {
     pub(crate) rtt_marks: (u32, u32),
     /// See `rtt_marks`.
     pub(crate) rtt_times: (Option<std::time::Instant>, Option<std::time::Instant>),
+    /// The certificate slot the core last chose (see `mirror`).
+    pub(crate) own_slot: Option<usize>,
     /// TLS 1.3's early data state (`early_data_state`), kept here before the core exists and
     /// mirrored from it after.
     pub(crate) early_data_state: EarlyDataState,
@@ -212,6 +214,33 @@ impl core::fmt::Debug for Driver {
 /// Raises the core's error as OpenSSL's ERR entry, in `function`. A received alert's reason
 /// gets OpenSSL's data, `SSL alert number <n>`.
 #[track_caller]
+/// Decodes what the core couldn't, as OpenSSL does (`d2i_X509`, `d2i_X509_NAME`), so the
+/// decoder's entries come before the handshake's `ERR_R_ASN1_LIB`.
+///
+/// # Safety
+/// No lock may be held (the decoders allocate and raise).
+unsafe fn raise_decoder_entries(bad: &rustyssl_tls::conn::DecodeFailure) {
+    use rustyssl_tls::conn::DecodeFailure;
+    match bad {
+        DecodeFailure::Certificate(der) => {
+            // SAFETY: the default library context; the octets.
+            let x = unsafe { crate::x509::cert::decode_in(der, ptr::null_mut(), ptr::null()) };
+            // SAFETY: ours, or NULL.
+            unsafe { crate::x509::cert::X509_free(x) };
+        }
+        DecodeFailure::Name(der) => {
+            let Ok(len) = c_long::try_from(der.len()) else {
+                return;
+            };
+            let mut p = der.as_ptr();
+            // SAFETY: the octets, `len` long.
+            let n = unsafe { crate::x509::name::d2i_X509_NAME(ptr::null_mut(), &raw mut p, len) };
+            // SAFETY: ours, or NULL.
+            unsafe { crate::x509::name::X509_NAME_free(n) };
+        }
+    }
+}
+
 pub(crate) fn raise_core(e: &TlsError, function: &str) {
     // OpenSSL's raising function when the core named it, else the API function's.
     let function = e.func.unwrap_or(function);
@@ -300,9 +329,25 @@ unsafe fn set_peer_ca_names(st: &mut SslState, names: Option<&[Vec<u8>]>) {
     st.peer_ca_names = sk;
 }
 
+/// Whether a failure takes the session out of the cache: a fatal alert received
+/// (`ssl3_read_bytes`), or one sent (`ssl3_send_alert`), which isn't once this end has sent
+/// close_notify. A failure with no alert (`SSL_AD_NO_ALERT`) keeps it.
+fn fatal_drops_session(c: &Connection, e: &TlsError, sent_shutdown: bool) -> bool {
+    if e.alert.is_some() {
+        return !sent_shutdown;
+    }
+    let (_, fatal, _) = c.alerts();
+    fatal != 0
+        && !e.library_reason
+        && e.reason == SSL_AD_REASON_OFFSET.saturating_add(c_int::from(fatal))
+}
+
 /// Copies the core's state into the mirrors the getters read.
 fn mirror(st: &mut SslState, c: &Connection) {
     st.hand_state = c.state();
+    let (num, total) = c.renegotiations();
+    st.num_renegotiations = c_int::try_from(num).unwrap_or(c_int::MAX);
+    st.total_renegotiations = c_int::try_from(total).unwrap_or(c_int::MAX);
     // A server's `peer_ciphers` (`bytes_to_cipher_list` of each ClientHello), which outlast
     // the handshake (`SSL_get_client_ciphers`, `SSL_get_shared_ciphers`). OpenSSL keeps the
     // old list when it resumes a TLS 1.2 session.
@@ -316,6 +361,20 @@ fn mirror(st: &mut SslState, c: &Connection) {
         let resumed12 = c.negotiated().reused && !c.is_tls13();
         if !resumed12 && let Some(list) = super::ciphers::peer_list(&st.drv.peer_ciphers_raw.0) {
             st.ciphers.peer = list;
+        }
+    }
+    // `tls_choose_sigalg` makes the chosen certificate current (`s->cert->key`), which
+    // `SSL_get_certificate` and `SSL_get_privatekey` then report; only when the choice changes,
+    // so an application's `SSL_set_current_cert` afterwards stands.
+    let own = c
+        .negotiated()
+        .own_cert
+        .and_then(|i| c.config().certs.get(i))
+        .map(|k| k.slot);
+    if own != st.drv.own_slot {
+        st.drv.own_slot = own;
+        if let Some(slot) = own {
+            st.cert.key = slot;
         }
     }
     st.drv.early_data_state = c.early_data_state();
@@ -1000,10 +1059,15 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             }
         }
         let (was_before, was_in_init) = (conn.before(), conn.in_init());
+        let sent_shutdown = conn.shutdown_state() & rustyssl_tls::conn::SENT_SHUTDOWN != 0;
         let skipped = conn.skipped_records();
         // SAFETY: no preconditions.
         unsafe { crate::err::ERR_set_mark() };
         let r = conn.step(&*prov, reading);
+        let removes_session = r
+            .as_ref()
+            .err()
+            .is_some_and(|e| fatal_drops_session(&conn, e, sent_shutdown));
         // A skipped early data record's failed decryption leaves nothing on the queue.
         if conn.skipped_records() == skipped {
             // SAFETY: the mark set above.
@@ -1069,11 +1133,22 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
             Ok(ev) => ev,
             Err(e) => {
                 if !failed_before {
+                    let bad = x
+                        .state()
+                        .drv
+                        .tls
+                        .as_mut()
+                        .and_then(|c| c.take_decode_failure());
+                    if let Some(bad) = bad {
+                        // SAFETY: no lock is held; only the octets are read.
+                        unsafe { raise_decoder_entries(&bad) };
+                    }
                     raise_core(&e, function);
                 }
-                // A fatal alert (sent or received) takes the session out of the cache.
-                // SAFETY: as above.
-                unsafe { super::sess_cache::on_fatal(x) };
+                if removes_session {
+                    // SAFETY: as above.
+                    unsafe { super::sess_cache::on_fatal(x) };
+                }
                 // The alert goes out if the BIO takes it.
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { flush(x) };
@@ -1150,6 +1225,20 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                 // SAFETY: as above.
                 match unsafe { read_input(x) } {
                     Input::Got => {}
+                    Input::Retry if dtls && x.state().in_init && super::dtls::expired(x) => {
+                        // `dtls1_read_failed`: the read stopped because the timer fired (a
+                        // blocking BIO's receive timeout is the timer's): during a handshake
+                        // the flight goes again and the read goes on.
+                        // SAFETY: as above.
+                        match unsafe { super::dtls::handle_timeout(s, x) } {
+                            r if r > 0 => continue,
+                            r if r < 0 => break Stop::Failed,
+                            _ => {
+                                x.state().rwstate = SSL_READING;
+                                break Stop::Retry;
+                            }
+                        }
+                    }
                     Input::Retry => {
                         // Application data that arrived during a renegotiation is returned
                         // first (`ssl3_read_bytes` with `in_read_app_data`) (fork M).
@@ -1168,12 +1257,14 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                     Input::Eof => {
                         let ignore = x.state().options & SSL_OP_IGNORE_UNEXPECTED_EOF != 0;
                         if ignore {
+                            // `SSL_set_shutdown(s, SSL_RECEIVED_SHUTDOWN)`: the flags become
+                            // that alone, so a close_notify sent before is forgotten (and an
+                            // `SSL_shutdown` sends another).
                             let mut st = x.state();
-                            st.shutdown |= SSL_RECEIVED_SHUTDOWN;
+                            st.shutdown = SSL_RECEIVED_SHUTDOWN;
                             st.drv.warn_alert = u8::try_from(SSL_AD_CLOSE_NOTIFY).unwrap_or(0);
                             if let Some(c) = st.drv.tls.as_mut() {
-                                let f = c.shutdown_state() | rustyssl_tls::conn::RECEIVED_SHUTDOWN;
-                                c.set_shutdown_state(f);
+                                c.set_shutdown_state(rustyssl_tls::conn::RECEIVED_SHUTDOWN);
                             }
                             break Stop::Closed;
                         }
@@ -1194,6 +1285,8 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
                                         SSL_R_UNEXPECTED_EOF_WHILE_READING,
                                     ),
                                 );
+                                // `ossl_statem_fatal` puts it back in init.
+                                st.in_init = c.in_init();
                                 let mut c2 = st.drv.tls.take();
                                 if let Some(cc) = c2.as_mut() {
                                     push_output(&mut st.drv, cc);
@@ -1288,6 +1381,35 @@ unsafe fn drive_inner(s: *mut SSL, x: &Ssl, reading: bool, function: &str) -> St
         unsafe { info(s, x, snap.as_ref(), exit, -1) };
     }
     stop
+}
+
+/// Delivers the reports a step outside the drive loop queued (a DTLS retransmission on a
+/// timeout) to the message and info callbacks, with no lock held, as OpenSSL calls them while
+/// it writes.
+///
+/// # Safety
+/// `s` is the live connection behind `x`; no lock is held.
+pub(crate) unsafe fn deliver_reports(s: *mut SSL, x: &Ssl) {
+    let snap = config::snapshot(x);
+    loop {
+        let ev = x.state().drv.tls.as_mut().and_then(|c| c.take_report());
+        match ev {
+            Some(Event::Message {
+                write,
+                version,
+                content_type,
+                bytes,
+            }) => {
+                // SAFETY: the caller's guarantee.
+                unsafe { message(s, x, write, version, content_type, &bytes) };
+            }
+            Some(Event::Info { where_, ret }) => {
+                // SAFETY: as above.
+                unsafe { info(s, x, snap.as_ref(), where_, ret) };
+            }
+            _ => break,
+        }
+    }
 }
 
 /// Calls the message callback with no lock held.

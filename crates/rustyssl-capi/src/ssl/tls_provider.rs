@@ -1258,7 +1258,11 @@ impl EvpAead {
                 EVP_CipherUpdate(ctx.0, ptr::null_mut(), &raw mut outl, aad.as_ptr(), alen)
             } != 0;
         let mut out = vec![0u8; data.len().saturating_add(16)];
-        if ok && !data.is_empty() {
+        // What the AAD's update reported isn't output.
+        outl = 0;
+        // CCM authenticates in this update, so it runs for an empty record too: skipping it
+        // would take the record unverified.
+        if ok && (!data.is_empty() || is_ccm(self.alg)) {
             // SAFETY: as above; room for the data and a block.
             ok = unsafe {
                 EVP_CipherUpdate(ctx.0, out.as_mut_ptr(), &raw mut outl, data.as_ptr(), dlen)
@@ -1670,11 +1674,17 @@ impl Provider for EvpProvider {
         let size = usize::try_from(unsafe { EVP_PKEY_get_size(pkey) }).unwrap_or(0);
         // SAFETY: as above.
         let security_bits = unsafe { EVP_PKEY_get_security_bits(pkey) };
+        let key_usage = match &_owner {
+            // SAFETY: the certificate decoded above.
+            KeyOwner::Cert(x) => unsafe { crate::x509::purpose::X509_get_key_usage(x.0) },
+            KeyOwner::Key(_) => u32::MAX,
+        };
         Ok(PeerKey {
             kind,
             curve_nid,
             size,
             security_bits,
+            key_usage,
         })
     }
 

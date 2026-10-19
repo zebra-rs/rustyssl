@@ -337,6 +337,35 @@ static void cut_server_flight(int dir, int n, unsigned char *buf, int *len)
     }
 }
 
+static void garbage_leaf(int dir, int n, unsigned char *buf, int *len)
+{
+    /*
+     * The server's TLS 1.2 flight (plaintext): in its Certificate message, the leaf's DER
+     * length octet 0x82 becomes 0x84, a four-octet length far past the data ("too long"),
+     * with every outer length left as it was.
+     */
+    int r = 0;
+
+    if (dir != 1 || n != 0)
+        return;
+    while (r + 5 <= *len) {
+        int rlen = (buf[r + 3] << 8) | buf[r + 4], m = r + 5;
+
+        if (buf[r] == 0x16) {
+            while (m + 4 <= r + 5 + rlen && m + 4 <= *len) {
+                int mlen = (buf[m + 1] << 16) | (buf[m + 2] << 8) | buf[m + 3];
+
+                if (buf[m] == 0x0b && m + 4 + 7 < *len) {
+                    buf[m + 4 + 7] = 0x84;
+                    return;
+                }
+                m += 4 + mlen;
+            }
+        }
+        r += 5 + rlen;
+    }
+}
+
 /* Callbacks. */
 
 static int sni_fatal(SSL *s, int *al, void *arg)
@@ -493,6 +522,11 @@ static void test_handshakes(void)
 
     c = client_ctx(1);
     s = server_ctx();
+    SSL_CTX_set_max_proto_version(c, TLS1_2_VERSION);
+    scenario("a server certificate that doesn't decode (TLS 1.2)", c, s, garbage_leaf);
+
+    c = client_ctx(1);
+    s = server_ctx();
     SSL_CTX_set_tlsext_servername_callback(s, sni_fatal);
     scenario("the servername callback fails", c, s, NULL);
 
@@ -561,6 +595,35 @@ static void test_unexpected_eof(void)
     link_up(&l, c, s, NULL);
     check(handshake(&l), "handshake");
     BIO_set_mem_eof_return(l.c_in, 0);
+    r = SSL_read(l.c, buf, sizeof(buf));
+    printf("  client: SSL_read %d, SSL_get_error %d\n", r, SSL_get_error(l.c, r));
+    errors("client");
+    link_down(&l);
+    SSL_CTX_free(c);
+    SSL_CTX_free(s);
+}
+
+/*
+ * A TLS 1.3 ChangeCipherSpec after the client's Finished: the server's application-key
+ * record layer takes none (RFC 8446, section 5; found by tlsfuzzer's test-tls13-ccs).
+ */
+static void test_late_ccs(void)
+{
+    static const unsigned char ccs[] = { 0x14, 0x03, 0x03, 0x00, 0x01, 0x01 };
+    SSL_CTX *c = client_ctx(1), *s = server_ctx();
+    struct link l;
+    unsigned char buf[16];
+    int r;
+
+    printf("# TLS 1.3 ChangeCipherSpec after the handshake\n");
+    SSL_CTX_set_min_proto_version(c, TLS1_3_VERSION);
+    link_up(&l, c, s, NULL);
+    check(handshake(&l), "handshake");
+    BIO_write(l.s_in, ccs, sizeof(ccs));
+    r = SSL_read(l.s, buf, sizeof(buf));
+    printf("  server: SSL_read %d, SSL_get_error %d\n", r, SSL_get_error(l.s, r));
+    errors("server");
+    relay(&l, 1);
     r = SSL_read(l.c, buf, sizeof(buf));
     printf("  client: SSL_read %d, SSL_get_error %d\n", r, SSL_get_error(l.c, r));
     errors("client");
@@ -661,6 +724,7 @@ int main(void)
     test_handshakes();
     test_renegotiation_refused();
     test_unexpected_eof();
+    test_late_ccs();
     test_configuration();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;

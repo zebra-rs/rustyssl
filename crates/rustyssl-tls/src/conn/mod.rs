@@ -208,6 +208,17 @@ fn early_data_count_ok(
     Ok(())
 }
 
+/// Octets OpenSSL decodes with libcrypto where this core only checks their framing: when they
+/// don't decode, OpenSSL's queue has the decoder's entries before the handshake's
+/// `ERR_R_ASN1_LIB`, so the caller decodes them again to raise those.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DecodeFailure {
+    /// A certificate (`d2i_X509`).
+    Certificate(Vec<u8>),
+    /// A CA name (`d2i_X509_NAME`).
+    Name(Vec<u8>),
+}
+
 /// A TLS connection.
 pub struct Connection {
     /// The settings.
@@ -252,6 +263,8 @@ pub struct Connection {
     pub(crate) shutdown: u32,
     /// The fatal error, once one happened.
     pub(crate) failed: Option<Error>,
+    /// The octets whose decoding failed with `ERR_R_ASN1_LIB` (see [`DecodeFailure`]).
+    pub(crate) decode_failure: Option<DecodeFailure>,
     /// Whether the first handshake hasn't finished yet (`SSL_IS_FIRST_HANDSHAKE`).
     pub(crate) first_handshake: bool,
     /// Whether a renegotiation was requested.
@@ -344,6 +357,14 @@ impl Connection {
             (cfg.method_version, cfg.method_version)
         };
         let server = cfg.server;
+        // `SSL_set_session` takes the session's verification result; a resumption verifies
+        // nothing, so it is what the connection reports (a full handshake's verification
+        // replaces it).
+        let verify_result = cfg
+            .session
+            .as_ref()
+            .filter(|_| !server)
+            .map_or(i64::from(abi::X509_V_OK), |s| s.verify_result);
         let is_dtls = cfg.dtls;
         let mut rw = if cfg.dtls {
             RecordWriter::new_dtls(record_version)
@@ -378,6 +399,7 @@ impl Connection {
             },
             neg: Negotiated {
                 version,
+                verify_result,
                 ..Negotiated::default()
             },
             input: Vec::new(),
@@ -392,6 +414,7 @@ impl Connection {
             app_in: VecDeque::new(),
             shutdown: 0,
             failed: None,
+            decode_failure: None,
             first_handshake: true,
             renegotiate: false,
             s3_renegotiate: false,
@@ -551,6 +574,11 @@ impl Connection {
     #[must_use]
     pub fn error(&self) -> Option<Error> {
         self.failed
+    }
+
+    /// What failed to decode when the connection failed with `ERR_R_ASN1_LIB`, once.
+    pub fn take_decode_failure(&mut self) -> Option<DecodeFailure> {
+        self.decode_failure.take()
     }
 
     /// `SSL_get_shutdown`'s flags.
@@ -778,6 +806,16 @@ impl Connection {
         let (e, in_init) = self.events.pop_front()?;
         self.event_in_init = Some(in_init);
         Some(e)
+    }
+
+    /// The next queued report for the message or info callback, if that's what comes next:
+    /// what a step outside [`Connection::step`] (a DTLS retransmission on a timeout) raised,
+    /// which OpenSSL reports as it happens.
+    pub fn take_report(&mut self) -> Option<Event> {
+        match self.events.front() {
+            Some((Event::Message { .. } | Event::Info { .. }, _)) => self.pop_event(),
+            _ => None,
+        }
     }
 
     /// Whether events are queued.
@@ -1209,6 +1247,14 @@ impl Connection {
             }
         };
         let ty = rec.content_type;
+        // Part of a post-handshake message (shorter than its header), then another record
+        // type: TLS 1.3 doesn't interleave them, here as in the handshake (`ssl3_read_bytes`).
+        if !self.hs_in.is_empty() && ty != handshake() && self.is_tls13() {
+            return Err(Error::alert(
+                abi::SSL_AD_UNEXPECTED_MESSAGE,
+                abi::SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA,
+            ));
+        }
         if ty != alert() && !rec.data.is_empty() {
             self.alert_count = 0;
         }
@@ -1429,9 +1475,16 @@ impl Connection {
         // (`tls13_alert_code` / `tls1_alert_code`): an alert the version doesn't have isn't
         // sent, TLS 1.3's certificate_required and missing_extension become handshake_failure
         // before TLS 1.3; after close_notify, only close_notify goes out.
-        let Some(desc) = self.alert_value(desc) else {
+        let Some(mut desc) = self.alert_value(desc) else {
             return Ok(());
         };
+        // SSL 3.0 has no protocol_version alert: an alert sent at that version (a ClientHello
+        // whose legacy_version is SSL 3.0 failing the version choice) is handshake_failure.
+        if self.neg.version == crate::consts::version::SSL3
+            && desc == msgs_type(abi::SSL_AD_PROTOCOL_VERSION)
+        {
+            desc = msgs_type(abi::SSL_AD_HANDSHAKE_FAILURE);
+        }
         if self.shutdown & SENT_SHUTDOWN != 0 && desc != msgs_type(abi::SSL_AD_CLOSE_NOTIFY) {
             return Ok(());
         }

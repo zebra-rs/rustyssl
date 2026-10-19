@@ -345,6 +345,12 @@ int main(void)
     old_style("TLS 1.2, the client has no key", TLS1_2_VERSION, NULL, 0, NULL);
     old_style("TLS 1.2, the server doesn't know the identity", TLS1_2_VERSION, NULL, 32,
               "someone else");
+    /* An empty identity: OpenSSL copies it with OPENSSL_memdup, which is NULL for nothing. */
+    identity = "";
+    tls13_failure("TLS 1.3, an external PSK with an empty identity", 1, 1, NULL);
+    old_style("TLS 1.3, the TLS 1.2-style callback with an empty identity", TLS1_3_VERSION, NULL,
+              32, NULL);
+    identity = "client-identity";
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;
 }

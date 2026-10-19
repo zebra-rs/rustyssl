@@ -83,6 +83,7 @@ pub(super) fn process_server_certificate(
             Ok(()) => {}
             Err(true) => return Err(Error::decode(abi::SSL_R_CERT_LENGTH_MISMATCH)),
             Err(false) => {
+                c.decode_failure = Some(crate::conn::DecodeFailure::Certificate(der.to_vec()));
                 return Err(Error::alert_lib(
                     abi::SSL_AD_BAD_CERTIFICATE,
                     abi::ERR_R_ASN1_LIB,
@@ -498,10 +499,12 @@ pub(super) fn process_server_done(
     Ok(MsgProcess::FinishedReading)
 }
 
-/// `ssl3_check_cert_and_algorithm`: the server's key suits the suite.
+/// `ssl3_check_cert_and_algorithm`: the server's key suits the suite, and an ECDSA
+/// certificate's key usage, if present, allows signing (`ssl_check_srvr_ecc_cert_and_alg`).
 ///
 /// # Errors
-/// `SSL_R_MISSING_SIGNING_CERT`, `SSL_R_MISSING_RSA_ENCRYPTING_CERT` (handshake-failure).
+/// `SSL_R_MISSING_SIGNING_CERT`, `SSL_R_MISSING_RSA_ENCRYPTING_CERT`, `SSL_R_BAD_ECC_CERT`
+/// (after `SSL_R_ECC_CERT_NOT_FOR_SIGNING`) (handshake-failure).
 fn check_cert_and_algorithm(c: &Connection, p: &dyn Provider) -> Result<()> {
     check_cert_and_algorithm_inner(c, p).in_func("ssl3_check_cert_and_algorithm")
 }
@@ -512,7 +515,8 @@ fn check_cert_and_algorithm_inner(c: &Connection, p: &dyn Provider) -> Result<()
     if cp.auth & SSL_aCERT == 0 {
         return Ok(());
     }
-    let slot = peer_pkey(c, p).and_then(|(_, k)| sigalgs::slot_of(c, &k.kind));
+    let key = peer_pkey(c, p);
+    let slot = key.as_ref().and_then(|(_, k)| sigalgs::slot_of(c, &k.kind));
     let Some(slot) = slot.filter(|&s| cp.auth & sigalgs::slot_amask(s) != 0) else {
         return Err(Error::alert(
             abi::SSL_AD_HANDSHAKE_FAILURE,
@@ -527,6 +531,25 @@ fn check_cert_and_algorithm_inner(c: &Connection, p: &dyn Provider) -> Result<()
     }
     if cp.mkey & SSL_kDHE != 0 && state_ref(c).is_none_or(|s| s.kx12.is_none()) {
         return Err(Error::internal());
+    }
+    // A raw public key has no key usage to check.
+    if c.neg.peer_rpk.is_some() {
+        return Ok(());
+    }
+    let signing = u32::try_from(abi::X509v3_KU_DIGITAL_SIGNATURE).unwrap_or(0);
+    if sigalgs::slot_amask(slot) & SSL_aECDSA != 0
+        && cp.auth & SSL_aECDSA != 0
+        && key.is_some_and(|(_, k)| k.key_usage & signing == 0)
+    {
+        return Err(
+            Error::alert(abi::SSL_AD_HANDSHAKE_FAILURE, abi::SSL_R_BAD_ECC_CERT).caused_by(
+                crate::error::Cause {
+                    lib: abi::ERR_LIB_SSL,
+                    reason: abi::SSL_R_ECC_CERT_NOT_FOR_SIGNING,
+                    func: "ssl_check_srvr_ecc_cert_and_alg",
+                },
+            ),
+        );
     }
     Ok(())
 }
@@ -736,7 +759,9 @@ pub(super) fn process_hello_req(
         c.send_alert(p, level, desc)?;
         return Ok(MsgProcess::FinishedReading);
     }
+    // `SSL_renegotiate_abbreviated`.
     c.renegotiate = true;
+    c.s3_renegotiate = true;
     // A TLS client answers with an abbreviated handshake, a DTLS client with a full one
     // (`SSL_renegotiate` rather than `SSL_renegotiate_abbreviated`, a historical discrepancy).
     c.hs.sh.new_session = c.cfg.dtls;

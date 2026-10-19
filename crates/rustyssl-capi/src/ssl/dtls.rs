@@ -242,6 +242,12 @@ pub(crate) unsafe fn apply_timer(s: *mut SSL, x: &Ssl, t: Timer) {
         Timer::Start => unsafe { start_timer(s, x) },
         // SAFETY: as above.
         Timer::Stop => unsafe { stop_timer(x) },
+        Timer::Restart => {
+            // SAFETY: as above.
+            unsafe { stop_timer(x) };
+            // SAFETY: as above.
+            unsafe { start_timer(s, x) };
+        }
     }
 }
 
@@ -326,6 +332,9 @@ pub(crate) unsafe fn handle_timeout(s: *mut SSL, x: &Ssl) -> c_int {
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { super::io::flush(x) };
             }
+            // The retransmitted records' reports (`-msg` shows them as they go).
+            // SAFETY: as above.
+            unsafe { super::io::deliver_reports(s, x) };
             v
         }
         Err(e) => {
@@ -534,8 +543,12 @@ fn parse_hello(d: &[u8], x: &Ssl) -> Result<(u16, Hello, Vec<u8>), c_int> {
     let clientvers = payload.u16().map_err(|_| mm)?;
     let method = x.state().method.version;
     if method != rustyssl_abi::DTLS_ANY_VERSION
-        && rustyssl_tls::conn::common::version::cmp(clientvers, u16::try_from(method).unwrap_or(0))
-            .is_lt()
+        && rustyssl_tls::conn::common::version::cmp(
+            true,
+            clientvers,
+            u16::try_from(method).unwrap_or(0),
+        )
+        .is_lt()
     {
         return Err(SSL_R_WRONG_VERSION_NUMBER);
     }

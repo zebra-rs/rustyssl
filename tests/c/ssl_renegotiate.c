@@ -168,6 +168,76 @@ static void test(const char *name, EVP_PKEY *k, X509 *x, const char *cipher, lon
     SSL_CTX_free(sctx);
 }
 
+/*
+ * A renegotiation the server asks for with a HelloRequest: the client's read starts it, and
+ * both ends count it (SSL_num_renegotiations, SSL_total_renegotiations).
+ */
+static void test_hello_request(EVP_PKEY *k, X509 *x, int version)
+{
+    SSL_CTX *cctx = SSL_CTX_new(TLS_client_method()), *sctx = SSL_CTX_new(TLS_server_method());
+    SSL *c, *s;
+    BIO *a = NULL, *b = NULL;
+    unsigned char buf[16];
+    int round, r, e;
+
+    printf("# the server asks with a HelloRequest, %s\n",
+           version == TLS1_VERSION ? "TLS 1.0" : "TLS 1.2");
+    if (cctx == NULL || sctx == NULL || SSL_CTX_use_certificate(sctx, x) != 1
+        || SSL_CTX_use_PrivateKey(sctx, k) != 1)
+        bail("contexts");
+    /* The server caps the version: the client's hellos still offer TLS 1.2 (and 1.3). */
+    if (version == TLS1_VERSION)
+        SSL_CTX_set_max_proto_version(sctx, version);
+    else
+        SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_options(cctx, SSL_OP_NO_TICKET);
+    SSL_CTX_set_options(sctx, SSL_OP_NO_TICKET);
+    /* TLS 1.0 needs security level 0; its renegotiation sends no signature_algorithms. */
+    if (version == TLS1_VERSION
+        && (SSL_CTX_set_cipher_list(cctx, "DEFAULT:@SECLEVEL=0") != 1
+            || SSL_CTX_set_cipher_list(sctx, "DEFAULT:@SECLEVEL=0") != 1
+            || SSL_CTX_set_min_proto_version(cctx, TLS1_VERSION) != 1
+            || SSL_CTX_set_min_proto_version(sctx, TLS1_VERSION) != 1))
+        bail("TLS 1.0");
+    c = SSL_new(cctx);
+    s = SSL_new(sctx);
+    if (c == NULL || s == NULL || BIO_new_bio_pair(&a, 0, &b, 0) != 1)
+        bail("connection");
+    SSL_set_bio(c, a, a);
+    SSL_set_bio(s, b, b);
+    SSL_set_connect_state(c);
+    SSL_set_accept_state(s);
+    check(run(c, s) == 0, "the first handshake");
+    check(SSL_renegotiate(s) == 1, "renegotiation requested");
+    printf("  requested: client %ld/%ld, server %ld/%ld\n", SSL_num_renegotiations(c),
+           SSL_total_renegotiations(c), SSL_num_renegotiations(s), SSL_total_renegotiations(s));
+    for (round = 0; round < 32; round++) {
+        r = SSL_do_handshake(s);
+        if (r == 1 && !SSL_renegotiate_pending(s))
+            break;
+        if (r <= 0 && (e = SSL_get_error(s, r)) != SSL_ERROR_WANT_READ) {
+            printf("  server handshake: %d\n", e);
+            errors("server");
+            break;
+        }
+        r = SSL_read(c, buf, sizeof(buf));
+        if (r <= 0 && (e = SSL_get_error(c, r)) != SSL_ERROR_WANT_READ) {
+            printf("  client read: %d\n", e);
+            errors("client");
+            break;
+        }
+    }
+    printf("  after: client %ld/%ld, server %ld/%ld, pending %d/%d\n", SSL_num_renegotiations(c),
+           SSL_total_renegotiations(c), SSL_num_renegotiations(s), SSL_total_renegotiations(s),
+           SSL_renegotiate_pending(c), SSL_renegotiate_pending(s));
+    printf("  cleared: %ld, then %ld/%ld\n", SSL_clear_num_renegotiations(c),
+           SSL_num_renegotiations(c), SSL_total_renegotiations(c));
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     EVP_PKEY *k = EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)2048);
@@ -179,6 +249,8 @@ int main(void)
     test("nothing changed", k, x, NULL, 0);
     test("the server's cipher list changed", k, x, "AES256-GCM-SHA384", 0);
     test("the server turned renegotiation off", k, x, NULL, SSL_OP_NO_RENEGOTIATION);
+    test_hello_request(k, x, TLS1_2_VERSION);
+    test_hello_request(k, x, TLS1_VERSION);
     X509_free(x);
     EVP_PKEY_free(k);
     printf("1..%d\n", number);

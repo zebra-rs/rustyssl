@@ -1,0 +1,27 @@
+# GnuTLS interop cases (cargo xtask test-interop --peer gnutls):
+#   name | role | openssl arguments | gnutls arguments
+# role gnutls-client: gnutls-cli connects to the reference's s_server on each library.
+# role gnutls-server: the reference's s_client on each library connects to gnutls-serv --echo.
+# A -dtls* OpenSSL argument makes the case DTLS (GnuTLS gets --udp); +faults (OpenSSL side)
+# puts the seeded fault relay between the two (drops, duplicates, reorders handshake
+# datagrams; --seed). OpenSSL placeholders as in cases.txt; GnuTLS ones: {rsa} {ec} ...
+# (--x509certfile/--x509keyfile), {ca} (--x509cafile), {dir}.
+
+gnutls-cli-tls13 | gnutls-client | | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
+gnutls-cli-tls13-ec | gnutls-client | {ec} | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
+gnutls-cli-tls12 | gnutls-client | | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.2
+gnutls-cli-tls12-cbc | gnutls-client | -cipher ECDHE-RSA-AES128-SHA | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.2
+gnutls-cli-tls13-client-auth | gnutls-client | -Verify 1 {ca} | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.3 {client}
+gnutls-cli-dtls12 | gnutls-client | -dtls | --priority=NORMAL:-VERS-ALL:+VERS-DTLS1.2
+gnutls-cli-dtls12-ec | gnutls-client | {ec} -dtls1_2 | --priority=NORMAL:-VERS-ALL:+VERS-DTLS1.2
+gnutls-cli-dtls12-faults | gnutls-client | -dtls +faults | --priority=NORMAL:-VERS-ALL:+VERS-DTLS1.2
+gnutls-cli-dtls12-mtu-faults | gnutls-client | -dtls -mtu 512 +faults | --priority=NORMAL:-VERS-ALL:+VERS-DTLS1.2 --mtu=512
+
+gnutls-serv-tls13 | gnutls-server | {ca} | --priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
+gnutls-serv-tls13-ec | gnutls-server | {ca} | {ec} --priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
+gnutls-serv-tls12 | gnutls-server | {ca} -tls1_2 | --priority=NORMAL
+gnutls-serv-tls12-cbc | gnutls-server | {ca} -tls1_2 -cipher ECDHE-RSA-AES128-SHA | --priority=NORMAL
+gnutls-serv-dtls12 | gnutls-server | {ca} -dtls | --priority=NORMAL
+gnutls-serv-dtls12-ec | gnutls-server | {ca} -dtls1_2 | {ec} --priority=NORMAL
+gnutls-serv-dtls12-faults | gnutls-server | {ca} -dtls +faults | --priority=NORMAL
+gnutls-serv-dtls12-mtu-faults | gnutls-server | {ca} -dtls -mtu 512 +faults | --priority=NORMAL --mtu=512

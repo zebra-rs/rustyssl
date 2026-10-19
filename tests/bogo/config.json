@@ -1,0 +1,7 @@
+{
+  "DisabledTests": {
+    "DTLS-*TLS13*": "DTLS 1.3: OpenSSL 3.5 has none (and the runner panics on some of these tests against a DTLS 1.2 peer)",
+    "*-TLS13-DTLS*": "DTLS 1.3: OpenSSL 3.5 has none",
+    "*DTLS13*": "DTLS 1.3: OpenSSL 3.5 has none"
+  }
+}

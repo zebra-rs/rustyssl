@@ -5288,12 +5288,19 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   - the tests that read or write OpenSSL's private structures, listed as `internal` in
     `tests/openssl-suite/ssl.txt` (they can't pass on another layout).
 - **Interop matrix:** green, 45 cases in all four pairings (`cargo xtask test-interop`).
-- **Not met yet:** the BoGo shim and the tlsfuzzer scripts aren't built, so M2 and M4's
-  external checks remain open; `test-consumers` (curl, nginx) arrives later.
+- **BoGo** (`cargo xtask test-bogo`, added in Phase 8): see the Phase 8 exit status.
+- **tlsfuzzer** (`cargo xtask test-tlsfuzzer`, added in Phase 8): 151 scripts and 6048
+  conversations, none failing on rustyssl where they pass on the reference (TEST_PLAN.md,
+  L7). The timing scripts need packet capture as root and SciPy, which the development
+  machine lacks; `cargo xtask test-timing` measures their concerns instead, including a
+  Lucky13 target through `SSL_read` that found and now passes a padding-removal timing
+  difference (TEST_PLAN.md, constant-time verification).
+- **Not met yet:** `test-consumers` (curl, nginx) arrives later, and the tlsfuzzer timing
+  scripts haven't run on a machine that can capture packets.
 
 ## Phase 8: libssl breadth → M5
 
-- [ ] **8.1 DTLS 1.0/1.2:**
+- [x] **8.1 DTLS 1.0/1.2:**
   - epochs and the replay window
   - bounded fragment reassembly
   - retransmission timers (`DTLSv1_get_timeout`/`handle_timeout`, the timer callback)
@@ -5314,8 +5321,20 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     bad_dtls_test 1/1, dtls_mtu_test 1/2 (the other reads libssl's internals), every DTLS
     `ssl-tests/*.cnf` iteration, and sslapitest's DTLS iterations. Tests:
     `tests/c/ssl_dtls.c`, core loopbacks with lost datagrams, six DTLS interop cases over UDP
-    in all four pairings, the fuzz target `dtls`. Left: GnuTLS interop and injected loss and
-    reordering outside the test BIOs.
+    in all four pairings, the fuzz target `dtls`.
+  - Done: interop with the reference and GnuTLS under loss, duplication and reordering
+    (TEST_PLAN L7, DTLS). `test-interop`'s seeded fault relay (`+faults`, `--seed`) runs the
+    eight DTLS fault cases in all four pairings; `--peer gnutls` runs 17 cases against
+    `gnutls-cli`/`gnutls-serv` on both libraries, DTLS 1.2 with the relay among them; the core
+    runs 600 seeded faulty handshakes. Fixes it found:
+    - A flight read and the next one written in one step now restart the retransmission
+      timer from its first duration (`Timer::Restart`). The core had reported only the start,
+      so the next flight kept the previous one's doubled timeout.
+    - A read that stops because the timer fired retransmits during a handshake
+      (`dtls1_read_failed`).
+    - `DTLSv1_handle_timeout`'s retransmissions reach the message and info callbacks.
+    - `SSL_handle_events` and `SSL_get_event_timeout` drive the DTLS timer, as `ssl_lib.c`
+      does. Tests: `tests/c/ssl_dtls.c` and `dtls_next_flight_restarts_the_timer`.
 - [x] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
   present, but the default security level makes it effectively unusable unless
   `@SECLEVEL=0`. SSLv3 is compiled out, as in the default build.
@@ -5326,7 +5345,7 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     where both libraries fail the same way at the default level (`no protocols available` on
     the client, `unexpected message` on the server). `test-interop` masks the source file and
     line in `ERR_print_errors` lines, which are the implementation's, not behavior.
-- [ ] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
+- [x] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
   - async fds, record padding, `SSL_stateless`, the remaining `tlsext` ctrls
   - temporary/auto DH, the CA-subject loaders, the early-data callback
   - `SSL_CTX_compress_certs`, `SSL_COMP_*`, SRP, the status callbacks, the CT callback
@@ -5340,9 +5359,45 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     transport they need. Implementing them as failures now would break rule 10 (a QUIC
     method that can't make connections reports success for work it didn't do). So the
     exit's "100%" is everything outside the QUIC API.
+  - Done: the three DTLS exports came with 8.1, so 595 of 603 are implemented, every export
+    outside the QUIC API (`docs/coverage.md`).
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.
+
+**Exit status (2026-10-18):** Steps 8.1–8.3 are done, and M5's targets are met, with the QUIC
+API left to Phase 10 (the 8.3 decision): libssl coverage is 595 of 603, every export outside
+QUIC; BoGo, tlsfuzzer and DTLS interop are each met, as recorded below. The upstream libssl
+suite fails nothing outside QUIC, ENGINE (step 9.3), third-party C providers (Phase 9), and
+the tests that read OpenSSL's private structures. Still open from the wider test plan: the
+tlsfuzzer timing scripts (they need packet capture as root and SciPy; `cargo xtask
+test-timing` covers their concerns, with the CBC-padding and X25519 findings fixed), and the
+consumer suites (`test-consumers`), which arrive later.
+
+**Exit status: BoGo (2026-10-18):** met. At BoringSSL 5e1bfb45, 7771 tests (3455
+unimplemented by the shim): the reference and rustyssl each pass 2897 and fail 1419, the same
+tests; none passes on one library alone, and no failed connection's first error differs.
+Bugs BoGo found, all fixed with tests: an empty AEAD record's plaintext; a resumed client's
+verify result; renegotiation counts; compressed TLS 1.3 key shares; signature algorithms
+after the version is chosen; an older version's ticket in TLS 1.3; signature_algorithms in a
+TLS 1.0 renegotiation; an ECDSA certificate that can't sign (TLS 1.2); `SSL_shutdown` after an
+unclean EOF and after the peer's fatal alert; an external TLS 1.3 PSK with an empty identity
+(fails, as `OPENSSL_memdup` of nothing does); several requested KeyUpdates in a row (one reply
+each: TLS 1.3 post-handshake messages re-enter the state machine from the start); SSL 3.0's
+missing protocol_version alert; a server's point formats without uncompressed (accepted); the
+decoder's entries for a certificate or CA name that doesn't decode; and the handshake's
+chosen certificate becoming the current one (`SSL_get_certificate`). The failures that
+appeared only under load were the runner's, on both libraries, not races.
+
+- **tlsfuzzer target (2026-10-18): met** for the script set: every conversation of the 151
+  scripts that passes on the reference passes on rustyssl (TEST_PLAN.md, L7). The timing
+  scripts are covered by `cargo xtask test-timing` until they run on a machine that can
+  capture packets.
+
+**Exit status: DTLS interop (2026-10-18):** met. The eight DTLS `+faults` interop cases pass
+in all four library pairings under seeds 1 to 6 (drops, duplicates and reordering from the
+seeded relay), and the 17 `--peer gnutls` cases, DTLS 1.2 with the relay among them, pass on
+both libraries (step 8.1).
 
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 

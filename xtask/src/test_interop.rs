@@ -25,6 +25,15 @@
 //! - `+cmd=X`: the client first sends the command line `X` (`R` renegotiates, `k`/`K` update
 //!   the keys), then the data a second later; commands need it to run without `-ign_eof`, so
 //!   its input stays open until it exits.
+//! - `+faults`: for a DTLS case, the client talks to the server through a relay that drops,
+//!   duplicates and reorders handshake datagrams by a schedule from `--seed` (see [`relay`]).
+//!   The client runs with `-nbio`, as a stale datagram after the handshake would leave a
+//!   blocking one waiting in `recvfrom`.
+//!
+//! A DTLS case runs without `-rev` (which `s_server` refuses with DTLS): the server printing
+//! the line the client sent stands for the echo.
+//!
+//! `--peer gnutls` runs `tests/interop/gnutls.txt` instead, against GnuTLS (see [`gnutls`]).
 //!
 //! The server's report of the client (its certificate, the ALPN list and the host name it
 //! sent) joins the summary.
@@ -36,6 +45,9 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
+
+mod gnutls;
+mod relay;
 
 use crate::test_c::{LOADER_PATH, prepare};
 use crate::util::{Result, fresh_dir, target_dir, workspace_root};
@@ -283,11 +295,20 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
     out
 }
 
-/// A free local port (the listener is closed again; the server binds it next).
-fn free_port() -> Result<u16> {
+/// A free local port, TCP's or (for a DTLS server) UDP's: the socket is closed again and the
+/// server binds the port next.
+fn free_port(udp: bool) -> Result<u16> {
+    if udp {
+        let s = std::net::UdpSocket::bind("127.0.0.1:0")?;
+        return Ok(s.local_addr()?.port());
+    }
     let l = TcpListener::bind("127.0.0.1:0")?;
     Ok(l.local_addr()?.port())
 }
+
+/// How many times `s_server` is started on a new port when another process took the one
+/// [`free_port`] found before the server could bind it.
+const BIND_ATTEMPTS: usize = 3;
 
 /// Starts `s_server` and waits for it to accept; returns it with its output so far.
 fn start_server(
@@ -370,6 +391,7 @@ struct Mode {
     early: bool,
     cmd: Option<String>,
     trace: bool,
+    faults: bool,
 }
 
 /// The client arguments without the directives, and the directives.
@@ -382,6 +404,7 @@ fn mode(args: &[String]) -> (Vec<String>, Mode) {
             "+resume" => m.resume = true,
             "+trace" => m.trace = true,
             "+early" => m.early = true,
+            "+faults" => m.faults = true,
             _ => match a.strip_prefix("+cmd=") {
                 Some(c) => m.cmd = Some(c.to_owned()),
                 None => rest.push(a.clone()),
@@ -402,7 +425,7 @@ fn client(
     port: u16,
     args: &[String],
     full: bool,
-    no_echo: bool,
+    no_echo: Option<Duration>,
     cmd: Option<&str>,
     trace: bool,
 ) -> Result<String> {
@@ -419,7 +442,7 @@ fn client(
     }
     // `-ign_eof` turns the commands off (`USER_DATA_MODE_NONE`). With no echo coming, the end of
     // the input ends the client.
-    if cmd.is_none() && !no_echo {
+    if cmd.is_none() && no_echo.is_none() {
         all.push("-ign_eof".to_owned());
     }
     all.extend(args.iter().cloned());
@@ -442,9 +465,10 @@ fn client(
         // `-rev` reverses each line and ends the connection on CLOSE.
         let _ = input.write_all(b"hello rustyssl\nCLOSE\n");
         let _ = input.flush();
-        if no_echo {
-            // No echo ends the connection: the session's tickets arrive first.
-            std::thread::sleep(Duration::from_secs(1));
+        if let Some(wait) = no_echo {
+            // No echo ends the connection: the session's tickets (and, with faults, the
+            // retransmitted flights) arrive first.
+            std::thread::sleep(wait);
         }
     }
     if cmd.is_none() {
@@ -461,7 +485,19 @@ fn client(
         Ok(Err(e)) => return Err(format!("s_client failed: {e}").into()),
         Err(_) => {
             let _ = Command::new("kill").arg(pid.to_string()).status();
-            return Err("s_client timed out".into());
+            // What it said before it was stopped.
+            let said = match rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(Ok(o)) => format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&o.stdout),
+                    String::from_utf8_lossy(&o.stderr)
+                ),
+                _ => String::new(),
+            };
+            let said: Vec<String> = said.lines().map(mask_err_location).collect();
+            return Err(
+                format!("s_client timed out; it said:\n{}", indent(&said.join("\n"))).into(),
+            );
         }
     };
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -484,7 +520,7 @@ fn client(
         summary.push_str(line);
         summary.push('\n');
     }
-    if no_echo {
+    if no_echo.is_some() {
         summary.push_str("echo: none\n");
         return Ok(summary);
     }
@@ -513,6 +549,11 @@ fn client(
     Ok(summary)
 }
 
+/// Whether the server's arguments make it a DTLS server.
+fn is_dtls(server_args: &[String]) -> bool {
+    server_args.iter().any(|a| a.starts_with("-dtls"))
+}
+
 /// One case in one pairing: the clients' summaries and what the server said of them.
 fn connect(
     t: &Tool<'_>,
@@ -520,20 +561,46 @@ fn connect(
     server_args: &[String],
     client_args: &[String],
 ) -> Result<String> {
-    let (args, m) = mode(client_args);
-    let port = free_port()?;
+    let (mut args, m) = mode(client_args);
     let naccept = if m.resume { 2 } else { 1 };
     // `-rev` can't be used with DTLS: no echo then (the summaries and the server's output are
     // compared).
-    let dtls = server_args.iter().any(|a| a.starts_with("-dtls"));
-    let (mut server, lines) = start_server(
-        t,
-        p.server_ours,
-        port,
-        naccept,
-        server_args,
-        !m.early && !dtls,
-    )?;
+    let dtls = is_dtls(server_args);
+    let mut attempt = 0;
+    let (port, mut server, lines) = loop {
+        let port = free_port(dtls)?;
+        match start_server(
+            t,
+            p.server_ours,
+            port,
+            naccept,
+            server_args,
+            !m.early && !dtls,
+        ) {
+            Ok((server, lines)) => break (port, server, lines),
+            Err(e) if attempt + 1 < BIND_ATTEMPTS && e.to_string().contains("already in use") => {
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    };
+    // With faults, the client talks to the relay; its schedule is the case's.
+    let relay = if m.faults && dtls {
+        Some(relay::Relay::start(port, &client_args.join(" "))?)
+    } else {
+        None
+    };
+    let client_port = relay.as_ref().map_or(port, |r| r.port);
+    if relay.is_some() {
+        // Non-blocking: a duplicated or held-back flight that arrives after the handshake is
+        // read and discarded, and a blocking `s_client` (`dtls1_read_bytes` reading again)
+        // would then wait in `recvfrom` for a datagram that never comes, on either library.
+        args.push("-nbio".to_owned());
+    }
+    // How long a client with no echo to wait for keeps its input open: with faults, past the
+    // longest retransmission run the relay allows (three drops: 1 + 2 + 4 seconds) with room
+    // for a loaded machine.
+    let wait = Duration::from_secs(if relay.is_some() { 15 } else { 1 });
     let sess = t.work.join("session.pem").display().to_string();
     let mut runs = Vec::new();
     if m.resume {
@@ -554,13 +621,14 @@ fn connect(
     }
     let mut summary = String::new();
     for (args, full, early) in &runs {
+        let no_echo = (*early || m.early || dtls).then_some(wait);
         match client(
             t,
             p.client_ours,
-            port,
+            client_port,
             args,
             *full,
-            *early || m.early || dtls,
+            no_echo,
             m.cmd.as_deref(),
             m.trace,
         ) {
@@ -594,13 +662,23 @@ fn connect(
         let line = line.strip_prefix("stderr: ").unwrap_or(line);
         if SERVER_SUMMARY.iter().any(|k| line.starts_with(k))
             || (m.early && SERVER_EARLY.contains(&line))
+            || (dtls && line == "hello rustyssl")
         {
             summary.push_str("server: ");
             summary.push_str(line);
             summary.push('\n');
         }
     }
-    if summary.contains("echo: MISSING") {
+    if let Some(r) = &relay {
+        // The relay's work, for the log (the counts vary with retransmission timing).
+        let [up, down] = r.counts();
+        println!(
+            "  relay ({}): client->server {up:?}, server->client {down:?}",
+            p.name
+        );
+    }
+    let data_missing = dtls && !summary.lines().any(|l| l == "server: hello rustyssl");
+    if summary.contains("echo: MISSING") || data_missing {
         let lines: Vec<String> = server_out.iter().map(|l| mask_err_location(l)).collect();
         summary.push_str(&format!("server: {}\n", lines.join(" / ")));
     }
@@ -621,11 +699,31 @@ pub fn run(args: &[String]) -> Result {
         ours: &our_lib,
         work: &work,
     };
+    let mut only: Vec<&String> = Vec::new();
+    let mut peer = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--seed" => {
+                let s = it.next().ok_or("--seed needs a number")?;
+                relay::set_seed(s.parse().map_err(|_| format!("bad --seed {s}"))?);
+            }
+            "--peer" => peer = Some(it.next().ok_or("--peer needs a name")?.as_str()),
+            "--reference-only" => {}
+            _ if a.starts_with("--") => return Err(format!("unknown option {a}").into()),
+            _ => only.push(a),
+        }
+    }
+    let reference_only = args.iter().any(|a| a == "--reference-only");
     make_pki(&t, &work)?;
+    println!("fault schedule seed: {}", relay::seed());
+    match peer {
+        None => {}
+        Some("gnutls") => return gnutls::run(&t, &root, &only, reference_only),
+        Some(p) => return Err(format!("unknown peer {p} (known: gnutls)").into()),
+    }
 
     let list = fs::read_to_string(root.join("tests/interop/cases.txt"))?;
-    let reference_only = args.iter().any(|a| a == "--reference-only");
-    let only: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     let mut failures = Vec::new();
     let mut count = 0;
     for line in list.lines().map(str::trim) {

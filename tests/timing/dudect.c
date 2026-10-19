@@ -29,6 +29,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
@@ -104,6 +106,8 @@ struct target {
     void (*run)(size_t i);
     /* How many runs one measurement times (fast operations repeat to beat the clock's step). */
     int reps;
+    /* Inputs made per batch (0: BATCH); fewer for inputs that hold a connection each. */
+    size_t batch;
 };
 
 #define MAXIN 1536
@@ -223,6 +227,7 @@ static void poly_run(size_t i)
 /* ---- X25519: the private key, with a fixed peer. ---- */
 static EVP_PKEY *peer;
 static EVP_PKEY *keys[BATCH];
+static unsigned char x25519_fixed[32];
 
 static int x25519_setup(void)
 {
@@ -230,6 +235,11 @@ static int x25519_setup(void)
 
     random_bytes(pub, 32);
     pub[31] &= 0x7f;
+    /* The fixed class's key: 0x11s, or (DUDECT_FIXED_RANDOM=1) a random key drawn once. */
+    if (getenv("DUDECT_FIXED_RANDOM") != NULL)
+        random_bytes(x25519_fixed, 32);
+    else
+        memset(x25519_fixed, 0x11, 32);
     peer = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, pub, 32);
     return peer != NULL;
 }
@@ -239,7 +249,7 @@ static void x25519_prepare(size_t i, int c)
     unsigned char priv[32];
 
     if (c == 0)
-        memset(priv, 0x11, 32);
+        memcpy(priv, x25519_fixed, 32);
     else
         random_bytes(priv, 32);
     EVP_PKEY_free(keys[i]);
@@ -256,6 +266,39 @@ static void x25519_run(size_t i)
     EVP_PKEY_derive(d, out, &n);
     EVP_PKEY_CTX_free(d);
     sink ^= out[0];
+}
+
+/*
+ * The same split in two: X25519's derivation alone, on contexts set up before timing, and the
+ * context's setup alone (EVP_PKEY_CTX_new, derive_init, derive_set_peer), to tell which half
+ * a signal of the whole comes from.
+ */
+static EVP_PKEY_CTX *dctx[BATCH];
+
+static void x25519_derive_prepare(size_t i, int c)
+{
+    x25519_prepare(i, c);
+    EVP_PKEY_CTX_free(dctx[i]);
+    dctx[i] = EVP_PKEY_CTX_new(keys[i], NULL);
+    EVP_PKEY_derive_init(dctx[i]);
+    EVP_PKEY_derive_set_peer(dctx[i], peer);
+}
+
+static void x25519_derive_run(size_t i)
+{
+    size_t n = sizeof(out);
+
+    EVP_PKEY_derive(dctx[i], out, &n);
+    sink ^= out[0];
+}
+
+static void x25519_ctx_run(size_t i)
+{
+    EVP_PKEY_CTX *d = EVP_PKEY_CTX_new(keys[i], NULL);
+
+    EVP_PKEY_derive_init(d);
+    EVP_PKEY_derive_set_peer(d, peer);
+    EVP_PKEY_CTX_free(d);
 }
 
 /* ---- ECDSA P-256 signing: the private key (fixed, or one of a pool of random ones). ---- */
@@ -481,17 +524,150 @@ static void mlkem_run(size_t i)
     sink ^= out[0];
 }
 
+/*
+ * ---- Lucky13: a TLS 1.2 server reading a MAC-then-encrypt CBC record (AES-128-CBC with
+ * HMAC-SHA1, no encrypt-then-MAC) that fails. The client's 512-octet record is altered
+ * through its next-to-last ciphertext block so the last plaintext octet, the padding length,
+ * is 0 (class 0) or 255 (class 1): a server whose MAC check's work depends on the padding
+ * takes longer on one. Each input is its own connection, resumed from one session so the
+ * handshakes stay cheap, and made (record and all) before anything is timed. ----
+ */
+#define TLS_BATCH 500
+static SSL_CTX *tls_cctx, *tls_sctx;
+static SSL_SESSION *tls_sess;
+static SSL *tls_srv[TLS_BATCH];
+
+static int tls_pump(SSL *c, SSL *s)
+{
+    int k;
+
+    for (k = 0; k < 32; k++) {
+        /* Each end's error before the other runs: the other's write changes the BIO's flags. */
+        int rc = SSL_do_handshake(c), ec = rc == 1 ? SSL_ERROR_NONE : SSL_get_error(c, rc);
+        int rs = SSL_do_handshake(s), es = rs == 1 ? SSL_ERROR_NONE : SSL_get_error(s, rs);
+
+        if (rc == 1 && rs == 1)
+            return 1;
+        if ((ec != SSL_ERROR_NONE && ec != SSL_ERROR_WANT_READ)
+            || (es != SSL_ERROR_NONE && es != SSL_ERROR_WANT_READ))
+            return 0;
+    }
+    return 0;
+}
+
+/* A connected pair over memory BIOs: the client writes to the server's read BIO and back. */
+static int tls_pair(SSL **c, SSL **s)
+{
+    BIO *c2s = BIO_new(BIO_s_mem()), *s2c = BIO_new(BIO_s_mem());
+
+    *c = SSL_new(tls_cctx);
+    *s = SSL_new(tls_sctx);
+    if (*c == NULL || *s == NULL || c2s == NULL || s2c == NULL)
+        return 0;
+    /* Empty is "try again", not the end. */
+    BIO_set_mem_eof_return(c2s, -1);
+    BIO_set_mem_eof_return(s2c, -1);
+    BIO_up_ref(c2s);
+    BIO_up_ref(s2c);
+    SSL_set_bio(*c, s2c, c2s);
+    SSL_set_bio(*s, c2s, s2c);
+    SSL_set_connect_state(*c);
+    SSL_set_accept_state(*s);
+    if (tls_sess != NULL)
+        SSL_set_session(*c, tls_sess);
+    return tls_pump(*c, *s);
+}
+
+static int tls_setup(void)
+{
+    EVP_PKEY *key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256");
+    X509 *cert = X509_new();
+    SSL *c, *s;
+    int ok;
+
+    if (key == NULL || cert == NULL)
+        return 0;
+    ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
+    X509_gmtime_adj(X509_getm_notBefore(cert), 0);
+    X509_gmtime_adj(X509_getm_notAfter(cert), 86400);
+    X509_set_pubkey(cert, key);
+    X509_NAME_add_entry_by_txt(X509_get_subject_name(cert), "CN", MBSTRING_ASC,
+                               (const unsigned char *)"dudect", -1, -1, 0);
+    X509_set_issuer_name(cert, X509_get_subject_name(cert));
+    X509_sign(cert, key, EVP_sha256());
+    tls_cctx = SSL_CTX_new(TLS_client_method());
+    tls_sctx = SSL_CTX_new(TLS_server_method());
+    if (tls_cctx == NULL || tls_sctx == NULL)
+        return 0;
+    SSL_CTX_set_max_proto_version(tls_cctx, TLS1_2_VERSION);
+    SSL_CTX_set_cipher_list(tls_cctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(tls_cctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_set_cipher_list(tls_sctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(tls_sctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_use_certificate(tls_sctx, cert);
+    SSL_CTX_use_PrivateKey(tls_sctx, key);
+    X509_free(cert);
+    EVP_PKEY_free(key);
+    /* One full handshake for the session the others resume. */
+    ok = tls_pair(&c, &s);
+    if (ok)
+        tls_sess = SSL_get1_session(c);
+    SSL_free(c);
+    SSL_free(s);
+    return ok && tls_sess != NULL;
+}
+
+static void tls_prepare(size_t i, int c)
+{
+    static unsigned char msg[512];
+    unsigned char rec[1024];
+    SSL *cl, *sv;
+    BIO *rb;
+    int n;
+    size_t pad, body;
+
+    SSL_free(tls_srv[i]);
+    tls_srv[i] = NULL;
+    if (!tls_pair(&cl, &sv) || SSL_write(cl, msg, (int)sizeof(msg)) != (int)sizeof(msg)) {
+        fprintf(stderr, "tls-cbc-record: no connection\n");
+        exit(2);
+    }
+    /* The client's record went to the server's read BIO: take it out, alter it, put it back. */
+    rb = SSL_get_rbio(sv);
+    n = BIO_read(rb, rec, (int)sizeof(rec));
+    /* header 5, explicit IV 16, then the message, the MAC (20) and the padding */
+    body = n > 5 + 16 ? (size_t)n - 5 - 16 : 0;
+    if (body < sizeof(msg) + 20 + 1 || body % 16 != 0 || n < 5 + 16 + 32) {
+        fprintf(stderr, "tls-cbc-record: unexpected record of %d octets\n", n);
+        exit(2);
+    }
+    pad = body - sizeof(msg) - 20 - 1;
+    /* The last plaintext octet is `pad`; XOR into the block before it makes it 0 or 255. */
+    rec[n - 16 - 1] ^= (unsigned char)(pad ^ (c == 0 ? 0 : 255));
+    BIO_write(rb, rec, n);
+    SSL_free(cl);
+    tls_srv[i] = sv;
+}
+
+static void tls_run(size_t i)
+{
+    sink ^= (unsigned char)SSL_read(tls_srv[i], out, (int)sizeof(out));
+}
+
 static const struct target targets[] = {
-    { "aes-gcm", aes_setup, key_prepare, aes_run, 8 },
-    { "ghash", ghash_setup, tag_prepare, ghash_run, 8 },
-    { "poly1305", poly_setup, key_prepare, poly_run, 8 },
-    { "x25519", x25519_setup, x25519_prepare, x25519_run, 1 },
-    { "ecdsa-sign", ecdsa_setup, ecdsa_prepare, ecdsa_run, 1 },
-    { "rsa-pkcs1-decrypt", rsa_setup, rsa_prepare, rsa_run, 1 },
-    { "rsa-raw-decrypt", rsa_setup, rsaraw_prepare, rsaraw_run, 1 },
-    { "bn-modexp-consttime", bn_setup, bn_prepare, bn_run, 1 },
-    { "memcmp", memcmp_setup, memcmp_prepare, memcmp_run, 1024 },
-    { "ml-kem-decap", mlkem_setup, mlkem_prepare, mlkem_run, 1 },
+    { "aes-gcm", aes_setup, key_prepare, aes_run, 8, 0 },
+    { "ghash", ghash_setup, tag_prepare, ghash_run, 8, 0 },
+    { "poly1305", poly_setup, key_prepare, poly_run, 8, 0 },
+    { "x25519", x25519_setup, x25519_prepare, x25519_run, 1, 0 },
+    { "x25519-derive", x25519_setup, x25519_derive_prepare, x25519_derive_run, 1, 0 },
+    { "x25519-ctx", x25519_setup, x25519_prepare, x25519_ctx_run, 1, 0 },
+    { "ecdsa-sign", ecdsa_setup, ecdsa_prepare, ecdsa_run, 1, 0 },
+    { "rsa-pkcs1-decrypt", rsa_setup, rsa_prepare, rsa_run, 1, 0 },
+    { "rsa-raw-decrypt", rsa_setup, rsaraw_prepare, rsaraw_run, 1, 0 },
+    { "bn-modexp-consttime", bn_setup, bn_prepare, bn_run, 1, 0 },
+    { "memcmp", memcmp_setup, memcmp_prepare, memcmp_run, 1024, 0 },
+    { "ml-kem-decap", mlkem_setup, mlkem_prepare, mlkem_run, 1, 0 },
+    { "tls-cbc-record", tls_setup, tls_prepare, tls_run, 1, TLS_BATCH },
 };
 
 int main(int argc, char **argv)
@@ -517,13 +693,20 @@ int main(int argc, char **argv)
         fprintf(stderr, "unknown target or count\n");
         return 2;
     }
+#if defined(__aarch64__)
+    /* DUDECT_DIT=1: run with PSTATE.DIT set (MSR DIT, #1), the Arm mode in which instruction
+     * timing doesn't depend on data (and Apple's data-dependent prefetcher is off). */
+    if (getenv("DUDECT_DIT") != NULL)
+        __asm__ volatile(".inst 0xd503415f" ::: "memory");
+#endif
     if (!t->setup()) {
         fprintf(stderr, "%s: setup failed\n", t->name);
         ERR_print_errors_fp(stderr);
         return 2;
     }
     while (done < (size_t)total) {
-        size_t n = (size_t)total - done < BATCH ? (size_t)total - done : BATCH;
+        size_t cap = t->batch != 0 ? t->batch : BATCH;
+        size_t n = (size_t)total - done < cap ? (size_t)total - done : cap;
 
         for (i = 0; i < n; i++) {
             unsigned char r;
@@ -585,6 +768,12 @@ int main(int argc, char **argv)
     }
     printf("%s t=%.2f n=%ld test=%s\n", t->name, best, total,
            best_at == 0 ? "all" : best_at == PERCENTILES + 1 ? "second-order" : "cropped");
+    /* DUDECT_MEANS=1: each class's mean time in the deciding test and in the whole, for
+     * telling how large a signal is (in the clock's ticks). */
+    if (getenv("DUDECT_MEANS") != NULL)
+        printf("  means: deciding %.3f / %.3f (n %.0f / %.0f), all %.3f / %.3f\n",
+               tests[best_at].mean[0], tests[best_at].mean[1], tests[best_at].n[0],
+               tests[best_at].n[1], tests[0].mean[0], tests[0].mean[1]);
     (void)sink;
     return 0;
 }

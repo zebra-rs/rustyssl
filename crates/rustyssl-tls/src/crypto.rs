@@ -288,6 +288,9 @@ pub struct PeerKey {
     pub size: usize,
     /// Its security in bits (`EVP_PKEY_get_security_bits`).
     pub security_bits: i32,
+    /// The certificate's key usage bits (`X509_get_key_usage`: all set without the
+    /// extension, or for a raw public key).
+    pub key_usage: u32,
 }
 
 /// A key share made for one group: the public value sent, and the secret derived once the

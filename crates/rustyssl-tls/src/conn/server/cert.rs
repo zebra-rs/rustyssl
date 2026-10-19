@@ -373,6 +373,7 @@ pub(crate) fn process_client_certificate(
                 }
             }
             _ => {
+                c.decode_failure = Some(crate::conn::DecodeFailure::Certificate(der.to_vec()));
                 return Err(Error::alert_lib(
                     abi::SSL_AD_DECODE_ERROR,
                     abi::ERR_R_ASN1_LIB,

@@ -83,7 +83,8 @@ pub fn default_policy(level: i32, op: c_int, bits: c_int, nid: c_int, other: Sec
         abi::SSL_SECOP_VERSION => {
             let v = u16::try_from(nid).unwrap_or(0);
             if super::version::is_dtls(v) {
-                !(super::version::cmp(v, crate::consts::version::DTLS1_2).is_lt() && level > 0)
+                !(super::version::cmp(true, v, crate::consts::version::DTLS1_2).is_lt()
+                    && level > 0)
             } else {
                 !(nid <= abi::TLS1_1_VERSION && level > 0)
             }

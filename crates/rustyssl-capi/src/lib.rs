@@ -34,6 +34,7 @@ mod dh_meth;
 mod dh_ops;
 mod dh_pmeth;
 mod dir;
+mod dit;
 mod dsa;
 mod dsa_asn1;
 mod dsa_backend;

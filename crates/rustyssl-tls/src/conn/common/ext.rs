@@ -30,7 +30,6 @@ use crate::crypto::{HashAlg, Provider};
 use crate::error::{Error, InFunc, Result};
 use crate::keysched::{Schedule13, hash_of};
 use crate::msgs::ext::{self as mx, EXT_DEFS, Policy};
-use crate::suites::masks::{SSL_aECDSA, SSL_kECDHE};
 
 /// `SSL_EXT_FLAG_RECEIVED` (`ssl_local.h`).
 pub const FLAG_RECEIVED: u8 = 0x1;
@@ -945,26 +944,12 @@ pub fn max_fragment_length(mode: u8) -> Option<usize> {
     512usize.checked_shl(u32::from(mode.checked_sub(1)?))
 }
 
-/// `final_ec_pt_formats` (client): with an ECDHE or ECDSA suite, a server's ec_point_formats
-/// must include uncompressed.
-fn final_ec_pt_formats(c: &Connection) -> Result<()> {
-    if c.cfg.server {
-        return Ok(());
-    }
-    let cp = c.hs.new_cipher.ok_or_else(Error::internal)?;
-    let own = super::groups::formats(c);
-    let uncompressed = u8::try_from(abi::TLSEXT_ECPOINTFORMAT_uncompressed).unwrap_or(0);
-    if let Some(peer) = &c.hs.sh.peer_ecpointformats
-        && !own.is_empty()
-        && !peer.is_empty()
-        && (cp.mkey & SSL_kECDHE != 0 || cp.auth & SSL_aECDSA != 0)
-        && !peer.contains(&uncompressed)
-    {
-        return Err(Error::alert(
-            abi::SSL_AD_ILLEGAL_PARAMETER,
-            abi::SSL_R_TLS_INVALID_ECPOINTFORMAT_LIST,
-        ));
-    }
+/// `final_ec_pt_formats` (client): OpenSSL requires uncompressed in a server's ec_point_formats
+/// only when the connection has a list of its own (`s->ext.ecpointformats`), and no 3.5 API
+/// sets one (the extension is built from the defaults), so the check never applies: a server
+/// whose list lacks uncompressed is accepted, as the reference accepts it (BoGo's
+/// `PointFormat-Client-MissingUncompressed` fails on both).
+fn final_ec_pt_formats(_c: &Connection) -> Result<()> {
     Ok(())
 }
 
@@ -1168,7 +1153,7 @@ pub fn construct_sig_algs(c: &Connection) -> Result<ExtReturn> {
     let tls12 = super::version::of(abi::TLS1_2_VERSION);
     let level = super::version::tls_level;
     if level(c.hs.sh.client_version) < tls12
-        || (c.cfg.method_version != super::version::ANY && level(c.neg.version) < tls12)
+        || (super::version::method_fixed(c) && level(c.neg.version) < tls12)
     {
         return Ok(ExtReturn::NotSent);
     }

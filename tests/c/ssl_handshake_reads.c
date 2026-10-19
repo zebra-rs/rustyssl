@@ -26,6 +26,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
+#include <openssl/x509v3.h>
 
 static int failures = 0;
 static int number = 0;
@@ -437,6 +438,128 @@ static void test_servername_resume(int version, const char *first, const char *s
     done(c, s, cctx, sctx);
 }
 
+/* Verification fails, but the client goes on (SSL_VERIFY_NONE). */
+static int soft_fail_cb(X509_STORE_CTX *ctx, void *arg)
+{
+    (void)arg;
+    X509_STORE_CTX_set_error(ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+    return 0;
+}
+
+/* A soft verification failure is kept in the session, and reported again on resumption. */
+static void test_soft_fail_resume(int version)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    SSL_SESSION *sess;
+    unsigned char b;
+
+    printf("# a soft verification failure, resumed, %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_verify(cctx, SSL_VERIFY_NONE, NULL);
+    SSL_CTX_set_cert_verify_callback(cctx, soft_fail_cb, NULL);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the first handshake");
+    SSL_read(c, &b, 1);
+    sess = SSL_get1_session(c);
+    printf("  first: result %ld\n", SSL_get_verify_result(c));
+    SSL_shutdown(c);
+    SSL_shutdown(s);
+    SSL_free(c);
+    SSL_free(s);
+    pair(cctx, sctx, &c, &s);
+    SSL_set_session(c, sess);
+    printf("  set the session: result %ld\n", SSL_get_verify_result(c));
+    check(handshake(c, s), "the second handshake");
+    printf("  resumed: reused %d, result %ld\n", SSL_session_reused(c), SSL_get_verify_result(c));
+    SSL_SESSION_free(sess);
+    done(c, s, cctx, sctx);
+}
+
+static int request_cb(int ok, X509_STORE_CTX *ctx)
+{
+    (void)ok;
+    (void)ctx;
+    return 1;
+}
+
+/*
+ * The signature algorithms a server's CertificateRequest lists, as its client reads them
+ * (SSL_get_sigalgs): only those the negotiated version may use, so none of TLS 1.3's alone
+ * (ML-DSA) in TLS 1.2.
+ */
+static void test_request_sigalgs(int version)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *c, *s;
+    int i, n;
+
+    printf("# the CertificateRequest's signature algorithms, %s\n",
+           version == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2");
+    SSL_CTX_set_max_proto_version(cctx, version);
+    SSL_CTX_set_verify(sctx, SSL_VERIFY_PEER, request_cb);
+    pair(cctx, sctx, &c, &s);
+    check(handshake(c, s), "the handshake");
+    n = SSL_get_sigalgs(c, -1, NULL, NULL, NULL, NULL, NULL);
+    printf("  %d:", n);
+    for (i = 0; i < n; i++) {
+        unsigned char rsig = 0, rhash = 0;
+
+        SSL_get_sigalgs(c, i, NULL, NULL, NULL, &rsig, &rhash);
+        printf(" %02x%02x", rhash, rsig);
+    }
+    printf("\n");
+    done(c, s, cctx, sctx);
+}
+
+/*
+ * A TLS 1.2 ECDSA server certificate whose key usage leaves out digitalSignature (here only
+ * keyAgreement, or with it): the client refuses the first (ssl3_check_cert_and_algorithm).
+ */
+static void test_ecdsa_key_usage(const char *usage)
+{
+    SSL_CTX *cctx = SSL_CTX_new(TLS_client_method()), *sctx = SSL_CTX_new(TLS_server_method());
+    EVP_PKEY *k = EVP_EC_gen("P-256");
+    X509 *x = X509_new();
+    X509_EXTENSION *ext;
+    SSL *c, *s;
+    int ok;
+
+    printf("# a TLS 1.2 ECDSA certificate with key usage %s\n", usage);
+    if (cctx == NULL || sctx == NULL || k == NULL || x == NULL) {
+        printf("Bail out! key usage setup\n");
+        exit(1);
+    }
+    ASN1_INTEGER_set(X509_get_serialNumber(x), 1);
+    X509_gmtime_adj(X509_getm_notBefore(x), 0);
+    X509_gmtime_adj(X509_getm_notAfter(x), 3600);
+    X509_NAME_add_entry_by_txt(X509_get_subject_name(x), "CN", MBSTRING_ASC,
+                               (const unsigned char *)"ku", -1, -1, 0);
+    X509_set_issuer_name(x, X509_get_subject_name(x));
+    X509_set_pubkey(x, k);
+    ext = X509V3_EXT_conf_nid(NULL, NULL, NID_key_usage, usage);
+    if (ext == NULL || !X509_add_ext(x, ext, -1) || !X509_sign(x, k, EVP_sha256())) {
+        printf("Bail out! key usage certificate\n");
+        exit(1);
+    }
+    X509_EXTENSION_free(ext);
+    SSL_CTX_use_certificate(sctx, x);
+    SSL_CTX_use_PrivateKey(sctx, k);
+    SSL_CTX_set_max_proto_version(cctx, TLS1_2_VERSION);
+    SSL_CTX_set_cipher_list(cctx, "ECDHE-ECDSA-AES128-GCM-SHA256");
+    pair(cctx, sctx, &c, &s);
+    ok = handshake(c, s);
+    printf("  handshake %d\n", ok);
+    errors();
+    SSL_free(c);
+    SSL_free(s);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+    X509_free(x);
+    EVP_PKEY_free(k);
+}
+
 static int retries = 0;
 
 static int retry_cb(X509_STORE_CTX *ctx, void *arg)
@@ -526,6 +649,12 @@ int main(void)
     test_servername_resume(TLS1_2_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_3_VERSION, "goodhost", NULL);
     test_servername_resume(TLS1_2_VERSION, NULL, "goodhost");
+    test_ecdsa_key_usage("keyAgreement");
+    test_ecdsa_key_usage("digitalSignature,keyAgreement");
+    test_request_sigalgs(TLS1_3_VERSION);
+    test_request_sigalgs(TLS1_2_VERSION);
+    test_soft_fail_resume(TLS1_3_VERSION);
+    test_soft_fail_resume(TLS1_2_VERSION);
     test_retry_verify();
     test_retry_with_chain();
     test_security();
