@@ -927,7 +927,7 @@ pub fn compat(c: &Connection, lu: &SigAlg) -> bool {
     } else {
         (lu.mintls, lu.maxtls)
     };
-    let vc = super::ciphers::vcmp;
+    let vc = |a, b| super::ciphers::vcmp(c, a, b);
     !(minv == -1
         || maxv == -1
         || (minv != 0 && maxproto != 0 && vc(minv, maxproto).is_gt())

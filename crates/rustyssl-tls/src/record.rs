@@ -988,11 +988,18 @@ fn low_octet(mask: usize) -> u8 {
     b
 }
 
+/// A mask the optimizer can't see through: without it LLVM recognizes the masks below as
+/// comparisons and may branch on them or shorten a loop at a secret bound (measured: the
+/// Lucky13 dudect target, `tests/timing/dudect.c` `tls-cbc-record`).
+fn barrier(mask: usize) -> usize {
+    core::hint::black_box(mask)
+}
+
 /// An all-ones mask when `a >= b` (`constant_time_ge_s`), without branching on secrets.
 fn ct_ge(a: usize, b: usize) -> usize {
     // The borrow out of a - b, in the top bit of (a ^ ((a ^ b) | ((a - b) ^ b))).
     let lt = (a ^ ((a ^ b) | (a.wrapping_sub(b) ^ b))) >> (usize::BITS - 1);
-    lt.wrapping_sub(1)
+    barrier(lt.wrapping_sub(1))
 }
 
 /// An all-ones mask when `a == b`.
@@ -1000,7 +1007,7 @@ fn ct_eq_s(a: usize, b: usize) -> usize {
     let x = a ^ b;
     // x - 1 has its top bit set (with x's clear) only for x == 0.
     let z = (!x & x.wrapping_sub(1)) >> (usize::BITS - 1);
-    0usize.wrapping_sub(z)
+    barrier(0usize.wrapping_sub(z))
 }
 
 /// An all-ones mask when `a < b`.
@@ -1024,7 +1031,7 @@ fn cbc_remove_padding_and_mac(
     if overhead > reclen {
         return Err(bad_mac());
     }
-    let padding_length = usize::from(rec.last().copied().unwrap_or(0));
+    let padding_length = barrier(usize::from(rec.last().copied().unwrap_or(0)));
     let mut good = ct_ge(reclen, overhead.wrapping_add(padding_length));
     // Check the most padding there can be, so the work doesn't depend on its length.
     let to_check = MAX_PADDING.min(reclen);
@@ -1035,10 +1042,10 @@ fn cbc_remove_padding_and_mac(
                 .copied()
                 .unwrap_or(0),
         );
-        good &= !(mask & (padding_length ^ b));
+        good = barrier(good & !(mask & (padding_length ^ b)));
     }
     good = ct_eq_s(0xff, good & 0xff);
-    let len = reclen.wrapping_sub(good & padding_length.wrapping_add(1));
+    let len = barrier(reclen.wrapping_sub(good & padding_length.wrapping_add(1)));
     // The block length only bounds the padding, which the 256-octet scan covers.
     let _ = block_len;
 

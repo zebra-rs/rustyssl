@@ -76,8 +76,8 @@ pub fn disabled(c: &Connection, cp: &Cipher, op: c_int, ecdhe: bool) -> bool {
     if minv == abi::TLS1_VERSION && ecdhe && cp.mkey & (SSL_kECDHE | SSL_kECDHEPSK) != 0 {
         minv = abi::SSL3_VERSION;
     }
-    if vcmp(minv, c_int::from(sh.max_ver)) == Ordering::Greater
-        || vcmp(maxv, c_int::from(sh.min_ver)) == Ordering::Less
+    if vcmp(c, minv, c_int::from(sh.max_ver)) == Ordering::Greater
+        || vcmp(c, maxv, c_int::from(sh.min_ver)) == Ordering::Less
     {
         return true;
     }
@@ -93,10 +93,10 @@ pub(crate) fn range(c: &Connection, cp: &Cipher) -> (c_int, c_int) {
     }
 }
 
-/// `ssl_version_cmp` on `int` versions.
-pub(crate) fn vcmp(a: c_int, b: c_int) -> Ordering {
+/// `ssl_version_cmp` on `int` versions, on `c`'s kind of connection.
+pub(crate) fn vcmp(c: &Connection, a: c_int, b: c_int) -> Ordering {
     let v = |x: c_int| u16::try_from(x).unwrap_or(0);
-    super::version::cmp(v(a), v(b))
+    super::version::cmp(c.cfg.dtls, v(a), v(b))
 }
 
 /// Shared addition (fork K, `SSL_get1_supported_ciphers`): the configured suites this end can
@@ -171,8 +171,8 @@ fn cipher_list_to_bytes_inner(c: &mut Connection) -> Result<Vec<u8>> {
         w.u16(cp.protocol_id());
         let (minv, maxv) = range(c, cp);
         if !maxverok
-            && vcmp(maxv, max_ver) != Ordering::Less
-            && vcmp(minv, max_ver) != Ordering::Greater
+            && vcmp(c, maxv, max_ver) != Ordering::Less
+            && vcmp(c, minv, max_ver) != Ordering::Greater
         {
             maxverok = true;
         }
@@ -424,7 +424,7 @@ pub fn choose(
     let mut ret: Option<&'static Cipher> = None;
     for cp in prio {
         let (minv, maxv) = range(c, cp);
-        if vcmp(v, minv) == Ordering::Less || vcmp(v, maxv) == Ordering::Greater {
+        if vcmp(c, v, minv) == Ordering::Less || vcmp(c, v, maxv) == Ordering::Greater {
             continue;
         }
         let (alg_k, alg_a) = (cp.mkey, cp.auth);

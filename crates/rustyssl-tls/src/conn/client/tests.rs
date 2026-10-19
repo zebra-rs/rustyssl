@@ -2105,6 +2105,37 @@ fn loopback_with_the_server() {
 }
 
 #[test]
+fn tls13_post_handshake_fragment_then_app_data_fails() {
+    // Part of a KeyUpdate (its type octet) and then application data: TLS 1.3 doesn't
+    // interleave them (`ssl3_read_bytes`; tlsfuzzer's "1/4 fragmented keyupdate msg, appdata
+    // between").
+    use crate::conn::pair::{self, End};
+    let p = TestProvider::new(b"mixed");
+    let mut ccfg = client12();
+    ccfg.max_version = v::TLS1_3;
+    let mut client = Connection::new(ccfg);
+    let mut server = Connection::new(server_config(&p));
+    let mut log = pair::Log::default();
+    let mut answer = |_: End, r: &Request| accept(r);
+    pair::handshake(&p, &mut client, &mut server, true, &mut answer, &mut log).unwrap();
+    client
+        .write_record(
+            &p,
+            crate::record::content_type::handshake(),
+            &[hm::KEY_UPDATE],
+        )
+        .unwrap();
+    client.write_app(&p, b"between").unwrap();
+    server.feed(&client.take_output());
+    // One record per step: the fragment, then the application data.
+    let e = (0..8)
+        .find_map(|_| server.step(&p, true).err())
+        .expect("the server took the records");
+    assert_eq!(e.alert.map(i32::from), Some(abi::SSL_AD_UNEXPECTED_MESSAGE));
+    assert_eq!(e.reason, abi::SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA);
+}
+
+#[test]
 fn tls12_cbc_with_encrypt_then_mac() {
     let p = TestProvider::new(b"tls12-etm");
     let mut cfg = client12();

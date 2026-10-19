@@ -1237,6 +1237,14 @@ impl Connection {
             }
         };
         let ty = rec.content_type;
+        // Part of a post-handshake message (shorter than its header), then another record
+        // type: TLS 1.3 doesn't interleave them, here as in the handshake (`ssl3_read_bytes`).
+        if !self.hs_in.is_empty() && ty != handshake() && self.is_tls13() {
+            return Err(Error::alert(
+                abi::SSL_AD_UNEXPECTED_MESSAGE,
+                abi::SSL_R_MIXED_HANDSHAKE_AND_NON_HANDSHAKE_DATA,
+            ));
+        }
         if ty != alert() && !rec.data.is_empty() {
             self.alert_count = 0;
         }
@@ -1460,9 +1468,9 @@ impl Connection {
         let Some(mut desc) = self.alert_value(desc) else {
             return Ok(());
         };
-        // SSL 3.0 has no protocol_version alert: a server refusing an SSL 3.0 ClientHello
-        // (whose version it took for the alert) sends handshake_failure.
-        if i32::from(self.neg.version) == abi::SSL3_VERSION
+        // SSL 3.0 has no protocol_version alert: an alert sent at that version (a ClientHello
+        // whose legacy_version is SSL 3.0 failing the version choice) is handshake_failure.
+        if self.neg.version == crate::consts::version::SSL3
             && desc == msgs_type(abi::SSL_AD_PROTOCOL_VERSION)
         {
             desc = msgs_type(abi::SSL_AD_HANDSHAKE_FAILURE);

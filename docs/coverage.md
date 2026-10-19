@@ -445,7 +445,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_ctrl` | libcrypto | `openssl/bio.h` | `asn1_bit_string`, `asn1_generate`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_text`, `asn1_time`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `bn`, `cmp`, `cms_data`, `cms_env`, `cms_sign`, `conf`, `ct`, `d2i_pkey`, `dh_asn1`, `dsa_asn1`, `ec_key`, `ec_params`, `encoder`, `err_bio`, `evp_dsa_kmgmt`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_pkey_ec`, `evp_pkey_print`, `evp_rsa_legacy`, `http`, `key2text`, `lhash`, `objects`, `ocsp`, `pem`, `pem_crypt`, `pem_pkey`, `pem_write_pkey`, `pkcs7`, `pkcs7_smime`, `pkcs7_stream`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_print`, `ssl_bio`, `ssl_errors`, `ssl_ktls`, `ssl_libctx`, `ssl_sess_fatal`, `ssl_session`, `ssl_shutdown`, `ssl_strings`, `ssl_trace`, `store`, `trace`, `txt_db`, `x509_cert`, `x509_info`, `x509_name`, `x509_policy`, `x509_print`, `x509_pubkey`, `x509_req`, `x509_spki`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `BIO_ctrl_get_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_get_write_guarantee` | libcrypto | `openssl/bio.h` | `bio_dgram_pair`, `bio_pair` |
-| `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_mem`, `rand`, `ssl_bio`, `ssl_trace` |
+| `BIO_ctrl_pending` | libcrypto | `openssl/bio.h` | `bio_mem`, `rand`, `ssl_bio`, `ssl_requests`, `ssl_trace` |
 | `BIO_ctrl_reset_read_request` | libcrypto | `openssl/bio.h` | `bio_pair` |
 | `BIO_ctrl_wpending` | libcrypto | `openssl/bio.h` | `bio_mem`, `ssl_bio` |
 | `BIO_debug_callback` | libcrypto | `openssl/bio.h` | `bio_dump` |
@@ -463,7 +463,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_f_asn1` | libcrypto | `openssl/asn1.h` | `pkcs7_stream` |
 | `BIO_f_base64` | libcrypto | `openssl/evp.h` | `bio_base64` |
 | `BIO_f_brotli` | libcrypto | `openssl/comp.h` | `comp` |
-| `BIO_f_buffer` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_sock` |
+| `BIO_f_buffer` | libcrypto | `openssl/bio.h` | `bio_filter`, `bio_sock`, `ssl_bio` |
 | `BIO_f_cipher` | libcrypto | `openssl/evp.h` | `bio_evp` |
 | `BIO_f_linebuffer` | libcrypto | `openssl/bio.h` | `bio_filter` |
 | `BIO_f_md` | libcrypto | `openssl/evp.h` | `bio_evp` |
@@ -603,7 +603,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `BIO_vprintf` | libcrypto | `openssl/bio.h` | `bio_print` |
 | `BIO_vsnprintf` | libcrypto | `openssl/bio.h` | `bio_print` |
 | `BIO_wait` | libcrypto | `openssl/bio.h` | `bio_sock` |
-| `BIO_write` | libcrypto | `openssl/bio.h` | `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `cms_data`, `cms_sign`, `decoder`, `evp_rsa_legacy`, `http`, `pkcs7_smime`, `pkcs7_stream`, `rand`, `ssl_bio`, `ssl_errors`, `ssl_libctx`, `ssl_sess_fatal`, `ssl_strings` |
+| `BIO_write` | libcrypto | `openssl/bio.h` | `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_dump`, `bio_evp`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_sock`, `cms_data`, `cms_sign`, `decoder`, `evp_rsa_legacy`, `http`, `pkcs7_smime`, `pkcs7_stream`, `rand`, `ssl_bio`, `ssl_errors`, `ssl_libctx`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_strings` |
 | `BIO_write_ex` | libcrypto | `openssl/bio.h` | `bio_mem` |
 | `BN_BLINDING_convert` | libcrypto | `openssl/bn.h` | `bn_mod` |
 | `BN_BLINDING_convert_ex` | libcrypto | `openssl/bn.h` | `bn_mod` |
@@ -2281,7 +2281,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_RAND_CTX_new` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `dh_check`, `dh_lib`, `dsa_lib`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa_gen`, `evp_rsa_kem`, `rand`, `rsa_lib`, `rsa_ops` |
 | `EVP_RAND_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_rand` |
-| `EVP_RAND_CTX_up_ref` | libcrypto | `openssl/evp.h` | `evp_rand` |
+| `EVP_RAND_CTX_up_ref` | libcrypto | `openssl/evp.h` | `evp_rand`, `rand` |
 | `EVP_RAND_do_all_provided` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_enable_locking` | libcrypto | `openssl/evp.h` | `evp_rand` |
 | `EVP_RAND_fetch` | libcrypto | `openssl/evp.h` | `bn`, `bn_mod`, `bn_prime`, `dh_check`, `dh_lib`, `dsa_lib`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_names_kept`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa_gen`, `evp_rsa_kem`, `rand`, `rsa_lib`, `rsa_ops` |
@@ -5074,7 +5074,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `X509_check_private_key` | libcrypto | `openssl/x509.h` | `x509_cert` |
 | `X509_check_purpose` | libcrypto | `openssl/x509v3.h` | `x509_purpose`, `x509_rfc3779` |
 | `X509_check_trust` | libcrypto | `openssl/x509_vfy.h` | `x509_trust` |
-| `X509_cmp` | libcrypto | `openssl/x509.h` | `cmp`, `cms_sign`, `crmf`, `ocsp`, `pkcs12`, `pkcs7_smime`, `x509_purpose`, `x509_store` |
+| `X509_cmp` | libcrypto | `openssl/x509.h` | `cmp`, `cms_sign`, `crmf`, `ocsp`, `pkcs12`, `pkcs7_smime`, `ssl_mldsa`, `x509_purpose`, `x509_store` |
 | `X509_cmp_current_time` | libcrypto | `openssl/x509.h` | `x509_cert` |
 | `X509_cmp_time` | libcrypto | `openssl/x509.h` | `x509_cert` |
 | `X509_cmp_timeframe` | libcrypto | `openssl/x509.h` | `x509_ctx` |
@@ -5877,7 +5877,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_CTX_compress_certs` | libssl | `openssl/ssl.h` | `ssl_apis` |
 | `SSL_CTX_config` | libssl | `openssl/ssl.h` | `ssl_conf` |
 | `SSL_CTX_ct_is_enabled` | libssl | `openssl/ssl.h` | `ssl_ct` |
-| `SSL_CTX_ctrl` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_check_chain`, `ssl_conf`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_dane`, `ssl_dtls`, `ssl_early`, `ssl_errors`, `ssl_handshake`, `ssl_handshake_reads`, `ssl_io`, `ssl_libctx`, `ssl_lists`, `ssl_misc`, `ssl_mldsa`, `ssl_padding`, `ssl_psk`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_sigalg_keys`, `ssl_sigalg_versions`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_ticket_key`, `ssl_tickets`, `ssl_tmp_dh` |
+| `SSL_CTX_ctrl` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_bio`, `ssl_check_chain`, `ssl_conf`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_dane`, `ssl_dtls`, `ssl_early`, `ssl_errors`, `ssl_handshake`, `ssl_handshake_reads`, `ssl_io`, `ssl_libctx`, `ssl_lists`, `ssl_misc`, `ssl_mldsa`, `ssl_padding`, `ssl_psk`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_sigalg_keys`, `ssl_sigalg_versions`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_ticket_key`, `ssl_tickets`, `ssl_tmp_dh` |
 | `SSL_CTX_dane_clear_flags` | libssl | `openssl/ssl.h` | `ssl_dane` |
 | `SSL_CTX_dane_enable` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_dane`, `ssl_rpk` |
 | `SSL_CTX_dane_mtype_set` | libssl | `openssl/ssl.h` | `ssl_dane` |
@@ -5953,7 +5953,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_CTX_set_cert_cb` | libssl | `openssl/ssl.h` | `ssl_check_chain`, `ssl_ctx`, `ssl_errors`, `ssl_handshake`, `ssl_mldsa`, `ssl_sigalg_versions` |
 | `SSL_CTX_set_cert_store` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_CTX_set_cert_verify_callback` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake_reads` |
-| `SSL_CTX_set_cipher_list` | libssl | `openssl/ssl.h` | `ssl_cipher`, `ssl_ctrl_more`, `ssl_dtls`, `ssl_errors`, `ssl_handshake_reads`, `ssl_psk`, `ssl_renegotiate`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_tmp_dh` |
+| `SSL_CTX_set_cipher_list` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_cipher`, `ssl_ctrl_more`, `ssl_dtls`, `ssl_errors`, `ssl_handshake_reads`, `ssl_psk`, `ssl_renegotiate`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_tmp_dh` |
 | `SSL_CTX_set_ciphersuites` | libssl | `openssl/ssl.h` | `ssl_cipher`, `ssl_errors`, `ssl_psk`, `ssl_strings` |
 | `SSL_CTX_set_client_CA_list` | libssl | `openssl/ssl.h` | `ssl_check_chain`, `ssl_ctx`, `ssl_strict` |
 | `SSL_CTX_set_client_cert_cb` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -5983,7 +5983,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_CTX_set_next_protos_advertised_cb` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_misc` |
 | `SSL_CTX_set_not_resumable_session_callback` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_CTX_set_num_tickets` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake` |
-| `SSL_CTX_set_options` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_errors`, `ssl_io`, `ssl_ktls`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_strings` |
+| `SSL_CTX_set_options` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_errors`, `ssl_io`, `ssl_ktls`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_strings` |
 | `SSL_CTX_set_post_handshake_auth` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_strings` |
 | `SSL_CTX_set_psk_client_callback` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_psk` |
 | `SSL_CTX_set_psk_find_session_callback` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_psk` |
@@ -6158,7 +6158,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get_all_async_fds` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_get_async_status` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_get_blocking_mode` | libssl | `openssl/ssl.h` | `ssl_misc` |
-| `SSL_get_certificate` | libssl | `openssl/ssl.h` | `ssl_ctx` |
+| `SSL_get_certificate` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_mldsa` |
 | `SSL_get_changed_async_fds` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_get_cipher_list` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_cipher` |
 | `SSL_get_ciphers` | libssl | `openssl/ssl.h` | `ssl_cipher` |
@@ -6196,7 +6196,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_get_psk_identity` | libssl | `openssl/ssl.h` | `ssl_sess_cache` |
 | `SSL_get_psk_identity_hint` | libssl | `openssl/ssl.h` | `ssl_sess_cache` |
 | `SSL_get_quiet_shutdown` | libssl | `openssl/ssl.h` | `ssl_ctx` |
-| `SSL_get_rbio` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_ktls` |
+| `SSL_get_rbio` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_ktls`, `ssl_requests` |
 | `SSL_get_read_ahead` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctx` |
 | `SSL_get_record_padding_callback_arg` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_get_recv_max_early_data` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6267,7 +6267,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_peek` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `SSL_peek_ex` | libssl | `openssl/ssl.h` | `ssl_io`, `ssl_io_idle` |
 | `SSL_pending` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_io`, `ssl_io_idle` |
-| `SSL_read` | libssl | `openssl/ssl.h` | `ssl_ctrl_more`, `ssl_dtls`, `ssl_eap`, `ssl_errors`, `ssl_handshake_reads`, `ssl_io`, `ssl_io_idle`, `ssl_ktls`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_stateless`, `ssl_strings`, `ssl_tickets` |
+| `SSL_read` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctrl_more`, `ssl_dtls`, `ssl_eap`, `ssl_errors`, `ssl_handshake_reads`, `ssl_io`, `ssl_io_idle`, `ssl_ktls`, `ssl_renegotiate`, `ssl_requests`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_stateless`, `ssl_strings`, `ssl_tickets` |
 | `SSL_read_early_data` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_psk` |
 | `SSL_read_ex` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_early`, `ssl_io`, `ssl_io_idle`, `ssl_padding`, `ssl_ticket_key`, `ssl_tickets` |
 | `SSL_renegotiate` | libssl | `openssl/ssl.h` | `ssl_errors`, `ssl_renegotiate`, `ssl_requests`, `ssl_strings` |
@@ -6318,7 +6318,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_set_incoming_stream_policy` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_set_info_callback` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctx`, `ssl_shutdown` |
 | `SSL_set_max_early_data` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_early` |
-| `SSL_set_msg_callback` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_padding`, `ssl_trace` |
+| `SSL_set_msg_callback` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_padding`, `ssl_trace` |
 | `SSL_set_not_resumable_session_callback` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_num_tickets` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_options` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctx`, `ssl_dtls`, `ssl_ktls`, `ssl_renegotiate`, `ssl_requests`, `ssl_shutdown`, `ssl_trace` |
@@ -6341,7 +6341,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_set_session_secret_cb` | libssl | `openssl/ssl.h` | `ssl_eap` |
 | `SSL_set_session_ticket_ext` | libssl | `openssl/ssl.h` | `ssl_eap` |
 | `SSL_set_session_ticket_ext_cb` | libssl | `openssl/ssl.h` | `ssl_eap` |
-| `SSL_set_shutdown` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_io_idle`, `ssl_ktls`, `ssl_shutdown`, `ssl_strings` |
+| `SSL_set_shutdown` | libssl | `openssl/ssl.h` | `ssl_bio`, `ssl_ctx`, `ssl_io_idle`, `ssl_ktls`, `ssl_shutdown`, `ssl_strings` |
 | `SSL_set_srp_server_param` | libssl | `openssl/ssl.h` | `ssl_srp` |
 | `SSL_set_srp_server_param_pw` | libssl | `openssl/ssl.h` | `ssl_srp` |
 | `SSL_set_ssl_method` | libssl | `openssl/ssl.h` | `ssl_ctx` |
@@ -6354,7 +6354,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_set_verify_depth` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctx` |
 | `SSL_set_verify_result` | libssl | `openssl/ssl.h` | `ssl_ctx` |
 | `SSL_set_wfd` | libssl | `openssl/ssl.h` | `ssl_ctx` |
-| `SSL_shutdown` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctrl_more`, `ssl_early`, `ssl_errors`, `ssl_handshake_reads`, `ssl_io_idle`, `ssl_ktls`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_ticket_key`, `ssl_tickets` |
+| `SSL_shutdown` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_bio`, `ssl_ctrl_more`, `ssl_early`, `ssl_errors`, `ssl_handshake_reads`, `ssl_io_idle`, `ssl_ktls`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_ticket_key`, `ssl_tickets` |
 | `SSL_shutdown_ex` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_srp_server_param_with_username` | libssl | `openssl/ssl.h` | `ssl_srp` |
 | `SSL_state_string` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_io_idle`, `ssl_stateless`, `ssl_strings` |
@@ -6380,7 +6380,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `SSL_version` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake`, `ssl_mldsa`, `ssl_strings` |
 | `SSL_waiting_for_async` | libssl | `openssl/ssl.h` | `ssl_misc` |
 | `SSL_want` | libssl | `openssl/ssl.h` | `ssl_ctx`, `ssl_handshake` |
-| `SSL_write` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_ctrl_more`, `ssl_dtls`, `ssl_eap`, `ssl_early`, `ssl_errors`, `ssl_io`, `ssl_io_idle`, `ssl_ktls`, `ssl_requests`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_stateless`, `ssl_strings`, `ssl_tickets` |
+| `SSL_write` | libssl | `openssl/ssl.h` | `ssl_apis`, `ssl_bio`, `ssl_ctrl_more`, `ssl_dtls`, `ssl_eap`, `ssl_early`, `ssl_errors`, `ssl_io`, `ssl_io_idle`, `ssl_ktls`, `ssl_requests`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_stateless`, `ssl_strings`, `ssl_tickets` |
 | `SSL_write_early_data` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_psk` |
 | `SSL_write_ex` | libssl | `openssl/ssl.h` | `ssl_early`, `ssl_io`, `ssl_io_idle`, `ssl_padding` |
 | `SSL_write_ex2` | libssl | `openssl/ssl.h` | `ssl_early` |

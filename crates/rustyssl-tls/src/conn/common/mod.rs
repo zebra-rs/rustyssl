@@ -295,7 +295,7 @@ fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
         } else {
             version::of(abi::TLS1_1_VERSION)
         };
-        if version::cmp(max, md5sha1_max).is_le() {
+        if version::cmp(c.cfg.dtls, max, md5sha1_max).is_le() {
             return Err(Error::alert(
                 abi::SSL_AD_HANDSHAKE_FAILURE,
                 abi::SSL_R_NO_SUITABLE_DIGEST_ALGORITHM,
@@ -306,16 +306,21 @@ fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
                          different providers",
             ));
         }
-        let tls12 = version::of(abi::TLS1_2_VERSION);
-        if version::cmp(min, tls12).is_lt() {
-            c.cfg.min_version = tls12;
+        // No TLS 1.1 or below (`negotiated_minversion`: DTLS 1.2 on a DTLS connection).
+        let v12 = if c.cfg.dtls {
+            version::of(abi::DTLS1_2_VERSION)
+        } else {
+            version::of(abi::TLS1_2_VERSION)
+        };
+        if version::cmp(c.cfg.dtls, min, v12).is_lt() {
+            c.cfg.min_version = v12;
         }
     }
     if c.cfg.server {
         let max_i = c_int::from(max);
         let ok = c.cfg.ciphers.iter().any(|cp| {
             let (minv, maxv) = ciphers::range(c, cp);
-            ciphers::vcmp(max_i, minv).is_ge() && ciphers::vcmp(max_i, maxv).is_le()
+            ciphers::vcmp(c, max_i, minv).is_ge() && ciphers::vcmp(c, max_i, maxv).is_le()
         });
         if !ok {
             return Err(Error::alert(

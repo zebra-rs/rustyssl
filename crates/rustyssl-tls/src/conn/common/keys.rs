@@ -576,6 +576,10 @@ fn change_cipher_state12_inner(c: &mut Connection, p: &dyn Provider, which: c_in
         new_read_layer(c);
     } else {
         c.rw.set_protection(Mode::Tls12(version), protection);
+        // The known-IV countermeasure, set as each write layer is made (`tls_new_record_layer`):
+        // an empty record before each record of data under an implicit-IV CBC cipher (SSL 3.0,
+        // TLS 1.0), unless `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS`.
+        c.rw.empty_fragments = c.cfg.options & abi::SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS == 0;
     }
     Ok(())
 }

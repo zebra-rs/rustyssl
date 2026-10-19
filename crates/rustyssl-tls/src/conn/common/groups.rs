@@ -217,7 +217,7 @@ pub fn valid(c: &Connection, id: u16, min: u16, max: u16, isec: bool) -> (bool, 
     if gmin < 0 || gmax < 0 {
         return (false, false);
     }
-    let vc = super::ciphers::vcmp;
+    let vc = |a, b| super::ciphers::vcmp(c, a, b);
     let mut ok = gmax == 0 || vc(i32::from(min), gmax).is_le();
     if gmin > 0 {
         ok &= vc(i32::from(max), gmin).is_ge();
@@ -302,7 +302,7 @@ pub fn shared_group(c: &Connection, nmatch: i32) -> u16 {
             continue;
         }
         let v = i32::from(c.neg.version);
-        let vc = super::ciphers::vcmp;
+        let vc = |a, b| super::ciphers::vcmp(c, a, b);
         if (gmin != 0 && vc(v, gmin).is_lt()) || (gmax != 0 && vc(v, gmax).is_gt()) {
             continue;
         }

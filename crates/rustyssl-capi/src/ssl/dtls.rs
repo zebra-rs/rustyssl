@@ -534,8 +534,12 @@ fn parse_hello(d: &[u8], x: &Ssl) -> Result<(u16, Hello, Vec<u8>), c_int> {
     let clientvers = payload.u16().map_err(|_| mm)?;
     let method = x.state().method.version;
     if method != rustyssl_abi::DTLS_ANY_VERSION
-        && rustyssl_tls::conn::common::version::cmp(clientvers, u16::try_from(method).unwrap_or(0))
-            .is_lt()
+        && rustyssl_tls::conn::common::version::cmp(
+            true,
+            clientvers,
+            u16::try_from(method).unwrap_or(0),
+        )
+        .is_lt()
     {
         return Err(SSL_R_WRONG_VERSION_NUMBER);
     }
