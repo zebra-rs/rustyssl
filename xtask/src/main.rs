@@ -21,6 +21,7 @@ mod test_c;
 mod test_differential;
 mod test_interop;
 mod test_openssl_suite;
+mod test_providers;
 mod test_timing;
 mod test_tlsfuzzer;
 mod test_wycheproof;
@@ -47,6 +48,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("test-differential", "compare results against the reference OpenSSL"),
     ("test-openssl-suite", "run the upstream OpenSSL test suite against our libraries"),
     ("test-tlsfuzzer", "tlsfuzzer's scripts against the reference's s_server on both libraries"),
+    ("test-providers", "third-party providers (oqs-provider) and their suites on both libraries"),
     ("test-wycheproof", "run Wycheproof's test vectors on the reference and rustyssl"),
     ("test-timing", "dudect's constant-time checks (and Marvin's RSA split) on both libraries"),
     ("test-consumers", "run consumer test suites (curl, nginx, openssh, ...) on our libraries"),
@@ -75,6 +77,7 @@ fn main() -> ExitCode {
         Some("test-differential") => report("test-differential", test_differential::run(&rest)),
         Some("test-openssl-suite") => report("test-openssl-suite", test_openssl_suite::run(&rest)),
         Some("test-tlsfuzzer") => report("test-tlsfuzzer", test_tlsfuzzer::run(&rest)),
+        Some("test-providers") => report("test-providers", test_providers::run(&rest)),
         Some("test-wycheproof") => report("test-wycheproof", test_wycheproof::run(&rest)),
         Some("test-timing") => report("test-timing", test_timing::run(&rest)),
         Some("usage-scan") => report("usage-scan", usage_scan::run(&rest)),
