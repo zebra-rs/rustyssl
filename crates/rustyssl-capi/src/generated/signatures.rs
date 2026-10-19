@@ -2670,6 +2670,19 @@ const _: unsafe extern "C" fn(
     usize,
 ) -> core::ffi::c_int = crate::cms::env::CMS_RecipientInfo_kekri_id_cmp;
 const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut X509) -> core::ffi::c_int =
+    crate::cms::kemri::CMS_RecipientInfo_kemri_cert_cmp;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> *mut EVP_CIPHER_CTX =
+    crate::cms::kemri::CMS_RecipientInfo_kemri_get0_ctx;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo) -> *mut X509_ALGOR =
+    crate::cms::kemri::CMS_RecipientInfo_kemri_get0_kdf_alg;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut EVP_PKEY) -> core::ffi::c_int =
+    crate::cms::kemri::CMS_RecipientInfo_kemri_set0_pkey;
+const _: unsafe extern "C" fn(
+    *mut CMS_RecipientInfo,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::cms::kemri::CMS_RecipientInfo_kemri_set_ukm;
+const _: unsafe extern "C" fn(*mut CMS_RecipientInfo, *mut X509) -> core::ffi::c_int =
     crate::cms::env::CMS_RecipientInfo_ktri_cert_cmp;
 const _: unsafe extern "C" fn(
     *mut CMS_RecipientInfo,

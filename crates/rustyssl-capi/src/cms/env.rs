@@ -357,6 +357,9 @@ ffi_export! {
         if let Some(k) = member::<KeyTransRecipientInfo>(r, CMS_RECIPINFO_TRANS) {
             return k.pctx;
         }
+        if let Some(k) = super::kemri::kemri_of(r, "", false) {
+            return k.pctx;
+        }
         member::<KeyAgreeRecipientInfo>(r, CMS_RECIPINFO_AGREE).map_or(ptr::null_mut(), |k| k.pctx)
     }
 }
@@ -527,6 +530,7 @@ unsafe fn ktri_init(
         return false;
     }
     ri.d = kp.cast();
+    ri.encoded_type = CMS_RECIPINFO_TRANS;
     ri.type_ = CMS_RECIPINFO_TRANS;
     let rip: *mut RecipientInfo = ri;
     // SAFETY: the new choice.
@@ -615,6 +619,8 @@ ffi_export! {
                 CMS_RECIPINFO_AGREE => unsafe {
                     super::kari::kari_init(ri, recip, pk, originator, originator_priv_key, flags, ctx)
                 },
+                // SAFETY: as above.
+                rustyssl_abi::CMS_RECIPINFO_KEM => unsafe { super::kemri::kemri_init(ri, recip, pk, flags, ctx) },
                 _ => {
                     raise(CMS_R_NOT_SUPPORTED_FOR_THIS_KEY_TYPE, F);
                     false
@@ -1021,6 +1027,7 @@ ffi_export! {
                 break 'err None;
             }
             ri.d = kp.cast();
+            ri.encoded_type = CMS_RECIPINFO_KEK;
             ri.type_ = CMS_RECIPINFO_KEK;
             // SAFETY: the new choice.
             let k = unsafe { &mut *kp };
@@ -1326,6 +1333,8 @@ ffi_export! {
             },
             // SAFETY: as above.
             CMS_RECIPINFO_PASS => unsafe { super::pwri::pwri_crypt(cms, r, false) },
+            // SAFETY: as above.
+            rustyssl_abi::CMS_RECIPINFO_KEM => unsafe { super::kemri::kemri_decrypt(cms, r) },
             _ => {
                 raise(CMS_R_UNSUPPORTED_RECIPIENTINFO_TYPE, "CMS_RecipientInfo_decrypt");
                 false
@@ -1358,6 +1367,8 @@ ffi_export! {
             },
             // SAFETY: as above.
             CMS_RECIPINFO_PASS => unsafe { super::pwri::pwri_crypt(cms, r, true) },
+            // SAFETY: as above.
+            rustyssl_abi::CMS_RECIPINFO_KEM => unsafe { super::kemri::kemri_encrypt(cms, r) },
             _ => {
                 raise(CMS_R_UNSUPPORTED_RECIPIENT_TYPE, "CMS_RecipientInfo_encrypt");
                 false
@@ -1417,7 +1428,10 @@ fn env_set_version(env: &mut EnvelopedData) {
         let Some(ri) = (unsafe { sk_get::<RecipientInfo>(ris, i) }) else {
             continue;
         };
-        if ri.type_ == CMS_RECIPINFO_PASS || ri.type_ == CMS_RECIPINFO_OTHER {
+        if ri.type_ == CMS_RECIPINFO_PASS
+            || ri.type_ == CMS_RECIPINFO_OTHER
+            || ri.type_ == rustyssl_abi::CMS_RECIPINFO_KEM
+        {
             env.version = 3;
             return;
         }
@@ -1742,9 +1756,18 @@ pub(crate) unsafe fn auth_enveloped_final(cms: *mut CMS_ContentInfo, cmsbio: *mu
     c_int::from(unsafe { ASN1_OCTET_STRING_set(aenv.mac, t.as_ptr(), taglen) } != 0)
 }
 
-/// `ossl_cms_pkey_get_ri_type`: the recipient type a key supports (key transport unless it
-/// says otherwise).
+/// `ossl_cms_pkey_get_ri_type` (3.6): the recipient type a provided key reports (`ri-type`),
+/// else the known types', else its method's, else what the key can do (encrypt: key
+/// transport; derive: key agreement; encapsulate: KEM), key transport by default.
 pub(crate) fn pkey_get_ri_type(pk: *mut EVP_PKEY) -> c_int {
+    let mut ri_type: c_int = 0;
+    // SAFETY: a live key.
+    if unsafe { crate::evp::pkey::pkey(pk) }.is_some_and(crate::evp::pkey::Pkey::is_provided)
+        // SAFETY: as above; a static name; room for the type.
+        && unsafe { crate::evp::pkey::params::EVP_PKEY_get_int_param(pk, c"ri-type".as_ptr(), &raw mut ri_type) } != 0
+    {
+        return ri_type;
+    }
     let is = |name: &core::ffi::CStr| {
         // SAFETY: a live key; a static name.
         (unsafe { EVP_PKEY_is_a(pk, name.as_ptr()) }) != 0
@@ -1760,10 +1783,34 @@ pub(crate) fn pkey_get_ri_type(pk: *mut EVP_PKEY) -> c_int {
     }
     let mut r: c_int = 0;
     // SAFETY: the key; room for the type.
-    match unsafe { asn1_ctrl_of(pk, ASN1_PKEY_CTRL_CMS_RI_TYPE, 0, (&raw mut r).cast()) } {
-        Some(i) if i > 0 => r,
-        _ => CMS_RECIPINFO_TRANS,
+    if let Some(i) = unsafe { asn1_ctrl_of(pk, ASN1_PKEY_CTRL_CMS_RI_TYPE, 0, (&raw mut r).cast()) }
+        && i > 0
+    {
+        return r;
     }
+    // 3.6 tries what the key can do.
+    let mut ri_type = CMS_RECIPINFO_TRANS;
+    // SAFETY: the key; no engine.
+    let ctx = unsafe { crate::evp::pkey_ctx::EVP_PKEY_CTX_new(pk, ptr::null_mut()) };
+    if !ctx.is_null() {
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_set_mark() };
+        // SAFETY: the context, for each.
+        if unsafe { crate::evp::asymcipher::EVP_PKEY_encrypt_init(ctx) } > 0 {
+            ri_type = CMS_RECIPINFO_TRANS;
+        // SAFETY: as above.
+        } else if unsafe { crate::evp::exchange::EVP_PKEY_derive_init(ctx) } > 0 {
+            ri_type = CMS_RECIPINFO_AGREE;
+        // SAFETY: as above.
+        } else if unsafe { crate::evp::kem::EVP_PKEY_encapsulate_init(ctx, ptr::null()) } > 0 {
+            ri_type = rustyssl_abi::CMS_RECIPINFO_KEM;
+        }
+        // SAFETY: the mark set above.
+        unsafe { crate::err::ERR_pop_to_mark() };
+    }
+    // SAFETY: made here, or NULL.
+    unsafe { crate::evp::pkey_ctx::EVP_PKEY_CTX_free(ctx) };
+    ri_type
 }
 
 /// `ossl_cms_pkey_is_ri_type_supported`.

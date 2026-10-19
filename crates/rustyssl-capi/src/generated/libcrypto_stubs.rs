@@ -5,43 +5,4 @@
 // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.
 #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
 
-use rustyssl_abi::*;
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_RecipientInfo_kemri_cert_cmp(
-    _: *mut CMS_RecipientInfo,
-    _: *mut X509,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_RecipientInfo_kemri_cert_cmp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_RecipientInfo_kemri_get0_ctx(
-    _: *mut CMS_RecipientInfo,
-) -> *mut EVP_CIPHER_CTX {
-    crate::stub::unimplemented("CMS_RecipientInfo_kemri_get0_ctx")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_RecipientInfo_kemri_get0_kdf_alg(
-    _: *mut CMS_RecipientInfo,
-) -> *mut X509_ALGOR {
-    crate::stub::unimplemented("CMS_RecipientInfo_kemri_get0_kdf_alg")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_RecipientInfo_kemri_set0_pkey(
-    _: *mut CMS_RecipientInfo,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_RecipientInfo_kemri_set0_pkey")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CMS_RecipientInfo_kemri_set_ukm(
-    _: *mut CMS_RecipientInfo,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("CMS_RecipientInfo_kemri_set_ukm")
-}
+// Every export is implemented: there are no stubs.

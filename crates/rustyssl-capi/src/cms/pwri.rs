@@ -193,6 +193,7 @@ ffi_export! {
                 break 'err false;
             }
             ri.d = pp.cast();
+            ri.encoded_type = CMS_RECIPINFO_PASS;
             ri.type_ = CMS_RECIPINFO_PASS;
             // SAFETY: the new choice.
             let p = unsafe { &mut *pp };

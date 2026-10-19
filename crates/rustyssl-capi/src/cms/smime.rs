@@ -1135,6 +1135,20 @@ ffi_export! {
                 if r < 0 {
                     return 0;
                 }
+            } else if ri_type == rustyssl_abi::CMS_RECIPINFO_KEM {
+                // 3.6: a KEM recipient (the one the certificate names, or each).
+                // SAFETY: as above.
+                if cert.is_null() || unsafe { super::kemri::CMS_RecipientInfo_kemri_cert_cmp(ri, cert) } == 0 {
+                    // SAFETY: the recipient info; the caller's key.
+                    unsafe { super::kemri::CMS_RecipientInfo_kemri_set0_pkey(ri, pk) };
+                    // SAFETY: the object; its recipient info.
+                    let r = unsafe { CMS_RecipientInfo_decrypt(cms, ri) };
+                    // SAFETY: as above.
+                    unsafe { super::kemri::CMS_RecipientInfo_kemri_set0_pkey(ri, ptr::null_mut()) };
+                    if !cert.is_null() || r > 0 {
+                        return r;
+                    }
+                }
             // With a certificate, the recipient it names; else each.
             // SAFETY: as above.
             } else if cert.is_null() || unsafe { CMS_RecipientInfo_ktri_cert_cmp(ri, cert) } == 0 {
