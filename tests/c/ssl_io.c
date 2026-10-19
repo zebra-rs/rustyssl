@@ -483,6 +483,38 @@ static void test_record_writes(int max)
     done(cctx, sctx, c, s);
 }
 
+/*
+ * SSL_set_split_send_fragment: a write goes out in records of that size, with max_pipelines
+ * set or not (no cipher here pipelines, so one record at a time), and each read gets one.
+ */
+static void test_split_writes(int max, int pipes)
+{
+    SSL_CTX *cctx, *sctx;
+    SSL *c, *s;
+    unsigned char buf[350], in[400];
+    size_t got = 0;
+    int n;
+
+    printf("# split_send_fragment 100, %s%s\n", max == TLS1_3_VERSION ? "TLS 1.3" : "TLS 1.2",
+           pipes ? ", 4 pipelines" : "");
+    connected(max, 0, &cctx, &sctx, &c, &s);
+    memset(buf, 's', sizeof(buf));
+    check(SSL_set_split_send_fragment(c, 100) == 1, "SSL_set_split_send_fragment");
+    if (pipes)
+        check(SSL_set_max_pipelines(c, 4) == 1 && SSL_set_max_pipelines(s, 4) == 1,
+              "SSL_set_max_pipelines");
+    bio_writes = 0;
+    BIO_set_callback_ex(SSL_get_wbio(c), count_writes);
+    check(SSL_write(c, buf, sizeof(buf)) == (int)sizeof(buf), "the write");
+    BIO_set_callback_ex(SSL_get_wbio(c), NULL);
+    while ((n = SSL_read(s, in + got, (int)(sizeof(in) - got))) > 0) {
+        printf("  read %d\n", n);
+        got += (size_t)n;
+    }
+    check(got == sizeof(buf), "all of it read");
+    done(cctx, sctx, c, s);
+}
+
 int main(void)
 {
     /* A write to the closed socket must fail, not kill the test. */
@@ -493,6 +525,9 @@ int main(void)
     test_big_writes();
     test_record_writes(TLS1_3_VERSION);
     test_record_writes(TLS1_2_VERSION);
+    test_split_writes(TLS1_3_VERSION, 0);
+    test_split_writes(TLS1_2_VERSION, 0);
+    test_split_writes(TLS1_2_VERSION, 1);
     test_socketpair(0);
     test_socketpair(SSL_OP_IGNORE_UNEXPECTED_EOF);
     printf("1..%d\n", number);

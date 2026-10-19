@@ -215,6 +215,19 @@ impl core::fmt::Debug for Protection {
 }
 
 impl Protection {
+    /// Whether records can be pipelined under this protection: an explicit IV per record
+    /// (`RLAYER_USE_EXPLICIT_IV`) and a pipeline-capable cipher.
+    fn pipelines(&self) -> bool {
+        match self {
+            Self::Cbc12 {
+                cipher: Some(c),
+                explicit_iv: true,
+                ..
+            } => c.pipeline(),
+            _ => false,
+        }
+    }
+
     /// TLS 1.3 protection with `alg` and a traffic secret's key and IV.
     ///
     /// # Errors
@@ -401,6 +414,23 @@ pub struct RecordReader {
 }
 
 impl RecordReader {
+    /// Whether several records may be read and decrypted together (TLS only).
+    #[must_use]
+    pub fn pipelines(&self) -> bool {
+        self.dtls.is_none() && self.protection.pipelines()
+    }
+
+    /// `tls_record_app_data_waiting`: whether `buf` holds a whole application-data record.
+    #[must_use]
+    pub fn app_data_waiting(buf: &[u8]) -> bool {
+        let Some(head) = buf.get(..HEADER_LEN) else {
+            return false;
+        };
+        let b = |i: usize| head.get(i).copied().unwrap_or(0);
+        let len = (usize::from(b(3)) << 8) | usize::from(b(4));
+        b(0) == octet(abi::SSL3_RT_APPLICATION_DATA) && buf.len() >= HEADER_LEN.saturating_add(len)
+    }
+
     /// A reader for a client or server, before any protection.
     #[must_use]
     pub fn new(server: bool) -> Self {
@@ -1148,6 +1178,12 @@ pub struct RecordWriter {
 }
 
 impl RecordWriter {
+    /// Whether a write may be split over pipelines (TLS only).
+    #[must_use]
+    pub fn pipelines(&self) -> bool {
+        self.dtls.is_none() && self.protection.pipelines()
+    }
+
     /// A writer before any protection, writing `version` in the headers.
     #[must_use]
     pub fn new(version: u16) -> Self {

@@ -1275,6 +1275,20 @@ impl Connection {
         }
         if ty == app_data() {
             self.app_in.extend(rec.data.iter());
+            // With a pipelining cipher, the records already in that follow it are read with it
+            // (`tls_get_more_records`), and one read returns them all (`ssl3_read_bytes`).
+            let mut taken = 1;
+            while taken < self.cfg.max_pipelines
+                && !self.cfg.dtls
+                && self.rr.pipelines()
+                && record::RecordReader::app_data_waiting(&self.input)
+            {
+                let Some(next) = self.fetch_record(p)? else {
+                    break;
+                };
+                self.app_in.extend(next.data.iter());
+                taken = taken.saturating_add(1);
+            }
             return Ok(if self.app_in.is_empty() {
                 None
             } else {
@@ -1353,8 +1367,73 @@ impl Connection {
                 return Ok(0);
             }
         }
-        self.write_record(p, app_data(), data)?;
+        if self.cfg.dtls || data.is_empty() {
+            self.write_record(p, app_data(), data)?;
+            return Ok(data.len());
+        }
+        for piece in self.split_for_pipelines(data.len()) {
+            let (start, len) = piece;
+            let end = start.saturating_add(len);
+            let chunk = data.get(start..end).ok_or_else(Error::internal)?;
+            self.write_record(p, app_data(), chunk)?;
+        }
         Ok(data.len())
+    }
+
+    /// `ssl3_write_bytes`'s apportioning of `n` octets into records: records of
+    /// `split_send_fragment` (at most the fragment the writer allows), and with a pipelining
+    /// cipher, as many records at once as `max_pipelines` allows and the data needs
+    /// (`tls_get_max_records_default`), the data spread evenly over them when it doesn't fill
+    /// them. `(offset, length)` of each record, in order.
+    fn split_for_pipelines(&self, n: usize) -> Vec<(usize, usize)> {
+        let max_send = self.rw.max_frag_len.clamp(1, record::MAX_PLAIN);
+        let split = if self.cfg.split_send_fragment == 0 {
+            max_send
+        } else {
+            self.cfg.split_send_fragment.min(max_send)
+        };
+        let max_pipelines = self
+            .cfg
+            .max_pipelines
+            .min(usize::try_from(abi::SSL_MAX_PIPELINES).unwrap_or(1));
+        let mut pieces = Vec::new();
+        let (mut tot, mut n) = (0usize, n);
+        while n > 0 {
+            let wanted = n
+                .saturating_sub(1)
+                .checked_div(split)
+                .unwrap_or(0)
+                .saturating_add(1);
+            let maxpipes = if max_pipelines > 0 && self.rw.pipelines() {
+                wanted.min(max_pipelines)
+            } else {
+                1
+            }
+            .max(1);
+            let per = n.checked_div(maxpipes).unwrap_or(n);
+            let sent = if per >= split {
+                for j in 0..maxpipes {
+                    pieces.push((tot.saturating_add(j.saturating_mul(split)), split));
+                }
+                maxpipes.saturating_mul(split)
+            } else {
+                // The first `remain` records take an extra octet.
+                let remain = n.checked_rem(maxpipes).unwrap_or(0);
+                let mut len = per.saturating_add(usize::from(remain > 0));
+                let mut sofar = 0usize;
+                for j in 0..maxpipes {
+                    pieces.push((tot.saturating_add(sofar), len));
+                    sofar = sofar.saturating_add(len);
+                    if j.saturating_add(1) == remain {
+                        len = len.saturating_sub(1);
+                    }
+                }
+                n
+            };
+            n = n.saturating_sub(sent);
+            tot = tot.saturating_add(sent);
+        }
+        pieces
     }
 
     /// Sets or clears `TLS1_FLAGS_STATELESS` (`SSL_stateless`): a TLS 1.3 server that keeps no

@@ -879,6 +879,7 @@ pub(crate) unsafe fn build(s: *mut SSL, x: &Ssl, snap: &CtxSnapshot, prov: &EvpP
         max_fragment_len_mode: st.max_fragment_len_mode,
         max_send_fragment: st.max_send_fragment,
         split_send_fragment: st.split_send_fragment,
+        max_pipelines: st.max_pipelines,
         block_padding: (st.block_padding, st.hs_padding),
         max_cert_list: st.max_cert_list,
         verify_depth,
