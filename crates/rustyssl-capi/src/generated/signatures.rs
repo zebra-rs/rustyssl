@@ -4534,6 +4534,44 @@ const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
     crate::evp::pkey::dsa::DSAparams_print;
 const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
     crate::evp::pkey::dsa::DSAparams_print_fp;
+const _: unsafe extern "C" fn() -> *mut DSO_METHOD = crate::dso::DSO_METHOD_openssl;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> DSO_FUNC_TYPE =
+    crate::dso::DSO_bind_func;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> *mut core::ffi::c_char =
+    crate::dso::DSO_convert_filename;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_long = crate::dso::DSO_ctrl;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, core::ffi::c_int) -> *mut DSO =
+    crate::dso::DSO_dsobyaddr;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_flags;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_free;
+const _: unsafe extern "C" fn(*mut DSO) -> *const core::ffi::c_char = crate::dso::DSO_get_filename;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut core::ffi::c_void =
+    crate::dso::DSO_global_lookup;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    *const core::ffi::c_char,
+    *mut DSO_METHOD,
+    core::ffi::c_int,
+) -> *mut DSO = crate::dso::DSO_load;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::dso::DSO_merge;
+const _: unsafe extern "C" fn() -> *mut DSO = crate::dso::DSO_new;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::dso::DSO_pathbyaddr;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::dso::DSO_set_filename;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_up_ref;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     usize,

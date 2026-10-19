@@ -41,6 +41,7 @@ mod dsa_backend;
 mod dsa_meth;
 mod dsa_ops;
 mod dsa_pmeth;
+mod dso;
 mod ec;
 mod ec_pmeth;
 mod ecx;
