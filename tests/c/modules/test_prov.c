@@ -353,7 +353,7 @@ static void run_bio(struct provctx *ctx, char *out, size_t len, const char *path
     BIO *b;
     char buf[64];
     size_t n = 0;
-    int r;
+    int r, up, f1, f2;
 
     m = c_bio_new_membuf(text, (int)strlen(text));
     say(out, len, "membuf %s", m != NULL ? "made" : "missing");
@@ -362,8 +362,11 @@ static void run_bio(struct provctx *ctx, char *out, size_t len, const char *path
         say(out, len, ", gets %d \"%.*s\"", r, r > 0 ? r - 1 : 0, buf);
         r = c_bio_read_ex(m, buf, 6, &n);
         say(out, len, ", read_ex %d %zu \"%.*s\"", r, n, (int)n, buf);
-        say(out, len, ", up_ref %d free %d free %d\n", c_bio_up_ref(m), c_bio_free(m),
-            c_bio_free(m));
+        /* One call per statement: argument order is unspecified, and the last free ends m. */
+        up = c_bio_up_ref(m);
+        f1 = c_bio_free(m);
+        f2 = c_bio_free(m);
+        say(out, len, ", up_ref %d free %d free %d\n", up, f1, f2);
     }
     f = c_bio_new_file(path, "w");
     say(out, len, "file %s", f != NULL ? "made" : "missing");
@@ -463,13 +466,18 @@ static void run_objects(char *out, size_t len)
 
 static void run_provider(struct provctx *ctx, char *out, size_t len)
 {
-    /* up_ref returns the count, which counts the library's own references: only its sign. */
+    int up, fr;
+
+    /* up_ref returns the count, which counts the library's own references: only its sign. One
+       call per statement, as argument order is unspecified and each free undoes an up_ref. */
+    up = c_prov_up_ref(core_handle, 0);
+    fr = c_prov_free(core_handle, 0);
     say(out, len, "name %s, own context %d, own dispatch %d, up_ref %s, free %d",
         c_prov_name(core_handle), c_prov_get0_provider_ctx(core_handle) == ctx,
-        c_prov_get0_dispatch(core_handle) == own_dispatch,
-        c_prov_up_ref(core_handle, 0) > 1 ? "counts" : "fails", c_prov_free(core_handle, 0));
-    say(out, len, ", activating up_ref %d, deactivating free %d\n", c_prov_up_ref(core_handle, 1),
-        c_prov_free(core_handle, 1));
+        c_prov_get0_dispatch(core_handle) == own_dispatch, up > 1 ? "counts" : "fails", fr);
+    up = c_prov_up_ref(core_handle, 1);
+    fr = c_prov_free(core_handle, 1);
+    say(out, len, ", activating up_ref %d, deactivating free %d\n", up, fr);
 }
 
 static void run_callbacks(char *out, size_t len)
