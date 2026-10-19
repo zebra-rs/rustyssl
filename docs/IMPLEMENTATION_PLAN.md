@@ -5294,7 +5294,7 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
 
 ## Phase 8: libssl breadth → M5
 
-- [ ] **8.1 DTLS 1.0/1.2:**
+- [x] **8.1 DTLS 1.0/1.2:**
   - epochs and the replay window
   - bounded fragment reassembly
   - retransmission timers (`DTLSv1_get_timeout`/`handle_timeout`, the timer callback)
@@ -5315,8 +5315,20 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     bad_dtls_test 1/1, dtls_mtu_test 1/2 (the other reads libssl's internals), every DTLS
     `ssl-tests/*.cnf` iteration, and sslapitest's DTLS iterations. Tests:
     `tests/c/ssl_dtls.c`, core loopbacks with lost datagrams, six DTLS interop cases over UDP
-    in all four pairings, the fuzz target `dtls`. Left: GnuTLS interop and injected loss and
-    reordering outside the test BIOs.
+    in all four pairings, the fuzz target `dtls`.
+  - Done: interop with the reference and GnuTLS under loss, duplication and reordering
+    (TEST_PLAN L7, DTLS). `test-interop`'s seeded fault relay (`+faults`, `--seed`) runs the
+    eight DTLS fault cases in all four pairings; `--peer gnutls` runs 17 cases against
+    `gnutls-cli`/`gnutls-serv` on both libraries, DTLS 1.2 with the relay among them; the core
+    runs 600 seeded faulty handshakes. Fixes it found:
+    - A flight read and the next one written in one step now restart the retransmission
+      timer from its first duration (`Timer::Restart`). The core had reported only the start,
+      so the next flight kept the previous one's doubled timeout.
+    - A read that stops because the timer fired retransmits during a handshake
+      (`dtls1_read_failed`).
+    - `DTLSv1_handle_timeout`'s retransmissions reach the message and info callbacks.
+    - `SSL_handle_events` and `SSL_get_event_timeout` drive the DTLS timer, as `ssl_lib.c`
+      does. Tests: `tests/c/ssl_dtls.c` and `dtls_next_flight_restarts_the_timer`.
 - [x] **8.2 TLS 1.0/1.1** behave exactly as the 3.x default does: the protocol code is
   present, but the default security level makes it effectively unusable unless
   `@SECLEVEL=0`. SSLv3 is compiled out, as in the default build.
@@ -5359,6 +5371,11 @@ missing protocol_version alert; a server's point formats without uncompressed (a
 decoder's entries for a certificate or CA name that doesn't decode; and the handshake's
 chosen certificate becoming the current one (`SSL_get_certificate`). The failures that
 appeared only under load were the runner's, on both libraries, not races.
+
+**Exit status: DTLS interop (2026-10-18):** met. The eight DTLS `+faults` interop cases pass
+in all four library pairings under seeds 1 to 6 (drops, duplicates and reordering from the
+seeded relay), and the 17 `--peer gnutls` cases, DTLS 1.2 with the relay among them, pass on
+both libraries (step 8.1).
 
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 

@@ -205,7 +205,8 @@ Tools each command needs:
 - **`usage-scan`:** `curl`, `xz`, and `zstd`, plus about 5 GB of downloads for a full scan
   (only the per-package results are kept, under `target/`).
 - **`dist`, `test-c`, `test-apps`, `test-interop`, `test-differential`, and `test-timing`:** a C compiler (`$CC`), `ar`, and `nm`; on
-  Alpine also `llvm-libunwind-dev`.
+  Alpine also `llvm-libunwind-dev`. `test-interop --peer gnutls` also needs GnuTLS's
+  `gnutls-cli` and `gnutls-serv` (it skips with a message without them).
 - **`test-openssl-suite`:** what `dist` and `ref-openssl` need (it builds upstream's test
   programs from the reference's source).
 - **`test-tlsfuzzer`:** what `dist` and `ref-openssl` need, plus `curl`, `tar`, and
@@ -256,6 +257,8 @@ cargo xtask usage-scan [--jobs N] [--limit N]  # rank exports by how many distro
 cargo xtask test-c                           # tests/c/*.c, each run on the reference and on target/dist; output must match
 cargo xtask test-apps                        # the reference's openssl tool (tests/apps/commands.txt) on both libraries; output must match
 cargo xtask test-interop [case...]           # the reference's s_server/s_client in four library pairings (tests/interop/cases.txt)
+cargo xtask test-interop --seed S [case...]  # the DTLS +faults cases' drop/duplicate/reorder schedule from seed S (default 1)
+cargo xtask test-interop --peer gnutls [case...]  # s_server/s_client on each library against gnutls-cli/gnutls-serv (tests/interop/gnutls.txt)
 cargo xtask test-differential [--random N] [--seed S]  # probe corpus + N random sessions, reference vs ours
 cargo xtask test-differential --only evp --duration 24h  # a campaign: rounds of random EVP sessions on every core
 cargo xtask test-openssl-suite [file|program...]  # upstream evp_test (tests/openssl-suite/evp_test.txt), bntest, ectest, rsa_test, both libraries
