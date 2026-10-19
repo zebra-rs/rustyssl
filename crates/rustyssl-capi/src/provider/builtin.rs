@@ -22,7 +22,7 @@ use rustyssl_abi::{
     OSSL_PROV_PARAM_VERSION, OSSL_PROVIDER, OSSL_provider_init_fn,
 };
 
-use crate::ffi::ffi_callback;
+use crate::ffi::{ffi_callback, ffi_export};
 use crate::handle::Handle;
 use crate::params::{OSSL_PARAM_locate, OSSL_PARAM_set_int, OSSL_PARAM_set_utf8_ptr};
 use crate::version::OpenSSL_version;
@@ -199,6 +199,40 @@ ffi_callback! {
 }
 
 ffi_callback! {
+    /// `legacy_get_params`.
+    ///
+    /// # Safety
+    /// As for `default_get_params`.
+    pub(crate) unsafe extern "C" fn legacy_get_params(_provctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { get_params(c"OpenSSL Legacy Provider", params) }
+    }
+}
+
+ffi_callback! {
+    /// `legacy_query`: the legacy provider's digests, ciphers, and KDFs, cacheable.
+    ///
+    /// # Safety
+    /// `no_cache` is NULL or valid for a write.
+    pub(crate) unsafe extern "C" fn legacy_query(_provctx: *mut c_void, operation_id: c_int, no_cache: *mut c_int) -> *const OSSL_ALGORITHM
+    where failure = ptr::null(), library = ERR_LIB_CRYPTO
+    {
+        if !no_cache.is_null() {
+            // SAFETY: the caller's guarantee.
+            unsafe { no_cache.write(0) };
+        }
+        match operation_id {
+            OSSL_OP_DIGEST => super::digests::LEGACY_DIGESTS.0.as_ptr(),
+            OSSL_OP_CIPHER => super::ciphers::LEGACY_CIPHERS.0.as_ptr(),
+            OSSL_OP_KDF => super::kdfs::LEGACY_KDFS.0.as_ptr(),
+            _ => ptr::null(),
+        }
+    }
+}
+
+ffi_callback! {
     /// `null_get_params`.
     ///
     /// # Safety
@@ -360,6 +394,22 @@ static BASE_DISPATCH: [OSSL_DISPATCH; 5] = [
     END,
 ];
 
+static LEGACY_DISPATCH: [OSSL_DISPATCH; 5] = [
+    entry!(OSSL_FUNC_PROVIDER_TEARDOWN, teardown, TeardownFn),
+    entry!(
+        OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
+        gettable_params,
+        Gettable_
+    ),
+    entry!(
+        OSSL_FUNC_PROVIDER_GET_PARAMS,
+        legacy_get_params,
+        GetParamsFn
+    ),
+    entry!(OSSL_FUNC_PROVIDER_QUERY_OPERATION, legacy_query, QueryFn),
+    END,
+];
+
 static NULL_DISPATCH: [OSSL_DISPATCH; 4] = [
     entry!(
         OSSL_FUNC_PROVIDER_GETTABLE_PARAMS,
@@ -442,6 +492,21 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { init_with(handle, in_, out, provctx, &BASE_DISPATCH) }
+    }
+}
+
+ffi_export! {
+    /// The legacy provider's init function (`ossl_legacy_provider_init`), which the `legacy`
+    /// module's `OSSL_provider_init` forwards to: libcrypto exports it in its private version
+    /// node, for the module only (docs/adr/0003-external-providers.md).
+    ///
+    /// # Safety
+    /// As for `default_init`.
+    pub unsafe extern "C" fn rustyssl_private_legacy_provider_init(handle: *const OSSL_CORE_HANDLE, in_: *const OSSL_DISPATCH, out: *mut *const OSSL_DISPATCH, provctx: *mut *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { init_with(handle, in_, out, provctx, &LEGACY_DISPATCH) }
     }
 }
 

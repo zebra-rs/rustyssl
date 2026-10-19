@@ -13,12 +13,12 @@ use core::ptr;
 
 use rustyssl_abi::{
     ERR_LIB_PROV, OSSL_ALGORITHM, OSSL_DIGEST_PARAM_ALGID_ABSENT, OSSL_DIGEST_PARAM_BLOCK_SIZE,
-    OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS, OSSL_DIGEST_PARAM_XOF,
-    OSSL_DIGEST_PARAM_XOFLEN, OSSL_FUNC_DIGEST_COPYCTX, OSSL_FUNC_DIGEST_DUPCTX,
-    OSSL_FUNC_DIGEST_FINAL, OSSL_FUNC_DIGEST_FREECTX, OSSL_FUNC_DIGEST_GET_CTX_PARAMS,
-    OSSL_FUNC_DIGEST_GET_PARAMS, OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS,
-    OSSL_FUNC_DIGEST_GETTABLE_PARAMS, OSSL_FUNC_DIGEST_INIT, OSSL_FUNC_DIGEST_NEWCTX,
-    OSSL_FUNC_DIGEST_SET_CTX_PARAMS, OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,
+    OSSL_DIGEST_PARAM_PAD_TYPE, OSSL_DIGEST_PARAM_SIZE, OSSL_DIGEST_PARAM_SSL3_MS,
+    OSSL_DIGEST_PARAM_XOF, OSSL_DIGEST_PARAM_XOFLEN, OSSL_FUNC_DIGEST_COPYCTX,
+    OSSL_FUNC_DIGEST_DUPCTX, OSSL_FUNC_DIGEST_FINAL, OSSL_FUNC_DIGEST_FREECTX,
+    OSSL_FUNC_DIGEST_GET_CTX_PARAMS, OSSL_FUNC_DIGEST_GET_PARAMS,
+    OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS, OSSL_FUNC_DIGEST_GETTABLE_PARAMS, OSSL_FUNC_DIGEST_INIT,
+    OSSL_FUNC_DIGEST_NEWCTX, OSSL_FUNC_DIGEST_SET_CTX_PARAMS, OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_DIGEST_SQUEEZE, OSSL_FUNC_DIGEST_UPDATE, OSSL_PARAM, OSSL_PARAM_INTEGER,
     OSSL_PARAM_OCTET_STRING, OSSL_PARAM_UNSIGNED_INTEGER, PROV_R_FAILED_TO_GET_PARAMETER,
     PROV_R_FAILED_TO_SET_PARAMETER, PROV_R_INVALID_DIGEST_LENGTH, PROV_R_INVALID_DIGEST_SIZE,
@@ -26,13 +26,13 @@ use rustyssl_abi::{
 use rustyssl_crypto::provided::digest::{Ctx, Error, Kind};
 
 use super::tables::{
-    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, bare, defn, entry,
+    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, bare, defn, entry, legacy_alg,
 };
 use crate::err;
 use crate::ffi::ffi_callback;
 use crate::params::{
-    OSSL_PARAM_get_size_t, OSSL_PARAM_locate, OSSL_PARAM_locate_const, OSSL_PARAM_set_int,
-    OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
+    OSSL_PARAM_get_size_t, OSSL_PARAM_get_uint, OSSL_PARAM_locate, OSSL_PARAM_locate_const,
+    OSSL_PARAM_set_int, OSSL_PARAM_set_size_t, OSSL_PARAM_set_uint,
 };
 
 /// The algorithm context behind `vctx`, or `None` for NULL.
@@ -251,6 +251,23 @@ ffi_callback! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { context(vctx) }.map_or(0, |c| c_int::from(c.init()))
+    }
+}
+
+ffi_callback! {
+    /// `init` for MDC2: starts again (padding 1), then sets the parameters (`pad-type`).
+    ///
+    /// # Safety
+    /// `vctx` is a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn mdc2_init(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        if !unsafe { context(vctx) }.is_some_and(|c| c.init()) {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        unsafe { mdc2_set_ctx_params(vctx, params) }
     }
 }
 
@@ -476,6 +493,10 @@ static SSL3_SETTABLE: Params<2> = Params([
     bare(OSSL_DIGEST_PARAM_SSL3_MS, OSSL_PARAM_OCTET_STRING),
     PARAM_END,
 ]);
+static MDC2_SETTABLE: Params<2> = Params([
+    bare(OSSL_DIGEST_PARAM_PAD_TYPE, OSSL_PARAM_UNSIGNED_INTEGER),
+    PARAM_END,
+]);
 static XOF_CTX_PARAMS: Params<3> = Params([
     bare(OSSL_DIGEST_PARAM_XOFLEN, OSSL_PARAM_UNSIGNED_INTEGER),
     bare(OSSL_DIGEST_PARAM_SIZE, OSSL_PARAM_UNSIGNED_INTEGER),
@@ -507,6 +528,48 @@ ffi_callback! {
     where failure = ptr::null(), library = ERR_LIB_PROV
     {
         SSL3_SETTABLE.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// MDC2's settable context parameters: `pad-type`.
+    ///
+    /// # Safety
+    /// No preconditions.
+    pub(crate) unsafe extern "C" fn mdc2_settable_ctx_params(_ctx: *mut c_void, _provctx: *mut c_void) -> *const OSSL_PARAM
+    where failure = ptr::null(), library = ERR_LIB_PROV
+    {
+        MDC2_SETTABLE.0.as_ptr()
+    }
+}
+
+ffi_callback! {
+    /// `mdc2_set_ctx_params`: `pad-type`, an unsigned integer.
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn mdc2_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: the caller's array.
+        let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_PAD_TYPE.as_ptr()) };
+        if p.is_null() {
+            return 1;
+        }
+        let mut pad = 0;
+        // SAFETY: a parameter of the array; a local.
+        if unsafe { OSSL_PARAM_get_uint(p, &raw mut pad) } == 0 {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER, "mdc2_set_ctx_params");
+            return 0;
+        }
+        ctx.set_mdc2_pad_type(pad);
+        1
     }
 }
 
@@ -626,6 +689,24 @@ macro_rules! ssl3 {
     };
 }
 
+macro_rules! mdc2 {
+    () => {
+        pub(crate) static TABLE: Dispatch<12> = Dispatch(table![
+            entry!(OSSL_FUNC_DIGEST_INIT, mdc2_init, InitFn),
+            entry!(
+                OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,
+                mdc2_settable_ctx_params,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_DIGEST_SET_CTX_PARAMS,
+                mdc2_set_ctx_params,
+                SetCtxFn
+            ),
+        ]);
+    };
+}
+
 macro_rules! xof {
     () => {
         pub(crate) static TABLE: Dispatch<15> = Dispatch(table![
@@ -710,6 +791,9 @@ digest!(md5, Kind::Md5, plain);
 digest!(md5_sha1, Kind::Md5Sha1, ssl3);
 digest!(ripemd160, Kind::Ripemd160, plain);
 digest!(nullmd, Kind::Null, plain);
+digest!(md4, Kind::Md4, plain);
+digest!(mdc2_md, Kind::Mdc2, mdc2);
+digest!(whirlpool, Kind::Whirlpool, plain);
 
 /// `deflt_digests`, with the reference's names (`PROV_NAMES_*`) in its order.
 pub(crate) static DEFAULT_DIGESTS: Algorithms<28> = Algorithms([
@@ -773,6 +857,18 @@ pub(crate) static DEFAULT_DIGESTS: Algorithms<28> = Algorithms([
         &ripemd160::TABLE,
     ),
     alg(c"NULL", &nullmd::TABLE),
+    ALG_END,
+]);
+
+/// `legacy_digests` (`providers/legacyprov.c`), in its order: MD4, MDC2, Whirlpool, RIPEMD-160.
+pub(crate) static LEGACY_DIGESTS: Algorithms<5> = Algorithms([
+    legacy_alg(c"MD4:1.2.840.113549.2.4", &md4::TABLE),
+    legacy_alg(c"MDC2:2.5.8.3.101", &mdc2_md::TABLE),
+    legacy_alg(c"WHIRLPOOL:1.0.10118.3.0.55", &whirlpool::TABLE),
+    legacy_alg(
+        c"RIPEMD-160:RIPEMD160:RIPEMD:RMD160:1.3.36.3.2.1",
+        &ripemd160::TABLE,
+    ),
     ALG_END,
 ]);
 

@@ -281,11 +281,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_TIME_to_generalizedtime` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TIME_to_tm` | libcrypto | `openssl/asn1.h` | `asn1_time` |
 | `ASN1_TYPE_cmp` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `asn1_type` |
-| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_print`, `asn1_template`, `evp_cipher_asn1`, `evp_cipher_meth`, `http`, `pbe` |
+| `ASN1_TYPE_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_print`, `asn1_template`, `evp_cipher_asn1`, `evp_cipher_meth`, `http`, `pbe`, `provider_legacy` |
 | `ASN1_TYPE_get` | libcrypto | `openssl/asn1.h` | `asn1_generate`, `asn1_type`, `cmp`, `evp_cipher_asn1` |
 | `ASN1_TYPE_get_int_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_item_io` |
 | `ASN1_TYPE_get_octetstring` | libcrypto | `openssl/asn1.h` | `asn1_type`, `evp_cipher_meth` |
-| `ASN1_TYPE_new` | libcrypto | `openssl/asn1.h` | `asn1_print`, `asn1_template`, `cmp`, `evp_cipher_asn1`, `evp_cipher_meth`, `pkcs7`, `rsa_asn1`, `x509v3_san` |
+| `ASN1_TYPE_new` | libcrypto | `openssl/asn1.h` | `asn1_print`, `asn1_template`, `cmp`, `evp_cipher_asn1`, `evp_cipher_meth`, `pkcs7`, `provider_legacy`, `rsa_asn1`, `x509v3_san` |
 | `ASN1_TYPE_pack_sequence` | libcrypto | `openssl/asn1.h` | `asn1_item_io`, `pbe` |
 | `ASN1_TYPE_set` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_item_io`, `asn1_print`, `asn1_template`, `asn1_type`, `cmp`, `evp_cipher_asn1`, `pbe`, `pkcs7`, `rsa_asn1`, `x509v3_san` |
 | `ASN1_TYPE_set1` | libcrypto | `openssl/asn1.h` | `asn1_type` |
@@ -1528,13 +1528,13 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ERR_add_error_mem_bio` | libcrypto | `openssl/err.h` | `err_bio` |
 | `ERR_add_error_txt` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_add_error_vdata` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `cms_env`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_secure_heap`, `crypto_str`, `d2i_pkey`, `d2i_pq`, `dhkem`, `ec_group_point`, `err_bio`, `err_queue`, `evp_cipher`, `evp_cipher_asn1`, `evp_digest`, `evp_kdf_more`, `evp_md_names`, `evp_mlx_kem`, `evp_modes`, `evp_rsa`, `evp_rsa_gen`, `evp_signature`, `evp_sm2_kmgmt`, `ex_data`, `http`, `key2text`, `lib_ctx`, `objects`, `ocsp`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs12_key`, `pkcs8_crypt`, `pvkfmt`, `srp`, `ssl_apis`, `ssl_check_chain`, `ssl_ct`, `ssl_dtls`, `ssl_early`, `ssl_handshake_reads`, `ssl_io`, `ssl_io_idle`, `ssl_mldsa`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_sigalg_versions`, `ssl_stateless`, `ssl_ticket_key`, `ssl_tickets`, `stack`, `trace`, `ts`, `ui`, `x509_acert`, `x509_crl`, `x509_name`, `x509_purpose`, `x509_spki`, `x509_vpm`, `x509v3_admission`, `x509v3_misc`, `x509v3_rfc3779` |
+| `ERR_clear_error` | libcrypto | `openssl/err.h` | `asn1_bit_string`, `asn1_d2i`, `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_item_io`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_text`, `asn1_time`, `asn1_type`, `bio_addr`, `bio_base64`, `bio_connect`, `bio_dgram`, `bio_dgram_pair`, `bio_file`, `bio_filter`, `bio_mem`, `bio_meth`, `bio_pair`, `bio_print`, `bio_sock`, `cms_env`, `conf`, `conf_modules`, `crypto_init_config_file`, `crypto_secure_heap`, `crypto_str`, `d2i_pkey`, `d2i_pq`, `dhkem`, `ec_group_point`, `err_bio`, `err_queue`, `evp_cipher`, `evp_cipher_asn1`, `evp_digest`, `evp_kdf_more`, `evp_md_names`, `evp_mlx_kem`, `evp_modes`, `evp_rsa`, `evp_rsa_gen`, `evp_signature`, `evp_sm2_kmgmt`, `ex_data`, `http`, `key2text`, `lib_ctx`, `objects`, `ocsp`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs12`, `pkcs12_key`, `pkcs8_crypt`, `provider_legacy`, `pvkfmt`, `srp`, `ssl_apis`, `ssl_check_chain`, `ssl_ct`, `ssl_dtls`, `ssl_early`, `ssl_handshake_reads`, `ssl_io`, `ssl_io_idle`, `ssl_mldsa`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_shutdown`, `ssl_sigalg_versions`, `ssl_stateless`, `ssl_ticket_key`, `ssl_tickets`, `stack`, `trace`, `ts`, `ui`, `x509_acert`, `x509_crl`, `x509_name`, `x509_purpose`, `x509_spki`, `x509_vpm`, `x509v3_admission`, `x509v3_misc`, `x509v3_rfc3779` |
 | `ERR_clear_last_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_count_to_mark` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_error_string_n` | libcrypto | `openssl/err.h` | `err_queue`, `err_strings`, `ssl_errors`, `ssl_libctx`, `ssl_strings` |
 | `ERR_func_error_string` | libcrypto | `openssl/err.h` | `err_queue` |
-| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `async`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `cms_env`, `crypto_str`, `ct`, `ec_group_point`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa_legacy`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `ocsp`, `pem_crypt`, `pkcs12`, `pkcs12_key`, `pkcs7`, `rand`, `rsa_print`, `srp`, `ssl_cipher`, `ssl_dane`, `ssl_dtls`, `ssl_handshake_reads`, `ssl_libctx`, `ssl_mldsa`, `ssl_psk`, `ssl_renegotiate`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_session`, `ssl_sigalg_keys`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_ticket_key`, `ssl_tmp_dh`, `stack`, `txt_db`, `ui_console`, `x509_check`, `x509_crlcheck`, `x509_policy`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509_vpm` |
+| `ERR_get_error` | libcrypto | `openssl/err.h` | `asn1_header`, `asn1_hex`, `asn1_integer`, `asn1_parse`, `asn1_print`, `asn1_string`, `asn1_template`, `asn1_type`, `async`, `bio_dgram`, `bio_evp`, `bio_file`, `bio_mem`, `bio_meth`, `bn_mod`, `bn_prime`, `cms_env`, `crypto_str`, `ct`, `ec_group_point`, `err_queue`, `err_strings`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_derive`, `evp_digest`, `evp_ecx448_legacy`, `evp_ecx_legacy`, `evp_kdf`, `evp_kdf_more`, `evp_kdf_others`, `evp_mac`, `evp_mac_others`, `evp_md_meth`, `evp_md_names`, `evp_modes`, `evp_pkey`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rand`, `evp_rsa_legacy`, `evp_signature`, `evp_skey`, `ex_data`, `lowlevel_hash`, `objects`, `ocsp`, `pem_crypt`, `pkcs12`, `pkcs12_key`, `pkcs7`, `provider_legacy`, `rand`, `rsa_print`, `srp`, `ssl_cipher`, `ssl_dane`, `ssl_dtls`, `ssl_handshake_reads`, `ssl_libctx`, `ssl_mldsa`, `ssl_psk`, `ssl_renegotiate`, `ssl_rpk`, `ssl_sess_cache`, `ssl_sess_fatal`, `ssl_session`, `ssl_sigalg_keys`, `ssl_srp`, `ssl_strict`, `ssl_strings`, `ssl_ticket_key`, `ssl_tmp_dh`, `stack`, `txt_db`, `ui_console`, `x509_check`, `x509_crlcheck`, `x509_policy`, `x509_rfc3779`, `x509_store`, `x509_verify`, `x509_vpm` |
 | `ERR_get_error_all` | libcrypto | `openssl/err.h` | `app_startup`, `asn1_d2i`, `asn1_generate`, `asn1_item_io`, `asn1_item_sign`, `asn1_text`, `bio_file`, `bio_print`, `bn`, `cmp`, `cms_data`, `cms_sign`, `conf`, `conf_modules`, `crmf`, `crypto_secure_heap`, `d2i_pkey`, `d2i_pq`, `decoder`, `dh_asn1`, `dh_check`, `dh_lib`, `dhkem`, `dsa_asn1`, `dsa_lib`, `ec_key`, `ec_params`, `ecdsa`, `encoder`, `err_queue`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ec_kmgmt`, `evp_ec_legacy`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_ecx448_ops`, `evp_ecx_kmgmt`, `evp_ecx_ops`, `evp_kdf_more`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_mlx_kem`, `evp_pkey_ec`, `evp_pkey_print`, `evp_pkey_rsa`, `evp_rand`, `evp_rsa`, `evp_rsa_gen`, `evp_rsa_kem`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `evp_sm2_enc`, `evp_sm2_kmgmt`, `evp_sm2_sig`, `fetch`, `hpke`, `http`, `key2text`, `params`, `pbe`, `pem`, `pem_pkey`, `pem_write_pkey`, `pkcs7_smime`, `pkcs7_stream`, `pkcs8_crypt`, `properties`, `provider`, `provider_ext`, `pvkfmt`, `rand`, `rsa_asn1`, `rsa_lib`, `rsa_ops`, `ssl_apis`, `ssl_bio`, `ssl_conf`, `ssl_ct`, `ssl_ctrl_more`, `ssl_ctx`, `ssl_custom`, `ssl_eap`, `ssl_early`, `ssl_errors`, `ssl_handshake`, `ssl_io`, `ssl_io_idle`, `ssl_ktls`, `ssl_lists`, `ssl_misc`, `ssl_requests`, `ssl_shutdown`, `ssl_stateless`, `ssl_tickets`, `stack`, `store`, `ts`, `ui`, `x509_acert`, `x509_attr_p8`, `x509_cert`, `x509_crl`, `x509_ctx`, `x509_ext`, `x509_info`, `x509_name`, `x509_print`, `x509_pubkey`, `x509_purpose`, `x509_req`, `x509_spki`, `x509_trust`, `x509v3_acext`, `x509v3_admission`, `x509v3_conf`, `x509v3_crld`, `x509v3_lib`, `x509v3_misc`, `x509v3_policy`, `x509v3_rfc3779`, `x509v3_san` |
 | `ERR_get_error_line` | libcrypto | `openssl/err.h` | `err_queue` |
 | `ERR_get_error_line_data` | libcrypto | `openssl/err.h` | `err_queue` |
@@ -1634,7 +1634,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_CTX_copy` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_CIPHER_CTX_ctrl` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
 | `EVP_CIPHER_CTX_dup` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
-| `EVP_CIPHER_CTX_free` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pbe`, `pem_crypt` |
+| `EVP_CIPHER_CTX_free` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pbe`, `pem_crypt`, `provider_legacy` |
 | `EVP_CIPHER_CTX_get0_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names` |
 | `EVP_CIPHER_CTX_get1_cipher` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_get_algor` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
@@ -1643,47 +1643,47 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_CTX_get_block_size` | libcrypto | `openssl/evp.h` | `bio_evp`, `evp_cipher` |
 | `EVP_CIPHER_CTX_get_cipher_data` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_modes` |
-| `EVP_CIPHER_CTX_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `pbe` |
+| `EVP_CIPHER_CTX_get_key_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `pbe`, `provider_legacy` |
 | `EVP_CIPHER_CTX_get_nid` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_get_num` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_get_original_iv` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1` |
-| `EVP_CIPHER_CTX_get_params` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
+| `EVP_CIPHER_CTX_get_params` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes`, `provider_legacy` |
 | `EVP_CIPHER_CTX_get_tag_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher` |
 | `EVP_CIPHER_CTX_get_updated_iv` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_gettable_params` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_is_encrypting` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_skey` |
 | `EVP_CIPHER_CTX_iv` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_iv_noconst` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
-| `EVP_CIPHER_CTX_new` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pbe`, `pem_crypt` |
+| `EVP_CIPHER_CTX_new` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pbe`, `pem_crypt`, `provider_legacy` |
 | `EVP_CIPHER_CTX_original_iv` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
-| `EVP_CIPHER_CTX_rand_key` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
+| `EVP_CIPHER_CTX_rand_key` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_modes`, `provider_legacy` |
 | `EVP_CIPHER_CTX_reset` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_set_algor_params` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_CTX_set_app_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_set_cipher_data` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_set_flags` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_asn1` |
-| `EVP_CIPHER_CTX_set_key_length` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
+| `EVP_CIPHER_CTX_set_key_length` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `provider_legacy` |
 | `EVP_CIPHER_CTX_set_num` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_set_padding` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth` |
 | `EVP_CIPHER_CTX_set_params` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_modes` |
 | `EVP_CIPHER_CTX_settable_params` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_CIPHER_CTX_test_flags` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_CIPHER_asn1_to_param` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth` |
+| `EVP_CIPHER_asn1_to_param` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth`, `provider_legacy` |
 | `EVP_CIPHER_can_pipeline` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
 | `EVP_CIPHER_do_all` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_CIPHER_do_all_provided` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
 | `EVP_CIPHER_do_all_sorted` | libcrypto | `openssl/evp.h` | `evp_cipher_names` |
-| `EVP_CIPHER_fetch` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_names_kept`, `evp_signature`, `evp_skey`, `ssl_ticket_key` |
-| `EVP_CIPHER_free` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_names_kept`, `evp_signature`, `evp_skey`, `ssl_ticket_key` |
+| `EVP_CIPHER_fetch` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_names_kept`, `evp_signature`, `evp_skey`, `provider_legacy`, `ssl_ticket_key` |
+| `EVP_CIPHER_free` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_names_kept`, `evp_signature`, `evp_skey`, `provider_legacy`, `ssl_ticket_key` |
 | `EVP_CIPHER_get0_description` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names` |
 | `EVP_CIPHER_get0_name` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `pbe`, `pem_crypt`, `pkcs7_smime`, `x509_info` |
 | `EVP_CIPHER_get0_provider` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names` |
 | `EVP_CIPHER_get_asn1_iv` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
-| `EVP_CIPHER_get_block_size` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_get_flags` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
-| `EVP_CIPHER_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
-| `EVP_CIPHER_get_key_length` | libcrypto | `openssl/evp.h` | `cms_data`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `pem_crypt` |
-| `EVP_CIPHER_get_mode` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
+| `EVP_CIPHER_get_block_size` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `provider_legacy` |
+| `EVP_CIPHER_get_flags` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `provider_legacy` |
+| `EVP_CIPHER_get_iv_length` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt`, `provider_legacy` |
+| `EVP_CIPHER_get_key_length` | libcrypto | `openssl/evp.h` | `cms_data`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `pem_crypt`, `provider_legacy` |
+| `EVP_CIPHER_get_mode` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `provider_legacy` |
 | `EVP_CIPHER_get_nid` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes` |
 | `EVP_CIPHER_get_params` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_names`, `evp_modes` |
 | `EVP_CIPHER_get_type` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names` |
@@ -1710,7 +1710,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_CIPHER_meth_set_iv_length` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
 | `EVP_CIPHER_meth_set_set_asn1_params` | libcrypto | `openssl/evp.h` | `evp_cipher_meth` |
 | `EVP_CIPHER_names_do_all` | libcrypto | `openssl/evp.h` | `evp_cipher_names`, `evp_names_kept` |
-| `EVP_CIPHER_param_to_asn1` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth` |
+| `EVP_CIPHER_param_to_asn1` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1`, `evp_cipher_meth`, `provider_legacy` |
 | `EVP_CIPHER_set_asn1_iv` | libcrypto | `openssl/evp.h` | `evp_cipher_asn1` |
 | `EVP_CIPHER_settable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_names`, `evp_modes` |
 | `EVP_CIPHER_up_ref` | libcrypto | `openssl/evp.h` | `evp_cipher_meth`, `evp_cipher_names` |
@@ -1727,12 +1727,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_DecodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecodeUpdate` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_DecryptFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_DecryptFinal_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
+| `EVP_DecryptFinal_ex` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes`, `provider_legacy` |
 | `EVP_DecryptInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_DecryptInit_ex` | libcrypto | `openssl/evp.h` | `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth` |
-| `EVP_DecryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
-| `EVP_DecryptUpdate` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes` |
-| `EVP_Digest` | libcrypto | `openssl/evp.h` | `bio_evp`, `cms_sign`, `dh_asn1`, `dh_check`, `dh_lib`, `dsa_asn1`, `dsa_lib`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_digest`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ecdsa_sig`, `evp_md_meth`, `evp_md_names`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `hpke`, `ocsp`, `pkcs12`, `pkcs7_smime`, `pkcs7_stream`, `provider_ext`, `pvkfmt`, `ssl_dane`, `ts` |
+| `EVP_DecryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes`, `provider_legacy` |
+| `EVP_DecryptUpdate` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_modes`, `provider_legacy` |
+| `EVP_Digest` | libcrypto | `openssl/evp.h` | `bio_evp`, `cms_sign`, `dh_asn1`, `dh_check`, `dh_lib`, `dsa_asn1`, `dsa_lib`, `evp_dh_exch`, `evp_dh_kmgmt`, `evp_digest`, `evp_dsa_kmgmt`, `evp_dsa_sig`, `evp_ecdsa_sig`, `evp_md_meth`, `evp_md_names`, `evp_ml_dsa_kmgmt`, `evp_ml_dsa_ops`, `evp_ml_kem_kmgmt`, `evp_ml_kem_ops`, `evp_slh_dsa_kmgmt`, `evp_slh_dsa_ops`, `hpke`, `ocsp`, `pkcs12`, `pkcs7_smime`, `pkcs7_stream`, `provider_ext`, `provider_legacy`, `pvkfmt`, `ssl_dane`, `ts` |
 | `EVP_DigestFinal` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_DigestFinalXOF` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_ml_dsa_ops` |
 | `EVP_DigestFinal_ex` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_signature`, `provider_ext` |
@@ -1760,11 +1760,11 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_EncodeInit` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_EncodeUpdate` | libcrypto | `openssl/evp.h` | `evp_encode` |
 | `EVP_EncryptFinal` | libcrypto | `openssl/evp.h` | `evp_cipher` |
-| `EVP_EncryptFinal_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_EncryptFinal_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt`, `provider_legacy` |
 | `EVP_EncryptInit` | libcrypto | `openssl/evp.h` | `evp_cipher` |
 | `EVP_EncryptInit_ex` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_cipher`, `evp_cipher_asn1`, `evp_cipher_meth`, `evp_cipher_names`, `pem_crypt` |
-| `EVP_EncryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes` |
-| `EVP_EncryptUpdate` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt` |
+| `EVP_EncryptInit_ex2` | libcrypto | `openssl/evp.h` | `evp_aead`, `evp_cipher`, `evp_modes`, `provider_legacy` |
+| `EVP_EncryptUpdate` | libcrypto | `openssl/evp.h` | `bio_evp`, `crmf`, `evp_aead`, `evp_cipher`, `evp_cipher_meth`, `evp_cipher_names`, `evp_modes`, `evp_skey`, `pem_crypt`, `provider_legacy` |
 | `EVP_KDF_CTX_dup` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
 | `EVP_KDF_CTX_free` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
 | `EVP_KDF_CTX_get_kdf_size` | libcrypto | `openssl/kdf.h` | `evp_kdf`, `evp_kdf_more`, `evp_kdf_others` |
@@ -1878,16 +1878,16 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `EVP_MD_do_all` | libcrypto | `openssl/evp.h` | `evp_md_names` |
 | `EVP_MD_do_all_provided` | libcrypto | `openssl/evp.h` | `fetch`, `provider_ext` |
 | `EVP_MD_do_all_sorted` | libcrypto | `openssl/evp.h` | `evp_md_names` |
-| `EVP_MD_fetch` | libcrypto | `openssl/evp.h` | `crypto_init_config_file`, `evp_digest`, `evp_md_meth`, `evp_md_names`, `evp_names_kept`, `fetch`, `modules/test_prov`, `pkcs12_key`, `provider_ext`, `ssl_ticket_key` |
-| `EVP_MD_free` | libcrypto | `openssl/evp.h` | `crypto_init_config_file`, `evp_digest`, `evp_md_meth`, `evp_md_names`, `evp_names_kept`, `fetch`, `modules/test_prov`, `pkcs12_key`, `provider_ext`, `ssl_ticket_key`, `x509_cert` |
+| `EVP_MD_fetch` | libcrypto | `openssl/evp.h` | `crypto_init_config_file`, `evp_digest`, `evp_md_meth`, `evp_md_names`, `evp_names_kept`, `fetch`, `modules/test_prov`, `pkcs12_key`, `provider_ext`, `provider_legacy`, `ssl_ticket_key` |
+| `EVP_MD_free` | libcrypto | `openssl/evp.h` | `crypto_init_config_file`, `evp_digest`, `evp_md_meth`, `evp_md_names`, `evp_names_kept`, `fetch`, `modules/test_prov`, `pkcs12_key`, `provider_ext`, `provider_legacy`, `ssl_ticket_key`, `x509_cert` |
 | `EVP_MD_get0_description` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names`, `fetch`, `provider_ext` |
-| `EVP_MD_get0_name` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_dh_exch`, `evp_digest`, `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdh`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `fetch`, `pbe`, `pem_crypt`, `provider_ext`, `ssl_cipher`, `ssl_psk`, `x509_cert` |
-| `EVP_MD_get0_provider` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names`, `fetch`, `modules/test_prov`, `provider_ext` |
-| `EVP_MD_get_block_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `fetch`, `provider_ext` |
+| `EVP_MD_get0_name` | libcrypto | `openssl/evp.h` | `evp_derive`, `evp_dh_exch`, `evp_digest`, `evp_dsa_sig`, `evp_ec_legacy`, `evp_ecdh`, `evp_md_meth`, `evp_md_names`, `evp_pkey_meth`, `evp_pkey_ops`, `evp_rsa`, `evp_rsa_legacy`, `evp_signature`, `fetch`, `pbe`, `pem_crypt`, `provider_ext`, `provider_legacy`, `ssl_cipher`, `ssl_psk`, `x509_cert` |
+| `EVP_MD_get0_provider` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names`, `fetch`, `modules/test_prov`, `provider_ext`, `provider_legacy` |
+| `EVP_MD_get_block_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `fetch`, `provider_ext`, `provider_legacy` |
 | `EVP_MD_get_flags` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `fetch` |
 | `EVP_MD_get_params` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
 | `EVP_MD_get_pkey_type` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names` |
-| `EVP_MD_get_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `fetch`, `provider_ext` |
+| `EVP_MD_get_size` | libcrypto | `openssl/evp.h` | `evp_digest`, `evp_md_meth`, `evp_md_names`, `fetch`, `provider_ext`, `provider_legacy` |
 | `EVP_MD_get_type` | libcrypto | `openssl/evp.h` | `evp_md_meth`, `evp_md_names`, `fetch` |
 | `EVP_MD_gettable_ctx_params` | libcrypto | `openssl/evp.h` | `evp_digest` |
 | `EVP_MD_gettable_params` | libcrypto | `openssl/evp.h` | `evp_md_names`, `fetch` |
@@ -3330,12 +3330,12 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_ISSUER_SERIAL_set1_issuer` | libcrypto | `openssl/x509_acert.h` | `x509_acert` |
 | `OSSL_ISSUER_SERIAL_set1_issuerUID` | libcrypto | `openssl/x509_acert.h` | `x509_acert` |
 | `OSSL_ISSUER_SERIAL_set1_serial` | libcrypto | `openssl/x509_acert.h` | `x509_acert` |
-| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `async`, `cms_data`, `cms_sign`, `conf_modules`, `d2i_pkey`, `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_skey`, `fetch`, `lib_ctx`, `lowlevel_hash`, `modules/test_prov`, `pkcs7_smime`, `pkcs7_stream`, `properties`, `provider`, `provider_ext`, `rand`, `self_test`, `ssl_libctx` |
+| `OSSL_LIB_CTX_free` | libcrypto | `openssl/crypto.h` | `async`, `cms_data`, `cms_sign`, `conf_modules`, `d2i_pkey`, `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_skey`, `fetch`, `lib_ctx`, `lowlevel_hash`, `modules/test_prov`, `pkcs7_smime`, `pkcs7_stream`, `properties`, `provider`, `provider_ext`, `provider_legacy`, `rand`, `self_test`, `ssl_libctx` |
 | `OSSL_LIB_CTX_get0_global_default` | libcrypto | `openssl/crypto.h` | `async`, `conf`, `lib_ctx`, `properties` |
 | `OSSL_LIB_CTX_get_conf_diagnostics` | libcrypto | `openssl/crypto.h` | `lib_ctx` |
 | `OSSL_LIB_CTX_get_data` | libcrypto | `openssl/crypto.h` | `modules/test_prov` |
-| `OSSL_LIB_CTX_load_config` | libcrypto | `openssl/crypto.h` | `conf_modules`, `crypto_init_config_file`, `provider_ext` |
-| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `async`, `cms_data`, `cms_sign`, `conf_modules`, `d2i_pkey`, `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_skey`, `fetch`, `lib_ctx`, `lowlevel_hash`, `pkcs7_smime`, `pkcs7_stream`, `properties`, `provider`, `provider_ext`, `rand`, `self_test`, `ssl_libctx` |
+| `OSSL_LIB_CTX_load_config` | libcrypto | `openssl/crypto.h` | `conf_modules`, `crypto_init_config_file`, `provider_ext`, `provider_legacy` |
+| `OSSL_LIB_CTX_new` | libcrypto | `openssl/crypto.h` | `async`, `cms_data`, `cms_sign`, `conf_modules`, `d2i_pkey`, `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_skey`, `fetch`, `lib_ctx`, `lowlevel_hash`, `pkcs7_smime`, `pkcs7_stream`, `properties`, `provider`, `provider_ext`, `provider_legacy`, `rand`, `self_test`, `ssl_libctx` |
 | `OSSL_LIB_CTX_new_child` | libcrypto | `openssl/crypto.h` | `modules/test_prov` |
 | `OSSL_LIB_CTX_new_from_dispatch` | libcrypto | `openssl/crypto.h` | `modules/test_prov` |
 | `OSSL_LIB_CTX_set0_default` | libcrypto | `openssl/crypto.h` | `async`, `lib_ctx`, `lowlevel_hash`, `properties` |
@@ -3432,25 +3432,25 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `OSSL_PRIVILEGE_POLICY_ID_new` | libcrypto | `openssl/x509v3.h` | `x509v3_acext` |
 | `OSSL_PROVIDER_add_builtin` | libcrypto | `openssl/provider.h` | `evp_cipher_asn1`, `evp_pkey_ops`, `evp_skey`, `fetch`, `provider_ext` |
 | `OSSL_PROVIDER_add_conf_parameter` | libcrypto | `openssl/provider.h` | `d2i_pq`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `provider` |
-| `OSSL_PROVIDER_available` | libcrypto | `openssl/provider.h` | `conf_modules`, `crypto_init_config_file`, `provider`, `provider_ext`, `ssl_libctx` |
+| `OSSL_PROVIDER_available` | libcrypto | `openssl/provider.h` | `conf_modules`, `crypto_init_config_file`, `provider`, `provider_ext`, `provider_legacy`, `ssl_libctx` |
 | `OSSL_PROVIDER_conf_get_bool` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_do_all` | libcrypto | `openssl/provider.h` | `modules/test_prov`, `provider` |
 | `OSSL_PROVIDER_get0_default_search_path` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_get0_dispatch` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext` |
-| `OSSL_PROVIDER_get0_name` | libcrypto | `openssl/provider.h` | `d2i_pkey`, `decoder`, `encoder`, `evp_derive`, `evp_dsa_sig`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_kdf`, `evp_mac`, `evp_pkey`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_sig`, `fetch`, `modules/test_prov`, `provider`, `provider_ext`, `store` |
+| `OSSL_PROVIDER_get0_name` | libcrypto | `openssl/provider.h` | `d2i_pkey`, `decoder`, `encoder`, `evp_derive`, `evp_dsa_sig`, `evp_ecdh`, `evp_ecdsa_sig`, `evp_kdf`, `evp_mac`, `evp_pkey`, `evp_pkey_ops`, `evp_rand`, `evp_signature`, `evp_skey`, `evp_sm2_enc`, `evp_sm2_sig`, `fetch`, `modules/test_prov`, `provider`, `provider_ext`, `provider_legacy`, `store` |
 | `OSSL_PROVIDER_get0_provider_ctx` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext` |
 | `OSSL_PROVIDER_get_capabilities` | libcrypto | `openssl/provider.h` | `provider_capabilities` |
 | `OSSL_PROVIDER_get_conf_parameters` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_get_params` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext` |
+| `OSSL_PROVIDER_get_params` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext`, `provider_legacy` |
 | `OSSL_PROVIDER_gettable_params` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_load` | libcrypto | `openssl/provider.h` | `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_rand`, `evp_skey`, `fetch`, `lowlevel_hash`, `provider`, `provider_capabilities`, `provider_ext`, `rand`, `ssl_libctx` |
+| `OSSL_PROVIDER_load` | libcrypto | `openssl/provider.h` | `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_rand`, `evp_skey`, `fetch`, `lowlevel_hash`, `provider`, `provider_capabilities`, `provider_ext`, `provider_legacy`, `rand`, `ssl_libctx` |
 | `OSSL_PROVIDER_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_query_operation` | libcrypto | `openssl/provider.h` | `fetch` |
 | `OSSL_PROVIDER_self_test` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_set_default_search_path` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext` |
+| `OSSL_PROVIDER_set_default_search_path` | libcrypto | `openssl/provider.h` | `provider`, `provider_ext`, `provider_legacy` |
 | `OSSL_PROVIDER_try_load` | libcrypto | `openssl/provider.h` | `provider` |
 | `OSSL_PROVIDER_try_load_ex` | libcrypto | `openssl/provider.h` | `provider` |
-| `OSSL_PROVIDER_unload` | libcrypto | `openssl/provider.h` | `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_rand`, `evp_skey`, `fetch`, `lowlevel_hash`, `provider`, `provider_capabilities`, `provider_ext`, `rand`, `ssl_libctx` |
+| `OSSL_PROVIDER_unload` | libcrypto | `openssl/provider.h` | `d2i_pq`, `evp_cipher_asn1`, `evp_ml_dsa_kmgmt`, `evp_ml_kem_kmgmt`, `evp_pkey_ops`, `evp_rand`, `evp_skey`, `fetch`, `lowlevel_hash`, `provider`, `provider_capabilities`, `provider_ext`, `provider_legacy`, `rand`, `ssl_libctx` |
 | `OSSL_PROVIDER_unquery_operation` | libcrypto | `openssl/provider.h` | `fetch` |
 | `OSSL_ROLE_SPEC_CERT_ID_SYNTAX_free` | libcrypto | `openssl/x509v3.h` | `x509v3_acext` |
 | `OSSL_ROLE_SPEC_CERT_ID_SYNTAX_it` | libcrypto | `openssl/x509v3.h` | `x509v3_acext` |
@@ -5548,7 +5548,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `i2d_ASN1_SET_ANY` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_T61STRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_TIME` | libcrypto | `openssl/asn1.h` | `asn1_template` |
-| `i2d_ASN1_TYPE` | libcrypto | `openssl/asn1.h` | `asn1_generate`, `asn1_template`, `evp_cipher_asn1` |
+| `i2d_ASN1_TYPE` | libcrypto | `openssl/asn1.h` | `asn1_generate`, `asn1_template`, `evp_cipher_asn1`, `provider_legacy` |
 | `i2d_ASN1_UNIVERSALSTRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_UTCTIME` | libcrypto | `openssl/asn1.h` | `asn1_template` |
 | `i2d_ASN1_UTF8STRING` | libcrypto | `openssl/asn1.h` | `asn1_template` |
