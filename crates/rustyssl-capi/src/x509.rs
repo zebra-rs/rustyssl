@@ -11,6 +11,7 @@ pub(crate) mod crl;
 pub(crate) mod ctx;
 pub(crate) mod dane;
 pub(crate) mod ext;
+pub(crate) mod ietfatt;
 pub(crate) mod info;
 pub(crate) mod lookup;
 pub(crate) mod name;

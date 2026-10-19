@@ -694,85 +694,6 @@ pub extern "C" fn ENGINE_up_ref(_: *mut ENGINE) -> core::ffi::c_int {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_VALUE_free(_: *mut OSSL_IETF_ATTR_SYNTAX_VALUE) {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_VALUE_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_VALUE_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_VALUE_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_VALUE_new() -> *mut OSSL_IETF_ATTR_SYNTAX_VALUE {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_VALUE_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_add1_value(
-    _: *mut OSSL_IETF_ATTR_SYNTAX,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_add1_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_free(_: *mut OSSL_IETF_ATTR_SYNTAX) {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_free")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_get0_policyAuthority(
-    _: *const OSSL_IETF_ATTR_SYNTAX,
-) -> *const GENERAL_NAMES {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_get0_policyAuthority")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_get0_value(
-    _: *const OSSL_IETF_ATTR_SYNTAX,
-    _: core::ffi::c_int,
-    _: *mut core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_get0_value")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_get_value_num(
-    _: *const OSSL_IETF_ATTR_SYNTAX,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_get_value_num")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_it() -> *const ASN1_ITEM {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_it")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_new() -> *mut OSSL_IETF_ATTR_SYNTAX {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_new")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_print(
-    _: *mut BIO,
-    _: *mut OSSL_IETF_ATTR_SYNTAX,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_print")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority(
-    _: *mut OSSL_IETF_ATTR_SYNTAX,
-    _: *mut GENERAL_NAMES,
-) {
-    crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_LIB_CTX_get_data(
     _: *mut OSSL_LIB_CTX,
     _: core::ffi::c_int,
@@ -794,21 +715,4 @@ pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
     _: *const OSSL_DISPATCH,
 ) -> *mut OSSL_LIB_CTX {
     crate::stub::unimplemented("OSSL_LIB_CTX_new_from_dispatch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn d2i_OSSL_IETF_ATTR_SYNTAX(
-    _: *mut *mut OSSL_IETF_ATTR_SYNTAX,
-    _: *mut *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-) -> *mut OSSL_IETF_ATTR_SYNTAX {
-    crate::stub::unimplemented("d2i_OSSL_IETF_ATTR_SYNTAX")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_OSSL_IETF_ATTR_SYNTAX(
-    _: *const OSSL_IETF_ATTR_SYNTAX,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_OSSL_IETF_ATTR_SYNTAX")
 }

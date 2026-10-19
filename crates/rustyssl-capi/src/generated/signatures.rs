@@ -10867,6 +10867,39 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
 ) -> *mut BIO = crate::http_client::OSSL_HTTP_transfer;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX_VALUE) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_IETF_ATTR_SYNTAX_VALUE =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_add1_value;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_free;
+const _: unsafe extern "C" fn(*const OSSL_IETF_ATTR_SYNTAX) -> *const GENERAL_NAMES =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get0_policyAuthority;
+const _: unsafe extern "C" fn(
+    *const OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get0_value;
+const _: unsafe extern "C" fn(*const OSSL_IETF_ATTR_SYNTAX) -> core::ffi::c_int =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get_value_num;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_IETF_ATTR_SYNTAX =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_new;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_print;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX, *mut GENERAL_NAMES) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_get_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =
@@ -18036,6 +18069,11 @@ const _: unsafe extern "C" fn(
     core::ffi::c_long,
 ) -> *mut OSSL_HASH = crate::x509v3::attrdesc::d2i_OSSL_HASH;
 const _: unsafe extern "C" fn(
+    *mut *mut OSSL_IETF_ATTR_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_IETF_ATTR_SYNTAX = crate::x509::ietfatt::d2i_OSSL_IETF_ATTR_SYNTAX;
+const _: unsafe extern "C" fn(
     *mut *mut OSSL_INFO_SYNTAX,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -19061,6 +19099,10 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_DAY_TIME_BAND;
 const _: unsafe extern "C" fn(*const OSSL_HASH, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::attrdesc::i2d_OSSL_HASH;
+const _: unsafe extern "C" fn(
+    *const OSSL_IETF_ATTR_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::ietfatt::i2d_OSSL_IETF_ATTR_SYNTAX;
 const _: unsafe extern "C" fn(
     *const OSSL_INFO_SYNTAX,
     *mut *mut core::ffi::c_uchar,
