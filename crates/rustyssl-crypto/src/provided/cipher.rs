@@ -415,7 +415,6 @@ impl ChaCha {
             }
             if self.partial == CHACHA_BLOCK {
                 self.partial = 0;
-                self.counter = self.counter.wrapping_add(1);
             }
         }
         let whole = data.len() & !(CHACHA_BLOCK - 1);
@@ -431,6 +430,9 @@ impl ChaCha {
                 self.stream.as_mut_slice(),
             )
             .map_err(|_| Error::Internal)?;
+            // OpenSSL 3.6 counts the block once it makes its key stream (3.5 counted it once
+            // used up), which a new key or `updated-iv` shows.
+            self.counter = self.counter.wrapping_add(1);
             for (b, k) in rest.iter_mut().zip(self.stream.iter()) {
                 *b ^= k;
             }
@@ -1314,6 +1316,18 @@ impl Generic {
     /// `chacha20_cipher`.
     fn chacha(&mut self, data: &mut [u8]) -> Result<(), Error> {
         self.chacha.as_mut().ok_or(Error::Internal)?.apply(data)
+    }
+
+    /// ChaCha20's counter and nonce as OpenSSL 3.6 reports them as its `updated-iv`: the block
+    /// counter (past the partial block's key stream), then the nonce. `None` for the other
+    /// ciphers.
+    pub fn chacha_state(&self) -> Option<[u8; 16]> {
+        let c = self.chacha.as_ref()?;
+        let mut state = [0; 16];
+        let (low, high) = state.split_at_mut(8);
+        low.copy_from_slice(&c.counter.to_le_bytes());
+        high.copy_from_slice(&c.nonce);
+        Some(state)
     }
 
     /// The cipher.

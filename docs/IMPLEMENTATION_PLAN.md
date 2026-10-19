@@ -5618,6 +5618,10 @@ both libraries (step 8.1).
     - Importing an X25519/X448/ED25519/ED448 public key from only a private key crashes 3.6
       (it derives from a NULL private key); rustyssl keeps 3.5's failure (`ecx.rs`,
       `key_fromdata`; docs/DEVIATIONS.md).
+    - ChaCha20 reports its counter and nonce as `updated-iv` (an octet string, so
+      `EVP_CIPHER_CTX_iv` and `get_updated_iv`'s pointer form fail with an error) and counts a
+      partial block once it makes its key stream, which a new key without an IV shows
+      (`provider/ciphers.rs` `chacha20_get_ctx_params`; rustyssl-crypto `ChaCha::apply`).
 
 **Exit:** M6.
 

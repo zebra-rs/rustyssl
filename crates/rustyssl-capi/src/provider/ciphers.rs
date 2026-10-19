@@ -554,6 +554,8 @@ pub(crate) enum Value {
     Iv(*const u8, usize),
     /// Likewise, copied as an octet string first (the AEADs' order).
     IvCopyFirst(*const u8, usize),
+    /// Octets copied into an octet string.
+    Octets(*const u8, usize),
 }
 
 /// Sets the parameter `key` of `params`, if there is one, to `value`, raising
@@ -587,6 +589,10 @@ pub(crate) unsafe fn set_param(
         // SAFETY: as above; the IV holds `n` octets and lives as long as the context.
         Value::IvCopyFirst(v, n) | Value::Iv(v, n) => unsafe {
             crate::params::OSSL_PARAM_set_octet_string_or_ptr(p, v.cast(), n)
+        },
+        // SAFETY: as above; the caller's `n` octets.
+        Value::Octets(v, n) => unsafe {
+            crate::params::OSSL_PARAM_set_octet_string(p, v.cast(), n)
         },
     };
     if ok == 0 {
@@ -1100,11 +1106,12 @@ ffi_callback! {
 }
 
 ffi_callback! {
-    /// `chacha20_get_ctx_params`: the IV and key lengths.
+    /// `chacha20_get_ctx_params`: the IV and key lengths, and (3.6) the counter and nonce as
+    /// the updated IV, an octet string.
     ///
     /// # Safety
-    /// `params` is NULL or a parameter array.
-    pub(crate) unsafe extern "C" fn chacha20_get_ctx_params(_vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    /// `vctx` is a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn chacha20_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
         const F: &str = "chacha20_get_ctx_params";
@@ -1116,6 +1123,13 @@ ffi_callback! {
             if !unsafe { set_param(params, key, F, Value::Size(value)) } {
                 return 0;
             }
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let state = ctx.core.generic().and_then(|g| g.chacha_state()).unwrap_or_default();
+        // SAFETY: the caller's array; the state's 16 octets.
+        if !unsafe { set_param(params, OSSL_CIPHER_PARAM_UPDATED_IV, F, Value::Octets(state.as_ptr(), state.len())) } {
+            return 0;
         }
         1
     }
@@ -1279,6 +1293,17 @@ static TDES_SETTABLE_CTX: Params<3> = Params([
     defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
     PARAM_END,
 ]);
+// `chacha20_known_gettable_ctx_params` (3.6 adds `updated-iv`).
+static CHACHA20_GETTABLE_CTX: Params<4> = Params([
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(OSSL_CIPHER_PARAM_IVLEN, OSSL_PARAM_UNSIGNED_INTEGER, SIZE_T),
+    defn(OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_PARAM_OCTET_STRING, 0),
+    PARAM_END,
+]);
 static CHACHA20_CTX: Params<3> = Params([
     defn(
         OSSL_CIPHER_PARAM_KEYLEN,
@@ -1377,6 +1402,7 @@ list!(generic_settable_ctx_params, GENERIC_SETTABLE_CTX);
 list!(tdes_gettable_ctx_params, TDES_GETTABLE_CTX);
 list!(tdes_settable_ctx_params, TDES_SETTABLE_CTX);
 list!(chacha20_ctx_params, CHACHA20_CTX);
+list!(chacha20_gettable_ctx_params, CHACHA20_GETTABLE_CTX);
 list!(null_gettable_ctx_params, NULL_GETTABLE_CTX);
 list!(null_settable_ctx_params, NULL_SETTABLE_CTX);
 
@@ -1689,7 +1715,7 @@ macro_rules! chacha20 {
             ),
             entry!(
                 OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
-                chacha20_ctx_params,
+                chacha20_gettable_ctx_params,
                 CtxParamsFn
             ),
             entry!(
