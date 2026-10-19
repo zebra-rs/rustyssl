@@ -5644,6 +5644,13 @@ both libraries (step 8.1).
       raises `EVP_R_INITIALIZATION_ERROR` (`evp/sigver.rs` `sigver_update`).
     - `X509_CRL_print_ex` indents its header by 4 (3.5: 8) and its extensions by 4, and puts a
       multi-line issuer on lines of its own indented by 8 (`x509/tprint.rs`).
+    - `X509_PURPOSE_add`'s invalid-argument error is `ERR_LIB_X509`'s (3.5: X509V3's;
+      `x509/purpose.rs`).
+    - The file store takes a relative path in a `file:` URI (3.5 raised
+      `PROV_R_PATH_MUST_BE_ABSOLUTE`), decodes a search's subject before refusing a search
+      outside a directory, and names the URI and subject in that error
+      (`provider/file_store.rs`); `X509_LOOKUP_store` drops what its search raises
+      (`x509/lookup.rs`).
 
 **Exit:** M6.
 

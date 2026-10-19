@@ -1517,8 +1517,13 @@ unsafe fn cache_objects(
         return 0;
     }
     if !search.is_null() {
+        // 3.6 drops what a search that can't apply (a single file) raises.
+        // SAFETY: no preconditions.
+        unsafe { crate::err::ERR_set_mark() };
         // SAFETY: the store opened here; the caller's search.
         unsafe { OSSL_STORE_find(ctx, search) };
+        // SAFETY: the mark set above.
+        unsafe { crate::err::ERR_pop_to_mark() };
     }
     let mut ok = 0;
     loop {

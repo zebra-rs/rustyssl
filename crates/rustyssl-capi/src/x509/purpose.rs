@@ -1230,7 +1230,8 @@ ffi_export! {
             return 0;
         }
         if trust < X509_TRUST_DEFAULT || name.is_null() || sname.is_null() || ck.is_none() {
-            err::raise(ERR_LIB_X509V3, ERR_R_PASSED_INVALID_ARGUMENT, F);
+            // 3.6 raises this from ERR_LIB_X509 (3.5: ERR_LIB_X509V3).
+            err::raise(ERR_LIB_X509, ERR_R_PASSED_INVALID_ARGUMENT, F);
             return 0;
         }
         let _guard = ADD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
