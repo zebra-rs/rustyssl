@@ -6,6 +6,7 @@
  * The engines directory is pointed at one that doesn't exist, so no engine module is found on
  * either library; source locations and dlopen's messages in the errors aren't printed.
  */
+#define _POSIX_C_SOURCE 200809L
 #define OPENSSL_SUPPRESS_DEPRECATED
 #include <stdio.h>
 #include <stdlib.h>
