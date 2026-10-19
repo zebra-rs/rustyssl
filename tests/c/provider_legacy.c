@@ -4,7 +4,8 @@
  * one of the test's own through a configuration file; its parameters; every digest and cipher
  * it offers, run on known inputs, with the lengths and flags the EVP layer reports; a
  * variable-length key, RC2's effective key length and its AlgorithmIdentifier parameters, DES's
- * random keys; and a search path without the module, where loading fails.
+ * random keys; RC4-HMAC-MD5 over TLS records (its MAC key and header, a bad MAC, a wrong
+ * length); and a search path without the module, where loading fails.
  *
  * `cargo xtask test-c` points each run at its own library's modules (OPENSSL_MODULES). Built once
  * against the vendored headers, then run against the reference OpenSSL and against rustyssl: it
@@ -109,7 +110,7 @@ static const struct cipher_case ciphers[] = {
     { "RC2-ECB", 0 }, { "RC2-CBC", 0 }, { "RC2-40-CBC", 0 }, { "RC2-64-CBC", 0 },
     { "RC2-CFB", 0 }, { "RC2-OFB", 0 }, { "RC4", 0 }, { "RC4", 7 }, { "RC4-40", 0 },
     { "DESX-CBC", 0 }, { "DES-ECB", 0 }, { "DES-CBC", 0 }, { "DES-OFB", 0 },
-    { "DES-CFB", 0 }, { "DES-CFB1", 0 }, { "DES-CFB8", 0 },
+    { "DES-CFB", 0 }, { "DES-CFB1", 0 }, { "DES-CFB8", 0 }, { "RC4-HMAC-MD5", 0 },
 };
 
 static void test_ciphers(OSSL_LIB_CTX *ctx)
@@ -166,6 +167,62 @@ static void test_ciphers(OSSL_LIB_CTX *ctx)
         EVP_CIPHER_CTX_free(cctx);
         EVP_CIPHER_free(cipher);
     }
+}
+
+
+/* RC4-HMAC-MD5 over a TLS record: the MAC key, the header, then one record each way. */
+static void tls_record(EVP_CIPHER *cipher, int enc, unsigned char *buf, int len, int len_in_aad,
+                       const char *what)
+{
+    static const unsigned char key[16] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+    static const unsigned char mackey[16] = { 0x55, 0x66, 0x77 };
+    unsigned char aad[13] = { 0, 0, 0, 0, 0, 0, 0, 1, 23, 3, 3, 0, 0 };
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int pad, ok, n;
+
+    aad[11] = (unsigned char)(len_in_aad >> 8);
+    aad[12] = (unsigned char)len_in_aad;
+    ok = EVP_CipherInit_ex2(ctx, cipher, key, NULL, enc, NULL)
+         && EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_MAC_KEY, (int)sizeof(mackey),
+                                (void *)mackey) > 0;
+    pad = ok ? EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_TLS1_AAD, (int)sizeof(aad), aad) : 0;
+    check(ok && pad > 0, what);
+    printf("  tls-aad-pad %d, the header's length now %d\n", pad, aad[11] << 8 | aad[12]);
+    n = EVP_Cipher(ctx, buf, buf, (unsigned int)len);
+    printf("  EVP_Cipher %d\n", n);
+    if (n <= 0)
+        error_codes();
+    EVP_CIPHER_CTX_free(ctx);
+}
+
+static void test_rc4_hmac_md5(OSSL_LIB_CTX *ctx)
+{
+    static const char payload[] = "GET / HTTP/1.0\r\n\r\n";
+    unsigned char rec[64];
+    int plen = (int)sizeof(payload) - 1;
+    EVP_CIPHER *cipher = EVP_CIPHER_fetch(ctx, "RC4-HMAC-MD5", NULL);
+
+    printf("# RC4-HMAC-MD5 over TLS records\n");
+    check(cipher != NULL, "fetched");
+    if (cipher == NULL) {
+        error_codes();
+        return;
+    }
+    printf("  key %d, iv %d, block %d, flags %lx\n", EVP_CIPHER_get_key_length(cipher),
+           EVP_CIPHER_get_iv_length(cipher), EVP_CIPHER_get_block_size(cipher),
+           (unsigned long)(EVP_CIPHER_get_flags(cipher) & ~EVP_CIPH_MODE));
+    memset(rec, 0, sizeof(rec));
+    memcpy(rec, payload, (size_t)plen);
+    tls_record(cipher, 1, rec, plen + 16, plen, "encrypt with the header");
+    hex("record", rec, (size_t)plen + 16);
+    tls_record(cipher, 0, rec, plen + 16, plen + 16, "decrypt with the header");
+    check(memcmp(rec, payload, (size_t)plen) == 0, "the payload back");
+    memcpy(rec, payload, (size_t)plen);
+    tls_record(cipher, 1, rec, plen + 16, plen, "encrypt again");
+    rec[plen + 3] ^= 1;
+    tls_record(cipher, 0, rec, plen + 16, plen + 16, "decrypt a bad MAC");
+    tls_record(cipher, 1, rec, plen + 3, plen, "a record of the wrong length");
+    EVP_CIPHER_free(cipher);
 }
 
 /* RC2: the effective key length, and the AlgorithmIdentifier's parameters both ways. */
@@ -298,6 +355,7 @@ int main(void)
     test_digests(NULL);
     test_ciphers(NULL);
     test_rc2(NULL);
+    test_rc4_hmac_md5(NULL);
     test_des_rand_key(NULL);
     check(OSSL_PROVIDER_unload(legacy) == 1, "unload it");
     check(EVP_MD_fetch(NULL, "MD4", "provider=legacy") == NULL, "its algorithms are gone");

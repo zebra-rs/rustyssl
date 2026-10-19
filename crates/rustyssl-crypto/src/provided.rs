@@ -6,4 +6,5 @@ pub mod aead;
 pub mod cipher;
 pub mod digest;
 pub mod mac;
+pub mod rc4_hmac_md5;
 pub mod siv;

@@ -85,6 +85,7 @@ pub(crate) mod mlx_kmgmt;
 pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
+mod rc4_hmac_md5;
 pub(crate) mod rsa_enc;
 pub(crate) mod rsa_kem;
 pub(crate) mod rsa_kmgmt;
