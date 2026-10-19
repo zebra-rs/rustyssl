@@ -94,6 +94,19 @@ running a module's `OSSL_provider_init`, and the upcalls beyond `core_get_libctx
    `OSSL_provider_init`, a one-branch forwarder to it. So `OSSL_PROVIDER_load(NULL, "legacy")`
    needs the module file to be present, as with OpenSSL, and finds it where OpenSSL would.
 
+9. **Two consequences of rule 7, recorded.** OpenSSL calls the child-provider callbacks
+   holding its store's lock; rustyssl copies the callbacks and providers out and calls with
+   no lock held. So a provider activated in the parent while a child context is registering
+   can be missed by that child, where OpenSSL would serialize the two. And an object being
+   destroyed can't be held (`Handle::hold` fails once its last reference is gone): a
+   provider's teardown that frees a child context finds its parent gone, as the parent is
+   being freed.
+
+10. **The built-ins' provider context begins as OpenSSL's `PROV_CTX`** (handle, then library
+    context). A provider compiled with OpenSSL's `provider_ctx.c` can pass its own context to
+    the built-ins' functions, as upstream's `filterprov.c` does, and they read it where
+    OpenSSL's would.
+
 ## Consequences
 
 - Third-party providers built against OpenSSL's headers load unchanged. They are validated with

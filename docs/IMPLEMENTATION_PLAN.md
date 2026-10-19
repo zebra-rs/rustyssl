@@ -5412,6 +5412,42 @@ both libraries (step 8.1).
     providers
 
   Validate with pkcs11-provider, oqs-provider, and tpm2-openssl.
+
+  Progress (ADR 0003):
+  - Done:
+    - Modules run: `OSSL_provider_init` from MODULESDIR or the search path, built-ins
+      (`OSSL_PROVIDER_add_builtin`), and configuration sections. Each module stays open until
+      its provider's teardown.
+    - The core's dispatch table, all 53 entries OpenSSL's has.
+    - `BIO_s_core`/`BIO_new_from_core_bio`, `OSSL_LIB_CTX_new_from_dispatch`, and
+      `OSSL_LIB_CTX_new_child` (child providers mirroring the parent's, with default properties).
+    - `OSSL_LIB_CTX_get_data` returns NULL: OpenSSL's internal stores have another layout.
+    - TLS takes external providers' TLS-GROUP and TLS-SIGALG capabilities as
+      `add_provider_groups`/`add_provider_sigalgs` do. The built-in schemes are available only
+      if their hash and key type can be fetched.
+    - The built-ins' provider context begins as OpenSSL's `PROV_CTX` does, so filterprov-style
+      forwarding works.
+  - Tests:
+    - `tests/c/provider_ext.c` (a C test provider in `tests/c/modules/`).
+    - Upstream (`test-openssl-suite --ssl`): provider_test (built-in and `-loaded`),
+      provfetchtest, provider_fallback_test, provider_default_search_path_test,
+      provider_pkey_test (keys of a foreign key manager), prov_config_test,
+      provider_status_test, evp_fetch_prov_test, evp_skey_test, evp_extra_test2, and
+      sslapitest's test_pluggable_group, test_pluggable_signature and test_sigalgs_available.
+      All pass except one evp_extra_test2 subtest, a PEM passphrase error order.
+    - evp_extra_test, evp_libctx_test, evp_pkey_provided_test and provider_internal_test use
+      libcrypto's internals, so they're skipped with the reason.
+  - Found on the way:
+    - `Handle::hold` brought back an object being destroyed (a provider's teardown freeing a
+      child context): now fixed.
+    - The suite's subtests shared one working directory.
+  - Left:
+    - The `legacy` provider: it doesn't exist yet. Its algorithms are MD4, MDC2, Whirlpool,
+      RIPEMD-160, DES (ECB/CBC/CFB/CFB1/CFB8/OFB), DESX, BF, CAST5, IDEA, SEED, RC2 (and 40/64),
+      RC4, RC4-40, RC4-HMAC-MD5, PBKDF1 and PVKKDF, over the existing low-level primitives.
+      It also needs the module in `lib/ossl-modules/` (`libs/legacy`, ADR 0003 item 8) and
+      each harness pointing each library at its own modules directory.
+    - Validation with oqs-provider, pkcs11-provider and tpm2-openssl.
 - [ ] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.
 - [ ] **9.3 ENGINE API** (3.x only): export every `ENGINE_*` symbol with "no engines
