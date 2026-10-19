@@ -2009,6 +2009,10 @@ impl Provider for EvpProvider {
         })
     }
 
+    fn ocsp_response_ok(&self, der: &[u8]) -> bool {
+        super::ocsp_resp::decodes(der)
+    }
+
     fn verify(&self, cert: &[u8], scheme: u16, msg: &[u8], sig: &[u8]) -> Result<bool> {
         let (_x, pkey) = self.cert_key(cert)?;
         // SAFETY: the certificate's key, which `_x` keeps alive.

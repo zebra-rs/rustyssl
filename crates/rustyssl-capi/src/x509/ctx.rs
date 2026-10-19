@@ -104,6 +104,8 @@ pub(crate) struct Ctx {
     pub(crate) rpk: *mut EVP_PKEY,
     pub(crate) libctx: *mut OSSL_LIB_CTX,
     pub(crate) propq: *mut c_char,
+    /// 3.6's stapled OCSP responses, one per certificate of the chain (not owned).
+    pub(crate) ocsp_resp: *mut rustyssl_abi::stack_st_OCSP_RESPONSE,
 }
 
 /// The context behind `ctx`, or `None` for NULL.
@@ -1186,6 +1188,23 @@ ffi_export! {
 }
 
 ffi_export! {
+    /// Sets the stapled OCSP responses that `X509_V_FLAG_OCSP_RESP_CHECK` checks the chain
+    /// against, one per certificate from the leaf (not a copy; 3.6).
+    ///
+    /// # Safety
+    /// `ctx` is NULL or a live context; `sk` is NULL or a stack of OCSP responses that outlives
+    /// the verification.
+    pub unsafe extern "C" fn X509_STORE_CTX_set_ocsp_resp(ctx: *mut X509_STORE_CTX, sk: *mut rustyssl_abi::stack_st_OCSP_RESPONSE)
+    where failure = (), library = ERR_LIB_X509
+    {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { ctx_of(ctx) } {
+            c.ocsp_resp = sk;
+        }
+    }
+}
+
+ffi_export! {
     /// Sets the CRLs to use (not a copy).
     ///
     /// # Safety
@@ -1662,6 +1681,7 @@ ffi_export! {
         c.rpk = ptr::null_mut();
         // SAFETY: an all-zero `CRYPTO_EX_DATA` is the empty one.
         c.ex_data = unsafe { core::mem::zeroed() };
+        c.ocsp_resp = ptr::null_mut();
         // SAFETY: the caller's store, or NULL.
         let cb = unsafe { super::store::store(store) }.map(super::store::Store::callbacks).unwrap_or_default();
         c.cleanup = cb.cleanup;

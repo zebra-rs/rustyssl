@@ -242,10 +242,43 @@ pub(super) fn post_process_server_certificate(
 ///
 /// # Errors
 /// `SSL_R_UNSUPPORTED_STATUS_TYPE` or `SSL_R_LENGTH_MISMATCH`, decode-error.
-pub(super) fn process_cert_status(c: &mut Connection, body: &[u8]) -> Result<MsgProcess> {
-    let s = CertificateStatus::parse(body)?;
-    c.neg.ocsp_response = Some(s.response);
+pub(super) fn process_cert_status(
+    c: &mut Connection,
+    p: &dyn Provider,
+    body: &[u8],
+) -> Result<MsgProcess> {
+    store_cert_status(c, p, 0, body)?;
     Ok(MsgProcess::ContinueReading)
+}
+
+/// `tls_process_cert_status_body` (3.6): the response kept with the others (TLS 1.2 keeps one;
+/// TLS 1.3's go in at the certificate's index, or at the end), once it decodes as an OCSP
+/// response (else `SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE`, a fatal
+/// bad_certificate_status_response).
+///
+/// # Errors
+/// As above, or a malformed body.
+pub(super) fn store_cert_status(
+    c: &mut Connection,
+    p: &dyn Provider,
+    chainidx: usize,
+    body: &[u8],
+) -> Result<()> {
+    let s = CertificateStatus::parse(body)?;
+    if !c.is_tls13() {
+        c.neg.ocsp_responses.clear();
+    }
+    if !s.response.is_empty() {
+        if !p.ocsp_response_ok(&s.response) {
+            return Err(Error::alert(
+                abi::TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE,
+                abi::SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE,
+            ));
+        }
+        let at = chainidx.min(c.neg.ocsp_responses.len());
+        c.neg.ocsp_responses.insert(at, s.response);
+    }
+    Ok(())
 }
 
 /// `BN_security_bits` for a finite-field group of `bits` (no subgroup size known).

@@ -5667,6 +5667,22 @@ both libraries (step 8.1).
     - libssl's ec_point_formats offers only uncompressed unless the new
       `SSL_OP_LEGACY_EC_POINT_FORMATS` (`LegacyECPointFormats`, `-legacy_ec_point_formats`)
       asks for 3.5's three formats (rustyssl-tls `groups::formats`; `ssl/conf.rs`).
+    - OCSP stapling (`ssl/ocsp_resp.rs`; rustyssl-tls `server::ocsp_response_for`,
+      `client::flight::store_cert_status`): a connection keeps its responses parsed
+      (`SSL_CTRL_*_OCSP_RESP_EX`, 142/143); `SSL_set_tlsext_status_ocsp_resp` keeps the one it
+      takes only if it decodes, and `SSL_get_tlsext_status_ocsp_resp` re-encodes the first. A
+      server staples, per certificate (TLS 1.3: each entry), the response at its index if it's
+      for that certificate (serial and issuer name hash; none for a self-signed one; one that
+      isn't successful as it is), and promises a status only when any is set; a client fails a
+      response that doesn't decode (`SSL_R_TLSV1_BAD_CERTIFICATE_STATUS_RESPONSE`), keeps a
+      TLS 1.3 response for every certificate, and accepts a status with no response.
+      `SSL_get0_peer_scts` takes SCTs from every response, and fails on a single response
+      without them (`ssl/ct.rs`).
+    - Verification (`x509/revoke.rs`): `X509_STORE_CTX_set_ocsp_resp` and
+      `X509_V_FLAG_OCSP_RESP_CHECK` (`_ALL`) check the chain against the stapled responses
+      (TLS 1.3 clients pass theirs), falling back to CRLs where `X509_V_FLAG_CRL_CHECK` allows,
+      else `X509_V_ERR_OCSP_VERIFY_FAILED`; CRL checking now skips self-signed certificates.
+      `tests/c/ssl_ocsp_stapling.c`.
 
 **Exit:** M6.
 

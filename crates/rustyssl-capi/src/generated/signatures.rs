@@ -16848,6 +16848,8 @@ const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_ulong) =
     crate::x509::ctx::X509_STORE_CTX_set_flags;
 const _: unsafe extern "C" fn(*mut X509_STORE_CTX, X509_STORE_CTX_get_crl_fn) =
     crate::x509::ctx::X509_STORE_CTX_set_get_crl;
+const _: unsafe extern "C" fn(*mut X509_STORE_CTX, *mut stack_st_OCSP_RESPONSE) =
+    crate::x509::ctx::X509_STORE_CTX_set_ocsp_resp;
 const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_int) -> core::ffi::c_int =
     crate::x509::ctx::X509_STORE_CTX_set_purpose;
 const _: unsafe extern "C" fn(*mut X509_STORE_CTX, core::ffi::c_ulong, time_t) =

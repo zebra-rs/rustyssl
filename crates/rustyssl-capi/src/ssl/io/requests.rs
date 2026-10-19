@@ -250,7 +250,8 @@ pub(crate) unsafe fn handle(
             let Some(cb) = cb else {
                 return Some(Answer::Status {
                     ret: 1,
-                    response: None,
+                    expected: false,
+                    responses: Vec::new(),
                 });
             };
             // SAFETY: the status callback's real type, as SSL_CTX_callback_ctrl stored it.
@@ -258,14 +259,19 @@ pub(crate) unsafe fn handle(
                 unsafe { core::mem::transmute(cb) };
             // SAFETY: the application's callback; no lock is held.
             let ret = unsafe { cb(s, arg) };
-            let response = {
-                let st = x.state();
-                (!st.ocsp_resp.is_null() && st.ocsp_resp_len > 0).then(|| {
-                    // SAFETY: the response the connection owns, `ocsp_resp_len` octets.
-                    unsafe { core::slice::from_raw_parts(st.ocsp_resp, st.ocsp_resp_len) }.to_vec()
-                })
-            };
-            Some(Answer::Status { ret, response })
+            // SAFETY: the live connection; no lock is held.
+            let (expected, responses) = unsafe { super::super::ocsp_resp::server_responses(s) };
+            if x.state().server {
+                // OpenSSL builds the chain (clearing the errors that leaves, the callback's
+                // too) when it writes the Certificate, after this callback.
+                // SAFETY: as above.
+                unsafe { refresh_certs(s, x, snap) };
+            }
+            Some(Answer::Status {
+                ret,
+                expected,
+                responses,
+            })
         }
         // The session cache (`sess_cache`).
         Request::GetSession { id } => {
@@ -769,6 +775,30 @@ unsafe fn verify(
     if !dane.is_null() {
         // SAFETY: the context; the connection's DANE state, which outlives it.
         unsafe { crate::x509::ctx::X509_STORE_CTX_set0_dane(ctx, dane) };
+    }
+    // 3.6: TLS 1.3's stapled OCSP responses, which arrive with the certificates, for
+    // `X509_V_FLAG_OCSP_RESP_CHECK`.
+    // SAFETY: the live connection.
+    let tls13 = unsafe { super::super::conn::rustyssl_private_SSL_is_dtls(s) } == 0
+        // SAFETY: as above.
+        && unsafe { super::super::conn::rustyssl_private_SSL_version(s) } >= rustyssl_abi::TLS1_3_VERSION;
+    if tls13 {
+        let mut st = x.state();
+        if st.status_type == rustyssl_abi::TLSEXT_STATUSTYPE_ocsp {
+            let received = st
+                .drv
+                .tls
+                .as_ref()
+                .map(|c| c.negotiated().ocsp_responses.clone())
+                .unwrap_or_default();
+            if !st.server && received != st.drv.peer_ocsp {
+                received.clone_into(&mut st.drv.peer_ocsp);
+                // SAFETY: the connection's own responses.
+                unsafe { super::super::ocsp_resp::set_received(&mut st, &received) };
+            }
+            // SAFETY: the context; the connection's responses, which outlive it.
+            unsafe { crate::x509::ctx::X509_STORE_CTX_set_ocsp_resp(ctx, st.ocsp_resp_ex) };
+        }
     }
     let purpose = if server { c"ssl_client" } else { c"ssl_server" };
     // SAFETY: as above; a NUL-terminated name.

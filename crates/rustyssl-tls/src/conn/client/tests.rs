@@ -1693,7 +1693,8 @@ fn tls12_ocsp_stapling() {
     let mut reject = |r: &Request| match r {
         Request::Status { .. } => Answer::Status {
             ret: 0,
-            response: None,
+            expected: false,
+            responses: Vec::new(),
         },
         _ => accept(r),
     };
@@ -1704,7 +1705,7 @@ fn tls12_ocsp_stapling() {
             Ok(_) => {}
         }
     };
-    assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 1, 0]));
+    assert_eq!(c.negotiated().ocsp_responses, vec![vec![0x30, 1, 0]]);
     assert!(
         seen.requests
             .iter()
@@ -1947,7 +1948,8 @@ fn ocsp_and_scts_in_tls13() {
     let mut ok = |r: &Request| match r {
         Request::Status { .. } => Answer::Status {
             ret: 1,
-            response: None,
+            expected: false,
+            responses: Vec::new(),
         },
         _ => accept(r),
     };
@@ -1960,7 +1962,7 @@ fn ocsp_and_scts_in_tls13() {
             .iter()
             .any(|r| matches!(r, Request::Status { .. }))
     );
-    assert_eq!(c.negotiated().ocsp_response, Some(vec![0x30, 0]));
+    assert_eq!(c.negotiated().ocsp_responses, vec![vec![0x30, 0]]);
 }
 
 #[test]

@@ -135,8 +135,9 @@ pub struct Negotiated {
     pub server_cert_type: u8,
     /// TLS 1.3's early data status (`SSL_get_early_data_status`).
     pub early_data_status: i32,
-    /// The OCSP response the server stapled (`SSL_get_tlsext_status_ocsp_resp`).
-    pub ocsp_response: Option<Vec<u8>>,
+    /// The OCSP responses the server stapled (`s->ext.ocsp.resp_ex`, 3.6): TLS 1.2's one, or
+    /// TLS 1.3's for the certificates, in the order received.
+    pub ocsp_responses: Vec<Vec<u8>>,
     /// The SCTs received (raw extension body), for CT validation.
     pub scts: Option<Vec<u8>>,
     /// The peer's signature algorithms (`SSL_get_sigalgs`) and the shared ones.

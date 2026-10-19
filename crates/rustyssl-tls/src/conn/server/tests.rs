@@ -2082,7 +2082,8 @@ fn ocsp_stapling_tls12_and_tls13() {
         assert!(matches!(r, Request::Status { .. }));
         Answer::Status {
             ret: abi::SSL_TLSEXT_ERR_OK,
-            response: Some(response.clone()),
+            expected: true,
+            responses: vec![Some(response.clone())],
         }
     });
     assert_eq!(last.unwrap(), Event::NeedInput);
@@ -2112,7 +2113,8 @@ fn ocsp_stapling_tls12_and_tls13() {
     c.feed(&plain_record(22, &hello.msg()));
     let (out, _) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
         ret: abi::SSL_TLSEXT_ERR_NOACK,
-        response: None,
+        expected: false,
+        responses: Vec::new(),
     });
     let mut client = Client12::new(&hello);
     let flight = client.server_flight(&p, &out);
@@ -2122,7 +2124,8 @@ fn ocsp_stapling_tls12_and_tls13() {
     c.feed(&plain_record(22, &hello.msg()));
     let (_, last) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
         ret: abi::SSL_TLSEXT_ERR_ALERT_FATAL,
-        response: None,
+        expected: false,
+        responses: Vec::new(),
     });
     assert_eq!(
         last.unwrap_err(),
@@ -2135,7 +2138,8 @@ fn ocsp_stapling_tls12_and_tls13() {
     c.feed(&plain_record(22, &h13.msg()));
     let (out, last) = drive_answering(&mut c, &p, &mut |_| Answer::Status {
         ret: abi::SSL_TLSEXT_ERR_OK,
-        response: Some(response.clone()),
+        expected: true,
+        responses: vec![Some(response.clone())],
     });
     assert_eq!(last.unwrap(), Event::NeedInput);
     let mut client = Client::new();

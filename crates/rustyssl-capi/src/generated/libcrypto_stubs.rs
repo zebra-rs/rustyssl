@@ -88,11 +88,3 @@ pub extern "C" fn EVP_SKEY_import_SKEYMGMT(
 ) -> *mut EVP_SKEY {
     crate::stub::unimplemented("EVP_SKEY_import_SKEYMGMT")
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_STORE_CTX_set_ocsp_resp(
-    _: *mut X509_STORE_CTX,
-    _: *mut stack_st_OCSP_RESPONSE,
-) {
-    crate::stub::unimplemented("X509_STORE_CTX_set_ocsp_resp")
-}

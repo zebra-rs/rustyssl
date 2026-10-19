@@ -967,7 +967,7 @@ pub(crate) fn ext_parse_session_ticket(
 /// Not asked for, a TLS 1.2 body (`SSL_R_BAD_EXTENSION`), or a malformed response.
 pub(crate) fn ext_parse_status_request(
     c: &mut Connection,
-    _p: &dyn Provider,
+    p: &dyn Provider,
     body: &[u8],
     x: &ext::Ctx,
 ) -> Result<Step> {
@@ -984,11 +984,8 @@ pub(crate) fn ext_parse_status_request(
         return Err(Error::decode(abi::SSL_R_BAD_EXTENSION));
     }
     if c.is_tls13() {
-        if x.chainidx != 0 {
-            return Ok(Step::Done);
-        }
-        let s = crate::msgs::cert::CertificateStatus::parse(body)?;
-        c.neg.ocsp_response = Some(s.response);
+        // 3.6 keeps every certificate's response.
+        super::flight::store_cert_status(c, p, x.chainidx, body)?;
         return Ok(Step::Done);
     }
     state(c)?.status_expected = true;

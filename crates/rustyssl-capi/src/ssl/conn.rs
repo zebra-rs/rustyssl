@@ -27,19 +27,20 @@ use rustyssl_abi::{
     SSL_CTRL_GET_NUM_RENEGOTIATIONS, SSL_CTRL_GET_RAW_CIPHERLIST, SSL_CTRL_GET_READ_AHEAD,
     SSL_CTRL_GET_RI_SUPPORT, SSL_CTRL_GET_TLSEXT_STATUS_REQ_EXTS,
     SSL_CTRL_GET_TLSEXT_STATUS_REQ_IDS, SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP,
-    SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE, SSL_CTRL_GET_TOTAL_RENEGOTIATIONS, SSL_CTRL_MODE,
-    SSL_CTRL_SET_CURRENT_CERT, SSL_CTRL_SET_MAX_CERT_LIST, SSL_CTRL_SET_MAX_PIPELINES,
-    SSL_CTRL_SET_MAX_PROTO_VERSION, SSL_CTRL_SET_MAX_SEND_FRAGMENT, SSL_CTRL_SET_MIN_PROTO_VERSION,
-    SSL_CTRL_SET_MSG_CALLBACK, SSL_CTRL_SET_MSG_CALLBACK_ARG, SSL_CTRL_SET_NOT_RESUMABLE_SESS_CB,
-    SSL_CTRL_SET_READ_AHEAD, SSL_CTRL_SET_RETRY_VERIFY, SSL_CTRL_SET_SPLIT_SEND_FRAGMENT,
-    SSL_CTRL_SET_TLSEXT_DEBUG_ARG, SSL_CTRL_SET_TLSEXT_DEBUG_CB, SSL_CTRL_SET_TLSEXT_HOSTNAME,
+    SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP_EX, SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE,
+    SSL_CTRL_GET_TOTAL_RENEGOTIATIONS, SSL_CTRL_MODE, SSL_CTRL_SET_CURRENT_CERT,
+    SSL_CTRL_SET_MAX_CERT_LIST, SSL_CTRL_SET_MAX_PIPELINES, SSL_CTRL_SET_MAX_PROTO_VERSION,
+    SSL_CTRL_SET_MAX_SEND_FRAGMENT, SSL_CTRL_SET_MIN_PROTO_VERSION, SSL_CTRL_SET_MSG_CALLBACK,
+    SSL_CTRL_SET_MSG_CALLBACK_ARG, SSL_CTRL_SET_NOT_RESUMABLE_SESS_CB, SSL_CTRL_SET_READ_AHEAD,
+    SSL_CTRL_SET_RETRY_VERIFY, SSL_CTRL_SET_SPLIT_SEND_FRAGMENT, SSL_CTRL_SET_TLSEXT_DEBUG_ARG,
+    SSL_CTRL_SET_TLSEXT_DEBUG_CB, SSL_CTRL_SET_TLSEXT_HOSTNAME,
     SSL_CTRL_SET_TLSEXT_STATUS_REQ_EXTS, SSL_CTRL_SET_TLSEXT_STATUS_REQ_IDS,
-    SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP, SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE,
-    SSL_CTRL_SET_TMP_DH_CB, SSL_CTX, SSL_MAX_PIPELINES, SSL_METHOD, SSL_NOTHING,
-    SSL_R_NO_METHOD_SPECIFIED, SSL_R_NULL_SSL_CTX, SSL_R_SSL3_EXT_INVALID_SERVERNAME,
-    SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, SSL_RETRY_VERIFY, SSL_verify_cb,
-    SSL3_RT_MAX_PLAIN_LENGTH, TLS_ST_BEFORE, TLSEXT_MAXLEN_host_name, TLSEXT_NAMETYPE_host_name,
-    X509_V_OK, X509_VERIFY_PARAM, pem_password_cb, stack_st_X509_NAME,
+    SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP, SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP_EX,
+    SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE, SSL_CTRL_SET_TMP_DH_CB, SSL_CTX, SSL_MAX_PIPELINES,
+    SSL_METHOD, SSL_NOTHING, SSL_R_NO_METHOD_SPECIFIED, SSL_R_NULL_SSL_CTX,
+    SSL_R_SSL3_EXT_INVALID_SERVERNAME, SSL_R_SSL3_EXT_INVALID_SERVERNAME_TYPE, SSL_RETRY_VERIFY,
+    SSL_verify_cb, SSL3_RT_MAX_PLAIN_LENGTH, TLS_ST_BEFORE, TLSEXT_MAXLEN_host_name,
+    TLSEXT_NAMETYPE_host_name, X509_V_OK, X509_VERIFY_PARAM, pem_password_cb, stack_st_X509_NAME,
 };
 
 use super::cert::{Cert, Owner};
@@ -114,6 +115,8 @@ pub(crate) struct SslState {
     /// The OCSP response to staple (owned C memory), and its length.
     pub(crate) ocsp_resp: *mut u8,
     pub(crate) ocsp_resp_len: usize,
+    /// 3.6's parsed OCSP responses (owned; `s->ext.ocsp.resp_ex`): see `ocsp_resp`.
+    pub(crate) ocsp_resp_ex: *mut rustyssl_abi::stack_st_OCSP_RESPONSE,
     /// The OCSP request's extensions and responder IDs (the application's, not owned until
     /// the handshake uses them, as in OpenSSL).
     pub(crate) ocsp_exts: *mut c_void,
@@ -197,6 +200,8 @@ impl Drop for SslState {
         unsafe { OPENSSL_sk_pop_free(self.peer_ca_names.cast(), Some(ctx::name_free)) };
         // SAFETY: as above.
         unsafe { crate::mem::release(self.ocsp_resp.cast()) };
+        // SAFETY: as above.
+        unsafe { super::ocsp_resp::free_ex(self) };
         // SAFETY: as above.
         unsafe { super::ocsp_req::free(self) };
         // The write BIO first, then the read BIO (BIO_free_all frees a chain only when its
@@ -381,6 +386,7 @@ ffi_export! {
                     cs.status_type
                 },
                 ocsp_resp: ptr::null_mut(),
+                ocsp_resp_ex: ptr::null_mut(),
                 ocsp_resp_len: 0,
                 ocsp_exts: ptr::null_mut(),
                 ocsp_ids: ptr::null_mut(),
@@ -1951,22 +1957,15 @@ ffi_export! {
                 st.ocsp_ids = parg;
                 1
             }
-            SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP => {
-                // SAFETY: the caller's slot.
-                unsafe { parg.cast::<*mut u8>().write(st.ocsp_resp) };
-                match c_long::try_from(st.ocsp_resp_len) {
-                    Ok(n) if n > 0 => n,
-                    _ => -1,
-                }
-            }
-            SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP => {
-                let old = core::mem::replace(&mut st.ocsp_resp, parg.cast());
-                st.ocsp_resp_len = usize::try_from(larg).unwrap_or(0);
-                drop(st);
-                // SAFETY: the response we owned (C memory), or NULL.
-                unsafe { crate::mem::release(old.cast()) };
-                1
-            }
+            // 3.6 keeps the responses parsed (`ssl/ocsp_resp.rs`).
+            // SAFETY: the caller's slot.
+            SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP => unsafe { super::ocsp_resp::get_resp(&mut st, parg) },
+            // SAFETY: the caller's `larg` octets of C memory, now ours.
+            SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP => unsafe { super::ocsp_resp::set_resp(&mut st, parg, larg) },
+            // SAFETY: the caller's slot.
+            SSL_CTRL_GET_TLSEXT_STATUS_REQ_OCSP_RESP_EX => unsafe { super::ocsp_resp::get_ex(&st, parg) },
+            // SAFETY: the caller's stack, now ours.
+            SSL_CTRL_SET_TLSEXT_STATUS_REQ_OCSP_RESP_EX => unsafe { super::ocsp_resp::set_ex(&mut st, parg) },
             SSL_CTRL_SET_MSG_CALLBACK_ARG => {
                 st.msg_callback_arg = parg;
                 1
