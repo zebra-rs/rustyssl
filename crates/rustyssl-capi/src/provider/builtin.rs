@@ -34,12 +34,17 @@ pub(crate) static PREDEFINED: &[(&CStr, OSSL_provider_init_fn, bool)] = &[
     (c"null", Some(null_init), false),
 ];
 
-/// The context of `default` and `base`: what OpenSSL's `PROV_CTX` holds so far.
+/// The context of `default` and `base`: what OpenSSL's `PROV_CTX` holds so far, its first two
+/// fields in its order (`providers/common/include/prov/provider_ctx.h`). A provider built with
+/// OpenSSL's `provider_ctx.c` can hand the built-ins' functions a context of its own, as
+/// upstream's `filterprov.c` does forwarding to the default provider, and the built-ins read
+/// its library context and handle where OpenSSL's do.
+#[repr(C)]
 struct ProvCtx {
-    /// The library context the provider was loaded into.
-    libctx: *mut OPENSSL_CORE_CTX,
     /// The provider's handle (its `OSSL_PROVIDER`).
     handle: *const OSSL_CORE_HANDLE,
+    /// The library context the provider was loaded into.
+    libctx: *mut OPENSSL_CORE_CTX,
 }
 
 /// `PROV_LIBCTX_OF`: the library context of the default or base provider's context `provctx`
