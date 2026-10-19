@@ -51,17 +51,17 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// `RSA_new` with an engine: NULL only (rustyssl has no engines; another pointer aborts).
+    /// `RSA_new` with the engine's RSA method (the engine initialized, and kept until the key
+    /// is freed); with NULL, the default RSA engine's, if any. NULL (`ERR_R_ENGINE_LIB`) if the
+    /// engine doesn't initialize or has no RSA method.
     ///
     /// # Safety
-    /// `engine` is NULL.
+    /// `engine` is NULL or a live engine.
     pub unsafe extern "C" fn RSA_new_method(engine: *mut ENGINE) -> *mut RSA
     where failure = ptr::null_mut(), library = ERR_LIB_RSA
     {
-        if !engine.is_null() {
-            crate::stub::unimplemented("RSA_new_method with an engine (rustyssl has none)");
-        }
-        Rsa::new_handle_in(ptr::null_mut(), Kind::Rsa)
+        // SAFETY: the caller's guarantee.
+        unsafe { Rsa::new_handle_engine(ptr::null_mut(), Kind::Rsa, engine) }
     }
 }
 
@@ -122,6 +122,10 @@ ffi_export! {
             // SAFETY: the method's function takes the key; no lock is held.
             unsafe { finish(rsa) };
         }
+        // The engine the old method came from is let go.
+        let engine = core::mem::replace(&mut k.legacy().engine, Ptr(ptr::null_mut()));
+        // SAFETY: the key's functional reference, or NULL.
+        unsafe { crate::engine::ENGINE_finish(engine.0) };
         k.legacy().meth = Ptr(meth.cast_mut());
         // SAFETY: the caller's guarantee.
         if let Some(init) = unsafe { fns_of(meth) }.and_then(|f| f.init) {
@@ -239,14 +243,15 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// The key's engine: none.
+    /// The engine the key's method came from, or NULL.
     ///
     /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn RSA_get0_engine(_r: *const RSA) -> *mut ENGINE
+    /// `r` is NULL or a live key.
+    pub unsafe extern "C" fn RSA_get0_engine(r: *const RSA) -> *mut ENGINE
     where failure = ptr::null_mut(), library = ERR_LIB_RSA
     {
-        ptr::null_mut()
+        // SAFETY: the caller's guarantee.
+        unsafe { key(r) }.map_or(ptr::null_mut(), |k| k.legacy().engine.0)
     }
 }
 

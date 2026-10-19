@@ -407,6 +407,43 @@ unsafe fn finish_locked(mut g: Guard, e: *mut ENGINE) -> (Guard, c_int) {
     (g, result)
 }
 
+/// The engine a new legacy key (`RSA`, `DSA`, `DH`, `EC_KEY`) takes its method from, as their
+/// `*_new_intern` functions choose it: `engine` itself, initialized (a functional reference
+/// the key keeps), else the kind's default engine, if any. With an engine, its method of the
+/// kind (`get_method`), which it must have. `Ok((engine or NULL, method or NULL for the
+/// library's default))`, or `Err` when the engine doesn't initialize or has no such method
+/// (the caller raises `ERR_R_ENGINE_LIB`).
+///
+/// # Safety
+/// `engine` is NULL or a live engine.
+pub(crate) unsafe fn key_method<T>(
+    engine: *mut ENGINE,
+    get_default: unsafe extern "C" fn() -> *mut ENGINE,
+    get_method: unsafe extern "C" fn(*const ENGINE) -> *const T,
+) -> Result<(*mut ENGINE, *const T), ()> {
+    let e = if engine.is_null() {
+        // SAFETY: no preconditions.
+        unsafe { get_default() }
+    } else {
+        // SAFETY: the caller's guarantee.
+        if unsafe { ENGINE_init(engine) } == 0 {
+            return Err(());
+        }
+        engine
+    };
+    if e.is_null() {
+        return Ok((e, ptr::null()));
+    }
+    // SAFETY: an initialized engine.
+    let m = unsafe { get_method(e) };
+    if m.is_null() {
+        // SAFETY: the functional reference taken above.
+        unsafe { ENGINE_finish(e) };
+        return Err(());
+    }
+    Ok((e, m))
+}
+
 /// Raises `ERR_R_PASSED_NULL_PARAMETER` from `function` (for the ENGINE library).
 fn null_parameter(function: &str) {
     err::raise(ERR_LIB_ENGINE, ERR_R_PASSED_NULL_PARAMETER, function);

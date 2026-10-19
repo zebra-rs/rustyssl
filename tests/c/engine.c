@@ -606,6 +606,109 @@ static void test_ex_data(void)
     ENGINE_free(e);
 }
 
+/* Keys made with an engine take its method and keep it initialized until they're freed. */
+static int key_inits;
+
+static int rsa_init(RSA *r)
+{
+    (void)r;
+    key_inits++;
+    return 1;
+}
+
+static int ec_init(EC_KEY *k)
+{
+    (void)k;
+    key_inits++;
+    return 1;
+}
+
+static void test_keys(void)
+{
+    ENGINE *e = app_engine("rustyssl-keys"), *bare = app_engine("rustyssl-bare");
+    RSA_METHOD *rm = RSA_meth_dup(RSA_PKCS1_OpenSSL());
+    DSA_METHOD *dm = DSA_meth_dup(DSA_OpenSSL());
+    DH_METHOD *hm = DH_meth_dup(DH_OpenSSL());
+    EC_KEY_METHOD *em = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
+    RSA *r, *r2;
+    DSA *d;
+    DH *h;
+    EC_KEY *k, *k2;
+
+    RSA_meth_set1_name(rm, "engine RSA");
+    RSA_meth_set_init(rm, rsa_init);
+    EC_KEY_METHOD_set_init(em, ec_init, NULL, NULL, NULL, NULL, NULL);
+    check(ENGINE_set_RSA(e, rm) == 1 && ENGINE_set_DSA(e, dm) == 1 && ENGINE_set_DH(e, hm) == 1
+              && ENGINE_set_EC(e, em) == 1 && ENGINE_set_init_function(e, app_init) == 1
+              && ENGINE_set_finish_function(e, app_finish) == 1,
+          "an engine with key methods");
+    inits = finishes = key_inits = 0;
+
+    r = RSA_new_method(e);
+    check(r != NULL && RSA_get_method(r) == rm && RSA_get0_engine(r) == e, "RSA_new_method");
+    printf("  RSA: engine inits %d, key inits %d\n", inits, key_inits);
+    d = DSA_new_method(e);
+    check(d != NULL && DSA_get_method(d) == dm && DSA_get0_engine(d) == e, "DSA_new_method");
+    h = DH_new_method(e);
+    check(h != NULL && DH_get0_engine(h) == e, "DH_new_method");
+    k = EC_KEY_new_method(e);
+    check(k != NULL && EC_KEY_get_method(k) == em && EC_KEY_get0_engine(k) == e,
+          "EC_KEY_new_method");
+    printf("  four keys: engine inits %d, finishes %d, key inits %d\n", inits, finishes,
+           key_inits);
+    DSA_free(d);
+    DH_free(h);
+    printf("  two freed: finishes %d\n", finishes);
+
+    check(RSA_set_method(r, RSA_PKCS1_OpenSSL()) == 1 && RSA_get0_engine(r) == NULL,
+          "RSA_set_method lets the engine go");
+    printf("  after RSA_set_method: finishes %d\n", finishes);
+    RSA_free(r);
+
+    /* A copy takes the source's engine. */
+    k2 = EC_KEY_new();
+    check(k2 != NULL && EC_KEY_copy(k2, k) == k2 && EC_KEY_get0_engine(k2) == e
+              && EC_KEY_get_method(k2) == em,
+          "EC_KEY_copy takes the engine");
+    printf("  after the copy: inits %d, key inits %d\n", inits, key_inits);
+    EC_KEY_free(k2);
+    EC_KEY_free(k);
+    printf("  all freed: finishes %d\n", finishes);
+
+    /* The default RSA engine is the one RSA_new uses. */
+    check(ENGINE_set_default_RSA(e) == 1, "ENGINE_set_default_RSA");
+    r = RSA_new();
+    check(r != NULL && RSA_get0_engine(r) == e && RSA_get_method(r) == rm,
+          "RSA_new takes the default engine");
+    r2 = RSA_new_method(NULL);
+    check(r2 != NULL && RSA_get0_engine(r2) == e, "RSA_new_method(NULL) too");
+    RSA_free(r);
+    RSA_free(r2);
+    ENGINE_unregister_RSA(e);
+    r = RSA_new();
+    check(r != NULL && RSA_get0_engine(r) == NULL, "unregistered, no engine");
+    RSA_free(r);
+
+    /* An engine without the method, and one whose init fails. */
+    ERR_clear_error();
+    check(RSA_new_method(bare) == NULL, "an engine without an RSA method");
+    errors("RSA_new_method(bare)");
+    check(EC_KEY_new_method(bare) == NULL, "an engine without an EC_KEY method");
+    errors("EC_KEY_new_method(bare)");
+    init_result = 0;
+    check(DH_new_method(e) == NULL, "an engine that doesn't initialize");
+    errors("DH_new_method");
+    init_result = 1;
+    printf("  at the end: inits %d, finishes %d\n", inits, finishes);
+
+    ENGINE_free(bare);
+    ENGINE_free(e);
+    RSA_meth_free(rm);
+    DSA_meth_free(dm);
+    DH_meth_free(hm);
+    EC_KEY_METHOD_free(em);
+}
+
 int main(void)
 {
     setenv("OPENSSL_ENGINES", "/nonexistent/rustyssl-engines", 1);
@@ -615,6 +718,7 @@ int main(void)
     test_tables();
     test_loaders();
     test_ex_data();
+    test_keys();
     list("at the end");
     printf("1..%d\n", number);
     return failures != 0;
