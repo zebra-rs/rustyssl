@@ -388,7 +388,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_shake128() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_shake128, 0, 128 / 8, XOF | ABSENT, block(Kind::Shake128), fns::NONE);
+        static DIGEST: Static = Static::new(NID_shake128, 0, 128 / 8, XOF | ABSENT, block(Kind::Shake128), fns::NONE_XOF);
         DIGEST.get()
     }
 }
@@ -401,7 +401,7 @@ ffi_export! {
     pub unsafe extern "C" fn EVP_shake256() -> *const EVP_MD
     where failure = ptr::null(), library = ERR_LIB_EVP
     {
-        static DIGEST: Static = Static::new(NID_shake256, 0, 256 / 8, XOF | ABSENT, block(Kind::Shake256), fns::NONE);
+        static DIGEST: Static = Static::new(NID_shake256, 0, 256 / 8, XOF | ABSENT, block(Kind::Shake256), fns::NONE_XOF);
         DIGEST.get()
     }
 }

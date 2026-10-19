@@ -5290,13 +5290,244 @@ const _: unsafe extern "C" fn(*mut EC_builtin_curve, usize) -> usize =
 const _: unsafe extern "C" fn(*mut EDIPARTYNAME) = crate::x509v3::genn::EDIPARTYNAME_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509v3::genn::EDIPARTYNAME_it;
 const _: unsafe extern "C" fn() -> *mut EDIPARTYNAME = crate::x509v3::genn::EDIPARTYNAME_new;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::list::ENGINE_add;
 const _: unsafe extern "C" fn() = crate::conf::builtin::ENGINE_add_conf_module;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut ENGINE =
+    crate::engine::list::ENGINE_by_id;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> core::ffi::c_int =
+    crate::engine::ctrl::ENGINE_cmd_is_executable;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+    ::core::option::Option<unsafe extern "C" fn()>,
+) -> core::ffi::c_int = crate::engine::ctrl::ENGINE_ctrl;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_char,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+    ::core::option::Option<unsafe extern "C" fn()>,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::engine::ctrl::ENGINE_ctrl_cmd;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::engine::ctrl::ENGINE_ctrl_cmd_string;
 const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_finish;
 const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_free;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const DH_METHOD = crate::engine::ENGINE_get_DH;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const DSA_METHOD = crate::engine::ENGINE_get_DSA;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const EC_KEY_METHOD = crate::engine::ENGINE_get_EC;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const RAND_METHOD = crate::engine::ENGINE_get_RAND;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const RSA_METHOD = crate::engine::ENGINE_get_RSA;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> *const EVP_CIPHER =
+    crate::engine::table::ENGINE_get_cipher;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
-    crate::engine::ENGINE_get_cipher_engine;
+    crate::engine::table::ENGINE_get_cipher_engine;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_CIPHERS_PTR =
+    crate::engine::ENGINE_get_ciphers;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const ENGINE_CMD_DEFN =
+    crate::engine::ENGINE_get_cmd_defns;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_CTRL_FUNC_PTR =
+    crate::engine::ENGINE_get_ctrl_function;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::table::ENGINE_get_default_DH;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::table::ENGINE_get_default_DSA;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::table::ENGINE_get_default_EC;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::table::ENGINE_get_default_RAND;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::table::ENGINE_get_default_RSA;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_GEN_INT_FUNC_PTR =
+    crate::engine::ENGINE_get_destroy_function;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> *const EVP_MD =
+    crate::engine::table::ENGINE_get_digest;
 const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
-    crate::engine::ENGINE_get_digest_engine;
+    crate::engine::table::ENGINE_get_digest_engine;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_DIGESTS_PTR =
+    crate::engine::ENGINE_get_digests;
+const _: unsafe extern "C" fn(*const ENGINE, core::ffi::c_int) -> *mut core::ffi::c_void =
+    crate::engine::ENGINE_get_ex_data;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_GEN_INT_FUNC_PTR =
+    crate::engine::ENGINE_get_finish_function;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::list::ENGINE_get_first;
+const _: unsafe extern "C" fn(*const ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_get_flags;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const core::ffi::c_char =
+    crate::engine::ENGINE_get_id;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_GEN_INT_FUNC_PTR =
+    crate::engine::ENGINE_get_init_function;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::list::ENGINE_get_last;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_LOAD_KEY_PTR =
+    crate::engine::ENGINE_get_load_privkey_function;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_LOAD_KEY_PTR =
+    crate::engine::ENGINE_get_load_pubkey_function;
+const _: unsafe extern "C" fn(*const ENGINE) -> *const core::ffi::c_char =
+    crate::engine::ENGINE_get_name;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut ENGINE = crate::engine::list::ENGINE_get_next;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> *const EVP_PKEY_ASN1_METHOD =
+    crate::engine::table::ENGINE_get_pkey_asn1_meth;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
+    crate::engine::table::ENGINE_get_pkey_asn1_meth_engine;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *const EVP_PKEY_ASN1_METHOD = crate::engine::table::ENGINE_get_pkey_asn1_meth_str;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_PKEY_ASN1_METHS_PTR =
+    crate::engine::ENGINE_get_pkey_asn1_meths;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> *const EVP_PKEY_METHOD =
+    crate::engine::table::ENGINE_get_pkey_meth;
+const _: unsafe extern "C" fn(core::ffi::c_int) -> *mut ENGINE =
+    crate::engine::table::ENGINE_get_pkey_meth_engine;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_PKEY_METHS_PTR =
+    crate::engine::ENGINE_get_pkey_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> *mut ENGINE = crate::engine::list::ENGINE_get_prev;
+const _: unsafe extern "C" fn(*const ENGINE) -> ENGINE_SSL_CLIENT_CERT_PTR =
+    crate::engine::ENGINE_get_ssl_client_cert_function;
+const _: unsafe extern "C" fn() -> *mut core::ffi::c_void = crate::engine::ENGINE_get_static_state;
+const _: unsafe extern "C" fn() -> core::ffi::c_uint = crate::engine::table::ENGINE_get_table_flags;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_init;
+const _: unsafe extern "C" fn() = crate::engine::list::ENGINE_load_builtin_engines;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_char,
+    *mut UI_METHOD,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::engine::pkey::ENGINE_load_private_key;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *const core::ffi::c_char,
+    *mut UI_METHOD,
+    *mut core::ffi::c_void,
+) -> *mut EVP_PKEY = crate::engine::pkey::ENGINE_load_public_key;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    *mut SSL,
+    *mut stack_st_X509_NAME,
+    *mut *mut X509,
+    *mut *mut EVP_PKEY,
+    *mut *mut stack_st_X509,
+    *mut UI_METHOD,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::engine::pkey::ENGINE_load_ssl_client_cert;
+const _: unsafe extern "C" fn() -> *mut ENGINE = crate::engine::ENGINE_new;
+const _: unsafe extern "C" fn(
+    *mut *mut ENGINE,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *const EVP_PKEY_ASN1_METHOD = crate::engine::table::ENGINE_pkey_asn1_find_str;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_DH;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_DSA;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_EC;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_RAND;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_RSA;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_DH;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_DSA;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_EC;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_RAND;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_RSA;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_ciphers;
+const _: unsafe extern "C" fn() -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_all_complete;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_digests;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_pkey_asn1_meths;
+const _: unsafe extern "C" fn() = crate::engine::table::ENGINE_register_all_pkey_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_ciphers;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_complete;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_digests;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_pkey_asn1_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_register_pkey_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::list::ENGINE_remove;
+const _: unsafe extern "C" fn(*mut ENGINE, *const DH_METHOD) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_DH;
+const _: unsafe extern "C" fn(*mut ENGINE, *const DSA_METHOD) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_DSA;
+const _: unsafe extern "C" fn(*mut ENGINE, *const EC_KEY_METHOD) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_EC;
+const _: unsafe extern "C" fn(*mut ENGINE, *const RAND_METHOD) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_RAND;
+const _: unsafe extern "C" fn(*mut ENGINE, *const RSA_METHOD) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_RSA;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_CIPHERS_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_ciphers;
+const _: unsafe extern "C" fn(*mut ENGINE, *const ENGINE_CMD_DEFN) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_cmd_defns;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_CTRL_FUNC_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_ctrl_function;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_uint) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_DH;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_DSA;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_EC;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_RAND;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_RSA;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_ciphers;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_digests;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_pkey_asn1_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_pkey_meths;
+const _: unsafe extern "C" fn(*mut ENGINE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::engine::table::ENGINE_set_default_string;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_GEN_INT_FUNC_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_destroy_function;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_DIGESTS_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_digests;
+const _: unsafe extern "C" fn(
+    *mut ENGINE,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::engine::ENGINE_set_ex_data;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_GEN_INT_FUNC_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_finish_function;
+const _: unsafe extern "C" fn(*mut ENGINE, core::ffi::c_int) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_flags;
+const _: unsafe extern "C" fn(*mut ENGINE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_id;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_GEN_INT_FUNC_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_init_function;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_LOAD_KEY_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_load_privkey_function;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_LOAD_KEY_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_load_pubkey_function;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_SSL_CLIENT_CERT_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_load_ssl_client_cert_function;
+const _: unsafe extern "C" fn(*mut ENGINE, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_name;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_PKEY_ASN1_METHS_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_pkey_asn1_meths;
+const _: unsafe extern "C" fn(*mut ENGINE, ENGINE_PKEY_METHS_PTR) -> core::ffi::c_int =
+    crate::engine::ENGINE_set_pkey_meths;
+const _: unsafe extern "C" fn(core::ffi::c_uint) = crate::engine::table::ENGINE_set_table_flags;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_DH;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_DSA;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_EC;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_RAND;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_RSA;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_ciphers;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_digests;
+const _: unsafe extern "C" fn(*mut ENGINE) =
+    crate::engine::table::ENGINE_unregister_pkey_asn1_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) = crate::engine::table::ENGINE_unregister_pkey_meths;
+const _: unsafe extern "C" fn(*mut ENGINE) -> core::ffi::c_int = crate::engine::ENGINE_up_ref;
 const _: unsafe extern "C" fn(core::ffi::c_int, ...) = crate::err::ERR_add_error_data;
 const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut BIO) =
     crate::err::strings::ERR_add_error_mem_bio;

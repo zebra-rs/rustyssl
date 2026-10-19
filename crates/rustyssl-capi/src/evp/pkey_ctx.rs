@@ -106,6 +106,16 @@ pub(crate) struct State {
     data: Ptr<c_void>,
     pkey_gencb: EVP_PKEY_gen_cb,
     keygen_info: KeygenInfo,
+    /// The engine the method came from, with a functional reference, or NULL.
+    engine: Ptr<ENGINE>,
+}
+
+impl Drop for State {
+    fn drop(&mut self) {
+        // SAFETY: the context's functional reference, or NULL; its lock isn't held (the state
+        // is being dropped with the context).
+        unsafe { crate::engine::ENGINE_finish(self.engine.0) };
+    }
 }
 
 handle_type!(EVP_PKEY_CTX => PkeyCtx);
@@ -151,6 +161,7 @@ impl State {
             data: Ptr(ptr::null_mut()),
             pkey_gencb: None,
             keygen_info: KeygenInfo::None(0),
+            engine: Ptr(ptr::null_mut()),
         }
     }
 
@@ -429,6 +440,8 @@ struct Resolved {
     keymgmt: Option<keymgmt::Ref>,
     pmeth: Option<pmeth::Ref>,
     id: c_int,
+    /// The engine `pmeth` came from, with a functional reference the context takes, or NULL.
+    engine: *mut ENGINE,
 }
 
 /// `int_ctx_new`'s choice of key type and key manager, or `None` with an error.
@@ -438,7 +451,7 @@ struct Resolved {
 unsafe fn resolve(
     libctx: *mut OSSL_LIB_CTX,
     pkey: Option<&PkeyRef>,
-    e: *mut ENGINE,
+    mut e: *mut ENGINE,
     keytype: Option<&CStr>,
     propq: Option<&CStr>,
     mut id: c_int,
@@ -469,31 +482,56 @@ unsafe fn resolve(
             return None;
         }
     } else {
-        // There are no engines (their API can't make one), so an engine argument can't be
-        // initialized.
+        // An engine makes the context entirely legacy: no key type name to fetch by.
         if !e.is_null() {
-            err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
-            return None;
+            keytype = None;
         }
         // A foreign key (its legacy data an application method's) keeps to the type's
         // `EVP_PKEY_METHOD`; any other key goes to the providers by its type's name.
         let foreign = pkey.is_some_and(|k| k.get().lock().foreign);
-        if !foreign {
+        if e.is_null() && !foreign {
             // SAFETY: a type number.
             let sn = unsafe { OBJ_nid2sn(id) };
             // SAFETY: NULL or a static string.
             keytype = unsafe { text(sn) }.map(CStr::to_owned);
         }
-        // OpenSSL searches for an engine implementing the type first.
-        pkey::ameth::engine_lookup();
-        if foreign {
+        if e.is_null()
+            && let Some(k) = pkey
+        {
+            let k = k.get();
+            e = k.pmeth_engine();
+            if e.is_null() {
+                e = k.engine();
+            }
+        }
+        if e.is_null() {
+            // OpenSSL searches for an engine implementing the type first.
+            pkey::ameth::engine_lookup();
+            // SAFETY: no preconditions; a functional reference, or NULL.
+            e = unsafe { crate::engine::table::ENGINE_get_pkey_meth_engine(id) };
+        } else {
+            // SAFETY: the caller's live engine, or the key's; its `init` may run.
+            if unsafe { crate::engine::ENGINE_init(e) } == 0 {
+                err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, F);
+                return None;
+            }
+        }
+        if !e.is_null() {
+            // SAFETY: an initialized engine; its method callback may run.
+            let m = unsafe { crate::engine::table::ENGINE_get_pkey_meth(e, id) };
+            // SAFETY: the engine's method, or NULL; the context takes a reference.
+            builtin_pmeth = unsafe { pmeth::Ref::new(m) };
+        } else if foreign {
             builtin_pmeth = pmeth::find(id);
         } else {
             app_pmeth = pmeth::find_app(id);
         }
     }
     let mut keymgmt = None;
-    if let Some(t) = keytype.as_ref().filter(|_| app_pmeth.is_none()) {
+    if let Some(t) = keytype
+        .as_ref()
+        .filter(|_| app_pmeth.is_none() && e.is_null())
+    {
         let km = match pkey.and_then(|k| k.get().provided().0) {
             Some(m) => Some(m),
             // SAFETY: the caller's guarantee.
@@ -515,6 +553,13 @@ unsafe fn resolve(
     let pmeth = app_pmeth.or(builtin_pmeth);
     if keymgmt.is_none() && pmeth.is_none() {
         err::raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_ALGORITHM, F);
+    }
+    if pmeth.is_none() && !e.is_null() {
+        // SAFETY: the functional reference taken above.
+        unsafe { crate::engine::ENGINE_finish(e) };
+        e = ptr::null_mut();
+    }
+    if keymgmt.is_none() && pmeth.is_none() {
         return None;
     }
     Some(Resolved {
@@ -522,6 +567,7 @@ unsafe fn resolve(
         keymgmt,
         pmeth,
         id,
+        engine: e,
     })
 }
 
@@ -549,6 +595,7 @@ unsafe fn int_ctx_new(
         r.id,
     );
     state.pkey = pkey;
+    state.engine = Ptr(r.engine);
     let init = r.pmeth.as_ref().and_then(|m| m.get().funcs().init);
     state.pmeth = r.pmeth;
     let ctx = EVP_PKEY_CTX::new_handle(PkeyCtx {
@@ -581,7 +628,10 @@ pub(crate) unsafe fn keymgmt_for(
     propq: Option<&CStr>,
 ) -> Option<keymgmt::Ref> {
     // SAFETY: the caller's guarantee.
-    unsafe { resolve(libctx, Some(pkey), ptr::null_mut(), None, propq, -1) }?.keymgmt
+    let r = unsafe { resolve(libctx, Some(pkey), ptr::null_mut(), None, propq, -1) }?;
+    // SAFETY: the reference the resolution took (for the key's engine), or NULL.
+    unsafe { crate::engine::ENGINE_finish(r.engine) };
+    r.keymgmt
 }
 
 ffi_export! {
@@ -589,7 +639,8 @@ ffi_export! {
     /// error if there's none.
     ///
     /// # Safety
-    /// `pkey` is NULL or a live key; `e` must be NULL (there are no engines).
+    /// `pkey` is NULL or a live key; `e` is NULL or a live engine (whose `EVP_PKEY_METHOD` the
+    /// context then uses).
     pub unsafe extern "C" fn EVP_PKEY_CTX_new(pkey: *mut EVP_PKEY, e: *mut ENGINE) -> *mut EVP_PKEY_CTX
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
@@ -605,7 +656,7 @@ ffi_export! {
     /// there's no key manager for it.
     ///
     /// # Safety
-    /// `e` must be NULL (there are no engines).
+    /// `e` is NULL or a live engine (whose `EVP_PKEY_METHOD` the context then uses).
     pub unsafe extern "C" fn EVP_PKEY_CTX_new_id(id: c_int, e: *mut ENGINE) -> *mut EVP_PKEY_CTX
     where failure = ptr::null_mut(), library = ERR_LIB_EVP
     {
@@ -681,6 +732,13 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         let Some(c) = (unsafe { context(pctx) }) else { return ptr::null_mut() };
+        // The copy takes its own functional reference to the context's engine.
+        let engine = c.lock().engine.0;
+        // SAFETY: the context's engine; its `init` may run (no lock is held).
+        if !engine.is_null() && unsafe { crate::engine::ENGINE_init(engine) } == 0 {
+            err::raise(ERR_LIB_EVP, ERR_R_ENGINE_LIB, "EVP_PKEY_CTX_dup");
+            return ptr::null_mut();
+        }
         let s = c.lock();
         let mut new = State::new(
             s.libctx.0,
@@ -745,6 +803,9 @@ ffi_export! {
         if s.is_gen_op() {
             return ptr::null_mut();
         }
+        // The copy holds the engine from here on. The returns above keep the reference taken
+        // for it without holding it, as OpenSSL's do (they come before `rctx->engine` is set).
+        new.engine = Ptr(engine);
         new.peerkey = s.peerkey.clone();
         if let Some(m) = s.pmeth.clone() {
             drop(s);

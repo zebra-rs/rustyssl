@@ -188,6 +188,8 @@ pub(crate) struct Legacy {
     /// An RSA-PSS key's restrictions as OpenSSL's `rsa->pss` holds them (owned), or NULL:
     /// what `RSA_get0_pss_params` returns, prints, and limits legacy signing.
     pub(crate) pss: Ptr<rustyssl_abi::RSA_PSS_PARAMS>,
+    /// The engine the method came from, with a functional reference, or NULL.
+    pub(crate) engine: Ptr<rustyssl_abi::ENGINE>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -244,7 +246,41 @@ impl Rsa {
     /// `rsa_new_intern`: an empty key of `kind` in `libctx` with the default method (whose
     /// `init` it runs), or NULL with the error raised.
     pub(crate) fn new_handle_in(libctx: *mut OSSL_LIB_CTX, kind: Kind) -> *mut RSA {
-        let meth = crate::rsa_meth::default_method();
+        // SAFETY: no engine.
+        unsafe { Self::new_handle_engine(libctx, kind, ptr::null_mut()) }
+    }
+
+    /// `rsa_new_intern` with an engine: the key takes its method from `engine` (initialized),
+    /// else from the default RSA engine if there is one, else the default method.
+    ///
+    /// # Safety
+    /// `engine` is NULL or a live engine.
+    pub(crate) unsafe fn new_handle_engine(
+        libctx: *mut OSSL_LIB_CTX,
+        kind: Kind,
+        engine: *mut rustyssl_abi::ENGINE,
+    ) -> *mut RSA {
+        // SAFETY: the caller's guarantee.
+        let chosen = unsafe {
+            crate::engine::key_method(
+                engine,
+                crate::engine::table::ENGINE_get_default_RSA,
+                crate::engine::ENGINE_get_RSA,
+            )
+        };
+        let Ok((engine, emeth)) = chosen else {
+            err::raise(
+                ERR_LIB_RSA,
+                rustyssl_abi::ERR_R_ENGINE_LIB,
+                "rsa_new_intern",
+            );
+            return ptr::null_mut();
+        };
+        let meth = if emeth.is_null() {
+            crate::rsa_meth::default_method()
+        } else {
+            emeth
+        };
         // SAFETY: the default method is live (built in, or the application's).
         let mflags = unsafe { crate::rsa_meth::flags(meth) };
         let h = RSA::new_handle(Rsa {
@@ -263,6 +299,7 @@ impl Rsa {
                 version: 0,
                 listed_primes: false,
                 pss: Ptr(ptr::null_mut()),
+                engine: Ptr(engine),
             }),
             ex_data: ExData(UnsafeCell::new(CRYPTO_EX_DATA {
                 ctx: ptr::null_mut(),
@@ -561,6 +598,9 @@ pub(crate) unsafe fn free(r: *mut RSA) {
         // SAFETY: the method's function takes the key.
         unsafe { finish(r) };
     }
+    let engine = core::mem::replace(&mut held.legacy().engine, Ptr(ptr::null_mut()));
+    // SAFETY: the key's functional reference to its engine, or NULL.
+    unsafe { crate::engine::ENGINE_finish(engine.0) };
     // SAFETY: the key's own ex_data; its last reference.
     unsafe { CRYPTO_free_ex_data(CRYPTO_EX_INDEX_RSA, r.cast(), held.ex_data()) };
     // SAFETY: the last reference; the hold keeps the key until this returns.

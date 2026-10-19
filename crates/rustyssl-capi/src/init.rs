@@ -10,8 +10,9 @@
 //!   `OPENSSL_init_crypto` fails.
 //!
 //! `OPENSSL_INIT_ASYNC` needs nothing set up: the job state is per thread, made on first use
-//! ([`crate::async_job`]). The `OPENSSL_INIT_ENGINE_*` flags load no engines: rustyssl has none. `OPENSSL_INIT_LOAD_CONFIG` loads the configuration
-//! file into the default library context and runs its modules ([`crate::conf::modules`]).
+//! ([`crate::async_job`]). The `OPENSSL_INIT_ENGINE_*` flags load the built-in engines
+//! ([`crate::engine`]). `OPENSSL_INIT_LOAD_CONFIG` loads the configuration file into the
+//! default library context and runs its modules ([`crate::conf::modules`]).
 
 use core::ffi::{CStr, c_char, c_int, c_long, c_ulong, c_void};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -196,8 +197,8 @@ fn init(opts: u64, settings: *const OPENSSL_INIT_SETTINGS) -> Option<u64> {
             return None;
         }
     }
-    // The `OPENSSL_INIT_ENGINE_*` flags load OpenSSL's built-in engines; rustyssl has none
-    // (docs/DEVIATIONS.md), so they load none. The ENGINE functions themselves still abort.
+    // The `OPENSSL_INIT_ENGINE_*` flags: the built-in engines, then their registration.
+    crate::engine::load_builtins(opts);
     Some(done)
 }
 
@@ -324,6 +325,8 @@ ffi_export! {
         }
         // `ossl_config_modules_free`: every module instance finished, every module forgotten.
         crate::conf::modules::free_all();
+        // `engine_cleanup_int`: the method tables, then the engine list.
+        crate::engine::cleanup();
         // SAFETY: no preconditions; a heap still in use stays up, as in OpenSSL.
         unsafe { crate::secure::CRYPTO_secure_malloc_done() };
         BASE.store(false, Ordering::Release);

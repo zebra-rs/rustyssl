@@ -13,8 +13,8 @@ use core::ffi::{c_char, c_int, c_uint, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    CMAC_CTX, ERR_LIB_PROV, EVP_CIPH_CBC_MODE, EVP_CIPH_GCM_MODE, EVP_CIPHER, EVP_CIPHER_CTX,
-    EVP_CTRL_AEAD_SET_IVLEN, EVP_GCM_TLS_TAG_LEN, EVP_MD, EVP_MD_CTX, HMAC_CTX,
+    CMAC_CTX, ENGINE, ERR_LIB_PROV, EVP_CIPH_CBC_MODE, EVP_CIPH_GCM_MODE, EVP_CIPHER,
+    EVP_CIPHER_CTX, EVP_CTRL_AEAD_SET_IVLEN, EVP_GCM_TLS_TAG_LEN, EVP_MD, EVP_MD_CTX, HMAC_CTX,
     OSSL_ALG_PARAM_CIPHER, OSSL_ALG_PARAM_DIGEST, OSSL_ALG_PARAM_ENGINE, OSSL_ALG_PARAM_PROPERTIES,
     OSSL_ALGORITHM, OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_FUNC_MAC_DUPCTX, OSSL_FUNC_MAC_FINAL,
     OSSL_FUNC_MAC_FREECTX, OSSL_FUNC_MAC_GET_CTX_PARAMS, OSSL_FUNC_MAC_GET_PARAMS,
@@ -110,11 +110,15 @@ pub(crate) unsafe fn locate<'a>(
 }
 
 /// `load_common`: the property query (`properties`), or `None` if a parameter is malformed or
-/// names an engine.
+/// the engine it names isn't there or doesn't initialize. `engine` is let go and replaced by
+/// the one the `engine` parameter names (a functional reference), or NULL.
 ///
 /// # Safety
-/// `params` is NULL or a parameter array.
-pub(crate) unsafe fn load_common(params: *const OSSL_PARAM) -> Option<*const c_char> {
+/// `params` is NULL or a parameter array; `engine` is NULL or a functional reference.
+pub(crate) unsafe fn load_common(
+    params: *const OSSL_PARAM,
+    engine: &mut *mut ENGINE,
+) -> Option<*const c_char> {
     let mut propquery = ptr::null();
     // SAFETY: the caller's guarantee.
     if let Some(p) = unsafe { locate(params, OSSL_ALG_PARAM_PROPERTIES) } {
@@ -123,17 +127,38 @@ pub(crate) unsafe fn load_common(params: *const OSSL_PARAM) -> Option<*const c_c
         }
         propquery = p.data.cast_const().cast();
     }
-    // No engines (docs/DEVIATIONS.md).
+    let old = core::mem::replace(engine, ptr::null_mut());
+    // SAFETY: the caller's functional reference, or NULL; the engine's `finish` may run.
+    unsafe { crate::engine::ENGINE_finish(old) };
     // SAFETY: as above.
-    if unsafe { locate(params, OSSL_ALG_PARAM_ENGINE) }.is_some() {
-        return None;
+    if let Some(p) = unsafe { locate(params, OSSL_ALG_PARAM_ENGINE) } {
+        if p.data_type != OSSL_PARAM_UTF8_STRING as u32 {
+            return None;
+        }
+        // A structural reference, then a functional one, then the structural one let go.
+        // SAFETY: the parameter's string.
+        let e = unsafe { crate::engine::list::ENGINE_by_id(p.data.cast_const().cast()) };
+        if e.is_null() {
+            return None;
+        }
+        // SAFETY: the engine found; its `init` may run.
+        if unsafe { crate::engine::ENGINE_init(e) } == 0 {
+            // SAFETY: the structural reference.
+            unsafe { crate::engine::ENGINE_free(e) };
+            return None;
+        }
+        // SAFETY: as above.
+        unsafe { crate::engine::ENGINE_free(e) };
+        *engine = e;
     }
     Some(propquery)
 }
 
-/// `PROV_DIGEST`/`PROV_CIPHER`: the method a MAC was given, with a reference (NULL for none).
+/// `PROV_DIGEST`/`PROV_CIPHER`: the method a MAC was given, with a reference (NULL for none),
+/// and the engine its implementation comes from (a functional reference, or NULL).
 pub(crate) struct Prov<T: Method> {
     pub(crate) method: *mut T,
+    pub(crate) engine: *mut ENGINE,
 }
 
 /// What a fetched method of either kind offers [`Prov`].
@@ -199,23 +224,34 @@ impl Method for EVP_CIPHER {
 impl<T: Method> Prov<T> {
     pub(crate) const NONE: Self = Self {
         method: ptr::null_mut(),
+        engine: ptr::null_mut(),
     };
 
-    /// `ossl_prov_*_reset`.
+    /// `ossl_prov_*_reset`: the method and the engine let go.
     pub(crate) fn reset(&mut self) {
         // SAFETY: the reference this holds, or NULL.
         unsafe { T::free(self.method) };
         self.method = ptr::null_mut();
+        let e = core::mem::replace(&mut self.engine, ptr::null_mut());
+        // SAFETY: the functional reference this holds, or NULL.
+        unsafe { crate::engine::ENGINE_finish(e) };
     }
 
-    /// `ossl_prov_*_copy`.
+    /// `ossl_prov_*_copy`: another reference to the method and the engine.
     pub(crate) fn copy(&self) -> Option<Self> {
         // SAFETY: the method this holds a reference to.
         if !self.method.is_null() && unsafe { T::up_ref(self.method) } == 0 {
             return None;
         }
+        // SAFETY: the engine this holds a functional reference to.
+        if !self.engine.is_null() && unsafe { crate::engine::ENGINE_init(self.engine) } == 0 {
+            // SAFETY: the reference taken above.
+            unsafe { T::free(self.method) };
+            return None;
+        }
         Some(Self {
             method: self.method,
+            engine: self.engine,
         })
     }
 
@@ -234,8 +270,8 @@ impl<T: Method> Prov<T> {
         if unsafe { is_empty(params) } {
             return true;
         }
-        // SAFETY: as above.
-        let Some(propquery) = (unsafe { load_common(params) }) else {
+        // SAFETY: as above; the engine this holds.
+        let Some(propquery) = (unsafe { load_common(params, &mut self.engine) }) else {
             return false;
         };
         // SAFETY: as above.
@@ -245,7 +281,10 @@ impl<T: Method> Prov<T> {
         if p.data_type != OSSL_PARAM_UTF8_STRING as u32 {
             return false;
         }
-        self.reset();
+        // The method is replaced; the engine just loaded stays.
+        // SAFETY: the reference this holds, or NULL.
+        unsafe { T::free(self.method) };
+        self.method = ptr::null_mut();
         // SAFETY: no preconditions.
         unsafe { ERR_set_mark() };
         // SAFETY: the provider's library context; the parameter's string; the query.
@@ -442,8 +481,8 @@ unsafe fn hmac_setkey(m: &mut HmacData, key: *const u8, keylen: usize) -> c_int 
         let len = u32::try_from(keylen & 0xffff_ffff)
             .unwrap_or(0)
             .cast_signed();
-        // SAFETY: the context's HMAC context; the caller's key; the digest it holds.
-        return unsafe { HMAC_Init_ex(m.ctx, key.cast(), len, digest, ptr::null_mut()) };
+        // SAFETY: the context's HMAC context; the caller's key; the digest and engine it holds.
+        return unsafe { HMAC_Init_ex(m.ctx, key.cast(), len, digest, m.digest.engine) };
     }
     1
 }
@@ -868,7 +907,7 @@ unsafe fn cmac_setkey(m: &mut CmacData, key: *const u8, keylen: usize) -> c_int 
             key.cast(),
             keylen,
             m.cipher.method,
-            ptr::null_mut(),
+            m.cipher.engine,
             ptr::null(),
         )
     };
@@ -1336,8 +1375,8 @@ ffi_callback! {
                 err::raise(ERR_LIB_PROV, PROV_R_INVALID_MODE, "gmac_set_ctx_params");
                 return 0;
             }
-            // SAFETY: the context's cipher context; the cipher it holds.
-            if unsafe { EVP_EncryptInit_ex(m.ctx, m.cipher.method, ptr::null_mut(), ptr::null(), ptr::null()) } == 0 {
+            // SAFETY: the context's cipher context; the cipher and engine it holds.
+            if unsafe { EVP_EncryptInit_ex(m.ctx, m.cipher.method, m.cipher.engine, ptr::null(), ptr::null()) } == 0 {
                 return 0;
             }
         }
@@ -2801,10 +2840,11 @@ mod tests {
     };
     use crate::params::OSSL_PARAM_construct_size_t;
 
-    /// docs/DEVIATIONS.md: there are no engines, so an `engine` parameter fails.
+    /// The `dynamic` engine refuses `ENGINE_init`, so naming it fails, as in the
+    /// reference; a later load without the parameter has no engine.
     #[test]
     #[cfg_attr(miri, ignore = "fetches, which loads the configuration")]
-    fn engines_are_refused() {
+    fn uninitializable_engines_are_refused() {
         let key = [1u8; 16];
         for (mac, param, sub) in [
             (c"HMAC", OSSL_MAC_PARAM_DIGEST, c"SHA256"),

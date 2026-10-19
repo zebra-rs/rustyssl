@@ -1841,15 +1841,20 @@ ffi_export! {
                 if st.max_send_fragment < st.split_send_fragment {
                     st.split_send_fragment = st.max_send_fragment;
                 }
-                let n = st.max_send_fragment;
+                let (n, split) = (st.max_send_fragment, st.split_send_fragment);
                 if let Some(c) = st.drv.tls.as_mut() {
                     c.set_max_send_fragment(n);
+                    c.config_mut().split_send_fragment = split;
                 }
                 1
             }
             SSL_CTRL_SET_SPLIT_SEND_FRAGMENT => match usize::try_from(larg) {
                 Ok(v) if v != 0 && v <= st.max_send_fragment => {
                     st.split_send_fragment = v;
+                    // The running connection's next writes split by it.
+                    if let Some(c) = st.drv.tls.as_mut() {
+                        c.config_mut().split_send_fragment = v;
+                    }
                     1
                 }
                 _ => 0,
@@ -1859,6 +1864,10 @@ ffi_export! {
                     return 0;
                 }
                 st.max_pipelines = usize::try_from(larg).unwrap_or(1);
+                let pipes = st.max_pipelines;
+                if let Some(c) = st.drv.tls.as_mut() {
+                    c.config_mut().max_pipelines = pipes;
+                }
                 1
             }
             SSL_CTRL_GET_RI_SUPPORT => c_long::from(st.send_connection_binding),

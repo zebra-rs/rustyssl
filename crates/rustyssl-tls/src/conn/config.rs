@@ -183,6 +183,8 @@ pub struct Config {
     pub max_send_fragment: usize,
     /// `SSL_set_split_send_fragment`.
     pub split_send_fragment: usize,
+    /// `SSL_set_max_pipelines` (0: unset, one pipeline).
+    pub max_pipelines: usize,
     /// `SSL_CTX_set_block_padding_ex`: application data and handshake (0: none).
     pub block_padding: (usize, usize),
     /// `SSL_set_max_cert_list` (default 100 KiB).

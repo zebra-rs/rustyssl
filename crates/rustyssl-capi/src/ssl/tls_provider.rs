@@ -11,7 +11,7 @@
     reason = "the TLS driver creates an EvpProvider for each SSL; until it lands, the tests do"
 )]
 
-use core::ffi::{CStr, c_char, c_int, c_uint, c_void};
+use core::ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void};
 use core::ptr;
 use std::ffi::CString;
 use std::sync::{Mutex, PoisonError};
@@ -1600,6 +1600,15 @@ struct EvpCipher {
 }
 
 impl Cipher for EvpCipher {
+    fn pipeline(&self) -> bool {
+        let Some(ctx) = &self.ctx else { return false };
+        // SAFETY: the keyed context; its cipher (an engine's, when one supplied it).
+        let c = unsafe { crate::evp::cipher_ctx::EVP_CIPHER_CTX_get0_cipher(ctx.0) };
+        // SAFETY: the context's cipher, or NULL.
+        let flags = unsafe { crate::evp::cipher::EVP_CIPHER_get_flags(c) };
+        flags & c_ulong::try_from(rustyssl_abi::EVP_CIPH_FLAG_PIPELINE).unwrap_or(0) != 0
+    }
+
     fn crypt(&mut self, iv: &[u8], data: &mut [u8]) -> Result<()> {
         let Some(ctx) = &self.ctx else { return Ok(()) };
         // SAFETY: the keyed context; the IV.

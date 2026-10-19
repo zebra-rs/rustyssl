@@ -119,7 +119,8 @@ impl Static {
                     self.key_len,
                     self.iv_len,
                     self.flags,
-                );
+                )
+                .with_legacy(super::legacy_cipher_fns::for_static(self.nid, self.flags));
                 Ptr(EVP_CIPHER::new_handle(c))
             })
             .0

@@ -589,7 +589,7 @@ ffi_export! {
     ///
     /// # Safety
     /// `ctx` is a live digest context; `pctx` is NULL or room for a pointer; `type_` is NULL or
-    /// a live digest; `e` must be NULL (there are no engines); `pkey` is NULL or a live key.
+    /// a live digest; `e` is NULL or a live engine; `pkey` is NULL or a live key.
     pub unsafe extern "C" fn EVP_DigestSignInit(ctx: *mut EVP_MD_CTX, pctx: *mut *mut EVP_PKEY_CTX, type_: *const EVP_MD, e: *mut ENGINE, pkey: *mut EVP_PKEY) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {

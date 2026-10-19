@@ -12,9 +12,10 @@ use core::ptr;
 use std::ffi::CString;
 
 use rustyssl_abi::{
-    ERR_LIB_PROV, EVP_MAC, EVP_MAC_CTX, OSSL_ALGORITHM, OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL,
-    OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE,
-    OSSL_FUNC_SIGNATURE_DUPCTX, OSSL_FUNC_SIGNATURE_FREECTX, OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS,
+    ERR_LIB_PROV, EVP_MAC, EVP_MAC_CTX, OSSL_ALG_PARAM_ENGINE, OSSL_ALGORITHM,
+    OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT,
+    OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, OSSL_FUNC_SIGNATURE_DUPCTX,
+    OSSL_FUNC_SIGNATURE_FREECTX, OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS,
     OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_FUNC_SIGNATURE_NEWCTX,
     OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, OSSL_LIB_CTX,
     OSSL_MAC_PARAM_CIPHER, OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_PROPERTIES, OSSL_PARAM,
@@ -144,10 +145,9 @@ ffi_callback! {
         // SAFETY: the context's key, live (it holds a reference).
         let Some(key) = (unsafe { mac_key(c.key.0) }) else { return 0 };
         let macctx = c.macctx.0;
-        key.with(|priv_key, cipher, properties| {
-            // `ossl_prov_set_macctx`: the digest, cipher, and properties (no engine: there are
-            // none), then the key.
-            let mut mp = Vec::with_capacity(4);
+        key.with(|priv_key, cipher, engine, properties| {
+            // `ossl_prov_set_macctx`: the digest, cipher, engine, and properties, then the key.
+            let mut mp = Vec::with_capacity(5);
             if !mdname.is_null() {
                 // SAFETY: a static key; the caller's name.
                 mp.push(unsafe { OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST.as_ptr(), mdname.cast_mut(), 0) });
@@ -155,6 +155,10 @@ ffi_callback! {
             if !cipher.is_null() {
                 // SAFETY: a static key; the cipher's name.
                 mp.push(unsafe { OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_CIPHER.as_ptr(), cipher.cast_mut(), 0) });
+            }
+            if !engine.is_null() {
+                // SAFETY: a static key; the engine's id.
+                mp.push(unsafe { OSSL_PARAM_construct_utf8_string(OSSL_ALG_PARAM_ENGINE.as_ptr(), engine.cast_mut(), 0) });
             }
             if let Some(p) = properties {
                 // SAFETY: a static key; the key's properties, which outlive the call.
