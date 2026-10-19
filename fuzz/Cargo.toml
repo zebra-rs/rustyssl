@@ -594,6 +594,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "ietf_attr_syntax"
+path = "fuzz_targets/ietf_attr_syntax.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "x509_acert"
 path = "fuzz_targets/x509_acert.rs"
 test = false

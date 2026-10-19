@@ -246,6 +246,26 @@ unsafe fn pbmac1_pbkdf2_param(macalg: *const X509_ALGOR) -> *mut PBKDF2PARAM {
     kp.cast()
 }
 
+ffi_export! {
+    /// The PBKDF2 parameters of a PBMAC1 AlgorithmIdentifier's key derivation, a new object the
+    /// caller frees, or NULL (with `ERR_R_PASSED_INVALID_ARGUMENT`) when it isn't PBMAC1 with
+    /// PBKDF2.
+    ///
+    /// # Safety
+    /// `macalg` is NULL or a live AlgorithmIdentifier.
+    pub unsafe extern "C" fn PBMAC1_get1_pbkdf2_param(macalg: *const X509_ALGOR) -> *mut PBKDF2PARAM
+    where failure = ptr::null_mut(), library = ERR_LIB_PKCS12
+    {
+        // OpenSSL reads through a NULL here; it isn't PBMAC1 either.
+        if macalg.is_null() {
+            raise(ERR_R_PASSED_INVALID_ARGUMENT, "PBMAC1_get1_pbkdf2_param");
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's live AlgorithmIdentifier.
+        unsafe { pbmac1_pbkdf2_param(macalg) }
+    }
+}
+
 /// `PBMAC1_PBKDF2_HMAC`: PBMAC1's key from the password by PBKDF2, of the length it gives
 /// (20 to 64 octets), or -1.
 ///

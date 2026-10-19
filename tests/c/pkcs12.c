@@ -1005,6 +1005,35 @@ static void show_mac(PKCS12 *p12)
     printf("\n");
 }
 
+/* PBMAC1_get1_pbkdf2_param of the PFX's MAC algorithm, and of algorithms that aren't PBMAC1. */
+static void pbmac1_params(PKCS12 *p12)
+{
+    const ASN1_OCTET_STRING *mac = NULL, *salt = NULL;
+    const X509_ALGOR *alg = NULL;
+    const ASN1_INTEGER *iter = NULL;
+    PBKDF2PARAM *kdf;
+    X509_ALGOR *sha = X509_ALGOR_new();
+
+    PKCS12_get0_mac(&mac, &alg, &salt, &iter, p12);
+    kdf = PBMAC1_get1_pbkdf2_param(alg);
+    check(kdf != NULL, "PBMAC1_get1_pbkdf2_param of the PFX's MAC");
+    if (kdf != NULL) {
+        const ASN1_OBJECT *prf = NULL;
+
+        if (kdf->prf != NULL)
+            X509_ALGOR_get0(&prf, NULL, NULL, kdf->prf);
+        printf("  PBKDF2: salt type %d length %d, iter %ld, key length %ld, prf %s\n", kdf->salt->type,
+               kdf->salt->type == V_ASN1_OCTET_STRING ? ASN1_STRING_length(kdf->salt->value.octet_string) : -1,
+               ASN1_INTEGER_get(kdf->iter), kdf->keylength ? ASN1_INTEGER_get(kdf->keylength) : -1,
+               prf ? oid(prf) : "(default)");
+    }
+    PBKDF2PARAM_free(kdf);
+    X509_ALGOR_set0(sha, OBJ_nid2obj(NID_sha256), V_ASN1_NULL, NULL);
+    check(PBMAC1_get1_pbkdf2_param(sha) == NULL, "not of SHA-256's AlgorithmIdentifier");
+    errors();
+    X509_ALGOR_free(sha);
+}
+
 static void show_bag(PKCS12_SAFEBAG *bag, const char *pass)
 {
     int nid = PKCS12_SAFEBAG_get_nid(bag);
@@ -1254,6 +1283,7 @@ int main(void)
     show_mac(p12);
     p12_fingerprint("with PBMAC1", p12);
     check(PKCS12_verify_mac(p12, "pw", -1) == 1, "which verifies");
+    pbmac1_params(p12);
     check(PKCS12_set_pbmac1_pbkdf2(p12, "pw", -1, (unsigned char *)salt16, 16, 1000, EVP_sha512(), "SHA256") == 1,
           "PBMAC1 with another PRF");
     p12_fingerprint("with PBMAC1 and SHA-256's PRF", p12);

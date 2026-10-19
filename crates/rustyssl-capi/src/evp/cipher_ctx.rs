@@ -39,17 +39,18 @@ use rustyssl_abi::{
     EVP_CTRL_RAND_KEY, EVP_CTRL_SET_KEY_LENGTH, EVP_CTRL_SET_RC2_KEY_BITS, EVP_CTRL_SET_RC5_ROUNDS,
     EVP_CTRL_SET_SPEED, EVP_CTRL_TLS1_1_MULTIBLOCK_AAD, EVP_CTRL_TLS1_1_MULTIBLOCK_ENCRYPT,
     EVP_CTRL_TLS1_1_MULTIBLOCK_MAX_BUFSIZE, EVP_CTRL_TLS1_1_MULTIBLOCK_PARAM, EVP_MAX_BLOCK_LENGTH,
-    EVP_MAX_IV_LENGTH, EVP_R_CANNOT_GET_PARAMETERS, EVP_R_CANNOT_SET_PARAMETERS,
+    EVP_MAX_IV_LENGTH, EVP_MAX_PIPES, EVP_R_CANNOT_GET_PARAMETERS, EVP_R_CANNOT_SET_PARAMETERS,
     EVP_R_CTRL_OPERATION_NOT_IMPLEMENTED, EVP_R_FINAL_ERROR, EVP_R_INITIALIZATION_ERROR,
     EVP_R_INPUT_NOT_INITIALIZED, EVP_R_INVALID_KEY_LENGTH, EVP_R_INVALID_LENGTH,
-    EVP_R_INVALID_OPERATION, EVP_R_NO_CIPHER_SET, EVP_R_NOT_ABLE_TO_COPY_CTX, EVP_R_UPDATE_ERROR,
-    NID_undef, OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TAG,
-    OSSL_CIPHER_PARAM_AEAD_TAGLEN, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD,
-    OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN,
-    OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV,
-    OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_NUM,
-    OSSL_CIPHER_PARAM_PADDING, OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_RC2_KEYBITS,
-    OSSL_CIPHER_PARAM_ROUNDS, OSSL_CIPHER_PARAM_SPEED, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_AAD,
+    EVP_R_INVALID_OPERATION, EVP_R_NO_CIPHER_SET, EVP_R_NOT_ABLE_TO_COPY_CTX,
+    EVP_R_PIPELINE_NOT_SUPPORTED, EVP_R_TOO_MANY_PIPES, EVP_R_UPDATE_ERROR, NID_undef,
+    OSSL_CIPHER_PARAM_AEAD_MAC_KEY, OSSL_CIPHER_PARAM_AEAD_TAG, OSSL_CIPHER_PARAM_AEAD_TAGLEN,
+    OSSL_CIPHER_PARAM_AEAD_TLS1_AAD, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD,
+    OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED,
+    OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV, OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN,
+    OSSL_CIPHER_PARAM_KEYLEN, OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING,
+    OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_RC2_KEYBITS, OSSL_CIPHER_PARAM_ROUNDS,
+    OSSL_CIPHER_PARAM_SPEED, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_AAD,
     OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_AAD_PACKLEN, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_ENC,
     OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_ENC_IN, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_ENC_LEN,
     OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_INTERLEAVE, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_BUFSIZE,
@@ -113,6 +114,8 @@ struct CipherCtx {
     algctx: *mut c_void,
     /// The context's reference to the cipher in use.
     fetched_cipher: *mut EVP_CIPHER,
+    /// The pipelines `EVP_CipherPipelineEncryptInit` or `_DecryptInit` set up (0 otherwise).
+    numpipes: usize,
 }
 
 impl CipherCtx {
@@ -137,6 +140,7 @@ impl CipherCtx {
             final_: [0; MAX_BLOCK],
             algctx: ptr::null_mut(),
             fetched_cipher: ptr::null_mut(),
+            numpipes: 0,
         }
     }
 
@@ -479,7 +483,8 @@ unsafe fn clear_for(ctx: *mut EVP_CIPHER_CTX, enc: c_int) {
     c.flags = flags;
 }
 
-/// `evp_cipher_init_internal`.
+/// `evp_cipher_init_internal`. With `pipeline` (`is_pipeline`), only the provided path, which
+/// stops once the provider's context exists: the pipeline functions take the key and IVs.
 ///
 /// # Safety
 /// `ctx` is a live cipher context; `cipher` is NULL or a live cipher method; `key` and `iv`
@@ -489,7 +494,7 @@ unsafe fn init_internal(
     cipher: *const EVP_CIPHER,
     engine: *mut ENGINE,
     (key, iv): (*const u8, *const u8),
-    enc: c_int,
+    (enc, pipeline): (c_int, bool),
     params: *const OSSL_PARAM,
 ) -> c_int {
     const F: &str = "evp_cipher_init_internal";
@@ -523,7 +528,7 @@ unsafe fn init_internal(
         return 0;
     };
     // SAFETY: the caller's guarantee.
-    if unsafe { legacy::is_application(ctx, cipher) } {
+    if !pipeline && unsafe { legacy::is_application(ctx, cipher) } {
         if c.cipher == c.fetched_cipher.cast_const() {
             c.cipher = ptr::null();
         }
@@ -570,6 +575,11 @@ unsafe fn init_internal(
         err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
         return 0;
     };
+    // SAFETY: the context's live method.
+    if pipeline && unsafe { super::cipher::EVP_CIPHER_can_pipeline(cipher, enc) } == 0 {
+        err::raise(ERR_LIB_EVP, EVP_R_PIPELINE_NOT_SUPPORTED, F);
+        return 0;
+    }
     if c.algctx.is_null() {
         let Some(newctx) = m.funcs.newctx else {
             err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
@@ -603,6 +613,9 @@ unsafe fn init_internal(
             err::raise(ERR_LIB_EVP, EVP_R_INVALID_LENGTH, F);
             return 0;
         }
+    }
+    if pipeline {
+        return 1;
     }
     let ivlen = if iv.is_null() {
         0
@@ -779,7 +792,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { init_internal(ctx, cipher, ptr::null_mut(), (key, iv), enc, params) }
+        unsafe { init_internal(ctx, cipher, ptr::null_mut(), (key, iv), (enc, false), params) }
     }
 }
 
@@ -794,7 +807,7 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_EVP
     {
         // SAFETY: the caller's guarantee.
-        unsafe { init_internal(ctx, cipher, impl_, (key, iv), enc, ptr::null()) }
+        unsafe { init_internal(ctx, cipher, impl_, (key, iv), (enc, false), ptr::null()) }
     }
 }
 
@@ -813,7 +826,185 @@ ffi_export! {
             unsafe { EVP_CIPHER_CTX_reset(ctx) };
         }
         // SAFETY: the caller's guarantee.
-        unsafe { init_internal(ctx, cipher, ptr::null_mut(), (key, iv), enc, ptr::null()) }
+        unsafe { init_internal(ctx, cipher, ptr::null_mut(), (key, iv), (enc, false), ptr::null()) }
+    }
+}
+
+/// `EVP_CipherPipelineEncryptInit` and `_DecryptInit`: the context set up for `numpipes`
+/// pipelines of the cipher, then the provider's pipeline init with the key and the IVs.
+///
+/// # Safety
+/// `ctx` is NULL or a live cipher context; `cipher` is NULL or a live cipher method; `key`
+/// holds `keylen` octets (or is NULL) and `iv` holds `numpipes` IVs of `ivlen` octets (or is
+/// NULL), as the provider reads them.
+unsafe fn pipeline_init(
+    ctx: *mut EVP_CIPHER_CTX,
+    cipher: *const EVP_CIPHER,
+    (key, keylen): (*const u8, usize),
+    numpipes: usize,
+    (iv, ivlen): (*mut *const u8, usize),
+    enc: c_int,
+    function: &str,
+) -> c_int {
+    if usize::try_from(EVP_MAX_PIPES).is_ok_and(|max| numpipes > max) {
+        err::raise(ERR_LIB_EVP, EVP_R_TOO_MANY_PIPES, function);
+        return 0;
+    }
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, function);
+        return 0;
+    };
+    // Set before the init, whose reset of a context that had a cipher clears it again: the
+    // provider then gets `numpipes` here but none in the updates, as with OpenSSL.
+    c.numpipes = numpipes;
+    let none = (ptr::null(), ptr::null());
+    // SAFETY: the caller's guarantee.
+    if unsafe { init_internal(ctx, cipher, ptr::null_mut(), none, (enc, true), ptr::null()) } == 0 {
+        return 0;
+    }
+    // SAFETY: as above.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
+    let f = c.cipher().map(|m| {
+        if enc != 0 {
+            m.funcs.p_einit
+        } else {
+            m.funcs.p_dinit
+        }
+    });
+    let Some(Some(init)) = f else {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, function);
+        return 0;
+    };
+    // SAFETY: the provider's function with its context and the caller's key and IVs.
+    unsafe { init(c.algctx, key, keylen, numpipes, iv, ivlen, ptr::null()) }
+}
+
+/// What `EVP_CipherPipelineUpdate` and `_Final` check before calling the provider: the
+/// context's cipher, from a provider, with the function; then each pipeline's output length
+/// cleared. The context, or `None` with the entry raised.
+///
+/// # Safety
+/// `ctx` is NULL or a live cipher context; `outl` is non-NULL and holds the context's
+/// `numpipes` lengths.
+unsafe fn pipeline_ready<'a>(
+    ctx: *mut EVP_CIPHER_CTX,
+    outl: *mut usize,
+    has: impl Fn(&super::cipher::Funcs) -> bool,
+    missing: c_int,
+    function: &str,
+) -> Option<&'a mut CipherCtx> {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, function);
+        return None;
+    };
+    if c.cipher.is_null() {
+        err::raise(ERR_LIB_EVP, EVP_R_NO_CIPHER_SET, function);
+        return None;
+    }
+    let Some(m) = c.cipher().filter(|m| !m.prov.0.is_null()) else {
+        err::raise(ERR_LIB_EVP, EVP_R_INVALID_OPERATION, function);
+        return None;
+    };
+    if !has(&m.funcs) {
+        err::raise(ERR_LIB_EVP, missing, function);
+        return None;
+    }
+    if c.numpipes > 0 {
+        // SAFETY: the caller's array of the context's `numpipes` lengths.
+        let lens = unsafe { core::slice::from_raw_parts_mut(outl, c.numpipes) };
+        lens.fill(0);
+    }
+    Some(c)
+}
+
+ffi_export! {
+    /// Sets the context up to encrypt `numpipes` pipelines (at most `EVP_MAX_PIPES`) with the
+    /// cipher, whose provider must support pipelining, then gives it the key and one IV per
+    /// pipeline.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context; `cipher` is NULL or a live cipher method; `key` holds
+    /// `keylen` octets (or is NULL) and `iv` holds `numpipes` IVs of `ivlen` octets (or is NULL).
+    pub unsafe extern "C" fn EVP_CipherPipelineEncryptInit(ctx: *mut EVP_CIPHER_CTX, cipher: *const EVP_CIPHER, key: *const u8, keylen: usize, numpipes: usize, iv: *mut *const u8, ivlen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_CipherPipelineEncryptInit";
+        // SAFETY: the caller's guarantee.
+        unsafe { pipeline_init(ctx, cipher, (key, keylen), numpipes, (iv, ivlen), 1, F) }
+    }
+}
+
+ffi_export! {
+    /// As [`EVP_CipherPipelineEncryptInit`], to decrypt.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context; `cipher` is NULL or a live cipher method; `key` holds
+    /// `keylen` octets (or is NULL) and `iv` holds `numpipes` IVs of `ivlen` octets (or is NULL).
+    pub unsafe extern "C" fn EVP_CipherPipelineDecryptInit(ctx: *mut EVP_CIPHER_CTX, cipher: *const EVP_CIPHER, key: *const u8, keylen: usize, numpipes: usize, iv: *mut *const u8, ivlen: usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_CipherPipelineDecryptInit";
+        // SAFETY: the caller's guarantee.
+        unsafe { pipeline_init(ctx, cipher, (key, keylen), numpipes, (iv, ivlen), 0, F) }
+    }
+}
+
+ffi_export! {
+    /// Processes one input buffer per pipeline into its output buffer, setting each pipeline's
+    /// output length.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context set up for pipelines; `out`, `outl`, `outsize`, `in_` and
+    /// `inl` are NULL or hold one entry per pipeline, the buffers as large as their sizes.
+    pub unsafe extern "C" fn EVP_CipherPipelineUpdate(ctx: *mut EVP_CIPHER_CTX, out: *mut *mut u8, outl: *mut usize, outsize: *const usize, in_: *mut *const u8, inl: *const usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_CipherPipelineUpdate";
+        if outl.is_null() || inl.is_null() {
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+            return 0;
+        }
+        let has = |f: &super::cipher::Funcs| f.p_cupdate.is_some();
+        // SAFETY: the caller's guarantee; `outl` isn't NULL.
+        let Some(c) = (unsafe { pipeline_ready(ctx, outl, has, EVP_R_UPDATE_ERROR, F) }) else {
+            return 0;
+        };
+        let Some(update) = c.cipher().and_then(|m| m.funcs.p_cupdate) else {
+            return 0;
+        };
+        // SAFETY: the provider's function with its context and the caller's arrays.
+        unsafe { update(c.algctx, c.numpipes, out, outl, outsize, in_, inl) }
+    }
+}
+
+ffi_export! {
+    /// Finishes each pipeline into its output buffer, setting its output length.
+    ///
+    /// # Safety
+    /// `ctx` is a live cipher context set up for pipelines; `out`, `outl` and `outsize` are NULL
+    /// or hold one entry per pipeline, the buffers as large as their sizes.
+    pub unsafe extern "C" fn EVP_CipherPipelineFinal(ctx: *mut EVP_CIPHER_CTX, out: *mut *mut u8, outl: *mut usize, outsize: *const usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        const F: &str = "EVP_CipherPipelineFinal";
+        if outl.is_null() {
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
+            return 0;
+        }
+        let has = |f: &super::cipher::Funcs| f.p_cfinal.is_some();
+        // SAFETY: the caller's guarantee; `outl` isn't NULL.
+        let Some(c) = (unsafe { pipeline_ready(ctx, outl, has, EVP_R_FINAL_ERROR, F) }) else {
+            return 0;
+        };
+        let Some(fin) = c.cipher().and_then(|m| m.funcs.p_cfinal) else {
+            return 0;
+        };
+        // SAFETY: the provider's function with its context and the caller's arrays.
+        unsafe { fin(c.algctx, c.numpipes, out, outl, outsize) }
     }
 }
 

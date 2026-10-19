@@ -5412,14 +5412,40 @@ both libraries (step 8.1).
     providers
 
   Validate with pkcs11-provider, oqs-provider, and tpm2-openssl.
-- [ ] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
+- [x] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.
+  - Done (audit, 2026-10-18): every family was implemented in Phases 4–6, and an application's
+    method runs end to end through both the legacy API and EVP with a legacy-assigned key:
+    `rsa_lib`, `rsa_ops` and `evp_rsa_legacy` (RSA_METHOD through RSA_* and EVP sign, verify,
+    encrypt, decrypt, keygen); `ec_key`, `ecdsa` and `evp_ec_legacy` (EC_KEY_METHOD: sign,
+    derive, keygen); `dh_lib` and `evp_dh_exch` (DH_METHOD); `dsa_lib` and `evp_dsa_sig`
+    (DSA_METHOD); `rand` (RAND_METHOD under RAND_bytes and key generation); `ui` and
+    `app_startup` (UI_METHOD). The audit added `tests/c/custom_methods.c` for the two paths
+    without a test: an X509_LOOKUP_METHOD as the only source of a CA in `X509_verify_cert`,
+    and the default UI_METHOD answering a PEM pass phrase (PKCS #8 and traditional). Both
+    matched the reference; no differences were found.
 - [ ] **9.3 ENGINE API** (3.x only): export every `ENGINE_*` symbol with "no engines
   available" semantics, i.e. how a normal build with no engines installed behaves. Settle the
   details by testing against consumers.
-- [ ] **9.4 Long-tail sweep:** every remaining `DEPRECATEDIN_*` family, the exported data
+- [x] **9.4 Long-tail sweep:** every remaining `DEPRECATEDIN_*` family, the exported data
   symbols, and the platform helpers (`OPENSSL_ia32cap_loc`, …), until libcrypto coverage
   reaches 100%; `OSSL_LIB_CTX_get_data` (from 3.1e).
+  - Done (2026-10-18): `EVP_Seal*`/`EVP_Open*`, `PEM_Sign*`, `PKCS1_MGF1`,
+    `PBMAC1_get1_pbkdf2_param`; `ASN1_ITEM_get`/`ASN1_ITEM_lookup` over OpenSSL's item table;
+    `ASN1_SCTX_*`; `conf_ssl_*` (`internal/sslconf.h`); `BIO_s_log`; `DSO_*`
+    (`internal/dso.h`); the cipher pipeline API (`EVP_CipherPipeline*`, through a provider's
+    pipeline functions; none of the built-in ciphers has them, as in OpenSSL); and
+    `OSSL_IETF_ATTR_SYNTAX_*` (RFC 5755, with a fuzz target). After it, the libcrypto stubs
+    left are `ENGINE_*` (9.3) and the provider-loading functions `BIO_s_core`,
+    `BIO_new_from_core_bio`, `OSSL_LIB_CTX_get_data`, `_new_child`, `_new_from_dispatch`
+    (9.1).
+  - Exported data symbols and platform helpers: 3.5 has none in its ABI. Every entry of
+    `libcrypto.num` is a FUNCTION, and the reference's Linux `libcrypto.so.3` exports only
+    them (no data object). The platform helpers named above (`OPENSSL_ia32cap_loc`, …) left
+    the `.num` file before 3.0. The macOS reference dylib also exports internal globals
+    (`OPENSSL_armcap_P`, `OPENSSL_cpuid_setup`, the `ossl_*` dispatch tables) because the macOS
+    link doesn't restrict exports; no public header declares them, so they aren't part of the
+    ABI, and rustyssl exports exactly `libcrypto.num` on every target (`abi-check`).
 - [ ] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
   additions under the `OPENSSL_3.6.0` node, and re-run the full test plan against the 3.6
   reference.

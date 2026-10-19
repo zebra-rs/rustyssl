@@ -320,16 +320,18 @@ OpenSSL never depends on them.
   (directories, compiler, build date, CPU capabilities) describes rustyssl's build, as a
   differently configured OpenSSL's would describe its own; it isn't a deviation.
 
-- **Items over opaque handles (`RSAPublicKey_it`, `RSAPrivateKey_it`).** OpenSSL describes these
-  as SEQUENCEs of the `RSA` structure's own fields. rustyssl's `RSA` is a Rust object with no C
+- **Items over opaque handles (`RSAPublicKey_it`, `RSAPrivateKey_it`, `DHparams_it`).** OpenSSL
+  describes these as SEQUENCEs of the `RSA` (or `DH`) structure's own fields. rustyssl's `RSA` is a Rust object with no C
   layout to put templates over, so these items are `ASN1_ITYPE_EXTERN`, and they decode, encode,
   and print through a private shadow structure that has OpenSSL's fields, field names, and items.
   Encodings, error queues (`Field=n, Type=RSAPrivateKey`), and printed text are OpenSSL's
   (`tests/c/rsa_asn1.c`, the probe's `asnd2i`). An application sees the difference only by
   reading the item's own fields (`itype`, `templates`, `tcount`, `size`), and in one more way: a
   key nested inside an application's type starts a new count toward the 30-level nesting limit,
-  as OpenSSL's own extern items (`X509_NAME`) do. Test:
-  `rsa_asn1::tests::the_key_items_are_extern`.
+  as OpenSSL's own extern items (`X509_NAME`) do. `X509_it` is a SEQUENCE in both, but its
+  `size` is each library's own `X509` structure's, which no header defines. Tests:
+  `rsa_asn1::tests::the_key_items_are_extern`, and `tests/c/asn1_item_list.c`, which compares
+  every other built-in item's fields with the reference's.
 
 - **`CRYPTO_aligned_alloc`.** On Linux both libraries use `posix_memalign`, which checks the
   size itself, so only macOS (and other builds without it) differs. The rest of the
