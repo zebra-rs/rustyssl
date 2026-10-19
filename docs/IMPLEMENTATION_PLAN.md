@@ -5561,19 +5561,16 @@ both libraries (step 8.1).
     selectable. `abi/openssl-3.5/` stays for `abi-check`'s `compat35` check (every 3.5 export
     still exported, at the same version node, with an unchanged prototype), and the 3.5 → 3.6
     behavior changes below are kept as the list for users of the 3.5 LTS.
-  - Progress (interim): 13 of the 23 new functions are done (the array allocators,
+  - Progress (interim): 18 of the 23 new functions are done (the array allocators,
     `OPENSSL_sk_set_thunks`, `OSSL_PARAM_set_octet_string_or_ptr`,
     `EVP_PKEY_get_security_category`, `i2d_PKCS8PrivateKey`,
-    `OSSL_STORE_LOADER_settable_ctx_params`, `X509_CRL_get0_tbs_sigalg`; `tests/c/openssl36.c`).
-    Providers follow 3.6's parameter lists; HKDF-SHA256/384/512 and the AES-CBC-HMAC-SHA*-ETM
-    ciphers exist. All but four tests/c programs give the reference's output.
-    Left: the CMS KEMRecipientInfo functions (5); the `EVP_SKEY` derivations (4);
-    `X509_STORE_CTX_set_ocsp_resp` with OCSP checking in verification, together with libssl's
-    stapled responses kept as parsed `OCSP_RESPONSE`s (`SSL_CTRL_*_OCSP_RESP_EX`, 142/143;
-    one per certificate in TLS 1.3; a response that doesn't parse isn't sent, and a client
-    receiving one fails the handshake), which `ssl_ctx`, `ssl_handshake_reads` and
-    `ssl_strings` show; the session cache's removal order (`ssl_sess_cache`); then
-    `abi-check`'s 3.5-exports check and the rest of the test plan.
+    `OSSL_STORE_LOADER_settable_ctx_params`, `X509_CRL_get0_tbs_sigalg` in
+    `tests/c/openssl36.c`; `X509_STORE_CTX_set_ocsp_resp` in `tests/c/ssl_ocsp_stapling.c`; the
+    four `EVP_SKEY` derivations in `tests/c/evp_skey_derive.c`). Providers follow 3.6's
+    parameter lists; HKDF-SHA256/384/512 and the AES-CBC-HMAC-SHA*-ETM ciphers exist; every
+    tests/c program gives the reference's output on macOS.
+    Left: the CMS KEMRecipientInfo functions (5, with KEM recipients in CMS); `abi-check`'s
+    3.5-exports check (`compat35`); the rest of the test plan against 3.6.5.
   - 3.5 → 3.6 behavior changes found so far (for review; 3.6's are followed):
     - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
       (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
