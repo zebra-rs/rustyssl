@@ -1,0 +1,6 @@
+# What OpenSSL's build compiles in for this target, resolved from its Makefile.
+platform = "linux-aarch64"
+openssldir = "/usr/local/ssl"
+enginesdir = "/usr/local/lib/engines-3"
+modulesdir = "/usr/local/lib/ossl-modules"
+dso_extension = ".so"
