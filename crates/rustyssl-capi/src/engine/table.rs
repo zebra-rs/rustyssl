@@ -215,9 +215,12 @@ unsafe fn unregister(class: Class, e: *mut ENGINE) {
 /// functional reference, or NULL. The default if it initializes; else, unless the pile is
 /// up to date, the first registered engine that initializes, which becomes the default.
 fn select(class: Class, nid: c_int) -> *mut ENGINE {
-    let flag = u64::try_from(OPENSSL_INIT_LOAD_CONFIG).unwrap_or(0);
-    // SAFETY: no settings.
-    unsafe { crate::init::OPENSSL_init_crypto(flag, ptr::null()) };
+    // The configuration file is loaded first (Miri can't run the system calls that find it).
+    if !cfg!(miri) {
+        let flag = u64::try_from(OPENSSL_INIT_LOAD_CONFIG).unwrap_or(0);
+        // SAFETY: no settings.
+        unsafe { crate::init::OPENSSL_init_crypto(flag, ptr::null()) };
+    }
     let mut g = global();
     if g.tables.table(class).is_none() {
         return ptr::null_mut();
