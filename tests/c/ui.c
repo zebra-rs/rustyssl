@@ -530,7 +530,15 @@ int main(void)
     test_user_data(mp);
     test_utilities(m, mp);
     test_encoder(mp);
+    /* NULL is a default too: new UIs then take UI_null. */
     UI_set_default_method(NULL);
+    check(UI_get_default_method() == NULL, "the default method set to NULL");
+    {
+        UI *ui = UI_new();
+
+        check(ui != NULL && UI_get_method(ui) == UI_null(), "a new UI then takes UI_null");
+        UI_free(ui);
+    }
     UI_destroy_method(m);
     UI_destroy_method(mp);
     printf("1..%d\n", number);

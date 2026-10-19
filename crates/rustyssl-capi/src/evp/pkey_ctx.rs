@@ -1445,11 +1445,18 @@ ffi_export! {
         let mut ret = 1;
         let mut not_supported = false;
         if let Some(t) = &template {
-            // SAFETY: the context's library context.
-            match unsafe { pkey::export_to_any(t, libctx, Some(km.clone()), propq.as_deref()) } {
-                // SAFETY: the key manager's generation context and data.
-                Some((_, kd)) => ret = unsafe { km.get().gen_set_template(genctx, kd.ptr()) },
-                None => not_supported = true,
+            if !t.get().lock().is_assigned() {
+                // A key with a type but no data (`EVP_PKEY_set_type`) exports nothing, and the
+                // key manager gets no template, which it handles as it sees fit.
+                // SAFETY: the key manager's generation context.
+                ret = unsafe { km.get().gen_set_template(genctx, ptr::null_mut()) };
+            } else {
+                // SAFETY: the context's library context.
+                match unsafe { pkey::export_to_any(t, libctx, Some(km.clone()), propq.as_deref()) } {
+                    // SAFETY: the key manager's generation context and data.
+                    Some((_, kd)) => ret = unsafe { km.get().gen_set_template(genctx, kd.ptr()) },
+                    None => not_supported = true,
+                }
             }
         }
         if !not_supported {

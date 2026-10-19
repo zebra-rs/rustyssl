@@ -25,7 +25,7 @@ pub fn hmac(p: &dyn Provider, hash: HashAlg, key: &[u8], data: &[&[u8]]) -> Resu
 pub fn hash_of(p: &dyn Provider, hash: HashAlg, data: &[u8]) -> Result<Vec<u8>> {
     let mut h = p.hash(hash)?;
     h.update(data);
-    Ok(h.current())
+    Ok(h.finish())
 }
 
 /// HKDF-Extract (RFC 5869): an empty salt is the hash's length of zeros.
@@ -737,7 +737,7 @@ impl Transcript {
         let (_, h) = self.hash.as_ref().ok_or_else(Error::internal)?;
         let mut f = h.fork();
         f.update(extra);
-        Ok(f.current())
+        Ok(f.finish())
     }
 
     /// A copy to continue separately (TLS 1.3 post-handshake authentication keeps the
@@ -758,9 +758,8 @@ impl Transcript {
     /// # Errors
     /// The hash hasn't started, or the provider failed.
     pub fn replace_with_message_hash(&mut self, p: &dyn Provider) -> Result<()> {
-        let (alg, h) = self.hash.as_ref().ok_or_else(Error::internal)?;
-        let alg = *alg;
-        let ch1 = h.current();
+        let (alg, h) = self.hash.take().ok_or_else(Error::internal)?;
+        let ch1 = h.finish();
         let mut msg = vec![
             MESSAGE_HASH,
             0,

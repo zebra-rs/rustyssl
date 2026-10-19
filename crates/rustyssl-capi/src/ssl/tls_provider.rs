@@ -1432,6 +1432,17 @@ impl Hash for EvpHash {
             None => Box::new(EvpHash(MdCtx(ptr::null_mut()))),
         }
     }
+
+    fn finish(self: Box<Self>) -> Vec<u8> {
+        let mut out = vec![0u8; 64];
+        let mut n: c_uint = 0;
+        // SAFETY: the context; room for any digest; the length's slot.
+        if unsafe { EVP_DigestFinal_ex(self.0.0, out.as_mut_ptr(), &raw mut n) } == 0 {
+            return Vec::new();
+        }
+        out.truncate(usize::try_from(n).unwrap_or(0));
+        out
+    }
 }
 
 /// An HMAC, re-keyed after each tag from a pristine copy.
@@ -1512,6 +1523,14 @@ impl EvpAead {
                     enc,
                 )
             } != 0;
+        if ok && !encrypt && !is_ccm(self.alg) {
+            // The expected tag before any data, as `tls13_cipher` gives it: a provider that
+            // decrypts in one operation (PKCS#11's) needs it first.
+            // SAFETY: as above; the expected tag.
+            ok = unsafe {
+                EVP_CIPHER_CTX_ctrl(ctx.0, EVP_CTRL_AEAD_SET_TAG, tlen, tag.as_mut_ptr().cast())
+            } > 0;
+        }
         let dlen = int_len(data.len())?;
         let mut outl: c_int = 0;
         if ok && is_ccm(self.alg) {
@@ -1538,12 +1557,6 @@ impl EvpAead {
             } != 0;
         }
         let done = usize::try_from(outl).unwrap_or(0);
-        if ok && !encrypt && !is_ccm(self.alg) {
-            // SAFETY: as above; the expected tag.
-            ok = unsafe {
-                EVP_CIPHER_CTX_ctrl(ctx.0, EVP_CTRL_AEAD_SET_TAG, tlen, tag.as_mut_ptr().cast())
-            } > 0;
-        }
         let mut fin: c_int = 0;
         let rest = out
             .get_mut(done..)
@@ -1593,10 +1606,16 @@ impl Aead for EvpAead {
     }
 }
 
-/// A CBC cipher (or no encryption), keyed once and given each record's IV.
+/// A CBC cipher (or no encryption): one stream, continued while each call's IV is the chain's
+/// last ciphertext block (as the record layer gives it), and keyed again with the IV
+/// otherwise. A provider may ignore a new init and keep its chain (PKCS#11's does), so the
+/// record layer keeps to one stream, as OpenSSL's does.
 struct EvpCipher {
     ctx: Option<CipherCtx>,
     encrypt: bool,
+    key: Secret,
+    /// The last ciphertext block, once keyed.
+    chain: Option<Vec<u8>>,
 }
 
 impl Cipher for EvpCipher {
@@ -1611,19 +1630,29 @@ impl Cipher for EvpCipher {
 
     fn crypt(&mut self, iv: &[u8], data: &mut [u8]) -> Result<()> {
         let Some(ctx) = &self.ctx else { return Ok(()) };
-        // SAFETY: the keyed context; the IV.
-        if unsafe {
-            EVP_CipherInit_ex(
-                ctx.0,
-                ptr::null(),
-                ptr::null_mut(),
-                ptr::null(),
-                iv.as_ptr(),
-                c_int::from(self.encrypt),
-            )
-        } == 0
+        // A new stream unless this continues the last one.
+        if self.chain.as_deref() != Some(iv)
+            // SAFETY: the keyed context; the key; the IV.
+            && unsafe {
+                EVP_CipherInit_ex(
+                    ctx.0,
+                    ptr::null(),
+                    ptr::null_mut(),
+                    self.key.bytes().as_ptr(),
+                    iv.as_ptr(),
+                    c_int::from(self.encrypt),
+                )
+            } == 0
         {
             return Err(fail());
+        }
+        // The stream's last ciphertext block afterwards: the input's when decrypting.
+        let last = |d: &[u8]| {
+            d.get(d.len().saturating_sub(iv.len())..)
+                .map(<[u8]>::to_vec)
+        };
+        if !self.encrypt {
+            self.chain = last(data);
         }
         let mut out = vec![0u8; data.len().saturating_add(32)];
         let mut outl: c_int = 0;
@@ -1632,14 +1661,20 @@ impl Cipher for EvpCipher {
         if unsafe { EVP_CipherUpdate(ctx.0, out.as_mut_ptr(), &raw mut outl, data.as_ptr(), len) }
             == 0
         {
+            // The stream's state is unknown: the next call keys it again.
+            self.chain = None;
             return Err(fail());
         }
         let n = usize::try_from(outl).map_err(|_| fail())?;
         let got = out.get(..n).ok_or_else(fail)?;
         if got.len() != data.len() {
+            self.chain = None;
             return Err(fail());
         }
         data.copy_from_slice(got);
+        if self.encrypt {
+            self.chain = last(data);
+        }
         Ok(())
     }
 }
@@ -1737,7 +1772,12 @@ impl Provider for EvpProvider {
 
     fn cipher(&self, alg: CipherAlg, key: &[u8], encrypt: bool) -> Result<Box<dyn Cipher>> {
         let Some(name) = cipher_name(alg) else {
-            return Ok(Box::new(EvpCipher { ctx: None, encrypt }));
+            return Ok(Box::new(EvpCipher {
+                ctx: None,
+                encrypt,
+                key: Secret::new(Vec::new()),
+                chain: None,
+            }));
         };
         if key.len() != alg.key_len() {
             return Err(fail());
@@ -1762,6 +1802,8 @@ impl Provider for EvpProvider {
         Ok(Box::new(EvpCipher {
             ctx: Some(ctx),
             encrypt,
+            key: Secret::new(key.to_vec()),
+            chain: None,
         }))
     }
 

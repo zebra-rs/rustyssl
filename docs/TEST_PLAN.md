@@ -304,8 +304,22 @@ reference run.** Any difference is the signal to investigate.
 | rust-openssl (`openssl` crate) | broad | its test suite | M6 |
 | Node.js (`--shared-openssl`) | broad | `test/parallel/test-crypto*`, `test-tls*` | M6 |
 | OpenVPN, stunnel, socat, wget, git, Tor, BIND 9, Unbound, OpenLDAP, Postfix | mixed | their own suites, or smoke tests | M6 |
-| pkcs11-provider, oqs-provider, tpm2-openssl | the provider ABI | their own suites | Phase 9 |
+| pkcs11-provider, oqs-provider, tpm2-openssl | the provider ABI | their own suites (`cargo xtask test-providers`) | Phase 9 |
 | ngtcp2 (ossl backend) | third-party QUIC API | its tests | Phase 10 |
+
+The providers run under `cargo xtask test-providers [oqs|pkcs11|tpm2]`, pinned to commits
+with their tarballs' SHA-256 in `tests/providers/pins.txt` and built against the reference;
+only the libraries change between the two runs:
+
+- **oqs:** liboqs and oqs-provider (cmake). Its `ctest` programs, its local algorithm scripts
+  (certificates, CMS, CA, PKCS#12) for every signature algorithm, and `test_tls_full.py`'s
+  handshakes, each TLS signature algorithm's server against a client of each of its groups.
+- **pkcs11:** pkcs11-provider (meson), its suite on the SoftHSM and NSS softokn tokens. SoftHSM
+  itself runs on the side's libraries and needs the ENGINE API (9.3).
+- **tpm2:** tpm2-openssl (autotools), its `make check` against `swtpm` behind `tpm2-abrmd`.
+
+pkcs11 and tpm2 need their distribution's tools (AGENTS.md lists them) and skip without them,
+so they run in the Linux containers; oqs runs anywhere cmake does.
 
 ### L9: Security testing
 

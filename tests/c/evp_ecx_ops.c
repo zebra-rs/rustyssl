@@ -17,8 +17,10 @@
 #include <openssl/core_names.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/objects.h>
 #include <openssl/params.h>
 #include <openssl/provider.h>
+#include <openssl/rsa.h>
 
 static int failures = 0;
 static int number = 0;
@@ -362,11 +364,48 @@ static void test_more(void)
     EVP_PKEY_free(pub);
 }
 
+/*
+ * Generation from a key with a type but no data (EVP_PKEY_set_type), as oqs-provider makes its
+ * hybrids' classical halves: the key manager gets no template. EC's needs one and fails.
+ */
+static void test_typed_template(void)
+{
+    static const int types[] = { EVP_PKEY_X25519, EVP_PKEY_X448, EVP_PKEY_ED25519,
+                                 EVP_PKEY_ED448, EVP_PKEY_RSA, EVP_PKEY_EC };
+    size_t i;
+
+    for (i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+        EVP_PKEY *t = EVP_PKEY_new(), *k = NULL;
+        EVP_PKEY_CTX *c;
+        char what[96];
+        int r;
+
+        snprintf(what, sizeof(what), "a typed template: set_type %s",
+                 OBJ_nid2sn(types[i]));
+        check(t != NULL && EVP_PKEY_set_type(t, types[i]) == 1, what);
+        c = EVP_PKEY_CTX_new_from_pkey(NULL, t, NULL);
+        check(c != NULL && EVP_PKEY_keygen_init(c) == 1, "  a context for it, initialized");
+        if (types[i] == EVP_PKEY_RSA)
+            EVP_PKEY_CTX_set_rsa_keygen_bits(c, 1024);
+        r = c != NULL ? EVP_PKEY_keygen(c, &k) : -9;
+        printf("  keygen %d, key %s, id %d\n", r, k != NULL ? "made" : "none",
+               k != NULL ? EVP_PKEY_get_id(k) : 0);
+        check(types[i] == EVP_PKEY_EC ? r == 0 && k == NULL
+                                      : r == 1 && k != NULL && EVP_PKEY_get_id(k) == types[i],
+              "  generates as the reference does");
+        errors();
+        EVP_PKEY_free(k);
+        EVP_PKEY_CTX_free(c);
+        EVP_PKEY_free(t);
+    }
+}
+
 int main(void)
 {
     test_exchange();
     test_signatures();
     test_more();
+    test_typed_template();
     errors();
     printf("1..%d\n", number);
     return failures == 0 ? 0 : 1;

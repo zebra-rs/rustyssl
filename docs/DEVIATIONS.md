@@ -292,6 +292,7 @@ OpenSSL never depends on them.
 | `CMS_get0_content`, `CMS_dataInit`, `CMS_is_detached`, and the functions over them with an object that has no content type (`CMS_ContentInfo_new`'s) | read its NULL content as an ANY | fail with `CMS_R_UNSUPPORTED_CONTENT_TYPE` | `cms::base::tests::an_empty_object_has_no_content` |
 | The `PKCS7_*` building, reading, and attribute functions with a NULL object | dereference NULL | fail (0 or NULL; `PKCS7_type_is_other` answers 1), or do nothing | `pkcs7::tests::null_objects_are_refused` |
 | `OSSL_CMP_exec_certreq`, `OSSL_CMP_try_certreq`, and the server's certificate responses with implicit confirmation, when adding the `implicitConfirm` item to the header fails (out of memory) | frees the item's NULL value and then the item that holds it (a double free) | frees each once and fails | `tests/c/cmp.c` (the successful path; the failure needs an allocation failure) |
+| The legacy provider's RC2 ciphers, `EVP_CIPHER_CTX_get_params` for `alg_id_param` (the AlgorithmIdentifier's parameters) into an octet string too short for them | `rc2_get_ctx_params` encodes them into the buffer without checking its size, writing past it | fails, writing nothing, with the length needed in `return_size` | `provider::ciphers::tests::a_short_buffer_for_parameters_is_refused` |
 
 ## Notes
 
