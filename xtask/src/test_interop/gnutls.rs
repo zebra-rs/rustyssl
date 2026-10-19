@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 
 use super::relay::Relay;
 use super::{
-    CLIENT_SUMMARY, SERVER_SUMMARY, TIMEOUT, Tool, free_port, indent, is_dtls, mask_err_location,
-    start_server, substitute,
+    BIND_ATTEMPTS, CLIENT_SUMMARY, SERVER_SUMMARY, TIMEOUT, Tool, free_port, indent, is_dtls,
+    mask_err_location, start_server, substitute,
 };
 use crate::util::Result;
 
@@ -194,8 +194,17 @@ fn gnutls_client(
     dtls: bool,
     faults: bool,
 ) -> Result<String> {
-    let port = free_port()?;
-    let (mut server, srx) = start_server(t, ours, port, 1, oargs, !dtls)?;
+    let mut attempt = 0;
+    let (port, mut server, srx) = loop {
+        let port = free_port(dtls)?;
+        match start_server(t, ours, port, 1, oargs, !dtls) {
+            Ok((server, srx)) => break (port, server, srx),
+            Err(e) if attempt + 1 < BIND_ATTEMPTS && e.to_string().contains("already in use") => {
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    };
     let relay = if faults {
         Some(Relay::start(port, name)?)
     } else {
@@ -298,7 +307,11 @@ fn gnutls_server(
     // though it's free for TCP on 127.0.0.1, so a failed bind tries another.
     let mut started = None;
     for _ in 0..5 {
-        let port = if dtls { free_udp_port()? } else { free_port()? };
+        let port = if dtls {
+            free_udp_port()?
+        } else {
+            free_port(false)?
+        };
         let mut c = Command::new("gnutls-serv");
         c.args(["--echo", "-p", &port.to_string()]);
         if !gargs.iter().any(|a| a.starts_with("--x509certfile")) {

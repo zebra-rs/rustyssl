@@ -295,11 +295,20 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
     out
 }
 
-/// A free local port (the listener is closed again; the server binds it next).
-fn free_port() -> Result<u16> {
+/// A free local port, TCP's or (for a DTLS server) UDP's: the socket is closed again and the
+/// server binds the port next.
+fn free_port(udp: bool) -> Result<u16> {
+    if udp {
+        let s = std::net::UdpSocket::bind("127.0.0.1:0")?;
+        return Ok(s.local_addr()?.port());
+    }
     let l = TcpListener::bind("127.0.0.1:0")?;
     Ok(l.local_addr()?.port())
 }
+
+/// How many times `s_server` is started on a new port when another process took the one
+/// [`free_port`] found before the server could bind it.
+const BIND_ATTEMPTS: usize = 3;
 
 /// Starts `s_server` and waits for it to accept; returns it with its output so far.
 fn start_server(
@@ -553,19 +562,28 @@ fn connect(
     client_args: &[String],
 ) -> Result<String> {
     let (mut args, m) = mode(client_args);
-    let port = free_port()?;
     let naccept = if m.resume { 2 } else { 1 };
     // `-rev` can't be used with DTLS: no echo then (the summaries and the server's output are
     // compared).
     let dtls = is_dtls(server_args);
-    let (mut server, lines) = start_server(
-        t,
-        p.server_ours,
-        port,
-        naccept,
-        server_args,
-        !m.early && !dtls,
-    )?;
+    let mut attempt = 0;
+    let (port, mut server, lines) = loop {
+        let port = free_port(dtls)?;
+        match start_server(
+            t,
+            p.server_ours,
+            port,
+            naccept,
+            server_args,
+            !m.early && !dtls,
+        ) {
+            Ok((server, lines)) => break (port, server, lines),
+            Err(e) if attempt + 1 < BIND_ATTEMPTS && e.to_string().contains("already in use") => {
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    };
     // With faults, the client talks to the relay; its schedule is the case's.
     let relay = if m.faults && dtls {
         Some(relay::Relay::start(port, &client_args.join(" "))?)
