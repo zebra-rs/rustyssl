@@ -254,8 +254,7 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Makes the engine the default for everything: 1 for `builtin`; otherwise 0, as
-    /// rustyssl has no engines.
+    /// Makes the engine the default for everything: 1 (always for `builtin`), or 0.
     ///
     /// # Safety
     /// `name` is a C string.
@@ -267,7 +266,23 @@ ffi_export! {
         if n == b"builtin" {
             return 1;
         }
-        crate::conf::builtin::engine_by_id_failed(&n);
+        // SAFETY: as above.
+        let e = unsafe { crate::engine::ENGINE_by_id(name) };
+        if !e.is_null() {
+            if n == b"chil" {
+                // SAFETY: a live engine; OpenSSL's fork-check command for that engine.
+                unsafe {
+                    crate::engine::ENGINE_ctrl(e, rustyssl_abi::ENGINE_CTRL_CHIL_SET_FORKCHECK, 1, core::ptr::null_mut(), None)
+                };
+            }
+            // SAFETY: as above.
+            let ok = unsafe { crate::engine::ENGINE_set_default(e, rustyssl_abi::ENGINE_METHOD_ALL) } != 0;
+            // SAFETY: our reference.
+            unsafe { crate::engine::ENGINE_free(e) };
+            if ok {
+                return 1;
+            }
+        }
         let mut d = b"engine:".to_vec();
         d.extend_from_slice(&n);
         err::raise_with_bytes(ERR_LIB_TS, TS_R_COULD_NOT_SET_ENGINE, "TS_CONF_set_default_engine", &d);
