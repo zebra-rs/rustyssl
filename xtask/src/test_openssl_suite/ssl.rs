@@ -1,6 +1,8 @@
-//! libssl's upstream test programs (`cargo xtask test-openssl-suite --ssl`, or by name).
+//! libssl's upstream test programs, and the provider programs (`cargo xtask test-openssl-suite
+//! --ssl`, or by name).
 //!
-//! `tests/openssl-suite/ssl.txt` lists the programs with the arguments their recipes give them.
+//! `tests/openssl-suite/ssl.txt` lists the programs with the arguments and environment their
+//! recipes give them, and the test modules (`p_test`) built with them.
 //! They're built from the reference's source as the others are; the ones upstream links with
 //! the static libraries are relinked with the shared ones, which needs `sslapitest`'s test
 //! providers to carry their own copies of three internal libcrypto helpers. The `dasync`
@@ -39,23 +41,45 @@ const DASYNC: &str = if cfg!(target_os = "macos") {
     "engines/dasync.so"
 };
 
-/// One program's line of `ssl.txt`: the program and its arguments, `{src}` and `{tmp}` unexpanded.
+/// One program's line of `ssl.txt`: the program, its arguments and its environment, the
+/// placeholders unexpanded.
 struct Line {
     program: String,
     args: Vec<String>,
+    /// `VAR=value` words before the program: its environment, over the run's.
+    env: Vec<(String, String)>,
     /// Whether it runs as one subtest (a `whole` line): its program reads its arguments in a
     /// way that options before them break.
     whole: bool,
 }
 
 impl Line {
-    /// The name its results go by: the program, with `ssl_test`'s file.
+    /// The name its results go by: the program, with `ssl_test`'s file, or with the options it
+    /// was given (`provider_test -loaded`).
     fn label(&self) -> String {
         match self.args.first().and_then(|a| a.rsplit('/').next()) {
             Some(file) if self.program == "ssl_test" => {
                 format!("ssl_test {}", file.trim_end_matches(".cnf"))
             }
-            _ => self.program.clone(),
+            _ => {
+                // Each option, with its value's file name when it has one.
+                let mut options: Vec<&str> = Vec::new();
+                let mut args = self.args.iter().map(String::as_str).peekable();
+                while let Some(a) = args.next() {
+                    if !a.starts_with('-') {
+                        continue;
+                    }
+                    options.push(a);
+                    if let Some(v) = args.next_if(|v| !v.starts_with('-')) {
+                        options.push(v.rsplit('/').next().unwrap_or(v));
+                    }
+                }
+                if options.is_empty() {
+                    self.program.clone()
+                } else {
+                    format!("{} {}", self.program, options.join(" "))
+                }
+            }
         }
     }
 
@@ -73,6 +97,42 @@ impl Line {
     }
 }
 
+impl Line {
+    /// A line's words: `VAR=value` words, the program, its arguments. `None` without a program.
+    fn parse(words: &[&str], whole: bool) -> Option<Line> {
+        let mut env = Vec::new();
+        let mut rest = words.iter();
+        let program = loop {
+            let w = rest.next()?;
+            match w.split_once('=') {
+                Some((var, value))
+                    if !var.is_empty()
+                        && var.bytes().all(|b| b.is_ascii_uppercase() || b == b'_') =>
+                {
+                    env.push((var.to_owned(), value.to_owned()));
+                }
+                _ => break (*w).to_owned(),
+            }
+        };
+        Some(Line {
+            program,
+            args: rest.map(|a| (*a).to_owned()).collect(),
+            env,
+            whole,
+        })
+    }
+}
+
+/// A `build` line's module as a make target: `test/p_test` with the platform's module
+/// extension.
+fn module_target(name: &str) -> String {
+    if cfg!(target_os = "macos") {
+        format!("{name}.dylib")
+    } else {
+        format!("{name}.so")
+    }
+}
+
 /// `tests/openssl-suite/ssl.txt`.
 pub struct List {
     lines: Vec<Line>,
@@ -81,6 +141,8 @@ pub struct List {
     /// Each program's tests that read libssl's private structures: a program (or an `ssl_test`
     /// file, as `ssl_test/<file>`) and a test, or one iteration of it (`<test>#<iteration>`).
     internal: Vec<(String, String)>,
+    /// What else the build makes (`build` lines): modules the programs load.
+    extra: Vec<String>,
 }
 
 impl List {
@@ -91,6 +153,7 @@ impl List {
             lines: Vec::new(),
             skips: Vec::new(),
             internal: Vec::new(),
+            extra: Vec::new(),
         };
         for line in text.lines().map(str::trim) {
             if line.is_empty() || line.starts_with('#') {
@@ -114,19 +177,19 @@ impl List {
                         list.internal.push((program.to_owned(), test.to_owned()));
                     }
                 }
-                "whole" => list.lines.push(Line {
-                    program: words
-                        .next()
-                        .ok_or(format!("{}: `{line}`", path.display()))?
-                        .to_owned(),
-                    args: words.map(str::to_owned).collect(),
-                    whole: true,
-                }),
-                program => list.lines.push(Line {
-                    program: program.to_owned(),
-                    args: words.map(str::to_owned).collect(),
-                    whole: false,
-                }),
+                "build" => list.extra.extend(words.map(module_target)),
+                "whole" => {
+                    let rest: Vec<&str> = words.collect();
+                    list.lines.push(
+                        Line::parse(&rest, true).ok_or(format!("{}: `{line}`", path.display()))?,
+                    );
+                }
+                _ => {
+                    let all: Vec<&str> = line.split_whitespace().collect();
+                    list.lines.push(
+                        Line::parse(&all, false).ok_or(format!("{}: `{line}`", path.display()))?,
+                    );
+                }
             }
         }
         Ok(list)
@@ -157,28 +220,54 @@ pub fn build(list: &List) -> Build {
         }
     }
     targets.push(DASYNC.to_owned());
-    Build {
-        suffix: "-ssl",
-        targets,
-        patches: vec![
+    for extra in &list.extra {
+        if !targets.contains(extra) {
+            targets.push(extra.clone());
+        }
+    }
+    let mut patches = vec![
             // Upstream links `sslapitest` with the static libraries, from which its test
             // providers (`filterprov.c`, `tls-provider.c`) take a few internal helpers that no
             // shared library exports (except the reference's on macOS, which exports
             // everything); they get their own copies, and the program the shared libraries.
             (
                 "test/build.info",
-                "DEPEND[sslapitest]=../libcrypto.a ../libssl.a libtestutil.a",
-                "DEPEND[sslapitest]=../libcrypto ../libssl libtestutil.a",
+                "DEPEND[sslapitest]=../libcrypto.a ../libssl.a libtestutil.a".to_owned(),
+                "DEPEND[sslapitest]=../libcrypto ../libssl libtestutil.a".to_owned(),
             ),
             (
                 "test/build.info",
-                "SOURCE[sslapitest]=sslapitest.c helpers/ssltestlib.c filterprov.c tls-provider.c\n",
+                "SOURCE[sslapitest]=sslapitest.c helpers/ssltestlib.c filterprov.c tls-provider.c\n".to_owned(),
                 "SOURCE[sslapitest]=sslapitest.c helpers/ssltestlib.c filterprov.c tls-provider.c \
-                 ../providers/common/provider_ctx.c ../providers/common/bio_prov.c ../crypto/time.c\n",
-            ),
-        ],
+                 ../providers/common/provider_ctx.c ../providers/common/bio_prov.c ../crypto/time.c\n".to_owned(),
+        ),
+    ];
+    // The provider programs upstream links statically, relinked with the shared libraries (they
+    // use only the public API).
+    for program in RELINKED {
+        if list.lines.iter().any(|l| l.program == *program) {
+            patches.push((
+                "test/build.info",
+                format!("DEPEND[{program}]=../libcrypto.a libtestutil.a"),
+                format!("DEPEND[{program}]=../libcrypto libtestutil.a"),
+            ));
+        }
+    }
+    Build {
+        suffix: "-ssl",
+        targets,
+        patches,
     }
 }
+
+/// Programs upstream links with the static libcrypto that the list's runs relink with the shared
+/// one.
+const RELINKED: &[&str] = &[
+    "provider_test",
+    "provfetchtest",
+    "prov_config_test",
+    "provider_status_test",
+];
 
 /// One subtest: a test of a line's program, or one iteration of it.
 struct Unit {
@@ -212,36 +301,54 @@ struct Setting<'a> {
 }
 
 impl Setting<'_> {
+    /// `text` with its placeholders expanded: `{src}`, `{tmp}`, and `{suite}` (the built
+    /// programs and modules).
+    fn expand(&self, text: &str, tmp: &Path) -> String {
+        text.replace("{src}", &self.src.to_string_lossy())
+            .replace("{tmp}", &tmp.to_string_lossy())
+            .replace("{suite}", &self.suite.to_string_lossy())
+    }
+
     fn args(&self, line: &Line, tmp: &Path) -> Vec<String> {
-        line.args
+        line.args.iter().map(|a| self.expand(a, tmp)).collect()
+    }
+
+    /// `line`'s own environment, expanded.
+    fn env(&self, line: &Line, tmp: &Path) -> Vec<(String, String)> {
+        line.env
             .iter()
-            .map(|a| {
-                a.replace("{src}", &self.src.to_string_lossy())
-                    .replace("{tmp}", &tmp.to_string_lossy())
-            })
+            .map(|(k, v)| (k.clone(), self.expand(v, tmp)))
             .collect()
     }
 
     /// Runs `program` with `args` on the libraries in `lib`, for at most `TIMEOUT`: its exit
-    /// status (`None` if it timed out) and output. `name` keeps its files apart from others'.
+    /// status (`None` if it timed out) and output. `name` keeps its files apart from others':
+    /// its output, and the directory it runs in, where programs write their own files
+    /// (`sslapitest`'s pluggable tests write a key and a certificate per iteration, which
+    /// subtests running at the same time would otherwise share).
     fn run(
         &self,
         program: &str,
         args: &[String],
+        env: &[(String, String)],
         lib: &Path,
         name: &str,
     ) -> Result<(Option<ExitStatus>, String)> {
         let out_path = self.work.join(format!("{name}.out"));
         let out = File::create(&out_path)?;
+        let cwd = self.work.join(format!("{name}.d"));
+        fs::create_dir_all(&cwd)?;
         let exe = self.suite.join(program);
         let mut child = Command::new(&exe)
             .args(args)
-            .current_dir(&self.work)
+            .current_dir(&cwd)
             .env(LOADER_PATH, lib)
+            .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
             .env("OPENSSL_CONF", MISSING_CONFIG)
             .env("OPENSSL_ENGINES", self.suite)
             .env("TEST_CERTS_DIR", self.src.join("test/certs"))
             .env("CTLOG_FILE", self.src.join("test/ct/log_list.cnf"))
+            .envs(env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::null())
             .stdout(out.try_clone()?)
             .stderr(out)
@@ -262,6 +369,7 @@ impl Setting<'_> {
         };
         let text = String::from_utf8_lossy(&fs::read(&out_path)?).into_owned();
         fs::remove_file(&out_path)?;
+        fs::remove_dir_all(&cwd)?;
         Ok((status, text))
     }
 }
@@ -395,7 +503,8 @@ fn list_tests(setting: &Setting, line: &Line, lib: &Path, n: usize) -> Result<Ve
     let tmp = setting.work.join(format!("list{n}.tmp"));
     let mut args = vec!["-list".to_owned()];
     args.extend(setting.args(line, &tmp));
-    let (status, text) = setting.run(&line.program, &args, lib, &format!("list{n}"))?;
+    let env = setting.env(line, &tmp);
+    let (status, text) = setting.run(&line.program, &args, &env, lib, &format!("list{n}"))?;
     if !status.is_some_and(|s| s.success()) {
         return Err(format!(
             "{} -list fails on the reference:\n{}",
@@ -698,7 +807,9 @@ fn run_unit(
             args.push(iteration.to_string());
         }
         args.extend(setting.args(line, &tmp));
-        let (status, text) = setting.run(&line.program, &args, lib, &format!("{i}.{side}"))?;
+        let env = setting.env(line, &tmp);
+        let (status, text) =
+            setting.run(&line.program, &args, &env, lib, &format!("{i}.{side}"))?;
         if tmp.exists() {
             fs::remove_file(&tmp)?;
         }

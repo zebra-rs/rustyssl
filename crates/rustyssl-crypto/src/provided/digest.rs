@@ -15,6 +15,8 @@
 //!   re-initialization, and SHAKE has no default length.
 //! - **BLAKE2** keeps the reference's two lengths: the `size` parameter, applied at the next
 //!   `init`, and the length the running hash has.
+//! - **The legacy provider's** MD4 and Whirlpool are plain digests; MDC2 keeps its padding
+//!   (`pad-type`, which the reference's context parameter sets).
 //!
 //! One deviation: `final` of a fixed-size Keccak digest writes the whole digest whatever room
 //! it's given, so `EVP_DigestFinalXOF` with a short length overflows the caller's buffer in the
@@ -54,6 +56,9 @@ pub enum Kind {
     Md5,
     Md5Sha1,
     Ripemd160,
+    Md4,
+    Mdc2,
+    Whirlpool,
     Null,
 }
 
@@ -79,6 +84,7 @@ impl Kind {
             Self::Sha3_384 | Self::Keccak384 => 104,
             Self::Sha3_512 | Self::Keccak512 => 72,
             Self::Shake128 | Self::KeccakKmac128 => 168,
+            Self::Mdc2 => crate::lowlevel::hash::MDC2_BLOCK,
             Self::Null => 0,
             _ => 64,
         }
@@ -100,7 +106,8 @@ impl Kind {
             Self::Sha384 | Self::Sha3_384 | Self::Keccak384 => 48,
             Self::Sha512 | Self::Sha3_512 | Self::Keccak512 | Self::Blake2b512 => 64,
             Self::KeccakKmac256 => 64,
-            Self::Md5 => 16,
+            Self::Md5 | Self::Md4 | Self::Mdc2 => 16,
+            Self::Whirlpool => 64,
             Self::Md5Sha1 => 36,
             Self::Shake128 | Self::Shake256 | Self::Null => 0,
         }
@@ -153,6 +160,8 @@ impl Kind {
             Self::Sm3 => md::Algorithm::Sm3,
             Self::Md5 => md::Algorithm::Md5,
             Self::Ripemd160 => md::Algorithm::Ripemd160,
+            Self::Md4 => md::Algorithm::Md4,
+            Self::Whirlpool => md::Algorithm::Whirlpool,
             Self::Null => md::Algorithm::Null,
             _ => return None,
         })
@@ -169,6 +178,8 @@ pub enum Ctx {
     Keccak(Box<Keccak>),
     /// BLAKE2s or BLAKE2b.
     Blake2(Blake2),
+    /// MDC2.
+    Mdc2(Box<crate::lowlevel::hash::Mdc2>),
 }
 
 /// A plain digest.
@@ -187,6 +198,7 @@ impl Clone for Ctx {
             Self::Md5Sha1(a, b) => Self::Md5Sha1(a.clone_box(), b.clone_box()),
             Self::Keccak(k) => Self::Keccak(k.clone()),
             Self::Blake2(b) => Self::Blake2(b.clone()),
+            Self::Mdc2(m) => Self::Mdc2(m.clone()),
         }
     }
 }
@@ -219,6 +231,17 @@ impl Ctx {
                 md::context(md::Algorithm::Sha1),
             ),
             Kind::Blake2s256 | Kind::Blake2b512 => Self::Blake2(Blake2::new(kind)),
+            Kind::Mdc2 => {
+                let mut m = crate::lowlevel::hash::Mdc2 {
+                    num: 0,
+                    data: [0; crate::lowlevel::hash::MDC2_BLOCK],
+                    h: [0; crate::lowlevel::hash::MDC2_BLOCK],
+                    hh: [0; crate::lowlevel::hash::MDC2_BLOCK],
+                    pad_type: 1,
+                };
+                m.init();
+                Self::Mdc2(Box::new(m))
+            }
             _ => Self::Keccak(Box::new(Keccak::new(kind))),
         }
     }
@@ -233,6 +256,8 @@ impl Ctx {
             }
             Self::Keccak(k) => k.reset(),
             Self::Blake2(b) => return b.init(),
+            // `MDC2_Init` sets padding 1, as the reference's `init` calls it.
+            Self::Mdc2(m) => m.init(),
         }
         true
     }
@@ -247,6 +272,7 @@ impl Ctx {
                 true
             }
             Self::Blake2(b) => b.update(data),
+            Self::Mdc2(m) => m.update(data).is_ok(),
         }
     }
 
@@ -282,6 +308,20 @@ impl Ctx {
             }
             Self::Keccak(k) => k.finalize(out, outl),
             Self::Blake2(b) => b.finalize(out, outl),
+            Self::Mdc2(m) => {
+                let n = 2 * crate::lowlevel::hash::MDC2_BLOCK;
+                let room = out.get_mut(..n).ok_or(Error::Silent)?;
+                room.copy_from_slice(&m.finish().map_err(|_| Error::Silent)?);
+                *outl = n;
+                Ok(())
+            }
+        }
+    }
+
+    /// Sets MDC2's padding (`pad-type`); other digests ignore it.
+    pub fn set_mdc2_pad_type(&mut self, pad: u32) {
+        if let Self::Mdc2(m) = self {
+            m.pad_type = pad;
         }
     }
 

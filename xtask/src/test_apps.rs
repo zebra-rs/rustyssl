@@ -23,6 +23,7 @@ fn run_tool(tool: &Path, lib: &Path, args: &[String], work: &Path) -> Result<(St
         .args(args)
         .current_dir(work)
         .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(Stdio::null())
         .output()

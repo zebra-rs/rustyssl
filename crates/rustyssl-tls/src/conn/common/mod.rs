@@ -24,7 +24,7 @@ use rustyssl_abi as abi;
 
 use super::statem::{MsgFlow, ReadState, st};
 use super::{Answer, Connection, Request};
-use crate::crypto::{GroupInfo, HashAlg, Provider};
+use crate::crypto::{GroupInfo, Provider};
 use crate::error::{Error, InFunc, Result};
 use crate::keysched::Transcript;
 
@@ -289,7 +289,7 @@ fn setup_handshake_inner(c: &mut Connection, p: &dyn Provider) -> Result<()> {
             abi::SSL_R_NO_PROTOCOLS_AVAILABLE,
         )
     })?;
-    if p.hash(HashAlg::Md5Sha1).is_err() {
+    if !p.digest_available(abi::NID_md5_sha1) {
         let md5sha1_max = if c.cfg.dtls {
             version::of(abi::DTLS1_VERSION)
         } else {

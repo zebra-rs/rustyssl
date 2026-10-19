@@ -396,6 +396,22 @@ pub trait Provider {
     /// The signature algorithms available beyond the built-in ones.
     fn sigalgs(&self) -> Vec<SigalgInfo>;
 
+    /// Whether the digest with NID `nid` can be fetched (`ssl_digest_methods`): a built-in
+    /// signature algorithm whose hash can't is unavailable, and a TLS 1.0/1.1 handshake needs
+    /// MD5-SHA1. Asking leaves no error behind.
+    fn digest_available(&self, nid: i32) -> bool {
+        let _ = nid;
+        true
+    }
+
+    /// Whether a key manager of the key type `name` (`RSA`, `RSA-PSS`, `EC`, ...) can be
+    /// fetched (`EVP_PKEY_CTX_new_from_pkey` of a key of that type): a built-in signature
+    /// algorithm whose key type can't is unavailable. Asking leaves no error behind.
+    fn keytype_available(&self, name: &str) -> bool {
+        let _ = name;
+        true
+    }
+
     /// A new key share for group `id` (for a KEM, the client's encapsulation key).
     ///
     /// # Errors

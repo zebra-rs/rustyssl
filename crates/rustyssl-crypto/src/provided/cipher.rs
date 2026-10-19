@@ -90,6 +90,12 @@ pub enum Kind {
     },
     /// ChaCha20.
     ChaCha20,
+    /// RC4 (the legacy provider's), with its default key length in octets (16, or 5 for
+    /// RC4-40); the length can be set.
+    Rc4 {
+        /// The default key length in octets.
+        key_len: usize,
+    },
     /// The NULL cipher.
     Null,
 }
@@ -113,7 +119,7 @@ impl Kind {
                     rustyssl_abi::EVP_CIPH_WRAP_MODE.cast_unsigned()
                 }
             },
-            Self::ChaCha20 | Self::Null => 0,
+            Self::ChaCha20 | Self::Rc4 { .. } | Self::Null => 0,
         }
     }
 
@@ -122,6 +128,7 @@ impl Kind {
         match self {
             Self::Block { key_len, .. } => key_len,
             Self::ChaCha20 => 32,
+            Self::Rc4 { key_len } => key_len,
             Self::Null => 0,
         }
     }
@@ -148,6 +155,7 @@ impl Kind {
             Self::Block {
                 mode: Mode::Ecb, ..
             }
+            | Self::Rc4 { .. }
             | Self::Null => 0,
             Self::Block {
                 algorithm: BlockAlgorithm::TripleDes,
@@ -167,14 +175,30 @@ impl Kind {
         }
     }
 
-    /// Whether the cipher makes random keys (`has-randkey`; triple DES).
+    /// Whether the cipher makes random keys (`has-randkey`: triple DES, and the legacy
+    /// provider's DES and DESX).
     pub const fn has_rand_key(self) -> bool {
         matches!(
             self,
             Self::Block {
-                algorithm: BlockAlgorithm::TripleDes,
+                algorithm: BlockAlgorithm::TripleDes | BlockAlgorithm::Des | BlockAlgorithm::DesX,
                 ..
             }
+        )
+    }
+
+    /// Whether the key length can be set (`PROV_CIPHER_FLAG_VARIABLE_LENGTH`: Blowfish, CAST5,
+    /// RC2, RC4).
+    pub const fn variable_key_length(self) -> bool {
+        matches!(
+            self,
+            Self::Rc4 { .. }
+                | Self::Block {
+                    algorithm: BlockAlgorithm::Blowfish
+                        | BlockAlgorithm::Cast5
+                        | BlockAlgorithm::Rc2,
+                    ..
+                }
         )
     }
 
@@ -451,6 +475,10 @@ pub struct Generic {
     hmac: Option<Box<composite::Hmac>>,
     cipher: Option<Box<dyn BlockCipher>>,
     chacha: Option<ChaCha>,
+    /// RC4's key stream.
+    rc4: Option<Box<dyn sym::KeyStream>>,
+    /// RC2's effective key length in bits (`rc2-keybits`, `PROV_RC2_CTX`'s `key_bits`).
+    rc2_bits: usize,
     /// Where DES3 key wrap's random IVs come from (the operating system without one).
     rng: Option<crate::rand::Random>,
 }
@@ -481,6 +509,8 @@ impl Clone for Generic {
             hmac: self.hmac.clone(),
             cipher: self.cipher.as_ref().map(|c| c.clone_box()),
             chacha: self.chacha.clone(),
+            rc4: self.rc4.as_ref().and_then(|r| r.clone_box().ok()),
+            rc2_bits: self.rc2_bits,
             rng: self.rng.clone(),
         }
     }
@@ -549,6 +579,9 @@ impl Ctx {
                 .then(|| Box::new(composite::Hmac::new(kind.composite_sha256()))),
             cipher: None,
             chacha: (kind == Kind::ChaCha20).then(ChaCha::new),
+            rc4: None,
+            // RC2's variants start at their key lengths (128, 40, 64 bits).
+            rc2_bits: kind.key_len().saturating_mul(8),
             rng: None,
         }))
     }
@@ -783,7 +816,11 @@ impl Generic {
         }
         if let Some(key) = key {
             if key.len() != self.keylen {
-                return Err(Error::InvalidKeyLength);
+                // A variable-length cipher takes the key's length (`cipher_generic_init_internal`).
+                if !self.kind.variable_key_length() {
+                    return Err(Error::InvalidKeyLength);
+                }
+                self.keylen = key.len();
             }
             self.init_key(key)?;
             self.key_set = true;
@@ -816,7 +853,8 @@ impl Generic {
     fn init_key(&mut self, key: &[u8]) -> Result<(), Error> {
         match self.kind {
             Kind::Block { algorithm, .. } => {
-                let c = sym::block_cipher(algorithm, key, None)
+                let bits = (algorithm == BlockAlgorithm::Rc2).then_some(self.rc2_bits);
+                let c = sym::block_cipher(algorithm, key, bits)
                     .map_err(|_| Error::CipherOperationFailed)?;
                 self.cipher = Some(c);
                 if self.is_composite() {
@@ -828,6 +866,9 @@ impl Generic {
                 let k: &[u8; 32] = key.try_into().map_err(|_| Error::InvalidKeyLength)?;
                 c.key.copy_from_slice(k);
                 c.partial = 0;
+            }
+            Kind::Rc4 { .. } => {
+                self.rc4 = Some(sym::rc4(key).map_err(|_| Error::InvalidKeyLength)?);
             }
             Kind::Null => {}
         }
@@ -1011,6 +1052,10 @@ impl Generic {
                 Ok(0xff)
             }
             Kind::Null => Ok(0xff),
+            Kind::Rc4 { .. } => {
+                self.rc4.as_mut().ok_or(Error::NoKeySet)?.apply(data);
+                Ok(0xff)
+            }
             Kind::Block { mode, .. } => {
                 let bs = self.blocksize_of_cipher();
                 let enc = self.enc;
@@ -1364,6 +1409,34 @@ impl Generic {
             }
         }
         Ok(())
+    }
+
+    /// `ossl_cipher_var_keylen_set_ctx_params`'s `keylen`: a new length unsets the key.
+    pub fn set_key_len(&mut self, n: usize) {
+        if self.keylen != n {
+            self.keylen = n;
+            self.key_set = false;
+        }
+    }
+
+    /// RC2's effective key length in bits.
+    pub fn rc2_bits(&self) -> usize {
+        self.rc2_bits
+    }
+
+    /// Sets RC2's effective key length (used at the next key).
+    pub fn set_rc2_bits(&mut self, bits: usize) {
+        self.rc2_bits = bits;
+    }
+
+    /// The IV as set (`ctx->base.iv` for the RC2 parameters' encoding is the running IV).
+    pub fn running_iv(&self) -> &[u8] {
+        self.iv.get(..self.ivlen.min(MAX_BLOCK)).unwrap_or(&[])
+    }
+
+    /// Sets the IV as RC2's parameters decode it (`ossl_cipher_generic_initiv`).
+    pub fn set_iv(&mut self, iv: &[u8]) -> Result<(), Error> {
+        self.init_iv(iv)
     }
 
     /// Whether the context is set to encrypt.

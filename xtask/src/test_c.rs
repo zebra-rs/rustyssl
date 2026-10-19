@@ -5,10 +5,16 @@
 //! reference libraries, and on rustyssl's (`cargo xtask dist`), by pointing the dynamic loader
 //! at each in turn. A test passes when both runs pass every check and print exactly the same
 //! output: the reference run validates the test, the rustyssl run the implementation.
+//!
+//! `tests/c/modules/*.c` are providers and other loadable modules the tests use: each is built
+//! into a module of its own (`<name>.so`, or `.dylib` on macOS) in one directory, which the
+//! tests find through `RUSTYSSL_TEST_MODULES`. They link against the reference libcrypto, as the
+//! tests do, so each run's loader gives them the libraries under test.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use crate::reference;
@@ -21,6 +27,12 @@ pub const CFLAGS: &[&str] = &["-std=c99", "-Wall", "-Wextra", "-Werror", "-g"];
 const TIMEOUT: Duration = Duration::from_secs(120);
 
 /// The variable that makes the dynamic loader look in a directory first.
+/// A library directory's provider modules (`lib/ossl-modules`), as `OPENSSL_MODULES` points each
+/// run at its own library's: the reference's legacy module and ours aren't interchangeable.
+pub fn modules_of(lib: &std::path::Path) -> std::path::PathBuf {
+    lib.join("ossl-modules")
+}
+
 pub const LOADER_PATH: &str = if cfg!(target_os = "macos") {
     "DYLD_LIBRARY_PATH"
 } else {
@@ -33,6 +45,12 @@ pub fn run(args: &[String]) -> Result {
     let tests = select(&root.join("tests/c"), args)?;
     let work = target_dir(&root).join("xtask/test-c");
     fresh_dir(&work)?;
+    compile_modules(
+        &root.join("tests/c/modules"),
+        &work.join("modules"),
+        &dist,
+        &reference,
+    )?;
 
     let mut failures = Vec::new();
     for (name, source) in &tests {
@@ -102,6 +120,45 @@ pub fn compile(source: &Path, exe: &Path, dist: &Path, reference: &Path) -> Resu
     Ok(())
 }
 
+/// The platform's extension for a loadable module (`DSO_EXTENSION`).
+pub const MODULE_EXTENSION: &str = if cfg!(target_os = "macos") {
+    "dylib"
+} else {
+    "so"
+};
+
+/// The directory of the built test modules, once built: given to every test run.
+static MODULES: OnceLock<PathBuf> = OnceLock::new();
+
+/// Builds each `<dir>/*.c` into the module `<out>/<name>.<ext>`, linked against the reference.
+pub fn compile_modules(dir: &Path, out: &Path, dist: &Path, reference: &Path) -> Result {
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    fresh_dir(out)?;
+    for (name, source) in select(dir, &[])? {
+        let module = out.join(format!("{name}.{MODULE_EXTENSION}"));
+        let mut cmd = cc();
+        cmd.args(CFLAGS);
+        if cfg!(target_os = "macos") {
+            cmd.arg("-dynamiclib");
+        } else {
+            cmd.args(["-shared", "-fPIC"]);
+        }
+        run_output(
+            cmd.arg("-I")
+                .arg(dist.join("include"))
+                .arg(&source)
+                .arg("-L")
+                .arg(reference.join("lib"))
+                .args(["-lcrypto", "-o"])
+                .arg(&module),
+        )?;
+    }
+    let _ = MODULES.set(out.to_path_buf());
+    Ok(())
+}
+
 /// What one run produced.
 pub struct Outcome {
     pub status: String,
@@ -134,8 +191,13 @@ pub fn execute_with_input(
         Some(path) => Stdio::from(fs::File::open(path)?),
         None => Stdio::null(),
     };
-    let mut child = Command::new(exe)
+    let mut command = Command::new(exe);
+    if let Some(modules) = MODULES.get() {
+        command.env("RUSTYSSL_TEST_MODULES", modules);
+    }
+    let mut child = command
         .env(LOADER_PATH, lib_dir)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib_dir))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(stdin)
         .stdout(fs::File::create(&stdout_path)?)

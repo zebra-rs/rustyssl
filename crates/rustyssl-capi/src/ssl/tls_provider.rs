@@ -25,13 +25,16 @@ use rustyssl_abi::{
     OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, OSSL_CAPABILITY_TLS_GROUP_MIN_TLS,
     OSSL_CAPABILITY_TLS_GROUP_NAME, OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL,
     OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT,
-    OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME, OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME,
-    OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE, OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS,
+    OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME, OSSL_CAPABILITY_TLS_SIGALG_HASH_OID,
+    OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME, OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE,
+    OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE_OID, OSSL_CAPABILITY_TLS_SIGALG_MAX_DTLS,
+    OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS, OSSL_CAPABILITY_TLS_SIGALG_MIN_DTLS,
     OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS, OSSL_CAPABILITY_TLS_SIGALG_NAME,
-    OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, OSSL_LIB_CTX, OSSL_MAC_PARAM_DIGEST,
-    OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_PARAM, OSSL_PARAM_UTF8_STRING, OSSL_PKEY_PARAM_FFC_G,
-    OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PROVIDER, RSA_PKCS1_PADDING,
-    RSA_PKCS1_PSS_PADDING, RSA_PKCS1_WITH_TLS_PADDING, RSA_PSS_SALTLEN_DIGEST,
+    OSSL_CAPABILITY_TLS_SIGALG_OID, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS,
+    OSSL_CAPABILITY_TLS_SIGALG_SIG_NAME, OSSL_CAPABILITY_TLS_SIGALG_SIG_OID, OSSL_LIB_CTX,
+    OSSL_MAC_PARAM_DIGEST, OSSL_MAC_PARAM_TLS_DATA_SIZE, OSSL_PARAM, OSSL_PARAM_UTF8_STRING,
+    OSSL_PKEY_PARAM_FFC_G, OSSL_PKEY_PARAM_FFC_P, OSSL_PKEY_PARAM_PUB_KEY, OSSL_PROVIDER,
+    RSA_PKCS1_PADDING, RSA_PKCS1_PSS_PADDING, RSA_PKCS1_WITH_TLS_PADDING, RSA_PSS_SALTLEN_DIGEST,
 };
 use rustyssl_tls::consts::sigscheme;
 use rustyssl_tls::crypto::{
@@ -57,7 +60,7 @@ use crate::evp::kem::{
     EVP_PKEY_decapsulate, EVP_PKEY_decapsulate_init, EVP_PKEY_encapsulate,
     EVP_PKEY_encapsulate_init,
 };
-use crate::evp::keymgmt::{EVP_KEYMGMT_fetch, EVP_KEYMGMT_free};
+use crate::evp::keymgmt::{EVP_KEYMGMT_fetch, EVP_KEYMGMT_free, EVP_KEYMGMT_get0_provider};
 use crate::evp::mac::{
     EVP_MAC_CTX_dup, EVP_MAC_CTX_free, EVP_MAC_CTX_new, EVP_MAC_fetch, EVP_MAC_final, EVP_MAC_free,
     EVP_MAC_init, EVP_MAC_update,
@@ -409,6 +412,20 @@ pub(crate) struct EvpProvider {
     keys: Mutex<Vec<Owned<EVP_PKEY>>>,
     /// The groups, discovered on first use (`ssl_load_groups`).
     groups: Mutex<Option<Vec<Group>>>,
+    /// The providers' signature algorithms, discovered on first use (`ssl_load_sigalgs`), each
+    /// with its IANA name as `SSL_get0_peer_signature_name` hands it out. Set once and never
+    /// replaced, so the names stay where they are while the provider lives.
+    sigalgs: Mutex<Option<Vec<(SigalgInfo, CString)>>>,
+    /// Which digests (by NID) and key types (by name) could be fetched, each asked once, as
+    /// OpenSSL loads `ssl_digest_methods` once per context.
+    available: Mutex<Vec<(Fetchable, bool)>>,
+}
+
+/// What [`EvpProvider`] remembers having tried to fetch.
+#[derive(Clone, PartialEq, Eq)]
+enum Fetchable {
+    Digest(c_int),
+    Keytype(String),
 }
 
 impl EvpProvider {
@@ -431,7 +448,105 @@ impl EvpProvider {
             },
             keys: Mutex::new(Vec::new()),
             groups: Mutex::new(None),
+            sigalgs: Mutex::new(None),
+            available: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Whether `what` can be fetched, asked once (no lock is held while fetching, and the
+    /// fetch's errors don't stay).
+    fn fetchable(&self, what: Fetchable) -> bool {
+        let known = self
+            .available
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .find(|(w, _)| *w == what)
+            .map(|(_, ok)| *ok);
+        if let Some(ok) = known {
+            return ok;
+        }
+        // SAFETY: no preconditions.
+        unsafe { ERR_set_mark() };
+        let ok = match &what {
+            Fetchable::Digest(nid) => {
+                // SAFETY: no pointers; a static name or NULL.
+                let name = unsafe { crate::objects::OBJ_nid2sn(*nid) };
+                !name.is_null()
+                    && self
+                        .fetch_md(
+                            // SAFETY: a static NUL-terminated name.
+                            unsafe { CStr::from_ptr(name) },
+                        )
+                        .is_ok()
+            }
+            Fetchable::Keytype(name) => CString::new(name.as_str()).is_ok_and(|n| {
+                // SAFETY: the library context; a NUL-terminated name; the property query.
+                let km = unsafe { EVP_KEYMGMT_fetch(self.libctx(), n.as_ptr(), self.propq()) };
+                // SAFETY: fetched above, or NULL.
+                unsafe { EVP_KEYMGMT_free(km) };
+                !km.is_null()
+            }),
+        };
+        // SAFETY: no preconditions.
+        unsafe { ERR_pop_to_mark() };
+        self.available
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((what, ok));
+        ok
+    }
+
+    /// The providers' signature algorithms (TLS-SIGALG), discovered once. The discovery runs
+    /// the providers' callbacks, so no lock is held during it.
+    fn provider_sigalgs(&self) -> Vec<SigalgInfo> {
+        let known = self
+            .sigalgs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_ref()
+            .map(|l| l.iter().map(|(i, _)| i.clone()).collect());
+        if let Some(list) = known {
+            return list;
+        }
+        let mut d = Discovery {
+            owner: self,
+            provider: ptr::null(),
+            groups: Vec::new(),
+            sigalgs: Vec::new(),
+        };
+        // SAFETY: the library context; the callback and its data, which outlive the call.
+        unsafe {
+            OSSL_PROVIDER_do_all(
+                self.libctx(),
+                Some(discover_sigalgs_cb),
+                ptr::from_mut(&mut d).cast(),
+            )
+        };
+        let named = d
+            .sigalgs
+            .into_iter()
+            .map(|i| {
+                let name = CString::new(i.name.clone()).unwrap_or_default();
+                (i, name)
+            })
+            .collect();
+        let mut slot = self.sigalgs.lock().unwrap_or_else(PoisonError::into_inner);
+        slot.get_or_insert(named)
+            .iter()
+            .map(|(i, _)| i.clone())
+            .collect()
+    }
+
+    /// A provider signature algorithm's IANA name (valid while the provider lives) and hash
+    /// NID, by code point (`tls1_lookup_sigalg` over the providers' part of the cache).
+    pub(crate) fn provider_sigalg(&self, id: u16) -> Option<(*const c_char, c_int)> {
+        self.provider_sigalgs();
+        let slot = self.sigalgs.lock().unwrap_or_else(PoisonError::into_inner);
+        slot.as_ref()?
+            .iter()
+            .find(|(i, _)| i.id == id)
+            .map(|(i, n)| (n.as_ptr(), i.hash_nid))
     }
 
     /// The property query, or NULL.
@@ -504,6 +619,7 @@ impl EvpProvider {
     fn discover_groups(&self) -> Vec<Group> {
         let mut d = Discovery {
             owner: self,
+            provider: ptr::null(),
             groups: Vec::new(),
             sigalgs: Vec::new(),
         };
@@ -582,14 +698,29 @@ impl EvpProvider {
     /// # Safety
     /// `pkey` is a live key.
     unsafe fn sig_ctx(&self, pkey: *mut EVP_PKEY, scheme: u16, sign: bool) -> Result<MdCtx> {
-        let (md, pss) = scheme_digest(scheme)?;
+        // A built-in scheme's digest, else a provider's (its capability's hash, `lu->hash`).
+        let (mdname, pss) = match scheme_digest(scheme) {
+            Ok((md, pss)) => (md.map_or(ptr::null(), CStr::as_ptr), pss),
+            Err(e) => {
+                let info = self.provider_sigalgs().into_iter().find(|i| i.id == scheme);
+                let Some(info) = info else {
+                    return Err(e);
+                };
+                let md = if info.hash_nid == rustyssl_abi::NID_undef {
+                    ptr::null()
+                } else {
+                    // SAFETY: no pointers; an object's name lives with the object table.
+                    unsafe { crate::objects::OBJ_nid2sn(info.hash_nid) }
+                };
+                (md, false)
+            }
+        };
         // SAFETY: no preconditions.
         let ctx = MdCtx(unsafe { EVP_MD_CTX_new() });
         if ctx.0.is_null() {
             return Err(fail());
         }
         let mut pctx: *mut EVP_PKEY_CTX = ptr::null_mut();
-        let mdname = md.map_or(ptr::null(), CStr::as_ptr);
         let r = if sign {
             // SAFETY: the context; the slot; the digest's name or NULL; the library context;
             // the property query; the caller's key.
@@ -683,6 +814,8 @@ impl Drop for EvpProvider {
 /// What group and sigalg discovery collects.
 struct Discovery<'a> {
     owner: &'a EvpProvider,
+    /// The provider whose capabilities are being read (`provider_ctx_data_st`'s `provider`).
+    provider: *const OSSL_PROVIDER,
     groups: Vec<Group>,
     sigalgs: Vec<SigalgInfo>,
 }
@@ -806,13 +939,14 @@ unsafe extern "C" fn add_group_cb(params: *const OSSL_PARAM, arg: *mut c_void) -
         );
         return 0;
     };
-    // The group counts only if its algorithm can be fetched under the property query; either
-    // way the set was processed.
+    // The group counts only if its algorithm can be fetched under the property query, from
+    // this provider; either way the set was processed.
     // SAFETY: no preconditions.
     unsafe { ERR_set_mark() };
     // SAFETY: the library context; NUL-terminated names.
     let km = unsafe { EVP_KEYMGMT_fetch(d.owner.libctx(), algorithm.as_ptr(), d.owner.propq()) };
-    let usable = !km.is_null();
+    // SAFETY: fetched above, or NULL.
+    let usable = !km.is_null() && unsafe { EVP_KEYMGMT_get0_provider(km) } == d.provider;
     // SAFETY: fetched above, or NULL.
     unsafe { EVP_KEYMGMT_free(km) };
     // SAFETY: no preconditions.
@@ -850,68 +984,199 @@ unsafe extern "C" fn add_group_cb(params: *const OSSL_PARAM, arg: *mut c_void) -
 /// # Safety
 /// `prov` is a live provider; `arg` a live [`Discovery`].
 unsafe extern "C" fn discover_groups_cb(prov: *mut OSSL_PROVIDER, arg: *mut c_void) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if let Some(d) = unsafe { arg.cast::<Discovery<'_>>().as_mut() } {
+        d.provider = prov.cast_const();
+    }
     // SAFETY: the caller's provider; the callback and its data. No lock is held.
     unsafe { OSSL_PROVIDER_get_capabilities(prov, c"TLS-GROUP".as_ptr(), Some(add_group_cb), arg) }
 }
 
-/// One TLS-SIGALG set (the parts the core uses).
+/// One TLS-SIGALG set (`add_provider_sigalgs`): its mandatory parameters checked (a missing or
+/// mistyped one fails the discovery with `ERR_R_PASSED_INVALID_ARGUMENT`, a mistyped optional one
+/// without an entry), its TLS versions normalized (provider sigalgs are TLS 1.3's only; none in
+/// DTLS), and the set taken only if its key type's key manager comes from this provider, with
+/// its objects created (`OBJ_create`, `OBJ_add_sigid`) as OpenSSL creates them. The lookups
+/// leave no errors behind (an error mark).
 ///
 /// # Safety
 /// `params` is a terminated parameter array; `arg` a live [`Discovery`].
 unsafe extern "C" fn add_sigalg_cb(params: *const OSSL_PARAM, arg: *mut c_void) -> c_int {
+    use crate::objects::sigid::OBJ_add_sigid;
+    use crate::objects::{OBJ_create, OBJ_nid2obj, OBJ_txt2nid};
     // SAFETY: the caller's guarantee.
     let Some(d) = (unsafe { arg.cast::<Discovery<'_>>().as_mut() }) else {
         return 0;
     };
-    // SAFETY: the caller's array.
-    let iana_p = unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME) };
-    // SAFETY: the caller's array.
-    let cp_p = unsafe { param_uint(params, OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT) };
-    // SAFETY: the caller's array.
-    let sbits_p = unsafe { param_uint(params, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS) };
-    // SAFETY: the caller's array.
-    let smin_p = unsafe { param_int(params, OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS) };
-    // SAFETY: the caller's array.
-    let smax_p = unsafe { param_int(params, OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS) };
-    let fields = (iana_p, cp_p, sbits_p, smin_p, smax_p);
-    let (Some(name), Some(cp), Some(bits), Some(min_tls), Some(max_tls)) = fields else {
+    let invalid = || {
         crate::err::raise(
             rustyssl_abi::ERR_LIB_SSL,
             rustyssl_abi::ERR_R_PASSED_INVALID_ARGUMENT,
             "add_provider_sigalgs",
         );
-        return 0;
+        0
     };
-    let Ok(id) = u16::try_from(cp) else {
-        crate::err::raise(
-            rustyssl_abi::ERR_LIB_SSL,
-            rustyssl_abi::ERR_R_PASSED_INVALID_ARGUMENT,
-            "add_provider_sigalgs",
-        );
-        return 0;
+    // A UTF-8 parameter: absent (`Ok(None)`), present (`Ok(Some)`), or of another type (`Err`).
+    let optional = |key: &CStr| -> core::result::Result<Option<CString>, ()> {
+        // SAFETY: the caller's array; a NUL-terminated key.
+        let p = unsafe { OSSL_PARAM_locate_const(params, key.as_ptr()) };
+        if p.is_null() {
+            return Ok(None);
+        }
+        // SAFETY: the caller's array.
+        unsafe { param_str(params, key) }.map(Some).ok_or(())
     };
-    // `inferred_keytype`: the capability's key type, else its signature algorithm's name.
+    // The mandatory parameters.
     // SAFETY: the caller's array.
-    let key_type = unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE) }
-        // SAFETY: as above.
-        .or_else(|| unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) })
-        .map(|k| k.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    // `OBJ_txt2nid` of the sigalg name (the cache's `sig` and `sigandhash`) and of the hash.
-    let nid_of = |s: Option<std::ffi::CString>| {
-        // SAFETY: a NUL-terminated name from the caller's array.
-        s.map_or(rustyssl_abi::NID_undef, |s| unsafe {
-            crate::objects::OBJ_txt2nid(s.as_ptr())
-        })
+    let Some(sigalg_name) = (unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) }) else {
+        return invalid();
     };
-    // SAFETY: the caller's array.
-    let sig_nid = nid_of(unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_NAME) });
     // SAFETY: as above.
-    let hash_nid = nid_of(unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME) });
+    let Some(name) = (unsafe { param_str(params, OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME) }) else {
+        return invalid();
+    };
+    // SAFETY: as above.
+    let code_point = unsafe { param_uint(params, OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT) };
+    let Some(id) = code_point.and_then(|cp| u16::try_from(cp).ok()) else {
+        return invalid();
+    };
+    // SAFETY: as above.
+    let Some(bits) = (unsafe { param_uint(params, OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS) })
+    else {
+        return invalid();
+    };
+    // The optional ones: a value of the wrong type fails the discovery, with no entry.
+    let optionals = (
+        optional(OSSL_CAPABILITY_TLS_SIGALG_OID),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_SIG_NAME),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_SIG_OID),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_HASH_NAME),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_HASH_OID),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE),
+        optional(OSSL_CAPABILITY_TLS_SIGALG_KEYTYPE_OID),
+    );
+    let (
+        Ok(sigalg_oid),
+        Ok(sig_name),
+        Ok(sig_oid),
+        Ok(hash_name),
+        Ok(hash_oid),
+        Ok(keytype),
+        Ok(keytype_oid),
+    ) = optionals
+    else {
+        return 0;
+    };
+    // The DTLS versions (optional, "not documented prior to 3.5"): checked, then dropped, as no
+    // provider sigalg is used in DTLS.
+    let mut dtls = [-1; 2];
+    for (key, slot) in [
+        OSSL_CAPABILITY_TLS_SIGALG_MIN_DTLS,
+        OSSL_CAPABILITY_TLS_SIGALG_MAX_DTLS,
+    ]
+    .into_iter()
+    .zip(dtls.iter_mut())
+    {
+        // SAFETY: as above.
+        if unsafe { OSSL_PARAM_locate_const(params, key.as_ptr()) }.is_null() {
+            continue;
+        }
+        // SAFETY: as above.
+        let Some(v) = (unsafe { param_int(params, key) }) else {
+            return invalid();
+        };
+        *slot = v;
+    }
+    let [min_dtls, max_dtls] = dtls;
+    // DTLS version numbers grow downward.
+    if max_dtls != 0 && max_dtls != -1 && max_dtls > min_dtls {
+        return invalid();
+    }
+    // The TLS versions, mandatory again.
+    // SAFETY: as above.
+    let Some(mut min_tls) = (unsafe { param_int(params, OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS) })
+    else {
+        return invalid();
+    };
+    // SAFETY: as above.
+    let Some(mut max_tls) = (unsafe { param_int(params, OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS) })
+    else {
+        return invalid();
+    };
+    if max_tls != 0 && max_tls != -1 && max_tls < min_tls {
+        return invalid();
+    }
+    let tls13 = rustyssl_abi::TLS1_3_VERSION;
+    if (min_tls != 0 && min_tls != -1 && min_tls > tls13)
+        || (max_tls != 0 && max_tls != -1 && max_tls < tls13)
+    {
+        (min_tls, max_tls) = (-1, -1);
+    }
+    // An unusable one is processed but not taken.
+    if min_tls == -1 {
+        return 1;
+    }
+    let c = |s: &Option<CString>| s.as_ref().map_or(ptr::null(), |s| s.as_ptr());
+    // `inferred_keytype`: the key type, else the signature algorithm's, else the sigalg's name.
+    let key_type = keytype
+        .clone()
+        .or_else(|| sig_name.clone())
+        .unwrap_or_else(|| sigalg_name.clone());
+    // SAFETY: no preconditions.
+    unsafe { ERR_set_mark() };
+    // SAFETY: the library context; NUL-terminated names.
+    let km = unsafe { EVP_KEYMGMT_fetch(d.owner.libctx(), key_type.as_ptr(), d.owner.propq()) };
+    // SAFETY: fetched above, or NULL.
+    let ours = !km.is_null() && unsafe { EVP_KEYMGMT_get0_provider(km) } == d.provider;
+    // SAFETY: fetched above, or NULL.
+    unsafe { EVP_KEYMGMT_free(km) };
+    let mut taken = None;
+    if ours {
+        // Registered here unless the provider registered it already; the result doesn't
+        // matter.
+        // SAFETY: NULL or NUL-terminated strings.
+        unsafe { OBJ_create(c(&sigalg_oid), sigalg_name.as_ptr(), ptr::null()) };
+        // SAFETY: a NUL-terminated name.
+        let sig_nid = unsafe { OBJ_txt2nid(sigalg_name.as_ptr()) };
+        // SAFETY: no pointers.
+        let registered =
+            sig_nid != rustyssl_abi::NID_undef && !unsafe { OBJ_nid2obj(sig_nid) }.is_null();
+        if registered {
+            for (oid, n) in [
+                (&sig_oid, &sig_name),
+                (&keytype_oid, &keytype),
+                (&hash_oid, &hash_name),
+            ] {
+                if let Some(n) = n {
+                    // SAFETY: as above.
+                    unsafe { OBJ_create(c(oid), n.as_ptr(), ptr::null()) };
+                }
+            }
+            let hash_nid = hash_name.as_ref().map_or(rustyssl_abi::NID_undef, |h| {
+                // SAFETY: a NUL-terminated name.
+                unsafe { OBJ_txt2nid(h.as_ptr()) }
+            });
+            // SAFETY: as above.
+            let key_nid = unsafe { OBJ_txt2nid(key_type.as_ptr()) };
+            // SAFETY: no pointers.
+            unsafe { OBJ_add_sigid(sig_nid, hash_nid, key_nid) };
+            taken = Some((sig_nid, hash_nid));
+        }
+    }
+    // SAFETY: no preconditions.
+    unsafe { ERR_pop_to_mark() };
+    let Some((sig_nid, hash_nid)) = taken else {
+        // Not this provider's: processed. This provider's, but its name names no object: the
+        // sanity check fails, raising its error, and the discovery goes on.
+        if ours {
+            invalid();
+        }
+        return 1;
+    };
     d.sigalgs.push(SigalgInfo {
         sig_nid,
         hash_nid,
-        key_type,
+        key_type: key_type.to_string_lossy().into_owned(),
         name: name.to_string_lossy().into_owned(),
         id,
         security_bits: bits,
@@ -926,6 +1191,10 @@ unsafe extern "C" fn add_sigalg_cb(params: *const OSSL_PARAM, arg: *mut c_void) 
 /// # Safety
 /// `prov` is a live provider; `arg` a live [`Discovery`].
 unsafe extern "C" fn discover_sigalgs_cb(prov: *mut OSSL_PROVIDER, arg: *mut c_void) -> c_int {
+    // SAFETY: the caller's guarantee.
+    if let Some(d) = unsafe { arg.cast::<Discovery<'_>>().as_mut() } {
+        d.provider = prov.cast_const();
+    }
     // SAFETY: the caller's provider; the callback and its data. No lock is held.
     unsafe {
         OSSL_PROVIDER_get_capabilities(prov, c"TLS-SIGALG".as_ptr(), Some(add_sigalg_cb), arg)
@@ -1522,20 +1791,15 @@ impl Provider for EvpProvider {
     }
 
     fn sigalgs(&self) -> Vec<SigalgInfo> {
-        let mut d = Discovery {
-            owner: self,
-            groups: Vec::new(),
-            sigalgs: Vec::new(),
-        };
-        // SAFETY: the library context; the callback and its data, which outlive the call.
-        unsafe {
-            OSSL_PROVIDER_do_all(
-                self.libctx(),
-                Some(discover_sigalgs_cb),
-                ptr::from_mut(&mut d).cast(),
-            )
-        };
-        d.sigalgs
+        self.provider_sigalgs()
+    }
+
+    fn digest_available(&self, nid: i32) -> bool {
+        self.fetchable(Fetchable::Digest(nid))
+    }
+
+    fn keytype_available(&self, name: &str) -> bool {
+        self.fetchable(Fetchable::Keytype(name.to_owned()))
     }
 
     fn key_share(&self, id: u16) -> Result<Box<dyn KeyShare>> {
@@ -1670,8 +1934,14 @@ impl Provider for EvpProvider {
                 }
             }
         }
+        // A provider's key may report no size; OpenSSL asks only RSA-PSS keys theirs, so asking
+        // leaves no error (`EVP_R_UNKNOWN_MAX_SIZE`) behind.
+        // SAFETY: no preconditions.
+        unsafe { ERR_set_mark() };
         // SAFETY: as above.
         let size = usize::try_from(unsafe { EVP_PKEY_get_size(pkey) }).unwrap_or(0);
+        // SAFETY: no preconditions.
+        unsafe { ERR_pop_to_mark() };
         // SAFETY: as above.
         let security_bits = unsafe { EVP_PKEY_get_security_bits(pkey) };
         let key_usage = match &_owner {

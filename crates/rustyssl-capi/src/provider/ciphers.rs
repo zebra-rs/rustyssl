@@ -20,15 +20,17 @@ use core::ptr;
 
 use rustyssl_abi::{
     ERR_LIB_PROV, ERR_R_INTERNAL_ERROR, ERR_R_PASSED_INVALID_ARGUMENT, OSSL_ALGORITHM,
-    OSSL_CIPHER_PARAM_AEAD, OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS,
+    OSSL_CIPHER_PARAM_AEAD, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS,
+    OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS_OLD, OSSL_CIPHER_PARAM_BLOCK_SIZE, OSSL_CIPHER_PARAM_CTS,
     OSSL_CIPHER_PARAM_CUSTOM_IV, OSSL_CIPHER_PARAM_DECRYPT_ONLY, OSSL_CIPHER_PARAM_HAS_RAND_KEY,
     OSSL_CIPHER_PARAM_IV, OSSL_CIPHER_PARAM_IVLEN, OSSL_CIPHER_PARAM_KEYLEN,
     OSSL_CIPHER_PARAM_MODE, OSSL_CIPHER_PARAM_NUM, OSSL_CIPHER_PARAM_PADDING,
-    OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_TLS_MAC, OSSL_CIPHER_PARAM_TLS_MAC_SIZE,
-    OSSL_CIPHER_PARAM_TLS_VERSION, OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV,
-    OSSL_CIPHER_PARAM_USE_BITS, OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT,
-    OSSL_FUNC_CIPHER_DUPCTX, OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL,
-    OSSL_FUNC_CIPHER_FREECTX, OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
+    OSSL_CIPHER_PARAM_RANDOM_KEY, OSSL_CIPHER_PARAM_RC2_KEYBITS, OSSL_CIPHER_PARAM_TLS_MAC,
+    OSSL_CIPHER_PARAM_TLS_MAC_SIZE, OSSL_CIPHER_PARAM_TLS_VERSION,
+    OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK, OSSL_CIPHER_PARAM_UPDATED_IV, OSSL_CIPHER_PARAM_USE_BITS,
+    OSSL_FUNC_CIPHER_CIPHER, OSSL_FUNC_CIPHER_DECRYPT_INIT, OSSL_FUNC_CIPHER_DUPCTX,
+    OSSL_FUNC_CIPHER_ENCRYPT_INIT, OSSL_FUNC_CIPHER_FINAL, OSSL_FUNC_CIPHER_FREECTX,
+    OSSL_FUNC_CIPHER_GET_CTX_PARAMS, OSSL_FUNC_CIPHER_GET_PARAMS,
     OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
     OSSL_FUNC_CIPHER_NEWCTX, OSSL_FUNC_CIPHER_SET_CTX_PARAMS, OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
     OSSL_FUNC_CIPHER_UPDATE, OSSL_LIB_CTX, OSSL_PARAM, OSSL_PARAM_INTEGER, OSSL_PARAM_OCTET_PTR,
@@ -45,7 +47,9 @@ use rustyssl_crypto::provided::aead::{Io, Raised};
 use rustyssl_crypto::provided::cipher::{Ctx, Error, Kind, Mode, Output};
 use rustyssl_crypto::sym::BlockAlgorithm;
 
-use super::tables::{ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry};
+use super::tables::{
+    ALG_END, Algorithms, Dispatch, END, PARAM_END, Params, alg, defn, entry, legacy_alg,
+};
 use super::{aeads, modes};
 use crate::err;
 use crate::ffi::ffi_callback;
@@ -274,6 +278,8 @@ enum Family {
     Generic,
     ChaCha20,
     Null,
+    /// RC2.
+    Rc2,
 }
 
 /// `einit`/`dinit`: the key and IV, then the parameters.
@@ -300,6 +306,8 @@ unsafe fn init(
         // SAFETY: the caller's guarantee.
         Family::ChaCha20 => unsafe { chacha20_set_ctx_params(vctx, params) },
         Family::Null => 1,
+        // SAFETY: as above.
+        Family::Rc2 => unsafe { rc2_set_ctx_params(vctx, params) },
     }
 }
 
@@ -369,6 +377,7 @@ macro_rules! inits {
 inits!(Family::Generic, generic_einit, generic_dinit);
 inits!(Family::ChaCha20, chacha20_einit, chacha20_dinit);
 inits!(Family::Null, null_einit, null_dinit);
+inits!(Family::Rc2, rc2_einit, rc2_dinit);
 
 ffi_callback! {
     /// `update`: `inl` octets (bits for CFB1 counting bits) through the mode, the output's
@@ -856,6 +865,251 @@ ffi_callback! {
 }
 
 ffi_callback! {
+    /// `ossl_cipher_var_keylen_set_ctx_params`: the generic parameters, then `keylen` (a new
+    /// length unsets the key).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn var_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "ossl_cipher_var_keylen_set_ctx_params";
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        if unsafe { generic_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: the caller's array.
+        match unsafe { get_param(params, OSSL_CIPHER_PARAM_KEYLEN, F, get_size) } {
+            Err(()) => 0,
+            Ok(Some(n)) => {
+                // SAFETY: the caller's guarantee.
+                let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+                let Some(g) = ctx.core.generic_mut() else { return 0 };
+                g.set_key_len(n);
+                1
+            }
+            Ok(None) => 1,
+        }
+    }
+}
+
+/// `rc2_keybits_to_magic`: the version number RC2's parameters encode a key length as, or 0
+/// with `PROV_R_UNSUPPORTED_KEY_SIZE`.
+fn rc2_magic(bits: usize, function: &str) -> core::ffi::c_long {
+    match bits {
+        128 => 0x3a,
+        64 => 0x78,
+        40 => 0xa0,
+        _ => {
+            err::raise(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_UNSUPPORTED_KEY_SIZE,
+                function,
+            );
+            0
+        }
+    }
+}
+
+/// `rc2_magic_to_keybits`, or 0 with `PROV_R_UNSUPPORTED_KEY_SIZE`.
+fn rc2_bits_of(magic: core::ffi::c_long, function: &str) -> usize {
+    match magic {
+        0x3a => 128,
+        0x78 => 64,
+        0xa0 => 40,
+        _ => {
+            err::raise(
+                ERR_LIB_PROV,
+                rustyssl_abi::PROV_R_UNSUPPORTED_KEY_SIZE,
+                function,
+            );
+            0
+        }
+    }
+}
+
+/// RC2's parameters as an `ASN1_TYPE` encodes them (`ASN1_TYPE_set_int_octetstring` of the
+/// version and the running IV), or `None` with `ERR_R_ASN1_LIB`.
+fn rc2_params_der(num: core::ffi::c_long, iv: &[u8], function: &str) -> Option<Vec<u8>> {
+    use crate::asn1::tpl::items::{ASN1_TYPE_free, ASN1_TYPE_new, i2d_ASN1_TYPE};
+    use crate::asn1::tpl::util::ASN1_TYPE_set_int_octetstring;
+    let fail = || {
+        err::raise(ERR_LIB_PROV, rustyssl_abi::ERR_R_ASN1_LIB, function);
+        None
+    };
+    let Ok(ivlen) = c_int::try_from(iv.len()) else {
+        return fail();
+    };
+    // SAFETY: no preconditions.
+    let t = unsafe { ASN1_TYPE_new() };
+    if t.is_null() {
+        return fail();
+    }
+    let mut ivc = iv.to_vec();
+    // SAFETY: the new type; the IV's copy and its length.
+    let set = unsafe { ASN1_TYPE_set_int_octetstring(t, num, ivc.as_mut_ptr(), ivlen) } != 0;
+    let mut der = None;
+    if set {
+        // SAFETY: the type, set above; a length only.
+        let n = unsafe { i2d_ASN1_TYPE(t, ptr::null_mut()) };
+        if let Ok(len) = usize::try_from(n) {
+            let mut buf = vec![0u8; len];
+            let mut at = buf.as_mut_ptr();
+            // SAFETY: as above; room for `len` octets.
+            if unsafe { i2d_ASN1_TYPE(t, &raw mut at) } == n {
+                der = Some(buf);
+            }
+        }
+    }
+    // SAFETY: made above.
+    unsafe { ASN1_TYPE_free(t) };
+    if der.is_none() {
+        return fail();
+    }
+    der
+}
+
+/// Writes `der` into an octet string parameter: its length always (`return_size`), its octets
+/// when there's room. The reference writes whatever room the parameter has; a short buffer
+/// fails here instead.
+///
+/// # Safety
+/// `p` is a located parameter of the caller's array.
+unsafe fn put_der(p: &mut OSSL_PARAM, der: &[u8]) -> bool {
+    p.return_size = der.len();
+    if p.data.is_null() {
+        return true;
+    }
+    if p.data_size < der.len() {
+        return false;
+    }
+    // SAFETY: the parameter's buffer holds `data_size` octets, at least `der.len()`.
+    unsafe { ptr::copy_nonoverlapping(der.as_ptr(), p.data.cast::<u8>(), der.len()) };
+    true
+}
+
+ffi_callback! {
+    /// `rc2_get_ctx_params`: the generic ones, `rc2-keybits`, and the AlgorithmIdentifier's
+    /// parameters (both the current and the old key).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn rc2_get_ctx_params(vctx: *mut c_void, params: *mut OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        const F: &str = "rc2_get_ctx_params";
+        // SAFETY: the caller's guarantee.
+        if unsafe { generic_get_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let Some(g) = ctx.core.generic() else { return 0 };
+        let (bits, iv) = (g.rc2_bits(), g.running_iv().to_vec());
+        // SAFETY: the caller's array.
+        if !unsafe { set_param(params, OSSL_CIPHER_PARAM_RC2_KEYBITS, F, Value::Size(bits)) } {
+            return 0;
+        }
+        // SAFETY: the caller's array.
+        let p1 = unsafe { OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS.as_ptr()) };
+        // SAFETY: as above.
+        let p2 = unsafe { OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS_OLD.as_ptr()) };
+        if p1.is_null() && p2.is_null() {
+            return 1;
+        }
+        let octets = OSSL_PARAM_OCTET_STRING.cast_unsigned();
+        // SAFETY: a located parameter, or NULL.
+        let q1 = unsafe { p1.as_mut() };
+        // SAFETY: as above.
+        let q2 = unsafe { p2.as_mut() };
+        if q1.as_ref().is_some_and(|p| p.data_type != octets) || q2.as_ref().is_some_and(|p| p.data_type != octets) {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, F);
+            return 0;
+        }
+        let num = rc2_magic(bits, F);
+        let Some(der) = rc2_params_der(num, &iv, F) else { return 0 };
+        for p in [q1, q2].into_iter().flatten() {
+            // SAFETY: a located parameter.
+            if !unsafe { put_der(p, &der) } {
+                err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, F);
+                return 0;
+            }
+        }
+        1
+    }
+}
+
+ffi_callback! {
+    /// `rc2_set_ctx_params`: a variable key length, `rc2-keybits`, and the AlgorithmIdentifier's
+    /// parameters (the IV and key length they give).
+    ///
+    /// # Safety
+    /// `vctx` is NULL or a live algorithm context; `params` is NULL or a parameter array.
+    pub(crate) unsafe extern "C" fn rc2_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        use crate::asn1::tpl::items::{ASN1_TYPE_free, d2i_ASN1_TYPE};
+        use crate::asn1::tpl::util::ASN1_TYPE_get_int_octetstring;
+        const F: &str = "rc2_set_ctx_params";
+        // SAFETY: the caller's guarantee.
+        if unsafe { is_empty(params) } {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
+        if unsafe { var_set_ctx_params(vctx, params) } == 0 {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(ctx) = (unsafe { context(vctx) }) else { return 0 };
+        let Some(g) = ctx.core.generic_mut() else { return 0 };
+        // SAFETY: the caller's array.
+        match unsafe { get_param(params, OSSL_CIPHER_PARAM_RC2_KEYBITS, F, get_size) } {
+            Err(()) => return 0,
+            Ok(Some(bits)) => g.set_rc2_bits(bits),
+            Ok(None) => {}
+        }
+        // SAFETY: the caller's array.
+        let p = unsafe { OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS.as_ptr()) };
+        // SAFETY: a located parameter, or NULL.
+        let Some(p) = (unsafe { p.as_ref() }) else { return 1 };
+        let ivlen = g.iv_len();
+        let mut iv = [0u8; 16];
+        let mut ok = p.data_type == OSSL_PARAM_OCTET_STRING.cast_unsigned() && ivlen <= iv.len();
+        let mut bits = 0;
+        if ok {
+            let mut d = p.data.cast::<u8>().cast_const();
+            let len = core::ffi::c_long::try_from(p.data_size).unwrap_or(core::ffi::c_long::MAX);
+            // SAFETY: the parameter's octets, `data_size` of them.
+            let t = unsafe { d2i_ASN1_TYPE(ptr::null_mut(), &raw mut d, len) };
+            let mut num: core::ffi::c_long = 0;
+            let want = c_int::try_from(ivlen).unwrap_or(0);
+            // SAFETY: the decoded type, or NULL; room for `ivlen` octets.
+            ok = !t.is_null()
+                && unsafe { ASN1_TYPE_get_int_octetstring(t, &raw mut num, iv.as_mut_ptr(), want) } == want
+                && g.set_iv(iv.get(..ivlen).unwrap_or(&[])).is_ok();
+            if ok {
+                bits = rc2_bits_of(num, F);
+                ok = bits != 0;
+            }
+            // SAFETY: decoded above, or NULL.
+            unsafe { ASN1_TYPE_free(t) };
+        }
+        if !ok {
+            err::raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER, F);
+            return 0;
+        }
+        g.set_rc2_bits(bits);
+        // The key that follows has the length these bits give.
+        g.set_key_len(bits / 8);
+        1
+    }
+}
+
+ffi_callback! {
     /// `chacha20_get_ctx_params`: the IV and key lengths.
     ///
     /// # Safety
@@ -1079,6 +1333,55 @@ macro_rules! list {
     };
 }
 
+// `ossl_cipher_var_keylen_settable_ctx_params`.
+static VAR_SETTABLE_CTX: Params<4> = Params([
+    defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    PARAM_END,
+]);
+// `rc2_gettable_ctx_params`.
+static RC2_GETTABLE_CTX: Params<9> = Params(default_gettable_ctx!(
+    defn(
+        OSSL_CIPHER_PARAM_RC2_KEYBITS,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS,
+        OSSL_PARAM_OCTET_STRING,
+        0
+    )
+));
+// `rc2_settable_ctx_params`.
+static RC2_SETTABLE_CTX: Params<6> = Params([
+    defn(OSSL_CIPHER_PARAM_PADDING, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(OSSL_CIPHER_PARAM_NUM, OSSL_PARAM_UNSIGNED_INTEGER, UINT),
+    defn(
+        OSSL_CIPHER_PARAM_KEYLEN,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_RC2_KEYBITS,
+        OSSL_PARAM_UNSIGNED_INTEGER,
+        SIZE_T,
+    ),
+    defn(
+        OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS,
+        OSSL_PARAM_OCTET_STRING,
+        0,
+    ),
+    PARAM_END,
+]);
+
+list!(var_settable_ctx_params, VAR_SETTABLE_CTX);
+list!(rc2_gettable_ctx_params, RC2_GETTABLE_CTX);
+list!(rc2_settable_ctx_params, RC2_SETTABLE_CTX);
 list!(generic_gettable_ctx_params, GENERIC_GETTABLE_CTX);
 list!(generic_settable_ctx_params, GENERIC_SETTABLE_CTX);
 list!(tdes_gettable_ctx_params, TDES_GETTABLE_CTX);
@@ -1199,6 +1502,92 @@ macro_rules! generic {
     };
 }
 
+/// `IMPLEMENT_var_keylen_cipher`'s table: the generic one with a settable key length.
+macro_rules! var {
+    () => {
+        pub(crate) static TABLE: Dispatch<15> = Dispatch([
+            entry!(OSSL_FUNC_CIPHER_NEWCTX, newctx, NewCtxFn),
+            entry!(OSSL_FUNC_CIPHER_FREECTX, freectx, FreeFn),
+            entry!(OSSL_FUNC_CIPHER_DUPCTX, dupctx, DupFn),
+            entry!(OSSL_FUNC_CIPHER_ENCRYPT_INIT, generic_einit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_DECRYPT_INIT, generic_dinit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_UPDATE, update, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_FINAL, final_, FinalFn),
+            entry!(OSSL_FUNC_CIPHER_CIPHER, cipher, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_GET_PARAMS, get_params, GetParamsFn),
+            entry!(
+                OSSL_FUNC_CIPHER_GET_CTX_PARAMS,
+                generic_get_ctx_params,
+                GetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SET_CTX_PARAMS,
+                var_set_ctx_params,
+                SetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
+                generic_gettable_params,
+                GettableFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
+                generic_gettable_ctx_params,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
+                var_settable_ctx_params,
+                CtxParamsFn
+            ),
+            END,
+        ]);
+    };
+}
+
+/// RC2's table (`cipher_rc2.c`): `rc2-keybits` and the AlgorithmIdentifier's parameters.
+macro_rules! rc2 {
+    () => {
+        pub(crate) static TABLE: Dispatch<15> = Dispatch([
+            entry!(OSSL_FUNC_CIPHER_NEWCTX, newctx, NewCtxFn),
+            entry!(OSSL_FUNC_CIPHER_FREECTX, freectx, FreeFn),
+            entry!(OSSL_FUNC_CIPHER_DUPCTX, dupctx, DupFn),
+            entry!(OSSL_FUNC_CIPHER_ENCRYPT_INIT, rc2_einit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_DECRYPT_INIT, rc2_dinit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_UPDATE, update, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_FINAL, final_, FinalFn),
+            entry!(OSSL_FUNC_CIPHER_CIPHER, cipher, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_GET_PARAMS, get_params, GetParamsFn),
+            entry!(
+                OSSL_FUNC_CIPHER_GET_CTX_PARAMS,
+                rc2_get_ctx_params,
+                GetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SET_CTX_PARAMS,
+                rc2_set_ctx_params,
+                SetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
+                generic_gettable_params,
+                GettableFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
+                rc2_gettable_ctx_params,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
+                rc2_settable_ctx_params,
+                CtxParamsFn
+            ),
+            END,
+        ]);
+    };
+}
+
 /// `IMPLEMENT_tdes_cipher`'s table.
 macro_rules! tdes {
     () => {
@@ -1235,6 +1624,49 @@ macro_rules! tdes {
             entry!(
                 OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
                 tdes_settable_ctx_params,
+                CtxParamsFn
+            ),
+            END,
+        ]);
+    };
+}
+
+/// DES's table (`IMPLEMENT_des_cipher`): triple DES's, with the generic settable parameters.
+macro_rules! des {
+    () => {
+        pub(crate) static TABLE: Dispatch<15> = Dispatch([
+            entry!(OSSL_FUNC_CIPHER_NEWCTX, newctx, NewCtxFn),
+            entry!(OSSL_FUNC_CIPHER_FREECTX, freectx, FreeFn),
+            entry!(OSSL_FUNC_CIPHER_DUPCTX, dupctx, DupFn),
+            entry!(OSSL_FUNC_CIPHER_ENCRYPT_INIT, generic_einit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_DECRYPT_INIT, generic_dinit, InitFn),
+            entry!(OSSL_FUNC_CIPHER_UPDATE, update, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_FINAL, final_, FinalFn),
+            entry!(OSSL_FUNC_CIPHER_CIPHER, cipher, UpdateFn),
+            entry!(OSSL_FUNC_CIPHER_GET_PARAMS, get_params, GetParamsFn),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_PARAMS,
+                generic_gettable_params,
+                GettableFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GET_CTX_PARAMS,
+                generic_get_ctx_params,
+                GetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS,
+                tdes_gettable_ctx_params,
+                CtxParamsFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SET_CTX_PARAMS,
+                generic_set_ctx_params,
+                SetCtxFn
+            ),
+            entry!(
+                OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS,
+                generic_settable_ctx_params,
                 CtxParamsFn
             ),
             END,
@@ -1337,7 +1769,9 @@ const fn block(algorithm: BlockAlgorithm, key_len: usize, mode: Mode) -> Kind {
     }
 }
 
-use BlockAlgorithm::{Aes, Aria, Camellia, Sm4, TripleDes};
+use BlockAlgorithm::{
+    Aes, Aria, Blowfish, Camellia, Cast5, Des, DesX, Idea, Rc2, Seed, Sm4, TripleDes,
+};
 use Mode::{Cbc, Cfb, Cfb1, Cfb8, Ctr, Ecb, Ofb};
 
 cipher!(null, Kind::Null, null);
@@ -1713,6 +2147,79 @@ pub(crate) static DEFAULT_CIPHERS: Algorithms<131> = Algorithms([
     alg(c"SM4-XTS:1.2.156.10197.1.104.10", &modes::sm4128xts::TABLE),
     alg(c"ChaCha20", &chacha20::TABLE),
     alg(c"ChaCha20-Poly1305", &aeads::chacha20_poly1305::TABLE),
+    ALG_END,
+]);
+
+// The legacy provider's ciphers (`legacy_ciphers` in `providers/legacyprov.c`).
+cipher!(cast5_ecb, block(Cast5, 16, Ecb), var);
+cipher!(cast5_cbc, block(Cast5, 16, Cbc), var);
+cipher!(cast5_ofb, block(Cast5, 16, Ofb), var);
+cipher!(cast5_cfb, block(Cast5, 16, Cfb), var);
+cipher!(bf_ecb, block(Blowfish, 16, Ecb), var);
+cipher!(bf_cbc, block(Blowfish, 16, Cbc), var);
+cipher!(bf_ofb, block(Blowfish, 16, Ofb), var);
+cipher!(bf_cfb, block(Blowfish, 16, Cfb), var);
+cipher!(idea_ecb, block(Idea, 16, Ecb), generic);
+cipher!(idea_cbc, block(Idea, 16, Cbc), generic);
+cipher!(idea_ofb, block(Idea, 16, Ofb), generic);
+cipher!(idea_cfb, block(Idea, 16, Cfb), generic);
+cipher!(seed_ecb, block(Seed, 16, Ecb), generic);
+cipher!(seed_cbc, block(Seed, 16, Cbc), generic);
+cipher!(seed_ofb, block(Seed, 16, Ofb), generic);
+cipher!(seed_cfb, block(Seed, 16, Cfb), generic);
+cipher!(rc2_ecb, block(Rc2, 16, Ecb), rc2);
+cipher!(rc2_cbc, block(Rc2, 16, Cbc), rc2);
+cipher!(rc2_40_cbc, block(Rc2, 5, Cbc), rc2);
+cipher!(rc2_64_cbc, block(Rc2, 8, Cbc), rc2);
+cipher!(rc2_cfb, block(Rc2, 16, Cfb), rc2);
+cipher!(rc2_ofb, block(Rc2, 16, Ofb), rc2);
+cipher!(rc4_128, Kind::Rc4 { key_len: 16 }, var);
+cipher!(rc4_40, Kind::Rc4 { key_len: 5 }, var);
+cipher!(desx_cbc, block(DesX, 24, Cbc), tdes);
+cipher!(des_ecb, block(Des, 8, Ecb), des);
+cipher!(des_cbc, block(Des, 8, Cbc), des);
+cipher!(des_ofb, block(Des, 8, Ofb), des);
+cipher!(des_cfb, block(Des, 8, Cfb), des);
+cipher!(des_cfb1, block(Des, 8, Cfb1), des);
+cipher!(des_cfb8, block(Des, 8, Cfb8), des);
+
+/// `legacy_ciphers`, with the reference's names in its order.
+pub(crate) static LEGACY_CIPHERS: Algorithms<33> = Algorithms([
+    legacy_alg(c"CAST5-ECB", &cast5_ecb::TABLE),
+    legacy_alg(
+        c"CAST5-CBC:CAST-CBC:CAST:1.2.840.113533.7.66.10",
+        &cast5_cbc::TABLE,
+    ),
+    legacy_alg(c"CAST5-OFB", &cast5_ofb::TABLE),
+    legacy_alg(c"CAST5-CFB", &cast5_cfb::TABLE),
+    legacy_alg(c"BF-ECB", &bf_ecb::TABLE),
+    legacy_alg(c"BF-CBC:BF:BLOWFISH:1.3.6.1.4.1.3029.1.2", &bf_cbc::TABLE),
+    legacy_alg(c"BF-OFB", &bf_ofb::TABLE),
+    legacy_alg(c"BF-CFB", &bf_cfb::TABLE),
+    legacy_alg(c"IDEA-ECB", &idea_ecb::TABLE),
+    legacy_alg(c"IDEA-CBC:IDEA:1.3.6.1.4.1.188.7.1.1.2", &idea_cbc::TABLE),
+    legacy_alg(c"IDEA-OFB:IDEA-OFB64", &idea_ofb::TABLE),
+    legacy_alg(c"IDEA-CFB:IDEA-CFB64", &idea_cfb::TABLE),
+    legacy_alg(c"SEED-ECB:1.2.410.200004.1.3", &seed_ecb::TABLE),
+    legacy_alg(c"SEED-CBC:SEED:1.2.410.200004.1.4", &seed_cbc::TABLE),
+    legacy_alg(c"SEED-OFB:SEED-OFB128:1.2.410.200004.1.6", &seed_ofb::TABLE),
+    legacy_alg(c"SEED-CFB:SEED-CFB128:1.2.410.200004.1.5", &seed_cfb::TABLE),
+    legacy_alg(c"RC2-ECB", &rc2_ecb::TABLE),
+    legacy_alg(c"RC2-CBC:RC2:RC2-128:1.2.840.113549.3.2", &rc2_cbc::TABLE),
+    legacy_alg(c"RC2-40-CBC:RC2-40", &rc2_40_cbc::TABLE),
+    legacy_alg(c"RC2-64-CBC:RC2-64", &rc2_64_cbc::TABLE),
+    legacy_alg(c"RC2-CFB", &rc2_cfb::TABLE),
+    legacy_alg(c"RC2-OFB", &rc2_ofb::TABLE),
+    legacy_alg(c"RC4:1.2.840.113549.3.4", &rc4_128::TABLE),
+    legacy_alg(c"RC4-40", &rc4_40::TABLE),
+    legacy_alg(c"RC4-HMAC-MD5", &super::rc4_hmac_md5::TABLE),
+    legacy_alg(c"DESX-CBC:DESX", &desx_cbc::TABLE),
+    legacy_alg(c"DES-ECB:1.3.14.3.2.6", &des_ecb::TABLE),
+    legacy_alg(c"DES-CBC:DES:1.3.14.3.2.7", &des_cbc::TABLE),
+    legacy_alg(c"DES-OFB:1.3.14.3.2.8", &des_ofb::TABLE),
+    legacy_alg(c"DES-CFB:1.3.14.3.2.9", &des_cfb::TABLE),
+    legacy_alg(c"DES-CFB1", &des_cfb1::TABLE),
+    legacy_alg(c"DES-CFB8", &des_cfb8::TABLE),
     ALG_END,
 ]);
 

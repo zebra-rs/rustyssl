@@ -49,6 +49,7 @@ pub(crate) mod aeads;
 mod blob2key;
 pub(crate) mod builtin;
 pub(crate) mod capabilities;
+pub(crate) mod child;
 pub(crate) mod ciphers;
 pub(crate) mod conf;
 mod decoders;
@@ -84,6 +85,7 @@ pub(crate) mod mlx_kmgmt;
 pub(crate) mod modes;
 mod module;
 pub(crate) mod rands;
+mod rc4_hmac_md5;
 pub(crate) mod rsa_enc;
 pub(crate) mod rsa_kem;
 pub(crate) mod rsa_kmgmt;
@@ -201,16 +203,30 @@ pub(crate) struct Provider {
     /// `OSSL_PROVIDER_add_conf_parameter`'s), in order. Never removed, so pointers to the values
     /// stay valid while the provider lives.
     parameters: Mutex<Vec<(CString, CString)>>,
-    /// The error library number taken for it.
-    #[expect(
-        dead_code,
-        reason = "used once providers load their error strings (3.1d-b)"
-    )]
+    /// The error library number taken for it: its own reasons' library.
     error_lib: c_int,
     state: Mutex<State>,
+    /// Its module, once opened (`prov->module`): closed after the teardown, with the provider.
+    module: Mutex<Option<module::Module>>,
+    /// The reason strings it gave (`get_reason_strings`), loaded under `error_lib` until it goes.
+    reasons: Mutex<Option<Reasons>>,
+    /// A child provider's parent in the parent context (`ossl_provider_set_child`).
+    parent: std::sync::OnceLock<Ptr<OSSL_CORE_HANDLE>>,
 }
 
-handle_type!(OSSL_PROVIDER => Provider);
+handle_type!(OSSL_PROVIDER => Provider, teardown = Provider::teardown);
+
+/// A provider's reason strings as `ERR_load_strings` takes them: the library's name, then the
+/// reasons, then the end. The strings are the provider's (static in its module) and its name.
+struct Reasons(Vec<rustyssl_abi::ERR_STRING_DATA>);
+
+// SAFETY: the table is only handed to the error-string functions, under the provider's lock; its
+// strings are never written.
+unsafe impl Send for Reasons {}
+
+/// The most entries a provider's table (dispatch, reason strings) is read for: past it, the
+/// table is taken as unterminated.
+pub(crate) const TABLE_LIMIT: usize = 1 << 16;
 
 impl Provider {
     fn state(&self) -> MutexGuard<'_, State> {
@@ -237,20 +253,77 @@ impl Provider {
     pub(crate) fn libctx(&self) -> *mut OSSL_LIB_CTX {
         self.libctx.0
     }
+
+    /// The error library its own reasons are raised in.
+    pub(crate) fn error_lib(&self) -> c_int {
+        self.error_lib
+    }
+
+    /// `ossl_provider_module_path`: the file its module was opened from (`DSO_get_filename`,
+    /// which raises `ERR_R_PASSED_NULL_PARAMETER` for a provider without one, NULL). The string
+    /// stays valid while the provider lives: a module, once open, is never replaced.
+    pub(crate) fn module_filename(&self) -> *const c_char {
+        let module = self.module.lock().unwrap_or_else(PoisonError::into_inner);
+        let name = module.as_ref().map(|m| m.filename.as_ptr());
+        if name.is_none() {
+            err::raise(
+                rustyssl_abi::ERR_LIB_DSO,
+                ERR_R_PASSED_NULL_PARAMETER,
+                "DSO_get_filename",
+            );
+        }
+        name.unwrap_or(ptr::null())
+    }
+
+    /// Whether it's a child provider (`ossl_provider_is_child`).
+    pub(crate) fn is_child(&self) -> bool {
+        self.parent.get().is_some()
+    }
+
+    /// A child provider's parent (`ossl_provider_get_parent`).
+    pub(crate) fn parent(&self) -> *const OSSL_CORE_HANDLE {
+        self.parent.get().map_or(ptr::null(), |p| p.0.cast_const())
+    }
+
+    /// `ossl_provider_set_child`: marks it as the child of `parent`.
+    pub(crate) fn set_child(&self, parent: *const OSSL_CORE_HANDLE) {
+        let _ = self.parent.set(Ptr(parent.cast_mut()));
+    }
 }
 
-impl Drop for Provider {
-    /// `ossl_provider_free` at the last reference: an initialized provider is torn down.
-    fn drop(&mut self) {
-        let state = self.state.get_mut().unwrap_or_else(PoisonError::into_inner);
-        if !state.initialized {
-            return;
-        }
-        if let Some(teardown) = state.functions.teardown {
+impl Provider {
+    /// `ossl_provider_free` at the last reference ([`Handle::teardown`]): an initialized
+    /// provider is torn down, its reason strings unloaded, its thread-stop handlers dropped;
+    /// its module is closed when it drops (the field drops last). The teardown makes upcalls
+    /// with the provider's handle, which still reaches it.
+    fn teardown(&self) {
+        let is_child = self.parent.get().is_some();
+        let (initialized, teardown, provctx) = {
+            let state = self.state();
             let provctx = state.provctx.map_or(ptr::null_mut(), |p| p.0);
-            // SAFETY: the provider's own teardown, given its own context, once.
-            unsafe { teardown(provctx) };
+            (state.initialized, state.functions.teardown, provctx)
+        };
+        if initialized {
+            // `ossl_provider_teardown`: a child provider's context is its parent's, torn down
+            // with the parent.
+            if let Some(teardown) = teardown.filter(|_| !is_child) {
+                // SAFETY: the provider's own teardown, given its own context, once, with no
+                // lock held.
+                unsafe { teardown(provctx) };
+            }
+            let reasons = self
+                .reasons
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+            if let Some(Reasons(mut table)) = reasons {
+                // SAFETY: the table loaded at init, ended by a zero entry.
+                unsafe {
+                    crate::err::strings::ERR_unload_strings(self.error_lib, table.as_mut_ptr())
+                };
+            }
         }
+        crate::threads::deregister_stop_handlers(core::ptr::from_ref(self).addr());
     }
 }
 
@@ -284,6 +357,8 @@ pub(crate) struct StoreState {
     /// The providers the configuration activated, each with a reference (OpenSSL's
     /// `PROVIDER_CONF_GLOBAL`).
     conf_activated: Vec<Stored>,
+    /// The child contexts' callbacks (`child_cbs`), in registration order.
+    child_cbs: Vec<ChildCb>,
 }
 
 /// What `ossl_provider_new` takes for a name that isn't predefined (`OSSL_PROVIDER_INFO`).
@@ -304,6 +379,7 @@ impl Default for StoreState {
             old_paths: Vec::new(),
             infos: Vec::new(),
             conf_activated: Vec::new(),
+            child_cbs: Vec::new(),
         }
     }
 }
@@ -332,15 +408,15 @@ impl StoreState {
     }
 }
 
-impl Drop for StoreState {
+impl StoreState {
     /// `provider_deactivate_free` for each provider, as the context goes.
-    fn drop(&mut self) {
+    fn release(conf_activated: Vec<Stored>, providers: Vec<Stored>) {
         // `ossl_prov_conf_ctx_free`: the configuration's references.
-        for p in self.conf_activated.drain(..) {
+        for p in conf_activated {
             // SAFETY: the configuration's reference, given up.
             unsafe { OSSL_PROVIDER::free(p.0.0) };
         }
-        for p in self.providers.drain(..) {
+        for p in providers {
             // The context is going, its method store with it: only the count changes.
             if let Some(prov) = p.get().filter(|p| p.state().activated) {
                 count_deactivation(prov);
@@ -351,11 +427,34 @@ impl Drop for StoreState {
     }
 }
 
+impl Drop for StoreState {
+    fn drop(&mut self) {
+        Self::release(
+            core::mem::take(&mut self.conf_activated),
+            core::mem::take(&mut self.providers),
+        );
+    }
+}
+
 /// A library context's provider store, behind its lock.
 #[derive(Default)]
 pub(crate) struct Store(Mutex<StoreState>);
 
 impl Store {
+    /// Gives up the store's providers as its context goes ([`Handle::teardown`]): their
+    /// teardowns run with the context still there and the store unlocked.
+    pub(crate) fn release(&self) {
+        let (conf_activated, providers) = {
+            let mut s = self.lock();
+            s.sorted = true;
+            (
+                core::mem::take(&mut s.conf_activated),
+                core::mem::take(&mut s.providers),
+            )
+        };
+        StoreState::release(conf_activated, providers);
+    }
+
     fn lock(&self) -> MutexGuard<'_, StoreState> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -431,6 +530,9 @@ fn provider_new(
         parameters: Mutex::new(parameters),
         error_lib,
         state: Mutex::new(State::default()),
+        module: Mutex::new(None),
+        reasons: Mutex::new(None),
+        parent: std::sync::OnceLock::new(),
     })
 }
 
@@ -505,16 +607,33 @@ unsafe fn set_module_path(handle: *mut OSSL_PROVIDER, path: CString) {
 fn provider_init(handle: *mut OSSL_PROVIDER, prov: &Provider) -> bool {
     let name = prov.name.to_string_lossy();
     let init = match prov.init {
-        Some(init) => init,
+        Some(init) => Some(init),
         None => {
-            // SAFETY: the store of a live provider's context.
-            let path = with_store(unsafe { context(prov.libctx.0) }, |s| {
-                s.lock().default_path.clone()
-            })
-            .flatten();
-            module::load(prov, path.as_deref());
-            return false;
+            // A module: opened once (it stays open while the provider lives, even if its init
+            // fails, as OpenSSL keeps `prov->module`).
+            let mut module = prov.module.lock().unwrap_or_else(PoisonError::into_inner);
+            if module.is_none() {
+                // SAFETY: the store of a live provider's context.
+                let path = with_store(unsafe { context(prov.libctx.0) }, |s| {
+                    s.lock().default_path.clone()
+                })
+                .flatten();
+                *module = module::open(prov, path.as_deref());
+            }
+            let Some(m) = module.as_ref() else {
+                return false;
+            };
+            m.init
         }
+    };
+    let Some(init) = init else {
+        err::raise_with_text(
+            ERR_LIB_CRYPTO,
+            rustyssl_abi::ERR_R_UNSUPPORTED,
+            "provider_init",
+            &format!("name={name}, provider has no provider init function"),
+        );
+        return false;
     };
     let mut out: *const OSSL_DISPATCH = ptr::null();
     let mut provctx: *mut c_void = ptr::null_mut();
@@ -538,22 +657,95 @@ fn provider_init(handle: *mut OSSL_PROVIDER, prov: &Provider) -> bool {
         return false;
     }
     let mut functions = Functions::default();
+    let mut reason_strings: Option<ReasonStringsFn> = None;
     let mut at = out;
-    // SAFETY: the provider's table, ended by a zero function id.
-    while let Some(d) = unsafe { at.as_ref() } {
+    // SAFETY: the provider's table, ended by a zero function id (read up to a limit).
+    for _ in 0..TABLE_LIMIT {
+        // SAFETY: as above.
+        let Some(d) = (unsafe { at.as_ref() }) else {
+            break;
+        };
         if d.function_id == 0 {
             break;
+        }
+        if d.function_id == rustyssl_abi::OSSL_FUNC_PROVIDER_GET_REASON_STRINGS
+            && let Some(f) = d.function
+        {
+            // SAFETY: the provider's guarantee of the function's type.
+            reason_strings = Some(unsafe { cast(f) });
         }
         // SAFETY: each function has the type its id says (the provider's guarantee).
         unsafe { functions.set(d) };
         at = at.wrapping_add(1);
     }
+    {
+        let mut s = prov.state();
+        s.provctx = Some(Ptr(provctx));
+        s.dispatch = Some(Ptr(out.cast_mut()));
+    }
+    if let Some(get) = reason_strings {
+        // SAFETY: the provider's function with its context.
+        let items = unsafe { get(provctx) };
+        // SAFETY: the provider's table of reasons, ended by a zero id.
+        let Some(table) = (unsafe { reason_table(prov, items) }) else {
+            // A reason with a library: OpenSSL gives up on the provider, with no error.
+            return false;
+        };
+        let mut reasons = prov.reasons.lock().unwrap_or_else(PoisonError::into_inner);
+        let table = reasons.insert(Reasons(table));
+        // SAFETY: a table ended by a zero entry, whose strings stay valid while the provider
+        // (its name) and its module (the reasons) are there; unloaded when it goes.
+        unsafe { crate::err::strings::ERR_load_strings(prov.error_lib, table.0.as_mut_ptr()) };
+    }
     let mut s = prov.state();
     s.initialized = true;
-    s.provctx = Some(Ptr(provctx));
-    s.dispatch = Some(Ptr(out.cast_mut()));
     s.functions = functions;
     true
+}
+
+/// `OSSL_FUNC_provider_get_reason_strings`.
+type ReasonStringsFn = unsafe extern "C" fn(*mut c_void) -> *const rustyssl_abi::OSSL_ITEM;
+
+/// The provider's reasons as `ERR_load_strings` takes them: the library's name (the provider's)
+/// first, then each reason, then the end. `None` if a reason carries a library number, which
+/// `provider_init` refuses.
+///
+/// # Safety
+/// `items` is NULL or a table of reasons ended by a zero id (read up to a limit), whose strings
+/// stay valid while the provider is loaded.
+unsafe fn reason_table(
+    prov: &Provider,
+    items: *const rustyssl_abi::OSSL_ITEM,
+) -> Option<Vec<rustyssl_abi::ERR_STRING_DATA>> {
+    use rustyssl_abi::ERR_STRING_DATA;
+    let mut table = vec![ERR_STRING_DATA {
+        error: crate::err::pack(prov.error_lib, 0),
+        string: prov.name.as_ptr(),
+    }];
+    let mut at = items;
+    for _ in 0..TABLE_LIMIT {
+        // SAFETY: the caller's guarantee.
+        let Some(item) = (unsafe { at.as_ref() }) else {
+            break;
+        };
+        if item.id == 0 {
+            break;
+        }
+        let id = core::ffi::c_ulong::from(item.id);
+        if crate::err::library_of(id) != 0 {
+            return None;
+        }
+        table.push(ERR_STRING_DATA {
+            error: id,
+            string: item.ptr.cast_const().cast(),
+        });
+        at = at.wrapping_add(1);
+    }
+    table.push(ERR_STRING_DATA {
+        error: 0,
+        string: ptr::null(),
+    });
+    Some(table)
 }
 
 /// A dispatch table's function as the type its id stands for.
@@ -598,12 +790,23 @@ impl Functions {
     }
 }
 
-/// `ossl_provider_activate`: initializes a provider not yet in its store, then counts an
-/// activation. False if it couldn't be initialized.
+/// `ossl_provider_activate(prov, 1, 0)`: [`activate_with`] with upcalls.
 ///
 /// # Safety
 /// `handle` is a live provider.
 unsafe fn activate(handle: *mut OSSL_PROVIDER) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { activate_with(handle, true) }
+}
+
+/// `ossl_provider_activate(prov, upcalls, 0)`: initializes a provider not yet in its store,
+/// gives a child provider's parent an activation (with `upcalls`), then counts an activation;
+/// the first, for a provider in its store, makes its children in the child contexts. False if
+/// any of it failed.
+///
+/// # Safety
+/// `handle` is a live provider.
+pub(crate) unsafe fn activate_with(handle: *mut OSSL_PROVIDER, upcalls: bool) -> bool {
     // SAFETY: the caller's guarantee.
     let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
         return false;
@@ -620,12 +823,20 @@ unsafe fn activate(handle: *mut OSSL_PROVIDER) -> bool {
     {
         return false;
     }
-    let first = {
+    if prov.is_child() && upcalls && !child::up_ref_parent(prov, true) {
+        return false;
+    }
+    let (first, in_store) = {
         let mut s = prov.state();
         s.activations = s.activations.saturating_add(1);
         s.activated = true;
-        s.activations == 1
+        (s.activations == 1, s.in_store)
     };
+    // As in OpenSSL, a failure here leaves the activation counted.
+    // SAFETY: the caller's guarantee.
+    if first && in_store && !unsafe { create_children(handle) } {
+        return false;
+    }
     if first {
         // `provider_flush_store_cache`: choices made without this provider are stale.
         crate::evp::fetch::flush_cache(prov.libctx());
@@ -633,12 +844,43 @@ unsafe fn activate(handle: *mut OSSL_PROVIDER) -> bool {
     true
 }
 
-/// `ossl_provider_deactivate`: counts a deactivation; false for NULL or after more
-/// deactivations than activations.
+/// `ossl_provider_activate(prov, 0, 1)`, for a provider that a child context finds of a parent
+/// provider's name: activated if it's a child provider; one the child context loaded itself is
+/// left alone (true).
+///
+/// # Safety
+/// `handle` is a live provider.
+pub(crate) unsafe fn activate_as_child(handle: *mut OSSL_PROVIDER) -> bool {
+    // SAFETY: the caller's guarantee.
+    if !unsafe { OSSL_PROVIDER::get(handle) }.is_some_and(Provider::is_child) {
+        return true;
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { activate_with(handle, false) }
+}
+
+/// `ossl_provider_deactivate(prov, 1)`: [`deactivate_with`] with upcalls, removing children.
 ///
 /// # Safety
 /// `handle` is NULL or a live provider.
 unsafe fn deactivate(handle: *mut OSSL_PROVIDER) -> bool {
+    // SAFETY: the caller's guarantee.
+    unsafe { deactivate_with(handle, true, true) }
+}
+
+/// `ossl_provider_deactivate` (`provider_deactivate(prov, upcalls, removechildren)`): counts a
+/// deactivation. The last takes its children from the child contexts (if `removechildren`) and
+/// its algorithms from the method store; one that isn't the last gives back a child provider's
+/// activation of its parent (with `upcalls`). False for NULL or after more deactivations than
+/// activations.
+///
+/// # Safety
+/// `handle` is NULL or a live provider.
+pub(crate) unsafe fn deactivate_with(
+    handle: *mut OSSL_PROVIDER,
+    upcalls: bool,
+    removechildren: bool,
+) -> bool {
     // SAFETY: the caller's guarantee.
     let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
         return false;
@@ -647,12 +889,214 @@ unsafe fn deactivate(handle: *mut OSSL_PROVIDER) -> bool {
         crate::rand_lib::check_random_provider_on_unload(prov.libctx(), handle);
     }
     let count = count_deactivation(prov);
+    let free_parent = count >= 1 && prov.is_child() && upcalls;
+    if count < 1 && removechildren {
+        // SAFETY: the caller's guarantee.
+        unsafe { remove_children(handle) };
+    }
+    if free_parent {
+        child::free_parent(prov, true);
+    }
     if count == 0 {
         // `provider_remove_store_methods`: its algorithms go from the method store.
         prov.state().operations = 0;
         crate::evp::fetch::remove_provider(prov.libctx(), handle);
     }
     count >= 0
+}
+
+/// A child context's callbacks, registered with its parent's store through a provider
+/// (`OSSL_PROVIDER_CHILD_CB`).
+#[derive(Clone, Copy)]
+struct ChildCb {
+    /// The provider that registered them.
+    prov: Ptr<OSSL_PROVIDER>,
+    create: upcalls::ChildFn,
+    remove: upcalls::ChildFn,
+    props: upcalls::PropsFn,
+    cbdata: Ptr<c_void>,
+}
+
+/// The child callbacks registered with `libctx`'s store, copied out of its lock.
+///
+/// # Safety
+/// `libctx` is NULL or a live library context.
+unsafe fn child_cbs(libctx: *mut OSSL_LIB_CTX) -> Vec<ChildCb> {
+    // SAFETY: the caller's guarantee.
+    with_store(unsafe { context(libctx) }, |s| s.lock().child_cbs.clone()).unwrap_or_default()
+}
+
+/// `create_provider_children`: each child context hears that `handle` was activated. True if
+/// every one made its child.
+///
+/// # Safety
+/// `handle` is a live provider.
+unsafe fn create_children(handle: *mut OSSL_PROVIDER) -> bool {
+    // SAFETY: the caller's guarantee.
+    let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
+        return false;
+    };
+    let mut ok = true;
+    // SAFETY: a live provider's context.
+    for cb in unsafe { child_cbs(prov.libctx()) } {
+        // SAFETY: the registrant's callback with its own data; no lock is held.
+        ok &= unsafe { (cb.create)(handle.cast(), cb.cbdata.0) } != 0;
+    }
+    ok
+}
+
+/// `provider_deactivate`'s removal: each child context hears that `handle` was deactivated.
+///
+/// # Safety
+/// `handle` is a live provider.
+unsafe fn remove_children(handle: *mut OSSL_PROVIDER) {
+    // SAFETY: the caller's guarantee.
+    let Some(prov) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
+        return;
+    };
+    // SAFETY: a live provider's context.
+    for cb in unsafe { child_cbs(prov.libctx()) } {
+        // SAFETY: as above.
+        unsafe { (cb.remove)(handle.cast(), cb.cbdata.0) };
+    }
+}
+
+/// `ossl_provider_default_props_update`: the child contexts registered with `ctx`'s store hear
+/// of its new default properties.
+pub(crate) fn default_props_update(ctx: &libctx::LibCtx, props: &[u8]) {
+    let cbs = ctx.providers.lock().child_cbs.clone();
+    if cbs.is_empty() {
+        return;
+    }
+    let Ok(text) = CString::new(props) else {
+        return;
+    };
+    for cb in cbs {
+        // SAFETY: the registrant's callback with a string and its own data; no lock is held.
+        unsafe { (cb.props)(text.as_ptr(), cb.cbdata.0) };
+    }
+}
+
+/// `ossl_provider_register_child_cb`: the provider `handle`'s child context hears of the
+/// global properties and of each provider active in `handle`'s context now, then of those
+/// activated and deactivated later. 1, or 0 if a creation failed (each provider up to it given
+/// to `remove`).
+///
+/// # Safety
+/// `handle` is a live provider; the callbacks take `cbdata`.
+pub(crate) unsafe fn register_child_cb(
+    handle: *const OSSL_PROVIDER,
+    create: upcalls::ChildFn,
+    remove: upcalls::ChildFn,
+    props: upcalls::PropsFn,
+    cbdata: *mut c_void,
+) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(this) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
+        return 0;
+    };
+    // SAFETY: a live provider's context.
+    let Some(ctx) = (unsafe { context(this.libctx()) }) else {
+        return 0;
+    };
+    let text = crate::property::global_text(&ctx);
+    // The store's providers, held, and whether each is active.
+    let providers: Vec<(*mut OSSL_PROVIDER, bool)> = {
+        let store = ctx.providers.lock();
+        store
+            .providers
+            .iter()
+            .filter_map(|p| {
+                let activated = p.get()?.state().activated;
+                // SAFETY: in the store, so live.
+                unsafe { OSSL_PROVIDER::up_ref(p.0.0) }.then_some((p.0.0, activated))
+            })
+            .collect()
+    };
+    if let Some(t) = text.and_then(|t| CString::new(t).ok()) {
+        // SAFETY: the caller's callback with a string and its data; no lock is held.
+        unsafe { props(t.as_ptr(), cbdata) };
+    }
+    let failed = providers.iter().position(|&(p, activated)| {
+        // SAFETY: as above, with a held provider.
+        activated && unsafe { create(p.cast(), cbdata) } == 0
+    });
+    let ret = match failed {
+        None => {
+            ctx.providers.lock().child_cbs.push(ChildCb {
+                prov: Ptr(handle.cast_mut()),
+                create,
+                remove,
+                props,
+                cbdata: Ptr(cbdata),
+            });
+            1
+        }
+        Some(i) => {
+            for &(p, _) in providers.iter().take(i.saturating_add(1)).rev() {
+                // SAFETY: as above.
+                unsafe { remove(p.cast(), cbdata) };
+            }
+            0
+        }
+    };
+    for (p, _) in providers {
+        // SAFETY: the references taken above.
+        unsafe { OSSL_PROVIDER::free(p) };
+    }
+    ret
+}
+
+/// `ossl_provider_deregister_child_cb`: the callbacks `handle` registered go.
+///
+/// # Safety
+/// `handle` is a live provider.
+pub(crate) unsafe fn deregister_child_cb(handle: *const OSSL_PROVIDER) {
+    // SAFETY: the caller's guarantee.
+    let Some(this) = (unsafe { OSSL_PROVIDER::get(handle) }) else {
+        return;
+    };
+    // SAFETY: a live provider's context.
+    with_store(unsafe { context(this.libctx()) }, |s| {
+        let mut store = s.lock();
+        if let Some(i) = store
+            .child_cbs
+            .iter()
+            .position(|c| c.prov.0.cast_const() == handle)
+        {
+            store.child_cbs.remove(i);
+        }
+    });
+}
+
+/// `core_provider_up_ref_intern`: an activation (1, or 0 if it failed) or a reference (the
+/// count afterwards).
+///
+/// # Safety
+/// `prov` is NULL or a live provider.
+pub(crate) unsafe fn up_ref_intern(prov: *mut OSSL_PROVIDER, activate: bool) -> c_int {
+    if activate {
+        // SAFETY: the caller's guarantee.
+        return c_int::from(!prov.is_null() && unsafe { activate_with(prov, true) });
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { OSSL_PROVIDER::up_ref_count(prov) }
+        .map_or(0, |n| c_int::try_from(n).unwrap_or(c_int::MAX))
+}
+
+/// `core_provider_free_intern`: a deactivation (1, or 0 after more than there were
+/// activations) or a reference given up (1).
+///
+/// # Safety
+/// `prov` is NULL or a live provider; without `deactivate`, the caller gives up a reference.
+pub(crate) unsafe fn free_intern(prov: *mut OSSL_PROVIDER, deactivate: bool) -> c_int {
+    if deactivate {
+        // SAFETY: the caller's guarantee.
+        return c_int::from(unsafe { deactivate_with(prov, true, true) });
+    }
+    // SAFETY: the caller's guarantee.
+    unsafe { OSSL_PROVIDER::free(prov) };
+    1
 }
 
 /// `provider_deactivate`'s count: one activation fewer. Returns the new count.
@@ -679,23 +1123,42 @@ unsafe fn add_to_store(
     let prov = unsafe { OSSL_PROVIDER::get(handle) }?;
     let name = prov.name.clone();
     let libctx = prov.libctx.0;
-    let actual = {
+    let (actual, added) = {
         // SAFETY: a live provider's context.
         with_store(unsafe { context(libctx) }, |s| {
             let mut store = s.lock();
             match store.find(&name) {
-                Some(existing) => existing,
+                Some(existing) => (existing, false),
                 None => {
                     store.push(handle);
                     prov.state().in_store = true;
-                    if !retain_fallbacks {
-                        store.use_fallbacks = false;
-                    }
-                    handle
+                    (handle, true)
                 }
             }
         })
     }?;
+    if added {
+        // `create_provider_children` (OpenSSL holds the store's lock; this doesn't, rule 7).
+        // SAFETY: the caller's guarantee.
+        if !unsafe { create_children(handle) } {
+            // SAFETY: as above.
+            with_store(unsafe { context(libctx) }, |s| {
+                let mut store = s.lock();
+                if let Some(i) = store.providers.iter().position(|p| p.0.0 == handle) {
+                    // The store's reference goes back to the caller (a `Stored` frees nothing).
+                    store.providers.remove(i);
+                }
+            });
+            prov.state().in_store = false;
+            return None;
+        }
+        if !retain_fallbacks {
+            // SAFETY: as above.
+            with_store(unsafe { context(libctx) }, |s| {
+                s.lock().use_fallbacks = false
+            });
+        }
+    }
     // SAFETY: in the store, so live.
     if !unsafe { OSSL_PROVIDER::up_ref(actual) } {
         return None;

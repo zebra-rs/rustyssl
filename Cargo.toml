@@ -2,7 +2,8 @@
 resolver = "3"
 members = ["crates/*", "libs/*", "xtask"]
 # fuzz/ is its own workspace: libfuzzer-sys builds C++, which the libraries must not use.
-exclude = ["fuzz"]
+# libs/legacy is C (the legacy provider's module, which `cargo xtask dist` links), not a crate.
+exclude = ["fuzz", "libs/legacy"]
 
 [workspace.package]
 version = "0.1.0"

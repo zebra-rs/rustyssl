@@ -44,6 +44,7 @@ fn measure(exe: &Path, target: &str, count: u64, lib: &Path) -> Result<(f64, Str
         .arg(target)
         .arg(count.to_string())
         .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .output()
         .map_err(|e| format!("cannot run {}: {e}", exe.display()))?;
