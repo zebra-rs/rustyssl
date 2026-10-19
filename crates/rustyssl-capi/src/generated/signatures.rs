@@ -1524,6 +1524,7 @@ const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::B
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::BIO_s_dgram_pair;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::fd::BIO_s_fd;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::file::BIO_s_file;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::log::BIO_s_log;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_mem;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_s_null;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_secmem;

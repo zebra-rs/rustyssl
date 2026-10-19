@@ -18,11 +18,6 @@ pub extern "C" fn BIO_s_core() -> *const BIO_METHOD {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn BIO_s_log() -> *const BIO_METHOD {
-    crate::stub::unimplemented("BIO_s_log")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn DSO_METHOD_openssl() -> *mut DSO_METHOD {
     crate::stub::unimplemented("DSO_METHOD_openssl")
 }
