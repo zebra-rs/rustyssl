@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <openssl/core_names.h>
 #include <openssl/dh.h>
 #include <openssl/dsa.h>
 #include <openssl/ec.h>
@@ -806,6 +807,41 @@ static void hex(const char *what, const unsigned char *p, size_t n)
     printf("\n");
 }
 
+static void test_mac(const char *name, const char *which, const char *alg, const char *engine)
+{
+    EVP_MAC *m = EVP_MAC_fetch(NULL, name, NULL);
+    EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(m), *dup;
+    unsigned char key[16] = { 0x5a }, iv[12] = { 0 }, out[64];
+    size_t n = 0;
+    int before = md_inits, calls = cipher_calls, ok;
+    OSSL_PARAM params[4], *q = params;
+
+    *q++ = OSSL_PARAM_construct_utf8_string(which, (char *)alg, 0);
+    *q++ = OSSL_PARAM_construct_utf8_string(OSSL_ALG_PARAM_ENGINE, (char *)engine, 0);
+    if (strcmp(name, "GMAC") == 0)
+        *q++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_IV, iv, sizeof(iv));
+    *q = OSSL_PARAM_construct_end();
+    ERR_clear_error();
+    ok = EVP_MAC_init(ctx, key, sizeof(key), params);
+    printf("  %s(%s) with engine %s: init %d", name, alg, engine, ok);
+    if (ok == 1) {
+        ok = EVP_MAC_update(ctx, (const unsigned char *)"abc", 3);
+        dup = EVP_MAC_CTX_dup(ctx);
+        printf(", dup %s", dup != NULL ? "made" : "not made");
+        if (dup != NULL) {
+            ok = ok && EVP_MAC_final(dup, out, &n, sizeof(out));
+            EVP_MAC_CTX_free(dup);
+        }
+        printf(", update+final %d", ok);
+    }
+    printf(", digest inits %d, cipher calls %d\n", md_inits - before, cipher_calls - calls);
+    if (n > 0)
+        hex("the MAC", out, n);
+    errors(name);
+    EVP_MAC_CTX_free(ctx);
+    EVP_MAC_free(m);
+}
+
 static void test_evp(void)
 {
     ENGINE *e = app_engine("rustyssl-evp"), *bare = app_engine("rustyssl-evp-bare");
@@ -908,6 +944,15 @@ static void test_evp(void)
     errors("EVP_PKEY_set1_engine(bare)");
     EVP_PKEY_free(hk);
     printf("  at the end: inits %d, finishes %d\n", inits, finishes);
+
+    /* The MACs' engine parameter (provider_util.c's load_common). */
+    check(ENGINE_add(e) == 1, "the engine listed for the MACs");
+    test_mac("HMAC", OSSL_MAC_PARAM_DIGEST, "SHA256", "rustyssl-evp");
+    test_mac("CMAC", OSSL_MAC_PARAM_CIPHER, "AES-128-CBC", "rustyssl-evp");
+    test_mac("GMAC", OSSL_MAC_PARAM_CIPHER, "AES-128-GCM", "rustyssl-evp");
+    test_mac("HMAC", OSSL_MAC_PARAM_DIGEST, "SHA256", "rustyssl-no-such-engine");
+    ENGINE_remove(e);
+    printf("  after the MACs: inits %d, finishes %d\n", inits, finishes);
 
     EVP_MD_CTX_free(md);
     EVP_MD_CTX_free(md2);
