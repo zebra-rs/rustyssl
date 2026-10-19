@@ -2183,9 +2183,8 @@ cipher!(des_cfb, block(Des, 8, Cfb), des);
 cipher!(des_cfb1, block(Des, 8, Cfb1), des);
 cipher!(des_cfb8, block(Des, 8, Cfb8), des);
 
-/// `legacy_ciphers`, with the reference's names in its order. RC4-HMAC-MD5 isn't offered
-/// yet (it fails to fetch, as an unknown algorithm does).
-pub(crate) static LEGACY_CIPHERS: Algorithms<32> = Algorithms([
+/// `legacy_ciphers`, with the reference's names in its order.
+pub(crate) static LEGACY_CIPHERS: Algorithms<33> = Algorithms([
     legacy_alg(c"CAST5-ECB", &cast5_ecb::TABLE),
     legacy_alg(
         c"CAST5-CBC:CAST-CBC:CAST:1.2.840.113533.7.66.10",
@@ -2213,6 +2212,7 @@ pub(crate) static LEGACY_CIPHERS: Algorithms<32> = Algorithms([
     legacy_alg(c"RC2-OFB", &rc2_ofb::TABLE),
     legacy_alg(c"RC4:1.2.840.113549.3.4", &rc4_128::TABLE),
     legacy_alg(c"RC4-40", &rc4_40::TABLE),
+    legacy_alg(c"RC4-HMAC-MD5", &super::rc4_hmac_md5::TABLE),
     legacy_alg(c"DESX-CBC:DESX", &desx_cbc::TABLE),
     legacy_alg(c"DES-ECB:1.3.14.3.2.6", &des_ecb::TABLE),
     legacy_alg(c"DES-CBC:DES:1.3.14.3.2.7", &des_cbc::TABLE),

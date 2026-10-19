@@ -5447,7 +5447,8 @@ both libraries (step 8.1).
     - Its algorithms, in `legacyprov.c`'s order:
       - digests: MD4, MDC2 (with `pad-type`), Whirlpool, RIPEMD-160;
       - ciphers: CAST5, BF, IDEA and SEED in ECB/CBC/OFB/CFB; RC2 ECB/CBC/40/64/CFB/OFB;
-        RC4 and RC4-40; DESX-CBC; DES ECB/CBC/OFB/CFB/CFB1/CFB8;
+        RC4, RC4-40 and RC4-HMAC-MD5 (with its TLS record parameters); DESX-CBC; DES
+        ECB/CBC/OFB/CFB/CFB1/CFB8;
       - KDFs: PBKDF1, PVKKDF.
     - Behavior:
       - BF, CAST5, RC2 and RC4 take variable key lengths
@@ -5458,14 +5459,14 @@ both libraries (step 8.1).
     - Tests:
       - Upstream `evp_test` now runs under `default-and-legacy.cnf`, as the recipe does when
         the module is built. The legacy files pass on rustyssl as on the reference: bf, cast5,
-        des, idea, rc2, rc4, seed, mdc2, whirlpool, ripemd, md (MD4), pbkdf1, pvkkdf.
-      - `tests/c/provider_legacy.c` (155 checks) covers loading the module from
+        des, idea, rc2, rc4, rc4_stitched, seed, mdc2, whirlpool, ripemd, md (MD4), pbkdf1,
+        pvkkdf.
+      - `tests/c/provider_legacy.c` (165 checks) covers loading the module from
         `OPENSSL_MODULES` and through a configuration file, every algorithm on known inputs,
-        RC2's parameters, DES's random keys, and a search path without the module.
+        RC2's parameters, RC4-HMAC-MD5 over TLS records (a bad MAC and a wrong length fail),
+        DES's random keys, and a search path without the module.
     - Every harness points each library at its own modules directory (`OPENSSL_MODULES`).
   - Left:
-    - RC4-HMAC-MD5. Until its TLS-stitched MAC is ported, it fails to fetch, as an unknown
-      algorithm does, and `evpciph_rc4_stitched.txt` fails.
     - Validation with oqs-provider, pkcs11-provider and tpm2-openssl.
 - [x] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.

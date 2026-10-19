@@ -101,11 +101,7 @@ impl Default for Global {
 
 impl Drop for Global {
     fn drop(&mut self) {
-        let s = guard(&self.state);
-        // SAFETY: the generators this context holds, or NULL.
-        unsafe { EVP_RAND_CTX_free(s.primary.0) };
-        // SAFETY: as above.
-        unsafe { EVP_RAND_CTX_free(s.seed.0) };
+        self.release();
     }
 }
 
@@ -114,6 +110,22 @@ fn guard<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Global {
+    /// Frees the context's generators as it goes ([`crate::handle::Handle::teardown`]), with
+    /// no lock held: their providers' functions run.
+    pub(crate) fn release(&self) {
+        let (primary, seed) = {
+            let mut s = self.lock();
+            (
+                core::mem::replace(&mut s.primary, Ptr(ptr::null_mut())),
+                core::mem::replace(&mut s.seed, Ptr(ptr::null_mut())),
+            )
+        };
+        // SAFETY: the generators this context held, or NULL.
+        unsafe { EVP_RAND_CTX_free(primary.0) };
+        // SAFETY: as above.
+        unsafe { EVP_RAND_CTX_free(seed.0) };
+    }
+
     fn lock(&self) -> MutexGuard<'_, State> {
         guard(&self.state)
     }

@@ -3,8 +3,10 @@
 //! (`abi/openssl-<series>/config/<target>/<lib>.ld`): an ELF version script for Linux and an
 //! exported-symbols list for macOS, which has no symbol versions.
 
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
+use std::path::Path;
 
 use super::headers::Context;
 use crate::targets::{OPENSSL_SERIES, TARGETS, Target};
@@ -17,6 +19,39 @@ pub const LIBRARIES: &[&str] = &["libcrypto", "libssl"];
 pub const PRIVATE_PREFIX: &str = "rustyssl_private_";
 const PRIVATE_NODE: &str = "RUSTYSSL_PRIVATE";
 const PRIVATE_GLOB: &str = "rustyssl_private_*";
+
+/// The private functions libcrypto exports to the modules it ships beside it (`libs/<module>/`,
+/// such as the legacy provider's): each `rustyssl_private_<name>` their C sources call. They
+/// sit in the private node with libssl's twins (docs/adr/0003-external-providers.md).
+pub fn module_imports(root: &Path) -> Result<BTreeSet<String>> {
+    let mut names = BTreeSet::new();
+    for entry in fs::read_dir(root.join("libs"))? {
+        let dir = entry?.path();
+        let is_library = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| LIBRARIES.contains(&n));
+        if is_library || !dir.is_dir() {
+            continue;
+        }
+        for file in fs::read_dir(&dir)? {
+            let file = file?.path();
+            if file.extension().is_some_and(|e| e == "c") {
+                names.extend(private_calls(&fs::read_to_string(&file)?));
+            }
+        }
+    }
+    Ok(names)
+}
+
+/// The `rustyssl_private_<name>` identifiers in C source.
+fn private_calls(source: &str) -> BTreeSet<String> {
+    source
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .filter(|w| w.len() > PRIVATE_PREFIX.len() && w.starts_with(PRIVATE_PREFIX))
+        .map(str::to_owned)
+        .collect()
+}
 
 /// The functions one library exports on one target, grouped by symbol version in order.
 pub struct Exports {
@@ -164,6 +199,18 @@ mod tests {
 
     const MKDEF: &str = "OPENSSL_3.0.0 {\n    global:\n        A_new;\n        A_free;\n};\n\
                          OPENSSL_3.1.0 {\n    global:\n        B_new;\n    local: *;\n} OPENSSL_3.0.0;\n";
+
+    #[test]
+    fn finds_the_private_calls_of_a_module() {
+        let calls = private_calls(
+            "int rustyssl_private_x_init(void);\n/* rustyssl_private_ */ int f(void)\n\
+             { return rustyssl_private_x_init(); }\n",
+        );
+        assert_eq!(
+            calls.into_iter().collect::<Vec<_>>(),
+            ["rustyssl_private_x_init"]
+        );
+    }
 
     #[test]
     fn private_glob_matches_the_prefix() {
