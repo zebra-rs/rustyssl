@@ -62,6 +62,9 @@ const FILES: &[&str] = &[
     // The verification errors' text (`X509_verify_cert_error_string`), which codegen turns
     // into rustyssl's table.
     "crypto/x509/x509_txt.c",
+    // The built-in ASN.1 items in their order (`ASN1_ITEM_get`, `ASN1_ITEM_lookup`), which
+    // codegen turns into rustyssl's table.
+    "crypto/asn1/asn1_item_list.h",
     // Internal headers that declare functions libcrypto exports all the same (DSO_*,
     // conf_ssl_*, OPENSSL_DIR_*, ...). Codegen fails if an export has no prototype.
     "include/internal/asn1.h",

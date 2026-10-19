@@ -12,6 +12,7 @@ pub(crate) mod bit_string;
 pub(crate) mod generate;
 pub(crate) mod hex;
 pub(crate) mod integer;
+pub(crate) mod item_list;
 pub(crate) mod mime;
 pub(crate) mod ndef;
 pub(crate) mod parse;

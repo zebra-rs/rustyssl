@@ -8,16 +8,6 @@
 use rustyssl_abi::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ASN1_ITEM_get(_: usize) -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASN1_ITEM_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn ASN1_ITEM_lookup(_: *const core::ffi::c_char) -> *const ASN1_ITEM {
-    crate::stub::unimplemented("ASN1_ITEM_lookup")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn ASN1_SCTX_free(_: *mut ASN1_SCTX) {
     crate::stub::unimplemented("ASN1_SCTX_free")
 }

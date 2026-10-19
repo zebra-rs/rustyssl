@@ -256,6 +256,9 @@ const _: unsafe extern "C" fn(*mut ASN1_INTEGER, u64) -> core::ffi::c_int =
     crate::asn1::integer::ASN1_INTEGER_set_uint64;
 const _: unsafe extern "C" fn(*const ASN1_INTEGER, *mut BIGNUM) -> *mut BIGNUM =
     crate::bn::conv::ASN1_INTEGER_to_BN;
+const _: unsafe extern "C" fn(usize) -> *const ASN1_ITEM = crate::asn1::item_list::ASN1_ITEM_get;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const ASN1_ITEM =
+    crate::asn1::item_list::ASN1_ITEM_lookup;
 const _: unsafe extern "C" fn(*mut ASN1_NULL) = crate::asn1::tpl::items::ASN1_NULL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_NULL_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_NULL = crate::asn1::tpl::items::ASN1_NULL_new;

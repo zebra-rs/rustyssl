@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 5709 | 167 | 97.2% |
+| libcrypto | 5876 | 5711 | 165 | 97.2% |
 | libssl | 603 | 595 | 8 | 98.7% |
-| **Total** | **6479** | **6304** | **175** | **97.3%** |
+| **Total** | **6479** | **6306** | **173** | **97.3%** |
 
 ## By header
 
@@ -25,7 +25,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
 | `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
 | `openssl/aes.h` | libcrypto | 15 | 15 | 100.0% |
-| `openssl/asn1.h` | libcrypto | 291 | 282 | 96.9% |
+| `openssl/asn1.h` | libcrypto | 291 | 284 | 97.6% |
 | `openssl/asn1t.h` | libcrypto | 20 | 20 | 100.0% |
 | `openssl/async.h` | libcrypto | 22 | 22 | 100.0% |
 | `openssl/bio.h` | libcrypto | 184 | 181 | 98.4% |
@@ -198,6 +198,8 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `ASN1_INTEGER_set_int64` | libcrypto | `openssl/asn1.h` | `asn1_integer` |
 | `ASN1_INTEGER_set_uint64` | libcrypto | `openssl/asn1.h` | `asn1_integer`, `ts` |
 | `ASN1_INTEGER_to_BN` | libcrypto | `openssl/asn1.h` | `bn` |
+| `ASN1_ITEM_get` | libcrypto | `openssl/asn1.h` | `asn1_item_list` |
+| `ASN1_ITEM_lookup` | libcrypto | `openssl/asn1.h` | `asn1_item_list` |
 | `ASN1_NULL_free` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_NULL_it` | libcrypto | `openssl/asn1.h` | `asn1_d2i`, `asn1_template` |
 | `ASN1_NULL_new` | libcrypto | `openssl/asn1.h` | `asn1_template` |
