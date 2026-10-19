@@ -29,6 +29,11 @@ const HOLD: Duration = Duration::from_millis(100);
 /// retransmissions get through within the cases' time limit.
 const MAX_DROPS_IN_A_ROW: u32 = 2;
 
+/// The most datagrams dropped per direction in all. Each drop costs a retransmission and the
+/// timer doubles (1, 2, 4 s, ...), so more would take a schedule past the cases' time limit
+/// on either library, the reference's included.
+const MAX_DROPS: u32 = 3;
+
 pub(super) fn set_seed(seed: u64) {
     let _ = SEED.set(seed);
 }
@@ -108,6 +113,7 @@ enum Fault {
 struct Schedule {
     state: u64,
     drops_in_a_row: u32,
+    drops: u32,
 }
 
 impl Schedule {
@@ -120,6 +126,7 @@ impl Schedule {
         Self {
             state: seed ^ h ^ direction.wrapping_mul(0x9e37_79b9_7f4a_7c15),
             drops_in_a_row: 0,
+            drops: 0,
         }
     }
 
@@ -131,16 +138,20 @@ impl Schedule {
         z ^ (z >> 31)
     }
 
-    /// The next faultable datagram's fault: about 20% dropped, 10% duplicated, 15% held back.
+    /// The next faultable datagram's fault: about 20% dropped (at most [`MAX_DROPS`] in all),
+    /// 10% duplicated, 15% held back.
     fn fault(&mut self) -> Fault {
         let f = match self.next() % 100 {
-            0..20 if self.drops_in_a_row < MAX_DROPS_IN_A_ROW => Fault::Drop,
+            0..20 if self.drops_in_a_row < MAX_DROPS_IN_A_ROW && self.drops < MAX_DROPS => {
+                Fault::Drop
+            }
             20..30 => Fault::Duplicate,
             30..45 => Fault::Reorder,
             _ => Fault::None,
         };
         if f == Fault::Drop {
             self.drops_in_a_row += 1;
+            self.drops += 1;
         } else {
             self.drops_in_a_row = 0;
         }
@@ -243,16 +254,20 @@ mod tests {
     }
 
     #[test]
-    fn drops_are_bounded_in_a_row() {
-        let mut s = Schedule::new(3, "x", 1);
-        let mut row = 0;
-        for _ in 0..10_000 {
-            if s.fault() == Fault::Drop {
-                row += 1;
-                assert!(row <= MAX_DROPS_IN_A_ROW);
-            } else {
-                row = 0;
+    fn drops_are_bounded_in_a_row_and_in_all() {
+        for seed in 0..64 {
+            let mut s = Schedule::new(seed, "x", 1);
+            let (mut row, mut all) = (0, 0);
+            for _ in 0..10_000 {
+                if s.fault() == Fault::Drop {
+                    row += 1;
+                    all += 1;
+                    assert!(row <= MAX_DROPS_IN_A_ROW);
+                } else {
+                    row = 0;
+                }
             }
+            assert!(all <= MAX_DROPS, "seed {seed}: {all} drops");
         }
     }
 

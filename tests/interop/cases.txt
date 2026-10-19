@@ -74,3 +74,4 @@ dtls12-listen-faults | -dtls -listen | {ca} -dtls +faults
 dtls12-mtu-faults | -dtls -mtu 512 | {ca} -dtls -mtu 512 +faults
 dtls12-resume-faults | -dtls | {ca} -dtls +resume +faults
 dtls12-client-auth-faults | -dtls -Verify 1 {ca} | {ca} -dtls {client} +faults
+dtls1-cbc-faults-msg | -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 | {ca} -dtls1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 -msg +faults

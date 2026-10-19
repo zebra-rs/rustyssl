@@ -242,6 +242,12 @@ pub(crate) unsafe fn apply_timer(s: *mut SSL, x: &Ssl, t: Timer) {
         Timer::Start => unsafe { start_timer(s, x) },
         // SAFETY: as above.
         Timer::Stop => unsafe { stop_timer(x) },
+        Timer::Restart => {
+            // SAFETY: as above.
+            unsafe { stop_timer(x) };
+            // SAFETY: as above.
+            unsafe { start_timer(s, x) };
+        }
     }
 }
 
@@ -326,6 +332,9 @@ pub(crate) unsafe fn handle_timeout(s: *mut SSL, x: &Ssl) -> c_int {
                 // SAFETY: the caller's guarantee.
                 let _ = unsafe { super::io::flush(x) };
             }
+            // The retransmitted records' reports (`-msg` shows them as they go).
+            // SAFETY: as above.
+            unsafe { super::io::deliver_reports(s, x) };
             v
         }
         Err(e) => {

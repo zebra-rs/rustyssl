@@ -27,6 +27,8 @@
 //!   its input stays open until it exits.
 //! - `+faults`: for a DTLS case, the client talks to the server through a relay that drops,
 //!   duplicates and reorders handshake datagrams by a schedule from `--seed` (see [`relay`]).
+//!   The client runs with `-nbio`, as a stale datagram after the handshake would leave a
+//!   blocking one waiting in `recvfrom`.
 //!
 //! A DTLS case runs without `-rev` (which `s_server` refuses with DTLS): the server printing
 //! the line the client sent stands for the echo.
@@ -293,11 +295,20 @@ fn substitute(args: &str, dir: &Path) -> Vec<String> {
     out
 }
 
-/// A free local port (the listener is closed again; the server binds it next).
-fn free_port() -> Result<u16> {
+/// A free local port, TCP's or (for a DTLS server) UDP's: the socket is closed again and the
+/// server binds the port next.
+fn free_port(udp: bool) -> Result<u16> {
+    if udp {
+        let s = std::net::UdpSocket::bind("127.0.0.1:0")?;
+        return Ok(s.local_addr()?.port());
+    }
     let l = TcpListener::bind("127.0.0.1:0")?;
     Ok(l.local_addr()?.port())
 }
+
+/// How many times `s_server` is started on a new port when another process took the one
+/// [`free_port`] found before the server could bind it.
+const BIND_ATTEMPTS: usize = 3;
 
 /// Starts `s_server` and waits for it to accept; returns it with its output so far.
 fn start_server(
@@ -474,7 +485,19 @@ fn client(
         Ok(Err(e)) => return Err(format!("s_client failed: {e}").into()),
         Err(_) => {
             let _ = Command::new("kill").arg(pid.to_string()).status();
-            return Err("s_client timed out".into());
+            // What it said before it was stopped.
+            let said = match rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(Ok(o)) => format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&o.stdout),
+                    String::from_utf8_lossy(&o.stderr)
+                ),
+                _ => String::new(),
+            };
+            let said: Vec<String> = said.lines().map(mask_err_location).collect();
+            return Err(
+                format!("s_client timed out; it said:\n{}", indent(&said.join("\n"))).into(),
+            );
         }
     };
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -538,20 +561,29 @@ fn connect(
     server_args: &[String],
     client_args: &[String],
 ) -> Result<String> {
-    let (args, m) = mode(client_args);
-    let port = free_port()?;
+    let (mut args, m) = mode(client_args);
     let naccept = if m.resume { 2 } else { 1 };
     // `-rev` can't be used with DTLS: no echo then (the summaries and the server's output are
     // compared).
     let dtls = is_dtls(server_args);
-    let (mut server, lines) = start_server(
-        t,
-        p.server_ours,
-        port,
-        naccept,
-        server_args,
-        !m.early && !dtls,
-    )?;
+    let mut attempt = 0;
+    let (port, mut server, lines) = loop {
+        let port = free_port(dtls)?;
+        match start_server(
+            t,
+            p.server_ours,
+            port,
+            naccept,
+            server_args,
+            !m.early && !dtls,
+        ) {
+            Ok((server, lines)) => break (port, server, lines),
+            Err(e) if attempt + 1 < BIND_ATTEMPTS && e.to_string().contains("already in use") => {
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    };
     // With faults, the client talks to the relay; its schedule is the case's.
     let relay = if m.faults && dtls {
         Some(relay::Relay::start(port, &client_args.join(" "))?)
@@ -559,8 +591,16 @@ fn connect(
         None
     };
     let client_port = relay.as_ref().map_or(port, |r| r.port);
-    // How long a client with no echo to wait for keeps its input open.
-    let wait = Duration::from_secs(if relay.is_some() { 8 } else { 1 });
+    if relay.is_some() {
+        // Non-blocking: a duplicated or held-back flight that arrives after the handshake is
+        // read and discarded, and a blocking `s_client` (`dtls1_read_bytes` reading again)
+        // would then wait in `recvfrom` for a datagram that never comes, on either library.
+        args.push("-nbio".to_owned());
+    }
+    // How long a client with no echo to wait for keeps its input open: with faults, past the
+    // longest retransmission run the relay allows (three drops: 1 + 2 + 4 seconds) with room
+    // for a loaded machine.
+    let wait = Duration::from_secs(if relay.is_some() { 15 } else { 1 });
     let sess = t.work.join("session.pem").display().to_string();
     let mut runs = Vec::new();
     if m.resume {

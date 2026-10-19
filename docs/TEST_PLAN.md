@@ -261,6 +261,22 @@ rustyssl itself**. You can only regenerate golden files with
   | Features | full and resumed handshakes (IDs and tickets), HRR, PSK, 0-RTT, client auth and post-handshake auth, ALPN, SNI, OCSP stapling, renegotiation, KeyUpdate, certificate compression, record size limit, hybrid PQ groups |
 - **DTLS:** interop with the reference and GnuTLS, with loss, duplication, and reordering
   injected (a fault-injecting BIO plus netem).
+  - Built: `cargo xtask test-interop`'s `+faults` cases put a UDP relay
+    (`xtask/src/test_interop/relay.rs`) between the reference's `s_client` and `s_server`.
+    Its seeded schedule (`--seed`, per case and direction) drops about 20% of the handshake's
+    datagrams (at most two in a row and three per direction), duplicates 10%, and holds 15%
+    back past the next one. It runs in all four library pairings, the reference's being the
+    expectation. `--peer gnutls` (`tests/interop/gnutls.txt`) pairs `s_server`/`s_client` on
+    each library with `gnutls-cli`/`gnutls-serv`: TLS 1.3, TLS 1.2 (GCM and CBC), client
+    authentication, and DTLS 1.2, with and without the relay. The core has the same faults
+    as a unit test (`dtls_survives_drops_duplicates_and_reordering`: 600 seeded handshakes
+    over DTLS 1.2 at two MTUs and DTLS 1.0).
+  - The relay's `s_client` runs with `-nbio`. A blocking one, on either library, waits in
+    `recvfrom` after `dtls1_read_bytes` discards a stale datagram that arrives after the
+    handshake. The drop cap keeps the doubling timer within the cases' time limit on the
+    reference too.
+  - Status (2026-10-18): 64 cases pass in all four pairings, the eight fault cases under
+    seeds 1 to 6, and the 17 GnuTLS cases on both libraries.
 - **QUIC:** quic-interop-runner cases (handshake, transfer, retry, resumption, zerortt,
   chacha20, keyupdate, multiplexing), plus curl and nghttp3 over HTTP/3.
 - **PKI:** the full x509-limbo suite. Results equal the reference's or are stricter only

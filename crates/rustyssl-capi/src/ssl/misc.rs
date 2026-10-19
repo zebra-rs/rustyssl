@@ -1,8 +1,9 @@
 //! The rest of the connection surface whose TLS behavior is fixed (`ssl_lib.c`, `ssl_ciph.c`):
 //! compression (none is ever negotiated: the default build has no compression algorithm) and
 //! the compression method list; asynchronous jobs (connections here never run in one); and
-//! the QUIC calls, which on a TLS connection (the only kind there is: the QUIC methods aren't
-//! built) do what OpenSSL's non-QUIC branches do.
+//! the QUIC calls, which on a TLS or DTLS connection (the QUIC methods aren't built yet) do
+//! what OpenSSL's non-QUIC branches do: for DTLS, the event calls drive the retransmission
+//! timer.
 
 use core::ffi::{c_char, c_int, c_void};
 use core::ptr;
@@ -241,25 +242,55 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Handles pending events: nothing to do for TLS (no DTLS timer runs here): 1.
+    /// Handles pending events: for DTLS, the retransmission timer (`DTLSv1_handle_timeout`; a
+    /// timer that hasn't fired is success); nothing to do for TLS. 1, or 0 when the
+    /// retransmission failed.
     ///
     /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_handle_events(_s: *mut SSL) -> c_int
+    /// `s` is NULL or a live connection.
+    pub unsafe extern "C" fn rustyssl_private_SSL_handle_events(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
-        1
+        // SAFETY: the caller's guarantee.
+        let Some(x) = (unsafe { super::conn::ssl(s) }) else { return 1 };
+        if !x.state().method.dtls {
+            return 1;
+        }
+        // SAFETY: the live connection; no lock is held.
+        c_int::from(unsafe { super::dtls::handle_timeout(s, x) } >= 0)
     }
 }
 
 ffi_export! {
-    /// When events need handling: never (an infinite timeout, given as 1000000 seconds): 1.
+    /// When events need handling: for DTLS with the retransmission timer running, when it fires
+    /// (`DTLSv1_get_timeout`, finite); otherwise never (an infinite timeout, given as 1000000
+    /// seconds). 1.
     ///
     /// # Safety
-    /// `tv` and `is_infinite` are valid for writes.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_event_timeout(_s: *mut SSL, tv: *mut timeval, is_infinite: *mut c_int) -> c_int
+    /// `s` is NULL or a live connection; `tv` and `is_infinite` are valid for writes.
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_event_timeout(s: *mut SSL, tv: *mut timeval, is_infinite: *mut c_int) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(x) = unsafe { super::conn::ssl(s) }
+            && !tv.is_null()
+            // SAFETY: the live connection; `tv` is the caller's `struct timeval`.
+            && unsafe {
+                super::dtls::ssl_ctrl(
+                    s,
+                    x,
+                    rustyssl_abi::DTLS_CTRL_GET_TIMEOUT,
+                    0,
+                    tv.cast::<c_void>(),
+                )
+            } == Some(1)
+        {
+            if !is_infinite.is_null() {
+                // SAFETY: the caller's guarantee.
+                unsafe { is_infinite.write(0) };
+            }
+            return 1;
+        }
         if !tv.is_null() {
             // SAFETY: the caller's guarantee.
             unsafe {
