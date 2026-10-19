@@ -890,49 +890,6 @@ pub extern "C" fn EVP_CipherPipelineUpdate(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_OpenFinal(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_OpenFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_OpenInit(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const EVP_CIPHER,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_int,
-    _: *const core::ffi::c_uchar,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_OpenInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SealFinal(
-    _: *mut EVP_CIPHER_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SealFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn EVP_SealInit(
-    _: *mut EVP_CIPHER_CTX,
-    _: *const EVP_CIPHER,
-    _: *mut *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_int,
-    _: *mut core::ffi::c_uchar,
-    _: *mut *mut EVP_PKEY,
-    _: core::ffi::c_int,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_SealInit")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn OSSL_IETF_ATTR_SYNTAX_VALUE_free(_: *mut OSSL_IETF_ATTR_SYNTAX_VALUE) {
     crate::stub::unimplemented("OSSL_IETF_ATTR_SYNTAX_VALUE_free")
 }
@@ -1033,46 +990,6 @@ pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
     _: *const OSSL_DISPATCH,
 ) -> *mut OSSL_LIB_CTX {
     crate::stub::unimplemented("OSSL_LIB_CTX_new_from_dispatch")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PBMAC1_get1_pbkdf2_param(_: *const X509_ALGOR) -> *mut PBKDF2PARAM {
-    crate::stub::unimplemented("PBMAC1_get1_pbkdf2_param")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_SignFinal(
-    _: *mut EVP_MD_CTX,
-    _: *mut core::ffi::c_uchar,
-    _: *mut core::ffi::c_uint,
-    _: *mut EVP_PKEY,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_SignFinal")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_SignInit(_: *mut EVP_MD_CTX, _: *mut EVP_MD) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_SignInit")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PEM_SignUpdate(
-    _: *mut EVP_MD_CTX,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_uint,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PEM_SignUpdate")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn PKCS1_MGF1(
-    _: *mut core::ffi::c_uchar,
-    _: core::ffi::c_long,
-    _: *const core::ffi::c_uchar,
-    _: core::ffi::c_long,
-    _: *const EVP_MD,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("PKCS1_MGF1")
 }
 
 #[unsafe(no_mangle)]

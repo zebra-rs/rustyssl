@@ -1013,6 +1013,40 @@ ffi_export! {
     }
 }
 
+ffi_export! {
+    /// `len` octets of MGF1 over `seed` with `dgst` into `mask`: `Hash(seed || BE32(i))` for
+    /// i = 0, 1, ... 0, or -1 (a digest with no size, or a length that isn't one).
+    ///
+    /// # Safety
+    /// `mask` has room for `len` octets; `seed` holds `seedlen`; `dgst` is NULL or live.
+    pub unsafe extern "C" fn PKCS1_MGF1(mask: *mut c_uchar, len: c_long, seed: *const c_uchar, seedlen: c_long, dgst: *const EVP_MD) -> c_int
+    where failure = -1, library = ERR_LIB_RSA
+    {
+        // The digest's size comes first, as in OpenSSL (a NULL digest raises there).
+        // SAFETY: the caller's guarantee.
+        if unsafe { crate::evp::digest::EVP_MD_get_size(dgst) } <= 0 {
+            return -1;
+        }
+        // Nothing asked for: done, as OpenSSL's loop doesn't run.
+        let Ok(len) = usize::try_from(len) else { return 0 };
+        if len == 0 {
+            return 0;
+        }
+        let Ok(seedlen) = usize::try_from(seedlen) else { return -1 };
+        // SAFETY: the caller's seed of `seedlen` octets.
+        let Some(seed) = (unsafe { bytes(seed, seedlen) }) else { return -1 };
+        // SAFETY: the caller's guarantee.
+        let Some(md) = (unsafe { Md::of(dgst) }) else { return -1 };
+        let Some(out) = core_rsa::mgf1(len, seed, &md) else { return -1 };
+        if mask.is_null() {
+            return -1;
+        }
+        // SAFETY: the caller's room for `len` octets, which `out` has.
+        unsafe { ptr::copy_nonoverlapping(out.as_ptr(), mask, len) };
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

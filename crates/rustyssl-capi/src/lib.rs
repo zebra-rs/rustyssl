@@ -77,6 +77,7 @@ mod pem;
 mod pem_cipher;
 mod pem_pkey;
 mod pem_read;
+mod pem_sign;
 mod pkcs12;
 mod pkcs7;
 mod pkcs8_crypt;
