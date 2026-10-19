@@ -42,7 +42,7 @@ pub struct Build {
     pub targets: Vec<String>,
     /// The changes made to the source before configuring: a file, a text it must contain, and
     /// what replaces it.
-    pub patches: Vec<(&'static str, &'static str, &'static str)>,
+    pub patches: Vec<(&'static str, String, String)>,
 }
 
 /// The build of `evp_test`, `bntest`, `ectest`, and `rsa_test`.
@@ -62,13 +62,13 @@ fn crypto_build() -> Build {
             // one.
             (
                 "test/build.info",
-                "DEPEND[ectest]=../libcrypto.a libtestutil.a",
-                "DEPEND[ectest]=../libcrypto libtestutil.a",
+                "DEPEND[ectest]=../libcrypto.a libtestutil.a".to_owned(),
+                "DEPEND[ectest]=../libcrypto libtestutil.a".to_owned(),
             ),
             (
                 "test/build.info",
-                "DEPEND[rsa_test]=../libcrypto.a libtestutil.a",
-                "DEPEND[rsa_test]=../libcrypto libtestutil.a",
+                "DEPEND[rsa_test]=../libcrypto.a libtestutil.a".to_owned(),
+                "DEPEND[rsa_test]=../libcrypto libtestutil.a".to_owned(),
             ),
             // `evp_test` tells a provided key from a legacy one by reading `keymgmt` out of
             // OpenSSL's private `struct evp_pkey_st` (`evp_pkey_is_provided`, from an internal
@@ -76,8 +76,8 @@ fn crypto_build() -> Build {
             // another layout, so the public equivalent goes in its place, for both libraries.
             (
                 "test/evp_test.c",
-                "if (!evp_pkey_is_provided(pkey)) {",
-                "if (EVP_PKEY_get0_provider(pkey) == NULL) {",
+                "if (!evp_pkey_is_provided(pkey)) {".to_owned(),
+                "if (EVP_PKEY_get0_provider(pkey) == NULL) {".to_owned(),
             ),
         ],
     }
@@ -135,10 +135,10 @@ pub fn ensure(root: &Path, version: &str, reference: &Path, build: &Build) -> Re
     for (file, from, to) in &build.patches {
         let path = src.join(file);
         let text = fs::read_to_string(&path)?;
-        if !text.contains(from) {
+        if !text.contains(from.as_str()) {
             return Err(format!("{file} has no `{from}`").into());
         }
-        fs::write(&path, text.replace(from, to))?;
+        fs::write(&path, text.replace(from.as_str(), to))?;
     }
     println!(
         "Building upstream OpenSSL {version}'s test programs for {} (log: {})...",
