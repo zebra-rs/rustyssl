@@ -91,6 +91,56 @@ ffi_export! {
     }
 }
 
+/// `i2d_PrivateKey_impl`: the type-specific structure when `traditional` (or, for a type
+/// without one, a PrivateKeyInfo), else a PrivateKeyInfo. The length, or -1 (0 when making the
+/// PrivateKeyInfo fails).
+///
+/// # Safety
+/// As for `i2d_KeyParams`.
+unsafe fn i2d_private_key(a: *const EVP_PKEY, pp: *mut *mut c_uchar, traditional: bool) -> c_int {
+    // SAFETY: the caller's guarantee.
+    let Some(k) = (unsafe { pkey(a) }) else {
+        return -1;
+    };
+    if k.is_provided() {
+        let outputs = [
+            (c"DER", Some(c"type-specific")),
+            (c"DER", Some(c"PrivateKeyInfo")),
+        ];
+        let outputs = if traditional {
+            &outputs[..]
+        } else {
+            outputs.get(1..).unwrap_or_default()
+        };
+        // SAFETY: as above.
+        return unsafe { i2d_provided(a, EVP_PKEY_KEYPAIR, outputs, pp) };
+    }
+    let funcs = k.ameth_funcs();
+    if traditional && let Some(encode) = funcs.and_then(|f| f.old_priv_encode) {
+        // SAFETY: the method's function with the caller's key and output.
+        return unsafe { encode(a, pp) };
+    }
+    if funcs.is_some_and(|f| f.priv_encode.is_some()) {
+        // SAFETY: the caller's key.
+        let p8 = unsafe { super::d2i::EVP_PKEY2PKCS8(a) };
+        let mut ret = 0;
+        if !p8.is_null() {
+            // SAFETY: the new structure; the caller's output.
+            ret = unsafe { crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO(p8, pp) };
+            // SAFETY: made above.
+            unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8) };
+        }
+        return ret;
+    }
+    // 3.6 raises it from the shared function.
+    err::raise(
+        ERR_LIB_ASN1,
+        ASN1_R_UNSUPPORTED_PUBLIC_KEY_TYPE,
+        "i2d_PrivateKey_impl",
+    );
+    -1
+}
+
 ffi_export! {
     /// Encodes the private key: the type-specific structure, or (for a type without one) a
     /// PrivateKeyInfo. The length, or -1 (0 when making the PrivateKeyInfo fails).
@@ -101,31 +151,21 @@ ffi_export! {
     where failure = -1, library = ERR_LIB_ASN1
     {
         // SAFETY: the caller's guarantee.
-        let Some(k) = (unsafe { pkey(a) }) else { return -1 };
-        if k.is_provided() {
-            let outputs = [(c"DER", Some(c"type-specific")), (c"DER", Some(c"PrivateKeyInfo"))];
-            // SAFETY: as above.
-            return unsafe { i2d_provided(a, EVP_PKEY_KEYPAIR, &outputs, pp) };
-        }
-        let funcs = k.ameth_funcs();
-        if let Some(encode) = funcs.and_then(|f| f.old_priv_encode) {
-            // SAFETY: the method's function with the caller's key and output.
-            return unsafe { encode(a, pp) };
-        }
-        if funcs.is_some_and(|f| f.priv_encode.is_some()) {
-            // SAFETY: the caller's key.
-            let p8 = unsafe { super::d2i::EVP_PKEY2PKCS8(a) };
-            let mut ret = 0;
-            if !p8.is_null() {
-                // SAFETY: the new structure; the caller's output.
-                ret = unsafe { crate::x509::p8::i2d_PKCS8_PRIV_KEY_INFO(p8, pp) };
-                // SAFETY: made above.
-                unsafe { crate::x509::p8::PKCS8_PRIV_KEY_INFO_free(p8) };
-            }
-            return ret;
-        }
-        err::raise(ERR_LIB_ASN1, ASN1_R_UNSUPPORTED_PUBLIC_KEY_TYPE, "i2d_PrivateKey");
-        -1
+        unsafe { i2d_private_key(a, pp, true) }
+    }
+}
+
+ffi_export! {
+    /// Encodes the private key as a PKCS #8 PrivateKeyInfo (3.6), whatever its type. The length,
+    /// or -1 (0 when making the PrivateKeyInfo fails).
+    ///
+    /// # Safety
+    /// As for `i2d_KeyParams`.
+    pub unsafe extern "C" fn i2d_PKCS8PrivateKey(a: *const EVP_PKEY, pp: *mut *mut c_uchar) -> c_int
+    where failure = -1, library = ERR_LIB_ASN1
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { i2d_private_key(a, pp, false) }
     }
 }
 

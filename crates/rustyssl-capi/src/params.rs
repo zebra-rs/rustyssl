@@ -688,6 +688,34 @@ ffi_export! {
     }
 }
 
+ffi_export! {
+    /// Sets an octet string parameter as `OSSL_PARAM_set_octet_string` does, or an octet pointer
+    /// parameter as `OSSL_PARAM_set_octet_ptr` does (3.6); any other type fails.
+    ///
+    /// # Safety
+    /// As for both setters.
+    pub unsafe extern "C" fn OSSL_PARAM_set_octet_string_or_ptr(p: *mut OSSL_PARAM, val: *const c_void, len: usize) -> c_int
+    where failure = 0, library = ERR_LIB_CRYPTO
+    {
+        let name = "OSSL_PARAM_set_octet_string_or_ptr";
+        // SAFETY: the caller's guarantee.
+        let Some(param) = (unsafe { p.as_ref() }) else {
+            raise(Error::NullArgument, name);
+            return 0;
+        };
+        match param.data_type {
+            // SAFETY: the caller's guarantee.
+            OCTET_STRING => unsafe { OSSL_PARAM_set_octet_string(p, val, len) },
+            // SAFETY: as above.
+            OCTET_PTR => unsafe { OSSL_PARAM_set_octet_ptr(p, val, len) },
+            _ => {
+                raise(Error::BadType, name);
+                0
+            }
+        }
+    }
+}
+
 /// `get_ptr_internal`: the pointer a `_ptr` parameter of type `data_type` holds, reporting
 /// `data_size` through `used_len`. A NULL data pointer fails (OpenSSL reads through it).
 ///

@@ -40,7 +40,8 @@ use rustyssl_abi::{
     NID_undef, OSSL_CALLBACK, OSSL_KEYMGMT_SELECT_ALL, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
     OSSL_KEYMGMT_SELECT_KEYPAIR, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, OSSL_LIB_CTX, OSSL_PARAM,
     OSSL_PKEY_PARAM_BITS, OSSL_PKEY_PARAM_DEFAULT_DIGEST, OSSL_PKEY_PARAM_MANDATORY_DIGEST,
-    OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PROVIDER, SN_undef,
+    OSSL_PKEY_PARAM_MAX_SIZE, OSSL_PKEY_PARAM_SECURITY_BITS, OSSL_PKEY_PARAM_SECURITY_CATEGORY,
+    OSSL_PROVIDER, SN_undef,
 };
 
 use super::keymgmt::{self, Keymgmt};
@@ -153,9 +154,10 @@ pub(crate) struct State {
     pub(crate) foreign: bool,
     pub(crate) keymgmt: Option<keymgmt::Ref>,
     pub(crate) keydata: Option<Arc<KeyData>>,
-    /// `cache`: bits, security bits, and maximum size.
+    /// `cache`: bits, security bits, security category (3.6), and maximum size.
     bits: c_int,
     security_bits: c_int,
+    security_category: c_int,
     size: c_int,
     dirty_cnt: u64,
     dirty_cnt_copy: u64,
@@ -423,6 +425,7 @@ pub(crate) fn new() -> *mut EVP_PKEY {
             keydata: None,
             bits: 0,
             security_bits: 0,
+            security_category: 0,
             size: 0,
             dirty_cnt: 0,
             dirty_cnt_copy: 0,
@@ -659,12 +662,13 @@ pub(crate) fn set_keydata(k: &Pkey, keydata: Arc<KeyData>) {
 }
 
 /// `evp_keymgmt_util_cache_keyinfo`: asks the key manager for the key's bits, security bits,
-/// and maximum size, and caches them.
+/// security category (-1 if it has none), and maximum size, and caches them.
 pub(crate) fn cache_keyinfo(k: &Pkey) {
     let (Some(km), Some(kd)) = k.provided() else {
         return;
     };
     let (mut bits, mut security_bits, mut size): (c_int, c_int, c_int) = (0, 0, 0);
+    let mut security_category: c_int = -1;
     // SAFETY: a static key; a local that outlives the array, here and below.
     let p0 = unsafe { OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_BITS.as_ptr(), &raw mut bits) };
     // SAFETY: as above.
@@ -675,14 +679,22 @@ pub(crate) fn cache_keyinfo(k: &Pkey) {
         )
     };
     // SAFETY: as above.
-    let p2 = unsafe { OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_MAX_SIZE.as_ptr(), &raw mut size) };
-    let mut params = [p0, p1, p2, end()];
+    let p2 = unsafe {
+        OSSL_PARAM_construct_int(
+            OSSL_PKEY_PARAM_SECURITY_CATEGORY.as_ptr(),
+            &raw mut security_category,
+        )
+    };
+    // SAFETY: as above.
+    let p3 = unsafe { OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_MAX_SIZE.as_ptr(), &raw mut size) };
+    let mut params = [p0, p1, p2, p3, end()];
     // SAFETY: the key manager's data; the array above.
     if unsafe { km.get().get_params(kd.ptr(), params.as_mut_ptr()) } != 0 {
         let mut s = k.lock();
         s.size = size;
         s.bits = bits;
         s.security_bits = security_bits;
+        s.security_category = security_category;
     }
 }
 
@@ -1554,6 +1566,20 @@ ffi_export! {
             s.save_parameters = mode;
         }
         ret
+    }
+}
+
+ffi_export! {
+    /// The key's NIST security category (3.6), as its key manager reports it: 0 for a classical
+    /// key, -1 for a key whose manager reports none (and for NULL).
+    ///
+    /// # Safety
+    /// `pkey` is NULL or a live key.
+    pub unsafe extern "C" fn EVP_PKEY_get_security_category(pkey: *const EVP_PKEY) -> c_int
+    where failure = -1, library = ERR_LIB_EVP
+    {
+        // SAFETY: the caller's guarantee.
+        unsafe { self::pkey(pkey) }.map_or(-1, |k| k.lock().security_category)
     }
 }
 

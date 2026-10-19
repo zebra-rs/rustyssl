@@ -47,81 +47,6 @@ pub extern "C" fn CMS_RecipientInfo_kemri_set_ukm(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_aligned_alloc_array(
-    _: usize,
-    _: usize,
-    _: usize,
-    _: *mut *mut core::ffi::c_void,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_aligned_alloc_array")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_calloc(
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_calloc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_clear_realloc_array(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_clear_realloc_array")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_malloc_array(
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_malloc_array")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_realloc_array(
-    _: *mut core::ffi::c_void,
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_realloc_array")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_calloc(
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_secure_calloc")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn CRYPTO_secure_malloc_array(
-    _: usize,
-    _: usize,
-    _: *const core::ffi::c_char,
-    _: core::ffi::c_int,
-) -> *mut core::ffi::c_void {
-    crate::stub::unimplemented("CRYPTO_secure_malloc_array")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_KDF_CTX_set_SKEY(
     _: *mut EVP_KDF_CTX,
     _: *mut EVP_SKEY,
@@ -155,11 +80,6 @@ pub extern "C" fn EVP_PKEY_derive_SKEY(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn EVP_PKEY_get_security_category(_: *const EVP_PKEY) -> core::ffi::c_int {
-    crate::stub::unimplemented("EVP_PKEY_get_security_category")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn EVP_SKEY_import_SKEYMGMT(
     _: *mut OSSL_LIB_CTX,
     _: *mut EVP_SKEYMGMT,
@@ -170,46 +90,9 @@ pub extern "C" fn EVP_SKEY_import_SKEYMGMT(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn OPENSSL_sk_set_thunks(
-    _: *mut OPENSSL_STACK,
-    _: OPENSSL_sk_freefunc_thunk,
-) -> *mut OPENSSL_STACK {
-    crate::stub::unimplemented("OPENSSL_sk_set_thunks")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_PARAM_set_octet_string_or_ptr(
-    _: *mut OSSL_PARAM,
-    _: *const core::ffi::c_void,
-    _: usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("OSSL_PARAM_set_octet_string_or_ptr")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn OSSL_STORE_LOADER_settable_ctx_params(
-    _: *const OSSL_STORE_LOADER,
-) -> *const OSSL_PARAM {
-    crate::stub::unimplemented("OSSL_STORE_LOADER_settable_ctx_params")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn X509_CRL_get0_tbs_sigalg(_: *const X509_CRL) -> *const X509_ALGOR {
-    crate::stub::unimplemented("X509_CRL_get0_tbs_sigalg")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn X509_STORE_CTX_set_ocsp_resp(
     _: *mut X509_STORE_CTX,
     _: *mut stack_st_OCSP_RESPONSE,
 ) {
     crate::stub::unimplemented("X509_STORE_CTX_set_ocsp_resp")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn i2d_PKCS8PrivateKey(
-    _: *const EVP_PKEY,
-    _: *mut *mut core::ffi::c_uchar,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("i2d_PKCS8PrivateKey")
 }

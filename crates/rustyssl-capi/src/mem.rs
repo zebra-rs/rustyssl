@@ -20,7 +20,8 @@ use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering, compiler_fence};
 
 use rustyssl_abi::{
-    CRYPTO_free_fn, CRYPTO_malloc_fn, CRYPTO_realloc_fn, ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE,
+    CRYPTO_R_INTEGER_OVERFLOW, CRYPTO_free_fn, CRYPTO_malloc_fn, CRYPTO_realloc_fn, ERR_LIB_CRYPTO,
+    ERR_R_MALLOC_FAILURE, ERR_R_PASSED_INVALID_ARGUMENT,
 };
 
 use crate::err;
@@ -100,13 +101,28 @@ pub(crate) fn malloc(num: usize, file: *const c_char, line: c_int) -> *mut c_voi
             block
         }
     };
-    if !file.is_null() || line != 0 {
-        // As OpenSSL's: the caller's file and line, and no function.
-        // SAFETY: CRYPTO_malloc's callers pass null or a NUL-terminated file name.
-        let file = (!file.is_null()).then(|| unsafe { CStr::from_ptr(file) }.to_bytes());
-        err::raise_from(ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE, file, line, None);
-    }
+    report_alloc_err(file, line, ERR_R_MALLOC_FAILURE);
     block
+}
+
+/// `ossl_report_alloc_err_ex`: an allocation failure's entry, at the caller's file and line with
+/// no function; none for a null file and line 0 (the error queue's own allocations).
+fn report_alloc_err(file: *const c_char, line: c_int, reason: c_int) {
+    if !file.is_null() || line != 0 {
+        // SAFETY: the allocator's callers pass null or a NUL-terminated file name.
+        let file = (!file.is_null()).then(|| unsafe { CStr::from_ptr(file) }.to_bytes());
+        err::raise_from(ERR_LIB_CRYPTO, reason, file, line, None);
+    }
+}
+
+/// `ossl_size_mul`: `num * size`, or `None` with `CRYPTO_R_INTEGER_OVERFLOW` (3.6's array
+/// allocators).
+fn size_mul(num: usize, size: usize, file: *const c_char, line: c_int) -> Option<usize> {
+    let bytes = num.checked_mul(size);
+    if bytes.is_none() {
+        report_alloc_err(file, line, CRYPTO_R_INTEGER_OVERFLOW);
+    }
+    bytes
 }
 
 /// `CRYPTO_zalloc`.
@@ -124,22 +140,28 @@ pub(crate) fn zalloc(num: usize, file: *const c_char, line: c_int) -> *mut c_voi
 /// # Safety
 /// `block` is null or a live block from this allocator.
 unsafe fn realloc(block: *mut c_void, num: usize, file: *const c_char, line: c_int) -> *mut c_void {
-    if let Some(function) = hook(&REALLOC) {
+    let resized = if let Some(function) = hook(&REALLOC) {
         // SAFETY: REALLOC only ever holds a `ReallocFn`.
         let function = unsafe { core::mem::transmute::<*mut (), ReallocFn>(function) };
         // SAFETY: the caller passes null or a block from the application's allocator.
-        return in_hook(|| unsafe { function(block, num, file, line) });
+        in_hook(|| unsafe { function(block, num, file, line) })
+    } else {
+        if block.is_null() {
+            return malloc(num, file, line);
+        }
+        if num == 0 {
+            // SAFETY: the caller passes a live block from this allocator.
+            unsafe { free(block, file, line) };
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller passes a live block, which the default allocator got from malloc.
+        unsafe { libc::realloc(block, num) }
+    };
+    // From 3.6 a failed resize (the application's too) leaves an entry.
+    if num != 0 && resized.is_null() {
+        report_alloc_err(file, line, ERR_R_MALLOC_FAILURE);
     }
-    if block.is_null() {
-        return malloc(num, file, line);
-    }
-    if num == 0 {
-        // SAFETY: the caller passes a live block from this allocator.
-        unsafe { free(block, file, line) };
-        return ptr::null_mut();
-    }
-    // SAFETY: the caller passes a live block, which the default allocator got from malloc.
-    unsafe { libc::realloc(block, num) }
+    resized
 }
 
 /// `CRYPTO_free`.
@@ -223,19 +245,29 @@ unsafe fn aligned_alloc(
 ) -> *mut c_void {
     // SAFETY: the caller guarantees `freeptr` is writable.
     unsafe { freeptr.write(ptr::null_mut()) };
+    // From 3.6 the alignment must be a power of two.
+    if !alignment.is_power_of_two() {
+        report_alloc_err(file, line, ERR_R_PASSED_INVALID_ARGUMENT);
+        return ptr::null_mut();
+    }
     if cfg!(target_os = "linux") && MALLOC.load(Ordering::Acquire).is_null() {
         let mut block = ptr::null_mut();
+        // posix_memalign wants at least a pointer's alignment.
+        let alignment = alignment.max(size_of::<*mut c_void>());
         // SAFETY: posix_memalign writes `block` only on success and checks the alignment.
-        if unsafe { libc::posix_memalign(&mut block, alignment, num) } != 0 {
-            return ptr::null_mut();
+        match unsafe { libc::posix_memalign(&mut block, alignment, num) } {
+            0 => {}
+            libc::EINVAL => report_alloc_err(file, line, ERR_R_PASSED_INVALID_ARGUMENT),
+            libc::ENOMEM => report_alloc_err(file, line, ERR_R_MALLOC_FAILURE),
+            _ => {}
         }
         // SAFETY: as above.
         unsafe { freeptr.write(block) };
         return block;
     }
-    // OpenSSL adds without checking, so a huge `num` wraps to a small block; this fails instead
-    // (docs/DEVIATIONS.md).
+    // `ossl_size_add` (from 3.6; 3.5 wrapped).
     let Some(total) = num.checked_add(alignment) else {
+        report_alloc_err(file, line, CRYPTO_R_INTEGER_OVERFLOW);
         return ptr::null_mut();
     };
     let block = malloc(total, file, line);
@@ -244,8 +276,7 @@ unsafe fn aligned_alloc(
     }
     // SAFETY: as above.
     unsafe { freeptr.write(block) };
-    // Round up to the alignment, which callers must make a power of two. The arithmetic wraps
-    // as OpenSSL's does, so alignment 0 gives null.
+    // Round up to the alignment, a power of two.
     let mask = alignment.wrapping_sub(1);
     block.map_addr(|address| address.wrapping_add(mask) & !mask)
 }
@@ -497,6 +528,137 @@ ffi_export! {
     {
         // SAFETY: the caller's guarantee.
         unsafe { clear_realloc(addr, old_num, num, file, line) }
+    }
+}
+
+ffi_export! {
+    /// `num` elements of `size` bytes (3.6): null with `CRYPTO_R_INTEGER_OVERFLOW` if the
+    /// product overflows.
+    ///
+    /// # Safety
+    /// `file` is null or a NUL-terminated string the allocator may keep.
+    pub unsafe extern "C" fn CRYPTO_malloc_array(num: usize, size: usize, file: *const c_char, line: c_int) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        match size_mul(num, size, file, line) {
+            Some(bytes) => malloc(bytes, file, line),
+            None => ptr::null_mut(),
+        }
+    }
+}
+
+ffi_export! {
+    /// `num` zeroed elements of `size` bytes (3.6), as `CRYPTO_malloc_array`.
+    ///
+    /// # Safety
+    /// As for `CRYPTO_malloc_array`.
+    pub unsafe extern "C" fn CRYPTO_calloc(num: usize, size: usize, file: *const c_char, line: c_int) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        match size_mul(num, size, file, line) {
+            Some(bytes) => zalloc(bytes, file, line),
+            None => ptr::null_mut(),
+        }
+    }
+}
+
+ffi_export! {
+    /// `num` elements of `size` bytes from the secure heap (3.6), as `CRYPTO_malloc_array`.
+    ///
+    /// # Safety
+    /// As for `CRYPTO_malloc_array`.
+    pub unsafe extern "C" fn CRYPTO_secure_malloc_array(num: usize, size: usize, file: *const c_char, line: c_int) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        match size_mul(num, size, file, line) {
+            // SAFETY: the caller's guarantee.
+            Some(bytes) => unsafe { crate::secure::CRYPTO_secure_malloc(bytes, file, line) },
+            None => ptr::null_mut(),
+        }
+    }
+}
+
+ffi_export! {
+    /// `num` zeroed elements of `size` bytes from the secure heap (3.6).
+    ///
+    /// # Safety
+    /// As for `CRYPTO_malloc_array`.
+    pub unsafe extern "C" fn CRYPTO_secure_calloc(num: usize, size: usize, file: *const c_char, line: c_int) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        match size_mul(num, size, file, line) {
+            // SAFETY: the caller's guarantee.
+            Some(bytes) => unsafe { crate::secure::CRYPTO_secure_zalloc(bytes, file, line) },
+            None => ptr::null_mut(),
+        }
+    }
+}
+
+ffi_export! {
+    /// `num` elements of `size` bytes aligned to `align` (3.6); `*freeptr` gets the block to free.
+    ///
+    /// # Safety
+    /// `freeptr` is valid for a write; `file` as for `CRYPTO_malloc`.
+    pub unsafe extern "C" fn CRYPTO_aligned_alloc_array(
+        num: usize,
+        size: usize,
+        align: usize,
+        freeptr: *mut *mut c_void,
+        file: *const c_char,
+        line: c_int,
+    ) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        let Some(bytes) = size_mul(num, size, file, line) else {
+            // SAFETY: the caller's guarantee.
+            unsafe { freeptr.write(ptr::null_mut()) };
+            return ptr::null_mut();
+        };
+        // SAFETY: the caller's guarantee.
+        unsafe { aligned_alloc(bytes, align, freeptr, file, line) }
+    }
+}
+
+ffi_export! {
+    /// Resizes `addr` to `num` elements of `size` bytes (3.6), as `CRYPTO_realloc`.
+    ///
+    /// # Safety
+    /// `addr` is null or a live block from this allocator.
+    pub unsafe extern "C" fn CRYPTO_realloc_array(
+        addr: *mut c_void,
+        num: usize,
+        size: usize,
+        file: *const c_char,
+        line: c_int,
+    ) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        let Some(bytes) = size_mul(num, size, file, line) else { return ptr::null_mut() };
+        // SAFETY: the caller's guarantee.
+        unsafe { realloc(addr, bytes, file, line) }
+    }
+}
+
+ffi_export! {
+    /// Resizes `addr` from `old_num` to `num` elements of `size` bytes (3.6), as
+    /// `CRYPTO_clear_realloc`.
+    ///
+    /// # Safety
+    /// `addr` is null or a live block from this allocator of at least `old_num * size` bytes.
+    pub unsafe extern "C" fn CRYPTO_clear_realloc_array(
+        addr: *mut c_void,
+        old_num: usize,
+        num: usize,
+        size: usize,
+        file: *const c_char,
+        line: c_int,
+    ) -> *mut c_void
+    where failure = ptr::null_mut(), library = ERR_LIB_CRYPTO
+    {
+        let Some(old) = size_mul(old_num, size, file, line) else { return ptr::null_mut() };
+        let Some(bytes) = size_mul(num, size, file, line) else { return ptr::null_mut() };
+        // SAFETY: the caller's guarantee.
+        unsafe { clear_realloc(addr, old, bytes, file, line) }
     }
 }
 

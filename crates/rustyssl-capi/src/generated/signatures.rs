@@ -3261,6 +3261,14 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_aligned_alloc;
 const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    usize,
+    *mut *mut core::ffi::c_void,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_aligned_alloc_array;
+const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *mut core::ffi::c_void,
     *mut CRYPTO_EX_DATA,
@@ -3287,6 +3295,12 @@ const _: unsafe extern "C" fn(*mut u64, u64, *mut u64, *mut CRYPTO_RWLOCK) -> co
     crate::threads::CRYPTO_atomic_or;
 const _: unsafe extern "C" fn(*mut u64, u64, *mut CRYPTO_RWLOCK) -> core::ffi::c_int =
     crate::threads::CRYPTO_atomic_store;
+const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_calloc;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -3389,6 +3403,14 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_clear_realloc;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_clear_realloc_array;
 const _: unsafe extern "C" fn(
     *const core::ffi::c_uchar,
     *mut core::ffi::c_uchar,
@@ -3515,6 +3537,12 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_malloc;
 const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_malloc_array;
+const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     *const core::ffi::c_void,
     usize,
@@ -3632,10 +3660,23 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::mem::CRYPTO_realloc;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_realloc_array;
 const _: unsafe extern "C" fn(*mut core::ffi::c_void) -> usize =
     crate::secure::CRYPTO_secure_actual_size;
 const _: unsafe extern "C" fn(*const core::ffi::c_void) -> core::ffi::c_int =
     crate::secure::CRYPTO_secure_allocated;
+const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_secure_calloc;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_void,
     usize,
@@ -3649,6 +3690,12 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> *mut core::ffi::c_void = crate::secure::CRYPTO_secure_malloc;
+const _: unsafe extern "C" fn(
+    usize,
+    usize,
+    *const core::ffi::c_char,
+    core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::mem::CRYPTO_secure_malloc_array;
 const _: unsafe extern "C" fn() -> core::ffi::c_int = crate::secure::CRYPTO_secure_malloc_done;
 const _: unsafe extern "C" fn(usize, usize) -> core::ffi::c_int =
     crate::secure::CRYPTO_secure_malloc_init;
@@ -7713,6 +7760,8 @@ const _: unsafe extern "C" fn(
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_get_security_bits;
 const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
+    crate::evp::pkey::EVP_PKEY_get_security_category;
+const _: unsafe extern "C" fn(*const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::EVP_PKEY_get_size;
 const _: unsafe extern "C" fn(
     *const EVP_PKEY,
@@ -9872,6 +9921,8 @@ const _: unsafe extern "C" fn(
 ) -> *mut core::ffi::c_void = crate::stack::OPENSSL_sk_set;
 const _: unsafe extern "C" fn(*mut OPENSSL_STACK, OPENSSL_sk_compfunc) -> OPENSSL_sk_compfunc =
     crate::stack::OPENSSL_sk_set_cmp_func;
+const _: unsafe extern "C" fn(*mut OPENSSL_STACK, OPENSSL_sk_freefunc_thunk) -> *mut OPENSSL_STACK =
+    crate::stack::OPENSSL_sk_set_thunks;
 const _: unsafe extern "C" fn(*mut OPENSSL_STACK) -> *mut core::ffi::c_void =
     crate::stack::OPENSSL_sk_shift;
 const _: unsafe extern "C" fn(*mut OPENSSL_STACK) = crate::stack::OPENSSL_sk_sort;
@@ -11440,6 +11491,11 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_void,
     usize,
 ) -> core::ffi::c_int = crate::params::OSSL_PARAM_set_octet_string;
+const _: unsafe extern "C" fn(
+    *mut OSSL_PARAM,
+    *const core::ffi::c_void,
+    usize,
+) -> core::ffi::c_int = crate::params::OSSL_PARAM_set_octet_string_or_ptr;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, usize) -> core::ffi::c_int =
     crate::params::OSSL_PARAM_set_size_t;
 const _: unsafe extern "C" fn(*mut OSSL_PARAM, time_t) -> core::ffi::c_int =
@@ -11676,6 +11732,8 @@ const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_fn) -> cor
     crate::store::OSSL_STORE_LOADER_set_open;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER, OSSL_STORE_open_ex_fn) -> core::ffi::c_int =
     crate::store::OSSL_STORE_LOADER_set_open_ex;
+const _: unsafe extern "C" fn(*const OSSL_STORE_LOADER) -> *const OSSL_PARAM =
+    crate::store::meth::OSSL_STORE_LOADER_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut OSSL_STORE_LOADER) -> core::ffi::c_int =
     crate::store::meth::OSSL_STORE_LOADER_up_ref;
 const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut OSSL_STORE_SEARCH =
@@ -15956,6 +16014,8 @@ const _: unsafe extern "C" fn(
     *mut *const ASN1_BIT_STRING,
     *mut *const X509_ALGOR,
 ) = crate::x509::crl::X509_CRL_get0_signature;
+const _: unsafe extern "C" fn(*const X509_CRL) -> *const X509_ALGOR =
+    crate::x509::crl::X509_CRL_get0_tbs_sigalg;
 const _: unsafe extern "C" fn(*mut X509_CRL) -> *mut stack_st_X509_REVOKED =
     crate::x509::crl::X509_CRL_get_REVOKED;
 const _: unsafe extern "C" fn(*const X509_CRL, core::ffi::c_int) -> *mut X509_EXTENSION =
@@ -19495,6 +19555,8 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::pkcs7::mime::i2d_PKCS7_bio_stream;
 const _: unsafe extern "C" fn(*mut FILE, *const PKCS7) -> core::ffi::c_int =
     crate::pkcs7::i2d_PKCS7_fp;
+const _: unsafe extern "C" fn(*const EVP_PKEY, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
+    crate::evp::pkey::i2d::i2d_PKCS8PrivateKey;
 const _: unsafe extern "C" fn(*mut BIO, *const EVP_PKEY) -> core::ffi::c_int =
     crate::evp::pkey::i2d::i2d_PKCS8PrivateKeyInfo_bio;
 const _: unsafe extern "C" fn(*mut FILE, *const EVP_PKEY) -> core::ffi::c_int =

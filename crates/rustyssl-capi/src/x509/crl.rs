@@ -1115,6 +1115,9 @@ crl_getters! {
     pub unsafe extern "C" fn X509_CRL_get_issuer(crl: *const X509_CRL) -> *mut X509_NAME = ptr::null_mut(), |c| c.crl.issuer;
     /// The extensions, which the CRL keeps.
     pub unsafe extern "C" fn X509_CRL_get0_extensions(crl: *const X509_CRL) -> *const stack_st_X509_EXTENSION = ptr::null(), |c| c.crl.extensions;
+    /// The TBSCertList's signature AlgorithmIdentifier (3.6), which the CRL keeps. NULL for a
+    /// NULL CRL (OpenSSL's reads through it).
+    pub unsafe extern "C" fn X509_CRL_get0_tbs_sigalg(crl: *const X509_CRL) -> *const X509_ALGOR = ptr::null(), |c| &raw const c.crl.sig_alg;
     /// The entries, which the CRL keeps.
     pub unsafe extern "C" fn X509_CRL_get_REVOKED(crl: *mut X509_CRL) -> *mut stack_st_X509_REVOKED = ptr::null_mut(), |c| c.crl.revoked;
     /// The NID of the signature algorithm.
