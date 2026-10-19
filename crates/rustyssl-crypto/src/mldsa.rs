@@ -626,6 +626,31 @@ pub fn encode_message(context: &[u8], message: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// An incremental `mu` (`ossl_ml_dsa_mu_init`, `_update`, and `_finalize`): SHAKE256 of the
+/// key's `tr`, then, for the pure encoding, its prefix and context string, then the message in
+/// pieces. Each squeeze continues the output, as `EVP_DigestSqueeze` does.
+pub struct MuHasher(Box<dyn md::Context>);
+
+impl Clone for MuHasher {
+    fn clone(&self) -> Self {
+        Self(self.0.clone_box())
+    }
+}
+
+impl MuHasher {
+    /// Absorbs the next piece of the message; `false` once squeezed.
+    pub fn update(&mut self, data: &[u8]) -> bool {
+        self.0.update(data).is_ok()
+    }
+
+    /// The next `MU_BYTES` octets of the output.
+    pub fn squeeze(&mut self) -> Option<[u8; MU_BYTES]> {
+        let mut mu = [0u8; MU_BYTES];
+        self.0.squeeze(&mut mu).ok()?;
+        Some(mu)
+    }
+}
+
 /// An ML-DSA public key, with its encoding and hash `tr`.
 #[derive(Clone)]
 pub struct PublicKey {
@@ -637,6 +662,19 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
+    /// A [`MuHasher`] for this key: with `context`, the pure encoding's prefix and that context
+    /// string (`None` if it's longer than [`MAX_CONTEXT`]).
+    pub fn mu_hasher(&self, context: Option<&[u8]>) -> Option<MuHasher> {
+        let mut ctx = md::context(Algorithm::Shake256);
+        ctx.update(&self.tr).ok()?;
+        if let Some(c) = context {
+            let n = u8::try_from(c.len()).ok()?;
+            ctx.update(&[0, n]).ok()?;
+            ctx.update(c).ok()?;
+        }
+        Some(MuHasher(ctx))
+    }
+
     fn new(variant: Variant, rho: [u8; 32], t1: Vec<Poly>) -> Option<Self> {
         let mut encoding = Vec::with_capacity(variant.public_key_bytes());
         encoding.extend_from_slice(&rho);

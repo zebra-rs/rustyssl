@@ -5654,6 +5654,12 @@ both libraries (step 8.1).
     - `RSA_blinding_on` and `RSA_blinding_off` only change the flags (3.5's `on` made a fresh
       blinding from the private generator and `off` freed it), so the key keeps its blinding
       and draws less from the generator (`rsa_lib.rs`).
+    - ML-DSA signs and verifies a message in pieces (`sign_message_update`/`_final`,
+      `verify_message_update`/`_final` with the `signature` parameter, which only a
+      message-at-a-time verification lists; rustyssl-crypto `MuHasher`), reports the
+      signature's length before refusing too little room, fails a length query with nowhere to
+      put it, and raises `PROV_R_BAD_LENGTH` for an external `mu` that isn't 64 octets
+      (`provider/ml_dsa_sig.rs`).
 
 **Exit:** M6.
 
