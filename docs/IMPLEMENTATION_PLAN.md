@@ -5631,6 +5631,10 @@ both libraries (step 8.1).
       hash's initial state). Ciphers report `encrypt-then-mac`. Their arrival shifts the
       default provider's algorithm numbers that appear in error text on aarch64.
       `tests/c/evp_cipher_etm.c`.
+    - The name map adds RSA-PSS's names (`RSA-PSS`, `rsassaPss`, `RSASSA-PSS`, its OID) after
+      the legacy digests' and before the key types' (`evp/fetch.rs` `prefill`), so RSA-PSS's
+      number comes before RSA's, which moves numbers in error text and the order of
+      `*_do_all_provided` lists.
 
 **Exit:** M6.
 
