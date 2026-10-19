@@ -8,9 +8,9 @@ calls it. Every other export is a generated stub that aborts (README.md, securit
 
 | Library | Exports | Implemented | Stubs | Coverage |
 |---|--:|--:|--:|--:|
-| libcrypto | 5876 | 5718 | 158 | 97.3% |
+| libcrypto | 5876 | 5721 | 155 | 97.4% |
 | libssl | 603 | 595 | 8 | 98.7% |
-| **Total** | **6479** | **6313** | **166** | **97.4%** |
+| **Total** | **6479** | **6316** | **163** | **97.5%** |
 
 ## By header
 
@@ -23,7 +23,7 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `internal/dso.h` | libcrypto | 15 | 0 | 0.0% |
 | `internal/err.h` | libcrypto | 1 | 1 | 100.0% |
 | `internal/o_dir.h` | libcrypto | 2 | 2 | 100.0% |
-| `internal/sslconf.h` | libcrypto | 3 | 0 | 0.0% |
+| `internal/sslconf.h` | libcrypto | 3 | 3 | 100.0% |
 | `openssl/aes.h` | libcrypto | 15 | 15 | 100.0% |
 | `openssl/asn1.h` | libcrypto | 291 | 291 | 100.0% |
 | `openssl/asn1t.h` | libcrypto | 20 | 20 | 100.0% |
@@ -5272,6 +5272,9 @@ internal APIs that libcrypto exports (`DSO_*` and others).
 | `b2i_PrivateKey_bio` | libcrypto | `openssl/pem.h` | `pvkfmt` |
 | `b2i_PublicKey` | libcrypto | `openssl/pem.h` | `pvkfmt` |
 | `b2i_PublicKey_bio` | libcrypto | `openssl/pem.h` | `pvkfmt` |
+| `conf_ssl_get` | libcrypto | `internal/sslconf.h` | `conf_modules` |
+| `conf_ssl_get_cmd` | libcrypto | `internal/sslconf.h` | `conf_modules` |
+| `conf_ssl_name_find` | libcrypto | `internal/sslconf.h` | `conf_modules` |
 | `d2i_ACCESS_DESCRIPTION` | libcrypto | `openssl/x509v3.h` | `x509v3_crld` |
 | `d2i_ADMISSIONS` | libcrypto | `openssl/x509v3.h` | `x509v3_admission` |
 | `d2i_ADMISSION_SYNTAX` | libcrypto | `openssl/x509v3.h` | `x509v3_admission` |

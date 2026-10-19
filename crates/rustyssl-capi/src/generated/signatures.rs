@@ -17329,6 +17329,19 @@ const _: unsafe extern "C" fn(*mut *const core::ffi::c_uchar, core::ffi::c_long)
     crate::pvkfmt::b2i_PublicKey;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut EVP_PKEY = crate::pvkfmt::b2i_PublicKey_bio;
 const _: unsafe extern "C" fn(
+    usize,
+    *mut *const core::ffi::c_char,
+    *mut usize,
+) -> *const SSL_CONF_CMD = crate::conf::builtin::conf_ssl_get;
+const _: unsafe extern "C" fn(
+    *const SSL_CONF_CMD,
+    usize,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+) = crate::conf::builtin::conf_ssl_get_cmd;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut usize) -> core::ffi::c_int =
+    crate::conf::builtin::conf_ssl_name_find;
+const _: unsafe extern "C" fn(
     *mut *mut ACCESS_DESCRIPTION,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,

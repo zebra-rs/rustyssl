@@ -946,33 +946,6 @@ pub extern "C" fn OSSL_LIB_CTX_new_from_dispatch(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn conf_ssl_get(
-    _: usize,
-    _: *mut *const core::ffi::c_char,
-    _: *mut usize,
-) -> *const SSL_CONF_CMD {
-    crate::stub::unimplemented("conf_ssl_get")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn conf_ssl_get_cmd(
-    _: *const SSL_CONF_CMD,
-    _: usize,
-    _: *mut *mut core::ffi::c_char,
-    _: *mut *mut core::ffi::c_char,
-) {
-    crate::stub::unimplemented("conf_ssl_get_cmd")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn conf_ssl_name_find(
-    _: *const core::ffi::c_char,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("conf_ssl_name_find")
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn d2i_OSSL_IETF_ATTR_SYNTAX(
     _: *mut *mut OSSL_IETF_ATTR_SYNTAX,
     _: *mut *const core::ffi::c_uchar,
