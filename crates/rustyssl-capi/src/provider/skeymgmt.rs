@@ -70,6 +70,50 @@ impl Drop for ProvSkey {
     }
 }
 
+/// The raw secret of the built-in key managers' key data (`PROV_SKEY`), for the KDFs' and
+/// exchanges' `set_skey` (3.6); `None` for NULL.
+///
+/// # Safety
+/// `keydata` is NULL or key data of these key managers.
+pub(crate) unsafe fn raw_secret<'a>(keydata: *mut c_void) -> Option<&'a [u8]> {
+    // SAFETY: the caller's guarantee.
+    unsafe { keydata.cast::<ProvSkey>().as_ref() }.map(|k| k.data.as_slice())
+}
+
+/// Imports `secret` with `import` (`OSSL_SKEY_PARAM_RAW_BYTES`): the provider-side end of
+/// the `derive_skey` functions (3.6). NULL without `import`.
+///
+/// # Safety
+/// `import` is NULL or a key manager's import with its provider context `provctx`.
+pub(crate) unsafe fn import_secret(
+    provctx: *mut c_void,
+    import: Option<crate::evp::skeymgmt::ImportFn>,
+    secret: &mut [u8],
+) -> *mut c_void {
+    let Some(import) = import else {
+        return core::ptr::null_mut();
+    };
+    let params = [
+        // SAFETY: a static key; the caller's octets, which outlive the call.
+        unsafe {
+            crate::params::OSSL_PARAM_construct_octet_string(
+                RAW_BYTES.as_ptr(),
+                secret.as_mut_ptr().cast(),
+                secret.len(),
+            )
+        },
+        crate::params::end(),
+    ];
+    // SAFETY: the caller's import with its provider context; the array above.
+    unsafe {
+        import(
+            provctx,
+            rustyssl_abi::OSSL_SKEYMGMT_SELECT_SECRET_KEY,
+            params.as_ptr(),
+        )
+    }
+}
+
 /// The raw key's parameter (`OSSL_SKEY_PARAM_RAW_BYTES`).
 const RAW_BYTES: &core::ffi::CStr = c"raw-bytes";
 

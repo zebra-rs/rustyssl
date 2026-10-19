@@ -5685,6 +5685,12 @@ both libraries (step 8.1).
       `tests/c/ssl_ocsp_stapling.c`.
     - The session cache tells the remove callback about evicted and flushed sessions after
       releasing its lock, the last removed first (`ssl/sess_cache.rs`).
+    - Opaque symmetric keys from derivations (`evp/exchange.rs` `EVP_PKEY_derive_SKEY`,
+      `evp/kdf.rs` `EVP_KDF_derive_SKEY`/`EVP_KDF_CTX_set_SKEY`, `evp/skey.rs`
+      `EVP_SKEY_import_SKEYMGMT`): a method's own `derive_skey`/`set_skey` when the key manager
+      is its provider's (ECDH's `derive_skey`; PBKDF1's both, in the legacy provider), else the
+      raw output imported, or the key's raw secret set as the parameter.
+      `tests/c/evp_skey_derive.c`.
 
 **Exit:** M6.
 

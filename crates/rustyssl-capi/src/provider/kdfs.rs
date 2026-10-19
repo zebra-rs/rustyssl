@@ -2101,6 +2101,63 @@ ffi_callback! {
 }
 
 ffi_callback! {
+    /// `kdf_pbkdf1_set_skey` (3.6): the password (`pass`) or salt (`salt`) from a key of the
+    /// legacy provider's.
+    ///
+    /// # Safety
+    /// `vctx` is a live PBKDF1 context; `skeydata` is NULL or the legacy provider's key data;
+    /// `paramname` is NULL or a string.
+    pub(crate) unsafe extern "C" fn pbkdf1_set_skey(vctx: *mut c_void, skeydata: *mut c_void, paramname: *const core::ffi::c_char) -> c_int
+    where failure = 0, library = ERR_LIB_PROV
+    {
+        if paramname.is_null() || skeydata.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
+        let Some(k) = (unsafe { context::<LegacyKdf>(vctx) }) else { return 0 };
+        // SAFETY: as above.
+        let Some(raw) = (unsafe { super::skeymgmt::raw_secret(skeydata) }) else { return 0 };
+        // SAFETY: a string.
+        let name = unsafe { CStr::from_ptr(paramname) };
+        let slot = if name == OSSL_KDF_PARAM_PASSWORD {
+            &mut k.pass
+        } else if name == OSSL_KDF_PARAM_SALT {
+            &mut k.salt
+        } else {
+            return 0;
+        };
+        *slot = Some(Secret(raw.to_vec()));
+        1
+    }
+}
+
+ffi_callback! {
+    /// `kdf_pbkdf1_derive_skey` (3.6): `keylen` octets derived, imported as a key with
+    /// `import`.
+    ///
+    /// # Safety
+    /// As for `pbkdf1_derive`; `import` is NULL or a key manager's import with its provider
+    /// context `provctx`.
+    pub(crate) unsafe extern "C" fn pbkdf1_derive_skey(vctx: *mut c_void, _key_type: *const core::ffi::c_char, provctx: *mut c_void, import: Option<crate::evp::skeymgmt::ImportFn>, keylen: usize, params: *const OSSL_PARAM) -> *mut c_void
+    where failure = core::ptr::null_mut(), library = ERR_LIB_PROV
+    {
+        if import.is_none() || keylen == 0 {
+            return core::ptr::null_mut();
+        }
+        let mut key = vec![0u8; keylen];
+        // SAFETY: the caller's guarantee; our room.
+        let key_data = if unsafe { pbkdf1_derive(vctx, key.as_mut_ptr(), keylen, params) } == 0 {
+            core::ptr::null_mut()
+        } else {
+            // SAFETY: the caller's import and context.
+            unsafe { super::skeymgmt::import_secret(provctx, import, &mut key) }
+        };
+        wipe(&mut key);
+        key_data
+    }
+}
+
+ffi_callback! {
     /// `kdf_pvk_derive`: the digest of the salt then the password, into a key at least the
     /// digest's size.
     ///
@@ -2209,7 +2266,27 @@ ffi_callback! {
     }
 }
 
-static PBKDF1_FUNCTIONS: Dispatch<10> = Dispatch([
+type SetSkeyFn = unsafe extern "C" fn(*mut c_void, *mut c_void, *const core::ffi::c_char) -> c_int;
+type DeriveSkeyFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const core::ffi::c_char,
+    *mut c_void,
+    Option<crate::evp::skeymgmt::ImportFn>,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut c_void;
+
+static PBKDF1_FUNCTIONS: Dispatch<12> = Dispatch([
+    entry!(
+        rustyssl_abi::OSSL_FUNC_KDF_SET_SKEY,
+        pbkdf1_set_skey,
+        SetSkeyFn
+    ),
+    entry!(
+        rustyssl_abi::OSSL_FUNC_KDF_DERIVE_SKEY,
+        pbkdf1_derive_skey,
+        DeriveSkeyFn
+    ),
     entry!(OSSL_FUNC_KDF_NEWCTX, pbkdf1_new, NewCtxFn),
     entry!(OSSL_FUNC_KDF_DUPCTX, legacy_kdf_dup, DupCtxFn),
     entry!(OSSL_FUNC_KDF_FREECTX, legacy_kdf_free, FreeCtxFn),

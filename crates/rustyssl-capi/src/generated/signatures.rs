@@ -6401,6 +6401,11 @@ const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> *const EVP_KDF =
     crate::evp::kdf::EVP_KDF_CTX_kdf;
 const _: unsafe extern "C" fn(*mut EVP_KDF) -> *mut EVP_KDF_CTX = crate::evp::kdf::EVP_KDF_CTX_new;
 const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) = crate::evp::kdf::EVP_KDF_CTX_reset;
+const _: unsafe extern "C" fn(
+    *mut EVP_KDF_CTX,
+    *mut EVP_SKEY,
+    *const core::ffi::c_char,
+) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_CTX_set_SKEY;
 const _: unsafe extern "C" fn(*mut EVP_KDF_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
     crate::evp::kdf::EVP_KDF_CTX_set_params;
 const _: unsafe extern "C" fn(*mut EVP_KDF_CTX) -> *const OSSL_PARAM =
@@ -6411,6 +6416,14 @@ const _: unsafe extern "C" fn(
     usize,
     *const OSSL_PARAM,
 ) -> core::ffi::c_int = crate::evp::kdf::EVP_KDF_derive;
+const _: unsafe extern "C" fn(
+    *mut EVP_KDF_CTX,
+    *mut EVP_SKEYMGMT,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut EVP_SKEY = crate::evp::kdf::EVP_KDF_derive_SKEY;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     ::core::option::Option<unsafe extern "C" fn(kdf: *mut EVP_KDF, arg: *mut core::ffi::c_void)>,
@@ -7592,6 +7605,14 @@ const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     *mut usize,
 ) -> core::ffi::c_int = crate::evp::exchange::EVP_PKEY_derive;
+const _: unsafe extern "C" fn(
+    *mut EVP_PKEY_CTX,
+    *mut EVP_SKEYMGMT,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+    usize,
+    *const OSSL_PARAM,
+) -> *mut EVP_SKEY = crate::evp::exchange::EVP_PKEY_derive_SKEY;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX) -> core::ffi::c_int =
     crate::evp::exchange::EVP_PKEY_derive_init;
 const _: unsafe extern "C" fn(*mut EVP_PKEY_CTX, *const OSSL_PARAM) -> core::ffi::c_int =
@@ -8640,6 +8661,12 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     *const OSSL_PARAM,
 ) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_import;
+const _: unsafe extern "C" fn(
+    *mut OSSL_LIB_CTX,
+    *mut EVP_SKEYMGMT,
+    core::ffi::c_int,
+    *const OSSL_PARAM,
+) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_import_SKEYMGMT;
 const _: unsafe extern "C" fn(
     *mut OSSL_LIB_CTX,
     *const core::ffi::c_char,

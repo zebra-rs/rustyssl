@@ -26,7 +26,8 @@ use crate::provider::Ptr;
 
 type AnyFn = unsafe extern "C" fn();
 type FreeFn = unsafe extern "C" fn(*mut c_void);
-type ImportFn = unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_PARAM) -> *mut c_void;
+pub(crate) type ImportFn =
+    unsafe extern "C" fn(*mut c_void, c_int, *const OSSL_PARAM) -> *mut c_void;
 type ExportFn = unsafe extern "C" fn(*mut c_void, c_int, OSSL_CALLBACK, *mut c_void) -> c_int;
 type GenerateFn = unsafe extern "C" fn(*mut c_void, *const OSSL_PARAM) -> *mut c_void;
 type KeyIdFn = unsafe extern "C" fn(*mut c_void) -> *const c_char;
@@ -214,6 +215,18 @@ impl Ref {
         unsafe { method(m) }.map(|_| Self(Ptr(m)))
     }
 
+    /// A new reference to `m`; `None` for NULL.
+    ///
+    /// # Safety
+    /// `m` is NULL or a live symmetric key manager.
+    pub(crate) unsafe fn borrow(m: *mut EVP_SKEYMGMT) -> Option<Self> {
+        // SAFETY: the caller's guarantee.
+        unsafe { method(m) }?;
+        // SAFETY: as above.
+        unsafe { EVP_SKEYMGMT::up_ref(m) };
+        Some(Self(Ptr(m)))
+    }
+
     /// The symmetric key manager.
     pub(crate) fn get(&self) -> &Skeymgmt {
         // SAFETY: this holds a reference to a live method (checked when made).
@@ -241,8 +254,13 @@ impl Drop for Ref {
 
 // The internal API (`evp_skeymgmt_*`).
 impl Skeymgmt {
+    /// Its `import` function (for a provider's `derive_skey`).
+    pub(crate) fn import_fn(&self) -> Option<ImportFn> {
+        self.funcs.import
+    }
+
     /// The provider's context, which the provider functions take.
-    fn provider_ctx(&self) -> *mut c_void {
+    pub(crate) fn provider_ctx(&self) -> *mut c_void {
         // SAFETY: the method holds a reference to its live provider.
         unsafe { crate::provider::OSSL_PROVIDER_get0_provider_ctx(self.prov.0) }
     }
