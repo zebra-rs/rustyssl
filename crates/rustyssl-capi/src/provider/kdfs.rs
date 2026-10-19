@@ -1116,18 +1116,15 @@ unsafe fn tls13_generate_secret(h: &Hkdf, md: *const EVP_MD, out: *mut u8, outle
 
 ffi_callback! {
     /// `kdf_tls1_3_set_ctx_params`: the common parameters (not in the default mode), the
-    /// prefix and label, and the data (cleared by every call).
+    /// prefix and label, and the data.
     ///
     /// # Safety
     /// `vctx` is a live HKDF context; `params` is NULL or a parameter array.
     pub(crate) unsafe extern "C" fn tls13_set_ctx_params(vctx: *mut c_void, params: *const OSSL_PARAM) -> c_int
     where failure = 0, library = ERR_LIB_PROV
     {
+        // 3.6 checks the mode even without parameters (3.5 returned 1 first).
         // SAFETY: the caller's guarantee.
-        if unsafe { is_empty(params) } {
-            return 1;
-        }
-        // SAFETY: as above.
         let Some(h) = (unsafe { context::<Hkdf>(vctx) }) else { return 0 };
         // SAFETY: as above.
         if !unsafe { hkdf_common_set(h, params) } {
@@ -1146,9 +1143,10 @@ ffi_callback! {
                 *slot = Some(v);
             }
         }
-        h.data = None;
+        // 3.6 replaces the data only when given (3.5 cleared it on every call).
         // SAFETY: as above.
         if let Some(p) = unsafe { locate(params, OSSL_KDF_PARAM_DATA) } {
+            h.data = None;
             // SAFETY: a parameter of the caller's array.
             let Some(v) = (unsafe { get_octets(p) }) else { return 0 };
             h.data = Some(v);

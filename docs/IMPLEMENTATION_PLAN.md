@@ -5635,6 +5635,11 @@ both libraries (step 8.1).
       the legacy digests' and before the key types' (`evp/fetch.rs` `prefill`), so RSA-PSS's
       number comes before RSA's, which moves numbers in error text and the order of
       `*_do_all_provided` lists.
+    - DH's `get_params` sets `security-category` after the encoded public key, so a request
+      whose encoded key fails leaves it unset (`provider/dh_kmgmt.rs`).
+    - TLS13-KDF checks its mode even without parameters (so deriving in the default mode
+      raises `PROV_R_INVALID_MODE`), and replaces its data only when `data` is given (3.5
+      cleared it on every call; `provider/kdfs.rs` `tls13_set_ctx_params`).
 
 **Exit:** M6.
 

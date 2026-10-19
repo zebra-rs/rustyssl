@@ -369,8 +369,6 @@ ffi_callback! {
             (OSSL_PKEY_PARAM_BITS, unsafe { DH_bits(h) }),
             (OSSL_PKEY_PARAM_SECURITY_BITS, unsafe { DH_security_bits(h) }),
             (OSSL_PKEY_PARAM_MAX_SIZE, unsafe { DH_size(h) }),
-            // 3.6: classical keys are in no NIST post-quantum category.
-            (OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0),
         ];
         for (name, v) in ints {
             // SAFETY: the caller's array.
@@ -396,6 +394,11 @@ ffi_callback! {
             if prm.return_size == 0 {
                 return 0;
             }
+        }
+        // 3.6: classical keys are in no NIST post-quantum category (after the encoded key).
+        // SAFETY: the caller's array.
+        if !unsafe { set_int(params, OSSL_PKEY_PARAM_SECURITY_CATEGORY, 0) } {
+            return 0;
         }
         let target = Target::Params(params);
         let mut kept = Kept::default();
