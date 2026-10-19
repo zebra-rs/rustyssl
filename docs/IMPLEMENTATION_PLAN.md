@@ -5705,6 +5705,47 @@ both libraries (step 8.1).
       parameter first, then the known types', then the method's, and otherwise what the key can
       do (encrypt: key transport; derive: key agreement; encapsulate: KEM), under an error
       mark. 3.5 defaulted every unknown key to key transport.
+    - `OPENSSL_thread_stop` forgets every random generator of the thread, those installed with
+      `RAND_set0_public`/`RAND_set0_private` too (3.6 clears the thread's values after the stop
+      handlers, `CRYPTO_THREAD_clean_local`; 3.5 kept an installed one whose freeing wasn't
+      registered), so the next `RAND_bytes` makes a new one from the primary. 3.6 leaks the
+      thread's reference; rustyssl releases it (`rand_lib.rs` `stop_thread`).
+      `OPENSSL_thread_stop_ex` is unchanged.
+    - `EVP_CIPHER_CTX_ctrl`'s `EVP_CTRL_AEAD_TLS1_AAD` and the two TLS 1.1 multiblock ctrls return
+      0 for a length beyond `INT_MAX` (3.5 truncated it, so a provider that answered nothing
+      gave -1; `evp/cipher_ctx.rs` `length_or_zero`).
+    - Parameter decoders (`provider/param_decoders.rs`, generated from 3.6.5's
+      `produce_param_decoder` declarations by `target/v36/gendec.py`-style extraction): every
+      provider function 3.6 reads through a generated decoder (130 in the default and legacy
+      providers: the ciphers' common, CCM, GCM, and ChaCha20-Poly1305 functions, the digests',
+      MACs', KDFs', DRBGs', signatures', key exchanges', KEMs', asymmetric ciphers', ECX, ML-DSA,
+      ML-KEM, hybrid and SLH-DSA key managers', the en/decoders', the file store's, and the
+      generic symmetric key import) fails a request that gives one of its parameters twice
+      (`PROV_R_REPEATED_PARAMETER`, "param <key> is repeated"; aliases such as `secret` and `key`
+      are one parameter) or a list parameter (HKDF's, KBKDF's, SSKDF's `info`, TLS1-PRF's
+      `seed`) more than 5 (6) times (`PROV_R_TOO_MANY_RECORDS`), before using any of it; 3.5 took
+      the first. Functions 3.6 didn't convert (RSA, EC, DH, DSA key managers, ...) still take
+      the first. To name each decoder in its errors, the size-only KDF getters, SSKDF/X963KDF's
+      setters, and the SPKI/EPKI decoders' setters are separate functions now.
+      `tests/c/params_repeated.c`.
+    - Ed25519ph, Ed25519ctx, and Ed448ph signatures set only the context string
+      (`eddsa_set_variant_ctx_params`): an `instance` given is ignored (3.5 refused it, the
+      instance being preset); the preset error now names `eddsa_set_ctx_params_internal`
+      (`provider/eddsa_sig.rs`).
+    - GCM answers `iv`, `updated-iv`, and `tag` without a buffer with their lengths (3.5 raised
+      `PROV_R_INVALID_IV_LENGTH` and `PROV_R_INVALID_TAG`; `provider/aeads.rs` `gcm_get`).
+      `tests/c/evp_aead.c`.
+    - GMAC no longer has `get_ctx_params` in the default provider (FIPS only in 3.6), as before
+      in rustyssl.
+  - Test harnesses adapted to 3.6.5 (the same change for both libraries): `evp_test`'s fake
+    random generator found by its own list instead of OpenSSL's private `EVP_RAND_CTX`
+    (`fake_random_patches`); `SSL_CONNECTION_FROM_SSL`'s new internal call weakly referenced
+    (`ssl.rs`); `test_tlsext_status_type_multi` listed as reading library internals; a patch
+    already upstream skipped (3.6 links `provider_test` with the shared libcrypto); interop
+    masks `ERR_print_errors`' thread id (an address on Linux); the differential probe sets its
+    DRBGs again after each thread stop and its generator follows 3.6's `BIO_printf` modifiers
+    (`hh`, `t`) and never asks 3.6 for an ECX public key from a private key alone (it crashes,
+    docs/DEVIATIONS.md).
 
 **Exit:** M6.
 

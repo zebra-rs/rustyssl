@@ -265,6 +265,15 @@ pub fn build(list: &List) -> Build {
             "#include \"fake_pipelineprov.h\"\n#pragma weak evp_pkey_copy_downgraded\n\
              #pragma weak evp_keymgmt_util_export\n".to_owned(),
         ),
+        // 3.6's `SSL_CONNECTION_FROM_SSL` (an internal header the programs include) calls
+        // libssl's internal `ossl_quic_obj_get0_handshake_layer` for a QUIC object; weakly
+        // referenced, so that the programs load on a library that doesn't export it.
+        (
+            "include/internal/ssl_unwrap.h",
+            "struct ssl_connection_st *ossl_quic_obj_get0_handshake_layer(QUIC_OBJ *obj);\n".to_owned(),
+            "struct ssl_connection_st *ossl_quic_obj_get0_handshake_layer(QUIC_OBJ *obj);\n\
+             #pragma weak ossl_quic_obj_get0_handshake_layer\n".to_owned(),
+        ),
         (
             "test/fake_pipelineprov.c",
             "#include \"fake_pipelineprov.h\"\n".to_owned(),

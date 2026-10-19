@@ -86,6 +86,9 @@ bad_dtls_test
 # for ForcePHA writes post_handshake_auth into it), so the server fails on another layout; 7
 # and 8 expect that failure anyway.
 internal ssl_test/26-tls13_client_auth test_handshake#7 test_handshake#8 test_handshake#9 test_handshake#10 test_handshake#11 test_handshake#12 test_handshake#13 test_handshake#14
+# test_tlsext_status_type_multi (3.6): its OCSP callback takes the SSL_CONNECTION with
+# SSL_CONNECTION_FROM_CONST_SSL, which reads the private SSL type to tell a QUIC object.
+internal sslapitest test_tlsext_status_type_multi
 internal sslapitest test_session_with_only_int_cache test_session_with_only_ext_cache test_session_with_both_cache test_session_wo_ca_names test_ciphersuite_change test_session_timeout test_session_cache_overflow test_cleanse_plaintext test_unknown_sigalgs_groups test_configuration_of_groups test_sigalg_ctx_switch test_sigalg_ctx_switch_cert_cb test_sigalg_ctx_switch_reneg
 internal sslbuffertest test_func
 internal dtls_mtu_test run_mtu_tests

@@ -79,8 +79,55 @@ fn crypto_build() -> Build {
                 "if (!evp_pkey_is_provided(pkey)) {".to_owned(),
                 "if (EVP_PKEY_get0_provider(pkey) == NULL) {".to_owned(),
             ),
-        ],
+        ]
+        .into_iter()
+        .chain(fake_random_patches())
+        .collect(),
     }
+}
+
+/// 3.6's `evp_test` installs the test library's fake random generator, whose helpers find their
+/// generator by reading `algctx` out of OpenSSL's private `struct evp_rand_ctx_st` (from an
+/// internal header). rustyssl's contexts have another layout, so the helpers keep a list of the
+/// generators they make instead, and find each by the context it was bound to (or, binding it,
+/// the newest unbound one), for both libraries.
+fn fake_random_patches() -> Vec<(&'static str, String, String)> {
+    const FILE: &str = "test/testutil/fake_random.c";
+    [
+        (
+            "static void *fake_rand_newctx(void *provctx, void *parent,",
+            "static FAKE_RAND *fake_rands[64];\nstatic size_t fake_rands_n;\n\n\
+             static void *fake_rand_newctx(void *provctx, void *parent,",
+        ),
+        (
+            "    if (r != NULL)\n        r->state = EVP_RAND_STATE_UNINITIALISED;\n    return r;",
+            "    if (r != NULL)\n        r->state = EVP_RAND_STATE_UNINITIALISED;\n    \
+             if (r != NULL && fake_rands_n < 64)\n        fake_rands[fake_rands_n++] = r;\n    \
+             return r;",
+        ),
+        (
+            "static void fake_rand_freectx(void *vrng)\n{\n    OPENSSL_free(vrng);\n}\n",
+            "static void fake_rand_freectx(void *vrng)\n{\n    size_t i, j;\n\n    \
+             for (i = 0; i < fake_rands_n; i++)\n        if (fake_rands[i] == vrng) {\n            \
+             for (j = i + 1; j < fake_rands_n; j++)\n                fake_rands[j - 1] = fake_rands[j];\n            \
+             fake_rands_n--;\n            break;\n        }\n    OPENSSL_free(vrng);\n}\n\n\
+             static FAKE_RAND *fake_of(EVP_RAND_CTX *rng)\n{\n    size_t i;\n\n    \
+             for (i = 0; i < fake_rands_n; i++)\n        if (fake_rands[i]->ctx == rng)\n            \
+             return fake_rands[i];\n    for (i = fake_rands_n; i-- > 0;)\n        \
+             if (fake_rands[i]->ctx == NULL)\n            return fake_rands[i];\n    return NULL;\n}\n",
+        ),
+        (
+            "    f = rng->algctx;",
+            "    f = fake_of(rng);\n    if (!TEST_ptr(f))\n        return 0;",
+        ),
+        (
+            "        ((FAKE_RAND *)rng->algctx)->cb = cb;",
+            "        if (fake_of(rng) != NULL)\n            fake_of(rng)->cb = cb;",
+        ),
+    ]
+    .into_iter()
+    .map(|(from, to)| (FILE, from.to_owned(), to.to_owned()))
+    .collect()
 }
 
 /// The other programs' runs: each program with the arguments of one run, a data file of
@@ -136,6 +183,11 @@ pub fn ensure(root: &Path, version: &str, reference: &Path, build: &Build) -> Re
         let path = src.join(file);
         let text = fs::read_to_string(&path)?;
         if !text.contains(from.as_str()) {
+            // A release that already has the change (3.6 links `provider_test` with the shared
+            // libcrypto) needs no patch.
+            if !to.is_empty() && text.contains(to.as_str()) {
+                continue;
+            }
             return Err(format!("{file} has no `{from}`").into());
         }
         fs::write(&path, text.replace(from.as_str(), to))?;
