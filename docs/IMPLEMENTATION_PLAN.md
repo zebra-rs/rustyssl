@@ -5651,6 +5651,9 @@ both libraries (step 8.1).
       outside a directory, and names the URI and subject in that error
       (`provider/file_store.rs`); `X509_LOOKUP_store` drops what its search raises
       (`x509/lookup.rs`).
+    - `RSA_blinding_on` and `RSA_blinding_off` only change the flags (3.5's `on` made a fresh
+      blinding from the private generator and `off` freed it), so the key keeps its blinding
+      and draws less from the generator (`rsa_lib.rs`).
 
 **Exit:** M6.
 
