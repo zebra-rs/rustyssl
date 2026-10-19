@@ -21,7 +21,7 @@ mod library;
 mod programs;
 mod values;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -68,6 +68,8 @@ pub struct Context {
     work: PathBuf,
     /// Each library's exports from the vendored export list: name -> version node.
     exports: BTreeMap<&'static str, BTreeMap<String, String>>,
+    /// The private functions the shipped modules call in libcrypto.
+    module_imports: BTreeSet<String>,
 }
 
 impl Context {
@@ -86,7 +88,8 @@ impl Context {
     }
 
     /// What rustyssl's library must export: the vendored list, plus, in libcrypto, the private
-    /// twin of every libssl function (docs/adr/0001-library-layout.md).
+    /// twin of every libssl function (docs/adr/0001-library-layout.md) and the private functions
+    /// the shipped modules call (docs/adr/0003-external-providers.md).
     fn expected_exports(&self, library: &str) -> BTreeMap<String, String> {
         let mut expected = self.exports.get(library).cloned().unwrap_or_default();
         if library == "libcrypto" {
@@ -100,6 +103,9 @@ impl Context {
                     format!("{PRIVATE_PREFIX}{name}"),
                     "RUSTYSSL_PRIVATE".to_owned(),
                 );
+            }
+            for name in &self.module_imports {
+                expected.insert(name.clone(), "RUSTYSSL_PRIVATE".to_owned());
             }
         }
         expected
@@ -149,6 +155,7 @@ pub fn run(args: &[String]) -> Result {
         }
         exports.insert(*library, names);
     }
+    let module_imports = crate::codegen::exports::module_imports(&root)?;
     let work = target_dir(&root).join("xtask/abi-check");
     fresh_dir(&work)?;
     let cx = Context {
@@ -159,6 +166,7 @@ pub fn run(args: &[String]) -> Result {
         dist,
         work,
         exports,
+        module_imports,
     };
 
     let mut failed = Vec::new();
