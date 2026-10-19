@@ -27,6 +27,7 @@ const TARGETS: &[(&str, u64)] = &[
     ("ecdsa-sign", 40_000),
     ("rsa-raw-decrypt", 40_000),
     ("rsa-pkcs1-decrypt", 40_000),
+    ("tls-cbc-record", 40_000),
 ];
 
 /// dudect's line: above it, "definitely not constant time".
@@ -86,7 +87,7 @@ pub fn run(args: &[String]) -> Result {
                 .arg(root.join("tests/timing/dudect.c"))
                 .arg("-L")
                 .arg(lib_root.join("lib"))
-                .args(["-lcrypto", "-lm", "-o"])
+                .args(["-lssl", "-lcrypto", "-lm", "-o"])
                 .arg(&exe),
         )?;
         Ok(exe)

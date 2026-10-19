@@ -29,6 +29,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
@@ -104,6 +106,8 @@ struct target {
     void (*run)(size_t i);
     /* How many runs one measurement times (fast operations repeat to beat the clock's step). */
     int reps;
+    /* Inputs made per batch (0: BATCH); fewer for inputs that hold a connection each. */
+    size_t batch;
 };
 
 #define MAXIN 1536
@@ -481,17 +485,148 @@ static void mlkem_run(size_t i)
     sink ^= out[0];
 }
 
+/*
+ * ---- Lucky13: a TLS 1.2 server reading a MAC-then-encrypt CBC record (AES-128-CBC with
+ * HMAC-SHA1, no encrypt-then-MAC) that fails. The client's 512-octet record is altered
+ * through its next-to-last ciphertext block so the last plaintext octet, the padding length,
+ * is 0 (class 0) or 255 (class 1): a server whose MAC check's work depends on the padding
+ * takes longer on one. Each input is its own connection, resumed from one session so the
+ * handshakes stay cheap, and made (record and all) before anything is timed. ----
+ */
+#define TLS_BATCH 500
+static SSL_CTX *tls_cctx, *tls_sctx;
+static SSL_SESSION *tls_sess;
+static SSL *tls_srv[TLS_BATCH];
+
+static int tls_pump(SSL *c, SSL *s)
+{
+    int k;
+
+    for (k = 0; k < 32; k++) {
+        /* Each end's error before the other runs: the other's write changes the BIO's flags. */
+        int rc = SSL_do_handshake(c), ec = rc == 1 ? SSL_ERROR_NONE : SSL_get_error(c, rc);
+        int rs = SSL_do_handshake(s), es = rs == 1 ? SSL_ERROR_NONE : SSL_get_error(s, rs);
+
+        if (rc == 1 && rs == 1)
+            return 1;
+        if ((ec != SSL_ERROR_NONE && ec != SSL_ERROR_WANT_READ)
+            || (es != SSL_ERROR_NONE && es != SSL_ERROR_WANT_READ))
+            return 0;
+    }
+    return 0;
+}
+
+/* A connected pair over memory BIOs: the client writes to the server's read BIO and back. */
+static int tls_pair(SSL **c, SSL **s)
+{
+    BIO *c2s = BIO_new(BIO_s_mem()), *s2c = BIO_new(BIO_s_mem());
+
+    *c = SSL_new(tls_cctx);
+    *s = SSL_new(tls_sctx);
+    if (*c == NULL || *s == NULL || c2s == NULL || s2c == NULL)
+        return 0;
+    /* Empty is "try again", not the end. */
+    BIO_set_mem_eof_return(c2s, -1);
+    BIO_set_mem_eof_return(s2c, -1);
+    BIO_up_ref(c2s);
+    BIO_up_ref(s2c);
+    SSL_set_bio(*c, s2c, c2s);
+    SSL_set_bio(*s, c2s, s2c);
+    SSL_set_connect_state(*c);
+    SSL_set_accept_state(*s);
+    if (tls_sess != NULL)
+        SSL_set_session(*c, tls_sess);
+    return tls_pump(*c, *s);
+}
+
+static int tls_setup(void)
+{
+    EVP_PKEY *key = EVP_PKEY_Q_keygen(NULL, NULL, "EC", "P-256");
+    X509 *cert = X509_new();
+    SSL *c, *s;
+    int ok;
+
+    if (key == NULL || cert == NULL)
+        return 0;
+    ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
+    X509_gmtime_adj(X509_getm_notBefore(cert), 0);
+    X509_gmtime_adj(X509_getm_notAfter(cert), 86400);
+    X509_set_pubkey(cert, key);
+    X509_NAME_add_entry_by_txt(X509_get_subject_name(cert), "CN", MBSTRING_ASC,
+                               (const unsigned char *)"dudect", -1, -1, 0);
+    X509_set_issuer_name(cert, X509_get_subject_name(cert));
+    X509_sign(cert, key, EVP_sha256());
+    tls_cctx = SSL_CTX_new(TLS_client_method());
+    tls_sctx = SSL_CTX_new(TLS_server_method());
+    if (tls_cctx == NULL || tls_sctx == NULL)
+        return 0;
+    SSL_CTX_set_max_proto_version(tls_cctx, TLS1_2_VERSION);
+    SSL_CTX_set_cipher_list(tls_cctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(tls_cctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_set_cipher_list(tls_sctx, "ECDHE-ECDSA-AES128-SHA");
+    SSL_CTX_set_options(tls_sctx, SSL_OP_NO_ENCRYPT_THEN_MAC);
+    SSL_CTX_use_certificate(tls_sctx, cert);
+    SSL_CTX_use_PrivateKey(tls_sctx, key);
+    X509_free(cert);
+    EVP_PKEY_free(key);
+    /* One full handshake for the session the others resume. */
+    ok = tls_pair(&c, &s);
+    if (ok)
+        tls_sess = SSL_get1_session(c);
+    SSL_free(c);
+    SSL_free(s);
+    return ok && tls_sess != NULL;
+}
+
+static void tls_prepare(size_t i, int c)
+{
+    static unsigned char msg[512];
+    unsigned char rec[1024];
+    SSL *cl, *sv;
+    BIO *rb;
+    int n;
+    size_t pad, body;
+
+    SSL_free(tls_srv[i]);
+    tls_srv[i] = NULL;
+    if (!tls_pair(&cl, &sv) || SSL_write(cl, msg, (int)sizeof(msg)) != (int)sizeof(msg)) {
+        fprintf(stderr, "tls-cbc-record: no connection\n");
+        exit(2);
+    }
+    /* The client's record went to the server's read BIO: take it out, alter it, put it back. */
+    rb = SSL_get_rbio(sv);
+    n = BIO_read(rb, rec, (int)sizeof(rec));
+    /* header 5, explicit IV 16, then the message, the MAC (20) and the padding */
+    body = n > 5 + 16 ? (size_t)n - 5 - 16 : 0;
+    if (body < sizeof(msg) + 20 + 1 || body % 16 != 0 || n < 5 + 16 + 32) {
+        fprintf(stderr, "tls-cbc-record: unexpected record of %d octets\n", n);
+        exit(2);
+    }
+    pad = body - sizeof(msg) - 20 - 1;
+    /* The last plaintext octet is `pad`; XOR into the block before it makes it 0 or 255. */
+    rec[n - 16 - 1] ^= (unsigned char)(pad ^ (c == 0 ? 0 : 255));
+    BIO_write(rb, rec, n);
+    SSL_free(cl);
+    tls_srv[i] = sv;
+}
+
+static void tls_run(size_t i)
+{
+    sink ^= (unsigned char)SSL_read(tls_srv[i], out, (int)sizeof(out));
+}
+
 static const struct target targets[] = {
-    { "aes-gcm", aes_setup, key_prepare, aes_run, 8 },
-    { "ghash", ghash_setup, tag_prepare, ghash_run, 8 },
-    { "poly1305", poly_setup, key_prepare, poly_run, 8 },
-    { "x25519", x25519_setup, x25519_prepare, x25519_run, 1 },
-    { "ecdsa-sign", ecdsa_setup, ecdsa_prepare, ecdsa_run, 1 },
-    { "rsa-pkcs1-decrypt", rsa_setup, rsa_prepare, rsa_run, 1 },
-    { "rsa-raw-decrypt", rsa_setup, rsaraw_prepare, rsaraw_run, 1 },
-    { "bn-modexp-consttime", bn_setup, bn_prepare, bn_run, 1 },
-    { "memcmp", memcmp_setup, memcmp_prepare, memcmp_run, 1024 },
-    { "ml-kem-decap", mlkem_setup, mlkem_prepare, mlkem_run, 1 },
+    { "aes-gcm", aes_setup, key_prepare, aes_run, 8, 0 },
+    { "ghash", ghash_setup, tag_prepare, ghash_run, 8, 0 },
+    { "poly1305", poly_setup, key_prepare, poly_run, 8, 0 },
+    { "x25519", x25519_setup, x25519_prepare, x25519_run, 1, 0 },
+    { "ecdsa-sign", ecdsa_setup, ecdsa_prepare, ecdsa_run, 1, 0 },
+    { "rsa-pkcs1-decrypt", rsa_setup, rsa_prepare, rsa_run, 1, 0 },
+    { "rsa-raw-decrypt", rsa_setup, rsaraw_prepare, rsaraw_run, 1, 0 },
+    { "bn-modexp-consttime", bn_setup, bn_prepare, bn_run, 1, 0 },
+    { "memcmp", memcmp_setup, memcmp_prepare, memcmp_run, 1024, 0 },
+    { "ml-kem-decap", mlkem_setup, mlkem_prepare, mlkem_run, 1, 0 },
+    { "tls-cbc-record", tls_setup, tls_prepare, tls_run, 1, TLS_BATCH },
 };
 
 int main(int argc, char **argv)
@@ -523,7 +658,8 @@ int main(int argc, char **argv)
         return 2;
     }
     while (done < (size_t)total) {
-        size_t n = (size_t)total - done < BATCH ? (size_t)total - done : BATCH;
+        size_t cap = t->batch != 0 ? t->batch : BATCH;
+        size_t n = (size_t)total - done < cap ? (size_t)total - done : cap;
 
         for (i = 0; i < n; i++) {
             unsigned char r;
