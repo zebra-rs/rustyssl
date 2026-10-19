@@ -419,7 +419,7 @@ static void test_unclean(int max, int ignore)
     if (ignore)
         SSL_set_options(c, SSL_OP_IGNORE_UNEXPECTED_EOF);
     said("first SSL_shutdown", c, SSL_shutdown(c));
-    BIO_shutdown_wr(SSL_get_wbio(s));
+    (void)BIO_shutdown_wr(SSL_get_wbio(s));
     said("second SSL_shutdown", c, SSL_shutdown(c));
     said("third SSL_shutdown", c, SSL_shutdown(c));
     done(cctx, sctx, c, s);
