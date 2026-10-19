@@ -5345,7 +5345,7 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     where both libraries fail the same way at the default level (`no protocols available` on
     the client, `unexpected message` on the server). `test-interop` masks the source file and
     line in `ERR_print_errors` lines, which are the implementation's, not behavior.
-- [ ] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
+- [x] **8.3 Coverage sweep to 100% of `libssl.num`**, ordered by `docs/symbol-usage.md`:
   - async fds, record padding, `SSL_stateless`, the remaining `tlsext` ctrls
   - temporary/auto DH, the CA-subject loaders, the early-data callback
   - `SSL_CTX_compress_certs`, `SSL_COMP_*`, SRP, the status callbacks, the CT callback
@@ -5359,9 +5359,20 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
     transport they need. Implementing them as failures now would break rule 10 (a QUIC
     method that can't make connections reports success for work it didn't do). So the
     exit's "100%" is everything outside the QUIC API.
+  - Done: the three DTLS exports came with 8.1, so 595 of 603 are implemented, every export
+    outside the QUIC API (`docs/coverage.md`).
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.
+
+**Exit status (2026-10-18):** Steps 8.1–8.3 are done, and M5's targets are met, with the QUIC
+API left to Phase 10 (the 8.3 decision): libssl coverage is 595 of 603, every export outside
+QUIC; BoGo, tlsfuzzer and DTLS interop are each met, as recorded below. The upstream libssl
+suite fails nothing outside QUIC, ENGINE (step 9.3), third-party C providers (Phase 9), and
+the tests that read OpenSSL's private structures. Still open from the wider test plan: the
+tlsfuzzer timing scripts (they need packet capture as root and SciPy; `cargo xtask
+test-timing` covers their concerns, with the CBC-padding and X25519 findings fixed), and the
+consumer suites (`test-consumers`), which arrive later.
 
 **Exit status: BoGo (2026-10-18):** met. At BoringSSL 5e1bfb45, 7771 tests (3455
 unimplemented by the shim): the reference and rustyssl each pass 2897 and fail 1419, the same
