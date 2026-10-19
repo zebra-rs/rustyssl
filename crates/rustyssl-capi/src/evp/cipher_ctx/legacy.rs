@@ -14,7 +14,7 @@ use core::ffi::{c_int, c_ulong, c_void};
 use core::ptr;
 
 use rustyssl_abi::{
-    ERR_LIB_EVP, EVP_CIPH_ALWAYS_CALL_INIT, EVP_CIPH_CBC_MODE, EVP_CIPH_CFB_MODE,
+    ENGINE, ERR_LIB_EVP, EVP_CIPH_ALWAYS_CALL_INIT, EVP_CIPH_CBC_MODE, EVP_CIPH_CFB_MODE,
     EVP_CIPH_CTR_MODE, EVP_CIPH_CTRL_INIT, EVP_CIPH_CUSTOM_COPY, EVP_CIPH_CUSTOM_IV,
     EVP_CIPH_CUSTOM_IV_LENGTH, EVP_CIPH_CUSTOM_KEY_LENGTH, EVP_CIPH_ECB_MODE,
     EVP_CIPH_FLAG_CUSTOM_CIPHER, EVP_CIPH_FLAG_LENGTH_BITS, EVP_CIPH_MODE, EVP_CIPH_NO_PADDING,
@@ -179,9 +179,9 @@ pub(super) unsafe fn release(ctx: *mut EVP_CIPHER_CTX) -> bool {
 pub(super) unsafe fn init(
     ctx: *mut EVP_CIPHER_CTX,
     cipher: *const EVP_CIPHER,
-    key: *const u8,
-    iv: *const u8,
+    (key, iv): (*const u8, *const u8),
     enc: c_int,
+    (engine, reserved): (*mut ENGINE, *mut ENGINE),
 ) -> c_int {
     const F: &str = "evp_cipher_init_internal";
     // SAFETY: the caller's guarantee.
@@ -207,11 +207,37 @@ pub(super) unsafe fn init(
             c.encrypt = enc;
             c.flags = flags;
         }
+        // With an engine (`engine`, initialized here, or the one reserved for the NID), the
+        // engine's own cipher, the engine's functional reference kept by the context.
+        let chosen = if engine.is_null() {
+            reserved
+        } else {
+            // SAFETY: the caller's live engine; its `init` may run (no lock is held).
+            if unsafe { crate::engine::ENGINE_init(engine) } == 0 {
+                err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+                return 0;
+            }
+            engine
+        };
+        let mut cipher = cipher;
+        if !chosen.is_null() {
+            // SAFETY: the caller's live method.
+            let nid = unsafe { method(cipher) }.map_or(0, |m| m.nid);
+            // SAFETY: an initialized engine; its cipher callback may run.
+            let ec = unsafe { crate::engine::table::ENGINE_get_cipher(chosen, nid) };
+            if ec.is_null() {
+                // OpenSSL keeps the functional reference here.
+                err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+                return 0;
+            }
+            cipher = ec;
+        }
         // SAFETY: as above.
         let Some(c) = (unsafe { context(ctx) }) else {
             return 0;
         };
-        // SAFETY: the caller's live method.
+        c.engine = chosen;
+        // SAFETY: the caller's live method, or the engine's.
         let Some(m) = (unsafe { method(cipher) }) else {
             return 0;
         };
@@ -767,6 +793,18 @@ pub(super) unsafe fn copy(out: *mut EVP_CIPHER_CTX, in_: *const EVP_CIPHER_CTX) 
     let Some((l, flags, _)) = (unsafe { legacy_of(in_.cast_mut()) }) else {
         return 0;
     };
+    // The copy keeps its own functional reference to the source's engine.
+    // SAFETY: the caller's guarantee.
+    let engine = unsafe { context(in_) }.map_or(ptr::null_mut(), |c| c.engine);
+    // SAFETY: the source's engine; its `init` may run.
+    if !engine.is_null() && unsafe { crate::engine::ENGINE_init(engine) } == 0 {
+        err::raise(
+            ERR_LIB_EVP,
+            rustyssl_abi::ERR_R_ENGINE_LIB,
+            "EVP_CIPHER_CTX_copy",
+        );
+        return 0;
+    }
     // SAFETY: the caller's guarantee.
     unsafe { EVP_CIPHER_CTX_reset(out) };
     // SAFETY: as above.

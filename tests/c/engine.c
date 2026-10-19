@@ -19,6 +19,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
+#include <openssl/sha.h>
 
 static int failures = 0;
 static int number = 0;
@@ -709,6 +710,215 @@ static void test_keys(void)
     EC_KEY_METHOD_free(em);
 }
 
+/*
+ * EVP through an engine: a digest (SHA-256's own functions, counted), a cipher (a toy: XOR
+ * with the key's first octet, under AES-128-CBC's NID), and a key method whose keygen is
+ * counted.
+ */
+static int md_inits, cipher_inits, cipher_calls, keygens;
+static EVP_MD *evp_md;
+static EVP_CIPHER *evp_cipher;
+static EVP_PKEY_METHOD *evp_pmeth;
+static int (*sha256_init)(EVP_MD_CTX *ctx);
+
+static int counted_init(EVP_MD_CTX *ctx)
+{
+    md_inits++;
+    return sha256_init(ctx);
+}
+
+static int xor_init(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv,
+                    int enc)
+{
+    (void)iv;
+    (void)enc;
+    cipher_inits++;
+    if (key != NULL)
+        *(unsigned char *)EVP_CIPHER_CTX_get_cipher_data(ctx) = key[0];
+    return 1;
+}
+
+static int xor_do(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl)
+{
+    unsigned char k = *(unsigned char *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    size_t i;
+
+    cipher_calls++;
+    for (i = 0; i < inl; i++)
+        out[i] = in[i] ^ k;
+    return 1;
+}
+
+static int evp_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
+{
+    (void)ctx;
+    (void)pkey;
+    keygens++;
+    return 1;
+}
+
+static int evp_digests(ENGINE *e, const EVP_MD **md, const int **nids, int nid)
+{
+    static const int n[] = { NID_sha256 };
+
+    (void)e;
+    if (md == NULL) {
+        *nids = n;
+        return 1;
+    }
+    *md = nid == NID_sha256 ? evp_md : NULL;
+    return *md != NULL;
+}
+
+static int evp_ciphers(ENGINE *e, const EVP_CIPHER **c, const int **nids, int nid)
+{
+    static const int n[] = { NID_aes_128_cbc };
+
+    (void)e;
+    if (c == NULL) {
+        *nids = n;
+        return 1;
+    }
+    *c = nid == NID_aes_128_cbc ? evp_cipher : NULL;
+    return *c != NULL;
+}
+
+static int evp_pkey_meths(ENGINE *e, EVP_PKEY_METHOD **m, const int **nids, int nid)
+{
+    static const int n[] = { NID_hmac };
+
+    (void)e;
+    if (m == NULL) {
+        *nids = n;
+        return 1;
+    }
+    *m = nid == NID_hmac ? evp_pmeth : NULL;
+    return *m != NULL;
+}
+
+static void hex(const char *what, const unsigned char *p, size_t n)
+{
+    size_t i;
+
+    printf("  %s:", what);
+    for (i = 0; i < n; i++)
+        printf("%02x", p[i]);
+    printf("\n");
+}
+
+static void test_evp(void)
+{
+    ENGINE *e = app_engine("rustyssl-evp"), *bare = app_engine("rustyssl-evp-bare");
+    EVP_MD_CTX *md = EVP_MD_CTX_new(), *md2 = EVP_MD_CTX_new();
+    EVP_CIPHER_CTX *c = EVP_CIPHER_CTX_new();
+    EVP_PKEY_CTX *p, *p2;
+    EVP_PKEY *k = NULL, *hk;
+    unsigned char out[64], key[16] = { 0x5a }, iv[16] = { 0 };
+    unsigned int n = 0;
+    int len = 0, fin = 0;
+
+    /* The static digest's table has no state size (an engine sets it, as dasync does). */
+    evp_md = EVP_MD_meth_dup(EVP_sha256());
+    sha256_init = EVP_MD_meth_get_init(EVP_sha256());
+    EVP_MD_meth_set_init(evp_md, counted_init);
+    EVP_MD_meth_set_app_datasize(evp_md, sizeof(SHA256_CTX));
+    evp_cipher = EVP_CIPHER_meth_new(NID_aes_128_cbc, 16, 16);
+    EVP_CIPHER_meth_set_iv_length(evp_cipher, 16);
+    EVP_CIPHER_meth_set_flags(evp_cipher, EVP_CIPH_CBC_MODE);
+    EVP_CIPHER_meth_set_init(evp_cipher, xor_init);
+    EVP_CIPHER_meth_set_do_cipher(evp_cipher, xor_do);
+    EVP_CIPHER_meth_set_impl_ctx_size(evp_cipher, 1);
+    evp_pmeth = EVP_PKEY_meth_new(NID_hmac, 0);
+    EVP_PKEY_meth_set_keygen(evp_pmeth, NULL, evp_keygen);
+    check(ENGINE_set_digests(e, evp_digests) == 1 && ENGINE_set_ciphers(e, evp_ciphers) == 1
+              && ENGINE_set_pkey_meths(e, evp_pkey_meths) == 1
+              && ENGINE_set_init_function(e, app_init) == 1
+              && ENGINE_set_finish_function(e, app_finish) == 1,
+          "an engine with a digest, a cipher and a key method");
+    inits = finishes = 0;
+
+    /* A digest through the engine given, then through the default digest engine. */
+    check(EVP_DigestInit_ex(md, EVP_sha256(), e) == 1 && EVP_DigestUpdate(md, "abc", 3) == 1
+              && EVP_DigestFinal_ex(md, out, &n) == 1,
+          "EVP_DigestInit_ex with the engine");
+    hex("SHA-256(abc) through the engine", out, n);
+    printf("  digest inits %d, engine inits %d\n", md_inits, inits);
+    check(EVP_DigestInit_ex(md, NULL, NULL) == 1 && EVP_DigestFinal_ex(md, out, &n) == 1,
+          "a re-init keeps the engine's digest");
+    printf("  digest inits %d, engine inits %d, finishes %d\n", md_inits, inits, finishes);
+    check(EVP_MD_CTX_copy_ex(md2, md) == 1, "EVP_MD_CTX_copy_ex of an engine's context");
+    printf("  after the copy: engine inits %d\n", inits);
+    EVP_MD_CTX_reset(md2);
+    EVP_MD_CTX_reset(md);
+    printf("  reset: finishes %d\n", finishes);
+    check(ENGINE_set_default_digests(e) == 1, "ENGINE_set_default_digests");
+    check(EVP_Digest("abc", 3, out, &n, EVP_sha256(), NULL) == 1, "EVP_Digest takes the default");
+    printf("  digest inits %d\n", md_inits);
+    ENGINE_unregister_digests(e);
+    check(EVP_Digest("abc", 3, out, &n, EVP_sha256(), NULL) == 1, "and not once unregistered");
+    printf("  digest inits %d\n", md_inits);
+    ERR_clear_error();
+    check(EVP_DigestInit_ex(md, EVP_sha256(), bare) == 0, "an engine without the digest");
+    errors("EVP_DigestInit_ex(bare)");
+    EVP_MD_CTX_reset(md);
+
+    /* A cipher through the engine. */
+    check(EVP_EncryptInit_ex(c, EVP_aes_128_cbc(), e, key, iv) == 1
+              && EVP_EncryptUpdate(c, out, &len, (const unsigned char *)"0123456789abcdefXY", 18) == 1
+              && EVP_EncryptFinal_ex(c, out + len, &fin) == 1,
+          "EVP_EncryptInit_ex with the engine");
+    hex("the engine's ciphertext", out, (size_t)(len + fin));
+    printf("  cipher inits %d, calls %d, cipher %s\n", cipher_inits, cipher_calls,
+           EVP_CIPHER_CTX_get0_cipher(c) == evp_cipher ? "the engine's" : "another");
+    EVP_CIPHER_CTX_reset(c);
+    ERR_clear_error();
+    check(EVP_EncryptInit_ex(c, EVP_aes_128_cbc(), bare, key, iv) == 0,
+          "an engine without the cipher");
+    errors("EVP_EncryptInit_ex(bare)");
+    EVP_CIPHER_CTX_reset(c);
+
+    /* A key context through the engine's method. */
+    p = EVP_PKEY_CTX_new_id(NID_hmac, e);
+    check(p != NULL && EVP_PKEY_keygen_init(p) == 1 && EVP_PKEY_keygen(p, &k) == 1,
+          "EVP_PKEY_CTX_new_id with the engine");
+    printf("  keygens %d, engine inits %d\n", keygens, inits);
+    p2 = EVP_PKEY_CTX_dup(p);
+    printf("  dup %s, engine inits %d\n", p2 != NULL ? "made" : "not made", inits);
+    EVP_PKEY_CTX_free(p2);
+    EVP_PKEY_CTX_free(p);
+    EVP_PKEY_free(k);
+    k = NULL;
+    printf("  freed: finishes %d\n", finishes);
+
+    /* A key whose contexts use the engine (EVP_PKEY_set1_engine). */
+    hk = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, key, 16);
+    check(hk != NULL && EVP_PKEY_set1_engine(hk, e) == 1, "EVP_PKEY_set1_engine");
+    /* The HMAC key is a provided one: its context doesn't reach the engine's keygen. */
+    ERR_clear_error();
+    p = EVP_PKEY_CTX_new(hk, NULL);
+    printf("  a context for the key: %s", p != NULL ? "made" : "not made");
+    if (p != NULL)
+        printf(", keygen_init %d", EVP_PKEY_keygen_init(p));
+    printf(", keygens %d\n", keygens);
+    errors("EVP_PKEY_CTX_new(hk)");
+    EVP_PKEY_CTX_free(p);
+    EVP_PKEY_free(k);
+    ERR_clear_error();
+    check(EVP_PKEY_set1_engine(hk, bare) == 0, "an engine without the key method");
+    errors("EVP_PKEY_set1_engine(bare)");
+    EVP_PKEY_free(hk);
+    printf("  at the end: inits %d, finishes %d\n", inits, finishes);
+
+    EVP_MD_CTX_free(md);
+    EVP_MD_CTX_free(md2);
+    EVP_CIPHER_CTX_free(c);
+    ENGINE_free(bare);
+    ENGINE_free(e);
+    EVP_MD_meth_free(evp_md);
+    EVP_CIPHER_meth_free(evp_cipher);
+    EVP_PKEY_meth_free(evp_pmeth);
+}
+
 int main(void)
 {
     setenv("OPENSSL_ENGINES", "/nonexistent/rustyssl-engines", 1);
@@ -719,6 +929,7 @@ int main(void)
     test_loaders();
     test_ex_data();
     test_keys();
+    test_evp();
     list("at the end");
     printf("1..%d\n", number);
     return failures != 0;

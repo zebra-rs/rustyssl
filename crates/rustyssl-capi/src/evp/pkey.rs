@@ -119,6 +119,10 @@ pub(crate) struct Pkey {
     this: AtomicPtr<EVP_PKEY>,
     /// The key's attributes (`EVP_PKEY_add1_attr` ...), as PKCS#8 and PKCS#12 carry them.
     attributes: AtomicPtr<rustyssl_abi::stack_st_X509_ATTRIBUTE>,
+    /// `pmeth_engine`: the engine whose `EVP_PKEY_METHOD` the key's contexts use
+    /// (`EVP_PKEY_set1_engine`), with a functional reference, or NULL. Outside the lock, as
+    /// letting it go runs the engine's `finish`.
+    pmeth_engine: AtomicPtr<ENGINE>,
 }
 
 /// The key's application data, at a fixed address for the `CRYPTO_*_ex_data` functions.
@@ -179,6 +183,19 @@ impl Pkey {
     /// The slot of the key's attributes, as the `X509at_*` functions take it.
     pub(crate) fn attributes_slot(&self) -> *mut *mut rustyssl_abi::stack_st_X509_ATTRIBUTE {
         self.attributes.as_ptr()
+    }
+
+    /// The engine set with `EVP_PKEY_set1_engine` (no reference is taken), or NULL.
+    pub(crate) fn pmeth_engine(&self) -> *mut ENGINE {
+        self.pmeth_engine.load(Ordering::Acquire)
+    }
+
+    /// Replaces the `EVP_PKEY_set1_engine` engine with `e` (whose functional reference the
+    /// key takes), letting the old one go.
+    fn replace_pmeth_engine(&self, e: *mut ENGINE) {
+        let old = self.pmeth_engine.swap(e, Ordering::AcqRel);
+        // SAFETY: the key's functional reference, or NULL; no lock is held.
+        unsafe { crate::engine::ENGINE_finish(old) };
     }
 
     /// The key manager and data (each with a reference), as they are now.
@@ -317,6 +334,8 @@ pub(crate) fn get_legacy(k: &Pkey) -> *mut c_void {
 /// `evp_pkey_free_it`: frees the key's data (legacy and provided) and untypes it.
 fn clear(k: &Pkey) {
     free_legacy(k);
+    // `evp_pkey_free_legacy` lets the key's engine go, legacy data or not.
+    k.replace_pmeth_engine(ptr::null_mut());
     let dropped = k.lock().free_it();
     drop(dropped);
 }
@@ -399,6 +418,7 @@ pub(crate) fn new() -> *mut EVP_PKEY {
         })),
         this: AtomicPtr::new(ptr::null_mut()),
         attributes: AtomicPtr::new(ptr::null_mut()),
+        pmeth_engine: AtomicPtr::new(ptr::null_mut()),
     });
     // SAFETY: just made.
     let Some(k) = (unsafe { pkey(p) }) else {
@@ -516,6 +536,9 @@ pub(crate) fn set_type(
         if s.type_ != EVP_PKEY_NONE && type_ == s.save_type && s.ameth.is_some() {
             return true;
         }
+        drop(s);
+        // Otherwise the engine its contexts used is let go.
+        k.replace_pmeth_engine(ptr::null_mut());
     }
     let found = match name {
         Some(n) => ameth::find_str(n),
@@ -1591,19 +1614,38 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Sets the engine the key's operations use: only NULL can be set, as there are no engines
-    /// (their API can't make one).
+    /// Sets the engine whose `EVP_PKEY_METHOD` for the key's type the key's contexts use
+    /// (initialized, and kept until replaced or the key is retyped or freed); NULL for none.
+    /// 0 if the engine doesn't initialize (`ERR_R_ENGINE_LIB`) or has no method for the type
+    /// (`EVP_R_UNSUPPORTED_ALGORITHM`).
     ///
     /// # Safety
-    /// `pkey` is NULL or a live key.
+    /// `pkey` is NULL or a live key; `e` is NULL or a live engine.
     pub unsafe extern "C" fn EVP_PKEY_set1_engine(pkey: *mut EVP_PKEY, e: *mut ENGINE) -> c_int
     where failure = 0, library = ERR_LIB_EVP
     {
+        const F: &str = "EVP_PKEY_set1_engine";
         // SAFETY: the caller's guarantee.
-        if unsafe { self::pkey(pkey) }.is_none() || !e.is_null() {
-            err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_ENGINE_LIB, "EVP_PKEY_set1_engine");
+        let Some(k) = (unsafe { self::pkey(pkey) }) else {
+            // OpenSSL dereferences the key.
+            err::raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER, F);
             return 0;
+        };
+        if !e.is_null() {
+            // SAFETY: the caller's live engine; its `init` may run (no lock is held).
+            if unsafe { crate::engine::ENGINE_init(e) } == 0 {
+                err::raise(ERR_LIB_EVP, rustyssl_abi::ERR_R_ENGINE_LIB, F);
+                return 0;
+            }
+            // SAFETY: an initialized engine; its method callback may run.
+            if unsafe { crate::engine::table::ENGINE_get_pkey_meth(e, k.type_()) }.is_null() {
+                // SAFETY: the functional reference taken above.
+                unsafe { crate::engine::ENGINE_finish(e) };
+                err::raise(ERR_LIB_EVP, rustyssl_abi::EVP_R_UNSUPPORTED_ALGORITHM, F);
+                return 0;
+            }
         }
+        k.replace_pmeth_engine(e);
         1
     }
 }
@@ -2433,29 +2475,33 @@ mod tests {
         crate::err::take_all();
     }
 
-    /// docs/DEVIATIONS.md: an engine argument is refused, as there are no engines.
+    /// An engine without a key method for the type gives neither a key nor a context.
     #[test]
-    fn engines_are_refused() {
-        let e = ptr::NonNull::<u8>::dangling().as_ptr().cast::<ENGINE>();
+    fn engines_without_key_methods_are_refused() {
+        // SAFETY: no preconditions.
+        let e = unsafe { crate::engine::ENGINE_new() };
+        assert!(!e.is_null());
         let key = [7u8; 16];
-        // SAFETY: the engine is never used: it's refused first.
+        // SAFETY: a live engine; the key's octets.
         let k = unsafe {
             EVP_PKEY_new_raw_private_key(rustyssl_abi::EVP_PKEY_HMAC, e, key.as_ptr(), 16)
         };
         assert!(k.is_null());
-        // SAFETY: as above.
+        // SAFETY: a live engine.
         assert!(unsafe { EVP_PKEY_CTX_new_id(rustyssl_abi::EVP_PKEY_HMAC, e) }.is_null());
         // SAFETY: no preconditions.
         let cipher = unsafe { crate::evp::legacy_cipher::EVP_aes_128_cbc() };
         // SAFETY: as above.
         assert!(unsafe { EVP_PKEY_new_CMAC_key(e, key.as_ptr(), 16, cipher) }.is_null());
         let p = new();
-        // SAFETY: as above.
+        // SAFETY: a live key and engine.
         assert_eq!(unsafe { EVP_PKEY_set1_engine(p, e) }, 0);
         // SAFETY: as above.
         assert!(unsafe { EVP_PKEY_CTX_new(p, e) }.is_null());
         // SAFETY: made above.
         unsafe { EVP_PKEY_free(p) };
+        // SAFETY: the engine made above, its last reference.
+        unsafe { crate::engine::ENGINE_free(e) };
         crate::err::take_all();
     }
 

@@ -72,6 +72,8 @@ pub(crate) struct MdCtx {
     pub(crate) update: Option<LegacyUpdateFn>,
     /// The provider's algorithm context.
     algctx: *mut c_void,
+    /// The engine the digest in use came from, with a functional reference, or NULL.
+    engine: *mut ENGINE,
 }
 
 /// The context behind `ctx`, or `None` for NULL.
@@ -180,6 +182,13 @@ pub(crate) unsafe fn clear_digest(ctx: *mut EVP_MD_CTX, force: bool, keep_fetche
     if force {
         c.digest = ptr::null();
     }
+    let engine = core::mem::replace(&mut c.engine, ptr::null_mut());
+    // SAFETY: the context's functional reference, or NULL; the engine's `finish` may run.
+    unsafe { crate::engine::ENGINE_finish(engine) };
+    // SAFETY: as above.
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return;
+    };
     if !keep_fetched {
         // SAFETY: the context's own reference.
         unsafe { EVP_MD_free(c.fetched_digest) };
@@ -224,6 +233,7 @@ impl MdCtx {
             pctx: ptr::null_mut(),
             update: None,
             algctx: ptr::null_mut(),
+            engine: ptr::null_mut(),
         }
     }
 }
@@ -338,22 +348,42 @@ unsafe fn init_internal(
         c.reqdigest = type_;
         type_
     };
-    // There are no engines (their API can't make one), so an engine argument can't be valid.
-    if !engine.is_null() {
-        err::raise(
-            ERR_LIB_EVP,
-            EVP_R_INITIALIZATION_ERROR,
-            "evp_md_init_internal",
-        );
-        return 0;
+    // SAFETY: the caller's live method.
+    let nid = unsafe { method(type_) }.map_or(NID_undef, |m| m.nid);
+    // An init after a final keeps the engine's digest when it's for the same algorithm.
+    // SAFETY: the context's digest, or NULL.
+    if !c.engine.is_null() && unsafe { digest_of(c) }.is_some_and(|m| m.nid == nid) {
+        let current = c.digest;
+        // SAFETY: the caller's guarantee; the context's own digest.
+        return unsafe { init_legacy(ctx, current) };
     }
+    // An engine left from before is let go.
+    let old = core::mem::replace(&mut c.engine, ptr::null_mut());
+    // SAFETY: the context's functional reference, or NULL; the engine's `finish` may run.
+    unsafe { crate::engine::ENGINE_finish(old) };
+    let reserved = if engine.is_null() {
+        // SAFETY: no preconditions; a functional reference, or NULL.
+        unsafe { crate::engine::table::ENGINE_get_digest_engine(nid) }
+    } else {
+        ptr::null_mut()
+    };
+    // SAFETY: as above (the engine's `finish` may have used the context).
+    let Some(c) = (unsafe { context(ctx) }) else {
+        return 0;
+    };
     // SAFETY: the caller's live method.
     let application = unsafe { method(type_) }.is_some_and(|m| m.origin == Origin::Meth);
-    if c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0 || application {
+    if !engine.is_null()
+        || !reserved.is_null()
+        || c.flags & flag(EVP_MD_CTX_FLAG_NO_INIT) != 0
+        || application
+    {
         // The legacy path: a provided digest drops its algorithm context; the digest's C
         // functions do the work, on state of its size.
         // SAFETY: the context's own fields.
         if !unsafe { free_algctx(c) } {
+            // SAFETY: the reference taken above, or NULL.
+            unsafe { crate::engine::ENGINE_finish(reserved) };
             return 0;
         }
         if c.digest == c.fetched_digest.cast_const() {
@@ -362,12 +392,60 @@ unsafe fn init_internal(
         // SAFETY: the context's own reference.
         unsafe { EVP_MD_free(c.fetched_digest) };
         c.fetched_digest = ptr::null_mut();
+        // SAFETY: the caller's guarantee; `reserved` is NULL or a functional reference.
+        let Some(type_) = (unsafe { engine_digest(ctx, type_, nid, engine, reserved) }) else {
+            return 0;
+        };
         // SAFETY: the caller's guarantee.
         unsafe { init_legacy(ctx, type_) }
     } else {
         // SAFETY: the caller's guarantee.
         unsafe { init_provided(ctx, type_, params) }
     }
+}
+
+/// The engine part of `evp_md_init_internal`'s legacy path: with `engine` (initialized here)
+/// or the one reserved for the digest's NID, the engine's own digest, the engine's functional
+/// reference kept by the context; else `type_`. `None` (with `EVP_R_INITIALIZATION_ERROR`)
+/// when the engine doesn't initialize or has no digest for the NID.
+///
+/// # Safety
+/// `ctx` is a live digest context; `type_` is a live digest method; `engine` is NULL or a live
+/// engine; `reserved` is NULL or a functional reference the context takes over (NULL when
+/// `engine` isn't).
+unsafe fn engine_digest(
+    ctx: *mut EVP_MD_CTX,
+    type_: *const EVP_MD,
+    nid: c_int,
+    engine: *mut ENGINE,
+    reserved: *mut ENGINE,
+) -> Option<*const EVP_MD> {
+    const F: &str = "evp_md_init_internal";
+    let chosen = if engine.is_null() {
+        reserved
+    } else {
+        // SAFETY: the caller's live engine; its `init` may run (no lock is held).
+        if unsafe { crate::engine::ENGINE_init(engine) } == 0 {
+            err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+            return None;
+        }
+        engine
+    };
+    if chosen.is_null() {
+        return Some(type_);
+    }
+    // SAFETY: an initialized engine; its digest callback may run.
+    let d = unsafe { crate::engine::table::ENGINE_get_digest(chosen, nid) };
+    if d.is_null() {
+        err::raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR, F);
+        // SAFETY: the functional reference taken above.
+        unsafe { crate::engine::ENGINE_finish(chosen) };
+        return None;
+    }
+    // SAFETY: the caller's guarantee (the callbacks may have used the context).
+    let c = unsafe { context(ctx) }?;
+    c.engine = chosen;
+    Some(d)
 }
 
 /// The legacy part of `evp_md_init_internal`: the digest's state (when it changes), the key
@@ -889,6 +967,16 @@ ffi_export! {
 /// # Safety
 /// `out` and `in_` are live digest contexts; `src` is `in_`'s fields; `md` is its digest.
 unsafe fn copy_legacy(out: *mut EVP_MD_CTX, in_: *const EVP_MD_CTX, src: &MdCtx, md: &Md) -> c_int {
+    // The copy keeps its own functional reference to the source's engine.
+    // SAFETY: the source's engine, or NULL.
+    if !src.engine.is_null() && unsafe { crate::engine::ENGINE_init(src.engine) } == 0 {
+        err::raise(
+            ERR_LIB_EVP,
+            rustyssl_abi::ERR_R_ENGINE_LIB,
+            "EVP_MD_CTX_copy_ex",
+        );
+        return 0;
+    }
     // SAFETY: the caller's guarantee.
     let Some(dst) = (unsafe { context(out) }) else {
         return 0;
