@@ -105,18 +105,27 @@ pub(crate) unsafe trait Handle: Sized {
 
     /// Keeps the object alive for as long as the returned guard lives, without changing the
     /// count `*_free` and `*_up_ref` work with: a call that runs C callbacks holds its object
-    /// this way, so a callback that frees it can't free it under the call. `None` for null or
-    /// a handle of another type.
+    /// this way, so a callback that frees it can't free it under the call. `None` for null, a
+    /// handle of another type, or an object already being destroyed: one whose last reference
+    /// went, reached again from its own teardown (a provider's teardown that frees a child
+    /// context, which then looks for its parent). Holding that one would bring it back and
+    /// destroy it twice.
     ///
     /// # Safety
-    /// As for [`Handle::get`].
+    /// As for [`Handle::get`]; an object being destroyed is still allocated (its teardown is
+    /// running).
     unsafe fn hold(handle: *const Self) -> Option<Held<Self>> {
         // SAFETY: the caller's guarantee is the one `get` needs.
         unsafe { Self::get(handle) }?;
         let tagged = handle.cast::<Tagged<Self::Object>>();
-        // SAFETY: `get` checked that this is a live `Arc<Tagged<Self::Object>>`.
-        unsafe { Arc::increment_strong_count(tagged) };
-        Some(Held { tagged })
+        // SAFETY: `get` checked that this is an `Arc<Tagged<Self::Object>>`'s allocation, live
+        // or being destroyed; the `Arc` is only looked at, never dropped.
+        let arc = core::mem::ManuallyDrop::new(unsafe { Arc::from_raw(tagged) });
+        // A weak reference upgrades only while a strong one remains.
+        let strong = Arc::downgrade(&arc).upgrade()?;
+        Some(Held {
+            tagged: Arc::into_raw(strong),
+        })
     }
 
     /// Drops a reference, as `*_free` does; the object is dropped with the last one. Null and
@@ -276,6 +285,46 @@ mod tests {
         held.uses.fetch_add(1, Ordering::SeqCst);
         drop(held);
         assert!(dropped.load(Ordering::SeqCst));
+    }
+
+    /// An object whose teardown reaches its own handle, as a provider's teardown reaches the
+    /// context being freed.
+    #[repr(C)]
+    struct Looper {
+        _opaque: [u8; 0],
+    }
+    struct LooperObject {
+        me: core::sync::atomic::AtomicPtr<Looper>,
+        drops: Arc<AtomicU32>,
+        held_in_drop: Arc<AtomicBool>,
+    }
+    impl Drop for LooperObject {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Ordering::SeqCst);
+            let me = self.me.load(Ordering::SeqCst);
+            // SAFETY: the allocation is still there while its object drops.
+            let held = unsafe { Looper::hold(me) };
+            self.held_in_drop.store(held.is_some(), Ordering::SeqCst);
+        }
+    }
+    crate::handle::handle_type!(Looper => LooperObject);
+
+    #[test]
+    fn an_object_being_destroyed_cant_be_held() {
+        let drops = Arc::new(AtomicU32::new(0));
+        let held_in_drop = Arc::new(AtomicBool::new(false));
+        let handle = Looper::new_handle(LooperObject {
+            me: core::sync::atomic::AtomicPtr::new(core::ptr::null_mut()),
+            drops: drops.clone(),
+            held_in_drop: held_in_drop.clone(),
+        });
+        // SAFETY: `handle` is live.
+        let object = unsafe { Looper::get(handle) }.unwrap();
+        object.me.store(handle, Ordering::SeqCst);
+        // SAFETY: drops the only reference.
+        unsafe { Looper::free(handle) };
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(!held_in_drop.load(Ordering::SeqCst));
     }
 
     #[test]
