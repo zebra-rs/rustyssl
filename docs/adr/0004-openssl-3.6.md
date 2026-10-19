@@ -1,6 +1,7 @@
 # ADR 0004: The default build implements OpenSSL 3.6's ABI
 
-- **Status:** Accepted, 2026-10-19 (implementation plan step 9.5)
+- **Status:** Accepted, 2026-10-19 (implementation plan step 9.5). Decision 2 (no selectable
+  3.5 build) was put to the user, who chose "3.6 only" on 2026-10-19.
 
 ## Context
 
@@ -34,9 +35,10 @@ from the generated header constants.
    target, behavior switches through every crate wherever 3.5 and 3.6 differ, and a second
    reference and test matrix in CI. A 3.5 binary already runs unchanged on the 3.6 build
    (decision 3 checks it), so the only thing a 3.5 build would add is 3.5's exact behavior where
-   3.6 changed it. Those changes are listed in `docs/IMPLEMENTATION_PLAN.md` (step 9.5) for
-   review; if a distribution needs one of them kept, it is reconsidered then, per behavior,
-   rather than by forking the whole build.
+   3.6 changed it. Those changes are listed in `docs/IMPLEMENTATION_PLAN.md` (step 9.5), for
+   users coming from the 3.5 LTS; if a distribution needs one of them kept, it is reconsidered
+   then, per behavior, rather than by forking the whole build. The user confirmed this choice
+   ("3.6 only") on 2026-10-19.
 3. **3.5 compatibility is checked, not assumed.** `abi/openssl-3.5/` stays vendored, and
    `abi-check` verifies that every 3.5 export is exported with the same symbol version, that
    its prototype is unchanged, and that every public struct layout and constant 3.5 defines is

@@ -5557,6 +5557,10 @@ both libraries (step 8.1).
     harness work from 3.6; the library reports `OpenSSL 3.6.5+rustyssl.<version>`. No 3.5
     build stays selectable: 3.6's exports are a superset of 3.5's (none removed), so 3.5
     binaries run unchanged; `abi/openssl-3.5/` stays vendored for a 3.5-compatibility check.
+  - Decision (the user, 2026-10-19): **3.6 only.** One build follows 3.6.5; no 3.5 build stays
+    selectable. `abi/openssl-3.5/` stays for `abi-check`'s `compat35` check (every 3.5 export
+    still exported, at the same version node, with an unchanged prototype), and the 3.5 → 3.6
+    behavior changes below are kept as the list for users of the 3.5 LTS.
   - Progress (interim): 13 of the 23 new functions are done (the array allocators,
     `OPENSSL_sk_set_thunks`, `OSSL_PARAM_set_octet_string_or_ptr`,
     `EVP_PKEY_get_security_category`, `i2d_PKCS8PrivateKey`,
