@@ -778,28 +778,30 @@ ffi_export! {
         // SAFETY: the caller's guarantee, for each getter.
         let l = unsafe { X509_CRL_get_version(x) };
         if (c_long::from(X509_CRL_VERSION_1)..=c_long::from(X509_CRL_VERSION_2)).contains(&l) {
-            printf!(out, c"%8sVersion %ld (0x%lx)\n", E, l + 1, l.cast_unsigned());
+            printf!(out, c"%4sVersion %ld (0x%lx)\n", E, l + 1, l.cast_unsigned());
         } else {
-            printf!(out, c"%8sVersion unknown (%ld)\n", E, l);
+            printf!(out, c"%4sVersion unknown (%ld)\n", E, l);
         }
         let (mut sig, mut alg): (*const ASN1_BIT_STRING, *const X509_ALGOR) = (ptr::null(), ptr::null());
         // SAFETY: as above; locals.
         unsafe { X509_CRL_get0_signature(x, &raw mut sig, &raw mut alg) };
-        puts(out, c"    ");
         // SAFETY: the CRL's algorithm.
         unsafe { X509_signature_print(out, alg, ptr::null()) };
-        printf!(out, c"%8sIssuer: ", E);
+        // 3.6 indents by 4, and puts a multi-line issuer on lines of its own.
+        let multiline = nmflag & fli(XN_FLAG_SEP_MASK) == fli(XN_FLAG_SEP_MULTILINE);
+        let (mlch, nmindent) = if multiline { (c_int::from(b'\n'), 8) } else { (c_int::from(b' '), 0) };
+        printf!(out, c"%4sIssuer:%c", E, mlch);
         // SAFETY: as above.
         let issuer = unsafe { X509_CRL_get_issuer(x) };
         // SAFETY: its issuer.
-        unsafe { X509_NAME_print_ex(out, issuer, 0, nmflag) };
+        unsafe { X509_NAME_print_ex(out, issuer, nmindent, nmflag) };
         puts(out, c"\n");
-        printf!(out, c"%8sLast Update: ", E);
+        printf!(out, c"%4sLast Update: ", E);
         // SAFETY: as above.
         let last = unsafe { X509_CRL_get0_lastUpdate(x) };
         // SAFETY: its time.
         unsafe { ASN1_TIME_print(out, last) };
-        printf!(out, c"\n%8sNext Update: ", E);
+        printf!(out, c"\n%4sNext Update: ", E);
         // SAFETY: as above.
         let next = unsafe { X509_CRL_get0_nextUpdate(x) };
         if next.is_null() {
@@ -812,7 +814,7 @@ ffi_export! {
         // SAFETY: as above.
         let exts = unsafe { X509_CRL_get0_extensions(x) };
         // SAFETY: its extensions.
-        unsafe { X509V3_extensions_print(out, c"CRL extensions".as_ptr(), exts, 0, 8) };
+        unsafe { X509V3_extensions_print(out, c"CRL extensions".as_ptr(), exts, 0, 4) };
         // SAFETY: as above.
         let rev = unsafe { X509_CRL_get_REVOKED(x) };
         // SAFETY: its entries, or NULL.

@@ -5640,6 +5640,10 @@ both libraries (step 8.1).
     - TLS13-KDF checks its mode even without parameters (so deriving in the default mode
       raises `PROV_R_INVALID_MODE`), and replaces its data only when `data` is given (3.5
       cleared it on every call; `provider/kdfs.rs` `tls13_set_ctx_params`).
+    - `EVP_DigestSignUpdate` on a context whose init failed
+      raises `EVP_R_INITIALIZATION_ERROR` (`evp/sigver.rs` `sigver_update`).
+    - `X509_CRL_print_ex` indents its header by 4 (3.5: 8) and its extensions by 4, and puts a
+      multi-line issuer on lines of its own indented by 8 (`x509/tprint.rs`).
 
 **Exit:** M6.
 
