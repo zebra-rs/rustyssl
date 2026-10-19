@@ -5552,6 +5552,46 @@ both libraries (step 8.1).
 - [ ] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
   additions under the `OPENSSL_3.6.0` node, and re-run the full test plan against the 3.6
   reference.
+  - Approach (ADR 0004): 3.6.5 is vendored beside 3.5.9 and `OPENSSL_SERIES` is `"3.6"`, so
+    codegen, the export lists (with `OPENSSL_3.6.0`), `dist`, the reference build and every
+    harness work from 3.6; the library reports `OpenSSL 3.6.5+rustyssl.<version>`. No 3.5
+    build stays selectable: 3.6's exports are a superset of 3.5's (none removed), so 3.5
+    binaries run unchanged; `abi/openssl-3.5/` stays vendored for a 3.5-compatibility check.
+  - Progress (interim): 13 of the 23 new functions are done (the array allocators,
+    `OPENSSL_sk_set_thunks`, `OSSL_PARAM_set_octet_string_or_ptr`,
+    `EVP_PKEY_get_security_category`, `i2d_PKCS8PrivateKey`,
+    `OSSL_STORE_LOADER_settable_ctx_params`, `X509_CRL_get0_tbs_sigalg`; `tests/c/openssl36.c`).
+    Left: the CMS KEMRecipientInfo functions (5), the `EVP_SKEY` derivations (4),
+    `X509_STORE_CTX_set_ocsp_resp` with OCSP checking in verification. Providers follow 3.6's
+    parameter lists, and HKDF-SHA256/384/512 exist. Still to do: the AES-CBC-HMAC-SHA*-ETM
+    ciphers (aarch64 only), and the remaining tests/c differences against 3.6.5 (print
+    indentation, BIO_printf, libssl's OCSP and point-format changes, and others).
+  - 3.5 → 3.6 behavior changes found so far (for review; 3.6's are followed):
+    - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
+      (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
+    - Typed stacks made by 3.6's headers free through a thunk (`OPENSSL_sk_set_thunks`).
+    - Every key manager reports `security-category`; ML-KEM reports CMS's `ri-type` and
+      `kemri-kdf-alg`; ciphers report `encrypt-then-mac`.
+    - HMAC no longer lists `digest-noinit`/`digest-oneshot`; ECDSA no longer takes `kat` (an
+      ACVP-only parameter); EdDSA lists only `algorithm-id` as gettable; SM2 encryption no longer
+      lists `engine`; RSA lists its integer `pad-mode`/`saltlen` forms too; the DRBGs take
+      `provider-name`; the encoders list `save-parameters`; the hybrid ML-KEM key managers take
+      `properties` as a string (3.5 listed an octet string).
+    - HKDF and TLS13-KDF return the digest, mode and salt from `get_params`; a fixed-digest
+      HKDF refuses `digest` in `set_params` but takes it at derive time (a reference quirk,
+      reproduced).
+    - KRB5KDF, PKCS12KDF and scrypt answer `get_params` with 1 when no size is asked (3.5:
+      -2); argon2 always answers -2, even after setting the size.
+    - X9.42 KDF fetches the CEK algorithm with the given properties (3.5 used the algorithm's
+      name as the query, a bug).
+    - IVs are returned by the parameter's type, with no stray error (3.5 left a
+      `CRYPTO_R_PARAM_OF_INCOMPATIBLE_TYPE` entry for an octet-string request).
+    - `i2d_PrivateKey`'s unsupported-type error now names `i2d_PrivateKey_impl`.
+    - The default provider gains HKDF-SHA256/384/512 and, on aarch64 with AES and SHA
+      hardware, nine AES-CBC-HMAC-SHA*-ETM ciphers, which shifts algorithm numbers in error
+      text; the legacy provider gains a `GENERIC-SECRET` symmetric key manager; RSA-PSS gains
+      the name `rsassaPss`.
+    - `PKCS12_SALT_LEN` is 16 (3.5: 8).
 
 **Exit:** M6.
 
