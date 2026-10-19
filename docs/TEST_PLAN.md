@@ -221,6 +221,28 @@ rustyssl itself**. You can only regenerate golden files with
   OpenSSL and GnuTLS run in their CI, covering fragmentation, extensions, renegotiation,
   invalid ECDHE points, version negotiation, and the timing scripts for Bleichenbacher/Marvin
   and Lucky13.
+  - `cargo xtask test-tlsfuzzer [--timing] [script...]` (`tests/tlsfuzzer/scripts.txt`, the
+    trees pinned and checked by SHA-256): each script against the reference's `s_server` on
+    each library; a conversation failing on rustyssl alone is a failure. The report is
+    `target/tlsfuzzer-report.md`. Many scripts run a random sample of their conversations,
+    so a name only one side ran is reported, not counted.
+  - Measured 2026-10-18 at tlsfuzzer 5eebc446: **151 scripts, 6048 conversations, none
+    failing on rustyssl alone** (the target, M4 and M5: every conversation the reference
+    passes). Fixes it led to: version comparison by the connection's kind (a TLS 0xfefe is
+    a high version, not DTLS), SSL 3.0's alert for protocol_version (handshake_failure), the
+    TLS 1.0 CBC empty fragment before each record of data, a TLS 1.3 post-handshake
+    message's fragment followed by another record type, CCM's empty records, TLS 1.3 key
+    shares (padded DH, uncompressed EC), signature algorithms once the version is chosen,
+    no TLS 1.3 ChangeCipherSpec after the handshake, `SSL_read`'s 0 on a fatal alert, and
+    the session kept after a failure that follows close_notify. The harness also read the
+    `*-random.py` scripts' `"<name>" repeat <n>...` lines as no conversation at all, which
+    had hidden the empty-fragment regression; it reads them now.
+  - `test-lengths.py -n 200` and `test-tls13-lengths.py -n 200` stop at the same
+    conversation (157 of 200) on both libraries and time out after 900 s, so their last 43
+    aren't checked.
+  - The timing scripts (`--timing`) capture with `tcpdump` (root on macOS: `/dev/bpf*`) and
+    analyse with SciPy and pandas; they weren't run on the development machine for lack of
+    both. Their two concerns are measured by `cargo xtask test-timing` instead (below).
 - **TLS-Anvil** combinatorial client and server testing, weekly.
 - **The interop matrix** (docker-compose, nightly). Our client and our server each run
   against every peer, combining:
@@ -300,6 +322,17 @@ M2. **Any crash, panic, hang, or OOM is a P0 bug** and gets a minimized regressi
 3. **The Marvin toolkit** against RSA decryption, both through the API and through TLS RSA
    key exchange.
 4. **The tlsfuzzer timing scripts** (Lucky13, Bleichenbacher/Marvin).
+
+`cargo xtask test-timing` (`tests/timing/dudect.c`) covers the first and part of the third on
+both libraries: AES-GCM, GHASH, Poly1305, `CRYPTO_memcmp`, X25519, BN `CONSTTIME` modexp,
+ML-KEM decapsulation, ECDSA signing, RSA raw and PKCS#1 v1.5 decryption (Marvin's
+valid/invalid split), and `tls-cbc-record`: Lucky13 through `SSL_read`, a TLS 1.2
+AES-128-CBC/HMAC-SHA1 record without encrypt-then-MAC whose padding length is 0 or 255.
+That target found rustyssl's padding removal taking about 70 ns longer on a good padding (|t|
+18–20, reference 3): LLVM had turned the masks into data-dependent code, and they now pass
+through an optimization barrier. Measured 2026-10-18 (Apple silicon), every target under
+|t| 10 on rustyssl; `tls-cbc-record` 4.9 (reference 4.4), X25519 the highest at 9.4
+(reference 2.6), which is worth watching.
 
 **CVE regression suite (`tests/cve/`).** Every OpenSSL security advisory since 2014
 (openssl-library.org vulnerabilities list) is classified as **applicable** (a test

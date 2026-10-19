@@ -5297,8 +5297,14 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
   key-usage bit isn't enforced for a TLS 1.2 ECDSA server certificate) and
   `Unclean-Shutdown` (a second `SSL_shutdown` after an EOF with no close_notify returns 1,
   not -1).
-- **Not met yet:** the tlsfuzzer scripts aren't built, so M2 and M4's external checks remain
-  partly open; `test-consumers` (curl, nginx) arrives later.
+- **tlsfuzzer** (`cargo xtask test-tlsfuzzer`, added in Phase 8): 151 scripts and 6048
+  conversations, none failing on rustyssl where they pass on the reference (TEST_PLAN.md,
+  L7). The timing scripts need packet capture as root and SciPy, which the development
+  machine lacks; `cargo xtask test-timing` measures their concerns instead, including a
+  Lucky13 target through `SSL_read` that found and now passes a padding-removal timing
+  difference (TEST_PLAN.md, constant-time verification).
+- **Not met yet:** `test-consumers` (curl, nginx) arrives later, and the tlsfuzzer timing
+  scripts haven't run on a machine that can capture packets.
 
 ## Phase 8: libssl breadth → M5
 
@@ -5352,6 +5358,11 @@ green. The upstream `sslapitest`, `ssl_test` (`ssl-tests/*.cnf`), `tls13*`, and
 
 **Exit:** M5. libssl coverage is 100%. The BoGo, tlsfuzzer, and DTLS targets are met.
 DTLS interop with the reference and GnuTLS works under loss and reordering.
+
+- **tlsfuzzer target (2026-10-18): met** for the script set: every conversation of the 151
+  scripts that passes on the reference passes on rustyssl (TEST_PLAN.md, L7). The timing
+  scripts are covered by `cargo xtask test-timing` until they run on a machine that can
+  capture packets.
 
 ## Phase 9: Provider ABI, long tail, 100% libcrypto → M6
 
