@@ -398,26 +398,53 @@ mod tests {
         unsafe { EVP_CIPHER_meth_free(own) };
     }
 
-    /// docs/DEVIATIONS.md: the static ciphers report no C functions and no state size (their
-    /// state is a structure OpenSSL doesn't publish), and a copy of one has none either.
+    /// The static ciphers report their C functions and state size in the slots OpenSSL's fill
+    /// (`legacy_cipher_fns`), and a copy of one keeps them.
     #[test]
-    fn static_ciphers_have_no_functions() {
+    fn static_ciphers_have_their_functions() {
         // SAFETY: no preconditions.
         let aes = unsafe { EVP_aes_128_cbc() };
         // SAFETY: a static cipher, for each call below.
-        assert!(unsafe { EVP_CIPHER_meth_get_init(aes) }.is_none());
+        assert!(unsafe { EVP_CIPHER_meth_get_init(aes) }.is_some());
         // SAFETY: as above.
-        assert!(unsafe { EVP_CIPHER_meth_get_do_cipher(aes) }.is_none());
+        assert!(unsafe { EVP_CIPHER_meth_get_do_cipher(aes) }.is_some());
+        // As in OpenSSL, AES-CBC has no `ctrl`.
         // SAFETY: as above.
         assert!(unsafe { EVP_CIPHER_meth_get_ctrl(aes) }.is_none());
         // SAFETY: as above.
-        assert_eq!(unsafe { EVP_CIPHER_impl_ctx_size(aes) }, 0);
+        assert!(unsafe { EVP_CIPHER_impl_ctx_size(aes) } > 0);
         // SAFETY: as above.
         let copy = unsafe { EVP_CIPHER_meth_dup(aes) };
         assert!(!copy.is_null());
         // SAFETY: the copy.
-        assert!(unsafe { EVP_CIPHER_meth_get_do_cipher(copy) }.is_none());
+        assert!(unsafe { EVP_CIPHER_meth_get_do_cipher(copy) }.is_some());
         // SAFETY: as above.
         unsafe { EVP_CIPHER_meth_free(copy) };
+    }
+
+    /// docs/DEVIATIONS.md: a static cipher whose state OpenSSL doesn't publish (AES-GCM) has
+    /// functions that fail, in the slots OpenSSL's fill (no NULL to call), and no state size.
+    #[test]
+    fn private_state_ciphers_have_failing_functions() {
+        // SAFETY: no preconditions.
+        let gcm = unsafe { crate::evp::legacy_cipher::EVP_aes_128_gcm() };
+        // SAFETY: a static cipher, for each call below.
+        let init = unsafe { EVP_CIPHER_meth_get_init(gcm) };
+        // SAFETY: as above.
+        assert!(unsafe { EVP_CIPHER_meth_get_do_cipher(gcm) }.is_some());
+        // SAFETY: as above.
+        assert!(unsafe { EVP_CIPHER_meth_get_cleanup(gcm) }.is_some());
+        // SAFETY: as above.
+        assert!(unsafe { EVP_CIPHER_meth_get_ctrl(gcm) }.is_some());
+        // SAFETY: as above.
+        assert_eq!(unsafe { EVP_CIPHER_impl_ctx_size(gcm) }, 0);
+        // SAFETY: no preconditions.
+        let ctx = unsafe { crate::evp::cipher_ctx::EVP_CIPHER_CTX_new() };
+        // SAFETY: the cipher's function with a context (it touches none of it).
+        let r = init.map(|f| unsafe { f(ctx, ptr::null(), ptr::null(), 1) });
+        assert_eq!(r, Some(0));
+        // SAFETY: made above.
+        unsafe { crate::evp::cipher_ctx::EVP_CIPHER_CTX_free(ctx) };
+        crate::err::take_all();
     }
 }

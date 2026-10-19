@@ -17,6 +17,7 @@ pub(crate) mod kem;
 pub(crate) mod key;
 pub(crate) mod keymgmt;
 pub(crate) mod legacy_cipher;
+pub(crate) mod legacy_cipher_fns;
 pub(crate) mod legacy_md;
 pub(crate) mod legacy_md_fns;
 pub(crate) mod mac;

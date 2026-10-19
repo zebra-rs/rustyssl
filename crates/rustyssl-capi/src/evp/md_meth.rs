@@ -434,22 +434,32 @@ mod tests {
         unsafe { EVP_MD_meth_free(own) };
     }
 
-    /// docs/DEVIATIONS.md: SHA-3, SHAKE, BLAKE2, and SM3 report no C functions (their state is
-    /// a structure OpenSSL doesn't publish, so an application can't size it).
+    /// docs/DEVIATIONS.md: SHA-3, SHAKE, BLAKE2, and SM3 report C functions that fail (their
+    /// state is a structure OpenSSL doesn't publish, so an application can't size it), in the
+    /// slots OpenSSL's fill: none is NULL for a caller to call.
     #[test]
-    fn private_state_digests_have_no_functions() {
+    fn private_state_digests_have_failing_functions() {
         // SAFETY: no preconditions.
         let sha3 = unsafe { EVP_sha3_256() };
         // SAFETY: as above.
         let shake = unsafe { EVP_shake128() };
         for md in [sha3, shake] {
             // SAFETY: a static digest, for each call below.
-            assert!(unsafe { EVP_MD_meth_get_init(md) }.is_none());
+            let init = unsafe { EVP_MD_meth_get_init(md) };
             // SAFETY: as above.
-            assert!(unsafe { EVP_MD_meth_get_update(md) }.is_none());
+            assert!(unsafe { EVP_MD_meth_get_update(md) }.is_some());
             // SAFETY: as above.
-            assert!(unsafe { EVP_MD_meth_get_final(md) }.is_none());
+            assert!(unsafe { EVP_MD_meth_get_final(md) }.is_some());
+            // SAFETY: a context (the function touches none of it).
+            let ctx = unsafe { crate::evp::md_ctx::EVP_MD_CTX_new() };
+            // SAFETY: the digest's function with a context.
+            assert_eq!(init.map(|f| unsafe { f(ctx) }), Some(0));
+            // SAFETY: made above.
+            unsafe { crate::evp::md_ctx::EVP_MD_CTX_free(ctx) };
         }
+        // SAFETY: as above.
+        assert!(unsafe { EVP_MD_meth_get_ctrl(shake) }.is_some());
+        crate::err::take_all();
         // SAFETY: no preconditions.
         let sha256 = unsafe { EVP_sha256() };
         // SAFETY: a static digest.

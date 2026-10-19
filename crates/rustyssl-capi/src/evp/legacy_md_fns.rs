@@ -537,13 +537,80 @@ pub(crate) const NULL_MD: Legacy = Legacy {
     ctrl: None,
 };
 
-/// No C functions: the digests whose state OpenSSL doesn't publish (see the module's notes).
+/// Raises the failing functions' error and returns 0.
+fn unsupported() -> c_int {
+    crate::err::raise(
+        ERR_LIB_EVP,
+        rustyssl_abi::EVP_R_UNSUPPORTED_ALGORITHM,
+        "legacy digest",
+    );
+    0
+}
+
+ffi_callback! {
+    /// The `init` of a digest whose state OpenSSL doesn't publish: it fails (0), touching no
+    /// state.
+    ///
+    /// # Safety
+    /// Always safe to call.
+    pub(crate) unsafe extern "C" fn unsupported_init(_ctx: *mut EVP_MD_CTX) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        unsupported()
+    }
+}
+
+ffi_callback! {
+    /// The `update` likewise.
+    ///
+    /// # Safety
+    /// Always safe to call.
+    pub(crate) unsafe extern "C" fn unsupported_update(_ctx: *mut EVP_MD_CTX, _data: *const c_void, _count: usize) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        unsupported()
+    }
+}
+
+ffi_callback! {
+    /// The `final` likewise.
+    ///
+    /// # Safety
+    /// Always safe to call.
+    pub(crate) unsafe extern "C" fn unsupported_final(_ctx: *mut EVP_MD_CTX, _md: *mut u8) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        unsupported()
+    }
+}
+
+ffi_callback! {
+    /// The `ctrl` of SHAKE likewise (OpenSSL's sets the output length).
+    ///
+    /// # Safety
+    /// Always safe to call.
+    pub(crate) unsafe extern "C" fn unsupported_ctrl(_ctx: *mut EVP_MD_CTX, _cmd: c_int, _p1: c_int, _p2: *mut c_void) -> c_int
+    where failure = 0, library = ERR_LIB_EVP
+    {
+        unsupported()
+    }
+}
+
+/// The digests whose state OpenSSL doesn't publish (see the module's notes): functions that
+/// fail, in the slots OpenSSL's fill, so that a caller calling what it's given doesn't call
+/// NULL.
 pub(crate) const NONE: Legacy = Legacy {
     ctx_size: 0,
-    init: None,
-    update: None,
-    final_: None,
+    init: Some(unsupported_init),
+    update: Some(unsupported_update),
+    final_: Some(unsupported_final),
     copy: None,
     cleanup: None,
     ctrl: None,
+};
+
+/// SHAKE's: as [`NONE`], with a `ctrl`.
+pub(crate) const NONE_XOF: Legacy = Legacy {
+    ctrl: Some(unsupported_ctrl),
+    ..NONE
 };
