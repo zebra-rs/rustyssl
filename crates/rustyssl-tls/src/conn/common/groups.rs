@@ -368,10 +368,16 @@ pub fn check_ec_tmp_key(c: &Connection, cid: u32) -> bool {
     false
 }
 
-/// `tls1_get_formatlist`: the EC point formats sent (uncompressed and both compressed forms;
-/// Suite B leaves out char2).
+/// `tls1_get_formatlist`: the EC point formats sent: 3.6 sends only uncompressed, unless
+/// `SSL_OP_LEGACY_EC_POINT_FORMATS` asks for 3.5's list (both compressed forms too; Suite B
+/// leaves out char2).
 #[must_use]
 pub fn formats(c: &Connection) -> Vec<u8> {
+    if c.cfg.options & abi::SSL_OP_LEGACY_EC_POINT_FORMATS == 0 {
+        return vec![crate::conn::statem::msgs_type(
+            abi::TLSEXT_ECPOINTFORMAT_uncompressed,
+        )];
+    }
     let all = [
         crate::conn::statem::msgs_type(abi::TLSEXT_ECPOINTFORMAT_uncompressed),
         crate::conn::statem::msgs_type(abi::TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime),

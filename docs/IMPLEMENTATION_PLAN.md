@@ -5660,6 +5660,9 @@ both libraries (step 8.1).
       signature's length before refusing too little room, fails a length query with nowhere to
       put it, and raises `PROV_R_BAD_LENGTH` for an external `mu` that isn't 64 octets
       (`provider/ml_dsa_sig.rs`).
+    - libssl's ec_point_formats offers only uncompressed unless the new
+      `SSL_OP_LEGACY_EC_POINT_FORMATS` (`LegacyECPointFormats`, `-legacy_ec_point_formats`)
+      asks for 3.5's three formats (rustyssl-tls `groups::formats`; `ssl/conf.rs`).
 
 **Exit:** M6.
 
