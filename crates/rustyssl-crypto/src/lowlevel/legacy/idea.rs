@@ -71,31 +71,33 @@ fn inverse(x: u32) -> u32 {
 
 /// `IDEA_set_encrypt_key`: the encryption schedule of a 16-octet key.
 pub fn set_encrypt_key(key: &[u8; 16]) -> IdeaKey {
-    let mut k = [0u32; WORDS];
-    for (w, b) in k.iter_mut().zip(key.as_chunks::<2>().0) {
-        *w = u32::from(u16::from_be_bytes(*b));
-    }
-    // Each row of eight is the previous one rotated left by 25 bits.
-    let at = |k: &[u32; WORDS], i: usize| k.get(i).copied().unwrap_or(0);
-    let mut from = 0usize;
-    let mut to = 8usize;
-    for i in 0..6 {
-        let order = [1usize, 2, 3, 4, 5, 6, 7, 0, 1];
-        let count = if i < 5 { 8 } else { 6 };
-        for j in 0..count {
-            let hi = at(&k, from.wrapping_add(order.get(j).copied().unwrap_or(0)));
-            let lo = at(
-                &k,
-                from.wrapping_add(order.get(j.wrapping_add(1)).copied().unwrap_or(0)),
-            );
-            if let Some(w) = k.get_mut(to) {
-                *w = ((hi << 9) | (lo >> 7)) & 0xffff;
-            }
-            to = to.wrapping_add(1);
+    crate::dit::with(|| {
+        let mut k = [0u32; WORDS];
+        for (w, b) in k.iter_mut().zip(key.as_chunks::<2>().0) {
+            *w = u32::from(u16::from_be_bytes(*b));
         }
-        from = from.wrapping_add(8);
-    }
-    IdeaKey(k)
+        // Each row of eight is the previous one rotated left by 25 bits.
+        let at = |k: &[u32; WORDS], i: usize| k.get(i).copied().unwrap_or(0);
+        let mut from = 0usize;
+        let mut to = 8usize;
+        for i in 0..6 {
+            let order = [1usize, 2, 3, 4, 5, 6, 7, 0, 1];
+            let count = if i < 5 { 8 } else { 6 };
+            for j in 0..count {
+                let hi = at(&k, from.wrapping_add(order.get(j).copied().unwrap_or(0)));
+                let lo = at(
+                    &k,
+                    from.wrapping_add(order.get(j.wrapping_add(1)).copied().unwrap_or(0)),
+                );
+                if let Some(w) = k.get_mut(to) {
+                    *w = ((hi << 9) | (lo >> 7)) & 0xffff;
+                }
+                to = to.wrapping_add(1);
+            }
+            from = from.wrapping_add(8);
+        }
+        IdeaKey(k)
+    })
 }
 
 /// `IDEA_set_decrypt_key` over one memory: the decryption schedule of the words at `e`
@@ -143,21 +145,23 @@ pub const DECRYPT_WORDS: usize = 52;
 /// `IDEA_set_decrypt_key` from one schedule into another: its first [`DECRYPT_WORDS`] words
 /// (the rest are zero).
 pub fn set_decrypt_key(ek: &[u32; WORDS]) -> IdeaKey {
-    let mut mem = [0u32; 2 * WORDS];
-    if let Some(a) = mem.get_mut(..WORDS) {
-        a.copy_from_slice(ek);
-    }
-    set_decrypt_key_at(&mut mem, 0, WORDS);
-    let mut dk = IdeaKey([0; WORDS]);
-    for (d, s) in
-        dk.0.iter_mut()
-            .zip(mem.iter().skip(WORDS))
-            .take(DECRYPT_WORDS)
-    {
-        *d = *s;
-    }
-    mem.zeroize();
-    dk
+    crate::dit::with(|| {
+        let mut mem = [0u32; 2 * WORDS];
+        if let Some(a) = mem.get_mut(..WORDS) {
+            a.copy_from_slice(ek);
+        }
+        set_decrypt_key_at(&mut mem, 0, WORDS);
+        let mut dk = IdeaKey([0; WORDS]);
+        for (d, s) in
+            dk.0.iter_mut()
+                .zip(mem.iter().skip(WORDS))
+                .take(DECRYPT_WORDS)
+        {
+            *d = *s;
+        }
+        mem.zeroize();
+        dk
+    })
 }
 
 /// `IDEA_set_decrypt_key` with the same schedule for both, as OpenSSL computes it in place.

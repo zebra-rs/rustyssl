@@ -37,14 +37,16 @@ pub fn x25519_clamp(k: &mut [u8; KEYLEN]) {
 /// `ossl_x25519`: the shared secret of `scalar` (clamped here) and the peer's u-coordinate, or
 /// `None` if it's all zeros (the peer's point has a small order).
 pub fn x25519(scalar: &[u8; KEYLEN], peer: &[u8; KEYLEN]) -> Option<Zeroizing<[u8; KEYLEN]>> {
-    let out = Zeroizing::new(MontgomeryPoint(*peer).mul_clamped(*scalar).to_bytes());
-    let zero = out.iter().fold(0u8, |acc, &b| acc | b) == 0;
-    (!zero).then_some(out)
+    crate::dit::with(|| {
+        let out = Zeroizing::new(MontgomeryPoint(*peer).mul_clamped(*scalar).to_bytes());
+        let zero = out.iter().fold(0u8, |acc, &b| acc | b) == 0;
+        (!zero).then_some(out)
+    })
 }
 
 /// `ossl_x25519_public_from_private`: the base point times the clamped scalar.
 pub fn x25519_public_from_private(private: &[u8; KEYLEN]) -> [u8; KEYLEN] {
-    MontgomeryPoint::mul_base_clamped(*private).to_bytes()
+    crate::dit::with(|| MontgomeryPoint::mul_base_clamped(*private).to_bytes())
 }
 
 /// SHA-512 of the parts.
@@ -75,8 +77,10 @@ fn expand(private: &[u8; KEYLEN]) -> Option<(Scalar, Zeroizing<[u8; 32]>)> {
 
 /// `ossl_ed25519_public_from_private`: the encoded `aB`.
 pub fn ed25519_public_from_private(private: &[u8; KEYLEN]) -> Option<[u8; KEYLEN]> {
-    let (a, _) = expand(private)?;
-    Some(EdwardsPoint::mul_base(&a).compress().to_bytes())
+    crate::dit::with(|| {
+        let (a, _) = expand(private)?;
+        Some(EdwardsPoint::mul_base(&a).compress().to_bytes())
+    })
 }
 
 /// How a signature's hashes start (`hash_init_with_dom`): nothing for Ed25519, `dom2(phflag,
@@ -126,20 +130,22 @@ pub fn ed25519_sign(
     if !dom.valid() {
         return None;
     }
-    let (a, prefix) = expand(private)?;
-    let d = dom.prefix();
-    let nonce = sha512(&[&d, prefix.as_slice(), msg])?;
-    let r = Scalar::from_bytes_mod_order_wide(&nonce);
-    let big_r = EdwardsPoint::mul_base(&r).compress().to_bytes();
-    let hram = sha512(&[&d, &big_r, public, msg])?;
-    let h = Scalar::from_bytes_mod_order_wide(&hram);
-    // Scalars are reduced mod L; their operators can't overflow.
-    #[expect(clippy::arithmetic_side_effects, reason = "arithmetic mod L")]
-    let s = h * a + r;
-    let mut sig = [0u8; ED25519_SIGSIZE];
-    sig.get_mut(..32)?.copy_from_slice(&big_r);
-    sig.get_mut(32..)?.copy_from_slice(s.as_bytes());
-    Some(sig)
+    crate::dit::with(|| {
+        let (a, prefix) = expand(private)?;
+        let d = dom.prefix();
+        let nonce = sha512(&[&d, prefix.as_slice(), msg])?;
+        let r = Scalar::from_bytes_mod_order_wide(&nonce);
+        let big_r = EdwardsPoint::mul_base(&r).compress().to_bytes();
+        let hram = sha512(&[&d, &big_r, public, msg])?;
+        let h = Scalar::from_bytes_mod_order_wide(&hram);
+        // Scalars are reduced mod L; their operators can't overflow.
+        #[expect(clippy::arithmetic_side_effects, reason = "arithmetic mod L")]
+        let s = h * a + r;
+        let mut sig = [0u8; ED25519_SIGSIZE];
+        sig.get_mut(..32)?.copy_from_slice(&big_r);
+        sig.get_mut(32..)?.copy_from_slice(s.as_bytes());
+        Some(sig)
+    })
 }
 
 /// Whether `s < L`, compared as OpenSSL compares it (public, so in variable time).

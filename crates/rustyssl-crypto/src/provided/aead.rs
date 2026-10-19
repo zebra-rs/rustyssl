@@ -251,6 +251,11 @@ impl Gcm {
 
     /// `gcm_init` before the parameters.
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.enc = enc;
         if let Some(iv) = iv {
             if iv.is_empty() || iv.len() > GCM_IV_MAX {
@@ -597,6 +602,11 @@ impl Gcm {
 
     /// `ossl_gcm_stream_update`.
     pub fn update(&mut self, io: Io<'_>) -> Result<Output, Raised> {
+        crate::dit::with(|| self.update_dit(io))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, io: Io<'_>) -> Result<Output, Raised> {
         if io.inl == 0 {
             return Ok(Output::new(Vec::new(), 0));
         }
@@ -611,6 +621,11 @@ impl Gcm {
 
     /// `ossl_gcm_stream_final`.
     pub fn finalize(&mut self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<Output, Error> {
         let io = Io {
             input: None,
             inl: 0,
@@ -627,6 +642,11 @@ impl Gcm {
 
     /// `ossl_gcm_cipher`.
     pub fn cipher(&mut self, io: Io<'_>) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(io))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(&mut self, io: Io<'_>) -> Result<Output, Error> {
         if io.outsize < io.inl {
             return Err(Error::OutputBufferTooSmall);
         }
@@ -966,6 +986,11 @@ impl Ccm {
 
     /// `ccm_init` before the parameters.
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.enc = enc;
         if let Some(iv) = iv {
             if iv.len() != self.iv_len() {
@@ -1201,6 +1226,11 @@ impl Ccm {
 
     /// `ossl_ccm_stream_update`.
     pub fn update(&mut self, io: Io<'_>) -> Result<Output, Raised> {
+        crate::dit::with(|| self.update_dit(io))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, io: Io<'_>) -> Result<Output, Raised> {
         if io.outsize < io.inl {
             return Err(Error::OutputBufferTooSmall.into());
         }
@@ -1212,6 +1242,11 @@ impl Ccm {
 
     /// `ossl_ccm_stream_final`: an update of nothing if the data hasn't been processed.
     pub fn finalize(&mut self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<Output, Error> {
         if !self.key_set {
             return Err(Error::Silent);
         }
@@ -1233,6 +1268,11 @@ impl Ccm {
 
     /// `ossl_ccm_cipher`.
     pub fn cipher(&mut self, io: Io<'_>) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(io))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(&mut self, io: Io<'_>) -> Result<Output, Error> {
         if io.input.is_none() {
             return self.finalize();
         }
@@ -1520,6 +1560,11 @@ impl Ocb {
 
     /// `aes_ocb_init` before the parameters.
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.aad_len = 0;
         self.data_len = 0;
         self.enc = enc;
@@ -1629,6 +1674,11 @@ impl Ocb {
     /// `aes_ocb_block_update`: whole blocks of data (or of AAD, with no output), the rest
     /// buffered.
     pub fn update(&mut self, io: Io<'_>) -> Result<Output, Raised> {
+        crate::dit::with(|| self.update_dit(io))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, io: Io<'_>) -> Result<Output, Raised> {
         if !self.key_set || !self.update_iv() {
             return Err(Error::Silent.into());
         }
@@ -1719,6 +1769,11 @@ impl Ocb {
 
     /// `aes_ocb_block_final`: the partial blocks, then the tag (made or checked).
     pub fn finalize(&mut self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<Output, Error> {
         if !self.key_set || !self.update_iv() {
             return Err(Error::Silent);
         }
@@ -1773,6 +1828,11 @@ impl Ocb {
 
     /// `aes_ocb_cipher`: the mode on the input directly (NULL input finishes).
     pub fn cipher(&mut self, io: Io<'_>) -> Result<Output, Raised> {
+        crate::dit::with(|| self.cipher_dit(io))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(&mut self, io: Io<'_>) -> Result<Output, Raised> {
         let Some(input) = io.input else {
             return self.finalize().map_err(Raised::from);
         };
@@ -1874,6 +1934,11 @@ impl ChaChaPoly {
 
     /// The generic init, then `initkey` and `initiv`, before the parameters.
     pub fn init(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
+        crate::dit::with(|| self.init_dit(enc, key, iv))
+    }
+
+    /// [`Self::init`]'s work.
+    fn init_dit(&mut self, enc: bool, key: Option<&[u8]>, iv: Option<&[u8]>) -> Result<(), Error> {
         self.enc = enc;
         if let Some(iv) = iv {
             if iv.len() != CHACHA_POLY_IV {
@@ -2198,6 +2263,11 @@ impl ChaChaPoly {
 
     /// `chacha20_poly1305_update`: nothing for no input.
     pub fn update(&mut self, io: Io<'_>) -> Result<Output, Error> {
+        crate::dit::with(|| self.update_dit(io))
+    }
+
+    /// [`Self::update`]'s work.
+    fn update_dit(&mut self, io: Io<'_>) -> Result<Output, Error> {
         if io.inl == 0 {
             return Ok(Output::new(Vec::new(), 0));
         }
@@ -2206,6 +2276,11 @@ impl ChaChaPoly {
 
     /// `chacha20_poly1305_cipher`.
     pub fn cipher(&mut self, io: Io<'_>) -> Result<Output, Error> {
+        crate::dit::with(|| self.cipher_dit(io))
+    }
+
+    /// [`Self::cipher`]'s work.
+    fn cipher_dit(&mut self, io: Io<'_>) -> Result<Output, Error> {
         if io.outsize < io.inl {
             return Err(Error::OutputBufferTooSmall);
         }
@@ -2214,6 +2289,11 @@ impl ChaChaPoly {
 
     /// `chacha20_poly1305_final`.
     pub fn finalize(&mut self) -> Result<Output, Error> {
+        crate::dit::with(|| self.finalize_dit())
+    }
+
+    /// [`Self::finalize`]'s work.
+    fn finalize_dit(&mut self) -> Result<Output, Error> {
         let io = Io {
             input: None,
             inl: 0,

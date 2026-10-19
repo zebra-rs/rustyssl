@@ -222,6 +222,11 @@ fn first_zero_from_2(em: &[u8]) -> usize {
 /// `RSA_padding_check_PKCS1_type_2` in constant time: the message length or -1, and the
 /// decoding error raised then cleared unless the padding was bad.
 pub fn check_pkcs1_type2(to: &mut [u8], from: &[u8], num: usize) -> (isize, Raised) {
+    crate::dit::with(|| check_pkcs1_type2_dit(to, from, num))
+}
+
+/// [`check_pkcs1_type2`]'s work.
+fn check_pkcs1_type2_dit(to: &mut [u8], from: &[u8], num: usize) -> (isize, Raised) {
     const F: &str = "RSA_padding_check_PKCS1_type_2";
     let tlen = to.len();
     if tlen == 0 || from.is_empty() {
@@ -262,6 +267,17 @@ pub fn check_pkcs1_type2(to: &mut [u8], from: &[u8], num: usize) -> (isize, Rais
 /// derived from `kdk` and the ciphertext when the padding is bad, so it never fails on bad
 /// padding. `from` is the whole decryption (`num` octets).
 pub fn check_pkcs1_type2_implicit(
+    to: &mut [u8],
+    from: &[u8],
+    num: usize,
+    kdk: &[u8],
+    sha256: &dyn Hash,
+) -> (isize, Raised) {
+    crate::dit::with(|| check_pkcs1_type2_implicit_dit(to, from, num, kdk, sha256))
+}
+
+/// [`check_pkcs1_type2_implicit`]'s work.
+fn check_pkcs1_type2_implicit_dit(
     to: &mut [u8],
     from: &[u8],
     num: usize,
@@ -330,6 +346,17 @@ pub fn check_pkcs1_type2_implicit(
 /// `ossl_rsa_padding_check_PKCS1_type_2_TLS`: the 48-octet premaster secret, or random
 /// octets in its place when the padding or the version is wrong; always 48.
 pub fn check_pkcs1_type2_tls(
+    to: &mut [u8],
+    from: &[u8],
+    client_version: i32,
+    alt_version: i32,
+    rng: &mut Random<'_>,
+) -> Outcome<usize> {
+    crate::dit::with(|| check_pkcs1_type2_tls_dit(to, from, client_version, alt_version, rng))
+}
+
+/// [`check_pkcs1_type2_tls`]'s work.
+fn check_pkcs1_type2_tls_dit(
     to: &mut [u8],
     from: &[u8],
     client_version: i32,
@@ -439,6 +466,18 @@ pub fn add_oaep(
 /// `RSA_padding_check_PKCS1_OAEP_mgf1` in constant time: the message length or -1, and the
 /// decoding error raised then cleared unless the encoding was bad.
 pub fn check_oaep(
+    to: &mut [u8],
+    from: &[u8],
+    num: usize,
+    label: &[u8],
+    md: &dyn Hash,
+    mgf1md: &dyn Hash,
+) -> (isize, Raised) {
+    crate::dit::with(|| check_oaep_dit(to, from, num, label, md, mgf1md))
+}
+
+/// [`check_oaep`]'s work.
+fn check_oaep_dit(
     to: &mut [u8],
     from: &[u8],
     num: usize,

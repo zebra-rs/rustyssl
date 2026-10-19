@@ -101,6 +101,11 @@ pub struct Request<'a> {
 /// an error entry, as OpenSSL's does when its zero-length allocation fails; the binary method,
 /// whose ladder OpenSSL runs on the missing scalar and crashes, gives infinity.
 pub fn mul(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -> Result<()> {
+    crate::dit::with(|| mul_dit(g, r, req, rng))
+}
+
+/// [`mul`]'s work.
+fn mul_dit(g: &Group, r: &mut Point, req: &Request<'_>, rng: &mut Random<'_>) -> Result<()> {
     if g.meth.specialized_mul() {
         return specialized(g, r, req);
     }

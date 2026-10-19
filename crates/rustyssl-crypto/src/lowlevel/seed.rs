@@ -54,32 +54,34 @@ fn words(b: &[u8; BLOCK]) -> [u32; 4] {
 
 /// `SEED_set_key`: the round keys of a 16-octet key.
 pub fn set_key(key: &[u8; 16]) -> SeedKey {
-    let [mut x1, mut x2, mut x3, mut x4] = words(key);
-    let mut ks = [0u32; 32];
-    let kc = |i: usize| KC.get(i).copied().unwrap_or(0);
-    let mut t0 = x1.wrapping_add(x3).wrapping_sub(kc(0));
-    let mut t1 = x2.wrapping_sub(x4).wrapping_add(kc(0));
-    for (i, pair) in ks.as_chunks_mut::<2>().0.iter_mut().enumerate() {
-        if i > 0 {
-            if i % 2 == 1 {
-                let t = x1;
-                x1 = (x1 >> 8) ^ (x2 << 24);
-                x2 = (x2 >> 8) ^ (t << 24);
-            } else {
-                let t = x3;
-                x3 = (x3 << 8) ^ (x4 >> 24);
-                x4 = (x4 << 8) ^ (t >> 24);
+    crate::dit::with(|| {
+        let [mut x1, mut x2, mut x3, mut x4] = words(key);
+        let mut ks = [0u32; 32];
+        let kc = |i: usize| KC.get(i).copied().unwrap_or(0);
+        let mut t0 = x1.wrapping_add(x3).wrapping_sub(kc(0));
+        let mut t1 = x2.wrapping_sub(x4).wrapping_add(kc(0));
+        for (i, pair) in ks.as_chunks_mut::<2>().0.iter_mut().enumerate() {
+            if i > 0 {
+                if i % 2 == 1 {
+                    let t = x1;
+                    x1 = (x1 >> 8) ^ (x2 << 24);
+                    x2 = (x2 >> 8) ^ (t << 24);
+                } else {
+                    let t = x3;
+                    x3 = (x3 << 8) ^ (x4 >> 24);
+                    x4 = (x4 << 8) ^ (t >> 24);
+                }
+                t0 = x1.wrapping_add(x3).wrapping_sub(kc(i));
+                t1 = x2.wrapping_add(kc(i)).wrapping_sub(x4);
             }
-            t0 = x1.wrapping_add(x3).wrapping_sub(kc(i));
-            t1 = x2.wrapping_add(kc(i)).wrapping_sub(x4);
+            *pair = [g(t0), g(t1)];
         }
-        *pair = [g(t0), g(t1)];
-    }
-    x1.zeroize();
-    x2.zeroize();
-    x3.zeroize();
-    x4.zeroize();
-    SeedKey(ks)
+        x1.zeroize();
+        x2.zeroize();
+        x3.zeroize();
+        x4.zeroize();
+        SeedKey(ks)
+    })
 }
 
 impl SeedKey {

@@ -69,21 +69,23 @@ fn at(data: &[u8], i: usize) -> u8 {
 /// own octets (as zeros under the XOR) and encrypted whole, so `out` takes `input.len()`
 /// rounded up to the block size.
 pub fn cbc_encrypt(input: &[u8], out: &mut [u8], iv: &mut [u8; BLOCK], b: &impl Block128) {
-    let mut chain = *iv;
-    for (i, chunk) in input.chunks(BLOCK).enumerate() {
-        let plain = block_at(chunk, 0);
-        let mut mixed = [0u8; BLOCK];
-        for (n, m) in mixed.iter_mut().enumerate() {
-            *m = if n < chunk.len() {
-                at(&plain, n) ^ at(&chain, n)
-            } else {
-                at(&chain, n)
-            };
+    crate::dit::with(|| {
+        let mut chain = *iv;
+        for (i, chunk) in input.chunks(BLOCK).enumerate() {
+            let plain = block_at(chunk, 0);
+            let mut mixed = [0u8; BLOCK];
+            for (n, m) in mixed.iter_mut().enumerate() {
+                *m = if n < chunk.len() {
+                    at(&plain, n) ^ at(&chain, n)
+                } else {
+                    at(&chain, n)
+                };
+            }
+            chain = b.block(&mixed);
+            put(out, i.saturating_mul(BLOCK), &chain);
         }
-        chain = b.block(&mixed);
-        put(out, i.saturating_mul(BLOCK), &chain);
-    }
-    *iv = chain;
+        *iv = chain;
+    })
 }
 
 /// CBC decryption (`CRYPTO_cbc128_decrypt`) of `len` octets: a partial last block is read
@@ -96,16 +98,18 @@ pub fn cbc_decrypt(
     iv: &mut [u8; BLOCK],
     b: &impl Block128,
 ) {
-    let mut done = 0;
-    while done < len {
-        let c = block_at(input, done);
-        let mut p = xor(&b.block(&c), iv);
-        let n = len.saturating_sub(done).min(BLOCK);
-        put(out, done, p.get(..n).unwrap_or_default());
-        p.zeroize();
-        *iv = c;
-        done = done.saturating_add(BLOCK);
-    }
+    crate::dit::with(|| {
+        let mut done = 0;
+        while done < len {
+            let c = block_at(input, done);
+            let mut p = xor(&b.block(&c), iv);
+            let n = len.saturating_sub(done).min(BLOCK);
+            put(out, done, p.get(..n).unwrap_or_default());
+            p.zeroize();
+            *iv = c;
+            done = done.saturating_add(BLOCK);
+        }
+    })
 }
 
 /// Increments a big-endian counter of the first `n` octets of `counter`.
@@ -128,22 +132,24 @@ pub fn ctr_encrypt(
     num: &mut u32,
     b: &impl Block128,
 ) -> Result<(), Corrupt> {
-    let mut n = usize::try_from(*num)
-        .ok()
-        .filter(|&n| n < BLOCK)
-        .ok_or(Corrupt)?;
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            *ecount = b.block(iv);
-            increment(iv, BLOCK);
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num)
+            .ok()
+            .filter(|&n| n < BLOCK)
+            .ok_or(Corrupt)?;
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                *ecount = b.block(iv);
+                increment(iv, BLOCK);
+            }
+            if let Some(o) = out.get_mut(i) {
+                *o = x ^ at(ecount, n);
+            }
+            n = n.wrapping_add(1) % BLOCK;
         }
-        if let Some(o) = out.get_mut(i) {
-            *o = x ^ at(ecount, n);
-        }
-        n = n.wrapping_add(1) % BLOCK;
-    }
-    *num = u32::try_from(n).unwrap_or(0);
-    Ok(())
+        *num = u32::try_from(n).unwrap_or(0);
+        Ok(())
+    })
 }
 
 /// CTR mode with a whole-buffer function that counts in the IV's last 32 bits
@@ -158,64 +164,66 @@ pub fn ctr32_encrypt(
     num: &mut u32,
     f: &impl Ctr128,
 ) -> Result<(), Corrupt> {
-    let mut n = usize::try_from(*num)
-        .ok()
-        .filter(|&n| n < BLOCK)
-        .ok_or(Corrupt)?;
-    let mut done = 0;
-    let len = input.len();
-    while n != 0 && done < len {
-        if let Some(o) = out.get_mut(done) {
-            *o = at(input, done) ^ at(ecount, n);
-        }
-        done = done.wrapping_add(1);
-        n = n.wrapping_add(1) % BLOCK;
-    }
-    let read_ctr =
-        |iv: &[u8; BLOCK]| u32::from_be_bytes([at(iv, 12), at(iv, 13), at(iv, 14), at(iv, 15)]);
-    let write_ctr = |iv: &mut [u8; BLOCK], c: u32| put(iv, 12, &c.to_be_bytes());
-    let mut ctr32 = read_ctr(iv);
-    while len.saturating_sub(done) >= BLOCK {
-        let mut blocks = len.saturating_sub(done) / BLOCK;
-        if blocks > 1 << 28 {
-            blocks = 1 << 28;
-        }
-        let low = u32::try_from(blocks).unwrap_or(u32::MAX);
-        ctr32 = ctr32.wrapping_add(low);
-        if usize::try_from(ctr32).unwrap_or(usize::MAX) < blocks {
-            blocks = blocks.saturating_sub(usize::try_from(ctr32).unwrap_or(0));
-            ctr32 = 0;
-        }
-        let bytes = blocks.saturating_mul(BLOCK);
-        let end = done.saturating_add(bytes);
-        if let (Some(i), Some(o)) = (input.get(done..end), out.get_mut(done..end)) {
-            f.ctr(i, o, blocks, iv);
-        }
-        write_ctr(iv, ctr32);
-        if ctr32 == 0 {
-            increment(iv, 12);
-        }
-        done = end;
-    }
-    if done < len {
-        let zero = [0u8; BLOCK];
-        *ecount = [0; BLOCK];
-        f.ctr(&zero, ecount, 1, iv);
-        ctr32 = ctr32.wrapping_add(1);
-        write_ctr(iv, ctr32);
-        if ctr32 == 0 {
-            increment(iv, 12);
-        }
-        while done < len {
+    crate::dit::with(|| {
+        let mut n = usize::try_from(*num)
+            .ok()
+            .filter(|&n| n < BLOCK)
+            .ok_or(Corrupt)?;
+        let mut done = 0;
+        let len = input.len();
+        while n != 0 && done < len {
             if let Some(o) = out.get_mut(done) {
                 *o = at(input, done) ^ at(ecount, n);
             }
-            n = n.wrapping_add(1);
             done = done.wrapping_add(1);
+            n = n.wrapping_add(1) % BLOCK;
         }
-    }
-    *num = u32::try_from(n).unwrap_or(0);
-    Ok(())
+        let read_ctr =
+            |iv: &[u8; BLOCK]| u32::from_be_bytes([at(iv, 12), at(iv, 13), at(iv, 14), at(iv, 15)]);
+        let write_ctr = |iv: &mut [u8; BLOCK], c: u32| put(iv, 12, &c.to_be_bytes());
+        let mut ctr32 = read_ctr(iv);
+        while len.saturating_sub(done) >= BLOCK {
+            let mut blocks = len.saturating_sub(done) / BLOCK;
+            if blocks > 1 << 28 {
+                blocks = 1 << 28;
+            }
+            let low = u32::try_from(blocks).unwrap_or(u32::MAX);
+            ctr32 = ctr32.wrapping_add(low);
+            if usize::try_from(ctr32).unwrap_or(usize::MAX) < blocks {
+                blocks = blocks.saturating_sub(usize::try_from(ctr32).unwrap_or(0));
+                ctr32 = 0;
+            }
+            let bytes = blocks.saturating_mul(BLOCK);
+            let end = done.saturating_add(bytes);
+            if let (Some(i), Some(o)) = (input.get(done..end), out.get_mut(done..end)) {
+                f.ctr(i, o, blocks, iv);
+            }
+            write_ctr(iv, ctr32);
+            if ctr32 == 0 {
+                increment(iv, 12);
+            }
+            done = end;
+        }
+        if done < len {
+            let zero = [0u8; BLOCK];
+            *ecount = [0; BLOCK];
+            f.ctr(&zero, ecount, 1, iv);
+            ctr32 = ctr32.wrapping_add(1);
+            write_ctr(iv, ctr32);
+            if ctr32 == 0 {
+                increment(iv, 12);
+            }
+            while done < len {
+                if let Some(o) = out.get_mut(done) {
+                    *o = at(input, done) ^ at(ecount, n);
+                }
+                n = n.wrapping_add(1);
+                done = done.wrapping_add(1);
+            }
+        }
+        *num = u32::try_from(n).unwrap_or(0);
+        Ok(())
+    })
 }
 
 /// The position in an OFB or CFB block: negative is refused as OpenSSL does (it sets -1 and
@@ -241,21 +249,23 @@ pub fn ofb_encrypt(
     num: &mut i32,
     b: &impl Block128,
 ) -> Result<(), Corrupt> {
-    let Some(n) = position(num) else {
-        return Ok(());
-    };
-    let mut n = n?;
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            *iv = b.block(iv);
+    crate::dit::with(|| {
+        let Some(n) = position(num) else {
+            return Ok(());
+        };
+        let mut n = n?;
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                *iv = b.block(iv);
+            }
+            if let Some(o) = out.get_mut(i) {
+                *o = x ^ at(iv, n);
+            }
+            n = n.wrapping_add(1) % BLOCK;
         }
-        if let Some(o) = out.get_mut(i) {
-            *o = x ^ at(iv, n);
-        }
-        n = n.wrapping_add(1) % BLOCK;
-    }
-    *num = i32::try_from(n).unwrap_or(0);
-    Ok(())
+        *num = i32::try_from(n).unwrap_or(0);
+        Ok(())
+    })
 }
 
 /// CFB mode by octets (`CRYPTO_cfb128_encrypt`): the IV becomes the ciphertext as it goes,
@@ -268,26 +278,28 @@ pub fn cfb_encrypt(
     enc: bool,
     b: &impl Block128,
 ) -> Result<(), Corrupt> {
-    let Some(n) = position(num) else {
-        return Ok(());
-    };
-    let mut n = n?;
-    for (i, x) in input.iter().enumerate() {
-        if n == 0 {
-            *iv = b.block(iv);
+    crate::dit::with(|| {
+        let Some(n) = position(num) else {
+            return Ok(());
+        };
+        let mut n = n?;
+        for (i, x) in input.iter().enumerate() {
+            if n == 0 {
+                *iv = b.block(iv);
+            }
+            let k = at(iv, n);
+            let (o, c) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
+            if let Some(d) = out.get_mut(i) {
+                *d = o;
+            }
+            if let Some(v) = iv.get_mut(n) {
+                *v = c;
+            }
+            n = n.wrapping_add(1) % BLOCK;
         }
-        let k = at(iv, n);
-        let (o, c) = if enc { (x ^ k, x ^ k) } else { (x ^ k, *x) };
-        if let Some(d) = out.get_mut(i) {
-            *d = o;
-        }
-        if let Some(v) = iv.get_mut(n) {
-            *v = c;
-        }
-        n = n.wrapping_add(1) % BLOCK;
-    }
-    *num = i32::try_from(n).unwrap_or(0);
-    Ok(())
+        *num = i32::try_from(n).unwrap_or(0);
+        Ok(())
+    })
 }
 
 /// One CFB step of `nbits` bits (1 to 128): `input`'s first `(nbits + 7) / 8` octets in, as
@@ -342,19 +354,21 @@ pub fn cfb1_encrypt(
     enc: bool,
     b: &impl Block128,
 ) {
-    for n in 0..bits {
-        let mask = 0x80u8 >> (n % 8);
-        let c = if at(input, n / 8) & mask != 0 {
-            0x80
-        } else {
-            0
-        };
-        let mut d = [0u8; 1];
-        cfbr_block(&[c], &mut d, 1, iv, enc, b);
-        if let Some(o) = out.get_mut(n / 8) {
-            *o = (*o & !mask) | ((d[0] & 0x80) >> (n % 8));
+    crate::dit::with(|| {
+        for n in 0..bits {
+            let mask = 0x80u8 >> (n % 8);
+            let c = if at(input, n / 8) & mask != 0 {
+                0x80
+            } else {
+                0
+            };
+            let mut d = [0u8; 1];
+            cfbr_block(&[c], &mut d, 1, iv, enc, b);
+            if let Some(o) = out.get_mut(n / 8) {
+                *o = (*o & !mask) | ((d[0] & 0x80) >> (n % 8));
+            }
         }
-    }
+    })
 }
 
 /// CFB-8 (`CRYPTO_cfb128_8_encrypt`): a CFB step per octet.
@@ -365,13 +379,15 @@ pub fn cfb8_encrypt(
     enc: bool,
     b: &impl Block128,
 ) {
-    for (i, x) in input.iter().enumerate() {
-        let mut d = [0u8; 1];
-        cfbr_block(&[*x], &mut d, 8, iv, enc, b);
-        if let Some(o) = out.get_mut(i) {
-            *o = d[0];
+    crate::dit::with(|| {
+        for (i, x) in input.iter().enumerate() {
+            let mut d = [0u8; 1];
+            cfbr_block(&[*x], &mut d, 8, iv, enc, b);
+            if let Some(o) = out.get_mut(i) {
+                *o = d[0];
+            }
         }
-    }
+    })
 }
 
 /// CTS encryption with a block function (`CRYPTO_cts128_encrypt_block`): returns the length
@@ -382,25 +398,27 @@ pub fn cts_encrypt_block(
     iv: &mut [u8; BLOCK],
     b: &impl Block128,
 ) -> usize {
-    let len = input.len();
-    if len <= BLOCK {
-        return 0;
-    }
-    let residue = match len % BLOCK {
-        0 => BLOCK,
-        r => r,
-    };
-    let head = len.saturating_sub(residue);
-    cbc_encrypt(input.get(..head).unwrap_or_default(), out, iv, b);
-    let tail = input.get(head..).unwrap_or_default();
-    for (v, x) in iv.iter_mut().zip(tail) {
-        *v ^= x;
-    }
-    *iv = b.block(iv);
-    let prev = block_at(out, head.saturating_sub(BLOCK));
-    put(out, head, prev.get(..residue).unwrap_or_default());
-    put(out, head.saturating_sub(BLOCK), iv);
-    len
+    crate::dit::with(|| {
+        let len = input.len();
+        if len <= BLOCK {
+            return 0;
+        }
+        let residue = match len % BLOCK {
+            0 => BLOCK,
+            r => r,
+        };
+        let head = len.saturating_sub(residue);
+        cbc_encrypt(input.get(..head).unwrap_or_default(), out, iv, b);
+        let tail = input.get(head..).unwrap_or_default();
+        for (v, x) in iv.iter_mut().zip(tail) {
+            *v ^= x;
+        }
+        *iv = b.block(iv);
+        let prev = block_at(out, head.saturating_sub(BLOCK));
+        put(out, head, prev.get(..residue).unwrap_or_default());
+        put(out, head.saturating_sub(BLOCK), iv);
+        len
+    })
 }
 
 /// NIST CBC-CS3 encryption with a block function (`CRYPTO_nistcts128_encrypt_block`): returns
@@ -411,45 +429,49 @@ pub fn nistcts_encrypt_block(
     iv: &mut [u8; BLOCK],
     b: &impl Block128,
 ) -> usize {
-    let len = input.len();
-    if len < BLOCK {
-        return 0;
-    }
-    let residue = len % BLOCK;
-    let head = len.saturating_sub(residue);
-    cbc_encrypt(input.get(..head).unwrap_or_default(), out, iv, b);
-    if residue == 0 {
-        return head;
-    }
-    for (v, x) in iv.iter_mut().zip(input.get(head..).unwrap_or_default()) {
-        *v ^= x;
-    }
-    *iv = b.block(iv);
-    put(out, head.saturating_sub(BLOCK).saturating_add(residue), iv);
-    len
+    crate::dit::with(|| {
+        let len = input.len();
+        if len < BLOCK {
+            return 0;
+        }
+        let residue = len % BLOCK;
+        let head = len.saturating_sub(residue);
+        cbc_encrypt(input.get(..head).unwrap_or_default(), out, iv, b);
+        if residue == 0 {
+            return head;
+        }
+        for (v, x) in iv.iter_mut().zip(input.get(head..).unwrap_or_default()) {
+            *v ^= x;
+        }
+        *iv = b.block(iv);
+        put(out, head.saturating_sub(BLOCK).saturating_add(residue), iv);
+        len
+    })
 }
 
 /// CTS encryption with a CBC function (`CRYPTO_cts128_encrypt`).
 pub fn cts_encrypt(input: &[u8], out: &mut [u8], iv: &mut [u8; BLOCK], f: &impl Cbc128) -> usize {
-    let len = input.len();
-    if len <= BLOCK {
-        return 0;
-    }
-    let residue = match len % BLOCK {
-        0 => BLOCK,
-        r => r,
-    };
-    let head = len.saturating_sub(residue);
-    if let Some(o) = out.get_mut(..head) {
-        f.cbc(input.get(..head).unwrap_or_default(), o, iv, true);
-    }
-    let tmp = block_at(input.get(head..).unwrap_or_default(), 0);
-    let prev = block_at(out, head.saturating_sub(BLOCK));
-    put(out, head, prev.get(..residue).unwrap_or_default());
-    let mut last = [0u8; BLOCK];
-    f.cbc(&tmp, &mut last, iv, true);
-    put(out, head.saturating_sub(BLOCK), &last);
-    len
+    crate::dit::with(|| {
+        let len = input.len();
+        if len <= BLOCK {
+            return 0;
+        }
+        let residue = match len % BLOCK {
+            0 => BLOCK,
+            r => r,
+        };
+        let head = len.saturating_sub(residue);
+        if let Some(o) = out.get_mut(..head) {
+            f.cbc(input.get(..head).unwrap_or_default(), o, iv, true);
+        }
+        let tmp = block_at(input.get(head..).unwrap_or_default(), 0);
+        let prev = block_at(out, head.saturating_sub(BLOCK));
+        put(out, head, prev.get(..residue).unwrap_or_default());
+        let mut last = [0u8; BLOCK];
+        f.cbc(&tmp, &mut last, iv, true);
+        put(out, head.saturating_sub(BLOCK), &last);
+        len
+    })
 }
 
 /// NIST CBC-CS3 encryption with a CBC function (`CRYPTO_nistcts128_encrypt`).
@@ -459,27 +481,29 @@ pub fn nistcts_encrypt(
     iv: &mut [u8; BLOCK],
     f: &impl Cbc128,
 ) -> usize {
-    let len = input.len();
-    if len < BLOCK {
-        return 0;
-    }
-    let residue = len % BLOCK;
-    let head = len.saturating_sub(residue);
-    if let Some(o) = out.get_mut(..head) {
-        f.cbc(input.get(..head).unwrap_or_default(), o, iv, true);
-    }
-    if residue == 0 {
-        return head;
-    }
-    let tmp = block_at(input.get(head..).unwrap_or_default(), 0);
-    let mut last = [0u8; BLOCK];
-    f.cbc(&tmp, &mut last, iv, true);
-    put(
-        out,
-        head.saturating_sub(BLOCK).saturating_add(residue),
-        &last,
-    );
-    len
+    crate::dit::with(|| {
+        let len = input.len();
+        if len < BLOCK {
+            return 0;
+        }
+        let residue = len % BLOCK;
+        let head = len.saturating_sub(residue);
+        if let Some(o) = out.get_mut(..head) {
+            f.cbc(input.get(..head).unwrap_or_default(), o, iv, true);
+        }
+        if residue == 0 {
+            return head;
+        }
+        let tmp = block_at(input.get(head..).unwrap_or_default(), 0);
+        let mut last = [0u8; BLOCK];
+        f.cbc(&tmp, &mut last, iv, true);
+        put(
+            out,
+            head.saturating_sub(BLOCK).saturating_add(residue),
+            &last,
+        );
+        len
+    })
 }
 
 /// CTS decryption with a block function (`CRYPTO_cts128_decrypt_block`): returns the length
@@ -490,50 +514,52 @@ pub fn cts_decrypt_block(
     iv: &mut [u8; BLOCK],
     b: &impl Block128,
 ) -> usize {
-    let len = input.len();
-    if len <= BLOCK {
-        return 0;
-    }
-    let residue = match len % BLOCK {
-        0 => BLOCK,
-        r => r,
-    };
-    let head = len.saturating_sub(BLOCK).saturating_sub(residue);
-    if head != 0 {
-        cbc_decrypt(input, out, head, iv, b);
-    }
-    let c1 = block_at(input, head);
-    let mut tmp = [0u8; 2 * BLOCK];
-    let d1 = b.block(&c1);
-    put(&mut tmp, 0, &d1);
-    put(&mut tmp, BLOCK, &d1);
-    put(
-        &mut tmp,
-        0,
-        input
-            .get(head.saturating_add(BLOCK)..len)
-            .unwrap_or_default(),
-    );
-    let first = b.block(&block_at(&tmp, 0));
-    put(&mut tmp, 0, &first);
-    for n in 0..BLOCK {
-        let c = at(input, head.saturating_add(n));
-        if let Some(o) = out.get_mut(head.saturating_add(n)) {
-            *o = at(&tmp, n) ^ at(iv, n);
+    crate::dit::with(|| {
+        let len = input.len();
+        if len <= BLOCK {
+            return 0;
         }
-        if let Some(v) = iv.get_mut(n) {
-            *v = c;
+        let residue = match len % BLOCK {
+            0 => BLOCK,
+            r => r,
+        };
+        let head = len.saturating_sub(BLOCK).saturating_sub(residue);
+        if head != 0 {
+            cbc_decrypt(input, out, head, iv, b);
         }
-    }
-    for n in BLOCK..BLOCK.saturating_add(residue) {
-        if let Some(o) = out.get_mut(head.saturating_add(n)) {
-            *o = at(&tmp, n) ^ at(input, head.saturating_add(n));
+        let c1 = block_at(input, head);
+        let mut tmp = [0u8; 2 * BLOCK];
+        let d1 = b.block(&c1);
+        put(&mut tmp, 0, &d1);
+        put(&mut tmp, BLOCK, &d1);
+        put(
+            &mut tmp,
+            0,
+            input
+                .get(head.saturating_add(BLOCK)..len)
+                .unwrap_or_default(),
+        );
+        let first = b.block(&block_at(&tmp, 0));
+        put(&mut tmp, 0, &first);
+        for n in 0..BLOCK {
+            let c = at(input, head.saturating_add(n));
+            if let Some(o) = out.get_mut(head.saturating_add(n)) {
+                *o = at(&tmp, n) ^ at(iv, n);
+            }
+            if let Some(v) = iv.get_mut(n) {
+                *v = c;
+            }
         }
-    }
-    tmp.zeroize();
-    // OpenSSL's count includes the last block twice: it adds the block size to the residue
-    // before adding the residue in.
-    len.saturating_add(BLOCK)
+        for n in BLOCK..BLOCK.saturating_add(residue) {
+            if let Some(o) = out.get_mut(head.saturating_add(n)) {
+                *o = at(&tmp, n) ^ at(input, head.saturating_add(n));
+            }
+        }
+        tmp.zeroize();
+        // OpenSSL's count includes the last block twice: it adds the block size to the residue
+        // before adding the residue in.
+        len.saturating_add(BLOCK)
+    })
 }
 
 /// NIST CBC-CS3 decryption with a block function (`CRYPTO_nistcts128_decrypt_block`): returns
@@ -545,82 +571,86 @@ pub fn nistcts_decrypt_block(
     iv: &mut [u8; BLOCK],
     b: &impl Block128,
 ) -> usize {
-    let len = input.len();
-    if len < BLOCK {
-        return 0;
-    }
-    let residue = len % BLOCK;
-    if residue == 0 {
-        cbc_decrypt(input, out, len, iv, b);
-        return len;
-    }
-    let head = len.saturating_sub(BLOCK).saturating_sub(residue);
-    if head != 0 {
-        cbc_decrypt(input, out, head, iv, b);
-    }
-    let mut tmp = [0u8; 2 * BLOCK];
-    let d = b.block(&block_at(input, head.saturating_add(residue)));
-    put(&mut tmp, 0, &d);
-    put(&mut tmp, BLOCK, &d);
-    put(
-        &mut tmp,
-        0,
-        input
-            .get(head..head.saturating_add(residue))
-            .unwrap_or_default(),
-    );
-    let first = b.block(&block_at(&tmp, 0));
-    put(&mut tmp, 0, &first);
-    for n in 0..BLOCK {
-        let c = at(input, head.saturating_add(n));
-        if let Some(o) = out.get_mut(head.saturating_add(n)) {
-            *o = at(&tmp, n) ^ at(iv, n);
+    crate::dit::with(|| {
+        let len = input.len();
+        if len < BLOCK {
+            return 0;
         }
-        if let Some(v) = iv.get_mut(n) {
-            *v = at(input, head.saturating_add(n).saturating_add(residue));
+        let residue = len % BLOCK;
+        if residue == 0 {
+            cbc_decrypt(input, out, len, iv, b);
+            return len;
         }
-        if let Some(t) = tmp.get_mut(n) {
-            *t = c;
+        let head = len.saturating_sub(BLOCK).saturating_sub(residue);
+        if head != 0 {
+            cbc_decrypt(input, out, head, iv, b);
         }
-    }
-    for n in BLOCK..BLOCK.saturating_add(residue) {
-        if let Some(o) = out.get_mut(head.saturating_add(n)) {
-            *o = at(&tmp, n) ^ at(&tmp, n.saturating_sub(BLOCK));
+        let mut tmp = [0u8; 2 * BLOCK];
+        let d = b.block(&block_at(input, head.saturating_add(residue)));
+        put(&mut tmp, 0, &d);
+        put(&mut tmp, BLOCK, &d);
+        put(
+            &mut tmp,
+            0,
+            input
+                .get(head..head.saturating_add(residue))
+                .unwrap_or_default(),
+        );
+        let first = b.block(&block_at(&tmp, 0));
+        put(&mut tmp, 0, &first);
+        for n in 0..BLOCK {
+            let c = at(input, head.saturating_add(n));
+            if let Some(o) = out.get_mut(head.saturating_add(n)) {
+                *o = at(&tmp, n) ^ at(iv, n);
+            }
+            if let Some(v) = iv.get_mut(n) {
+                *v = at(input, head.saturating_add(n).saturating_add(residue));
+            }
+            if let Some(t) = tmp.get_mut(n) {
+                *t = c;
+            }
         }
-    }
-    tmp.zeroize();
-    // OpenSSL's count includes the last block twice: it adds the block size to the residue
-    // before adding the residue in.
-    len.saturating_add(BLOCK)
+        for n in BLOCK..BLOCK.saturating_add(residue) {
+            if let Some(o) = out.get_mut(head.saturating_add(n)) {
+                *o = at(&tmp, n) ^ at(&tmp, n.saturating_sub(BLOCK));
+            }
+        }
+        tmp.zeroize();
+        // OpenSSL's count includes the last block twice: it adds the block size to the residue
+        // before adding the residue in.
+        len.saturating_add(BLOCK)
+    })
 }
 
 /// CTS decryption with a CBC function (`CRYPTO_cts128_decrypt`).
 pub fn cts_decrypt(input: &[u8], out: &mut [u8], iv: &mut [u8; BLOCK], f: &impl Cbc128) -> usize {
-    let len = input.len();
-    if len <= BLOCK {
-        return 0;
-    }
-    let residue = match len % BLOCK {
-        0 => BLOCK,
-        r => r,
-    };
-    let head = len.saturating_sub(BLOCK).saturating_sub(residue);
-    if head != 0
-        && let Some(o) = out.get_mut(..head)
-    {
-        f.cbc(input.get(..head).unwrap_or_default(), o, iv, false);
-    }
-    cts_decrypt_tail(
-        input,
-        out,
-        head,
-        BLOCK.saturating_add(residue),
-        iv,
-        f,
-        head,
-        head.saturating_add(BLOCK),
-    );
-    len
+    crate::dit::with(|| {
+        let len = input.len();
+        if len <= BLOCK {
+            return 0;
+        }
+        let residue = match len % BLOCK {
+            0 => BLOCK,
+            r => r,
+        };
+        let head = len.saturating_sub(BLOCK).saturating_sub(residue);
+        if head != 0
+            && let Some(o) = out.get_mut(..head)
+        {
+            f.cbc(input.get(..head).unwrap_or_default(), o, iv, false);
+        }
+        cts_decrypt_tail(
+            input,
+            out,
+            head,
+            BLOCK.saturating_add(residue),
+            iv,
+            f,
+            head,
+            head.saturating_add(BLOCK),
+        );
+        len
+    })
 }
 
 /// NIST CBC-CS3 decryption with a CBC function (`CRYPTO_nistcts128_decrypt`).
@@ -630,34 +660,36 @@ pub fn nistcts_decrypt(
     iv: &mut [u8; BLOCK],
     f: &impl Cbc128,
 ) -> usize {
-    let len = input.len();
-    if len < BLOCK {
-        return 0;
-    }
-    let residue = len % BLOCK;
-    if residue == 0 {
-        if let Some(o) = out.get_mut(..len) {
-            f.cbc(input, o, iv, false);
+    crate::dit::with(|| {
+        let len = input.len();
+        if len < BLOCK {
+            return 0;
         }
-        return len;
-    }
-    let head = len.saturating_sub(BLOCK).saturating_sub(residue);
-    if head != 0
-        && let Some(o) = out.get_mut(..head)
-    {
-        f.cbc(input.get(..head).unwrap_or_default(), o, iv, false);
-    }
-    cts_decrypt_tail(
-        input,
-        out,
-        head,
-        BLOCK.saturating_add(residue),
-        iv,
-        f,
-        head.saturating_add(residue),
-        head,
-    );
-    len
+        let residue = len % BLOCK;
+        if residue == 0 {
+            if let Some(o) = out.get_mut(..len) {
+                f.cbc(input, o, iv, false);
+            }
+            return len;
+        }
+        let head = len.saturating_sub(BLOCK).saturating_sub(residue);
+        if head != 0
+            && let Some(o) = out.get_mut(..head)
+        {
+            f.cbc(input.get(..head).unwrap_or_default(), o, iv, false);
+        }
+        cts_decrypt_tail(
+            input,
+            out,
+            head,
+            BLOCK.saturating_add(residue),
+            iv,
+            f,
+            head.saturating_add(residue),
+            head,
+        );
+        len
+    })
 }
 
 /// The last two blocks of a CTS decryption through a CBC function: the block at `full`
@@ -725,28 +757,30 @@ fn xor_t(a: &mut [u8; BLOCK], t: usize) {
 /// RFC 3394 wrapping (`CRYPTO_128_wrap`) into `out` (`input.len() + 8` octets): returns that
 /// length, or 0 for an input that isn't 16 octets or more in 8-octet steps.
 pub fn wrap(iv: Option<&[u8; 8]>, input: &[u8], out: &mut [u8], b: &impl Block128) -> usize {
-    let inlen = input.len();
-    if !inlen.is_multiple_of(8) || !(16..=WRAP_MAX).contains(&inlen) {
-        return 0;
-    }
-    let mut r = input.to_vec();
-    let mut buf = [0u8; BLOCK];
-    put(&mut buf, 0, iv.unwrap_or(&DEFAULT_IV));
-    let mut t = 1usize;
-    for _ in 0..6 {
-        for chunk in r.chunks_mut(8) {
-            put(&mut buf, 8, chunk);
-            buf = b.block(&buf);
-            xor_t(&mut buf, t);
-            put(chunk, 0, buf.get(8..).unwrap_or_default());
-            t = t.wrapping_add(1);
+    crate::dit::with(|| {
+        let inlen = input.len();
+        if !inlen.is_multiple_of(8) || !(16..=WRAP_MAX).contains(&inlen) {
+            return 0;
         }
-    }
-    put(out, 0, buf.get(..8).unwrap_or_default());
-    put(out, 8, &r);
-    r.zeroize();
-    buf.zeroize();
-    inlen.saturating_add(8)
+        let mut r = input.to_vec();
+        let mut buf = [0u8; BLOCK];
+        put(&mut buf, 0, iv.unwrap_or(&DEFAULT_IV));
+        let mut t = 1usize;
+        for _ in 0..6 {
+            for chunk in r.chunks_mut(8) {
+                put(&mut buf, 8, chunk);
+                buf = b.block(&buf);
+                xor_t(&mut buf, t);
+                put(chunk, 0, buf.get(8..).unwrap_or_default());
+                t = t.wrapping_add(1);
+            }
+        }
+        put(out, 0, buf.get(..8).unwrap_or_default());
+        put(out, 8, &r);
+        r.zeroize();
+        buf.zeroize();
+        inlen.saturating_add(8)
+    })
 }
 
 /// RFC 3394 unwrapping without the IV check: `out` takes `input.len() - 8` octets; returns
@@ -780,87 +814,93 @@ fn unwrap_raw(input: &[u8], out: &mut [u8], b: &impl Block128) -> Option<(usize,
 /// RFC 3394 unwrapping (`CRYPTO_128_unwrap`): returns the length (`input.len() - 8`), or 0 for
 /// a bad length or an IV that doesn't match (after zeroing what it wrote).
 pub fn unwrap(iv: Option<&[u8; 8]>, input: &[u8], out: &mut [u8], b: &impl Block128) -> usize {
-    let Some((ret, got)) = unwrap_raw(input, out, b) else {
-        return 0;
-    };
-    if !ct_eq(&got, iv.unwrap_or(&DEFAULT_IV)) {
-        for o in out.iter_mut().take(ret) {
-            *o = 0;
+    crate::dit::with(|| {
+        let Some((ret, got)) = unwrap_raw(input, out, b) else {
+            return 0;
+        };
+        if !ct_eq(&got, iv.unwrap_or(&DEFAULT_IV)) {
+            for o in out.iter_mut().take(ret) {
+                *o = 0;
+            }
+            return 0;
         }
-        return 0;
-    }
-    ret
+        ret
+    })
 }
 
 /// RFC 5649 wrapping with padding (`CRYPTO_128_wrap_pad`): returns the length written (16 for
 /// up to 8 octets, else the input padded to 8-octet steps plus 8), or 0 for no input or too
 /// much.
 pub fn wrap_pad(icv: Option<&[u8; 4]>, input: &[u8], out: &mut [u8], b: &impl Block128) -> usize {
-    let inlen = input.len();
-    if inlen == 0 || inlen >= WRAP_MAX {
-        return 0;
-    }
-    let padded = inlen.div_ceil(8).saturating_mul(8);
-    let mut aiv = [0u8; 8];
-    put(&mut aiv, 0, icv.unwrap_or(&DEFAULT_AIV));
-    put(
-        &mut aiv,
-        4,
-        &u32::try_from(inlen).unwrap_or(0).to_be_bytes(),
-    );
-    let mut data = input.to_vec();
-    data.resize(padded, 0);
-    let ret = if padded == 8 {
-        let mut buf = [0u8; BLOCK];
-        put(&mut buf, 0, &aiv);
-        put(&mut buf, 8, &data);
-        let c = b.block(&buf);
-        put(out, 0, &c);
-        buf.zeroize();
-        BLOCK
-    } else {
-        wrap(Some(&aiv), &data, out, b)
-    };
-    data.zeroize();
-    ret
+    crate::dit::with(|| {
+        let inlen = input.len();
+        if inlen == 0 || inlen >= WRAP_MAX {
+            return 0;
+        }
+        let padded = inlen.div_ceil(8).saturating_mul(8);
+        let mut aiv = [0u8; 8];
+        put(&mut aiv, 0, icv.unwrap_or(&DEFAULT_AIV));
+        put(
+            &mut aiv,
+            4,
+            &u32::try_from(inlen).unwrap_or(0).to_be_bytes(),
+        );
+        let mut data = input.to_vec();
+        data.resize(padded, 0);
+        let ret = if padded == 8 {
+            let mut buf = [0u8; BLOCK];
+            put(&mut buf, 0, &aiv);
+            put(&mut buf, 8, &data);
+            let c = b.block(&buf);
+            put(out, 0, &c);
+            buf.zeroize();
+            BLOCK
+        } else {
+            wrap(Some(&aiv), &data, out, b)
+        };
+        data.zeroize();
+        ret
+    })
 }
 
 /// RFC 5649 unwrapping (`CRYPTO_128_unwrap_pad`): returns the unpadded length, or 0 for a bad
 /// length, IV, length field, or padding (after zeroing the `input.len() - 8` octets it wrote).
 pub fn unwrap_pad(icv: Option<&[u8; 4]>, input: &[u8], out: &mut [u8], b: &impl Block128) -> usize {
-    let inlen = input.len();
-    if !inlen.is_multiple_of(8) || !(16..WRAP_MAX).contains(&inlen) {
-        return 0;
-    }
-    let n = (inlen / 8).saturating_sub(1);
-    let padded = inlen.saturating_sub(8);
-    let mut aiv = [0u8; 8];
-    if inlen == 16 {
-        let mut buf = b.block(&block_at(input, 0));
-        put(&mut aiv, 0, buf.get(..8).unwrap_or_default());
-        put(out, 0, buf.get(8..).unwrap_or_default());
-        buf.zeroize();
-    } else {
-        match unwrap_raw(input, out, b) {
-            Some((ret, got)) if ret == padded => aiv = got,
-            _ => return fail(out, padded),
+    crate::dit::with(|| {
+        let inlen = input.len();
+        if !inlen.is_multiple_of(8) || !(16..WRAP_MAX).contains(&inlen) {
+            return 0;
         }
-    }
-    let prefix = aiv.get(..4).unwrap_or_default();
-    if !ct_eq(prefix, icv.unwrap_or(&DEFAULT_AIV)) {
-        return fail(out, padded);
-    }
-    let ptext =
-        usize::try_from(u32::from_be_bytes([aiv[4], aiv[5], aiv[6], aiv[7]])).unwrap_or(usize::MAX);
-    if n.saturating_sub(1).saturating_mul(8) >= ptext || ptext > n.saturating_mul(8) {
-        return fail(out, padded);
-    }
-    let zeros = [0u8; 8];
-    let pad = out.get(ptext..padded).unwrap_or_default();
-    if !ct_eq(pad, zeros.get(..pad.len()).unwrap_or_default()) {
-        return fail(out, padded);
-    }
-    ptext
+        let n = (inlen / 8).saturating_sub(1);
+        let padded = inlen.saturating_sub(8);
+        let mut aiv = [0u8; 8];
+        if inlen == 16 {
+            let mut buf = b.block(&block_at(input, 0));
+            put(&mut aiv, 0, buf.get(..8).unwrap_or_default());
+            put(out, 0, buf.get(8..).unwrap_or_default());
+            buf.zeroize();
+        } else {
+            match unwrap_raw(input, out, b) {
+                Some((ret, got)) if ret == padded => aiv = got,
+                _ => return fail(out, padded),
+            }
+        }
+        let prefix = aiv.get(..4).unwrap_or_default();
+        if !ct_eq(prefix, icv.unwrap_or(&DEFAULT_AIV)) {
+            return fail(out, padded);
+        }
+        let ptext = usize::try_from(u32::from_be_bytes([aiv[4], aiv[5], aiv[6], aiv[7]]))
+            .unwrap_or(usize::MAX);
+        if n.saturating_sub(1).saturating_mul(8) >= ptext || ptext > n.saturating_mul(8) {
+            return fail(out, padded);
+        }
+        let zeros = [0u8; 8];
+        let pad = out.get(ptext..padded).unwrap_or_default();
+        if !ct_eq(pad, zeros.get(..pad.len()).unwrap_or_default()) {
+            return fail(out, padded);
+        }
+        ptext
+    })
 }
 
 /// Zeroes the first `n` octets of `out` and returns 0.
@@ -874,25 +914,27 @@ fn fail(out: &mut [u8], n: usize) -> usize {
 /// IGE mode (`AES_ige_encrypt`): `input.len()` is a multiple of the block size; `iv` is two
 /// blocks, the previous ciphertext and plaintext, and ends as the last ones.
 pub fn ige(input: &[u8], out: &mut [u8], iv: &mut [u8; 2 * BLOCK], enc: bool, b: &impl Block128) {
-    let mut first = block_at(iv, 0);
-    let mut second = block_at(iv, BLOCK);
-    for (i, chunk) in input.chunks(BLOCK).enumerate() {
-        let x = block_at(chunk, 0);
-        let y = if enc {
-            let y = xor(&b.block(&xor(&x, &first)), &second);
-            first = y;
-            second = x;
-            y
-        } else {
-            let y = xor(&b.block(&xor(&x, &second)), &first);
-            first = x;
-            second = y;
-            y
-        };
-        put(out, i.saturating_mul(BLOCK), &y);
-    }
-    put(iv, 0, &first);
-    put(iv, BLOCK, &second);
+    crate::dit::with(|| {
+        let mut first = block_at(iv, 0);
+        let mut second = block_at(iv, BLOCK);
+        for (i, chunk) in input.chunks(BLOCK).enumerate() {
+            let x = block_at(chunk, 0);
+            let y = if enc {
+                let y = xor(&b.block(&xor(&x, &first)), &second);
+                first = y;
+                second = x;
+                y
+            } else {
+                let y = xor(&b.block(&xor(&x, &second)), &first);
+                first = x;
+                second = y;
+                y
+            };
+            put(out, i.saturating_mul(BLOCK), &y);
+        }
+        put(iv, 0, &first);
+        put(iv, BLOCK, &second);
+    })
 }
 
 /// Bi-directional IGE (`AES_bi_ige_encrypt`): IGE forwards under the IV's first two blocks,
@@ -900,45 +942,48 @@ pub fn ige(input: &[u8], out: &mut [u8], iv: &mut [u8; 2 * BLOCK], enc: bool, b:
 /// given); decryption runs the passes the other way round. `input.len()` is a multiple of the
 /// block size.
 pub fn bi_ige(input: &[u8], out: &mut [u8], iv: &[u8; 4 * BLOCK], enc: bool, b: &impl Block128) {
-    let blocks: Vec<[u8; BLOCK]> = input.chunks(BLOCK).map(|c| block_at(c, 0)).collect();
-    let front = (block_at(iv, 0), block_at(iv, BLOCK));
-    let back = (block_at(iv, 2 * BLOCK), block_at(iv, 3 * BLOCK));
-    let pass = |data: &[[u8; BLOCK]], (mut p, mut q): ([u8; BLOCK], [u8; BLOCK]), reverse: bool| {
-        let mut res = vec![[0u8; BLOCK]; data.len()];
-        let order: Vec<usize> = if reverse {
-            (0..data.len()).rev().collect()
-        } else {
-            (0..data.len()).collect()
-        };
-        for i in order {
-            let x = data.get(i).copied().unwrap_or_default();
-            let y = if enc {
-                let y = xor(&b.block(&xor(&x, &p)), &q);
-                p = y;
-                q = x;
-                y
-            } else {
-                let y = xor(&b.block(&xor(&x, &q)), &p);
-                p = x;
-                q = y;
-                y
+    crate::dit::with(|| {
+        let blocks: Vec<[u8; BLOCK]> = input.chunks(BLOCK).map(|c| block_at(c, 0)).collect();
+        let front = (block_at(iv, 0), block_at(iv, BLOCK));
+        let back = (block_at(iv, 2 * BLOCK), block_at(iv, 3 * BLOCK));
+        let pass =
+            |data: &[[u8; BLOCK]], (mut p, mut q): ([u8; BLOCK], [u8; BLOCK]), reverse: bool| {
+                let mut res = vec![[0u8; BLOCK]; data.len()];
+                let order: Vec<usize> = if reverse {
+                    (0..data.len()).rev().collect()
+                } else {
+                    (0..data.len()).collect()
+                };
+                for i in order {
+                    let x = data.get(i).copied().unwrap_or_default();
+                    let y = if enc {
+                        let y = xor(&b.block(&xor(&x, &p)), &q);
+                        p = y;
+                        q = x;
+                        y
+                    } else {
+                        let y = xor(&b.block(&xor(&x, &q)), &p);
+                        p = x;
+                        q = y;
+                        y
+                    };
+                    if let Some(r) = res.get_mut(i) {
+                        *r = y;
+                    }
+                }
+                res
             };
-            if let Some(r) = res.get_mut(i) {
-                *r = y;
-            }
+        let result = if enc {
+            let mid = pass(&blocks, front, false);
+            pass(&mid, back, true)
+        } else {
+            let mid = pass(&blocks, back, true);
+            pass(&mid, front, false)
+        };
+        for (i, y) in result.iter().enumerate() {
+            put(out, i.saturating_mul(BLOCK), y);
         }
-        res
-    };
-    let result = if enc {
-        let mid = pass(&blocks, front, false);
-        pass(&mid, back, true)
-    } else {
-        let mid = pass(&blocks, back, true);
-        pass(&mid, front, false)
-    };
-    for (i, y) in result.iter().enumerate() {
-        put(out, i.saturating_mul(BLOCK), y);
-    }
+    })
 }
 
 #[cfg(test)]

@@ -241,12 +241,14 @@ impl Key {
     /// The method's `rsa_mod_exp` (`rsa_ossl_mod_exp`): `i^d mod n`, through the CRT when the
     /// key has its numbers, else with `d`; `None` when it can't be computed.
     pub fn mod_exp(&self, i: &BigNum) -> Option<BigNum> {
-        if self.uses_crt() {
-            return self.crt(i);
-        }
-        let (n, d) = (self.n.as_ref()?, self.d.as_ref()?);
-        let i = BigNum::from_limbs(false, reduce(i.limbs(), n.limbs())).ok()?;
-        Some(Montgomery::new(n).ok()?.exp_consttime(&i, d.limbs()))
+        crate::dit::with(|| {
+            if self.uses_crt() {
+                return self.crt(i);
+            }
+            let (n, d) = (self.n.as_ref()?, self.d.as_ref()?);
+            let i = BigNum::from_limbs(false, reduce(i.limbs(), n.limbs())).ok()?;
+            Some(Montgomery::new(n).ok()?.exp_consttime(&i, d.limbs()))
+        })
     }
 
     /// `rsa_ossl_mod_exp`: `i^d mod n` through the CRT, checked with the public exponent; `None`
@@ -427,6 +429,17 @@ impl Key {
         padding: Padding,
         rng: &mut Random<'_>,
     ) -> Outcome<usize> {
+        crate::dit::with(|| self.private_encrypt_dit(from, to, padding, rng))
+    }
+
+    /// [`Key::private_encrypt`]'s work.
+    fn private_encrypt_dit(
+        &self,
+        from: &[u8],
+        to: &mut [u8],
+        padding: Padding,
+        rng: &mut Random<'_>,
+    ) -> Outcome<usize> {
         const F: &str = "rsa_ossl_private_encrypt";
         let Some(n) = self.n.as_ref() else {
             return fail(F, Reason::MissingPrivateKey);
@@ -503,6 +516,19 @@ impl Key {
     /// As in OpenSSL, `to` is written only where a padding check passed: on failure its
     /// octets stay as they were.
     pub fn private_decrypt(
+        &self,
+        from: &[u8],
+        to: &mut [u8],
+        padding: Padding,
+        sha1: Option<&dyn Hash>,
+        sha256: Option<&dyn Hash>,
+        rng: &mut Random<'_>,
+    ) -> (isize, Raised) {
+        crate::dit::with(|| self.private_decrypt_dit(from, to, padding, sha1, sha256, rng))
+    }
+
+    /// [`Key::private_decrypt`]'s work.
+    fn private_decrypt_dit(
         &self,
         from: &[u8],
         to: &mut [u8],

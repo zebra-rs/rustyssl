@@ -150,7 +150,7 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
             let Ok(p) = <[u8; 32]>::try_from(private) else {
                 return false;
             };
-            Some(crate::dit::with(|| rustyssl_crypto::ecx::x25519_public_from_private(&p)).to_vec())
+            Some(rustyssl_crypto::ecx::x25519_public_from_private(&p).to_vec())
         }
         EcxType::Ed25519 => {
             if !sha512_available(k.libctx.get(), s.propq.as_deref()) {
@@ -159,14 +159,11 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
             let Ok(p) = <[u8; 32]>::try_from(private) else {
                 return false;
             };
-            crate::dit::with(|| rustyssl_crypto::ecx::ed25519_public_from_private(&p))
-                .map(|v| v.to_vec())
+            rustyssl_crypto::ecx::ed25519_public_from_private(&p).map(|v| v.to_vec())
         }
         EcxType::X448 => <[u8; 56]>::try_from(private)
             .ok()
-            .and_then(|p| {
-                crate::dit::with(|| rustyssl_crypto::ecx448::x448_public_from_private(&p))
-            })
+            .and_then(|p| rustyssl_crypto::ecx448::x448_public_from_private(&p))
             .map(|v| v.to_vec()),
         EcxType::Ed448 => {
             if !digest_available(k.libctx.get(), c"SHAKE256", s.propq.as_deref()) {
@@ -175,8 +172,7 @@ pub(crate) fn public_from_private(k: &EcxKey, s: &mut State) -> bool {
             let Ok(p) = <[u8; 57]>::try_from(private) else {
                 return false;
             };
-            crate::dit::with(|| rustyssl_crypto::ecx448::ed448_public_from_private(&p))
-                .map(|v| v.to_vec())
+            rustyssl_crypto::ecx448::ed448_public_from_private(&p).map(|v| v.to_vec())
         }
     };
     let Some(public) = public else { return false };
@@ -425,14 +421,14 @@ pub(crate) fn exchange(private: &[u8], public: &[u8]) -> Option<(Vec<u8>, bool)>
         32 => {
             let mut d = <[u8; 32]>::try_from(private).ok()?;
             let q = <[u8; 32]>::try_from(public).ok()?;
-            let s = crate::dit::with(|| rustyssl_crypto::ecx::x25519(&d, &q)).map(|s| s.to_vec());
+            let s = rustyssl_crypto::ecx::x25519(&d, &q).map(|s| s.to_vec());
             wipe(&mut d);
             s
         }
         56 => {
             let mut d = <[u8; 56]>::try_from(private).ok()?;
             let q = <[u8; 56]>::try_from(public).ok()?;
-            let s = crate::dit::with(|| rustyssl_crypto::ecx448::x448(&d, &q)).map(|s| s.to_vec());
+            let s = rustyssl_crypto::ecx448::x448(&d, &q).map(|s| s.to_vec());
             wipe(&mut d);
             s
         }

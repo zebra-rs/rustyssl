@@ -285,6 +285,14 @@ pub fn x448(
     scalar: &[u8; X448_KEYLEN],
     u: &[u8; X448_KEYLEN],
 ) -> Option<Zeroizing<[u8; X448_KEYLEN]>> {
+    crate::dit::with(|| x448_ladder(scalar, u))
+}
+
+/// [`x448`]'s ladder.
+fn x448_ladder(
+    scalar: &[u8; X448_KEYLEN],
+    u: &[u8; X448_KEYLEN],
+) -> Option<Zeroizing<[u8; X448_KEYLEN]>> {
     let c = CURVE.as_ref()?;
     let f = &c.f;
     let mut k = Zeroizing::new(*scalar);
@@ -360,9 +368,11 @@ fn expand(private: &[u8; ED448_KEYLEN]) -> Option<(Secret, Secret)> {
 
 /// `ossl_ed448_public_from_private`.
 pub fn ed448_public_from_private(private: &[u8; ED448_KEYLEN]) -> Option<[u8; ED448_KEYLEN]> {
-    let c = CURVE.as_ref()?;
-    let (s, _) = expand(private)?;
-    Some(c.encode(&c.mul(&s, &c.base)))
+    crate::dit::with(|| {
+        let c = CURVE.as_ref()?;
+        let (s, _) = expand(private)?;
+        Some(c.encode(&c.mul(&s, &c.base)))
+    })
 }
 
 /// `dom4(phflag, context)`, or `None` for a context over 255 octets.
@@ -386,17 +396,19 @@ pub fn ed448_sign(
 ) -> Option<[u8; ED448_SIGSIZE]> {
     let c = CURVE.as_ref()?;
     let dom = dom4(ph, context)?;
-    let (s, prefix) = expand(private)?;
-    let s = c.scalar(&s)?;
-    let r = c.scalar(&shake256(&[&dom, &prefix, msg], ED448_SIGSIZE)?)?;
-    let big_r = c.encode(&c.mul(&c.scalar_bytes(&r), &c.base));
-    let k = c.scalar(&shake256(&[&dom, &big_r, public, msg], ED448_SIGSIZE)?)?;
-    let big_s = c.l.add(&c.l.mul(&k, &s), &r);
-    let mut sig = [0u8; ED448_SIGSIZE];
-    let (sr, ss) = sig.split_at_mut(ED448_KEYLEN);
-    sr.copy_from_slice(&big_r);
-    ss.copy_from_slice(&c.scalar_bytes(&big_s));
-    Some(sig)
+    crate::dit::with(|| {
+        let (s, prefix) = expand(private)?;
+        let s = c.scalar(&s)?;
+        let r = c.scalar(&shake256(&[&dom, &prefix, msg], ED448_SIGSIZE)?)?;
+        let big_r = c.encode(&c.mul(&c.scalar_bytes(&r), &c.base));
+        let k = c.scalar(&shake256(&[&dom, &big_r, public, msg], ED448_SIGSIZE)?)?;
+        let big_s = c.l.add(&c.l.mul(&k, &s), &r);
+        let mut sig = [0u8; ED448_SIGSIZE];
+        let (sr, ss) = sig.split_at_mut(ED448_KEYLEN);
+        sr.copy_from_slice(&big_r);
+        ss.copy_from_slice(&c.scalar_bytes(&big_s));
+        Some(sig)
+    })
 }
 
 /// `ossl_ed448_verify`: whether `sig` signs `msg` for the public key: `S < L`, both points

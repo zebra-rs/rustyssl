@@ -569,16 +569,20 @@ ffi_export! {
         // if any bit is set, without a branch. (Passing each XOR through `black_box` instead
         // stores it to the stack, and stores of zeros time differently on some CPUs.)
         let (pa, pb) = (in_a.cast::<u8>(), in_b.cast::<u8>());
-        let mut x = 0u8;
-        for i in 0..len {
-            let (ai, bi) = (pa.wrapping_add(i), pb.wrapping_add(i));
-            // SAFETY: `i < len`, and `in_a` is valid for `len` bytes of reads (caller's guarantee).
-            let p = unsafe { ai.read_volatile() };
-            // SAFETY: as for `in_a`.
-            let q = unsafe { bi.read_volatile() };
-            x |= p ^ q;
-        }
-        let differs = u32::from(x).wrapping_neg() >> 31;
+        // In data-independent timing (`dit`): only reads and arithmetic run inside.
+        let differs = crate::dit::with(|| {
+            let mut x = 0u8;
+            for i in 0..len {
+                let (ai, bi) = (pa.wrapping_add(i), pb.wrapping_add(i));
+                // SAFETY: `i < len`, and `in_a` is valid for `len` bytes of reads (caller's
+                // guarantee).
+                let p = unsafe { ai.read_volatile() };
+                // SAFETY: as for `in_a`.
+                let q = unsafe { bi.read_volatile() };
+                x |= p ^ q;
+            }
+            u32::from(x).wrapping_neg() >> 31
+        });
         c_int::try_from(differs).unwrap_or(1)
     }
 }
