@@ -51,7 +51,7 @@ unsafe fn tag_of<T>(handle: *const Tagged<T>) -> u64 {
 unsafe fn strong<'a, T>(handle: *const Tagged<T>) -> &'a AtomicUsize {
     // SAFETY: the caller's guarantee; the count is outside the object, so this borrows nothing
     // a teardown has borrowed.
-    unsafe { &*(&raw const (*handle).strong) }
+    unsafe { &(*handle).strong }
 }
 
 /// Drops one reference of a handle whose tag has been checked; with the last, tears the object
@@ -68,11 +68,13 @@ unsafe fn release<H: Handle>(handle: *const Tagged<H::Object>) {
     fence(Ordering::Acquire);
     // SAFETY: the object is live; its teardown may reach it again through the handle, sharing
     // it.
-    H::teardown(unsafe { &*(&raw const (*handle).object) });
+    H::teardown(unsafe { &(*handle).object });
     let handle = handle.cast_mut();
     // SAFETY: that was the last reference, so nothing else uses the object; this borrows the
     // object alone, leaving the tag and the count readable while it drops.
-    unsafe { ManuallyDrop::drop(&mut *(&raw mut (*handle).object)) };
+    let object = unsafe { &mut (*handle).object };
+    // SAFETY: the object is dropped once, here; `ManuallyDrop` keeps the box from dropping it.
+    unsafe { ManuallyDrop::drop(object) };
     // SAFETY: the allocation came from `Box::into_raw` in `new_handle`, and its object is gone
     // (`ManuallyDrop` keeps the box from dropping it again).
     drop(unsafe { Box::from_raw(handle) });
@@ -129,7 +131,7 @@ pub(crate) unsafe trait Handle: Sized {
             return None;
         }
         // SAFETY: the tag says this is a live `Tagged<Self::Object>`.
-        Some(unsafe { &*(&raw const (*tagged).object) })
+        Some(unsafe { &(*tagged).object })
     }
 
     /// Adds a reference, as `*_up_ref` does. Returns `false` for null or a handle of another
@@ -229,7 +231,7 @@ impl<H: Handle> core::ops::Deref for Held<H> {
 
     fn deref(&self) -> &H::Object {
         // SAFETY: the guard owns a reference, so the object is live.
-        unsafe { &*(&raw const (*self.tagged).object) }
+        unsafe { &(*self.tagged).object }
     }
 }
 
