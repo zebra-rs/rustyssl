@@ -5549,7 +5549,7 @@ both libraries (step 8.1).
     (`OPENSSL_armcap_P`, `OPENSSL_cpuid_setup`, the `ossl_*` dispatch tables) because the macOS
     link doesn't restrict exports; no public header declares them, so they aren't part of the
     ABI, and rustyssl exports exactly `libcrypto.num` on every target (`abi-check`).
-- [ ] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
+- [x] **9.5 3.6 delta:** diff the 3.5 and 3.6 `.num` files and headers, implement the
   additions under the `OPENSSL_3.6.0` node, and re-run the full test plan against the 3.6
   reference.
   - Approach (ADR 0004): 3.6.5 is vendored beside 3.5.9 and `OPENSSL_SERIES` is `"3.6"`, so
@@ -5574,8 +5574,19 @@ both libraries (step 8.1).
     passes on all three targets: every 3.5 export is still at its node with its prototype,
     and 3.5's struct layouts are unchanged (3.6 only names `OPENSSL_sk_pop_free`'s function
     type `OPENSSL_sk_freefunc`, which the check resolves).
-    Left: the rest of the test plan against 3.6.5.
-  - 3.5 → 3.6 behavior changes found so far (for review; 3.6's are followed):
+  - Done (2026-10-19): the test plan against 3.6.5, on macOS (aarch64) and x86_64 Linux:
+    fmt, clippy, `cargo test`, codegen and coverage up to date, deny, vet; Miri on the host and
+    for x86_64 Linux (20 of 20 shards' runs each); `test-c` (261 programs, the reference's
+    output on both); the GCC `-Werror` checks; `test-apps` (46 commands); `test-interop` (64
+    cases in all four pairings); `test-openssl-suite` (109 `evp_test` files and 9 program
+    runs, rebuilt from 3.6.5); `test-wycheproof` (61339 tests agree); `test-differential`
+    (corpus and random sessions); `abi-check` with `compat35`; `test-providers` (oqs-provider as
+    on the reference). `test-openssl-suite --ssl`: 4659 of 4729 subtests pass on macOS (4661 of
+    the 4720 that pass on the reference on Linux); the rest are the known classes: tests that
+    read OpenSSL's private structures or call its internal functions (the `internal` lines of
+    `tests/openssl-suite/ssl.txt`) and QUIC (`SSL_set_quic_tls_cbs`, `OSSL_QUIC_client_method`;
+    Phase 10). `test-bogo` and `test-tlsfuzzer` weren't rerun against 3.6.5.
+  - 3.5 → 3.6 behavior changes (for users of the 3.5 LTS; 3.6's are followed):
     - `CRYPTO_aligned_alloc` rejects an alignment that is 0 or not a power of two
       (`ERR_R_PASSED_INVALID_ARGUMENT`), and `CRYPTO_realloc` failures leave an entry.
     - Typed stacks made by 3.6's headers free through a thunk (`OPENSSL_sk_set_thunks`).
