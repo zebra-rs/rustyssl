@@ -23,7 +23,7 @@ use rustyssl_abi::{
     ENGINE_R_ENGINES_SECTION_ERROR, ENGINE_R_NO_SUCH_ENGINE, ERR_LIB_ASN1, ERR_LIB_CONF,
     ERR_LIB_CRYPTO, ERR_LIB_DSO, ERR_LIB_ENGINE, ERR_LIB_EVP, ERR_R_ASN1_LIB, ERR_R_INTERNAL_ERROR,
     EVP_R_ERROR_LOADING_SECTION, EVP_R_SET_DEFAULT_PROPERTY_FAILURE, EVP_R_UNKNOWN_OPTION,
-    NID_undef, OPENSSL_STACK, OSSL_LIB_CTX, STABLE_FLAGS_CLEAR, STABLE_NO_MASK,
+    NID_undef, OPENSSL_STACK, OSSL_LIB_CTX, SSL_CONF_CMD, STABLE_FLAGS_CLEAR, STABLE_NO_MASK,
 };
 
 use super::modules::{CONF_imodule_get_value, FinishFn, InitFn, add_builtin};
@@ -508,7 +508,34 @@ pub(crate) struct SslName {
     pub(crate) name: CString,
     /// The commands and their arguments, in order (a name's leading part up to `.` dropped).
     pub(crate) cmds: Vec<(CString, CString)>,
+    /// The same as the array `conf_ssl_get` hands out (`ssl_conf_cmd_st`), pointing into
+    /// `cmds`, whose strings stay where they are until the set is dropped.
+    c_cmds: Vec<SslConfCmd>,
 }
+
+impl SslName {
+    fn new(name: CString, cmds: Vec<(CString, CString)>) -> Self {
+        let c_cmds = cmds
+            .iter()
+            .map(|(c, a)| SslConfCmd {
+                cmd: c.as_ptr().cast_mut(),
+                arg: a.as_ptr().cast_mut(),
+            })
+            .collect();
+        Self { name, cmds, c_cmds }
+    }
+}
+
+/// `struct ssl_conf_cmd_st`, which only these functions read (its layout is libcrypto's own).
+#[repr(C)]
+struct SslConfCmd {
+    cmd: *mut c_char,
+    arg: *mut c_char,
+}
+
+// SAFETY: the pointers are into the strings of the `SslName` that holds this, which are never
+// written; the set is shared under `SSL_NAMES`'s lock.
+unsafe impl Send for SslConfCmd {}
 
 /// The `ssl_conf` module's sets (OpenSSL's `ssl_names`), which `SSL_CTX_config` reads.
 pub(crate) static SSL_NAMES: Mutex<Vec<SslName>> = Mutex::new(Vec::new());
@@ -590,10 +617,88 @@ unsafe extern "C" fn ssl_module_init(md: *mut CONF_IMODULE, cnf: *const CONF) ->
         let Ok(name) = CString::new(unsafe { text(sect.name) }) else {
             return 0;
         };
-        names.push(SslName { name, cmds: list });
+        names.push(SslName::new(name, list));
     }
     *SSL_NAMES.lock().unwrap_or_else(PoisonError::into_inner) = names;
     1
+}
+
+ffi_export! {
+    /// The `idx`th set of commands from `conf_ssl_name_find`, its name in `*name` and its
+    /// number of commands in `*cnt`. Valid until the module is unloaded or configured again.
+    /// NULL (with a NULL name and no commands) past the last set, which OpenSSL would read.
+    ///
+    /// # Safety
+    /// `name` and `cnt` are writable.
+    pub unsafe extern "C" fn conf_ssl_get(idx: usize, name: *mut *const c_char, cnt: *mut usize) -> *const SSL_CONF_CMD
+    where failure = ptr::null(), library = ERR_LIB_CONF
+    {
+        let names = SSL_NAMES.lock().unwrap_or_else(PoisonError::into_inner);
+        let (n, c, cmds) = names.get(idx).map_or((ptr::null(), 0, ptr::null()), |s| {
+            (s.name.as_ptr(), s.c_cmds.len(), s.c_cmds.as_ptr().cast::<SSL_CONF_CMD>())
+        });
+        if !name.is_null() {
+            // SAFETY: the caller's slot.
+            unsafe { *name = n };
+        }
+        if !cnt.is_null() {
+            // SAFETY: the caller's slot.
+            unsafe { *cnt = c };
+        }
+        cmds
+    }
+}
+
+ffi_export! {
+    /// Finds the set of commands called `name`: 1 with its index in `*idx`, or 0 (also for a
+    /// NULL name).
+    ///
+    /// # Safety
+    /// `name` is NULL or a NUL-terminated string; `idx` is writable.
+    pub unsafe extern "C" fn conf_ssl_name_find(name: *const c_char, idx: *mut usize) -> c_int
+    where failure = 0, library = ERR_LIB_CONF
+    {
+        if name.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's string.
+        let name = unsafe { CStr::from_ptr(name) };
+        let names = SSL_NAMES.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(i) = names.iter().position(|s| s.name.as_c_str() == name) else { return 0 };
+        if idx.is_null() {
+            return 0;
+        }
+        // SAFETY: the caller's slot.
+        unsafe { *idx = i };
+        1
+    }
+}
+
+ffi_export! {
+    /// The `idx`th command of the set `cmd` (from `conf_ssl_get`): its name in `*cmdstr` and
+    /// its argument in `*arg`. Anything that isn't a current set, or an index past its last
+    /// command, gives NULLs where OpenSSL would read past it.
+    ///
+    /// # Safety
+    /// `cmdstr` and `arg` are writable.
+    pub unsafe extern "C" fn conf_ssl_get_cmd(cmd: *const SSL_CONF_CMD, idx: usize, cmdstr: *mut *mut c_char, arg: *mut *mut c_char)
+    where failure = (), library = ERR_LIB_CONF
+    {
+        let names = SSL_NAMES.lock().unwrap_or_else(PoisonError::into_inner);
+        let entry = names
+            .iter()
+            .find(|s| ptr::eq(s.c_cmds.as_ptr().cast::<SSL_CONF_CMD>(), cmd))
+            .and_then(|s| s.c_cmds.get(idx));
+        let (c, a) = entry.map_or((ptr::null_mut(), ptr::null_mut()), |e| (e.cmd, e.arg));
+        if !cmdstr.is_null() {
+            // SAFETY: the caller's slot.
+            unsafe { *cmdstr = c };
+        }
+        if !arg.is_null() {
+            // SAFETY: the caller's slot.
+            unsafe { *arg = a };
+        }
+    }
 }
 
 // --- providers (`provider_conf.c`) ---

@@ -256,6 +256,9 @@ const _: unsafe extern "C" fn(*mut ASN1_INTEGER, u64) -> core::ffi::c_int =
     crate::asn1::integer::ASN1_INTEGER_set_uint64;
 const _: unsafe extern "C" fn(*const ASN1_INTEGER, *mut BIGNUM) -> *mut BIGNUM =
     crate::bn::conv::ASN1_INTEGER_to_BN;
+const _: unsafe extern "C" fn(usize) -> *const ASN1_ITEM = crate::asn1::item_list::ASN1_ITEM_get;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const ASN1_ITEM =
+    crate::asn1::item_list::ASN1_ITEM_lookup;
 const _: unsafe extern "C" fn(*mut ASN1_NULL) = crate::asn1::tpl::items::ASN1_NULL_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_NULL_it;
 const _: unsafe extern "C" fn() -> *mut ASN1_NULL = crate::asn1::tpl::items::ASN1_NULL_new;
@@ -319,6 +322,20 @@ const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::A
 const _: unsafe extern "C" fn() -> *mut ASN1_STRING = crate::asn1::tpl::items::ASN1_PRINTABLE_new;
 const _: unsafe extern "C" fn(*const core::ffi::c_uchar, core::ffi::c_int) -> core::ffi::c_int =
     crate::asn1::text::ASN1_PRINTABLE_type;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) = crate::asn1::sctx::ASN1_SCTX_free;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *mut core::ffi::c_void =
+    crate::asn1::sctx::ASN1_SCTX_get_app_data;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> core::ffi::c_ulong =
+    crate::asn1::sctx::ASN1_SCTX_get_flags;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *const ASN1_ITEM =
+    crate::asn1::sctx::ASN1_SCTX_get_item;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX) -> *const ASN1_TEMPLATE =
+    crate::asn1::sctx::ASN1_SCTX_get_template;
+const _: unsafe extern "C" fn(
+    ::core::option::Option<unsafe extern "C" fn(ctx: *mut ASN1_SCTX) -> core::ffi::c_int>,
+) -> *mut ASN1_SCTX = crate::asn1::sctx::ASN1_SCTX_new;
+const _: unsafe extern "C" fn(*mut ASN1_SCTX, *mut core::ffi::c_void) =
+    crate::asn1::sctx::ASN1_SCTX_set_app_data;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SEQUENCE_ANY_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SEQUENCE_it;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::asn1::tpl::items::ASN1_SET_ANY_it;
@@ -1510,6 +1527,7 @@ const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::B
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::dgram_pair::BIO_s_dgram_pair;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::fd::BIO_s_fd;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::file::BIO_s_file;
+const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::log::BIO_s_log;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_mem;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::null::BIO_s_null;
 const _: unsafe extern "C" fn() -> *const BIO_METHOD = crate::bio::mem::BIO_s_secmem;
@@ -4519,6 +4537,44 @@ const _: unsafe extern "C" fn(*mut BIO, *const DSA) -> core::ffi::c_int =
     crate::evp::pkey::dsa::DSAparams_print;
 const _: unsafe extern "C" fn(*mut FILE, *const DSA) -> core::ffi::c_int =
     crate::evp::pkey::dsa::DSAparams_print_fp;
+const _: unsafe extern "C" fn() -> *mut DSO_METHOD = crate::dso::DSO_METHOD_openssl;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> DSO_FUNC_TYPE =
+    crate::dso::DSO_bind_func;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> *mut core::ffi::c_char =
+    crate::dso::DSO_convert_filename;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    core::ffi::c_int,
+    core::ffi::c_long,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_long = crate::dso::DSO_ctrl;
+const _: unsafe extern "C" fn(*mut core::ffi::c_void, core::ffi::c_int) -> *mut DSO =
+    crate::dso::DSO_dsobyaddr;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_flags;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_free;
+const _: unsafe extern "C" fn(*mut DSO) -> *const core::ffi::c_char = crate::dso::DSO_get_filename;
+const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *mut core::ffi::c_void =
+    crate::dso::DSO_global_lookup;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    *const core::ffi::c_char,
+    *mut DSO_METHOD,
+    core::ffi::c_int,
+) -> *mut DSO = crate::dso::DSO_load;
+const _: unsafe extern "C" fn(
+    *mut DSO,
+    *const core::ffi::c_char,
+    *const core::ffi::c_char,
+) -> *mut core::ffi::c_char = crate::dso::DSO_merge;
+const _: unsafe extern "C" fn() -> *mut DSO = crate::dso::DSO_new;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    *mut core::ffi::c_char,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::dso::DSO_pathbyaddr;
+const _: unsafe extern "C" fn(*mut DSO, *const core::ffi::c_char) -> core::ffi::c_int =
+    crate::dso::DSO_set_filename;
+const _: unsafe extern "C" fn(*mut DSO) -> core::ffi::c_int = crate::dso::DSO_up_ref;
 const _: unsafe extern "C" fn(
     *mut core::ffi::c_uchar,
     usize,
@@ -5802,6 +5858,38 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherInit_ex2;
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+    *mut *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineDecryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    usize,
+    usize,
+    *mut *const core::ffi::c_uchar,
+    usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineEncryptInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+    *const usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut *mut core::ffi::c_uchar,
+    *mut usize,
+    *const usize,
+    *mut *const core::ffi::c_uchar,
+    *const usize,
+) -> core::ffi::c_int = crate::evp::cipher_ctx::EVP_CipherPipelineUpdate;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
     *mut core::ffi::c_uchar,
     *mut core::ffi::c_int,
     *const core::ffi::c_uchar,
@@ -6494,6 +6582,19 @@ const _: unsafe extern "C" fn(*const EVP_MD) -> *const OSSL_PARAM =
     crate::evp::md_ctx::EVP_MD_settable_ctx_params;
 const _: unsafe extern "C" fn(*mut EVP_MD) -> core::ffi::c_int = crate::evp::digest::EVP_MD_up_ref;
 const _: unsafe extern "C" fn(*const EVP_MD) -> core::ffi::c_int = crate::evp::md_ctx::EVP_MD_xof;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::seal::EVP_OpenFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *const core::ffi::c_uchar,
+    core::ffi::c_int,
+    *const core::ffi::c_uchar,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::evp::seal::EVP_OpenInit;
 const _: unsafe extern "C" fn(
     *mut ASN1_OBJECT,
     *const core::ffi::c_char,
@@ -8276,6 +8377,20 @@ const _: unsafe extern "C" fn(
 ) -> *mut EVP_SKEY = crate::evp::skey::EVP_SKEY_to_provider;
 const _: unsafe extern "C" fn(*mut EVP_SKEY) -> core::ffi::c_int =
     crate::evp::skey::EVP_SKEY_up_ref;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::seal::EVP_SealFinal;
+const _: unsafe extern "C" fn(
+    *mut EVP_CIPHER_CTX,
+    *const EVP_CIPHER,
+    *mut *mut core::ffi::c_uchar,
+    *mut core::ffi::c_int,
+    *mut core::ffi::c_uchar,
+    *mut *mut EVP_PKEY,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::evp::seal::EVP_SealInit;
 const _: unsafe extern "C" fn(
     *mut EVP_MD_CTX,
     *mut core::ffi::c_uchar,
@@ -10755,6 +10870,39 @@ const _: unsafe extern "C" fn(
     core::ffi::c_int,
     core::ffi::c_int,
 ) -> *mut BIO = crate::http_client::OSSL_HTTP_transfer;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX_VALUE) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_free;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_IETF_ATTR_SYNTAX_VALUE =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_VALUE_new;
+const _: unsafe extern "C" fn(
+    *mut OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+    *mut core::ffi::c_void,
+) -> core::ffi::c_int = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_add1_value;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_free;
+const _: unsafe extern "C" fn(*const OSSL_IETF_ATTR_SYNTAX) -> *const GENERAL_NAMES =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get0_policyAuthority;
+const _: unsafe extern "C" fn(
+    *const OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+    *mut core::ffi::c_int,
+) -> *mut core::ffi::c_void = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get0_value;
+const _: unsafe extern "C" fn(*const OSSL_IETF_ATTR_SYNTAX) -> core::ffi::c_int =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_get_value_num;
+const _: unsafe extern "C" fn() -> *const ASN1_ITEM =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_it;
+const _: unsafe extern "C" fn() -> *mut OSSL_IETF_ATTR_SYNTAX =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_new;
+const _: unsafe extern "C" fn(
+    *mut BIO,
+    *mut OSSL_IETF_ATTR_SYNTAX,
+    core::ffi::c_int,
+) -> core::ffi::c_int = crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_print;
+const _: unsafe extern "C" fn(*mut OSSL_IETF_ATTR_SYNTAX, *mut GENERAL_NAMES) =
+    crate::x509::ietfatt::OSSL_IETF_ATTR_SYNTAX_set0_policyAuthority;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, *mut OSSL_INDICATOR_CALLBACK) =
     crate::libctx::OSSL_INDICATOR_get_callback;
 const _: unsafe extern "C" fn(*mut OSSL_LIB_CTX, OSSL_INDICATOR_CALLBACK) =
@@ -11517,6 +11665,8 @@ const _: unsafe extern "C" fn() -> *mut PBKDF2PARAM = crate::x509::pbe::PBKDF2PA
 const _: unsafe extern "C" fn(*mut PBMAC1PARAM) = crate::x509::pbe::PBMAC1PARAM_free;
 const _: unsafe extern "C" fn() -> *const ASN1_ITEM = crate::x509::pbe::PBMAC1PARAM_it;
 const _: unsafe extern "C" fn() -> *mut PBMAC1PARAM = crate::x509::pbe::PBMAC1PARAM_new;
+const _: unsafe extern "C" fn(*const X509_ALGOR) -> *mut PBKDF2PARAM =
+    crate::pkcs12::mutl::PBMAC1_get1_pbkdf2_param;
 const _: unsafe extern "C" fn(
     d2i_of_void,
     *const core::ffi::c_char,
@@ -11567,6 +11717,19 @@ const _: unsafe extern "C" fn(
     pem_password_cb,
     *mut core::ffi::c_void,
 ) -> core::ffi::c_int = crate::pem_cipher::PEM_ASN1_write_bio_ctx;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *mut core::ffi::c_uchar,
+    *mut core::ffi::c_uint,
+    *mut EVP_PKEY,
+) -> core::ffi::c_int = crate::pem_sign::PEM_SignFinal;
+const _: unsafe extern "C" fn(*mut EVP_MD_CTX, *mut EVP_MD) -> core::ffi::c_int =
+    crate::pem_sign::PEM_SignInit;
+const _: unsafe extern "C" fn(
+    *mut EVP_MD_CTX,
+    *const core::ffi::c_uchar,
+    core::ffi::c_uint,
+) -> core::ffi::c_int = crate::pem_sign::PEM_SignUpdate;
 const _: unsafe extern "C" fn(
     *mut FILE,
     *mut stack_st_X509_INFO,
@@ -12741,6 +12904,13 @@ const _: unsafe extern "C" fn(
     *const core::ffi::c_char,
     core::ffi::c_int,
 ) -> core::ffi::c_int = crate::pkcs12::mutl::PKCS12_verify_mac;
+const _: unsafe extern "C" fn(
+    *mut core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const core::ffi::c_uchar,
+    core::ffi::c_long,
+    *const EVP_MD,
+) -> core::ffi::c_int = crate::rsa_ops::PKCS1_MGF1;
 const _: unsafe extern "C" fn() = crate::evp::pbe::PKCS5_PBE_add;
 const _: unsafe extern "C" fn(
     *mut EVP_CIPHER_CTX,
@@ -17272,6 +17442,19 @@ const _: unsafe extern "C" fn(*mut *const core::ffi::c_uchar, core::ffi::c_long)
     crate::pvkfmt::b2i_PublicKey;
 const _: unsafe extern "C" fn(*mut BIO) -> *mut EVP_PKEY = crate::pvkfmt::b2i_PublicKey_bio;
 const _: unsafe extern "C" fn(
+    usize,
+    *mut *const core::ffi::c_char,
+    *mut usize,
+) -> *const SSL_CONF_CMD = crate::conf::builtin::conf_ssl_get;
+const _: unsafe extern "C" fn(
+    *const SSL_CONF_CMD,
+    usize,
+    *mut *mut core::ffi::c_char,
+    *mut *mut core::ffi::c_char,
+) = crate::conf::builtin::conf_ssl_get_cmd;
+const _: unsafe extern "C" fn(*const core::ffi::c_char, *mut usize) -> core::ffi::c_int =
+    crate::conf::builtin::conf_ssl_name_find;
+const _: unsafe extern "C" fn(
     *mut *mut ACCESS_DESCRIPTION,
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
@@ -17894,6 +18077,11 @@ const _: unsafe extern "C" fn(
     *mut *const core::ffi::c_uchar,
     core::ffi::c_long,
 ) -> *mut OSSL_HASH = crate::x509v3::attrdesc::d2i_OSSL_HASH;
+const _: unsafe extern "C" fn(
+    *mut *mut OSSL_IETF_ATTR_SYNTAX,
+    *mut *const core::ffi::c_uchar,
+    core::ffi::c_long,
+) -> *mut OSSL_IETF_ATTR_SYNTAX = crate::x509::ietfatt::d2i_OSSL_IETF_ATTR_SYNTAX;
 const _: unsafe extern "C" fn(
     *mut *mut OSSL_INFO_SYNTAX,
     *mut *const core::ffi::c_uchar,
@@ -18920,6 +19108,10 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::x509v3::timespec::i2d_OSSL_DAY_TIME_BAND;
 const _: unsafe extern "C" fn(*const OSSL_HASH, *mut *mut core::ffi::c_uchar) -> core::ffi::c_int =
     crate::x509v3::attrdesc::i2d_OSSL_HASH;
+const _: unsafe extern "C" fn(
+    *const OSSL_IETF_ATTR_SYNTAX,
+    *mut *mut core::ffi::c_uchar,
+) -> core::ffi::c_int = crate::x509::ietfatt::i2d_OSSL_IETF_ATTR_SYNTAX;
 const _: unsafe extern "C" fn(
     *const OSSL_INFO_SYNTAX,
     *mut *mut core::ffi::c_uchar,

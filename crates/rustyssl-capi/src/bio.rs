@@ -31,6 +31,7 @@ pub(crate) mod dump;
 pub(crate) mod evp;
 pub(crate) mod fd;
 pub(crate) mod file;
+pub(crate) mod log;
 pub(crate) mod mem;
 pub(crate) mod method;
 pub(crate) mod nbio;

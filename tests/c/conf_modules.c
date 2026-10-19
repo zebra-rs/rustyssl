@@ -33,6 +33,12 @@
 #include <openssl/provider.h>
 #include <openssl/x509v3.h>
 
+/* libcrypto's accessors of the ssl_conf module's sets (internal/sslconf.h, exported for libssl). */
+typedef struct ssl_conf_cmd_st SSL_CONF_CMD;
+const SSL_CONF_CMD *conf_ssl_get(size_t idx, const char **name, size_t *cnt);
+int conf_ssl_name_find(const char *name, size_t *idx);
+void conf_ssl_get_cmd(const SSL_CONF_CMD *cmd, size_t idx, char **cmdstr, char **arg);
+
 static int failures = 0;
 static int number = 0;
 static char path[128];
@@ -113,6 +119,30 @@ static void my_finish(CONF_IMODULE *md)
 {
     printf("# my_finish: name %s, data %s, flags %lu\n", CONF_imodule_get_name(md),
         CONF_imodule_get_usr_data(md) == md ? "its own" : "other", CONF_imodule_get_flags(md));
+}
+
+/* The ssl_conf sets `names` name, as libssl's SSL_CTX_config reads them. */
+static void ssl_sets(const char *const *names)
+{
+    for (; *names != NULL; names++) {
+        size_t idx = 99, cnt = 99, i;
+        const char *name = NULL;
+        const SSL_CONF_CMD *cmds;
+
+        if (!conf_ssl_name_find(*names, &idx)) {
+            printf("# ssl set %s: not found\n", *names);
+            continue;
+        }
+        cmds = conf_ssl_get(idx, &name, &cnt);
+        printf("# ssl set %s: index %zu, name %s, %zu commands:", *names, idx, name, cnt);
+        for (i = 0; i < cnt; i++) {
+            char *cmd = NULL, *arg = NULL;
+
+            conf_ssl_get_cmd(cmds, i, &cmd, &arg);
+            printf(" %s=%s", cmd, arg);
+        }
+        printf("\n");
+    }
 }
 
 static void test_flags(void)
@@ -200,6 +230,20 @@ static void test_modules(void)
         "[t]\n", NULL, 0);
     run("ssl_conf", "openssl_conf = init\n[init]\nssl_conf = s\n[s]\nsystem_default = t\n[t]\n"
         "CipherString = DEFAULT\n.MinProtocol = TLSv1.2\n", NULL, 0);
+    {
+        static const char *const one[] = { "system_default", "other", "", NULL };
+
+        ssl_sets(one);
+        check(conf_ssl_name_find(NULL, NULL) == 0, "conf_ssl_name_find of NULL");
+    }
+    run("ssl_conf: two sets", "openssl_conf = init\n[init]\nssl_conf = s\n[s]\nfirst = a\n"
+        "x.second = b\n[a]\nOptions = -SessionTicket\n[b]\nCiphersuites = TLS_AES_128_GCM_SHA256\n"
+        "y.z.Groups = X25519\n", NULL, 0);
+    {
+        static const char *const two[] = { "first", "x.second", "second", "system_default", NULL };
+
+        ssl_sets(two);
+    }
 
     run("random: unknown", "openssl_conf = init\n[init]\nrandom = r\n[r]\nfoo = bar\n", NULL, 0);
     run("random", "openssl_conf = init\n[init]\nrandom = r\n[r]\nrandom = CTR-DRBG\n"
