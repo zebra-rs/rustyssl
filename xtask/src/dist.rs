@@ -8,6 +8,7 @@
 //!   lib/libcrypto.so -> libcrypto.so.3      (and the same for libssl)
 //!   lib/libcrypto.a, lib/libssl.a
 //!   lib/pkgconfig/{libcrypto,libssl,openssl}.pc
+//!   lib/ossl-modules/legacy.so              (macOS: legacy.dylib, a bundle) the legacy provider
 //! ```
 //!
 //! Cargo builds each library as a static archive, and this links the shared library from it
@@ -22,7 +23,10 @@
 //!
 //! libcrypto is linked from its whole archive. libssl, both shared and as `libssl.a`, is
 //! built from the crate's forwarder objects alone, so it carries no second Rust runtime
-//! (docs/adr/0001-library-layout.md). Needs `ar` and `nm`; on Alpine, `llvm-libunwind-dev`.
+//! (docs/adr/0001-library-layout.md). The legacy provider's module is `libs/legacy/legacy.c`,
+//! compiled against the installed headers and linked against libcrypto, exporting only
+//! `OSSL_provider_init` (docs/adr/0003-external-providers.md). Needs `ar` and `nm`; on Alpine,
+//! `llvm-libunwind-dev`.
 
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -104,6 +108,8 @@ pub fn run(args: &[String]) -> Result {
     )?;
 
     install_headers(&abi, target, &dist)?;
+    println!("Linking the legacy provider's module...");
+    link_legacy_module(&root, target, &dist, &lib_dir, major, &work)?;
     // What static users of libcrypto must link besides it (pkg-config --static).
     write_pkgconfig(&lib_dir.join("pkgconfig"), version, &native)?;
     println!(
@@ -162,6 +168,57 @@ impl Shared {
             }
         }
     }
+}
+
+/// The legacy provider's module, `lib/ossl-modules/legacy.{so,dylib}`: OpenSSL's is a bundle
+/// on macOS and a shared object elsewhere, linked against libcrypto, and exports
+/// `OSSL_provider_init` (`providers.num`).
+fn link_legacy_module(
+    root: &Path,
+    target: &Target,
+    dist: &Path,
+    lib_dir: &Path,
+    major: &str,
+    work: &Path,
+) -> Result {
+    let modules = lib_dir.join("ossl-modules");
+    fs::create_dir_all(&modules)?;
+    let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
+    let object = work.join("legacy.o");
+    run_output(
+        Command::new(&cc)
+            .args(["-c", "-fPIC", "-O2", "-I"])
+            .arg(dist.join("include"))
+            .arg(root.join("libs/legacy/legacy.c"))
+            .arg("-o")
+            .arg(&object),
+    )?;
+    let mut cmd = Command::new(&cc);
+    if is_apple(target) {
+        let output = modules.join("legacy.dylib");
+        cmd.arg("-bundle")
+            .arg("-o")
+            .arg(&output)
+            .arg(&object)
+            .arg("-Wl,-exported_symbol,_OSSL_provider_init")
+            .arg(lib_dir.join(format!("libcrypto.{major}.dylib")));
+    } else {
+        let script = work.join("legacy.map");
+        fs::write(
+            &script,
+            "{\n    global: OSSL_provider_init;\n    local: *;\n};\n",
+        )?;
+        cmd.arg("-shared")
+            .arg("-o")
+            .arg(modules.join("legacy.so"))
+            .arg(&object)
+            .arg(link_arg("--version-script=", &script))
+            .arg("-L")
+            .arg(lib_dir)
+            .arg("-lcrypto");
+    }
+    run_output(&mut cmd)?;
+    Ok(())
 }
 
 fn is_apple(target: &Target) -> bool {

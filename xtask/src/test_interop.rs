@@ -151,6 +151,10 @@ impl Tool<'_> {
         c.args(args)
             .current_dir(self.work)
             .env(LOADER_PATH, if ours { self.ours } else { self.reference })
+            .env(
+                "OPENSSL_MODULES",
+                crate::test_c::modules_of(if ours { self.ours } else { self.reference }),
+            )
             .env("OPENSSL_CONF", MISSING_CONFIG);
         c
     }

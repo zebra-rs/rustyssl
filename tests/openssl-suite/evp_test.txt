@@ -7,7 +7,9 @@
 # (PEM_read_bio_*) and the key-generation files their key types (Phase 4), for instance;
 # evpciph_aes_stitched.txt (the AES-CBC-HMAC composites, offered on x86_64 with
 # AES-NI) needs TLS record mode (`tls-version`), which arrives with libssl in Phase 7. The
-# legacy provider isn't loaded (test/default.cnf), so its tests are skipped.
+# runs load the default and legacy providers (test/default-and-legacy.cnf), as the recipe does
+# when the legacy module is built; each library finds its own module through OPENSSL_MODULES.
+# evpciph_rc4_stitched.txt waits for the legacy provider's RC4-HMAC-MD5.
 evpciph_aes_ccm_cavs.txt
 evpciph_aes_common.txt
 evpciph_aes_cts.txt
@@ -26,7 +28,6 @@ evpciph_des3_common.txt
 evpciph_idea.txt
 evpciph_rc2.txt
 evpciph_rc4.txt
-evpciph_rc4_stitched.txt
 evpciph_rc5.txt
 evpciph_seed.txt
 evpciph_sm4.txt

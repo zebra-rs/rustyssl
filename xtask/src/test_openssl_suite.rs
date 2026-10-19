@@ -199,6 +199,7 @@ fn run_evp_test(
         .arg(config)
         .arg(file)
         .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(Stdio::null())
         .output()
@@ -226,6 +227,7 @@ fn run_program(
     let out = Command::new(program)
         .args(files)
         .env(LOADER_PATH, lib)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(Stdio::null())
         .output()
@@ -296,7 +298,9 @@ fn run_crypto(
     let suite = ensure(root, version, reference, &crypto_build())?;
     let evp_test = suite.join("evp_test");
     let src = reference.join("src");
-    let config = src.join("test/default.cnf");
+    // `30-test_evp.t`'s configuration when the legacy module is built: the default and legacy
+    // providers, each library finding its own module (`OPENSSL_MODULES`).
+    let config = src.join("test/default-and-legacy.cnf");
     let data = src.join("test/recipes/30-test_evp_data");
 
     let list = fs::read_to_string(root.join("tests/openssl-suite/evp_test.txt"))?;

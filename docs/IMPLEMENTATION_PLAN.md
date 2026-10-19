@@ -5441,12 +5441,31 @@ both libraries (step 8.1).
     - `Handle::hold` brought back an object being destroyed (a provider's teardown freeing a
       child context): now fixed.
     - The suite's subtests shared one working directory.
+  - The `legacy` provider, as a module (ADR 0003 item 8):
+    - `lib/ossl-modules/legacy.{so,dylib}`, built by `cargo xtask dist` from
+      `libs/legacy/legacy.c`, a forwarder to libcrypto's `rustyssl_private_legacy_provider_init`.
+    - Its algorithms, in `legacyprov.c`'s order:
+      - digests: MD4, MDC2 (with `pad-type`), Whirlpool, RIPEMD-160;
+      - ciphers: CAST5, BF, IDEA and SEED in ECB/CBC/OFB/CFB; RC2 ECB/CBC/40/64/CFB/OFB;
+        RC4 and RC4-40; DESX-CBC; DES ECB/CBC/OFB/CFB/CFB1/CFB8;
+      - KDFs: PBKDF1, PVKKDF.
+    - Behavior:
+      - BF, CAST5, RC2 and RC4 take variable key lengths
+        (`ossl_cipher_var_keylen_set_ctx_params`).
+      - RC2 has `rc2-keybits` and its AlgorithmIdentifier parameters both ways. Where the
+        reference writes past a short buffer, ours fails instead.
+      - DES and DESX make random keys.
+    - Tests:
+      - Upstream `evp_test` now runs under `default-and-legacy.cnf`, as the recipe does when
+        the module is built. The legacy files pass on rustyssl as on the reference: bf, cast5,
+        des, idea, rc2, rc4, seed, mdc2, whirlpool, ripemd, md (MD4), pbkdf1, pvkkdf.
+      - `tests/c/provider_legacy.c` (155 checks) covers loading the module from
+        `OPENSSL_MODULES` and through a configuration file, every algorithm on known inputs,
+        RC2's parameters, DES's random keys, and a search path without the module.
+    - Every harness points each library at its own modules directory (`OPENSSL_MODULES`).
   - Left:
-    - The `legacy` provider: it doesn't exist yet. Its algorithms are MD4, MDC2, Whirlpool,
-      RIPEMD-160, DES (ECB/CBC/CFB/CFB1/CFB8/OFB), DESX, BF, CAST5, IDEA, SEED, RC2 (and 40/64),
-      RC4, RC4-40, RC4-HMAC-MD5, PBKDF1 and PVKKDF, over the existing low-level primitives.
-      It also needs the module in `lib/ossl-modules/` (`libs/legacy`, ADR 0003 item 8) and
-      each harness pointing each library at its own modules directory.
+    - RC4-HMAC-MD5. Until its TLS-stitched MAC is ported, it fails to fetch, as an unknown
+      algorithm does, and `evpciph_rc4_stitched.txt` fails.
     - Validation with oqs-provider, pkcs11-provider and tpm2-openssl.
 - [ ] **9.2 Remaining custom-method APIs:** `RSA_meth_*`, `EC_KEY_METHOD_*`, `DH_meth_*`,
   `DSA_meth_*`, `RAND_METHOD`, `UI_METHOD`, `X509_LOOKUP_METHOD`.

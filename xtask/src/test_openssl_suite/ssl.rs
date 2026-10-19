@@ -343,6 +343,7 @@ impl Setting<'_> {
             .args(args)
             .current_dir(&cwd)
             .env(LOADER_PATH, lib)
+            .env("OPENSSL_MODULES", crate::test_c::modules_of(lib))
             .env("OPENSSL_CONF", MISSING_CONFIG)
             .env("OPENSSL_ENGINES", self.suite)
             .env("TEST_CERTS_DIR", self.src.join("test/certs"))

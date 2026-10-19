@@ -87,12 +87,17 @@ running a module's `OSSL_provider_init`, and the upcalls beyond `core_get_libctx
    instead of being dereferenced.
 
 8. **The `legacy` provider is a module, as OpenSSL ships it.** Its algorithms are implemented in
-   libcrypto, next to the default provider's, behind an init function that libcrypto exports to
-   the module only (`rustyssl_private_legacy_provider_init`, in the `RUSTYSSL_PRIVATE` version
-   node, as ADR 0001's libssl forwarders do). The module (`libs/legacy`, a static archive that
-   `cargo xtask dist` links into `lib/ossl-modules/legacy.so` or `legacy.dylib`) defines only
-   `OSSL_provider_init`, a one-branch forwarder to it. So `OSSL_PROVIDER_load(NULL, "legacy")`
-   needs the module file to be present, as with OpenSSL, and finds it where OpenSSL would.
+   libcrypto, next to the default provider's (`provider/digests.rs`, `ciphers.rs`, `kdfs.rs`),
+   behind an init function that libcrypto exports to the module only
+   (`rustyssl_private_legacy_provider_init`, in the `RUSTYSSL_PRIVATE` version node, as ADR
+   0001's libssl forwarders do). The module is `libs/legacy/legacy.c`, a C file that defines
+   only `OSSL_provider_init`, a one-branch forwarder to it. `cargo xtask dist` compiles it
+   against the installed headers and links it against libcrypto into `lib/ossl-modules/`:
+   `legacy.dylib` (a bundle, as OpenSSL's) on macOS, `legacy.so` elsewhere. It exports only
+   `OSSL_provider_init`, as `providers.num` asks. So `OSSL_PROVIDER_load(NULL, "legacy")` needs
+   the module file to be present, and finds it where OpenSSL would: the search path, else
+   `$OPENSSL_MODULES`, else `MODULESDIR`. The test harnesses point each run at its own library's
+   modules (`OPENSSL_MODULES`), since the reference's module and ours aren't interchangeable.
 
 9. **Two consequences of rule 7, recorded.** OpenSSL calls the child-provider callbacks
    holding its store's lock; rustyssl copies the callbacks and providers out and calls with

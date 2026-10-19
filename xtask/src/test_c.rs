@@ -27,6 +27,12 @@ pub const CFLAGS: &[&str] = &["-std=c99", "-Wall", "-Wextra", "-Werror", "-g"];
 const TIMEOUT: Duration = Duration::from_secs(120);
 
 /// The variable that makes the dynamic loader look in a directory first.
+/// A library directory's provider modules (`lib/ossl-modules`), as `OPENSSL_MODULES` points each
+/// run at its own library's: the reference's legacy module and ours aren't interchangeable.
+pub fn modules_of(lib: &std::path::Path) -> std::path::PathBuf {
+    lib.join("ossl-modules")
+}
+
 pub const LOADER_PATH: &str = if cfg!(target_os = "macos") {
     "DYLD_LIBRARY_PATH"
 } else {
@@ -191,6 +197,7 @@ pub fn execute_with_input(
     }
     let mut child = command
         .env(LOADER_PATH, lib_dir)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib_dir))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .stdin(stdin)
         .stdout(fs::File::create(&stdout_path)?)

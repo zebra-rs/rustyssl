@@ -278,6 +278,7 @@ fn execute(
     let mut cmd = Command::new(runner);
     cmd.current_dir(runner_dir)
         .env(LOADER_PATH, lib_dir)
+        .env("OPENSSL_MODULES", crate::test_c::modules_of(lib_dir))
         .env("OPENSSL_CONF", MISSING_CONFIG)
         .env("BOGO_SHIM_LOG", &log_dir)
         .arg("-shim-path")
