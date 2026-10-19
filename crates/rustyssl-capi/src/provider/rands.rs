@@ -3639,7 +3639,10 @@ mod tests {
         EVP_RAND_CTX_free, EVP_RAND_CTX_get_params, EVP_RAND_CTX_new, EVP_RAND_CTX_set_params,
         EVP_RAND_fetch, EVP_RAND_free, EVP_RAND_instantiate, EVP_RAND_nonce,
     };
-    use crate::params::{OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_uint};
+    use crate::params::{
+        OSSL_PARAM_construct_octet_string, OSSL_PARAM_construct_uint,
+        OSSL_PARAM_construct_utf8_string,
+    };
 
     /// A context of the random algorithm `name` under `parent`.
     fn rand_ctx(

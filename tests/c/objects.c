@@ -251,10 +251,18 @@ static void creating(void)
     ASN1_OBJECT_free(o);
     check(OBJ_add_object(added) == nid, "adding an added object again is harmless");
     o = ASN1_OBJECT_create(nid, (unsigned char *)"\x2a\x03\x05\x08", 4, "replacingSN", NULL);
-    check(OBJ_add_object(o) == nid && OBJ_nid2obj(nid) != added && OBJ_txt2nid("1.2.3.5.7") == nid
-              && OBJ_sn2nid("addedSN") == nid && OBJ_sn2nid("replacingSN") == nid,
-          "an object added under the same NID replaces it by NID only");
+    check(OBJ_add_object(o) == NID_undef && OBJ_nid2obj(nid) == added && OBJ_txt2nid("1.2.3.5.7") == nid
+              && OBJ_txt2nid("1.2.3.5.8") == NID_undef && OBJ_sn2nid("replacingSN") == NID_undef,
+          "a different object under an added NID is refused");
     ASN1_OBJECT_free(o);
+    o = ASN1_OBJECT_create(OBJ_new_nid(1), (unsigned char *)"\x2a\x03\x05\x07", 4, "otherSN", NULL);
+    check(OBJ_add_object(o) == NID_undef && OBJ_sn2nid("otherSN") == NID_undef,
+          "so is an added OID under another NID");
+    ASN1_OBJECT_free(o);
+    o = ASN1_OBJECT_create(OBJ_new_nid(1), (unsigned char *)"\x55\x04\x03", 3, "cnAgain", NULL);
+    check(OBJ_add_object(o) == NID_undef && OBJ_sn2nid("cnAgain") == NID_undef, "and a built-in OID");
+    ASN1_OBJECT_free(o);
+    check(OBJ_add_object(OBJ_nid2obj(NID_commonName)) == NID_undef, "and a built-in object");
 
     in = BIO_new(BIO_s_mem());
     BIO_puts(in, "1.2.3.6.1 fileSN1 file long name 1\n"

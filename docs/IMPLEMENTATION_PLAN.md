@@ -5608,6 +5608,11 @@ both libraries (step 8.1).
       (`hmac_fetch_algs`), so one given only a digest doesn't instantiate, and a refused digest
       keeps the MAC; CTR-DRBG ignores `properties` that aren't a string (3.5 refused them;
       `propquery`).
+    - `OBJ_add_object` registrations are immutable (`objects.rs`, `add_object`): a NID within
+      the built-in table, a built-in OID or name, or any key (OID, name, NID) already added by
+      a different object gives `NID_undef` (3.5 replaced the older object under each key, and
+      crashed on a built-in object, a deviation now gone); adding the same object again
+      returns its NID.
 
 **Exit:** M6.
 

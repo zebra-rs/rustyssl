@@ -364,43 +364,124 @@ unsafe fn dup(object: *const Object) -> *mut Object {
     copy
 }
 
-/// `OBJ_add_object` (and `OBJ_create`'s last step): keeps a copy of `object` for the life of
-/// the process under its NID, content octets, and names. Returns its NID, or `NID_undef`.
+/// Whether two objects have the same content octets and names (OpenSSL's `obj_equivalent`).
+///
+/// # Safety
+/// Both are live objects.
+unsafe fn equivalent(a: *const Object, b: *const Object) -> bool {
+    // SAFETY: the caller's guarantee.
+    let (x, y) = unsafe { (&*a, &*b) };
+    // SAFETY: as above.
+    let same_names = unsafe { c_text(x.sn) == c_text(y.sn) && c_text(x.ln) == c_text(y.ln) };
+    // SAFETY: as above.
+    x.length == y.length && unsafe { content(a) == content(b) } && same_names
+}
+
+/// OpenSSL 3.6's `add_object`: keeps a copy of `object` for the life of the process under its
+/// NID, content octets, and names, and returns its NID, or `NID_undef`.
+///
+/// `OBJ_create` (`indirect`) passes an object without a NID, which gets a new one;
+/// `OBJ_add_object` passes one with a NID past the built-in table whose OID and names aren't
+/// built in. Registrations are immutable: if any key is already added, the result is that
+/// object's NID when `object` has the same NID and is equivalent, else `NID_undef` (3.5
+/// replaced the older object under each key).
 ///
 /// # Safety
 /// `object` is NULL or a live object.
-unsafe fn add_object(object: *const Object) -> c_int {
-    // SAFETY: the caller's guarantee.
-    let kept = unsafe { dup(object) };
-    if kept.is_null() {
+unsafe fn add_object(object: *const Object, indirect: bool) -> c_int {
+    if object.is_null() {
         return NID_undef;
     }
+    // SAFETY: the caller's guarantee.
+    let view = unsafe { &*object };
+    let builtin_nids = c_int::try_from(table::objects().len()).unwrap_or(c_int::MAX);
+    let kept = if indirect {
+        if view.nid != NID_undef {
+            return NID_undef;
+        }
+        let nid = next_nid(1);
+        if nid < builtin_nids {
+            return NID_undef;
+        }
+        // SAFETY: the caller's guarantee.
+        let kept = unsafe { dup(object) };
+        if kept.is_null() || kept.cast_const() == object {
+            return NID_undef;
+        }
+        // SAFETY: a copy, not yet shared.
+        unsafe { (*kept).nid = nid };
+        kept
+    } else {
+        // SAFETY: the caller's guarantee: its names are strings, its data its length.
+        let (data, sn, ln) = unsafe { (content(object), c_text(view.sn), c_text(view.ln)) };
+        if view.nid < builtin_nids
+            || table::by_der(data).is_some()
+            || sn.is_some_and(|sn| table::by_short_name(sn).is_some())
+            || ln.is_some_and(|ln| table::by_long_name(ln).is_some())
+        {
+            return NID_undef;
+        }
+        // SAFETY: the caller's guarantee.
+        let kept = unsafe { dup(object) };
+        if kept.is_null() {
+            return NID_undef;
+        }
+        kept
+    };
     // SAFETY: a copy (or a kept object), live.
     let view = unsafe { &*kept };
     let nid = view.nid;
     // SAFETY: as above.
     let data = unsafe { content(kept) }.to_vec();
     // SAFETY: its names are strings.
-    let sn = unsafe { c_text(view.sn) };
+    let sn = unsafe { c_text(view.sn) }.map(<[u8]>::to_vec);
     // SAFETY: as above.
-    let ln = unsafe { c_text(view.ln) };
-    if kept.cast_const() != object {
-        // SAFETY: the copy isn't shared yet; from now on it is kept and never freed.
-        unsafe { (*kept).flags &= !FLAGS_ALL_DYNAMIC };
-    }
+    let ln = unsafe { c_text(view.ln) }.map(<[u8]>::to_vec);
     before_added();
     let mut added = ADDED.write().unwrap_or_else(PoisonError::into_inner);
     let added = added.get_or_insert_with(Added::default);
+    // The last key found, in OpenSSL's order: content, short name, long name, NID.
+    let existing = [
+        (!data.is_empty())
+            .then(|| added.by_data.get(&data))
+            .flatten(),
+        sn.as_ref().and_then(|sn| added.by_short_name.get(sn)),
+        ln.as_ref().and_then(|ln| added.by_long_name.get(ln)),
+        added.by_nid.get(&nid),
+    ]
+    .into_iter()
+    .flatten()
+    .last()
+    .copied();
+    if let Some(Kept(existing)) = existing {
+        // SAFETY: added objects are always live; `object` is the caller's.
+        let same = unsafe { (*object).nid == (*existing).nid && equivalent(object, existing) };
+        // SAFETY: as above.
+        let result = if same {
+            unsafe { (*existing).nid }
+        } else {
+            NID_undef
+        };
+        if kept != existing {
+            // SAFETY: the copy made here, not shared.
+            unsafe { free_object(kept) };
+        }
+        return result;
+    }
     if !data.is_empty() {
         added.by_data.insert(data, Kept(kept));
     }
     if let Some(sn) = sn {
-        added.by_short_name.insert(sn.to_vec(), Kept(kept));
+        added.by_short_name.insert(sn, Kept(kept));
     }
     if let Some(ln) = ln {
-        added.by_long_name.insert(ln.to_vec(), Kept(kept));
+        added.by_long_name.insert(ln, Kept(kept));
     }
     added.by_nid.insert(nid, Kept(kept));
+    if kept.cast_const() != object {
+        // SAFETY: from now on the copy is kept and never freed; nothing else writes it yet.
+        unsafe { (*kept).flags &= !FLAGS_ALL_DYNAMIC };
+    }
     nid
 }
 
@@ -1005,12 +1086,12 @@ ffi_export! {
         {
             // SAFETY: an object made here (a known one was refused above), not shared.
             let target = unsafe { &mut *made };
-            target.nid = next_nid(1);
+            target.nid = NID_undef;
             target.sn = sn;
             target.ln = ln;
         }
         // SAFETY: a live object; the copy takes its own names.
-        let nid = unsafe { add_object(made) };
+        let nid = unsafe { add_object(made, true) };
         {
             // SAFETY: as above; the names are the caller's, so they're detached before freeing.
             let target = unsafe { &mut *made };
@@ -1024,10 +1105,9 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// Adds a copy of `obj` under its NID, OID, and names; returns its NID.
-    ///
-    /// Unlike OpenSSL, adding a built-in object keeps it as it is rather than crashing on a
-    /// write to read-only memory (docs/DEVIATIONS.md).
+    /// Adds a copy of `obj` under its NID, OID, and names; returns its NID. The NID must be
+    /// past the built-in ones, the OID and names not built in, and none of its keys added
+    /// before unless by the same object (whose NID it then returns); else `NID_undef`.
     ///
     /// # Safety
     /// `obj` is NULL or a live object.
@@ -1035,7 +1115,7 @@ ffi_export! {
     where failure = NID_undef, library = ERR_LIB_OBJ
     {
         // SAFETY: the caller's guarantee.
-        unsafe { add_object(obj.cast()) }
+        unsafe { add_object(obj.cast(), false) }
     }
 }
 
@@ -1393,11 +1473,11 @@ mod tests {
     }
 
     #[test]
-    fn adding_a_built_in_object_keeps_it() {
+    fn adding_a_built_in_object_is_refused() {
         // SAFETY: no preconditions.
         let cn = unsafe { OBJ_nid2obj(13) };
         // SAFETY: a built-in object, which stays as it is.
-        assert_eq!(unsafe { OBJ_add_object(cn) }, 13);
+        assert_eq!(unsafe { OBJ_add_object(cn) }, NID_undef);
         // SAFETY: still live and unchanged.
         assert_eq!(unsafe { (*cn.cast::<Object>()).flags }, 0);
     }
