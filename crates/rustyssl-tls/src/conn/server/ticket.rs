@@ -251,6 +251,15 @@ fn get_prev_session_inner(c: &mut Connection, p: &dyn Provider) -> Result<Option
     if !sess.ems && received_ems {
         return miss(c);
     }
+    // 3.6: before TLS 1.3, a session whose ID isn't the one the ClientHello offered (a
+    // corrupt cache entry, an external cache returning the wrong session, tampering) isn't
+    // resumed; the handshake goes on as a full one, without err's bookkeeping.
+    if !c.is_tls13() {
+        let sid = super::hello::client_session_id(c)?;
+        if !sid.is_empty() && sess.session_id != sid {
+            return Ok(Some(false));
+        }
+    }
     c.neg.verify_result = sess.verify_result;
     c.neg.peer_chain.clone_from(&sess.peer_chain);
     c.neg.session = sess;
