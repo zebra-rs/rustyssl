@@ -19,6 +19,13 @@
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
 //!
+//! Output that is random by design (key and parameter generation, randomized signatures) is
+//! compared structurally: in `command ... | check ...`, each run of `command` is followed by
+//! `check` with upstream's tool on the reference libraries, reading the command's standard
+//! output (further `| check` stages chain the same way). What is compared is the command's
+//! exit status and the last check's output, with runs of hex-dump lines (`    01:ab:...`)
+//! collapsed to one; a `< file` comes before the first `|`.
+//!
 //! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
 //! shared helpers) on each library.
 //!
@@ -160,12 +167,14 @@ struct Setup {
     subst: Vec<(&'static str, String)>,
 }
 
-/// One line of a list: its arguments, its standard input, and whether it is compared.
+/// One line of a list: its arguments, its standard input, whether it is compared, and the
+/// checks its output is piped through (each one's arguments).
 struct Line {
     text: String,
     compare: bool,
     args: Vec<String>,
     stdin: Option<PathBuf>,
+    checks: Vec<Vec<String>>,
 }
 
 fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
@@ -188,6 +197,11 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
                 a
             })
             .collect();
+        let mut checks: Vec<Vec<String>> = Vec::new();
+        while let Some(at) = args.iter().rposition(|a| a == "|") {
+            checks.insert(0, args.split_off(at + 1));
+            args.pop();
+        }
         let mut stdin = None;
         if args.len() >= 2 && args.get(args.len() - 2).is_some_and(|a| a == "<") {
             stdin = args.pop().map(PathBuf::from);
@@ -198,6 +212,7 @@ fn parse_list(text: &str, setup: &Setup) -> Vec<Line> {
             compare,
             args,
             stdin,
+            checks,
         });
     }
     out
@@ -215,6 +230,64 @@ fn ported(root: &Path, command: &str) -> bool {
             .is_file()
 }
 
+/// Runs a line's command with `tool` on `lib`, then its checks (if any) with upstream's tool on
+/// the reference, each reading the previous one's standard output. With checks, the result is
+/// the command's exit status and the last check's output, hex dumps collapsed.
+fn run_line(setup: &Setup, line: &Line, tool: &Path, lib: &Path) -> Result<Output> {
+    let w = &setup.work;
+    let first = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
+    if line.checks.is_empty() {
+        return Ok(first);
+    }
+    let mut prev = first.stdout.clone();
+    let mut last = None;
+    for check in &line.checks {
+        let piped = w.join("pipe.in");
+        fs::write(&piped, &prev)?;
+        let out = run_tool(&setup.upstream, &setup.ref_lib, check, Some(&piped), w)?;
+        prev = out.stdout.clone();
+        last = Some(out);
+    }
+    let last = last.ok_or("no check")?;
+    let text = format!(
+        "[command: {}]\n{}",
+        if first.ok { "success" } else { "failure" },
+        collapse_hex(&last.text)
+    );
+    Ok(Output {
+        stdout: last.stdout,
+        stderr: last.stderr,
+        text,
+        ok: first.ok && last.ok,
+    })
+}
+
+/// Collapses each run of hex-dump lines (`    00:c3:...`, the random parts of a printed key)
+/// into one `HEX` line.
+fn collapse_hex(text: &str) -> String {
+    let is_hex = |l: &str| {
+        let t = l.trim();
+        l.starts_with(' ')
+            && !t.is_empty()
+            && t.split(':')
+                .filter(|p| !p.is_empty())
+                .all(|p| p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit()))
+    };
+    let mut out: Vec<&str> = Vec::new();
+    for l in text.lines() {
+        if is_hex(l) {
+            if out.last() != Some(&"HEX") {
+                out.push("HEX");
+            }
+        } else {
+            out.push(l);
+        }
+    }
+    let mut s = out.join("\n");
+    s.push('\n');
+    s
+}
+
 /// Runs one line: upstream's tool on the reference (the expectation), then the runs `ours`
 /// lists, each as (tool, libraries, label).
 fn check(
@@ -222,16 +295,9 @@ fn check(
     line: &Line,
     runs: &[(&Path, &Path, &str)],
 ) -> Result<std::result::Result<(), String>> {
-    let w = &setup.work;
-    let expected = run_tool(
-        &setup.upstream,
-        &setup.ref_lib,
-        &line.args,
-        line.stdin.as_deref(),
-        w,
-    )?;
+    let expected = run_line(setup, line, &setup.upstream, &setup.ref_lib)?;
     for (tool, lib, label) in runs {
-        let got = run_tool(tool, lib, &line.args, line.stdin.as_deref(), w)?;
+        let got = run_line(setup, line, tool, lib)?;
         let verdict = if line.compare {
             compare(&expected, &got, label)
         } else if expected.ok && got.ok {
@@ -503,5 +569,21 @@ mod tests {
         assert_eq!(lines[1].args, ["enc", "-base64", "-in", "/w/t"]);
         assert_eq!(lines[2].args, ["x509", "-noout"]);
         assert_eq!(lines[2].stdin.as_deref(), Some(Path::new("/w/t")));
+        let piped = parse_list("genrsa 512 < {txt} | rsa -check | pkey -noout\n", &setup);
+        assert_eq!(piped[0].args, ["genrsa", "512"]);
+        assert_eq!(piped[0].stdin.as_deref(), Some(Path::new("/w/t")));
+        assert_eq!(
+            piped[0].checks,
+            [vec!["rsa", "-check"], vec!["pkey", "-noout"]]
+        );
+    }
+
+    #[test]
+    fn hex_collapses() {
+        assert_eq!(
+            collapse_hex("modulus:\n    00:c3:\n    ab:01\nexponent: 3\n    12\n"),
+            "modulus:\nHEX\nexponent: 3\nHEX\n"
+        );
+        assert_eq!(collapse_hex("a: 1:\n"), "a: 1:\n");
     }
 }

@@ -35,3 +35,10 @@ pub mod store;
 pub mod ui;
 pub mod verify;
 pub mod x509;
+// The key commands' (fork G2).
+pub mod bn;
+pub mod encoder;
+pub mod obj;
+pub mod params;
+pub mod pkcs8;
+pub mod skey;

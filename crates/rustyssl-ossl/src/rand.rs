@@ -20,3 +20,9 @@ pub fn write_file(name: &str) -> i32 {
     // SAFETY: n is a valid C string.
     unsafe { ffi::RAND_write_file(n.as_ptr()) }
 }
+
+/// `RAND_status()`.
+pub fn status() -> bool {
+    // SAFETY: no arguments.
+    unsafe { ffi::RAND_status() == 1 }
+}

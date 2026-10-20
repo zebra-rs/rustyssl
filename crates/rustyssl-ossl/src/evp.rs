@@ -99,3 +99,17 @@ impl Md {
         Self::from_ptr(unsafe { ffi::EVP_get_digestbyname(n.as_ptr()) }.cast_mut())
     }
 }
+
+impl Cipher {
+    /// `EVP_CIPHER_get0_name`.
+    pub fn name(&self) -> Option<String> {
+        // SAFETY: the cipher is live; the name is static or the cipher's, and copied.
+        crate::util::string_at(unsafe { ffi::EVP_CIPHER_get0_name(self.as_ptr()) })
+    }
+
+    /// `EVP_aes_256_cbc()` (a legacy, static cipher; dropping it is a no-op).
+    pub fn aes_256_cbc() -> Option<Self> {
+        // SAFETY: no arguments; EVP_CIPHER_free ignores the static result.
+        Self::from_ptr(unsafe { ffi::EVP_aes_256_cbc() }.cast_mut())
+    }
+}

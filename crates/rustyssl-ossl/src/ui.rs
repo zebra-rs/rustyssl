@@ -295,3 +295,21 @@ pub unsafe extern "C" fn password_callback(
     crate::util::openssl_free(prompt.cast());
     res
 }
+
+/// `EVP_read_pw_string(buf, len, prompt, verify)`: what it returns (0 on success), and the
+/// password read (zeroed buffer copied out; at most `len - 1` bytes).
+pub fn read_pw_string(len: usize, prompt: &str, verify: bool) -> (c_int, Vec<u8>) {
+    let Some(p) = crate::cstring(prompt) else {
+        return (-1, Vec::new());
+    };
+    let mut buf = vec![0u8; len.max(1) + 1];
+    let n = c_int::try_from(len).unwrap_or(c_int::MAX);
+    // SAFETY: buf has room for len bytes plus a NUL; p is a valid C string.
+    let r = unsafe {
+        ffi::EVP_read_pw_string(buf.as_mut_ptr().cast(), n, p.as_ptr(), c_int::from(verify))
+    };
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(0);
+    let pw = buf.get(..end).unwrap_or_default().to_vec();
+    buf.fill(0);
+    (r, pw)
+}

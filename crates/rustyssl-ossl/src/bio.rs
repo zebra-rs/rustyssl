@@ -169,3 +169,36 @@ impl io::Write for &Bio {
         Ok(())
     }
 }
+
+impl Bio {
+    /// `BIO_set_mem_eof_return(bio, v)`.
+    pub fn set_mem_eof_return(&self, v: core::ffi::c_long) {
+        // SAFETY: a memory BIO's command with no pointer argument; the BIO is live.
+        unsafe {
+            ffi::BIO_ctrl(
+                self.as_ptr(),
+                crate::abi::BIO_C_SET_BUF_MEM_EOF_RETURN,
+                v,
+                core::ptr::null_mut(),
+            )
+        };
+    }
+
+    /// `BIO_dump(bio, data, len)`.
+    pub fn dump(&self, data: &[u8]) -> c_int {
+        let Ok(n) = c_int::try_from(data.len()) else {
+            return -1;
+        };
+        // SAFETY: data is valid for n bytes; the BIO is live.
+        unsafe { ffi::BIO_dump(self.as_ptr(), data.as_ptr().cast(), n) }
+    }
+
+    /// `ASN1_parse_dump(bio, data, len, indent, dump)`.
+    pub fn asn1_parse_dump(&self, data: &[u8], indent: c_int, dump: c_int) -> c_int {
+        let Ok(n) = core::ffi::c_long::try_from(data.len()) else {
+            return 0;
+        };
+        // SAFETY: data is valid for n bytes; the BIO is live.
+        unsafe { ffi::ASN1_parse_dump(self.as_ptr(), data.as_ptr(), n, indent, dump) }
+    }
+}

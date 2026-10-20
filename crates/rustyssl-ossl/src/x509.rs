@@ -530,3 +530,11 @@ pub fn load_http_crl(url: &str) -> Option<Crl> {
         ffi::X509_CRL_load_http(u.as_ptr(), core::ptr::null_mut(), core::ptr::null_mut(), 0)
     })
 }
+
+impl Cert {
+    /// `X509_get_pubkey`.
+    pub fn pubkey(&self) -> Option<Pkey> {
+        // SAFETY: the certificate is live; the key is a new reference, ours.
+        Pkey::from_raw(unsafe { ffi::X509_get_pubkey(self.as_ptr()) })
+    }
+}
