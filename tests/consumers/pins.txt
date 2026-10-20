@@ -1,0 +1,17 @@
+# Consumers for `cargo xtask test-consumers` (TEST_PLAN.md, layer L8): each built against the
+# reference OpenSSL, its own test suite run with the reference's libraries and with rustyssl's.
+#
+# Each source tree is a GitHub tarball of a release's commit, checked against its SHA-256 sum:
+#   pin <name> <owner/repository> <commit> <sha256 of the tarball>
+
+# rust: rust-openssl's openssl-v0.10.81 (openssl-sys 0.9.117), the `openssl` crate's tests.
+pin rust-openssl sfackler/rust-openssl db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c 2e36415cd90c174a63b34e06d7cf26b34924f3a930c26ff782129b044075e4a7
+
+# ruby: the openssl gem v4.0.2, its test suite (test/openssl).
+pin ruby-openssl ruby/openssl 6e410b804f4c6a52c146fe651941bafdbb332754 b36966b11c377554d7c20c1f821a8c87cdd05961518a304c8f771f9f489dbd1b
+
+# pyca: cryptography 50.0.2, its test suite (vectors from the same tree).
+pin cryptography pyca/cryptography 4dda5c7fe4ae71b8925f2551910a0ef959df9c7a 6471dd1d85685ec951a5457b1098161b73cccd165d267a420487ce1256bdd0eb
+
+# node: Node.js v24.22.0 (LTS), built with --shared-openssl; test/parallel/test-crypto*, test-tls*.
+pin node nodejs/node f14cd3aa7bf9ca8df2cc5b8bb14beb0f335b1d93 a56a49f1950bb1f69c2fb4ac2eb2e8aaaf79baf9250162e395670d0b5553f19c
