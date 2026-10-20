@@ -131,10 +131,16 @@ impl Port {
         peer: PeerAddr,
         now: Time,
     ) -> Result<ChannelId> {
-        if self.cfg.listen || !self.channels.is_empty() {
+        // A listening port takes outgoing connections too (with connection IDs to route by); a
+        // client's port has one.
+        if !self.cfg.listen && !self.channels.is_empty() {
             return Err(Error::internal("port cannot connect"));
         }
-        let ch = Channel::connect(p, hs, peer, &self.cfg.channel, now)?;
+        let mut cfg = self.cfg.channel.clone();
+        if self.cfg.listen {
+            cfg.local_cid_len = LOCAL_CID_LEN;
+        }
+        let ch = Channel::connect(p, hs, peer, &cfg, now)?;
         let id = self.insert(ch);
         Ok(id)
     }

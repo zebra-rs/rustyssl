@@ -45,6 +45,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_write_early_data(s: *mut SSL, buf: *const c_void, num: usize, written: *mut usize) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         const F: &str = "SSL_write_early_data";
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
@@ -135,6 +139,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_read_early_data(s: *mut SSL, buf: *mut c_void, num: usize, readbytes: *mut usize) -> c_int
     where failure = SSL_READ_EARLY_DATA_ERROR, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            err::raise(ERR_LIB_SSL, rustyssl_abi::ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED, "SSL_read_early_data");
+            return rustyssl_abi::SSL_READ_EARLY_DATA_ERROR;
+        }
         const F: &str = "SSL_read_early_data";
         // SAFETY: the caller's guarantee.
         let server = unsafe { ssl(s) }.is_some_and(|x| x.state().server);

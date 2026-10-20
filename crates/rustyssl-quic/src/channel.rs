@@ -92,6 +92,9 @@ pub struct ChannelConfig {
     pub idle_timeout_ms: u64,
     /// A client's address-validation token (from a NEW_TOKEN), sent in its Initials.
     pub token: Vec<u8>,
+    /// A client's own connection ID length: 0, except on a port that also listens (OpenSSL's
+    /// `SSL_new_from_listener`), which routes by it.
+    pub local_cid_len: usize,
 }
 
 impl Default for ChannelConfig {
@@ -99,6 +102,7 @@ impl Default for ChannelConfig {
         Self {
             idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
             token: Vec::new(),
+            local_cid_len: 0,
         }
     }
 }
@@ -331,17 +335,13 @@ impl Channel {
     ) -> Result<Self> {
         let dcid = random_cid(p, INIT_DCID_LEN)?;
         let keys = packet::initial_keys(p, dcid.as_bytes())?;
+        let local_cid = if cfg.local_cid_len == 0 {
+            ConnId::default()
+        } else {
+            random_cid(p, cfg.local_cid_len)?
+        };
         // (tx, rx): a client writes with the client's keys and reads with the server's.
-        let mut ch = Self::base(
-            false,
-            hs,
-            peer,
-            cfg,
-            ConnId::default(),
-            dcid.clone(),
-            dcid,
-            keys,
-        );
+        let mut ch = Self::base(false, hs, peer, cfg, local_cid, dcid.clone(), dcid, keys);
         ch.token = cfg.token.clone();
         if !ch.hs.alpn_configured() {
             // quic_tls.c refuses to start a client without ALPN.

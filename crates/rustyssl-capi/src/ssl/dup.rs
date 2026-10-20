@@ -205,6 +205,10 @@ ffi_export! {
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return ptr::null_mut();
+        }
+        // SAFETY: the caller's guarantee.
         if unsafe { ssl(s) }.is_none() {
             return ptr::null_mut();
         }

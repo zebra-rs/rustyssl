@@ -281,11 +281,119 @@ static void test_connection(void)
     free_pair(&p);
 }
 
+/*
+ * A listener that validates addresses (Retry, the default), as quicapitest's
+ * test_ssl_accept_connection: the connection is accepted before its handshake completes, then
+ * SSL_connect and SSL_accept run it.
+ */
+static void test_validated(void)
+{
+    SSL_CTX *cctx = client_ctx(), *sctx = server_ctx();
+    SSL *listener, *client, *server = NULL;
+    BIO *cb = NULL, *sb = NULL;
+    BIO_ADDR *peer;
+    int r, i, cdone = 0, sdone = 0;
+
+    printf("# a validating listener\n");
+    BIO_new_bio_dgram_pair(&cb, 0, &sb, 0);
+    bind_end(sb, 8040);
+    listener = SSL_new_listener(sctx, 0);
+    SSL_set_bio(listener, sb, sb);
+    check(SSL_listen(listener) == 1, "SSL_listen");
+    client = SSL_new(cctx);
+    bind_end(cb, 8040);
+    peer = addr(8040);
+    SSL_set1_initial_peer_addr(client, peer);
+    BIO_ADDR_free(peer);
+    SSL_set_alpn_protos(client, alpn, sizeof(alpn));
+    SSL_set_bio(client, cb, cb);
+
+    r = SSL_accept(listener);
+    printf("  SSL_accept on the listener: %d, %s\n", r, err_name(SSL_get_error(listener, r)));
+    errors("listener accept");
+    for (i = 0; i < 2; i++) {
+        r = SSL_connect(client);
+        printf("  connect %d: %d, %s\n", i, r, err_name(SSL_get_error(client, r)));
+        SSL_handle_events(listener);
+    }
+    server = SSL_accept_connection(listener, 0);
+    check(server != NULL, "the connection is accepted before its handshake completes");
+    if (server != NULL) {
+        printf("  server init finished: %d\n", SSL_is_init_finished(server));
+        for (i = 0; i < 1000000 && !(cdone && sdone); i++) {
+            if (!cdone && SSL_connect(client) == 1)
+                cdone = 1;
+            if (!sdone && SSL_accept(server) == 1)
+                sdone = 1;
+        }
+        check(cdone && sdone, "SSL_connect and SSL_accept complete the handshake");
+    }
+    ERR_clear_error();
+    SSL_free(server);
+    SSL_free(client);
+    SSL_free(listener);
+    SSL_CTX_free(cctx);
+    SSL_CTX_free(sctx);
+}
+
+static SSL *info_ssl;
+
+static void info_cb(const SSL *s, int where, int ret)
+{
+    (void)ret;
+    if (where == SSL_CB_HANDSHAKE_DONE)
+        info_ssl = (SSL *)s;
+}
+
+/* A client connection on a listener's port (SSL_new_from_listener) to another listener. */
+static void test_from_listener(void)
+{
+    SSL_CTX *lctx = server_ctx(), *sctx = server_ctx();
+    SSL *l1, *l2, *conn;
+    BIO *b1 = NULL, *b2 = NULL;
+    BIO_ADDR *peer;
+    int r, i;
+
+    printf("# a connection from a listener\n");
+    SSL_CTX_set_info_callback(lctx, info_cb);
+    BIO_new_bio_dgram_pair(&b1, 0, &b2, 0);
+    bind_end(b1, 8041);
+    bind_end(b2, 4081);
+    l1 = SSL_new_listener(lctx, 0);
+    SSL_set_bio(l1, b1, b1);
+    l2 = SSL_new_listener(sctx, 0);
+    SSL_set_bio(l2, b2, b2);
+    check(SSL_listen(l1) == 1 && SSL_listen(l2) == 1, "two listeners");
+    check(SSL_new_from_listener(l1, 1) == NULL, "SSL_new_from_listener refuses flags");
+    conn = SSL_new_from_listener(l1, 0);
+    check(conn != NULL, "SSL_new_from_listener");
+    printf("  is_connection %d, listener is its listener %d\n", SSL_is_connection(conn),
+           SSL_get0_listener(conn) == l1);
+    peer = addr(4081);
+    SSL_set1_initial_peer_addr(conn, peer);
+    BIO_ADDR_free(peer);
+    SSL_set_alpn_protos(conn, alpn, sizeof(alpn));
+    for (i = 0; i < 1000000 && (r = SSL_do_handshake(conn)) == -1; i++) {
+        SSL_handle_events(l2);
+        SSL_handle_events(l1);
+    }
+    check(r == 1, "the handshake completes");
+    check(info_ssl == conn, "the info callback gets the connection object");
+    ERR_clear_error();
+    SSL_free(conn);
+    SSL_free(l1);
+    SSL_free(l2);
+    SSL_CTX_free(lctx);
+    SSL_CTX_free(sctx);
+}
+
 int main(void)
 {
     cert = ed_cert(&key);
     test_objects();
     test_connection();
+    test_validated();
+    test_from_listener();
     X509_free(cert);
     EVP_PKEY_free(key);
     printf("1..%d\n", number);

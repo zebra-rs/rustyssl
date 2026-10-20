@@ -707,6 +707,11 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return c_int::try_from(unsafe { super::super::quic::api::pending(s) }).unwrap_or(c_int::MAX);
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         x.state().drv.tls.as_ref().map_or(0, |c| c_int::try_from(c.pending_app()).unwrap_or(c_int::MAX))
     }
@@ -720,6 +725,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_has_pending(s: *const SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::super::quic::api::has_pending(s) };
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         x.state().drv.tls.as_ref().map_or(0, |c| c_int::from(c.pending_app() > 0 || c.buffered_input() > 0))

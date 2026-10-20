@@ -778,6 +778,11 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::poll_descriptor(s, desc, false) };
+        }
+        // SAFETY: the caller's guarantee.
         let r = unsafe { rustyssl_private_SSL_get_rbio(s) };
         if r.is_null() {
             return 0;
@@ -795,6 +800,11 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_wpoll_descriptor(s: *mut SSL, desc: *mut BIO_POLL_DESCRIPTOR) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::poll_descriptor(s, desc, true) };
+        }
         // SAFETY: the caller's guarantee.
         let w = unsafe { rustyssl_private_SSL_get_wbio(s) };
         if w.is_null() {

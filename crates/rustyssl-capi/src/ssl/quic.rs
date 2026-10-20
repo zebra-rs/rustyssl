@@ -44,6 +44,7 @@ pub(crate) enum Kind {
     Conn,
     Listener,
     Stream,
+    Domain,
 }
 
 /// The QUIC part of an `SSL` handle.
@@ -87,6 +88,19 @@ pub(crate) struct StreamApi {
     pub(crate) ssl_mode: u32,
     /// An all-or-nothing write in progress: the buffer's address, length, and what's taken.
     pub(crate) aon: Option<(usize, usize, usize)>,
+    pub(crate) ssl_options: u64,
+}
+
+impl StreamApi {
+    /// A stream's state with its connection's defaults (`create_xso_from_stream`).
+    pub(crate) fn new(id: u64, ssl_mode: u32, conn_options: u64) -> Self {
+        Self {
+            id,
+            ssl_mode,
+            aon: None,
+            ssl_options: conn_options & api::permitted_stream(),
+        }
+    }
 }
 
 /// A connection's API state (`QUIC_CONNECTION`).
@@ -103,6 +117,8 @@ pub(crate) struct ConnRec {
     pub(crate) incoming_policy: c_int,
     pub(crate) incoming_aec: u64,
     pub(crate) default_ssl_mode: u32,
+    /// The options new streams take.
+    pub(crate) default_ssl_options: u64,
     pub(crate) last_error: c_int,
     pub(crate) started: bool,
     pub(crate) shutting_down: bool,
@@ -135,10 +151,16 @@ pub(crate) struct ListenerRec {
     pub(crate) listening: bool,
 }
 
+/// A domain's API state: its listeners' engines.
+pub(crate) struct DomainRec {
+    pub(crate) members: Vec<std::sync::Weak<Engine>>,
+}
+
 pub(crate) enum Rec {
     Conn(ConnRec),
     Stream(StreamRec),
     Listener(ListenerRec),
+    Domain(DomainRec),
 }
 
 /// A port, and the objects on it.
@@ -167,6 +189,10 @@ pub(crate) struct EngineState {
     pub(crate) desires_blocking: bool,
     /// Each object's `SSL_VALUE_EVENT_HANDLING_MODE`.
     pub(crate) event_mode: BTreeMap<usize, u64>,
+    /// The domain flags of the objects on it (`SSL_get_domain_flags`).
+    pub(crate) domain_flags: u64,
+    /// The domain a listener was made from (a reference held), or NULL.
+    pub(crate) domain: *mut SSL,
     /// The network BIOs (a reference held each).
     pub(crate) net_rbio: *mut BIO,
     pub(crate) net_wbio: *mut BIO,
@@ -233,6 +259,9 @@ impl Engine {
                 event_mode: BTreeMap::new(),
                 net_rbio: ptr::null_mut(),
                 net_wbio: ptr::null_mut(),
+                // SAFETY: the caller's live context.
+                domain_flags: unsafe { super::ctx::ctx(ctx) }.map_or(0, |c| c.state().domain_flags),
+                domain: ptr::null_mut(),
             }),
         })
     }
@@ -302,6 +331,9 @@ impl EngineState {
             }
             (Kind::Listener, _) => {
                 free.extend(self.accept_queue.drain(..));
+                if !self.domain.is_null() {
+                    free.push(core::mem::replace(&mut self.domain, ptr::null_mut()));
+                }
                 for (id, _) in self.pending.drain(..) {
                     self.port.remove(id);
                 }
@@ -322,17 +354,12 @@ impl EngineState {
         if rbio.is_null() {
             return;
         }
-        // SAFETY: the owner's live BIO.
-        let src = unsafe { caps(rbio) } & u64::from(BIO_DGRAM_CAP_PROVIDES_SRC_ADDR) != 0;
         let mut buf = vec![0u8; 65536];
         let fallback = self.default_peer();
         for _ in 0..64 {
+            // The source address, which a BIO that knows it fills (as the demuxer asks).
             // SAFETY: no preconditions.
-            let peer = if src {
-                unsafe { addr::BIO_ADDR_new() }
-            } else {
-                ptr::null_mut()
-            };
+            let peer = unsafe { addr::BIO_ADDR_new() };
             let mut msg = BIO_MSG {
                 data: buf.as_mut_ptr().cast::<c_void>(),
                 data_len: buf.len(),
@@ -357,7 +384,10 @@ impl EngineState {
             // SAFETY: the mark set above.
             unsafe { crate::err::ERR_pop_to_mark() };
             let got = ok == 1 && n == 1;
-            let from = if got && !peer.is_null() {
+            // SAFETY: our address, or NULL.
+            let known =
+                !peer.is_null() && unsafe { addr::BIO_ADDR_family(peer) } != libc::AF_UNSPEC;
+            let from = if got && known {
                 // SAFETY: the address the BIO filled.
                 unsafe { peer_of(peer) }
             } else {
@@ -746,10 +776,11 @@ unsafe fn make_incoming(
     unsafe { super::conn::rustyssl_private_SSL_set_accept_state(s) };
     attach_tls(x, sh);
     let mode = x.state().mode;
-    engine.lock().objs.insert(
-        s.addr(),
-        Rec::Conn(ConnRec::new(s, Arc::clone(sh), true, mode)),
-    );
+    // SAFETY: the listener's live context.
+    let ctx_options = unsafe { super::ctx::ctx(ctx) }.map_or(0, |c| c.state().options);
+    let mut rec = ConnRec::new(s, Arc::clone(sh), true, mode);
+    api::init_options(x, &mut rec, ctx_options);
+    engine.lock().objs.insert(s.addr(), Rec::Conn(rec));
     let _ = x.quic.set(Quic {
         kind: Kind::Conn,
         engine: Arc::clone(engine),
@@ -771,6 +802,7 @@ impl ConnRec {
             incoming_policy: SSL_INCOMING_STREAM_POLICY_AUTO,
             incoming_aec: 0,
             default_ssl_mode: mode,
+            default_ssl_options: 0,
             last_error: SSL_ERROR_NONE,
             started: false,
             shutting_down: false,

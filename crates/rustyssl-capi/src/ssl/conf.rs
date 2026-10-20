@@ -1010,9 +1010,14 @@ unsafe fn run(cc: &ConfCtx, t: Target, cmd: Cmd, value: &CStr) -> c_int {
             };
             let mut rv = 0;
             if has_ctx {
-                // No QUIC methods exist yet, so a context is never a QUIC one.
+                // QUIC pads at the packet level: ignored for a QUIC context.
                 // SAFETY: the target's context.
-                rv = unsafe { rustyssl_private_SSL_CTX_set_block_padding_ex(t.ctx, block, hs) };
+                rv = if unsafe { super::quic::api::is_quic_ctx(t.ctx) } {
+                    1
+                } else {
+                    // SAFETY: as above.
+                    unsafe { rustyssl_private_SSL_CTX_set_block_padding_ex(t.ctx, block, hs) }
+                };
             }
             if has_ssl {
                 // SAFETY: the target's connection.

@@ -34,6 +34,7 @@ use crate::ssl::conn::{Ssl, ssl};
 const C: u32 = 1;
 const S: u32 = 2;
 const L: u32 = 4;
+const D: u32 = 0x80;
 const NO_ERROR: u32 = 0x100;
 
 /// An object resolved for a call (`QCTX`).
@@ -52,7 +53,8 @@ fn wrong_type(flags: u32) {
     if flags & NO_ERROR != 0 {
         return;
     }
-    let reason = match flags & (C | S | L) {
+    let reason = match flags & (C | S | L | D) {
+        D => rustyssl_abi::SSL_R_DOMAIN_USE_ONLY,
         L => SSL_R_LISTENER_USE_ONLY,
         C => SSL_R_CONN_USE_ONLY,
         x if x == S || x == C | S => SSL_R_NO_STREAM,
@@ -77,6 +79,13 @@ unsafe fn expect<'a>(s: *const SSL, flags: u32) -> Option<Qctx<'a>> {
     };
     let q = x.quic.get()?;
     let (conn, is_stream) = match q.kind {
+        Kind::Domain => {
+            if flags & D == 0 {
+                wrong_type(flags);
+                return None;
+            }
+            (0, false)
+        }
         Kind::Listener => {
             if flags & L == 0 {
                 wrong_type(flags);
@@ -227,13 +236,12 @@ pub(crate) unsafe fn ssl_new(ctx: *mut SSL_CTX) -> Option<*mut SSL> {
     unsafe { crate::ssl::conn::rustyssl_private_SSL_set_connect_state(s) };
     let engine = Engine::new(ctx, false, false);
     let mode = x.state().mode;
+    let mut rec = ConnRec::new(s, Shared::new(false), false, mode);
+    init_options(x, &mut rec, c.state().options);
     {
         let mut es = engine.lock();
         es.owner = s;
-        es.objs.insert(
-            s.addr(),
-            Rec::Conn(ConnRec::new(s, Shared::new(false), false, mode)),
-        );
+        es.objs.insert(s.addr(), Rec::Conn(rec));
     }
     let _ = x.quic.set(Quic {
         kind: Kind::Conn,
@@ -446,6 +454,13 @@ pub(crate) unsafe fn handshake(s: *mut SSL) -> c_int {
 /// # Safety
 /// `q` is a live object's; no lock is held.
 pub(crate) unsafe fn handle_events(q: &Quic) -> c_int {
+    if q.kind == Kind::Domain {
+        for e in domain_members(q) {
+            // SAFETY: the caller's guarantee.
+            unsafe { super::tick(&e) };
+        }
+        return 1;
+    }
     // SAFETY: the caller's guarantee.
     unsafe { super::tick(&q.engine) };
     1
@@ -552,20 +567,16 @@ unsafe fn make_stream(engine: &Arc<Engine>, conn_s: *mut SSL, id: u64) -> *mut S
     unsafe { crate::ssl::conn::rustyssl_private_SSL_up_ref(conn_s) };
     {
         let mut es = engine.lock();
-        let mode = es.conn(conn_s.addr()).map_or(0, |r| {
+        let (mode, opts) = es.conn(conn_s.addr()).map_or((0, 0), |r| {
             r.streams = r.streams.saturating_add(1);
-            r.default_ssl_mode
+            (r.default_ssl_mode, r.default_ssl_options)
         });
         es.objs.insert(
             s.addr(),
             Rec::Stream(StreamRec {
                 conn: conn_s.addr(),
                 conn_s,
-                api: StreamApi {
-                    id,
-                    ssl_mode: mode,
-                    aon: None,
-                },
+                api: StreamApi::new(id, mode, opts),
                 last_error: SSL_ERROR_NONE,
             }),
         );
@@ -677,17 +688,13 @@ fn default_for_write(c: &Qctx<'_>, es: &mut EngineState) -> bool {
         return false;
     }
     let uni = r.default_stream_mode == u32::try_from(SSL_DEFAULT_STREAM_MODE_AUTO_UNI).unwrap_or(2);
-    let mode = r.default_ssl_mode;
+    let (mode, opts) = (r.default_ssl_mode, r.default_ssl_options);
     let Some(id) = es.channel_of(c.conn).and_then(|ch| ch.stream_open(!uni)) else {
         c.non_normal(es, SSL_R_STREAM_COUNT_LIMITED, "quic_conn_stream_new");
         return false;
     };
     if let Some(r) = es.conn(c.conn) {
-        r.default_stream = Some(StreamApi {
-            id,
-            ssl_mode: mode,
-            aon: None,
-        });
+        r.default_stream = Some(StreamApi::new(id, mode, opts));
         r.default_created = true;
     }
     true
@@ -712,7 +719,7 @@ unsafe fn default_for_read(c: &Qctx<'_>, peek: bool) -> bool {
             return false;
         }
         let server = r.server;
-        let mode = r.default_ssl_mode;
+        let (mode, opts) = (r.default_ssl_mode, r.default_ssl_options);
         // The peer's first stream: ordinal 0, bidi or uni.
         let first = [u64::from(!server), u64::from(!server) | 2];
         let now = es.now();
@@ -725,11 +732,7 @@ unsafe fn default_for_read(c: &Qctx<'_>, peek: bool) -> bool {
         });
         if let Some(id) = found {
             if let Some(r) = es.conn(c.conn) {
-                r.default_stream = Some(StreamApi {
-                    id,
-                    ssl_mode: mode,
-                    aon: None,
-                });
+                r.default_stream = Some(StreamApi::new(id, mode, opts));
                 r.default_created = true;
             }
             return true;
@@ -1386,8 +1389,13 @@ pub(crate) fn net_write_desired(_q: &Quic) -> c_int {
 /// `SSL_get0_domain`: no QUIC object here belongs to a domain.
 pub(crate) fn get0_domain(s: *mut SSL) -> *mut SSL {
     // SAFETY: the export's caller passes a live object.
-    let _ = unsafe { expect(s, C | S | L) };
-    ptr::null_mut()
+    let Some(c) = (unsafe { expect(s, C | S | L | D) }) else {
+        return ptr::null_mut();
+    };
+    if c.q.kind == Kind::Domain {
+        return s;
+    }
+    c.engine().lock().domain
 }
 
 /// `expect_quic_with_stream_lock(s, remote_init=0)`: a stream object, or a connection whose
@@ -1644,16 +1652,31 @@ pub(crate) unsafe fn conn_close_info(
 }
 
 /// `SSL_new_listener_from`: listeners on a domain (none here: no object is a domain).
-pub(crate) fn new_listener_from(s: *mut SSL, _flags: u64) -> *mut SSL {
+pub(crate) fn new_listener_from(s: *mut SSL, flags: u64) -> *mut SSL {
     // SAFETY: the export's caller passes a live object.
-    if unsafe { ssl(s) }.is_some() {
-        err::raise(
-            ERR_LIB_SSL,
-            rustyssl_abi::SSL_R_DOMAIN_USE_ONLY,
-            "wrong_type",
-        );
+    let Some(c) = (unsafe { expect(s, D) }) else {
+        return ptr::null_mut();
+    };
+    let ctx = c.x.state().ctx;
+    // SAFETY: the domain's live context.
+    let l = unsafe { new_listener(ctx, flags) };
+    // SAFETY: the new listener, or NULL.
+    let Some(lq) = (unsafe { super::of(l) }) else {
+        return ptr::null_mut();
+    };
+    // The listener holds a reference to its domain.
+    // SAFETY: the live domain.
+    unsafe { crate::ssl::conn::rustyssl_private_SSL_up_ref(s) };
+    let flags = c.engine().lock().domain_flags;
+    {
+        let mut es = lq.engine.lock();
+        es.domain = s;
+        es.domain_flags = flags;
     }
-    ptr::null_mut()
+    if let Some(Rec::Domain(d)) = c.engine().lock().objs.get_mut(&c.q.key()) {
+        d.members.push(Arc::downgrade(&lq.engine));
+    }
+    l
 }
 
 /// `SSL_new_from_listener`: a client connection on a listener's port.
@@ -1682,9 +1705,12 @@ pub(crate) unsafe fn new_from_listener(s: *mut SSL, flags: u64) -> *mut SSL {
     // SAFETY: the live listener.
     unsafe { crate::ssl::conn::rustyssl_private_SSL_up_ref(s) };
     let mode = x.state().mode;
+    // SAFETY: the listener's live context.
+    let ctx_options = unsafe { crate::ssl::ctx::ctx(ctx) }.map_or(0, |c| c.state().options);
     {
         let mut es = engine.lock();
         let mut r = ConnRec::new(n, Shared::new(false), false, mode);
+        init_options(x, &mut r, ctx_options);
         r.listener = s;
         es.objs.insert(n.addr(), Rec::Conn(r));
     }
@@ -1696,13 +1722,69 @@ pub(crate) unsafe fn new_from_listener(s: *mut SSL, flags: u64) -> *mut SSL {
     n
 }
 
-/// `SSL_new_domain`: domains aren't supported here yet (fails as an allocation failure would).
+/// `SSL_new_domain` (`ossl_quic_new_domain`): an object whose listeners share its domain
+/// flags, and which ticks them all.
 ///
 /// # Safety
 /// `ctx` is a live QUIC context.
-pub(crate) unsafe fn new_domain(_ctx: *mut SSL_CTX, _flags: u64) -> *mut SSL {
-    err::raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED, "ossl_quic_new_domain");
-    ptr::null_mut()
+pub(crate) unsafe fn new_domain(ctx: *mut SSL_CTX, flags: u64) -> *mut SSL {
+    use rustyssl_abi::{
+        SSL_DOMAIN_FLAG_MULTI_THREAD, SSL_DOMAIN_FLAG_SINGLE_THREAD,
+        SSL_DOMAIN_FLAG_THREAD_ASSISTED,
+    };
+    // SAFETY: the caller's guarantee.
+    let Some(cx) = (unsafe { crate::ssl::ctx::ctx(ctx) }) else {
+        return ptr::null_mut();
+    };
+    let ctx_flags = cx.state().domain_flags;
+    let threading = u64::from(
+        SSL_DOMAIN_FLAG_SINGLE_THREAD
+            | SSL_DOMAIN_FLAG_MULTI_THREAD
+            | SSL_DOMAIN_FLAG_THREAD_ASSISTED,
+    );
+    let wanted = if flags & threading != 0 {
+        flags
+    } else {
+        ctx_flags | flags
+    };
+    let Some(domain_flags) = adjust_domain_flags(wanted) else {
+        return ptr::null_mut();
+    };
+    // SAFETY: the caller's guarantee.
+    let s = unsafe { crate::ssl::conn::new_ssl(ctx) };
+    // SAFETY: the new object, or NULL.
+    let Some(x) = (unsafe { ssl(s) }) else {
+        return ptr::null_mut();
+    };
+    let engine = Engine::new(ctx, false, false);
+    {
+        let mut es = engine.lock();
+        es.domain_flags = domain_flags;
+        es.objs.insert(
+            s.addr(),
+            Rec::Domain(super::DomainRec {
+                members: Vec::new(),
+            }),
+        );
+    }
+    let _ = x.quic.set(Quic {
+        kind: Kind::Domain,
+        engine,
+        s,
+    });
+    s
+}
+
+/// The engines of a domain's listeners, still alive.
+pub(crate) fn domain_members(q: &Quic) -> Vec<Arc<Engine>> {
+    match q.engine.lock().objs.get(&q.key()) {
+        Some(Rec::Domain(d)) => d
+            .members
+            .iter()
+            .filter_map(std::sync::Weak::upgrade)
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// `SSL_get_value_uint` (`ossl_quic_get_value_uint`).
@@ -2076,4 +2158,482 @@ pub(crate) fn net_bio(s: *const SSL, write: bool) -> *mut BIO {
     };
     let es = c.engine().lock();
     if write { es.net_wbio } else { es.net_rbio }
+}
+
+/// `SSL_version` and `SSL_client_version`: QUICv1 for a connection or stream, 0 for a listener.
+pub(crate) fn quic_version(q: &Quic) -> c_int {
+    match q.kind {
+        Kind::Conn | Kind::Stream => rustyssl_abi::OSSL_QUIC1_VERSION,
+        Kind::Listener | Kind::Domain => 0,
+    }
+}
+
+/// `SSL_get_shutdown` (`ossl_quic_get_shutdown`).
+pub(crate) fn get_shutdown(s: *const SSL) -> c_int {
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C) }) else {
+        return 0;
+    };
+    let mut es = c.engine().lock();
+    match es.channel_of(c.conn).map(|ch| ch.state()) {
+        Some(State::Active) | None => 0,
+        Some(State::Closing) => rustyssl_abi::SSL_SENT_SHUTDOWN,
+        Some(_) => rustyssl_abi::SSL_SENT_SHUTDOWN | rustyssl_abi::SSL_RECEIVED_SHUTDOWN,
+    }
+}
+
+/// `SSL_want` (`ossl_quic_want`): from what `SSL_get_error` reports.
+pub(crate) fn want(s: *const SSL) -> c_int {
+    use rustyssl_abi::{
+        SSL_CLIENT_HELLO_CB, SSL_ERROR_WANT_CLIENT_HELLO_CB, SSL_ERROR_WANT_RETRY_VERIFY,
+        SSL_ERROR_WANT_X509_LOOKUP, SSL_NOTHING, SSL_READING, SSL_RETRY_VERIFY, SSL_WRITING,
+        SSL_X509_LOOKUP,
+    };
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C | S) }) else {
+        return SSL_NOTHING;
+    };
+    let mut es = c.engine().lock();
+    let last = if c.is_stream {
+        es.stream(c.q.key())
+            .map_or(SSL_ERROR_NONE, |r| r.last_error)
+    } else {
+        es.conn(c.conn).map_or(SSL_ERROR_NONE, |r| r.last_error)
+    };
+    match last {
+        SSL_ERROR_WANT_READ => SSL_READING,
+        SSL_ERROR_WANT_WRITE => SSL_WRITING,
+        SSL_ERROR_WANT_RETRY_VERIFY => SSL_RETRY_VERIFY,
+        SSL_ERROR_WANT_CLIENT_HELLO_CB => SSL_CLIENT_HELLO_CB,
+        SSL_ERROR_WANT_X509_LOOKUP => SSL_X509_LOOKUP,
+        _ => SSL_NOTHING,
+    }
+}
+
+/// `ossl_quic_pending_int`: the octets the stream has to read (or, `check_channel`, whether
+/// anything is pending at all).
+///
+/// # Safety
+/// `s` is a live QUIC object; no lock is held.
+unsafe fn pending_int(s: *const SSL, check_channel: bool) -> usize {
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { expect(s, C | S) }) else {
+        return 0;
+    };
+    let started = c
+        .engine()
+        .lock()
+        .conn(c.conn)
+        .is_some_and(|r| r.ch.is_some());
+    if !started {
+        return 0;
+    }
+    let mut es = c.engine().lock();
+    let id = match c.stream_id(&mut es) {
+        Some(id) => id,
+        None => {
+            // A default stream the peer may have opened, made only to look (`peek`).
+            drop(es);
+            // SAFETY: no lock is held.
+            if !unsafe { default_for_read(&c, true) } {
+                err::raise(ERR_LIB_SSL, SSL_R_NO_STREAM, "ossl_quic_pending_int");
+                return 0;
+            }
+            es = c.engine().lock();
+            match c.stream_id(&mut es) {
+                Some(id) => id,
+                None => return 0,
+            }
+        }
+    };
+    let term = term_any(&mut es, c.conn);
+    let (avail, end) = es
+        .channel_of(c.conn)
+        .map_or((0, false), |ch| ch.streams().readable(id));
+    let avail = usize::try_from(avail).unwrap_or(usize::MAX);
+    if check_channel {
+        usize::from(avail > 0 || end || term)
+    } else {
+        avail
+    }
+}
+
+/// `SSL_pending`.
+///
+/// # Safety
+/// `s` is a live QUIC object; no lock is held.
+pub(crate) unsafe fn pending(s: *const SSL) -> usize {
+    // SAFETY: the caller's guarantee.
+    unsafe { pending_int(s, false) }
+}
+
+/// `SSL_has_pending`.
+///
+/// # Safety
+/// `s` is a live QUIC object; no lock is held.
+pub(crate) unsafe fn has_pending(s: *const SSL) -> c_int {
+    // SAFETY: the caller's guarantee.
+    c_int::from(unsafe { pending_int(s, true) } > 0)
+}
+
+/// `SSL_key_update` (`ossl_quic_key_update`): a transport key update.
+pub(crate) fn key_update(s: *mut SSL, update_type: c_int) -> c_int {
+    use rustyssl_abi::{SSL_KEY_UPDATE_NOT_REQUESTED, SSL_KEY_UPDATE_REQUESTED};
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C) }) else {
+        return 0;
+    };
+    if update_type != SSL_KEY_UPDATE_NOT_REQUESTED && update_type != SSL_KEY_UPDATE_REQUESTED {
+        err::raise(
+            ERR_LIB_SSL,
+            ERR_R_PASSED_INVALID_ARGUMENT,
+            "ossl_quic_key_update",
+        );
+        return 0;
+    }
+    let mut es = c.engine().lock();
+    let Some(p) = es.prov.clone() else {
+        drop(es);
+        err::raise(
+            ERR_LIB_SSL,
+            rustyssl_abi::SSL_R_TOO_MANY_KEY_UPDATES,
+            "ossl_quic_key_update",
+        );
+        return 0;
+    };
+    let now = es.now();
+    let ok = es
+        .channel_of(c.conn)
+        .is_some_and(|ch| ch.key_update(&*p, now).is_ok());
+    drop(es);
+    if !ok {
+        err::raise(
+            ERR_LIB_SSL,
+            rustyssl_abi::SSL_R_TOO_MANY_KEY_UPDATES,
+            "ossl_quic_key_update",
+        );
+        return 0;
+    }
+    1
+}
+
+/// `SSL_set_connect_state` and `SSL_set_accept_state` (errors suppressed).
+pub(crate) fn set_role(s: *mut SSL, server: bool) {
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C | NO_ERROR) }) else {
+        return;
+    };
+    let mut es = c.engine().lock();
+    if let Some(r) = es.conn(c.conn)
+        && r.ch.is_none()
+    {
+        r.as_server_state = server;
+    }
+}
+
+/// `SSL_get_rpoll_descriptor` and `_wpoll_descriptor`: the network BIO's.
+///
+/// # Safety
+/// `desc` is NULL or writable.
+pub(crate) unsafe fn poll_descriptor(
+    s: *mut SSL,
+    desc: *mut rustyssl_abi::BIO_POLL_DESCRIPTOR,
+    write: bool,
+) -> c_int {
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C | S | L) }) else {
+        return 0;
+    };
+    let b = {
+        let es = c.engine().lock();
+        if write { es.net_wbio } else { es.net_rbio }
+    };
+    if desc.is_null() || b.is_null() {
+        let mut es = c.engine().lock();
+        return c.non_normal(
+            &mut es,
+            ERR_R_PASSED_INVALID_ARGUMENT,
+            "ossl_quic_get_rpoll_descriptor",
+        );
+    }
+    // SAFETY: the port's live BIO; the caller's descriptor.
+    unsafe {
+        if write {
+            crate::bio::BIO_get_wpoll_descriptor(b, desc)
+        } else {
+            crate::bio::BIO_get_rpoll_descriptor(b, desc)
+        }
+    }
+}
+
+/// `OSSL_QUIC_PERMITTED_OPTIONS_CONN` (ssl_local.h), from the public option bits.
+fn permitted_conn() -> u64 {
+    use rustyssl_abi as a;
+    legacy_and_tls12()
+        | ops!(
+            a::SSL_OP_CIPHER_SERVER_PREFERENCE,
+            a::SSL_OP_DISABLE_TLSEXT_CA_NAMES,
+            a::SSL_OP_NO_TX_CERTIFICATE_COMPRESSION,
+            a::SSL_OP_NO_RX_CERTIFICATE_COMPRESSION,
+            a::SSL_OP_PRIORITIZE_CHACHA,
+            a::SSL_OP_NO_QUERY_MTU,
+            a::SSL_OP_NO_TICKET,
+            a::SSL_OP_NO_ANTI_REPLAY,
+        )
+}
+
+/// `OSSL_QUIC_PERMITTED_OPTIONS_STREAM`.
+pub(super) fn permitted_stream() -> u64 {
+    legacy_and_tls12() | rustyssl_abi::SSL_OP_CLEANSE_PLAINTEXT
+}
+
+/// The union of option bits of mixed integer types (the legacy ones are 0 `int`s).
+macro_rules! ops {
+    ($($o:expr),* $(,)?) => {
+        0u64 $(| u64::try_from($o).unwrap_or(0))*
+    };
+}
+use ops;
+
+/// `OSSL_LEGACY_SSL_OPTIONS | OSSL_TLS1_2_OPTIONS`.
+fn legacy_and_tls12() -> u64 {
+    use rustyssl_abi as a;
+    ops!(
+        a::SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG,
+        a::SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER,
+        a::SSL_OP_SSLEAY_080_CLIENT_DH_BUG,
+        a::SSL_OP_TLS_D5_BUG,
+        a::SSL_OP_TLS_BLOCK_PADDING_BUG,
+        a::SSL_OP_MSIE_SSLV2_RSA_PADDING,
+        a::SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG,
+        a::SSL_OP_MICROSOFT_SESS_ID_BUG,
+        a::SSL_OP_NETSCAPE_CHALLENGE_BUG,
+        a::SSL_OP_PKCS1_CHECK_1,
+        a::SSL_OP_PKCS1_CHECK_2,
+        a::SSL_OP_SINGLE_DH_USE,
+        a::SSL_OP_SINGLE_ECDH_USE,
+        a::SSL_OP_EPHEMERAL_RSA,
+        a::SSL_OP_CRYPTOPRO_TLSEXT_BUG,
+        a::SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS,
+        a::SSL_OP_ALLOW_CLIENT_RENEGOTIATION,
+        a::SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION,
+        a::SSL_OP_NO_COMPRESSION,
+        a::SSL_OP_NO_SSLv3,
+        a::SSL_OP_NO_TLSv1,
+        a::SSL_OP_NO_TLSv1_1,
+        a::SSL_OP_NO_TLSv1_2,
+        a::SSL_OP_NO_DTLSv1,
+        a::SSL_OP_NO_DTLSv1_2,
+        a::SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION,
+        a::SSL_OP_CISCO_ANYCONNECT,
+        a::SSL_OP_NO_RENEGOTIATION,
+        a::SSL_OP_NO_EXTENDED_MASTER_SECRET,
+        a::SSL_OP_NO_ENCRYPT_THEN_MAC,
+        a::SSL_OP_COOKIE_EXCHANGE,
+        a::SSL_OP_LEGACY_SERVER_CONNECT,
+        a::SSL_OP_IGNORE_UNEXPECTED_EOF,
+    )
+}
+
+/// A new QUIC connection's options (`ossl_quic_new`): its handshake layer's keep the
+/// connection-level ones, its streams' default the permitted ones.
+pub(crate) fn init_options(x: &Ssl, rec: &mut ConnRec, ctx_options: u64) {
+    x.state().options &= permitted_conn();
+    rec.default_ssl_options = ctx_options & (permitted_conn() | permitted_stream());
+}
+
+/// `SSL_set_options`, `SSL_clear_options` and `SSL_get_options` (`quic_mask_or_options`).
+pub(crate) fn options(s: *const SSL, mask: u64, or: u64) -> u64 {
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C | S) }) else {
+        return 0;
+    };
+    if !c.is_stream {
+        let mut st = c.x.state();
+        st.options = (st.options & !(mask & permitted_conn())) | (or & permitted_conn());
+    }
+    let mut es = c.engine().lock();
+    let all = permitted_conn() | permitted_stream();
+    let mut ret = 0;
+    if let Some(r) = es.conn(c.conn) {
+        if !c.is_stream {
+            r.default_ssl_options = ((r.default_ssl_options & !mask) | or) & all;
+        }
+        ret = r.default_ssl_options;
+    }
+    if let Some(api) = c.stream_api(&mut es) {
+        api.ssl_options = ((api.ssl_options & !mask) | or) & permitted_stream();
+        if c.is_stream {
+            ret = api.ssl_options;
+        }
+    }
+    ret
+}
+
+/// `SSL_ctrl` on a QUIC object (`ossl_quic_ctrl`): `Some` with the answer, or `None` for a
+/// TLS control the connection's handshake layer answers.
+///
+/// # Safety
+/// `s` is a live QUIC object; `parg` is what `cmd` documents; no lock is held.
+pub(crate) unsafe fn ctrl(
+    s: *mut SSL,
+    cmd: c_int,
+    larg: core::ffi::c_long,
+    parg: *mut c_void,
+) -> Option<core::ffi::c_long> {
+    use core::ffi::c_long;
+    use rustyssl_abi::{
+        DTLS_CTRL_GET_TIMEOUT, DTLS_CTRL_HANDLE_TIMEOUT, SSL_CTRL_CLEAR_MODE,
+        SSL_CTRL_GET_READ_AHEAD, SSL_CTRL_MODE, SSL_CTRL_SET_MAX_PIPELINES,
+        SSL_CTRL_SET_MAX_SEND_FRAGMENT, SSL_CTRL_SET_READ_AHEAD, SSL_CTRL_SET_SPLIT_SEND_FRAGMENT,
+    };
+    // SAFETY: the caller's guarantee.
+    let Some(c) = (unsafe { expect(s, C | S | L) }) else {
+        return Some(0);
+    };
+    let listener = c.q.kind == Kind::Listener;
+    let unsupported = || {
+        err::raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED, "ossl_quic_ctrl");
+        Some(0)
+    };
+    match cmd {
+        SSL_CTRL_MODE | SSL_CTRL_CLEAR_MODE => {
+            if listener {
+                return unsupported();
+            }
+            let bits = u32::try_from(larg).unwrap_or(0);
+            let set = cmd == SSL_CTRL_MODE;
+            let mut es = c.engine().lock();
+            let mut ret = 0u32;
+            if let Some(r) = es.conn(c.conn) {
+                if !c.is_stream {
+                    if set {
+                        r.default_ssl_mode |= bits;
+                    } else {
+                        r.default_ssl_mode &= !bits;
+                    }
+                }
+                ret = r.default_ssl_mode;
+            }
+            if let Some(api) = c.stream_api(&mut es) {
+                let mut bits = bits;
+                // Partial writes can't start during an all-or-nothing write.
+                if set && api.aon.is_some() {
+                    bits &= !SSL_MODE_ENABLE_PARTIAL_WRITE;
+                }
+                if set {
+                    api.ssl_mode |= bits;
+                } else {
+                    api.ssl_mode &= !bits;
+                }
+                ret = api.ssl_mode;
+            }
+            Some(c_long::from(ret))
+        }
+        DTLS_CTRL_GET_TIMEOUT => {
+            let mut inf = 0;
+            // SAFETY: `parg` is the caller's `struct timeval`.
+            unsafe { event_timeout(c.q, parg.cast(), &raw mut inf) };
+            Some(c_long::from(inf == 0))
+        }
+        DTLS_CTRL_HANDLE_TIMEOUT => {
+            // SAFETY: no lock is held.
+            unsafe { super::tick(c.engine()) };
+            Some(1)
+        }
+        SSL_CTRL_GET_READ_AHEAD
+        | SSL_CTRL_SET_READ_AHEAD
+        | SSL_CTRL_SET_MAX_SEND_FRAGMENT
+        | SSL_CTRL_SET_SPLIT_SEND_FRAGMENT
+        | SSL_CTRL_SET_MAX_PIPELINES => Some(0),
+        _ if listener => unsupported(),
+        _ => None,
+    }
+}
+
+/// `SSL_clear` on a QUIC object (`ossl_quic_reset`): unsupported.
+pub(crate) fn clear(s: *mut SSL) -> c_int {
+    // SAFETY: the export's caller passes a live object.
+    if unsafe { expect(s, C | S | L) }.is_some() {
+        err::raise(ERR_LIB_SSL, ERR_R_UNSUPPORTED, "ossl_quic_reset");
+    }
+    0
+}
+
+/// `SSL_get_domain_flags` (`ossl_quic_get_domain_flags`).
+///
+/// # Safety
+/// `out` is NULL or writable.
+pub(crate) unsafe fn get_domain_flags(s: *const SSL, out: *mut u64) -> c_int {
+    // SAFETY: the export's caller passes a live object.
+    let Some(c) = (unsafe { expect(s, C | S | L | D) }) else {
+        return 0;
+    };
+    let flags = c.engine().lock().domain_flags;
+    if !out.is_null() {
+        // SAFETY: the caller's guarantee.
+        unsafe { out.write(flags) };
+    }
+    1
+}
+
+/// `ossl_adjust_domain_flags`: the flags as a domain takes them, or `None` with an error.
+pub(crate) fn adjust_domain_flags(flags: u64) -> Option<u64> {
+    use rustyssl_abi::{
+        SSL_DOMAIN_FLAG_BLOCKING, SSL_DOMAIN_FLAG_LEGACY_BLOCKING, SSL_DOMAIN_FLAG_MULTI_THREAD,
+        SSL_DOMAIN_FLAG_SINGLE_THREAD, SSL_DOMAIN_FLAG_THREAD_ASSISTED,
+    };
+    let single = u64::from(SSL_DOMAIN_FLAG_SINGLE_THREAD);
+    let multi = u64::from(SSL_DOMAIN_FLAG_MULTI_THREAD);
+    let assisted = u64::from(SSL_DOMAIN_FLAG_THREAD_ASSISTED);
+    let supported = single
+        | multi
+        | assisted
+        | u64::from(SSL_DOMAIN_FLAG_BLOCKING)
+        | u64::from(SSL_DOMAIN_FLAG_LEGACY_BLOCKING);
+    if flags & !supported != 0 {
+        err::raise_with_text(
+            ERR_LIB_SSL,
+            ERR_R_UNSUPPORTED,
+            "ossl_adjust_domain_flags",
+            "unsupported domain flag requested",
+        );
+        return None;
+    }
+    let mut f = flags;
+    if f & assisted != 0 {
+        f |= multi;
+    }
+    if f & (multi | single) == 0 {
+        f |= multi;
+    }
+    if f & single != 0 && f & multi != 0 {
+        err::raise_with_text(
+            ERR_LIB_SSL,
+            ERR_R_PASSED_INVALID_ARGUMENT,
+            "ossl_adjust_domain_flags",
+            "mutually exclusive domain flags specified",
+        );
+        return None;
+    }
+    Some(f)
+}
+
+/// A new context's domain flags (`SSL_CTX_new_ex`): QUIC's defaults, 0 for TLS.
+pub(crate) fn default_domain_flags(m: &crate::ssl::method::Method) -> u64 {
+    use rustyssl_abi::{
+        SSL_DOMAIN_FLAG_BLOCKING, SSL_DOMAIN_FLAG_LEGACY_BLOCKING, SSL_DOMAIN_FLAG_MULTI_THREAD,
+        SSL_DOMAIN_FLAG_THREAD_ASSISTED,
+    };
+    if !m.quic {
+        0
+    } else if m.thread {
+        u64::from(
+            SSL_DOMAIN_FLAG_MULTI_THREAD
+                | SSL_DOMAIN_FLAG_THREAD_ASSISTED
+                | SSL_DOMAIN_FLAG_BLOCKING,
+        )
+    } else {
+        u64::from(SSL_DOMAIN_FLAG_MULTI_THREAD | SSL_DOMAIN_FLAG_LEGACY_BLOCKING)
+    }
 }
