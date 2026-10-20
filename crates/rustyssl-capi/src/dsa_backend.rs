@@ -49,6 +49,7 @@ pub(crate) unsafe fn key_fromdata(
     let ok = unsafe { crate::dh_backend::key_fromdata(&mut dh, params, include_private) };
     st.pub_key = dh.pub_key;
     st.priv_key = dh.priv_key;
+    st.secure_private();
     ok
 }
 
@@ -133,6 +134,7 @@ pub(crate) unsafe fn dup(h: *const DSA, selection: c_int) -> *mut DSA {
     }
     if selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0 {
         st.priv_key = src.priv_key.clone();
+        st.secure_private();
     }
     let out = if k.is_in_libctx() {
         Dsa::new_handle_provided(k.libctx.get())

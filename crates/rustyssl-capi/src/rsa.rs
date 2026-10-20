@@ -121,6 +121,35 @@ impl Field {
     }
 }
 
+/// Moves the key's private numbers to the secure heap, where OpenSSL keeps them
+/// (`BN_secure_new`), when the heap is set up.
+fn secure_private(key: &mut Key) {
+    if !crate::secure::initialized() {
+        return;
+    }
+    crate::secure::scope(|| {
+        for v in [
+            &mut key.d,
+            &mut key.p,
+            &mut key.q,
+            &mut key.dmp1,
+            &mut key.dmq1,
+            &mut key.iqmp,
+        ] {
+            if let Some(x) = v.take() {
+                *v = Some(x.clone());
+            }
+        }
+        for e in &mut key.extra {
+            *e = ExtraPrime {
+                r: e.r.clone(),
+                d: e.d.clone(),
+                t: e.t.clone(),
+            };
+        }
+    });
+}
+
 /// The key's own number `f`.
 pub(crate) fn key_field(key: &mut Key, f: Field) -> Option<&mut Option<BigNum>> {
     Some(match f {
@@ -475,6 +504,7 @@ impl Rsa {
         let mut lg = self.legacy();
         read_numbers(&mut lg.numbers, &mut st.key);
         f(&mut st.key);
+        secure_private(&mut st.key);
         write_numbers(&mut lg.numbers, &st.key);
         self.touch();
     }

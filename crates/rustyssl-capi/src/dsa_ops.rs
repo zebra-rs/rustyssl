@@ -861,6 +861,7 @@ unsafe fn builtin_keygen(h: *mut DSA) -> c_int {
         }
         let y = core_bn::modular::exp_mod(g, &x, p).ok()?;
         st.priv_key = Some(x);
+        st.secure_private();
         st.pub_key = Some(y);
         Some(())
     })();
