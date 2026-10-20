@@ -155,6 +155,8 @@ pub(crate) struct CtxState {
     pub(crate) new_pending_conn_cb: rustyssl_abi::SSL_new_pending_conn_cb_fn,
     /// See `new_pending_conn_cb`.
     pub(crate) new_pending_conn_arg: *mut c_void,
+    /// QUIC's domain flags (`SSL_CTX_set_domain_flags`); 0 for a TLS context.
+    pub(crate) domain_flags: u64,
     pub(crate) alpn_select_cb: rustyssl_abi::SSL_CTX_alpn_select_cb_func,
     pub(crate) alpn_select_cb_arg: *mut c_void,
     pub(crate) npn_select_cb: rustyssl_abi::SSL_CTX_npn_select_cb_func,
@@ -434,6 +436,7 @@ fn new_state(method: &'static Method, cert_store: *mut X509_STORE) -> CtxState {
         client_hello_cb_arg: ptr::null_mut(),
         new_pending_conn_cb: None,
         new_pending_conn_arg: ptr::null_mut(),
+        domain_flags: super::quic::api::default_domain_flags(method),
         alpn_select_cb: None,
         alpn_select_cb_arg: ptr::null_mut(),
         npn_select_cb: None,
@@ -882,7 +885,8 @@ ffi_export! {
             }
             SSL_CTRL_SET_MIN_PROTO_VERSION | SSL_CTRL_SET_MAX_PROTO_VERSION => {
                 let Ok(v) = c_int::try_from(larg) else { return 0 };
-                let method_version = st.method.version;
+                // QUIC's methods take no bounds (`OSSL_QUIC_ANY_VERSION`: a version-inflexible one).
+                let method_version = if st.method.quic { 0 } else { st.method.version };
                 if cmd == SSL_CTRL_SET_MIN_PROTO_VERSION {
                     c_long::from(check_allowed_versions(v, st.max_proto_version) != 0 && set_version_bound(method_version, v, &mut st.min_proto_version) != 0)
                 } else {
@@ -1556,6 +1560,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_block_padding_ex(c: *mut SSL_CTX, app_block_size: usize, hs_block_size: usize) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(c) } && (app_block_size > 1 || hs_block_size > 1) {
+            return 0;
+        }
         let (Some(a), Some(h)) = (padding(app_block_size), padding(hs_block_size)) else { return 0 };
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ctx(c) }) else { return 0 };

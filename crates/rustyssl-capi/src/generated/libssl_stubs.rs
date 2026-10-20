@@ -8,43 +8,4 @@
 // Some OpenSSL functions take many parameters; variadic stubs must be `unsafe`.
 #![allow(clippy::too_many_arguments, clippy::missing_safety_doc)]
 
-use libc::timeval;
-use rustyssl_abi::*;
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_client_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_client_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_client_thread_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_client_thread_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_OSSL_QUIC_server_method() -> *const SSL_METHOD {
-    crate::stub::unimplemented("OSSL_QUIC_server_method")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_inject_net_dgram(
-    _: *mut SSL,
-    _: *const core::ffi::c_uchar,
-    _: usize,
-    _: *const BIO_ADDR,
-    _: *const BIO_ADDR,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_inject_net_dgram")
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rustyssl_private_SSL_poll(
-    _: *mut SSL_POLL_ITEM,
-    _: usize,
-    _: usize,
-    _: *const timeval,
-    _: u64,
-    _: *mut usize,
-) -> core::ffi::c_int {
-    crate::stub::unimplemented("SSL_poll")
-}
+// Every export is implemented: there are no stubs.

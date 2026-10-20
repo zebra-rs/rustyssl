@@ -554,12 +554,12 @@ impl EvpProvider {
     }
 
     /// The property query, or NULL.
-    fn propq(&self) -> *const c_char {
+    pub(crate) fn propq(&self) -> *const c_char {
         self.env.propq()
     }
 
     /// The library context.
-    fn libctx(&self) -> *mut OSSL_LIB_CTX {
+    pub(crate) fn libctx(&self) -> *mut OSSL_LIB_CTX {
         self.env.libctx()
     }
 

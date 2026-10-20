@@ -176,6 +176,10 @@ ffi_export! {
     where failure = 1, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(ctx) } {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
         let (Some(c), Some(t)) = (unsafe { ctxs::ctx(ctx) }, unsafe { text(profiles) }) else {
             return 1;
         };
@@ -191,6 +195,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_tlsext_use_srtp(s: *mut SSL, profiles: *const c_char) -> c_int
     where failure = 1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 1;
+        }
         // SAFETY: the caller's guarantee.
         let (Some(x), Some(t)) = (unsafe { ssl(s) }, unsafe { text(profiles) }) else {
             return 1;
@@ -243,6 +251,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_selected_srtp_profile(s: *mut SSL) -> *mut SRTP_PROTECTION_PROFILE
     where failure = ptr::null_mut(), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return ptr::null_mut();
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return ptr::null_mut() };
         let Some(id) = x.state().drv.tls.as_ref().and_then(|c| c.srtp_profile()) else {

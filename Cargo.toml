@@ -20,6 +20,7 @@ rustyssl-conf = { path = "crates/rustyssl-conf" }
 rustyssl-crypto = { path = "crates/rustyssl-crypto" }
 rustyssl-pki = { path = "crates/rustyssl-pki" }
 rustyssl-tls = { path = "crates/rustyssl-tls" }
+rustyssl-quic = { path = "crates/rustyssl-quic" }
 rustyssl-capi = { path = "crates/rustyssl-capi" }
 
 # Third-party crates. Each one is recorded in docs/DEPENDENCIES.md.

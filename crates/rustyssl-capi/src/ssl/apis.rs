@@ -53,6 +53,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 1;
+        }
+        // SAFETY: the caller's guarantee.
         c_int::from(unsafe { ssl(s) }.is_some())
     }
 }
@@ -66,6 +70,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_free_buffers(s: *mut SSL) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         let st = x.state();
@@ -207,13 +215,22 @@ ffi_export! {
 }
 
 ffi_export! {
-    /// QUIC's domain flags: unsupported on a TLS context, 0.
+    /// Sets a QUIC context's domain flags (`ossl_adjust_domain_flags` first): 1, or 0;
+    /// unsupported on a TLS context.
     ///
     /// # Safety
-    /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_domain_flags(_ctx: *mut SSL_CTX, _domain_flags: u64) -> c_int
+    /// `ctx` is NULL or a live context.
+    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_domain_flags(ctx: *mut SSL_CTX, domain_flags: u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { super::ctx::ctx(ctx) }
+            && c.state().method.quic
+        {
+            let Some(f) = super::quic::api::adjust_domain_flags(domain_flags) else { return 0 };
+            c.state().domain_flags = f;
+            return 1;
+        }
         err::raise_with_text(ERR_LIB_SSL, ERR_R_UNSUPPORTED, "SSL_CTX_set_domain_flags", "domain flags unsupported on this kind of SSL_CTX");
         0
     }
@@ -224,9 +241,20 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_get_domain_flags(_ctx: *const SSL_CTX, _domain_flags: *mut u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_CTX_get_domain_flags(ctx: *const SSL_CTX, domain_flags: *mut u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if let Some(c) = unsafe { super::ctx::ctx(ctx.cast_mut()) } {
+            let st = c.state();
+            if st.method.quic {
+                if !domain_flags.is_null() {
+                    // SAFETY: the caller's slot.
+                    unsafe { domain_flags.write(st.domain_flags) };
+                }
+                return 1;
+            }
+        }
         err::raise_with_text(ERR_LIB_SSL, ERR_R_UNSUPPORTED, "SSL_CTX_get_domain_flags", "domain flags unsupported on this kind of SSL_CTX");
         0
     }
@@ -237,9 +265,14 @@ ffi_export! {
     ///
     /// # Safety
     /// No preconditions.
-    pub unsafe extern "C" fn rustyssl_private_SSL_get_domain_flags(_s: *const SSL, _domain_flags: *mut u64) -> c_int
+    pub unsafe extern "C" fn rustyssl_private_SSL_get_domain_flags(s: *const SSL, domain_flags: *mut u64) -> c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            // SAFETY: as above.
+            return unsafe { super::quic::api::get_domain_flags(s, domain_flags) };
+        }
         0
     }
 }
@@ -336,6 +369,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_stateless(s: *mut SSL) -> c_int
     where failure = -1, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ssl(s) }) else { return 0 };
         // SAFETY: as above.

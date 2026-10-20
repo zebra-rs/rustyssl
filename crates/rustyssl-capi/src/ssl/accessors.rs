@@ -79,6 +79,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::options(s, 0, a);
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.options |= a;
@@ -96,6 +100,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::options(s, a, 0);
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.options &= !a;
@@ -112,6 +120,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_options(s: *const SSL) -> u64
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::options(s, 0, 0);
+        }
         // SAFETY: the caller's guarantee.
         unsafe { conn::ssl(s) }.map_or(0, |x| x.state().options)
     }
@@ -367,6 +379,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
         st.quiet_shutdown = a;
@@ -383,6 +399,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         unsafe { conn::ssl(s) }.map_or(0, |x| x.state().quiet_shutdown)
     }
 }
@@ -396,6 +416,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_shutdown(s: *mut SSL, a: core::ffi::c_int)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
@@ -412,6 +436,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_get_shutdown(s: *const SSL) -> core::ffi::c_int
     where failure = 0, library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return super::quic::api::get_shutdown(s);
+        }
         // SAFETY: the caller's guarantee.
         unsafe { conn::ssl(s) }.map_or(0, |x| x.state().shutdown)
     }
@@ -822,6 +850,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.max_early_data = a;
@@ -884,6 +916,10 @@ ffi_export! {
     where failure = 0, library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return 0;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return 0 };
         let mut st = x.state();
         st.recv_max_early_data = a;
@@ -930,6 +966,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_post_handshake_auth(s: *mut SSL, a: core::ffi::c_int)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
@@ -1058,6 +1098,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_set_default_read_buffer_len(s: *mut SSL, a: usize)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
@@ -1375,6 +1419,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::of(s) }.is_some() {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { conn::ssl(s) }) else { return };
         let mut st = x.state();
         st.allow_early_data_cb = a;
@@ -1554,6 +1602,10 @@ ffi_export! {
     where failure = (), library = ERR_LIB_SSL
     {
         // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(c) } {
+            return;
+        }
+        // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ctx::ctx(c) }) else { return };
         let mut st = x.state();
         st.npn_select_cb = a;
@@ -1570,6 +1622,10 @@ ffi_export! {
     pub unsafe extern "C" fn rustyssl_private_SSL_CTX_set_next_protos_advertised_cb(c: *mut SSL_CTX, a: SSL_CTX_npn_advertised_cb_func, b: *mut core::ffi::c_void)
     where failure = (), library = ERR_LIB_SSL
     {
+        // SAFETY: the caller's guarantee.
+        if unsafe { super::quic::api::is_quic_ctx(c) } {
+            return;
+        }
         // SAFETY: the caller's guarantee.
         let Some(x) = (unsafe { ctx::ctx(c) }) else { return };
         let mut st = x.state();

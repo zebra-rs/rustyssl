@@ -85,7 +85,17 @@ rustyssl itself**. You can only regenerate golden files with
   - RFC 5869 (HKDF), RFC 6070 (PBKDF2), RFC 7914 (scrypt), RFC 9106 (Argon2)
   - RFC 6979 (deterministic ECDSA), RFC 8032 (EdDSA), RFC 7748 (X25519/X448)
   - RFC 8439 (ChaCha20-Poly1305), RFC 9180 (HPKE), RFC 9001 (QUIC initial secrets and packet
-    protection)
+    protection): Appendix A.1–A.5 run as KATs in `rustyssl-quic` (`packet::tests`: the Initial
+    secrets and keys, the client Initial re-protected byte for byte, the server Initial, Retry's
+    tag, the ChaCha20 short header), and A.2's and A.5's masks again through capi's EVP header
+    protection (`ssl::quic_provider::tests`)
+  - The QUIC transport's other layers are tested per module (`rustyssl-quic`: ACK generation
+    against `quic_ackm.c`'s rules, NewReno against `cc_newreno.c`, window auto-tuning against
+    `quic_fc.c`, stream and connection-ID errors with OpenSSL's codes, tokens, property tests
+    of the send and receive buffers under loss, reordering and duplication) and end to end by a
+    loopback of a client and a listening port over a simulated network with seeded loss (to
+    30%), reordering and duplication: Retry, NEW_TOKEN, every supported suite, a CCM suite's
+    failure, close and drain, idle timeout, key updates, version negotiation, ALPN required
 - **Upstream data files:** `test/recipes/30-test_evp_data/*.txt` (evpciph, evpmd, evpkdf,
   evpmac, evppkey, …) run through the public EVP API, once by a Rust runner and once by
   upstream `evp_test` in L6.
@@ -199,14 +209,14 @@ rustyssl itself**. You can only regenerate golden files with
   reported per recipe in `target/upstream-report.md`.
   - **Eligible:** a subtest that passes on the reference and isn't excluded. Excluded, and
     reported apart: recipes `tests/openssl-suite/recipes.txt` skips, each with its reason
-    (FIPS, there being no FIPS provider; QUIC, Phase 10; features the default build leaves
-    out); subtests running a program that imports libcrypto's or libssl's internal functions
+    (FIPS, there being no FIPS provider; features the default build leaves out); subtests running a program that imports libcrypto's or libssl's internal functions
     (found from the programs' own imports, so they can't load on another library by
     construction); subtests `recipes.txt` lists as reading the libraries' private structures
     (`internal` lines, with reasons); subtests skipped on both; and subtests failing on the
     reference itself.
-  - **Measured (2026-10-19, OpenSSL 3.6.5, macOS arm64):** all 4333 eligible subtests pass on
-    rustyssl (100.00%; M6 asks for 98%). 103 are excluded as internal, 83 skipped on both, none
+  - **Measured (2026-10-20, OpenSSL 3.6.5, macOS arm64, with the QUIC recipes):** all 4334
+    eligible subtests pass on rustyssl (100.00%; M6 asks for 98%). 103 are excluded as internal
+    (the QUIC programs built on OpenSSL's internal QUIC among them), 83 skipped on both, none
     fails on the reference. x86_64 Linux isn't measured yet: the whole tree's build and
     rustyssl's need more than the Docker VM's free space here.
 - Classify every test, and keep the list in `tests/openssl-suite/classification.toml`:
@@ -301,8 +311,37 @@ rustyssl itself**. You can only regenerate golden files with
     reference too.
   - Status (2026-10-18): 64 cases pass in all four pairings, the eight fault cases under
     seeds 1 to 6, and the 17 GnuTLS cases on both libraries.
+- **QUIC (OpenSSL's API, 10.2):** `tests/c/quic_api.c` and `tests/c/quic_blocking.c` (L4);
+  `cargo xtask test-interop --peer quic` (`tests/interop/quic.txt`): OpenSSL's guide QUIC demo
+  servers and clients, built from the reference's source, and the reference's `s_client
+  -quic`, in four library pairings; upstream `quicapitest`'s public-API tests and
+  `ssl_ctx_test`'s QUIC iterations under `test-openssl-suite --ssl` (the tests built on
+  OpenSSL's internal test server are excluded as internal, ADR 0006 section 6).
 - **QUIC:** quic-interop-runner cases (handshake, transfer, retry, resumption, zerortt,
   chacha20, keyupdate, multiplexing), plus curl and nghttp3 over HTTP/3.
+  - Built: `cargo xtask test-quic-interop [--peer quiche|ngtcp2|quic-go] [--reference-only]
+    [case...]` (the user's decision, 2026-10-20: a local driver first, the Docker runner a
+    follow-up). The cases follow the runner's `testcases_quic.py` (pinned commit): each case's
+    files, and the test name each role is given. They run on loopback between OpenSSL's own
+    interop endpoint (`test/quic-openssl-docker/`'s `quic-hq-interop` client and server for
+    HTTP/0.9; curl 8.18.0 with `--with-openssl-quic` and `ossl-nghttp3-demo-server` for http3),
+    compiled from the reference's source and run on each library, and three peers built from
+    pinned sources (`tests/quic-interop/pins.txt`): quiche 0.30.0's apps (BoringSSL), ngtcp2
+    v1.25.0's `ossl` examples (on the reference; HTTP/0.9 variants added to its cmake build),
+    and quic-go v0.64.1's interop programs (Go's crypto/tls). Each endpoint supports what its
+    own `run_endpoint.sh` supports; the rest is "unsupported", as the runner's exit 127.
+  - A run passes when the client exits 0 and every file arrived intact. The runner's
+    packet-trace checks (one handshake, a Retry sent, no certificate on resumption, the key
+    phase changing, the stream limit) need a capture and its keys, and aren't made locally.
+    A failing run is tried up to three times (OpenSSL's nghttp3 demo server asserts on some
+    orders of parallel requests, on any library); runs that needed a retry are listed.
+  - Status (2026-10-20, reference only): every supported run passes, both ways, against all
+    three peers: handshake, transfer, retry, resumption, multiplexing, and http3 everywhere;
+    chacha20 with ngtcp2 and quic-go, and as a client with quiche (quiche's client can't pick
+    ciphers); keyupdate as a server with ngtcp2's and quic-go's clients (OpenSSL's client
+    doesn't run it, nor does quiche's). zerortt is unsupported
+    by OpenSSL's endpoint in both roles. rustyssl's runs wait for 10.2 (its QUIC API is still
+    stubs).
 - **PKI:** the full x509-limbo suite. Results equal the reference's or are stricter only
   where `DEVIATIONS.md` documents it. A dedicated hostname-verification corpus covers
   wildcards, IDNA, IP SANs, and the CN-fallback flags.
@@ -330,6 +369,7 @@ reference run.** Any difference is the signal to investigate.
 | OpenVPN, stunnel, socat, wget, git, Tor, BIND 9, Unbound, OpenLDAP, Postfix | mixed | their own suites, or smoke tests | M6 |
 | pkcs11-provider, oqs-provider, tpm2-openssl | the provider ABI | their own suites (`cargo xtask test-providers`) | Phase 9 |
 | ngtcp2 (ossl backend) | third-party QUIC API | its examples' pytest suite (`cargo xtask test-consumers ngtcp2`) | Phase 10 |
+| curl 8.18.0 (`--with-openssl-quic`, nghttp3) | OpenSSL's QUIC client API over HTTP/3 | downloads from quiche's, ngtcp2's, and quic-go's h3 servers (`cargo xtask test-consumers curl-h3`) | Phase 10 |
 
 The providers run under `cargo xtask test-providers [oqs|pkcs11|tpm2]`, pinned to commits
 with their tarballs' SHA-256 in `tests/providers/pins.txt` and built against the reference;
@@ -396,7 +436,10 @@ Fixed on the way:
 - the cipher-string and `SSL_CONF` parsers, MIME and S/MIME, HTTP responses
 - the TLS client (fed server flights) and server (fed client flights), with structure-aware
   generators for the typed handshake messages
-- DTLS and QUIC packets
+- DTLS and QUIC packets (`quic_packet`: coalesced packets unprotected under their Initial keys, and a
+  protect/open round trip; `quic_frames` and `quic_transport_params`: decoding with
+  encode/decode round trips; `quic_port`: a listener and a client fed arbitrary datagrams
+  between their own traffic and timers)
 - **API-sequence fuzzing:** random sequences of public calls on `SSL`/`SSL_CTX`/`EVP_*`
   objects, to find state-machine panics and capi UB
 

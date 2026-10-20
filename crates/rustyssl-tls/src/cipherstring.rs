@@ -222,6 +222,9 @@ pub struct Method {
     /// The method can use TLS 1.2's suites (`SSL_ENC_FLAG_TLS1_2_CIPHERS`), which Suite B
     /// requires.
     pub tls12_ciphers: bool,
+    /// The method has no suites of its own (OpenSSL's QUIC methods, whose `num_ciphers` is 0):
+    /// its lists hold only TLS 1.3's.
+    pub no_ciphers: bool,
 }
 
 impl Method {
@@ -229,11 +232,13 @@ impl Method {
     pub const TLS: Self = Self {
         dtls: false,
         tls12_ciphers: true,
+        no_ciphers: false,
     };
     /// `DTLS_method()` and its client and server forms.
     pub const DTLS: Self = Self {
         dtls: true,
         tls12_ciphers: true,
+        no_ciphers: false,
     };
 }
 
@@ -724,7 +729,7 @@ impl List {
         let mut nodes: Vec<Node> = suites::ssl3_by_descending_id()
             .iter()
             .copied()
-            .filter(|c| c.valid && available.allows(c))
+            .filter(|c| c.valid && available.allows(c) && !method.no_ciphers)
             .filter(|c| {
                 if method.dtls {
                     c.min_dtls != 0

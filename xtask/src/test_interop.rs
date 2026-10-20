@@ -33,7 +33,9 @@
 //! A DTLS case runs without `-rev` (which `s_server` refuses with DTLS): the server printing
 //! the line the client sent stands for the echo.
 //!
-//! `--peer gnutls` runs `tests/interop/gnutls.txt` instead, against GnuTLS (see [`gnutls`]).
+//! `--peer gnutls` runs `tests/interop/gnutls.txt` instead, against GnuTLS (see [`gnutls`]);
+//! `--peer quic` runs `tests/interop/quic.txt`, QUIC with OpenSSL's QUIC demos and `s_client
+//! -quic` (see [`quic`]).
 //!
 //! The server's report of the client (its certificate, the ALPN list and the host name it
 //! sent) joins the summary.
@@ -47,6 +49,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 mod gnutls;
+mod quic;
 mod relay;
 
 use crate::test_c::{LOADER_PATH, prepare};
@@ -724,7 +727,8 @@ pub fn run(args: &[String]) -> Result {
     match peer {
         None => {}
         Some("gnutls") => return gnutls::run(&t, &root, &only, reference_only),
-        Some(p) => return Err(format!("unknown peer {p} (known: gnutls)").into()),
+        Some("quic") => return quic::run(&t, &root, &only),
+        Some(p) => return Err(format!("unknown peer {p} (known: gnutls, quic)").into()),
     }
 
     let list = fs::read_to_string(root.join("tests/interop/cases.txt"))?;

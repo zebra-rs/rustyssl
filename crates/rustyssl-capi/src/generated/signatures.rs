@@ -19995,6 +19995,12 @@ const _: unsafe extern "C" fn(*const core::ffi::c_char) -> *const core::ffi::c_c
     crate::ssl::ciphers::rustyssl_private_OPENSSL_cipher_name;
 const _: unsafe extern "C" fn(u64, *const OPENSSL_INIT_SETTINGS) -> core::ffi::c_int =
     crate::ssl::rustyssl_private_OPENSSL_init_ssl;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_client_method;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_client_thread_method;
+const _: unsafe extern "C" fn() -> *const SSL_METHOD =
+    crate::ssl::method::rustyssl_private_OSSL_QUIC_server_method;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
     crate::ssl::apis::rustyssl_private_OSSL_default_cipher_list;
 const _: unsafe extern "C" fn() -> *const core::ffi::c_char =
@@ -21256,6 +21262,13 @@ const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_in_before;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::conn::rustyssl_private_SSL_in_init;
+const _: unsafe extern "C" fn(
+    *mut SSL,
+    *const core::ffi::c_uchar,
+    usize,
+    *const BIO_ADDR,
+    *const BIO_ADDR,
+) -> core::ffi::c_int = crate::ssl::quic::poll::rustyssl_private_SSL_inject_net_dgram;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
     crate::ssl::misc::rustyssl_private_SSL_is_connection;
 const _: unsafe extern "C" fn(*mut SSL) -> core::ffi::c_int =
@@ -21316,6 +21329,14 @@ const _: unsafe extern "C" fn(
 ) -> core::ffi::c_int = crate::ssl::io::api::rustyssl_private_SSL_peek_ex;
 const _: unsafe extern "C" fn(*const SSL) -> core::ffi::c_int =
     crate::ssl::io::api::rustyssl_private_SSL_pending;
+const _: unsafe extern "C" fn(
+    *mut SSL_POLL_ITEM,
+    usize,
+    usize,
+    *const timeval,
+    u64,
+    *mut usize,
+) -> core::ffi::c_int = crate::ssl::quic::poll::rustyssl_private_SSL_poll;
 const _: unsafe extern "C" fn(
     *mut SSL,
     *mut core::ffi::c_void,

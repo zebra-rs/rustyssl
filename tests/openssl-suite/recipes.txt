@@ -16,8 +16,13 @@ skip test_tls13secrets tls13secretstest compiles its own copy of ssl/tls13_enc.c
 # Programs that read libcrypto's private structures.
 internal test_rand #3 drbgtest's prov_rand reads the private EVP_RAND_CTX's algctx as the default provider's PROV_DRBG (reseed counters and times, its parent), and crashes on another layout
 
-# QUIC (Phase 10): programs that need the QUIC API, which rustyssl doesn't implement yet.
-skip test_ssl_ctx ssl_ctx_test runs as one subtest and its QUIC iterations need OSSL_QUIC_client_method (Phase 10); its others pass under test-openssl-suite --ssl
+# QUIC (Phase 10): the QUIC recipes run. Those whose programs use OpenSSL's internal QUIC
+# (the module unit tests 70-test_quic_{cfq,fc,fifd,lcidm,rcidm,record,srtm,stream,txp,txpim,wire,
+# radix,qlog}.t and 75-test_quic_{ackm,cc,srt_gen}.t, the test server in 70-test_quic_tserver.t,
+# 70-test_quic_multistream.t and 75-test_quicapi.t, the fault injector of 90-test_quicfaults.t,
+# and the fake time of the fuzz targets' 99-test_fuzz_quic_*.t) import its functions, so they are
+# found from the programs as internal, as the user decided on 2026-10-20 (ADR 0006).
+# test-openssl-suite --ssl runs quicapitest's and quic_multistream_test's tests one by one.
 
 # docs/DEVIATIONS.md: the library's version text carries build metadata (+rustyssl.<version>).
 skip test_cipherlist the recipe skips itself when the library's version differs from the programs' build version (regression testing), as rustyssl's +rustyssl.<version> does; cipherlist_test passes under test-openssl-suite --ssl
