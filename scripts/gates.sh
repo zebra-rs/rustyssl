@@ -18,7 +18,7 @@
 set -u
 export NO_COLOR=1 CARGO_TERM_COLOR=never
 ROOT=$(git rev-parse --show-toplevel)
-cd "$ROOT"
+cd "$ROOT" || exit 1
 OUT=$ROOT/target/gates
 mkdir -p "$OUT"
 FAILED=0
