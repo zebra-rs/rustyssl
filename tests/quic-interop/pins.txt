@@ -1,0 +1,16 @@
+# Peers for `cargo xtask test-quic-interop` (TEST_PLAN.md, layer L7): other QUIC stacks, each
+# run against OpenSSL's interop endpoint on the reference's libraries and on rustyssl's.
+#
+# Each source tree is a GitHub tarball of a release's commit, checked against its SHA-256 sum:
+#   pin <name> <owner/repository> <commit> <sha256 of the tarball>
+
+# quiche: quiche 0.30.0's apps (quiche-client, quiche-server), on BoringSSL through the `boring`
+# crate; built with quiche.Cargo.lock (quiche commits no lockfile).
+pin quiche cloudflare/quiche be47c5011215b9f13bad06bd7627d3ae49888a19 8a49bf6b75befbfbd6b75c13926e5dc3d7eee2da516faf40a6c2506b8a67bed3
+
+# ngtcp2: ngtcp2 v1.25.0's ossl examples (with the HTTP/0.9 ones the driver adds), with nghttp3
+# v1.18.0, and the submodules they build with; the same pins as tests/consumers/pins.txt.
+pin ngtcp2 ngtcp2/ngtcp2 f9e9ff01ad2c8116bc09de4f644b0028a61486a6 5011b0e5b53faaccc58a2c3299bcb2fd6fe6bdb895f18cc20fdea2bae1b13615
+pin ngtcp2-urlparse ngtcp2/urlparse c8168839c89fc5c5917c375e1bd6ffeddf3f7f88 8b638ee2fd2bd4d1633a8ed10bc090101ccb8050a9ff22444b7404fe21d8e8f1
+pin nghttp3 ngtcp2/nghttp3 dbfc24286138cb0b6490160e7ca87fe1ce6722a0 987c1f908cee3a708109a41c264a53728aebf91b32d1110182277df1181d21b5
+pin nghttp3-sfparse ngtcp2/sfparse 4b313cfd2e1b389ae632b36dcd50402307289af2 cc8256a65a03577654941839e100b3d61fe7f7d69f2a08f9b2f17a123b580b4c
