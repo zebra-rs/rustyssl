@@ -5961,6 +5961,11 @@ CLI, both for users and for the upstream test recipes.
   `ts`, `asn1parse`, `ciphers`, `list`, `speed`, `rehash`, then the rest.
 - [ ] **11.2** Run the upstream app-driven test recipes with our CLI in place of upstream's.
 
+Progress (2026-10-20): the design is [ADR 0007](adr/0007-openssl-cli.md). It covers how the
+CLI reaches the library, its packaging, the generated option tables, the three-run golden tests,
+and the split into a first infrastructure fork (F0) and six command-group forks (G1–G6). It has
+four open decisions for the user.
+
 ## Phase 12: Hardening, performance, release 1.0 → M7
 
 - [ ] **12.1 Performance:** benchmark against the reference (per TEST_PLAN L10). Close the gaps
