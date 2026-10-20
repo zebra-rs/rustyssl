@@ -17,3 +17,6 @@ internal test_rand #3 drbgtest's prov_rand reads the private EVP_RAND_CTX's algc
 
 # QUIC (Phase 10): programs that need the QUIC API, which rustyssl doesn't implement yet.
 skip test_ssl_ctx ssl_ctx_test runs as one subtest and its QUIC iterations need OSSL_QUIC_client_method (Phase 10); its others pass under test-openssl-suite --ssl
+
+# docs/DEVIATIONS.md: the library's version text carries build metadata (+rustyssl.<version>).
+skip test_cipherlist the recipe skips itself when the library's version differs from the programs' build version (regression testing), as rustyssl's +rustyssl.<version> does; cipherlist_test passes under test-openssl-suite --ssl
