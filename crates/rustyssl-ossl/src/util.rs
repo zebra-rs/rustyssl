@@ -45,6 +45,7 @@ macro_rules! handle {
 
         impl $name {
             /// Takes ownership of `p`; `None` for NULL.
+            #[allow(dead_code)]
             pub(crate) fn from_ptr(p: *mut $crate::abi::$ty) -> Option<Self> {
                 core::ptr::NonNull::new(p).map(Self)
             }

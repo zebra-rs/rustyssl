@@ -46,3 +46,19 @@ pub fn secure_malloc_done() {
     // SAFETY: no arguments.
     unsafe { ffi::CRYPTO_secure_malloc_done() };
 }
+
+/// `OPENSSL_hexstr2buf(s, &len)`.
+pub fn hexstr2buf(s: &str) -> Option<Vec<u8>> {
+    let c = crate::cstring(s)?;
+    let mut len: core::ffi::c_long = 0;
+    // SAFETY: c is a valid C string; len is a valid out-pointer; the buffer is the caller's.
+    let p = unsafe { ffi::OPENSSL_hexstr2buf(c.as_ptr(), &mut len) };
+    if p.is_null() {
+        return None;
+    }
+    let n = usize::try_from(len).unwrap_or(0);
+    // SAFETY: p holds len bytes.
+    let v = unsafe { core::slice::from_raw_parts(p, n) }.to_vec();
+    crate::util::openssl_free(p.cast());
+    Some(v)
+}

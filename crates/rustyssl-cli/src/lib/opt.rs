@@ -14,7 +14,14 @@
 use std::cell::RefCell;
 use std::io::Write;
 
-use super::io;
+use rustyssl_ossl::abi::{
+    EVP_CIPH_FLAG_AEAD_CIPHER, EVP_CIPH_FLAG_ENC_THEN_MAC, EVP_CIPH_XTS_MODE,
+};
+use rustyssl_ossl::verify::ParamRef;
+use rustyssl_ossl::{err, evp};
+
+use super::{app_libctx, io};
+use crate::generated::options::V;
 
 /// Kinds of marker entries (`OPT_HELP_STR`, `OPT_MORE_STR`, `OPT_SECTION_STR`,
 /// `OPT_PARAM_STR`), which C tells apart by address.
@@ -803,6 +810,172 @@ pub fn help<O>(list: &[OptDef<O>]) {
         }
         print_one(o, sawparams, width);
     }
+}
+
+/// `opt_cipher_silent`: fetches `name` (or, when the legacy lookups are allowed, finds it by
+/// name), with no error left behind on failure.
+pub fn cipher_silent(name: &str) -> Option<evp::Cipher> {
+    err::set_mark();
+    let lc = app_libctx::libctx();
+    let pq = app_libctx::propq();
+    let c = evp::Cipher::fetch(lc.as_deref(), name, pq.as_deref()).or_else(|| {
+        app_libctx::legacy_okay()
+            .then(|| evp::Cipher::by_name(name))
+            .flatten()
+    });
+    if c.is_some() {
+        err::pop_to_mark();
+    } else {
+        err::clear_last_mark();
+    }
+    c
+}
+
+/// `opt_cipher_any`: as [`cipher_silent`], with upstream's message on failure.
+pub fn cipher_any(name: &str) -> Option<evp::Cipher> {
+    let c = cipher_silent(name);
+    if c.is_none() {
+        let prog = prog();
+        eprintf!("{prog}: Unknown option or cipher: {name}\n");
+    }
+    c
+}
+
+/// `opt_cipher`: as [`cipher_any`], refusing XTS, AEAD, and encrypt-then-MAC ciphers.
+pub fn cipher(name: &str) -> Option<evp::Cipher> {
+    let c = cipher_any(name)?;
+    let prog = prog();
+    let flags = c.flags();
+    let has = |f: core::ffi::c_int| u64::try_from(f).is_ok_and(|f| flags & f != 0);
+    if c.mode() == EVP_CIPH_XTS_MODE {
+        eprintf!("{prog} XTS ciphers not supported\n");
+    } else if has(EVP_CIPH_FLAG_AEAD_CIPHER) {
+        eprintf!("{prog}: AEAD ciphers not supported\n");
+    } else if has(EVP_CIPH_FLAG_ENC_THEN_MAC) {
+        eprintf!("{prog}: ENC-then-MAC cipher not supported\n");
+    } else {
+        return Some(c);
+    }
+    None
+}
+
+/// `opt_md_silent`.
+pub fn md_silent(name: &str) -> Option<evp::Md> {
+    err::set_mark();
+    let lc = app_libctx::libctx();
+    let pq = app_libctx::propq();
+    let m = evp::Md::fetch(lc.as_deref(), name, pq.as_deref()).or_else(|| {
+        app_libctx::legacy_okay()
+            .then(|| evp::Md::by_name(name))
+            .flatten()
+    });
+    if m.is_some() {
+        err::pop_to_mark();
+    } else {
+        err::clear_last_mark();
+    }
+    m
+}
+
+/// `opt_md`.
+pub fn md(name: &str) -> Option<evp::Md> {
+    let m = md_silent(name);
+    if m.is_none() {
+        let prog = prog();
+        eprintf!("{prog}: Unknown option or message digest: {name}\n");
+    }
+    m
+}
+
+/// `opt_check_md`.
+pub fn check_md(name: &str) -> bool {
+    if md(name).is_some() {
+        return true;
+    }
+    err::clear();
+    false
+}
+
+/// `opt_verify`: one of the verification options, with its value, into `vpm`.
+pub fn verify(o: V, arg: &str, vpm: ParamRef) -> bool {
+    use rustyssl_ossl::abi as a;
+    let prog = prog();
+    let flag = |f: core::ffi::c_long| vpm.set_flags(core::ffi::c_ulong::try_from(f).unwrap_or(0));
+    match o {
+        V::POLICY => match vpm.add_policy(arg) {
+            Ok(()) => {}
+            Err(true) => {
+                eprintf!("{prog}: Invalid Policy {arg}\n");
+                return false;
+            }
+            Err(false) => {
+                eprintf!("{prog}: Internal error adding Policy {arg}\n");
+                return false;
+            }
+        },
+        V::PURPOSE => match vpm.set_purpose_by_sname(arg) {
+            Ok(()) => {}
+            Err(true) => {
+                eprintf!("{prog}: Invalid purpose {arg}\n");
+                return false;
+            }
+            Err(false) => {
+                eprintf!("{prog}: Internal error setting purpose {arg}\n");
+                return false;
+            }
+        },
+        V::VERIFY_NAME => {
+            if !vpm.set_by_name(arg) {
+                eprintf!("{prog}: Invalid verify name {arg}\n");
+                return false;
+            }
+        }
+        V::VERIFY_DEPTH => {
+            let i = super::apps::atoi(arg);
+            if i >= 0 {
+                vpm.set_depth(i);
+            }
+        }
+        V::VERIFY_AUTH_LEVEL => {
+            let i = super::apps::atoi(arg);
+            if i >= 0 {
+                vpm.set_auth_level(i);
+            }
+        }
+        V::ATTIME => {
+            let Some(t) = intmax(arg) else {
+                return false;
+            };
+            vpm.set_time(t);
+        }
+        V::VERIFY_HOSTNAME => return vpm.set1_host(arg),
+        V::VERIFY_EMAIL => return vpm.set1_email(arg),
+        V::VERIFY_IP => return vpm.set1_ip_asc(arg),
+        V::IGNORE_CRITICAL => flag(a::X509_V_FLAG_IGNORE_CRITICAL.into()),
+        V::ISSUER_CHECKS => {} // deprecated, a no-op
+        V::CRL_CHECK => flag(a::X509_V_FLAG_CRL_CHECK.into()),
+        V::CRL_CHECK_ALL => {
+            flag((a::X509_V_FLAG_CRL_CHECK | a::X509_V_FLAG_CRL_CHECK_ALL).into());
+        }
+        V::POLICY_CHECK => flag(a::X509_V_FLAG_POLICY_CHECK.into()),
+        V::EXPLICIT_POLICY => flag(a::X509_V_FLAG_EXPLICIT_POLICY.into()),
+        V::INHIBIT_ANY => flag(a::X509_V_FLAG_INHIBIT_ANY.into()),
+        V::INHIBIT_MAP => flag(a::X509_V_FLAG_INHIBIT_MAP.into()),
+        V::X509_STRICT => flag(a::X509_V_FLAG_X509_STRICT.into()),
+        V::EXTENDED_CRL => flag(a::X509_V_FLAG_EXTENDED_CRL_SUPPORT.into()),
+        V::USE_DELTAS => flag(a::X509_V_FLAG_USE_DELTAS.into()),
+        V::POLICY_PRINT => flag(a::X509_V_FLAG_NOTIFY_POLICY.into()),
+        V::CHECK_SS_SIG => flag(a::X509_V_FLAG_CHECK_SS_SIGNATURE.into()),
+        V::TRUSTED_FIRST => flag(a::X509_V_FLAG_TRUSTED_FIRST.into()),
+        V::SUITEB_128_ONLY => flag(a::X509_V_FLAG_SUITEB_128_LOS_ONLY.into()),
+        V::SUITEB_128 => flag(a::X509_V_FLAG_SUITEB_128_LOS.into()),
+        V::SUITEB_192 => flag(a::X509_V_FLAG_SUITEB_192_LOS.into()),
+        V::PARTIAL_CHAIN => flag(a::X509_V_FLAG_PARTIAL_CHAIN.into()),
+        V::NO_ALT_CHAINS => flag(a::X509_V_FLAG_NO_ALT_CHAINS.into()),
+        V::NO_CHECK_TIME => flag(a::X509_V_FLAG_NO_CHECK_TIME.into()),
+        V::ALLOW_PROXY_CERTS => flag(a::X509_V_FLAG_ALLOW_PROXY_CERTS.into()),
+    }
+    true
 }
 
 /// For a command not ported yet (which fails closed): parses `argv` with its table, silently,

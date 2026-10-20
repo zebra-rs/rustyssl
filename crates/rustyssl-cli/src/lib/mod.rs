@@ -8,5 +8,10 @@
 
 pub mod app_libctx;
 pub mod app_rand;
+pub mod apps;
+pub mod engine;
 pub mod io;
 pub mod opt;
+
+#[cfg(test)]
+mod live_tests;

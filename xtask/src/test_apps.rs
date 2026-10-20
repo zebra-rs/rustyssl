@@ -19,6 +19,9 @@
 //! directory, `{src}` the reference's source tree (its `test/certs/`, ...), and `{tests}`
 //! `tests/apps/`; a final `< file` gives the command its standard input (otherwise empty).
 //!
+//! Run whole (no list named), it also runs the CLI's library-backed unit tests (`live_*`, the
+//! shared helpers) on each library.
+//!
 //! `crates/rustyssl-cli/tests/help/<command>.txt` holds upstream's `<command> -help` for each
 //! `<command> -help` line of `tests/apps/help.txt`, which the CLI's unit tests compare its
 //! generated help with; this checks them against the reference and fails when one is stale,
@@ -351,6 +354,9 @@ pub fn run(args: &[String]) -> Result {
             failures += check_help_goldens(&root, &setup, &text, bless)?;
         }
     }
+    if only.is_empty() {
+        failures += run_live_tests(&root, &reference, &dist)?;
+    }
     if failures == 0 {
         println!(
             "{count} command lines behave the same on rustyssl, and with our tool, as upstream's tool on the reference"
@@ -359,6 +365,62 @@ pub fn run(args: &[String]) -> Result {
     } else {
         Err(format!("{failures} check(s) failed").into())
     }
+}
+
+/// The CLI's library-backed unit tests (`live_*`, the shared helpers of `src/lib/`) on each
+/// library: the number of runs that failed.
+fn run_live_tests(root: &Path, reference: &Path, dist: &Path) -> Result<usize> {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let mut failed = 0;
+    for (label, lib) in [
+        ("the reference", reference.join("lib")),
+        ("rustyssl", dist.join("lib")),
+    ] {
+        let out = Command::new(&cargo)
+            .args([
+                "test",
+                "--quiet",
+                "--color",
+                "never",
+                "-p",
+                "rustyssl-cli",
+                "live_",
+            ])
+            .current_dir(root)
+            .env(LOADER_PATH, &lib)
+            .env("OPENSSL_MODULES", crate::test_c::modules_of(&lib))
+            .env("OPENSSL_CONF", MISSING_CONFIG)
+            .env("RUSTYSSL_CLI_LIVE", reference.join("src"))
+            .output()
+            .map_err(|e| format!("cannot run cargo: {e}"))?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let summary = text
+            .lines()
+            .find(|l| l.starts_with("test result:"))
+            .unwrap_or("no result")
+            .to_owned();
+        if out.status.success() && !summary.contains(" 0 passed") {
+            println!("PASS the CLI's shared helpers on {label}: {summary}");
+        } else {
+            let details: Vec<&str> = text
+                .lines()
+                .filter(|l| l.contains("panicked") || l.contains("left:") || l.contains("right:"))
+                .take(9)
+                .collect();
+            println!(
+                "FAIL the CLI's shared helpers on {label}: {summary}\n{}\n{}",
+                details.join("\n"),
+                String::from_utf8_lossy(&out.stderr)
+                    .lines()
+                    .rev()
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+            failed += 1;
+        }
+    }
+    Ok(failed)
 }
 
 /// Checks (or with `bless`, writes) the golden `-help` texts against upstream's tool.

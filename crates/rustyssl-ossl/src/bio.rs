@@ -82,6 +82,26 @@ impl Bio {
         Ok(())
     }
 
+    /// `BIO_new(BIO_f_buffer())`.
+    pub fn new_buffer() -> Option<Self> {
+        // SAFETY: no arguments; the result is a static method table.
+        let method = unsafe { ffi::BIO_f_buffer() };
+        // SAFETY: method is a valid method table.
+        Self::from_ptr(unsafe { ffi::BIO_new(method) })
+    }
+
+    /// `BIO_gets(bio, buf, size)`: what it returns, and the line read (up to `size - 1`
+    /// bytes, with its newline).
+    pub fn gets(&self, size: usize) -> (c_int, Vec<u8>) {
+        let mut buf = vec![0u8; size.max(1)];
+        let n = c_int::try_from(buf.len()).unwrap_or(c_int::MAX);
+        // SAFETY: buf is writable for n bytes; the BIO is live.
+        let r = unsafe { ffi::BIO_gets(self.as_ptr(), buf.as_mut_ptr().cast(), n) };
+        let len = buf.iter().position(|&b| b == 0).unwrap_or(0);
+        buf.truncate(if r > 0 { len } else { 0 });
+        (r, buf)
+    }
+
     /// `BIO_read` into `buf`: what it returns.
     pub fn read(&self, buf: &mut [u8]) -> c_int {
         let n = c_int::try_from(buf.len()).unwrap_or(c_int::MAX);

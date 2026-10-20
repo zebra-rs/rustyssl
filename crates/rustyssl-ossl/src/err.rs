@@ -12,6 +12,13 @@ pub fn print_errors(bio: &Bio) {
     unsafe { ffi::ERR_print_errors(bio.as_ptr()) };
 }
 
+/// `ERR_print_errors` to standard error (descriptor 2).
+pub fn print_errors_fd2() {
+    if let Some(b) = Bio::new_fd(2, false) {
+        print_errors(&b);
+    }
+}
+
 /// `ERR_clear_error()`.
 pub fn clear() {
     // SAFETY: no arguments; it only touches this thread's queue.

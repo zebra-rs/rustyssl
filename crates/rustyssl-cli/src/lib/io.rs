@@ -41,6 +41,21 @@ fn streams() -> Option<&'static Streams> {
 thread_local! {
     /// Standard error, captured (for tests).
     static CAPTURED: RefCell<Option<Vec<u8>>> = const { RefCell::new(None) };
+    /// Standard error muted: upstream's `bio_err = NULL` (`load_csr_autofmt`'s first try).
+    static MUTED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Runs `f` with standard error muted, as upstream does by setting `bio_err` to NULL: the
+/// CLI's messages are dropped, and `ERR_print_errors(bio_err)` still empties the queue.
+pub fn muted<T>(f: impl FnOnce() -> T) -> T {
+    MUTED.with(|m| m.set(m.get() + 1));
+    let t = f();
+    MUTED.with(|m| m.set(m.get().saturating_sub(1)));
+    t
+}
+
+fn is_muted() -> bool {
+    MUTED.with(std::cell::Cell::get) > 0
 }
 
 /// Runs `f`, collecting what it writes to standard error through [`err`].
@@ -57,6 +72,9 @@ pub struct ErrStream;
 
 impl Write for ErrStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if is_muted() {
+            return Ok(buf.len());
+        }
         let captured = CAPTURED.with(|c| {
             c.borrow_mut().as_mut().map(|v| {
                 v.extend_from_slice(buf);
@@ -117,8 +135,20 @@ pub fn out() -> OutStream {
     OutStream
 }
 
-/// `ERR_print_errors(bio_err)`.
+/// `ERR_print_errors(bio_err)` (which, muted, only empties the queue).
 pub fn print_errors() {
+    if is_muted() {
+        let _ = rustyssl_ossl::err::snapshot();
+        return;
+    }
+    if CAPTURED.with(|c| c.borrow().is_some()) {
+        if let Some(mem) = Bio::new_mem() {
+            rustyssl_ossl::err::print_errors(&mem);
+            let text = mem.read_to_end();
+            let _ = err().write_all(&text);
+        }
+        return;
+    }
     if let Some(b) = bio_err() {
         rustyssl_ossl::err::print_errors(b);
     }

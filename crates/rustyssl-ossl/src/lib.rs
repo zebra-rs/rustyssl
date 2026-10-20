@@ -28,3 +28,10 @@ mod util;
 
 pub use bio::Bio;
 pub use util::cstring;
+pub mod conf;
+pub mod engine;
+pub mod pkey;
+pub mod store;
+pub mod ui;
+pub mod verify;
+pub mod x509;

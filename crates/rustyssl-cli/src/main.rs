@@ -35,7 +35,7 @@ fn main() {
 }
 
 #[allow(clippy::exit)] // The program's exit status.
-fn exit(code: i32) -> ! {
+pub(crate) fn exit(code: i32) -> ! {
     let _ = std::io::stderr().flush();
     std::process::exit(code)
 }
@@ -53,7 +53,10 @@ fn run(mut argv: Vec<String>) -> i32 {
     if !app_rand::write() {
         ret = 1;
     }
+    // apps_shutdown.
     app_libctx::cleanup();
+    rustyssl_ossl::engine::destroy_loader();
+    rustyssl_ossl::ui::destroy();
     crypto::secure_malloc_done();
     ret
 }
@@ -90,9 +93,11 @@ fn startup_and_dispatch(argv: &mut Vec<String>) -> i32 {
         return 1;
     }
     let pname = opt::progname(&argv0);
-    if crypto::default_config_file().is_none() {
+    let config = crypto::default_config_file();
+    if config.is_none() {
         bail_out(&format!("{pname}: could not get default config file\n"));
     }
+    lib::apps::set_default_config_file(config);
 
     // Called by a command's name (a link), or as `openssl <command> ...`.
     if find_function(&pname).is_some() {
@@ -131,6 +136,8 @@ fn apps_startup() -> bool {
     ) {
         return false;
     }
+    let _ = rustyssl_ossl::ui::setup();
+    let _ = rustyssl_ossl::engine::setup_loader();
     // An undocumented testing feature of upstream's: a global library context.
     if std::env::var("OPENSSL_TEST_LIBCTX").is_ok_and(|v| v == "1")
         && app_libctx::create_libctx().is_none()
