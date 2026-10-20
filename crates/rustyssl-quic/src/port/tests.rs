@@ -481,3 +481,74 @@ fn alpn_is_required_as_openssl() {
     assert_eq!(ch.terminate_cause().unwrap().code, 0x100 + 120);
     assert!(client.poll_transmit(&p, Time(0)).is_none());
 }
+
+#[test]
+fn port_tx_queue_is_bounded() {
+    let p = TestProvider::new(b"flood");
+    let mut server = Port::new(PortConfig {
+        listen: true,
+        ..PortConfig::default()
+    });
+    let mut d = vec![0xc0, 0xba, 0xba, 0xba, 0xba, 8];
+    d.extend_from_slice(&[1; 8]);
+    d.push(0);
+    d.resize(1200, 0);
+    let from = PeerAddr(CLIENT.to_vec());
+    for _ in 0..(MAX_PORT_TX_QUEUE + 50) {
+        server.handle_datagram(&p, Time(0), &from, &d);
+    }
+    let mut n = 0;
+    while server.poll_transmit(&p, Time(0)).is_some() {
+        n += 1;
+    }
+    assert_eq!(n, MAX_PORT_TX_QUEUE);
+}
+
+#[test]
+fn new_token_skips_retry() {
+    let net = Net {
+        loss: 0,
+        dup: 0,
+        jitter_ms: 0,
+    };
+    let mut sim = Sim::new(13, net, AeadAlg::Aes128Gcm, true);
+    sim.handshake();
+    let mut token = None;
+    for _ in 0..20 {
+        while let Some(e) = sim.c().poll_event() {
+            if let ChannelEvent::NewToken(t) = e {
+                token = Some(t);
+            }
+        }
+        if token.is_some() {
+            break;
+        }
+        sim.step();
+    }
+    let token = token.expect("a NEW_TOKEN after the Retry");
+    // A second connection from the same address presents it: no Retry, and its
+    // original_destination_connection_id is the client's own (OpenSSL takes a fresh one here,
+    // which the client's check would refuse; see DEVIATIONS.md).
+    let suite = TestHandshake::suite(AeadAlg::Aes128Gcm).unwrap();
+    let mut client = Port::new(PortConfig {
+        channel: crate::channel::ChannelConfig {
+            token,
+            ..crate::channel::ChannelConfig::default()
+        },
+        ..PortConfig::default()
+    });
+    let now = sim.now;
+    sim.cid = client
+        .connect(
+            &sim.p,
+            Box::new(TestHandshake::new(false, suite)),
+            PeerAddr(SERVER.to_vec()),
+            now,
+        )
+        .unwrap();
+    sim.client = client;
+    sim.sid = None;
+    sim.handshake();
+    let tp = sim.c().peer_transport_params().unwrap().clone();
+    assert!(tp.retry_scid.is_none());
+}

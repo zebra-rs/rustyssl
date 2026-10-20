@@ -1279,4 +1279,24 @@ mod tests {
         bad.extend_from_slice(&[0x0a, 0x01, 21]);
         assert!(TransportParams::decode(&bad, true).is_err());
     }
+
+    #[test]
+    fn too_many_transport_params_are_refused() {
+        let p = TransportParams {
+            initial_scid: Some(ConnId::new(&[9; 8]).unwrap()),
+            ..TransportParams::default()
+        };
+        let base = p.encode().unwrap();
+        let with = |n: u64| {
+            let mut b = base.clone();
+            for i in 0..n {
+                put_varint(&mut b, 0x40 + i).unwrap();
+                put_varint(&mut b, 0).unwrap();
+            }
+            b
+        };
+        // Unknown ones are skipped, up to our cap of 256 in all.
+        assert!(TransportParams::decode(&with(MAX_TRANSPORT_PARAMS as u64 - 1), false).is_ok());
+        assert!(TransportParams::decode(&with(MAX_TRANSPORT_PARAMS as u64), false).is_err());
+    }
 }

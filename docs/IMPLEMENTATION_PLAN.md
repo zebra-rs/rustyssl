@@ -5815,12 +5815,32 @@ channel; and capi's QUIC objects under one mutex per engine. Work is split into 
 with disjoint files: A (the seam and 10.3), B (the transport), then C (10.2's API) and D
 (interop and curl HTTP/3).
 
-- [ ] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
+- [x] **10.1 Sans-IO QUIC transport** (`rustyssl-quic`):
   - packet protection and header protection
   - frames, streams, flow control
   - congestion control (NewReno, as upstream) and loss detection
   - address validation (Retry, tokens), version negotiation
   - idle timeout, migration limits
+
+  Done (2026-10-20, fork B, branch `quic-b`). Modules as ADR 0006 lists them: `wire` (varints,
+  every RFC 9000 frame, strict, transport parameters), `packet` (locating coalesced packets,
+  protection and header protection, packet numbers, key phases, Retry's integrity tag, version
+  negotiation), `ackm` (`quic_ackm.c`'s ACK rules with a 32-range history and watermark; RFC
+  9002 RTT, loss, PTO, persistent congestion), `cc` (`cc_newreno.c`), `fc` (`quic_fc.c`'s
+  auto-tuning windows), `stream` (send and receive buffers, part states, implicit creation,
+  limits, the accept queue retiring stream credit), `cid` (one local ID; at most two active
+  peer IDs and ten retirements at once, as `ossl_quic_channel_on_new_conn_id`), `token`
+  (Retry and NEW_TOKEN tokens under a per-port AES-256-GCM key, with OpenSSL's lifetimes),
+  `tls` (the `Handshake` trait, named after the seam's `feed_quic_crypto`/`take_quic_crypto`,
+  and a test double), `txp`, `channel` (OpenSSL's frame-permission checks and reason texts,
+  transport parameter checks, key updates, idle timeout with keepalive, closing and draining;
+  what OpenSSL's QUIC layer rather than libssl requires: ALPN, the peer's parameters, the GCM
+  and ChaCha20 suites only) and `port` (DCID demux, stateless reset, version negotiation for
+  v1 only, Retry by default). Defaults are OpenSSL's: 1200-octet datagrams, 30 s idle
+  timeout, windows of 768 KiB (connection, up to x20) and 512 KiB (stream, up to x12), 100
+  streams each way, `disable_active_migration`, no 0-RTT. capi's `ssl/quic_provider.rs` gives
+  the transport header protection over EVP. Our own bounds are in DEVIATIONS.md. The seam
+  adapter (the trait over fork A's `Connection`) comes with 10.2.
 - [ ] **10.2 The OpenSSL QUIC API:**
   - the client methods (3.2), the server and listener API (3.5)
   - the stream API (`SSL_new_stream`, `accept_stream`, `stream_conclude`, `stream_reset`,

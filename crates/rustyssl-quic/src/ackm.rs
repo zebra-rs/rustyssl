@@ -881,6 +881,19 @@ mod tests {
     }
 
     #[test]
+    fn sent_packets_are_bounded() {
+        let mut a: Ackm<u64> = Ackm::new(1200);
+        for pn in 0..MAX_SENT_TRACKED as u64 {
+            let mut p = sent(pn, 0);
+            p.in_flight = false;
+            a.on_packet_sent(Space::Application, p).unwrap();
+        }
+        let mut p = sent(MAX_SENT_TRACKED as u64, 0);
+        p.in_flight = false;
+        assert!(a.on_packet_sent(Space::Application, p).is_err());
+    }
+
+    #[test]
     fn range_insertion_merges() {
         let mut rx = RxSpace::default();
         for pn in [5, 3, 4, 10, 1, 2, 0, 9, 11] {

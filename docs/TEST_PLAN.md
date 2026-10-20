@@ -85,7 +85,17 @@ rustyssl itself**. You can only regenerate golden files with
   - RFC 5869 (HKDF), RFC 6070 (PBKDF2), RFC 7914 (scrypt), RFC 9106 (Argon2)
   - RFC 6979 (deterministic ECDSA), RFC 8032 (EdDSA), RFC 7748 (X25519/X448)
   - RFC 8439 (ChaCha20-Poly1305), RFC 9180 (HPKE), RFC 9001 (QUIC initial secrets and packet
-    protection)
+    protection): Appendix A.1–A.5 run as KATs in `rustyssl-quic` (`packet::tests`: the Initial
+    secrets and keys, the client Initial re-protected byte for byte, the server Initial, Retry's
+    tag, the ChaCha20 short header), and A.2's and A.5's masks again through capi's EVP header
+    protection (`ssl::quic_provider::tests`)
+  - The QUIC transport's other layers are tested per module (`rustyssl-quic`: ACK generation
+    against `quic_ackm.c`'s rules, NewReno against `cc_newreno.c`, window auto-tuning against
+    `quic_fc.c`, stream and connection-ID errors with OpenSSL's codes, tokens, property tests
+    of the send and receive buffers under loss, reordering and duplication) and end to end by a
+    loopback of a client and a listening port over a simulated network with seeded loss (to
+    30%), reordering and duplication: Retry, NEW_TOKEN, every supported suite, a CCM suite's
+    failure, close and drain, idle timeout, key updates, version negotiation, ALPN required
 - **Upstream data files:** `test/recipes/30-test_evp_data/*.txt` (evpciph, evpmd, evpkdf,
   evpmac, evppkey, …) run through the public EVP API, once by a Rust runner and once by
   upstream `evp_test` in L6.
@@ -396,7 +406,10 @@ Fixed on the way:
 - the cipher-string and `SSL_CONF` parsers, MIME and S/MIME, HTTP responses
 - the TLS client (fed server flights) and server (fed client flights), with structure-aware
   generators for the typed handshake messages
-- DTLS and QUIC packets
+- DTLS and QUIC packets (`quic_packet`: coalesced packets unprotected under their Initial keys, and a
+  protect/open round trip; `quic_frames` and `quic_transport_params`: decoding with
+  encode/decode round trips; `quic_port`: a listener and a client fed arbitrary datagrams
+  between their own traffic and timers)
 - **API-sequence fuzzing:** random sequences of public calls on `SSL`/`SSL_CTX`/`EVP_*`
   objects, to find state-machine panics and capi UB
 
