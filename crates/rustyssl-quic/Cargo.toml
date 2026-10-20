@@ -1,0 +1,29 @@
+[package]
+name = "rustyssl-quic"
+description = "Sans-IO QUIC v1 transport (RFC 9000, 9001, 9002) for rustyssl's OpenSSL QUIC API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustyssl-abi.workspace = true
+rustyssl-tls.workspace = true
+subtle.workspace = true
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
+# Only for the test provider (the non-default `test-provider` feature).
+rustyssl-crypto = { workspace = true, optional = true }
+
+[dev-dependencies]
+rustyssl-crypto.workspace = true
+rustyssl-tls = { workspace = true, features = ["test-provider"] }
+
+[features]
+# The crate's own test provider (header protection through rustyssl-crypto directly) for the
+# fuzz targets. Never enabled by anything that ships.
+test-provider = ["rustyssl-tls/test-provider", "dep:rustyssl-crypto"]
+
+[lints]
+workspace = true
